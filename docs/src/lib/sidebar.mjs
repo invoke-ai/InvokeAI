@@ -1,3 +1,6 @@
+import { slug } from 'github-slugger';
+
+import { splitSitePath } from '../config/locales.mjs';
 import { generateDocsId, getSortPrefix, stripSortPrefix } from './sort-prefix.mjs';
 
 // Sidebar post-processing for the Starlight route middleware (`src/route-data.ts`): sort-prefix ordering,
@@ -22,17 +25,12 @@ export const trimSlashes = (path) => path.replace(/^\/+|\/+$/g, '');
 export const parentDirectory = (id) => id.slice(0, Math.max(id.lastIndexOf('/'), 0));
 
 /**
- * Maps a sidebar link's href to a docs page id, removing the deployment base path.
+ * Maps a sidebar link's href to the English docs page id, removing the deployment base path and any locale: a
+ * translation mirrors its English file's name and directory, so English data drives every locale's sidebar.
  * @param {string} baseUrl
  * @returns {(href: string) => string}
  */
-export const makeHrefToId = (baseUrl) => {
-  const basePath = trimSlashes(baseUrl);
-  return (href) => {
-    const path = trimSlashes(href);
-    return basePath && path.startsWith(`${basePath}/`) ? path.slice(basePath.length + 1) : path;
-  };
-};
+export const makeHrefToId = (baseUrl) => (href) => trimSlashes(splitSitePath(href, baseUrl)?.path ?? href);
 
 /**
  * A docs file's directory as a URL path, e.g. `src/content/docs/Users Guide/03.Models/x.mdx` -> `users-guide/models`.
@@ -66,10 +64,8 @@ export const selectCrossListings = (docs, isProduction) =>
  * @param {SidebarEntry[]} entries
  * @param {Map<string, string>} fileNames page id -> file name, which keeps the sorting prefix the id drops
  * @param {(href: string) => string} hrefToId
- * @returns {boolean} whether anything moved
  */
 export const sortAndRelabel = (entries, fileNames, hrefToId) => {
-  let changed = false;
   /** @param {SidebarEntry} entry */
   const sortKey = (entry) =>
     getSortPrefix(entry.type === 'group' ? entry.label : (fileNames.get(hrefToId(entry.href)) ?? '')) ??
@@ -84,7 +80,6 @@ export const sortAndRelabel = (entries, fileNames, hrefToId) => {
   for (const slots of slotsByDirectory.values()) {
     const sorted = slots.map((index) => entries[index]).sort((a, b) => sortKey(a) - sortKey(b));
     slots.forEach((slot, i) => {
-      if (entries[slot] !== sorted[i]) changed = true;
       entries[slot] = sorted[i];
     });
   }
@@ -92,9 +87,29 @@ export const sortAndRelabel = (entries, fileNames, hrefToId) => {
   for (const entry of entries) {
     if (entry.type !== 'group') continue;
     if ('autogenerate' in entry && entry.autogenerate) entry.label = stripSortPrefix(entry.label);
-    if (sortAndRelabel(entry.entries, fileNames, hrefToId)) changed = true;
+    sortAndRelabel(entry.entries, fileNames, hrefToId);
   }
-  return changed;
+};
+
+/**
+ * The UI string key of a sidebar group's label: the label's slug, which is also the last segment of the URL path of
+ * the directory a group is generated from, e.g. `sidebar.group.image-generation`.
+ * @param {string} label the English label
+ */
+export const sidebarGroupKey = (label) => `sidebar.group.${slug(label)}`;
+
+/**
+ * Translates the labels of groups at every depth, directory-derived ones included. A label without a UI string stays.
+ * @param {SidebarEntry[]} entries
+ * @param {{ (key: string): string, exists: (key: string) => boolean }} t
+ */
+export const translateGroupLabels = (entries, t) => {
+  for (const entry of entries) {
+    if (entry.type !== 'group') continue;
+    const key = sidebarGroupKey(entry.label);
+    if (t.exists(key)) entry.label = t(key);
+    translateGroupLabels(entry.entries, t);
+  }
 };
 
 /**
@@ -133,10 +148,8 @@ export const findDirectoryGroup = (entries, directory, directories, hrefToId) =>
  * @param {CrossListing[]} crossListings
  * @param {Map<string, string>} directories page id -> file directory
  * @param {(href: string) => string} hrefToId
- * @returns {boolean} whether anything was added
  */
 export const addCrossListings = (sidebar, crossListings, directories, hrefToId) => {
-  if (crossListings.length === 0) return false;
   const linksById = new Map(flattenLinks(sidebar).map((link) => [hrefToId(link.href), link]));
   for (const { id, directory } of crossListings) {
     const link = linksById.get(id);
@@ -155,7 +168,6 @@ export const addCrossListings = (sidebar, crossListings, directories, hrefToId) 
     // The page's own link carries the current-page state, so the copy never does.
     group.splice(index, 0, { ...link, isCurrent: false, attrs: { ...link.attrs, [CROSS_LISTED_ATTR]: '' } });
   }
-  return true;
 };
 
 /**
@@ -189,4 +201,44 @@ export const paginate = (sidebar, data) => {
     prev: applyPrevNextConfig(links[current - 1], data.prev),
     next: applyPrevNextConfig(links[current + 1], data.next),
   };
+};
+
+/**
+ * The labels of the groups enclosing the current page's link, outermost first, and the link itself, for a breadcrumb.
+ * `undefined` when the current page is not in the sidebar.
+ * @param {SidebarEntry[]} entries
+ * @returns {{ groups: string[], link: SidebarLink } | undefined}
+ */
+export const findCurrentTrail = (entries) => {
+  for (const entry of entries) {
+    if (entry.type === 'link') {
+      if (entry.isCurrent) return { groups: [], link: entry };
+      continue;
+    }
+    const trail = findCurrentTrail(entry.entries);
+    if (trail) return { groups: [entry.label, ...trail.groups], link: trail.link };
+  }
+  return undefined;
+};
+
+/**
+ * The docs directory, as a URL path, that a sidebar section was generated from: the deepest directory holding all of
+ * its pages. Cross-listed copies belong to other directories and are ignored. `undefined` for a section without pages.
+ * @param {Extract<SidebarEntry, { type: 'group' }>} group
+ * @param {Map<string, string>} directories page id -> file directory
+ * @param {(href: string) => string} hrefToId
+ */
+export const sectionDirectory = (group, directories, hrefToId) => {
+  const paths = flattenLinks(group.entries)
+    .filter((link) => !(CROSS_LISTED_ATTR in link.attrs))
+    .map((link) => directories.get(hrefToId(link.href)))
+    .filter((directory) => directory !== undefined)
+    .map((directory) => directory.split('/'));
+  if (paths.length === 0) return undefined;
+  const [first, ...rest] = paths;
+  let length = first.length;
+  for (const path of rest) {
+    while (length > 0 && path.slice(0, length).join('/') !== first.slice(0, length).join('/')) length--;
+  }
+  return first.slice(0, length).join('/');
 };

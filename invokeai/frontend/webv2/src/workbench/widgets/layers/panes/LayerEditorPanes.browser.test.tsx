@@ -15,7 +15,7 @@ import type { Project } from '@workbench/projectContracts';
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { createDocumentModel, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { createDocumentModel, getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/api';
 import {
   groupContract,
   layerContract,
@@ -407,25 +407,95 @@ describe('Properties pane', () => {
     expect(page.getByRole('button', { exact: true, name: 'Brush color' }).query()).toBeNull();
   });
 
-  it('labels the shape form with its edit target and gates stroke width on the stroke slot', async () => {
-    await mount(PropertiesPane);
-    await act(() => engine!.tools.setTool('shape'));
-    await settle();
-    // Nothing selected: the chip says the form edits the creation defaults.
-    expect(host!.textContent).toContain('Defaults');
-    await expect.element(page.getByRole('radio', { exact: true, name: 'Rectangle' })).toBeInTheDocument();
-    await expect.element(page.getByRole('radio', { exact: true, name: 'Triangle' })).toBeInTheDocument();
-    await expect.element(page.getByRole('radio', { exact: true, name: 'Star' })).toBeInTheDocument();
-
-    await act(() => root?.unmount());
+  it('keeps one selected-shape appearance editor in Layer with any active tool', async () => {
     await mount(PropertiesPane, 'shape');
-    await act(() => engine!.tools.setTool('shape'));
-    await settle();
-    expect(host!.textContent).toContain('Editing: My Shape');
-    // The fixture shape has no stroke, so the width slider is disabled in place.
-    const width = page.getByRole('slider', { exact: true, name: 'Stroke width' });
-    await expect.element(width).toBeVisible();
+    const layer = page.getByRole('group', { exact: true, name: 'Layer' });
+    const appearance = layer.getByRole('group', { exact: true, name: 'Appearance' });
+    for (const tool of ['brush', 'move', 'view', 'shape'] as const) {
+      await act(() => engine!.tools.setTool(tool));
+      await settle();
+      await expect.element(appearance).toBeVisible();
+      expect(layer.getByRole('slider', { exact: true, name: 'Stroke width' }).elements()).toHaveLength(1);
+      await expect
+        .element(appearance.getByRole('slider', { exact: true, name: 'Stroke width' }))
+        .toHaveAttribute('aria-disabled', 'true');
+      if (tool === 'shape') {
+        const defaults = page.getByRole('group', { exact: true, name: 'Tool' });
+        await expect.element(defaults.getByText('Defaults', { exact: true })).toBeVisible();
+        await expect.element(defaults.getByRole('radiogroup', { name: 'Place on' })).toBeVisible();
+        expect(layer.getByRole('radiogroup', { name: 'Kind' }).query()).toBeNull();
+      }
+    }
+  });
+
+  it('edits only the selected shape appearance, with one undo step per gesture', async () => {
+    harness.appliesMutations = true;
+    await mount(PropertiesPane, 'stroked-shape');
+    await act(() => engine!.tools.setTool('view'));
+    const optionsBefore = engine!.interaction.get('shapeOptions');
+    const colorsBefore = harness.project!.widgetInstances.canvas!.state.values;
+    const layer = page.getByRole('group', { exact: true, name: 'Layer' });
+    const source = () => {
+      const selected = getDocumentLayer(harness.project!.canvas.document, 'l0');
+      if (selected?.type !== 'raster' || selected.source.type !== 'shape') {
+        throw new Error('Expected selected shape');
+      }
+      return selected.source;
+    };
+    const toggle = (name: string) =>
+      act(() => layer.element().querySelector<HTMLElement>(`button[aria-label="${name}"][aria-pressed]`)!.click());
+
+    await toggle('Fill');
+    expect(source().fill).toBeNull();
+    expect(engine!.history.getEntries().past).toHaveLength(1);
+    const width = layer.getByRole('slider', { exact: true, name: 'Stroke width' });
+    await act(async () => {
+      (width.element() as HTMLElement).focus();
+      await userEvent.keyboard('{ArrowRight>3/}');
+    });
+    expect(source().strokeWidth).toBe(7);
+    expect(engine!.history.getEntries().past).toHaveLength(2);
+    await act(() => engine!.history.undo());
+    expect(source().strokeWidth).toBe(4);
+    expect(source().fill).toBeNull();
+    await toggle('Stroke');
+    expect(source().stroke).toBeNull();
     await expect.element(width).toHaveAttribute('aria-disabled', 'true');
+    expect(source().kind).toBe('rect');
+    expect(source().width).toBe(10);
+    expect(engine!.interaction.get('shapeOptions')).toBe(optionsBefore);
+    expect(harness.project!.widgetInstances.canvas!.state.values).toBe(colorsBefore);
+
+    await act(() => operations!.start(true));
+    expect(layer.element().hasAttribute('inert')).toBe(true);
+    await act(() => operations!.start(false));
+    expect(layer.element().hasAttribute('inert')).toBe(false);
+  });
+
+  it('drops a selected-shape width scrub when another shape becomes selected', async () => {
+    harness.appliesMutations = true;
+    const other = layerContract('s2', 'raster', { source: { ...SHAPE_SOURCE, stroke: '#000000', strokeWidth: 2 } });
+    await mount(PropertiesPane, 'stroked-shape', { extraNodes: [other] });
+    await act(() => engine!.tools.setTool('view'));
+    const width = page.getByRole('slider', { exact: true, name: 'Stroke width' });
+    const frame = width.element().closest<HTMLElement>('[data-scope="scrubber"]')!;
+    const pointer = (target: EventTarget, type: 'pointerdown' | 'pointermove' | 'pointerup', clientX: number) =>
+      act(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX })));
+    const bounds = frame.getBoundingClientRect();
+    await pointer(frame, 'pointerdown', bounds.left + bounds.width * 0.1);
+    await pointer(window, 'pointermove', bounds.left + bounds.width * 0.5);
+    expect(width.element().getAttribute('aria-valuenow')).not.toBe('4');
+    await act(() => {
+      harness.project = applyCanvasProjectMutation(harness.project!, { id: 's2', type: 'setCanvasSelectedLayer' });
+      harness.listeners.forEach((listener) => listener());
+    });
+    await pointer(window, 'pointerup', bounds.left + bounds.width * 0.5);
+    const first = getDocumentLayer(harness.project!.canvas.document, 'l0');
+    const second = getDocumentLayer(harness.project!.canvas.document, 's2');
+    expect(first?.type === 'raster' && first.source.type === 'shape' && first.source.strokeWidth).toBe(4);
+    expect(second?.type === 'raster' && second.source.type === 'shape' && second.source.strokeWidth).toBe(2);
+    expect(engine!.history.getEntries().past).toHaveLength(0);
+    await expect.element(width).toHaveAttribute('aria-valuenow', '2');
   });
 
   it('previews the selected text layer above its form and offers style and weight on one row', async () => {
@@ -660,7 +730,11 @@ describe('Tool property scrubbers', () => {
   beforeEach(() => resetPropertyGroupCollapse());
   afterEach(() => resetPropertyGroupCollapse());
 
-  const scrubber = (name: string) => page.getByRole('slider', { exact: true, name }).element() as HTMLElement;
+  const scrubber = (name: string, section: 'Tool' | 'Layer' = 'Tool') =>
+    page
+      .getByRole('group', { exact: true, name: section })
+      .getByRole('slider', { exact: true, name })
+      .element() as HTMLElement;
 
   /** Presses the scrubber at `from` and moves through `to`; the gesture continues with `move` and ends on `release`. */
   const drag = async (slider: HTMLElement, from: number, ...to: number[]) => {
@@ -727,24 +801,24 @@ describe('Tool property scrubbers', () => {
     ['stroked-shape', 'Stroke width', 'shapeOptions'],
     ['gradient', 'Angle', 'gradientOptions'],
   ] as const)(
-    'previews every step and commits once per drag or held key (%s, %s)',
+    'shows draft steps and commits once per drag or held key (%s, %s)',
     async (selection, name, optionsKey) => {
       await mount(PropertiesPane, selection);
       await act(() => engine!.tools.setTool(selection === 'stroked-shape' ? 'shape' : selection));
       await settle();
       const { commits, previews } = observe(optionsKey);
-      const slider = scrubber(name);
+      const slider = scrubber(name, selection === 'stroked-shape' ? 'Layer' : 'Tool');
 
       const gesture = await drag(slider, 0.5, 0.55, 0.6);
-      expect(previews()).toBe(2);
+      expect(previews()).toBe(selection === 'stroked-shape' ? 0 : 2);
       expect(commits).toHaveLength(0);
       await gesture.release();
       expect(commits).toHaveLength(1);
 
-      // The settle writes the defaults too; count the key steps from there.
+      // Selected shape edits keep creation defaults untouched; other tools also preview in their options.
       const settled = previews();
       const releaseKey = await holdKey(slider, 'ArrowRight', 3);
-      expect(previews() - settled).toBe(3);
+      expect(previews() - settled).toBe(selection === 'stroked-shape' ? 0 : 3);
       expect(commits).toHaveLength(1);
       await releaseKey();
       expect(commits).toHaveLength(2);
@@ -757,7 +831,7 @@ describe('Tool property scrubbers', () => {
     await settle();
     const { committedSources, setLiveSource } = observe('shapeOptions');
 
-    const gesture = await drag(scrubber('Stroke width'), 0.5, 0.6);
+    const gesture = await drag(scrubber('Stroke width', 'Layer'), 0.5, 0.6);
     await act(() =>
       engine!.interaction.set('shapeOptions', { ...engine!.interaction.get('shapeOptions'), kind: 'star' })
     );

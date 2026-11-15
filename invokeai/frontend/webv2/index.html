@@ -42,8 +42,10 @@
           }
           var language = localStorage.getItem('invokeai:v7:webv2:language');
           if (language) {
-            root.setAttribute('lang', language);
-            var direction = language === 'ar' || language === 'he' ? 'rtl' : 'ltr';
+            var ready = __READY_CONTENT_LANGUAGES__;
+            var effective = ready.includes(language) || ready.includes(language.split('-')[0]) ? language : 'en';
+            root.setAttribute('lang', effective);
+            var direction = effective === 'ar' || effective === 'he' ? 'rtl' : 'ltr';
             root.setAttribute('dir', direction);
           }
         } catch (error) {

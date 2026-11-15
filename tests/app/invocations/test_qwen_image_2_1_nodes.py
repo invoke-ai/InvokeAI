@@ -389,18 +389,29 @@ def _loader(**fields) -> QwenImage21ModelLoaderInvocation:
         "model": ident("main", BaseModelType.QwenImage21, ModelType.Main),
         "vae_model": None,
         "qwen3_vl_encoder_model": None,
+        "qwen3_vl_vision_tower_model": None,
     }
     return QwenImage21ModelLoaderInvocation.model_construct(
         **(defaults | {k: ident(*v) if isinstance(v, tuple) else v for k, v in fields.items()})
     )
 
 
-def _loader_context(main_format: ModelFormat, encoder_variant: Qwen3VLVariantType = Qwen3VLVariantType.Qwen3VL_8B):
+def _loader_context(
+    main_format: ModelFormat,
+    encoder_variant: Qwen3VLVariantType = Qwen3VLVariantType.Qwen3VL_8B,
+    encoder_format: ModelFormat = ModelFormat.Checkpoint,
+    tower_variant: Qwen3VLVariantType = Qwen3VLVariantType.Qwen3VL_8B,
+):
     configs = {
         "main": SimpleNamespace(name="main", base=BaseModelType.QwenImage21, type=ModelType.Main, format=main_format),
         "vae": SimpleNamespace(name="vae", base=BaseModelType.QwenImage21, type=ModelType.VAE),
         "wan_vae": SimpleNamespace(name="wan_vae", base=BaseModelType.Wan, type=ModelType.VAE),
-        "encoder": SimpleNamespace(name="encoder", type=ModelType.Qwen3VLEncoder, variant=encoder_variant),
+        "encoder": SimpleNamespace(
+            name="encoder", type=ModelType.Qwen3VLEncoder, variant=encoder_variant, format=encoder_format
+        ),
+        "tower": SimpleNamespace(
+            name="mmproj", type=ModelType.Qwen3VLVisionTower, variant=tower_variant, format=ModelFormat.GGUFQuantized
+        ),
     }
     return SimpleNamespace(models=SimpleNamespace(get_config=lambda identifier: configs[identifier.key]))
 
@@ -419,6 +430,9 @@ def test_a_gguf_transformer_takes_the_standalone_components() -> None:
     assert output.qwen3_vl_encoder.text_encoder.key == "encoder"
 
 
+_VAE_ID = ("vae", BaseModelType.QwenImage21, ModelType.VAE)
+
+
 def test_another_familys_vae_is_refused() -> None:
     loader = _loader(vae_model=("wan_vae", BaseModelType.Wan, ModelType.VAE))
     with pytest.raises(ValueError, match="not a Qwen-Image-2.1 VAE"):
@@ -429,6 +443,57 @@ def test_the_4b_encoder_is_refused() -> None:
     loader = _loader(qwen3_vl_encoder_model=("encoder", BaseModelType.Any, ModelType.Qwen3VLEncoder))
     with pytest.raises(ValueError, match="8B"):
         loader.invoke(_loader_context(ModelFormat.Diffusers, encoder_variant=Qwen3VLVariantType.Qwen3VL_4B))
+
+
+_TOWER = ("tower", BaseModelType.Any, ModelType.Qwen3VLVisionTower)
+_ENCODER = ("encoder", BaseModelType.Any, ModelType.Qwen3VLEncoder)
+
+
+def test_a_gguf_encoder_takes_the_vision_tower_model() -> None:
+    output = _loader(qwen3_vl_encoder_model=_ENCODER, qwen3_vl_vision_tower_model=_TOWER, vae_model=_VAE_ID).invoke(
+        _loader_context(ModelFormat.GGUFQuantized, encoder_format=ModelFormat.GGUFQuantized)
+    )
+
+    tower = output.qwen3_vl_encoder.vision_tower
+    assert tower is not None
+    assert (tower.key, tower.submodel_type) == ("tower", None)
+
+
+def test_without_a_vision_tower_model_the_encoder_field_carries_none() -> None:
+    output = _loader(qwen3_vl_encoder_model=_ENCODER, vae_model=_VAE_ID).invoke(
+        _loader_context(ModelFormat.GGUFQuantized, encoder_format=ModelFormat.GGUFQuantized)
+    )
+    assert output.qwen3_vl_encoder.vision_tower is None
+
+
+@pytest.mark.parametrize("encoder_format", [ModelFormat.Checkpoint, ModelFormat.Qwen3VLEncoder])
+def test_a_vision_tower_model_beside_an_encoder_with_its_own_tower_is_refused(encoder_format: ModelFormat) -> None:
+    loader = _loader(qwen3_vl_encoder_model=_ENCODER, qwen3_vl_vision_tower_model=_TOWER, vae_model=_VAE_ID)
+    with pytest.raises(ValueError, match="pairs only with a GGUF Qwen3-VL encoder"):
+        loader.invoke(_loader_context(ModelFormat.GGUFQuantized, encoder_format=encoder_format))
+
+
+def test_a_vision_tower_model_on_a_diffusers_model_without_an_encoder_is_refused() -> None:
+    loader = _loader(qwen3_vl_vision_tower_model=_TOWER)
+    with pytest.raises(ValueError, match="pairs only with a GGUF Qwen3-VL encoder"):
+        loader.invoke(_loader_context(ModelFormat.Diffusers))
+
+
+def test_the_4b_vision_tower_is_refused() -> None:
+    loader = _loader(qwen3_vl_encoder_model=_ENCODER, qwen3_vl_vision_tower_model=_TOWER, vae_model=_VAE_ID)
+    context = _loader_context(
+        ModelFormat.GGUFQuantized, encoder_format=ModelFormat.GGUFQuantized, tower_variant=Qwen3VLVariantType.Qwen3VL_4B
+    )
+    with pytest.raises(ValueError, match="4B vision tower"):
+        loader.invoke(context)
+
+
+def test_another_model_as_the_vision_tower_is_refused() -> None:
+    loader = _loader(qwen3_vl_encoder_model=_ENCODER, qwen3_vl_vision_tower_model=("encoder", *_ENCODER[1:]))
+    # The 8B encoder has the right size and is no tower: the message must not call it one.
+    with pytest.raises(ValueError, match=r"'encoder' is not a Qwen3-VL vision tower") as raised:
+        loader.invoke(_loader_context(ModelFormat.Diffusers, encoder_format=ModelFormat.GGUFQuantized))
+    assert "8B vision tower" not in str(raised.value)
 
 
 def _edit_prompt(sign: float, grids: list[tuple[int, int]]) -> QwenImage21ConditioningInfo:
@@ -604,25 +669,87 @@ def test_the_metadata_records_whether_the_prefix_was_cached(cache_fits: bool, mo
     assert (output.latents.latents_name, output.width, output.height) == ("out", 64, 64)
 
 
-def test_a_standalone_encoder_cannot_read_references() -> None:
+def _standalone_encoder_node(*, tokenizer_from=None, vision_tower=None) -> QwenImage21TextEncoderInvocation:
     encoder = ModelIdentifierField(
         key="enc", hash="h", name="qwen3vl_8b", base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder
     )
-    node = QwenImage21TextEncoderInvocation.model_construct(
+    return QwenImage21TextEncoderInvocation.model_construct(
         prompt="swap them",
-        qwen3_vl_encoder=Qwen3VLEncoderField(tokenizer=encoder, text_encoder=encoder, loras=[]),
+        qwen3_vl_encoder=Qwen3VLEncoderField(
+            tokenizer=tokenizer_from or encoder, text_encoder=encoder, vision_tower=vision_tower, loras=[]
+        ),
         reference_images=[ImageField(image_name="ref.png")],
     )
+
+
+def _encoder_config(model_format: ModelFormat):
+    return SimpleNamespace(
+        name="qwen3vl_8b", base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder, format=model_format
+    )
+
+
+def test_a_standalone_checkpoint_encoder_brings_the_tower_and_the_processor() -> None:
+    context = SimpleNamespace(
+        models=SimpleNamespace(get_config=lambda _identifier: _encoder_config(ModelFormat.Checkpoint))
+    )
+    tower, processor = _standalone_encoder_node()._edit_identifiers(context)
+    assert (tower.key, tower.submodel_type) == ("enc", SubModelType.VisionEncoder)
+    assert (processor.key, processor.submodel_type) == ("enc", SubModelType.Processor)
+
+
+def test_a_gguf_encoder_cannot_read_references() -> None:
+    context = SimpleNamespace(
+        images=SimpleNamespace(get_pil=lambda _name: Image.new("RGB", (64, 64))),
+        models=SimpleNamespace(get_config=lambda _identifier: _encoder_config(ModelFormat.GGUFQuantized)),
+    )
+    with pytest.raises(ValueError, match="'qwen3vl_8b' has none.*non-GGUF Qwen3-VL 8B encoder.*vision tower model"):
+        _standalone_encoder_node().invoke(context)
+
+
+def test_a_gguf_encoder_reads_references_through_the_vision_tower_model() -> None:
+    mmproj = ModelIdentifierField(
+        key="mmproj", hash="h", name="mmproj", base=BaseModelType.Any, type=ModelType.Qwen3VLVisionTower
+    )
+    context = SimpleNamespace(
+        models=SimpleNamespace(get_config=lambda _identifier: _encoder_config(ModelFormat.GGUFQuantized))
+    )
+
+    tower, processor = _standalone_encoder_node(vision_tower=mmproj)._edit_identifiers(context)
+
+    # The mmproj file is the tower itself, loaded whole; the processor still comes from the encoder's tokenizer.
+    assert (tower.key, tower.submodel_type) == ("mmproj", None)
+    assert (processor.key, processor.submodel_type) == ("enc", SubModelType.Processor)
+
+
+def test_a_tower_and_an_encoder_on_different_devices_are_refused_with_the_fix() -> None:
+    mmproj = ModelIdentifierField(
+        key="mmproj", hash="h", name="mmproj", base=BaseModelType.Any, type=ModelType.Qwen3VLVisionTower
+    )
+    devices = {"enc": torch.device("meta"), "mmproj": torch.device("cpu")}
     context = SimpleNamespace(
         images=SimpleNamespace(get_pil=lambda _name: Image.new("RGB", (64, 64))),
         models=SimpleNamespace(
-            get_config=lambda _identifier: SimpleNamespace(
-                base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder, format=ModelFormat.Checkpoint
-            )
+            get_config=lambda _identifier: _encoder_config(ModelFormat.GGUFQuantized),
+            load=lambda identifier: SimpleNamespace(compute_device=devices[identifier.key]),
         ),
+        util=SimpleNamespace(signal_progress=lambda _message: None),
     )
-    with pytest.raises(ValueError, match="vision tower"):
-        node.invoke(context)
+
+    with pytest.raises(RuntimeError, match="same CPU Only setting in the Model Manager"):
+        _standalone_encoder_node(vision_tower=mmproj).invoke(context)
+
+
+def test_a_vision_tower_model_does_not_replace_the_tower_an_encoder_already_has() -> None:
+    mmproj = ModelIdentifierField(
+        key="mmproj", hash="h", name="mmproj", base=BaseModelType.Any, type=ModelType.Qwen3VLVisionTower
+    )
+    context = SimpleNamespace(
+        models=SimpleNamespace(get_config=lambda _identifier: _encoder_config(ModelFormat.Checkpoint))
+    )
+
+    tower, _processor = _standalone_encoder_node(vision_tower=mmproj)._edit_identifiers(context)
+
+    assert (tower.key, tower.submodel_type) == ("enc", SubModelType.VisionEncoder)
 
 
 def _pipeline_encoder_node(num_references: int) -> QwenImage21TextEncoderInvocation:
@@ -653,15 +780,51 @@ def test_the_processor_comes_from_the_qwen_image_2_1_pipeline_the_tokenizer_is_f
     assert (processor.key, processor.submodel_type) == ("qwen21", SubModelType.Processor)
 
 
-def test_a_standalone_encoder_beside_the_pipelines_tokenizer_cannot_read_references() -> None:
-    # The tokenizer passes; the encoder, whose pipeline would have to bring the vision tower, does not.
-    def get_config(identifier):
-        if identifier.submodel_type is SubModelType.Tokenizer:
-            return SimpleNamespace(base=BaseModelType.QwenImage21, type=ModelType.Main, format=ModelFormat.Diffusers)
-        return SimpleNamespace(base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder, format=ModelFormat.Checkpoint)
+def _mixed_node(encoder_key: str) -> QwenImage21TextEncoderInvocation:
+    """The pipeline's tokenizer beside a standalone encoder, the way a graph can pair them."""
+    node = _pipeline_encoder_node(1)
+    encoder = ModelIdentifierField(
+        key=encoder_key,
+        hash="h",
+        name="qwen3vl_8b",
+        base=BaseModelType.Any,
+        type=ModelType.Qwen3VLEncoder,
+        submodel_type=SubModelType.TextEncoder,
+    )
+    return node.model_copy(
+        update={
+            "qwen3_vl_encoder": Qwen3VLEncoderField(
+                tokenizer=node.qwen3_vl_encoder.tokenizer, text_encoder=encoder, loras=[]
+            )
+        }
+    )
 
-    with pytest.raises(ValueError, match="vision tower"):
-        _pipeline_encoder_node(1)._edit_identifiers(SimpleNamespace(models=SimpleNamespace(get_config=get_config)))
+
+def _by_key(configs: dict):
+    return SimpleNamespace(models=SimpleNamespace(get_config=lambda identifier: configs[identifier.key]))
+
+
+_PIPELINE_CONFIG = SimpleNamespace(
+    name="pipe", base=BaseModelType.QwenImage21, type=ModelType.Main, format=ModelFormat.Diffusers
+)
+
+
+def test_a_gguf_encoder_beside_the_pipelines_tokenizer_cannot_read_references() -> None:
+    # The tokenizer passes; the encoder, whose tower the pipeline does not bring, does not.
+    context = _by_key({"qwen21": _PIPELINE_CONFIG, "enc": _encoder_config(ModelFormat.GGUFQuantized)})
+
+    with pytest.raises(ValueError, match="has none"):
+        _mixed_node("enc")._edit_identifiers(context)
+
+
+@pytest.mark.parametrize("model_format", [ModelFormat.Checkpoint, ModelFormat.Qwen3VLEncoder])
+def test_a_standalone_encoder_beside_the_pipelines_tokenizer_brings_the_tower(model_format: ModelFormat) -> None:
+    # The HF-folder format (`Qwen3VLEncoder`) serves the tower too.
+    context = _by_key({"qwen21": _PIPELINE_CONFIG, "enc": _encoder_config(model_format)})
+    tower, processor = _mixed_node("enc")._edit_identifiers(context)
+
+    assert (tower.key, tower.submodel_type) == ("enc", SubModelType.VisionEncoder)
+    assert (processor.key, processor.submodel_type) == ("qwen21", SubModelType.Processor)
 
 
 def test_more_references_than_the_architecture_reads_are_refused_before_anything_loads() -> None:
@@ -1317,21 +1480,27 @@ def test_a_sidecar_reserves_what_its_forward_allocates(kinds: list[str], monkeyp
     assert abs(reserved - beyond_cpu - mode.peak) < weight_copy / 2, (reserved / weight_copy, mode.peak / weight_copy)
 
 
-def test_a_dora_lora_on_an_int8_transformer_is_refused_before_the_transformer_is_loaded() -> None:
+def test_a_dora_lora_runs_on_an_int8_transformer(monkeypatch: pytest.MonkeyPatch) -> None:
     from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
         apply_custom_layers_to_model,
     )
+    from invokeai.backend.patches.layer_patcher import LayerPatcher
     from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 
+    monkeypatch.setattr(LayerPatcher, "_is_any_part_of_layer_on_cpu", staticmethod(lambda _module: False))
     transformer = _LinearTransformer()
-    weight = torch.zeros(8, 8, dtype=torch.int8)
-    transformer.transformer_blocks[0].attn.to_q = Int8ConvrotLinear(weight, torch.ones(8, 1), convrot=False)
+    transformer.transformer_blocks[0].attn.to_q = Int8ConvrotLinear(
+        torch.ones(8, 8, dtype=torch.int8), torch.full((8, 1), 0.125), convrot=False
+    )
     apply_custom_layers_to_model(transformer)
-    low_rank = {"lora_A.weight": torch.zeros(2, 8), "lora_B.weight": torch.zeros(8, 2)}
-    dora = _patch(**low_rank, **{"lora_magnitude_vector.weight": torch.ones(8)})
+    magnitude = torch.arange(1, 9, dtype=torch.float32) / 4
+    dora = _patch(
+        "transformer_blocks.0.attn.to_q",
+        **{"lora_A.weight": _DOWN, "lora_B.weight": _UP, "lora_magnitude_vector.weight": magnitude},
+    )
     transformer_info = _ReservingTransformerInfo(transformer)
     context = _context(_Transformer(), QwenImage21VariantType.Base)
-    loaded = {"lora": SimpleNamespace(model=dora)}
+    loaded = {"lora": SimpleNamespace(model=dora, model_in_ram=nullcontext)}
     context.models = SimpleNamespace(
         load=lambda identifier: loaded.get(identifier.key, transformer_info),
         get_config=lambda _identifier: SimpleNamespace(
@@ -1341,13 +1510,13 @@ def test_a_dora_lora_on_an_int8_transformer_is_refused_before_the_transformer_is
     node = _denoise(steps=1)
     node.transformer.loras.append(_lora_field(1.0))
 
-    with pytest.raises(ValueError) as refused:
-        node._run_diffusion(context)
-    assert _LORA_NAME in str(refused.value) and "int8" in str(refused.value)
-    assert transformer_info.reserved == []
-    # A low-rank LoRA runs there as a sidecar.
-    loaded["lora"] = SimpleNamespace(model=_patch(**low_rank))
-    node._refuse_dora_on_int8(context, transformer)
+    node._run_diffusion(context)
+
+    # DoRA of the dequantized weight (0.125 everywhere): the updated rows, rescaled to the magnitude.
+    updated = torch.full((8, 8), 0.125) + _UP @ _DOWN
+    expected = (magnitude[:, None] * updated / updated.norm(dim=1, keepdim=True)) @ torch.ones(8)
+    torch.testing.assert_close(transformer.seen[0][1][0], expected)
+    assert len(transformer_info.reserved) == 1
 
 
 def test_a_lora_already_on_the_transformer_is_not_applied_again() -> None:

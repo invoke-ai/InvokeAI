@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
     CustomConv2d,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_dequantizing_linear import (
+    CustomFp8Linear,
     CustomInt4ConvrotLinear,
     CustomInt8ConvrotLinear,
     CustomNVFP4Linear,
@@ -37,6 +38,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
     CustomModuleMixin,
 )
 from invokeai.backend.quantization.bnb_import import record_bnb_import_failure
+from invokeai.backend.quantization.fp8_rowwise import Fp8Linear
 from invokeai.backend.quantization.int8_convrot import Int4ConvrotLinear, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 
@@ -49,13 +51,24 @@ AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]]
     torch.nn.LayerNorm: CustomLayerNorm,
     FluxRMSNorm: CustomFluxRMSNorm,
     DiffusersRMSNorm: CustomDiffusersRMSNorm,
+    Fp8Linear: CustomFp8Linear,
     Int8ConvrotLinear: CustomInt8ConvrotLinear,
     Int4ConvrotLinear: CustomInt4ConvrotLinear,
     NVFP4Linear: CustomNVFP4Linear,
 }
 
+# The plain bitsandbytes Linear types (as built by `transformers`' `from_pretrained(quantization_config=...)`) and the
+# custom layers that can wrap them. Empty when bitsandbytes is unavailable. Deliberately not part of
+# AUTOCAST_MODULE_TYPE_MAPPING: the model cache would then wrap, and `remove_custom_layers_from_model` would "unwrap",
+# bnb layers of every model, and the INVERSE mapping needs one original type per custom type. The custom layers read the
+# same attributes as the plain ones, so a caller that owns a transformers-built bnb model (which bypasses the cache)
+# opts in by passing this to `apply_custom_layers_to_model`, to give those layers `add_patch`.
+BNB_LINEAR_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]] = {}
+
 try:
     # These dependencies are not expected to be present on MacOS.
+    import bitsandbytes as bnb
+
     from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_invoke_linear_8_bit_lt import (
         CustomInvokeLinear8bitLt,
     )
@@ -67,6 +80,8 @@ try:
 
     AUTOCAST_MODULE_TYPE_MAPPING[InvokeLinear8bitLt] = CustomInvokeLinear8bitLt
     AUTOCAST_MODULE_TYPE_MAPPING[InvokeLinearNF4] = CustomInvokeLinearNF4
+    BNB_LINEAR_TYPE_MAPPING[bnb.nn.Linear8bitLt] = CustomInvokeLinear8bitLt
+    BNB_LINEAR_TYPE_MAPPING[bnb.nn.Linear4bit] = CustomInvokeLinearNF4
 except (ImportError, OSError, RuntimeError) as e:  # bnb may import and then fail loading its native library
     record_bnb_import_failure(e)
 
@@ -103,9 +118,17 @@ def unwrap_custom_layer(custom_layer: torch.nn.Module, original_layer_type: type
     return original_layer
 
 
-def apply_custom_layers_to_model(module: torch.nn.Module, device_autocasting_enabled: bool = False):
+def apply_custom_layers_to_model(
+    module: torch.nn.Module,
+    device_autocasting_enabled: bool = False,
+    type_mapping: dict[type[torch.nn.Module], type[torch.nn.Module]] | None = None,
+):
+    """Replace the children of `module` that `type_mapping` knows (default: AUTOCAST_MODULE_TYPE_MAPPING) with custom
+    layers, sharing their state. A custom `type_mapping` replaces the default, so merge it in to keep the defaults."""
+    if type_mapping is None:
+        type_mapping = AUTOCAST_MODULE_TYPE_MAPPING
     for name, submodule in module.named_children():
-        override_type = AUTOCAST_MODULE_TYPE_MAPPING.get(type(submodule), None)
+        override_type = type_mapping.get(type(submodule), None)
         if override_type is not None:
             custom_layer = wrap_custom_layer(submodule, override_type)
             # TODO(ryand): In the future, we should manage this flag on a per-module basis.
@@ -113,7 +136,7 @@ def apply_custom_layers_to_model(module: torch.nn.Module, device_autocasting_ena
             setattr(module, name, custom_layer)
         else:
             # Recursively apply to submodules
-            apply_custom_layers_to_model(submodule, device_autocasting_enabled)
+            apply_custom_layers_to_model(submodule, device_autocasting_enabled, type_mapping)
 
 
 def remove_custom_layers_from_model(module: torch.nn.Module):

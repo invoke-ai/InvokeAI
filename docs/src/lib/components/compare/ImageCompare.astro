@@ -1,0 +1,347 @@
+---
+/*
+ * A before/after slider over two images of the same size. The before image shows left of the divider and the after
+ * image right of it; drag the divider, click or tap anywhere on the image, or focus the handle and use the arrow keys,
+ * Page Up/Down, Home and End. Without JavaScript the two images sit side by side. The default slot, if given, is the
+ * figure's caption.
+ *
+ * The images are `CompareImage` children in the `before` and `after` slots, so their alt text and labels are string
+ * attributes that Crowdin can translate in a docs page:
+ *
+ *   <ImageCompare label="Model only and Refine compared">
+ *     <CompareImage slot="before" src={modelOnly} alt="…" label="Model only" />
+ *     <CompareImage slot="after" src={refine} alt="…" label="Refine" />
+ *   </ImageCompare>
+ *
+ * Both images must have the same size and framing, so they line up pixel for pixel.
+ */
+import ChevronsLeftRight from '@lucide/astro/icons/chevrons-left-right';
+
+type Props = {
+  /** Names the slider for screen readers. */
+  label: string;
+  /** Where the divider starts, in percent of the width from the left. */
+  start?: number;
+  class?: string;
+};
+
+const { label, start = 50, class: className } = Astro.props;
+const { t } = Astro.locals;
+---
+
+{/* `not-content` opts out of Starlight's Markdown spacing, which would push the stacked layers apart. */}
+<figure
+  class:list={['compare not-content', className]}
+  data-image-compare
+  data-value-text={t('imageCompare.valueText')}
+  style={`--pos: ${start}%`}
+>
+  {/* Marks the figure before first paint, so readers with JavaScript never see the side-by-side layout. */}
+  <script is:inline>
+    document.currentScript.parentElement.dataset.js = '';
+  </script>
+  <div class="compare__view" data-compare-view>
+    <div class="compare__pane compare__pane--before" data-compare-pane="before">
+      <slot name="before" />
+    </div>
+    <div class="compare__pane compare__pane--after" data-compare-pane="after">
+      <slot name="after" />
+    </div>
+    <div class="compare__track">
+      {/* The script names the value with the images' labels; without script the slider is hidden. */}
+      <div
+        class="compare__handle"
+        role="slider"
+        tabindex="0"
+        aria-label={label}
+        aria-orientation="horizontal"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow={start}
+        data-compare-handle
+      >
+        <ChevronsLeftRight aria-hidden="true" size={16} />
+      </div>
+    </div>
+  </div>
+  {
+    Astro.slots.has('default') && (
+      <figcaption class="compare__caption">
+        <slot />
+      </figcaption>
+    )
+  }
+</figure>
+
+<script>
+  import {
+    clampPercent,
+    nudgeAt,
+    percentFromKey,
+    percentFromPointer,
+    touchGesture,
+    valueText,
+  } from './image-compare.mjs';
+
+  const NUDGE_TO = 64;
+  const NUDGE_MS = 1400;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  const mount = (root: HTMLElement) => {
+    const view = root.querySelector<HTMLElement>('[data-compare-view]');
+    const handle = root.querySelector<HTMLElement>('[data-compare-handle]');
+    if (!view || !handle) return;
+
+    const labelOf = (pane: 'before' | 'after') =>
+      root.querySelector(`[data-compare-pane="${pane}"] [data-compare-label]`)?.textContent?.trim() ?? '';
+    const labels = { before: labelOf('before'), after: labelOf('after') };
+    let position = clampPercent(Number(handle.getAttribute('aria-valuenow')));
+    let nudgeFrame = 0;
+    let touched = false;
+
+    const set = (value: number) => {
+      position = clampPercent(value);
+      // One custom property drives the clip and the divider's translate: no layout reads or writes per move.
+      root.style.setProperty('--pos', `${position}%`);
+      handle.setAttribute('aria-valuenow', String(Math.round(position)));
+      handle.setAttribute('aria-valuetext', valueText(position, root.dataset.valueText!, labels));
+    };
+    set(position);
+
+    const stopNudge = () => {
+      touched = true;
+      if (nudgeFrame) cancelAnimationFrame(nudgeFrame);
+      nudgeFrame = 0;
+    };
+
+    /*
+     * Mouse: press anywhere to jump there, keep dragging to scrub. Touch and pen: the image also scrolls the page
+     * (`touch-action: pan-y`), so a press waits until it is a tap (released in place: jump there) or a sideways drag
+     * (scrub); a vertical swipe hands over to the scroll with `pointercancel` and leaves the slider as it was. A press
+     * on the handle scrubs at once for every pointer. The rect is read once per press.
+     */
+    let press: { id: number; x: number; y: number; rect: DOMRect; grab: number; scrubbing: boolean } | null = null;
+
+    const scrubTo = (clientX: number) => {
+      if (press) set(percentFromPointer(clientX - press.grab, press.rect));
+    };
+    const startScrub = (event: PointerEvent) => {
+      if (!press) return;
+      press.scrubbing = true;
+      stopNudge();
+      view.setPointerCapture(event.pointerId);
+      root.dataset.dragging = '';
+      scrubTo(event.clientX);
+    };
+
+    view.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 || press) return;
+      const rect = view.getBoundingClientRect();
+      const onHandle = handle.contains(event.target as Node);
+      // Grabbing the handle off-centre keeps that offset, so the divider does not jump under the pointer.
+      const grab = onHandle ? event.clientX - (rect.left + (rect.width * position) / 100) : 0;
+      press = { id: event.pointerId, x: event.clientX, y: event.clientY, rect, grab, scrubbing: false };
+      if (event.pointerType === 'mouse' || onHandle) startScrub(event);
+    });
+    view.addEventListener('pointermove', (event) => {
+      if (!press || event.pointerId !== press.id) return;
+      if (press.scrubbing) scrubTo(event.clientX);
+      else if (touchGesture(event.clientX - press.x, event.clientY - press.y) === 'scrub') startScrub(event);
+    });
+    view.addEventListener('pointerup', (event) => {
+      if (!press || event.pointerId !== press.id) return;
+      // A touch or pen press released before it moved is a tap.
+      if (!press.scrubbing && touchGesture(event.clientX - press.x, event.clientY - press.y) === 'pending') {
+        stopNudge();
+        scrubTo(event.clientX);
+      }
+      release();
+    });
+    const release = () => {
+      press = null;
+      delete root.dataset.dragging;
+    };
+    view.addEventListener('pointercancel', release);
+    // Only the view's own capture: a touch's implicit capture on the pressed child ends, and bubbles, when the scrub
+    // moves capture to the view.
+    view.addEventListener('lostpointercapture', (event) => {
+      if (event.target === view && press?.scrubbing && event.pointerId === press.id) release();
+    });
+
+    handle.addEventListener('keydown', (event) => {
+      const next = percentFromKey(event.key, position);
+      if (next === null) return;
+      event.preventDefault();
+      stopNudge();
+      set(next);
+    });
+
+    // A one-time hint when the slider first comes into view: the divider sweeps right and back.
+    if (reducedMotion.matches || !('IntersectionObserver' in window)) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        observer.disconnect();
+        if (touched || reducedMotion.matches) return;
+        const from = position;
+        const begin = performance.now();
+        const step = (now: number) => {
+          const t = (now - begin) / NUDGE_MS;
+          set(nudgeAt(t, from, NUDGE_TO));
+          if (t < 1) nudgeFrame = requestAnimationFrame(step);
+          else nudgeFrame = 0;
+        };
+        nudgeFrame = requestAnimationFrame(step);
+      },
+      { threshold: 0.6 }
+    );
+    observer.observe(view);
+  };
+
+  for (const root of document.querySelectorAll<HTMLElement>('[data-image-compare]')) mount(root);
+</script>
+
+<style>
+  .compare {
+    /* The home page tour frames' shell: see `.frame` in HomePage.astro. */
+    --frame-inset: 0.375rem;
+    --inner-radius: calc(var(--docs-radius-container) - var(--frame-inset) - 1px);
+    --line: oklch(1 0 0 / 0.92);
+    margin: 0;
+    padding: var(--frame-inset);
+    border: 1px solid var(--docs-border);
+    border-radius: var(--docs-radius-container);
+    background-color: var(--docs-surface);
+  }
+
+  .compare__view {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--inner-radius);
+    /* Horizontal drags scrub the slider; vertical swipes still scroll the page. */
+    touch-action: pan-y;
+    cursor: ew-resize;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .compare__pane--after {
+    position: absolute;
+    inset: 0;
+    clip-path: inset(0 0 0 var(--pos));
+  }
+
+  .compare__caption {
+    padding: 0.5rem 0.375rem 0.125rem;
+    color: var(--docs-text-muted);
+    font-size: var(--sl-text-sm);
+    line-height: 1.55;
+
+    > :global(* + *) {
+      margin-top: 0.5rem;
+    }
+
+    :global(strong) {
+      color: var(--docs-text);
+      font-weight: 600;
+    }
+  }
+
+  /*
+   * The track is as wide as the view and carries the line and the handle on its left edge, so `translate` in percent
+   * moves them by the view's width: a composited move that follows resizes without measuring.
+   */
+  .compare__track {
+    position: absolute;
+    inset: 0;
+    translate: var(--pos) 0;
+    pointer-events: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: -1px;
+      width: 2px;
+      background-color: var(--line);
+      box-shadow: 0 0 0 1px oklch(0 0 0 / 0.18);
+    }
+  }
+
+  .compare__handle {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin: -1.125rem 0 0 -1.125rem;
+    border-radius: 999px;
+    background-color: var(--docs-surface);
+    box-shadow:
+      inset 0 0 0 2px var(--line),
+      0 4px 14px oklch(0 0 0 / 0.35);
+    color: var(--docs-text-strong);
+    cursor: ew-resize;
+    pointer-events: auto;
+    transition:
+      scale 120ms ease-out,
+      background-color 100ms;
+    touch-action: none;
+
+    &:hover {
+      background-color: var(--docs-control);
+    }
+
+    /* A 44px target around the 36px knob. */
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -0.25rem;
+      border-radius: inherit;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--docs-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  .compare[data-dragging] .compare__handle {
+    scale: 0.96;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .compare__handle {
+      transition: none;
+    }
+  }
+
+  /* Without JavaScript: the two images side by side, each with its label, and no slider. */
+  .compare:not([data-js]) {
+    .compare__view {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+      gap: var(--frame-inset);
+      border-radius: 0;
+      cursor: auto;
+    }
+
+    .compare__pane {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--inner-radius);
+    }
+
+    .compare__pane--after {
+      inset: auto;
+      clip-path: none;
+    }
+
+    .compare__track {
+      display: none;
+    }
+  }
+</style>

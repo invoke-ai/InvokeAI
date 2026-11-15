@@ -1,5 +1,6 @@
 """Contracts of the intermediates manager: summaries, previews and cleanup operations."""
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Literal, Optional
 
@@ -37,6 +38,16 @@ MAX_AFFECTED_DOCUMENTS = 200
 MAX_ACKNOWLEDGED_DOCUMENTS = 10_000
 
 MediaName = Annotated[str, Field(min_length=1, max_length=255)]
+
+
+@dataclass(frozen=True)
+class ActiveQueueMediaUse:
+    """An active queue item (see `queries/intermediates.py`) whose session names some of the media asked about."""
+
+    # The queue item's account; None for a row stored without one.
+    user_id: Optional[str]
+    images: frozenset[str]
+    videos: frozenset[str]
 
 
 class IntermediatesBrowserHoldRequest(BaseModel):

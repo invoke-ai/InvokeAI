@@ -110,6 +110,8 @@ export interface ImageWithDims {
 export interface ExpandPromptSuggestion {
   /** Source of the family's released enhancer, preselected when an installed text LLM has it. */
   modelSource: string | null;
+  /** File names of single-file builds of the same model, matched against the end of an installed model's source. */
+  modelFileNames?: readonly string[];
   /** How the model is listed among the starter models, for the hint shown when it is not installed. */
   modelName: string | null;
   /** For a text-only rewrite. */
@@ -248,8 +250,10 @@ export interface GenerateSettings {
   hiDiffusionEnabled: boolean;
   hiDiffusionRauNetEnabled: boolean;
   hiDiffusionWindowAttentionEnabled: boolean;
-  hiDiffusionT1Ratio: number;
-  hiDiffusionT2Ratio: number;
+  hiDiffusionT1Ratio: number | null;
+  hiDiffusionT2Ratio: number | null;
+  /** Manual slider positions retained while the active ratios use automatic presets. */
+  hiDiffusionManualRatios?: { t1: number; t2: number };
   seed: number;
   seedMode: SeedMode;
   seamlessXAxis: boolean;
@@ -269,6 +273,8 @@ export interface GenerateSettings {
   qwenVLEncoderModel: ComponentModelConfig | null;
   /** Krea-2's text encoder. Distinct from `qwenVLEncoderModel` (Qwen2.5-VL). */
   qwen3VLEncoderModel: ComponentModelConfig | null;
+  /** The mmproj file that lets a GGUF Qwen3-VL 8B encoder read Qwen-Image-2.1 reference images. */
+  qwen3VLVisionTowerModel: ComponentModelConfig | null;
   /** Anima-3.8B's second text encoder, read by its bundled semantic connector. */
   qwen35EncoderModel: ComponentModelConfig | null;
   /**
@@ -279,6 +285,13 @@ export interface GenerateSettings {
   /** Off skips the adapter on the canvas and keeps the selected model and weight. */
   animaInpaintAdapterEnabled: boolean;
   animaInpaintAdapterWeight: number;
+  /**
+   * FLUX.3: rewrite the prompt into the detailed caption the model is trained on before every generation. Off skips
+   * the upsampler and keeps the selected model; other families never run it.
+   */
+  flux3PromptUpsamplerEnabled: boolean;
+  /** A Text LLM that can read images; required while `flux3PromptUpsamplerEnabled` is on. */
+  flux3PromptUpsamplerModel: ComponentModelConfig | null;
   /** Wan 2.2's UMT5-XXL text encoder. */
   wanT5EncoderModel: ComponentModelConfig | null;
   /** The low-noise expert is optional; the selected expert can span the full schedule. */

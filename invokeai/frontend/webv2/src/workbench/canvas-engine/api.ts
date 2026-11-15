@@ -15,3 +15,4 @@ export {
   restoreControlOriginal,
 } from './document/controlDerivation';
 export { createControlLayer, type CreateControlLayerInput, nextControlLayerName } from './document/layerFactories';
+export { shapeDrawsOnLayer } from './tools/shapeTarget';

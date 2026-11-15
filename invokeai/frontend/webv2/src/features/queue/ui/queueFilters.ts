@@ -25,14 +25,15 @@ export const matchesFilter = (status: QueueItemStatus, filter: QueueFilterId): b
 
 /**
  * Count for a filter, derived from the scope's status counts (not the windowed list). Every tab counts what its list
- * shows, everyone's items alike, so Active is the pending, running and waiting items `matchesFilter` keeps.
+ * shows, everyone's items alike, so Active is the pending, running and waiting items `matchesFilter` keeps. This tab's
+ * runs the backend has not accepted (`localRuns`) are listed under All and Active, so both count them too.
  */
-export const getFilterCount = (counts: QueueCounts, filter: QueueFilterId): number => {
+export const getFilterCount = (counts: QueueCounts, filter: QueueFilterId, localRuns: number): number => {
   switch (filter) {
     case 'all':
-      return counts.total;
+      return counts.total + localRuns;
     case 'active':
-      return counts.pending + counts.inProgress + counts.waiting;
+      return counts.pending + counts.inProgress + counts.waiting + localRuns;
     case 'completed':
       return counts.completed;
     case 'failed':

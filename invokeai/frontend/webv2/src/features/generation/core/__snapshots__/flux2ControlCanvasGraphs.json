@@ -319,7 +319,35 @@
         "type": "core_metadata",
         "width": 768,
         "clip_skip": 0,
-        "strength": 0.6
+        "strength": 0.6,
+        "control_layers": [
+          {
+            "begin_step_percent": 0,
+            "end_step_percent": 1,
+            "control_mode": null,
+            "image": {
+              "image_name": "f-control.png",
+              "width": 768,
+              "height": 1024
+            },
+            "position": {
+              "x": 128,
+              "y": 64
+            },
+            "layer_id": "f-control",
+            "model": {
+              "base": "flux2",
+              "key": "flux2-union",
+              "name": "FLUX.2 [dev] ControlNet Union",
+              "type": "controlnet",
+              "hash": "blake3:union"
+            },
+            "type": "flux2_control",
+            "weight": 0.75
+          }
+        ],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "canvas_i2l": {
         "is_intermediate": true,
@@ -772,7 +800,35 @@
         "type": "core_metadata",
         "width": 768,
         "clip_skip": 0,
-        "strength": 0.6
+        "strength": 0.6,
+        "control_layers": [
+          {
+            "begin_step_percent": 0,
+            "end_step_percent": 1,
+            "control_mode": null,
+            "image": {
+              "image_name": "f-control.png",
+              "width": 768,
+              "height": 1024
+            },
+            "position": {
+              "x": 128,
+              "y": 64
+            },
+            "layer_id": "f-control",
+            "model": {
+              "base": "flux2",
+              "key": "flux2-union",
+              "name": "FLUX.2 [dev] ControlNet Union",
+              "type": "controlnet",
+              "hash": "blake3:union"
+            },
+            "type": "flux2_control",
+            "weight": 0.75
+          }
+        ],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "infill": {
         "is_intermediate": true,
@@ -1115,7 +1171,35 @@
         "steps": 28,
         "type": "core_metadata",
         "width": 768,
-        "clip_skip": 0
+        "clip_skip": 0,
+        "control_layers": [
+          {
+            "begin_step_percent": 0,
+            "end_step_percent": 1,
+            "control_mode": null,
+            "image": {
+              "image_name": "f-control.png",
+              "width": 768,
+              "height": 1024
+            },
+            "position": {
+              "x": 128,
+              "y": 64
+            },
+            "layer_id": "f-control",
+            "model": {
+              "base": "flux2",
+              "key": "flux2-union",
+              "name": "FLUX.2 [dev] ControlNet Union",
+              "type": "controlnet",
+              "hash": "blake3:union"
+            },
+            "type": "flux2_control",
+            "weight": 0.75
+          }
+        ],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "flux2_control_f-control": {
         "is_intermediate": true,

@@ -178,11 +178,31 @@ describe('text tool: teardown', () => {
     expect(h.cancelTextEdit).toHaveBeenCalledTimes(1);
   });
 
-  it('cancels the session on an Escape key command', () => {
+  it('cancels an open session on an Escape key command, and leaves Escape to the ladder without one', () => {
     const h = createHarness(makeDoc());
     const tool = createTextTool();
 
-    tool.onKeyCommand?.(h.ctx, 'cancel');
+    expect(tool.onKeyCommand?.(h.ctx, 'cancel')).toBe(false);
+    expect(h.cancelTextEdit).not.toHaveBeenCalled();
+
+    h.stores.textEditSession.set({
+      id: 1,
+      layerId: null,
+      mode: 'create',
+      source: {
+        align: 'left',
+        color: '#000000',
+        content: '',
+        fontFamily: 'Inter',
+        fontSize: 20,
+        fontWeight: 400,
+        lineHeight: 1.2,
+        type: 'text',
+      },
+      startSource: null,
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    });
+    expect(tool.onKeyCommand?.(h.ctx, 'cancel')).toBe(true);
     expect(h.cancelTextEdit).toHaveBeenCalledTimes(1);
 
     // Apply is a no-op here (React owns the live content/commit).

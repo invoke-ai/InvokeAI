@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import type { LayerRowCommands } from './layerRowCommands';
 
 import { anchorFromPoint } from './layerRowCommands';
+import { LAYER_PANEL_CONTROL_GAP, LAYER_PANEL_END_INSET } from './LayerRowSurface';
 import { useLayerStackActions, type LayerStackActionsEngine } from './useLayerStackActions';
 
 const HEADER_FOCUS = { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' };
@@ -62,6 +63,7 @@ const LayerStackHeaderComponent = ({
 }: LayerStackHeaderProps) => {
   const { t } = useTranslation();
   const actions = useLayerStackActions(stack, document, engine, editingLocked);
+  const exportStatus = actions.find((action) => action.status)?.status;
   const handleToggle = useCallback(
     (event: { stopPropagation: () => void }) => {
       event.stopPropagation();
@@ -120,7 +122,7 @@ const LayerStackHeaderComponent = ({
         onKeyDown={pinned ? undefined : handleKeyDown}
       >
         {pinned ? null : <VisuallyHidden id={descriptionId}>{t(`hints.${hintId}.paragraphs.0`)}</VisuallyHidden>}
-        <HStack gap="1" h="full" pe="1.5" ps="0">
+        <HStack gap="1" h="full" pe={LAYER_PANEL_END_INSET} ps="0">
           <IconButton
             aria-label={t(collapsed ? 'widgets.layers.groupActions.expand' : 'widgets.layers.groupActions.collapse')}
             color="fg.muted"
@@ -150,7 +152,12 @@ const LayerStackHeaderComponent = ({
             {t(`widgets.layers.groups.${stack}`)} ({leafCount})
           </Text>
           <FeatureHintExclusion>
-            <HStack gap="0.5" onClick={stopPropagation} onMouseDown={keepFocus}>
+            <HStack gap={LAYER_PANEL_CONTROL_GAP} onClick={stopPropagation} onMouseDown={keepFocus}>
+              {exportStatus && (
+                <Text role="status" color="fg.muted" fontSize="xs" maxW="7rem" truncate>
+                  {exportStatus}
+                </Text>
+              )}
               {actions.map((action) => (
                 <Tooltip key={action.id} content={action.label}>
                   <IconButton

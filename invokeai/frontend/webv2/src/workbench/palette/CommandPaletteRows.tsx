@@ -1,11 +1,11 @@
 import type { ReactNode, Ref } from 'react';
 
-import { Box, HStack, Icon, Kbd, Spacer, Text, chakra } from '@chakra-ui/react';
+import { Box, HStack, Icon, Kbd, Spacer, Text, VisuallyHidden, chakra } from '@chakra-ui/react';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { dropdownGroupLabel } from '@theme/recipes';
 import { ShortcutKeyGlyph, ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
-import { CheckIcon } from 'lucide-react';
+import { CheckIcon, ExternalLinkIcon } from 'lucide-react';
 import { useCallback, useImperativeHandle, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -75,6 +75,8 @@ const EntryRow = ({
   onActive: () => void;
   onRun: () => void;
 }) => {
+  const { t } = useTranslation();
+
   return (
     <HStack
       {...rowButtonProps}
@@ -101,6 +103,12 @@ const EntryRow = ({
       ) : null}
       <Spacer />
       {entry.keys ? <ShortcutKeycaps parts={entry.keys} /> : null}
+      {entry.opensExternally ? (
+        <>
+          <Icon as={ExternalLinkIcon} boxSize="3.5" color="fg.muted" flexShrink={0} />
+          <VisuallyHidden>{t('commandPalette.opensInNewTab')}</VisuallyHidden>
+        </>
+      ) : null}
     </HStack>
   );
 };

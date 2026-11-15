@@ -9,7 +9,9 @@ runner. End-to-end tests against real Wan checkpoints are gated behind
 
 from __future__ import annotations
 
+import gc
 import os
+import weakref
 from collections import Counter
 from contextlib import contextmanager
 from pathlib import Path
@@ -562,6 +564,63 @@ class TestWanDenoiseShapes:
         ).squeeze(2)
 
         assert torch.allclose(latents, expected, atol=1e-5)
+
+    @pytest.mark.parametrize(
+        ("num_frames", "window"),
+        [(17, slice(1, 3)), (5, slice(0, 2)), (1, slice(0, 1))],
+        ids=["5-latents", "2-latents", "1-latent"],
+    )
+    def test_video_previews_carry_the_middle_latent_frame_after_the_one_before_it(
+        self, num_frames: int, window: slice, fake_model_root
+    ) -> None:
+        """With a zero-velocity transformer the latents stay the initial noise, so the window is checkable.
+
+        17 frames are 5 latent frames: the middle one is 2, and the window is frames 1 and 2. A single
+        latent frame has no frame before it; the field allows no fewer than 5 frames, so that case is
+        built without validation to exercise the window's clamp.
+        """
+        from invokeai.backend.wan.sampling_utils import make_noise
+
+        ctx = _build_context(
+            _ZeroTransformer(),
+            variant=WanVariantType.T2V_A14B,
+            model_root=fake_model_root,
+            pos_cond=_make_conditioning(),
+            neg_cond=None,
+        )
+        fields = {
+            "id": "test",
+            "transformer": _wan_transformer_field(),
+            "positive_conditioning": WanConditioningField(conditioning_name="pos"),
+            "negative_conditioning": None,
+            "ref_image": None,
+            "width": 64,
+            "height": 64,
+            "num_frames": 5,
+            "steps": 2,
+            "guidance_scale": 1.0,
+            "seed": 42,
+        }
+        # `model_copy` does not validate, which is what lets the 1-frame case past the field's minimum.
+        invocation = WanVideoDenoiseInvocation(**fields).model_copy(update={"num_frames": num_frames})
+
+        invocation._run_diffusion(ctx)
+
+        noise = make_noise(
+            batch_size=1,
+            latent_channels=16,
+            height=64,
+            width=64,
+            spatial_scale_factor=8,
+            device=torch.device("cpu"),
+            dtype=torch.float32,
+            seed=42,
+            num_latent_frames=(num_frames - 1) // 4 + 1,
+        )
+        previews = [call.args[0].latents for call in ctx.util.sd_step_callback.call_args_list]
+        assert [call.args[1] for call in ctx.util.sd_step_callback.call_args_list] == [BaseModelType.Wan] * 2
+        assert all(p.shape == (1, 16, window.stop - window.start, 8, 8) for p in previews)
+        assert all(torch.allclose(p, noise[:, :, window], atol=1e-5) for p in previews)
 
 
 class TestWanDenoiseDualExpert:
@@ -1525,3 +1584,53 @@ class TestWanVideoDenoiseMultiFrame:
             num_latent_frames=t_lat,
         )
         assert torch.allclose(latents[:, :, 1:], expected_noise[:, :, 1:], atol=1e-5)
+
+
+@pytest.mark.parametrize("invocation_type", ["image", "video"])
+def test_outgoing_expert_is_collectable_when_the_denoise_loop_loads_the_next(
+    invocation_type: str, fake_model_root: Path
+) -> None:
+    """The loop's own `transformer` local would keep the high-noise expert alive through the low-noise
+    load, so both experts would be resident during every swap."""
+    ctx = _build_context(
+        nn.Identity(),
+        transformer_low=nn.Identity(),
+        variant=WanVariantType.T2V_A14B,
+        model_root=fake_model_root,
+        pos_cond=_make_conditioning(),
+        neg_cond=None,
+    )
+    high_ref: list[weakref.ref] = []
+    outgoing_collected: list[bool] = []
+
+    def load(model_id) -> MagicMock:
+        if str(getattr(model_id, "submodel_type", None)) == "SubModelType.Transformer2":
+            gc.collect()
+            outgoing_collected.append(high_ref[0]() is None)
+            expert = _ZeroTransformer(label="low")
+        else:
+            expert = _ZeroTransformer(label="high")
+            high_ref.append(weakref.ref(expert))
+        loaded = _make_loaded_model(expert)
+        # A plain int, as on the real LoadedModel: a mock attribute would point back at `loaded`.
+        loaded.weight_bytes = 0
+        return loaded
+
+    ctx.models.load.side_effect = load
+    field = _wan_transformer_field(dual=True, boundary_ratio=0.5)
+    if invocation_type == "image":
+        inv = _make_invocation(
+            field,
+            WanConditioningField(conditioning_name="pos"),
+            None,
+            width=64,
+            height=64,
+            steps=6,
+            guidance_scale=1.0,
+        )
+    else:
+        inv = _make_video_invocation(transformer_field=field, num_frames=5, steps=6)
+
+    inv._run_diffusion(ctx)
+
+    assert outgoing_collected == [True]

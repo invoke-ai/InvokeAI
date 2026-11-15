@@ -1,4 +1,5 @@
 import type { GenerationModelCatalogItem, PromptHistoryItem } from '@features/generation/contracts';
+import type { AspectRatioPresetsPort } from '@features/generation/core/aspectRatioPresets';
 import type { RebalancePreset } from '@features/generation/core/conditioningRebalance';
 import type { GenerateSettings } from '@features/generation/core/types';
 import type { ReadableExternalStore } from '@platform/state/projectedExternalStore';
@@ -18,6 +19,7 @@ export interface GenerationModelSelectProps {
   modelTypes: string[];
   onChange: (model: GenerationModelCatalogItem | null) => void;
   placeholder?: string;
+  relatedTo?: string | null;
   scopeLabel?: string;
   showManagerButton?: boolean;
   size?: 'md' | 'lg' | 'xl';
@@ -89,6 +91,8 @@ export interface GenerationUiAdapter {
     currentUserId: string | null;
     multiuserEnabled: boolean;
   };
+  /** The account's saved aspect ratios, shared with the canvas Frame tool. */
+  aspectRatioPresets: AspectRatioPresetsPort;
   capabilities: {
     /** Bulk import/export of prompt templates; the backend routes are admin-only. */
     canManagePromptTemplates: boolean;

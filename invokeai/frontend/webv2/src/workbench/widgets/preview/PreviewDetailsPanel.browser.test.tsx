@@ -373,11 +373,8 @@ describe('PreviewDetailsPanel', () => {
     await render(imageItem);
 
     // Availability, the lazily loaded cache, and the label request resolve in turn; wait rather than time them.
-    const tags = await vi.waitFor(() => {
-      const element = document.querySelector<HTMLElement>('[data-preview-image-tags]');
-      expect(element).not.toBeNull();
-      return element;
-    });
+    await expect.element(page.getByText('Image tags:', { exact: true })).toBeInTheDocument();
+    const tags = document.querySelector<HTMLElement>('[data-preview-image-tags]')!;
     const dimensions = page.getByText('512 × 768').element();
     expect(mocks.getImageLabels).toHaveBeenCalledWith({ kind: 'image', name: 'still.png' });
     expect(tags?.textContent).toBe(

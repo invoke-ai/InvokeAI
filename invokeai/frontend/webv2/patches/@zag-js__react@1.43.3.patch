@@ -1,0 +1,64 @@
+diff --git a/dist/track.js b/dist/track.js
+index 073d18ef671a7c356c0b9e7e808acc70cbaefd94..8e5bf5a96b05c84571709972c1cbaabb41f24858 100644
+--- a/dist/track.js
++++ b/dist/track.js
+@@ -26,20 +26,14 @@ __export(track_exports, {
+ module.exports = __toCommonJS(track_exports);
+ var import_react = require("react");
+ var useTrack = (deps, effect) => {
+-  const render = (0, import_react.useRef)(false);
+-  const called = (0, import_react.useRef)(false);
++  const values = [...(deps ?? []).map((d) => typeof d === "function" ? d() : d)];
++  const previous = (0, import_react.useRef)();
+   (0, import_react.useEffect)(() => {
+-    const mounted = render.current;
+-    const run = mounted && called.current;
+-    if (run) return effect();
+-    called.current = true;
+-  }, [...(deps ?? []).map((d) => typeof d === "function" ? d() : d)]);
+-  (0, import_react.useEffect)(() => {
+-    render.current = true;
+-    return () => {
+-      render.current = false;
+-    };
+-  }, []);
++    // Reconcile hidden prop changes without replaying unchanged watchers on Activity reconnect.
++    const changed = previous.current && (previous.current.length !== values.length || values.some((value, index) => !Object.is(value, previous.current[index])));
++    previous.current = values;
++    if (changed) return effect();
++  }, values);
+ };
+ // Annotate the CommonJS export names for ESM import in node:
+ 0 && (module.exports = {
+diff --git a/dist/track.mjs b/dist/track.mjs
+index 9a14a15c57b319967266283a7f067d60d91df01c..cc82b31fc1a9a49487484030347de4cce9ece037 100644
+--- a/dist/track.mjs
++++ b/dist/track.mjs
+@@ -3,20 +3,14 @@
+ // src/track.ts
+ import { useEffect, useRef } from "react";
+ var useTrack = (deps, effect) => {
+-  const render = useRef(false);
+-  const called = useRef(false);
++  const values = [...(deps ?? []).map((d) => typeof d === "function" ? d() : d)];
++  const previous = useRef();
+   useEffect(() => {
+-    const mounted = render.current;
+-    const run = mounted && called.current;
+-    if (run) return effect();
+-    called.current = true;
+-  }, [...(deps ?? []).map((d) => typeof d === "function" ? d() : d)]);
+-  useEffect(() => {
+-    render.current = true;
+-    return () => {
+-      render.current = false;
+-    };
+-  }, []);
++    // Reconcile hidden prop changes without replaying unchanged watchers on Activity reconnect.
++    const changed = previous.current && (previous.current.length !== values.length || values.some((value, index) => !Object.is(value, previous.current[index])));
++    previous.current = values;
++    if (changed) return effect();
++  }, values);
+ };
+ export {
+   useTrack

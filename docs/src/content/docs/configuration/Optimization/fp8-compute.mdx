@@ -1,0 +1,74 @@
+---
+title: FP8 Compute
+description: Run checkpoints published in FP8 on the FP8 tensor cores of RTX 40-series and newer GPUs, and what it means for repeatable images.
+lastUpdated: 2026-10-26
+sidebar:
+  order: 7
+---
+
+[FP8 Storage](/configuration/optimization/fp8-storage/) changes how weights are **stored**, while the math still runs in
+BF16. `fp8_compute` is a separate, global setting that also does the **math** in FP8, on GPUs that have hardware for it.
+That makes generation faster, not just smaller.
+
+It is for models that were **already saved in FP8** by whoever published them, often labelled "fp8" or "fp8_scaled" in
+the filename. With `fp8_compute` on, their FP8 layers stay as they are and run directly on the GPU's FP8 tensor cores.
+With only FP8 Storage on (which installing such a checkpoint does for you), they also stay in FP8, but each layer is
+unpacked to BF16 before it runs. ComfyUI's int8 builds have a counterpart of their own,
+[int8 Compute](/configuration/optimization/int8-compute/).
+
+## Requirements
+
+- **An NVIDIA GPU with compute capability 8.9 or newer**: RTX 40-series, RTX 50-series, and the datacenter cards of
+  those generations and later (such as the H100), **or an AMD GPU whose ROCm build supports FP8 matrix multiplication**
+  (such as the MI300).
+- **A model whose weights are stored in fp8**: plain fp8 or scaled fp8. MXFP8 checkpoints are unpacked at load and
+  never run on the FP8 tensor cores.
+
+InvokeAI checks the card the first time it needs to, by running a small FP8 matrix multiplication rather than going by
+the card's name, so a card that can't do it quietly takes the normal path instead of failing partway through a
+generation. Intel GPUs, Apple silicon and the CPU always take the normal path. Layers whose input or output size is not
+divisible by 16 take it too.
+
+## Turning it on
+
+Set it in your [`invokeai.yaml`](/configuration/invokeai-yaml/) and restart InvokeAI:
+
+```yaml
+fp8_compute: true
+```
+
+The model's load line then reports the layers it kept for the tensor cores, for example
+`Ideogram 4: kept 208 layer(s) in fp8 (scaled fp8 checkpoint, kept for fp8_compute, on the fp8 tensor cores)`.
+
+:::danger[The same seed only reproduces the same image if the model is fully in VRAM]
+FP8 math only happens for the parts of the model that are on the GPU. Anything still in system RAM takes the normal
+path instead, which gives slightly different numbers, and *which* parts that affects depends on how much of the model
+happened to fit at that moment, which changes from run to run.
+
+Measured on a 24GB card with a ~12GB model at 88–95% loaded, two runs with an identical seed and identical settings
+differed in **98.7% of all pixels**. With the model fully loaded, repeated runs came out **identical**.
+
+For repeatable output, check the model's load line in the log for `VRAM: … (100.0%)`. If it is below that, free up
+VRAM (lower the resolution, load fewer models at once, use a smaller text encoder) or set
+`enable_partial_loading: false`.
+:::
+
+Keeping the whole model on the GPU pays off in speed as well: on the same 24GB card, streaming the last 5–12% of the
+model over PCIe cost **47% more time per step** (1.03 → 1.51 s/it at 1024², 8 steps).
+
+Images also differ from those made without `fp8_compute` at the same seed, because the inputs of each layer are
+quantized to FP8 too.
+
+## When the model asks for full precision
+
+Some FP8 checkpoints mark layers that should not use FP8 math (`full_precision_matrix_mult`). InvokeAI follows those
+marks by default, so those layers run the slower way; on a model that marks many layers, that can eat most of the
+speedup.
+
+```yaml
+fp8_compute_full_precision_hints: false
+```
+
+ignores the marks and runs every quantized layer on the FP8 tensor cores. It is faster, but it overrides the model
+author's judgement about which layers are sensitive: compare a few images before keeping it. It has no effect unless
+`fp8_compute` is on.

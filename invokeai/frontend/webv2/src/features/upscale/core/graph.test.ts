@@ -761,13 +761,30 @@ describe('compileUpscaleGraph for Qwen Image', () => {
     expect(hasEdge(edges, 'pos_cond', 'conditioning', 'denoise_latents', 'positive_conditioning')).toBe(true);
     expect(hasEdge(edges, 'neg_cond', 'conditioning', 'denoise_latents', 'negative_conditioning')).toBe(true);
     expect(nodes.pos_cond_collect).toBeUndefined();
-    expect(hasEdge(edges, 'model_loader', 'qwen_vl_encoder', 'neg_cond', 'qwen_vl_encoder')).toBe(true);
-    expect(Object.values(nodes).some((node) => node.type === 'qwen_image_lora_collection_loader')).toBe(true);
+    const loraLoaderId = Object.entries(nodes).find(
+      ([, node]) => node.type === 'qwen_image_lora_collection_loader'
+    )?.[0];
+    expect(loraLoaderId).toBeDefined();
+    // The LoRAs' text-encoder layers patch the encoder, so it reaches both prompts through the loader.
+    expect(hasEdge(edges, 'model_loader', 'qwen_vl_encoder', loraLoaderId ?? '', 'qwen_vl_encoder')).toBe(true);
+    expect(hasEdge(edges, loraLoaderId ?? '', 'qwen_vl_encoder', 'pos_cond', 'qwen_vl_encoder')).toBe(true);
+    expect(hasEdge(edges, loraLoaderId ?? '', 'qwen_vl_encoder', 'neg_cond', 'qwen_vl_encoder')).toBe(true);
+    expect(hasEdge(edges, 'model_loader', 'qwen_vl_encoder', 'neg_cond', 'qwen_vl_encoder')).toBe(false);
     expect(nodes.core_metadata).toMatchObject({
       cfg_scale: 4,
       qwen_image_qwen_vl_encoder: { key: 'qwen-vl' },
       scheduler: 'euler',
     });
+  });
+
+  it('takes the encoder straight from the model loader without LoRAs', () => {
+    const { edges, nodes } = compileUpscaleGraph({ ...createQwenImageValues(), loras: [] }, 'gallery', {
+      useCpuNoise: true,
+    }).backendGraph;
+
+    expect(Object.values(nodes).some((node) => node.type === 'qwen_image_lora_collection_loader')).toBe(false);
+    expect(hasEdge(edges, 'model_loader', 'qwen_vl_encoder', 'pos_cond', 'qwen_vl_encoder')).toBe(true);
+    expect(hasEdge(edges, 'model_loader', 'qwen_vl_encoder', 'neg_cond', 'qwen_vl_encoder')).toBe(true);
   });
 
   it('wires the negative prompt only above CFG 1, where the node runs an unconditional pass', () => {

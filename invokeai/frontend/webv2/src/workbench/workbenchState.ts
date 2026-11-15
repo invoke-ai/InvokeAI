@@ -1,6 +1,11 @@
 import type { GenerateWidgetValues, ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
-import type { QueueCompiledSubmission, QueueHistoryItemStatus, QueueRunErrorCode } from '@features/queue/contracts';
+import type {
+  QueueCompiledSubmission,
+  QueueHistoryItemStatus,
+  QueueRunErrorCode,
+  QueueSubmissionRetry,
+} from '@features/queue/contracts';
 import type { ProjectGraphState, ProjectWorkflowSource } from '@features/workflow/contracts';
 import type { WorkflowSubmissionPlan } from '@features/workflow/graph';
 import type { LogNamespace } from '@platform/logging/contracts';
@@ -15,6 +20,7 @@ import type {
   ExpandedPositivePrompts,
   InvocationRoute,
   InvocationSourceId,
+  ResolvedInvocationRoute,
   ResultDestination,
   UpscaleSourceMetadata,
 } from '@workbench/invocationContracts';
@@ -96,6 +102,7 @@ import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import { prependProjectEvent, PROJECT_EVENT_LIMIT } from '@workbench/projectEvents';
 import { createProjectId } from '@workbench/projects/ids';
 
+import type { InvocationRuntimeInputs } from './invocationContracts';
 import type { WorkbenchQueueItem as QueueItem } from './queueHistoryContracts';
 
 import {
@@ -139,7 +146,6 @@ import { applyWidgetDefaults, getProjectWidgetValues, getResolvedProjectWidgetVa
 export { nextLayerName } from './canvasProjectMutations';
 import type { ProjectPromptDraftPatch } from '@features/generation/settings';
 
-import { canAddToCachedGalleryBoard } from '@features/gallery/queries';
 import { compileGenerateGraph, resolveGenerateSeed } from '@features/generation/graph';
 import {
   addPromptHistoryItem,
@@ -161,7 +167,6 @@ import {
 } from '@features/generation/settings';
 import { getQueueSourceResultSelection, MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
 import { getQueueItemSnapshotLabel } from '@features/queue/contracts';
-import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   clearDeletedUpscaleInput,
   cloneUpscaleWidgetValues,
@@ -191,7 +196,6 @@ import {
   type VideoWidgetValues,
 } from '@features/video';
 import { planWorkflowSubmission } from '@features/workflow/graph';
-import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import {
   hasMultipleWorkflowReturnNodes,
   projectGraphReducer,
@@ -423,9 +427,9 @@ type WorkbenchReducerAction =
     }
   | { type: 'undoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'redoWorkflowChange'; projectId?: string; workflowId?: string }
-  | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean; models?: readonly ModelConfig[] }
   | ({
       type: 'submitResolvedInvocationSnapshot';
+      runtime: InvocationRuntimeInputs;
       backendSupportsCancellation: boolean;
       /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
       prepend?: boolean;
@@ -443,6 +447,7 @@ type WorkbenchReducerAction =
   | {
       /** The image menu's one-click upscale: queued at once, leaving the Upscale widget and the route as they are. */
       type: 'submitModelOnlyUpscale';
+      runtime: Pick<InvocationRuntimeInputs, 'boardDestinationIds'>;
       projectId: string;
       image: ImageWithDims;
       upscaleModel: SpandrelModelConfig;
@@ -461,6 +466,13 @@ type WorkbenchReducerAction =
       queueItemId: string;
       backendItemIds: number[];
       backendBatchId?: string;
+    }
+  | {
+      /** The latest failed submission of a pending run the backend has not accepted; ignored for any other run. */
+      type: 'recordQueueItemSubmissionRetry';
+      projectId: string;
+      queueItemId: string;
+      retry: QueueSubmissionRetry;
     }
   | {
       type: 'setQueueItemStatus';
@@ -579,6 +591,7 @@ type WorkbenchReducerAction =
   | { type: 'commitCanvasEdit'; projectId: string; intent: CanvasEditIntent }
   | ({
       type: 'submitCanvasInvocationSnapshot';
+      runtime: Pick<InvocationRuntimeInputs, 'boardDestinationIds'>;
       backendSupportsCancellation: boolean;
       canvas: CanvasStateContractV3;
       destination: ResultDestination;
@@ -3129,6 +3142,7 @@ const compileInvocationSnapshot = (
   project: Project,
   defaults: ScopedDefaults,
   route: InvocationRoute,
+  runtime: InvocationRuntimeInputs,
   models?: readonly ModelConfig[],
   workflowGenerators?: WorkflowGeneratorResolutions,
   workflowDocument: ProjectGraphState = getActiveProjectGraph(project),
@@ -3143,11 +3157,10 @@ const compileInvocationSnapshot = (
 } | null => {
   const widgetStates = getWidgetStatesSnapshot(project.widgetInstances);
   const projectSettings = getEffectiveProjectSettings(project.settings, defaults[PROJECT_SETTINGS_OWNER]);
-  const randDevice = resolveRandDeviceMetadata(projectSettings.useCpuNoise, getGenerationDevicesSnapshot().options);
+  const randDevice = projectSettings.useCpuNoise ? 'cpu' : runtime.noiseDevice;
 
   if (route.sourceId === 'workflow') {
-    // Route validation guarantees templates are loaded before this imperative read.
-    const templatesSnapshot = getInvocationTemplatesSnapshot();
+    const templatesSnapshot = runtime.templates;
 
     if (templatesSnapshot.status !== 'loaded') {
       return null;
@@ -3156,12 +3169,12 @@ const compileInvocationSnapshot = (
     const plan = planWorkflowSubmission(workflowDocument, templatesSnapshot.templates, {
       autoBoardId: getGalleryAutoAddBoardId(
         getResolvedProjectWidgetValues(project, 'gallery', defaults),
-        canAddToCachedGalleryBoard
+        (boardId: string) => runtime.boardDestinationIds.includes(boardId)
       ),
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
       generators: workflowGenerators,
       // An explicit board a node names is judged like the auto-add board: one the caller may add to now.
-      isBoardDestination: (boardId) => canAddToCachedGalleryBoard(boardId),
+      isBoardDestination: (boardId) => runtime.boardDestinationIds.includes(boardId),
     });
 
     // Null means a generator is still unresolved or was edited during its round trip; nothing is queued.
@@ -3689,6 +3702,25 @@ const reopenQueueItemForRetry = (
   });
 };
 
+const isSameSubmissionRetry = (left: QueueSubmissionRetry | undefined, right: QueueSubmissionRetry): boolean =>
+  left !== undefined &&
+  left.reason === right.reason &&
+  left.failureCount === right.failureCount &&
+  left.serverErrorCount === right.serverErrorCount &&
+  left.serverErrorSince === right.serverErrorSince &&
+  left.status === right.status &&
+  left.message === right.message &&
+  left.failedAt === right.failedAt;
+
+/** A run the backend accepted, or one that ended, has no submission left to retry. */
+const withoutSubmissionRetry = (item: QueueItem): QueueItem => {
+  if (item.submissionRetry === undefined) {
+    return item;
+  }
+  const { submissionRetry: _, ...rest } = item;
+  return rest;
+};
+
 const mergeBackendItemId = (ids: number[] | undefined, backendItemId: number): number[] =>
   ids?.includes(backendItemId) ? ids : [...(ids ?? []), backendItemId];
 
@@ -3949,6 +3981,7 @@ const enqueueCompiledSnapshot = (
   project: Project,
   defaults: ScopedDefaults,
   route: InvocationRoute,
+  runtime: Pick<InvocationRuntimeInputs, 'boardDestinationIds'>,
   compiled: Partial<ExpandedPositivePrompts> & {
     generate?: QueueGenerateSnapshot;
     graph: GraphContract;
@@ -4032,7 +4065,7 @@ const enqueueCompiledSnapshot = (
       ? null
       : getGalleryAutoAddBoardId(
           applyWidgetDefaults(widgetStates.gallery?.values ?? {}, 'gallery', defaults),
-          canAddToCachedGalleryBoard
+          (boardId: string) => runtime.boardDestinationIds.includes(boardId)
         );
   const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
   const videoPresentationDimensions =
@@ -4053,9 +4086,21 @@ const enqueueCompiledSnapshot = (
       : route.sourceId === 'generate'
         ? normalizeGenerateWidgetValues(widgetStates.generate?.values)
         : null;
+  const recordedCanvas =
+    route.sourceId === 'canvas'
+      ? Object.values(backendGraph?.nodes ?? {}).find((node) => node.type === 'core_metadata')?.canvas_v3_metadata
+      : undefined;
   const recalledSampleSeed = expansionSampleSeed === null ? {} : { dynamicPromptsSampleSeed: expansionSampleSeed };
   const recall = generateRecallValues
-    ? { generateValues: { ...cloneGenerateWidgetValues(generateRecallValues), ...recalledSampleSeed } }
+    ? {
+        ...(recordedCanvas && typeof recordedCanvas === 'object' && !Array.isArray(recordedCanvas)
+          ? { canvasMetadata: { canvas_v3_metadata: structuredClone(recordedCanvas) } }
+          : {}),
+        generateValues: {
+          ...cloneGenerateWidgetValues(generateRecallValues),
+          ...recalledSampleSeed,
+        },
+      }
     : videoSettings
       ? { videoValues: { ...cloneVideoWidgetValues(videoSettings), ...recalledSampleSeed } }
       : undefined;
@@ -4191,6 +4236,7 @@ const submitModelOnlyUpscale = (
   defaults: ScopedDefaults,
   {
     backendSupportsCancellation,
+    runtime,
     image,
     scale,
     sourceMetadata,
@@ -4222,6 +4268,7 @@ const submitModelOnlyUpscale = (
     project,
     defaults,
     route,
+    runtime,
     { graph: compiled.graph, widgetStates },
     backendSupportsCancellation,
     undefined,
@@ -4234,7 +4281,8 @@ const submitInvocationSnapshot = (
   project: Project,
   defaults: ScopedDefaults,
   backendSupportsCancellation: boolean,
-  route = resolveInvocationRoute(project),
+  runtime: InvocationRuntimeInputs,
+  route: ResolvedInvocationRoute,
   models?: readonly ModelConfig[],
   expansion: Partial<ExpandedPositivePrompts> = {},
   workflowGenerators?: WorkflowGeneratorResolutions,
@@ -4250,6 +4298,7 @@ const submitInvocationSnapshot = (
     project,
     defaults,
     route,
+    runtime,
     models,
     workflowGenerators,
     workflowDocument,
@@ -4264,6 +4313,7 @@ const submitInvocationSnapshot = (
     project,
     defaults,
     route,
+    runtime,
     { ...compiledSnapshot, ...expansion },
     backendSupportsCancellation,
     undefined,
@@ -5460,21 +5510,6 @@ const reduceWorkbenchAction = (
         redoProjectWorkflow(project, action.workflowId ?? project.workflows.activeWorkflowId, now())
       );
     }
-    case 'submitInvocationSnapshot': {
-      return withEnqueueNotification(
-        state,
-        updateActiveProject(state, (project) =>
-          submitInvocationSnapshot(
-            project,
-            state.scopedDefaults,
-            action.backendSupportsCancellation,
-            undefined,
-            action.models
-          )
-        ),
-        state.activeProjectId
-      );
-    }
     case 'submitResolvedInvocationSnapshot': {
       const target = state.projects.find((project) => project.id === action.projectId);
       const workflow =
@@ -5547,7 +5582,15 @@ const reduceWorkbenchAction = (
             project,
             state.scopedDefaults,
             action.backendSupportsCancellation,
-            resolveInvocationRoute(project, 'global', action.route, action.models, workflow?.document),
+            action.runtime,
+            resolveInvocationRoute(
+              project,
+              'global',
+              action.route,
+              action.models,
+              workflow?.document,
+              action.runtime.templates
+            ),
             action.models,
             { positivePrompts: action.positivePrompts, positivePromptsSampleSeed: action.positivePromptsSampleSeed },
             action.workflowGenerators,
@@ -5577,13 +5620,32 @@ const reduceWorkbenchAction = (
             item.backendItemIds?.length === action.backendItemIds.length &&
             item.backendItemIds.every((id, index) => id === action.backendItemIds[index]);
 
-          return item.backendBatchId === action.backendBatchId && hasSameBackendItemIds && item.status === status
+          return item.backendBatchId === action.backendBatchId &&
+            hasSameBackendItemIds &&
+            item.status === status &&
+            item.submissionRetry === undefined
             ? item
-            : { ...item, backendBatchId: action.backendBatchId, backendItemIds: action.backendItemIds, status };
+            : {
+                ...withoutSubmissionRetry(item),
+                backendBatchId: action.backendBatchId,
+                backendItemIds: action.backendItemIds,
+                status,
+              };
         });
 
         return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
       });
+    }
+    case 'recordQueueItemSubmissionRetry': {
+      return updateProjectById(state, action.projectId, (project) =>
+        updateQueueItem(project, action.queueItemId, (item) =>
+          item.status !== 'pending' ||
+          item.backendItemIds?.length ||
+          isSameSubmissionRetry(item.submissionRetry, action.retry)
+            ? item
+            : { ...item, submissionRetry: { ...action.retry } }
+        )
+      );
     }
     case 'setQueueItemStatus': {
       const project = state.projects.find((project) => project.id === action.projectId);
@@ -5593,6 +5655,7 @@ const reduceWorkbenchAction = (
         return state;
       }
 
+      // Only a pending run holds a submission retry, so an unchanged status has none to clear.
       if (queueItem?.status === action.status && queueItem.error === action.error) {
         return state;
       }
@@ -5600,7 +5663,7 @@ const reduceWorkbenchAction = (
       const nextState = updateProjectById(state, action.projectId, (project) => {
         const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
         const nextProject = updateQueueItem(project, action.queueItemId, (item) => ({
-          ...item,
+          ...(action.status === 'pending' ? item : withoutSubmissionRetry(item)),
           error: action.error,
           status: action.status,
         }));
@@ -6165,6 +6228,7 @@ const reduceWorkbenchAction = (
             project,
             state.scopedDefaults,
             { ...project.invocation, destination: action.destination, sourceId: 'canvas' },
+            action.runtime,
             {
               generate: action.generate,
               graph: action.graph,
@@ -6195,7 +6259,7 @@ const reduceWorkbenchAction = (
                 return item;
               }
 
-              return { ...item, cancellationPending: true, status: 'cancelled' };
+              return { ...withoutSubmissionRetry(item), cancellationPending: true, status: 'cancelled' };
             }),
           },
         };
@@ -6247,7 +6311,9 @@ const reduceWorkbenchAction = (
             ...project,
             queue: {
               items: project.queue.items.map((item) =>
-                isUnsubmittedQueueItem(item) ? { ...item, cancellationPending: true, status: 'cancelled' } : item
+                isUnsubmittedQueueItem(item)
+                  ? { ...withoutSubmissionRetry(item), cancellationPending: true, status: 'cancelled' }
+                  : item
               ),
             },
           };

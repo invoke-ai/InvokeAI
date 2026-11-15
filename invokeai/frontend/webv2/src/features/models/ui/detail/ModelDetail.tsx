@@ -45,10 +45,12 @@ import { UnrecordedFactNotice } from './UnrecordedFactNotice';
 import { UpdatePathDialog } from './UpdatePathDialog';
 import { WorkingMemorySection } from './WorkingMemorySection';
 
-const TRIGGER_PHRASE_TYPES = new Set(['main', 'lora', 'embedding']);
 const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
 
-type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'type'>;
+type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'type'> & {
+  hasCpuOnlySetting: boolean;
+  hasTriggerPhrases: boolean;
+};
 type TriggerPhrasesModel = Pick<ModelConfig, 'key' | 'trigger_phrases'>;
 type CpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name' | 'type'>;
 type ModelIdentityModel = Pick<
@@ -85,7 +87,17 @@ const findModel = (snapshot: ModelsSnapshot, modelKey: string): ModelConfig | un
 const selectModelShell = (snapshot: ModelsSnapshot, modelKey: string): ModelDetailShellModel | null => {
   const model = findModel(snapshot, modelKey);
 
-  return model ? { key: model.key, type: model.type } : null;
+  // The backend serializes `cpu_only` and `trigger_phrases` (null when unset) on exactly the configs that store them,
+  // so presence decides which editors appear. Control LoRAs store `trigger_phrases` but prompt triggers never read
+  // them, so they get no editor. Flags rather than the values, so editing them does not re-render the whole detail.
+  return model
+    ? {
+        hasCpuOnlySetting: supportsCpuOnlySetting(model),
+        hasTriggerPhrases: model.trigger_phrases !== undefined && model.type !== 'control_lora',
+        key: model.key,
+        type: model.type,
+      }
+    : null;
 };
 
 const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelIdentityModel | null => {
@@ -200,7 +212,7 @@ export const ModelDetail = ({
     <Stack gap="4" pb="4">
       <ModelIdentitySectionContainer modelKey={model.key} onRequestConfirm={onRequestConfirm} />
 
-      {supportsCpuOnlySetting(model) ? (
+      {model.hasCpuOnlySetting ? (
         <>
           <Separator borderColor="border.subtle" />
           <CpuOnlySettingContainer modelKey={model.key} />
@@ -228,7 +240,7 @@ export const ModelDetail = ({
         </>
       ) : null}
 
-      {TRIGGER_PHRASE_TYPES.has(model.type) ? (
+      {model.hasTriggerPhrases ? (
         <>
           <Separator borderColor="border.subtle" />
           <TriggerPhrasesEditorContainer modelKey={model.key} />

@@ -139,16 +139,21 @@ describe('executeRecallParameters', () => {
     );
   });
 
-  it('explains why nothing was applied instead of committing unchanged values', async () => {
+  it.each([
+    ['denoise_strength', 0.4],
+    ['control_layers', [{ model_key: 'controlnet' }]],
+    ['control_layers', []],
+    ['denoise_strength', null],
+  ] as const)('reports %s as unsupported when no canvas destination is available', async (key, value) => {
     const { add, commands, setSettings } = createCommands();
 
-    await expect(run(commands, { denoise_strength: 0.4 })).resolves.toBe(false);
+    await expect(run(commands, { [key]: value })).resolves.toBe(false);
 
     expect(setSettings).not.toHaveBeenCalled();
     expect(add).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: 'info',
-        message: 'denoise_strength: not supported by the Generate panel',
+        message: `${key}: not supported by the Generate panel`,
         title: 'No recalled parameters applied',
       })
     );

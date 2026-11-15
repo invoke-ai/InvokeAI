@@ -1,0 +1,18 @@
+title: BiRefNet Background Removal
+author: veeliks
+repo: https://github.com/veeliks/invoke_birefnet
+summary: Remove image backgrounds with the BiRefNet segmentation model.
+description: >-
+  BiRefNet (Bilateral Reference Network) is a high-quality segmentation model. The node supports several model
+  variants: standard, high-resolution, matting, portrait and others specialized for different uses.
+categories: [masks]
+dependencies: true
+archived: true
+thumbnail: ./birefnet-background-removal.webp
+images:
+  - src: https://raw.githubusercontent.com/veeliks/invoke_birefnet/main/.readme/example_after_removal.png
+    alt: A subject cut out on a transparent background
+    caption: After background removal
+  - src: https://raw.githubusercontent.com/veeliks/invoke_birefnet/main/.readme/example_before_removal.png
+    alt: The original photo with its background
+    caption: Before background removal

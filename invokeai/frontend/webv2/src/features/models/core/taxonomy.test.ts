@@ -19,6 +19,7 @@ describe('label fallbacks', () => {
   it('prefers curated labels for known values', () => {
     expect(getModelTypeLabel('lora')).toBe('LoRA');
     expect(getModelTypeLabel('qwen3_vl_encoder')).toBe('Qwen3 VL Encoder');
+    expect(getModelTypeLabel('qwen3_vl_vision_tower')).toBe('Qwen3 VL Vision Tower');
     expect(getModelTypeLabel('gemma2_encoder')).toBe('Gemma 2 Encoder');
     expect(getModelTypeLabel('pid_decoder')).toBe('PiD Decoder');
     expect(getModelFormatLabel('gguf_quantized')).toBe('GGUF');
@@ -35,8 +36,10 @@ describe('variant options', () => {
     expect(getVariantOptionsFor('minimax-h3', 'main')).toEqual(['fl2va', 'ref2va']);
   });
 
-  it('distinguishes wan main and wan lora variants', () => {
+  it('offers LoRA variants where the LoRA size decides which mains it fits', () => {
     expect(getVariantOptionsFor('wan', 'lora')).toEqual(['a14b', '5b']);
+    expect(getVariantOptionsFor('sd-3', 'lora')).toEqual(['sd3_medium', 'sd3_large']);
+    expect(getVariantOptionsFor('sd-3', 'main')).toEqual(['sd3_medium', 'sd3_large']);
     expect(getVariantOptionsFor('sdxl', 'lora')).toEqual([]);
   });
 
@@ -56,6 +59,7 @@ describe('variant options', () => {
     expect(getModelVariantLabel('qwen3_vl_8b')).toBe('Qwen3-VL 8B (Ideogram 4, Qwen-Image-2.1)');
     // MiniMax H3 shares the encoder type but lacks a variant field; size choices would fail saving.
     expect(getVariantOptionsFor('minimax-h3', 'qwen3_vl_encoder')).toEqual([]);
+    expect(getVariantOptionsFor('any', 'qwen3_vl_vision_tower')).toEqual(['qwen3_vl_4b', 'qwen3_vl_8b']);
   });
 
   it('returns empty for pairs with no variant concept, enabling free text', () => {

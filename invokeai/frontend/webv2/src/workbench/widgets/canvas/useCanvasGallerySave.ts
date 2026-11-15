@@ -60,7 +60,13 @@ export const useCanvasGallerySave = (
         savingProjects.set(project.id, true);
 
         try {
-          const result = await saveCanvasToGallery({ engine: matchedEngine, project, region, scopedDefaults });
+          const result = await saveCanvasToGallery({
+            engine: matchedEngine,
+            getProject: queries.getProject,
+            project,
+            region,
+            scopedDefaults,
+          });
 
           assertAccountScopeCurrent(owner);
           if (result.status === 'saved') {

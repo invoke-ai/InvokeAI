@@ -18,6 +18,7 @@ export {
   hasModelDefaultVae,
   isAspectRatioLocked,
   isFluxDypePreset,
+  isIdeogram4SamplerPreset,
   isGenerateModelConfig,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
@@ -62,6 +63,7 @@ export {
   getGenerationUiPolicy,
   getMaxReferenceImages,
   getPromptHistoryRecallPatch,
+  getReferenceImageLimit,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
   isArchitectureDescribed,
@@ -70,6 +72,7 @@ export {
   isLossyModelSwitch,
   isReferenceImageSupported,
   isSupportedGenerateModel,
+  takesReferenceImages,
   NO_GENERATE_MODEL_ISSUE,
   SCHEDULER_OPTIONS,
   type GenerateModelSelectionResult,
@@ -119,11 +122,17 @@ export {
   isZImageQwen3Encoder,
 } from './core/componentCompatibility';
 export {
+  getLockedAspectRatioSettings,
+  MAX_ASPECT_RATIO_PRESETS,
+  normalizeAspectRatioPresets,
+} from './core/aspectRatioPresets';
+export {
   isValidKrea2RebalanceWeights,
   normalizeRebalancePresets,
   type RebalancePreset,
 } from './core/conditioningRebalance';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
+export { clampPidSteps, isPidMode } from './core/pid';
 export {
   getActiveRefiner,
   isRefinerModel,

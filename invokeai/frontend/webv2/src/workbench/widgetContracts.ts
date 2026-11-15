@@ -133,10 +133,8 @@ export interface WidgetRuntimeApi<State extends Record<string, unknown> = Record
   diagnostics: WidgetDiagnosticsApi;
   commands: WidgetCommandApi;
   hotkeys: WidgetHotkeyApi;
-  menus: WidgetMenuApi;
   palette: WidgetCommandPaletteApi;
   search: WidgetSearchApi;
-  toolbars: WidgetToolbarApi;
   workbench: WidgetWorkbenchApi;
 }
 
@@ -199,16 +197,6 @@ export interface WidgetHotkeyContribution {
   allowInEditable?: boolean;
 }
 
-export interface WidgetMenuApi {
-  register: (menu: WidgetMenuContribution) => () => void;
-}
-
-export interface WidgetMenuContribution {
-  id: string;
-  items: Array<{ commandId: string; group?: string }>;
-  source?: WidgetContributionSource;
-}
-
 export interface WidgetCommandPaletteApi {
   register: (entry: WidgetCommandPaletteContribution) => () => void;
 }
@@ -243,21 +231,6 @@ export interface WidgetSearchResult {
   subtitle?: string;
   /** Commandless results are informational and are omitted from the command palette. */
   commandId?: string;
-}
-
-export interface WidgetToolbarApi {
-  register: (toolbar: WidgetToolbarContribution) => () => void;
-}
-
-export interface WidgetToolbarContribution {
-  id: string;
-  location: 'center.tabs.trailing' | 'status.left' | 'status.right';
-  items: Array<{
-    commandId: string;
-    icon?: WidgetIconComponent;
-    label?: string;
-  }>;
-  source?: WidgetContributionSource;
 }
 
 export interface OpenWorkbenchWidgetOptions {

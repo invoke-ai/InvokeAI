@@ -2404,3 +2404,92 @@ test('wildcards are stateful: create, rename, delete one, and delete a batch of 
     await backend.close();
   }
 });
+
+test('settings read routes provide usable vocabulary and dependency information', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  try {
+    const vocabulary = await fetch(`${backend.origin}/api/v1/image_map/vocab`);
+    assert.equal(vocabulary.status, 200);
+    assert.deepEqual(await vocabulary.json(), {
+      terms: ['architectural study', 'watercolor'],
+      state: 'ready',
+      error: null,
+      max_terms: 500,
+      max_term_length: 64,
+    });
+    const dependencies = await fetch(`${backend.origin}/api/v1/app/app_deps`);
+    assert.equal(dependencies.status, 200);
+    const versions = await dependencies.json();
+    assert.equal(versions.CUDA, 'N/A');
+    const version = await fetch(`${backend.origin}/api/v1/app/version`).then((response) => response.json());
+    assert.equal(versions.invokeai, version.version, 'About dependency information must identify the served app');
+    assert.ok(Object.values(versions).every((value) => typeof value === 'string'));
+  } finally {
+    await backend.close();
+  }
+});
+
+test('image PATCH adopts an intermediate as hidden durable Canvas pixels on every read', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const form = new FormData();
+    form.append('file', new Blob(['paint'], { type: 'image/png' }), 'paint.png');
+    const response = await fetch(`${backend.origin}/api/v1/images/upload?image_category=general&is_intermediate=true`, {
+      method: 'POST',
+      body: form,
+    });
+    const temporary = await response.json();
+    assert.equal(temporary.is_intermediate, true);
+    const path = `/api/v1/images/i/${encodeURIComponent(temporary.image_name)}`;
+    const adopted = await getJson(backend, path, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ is_intermediate: false, image_category: 'other' }),
+    });
+    assert.deepEqual(adopted, { ...temporary, is_intermediate: false, image_category: 'other' });
+    assert.deepEqual(await getJson(backend, path), adopted);
+    assert.deepEqual(
+      await getJson(backend, '/api/v1/images/images_by_names', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image_names: [temporary.image_name] }),
+      }),
+      [adopted]
+    );
+    const missing = await fetch(`${backend.origin}/api/v1/images/i/missing.png`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ is_intermediate: false }),
+    });
+    assert.equal(missing.status, 404);
+  });
+});
+
+test('opt-in large library has pageable metadata, representative documents, retry and revision scenarios', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  try {
+    const seed = (scenario) =>
+      getJson(backend, '/__workflow-library', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ scenario }),
+      });
+    assert.equal((await seed('large')).count, 1000);
+    const first = await getJson(backend, '/api/v1/workflows/?page=0&per_page=20');
+    assert.equal(first.total, 1000);
+    assert.equal(first.pages, 50);
+    assert.equal(first.items.length, 20);
+    assert.equal('workflow' in first.items[0], false);
+    const id = first.items[0].workflow_id;
+    assert.equal((await getJson(backend, `/api/v1/workflows/i/${id}`)).workflow.nodes.length, 40);
+    await seed('failed-page');
+    const failedPath = '/api/v1/workflows/?page=2&per_page=20';
+    assert.equal((await fetch(`${backend.origin}${failedPath}`)).status, 503);
+    assert.equal((await getJson(backend, failedPath)).page, 2);
+    await seed('changed-revision');
+    assert.equal((await getJson(backend, `/api/v1/workflows/i/${id}`)).revision, 2);
+    await seed('empty');
+    assert.equal((await getJson(backend, '/api/v1/workflows/')).total, 0);
+  } finally {
+    await backend.close();
+  }
+});

@@ -52,17 +52,19 @@ const starterIdentity = (base: string, type: string, name: string): string => `$
 
 /**
  * The installed model a starter entry stands for, matched the way the backend
- * marks starters installed: by install source, else by name (or a previous
+ * marks starters installed: by install source (or a previous source), else by name (or a previous
  * name) together with base and type.
  */
 export const findInstalledStarterModelKey = (
-  starter: Pick<StarterModel, 'base' | 'name' | 'previous_names' | 'source' | 'type'>,
+  starter: Pick<StarterModel, 'base' | 'name' | 'previous_names' | 'previous_sources' | 'source' | 'type'>,
   installedSourceKeys: ReadonlyMap<string, string>,
   models: readonly ModelConfig[]
 ): string | null => {
-  const bySource = installedSourceKeys.get(starter.source);
-  if (bySource !== undefined) {
-    return bySource;
+  for (const source of [starter.source, ...(starter.previous_sources ?? [])]) {
+    const bySource = installedSourceKeys.get(source);
+    if (bySource !== undefined) {
+      return bySource;
+    }
   }
   const names = new Set(
     [starter.name, ...(starter.previous_names ?? [])].map((name) => starterIdentity(starter.base, starter.type, name))

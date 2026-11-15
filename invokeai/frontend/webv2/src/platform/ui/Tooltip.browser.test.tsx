@@ -3,10 +3,11 @@ import { system } from '@theme/system';
 import { CameraIcon } from 'lucide-react';
 import { act, useCallback, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { Toolbar, ToolbarButton } from './Toolbar';
-import { ClippedTooltip } from './Tooltip';
+import { ClippedTooltip, Tooltip } from './Tooltip';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -133,4 +134,40 @@ it('shows a clipped name on keyboard focus and nothing for a name that fits', as
     });
   });
   expect(openTooltipText()).toBeUndefined();
+});
+
+it('lets a click through an open tip to the control under it, such as the next row of a dense list', async () => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  const onNextClick = vi.fn();
+  await act(() =>
+    root?.render(
+      <ChakraProvider value={system}>
+        <div style={{ display: 'grid', gap: '2px', left: '200px', position: 'absolute', top: '200px' }}>
+          <Tooltip content="Delete" openDelay={0} placement="bottom">
+            <button style={{ height: '28px', width: '28px' }} type="button">
+              A
+            </button>
+          </Tooltip>
+          <button aria-label="Next" style={{ height: '28px', width: '28px' }} type="button" onClick={onNextClick}>
+            B
+          </button>
+        </div>
+      </ChakraProvider>
+    )
+  );
+  const [first, next] = host.querySelectorAll('button');
+
+  await focusWithKeyboard(first!);
+  await expect.poll(openTooltipText).toBe('Delete');
+  const target = next!.getBoundingClientRect();
+  const centre = target.top + target.height / 2;
+  const tip = () => document.querySelector('[role="tooltip"][data-state="open"]')!.getBoundingClientRect();
+  // Once placed, the tip covers the next button's centre: the case this guards.
+  await expect.poll(() => tip().top < centre && tip().bottom > centre).toBe(true);
+
+  await userEvent.click(next!);
+
+  expect(onNextClick).toHaveBeenCalledOnce();
 });

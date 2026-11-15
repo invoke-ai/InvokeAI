@@ -61,6 +61,7 @@ from tests.test_nodes import (
     PromptTestInvocation,
     PromptTestInvocationOutput,
     TextToImageTestInvocation,
+    TypeFormCollectionTestInvocation,
     UnionCollectionTestInvocation,
     UnionItemCollectionTestInvocation,
     get_single_output_from_session,
@@ -1230,6 +1231,149 @@ def test_batch_with_literal_collector_items_is_validated_without_type_error():
             {
                 "source": {"node_id": "collect", "field": "collection"},
                 "destination": {"node_id": "strings", "field": "collection"},
+            },
+        ],
+    }
+    with pytest.raises(ValidationError, match="matching type"):
+        Batch.model_validate({"graph": graph})
+
+
+def _collect_type_form_items(graph: Graph, type_form_field: str, other_item: BaseInvocation) -> None:
+    graph.add_node(TypeFormCollectionTestInvocation(id="type_forms"))
+    graph.add_node(other_item)
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("type_forms", type_form_field, "collect", "item"))
+    graph.add_edge(create_edge(other_item.id, "value", "collect", "item"))
+
+
+def test_graph_collector_accepts_union_items_with_a_member_item_for_a_union_collection():
+    # Union items next to another typed item used to reach issubclass() with the union, which
+    # enqueue_batch returned as a 500.
+    graph = Graph()
+    _collect_type_form_items(graph, "union_items", IntegerInvocation(id="other"))
+    graph.add_node(TypeFormCollectionTestInvocation(id="consumer"))
+    graph.add_edge(create_edge("collect", "collection", "consumer", "union_items"))
+    assert graph.is_valid()
+
+
+def test_graph_collector_rejects_union_items_for_a_collection_of_one_member():
+    graph = Graph()
+    _collect_type_form_items(graph, "union_items", IntegerInvocation(id="other"))
+    graph.add_node(IntegerCollectionInvocation(id="ints"))
+    with pytest.raises(InvalidEdgeError, match="matching type"):
+        graph.add_edge(create_edge("collect", "collection", "ints", "collection"))
+
+
+def test_graph_collector_accepts_union_items_whose_members_subclass_the_collection_members():
+    graph = Graph()
+    _collect_type_form_items(graph, "derived_union_items", DerivedFieldTestInvocation(id="other"))
+    graph.add_node(UnionItemCollectionTestInvocation(id="consumer"))
+    graph.add_edge(create_edge("collect", "collection", "consumer", "value"))
+    assert graph.is_valid()
+
+
+@pytest.mark.parametrize(
+    ("type_form_field", "other_item"),
+    [
+        pytest.param("union_items", FloatInvocation(id="other"), id="union-and-non-member"),
+        pytest.param("nested_items", IntegerInvocation(id="other"), id="generic-and-class"),
+        pytest.param("optional_nested_items", IntegerInvocation(id="other"), id="optional-generic-and-class"),
+    ],
+)
+def test_graph_collector_rejects_unrelated_type_form_items_as_mixed_types(
+    type_form_field: str, other_item: BaseInvocation
+):
+    graph = Graph()
+    with pytest.raises(InvalidEdgeError, match="single type"):
+        _collect_type_form_items(graph, type_form_field, other_item)
+
+
+def _collect_type_form_collection(graph: Graph, type_form_field: str = "literal_items") -> None:
+    graph.add_node(TypeFormCollectionTestInvocation(id="type_forms"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("type_forms", type_form_field, "collect", "collection"))
+
+
+@pytest.mark.parametrize(
+    ("type_form_field", "consumer", "field"),
+    [
+        pytest.param(
+            "literal_items",
+            TypeFormCollectionTestInvocation(id="consumer"),
+            "wider_literal_items",
+            id="literal-superset",
+        ),
+        pytest.param(
+            "literal_items", StringCollectionInvocation(id="consumer"), "collection", id="class-of-every-value"
+        ),
+        # Each value of `Literal["a", 1]` fits a different member of `int | str`.
+        pytest.param(
+            "mixed_literal_items",
+            TypeFormCollectionTestInvocation(id="consumer"),
+            "union_items",
+            id="literal-values-across-union-members",
+        ),
+        # bool subclasses int, and pydantic accepts `True` for `int`.
+        pytest.param(
+            "true_literal_items", IntegerCollectionInvocation(id="consumer"), "collection", id="bool-into-int"
+        ),
+        pytest.param(
+            "nested_items",
+            TypeFormCollectionTestInvocation(id="consumer"),
+            "nested_items",
+            id="same-parameterized-generic",
+        ),
+    ],
+)
+def test_graph_collector_accepts_collection_items_for_a_collection_holding_every_value(
+    type_form_field: str, consumer: BaseInvocation, field: str
+):
+    graph = Graph()
+    _collect_type_form_collection(graph, type_form_field)
+    graph.add_node(consumer)
+    graph.add_edge(create_edge("collect", "collection", "consumer", field))
+    assert graph.is_valid()
+
+
+def test_graph_collector_rejects_literal_collection_items_for_a_collection_missing_a_value():
+    graph = Graph()
+    _collect_type_form_collection(graph)
+    graph.add_node(TypeFormCollectionTestInvocation(id="consumer"))
+    with pytest.raises(InvalidEdgeError, match="matching type"):
+        graph.add_edge(create_edge("collect", "collection", "consumer", "narrower_literal_items"))
+
+
+def test_graph_collector_accepts_literal_collection_items_with_an_item_of_their_values_type():
+    graph = Graph()
+    _collect_type_form_collection(graph)
+    graph.add_node(StringInvocation(id="string"))
+    graph.add_node(StringCollectionInvocation(id="strings"))
+    graph.add_edge(create_edge("string", "value", "collect", "item"))
+    graph.add_edge(create_edge("collect", "collection", "strings", "collection"))
+    assert graph.is_valid()
+
+
+def test_batch_with_union_collector_items_is_validated_without_type_error():
+    graph = {
+        "id": "g",
+        "nodes": {
+            "type_forms": {"id": "type_forms", "type": "test_type_form_collection"},
+            "int": {"id": "int", "type": "integer"},
+            "collect": {"id": "collect", "type": "collect"},
+            "ints": {"id": "ints", "type": "integer_collection"},
+        },
+        "edges": [
+            {
+                "source": {"node_id": "type_forms", "field": "union_items"},
+                "destination": {"node_id": "collect", "field": "item"},
+            },
+            {
+                "source": {"node_id": "int", "field": "value"},
+                "destination": {"node_id": "collect", "field": "item"},
+            },
+            {
+                "source": {"node_id": "collect", "field": "collection"},
+                "destination": {"node_id": "ints", "field": "collection"},
             },
         ],
     }

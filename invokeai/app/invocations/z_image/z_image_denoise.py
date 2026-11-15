@@ -295,13 +295,12 @@ class ZImageDenoiseInvocation(BaseInvocation):
         # At cfg_scale=1.0: pred = pred_cond (no effect, skip uncond computation)
         # This matches FLUX's convention where 1.0 means "no CFG"
         neg_prompt_embeds: torch.Tensor | None = None
+        negative_regional_extension: ZImageRegionalPromptingExtension | None = None
         do_classifier_free_guidance = (
             not math.isclose(self.guidance_scale, 1.0) and self.negative_conditioning is not None
         )
         if do_classifier_free_guidance:
             assert self.negative_conditioning is not None
-            # Load all negative conditionings and concatenate embeddings
-            # Note: We ignore masks for negative conditioning as regional negative prompting is not fully supported
             neg_text_conditionings = self._load_text_conditioning(
                 context=context,
                 cond_field=self.negative_conditioning,
@@ -310,8 +309,13 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 dtype=inference_dtype,
                 device=device,
             )
-            # Concatenate all negative embeddings
-            neg_prompt_embeds = torch.cat([tc.prompt_embeds for tc in neg_text_conditionings], dim=0)
+            # The global negative stays image-wide; only the positive pass's unmasked prompt yields to regions.
+            negative_regional_extension = ZImageRegionalPromptingExtension.from_text_conditionings(
+                text_conditionings=neg_text_conditionings,
+                img_seq_len=img_seq_len,
+                unmasked_covers_whole_image=True,
+            )
+            neg_prompt_embeds = negative_regional_extension.regional_text_conditioning.prompt_embeds
 
         # Calculate shift based on image sequence length, or use override
         if self.shift is not None:
@@ -441,7 +445,14 @@ class ZImageDenoiseInvocation(BaseInvocation):
             # Ask the model cache to keep the forward's working memory free; it offloads as much of the
             # transformer as that takes. Without it the cache reserves only `device_working_mem_gb`, which a
             # build that materializes the score matrices (ROCm on Windows, MPS) overruns several times at 1024px.
-            regional_attn_mask = regional_extension.regional_attn_mask
+            negative_regional_attn_mask = (
+                negative_regional_extension.regional_attn_mask if negative_regional_extension is not None else None
+            )
+            # Both boolean masks are already resident; only the larger additive bias is live per forward.
+            regional_attn_mask = max(
+                (regional_extension.regional_attn_mask, negative_regional_attn_mask),
+                key=lambda mask: mask.numel() if mask is not None else 0,
+            )
             working_memory = estimate_z_image_denoise_working_memory(
                 transformer_info.model,
                 image_seq_len=img_seq_len,
@@ -504,6 +515,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     regional_attn_mask=regional_extension.regional_attn_mask,
                     img_seq_len=img_seq_len,
                     positive_cap_feats=pos_prompt_embeds,
+                    negative_regional_attn_mask=negative_regional_attn_mask,
+                    negative_cap_feats=neg_prompt_embeds,
                 )
             )
 

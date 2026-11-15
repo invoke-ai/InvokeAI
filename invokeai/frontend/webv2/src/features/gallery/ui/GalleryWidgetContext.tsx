@@ -1,4 +1,5 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryMediaUsageReport } from '@features/gallery/core/mediaUsage';
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySearchScope, GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryGeneralAccess, GalleryView } from '@features/gallery/core/types';
@@ -28,6 +29,8 @@ export interface GalleryActions {
   createBoard: (boardName: string, projectId: string | null) => Promise<boolean>;
   deleteBoard: (boardId: string, includeImages: boolean) => Promise<void>;
   downloadBoard: (boardId: string) => Promise<void>;
+  /** Where the board's media is still used; see `GalleryUiAdapter.getBoardMediaUsage`. */
+  getBoardMediaUsage: (boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>;
   /** Export the project that owns this board as a complete `.invk` archive. */
   exportProject: (projectId: string, projectName: string) => void;
   loadMore: () => void;

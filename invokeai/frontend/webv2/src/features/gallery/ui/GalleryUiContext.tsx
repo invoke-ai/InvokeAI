@@ -1,4 +1,5 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryMediaUsageReport } from '@features/gallery/core/mediaUsage';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type {
   GalleryBoard,
@@ -56,6 +57,11 @@ export interface GalleryItemContextMenuTarget {
   items: GalleryItem[];
   /** The board the listing the targets were selected in reads, where targets `items` omits sit. */
   listingBoardId?: string;
+  /**
+   * Where focus goes when a dialog the menu opens (a deletion's confirmation) closes, resolved then: the menu, which
+   * had focus as the dialog opened, is gone by then.
+   */
+  returnFocus?: () => HTMLElement | null;
   x: number;
   y: number;
 }
@@ -128,6 +134,11 @@ export interface GalleryUiAdapter {
   gallery: GalleryCommandsPort;
   galleryValues: Record<string, unknown>;
   generateValues: Record<string, unknown>;
+  /**
+   * Where a board's media is still used, for deleting the board with its media: the host narrows the server's check
+   * with its projects' own scans. Rejects when the check cannot run at all.
+   */
+  getBoardMediaUsage(boardId: string, signal: AbortSignal): Promise<GalleryMediaUsageReport>;
   /** A project's gallery values as they are now, or null once it is closed; absent for hosts without projects. */
   getProjectGalleryValues?(projectId: string): Record<string, unknown> | null;
   /** The user picked a board in the board list to look at it: the host may explain where new results still go. */

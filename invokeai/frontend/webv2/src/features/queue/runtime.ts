@@ -1,4 +1,4 @@
-import type { QueueItem, QueueRunErrorCode } from '@features/queue/core/historyTypes';
+import type { QueueItem, QueueRunErrorCode, QueueSubmissionRetry } from '@features/queue/core/historyTypes';
 import type {
   QueueBackendPort,
   QueueEnqueueGenerateRequest,
@@ -21,7 +21,11 @@ import {
   MAX_QUEUE_BATCH_ITEMS,
   type QueueWorkflowSeed,
 } from '@features/queue/core/promptBatch';
-import { QUEUE_SOURCE_RESULT_NODE_IDS, shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
+import {
+  boundSubmissionRetryMessage,
+  QUEUE_SOURCE_RESULT_NODE_IDS,
+  shouldSubmitPendingQueueItem,
+} from '@features/queue/core/submissionRules';
 import {
   buildQueueItemOrigin,
   isTerminalBackendStatus,
@@ -43,11 +47,12 @@ import {
   type ReconcileInput,
   type ReconcileOutcome,
 } from '@features/queue/runtime/coordinator';
+import { createDeliveryConfirmations } from '@features/queue/runtime/deliveryClaims';
 import { createUuid } from '@platform/browser/randomUuid';
 import { mapWithConcurrency } from '@platform/core/concurrency';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
-import { ApiError, getApiErrorMessage } from '@platform/transport/http';
+import { ApiError, getApiErrorMessage, sleep } from '@platform/transport/http';
 
 export interface QueueResultDestinationPort {
   addImagesToGalleryBoard(boardId: string, imageNames: string[]): Promise<void>;
@@ -96,6 +101,8 @@ export interface QueueHistoryCommands {
     projectId: string;
     queueItemId: string;
   }): void;
+  /** Record the latest failed submission of a run the backend has not accepted; acceptance or an ending clears it. */
+  recordSubmissionRetry(payload: { projectId: string; queueItemId: string; retry: QueueSubmissionRetry }): void;
   setCancellationPending(payload: { pending: boolean; projectId: string; queueItemId: string }): void;
   setLocalRecoveryState(payload: {
     projectId: string;
@@ -376,6 +383,8 @@ export interface QueueHistoryPort {
     isHydrated: boolean;
     projects: QueueHistoryProject[];
   };
+  /** Existing Canvas candidates, including those restored by project recovery; no new persistence schema. */
+  listStagedResults(): Array<{ backendItemId: number; projectId: string; queueItemId: string }>;
   subscribe(listener: () => void): () => void;
 }
 
@@ -403,6 +412,8 @@ const RERUN_CLAIM_TTL_MS = 120_000;
 const RERUN_CLAIM_RENEW_MS = 40_000;
 
 interface RunAttempt {
+  /** Only fresh admissions observed here are known ordinary; restored runs still need metadata validation. */
+  ordinaryBackendItemIds?: ReadonlySet<number>;
   generation: number;
   key: string;
   projectId: string;
@@ -417,22 +428,106 @@ const getJournalSignature = (item: QueueItem): string =>
     item.backendItemIds,
     item.completedBackendItemIds,
     item.cancelledBackendItemIds,
+    // The failure budget and the wait before the next attempt survive a reload, so every failed attempt writes the run
+    // once more; the retry pace bounds those writes.
+    item.submissionRetry,
   ]);
 
 /**
  * A 5xx answer to an enqueue is usually caused by the request itself (e.g. a graph that
  * crashes server-side validation), so retrying the same submission forever never succeeds.
- * Gateway and availability errors (502/503/504) stay transient and keep retrying.
- * A run only gives up after at least MAX_SERVER_ERROR_SUBMISSIONS 500s spread over at least
+ * Gateway and availability errors (502/503/504, and 408/429) stay transient and keep retrying.
+ * A run only gives up after at least MAX_SERVER_ERROR_SUBMISSIONS consecutive 500s spread over at least
  * MIN_SERVER_ERROR_WINDOW_MS, so a short-lived internal error can still recover.
  * After the last allowed 500 the run is reconciled once more, and only fails if the
- * backend queue really has nothing for it.
+ * backend queue really has nothing for it. The count lives on the run (`submissionRetry`), so a reload continues it.
  */
 const MAX_SERVER_ERROR_SUBMISSIONS = 3;
 const MIN_SERVER_ERROR_WINDOW_MS = 10_000;
-const TRANSIENT_SERVER_STATUSES = [502, 503, 504];
-const isDeterministicServerError = (error: unknown): boolean =>
-  error instanceof ApiError && error.status >= 500 && !TRANSIENT_SERVER_STATUSES.includes(error.status);
+/**
+ * An attempt starting this long after the run's previous failure begins a new 500 streak, so 500s from an earlier
+ * session do not spend the budget of a later one. Minutes rather than a few retry delays: a hidden tab's timers can
+ * fire only about once a minute, and that must not reset a streak.
+ */
+const SERVER_ERROR_STREAK_GAP_MS = 5 * 60_000;
+const UNAVAILABLE_STATUSES = [408, 429, 502, 503, 504];
+/**
+ * A run waits before each resubmission, 1 s after its first failed submission and doubling up to 15 s, whatever the
+ * reason; its 500 budget is then spent after five attempts over about 15 s. When the connection comes back, each run
+ * waiting then submits within a random RECONNECT_SPREAD_MS instead (never later than its own wait), so a restarting
+ * server, and every tab, does not get all of them at once.
+ *
+ * Clock rules, for the wall clock the recorded times use:
+ * - A wait runs from the recorded failure (`failedAt`), so a reload keeps it.
+ * - A wait is never longer than the run's delay: a failure recorded ahead of the clock (set back since) waits the
+ *   delay from now (`getSubmissionWaitMs`), and a due time the clock has since moved more than a delay away is fixed
+ *   again (`getRemainingSubmissionWaitMs`). A clock set back delays a run once by at most its delay.
+ * - A 500 streak whose start reads after now restarts its window at now and keeps its count, so the run neither waits
+ *   for the clock to catch up nor fails at once; a clock set forward can only shorten the window, and the run still
+ *   takes MAX_SERVER_ERROR_SUBMISSIONS 500s to fail (`getSubmissionRetry`). A clock set back never starts a new streak
+ *   by SERVER_ERROR_STREAK_GAP_MS; one set forward past it does, which only gives the run a fresh budget.
+ * - Whether the budget is spent is judged from the recorded times alone (`isSubmissionRetryExhausted`).
+ */
+const SUBMISSION_RETRY_BASE_MS = 1_000;
+const SUBMISSION_RETRY_MAX_MS = 15_000;
+const RECONNECT_SPREAD_MS = 2_000;
+const getSubmissionRetryDelayMs = (failureCount: number): number =>
+  Math.min(SUBMISSION_RETRY_BASE_MS * 2 ** Math.max(failureCount - 1, 0), SUBMISSION_RETRY_MAX_MS);
+const getSubmissionWaitMs = (retry: QueueSubmissionRetry, now: number): number => {
+  const delayMs = getSubmissionRetryDelayMs(retry.failureCount);
+  return Math.min(Math.max(retry.failedAt + delayMs - now, 0), delayMs);
+};
+const isDeterministicServerError = (error: unknown): error is ApiError =>
+  error instanceof ApiError && error.status >= 500 && !UNAVAILABLE_STATUSES.includes(error.status);
+/** `fetch` rejects with a TypeError when the request gets no answer, and a DOMException when it is aborted. */
+const isTransportFailure = (error: unknown): boolean =>
+  error instanceof TypeError ||
+  (error instanceof DOMException && ['AbortError', 'NetworkError', 'TimeoutError'].includes(error.name));
+
+const getRetryReason = (error: unknown): Exclude<QueueSubmissionRetry['reason'], 'server-error'> => {
+  if (error instanceof ApiError) {
+    return UNAVAILABLE_STATUSES.includes(error.status) ? 'unavailable' : 'error';
+  }
+  return isTransportFailure(error) ? 'unreachable' : 'error';
+};
+
+/**
+ * The retry a failed submission leaves, continuing the run's consecutive server errors unless the attempt started
+ * more than SERVER_ERROR_STREAK_GAP_MS after the previous failure. The gap is measured from the attempt's start, so
+ * a slow answer cannot reset its own streak.
+ */
+const getSubmissionRetry = (
+  error: unknown,
+  previous: QueueSubmissionRetry | undefined,
+  { attemptStartedAt, now }: { attemptStartedAt: number; now: number }
+): QueueSubmissionRetry => {
+  const base = {
+    failedAt: now,
+    failureCount: (previous?.failureCount ?? 0) + 1,
+    message: boundSubmissionRetryMessage(toErrorMessage(error)),
+    status: error instanceof ApiError ? error.status : null,
+  };
+  if (!isDeterministicServerError(error)) {
+    return { ...base, reason: getRetryReason(error), serverErrorCount: 0, serverErrorSince: null };
+  }
+  const streak =
+    previous?.reason === 'server-error' && attemptStartedAt - previous.failedAt <= SERVER_ERROR_STREAK_GAP_MS
+      ? previous
+      : undefined;
+  const since = streak?.serverErrorSince ?? null;
+  return {
+    ...base,
+    reason: 'server-error',
+    serverErrorCount: (streak?.serverErrorCount ?? 0) + 1,
+    serverErrorSince: since !== null && since <= now ? since : now,
+  };
+};
+
+const isSubmissionRetryExhausted = (retry: QueueSubmissionRetry): boolean =>
+  retry.reason === 'server-error' &&
+  retry.serverErrorSince !== null &&
+  retry.serverErrorCount >= MAX_SERVER_ERROR_SUBMISSIONS &&
+  retry.failedAt - retry.serverErrorSince >= MIN_SERVER_ERROR_WINDOW_MS;
 
 const NO_CANCEL_REQUESTS: QueueCancelRequestPort = { wasRequestedHere: () => false };
 
@@ -513,9 +608,15 @@ export const createQueueRuntime = ({
   const submissionOperations = new Map<string, Promise<unknown>>();
   const cancelRequestedRunKeys = new Set<string>();
   let reconcileRetryDelayMs = 100;
-  const serverErrorCounts = new Map<string, { count: number; firstAt: number }>();
-  const exhaustedServerErrors = new Map<string, string>();
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Wakes the runtime when the earliest waiting run may submit again. */
+  let submissionTimer: { dueAt: number; timer: ReturnType<typeof setTimeout> } | undefined;
+  /**
+   * When each waiting run may submit again, by the failure it waits on; fixed when that failure is first seen and
+   * shortened on reconnect. See the clock rules at SUBMISSION_RETRY_BASE_MS.
+   */
+  const submissionDueTimes = new Map<string, { dueAt: number; failedAt: number }>();
+  let sawDisconnect = false;
   let renewTimer: ReturnType<typeof setInterval> | undefined;
   let hasInitialized = false;
   let isInitializing = false;
@@ -526,6 +627,7 @@ export const createQueueRuntime = ({
   const beginAttempt = (projectId: string, queueItemId: string): RunAttempt => {
     const key = getRunKey(projectId, queueItemId);
     const attempt = {
+      ordinaryBackendItemIds: activeAttempts.get(key)?.ordinaryBackendItemIds,
       generation: ++nextAttemptGeneration,
       key,
       projectId,
@@ -824,8 +926,7 @@ export const createQueueRuntime = ({
     reconcileRetryRunKeys.delete(key);
     cancelRequestedRunKeys.delete(key);
     reportedCancelFailures.delete(key);
-    serverErrorCounts.delete(key);
-    exhaustedServerErrors.delete(key);
+    submissionDueTimes.delete(key);
     invalidateAttempt(projectId, queueItemId);
     pendingJournalRecords.delete(key);
     const ownershipEpoch = ownershipEpochs.get(key) ?? 0;
@@ -1167,8 +1268,32 @@ export const createQueueRuntime = ({
         return;
       }
 
+      if (images.length > 0) {
+        markAdoptedRerunsStaged(
+          projectId,
+          queueItem,
+          images.flatMap((image) => (image.sourceBackendItemId === undefined ? [] : [image.sourceBackendItemId]))
+        );
+      }
+      try {
+        deliveryConfirmations.routeOrdinaryResults(
+          backendItemIds.filter((id) => attempt.ordinaryBackendItemIds?.has(id)),
+          () => commands.routeResults({ images, projectId, queueItemId: queueItem.id, videos })
+        );
+      } catch (error) {
+        let stagedBackendItemIds: Set<number> | undefined;
+        for (const backendItemId of backendItemIds) {
+          const claim = adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId));
+          if (claim) {
+            stagedBackendItemIds ??= getStagedBackendItemIds(projectId, queueItem.id);
+            claim.isStaged = stagedBackendItemIds.has(backendItemId);
+          }
+        }
+        confirmAdoptedReruns(projectId, queueItem, backendItemIds);
+        releaseAdoptedReruns(projectId, queueItem.id);
+        throw error;
+      }
       confirmAdoptedReruns(projectId, queueItem, backendItemIds);
-      commands.routeResults({ images, projectId, queueItemId: queueItem.id, videos });
       if (queueItem.snapshot.destination === 'gallery') {
         commands.refreshBackendData();
       }
@@ -1254,7 +1379,7 @@ export const createQueueRuntime = ({
       }
 
       // A renewal may have found the claim lost while the results loaded; another claimant stages the rerun then.
-      const visibleImages = isAdoptedRerunDecidedHere(projectId, queueItem, backendItemId)
+      const visibleImages = (await isAdoptedRerunStagedHere(projectId, queueItem, backendItemId))
         ? await deliverVisibleImages(queueItem, images)
         : [];
       // Never throws — a board-attach hiccup must not block routePartialResults below.
@@ -1270,14 +1395,38 @@ export const createQueueRuntime = ({
         queueItem.id,
         visibleImages.map((image) => image.imageName)
       );
+      if (visibleImages.length > 0) {
+        markAdoptedRerunsStaged(projectId, queueItem, [backendItemId]);
+      }
+      try {
+        deliveryConfirmations.routeOrdinaryResults(
+          attempt.ordinaryBackendItemIds?.has(backendItemId) ? [backendItemId] : [],
+          () =>
+            commands.routePartialResults({
+              backendItemId,
+              images: visibleImages,
+              projectId,
+              queueItemId: queueItem.id,
+              videos,
+            })
+        );
+      } catch (error) {
+        const claim = adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId));
+        if (claim) {
+          claim.isStaged = history
+            .listStagedResults()
+            .some(
+              (result) =>
+                result.backendItemId === backendItemId &&
+                result.projectId === projectId &&
+                result.queueItemId === queueItem.id
+            );
+        }
+        confirmAdoptedReruns(projectId, queueItem, [backendItemId]);
+        releaseAdoptedReruns(projectId, queueItem.id);
+        throw error;
+      }
       confirmAdoptedReruns(projectId, queueItem, [backendItemId]);
-      commands.routePartialResults({
-        backendItemId,
-        images: visibleImages,
-        projectId,
-        queueItemId: queueItem.id,
-        videos,
-      });
       if (queueItem.snapshot.destination === 'gallery') {
         commands.refreshBackendData();
       }
@@ -1358,7 +1507,11 @@ export const createQueueRuntime = ({
       if (target?.queueItem && !(await isAdoptedRerunStagedHere(target.project.id, target.queueItem, itemId))) {
         return [];
       }
-      return runResultRead(() => backend.getResultImages(itemId, localQueueItemId, ...rest));
+      const images = await runResultRead(() => backend.getResultImages(itemId, localQueueItemId, ...rest));
+      if (target?.queueItem && !(await isAdoptedRerunStagedHere(target.project.id, target.queueItem, itemId))) {
+        return [];
+      }
+      return images;
     },
   };
   const coordinator = createQueueCoordinator(
@@ -1413,6 +1566,7 @@ export const createQueueRuntime = ({
 
   /** Backend ids of reruns no run in this tab adopted. */
   const unadoptedReruns = new Set<number>();
+  const ownedUnadoptedClaims = new Map<number, string>();
   const rememberUnadoptedRerun = (itemId: number): void => {
     unadoptedReruns.add(itemId);
     for (const oldest of unadoptedReruns) {
@@ -1426,17 +1580,7 @@ export const createQueueRuntime = ({
   /** Ends every wait on another tab's run, or on a rerun another claimant holds, once this runtime stops. */
   const rerunWaits = new AbortController();
   const waitForRerunRetry = (delayMs: number): Promise<void> =>
-    new Promise((resolve) => {
-      const timer = setTimeout(resolve, delayMs);
-      rerunWaits.signal.addEventListener(
-        'abort',
-        () => {
-          clearTimeout(timer);
-          resolve();
-        },
-        { once: true }
-      );
-    });
+    sleep(delayMs, rerunWaits.signal).catch(() => undefined);
   /** This tab, as the claimant of the reruns it stages outside any run. */
   const tabClaimant = `tab:${createUuid()}`;
   /** A run, as the claimant of the reruns it was reopened around; the run restored by a reload claims as it did. */
@@ -1448,8 +1592,16 @@ export const createQueueRuntime = ({
    * request that fails is asked again for as long as a claim could last. A server without claims (a 404) lets every
    * claimant stage it, as before claims existed.
    */
-  const claimRerunDelivery = async (itemId: number, claimant: string, canDeliver: () => boolean): Promise<boolean> => {
+  const claimRerunDelivery = async (
+    itemId: number,
+    claimant: string,
+    canDeliver: () => boolean,
+    onClaim: () => void
+  ): Promise<boolean> => {
     for (let failures = 0; ;) {
+      if (!isActive()) {
+        return false;
+      }
       let claim: QueueItemDeliveryClaim;
       try {
         claim = await backend.claimItemDelivery(itemId, 'claim', claimant);
@@ -1464,7 +1616,14 @@ export const createQueueRuntime = ({
         claim = { kind: 'held', retryInMs: RERUN_CLAIM_POLL_MS };
       }
       if (claim.kind !== 'held') {
-        return claim.kind === 'claimed';
+        if (claim.kind === 'claimed' && !canDeliver()) {
+          settleRerunClaim(itemId, 'release', claimant);
+          return false;
+        }
+        if (claim.kind === 'claimed') {
+          onClaim();
+        }
+        return canDeliver() && claim.kind === 'claimed';
       }
       // Soon enough to see the holder confirm, and spread out so claimants turned away together do not ask together.
       await waitForRerunRetry(Math.min(claim.retryInMs, RERUN_CLAIM_POLL_MS) * (1 + Math.random() / 2));
@@ -1474,15 +1633,51 @@ export const createQueueRuntime = ({
     }
   };
   /** Whether this claimant still holds an item it claimed, renewing the claim; a server that cannot answer keeps it. */
-  const isRerunClaimHeld = async (itemId: number, claimant: string): Promise<boolean> => {
+  const isRerunClaimHeld = async (
+    itemId: number,
+    claimant: string,
+    canDeliver: () => boolean,
+    onClaim: () => void
+  ): Promise<boolean> => {
+    if (!isActive()) {
+      return false;
+    }
     try {
-      return (await backend.claimItemDelivery(itemId, 'claim', claimant)).kind === 'claimed';
+      const result = await backend.claimItemDelivery(itemId, 'claim', claimant);
+      if (result.kind === 'claimed' && !canDeliver()) {
+        settleRerunClaim(itemId, 'release', claimant);
+        return false;
+      }
+      if (result.kind === 'claimed') {
+        onClaim();
+      }
+      return result.kind === 'claimed' && canDeliver();
     } catch {
-      return true;
+      return canDeliver();
     }
   };
-  const settleRerunClaim = (itemId: number, action: 'confirm' | 'release', claimant: string): void => {
-    void backend.claimItemDelivery(itemId, action, claimant).catch(() => undefined);
+  const deliveryConfirmations = createDeliveryConfirmations({
+    backend,
+    isActive,
+    signal: owner.signal,
+    reportError: (message) => commands.recordError({ area: 'queue-results', message, namespace: 'queue' }),
+  });
+  const settleRerunClaim = (
+    itemId: number,
+    action: 'confirm' | 'release',
+    claimant: string,
+    ownsClaim = false
+  ): void => {
+    if (action === 'confirm') {
+      deliveryConfirmations.confirm(itemId, claimant, ownsClaim);
+    } else if (
+      isAccountScopeCurrent(owner) &&
+      !deliveryConfirmations.isStaged(itemId) &&
+      !history.listStagedResults().some((result) => result.backendItemId === itemId)
+    ) {
+      // Same-account teardown may release unstaged work; an account change must never send with new credentials.
+      void backend.claimItemDelivery(itemId, action, claimant).catch(() => undefined);
+    }
   };
 
   /**
@@ -1492,7 +1687,8 @@ export const createQueueRuntime = ({
   interface AdoptedRerunClaim {
     decision: Promise<boolean>;
     isClaimed: boolean;
-    isConfirmed: boolean;
+    isStaged: boolean;
+    ownsClaim: boolean;
   }
   const adoptedRerunClaims = new Map<string, AdoptedRerunClaim>();
   const getAdoptedRerunKey = (projectId: string, queueItemId: string, backendItemId: number): string =>
@@ -1512,13 +1708,17 @@ export const createQueueRuntime = ({
       decision: claimRerunDelivery(
         backendItemId,
         getRunClaimant(projectId, queueItemId),
-        () => isActive() && adoptedRerunClaims.get(key) === claim
+        () => isActive() && adoptedRerunClaims.get(key) === claim,
+        () => {
+          claim.ownsClaim = true;
+        }
       ).then((isClaimed) => {
         claim.isClaimed = isClaimed;
         return isClaimed;
       }),
       isClaimed: false,
-      isConfirmed: false,
+      isStaged: deliveryConfirmations.isStaged(backendItemId),
+      ownsClaim: false,
     };
     adoptedRerunClaims.set(key, claim);
     return claim;
@@ -1526,22 +1726,33 @@ export const createQueueRuntime = ({
   /** Claim the Canvas reruns of a run this tab holds that it has yet to stage. */
   const claimAdoptedReruns = (projectId: string, queueItem: QueueItem): void => {
     for (const backendItemId of queueItem.backendItemIds ?? []) {
-      if (isAdoptedRerun(queueItem, backendItemId) && !queueItem.completedBackendItemIds?.includes(backendItemId)) {
+      if (
+        isAdoptedRerun(queueItem, backendItemId) &&
+        !deliveryConfirmations.isStaged(backendItemId) &&
+        !queueItem.completedBackendItemIds?.includes(backendItemId)
+      ) {
         claimAdoptedRerun(projectId, queueItem.id, backendItemId);
       }
     }
   };
   /** Keep the claims of runs still going from lapsing; a claim lost meanwhile leaves its rerun out of the run. */
   const renewAdoptedRerunClaims = (): void => {
+    if (!isActive()) {
+      return;
+    }
+    deliveryConfirmations.renewOwned();
     for (const [key, claim] of adoptedRerunClaims) {
-      if (!claim.isClaimed || claim.isConfirmed) {
+      if (!claim.isClaimed || !claim.ownsClaim || claim.isStaged) {
         continue;
       }
       const [projectId, queueItemId, backendItemId] = JSON.parse(key) as [string, string, number];
       void backend
         .claimItemDelivery(backendItemId, 'claim', getRunClaimant(projectId, queueItemId))
         .then((renewal) => {
-          if (renewal.kind !== 'claimed' && adoptedRerunClaims.get(key) === claim && !claim.isConfirmed) {
+          if (renewal.kind === 'claimed' && adoptedRerunClaims.get(key) !== claim && !claim.isStaged) {
+            settleRerunClaim(backendItemId, 'release', getRunClaimant(projectId, queueItemId));
+          }
+          if (renewal.kind !== 'claimed' && adoptedRerunClaims.get(key) === claim && !claim.isStaged) {
             claim.isClaimed = false;
           }
         })
@@ -1557,11 +1768,28 @@ export const createQueueRuntime = ({
     queueItem: QueueItem,
     backendItemId: number
   ): Promise<boolean> => {
+    if (!isActive()) {
+      return false;
+    }
     if (!isAdoptedRerun(queueItem, backendItemId)) {
       return true;
     }
+    if (deliveryConfirmations.isStaged(backendItemId)) {
+      return false;
+    }
     const claim = claimAdoptedRerun(projectId, queueItem.id, backendItemId);
     await claim.decision;
+    if (claim.isClaimed && !claim.isStaged) {
+      claim.isClaimed = await isRerunClaimHeld(
+        backendItemId,
+        getRunClaimant(projectId, queueItem.id),
+        () =>
+          isActive() && adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId)) === claim,
+        () => {
+          claim.ownsClaim = true;
+        }
+      );
+    }
     return claim.isClaimed;
   };
   /**
@@ -1570,18 +1798,45 @@ export const createQueueRuntime = ({
    */
   const isAdoptedRerunDecidedHere = (projectId: string, queueItem: QueueItem, backendItemId: number): boolean =>
     !isAdoptedRerun(queueItem, backendItemId) ||
-    adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId))?.isClaimed === true;
+    (!deliveryConfirmations.isStaged(backendItemId) &&
+      adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId))?.isClaimed === true);
   /**
-   * Confirm the reruns a run is about to stage. Called just before their results are routed, since routing them can
-   * finish the run, and a finished run gives back the claims it did not confirm.
+   * Protect claims during synchronous routing, which may finish the run and release its unstaged claims.
+   * Actual candidates decide confirmation; a routing failure releases only work it did not stage.
    */
-  const confirmAdoptedReruns = (projectId: string, queueItem: QueueItem, backendItemIds: number[]): void => {
+  const markAdoptedRerunsStaged = (projectId: string, queueItem: QueueItem, backendItemIds: number[]): void => {
     for (const backendItemId of backendItemIds) {
       const claim = adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId));
-      if (claim?.isClaimed && !claim.isConfirmed) {
-        claim.isConfirmed = true;
-        settleRerunClaim(backendItemId, 'confirm', getRunClaimant(projectId, queueItem.id));
+      if (claim?.isClaimed && !claim.isStaged) {
+        claim.isStaged = true;
       }
+    }
+  };
+  const getStagedBackendItemIds = (projectId: string, queueItemId: string): Set<number> => {
+    const backendItemIds = new Set<number>();
+    for (const result of history.listStagedResults()) {
+      if (result.projectId === projectId && result.queueItemId === queueItemId) {
+        backendItemIds.add(result.backendItemId);
+      }
+    }
+    return backendItemIds;
+  };
+  const confirmAdoptedReruns = (projectId: string, queueItem: QueueItem, backendItemIds: number[]): void => {
+    let stagedBackendItemIds: Set<number> | undefined;
+    for (const backendItemId of backendItemIds) {
+      const key = getAdoptedRerunKey(projectId, queueItem.id, backendItemId);
+      const claim = adoptedRerunClaims.get(key);
+      if (!claim?.isStaged) {
+        continue;
+      }
+      stagedBackendItemIds ??= getStagedBackendItemIds(projectId, queueItem.id);
+      if (!stagedBackendItemIds.has(backendItemId)) {
+        claim.isStaged = false;
+        releaseAdoptedReruns(projectId, queueItem.id);
+        continue;
+      }
+      settleRerunClaim(backendItemId, 'confirm', getRunClaimant(projectId, queueItem.id), claim.ownsClaim);
+      adoptedRerunClaims.delete(key);
     }
   };
   /**
@@ -1594,8 +1849,8 @@ export const createQueueRuntime = ({
       if (keyProjectId !== projectId || keyQueueItemId !== queueItemId) {
         continue;
       }
-      adoptedRerunClaims.delete(key);
-      if (!claim.isConfirmed) {
+      if (!claim.isStaged) {
+        adoptedRerunClaims.delete(key);
         void claim.decision.then((isClaimed) => {
           if (isClaimed) {
             settleRerunClaim(backendItemId, 'release', getRunClaimant(projectId, queueItemId));
@@ -1784,20 +2039,55 @@ export const createQueueRuntime = ({
       if (await isRunTrackedElsewhere(projectId, queueItemId)) {
         await locks?.waitForRunRelease(projectId, queueItemId, rerunWaits.signal);
       }
-      if (!canStage() || !(await claimRerunDelivery(event.item_id, tabClaimant, canStage))) {
+      let ownsClaim = false;
+      if (
+        !canStage() ||
+        !(await claimRerunDelivery(event.item_id, tabClaimant, canStage, () => {
+          ownsClaim = true;
+        }))
+      ) {
         return;
       }
-      // Confirmed only once staged, so a tab that cannot stage it, or closes first, leaves the rerun to the next.
+      if (!canStage()) {
+        settleRerunClaim(event.item_id, 'release', tabClaimant);
+        return;
+      }
+      ownedUnadoptedClaims.set(event.item_id, projectId);
+      // The candidate read model remains authoritative even if a routing callback stages and then throws.
       let isStaged = false;
       try {
         const images = await readUnadoptedRerunImages(event, queueItemId, run);
         // A read slower than the claim lasts may have let another claimant stage it meanwhile.
-        if (images.length > 0 && canStage() && (await isRerunClaimHeld(event.item_id, tabClaimant)) && canStage()) {
+        if (
+          images.length > 0 &&
+          canStage() &&
+          (await isRerunClaimHeld(event.item_id, tabClaimant, canStage, () => {
+            ownsClaim = true;
+          })) &&
+          canStage()
+        ) {
           commands.stageRetriedCanvasResults({ backendItemId: event.item_id, images, projectId, queueItemId });
-          isStaged = true;
+          isStaged = history
+            .listStagedResults()
+            .some(
+              (result) =>
+                result.backendItemId === event.item_id &&
+                result.projectId === projectId &&
+                result.queueItemId === queueItemId
+            );
         }
       } finally {
-        settleRerunClaim(event.item_id, isStaged ? 'confirm' : 'release', tabClaimant);
+        isStaged ||= history
+          .listStagedResults()
+          .some(
+            (result) =>
+              result.backendItemId === event.item_id &&
+              result.projectId === projectId &&
+              result.queueItemId === queueItemId
+          );
+        if (ownedUnadoptedClaims.delete(event.item_id)) {
+          settleRerunClaim(event.item_id, isStaged ? 'confirm' : 'release', tabClaimant, ownsClaim);
+        }
       }
     };
     void stage().catch(recordError);
@@ -1875,6 +2165,7 @@ export const createQueueRuntime = ({
       return;
     }
 
+    const attemptStartedAt = Date.now();
     const request =
       submission.kind === 'generate'
         ? coordinator.submitGenerate(currentQueueItem.id, submission.request)
@@ -1887,7 +2178,6 @@ export const createQueueRuntime = ({
 
     await request
       .then(async ({ batchId, enqueued, itemIds, requested }) => {
-        serverErrorCounts.delete(runKey);
         if (!isAttemptCurrent(attempt)) {
           return;
         }
@@ -1909,6 +2199,9 @@ export const createQueueRuntime = ({
           });
         }
 
+        if (currentQueueItem.snapshot.destination === 'canvas') {
+          attempt.ordinaryBackendItemIds = new Set(itemIds);
+        }
         commands.markBackendSubmitted({
           backendBatchId: batchId,
           backendItemIds: itemIds,
@@ -1958,21 +2251,18 @@ export const createQueueRuntime = ({
           });
           return;
         }
-        if (isDeterministicServerError(error)) {
-          const now = Date.now();
-          const previous = serverErrorCounts.get(runKey);
-          const failures = (previous?.count ?? 0) + 1;
-          const firstAt = previous?.firstAt ?? now;
-          if (failures >= MAX_SERVER_ERROR_SUBMISSIONS && now - firstAt >= MIN_SERVER_ERROR_WINDOW_MS) {
-            // The server may have accepted the batch before answering 500, so reconcile before failing the run.
-            serverErrorCounts.delete(runKey);
-            exhaustedServerErrors.set(runKey, toErrorMessage(error));
-          } else {
-            serverErrorCounts.set(runKey, { count: failures, firstAt });
-          }
-        } else {
-          serverErrorCounts.delete(runKey);
-        }
+        // Even a run past its server-error budget is reconciled first: the server may have accepted the batch before
+        // answering 500.
+        const failedTarget = getRouteTarget(history, currentQueueItem.id);
+        commands.recordSubmissionRetry({
+          projectId: project.id,
+          queueItemId: currentQueueItem.id,
+          retry: getSubmissionRetry(
+            error,
+            failedTarget?.project.id === project.id ? failedTarget.queueItem?.submissionRetry : undefined,
+            { attemptStartedAt, now: Date.now() }
+          ),
+        });
         startedRunKeys.delete(runKey);
         reconcileRetryRunKeys.add(runKey);
         scheduleRetry();
@@ -1988,9 +2278,16 @@ export const createQueueRuntime = ({
     if (!hasInitialized || !isActive()) {
       return;
     }
-    const activeKeys = new Set<string>();
     const projects = history.getSnapshot().projects;
+    deliveryConfirmations.recover(history.listStagedResults());
+    const activeKeys = new Set<string>();
     const openProjectIds = new Set(projects.map((project) => project.id));
+    for (const [itemId, projectId] of ownedUnadoptedClaims) {
+      if (!openProjectIds.has(projectId)) {
+        settleRerunClaim(itemId, 'release', tabClaimant);
+        ownedUnadoptedClaims.delete(itemId);
+      }
+    }
     for (const project of projects) {
       for (const item of project.queue.items) {
         const key = getRunKey(project.id, item.id);
@@ -2032,8 +2329,7 @@ export const createQueueRuntime = ({
           pendingReconcileRunKeys.delete(key);
           reconcileRetryRunKeys.delete(key);
           reportedCancelFailures.delete(key);
-          serverErrorCounts.delete(key);
-          exhaustedServerErrors.delete(key);
+          submissionDueTimes.delete(key);
           pendingJournalRecords.delete(key);
           releaseRunOwnershipAfterJournal(tracked.projectId, tracked.queueItemId);
         }
@@ -2112,28 +2408,88 @@ export const createQueueRuntime = ({
     });
   };
 
+  const getRemainingSubmissionWaitMs = (key: string, retry: QueueSubmissionRetry, now: number): number => {
+    let due = submissionDueTimes.get(key);
+    if (!due || due.failedAt !== retry.failedAt || due.dueAt - now > getSubmissionRetryDelayMs(retry.failureCount)) {
+      due = { dueAt: now + getSubmissionWaitMs(retry, now), failedAt: retry.failedAt };
+      submissionDueTimes.set(key, due);
+    }
+    return Math.max(due.dueAt - now, 0);
+  };
+
+  /** Each waiting run's remaining wait becomes a random share of RECONNECT_SPREAD_MS, never longer than it was. */
+  const spreadSubmissionWaits = (): void => {
+    const now = Date.now();
+    for (const project of history.getSnapshot().projects) {
+      for (const item of project.queue.items) {
+        const key = getRunKey(project.id, item.id);
+        if (item.status !== 'pending' || !item.submissionRetry || !trackedRuns.has(key)) {
+          continue;
+        }
+        const waitMs = Math.min(
+          getRemainingSubmissionWaitMs(key, item.submissionRetry, now),
+          Math.random() * RECONNECT_SPREAD_MS
+        );
+        submissionDueTimes.set(key, { dueAt: now + waitMs, failedAt: item.submissionRetry.failedAt });
+      }
+    }
+  };
+
+  const scheduleSubmissionWake = (waitMs: number): void => {
+    const dueAt = Date.now() + waitMs;
+    if (submissionTimer && submissionTimer.dueAt <= dueAt) {
+      return;
+    }
+    if (submissionTimer) {
+      clearTimeout(submissionTimer.timer);
+    }
+    submissionTimer = {
+      dueAt,
+      timer: setTimeout(() => {
+        submissionTimer = undefined;
+        if (isActive()) {
+          synchronize();
+        }
+      }, waitMs),
+    };
+  };
+
   const processQueueItems = (): void => {
     if (!hasInitialized || !isActive() || history.getSnapshot().connectionStatus !== 'connected' || isReconciling) {
       return;
     }
 
+    const now = Date.now();
+    let nextWaitMs: number | undefined;
     for (const project of history.getSnapshot().projects) {
       if (!loadedProjectIds.has(project.id)) {
         continue;
       }
       for (const queueItem of project.queue.items) {
         const runKey = getRunKey(project.id, queueItem.id);
+        // A run waiting out its retry backoff is reconciled before it is submitted again, whatever else changes.
         if (
           shouldSubmitPendingQueueItem(queueItem) &&
           trackedRuns.has(runKey) &&
           !preparingRunKeys.has(runKey) &&
           !pendingReconcileRunKeys.has(runKey) &&
+          !reconcileRetryRunKeys.has(runKey) &&
           !startedRunKeys.has(runKey)
         ) {
+          const retry = queueItem.submissionRetry;
+          const waitMs = retry ? getRemainingSubmissionWaitMs(runKey, retry, now) : 0;
+          if (waitMs > 0) {
+            nextWaitMs = Math.min(nextWaitMs ?? waitMs, waitMs);
+            continue;
+          }
+          submissionDueTimes.delete(runKey);
           startedRunKeys.add(runKey);
           void submitQueueItem(project, queueItem, beginAttempt(project.id, queueItem.id));
         }
       }
+    }
+    if (nextWaitMs !== undefined) {
+      scheduleSubmissionWake(nextWaitMs);
     }
   };
 
@@ -2261,8 +2617,6 @@ export const createQueueRuntime = ({
           const cancelRequested = cancelRequestedRunKeys.has(runKey);
           reconcileRetryRunKeys.delete(runKey);
           const outcome = outcomes.get(queueItem.id);
-          const exhaustedServerError = exhaustedServerErrors.get(runKey);
-          exhaustedServerErrors.delete(runKey);
 
           if ((outcome?.kind === 'adopted' || outcome?.kind === 'resumed') && outcome.missingBackendItemIds?.length) {
             commands.recordError({
@@ -2288,9 +2642,9 @@ export const createQueueRuntime = ({
 
           switch (outcome?.kind) {
             case 'enqueue':
-              if (exhaustedServerError !== undefined) {
+              if (currentQueueItem.submissionRetry && isSubmissionRetryExhausted(currentQueueItem.submissionRetry)) {
                 commands.setStatus({
-                  error: exhaustedServerError,
+                  error: currentQueueItem.submissionRetry.message,
                   errorCode: 'server-error',
                   projectId: project.id,
                   queueItemId: currentQueueItem.id,
@@ -2537,6 +2891,13 @@ export const createQueueRuntime = ({
         }
 
         commands.setConnectionStatus({ error, status });
+        if (status === 'disconnected') {
+          sawDisconnect = true;
+        } else if (status === 'connected' && sawDisconnect) {
+          // The server is likely back: the runs this tab is waiting to submit go soon, spread out.
+          sawDisconnect = false;
+          spreadSubmissionWaits();
+        }
         if (status === 'connected') {
           for (const runKey of reconcileRetryRunKeys) {
             reconcileRetryRunKeys.delete(runKey);
@@ -2556,9 +2917,28 @@ export const createQueueRuntime = ({
   const dispose = async (): Promise<void> => {
     isDisposed = true;
     rerunWaits.abort();
+    for (const key of adoptedRerunClaims.keys()) {
+      const [projectId, queueItemId] = JSON.parse(key) as [string, string];
+      releaseAdoptedReruns(projectId, queueItemId);
+    }
+    adoptedRerunClaims.clear();
+    for (const itemId of ownedUnadoptedClaims.keys()) {
+      settleRerunClaim(itemId, 'release', tabClaimant);
+    }
+    ownedUnadoptedClaims.clear();
+    unadoptedReruns.clear();
+    deliveryConfirmations.dispose();
+    if (renewTimer !== undefined) {
+      clearInterval(renewTimer);
+      renewTimer = undefined;
+    }
     if (retryTimer !== undefined) {
       clearTimeout(retryTimer);
       retryTimer = undefined;
+    }
+    if (submissionTimer) {
+      clearTimeout(submissionTimer.timer);
+      submissionTimer = undefined;
     }
 
     for (const detach of detachers.splice(0)) {
@@ -2587,15 +2967,6 @@ export const createQueueRuntime = ({
         )
       );
     }
-    if (renewTimer !== undefined) {
-      clearInterval(renewTimer);
-      renewTimer = undefined;
-    }
-    // A run restored by the next hold claims again as the same claimant; meanwhile another tab may stage the rerun.
-    for (const key of adoptedRerunClaims.keys()) {
-      const [projectId, queueItemId] = JSON.parse(key) as [string, string];
-      releaseAdoptedReruns(projectId, queueItemId);
-    }
     startedRunKeys.clear();
     preparingRunKeys.clear();
     pendingJournalSettles.clear();
@@ -2604,8 +2975,7 @@ export const createQueueRuntime = ({
     fallbackAckOperations.clear();
     reconcileRetryRunKeys.clear();
     pendingReconcileRunKeys.clear();
-    serverErrorCounts.clear();
-    exhaustedServerErrors.clear();
+    submissionDueTimes.clear();
     trackedRuns.clear();
     activeAttempts.clear();
     ownershipEpochs.clear();

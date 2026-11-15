@@ -1,0 +1,922 @@
+---
+/*
+ * The workbench as a calm wireframe of the app: the real top bar, rails and view chrome, with the panels' contents
+ * drawn as skeleton bars. It switches from the Compose preset (Preview and Gallery) to Edit (Canvas and Layers), floats
+ * the Preview out of its rail slot over the canvas, docks it again and switches back.
+ * The still frame is Edit with the Preview floating; its rail slot turns dashed, as the app marks a floating panel.
+ */
+import ArrowRight from '@lucide/astro/icons/arrow-right';
+import Bell from '@lucide/astro/icons/bell';
+import Blend from '@lucide/astro/icons/blend';
+import Brush from '@lucide/astro/icons/brush';
+import ChevronDown from '@lucide/astro/icons/chevron-down';
+import ChevronRight from '@lucide/astro/icons/chevron-right';
+import ChevronUp from '@lucide/astro/icons/chevron-up';
+import ChevronsUpDown from '@lucide/astro/icons/chevrons-up-down';
+import Clapperboard from '@lucide/astro/icons/clapperboard';
+import Ellipsis from '@lucide/astro/icons/ellipsis';
+import Eraser from '@lucide/astro/icons/eraser';
+import Eye from '@lucide/astro/icons/eye';
+import Frame from '@lucide/astro/icons/frame';
+import Hand from '@lucide/astro/icons/hand';
+import ImageIcon from '@lucide/astro/icons/image';
+import Lasso from '@lucide/astro/icons/lasso';
+import Layers from '@lucide/astro/icons/layers';
+import ListOrdered from '@lucide/astro/icons/list-ordered';
+import MapIcon from '@lucide/astro/icons/map';
+import Maximize from '@lucide/astro/icons/maximize';
+import Move from '@lucide/astro/icons/move';
+import PictureInPicture2 from '@lucide/astro/icons/picture-in-picture-2';
+import Play from '@lucide/astro/icons/play';
+import Plus from '@lucide/astro/icons/plus';
+import Redo2 from '@lucide/astro/icons/redo-2';
+import Rotate3d from '@lucide/astro/icons/rotate-3d';
+import Save from '@lucide/astro/icons/save';
+import Scaling from '@lucide/astro/icons/scaling';
+import Settings2 from '@lucide/astro/icons/settings-2';
+import SlidersHorizontal from '@lucide/astro/icons/sliders-horizontal';
+import Square from '@lucide/astro/icons/square';
+import SquareDashed from '@lucide/astro/icons/square-dashed';
+import Star from '@lucide/astro/icons/star';
+import TypeIcon from '@lucide/astro/icons/type';
+import Undo2 from '@lucide/astro/icons/undo-2';
+import WandSparkles from '@lucide/astro/icons/wand-sparkles';
+import Workflow from '@lucide/astro/icons/workflow';
+import X from '@lucide/astro/icons/x';
+import { Image } from 'astro:assets';
+
+import landscape from '../../../assets/whats-new-landscape.webp';
+import { box } from './box';
+import Stage from './Stage.astro';
+
+// Columns, in stage units: rails, Generate panel, center view, right panel.
+const leftPanel = { x: 24, width: 160 };
+const center = { x: 184, width: 202 };
+const rightPanel = { x: 386, width: 150 };
+const rightRailX = 538;
+const slotY = (index: number) => 36 + index * 22;
+// A skeleton bar's width, in stage units.
+const sk = (width: number) => `--sk: ${width}`;
+
+// Compose and Edit leave room for the chevron the active tab carries; the indicator moves between their boxes.
+const tabs = [
+  { label: 'Compose', Icon: TypeIcon, x: 172, width: 58 },
+  { label: 'Edit', Icon: Layers, x: 232, width: 44 },
+  { label: 'Video', Icon: Clapperboard, x: 278, width: 44 },
+  { label: 'Workflow', Icon: Workflow, x: 324, width: 56 },
+];
+const tools = [Hand, Move, Rotate3d, SquareDashed, Brush, Eraser, Square, Blend, TypeIcon, Lasso];
+// Collapsed sections of the Generate panel: title and summary-chip widths.
+const collapsed = [
+  { title: 24, summary: 36 },
+  { title: 38, summary: 0 },
+  { title: 30, summary: 0 },
+  { title: 52, summary: 14 },
+];
+const boards = [
+  { name: 22, count: 22 },
+  { name: 36, count: 16, crop: 'object-position: 10% 50%; scale: 2.2' },
+  { name: 44, count: 16, crop: 'object-position: 50% 50%' },
+  { name: 46, count: 16, crop: 'object-position: 90% 50%; scale: 1.8', selected: true },
+  { name: 52, count: 18, crop: 'object-position: 30% 50%; scale: 2.6' },
+];
+// Different crops of the one image: a pan, then a zoom about a point. The first seven are starred.
+const thumbs = Array.from({ length: 9 }, (_, index) =>
+  [
+    `object-position: ${(index * 37) % 100}% 50%`,
+    `scale: ${1 + (index % 3) * 0.8}`,
+    `transform-origin: ${(index * 53) % 100}% ${(index * 29) % 100}%`,
+  ].join('; ')
+);
+const starred = 7;
+const imageProps = { src: landscape, alt: '', widths: [320, 640], sizes: '(min-width: 36rem) 14rem, 45vw' };
+const thumbProps = { src: landscape, alt: '', width: 96 };
+---
+
+<Stage width={560} height={400}>
+  <div class="window wn-abs" style={box(0, 0, 560, 400)}>
+    <div class="wn-abs checker" style={box(center.x, 32, center.width, 352)}></div>
+    <div class="wn-abs rule" style={`${box(0, 0, 560, 32)}; border-bottom-width: 1px`}></div>
+    <div class="wn-abs rule" style={`${box(0, 32, leftPanel.x, 352)}; border-right-width: 1px`}></div>
+    <div class="wn-abs rule" style={`${box(leftPanel.x, 32, leftPanel.width, 352)}; border-right-width: 1px`}></div>
+    <div class="wn-abs rule" style={`${box(rightPanel.x, 32, rightPanel.width, 352)}; border-inline-width: 1px`}></div>
+    <div class="wn-abs rule" style={`${box(0, 384, 560, 16)}; border-top-width: 1px`}></div>
+
+    <!-- Top bar -->
+    <div class="wn-abs row menu" style={box(6, 7, 26, 18)}>
+      <svg class="logomark" viewBox="0 0 44 44" fill="none">
+        <path d="M29.1951 10.6667H42V2H2V10.6667H14.8049L29.1951 33.3333H42V42H2V33.3333H14.8049"></path>
+      </svg>
+      <ChevronDown />
+    </div>
+    <div class="wn-abs row project" style={box(36, 7, 84, 18)}>Coastal Series<ChevronsUpDown /></div>
+    <div class="wn-abs indicator" style={box(232, 7, 44, 18)}></div>
+    {
+      tabs.map(({ label, Icon, x, width }) => (
+        <div class="wn-abs row tab" style={box(x, 7, width, 18)}>
+          <Icon />
+          {label}
+        </div>
+      ))
+    }
+    <div class="wn-abs row tab tab--add" style={box(382, 7, 16, 18)}><Plus /></div>
+    <div class="wn-abs row launch" style={box(414, 7, 98, 18)}>
+      <span class="iterations">1<span class="stepper"><ChevronUp /><ChevronDown /></span></span>
+      <span class="invoke"><Play />Invoke</span>
+      <span class="routing"><SlidersHorizontal /><ArrowRight class="routing__arrow" /><ImageIcon /></span>
+    </div>
+    <div class="wn-abs row queue" style={box(516, 7, 38, 18)}>
+      <ListOrdered />0<span class="queue__more"><ChevronDown /></span>
+    </div>
+
+    <!-- Left rail and the Generate panel, shared by both presets -->
+    <div class="wn-abs slot slot--shown" style={box(2, slotY(0), 20, 20)}><SlidersHorizontal /></div>
+    <div class="wn-abs slot" style={box(2, slotY(1), 20, 20)}><Scaling /></div>
+    <div class="wn-abs slot" style={box(2, slotY(2), 20, 20)}><Ellipsis /></div>
+
+    <div class="wn-abs row panel-head" style={box(leftPanel.x, 32, leftPanel.width, 28)}>
+      <SlidersHorizontal /><strong>Generate</strong>
+    </div>
+    <div class="wn-abs panel-body" style={box(leftPanel.x, 60, leftPanel.width, 324)}>
+      <i class="sk" style={sk(20)}></i>
+      <div class="field">
+        <i class="sk" style={sk(64)}></i><i class="sk" style={sk(14)}></i><i class="spacer"></i><ChevronDown />
+      </div>
+      <div class="row"><i class="sk" style={sk(22)}></i><i class="spacer"></i><i class="sk" style={sk(26)}></i></div>
+      <div class="field textarea">
+        <i class="sk" style={sk(112)}></i><i class="sk" style={sk(128)}></i><i class="sk" style={sk(76)}></i>
+      </div>
+      <i class="sk" style={sk(44)}></i>
+      <div class="field textarea" style="height: calc(var(--u) * 20)"><i class="sk" style={sk(60)}></i></div>
+
+      <div class="section">
+        <div class="row collapsed">
+          <i class="sk" style={sk(16)}></i><i class="spacer"></i><i class="sk" style={sk(24)}></i>
+        </div>
+        <div class="field slider"><i class="sk" style={sk(16)}></i><i class="slider__track"></i></div>
+        <div class="field slider"><i class="sk" style={sk(18)}></i><i class="slider__track"></i></div>
+        <div class="field slider"><i class="sk" style={sk(10)}></i><i class="spacer"></i><ChevronDown /></div>
+      </div>
+
+      <div class="section">
+        <div class="row collapsed"><i class="sk" style={sk(36)}></i></div>
+        <div class="reference"><i class="sk" style={sk(60)}></i><i class="sk" style={sk(42)}></i></div>
+      </div>
+      {
+        collapsed.map(({ title, summary }, index) => (
+          <div class="row collapsed">
+            {index === collapsed.length - 1 ? <ChevronDown /> : <ChevronRight />}
+            <i class="sk" style={sk(title)} />
+            <i class="spacer" />
+            {summary > 0 && <i class="sk" style={sk(summary)} />}
+          </div>
+        ))
+      }
+    </div>
+
+    <!-- Compose: Preview in the center, Gallery on the right -->
+    <div class="wn-abs compose" style={box(0, 0, 560, 400)}>
+      <div class="wn-abs row tab tab--active" style={box(tabs[0].x, 7, tabs[0].width, 18)}>
+        <TypeIcon />Compose<ChevronDown />
+      </div>
+      <div class="wn-abs row island" style={box(center.x + 6, 38, 58, 18)}>
+        <Eye /><strong>Preview</strong><ChevronDown />
+      </div>
+      <Image {...imageProps} class="wn-abs view-image" style={box(center.x + 8, 115, 186, 186)} />
+
+      <div class="wn-abs slot slot--shown" style={box(rightRailX, slotY(0), 20, 20)}><ImageIcon /></div>
+      <div class="wn-abs slot" style={box(rightRailX, slotY(1), 20, 20)}><MapIcon /></div>
+      <div class="wn-abs slot" style={box(rightRailX, slotY(2), 20, 20)}><ListOrdered /></div>
+      <div class="wn-abs slot" style={box(rightRailX, slotY(3), 20, 20)}><Ellipsis /></div>
+
+      <div class="wn-abs row panel-head" style={box(rightPanel.x, 32, rightPanel.width, 28)}>
+        <ImageIcon /><strong>Gallery</strong>
+      </div>
+      <div class="wn-abs panel-body" style={box(rightPanel.x, 60, rightPanel.width, 324)}>
+        <div class="field"><i class="sk" style={sk(64)}></i></div>
+        <i class="sk" style={sk(26)}></i>
+        {
+          boards.map(({ name, count, crop, selected }) => (
+            <div class:list={['row list-row', { 'list-row--accent': selected }]}>
+              <span class="mini-thumb">{crop && <Image {...thumbProps} class="fill" style={crop} />}</span>
+              <i class="sk" style={sk(name)} />
+              <i class="spacer" />
+              <i class="sk" style={`${sk(count)}; height: calc(var(--u) * 6)`} />
+            </div>
+          ))
+        }
+        <i class="divider"></i>
+        <div class="row segments">
+          <span class="segment"><i class="sk" style={sk(28)}></i></span><i class="sk" style={sk(30)}></i>
+        </div>
+        <div class="field"><i class="sk" style={sk(40)}></i></div>
+        <i class="sk" style={sk(30)}></i>
+        <div class="grid">
+          {
+            thumbs.map((crop, index) => (
+              <span class="thumb">
+                <Image {...thumbProps} class="fill" style={crop} />
+                {index < starred && (
+                  <span class="star">
+                    <Star />
+                  </span>
+                )}
+              </span>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit: Canvas in the center, Layers on the right -->
+    <div class="wn-abs edit" style={box(0, 0, 560, 400)}>
+      <div class="wn-abs row tab tab--active" style={box(tabs[1].x, 7, tabs[1].width, 18)}>
+        <Layers />Edit<ChevronDown />
+      </div>
+      <div class="wn-abs row island" style={box(center.x + 6, 38, 56, 18)}>
+        <WandSparkles /><strong>Canvas</strong><ChevronDown />
+      </div>
+      <div class="wn-abs row island" style={box(276, 38, 104, 18)}>
+        <strong>81%</strong><ChevronDown />
+        <i class="island__rule"></i><Maximize /><Frame />
+        <i class="island__rule"></i><Undo2 /><Redo2 />
+        <i class="island__rule"></i><Save /><Settings2 />
+      </div>
+      <div class="wn-abs palette" style={box(center.x + 6, 62, 18, 147)}>
+        {
+          tools.map((Tool, index) => (
+            <span class:list={['tool', { 'tool--active': index === 0 }]}>
+              <Tool />
+            </span>
+          ))
+        }
+      </div>
+      <Image {...imageProps} class="wn-abs view-image" style={box(213, 136, 144, 144)} />
+      <div class="wn-abs bbox" style={box(211, 134, 148, 148)}></div>
+
+      <div class="wn-abs slot slot--shown" style={box(rightRailX, slotY(0), 20, 20)}><Layers /></div>
+      <div class="wn-abs slot" style={box(rightRailX, slotY(1), 20, 20)}><Eye /></div>
+      <div class="wn-abs slot" style={box(rightRailX, slotY(2), 20, 20)}><Ellipsis /></div>
+      <div class="wn-abs slot slot--floating" style={box(rightRailX, slotY(1), 20, 20)}>
+        <Eye />
+        <span class="slot__badge"><PictureInPicture2 /></span>
+      </div>
+
+      <div class="wn-abs row panel-head" style={box(rightPanel.x, 32, rightPanel.width, 28)}>
+        <Layers /><strong>Layers</strong>
+      </div>
+      <div class="wn-abs panel-body" style={box(rightPanel.x, 60, rightPanel.width, 324)}>
+        <div class="row segments">
+          <span class="segment"><i class="sk" style={sk(20)}></i></span><i class="sk" style={sk(32)}></i>
+        </div>
+        <div class="color">
+          <div class="wheel"><i class="wheel__triangle"></i></div>
+          <div class="field"><i class="sk" style={sk(30)}></i></div>
+        </div>
+        <i class="divider"></i>
+        <div class="row segments">
+          <span class="segment"><i class="sk" style={sk(24)}></i></span><i class="sk" style={sk(28)}></i>
+        </div>
+        <div class="row">
+          <div class="field" style="flex: 1">
+            <i class="sk" style={sk(28)}></i><i class="spacer"></i><ChevronDown />
+          </div>
+          <div class="field"><i class="sk" style={sk(12)}></i></div>
+        </div>
+        <i class="sk" style={sk(56)}></i>
+        <div class="row list-row">
+          <i class="dot"></i><span class="mini-thumb"></span><i class="sk" style={sk(52)}></i>
+        </div>
+        <i class="sk" style={sk(50)}></i>
+        <div class="row list-row list-row--shown">
+          <i class="dot"></i>
+          <span class="mini-thumb"><Image {...thumbProps} class="fill" /></span>
+          <i class="sk" style={sk(30)}></i>
+        </div>
+        <div class="field" style="margin-top: auto"><i class="sk" style={sk(40)}></i></div>
+        <div class="row segments">
+          <span class="segment"><i class="sk" style={sk(32)}></i></span><i class="sk" style={sk(30)}></i>
+          <i class="sk" style={sk(30)}></i>
+        </div>
+        <i class="sk" style={sk(70)}></i>
+        <i class="sk" style={sk(104)}></i>
+        <i class="sk" style={sk(84)}></i>
+      </div>
+    </div>
+
+    <div class="wn-abs row status" style={box(0, 384, 560, 16)}>
+      <i class="dot" style="background-color: var(--invoke-success)"></i>
+      {[30, 28, 48, 42].map((width) => <i class="sk" style={sk(width)} />)}
+      <i class="spacer"></i>
+      <Bell />
+    </div>
+
+    <div class="wn-abs floating" style={box(256, 210, 132, 104)}>
+      <div class="wn-abs row floating__title" style={box(0, 0, 132, 15)}>
+        <Eye /><strong>Preview</strong><i class="spacer"></i><PictureInPicture2 /><Maximize /><X />
+      </div>
+      <Image {...imageProps} class="wn-abs view-image" style={box(4, 19, 122, 79)} />
+    </div>
+  </div>
+</Stage>
+
+<style>
+  .window {
+    overflow: hidden;
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 8);
+    background-color: var(--wn-panel);
+    box-shadow: var(--docs-shadow-popup);
+    font-size: calc(var(--u) * 7.5);
+  }
+
+  /* Lucide icons size from `--i`, in stage units, set by the context that holds them. */
+  .window :global(.lucide) {
+    flex: none;
+    width: calc(var(--u) * var(--i, 7));
+    height: calc(var(--u) * var(--i, 7));
+    stroke-width: 2.25;
+  }
+
+  .window :global(:is(.lucide-chevron-down, .lucide-chevron-right, .lucide-chevron-up, .lucide-chevrons-up-down)) {
+    --i: 5.5;
+  }
+
+  .checker {
+    --check: color-mix(in oklab, var(--docs-surface) 45%, var(--docs-bg));
+    background: repeating-conic-gradient(var(--check) 0 25%, var(--docs-bg) 0 50%) 0 0 / calc(var(--u) * 16)
+      calc(var(--u) * 16);
+  }
+
+  .rule {
+    border: 0 solid var(--wn-line);
+  }
+
+  .row {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: calc(var(--u) * 3);
+    white-space: nowrap;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  strong {
+    color: var(--wn-strong);
+    font-weight: 600;
+  }
+
+  /* Skeleton text, `--sk` units wide. */
+  .sk {
+    flex: none;
+    width: calc(var(--u) * var(--sk));
+    height: calc(var(--u) * 3.5);
+    border-radius: calc(var(--u) * 2);
+    background-color: var(--wn-faint);
+  }
+
+  .field {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: calc(var(--u) * 3);
+    height: calc(var(--u) * 14);
+    padding-inline: calc(var(--u) * 4);
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 3);
+  }
+
+  .divider {
+    flex: none;
+    height: 1px;
+    background-color: var(--wn-line);
+  }
+
+  .fill {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .mini-thumb {
+    flex: none;
+    overflow: hidden;
+    width: calc(var(--u) * 10);
+    height: calc(var(--u) * 10);
+    border-radius: calc(var(--u) * 2);
+    background-color: var(--wn-raised);
+  }
+
+  .dot {
+    flex: none;
+    width: calc(var(--u) * 5);
+    height: calc(var(--u) * 5);
+    border-radius: 50%;
+    background-color: var(--docs-accent);
+  }
+
+  /* Top bar */
+
+  .menu {
+    justify-content: center;
+    gap: calc(var(--u) * 2);
+  }
+
+  .logomark {
+    width: calc(var(--u) * 10);
+    height: calc(var(--u) * 10);
+    stroke: var(--wn-strong);
+    stroke-width: 4;
+  }
+
+  .project {
+    padding-inline: calc(var(--u) * 4);
+    color: var(--wn-strong);
+    font-weight: 500;
+  }
+
+  .indicator {
+    border-radius: calc(var(--u) * 4);
+    background-color: var(--wn-shown);
+  }
+
+  .tab {
+    --i: 8;
+    gap: calc(var(--u) * 2.5);
+    padding-left: calc(var(--u) * 5);
+  }
+
+  .tab--add {
+    justify-content: center;
+    padding: 0;
+  }
+
+  /* The active tab, drawn over its plain one by the preset it belongs to. */
+  .tab--active {
+    color: var(--wn-strong);
+
+    > :global(.lucide:first-child) {
+      color: var(--docs-brand);
+    }
+  }
+
+  .launch,
+  .queue,
+  .island,
+  .palette {
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 4);
+    background-color: var(--wn-panel);
+  }
+
+  .launch {
+    gap: 0;
+    overflow: hidden;
+
+    > span {
+      display: flex;
+      align-items: center;
+      height: 100%;
+    }
+  }
+
+  .iterations {
+    width: calc(var(--u) * 20);
+    justify-content: space-between;
+    padding-inline: calc(var(--u) * 4) calc(var(--u) * 1.5);
+    color: var(--wn-strong);
+  }
+
+  .stepper {
+    display: flex;
+    flex-direction: column;
+
+    :global(.lucide) {
+      --i: 4;
+    }
+  }
+
+  .invoke {
+    width: calc(var(--u) * 50);
+    justify-content: center;
+    gap: calc(var(--u) * 2.5);
+    background-color: var(--docs-brand);
+    color: var(--invoke-brand-contrast, var(--docs-accent-contrast));
+    font-weight: 600;
+  }
+
+  .routing {
+    --i: 6;
+    flex: 1;
+    justify-content: center;
+    gap: calc(var(--u) * 0.5);
+    border-left: 1px solid var(--wn-line);
+
+    :global(.routing__arrow) {
+      --i: 4;
+    }
+  }
+
+  .queue {
+    padding-left: calc(var(--u) * 4);
+    color: var(--wn-strong);
+  }
+
+  .queue__more {
+    display: flex;
+    align-self: stretch;
+    align-items: center;
+    margin-left: auto;
+    padding-inline: calc(var(--u) * 2);
+    border-left: 1px solid var(--wn-line);
+  }
+
+  /* Rails */
+
+  .slot {
+    --i: 11;
+    display: grid;
+    place-items: center;
+    border-radius: calc(var(--u) * 4);
+    background-color: var(--wn-panel);
+  }
+
+  .slot--shown {
+    background-color: var(--wn-shown);
+    color: var(--docs-brand);
+  }
+
+  /* A floating panel's slot: dashed, dimmed, with a picture-in-picture badge. Drawn over the docked slot. */
+  .slot--floating {
+    outline: 1px dashed var(--docs-border-strong);
+    outline-offset: -1px;
+
+    > :global(.lucide) {
+      opacity: 0.55;
+    }
+  }
+
+  .slot__badge {
+    --i: 5;
+    position: absolute;
+    top: calc(var(--u) * 1);
+    right: calc(var(--u) * 1);
+    display: grid;
+    border-radius: calc(var(--u) * 1.5);
+    background-color: var(--wn-panel);
+    color: var(--wn-strong);
+  }
+
+  /* Panels */
+
+  .panel-head {
+    padding-inline: calc(var(--u) * 6);
+    border-bottom: 1px solid var(--wn-line);
+    color: var(--wn-strong);
+    font-size: calc(var(--u) * 8.5);
+  }
+
+  .panel-body {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--u) * 5);
+    overflow: hidden;
+    padding: calc(var(--u) * 7) calc(var(--u) * 6);
+  }
+
+  .textarea {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(var(--u) * 3.5);
+    height: calc(var(--u) * 38);
+    padding: calc(var(--u) * 6) calc(var(--u) * 5);
+  }
+
+  .section {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: calc(var(--u) * 4);
+    padding: 0 calc(var(--u) * 4) calc(var(--u) * 5);
+    border-radius: calc(var(--u) * 3);
+    background-color: color-mix(in oklab, var(--wn-raised) 55%, transparent);
+  }
+
+  .slider {
+    margin-top: calc(var(--u) * -1);
+    background-color: var(--wn-panel);
+  }
+
+  .slider__track {
+    flex: 1;
+    height: calc(var(--u) * 2);
+    border-radius: calc(var(--u) * 1);
+    background: linear-gradient(to right, var(--wn-ink) 40%, var(--wn-faint) 40%);
+  }
+
+  .reference {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(var(--u) * 4);
+    padding-block: calc(var(--u) * 7);
+    border: 1px dashed var(--docs-border-strong);
+    border-radius: calc(var(--u) * 3);
+  }
+
+  .collapsed {
+    height: calc(var(--u) * 13);
+  }
+
+  .panel-body > .collapsed {
+    margin-top: calc(var(--u) * -2);
+    padding-inline: calc(var(--u) * 4);
+    border-bottom: 1px solid var(--wn-line);
+  }
+
+  .list-row {
+    height: calc(var(--u) * 14);
+    margin-top: calc(var(--u) * -3);
+    padding-inline: calc(var(--u) * 2);
+    border-radius: calc(var(--u) * 2.5);
+  }
+
+  .list-row--accent {
+    background-color: var(--docs-accent);
+
+    .sk {
+      background-color: color-mix(in oklab, var(--docs-accent-contrast) 45%, transparent);
+    }
+  }
+
+  .list-row--shown {
+    background-color: var(--wn-shown);
+  }
+
+  .segments {
+    gap: calc(var(--u) * 6);
+    height: calc(var(--u) * 14);
+  }
+
+  .segment {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding-inline: calc(var(--u) * 5);
+    border-radius: calc(var(--u) * 3);
+    background-color: var(--wn-shown);
+  }
+
+  .grid {
+    display: grid;
+    flex: none;
+    grid-template-columns: repeat(3, 1fr);
+    gap: calc(var(--u) * 3);
+  }
+
+  .thumb {
+    position: relative;
+    overflow: hidden;
+    aspect-ratio: 1;
+    border: 1px solid var(--wn-line);
+    border-radius: calc(var(--u) * 2.5);
+  }
+
+  .star {
+    --i: 5;
+    position: absolute;
+    top: calc(var(--u) * 2.5);
+    right: calc(var(--u) * 2.5);
+    display: grid;
+    place-items: center;
+    width: calc(var(--u) * 9);
+    height: calc(var(--u) * 9);
+    border-radius: calc(var(--u) * 2);
+    background-color: var(--docs-brand);
+    color: var(--invoke-brand-contrast, var(--docs-accent-contrast));
+
+    :global(.lucide) {
+      fill: currentColor;
+    }
+  }
+
+  .color {
+    display: flex;
+    flex: none;
+    gap: calc(var(--u) * 6);
+
+    .field {
+      flex: 1;
+      margin-top: calc(var(--u) * 4);
+    }
+  }
+
+  /* A hue ring around the saturation and value triangle, whose hue corner points at red. */
+  .wheel {
+    position: relative;
+    flex: none;
+    width: calc(var(--u) * 50);
+    height: calc(var(--u) * 50);
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: conic-gradient(from 90deg, red, yellow, lime, cyan, blue, magenta, red);
+      mask: radial-gradient(
+        farthest-side,
+        transparent calc(100% - var(--u) * 5),
+        #000 calc(100% - var(--u) * 5 + 0.5px)
+      );
+    }
+  }
+
+  .wheel__triangle {
+    position: absolute;
+    inset: calc(var(--u) * 6);
+    clip-path: polygon(100% 50%, 25% 6.7%, 25% 93.3%);
+    background:
+      linear-gradient(to right, transparent 25%, red),
+      linear-gradient(#000, #fff);
+  }
+
+  /* Center views */
+
+  .island {
+    --i: 6.5;
+    padding-inline: calc(var(--u) * 5);
+    box-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 5) color-mix(in oklab, var(--docs-bg) 60%, transparent);
+  }
+
+  .island__rule {
+    width: 1px;
+    height: 50%;
+    background-color: var(--wn-line);
+  }
+
+  .palette {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--u) * 1);
+    padding: calc(var(--u) * 2.5);
+  }
+
+  .tool {
+    --i: 7.5;
+    display: grid;
+    place-items: center;
+    height: calc(var(--u) * 13);
+    border-radius: calc(var(--u) * 2.5);
+  }
+
+  .tool--active {
+    background-color: var(--docs-accent-tint);
+    color: var(--docs-accent);
+  }
+
+  .view-image {
+    border-radius: calc(var(--u) * 2);
+  }
+
+  .bbox {
+    border: 1px dashed var(--docs-accent);
+  }
+
+  .status {
+    --i: 6;
+    gap: calc(var(--u) * 8);
+    padding-inline: calc(var(--u) * 7);
+  }
+
+  /* Floating Preview */
+
+  .floating {
+    overflow: hidden;
+    border: 1px solid var(--docs-accent);
+    border-radius: calc(var(--u) * 6);
+    background-color: var(--wn-panel);
+    box-shadow: var(--docs-shadow-popup);
+    transform-origin: 100% 0;
+  }
+
+  .floating__title {
+    --i: 6.5;
+    padding-inline: calc(var(--u) * 6);
+    border-bottom: 1px solid var(--wn-line);
+  }
+
+  .compose {
+    opacity: 0;
+  }
+
+  /*
+   * One 10s cycle: Compose until 40%, switch to Edit by 46%, float the Preview out from 56% to 66%, dock it again
+   * from 84% to 90%, and switch back to Compose from 92% to 98%.
+   */
+  @media (prefers-reduced-motion: no-preference) {
+    .indicator,
+    .compose,
+    .edit,
+    .slot--floating,
+    .floating {
+      animation: 10s var(--wn-ease) infinite;
+    }
+
+    .indicator {
+      animation-name: wb-preset;
+    }
+
+    .compose {
+      animation-name: wb-compose;
+    }
+
+    .edit {
+      animation-name: wb-edit;
+    }
+
+    .slot--floating {
+      animation-name: wb-slot;
+    }
+
+    .floating {
+      animation-name: wb-float;
+    }
+  }
+
+  @keyframes wb-preset {
+    0%,
+    40%,
+    98%,
+    100% {
+      translate: calc(var(--u) * -60) 0;
+      width: calc(var(--u) * 58);
+    }
+    46%,
+    92% {
+      translate: 0 0;
+      width: calc(var(--u) * 44);
+    }
+  }
+
+  @keyframes wb-compose {
+    0%,
+    40%,
+    98%,
+    100% {
+      opacity: 1;
+    }
+    46%,
+    92% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes wb-edit {
+    0%,
+    40%,
+    98%,
+    100% {
+      opacity: 0;
+    }
+    46%,
+    92% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes wb-slot {
+    0%,
+    58%,
+    90%,
+    100% {
+      opacity: 0;
+    }
+    64%,
+    84% {
+      opacity: 1;
+    }
+  }
+
+  /* Out of the Preview's rail slot and over the canvas, then back. */
+  @keyframes wb-float {
+    0%,
+    56%,
+    90%,
+    100% {
+      opacity: 0;
+      translate: calc(var(--u) * 167) calc(var(--u) * -147);
+      scale: 0.1;
+    }
+    66%,
+    84% {
+      opacity: 1;
+      translate: 0 0;
+      scale: 1;
+    }
+  }
+</style>

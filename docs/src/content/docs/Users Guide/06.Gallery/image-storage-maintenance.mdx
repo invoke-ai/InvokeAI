@@ -1,6 +1,7 @@
 ---
 title: Image Storage Maintenance
-description: Move existing images into the current image subfolder strategy with crash recovery.
+description: Move existing images into the current folder layout, and clean up gallery records and image files that no longer match.
+lastUpdated: 2026-10-26
 ---
 
 InvokeAI can move existing images into the folder layout selected by [`image_subfolder_strategy`](/configuration/invokeai-yaml/#image-subfolder-strategy). This is useful after changing the image subfolder strategy from `flat` to `date`, `type`, or `hash`, or when reorganizing an older image library.
@@ -38,3 +39,22 @@ Missing intermediate image files are treated as already cleaned up and do not ha
 For the `date` strategy, existing images are moved according to their original image creation timestamp stored in the database, not according to the time the maintenance job is run.
 
 Empty source directories left behind by successful moves are removed when safe.
+
+## Gallery maintenance
+
+Gallery maintenance repairs mismatches between the gallery's records and the image files on disk, for example after files were deleted by hand, or images were left behind by a [deleted user](/configuration/multi-user-mode/admin-guide/#deleting-a-user). Administrators open it under **Settings → Data & workspace → Gallery maintenance**.
+
+| Action | What it does |
+| --- | --- |
+| **Remove records for missing images** | Deletes gallery records whose image file is missing, with their image-search (semantic index) entries. Thumbnails left behind go to the archive. |
+| **Archive untracked files** | Moves image files that have no gallery record, and thumbnails without an image, to the archive. |
+| **Regenerate missing thumbnails** | Creates missing thumbnails. Original images are unchanged. |
+
+Each action scans first and shows what it would change; nothing changes until you confirm, and the dialog waits until the action finishes. If the gallery changed since the scan, InvokeAI asks you to scan again. The actions cover images of every account, including images on archived boards and intermediates. They do not cover videos.
+
+Before an action changes anything, it backs up the database, and the two archiving actions create an archive folder. The result shows both paths:
+
+- **Database backup:** `databases/backup/backup-<timestamp>-gallery-maintenance-<id>.db`. With a [MySQL or MariaDB database](/configuration/external-database/) no backup is made; back it up with the server's tools first.
+- **Archive** (**Remove records for missing images** and **Archive untracked files** only): a new folder per run, `outputs/images-archive/gallery-maintenance/<action>-<id>/`.
+
+Keep both until you are sure you will not need the removed records or archived files. Maintenance does not import archived files back into the gallery.

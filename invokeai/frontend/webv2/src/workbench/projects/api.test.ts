@@ -3,7 +3,7 @@ import type * as transportModule from '@platform/transport/http';
 import { galleryKeys } from '@features/gallery/queries';
 import { queryClient } from '@platform/query/client';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
-import { ApiError } from '@platform/transport/http';
+import { ApiError, RequestDeadlineError } from '@platform/transport/http';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 const transport = vi.hoisted(() => ({
@@ -19,14 +19,17 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
 
 import {
   deleteProject,
+  deleteClientStateValue,
   createProject,
   createProjectSettled,
   getProjectDocumentSchemaRefusal,
   getProjectWriteSizeRefusal,
   getProject,
+  getProjectWithinSize,
   isProjectCanvasSchemaUnsupportedError,
   ProjectCreateAbsentError,
   saveProjectWorkspace,
+  setClientStateValue,
   updateProject,
 } from './api';
 
@@ -34,6 +37,77 @@ beforeEach(() => {
   transport.apiFetch.mockReset();
   transport.apiFetchJson.mockReset();
   accountLifecycle.activate('project-api-test-user');
+});
+
+describe('getProjectWithinSize', () => {
+  it('parses a record within the bound and skips one past it, declared or measured, without parsing it', async () => {
+    const record = { name: 'Small', project_id: 'p-1' };
+    const body = JSON.stringify(record);
+    const cancel = vi.fn(() => Promise.resolve());
+    const text = vi.fn(() => Promise.resolve(body));
+
+    transport.apiFetch.mockResolvedValueOnce(
+      new Response(body, { headers: { 'Content-Length': String(body.length) } })
+    );
+    await expect(getProjectWithinSize('p-1', 1000)).resolves.toEqual(record);
+    expect(transport.apiFetch).toHaveBeenCalledWith(
+      '/api/v1/projects/p-1?max_canvas_schema_version=6&max_document_schema_version=4',
+      { signal: undefined }
+    );
+
+    transport.apiFetch.mockResolvedValueOnce({
+      body: { cancel },
+      headers: new Headers({ 'Content-Length': '5000' }),
+      text,
+    });
+    await expect(getProjectWithinSize('p-1', 1000)).resolves.toBeNull();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(text).not.toHaveBeenCalled();
+
+    // Without a declared length (a chunked answer) the body is measured as it arrives.
+    transport.apiFetch.mockResolvedValueOnce(new Response(`{"padding":"${'x'.repeat(2000)}"}`));
+    await expect(getProjectWithinSize('p-1', 1000)).resolves.toBeNull();
+  });
+
+  it('stops reading a compressed answer whose small declared length hides a body past the bound', async () => {
+    // What a gzipped answer looks like once the browser decodes it: the header counts the compressed bytes.
+    const chunk = new TextEncoder().encode(`{"padding":"${'x'.repeat(390)}",`);
+    let pulls = 0;
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      cancel: () => {
+        cancelled = true;
+      },
+      pull: (controller) => {
+        pulls += 1;
+        controller.enqueue(chunk);
+      },
+    });
+
+    transport.apiFetch.mockResolvedValueOnce(new Response(body, { headers: { 'Content-Length': '120' } }));
+
+    await expect(getProjectWithinSize('p-1', 1000)).resolves.toBeNull();
+    expect(cancelled).toBe(true);
+    // The third chunk crosses the bound; the endless rest is never pulled.
+    expect(pulls).toBeLessThanOrEqual(4);
+  });
+
+  it('decodes a record split across chunks, a character straddling two of them', async () => {
+    const record = { name: 'Café', project_id: 'p-1' };
+    const bytes = new TextEncoder().encode(JSON.stringify(record));
+    const split = bytes.indexOf(0xc3) + 1;
+    const body = new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        controller.enqueue(bytes.slice(0, split));
+        controller.enqueue(bytes.slice(split));
+        controller.close();
+      },
+    });
+
+    transport.apiFetch.mockResolvedValueOnce(new Response(body, { headers: { 'Content-Length': '30' } }));
+
+    await expect(getProjectWithinSize('p-1', 1000)).resolves.toEqual(record);
+  });
 });
 
 /** Cleanup requires proven project absence after an ambiguous create. */
@@ -266,7 +340,7 @@ describe('canvas schema compatibility declarations', () => {
 
     expect(transport.apiFetchJson).toHaveBeenCalledWith(
       '/api/v1/projects/project%2Fone?max_canvas_schema_version=6&max_document_schema_version=4',
-      { signal: undefined }
+      { signal: expect.any(AbortSignal) }
     );
   });
 
@@ -285,7 +359,7 @@ describe('canvas schema compatibility declarations', () => {
         minimum_canvas_schema_version: 3,
       }),
       method: 'POST',
-      signal: undefined,
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -309,7 +383,7 @@ describe('canvas schema compatibility declarations', () => {
         max_document_schema_version: 4,
       }),
       method: 'PUT',
-      signal: undefined,
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -350,26 +424,35 @@ describe('canvas schema compatibility declarations', () => {
     const random = vi.spyOn(Math, 'random').mockReturnValue(0);
     transport.apiFetchJson.mockRejectedValueOnce(busy).mockRejectedValueOnce(busy).mockRejectedValueOnce(busy);
     transport.apiFetchJson.mockRejectedValueOnce(busy).mockRejectedValueOnce(busy).mockRejectedValueOnce(busy);
-    transport.apiFetchJson.mockRejectedValueOnce(busy).mockRejectedValueOnce(busy).mockResolvedValueOnce({
-      project_id: 'project-1',
-    });
+    transport.apiFetchJson
+      .mockRejectedValueOnce(busy)
+      .mockRejectedValueOnce(busy)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({ project_id: 'project-1' }), 2_000);
+          })
+      );
 
-    const write = updateProject('project-1', { data: {}, expected_revision: 1, name: 'Project' });
+    const write = expect(
+      updateProject('project-1', { data: {}, expected_revision: 1, name: 'Project' })
+    ).resolves.toMatchObject({ project_id: 'project-1' });
     await vi.advanceTimersByTimeAsync(123_999);
     expect(transport.apiFetchJson).toHaveBeenCalledTimes(8);
     await vi.advanceTimersByTimeAsync(1);
-    await expect(write).resolves.toMatchObject({ project_id: 'project-1' });
+    await vi.advanceTimersByTimeAsync(2_000);
+    await write;
     expect(transport.apiFetchJson).toHaveBeenCalledTimes(9);
     vi.useRealTimers();
     random.mockRestore();
   });
 
-  it('stops retrying when the owning account scope expires during backoff', async () => {
+  it('stops retrying when the account expires during backoff even without a caller signal', async () => {
     const owner = captureAccountScope();
     const busy = new ApiError('{"detail":{"code":"project_write_busy"}}', 429, new Headers({ 'Retry-After': '60' }));
     transport.apiFetchJson.mockRejectedValue(busy);
 
-    const write = updateProject('project-1', { data: {}, expected_revision: 1, name: 'Project' }, owner.signal);
+    const write = updateProject('project-1', { data: {}, expected_revision: 1, name: 'Project' });
     await vi.waitFor(() => expect(transport.apiFetchJson).toHaveBeenCalledTimes(1));
     accountLifecycle.invalidate();
 
@@ -511,7 +594,7 @@ describe('project workspaces', () => {
         max_document_schema_version: 4,
       }),
       method: 'PUT',
-      signal: undefined,
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -539,7 +622,7 @@ describe('project workspaces', () => {
         max_document_schema_version: 4,
       }),
       method: 'PUT',
-      signal: undefined,
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -586,7 +669,7 @@ describe('project workspaces', () => {
         minimum_canvas_schema_version: 3,
       }),
       method: 'POST',
-      signal: undefined,
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -641,5 +724,148 @@ describe('project workspaces', () => {
         captureAccountScope()
       )
     ).rejects.toBe(conflict);
+  });
+});
+
+describe('project request deadlines', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+  });
+
+  it.each(['set', 'delete'] as const)(
+    'waits for an unconditional client-state %s to settle beyond the project deadline',
+    async (kind) => {
+      let finish!: () => void;
+      const pending = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+      (kind === 'set' ? transport.apiFetchJson : transport.apiFetch).mockReturnValueOnce(pending);
+      let status = 'pending';
+      const result = (
+        kind === 'set' ? setClientStateValue('session', 'value') : deleteClientStateValue('session')
+      ).then(
+        () => {
+          status = 'resolved';
+        },
+        () => {
+          status = 'rejected';
+        }
+      );
+
+      await vi.advanceTimersByTimeAsync(151_000);
+      const statusAtDeadline = status;
+      finish();
+      await result;
+
+      expect(statusAtDeadline).toBe('pending');
+      expect(status).toBe('resolved');
+    }
+  );
+
+  it.each(['content', 'workspace', 'read'] as const)(
+    'allows a slow %s transfer within the server upload contract',
+    async (kind) => {
+      let requestSignal!: AbortSignal;
+      transport.apiFetchJson.mockImplementationOnce((_path, init) => {
+        requestSignal = init.signal;
+        return new Promise((resolve) => {
+          setTimeout(() => resolve({ revision: 2 }), 120_000);
+        });
+      });
+      const result = expect(
+        kind === 'read'
+          ? getProject('p')
+          : kind === 'workspace'
+            ? saveProjectWorkspace('p', { data: {}, expected_revision: 1 })
+            : updateProject('p', { data: {}, expected_revision: 1, name: 'P' })
+      ).resolves.toMatchObject({ revision: 2 });
+      await vi.advanceTimersByTimeAsync(120_000);
+      await result;
+      expect(requestSignal.aborted).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
+
+  it.each(['content', 'workspace', 'read'] as const)(
+    'cancels a stalled %s request and permits the next operation',
+    async (kind) => {
+      let stalledSignal!: AbortSignal;
+      transport.apiFetchJson
+        .mockImplementationOnce((_path, init) => {
+          stalledSignal = init.signal;
+          return new Promise(() => {
+            /* Simulate an unresponsive request. */
+          });
+        })
+        .mockResolvedValueOnce({ revision: 2 });
+      const run = () =>
+        kind === 'read'
+          ? getProject('p')
+          : kind === 'workspace'
+            ? saveProjectWorkspace('p', { data: {}, expected_revision: 1 })
+            : updateProject('p', { data: {}, expected_revision: 1, name: 'P' });
+      const first = expect(run()).rejects.toBeInstanceOf(RequestDeadlineError);
+      await vi.advanceTimersByTimeAsync(150_000);
+      await first;
+      expect(stalledSignal.aborted).toBe(true);
+      await expect(run()).resolves.toMatchObject({ revision: 2 });
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
+
+  it('settles a timed-out create by the same identity without creating another project', async () => {
+    const request = { data: {}, name: 'P', project_id: 'reserved' };
+    transport.apiFetchJson
+      .mockImplementationOnce(
+        () =>
+          new Promise(() => {
+            /* Simulate an unresponsive request. */
+          })
+      )
+      .mockResolvedValueOnce({ ...request, minimum_canvas_schema_version: 3, minimum_document_schema_version: 4 });
+    const result = createProjectSettled(request, captureAccountScope());
+    await vi.advanceTimersByTimeAsync(150_000);
+    await expect(result).resolves.toMatchObject({ project_id: 'reserved' });
+    expect(transport.apiFetchJson).toHaveBeenCalledTimes(2);
+    expect(transport.apiFetchJson.mock.calls[1]![0]).toContain('/projects/reserved?');
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('bounds an unanswered create and its reconciliation without proving absence', async () => {
+    transport.apiFetchJson.mockImplementation(
+      () =>
+        new Promise(() => {
+          /* Simulate an unresponsive request. */
+        })
+    );
+    const result = expect(
+      createProjectSettled({ data: {}, name: 'P', project_id: 'reserved' }, captureAccountScope())
+    ).rejects.toBeInstanceOf(RequestDeadlineError);
+    await vi.advanceTimersByTimeAsync(300_000);
+    await result;
+    expect(transport.apiFetchJson).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('settles an ambiguous delete by repeating its identity and board policy', async () => {
+    transport.apiFetch
+      .mockImplementationOnce(
+        () =>
+          new Promise(() => {
+            /* Simulate an unresponsive request. */
+          })
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const result = deleteProject('reserved', undefined, 'delete');
+    await vi.advanceTimersByTimeAsync(150_000);
+    await expect(result).resolves.toBeUndefined();
+    expect(transport.apiFetch.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/projects/reserved?boards=delete',
+      '/api/v1/projects/reserved?boards=delete',
+    ]);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

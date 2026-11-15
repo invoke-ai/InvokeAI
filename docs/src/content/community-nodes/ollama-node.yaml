@@ -1,0 +1,15 @@
+title: Ollama Node
+author: Jonseed
+repo: https://github.com/Jonseed/Ollama-Node
+summary: Expand short prompts into detailed natural-language prompts with a local LLM through Ollama.
+description: >-
+  Works well for expanding basic prompts into detailed prompts for FLUX. A toggle unloads the LLM right after
+  expanding, to free VRAM for the rest of the generation.
+categories: [prompts, language-models]
+links:
+  - label: Example FLUX workflow
+    url: https://github.com/Jonseed/Ollama-Node/blob/main/Ollama-Node-Flux-example.json
+thumbnail: ./ollama-node.webp
+images:
+  - src: https://raw.githubusercontent.com/Jonseed/Ollama-Node/a3e7cdc55e394cb89c1ea7ed54e106c212c85e8c/ollama-node-screenshot.png
+    alt: The Ollama node expanding a prompt

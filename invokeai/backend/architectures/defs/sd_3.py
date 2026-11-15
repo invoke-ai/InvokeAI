@@ -8,16 +8,16 @@ from invokeai.backend.architectures.facets.modality import ModalityFacet
 from invokeai.backend.architectures.facets.variant import VariantFacet
 from invokeai.backend.architectures.registry import register
 from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, PiDDecoderVariantType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, PiDDecoderVariantType, SD3VariantType
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo
 
 register(
     BaseModelType.StableDiffusion3,
     LatentSpaceFacet(SD3_16),
     ConditioningFacet(SD3ConditioningInfo),
-    # stable-diffusion-3.5-medium's example: 40 steps at guidance 4.5. Medium rather than Large
-    # (28/3.5) because there is one `sd-3` row and no variant to tell them apart, and Medium is the
-    # smaller, more commonly run model.
+    # stable-diffusion-3.5-medium's example: 40 steps at guidance 4.5, for every SD 3 model. Medium
+    # rather than Large (28/3.5) because Medium is the smaller, more commonly run model; defaults per
+    # size, keyed on the variant, are a separate change.
     DefaultSettingsFacet(
         {None: MainModelDefaultSettings(scheduler="euler_a", steps=40, cfg_scale=4.5, width=1024, height=1024)}
     ),
@@ -28,6 +28,13 @@ register(
         guidance_label="CFG",
         scheduler_set="standard",
     ),
-    # SD3 mains carry no variant; only its PiD decoder checkpoints do.
-    VariantFacet({ModelType.PiDDecoder: PiDDecoderVariantType}),
+    # Mains and LoRAs carry the transformer size (Medium / Large), which decides the LoRAs that fit; records
+    # installed before it existed carry none. Its PiD decoder checkpoints carry their own variant.
+    VariantFacet(
+        {
+            ModelType.Main: SD3VariantType,
+            ModelType.LoRA: SD3VariantType,
+            ModelType.PiDDecoder: PiDDecoderVariantType,
+        }
+    ),
 )

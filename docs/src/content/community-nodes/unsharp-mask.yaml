@@ -1,0 +1,5 @@
+title: Unsharp Mask
+author: JPPhoto
+repo: https://github.com/JPPhoto/unsharp-mask-node
+summary: Sharpen an image with an unsharp mask filter, keeping its alpha channel.
+categories: [image-effects]

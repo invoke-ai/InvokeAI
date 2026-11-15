@@ -15,24 +15,19 @@ import { applyCustomHotkeys } from '@workbench/hotkeys/resolve';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import {
   BrushIcon,
-  CircleIcon,
   EraserIcon,
   HandIcon,
   LassoIcon,
   MousePointer2Icon,
-  PenLineIcon,
-  PentagonIcon,
   ScalingIcon,
   ScanIcon,
   SquareDashedMousePointerIcon,
-  SquareIcon,
-  StarIcon,
-  TriangleIcon,
   TypeIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, type ElementType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { SHAPE_KIND_ORDER, SHAPE_KIND_PRESENTATION } from './canvasToolCommands';
 import { useCanvasActiveTool, useShapeOptions } from './engineStoreHooks';
 import { recordSelectFamilyTool, useSelectFamilyTool, type SelectFamilyTool } from './toolFamilyStore';
 import { ToolFamilyButton, type ToolFlyoutItem } from './ToolStripFlyout';
@@ -81,24 +76,6 @@ const ToolStripButton = ({ description, engine, hotkey, icon, label, toolId }: T
   );
 };
 
-const SHAPE_KIND_ICONS: Record<ShapeToolKind, React.ElementType> = {
-  ellipse: CircleIcon,
-  freehand: PenLineIcon,
-  polygon: PentagonIcon,
-  rect: SquareIcon,
-  star: StarIcon,
-  triangle: TriangleIcon,
-};
-const SHAPE_KIND_ORDER: readonly ShapeToolKind[] = ['rect', 'ellipse', 'triangle', 'star', 'polygon', 'freehand'];
-const SHAPE_KIND_LABEL_KEYS: Record<ShapeToolKind, string> = {
-  ellipse: 'widgets.canvas.toolOptions.shapeEllipse',
-  freehand: 'widgets.canvas.toolOptions.shapeFreehand',
-  polygon: 'widgets.canvas.toolOptions.shapePolygon',
-  rect: 'widgets.canvas.toolOptions.shapeRect',
-  star: 'widgets.canvas.toolOptions.shapeStar',
-  triangle: 'widgets.canvas.toolOptions.shapeTriangle',
-};
-
 /** The Shape slot: one tool id, the flyout switching which kind the next drag draws. */
 const ShapeFamilyButton = ({ engine, hotkey }: { engine: ToolStripEngine; hotkey: string | undefined }) => {
   const { t } = useTranslation();
@@ -109,9 +86,9 @@ const ShapeFamilyButton = ({ engine, hotkey }: { engine: ToolStripEngine; hotkey
       SHAPE_KIND_ORDER.map((kind) => ({
         // One key selects the Shape tool and cycles its kinds; each entry shows it.
         hotkeys: hotkey ? [hotkey] : undefined,
-        icon: SHAPE_KIND_ICONS[kind],
+        icon: SHAPE_KIND_PRESENTATION[kind].icon,
         id: kind,
-        label: t(SHAPE_KIND_LABEL_KEYS[kind]),
+        label: t(SHAPE_KIND_PRESENTATION[kind].labelKey),
       })),
     [hotkey, t]
   );
@@ -126,7 +103,7 @@ const ShapeFamilyButton = ({ engine, hotkey }: { engine: ToolStripEngine; hotkey
   return (
     <ToolFamilyButton
       currentId={options.kind}
-      icon={SHAPE_KIND_ICONS[options.kind]}
+      icon={SHAPE_KIND_PRESENTATION[options.kind].icon}
       isActive={activeTool === 'shape'}
       items={items}
       label={t('widgets.canvas.tools.shape')}

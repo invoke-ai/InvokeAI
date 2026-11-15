@@ -51,7 +51,7 @@ class ForProcessorAfterOutput(BaseInvocationOutput):
 
 @invocation("test_for_processor_after", version="1.0.0")
 class ForProcessorAfterInvocation(BaseInvocation):
-    values: list[Any] = InputField(default_factory=list, description="The completed loop values")
+    values: list[Any] = InputField(default=[], description="The completed loop values")
 
     def invoke(self, context: InvocationContext) -> ForProcessorAfterOutput:
         return ForProcessorAfterOutput(values=self.values)

@@ -40,8 +40,11 @@ const getGalleryItemRange = (
  * the captured context.
  */
 export const useGalleryGridSelection = ({
+  getItemReturnFocus,
   getSelectionPage,
 }: {
+  /** Where focus returns from a dialog the item's context menu opens; see `GalleryItemContextMenuTarget`. */
+  getItemReturnFocus?: (item: GalleryItem) => () => HTMLElement | null;
   /** The sparse page stamp for a loaded listing item; selections without one stamp the grid's page. */
   getSelectionPage?: (item: GalleryItem) => number | undefined;
 } = {}) => {
@@ -297,6 +300,7 @@ export const useGalleryGridSelection = ({
   const handleThumbnailContextMenu = useCallback(
     (item: GalleryItem, x: number, y: number) => {
       const itemKey = toGalleryItemKey(item);
+      const returnFocus = getItemReturnFocus?.(item);
 
       if (selectedItemKeys.has(itemKey) && selectedItemKeys.size > 1) {
         const selectionItems = [
@@ -312,15 +316,16 @@ export const useGalleryGridSelection = ({
           itemRefs: selectedItemRefs,
           items: selectionItems,
           listingBoardId: gallery.listingBoardId,
+          returnFocus,
           x,
           y,
         });
         return;
       }
 
-      setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y });
+      setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], returnFocus, x, y });
     },
-    [gallery.listingBoardId, loadedItems, selectedItemKeys, selectedItemRefs, shouldStarSelection]
+    [getItemReturnFocus, gallery.listingBoardId, loadedItems, selectedItemKeys, selectedItemRefs, shouldStarSelection]
   );
 
   const getDragItems = useCallback(

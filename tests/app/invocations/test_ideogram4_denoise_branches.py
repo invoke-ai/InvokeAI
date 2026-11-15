@@ -21,6 +21,7 @@ from invokeai.app.invocations.fields import Ideogram4ConditioningField
 from invokeai.app.invocations.ideogram4.ideogram4_denoise import Ideogram4DenoiseInvocation
 from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
 from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Config, Ideogram4Transformer
+from invokeai.backend.ideogram4.sampling_utils import PIXELS_PER_IMAGE_TOKEN
 from invokeai.backend.ideogram4.transformer_pair import Ideogram4TransformerPair
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
@@ -159,7 +160,9 @@ def test_a_bundled_pair_supplies_both_branches_from_one_model() -> None:
     invocation = _invocation(transformer=_field("pipeline"))
 
     with ExitStack() as stack:
-        conditional, unconditional = invocation._load_branches(_context({"pipeline": pair}, released), stack, 0)
+        conditional, unconditional = invocation._load_branches(
+            _context({"pipeline": pair}, released), stack, 0, lora_rows=0
+        )
 
         assert conditional is pair.conditional
         assert unconditional is pair.unconditional
@@ -177,7 +180,9 @@ def test_two_single_files_are_both_held_for_the_whole_loop() -> None:
     loaded: list[str] = []
     calls: list[tuple[str, int]] = []
     with ExitStack() as stack:
-        conditional, unconditional = invocation._load_branches(_context(models, released, calls, loaded), stack, 0)
+        conditional, unconditional = invocation._load_branches(
+            _context(models, released, calls, loaded), stack, 0, lora_rows=0
+        )
 
         assert conditional is models["cond"]
         assert unconditional is models["uncond"]
@@ -198,7 +203,7 @@ def test_a_lone_single_file_is_refused() -> None:
     invocation = _invocation(transformer=_field("cond"))
 
     with pytest.raises(ValueError, match="only one branch"), ExitStack() as stack:
-        invocation._load_branches(_context({"cond": Ideogram4Transformer(TINY)}, released), stack, 0)
+        invocation._load_branches(_context({"cond": Ideogram4Transformer(TINY)}, released), stack, 0, lora_rows=0)
 
 
 def test_a_bundled_pair_with_a_second_branch_connected_is_refused() -> None:
@@ -210,7 +215,10 @@ def test_a_bundled_pair_with_a_second_branch_connected_is_refused() -> None:
     loaded: list[str] = []
     with pytest.raises(ValueError, match="already carries both"), ExitStack() as stack:
         invocation._load_branches(
-            _context({"pipeline": pair, "uncond": Ideogram4Transformer(TINY)}, released, loaded=loaded), stack, 0
+            _context({"pipeline": pair, "uncond": Ideogram4Transformer(TINY)}, released, loaded=loaded),
+            stack,
+            0,
+            lora_rows=0,
         )
 
     # The refusal comes before the second branch is read: a mis-wired graph costs an error, not a
@@ -249,6 +257,21 @@ def test_an_int8_branch_adds_its_dequantization_headroom() -> None:
     assert Ideogram4DenoiseInvocation._dequant_transient(int8) == (
         2 * largest.in_features * largest.out_features * torch.bfloat16.itemsize
     )
+
+
+def test_an_fp8_branch_adds_no_dequantization_headroom() -> None:
+    """The row-wise fp8 build casts one weight per forward too, but the activation estimate's fixed base already
+    holds that cast; counting it again cost the fp8 pair its full residency on a 24 GB card (34 s -> 42 s)."""
+    from invokeai.backend.ideogram4.quantized_loading import quantize_weight_to_fp8, swap_linears_to_fp8
+
+    model = Ideogram4Transformer(TINY)
+    state_dict = {}
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.Linear) and name.startswith("layers."):
+            state_dict[f"{name}.weight"], state_dict[f"{name}.weight_scale"] = quantize_weight_to_fp8(module.weight)
+    swap_linears_to_fp8(model, state_dict, compute_dtype=torch.bfloat16)
+
+    assert Ideogram4DenoiseInvocation._dequant_transient(model) == 0
 
 
 def _gguf_branch(*packed: str) -> Ideogram4Transformer:
@@ -304,7 +327,7 @@ def test_a_mixed_pair_reserves_for_the_hungrier_branch(int8_branch: str) -> None
     assert transient > 0
 
     with ExitStack() as stack:
-        invocation._load_branches(_context(models, [], calls), stack, 4 * 1024**3)
+        invocation._load_branches(_context(models, [], calls), stack, 4 * 1024**3, lora_rows=0)
 
     assert calls == [("cond", 4 * 1024**3 + transient), ("uncond", 4 * 1024**3 + transient)]
 
@@ -322,7 +345,7 @@ def test_both_branches_reserve_the_same_activation_headroom() -> None:
     invocation.unconditional_transformer = _field("uncond")
 
     with ExitStack() as stack:
-        invocation._load_branches(_context(models, [], calls), stack, 4 * 1024**3)
+        invocation._load_branches(_context(models, [], calls), stack, 4 * 1024**3, lora_rows=0)
 
     assert calls == [("cond", 4 * 1024**3), ("uncond", 4 * 1024**3)]
 
@@ -354,7 +377,7 @@ def test_invoke_passes_its_own_estimate_into_the_load(monkeypatch) -> None:
     argument -- or passed a constant -- would leave them all green while the cache went back to
     filling VRAM with weights and leaving none for the activations.
     """
-    reserved: list[int] = []
+    reserved: list[tuple[int, int]] = []
     invocation = _invocation(
         transformer=_field("cond"),
         positive_conditioning=Ideogram4ConditioningField(conditioning_name="cond-1"),
@@ -367,8 +390,8 @@ def test_invoke_passes_its_own_estimate_into_the_load(monkeypatch) -> None:
         seed=0,
     )
 
-    def load_branches(_context, _stack, working_mem_bytes: int):
-        reserved.append(working_mem_bytes)
+    def load_branches(_context, _stack, working_mem_bytes: int, lora_rows: int):
+        reserved.append((working_mem_bytes, lora_rows))
         raise _StopAfterLoad
 
     monkeypatch.setattr(invocation, "_load_branches", load_branches)
@@ -384,7 +407,8 @@ def test_invoke_passes_its_own_estimate_into_the_load(monkeypatch) -> None:
     with pytest.raises(_StopAfterLoad):
         invocation.invoke(context)
 
-    assert reserved == [invocation._estimate_working_memory(TEXT_TOKENS)]
+    image_tokens = (1024 // PIXELS_PER_IMAGE_TOKEN) ** 2
+    assert reserved == [(invocation._estimate_working_memory(TEXT_TOKENS), TEXT_TOKENS + image_tokens)]
 
 
 GIB = 1024**3
@@ -440,6 +464,7 @@ def _drive(
             ),
             stack,
             reservation,
+            lora_rows=0,
         )
     return cond, uncond, calls, emptied
 
@@ -595,7 +620,7 @@ def test_the_bundled_pair_is_never_capped(monkeypatch) -> None:
 
     with ExitStack() as stack:
         invocation._load_branches(
-            _context({"pipeline": pair}, [], residency={"pipeline": pair_record}), stack, RESERVATION
+            _context({"pipeline": pair}, [], residency={"pipeline": pair_record}), stack, RESERVATION, lora_rows=0
         )
 
     assert pair_record.unloaded == []

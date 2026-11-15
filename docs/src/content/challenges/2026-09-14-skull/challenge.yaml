@@ -1,0 +1,22 @@
+theme: Skull
+brief: >-
+  From ancient symbols to contemporary art, skulls have taken countless forms and meanings throughout history and across cultures. Reimagine the skull. Take it somewhere unexpected.
+startDate: 2026-09-14
+endDate: 2026-09-21
+discordUrl: https://discord.com/channels/1020123559063990373/1020355799945580585/1551507736951390208
+winners:
+  - place: 1
+    image: ./1-skunkworxdark.webp
+    artist: SkunkWorxDark
+  - place: 2
+    image: ./2-bob.webp
+    artist: Bob
+  - place: runner-up
+    image: ./runner-up-alz-heimer.webp
+    artist: Alz-Heimer
+  - place: runner-up
+    image: ./runner-up-brainslime.webp
+    artist: Brainslime
+  - place: runner-up
+    image: ./runner-up-mickr777.webp
+    artist: mickr777

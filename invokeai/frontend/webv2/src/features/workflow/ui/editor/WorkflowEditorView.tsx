@@ -103,6 +103,7 @@ import { NodeContextMenu, type WorkflowContextMenuPaste, type WorkflowContextMen
 import { NotesFlowNode } from './NotesFlowNode';
 import {
   isLargeWorkflowGraph,
+  UNMEASURED_WORKFLOW_NODE_SIZE,
   WORKFLOW_INITIAL_RENDER_NODE_COUNT,
   WORKFLOW_MINIMAP_DELAY_MS,
 } from './performanceConstants';
@@ -1272,6 +1273,32 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     duplicateNodes(contextMenu?.kind === 'node' ? contextMenu.nodeId : undefined);
     setContextMenu(null);
   }, [contextMenu, duplicateNodes]);
+  const onContextMenuFitSelection = useCallback(() => {
+    setContextMenu(null);
+    if (!flowInstance || contextMenu?.kind !== 'node') {
+      return;
+    }
+
+    const nodes = getActionNodeIds(contextMenu.nodeId).flatMap((id) => {
+      const node = flowInstance.getInternalNode(id);
+      if (!node) {
+        return [];
+      }
+
+      // A selection can include offscreen nodes that XYFlow has never rendered or measured.
+      return [
+        node.measured.width && node.measured.height ? node : { ...node, measured: UNMEASURED_WORKFLOW_NODE_SIZE },
+      ];
+    });
+    if (nodes.length > 0) {
+      void fitWorkflowBounds(
+        flowInstance,
+        flowInstance.getNodesBounds(nodes),
+        flowStore.getState(),
+        reduceMotion ? 0 : 300
+      );
+    }
+  }, [contextMenu, flowInstance, flowStore, getActionNodeIds, reduceMotion]);
   // Only the empty-canvas menu names a point; a node or selection menu pastes like any other menu, centered in the
   // view, so the copy never lands on the nodes it was opened on.
   const onContextMenuPaste = useCallback<WorkflowContextMenuPaste>(
@@ -1462,6 +1489,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         onCopy={onContextMenuCopy}
         onDelete={onContextMenuDelete}
         onDuplicate={onContextMenuDuplicate}
+        onFitSelection={onContextMenuFitSelection}
         onPaste={onContextMenuPaste}
         onToggleOpen={onContextMenuToggleOpen}
         onUpdate={onContextMenuUpdate}

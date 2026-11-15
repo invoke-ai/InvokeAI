@@ -20,6 +20,7 @@ export const QUEUE_RECALL_CACHE_MAX_BYTES = 32 * 1024 * 1024;
 export const QUEUE_RECALL_CACHE_MAX_ENTRIES = 500;
 
 export interface QueueRecallSnapshotInput {
+  canvasMetadata?: Record<string, unknown>;
   generateValues?: GenerateWidgetValues;
   projectId: string;
   queueItemId: string;
@@ -30,6 +31,7 @@ export interface QueueRecallSnapshotInput {
 
 /** Values crossing the persistence boundary stay untrusted until their feature owner normalizes them. */
 export interface QueueRecallSnapshot {
+  canvasMetadata?: unknown;
   generateValues?: unknown;
   projectId: string;
   queueItemId: string;
@@ -80,6 +82,7 @@ const isQueueRecallSnapshot = (value: unknown): value is QueueRecallSnapshot => 
     isQueueSourceId(value.sourceId) &&
     isNonEmptyString(value.submittedAt) &&
     (isRecord(value.generateValues) || isRecord(value.videoValues)) &&
+    (value.canvasMetadata === undefined || isRecord(value.canvasMetadata)) &&
     (value.generateValues === undefined || isRecord(value.generateValues)) &&
     (value.videoValues === undefined || isRecord(value.videoValues))
   );

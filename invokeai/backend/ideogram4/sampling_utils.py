@@ -105,6 +105,18 @@ def pack_latents_to_grid(z: torch.Tensor, grid_h: int, grid_w: int) -> torch.Ten
     return z.permute(0, 3, 1, 2).contiguous()
 
 
+def unpatchify(packed: torch.Tensor) -> torch.Tensor:
+    """Convert a packed latent ``(1, LATENT_DIM, grid_h, grid_w)`` to ``(1, 32, H/8, W/8)``, leaving its values as they are."""
+    batch_size, channels, grid_h, grid_w = packed.shape
+    if channels != LATENT_DIM:
+        raise ValueError(f"expected {LATENT_DIM} packed channels, got {channels}")
+
+    ae_channels = LATENT_DIM // (PATCH_SIZE * PATCH_SIZE)  # 32
+    z = packed.permute(0, 2, 3, 1).reshape(batch_size, grid_h, grid_w, PATCH_SIZE, PATCH_SIZE, ae_channels)
+    z = z.permute(0, 5, 1, 3, 2, 4).contiguous()
+    return z.reshape(batch_size, ae_channels, grid_h * PATCH_SIZE, grid_w * PATCH_SIZE)
+
+
 def unpatchify_and_denormalize(
     packed: torch.Tensor,
     latent_shift: torch.Tensor,
@@ -115,16 +127,6 @@ def unpatchify_and_denormalize(
     Applies the per-channel latent denormalization (``z * scale + shift``) in the
     packed space, then unpatchifies, exactly as ``Ideogram4Pipeline._decode`` does.
     """
-    batch_size, channels, grid_h, grid_w = packed.shape
-    if channels != LATENT_DIM:
-        raise ValueError(f"expected {LATENT_DIM} packed channels, got {channels}")
-
-    # (B, grid_h, grid_w, LATENT_DIM)
-    z = packed.permute(0, 2, 3, 1)
-    z = z * latent_scale.to(z.device, z.dtype) + latent_shift.to(z.device, z.dtype)
-
-    ae_channels = LATENT_DIM // (PATCH_SIZE * PATCH_SIZE)  # 32
-    z = z.reshape(batch_size, grid_h, grid_w, PATCH_SIZE, PATCH_SIZE, ae_channels)
-    z = z.permute(0, 5, 1, 3, 2, 4).contiguous()
-    z = z.reshape(batch_size, ae_channels, grid_h * PATCH_SIZE, grid_w * PATCH_SIZE)
-    return z
+    scale = latent_scale.to(packed.device, packed.dtype).view(1, -1, 1, 1)
+    shift = latent_shift.to(packed.device, packed.dtype).view(1, -1, 1, 1)
+    return unpatchify(packed * scale + shift)

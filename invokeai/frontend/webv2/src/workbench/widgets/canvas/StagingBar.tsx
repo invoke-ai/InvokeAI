@@ -74,9 +74,6 @@ const NARROW_HIDDEN_CSS = { [NARROW]: { display: 'none' } } as const;
 const NARROW_ONLY_CSS = { display: 'none', [NARROW]: { display: 'inline-flex' } } as const;
 /** Buttons whose text goes while narrow keep a square icon footprint. */
 const NARROW_ICON_BUTTON_CSS = { [NARROW]: { minW: '8', px: '0' } } as const;
-/** The status pill tightens once narrow. */
-const STATUS_PILL_CSS = { px: '2', [NARROW]: { px: '1' } } as const;
-const STATUS_PILL_IDLE_CSS = { px: '2', [COMPACT]: SR_ONLY } as const;
 /** Marks a thumbnail with its slot index, for roving focus and focus restore. */
 const THUMBNAIL_ATTR = 'data-staging-thumbnail';
 /** Marks the previous/next buttons, a focus target once no thumbnail shows. */
@@ -344,19 +341,17 @@ export const StagingBar = ({
         {/* Results keep coming in and waiting here while the canvas stays editable; the status says how many. */}
         <Tooltip content={statusLabel}>
           <HStack
-            bg="bg.muted"
             color="fg.muted"
-            // Once compact a running batch keeps its spinner; otherwise the pill goes, since the counter shows the
-            // count, and its status still reads the sentence.
-            css={isGenerating ? STATUS_PILL_CSS : STATUS_PILL_IDLE_CSS}
+            // Once compact a running batch keeps its spinner; otherwise the status goes, since the counter shows the
+            // count, and it still reads the sentence.
+            css={isGenerating ? undefined : COMPACT_SR_ONLY_CSS}
             flexShrink="0"
             gap="1.5"
-            h="6"
             position="relative"
-            rounded="full"
+            px="1"
           >
             {isGenerating ? <Spinner /> : null}
-            <Text css={COMPACT_SR_ONLY_CSS} fontSize="md" fontWeight="600" role="status" whiteSpace="nowrap">
+            <Text css={COMPACT_SR_ONLY_CSS} fontSize="md" role="status" whiteSpace="nowrap">
               {statusLabel}
             </Text>
           </HStack>
@@ -369,6 +364,9 @@ export const StagingBar = ({
                 {areThumbnailsVisible ? <ChevronDownIcon /> : <ChevronUpIcon />}
               </IconButton>
             </Tooltip>
+
+            {/* The status and its thumbnail toggle read as one group: the toggle shows or hides the pending results. */}
+            <CanvasFloatingBarDivider css={NARROW_HIDDEN_CSS} />
 
             <HStack gap="0.5">
               <Tooltip content={t('widgets.canvas.previousStagedCandidate')}>

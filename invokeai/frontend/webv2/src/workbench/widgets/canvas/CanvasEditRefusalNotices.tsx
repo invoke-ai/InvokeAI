@@ -97,12 +97,13 @@ const paintOnNewLayer = (
   );
 
 /**
- * Explains edits the engine refused without a caller to report to: a stroke too large to undo, or a press on a layer
- * the tool cannot edit (hidden, locked, still loading). A brush press on a locked or hidden image offers a new paint
- * layer above it rather than making one unasked; that offer holds a closure, so it is a toast only, closed with this
- * canvas or the account. Layer refusals are toasts only, one per layer and reason: a repeated press (every eraser
- * press on a transparency-locked layer, say) replaces its toast instead of stacking another, and taking one offer
- * closes the other offers. Keyed by engine.
+ * Explains edits the engine refused without a caller to report to: a stroke too large to undo, a press on a layer
+ * the tool cannot edit (hidden, locked, still loading), or a shape cutout with no paint layer or mask selected. A
+ * brush press on a locked or hidden image offers a new paint layer above it rather than making one unasked; that
+ * offer holds a closure, so it is a toast only, closed with this canvas or the account. Layer refusals are toasts
+ * only, one per layer and reason: a repeated press (every eraser press on a transparency-locked layer, say) replaces
+ * its toast instead of stacking another, and taking one offer closes the other offers. A cutout with nothing to cut
+ * from keeps a single toast the same way. Keyed by engine.
  */
 export const CanvasEditRefusalNotices = ({
   engine,
@@ -130,10 +131,21 @@ export const CanvasEditRefusalNotices = ({
         notify.error(t('widgets.canvas.structural.failed'), describeAdjustmentRefusal(refusal, t));
         return;
       }
+      const signal = AbortSignal.any([captureAccountScope().signal, mounted.signal]);
+      if (refusal.status === 'cutout-no-target') {
+        createActionToast({
+          actions: [],
+          description: t('widgets.canvas.editRefusal.noCutoutTargetMessage'),
+          id: `${scope}:${refusal.status}`,
+          signal,
+          title: t('widgets.canvas.editRefusal.noCutoutTarget'),
+          type: 'info',
+        });
+        return;
+      }
       const { message, title } = describeLayerEditRefusal(refusal, t);
       // One toast per layer and reason: pressing again on the same layer replaces it rather than stacking another.
       const id = `${scope}:${refusal.status}:${refusal.layerId}`;
-      const signal = AbortSignal.any([captureAccountScope().signal, mounted.signal]);
       if (!refusal.canPaintNewLayer) {
         createActionToast({ actions: [], description: message, id, signal, title, type: 'info' });
         return;

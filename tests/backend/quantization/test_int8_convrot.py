@@ -14,6 +14,7 @@ from torch.utils._python_dispatch import TorchDispatchMode
 from torch.utils._pytree import tree_flatten
 
 from invokeai.backend.model_manager.taxonomy import ModelFormat
+from invokeai.backend.quantization import int8_convrot
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.quantization.int8_convrot import (
     CONVROT_GROUP_SIZE,
@@ -71,6 +72,38 @@ def test_dequantize_without_convrot() -> None:
     q, scale = _quantize_reference(w, convrot=False)
     recovered = dequantize_convrot_weight(q, scale, convrot=False, dtype=torch.float32)
     assert (recovered - w).abs().max().item() < scale.max().item()
+
+
+@pytest.mark.parametrize("scale_layout", ["column", "flat", "per_tensor"])
+def test_a_tall_weight_decodes_in_passes_to_what_one_pass_gives(
+    monkeypatch: pytest.MonkeyPatch, scale_layout: str
+) -> None:
+    """An LLM's embedding or LM head (248320 rows) is widened on load a bounded number of rows at a time, so its
+    float32 intermediates stay small. Each pass needs its own rows of a per-row scale, and all of a per-tensor one."""
+    torch.manual_seed(3)
+    w = torch.randn(10, 2 * CONVROT_GROUP_SIZE)
+    q, scale = _quantize_reference(w, convrot=True)
+    scale = {"column": scale, "flat": scale.flatten(), "per_tensor": scale.max()}[scale_layout]
+    one_pass = dequantize_convrot_weight(q, scale, convrot=True, dtype=torch.float32)
+
+    monkeypatch.setattr(int8_convrot, "DEQUANTIZE_ROWS_PER_PASS", 3)
+    in_passes = dequantize_convrot_weight(q, scale, convrot=True, dtype=torch.float32)
+
+    torch.testing.assert_close(in_passes, one_pass, rtol=1e-6, atol=1e-6)
+
+
+def test_a_tall_packed_int4_weight_decodes_in_passes_to_what_one_pass_gives(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each pass unpacks its own rows of the int4 bytes, so the result has the decoded width, not the packed one."""
+    torch.manual_seed(4)
+    packed = torch.randint(-128, 128, (10, CONVROT_GROUP_SIZE), dtype=torch.int8)
+    scale = torch.rand(10, 1) * 0.01 + 0.005
+    one_pass = dequantize_convrot_weight(packed, scale, convrot=True, dtype=torch.float32, packed_int4=True)
+
+    monkeypatch.setattr(int8_convrot, "DEQUANTIZE_ROWS_PER_PASS", 3)
+    in_passes = dequantize_convrot_weight(packed, scale, convrot=True, dtype=torch.float32, packed_int4=True)
+
+    assert in_passes.shape == (10, 2 * CONVROT_GROUP_SIZE)
+    torch.testing.assert_close(in_passes, one_pass, rtol=1e-6, atol=1e-6)
 
 
 def test_int8_convrot_linear_matches_dequantized_f_linear() -> None:

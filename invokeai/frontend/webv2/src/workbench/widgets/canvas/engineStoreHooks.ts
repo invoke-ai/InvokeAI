@@ -281,3 +281,15 @@ export const useTextOptions = (engine: CanvasCoreStoreCapability): TextToolOptio
 /** The active text-editing session (create/edit mode + live source + transform), or `null`. */
 export const useTextEditSession = (engine: CanvasCoreStoreCapability): TextEditSession | null =>
   useCanvasInteractionState(engine, 'textEditSession');
+
+/** PSD preparation/worker/download lifecycle belongs to the engine, across widget remounts. */
+export const usePsdExportStatus = (
+  engine: CanvasCoreStoreCapability | null
+): CanvasInteractionState['psdExportStatus'] => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('psdExportStatus', listener) ?? (() => undefined),
+    [engine]
+  );
+  const getSnapshot = useCallback(() => engine?.interaction.get('psdExportStatus') ?? 'idle', [engine]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};

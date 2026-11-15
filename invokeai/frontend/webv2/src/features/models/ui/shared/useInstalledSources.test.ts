@@ -19,10 +19,11 @@ const model = (overrides: Partial<ModelConfig>): ModelConfig =>
     ...overrides,
   }) as ModelConfig;
 
-const starter: Pick<StarterModel, 'base' | 'name' | 'previous_names' | 'source' | 'type'> = {
+const starter: Pick<StarterModel, 'base' | 'name' | 'previous_names' | 'previous_sources' | 'source' | 'type'> = {
   base: 'sdxl',
   name: 'Juggernaut XL',
   previous_names: ['Juggernaut'],
+  previous_sources: ['https://example/jxl-old'],
   source: 'https://example/jxl',
   type: 'main',
 };
@@ -32,6 +33,13 @@ describe('findInstalledStarterModelKey', () => {
     const bySource = new Map([['https://example/jxl', 'from-source']]);
     expect(findInstalledStarterModelKey(starter, bySource, [model({ key: 'by-name', name: 'Juggernaut XL' })])).toBe(
       'from-source'
+    );
+  });
+
+  it('recognizes a model recorded under a previous source even when it was renamed', () => {
+    const bySource = new Map([['https://example/jxl-old', 'from-old-source']]);
+    expect(findInstalledStarterModelKey(starter, bySource, [model({ key: 'x', name: 'My own name' })])).toBe(
+      'from-old-source'
     );
   });
 

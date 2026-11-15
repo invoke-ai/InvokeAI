@@ -23,7 +23,9 @@ import { useAuthSession } from '@features/identity';
 import {
   ensureWorkflowLibraryBrowseLoaded,
   getWorkflowLibraryBrowseSnapshot,
+  selectWorkflowLibraryEntry,
   setWorkflowLibraryBrowseFilter,
+  setWorkflowLibrarySelectedDemand,
   useWorkflowLibraryBrowseSelector,
 } from '@features/workflow/data/libraryBrowseStore';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
@@ -63,6 +65,27 @@ import { useWorkflowLibraryMissingCounts } from './WorkflowRequirementsList';
 import { WorkflowThumbnailFitContext } from './workflowThumbnail';
 
 const SEARCH_DEBOUNCE_MS = 300;
+// Short windows need the panes' full shared height; reclaim modal margins before compressing the toolbar.
+const CONTENT_CSS: SystemStyleObject = {
+  containerName: 'workflow-library-content',
+  containerType: 'size',
+  overflowY: 'auto',
+  '@media (height < 40rem)': {
+    h: 'calc(100dvh - 2rem)',
+    maxH: 'calc(100dvh - 2rem)',
+    maxW: 'min(72rem, calc(100vw - 1rem))',
+  },
+};
+// A 180px card, 18rem rail, gap and body padding need 32rem; below that, keep the stacked layout.
+const BODY_CSS: SystemStyleObject = {
+  '@container workflow-library-content (width < 42rem) and ((height >= 32rem) or (width < 32rem))': {
+    flexDirection: 'column',
+  },
+  // Finite panes enter modal scroll flow when they cannot share the remaining height.
+  '@container workflow-library-content ((width < 32rem) and (height < 32rem)) or (height < 20rem)': {
+    flex: '0 0 auto',
+  },
+};
 
 const TAB_ITEMS: ReadonlyArray<{ labelKey: string; value: WorkflowLibraryTab }> = [
   { labelKey: 'workflowLibrary.thisProject', value: 'project' },
@@ -112,8 +135,13 @@ const SORT_SELECT_CSS: SystemStyleObject = { [NARROW_HEADER]: { flex: '1', minW:
 
 /** Flat and shallow-comparable, so unrelated store patches do not re-render the shell. */
 const selectBrowseView = (snapshot: WorkflowLibraryBrowseSnapshot) => ({
+  viewKey: JSON.stringify(snapshot.filter),
   category: snapshot.filter.category,
   entries: snapshot.entries,
+  startIndex: snapshot.startIndex ?? 0,
+  filter: snapshot.filter,
+  total: snapshot.total,
+  selectedEntry: snapshot.selectedEntry,
   error: snapshot.error,
   isPublic: snapshot.filter.isPublic,
   status: snapshot.status,
@@ -158,8 +186,20 @@ export const WorkflowLibraryDialog = ({
   onOpenChange: (isOpen: boolean) => void;
 }) => {
   const { t } = useTranslation();
-  const { category, entries, error, isPublic, status, tag, tagCounts } =
-    useWorkflowLibraryBrowseSelector(selectBrowseView);
+  const {
+    category,
+    entries,
+    error,
+    isPublic,
+    status,
+    tag,
+    tagCounts,
+    startIndex,
+    filter,
+    total,
+    selectedEntry,
+    viewKey,
+  } = useWorkflowLibraryBrowseSelector(selectBrowseView);
   const { selection, tab } = workflowUiStore.useSelector(selectLibraryNavigation);
   const authSession = useAuthSession();
   const projectId = useWorkflowProjectSelector((project) => project.id);
@@ -170,6 +210,7 @@ export const WorkflowLibraryDialog = ({
   const thumbnailFit = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibraryThumbnailFit);
   const [searchInput, setSearchInput] = useState('');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  const [removedWorkflowId, setRemovedWorkflowId] = useState<string | null>(null);
   // Clear pending preview entries on every library-close path because the persistent shell otherwise resurrects
   // them on reopen.
   const [previewRequest, setPreviewRequest] = useState<PreviewRequest | null>(null);
@@ -193,10 +234,13 @@ export const WorkflowLibraryDialog = ({
   const missingCounts = useWorkflowLibraryMissingCounts(entries);
 
   // Derive a fallback selection when filtering/deletion removes the selected row.
-  const activeWorkflowId = entries.some((entry) => entry.item.workflow_id === selectedWorkflowId)
-    ? selectedWorkflowId
-    : (entries[0]?.item.workflow_id ?? null);
-  const activeEntry = entries.find((entry) => entry.item.workflow_id === activeWorkflowId) ?? null;
+  const desiredWorkflowId = selectedWorkflowId ?? selectedEntry?.item.workflow_id ?? null;
+  const activeWorkflowId =
+    selectedEntry?.item.workflow_id === desiredWorkflowId ||
+    entries.some((entry) => entry.item.workflow_id === desiredWorkflowId)
+      ? desiredWorkflowId
+      : (entries[0]?.item.workflow_id ?? null);
+  const activeEntry = selectWorkflowLibraryEntry({ entries, selectedEntry }, activeWorkflowId) ?? null;
   const isCurrentLibraryOwner =
     authSession.phase === 'ready' &&
     (authSession.multiuserEnabled
@@ -361,9 +405,10 @@ export const WorkflowLibraryDialog = ({
   );
 
   const handleDeleted = useCallback(() => {
+    setRemovedWorkflowId(activeWorkflowId);
     setSelectedWorkflowId(null);
     setContextMenuPoint(null);
-  }, []);
+  }, [activeWorkflowId]);
   const handleCardContextMenu = useCallback(
     (workflowId: string, point: WorkflowCardMenuAnchor) => {
       if (tab === 'project') {
@@ -401,6 +446,7 @@ export const WorkflowLibraryDialog = ({
     [projectId]
   );
 
+  const browseWindow = useMemo(() => ({ startIndex, total, filter }), [startIndex, total, filter]);
   const isProjectTab = tab === 'project';
   const tabsIdBase = useId();
   const activeTab: WorkflowLibraryTab = tab;
@@ -421,6 +467,7 @@ export const WorkflowLibraryDialog = ({
           <Dialog.Positioner>
             <Dialog.Content
               ref={preloadGraphPreview}
+              css={CONTENT_CSS}
               aria-busy={isLoadPending}
               h="80vh"
               maxH="80vh"
@@ -517,6 +564,7 @@ export const WorkflowLibraryDialog = ({
                 </Stack>
               </Dialog.Header>
               <Dialog.Body
+                css={BODY_CSS}
                 aria-labelledby={segmentTabsTabId(tabsIdBase, activeTab)}
                 data-library-tab={tab}
                 data-pending-preview={previewGraphId || undefined}
@@ -541,7 +589,16 @@ export const WorkflowLibraryDialog = ({
                     />
                   ) : (
                     <>
+                      {isOpen ? (
+                        <SelectedDemand
+                          key={`${authSession.user?.user_id}:${viewKey}:${activeWorkflowId}`}
+                          id={activeWorkflowId}
+                        />
+                      ) : null}
                       <WorkflowLibraryGrid
+                        key={`${authSession.user?.user_id}:${viewKey}`}
+                        window={browseWindow}
+                        removedWorkflowId={removedWorkflowId}
                         entries={entries}
                         error={error}
                         missingCounts={missingCounts}
@@ -591,4 +648,20 @@ export const WorkflowLibraryDialog = ({
       ) : null}
     </>
   );
+};
+
+let selectedLease = 0;
+const SelectedDemand = ({ id }: { id: string | null }) => {
+  useMountEffect(() => {
+    const lease = ++selectedLease;
+    setWorkflowLibrarySelectedDemand(id);
+    return () => {
+      queueMicrotask(() => {
+        if (lease === selectedLease) {
+          setWorkflowLibrarySelectedDemand(null);
+        }
+      });
+    };
+  });
+  return null;
 };

@@ -23,6 +23,7 @@ from invokeai.app.services.model_records.model_records_base import (
     ModelRecordServiceBase,
 )
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
+from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
@@ -84,8 +85,15 @@ class ModelManagerService(ModelManagerServiceBase):
         override_fields = {"source": config.source, "source_type": config.source_type}
         if encoder_id := getattr(config, "image_encoder_model_id", None):
             override_fields["image_encoder_model_id"] = encoder_id
+        if isinstance(config, Qwen35Encoder_Checkpoint_Config):
+            # A Qwen3.5 encoder file can be the same tensors as a Text LLM (Comfy-Org's int8 MOSS-Image encoder against
+            # the FLUX.3 upsampler), and a local copy has no source to tell them apart: keep the type it was given.
+            override_fields["type"] = config.type
         result = ModelConfigFactory.from_model_on_disk(mod, override_fields)
         if result.config is None:
+            # A model that was recognised and refused as unusable names its reason; the stored record stays as it is.
+            if invalid := result.invalid_matches:
+                raise InvalidModelException(f"Unable to identify model format: {invalid[0]}")
             raise InvalidModelException("Unable to identify model format")
 
         # Retain user-editable fields from the original config

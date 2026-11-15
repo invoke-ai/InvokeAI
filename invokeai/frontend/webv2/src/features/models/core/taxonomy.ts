@@ -25,6 +25,7 @@ export const MODEL_CATEGORIES: CategoryDefinition[] = [
   { label: 'Qwen3 Encoder', pluralLabel: 'Qwen3 Encoders', type: 'qwen3_encoder' },
   { label: 'Qwen VL Encoder', pluralLabel: 'Qwen VL Encoders', type: 'qwen_vl_encoder' },
   { label: 'Qwen3 VL Encoder', pluralLabel: 'Qwen3 VL Encoders', type: 'qwen3_vl_encoder' },
+  { label: 'Qwen3 VL Vision Tower', pluralLabel: 'Qwen3 VL Vision Towers', type: 'qwen3_vl_vision_tower' },
   { label: 'Qwen3.5 Encoder', pluralLabel: 'Qwen3.5 Encoders', type: 'qwen3_5_encoder' },
   { label: 'Mistral Encoder', pluralLabel: 'Mistral Encoders', type: 'mistral_encoder' },
   { label: 'Gemma 2 Encoder', pluralLabel: 'Gemma 2 Encoders', type: 'gemma2_encoder' },
@@ -147,6 +148,8 @@ export const MODEL_VARIANT_LABELS: Record<string, string> = {
   res2k_sr4x: 'PiD 2K (4x SR)',
   res2kto4k_sr4x: 'PiD 4K (4x SR Upscale)',
   schnell: 'FLUX Schnell',
+  sd3_large: 'SD 3.5 Large',
+  sd3_medium: 'SD 3 / 3.5 Medium',
   ltx2_dev: 'LTX-2 Dev',
   ltx2_distilled: 'LTX-2 Distilled',
   t2v_a14b: 'Wan 2.2 T2V A14B',
@@ -171,6 +174,7 @@ const MAIN_VARIANTS_BY_BASE: Record<string, readonly string[]> = {
   'qwen-image-2-1': ['qwen_image_21_base', 'qwen_image_21_turbo'],
   'sd-1': ['normal', 'inpaint'],
   'sd-2': ['normal', 'inpaint', 'depth'],
+  'sd-3': ['sd3_medium', 'sd3_large'],
   sdxl: ['normal', 'inpaint'],
   'sdxl-refiner': ['normal'],
   wan: ['t2v_a14b', 'i2v_a14b', 'ti2v_5b'],
@@ -185,11 +189,13 @@ const VARIANTS_BY_TYPE: Record<string, readonly string[]> = {
   qwen3_5_encoder: ['qwen3_5_4b', 'qwen3_5_9b'],
   // Required variant configs need explicit choices; a fallback None would fail database validation.
   qwen3_vl_encoder: ['qwen3_vl_4b', 'qwen3_vl_8b'],
+  qwen3_vl_vision_tower: ['qwen3_vl_4b', 'qwen3_vl_8b'],
 };
 
 /**
- * Constrained variant choices for a base/type pair; empty means the pair has
- * no variant concept and the edit form falls back to free text.
+ * Constrained variant choices for a base/type pair; empty means the pair has no
+ * variant concept, so the edit form hides the field unless the model already
+ * stores a variant, which it then edits as free text.
  */
 export const getVariantOptionsFor = (base: string, type: string): readonly string[] => {
   if (type === 'main') {
@@ -197,7 +203,10 @@ export const getVariantOptionsFor = (base: string, type: string): readonly strin
   }
 
   if (type === 'lora') {
-    return base === 'wan' ? ['a14b', '5b'] : [];
+    if (base === 'wan') {
+      return ['a14b', '5b'];
+    }
+    return base === 'sd-3' ? ['sd3_medium', 'sd3_large'] : [];
   }
 
   if (type === 'qwen3_vl_encoder') {

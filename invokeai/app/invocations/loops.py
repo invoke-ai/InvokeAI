@@ -86,7 +86,7 @@ class StateMergeInvocation(BaseInvocation):
 
     state: Optional[LoopState] = InputField(default=None, description="The loop state to update")
     values: dict[str, Any] = InputField(
-        default_factory=dict,
+        default={},
         description="The values to merge into the loop state. Connect an output to this input.",
         ui_type=UIType.Any,
     )

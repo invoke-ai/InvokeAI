@@ -16,6 +16,7 @@ import {
   SUPPORTED_GENERATE_BASES,
   withAddedReferenceImages,
 } from './baseGenerationPolicies';
+import { compileCanvasGraph } from './canvas/compileCanvasGraph';
 import { compileGenerateGraph, GRAPH_BUILDERS } from './graph';
 import {
   buildContext,
@@ -46,7 +47,7 @@ const compileForShape = (
         projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
       };
   // One enabled reference image wherever the model takes one, so reference nodes and their fields enter the contract.
-  const settings = isReferenceImageSupported(model)
+  const settings = isReferenceImageSupported(model, satisfied)
     ? {
         ...satisfied,
         referenceImages: withAddedReferenceImages(
@@ -95,6 +96,62 @@ const refinerCase = () => {
     }).backendGraph,
     shape: SDXL_REFINER_SHAPE,
   };
+};
+
+/** The same shape with one concept applied, for bases that load LoRAs; `null` for the rest. */
+const compileWithLoraForShape = (
+  base: SupportedGenerateBase,
+  shape: ModelShape
+): { filled: GenerateComponentValueKey[]; graph: BackendGraphContract } | null => {
+  const { filled, model, settings } = satisfiedSettingsFor(base, shape);
+
+  if (!isLoraSupported(model)) {
+    return null;
+  }
+
+  const lora = { base, key: 'concept', name: 'concept', type: 'lora' as const };
+
+  return {
+    filled,
+    graph: compileGenerateGraph(
+      { ...settings, loras: [{ isEnabled: true, model: lora, weight: 0.75 }] },
+      model,
+      'gallery',
+      { useCpuNoise: true, useNsfwChecker: false, useWatermark: false }
+    ).backendGraph,
+  };
+};
+
+// Canvas owns image encoding; both toggle values must reach the backend-validated literal contract.
+const sdxlCanvasCase = (colorCompensation: boolean) => {
+  const shape: ModelShape = {
+    label: `canvas-img2img-${colorCompensation ? 'compensated' : 'uncompensated'}`,
+    overrides: { format: 'diffusers' },
+  };
+  const { filled, model, settings } = satisfiedSettingsFor('sdxl', shape);
+  const { backendGraph: graph } = compileCanvasGraph({
+    bbox: { height: 1024, width: 1024, x: 0, y: 0 },
+    compositeImageName: 'canvas-input.png',
+    compositing: {
+      coherenceEdgeSize: 16,
+      coherenceMinDenoise: 0,
+      coherenceMode: 'Gaussian Blur',
+      infillColorValue: { a: 1, b: 0, g: 0, r: 0 },
+      infillMethod: 'lama',
+      infillPatchmatchDownscaleSize: 1,
+      infillTileSize: 32,
+      maskBlur: 16,
+      outputOnlyMaskedRegions: false,
+    },
+    destination: 'canvas',
+    mode: 'img2img',
+    model,
+    projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
+    settings: { ...settings, colorCompensation },
+    strength: 0.6,
+  });
+
+  return { base: 'sdxl' as const, filled, graph, shape };
 };
 
 // Edit references replace the style reference the tuned Krea-2 recipe carries, so they need their own case.
@@ -294,11 +351,19 @@ describe('generate graph coverage', () => {
       (fields[nodeType] ??= { inputs: new Set(), literals: new Map(), outputs: new Set() });
 
     // Each shape compiles twice: at its defaults, and with every optional tuning and output filter switched on.
+    // Bases that load LoRAs compile it once more with a concept, whose loader nodes the backend has to provide as well.
     const compilations = [
-      ...generateGraphCases.flatMap(({ base, shape }) =>
-        [false, true].map((tuned) => ({ base, shape, ...compileForShape(base, shape, tuned) }))
-      ),
+      ...generateGraphCases.flatMap(({ base, shape }) => {
+        const withLora = compileWithLoraForShape(base, shape);
+
+        return [
+          ...[false, true].map((tuned) => ({ base, shape, ...compileForShape(base, shape, tuned) })),
+          ...(withLora ? [{ base, shape, ...withLora }] : []),
+        ];
+      }),
       refinerCase(),
+      sdxlCanvasCase(false),
+      sdxlCanvasCase(true),
       krea2EditCase(),
     ];
 

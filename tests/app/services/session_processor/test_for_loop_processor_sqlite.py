@@ -77,7 +77,7 @@ class ForSqliteAfterOutput(BaseInvocationOutput):
 
 @invocation("test_for_sqlite_after", version="1.0.0")
 class ForSqliteAfterInvocation(BaseInvocation):
-    collection: list[Any] = InputField(default_factory=list, description="The completed loop collection")
+    collection: list[Any] = InputField(default=[], description="The completed loop collection")
 
     def invoke(self, context: InvocationContext) -> ForSqliteAfterOutput:
         return ForSqliteAfterOutput(collection=self.collection)

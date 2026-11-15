@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Collection
 from typing import Literal, Optional
 
 from invokeai.app.services.gallery.gallery_common import (
@@ -8,6 +9,7 @@ from invokeai.app.services.gallery.gallery_common import (
     GalleryItemLocation,
     GalleryItemNames,
     GalleryItemNamesResult,
+    GalleryMediaUsage,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
@@ -131,4 +133,18 @@ class GalleryServiceABC(ABC):
     @abstractmethod
     def get_board_media_summaries(self, board_ids: list[str]) -> dict[str, BoardMediaSummary]:
         """Returns covers and media counts for each requested board."""
+        pass
+
+    @abstractmethod
+    def get_media_usage(
+        self, image_names: Collection[str], video_names: Collection[str], user_id: str, is_admin: bool
+    ) -> GalleryMediaUsage:
+        """What still uses the named media that the caller may delete: the names `POST /images/delete` and
+        `POST /videos/delete` would delete. Other names, unknown ones included, are left out as those skip them."""
+        pass
+
+    @abstractmethod
+    def get_board_media_usage(self, board_id: str, user_id: str, contributor_id: Optional[str]) -> GalleryMediaUsage:
+        """What still uses the media that deleting the board with its media would delete: `contributor_id`'s items on
+        it, or every item when None. The caller (`user_id`) must already be allowed to delete the board."""
         pass

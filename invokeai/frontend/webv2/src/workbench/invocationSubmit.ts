@@ -32,6 +32,7 @@ import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepar
 import type { WorkbenchCommands } from './workbenchStore';
 
 import { getDynamicPromptsExpansionSource } from './invocation';
+import { captureInvocationRuntimeInputs } from './invocationPreparation';
 import { getActiveProjectWorkflow } from './projectWorkflows';
 import { getEffectiveProjectSettings, PROJECT_SETTINGS_OWNER } from './settings/projectSettings';
 import { readCanvasCompositingSettings } from './widgets/canvas/invoke/canvasCompositing';
@@ -401,6 +402,7 @@ const dispatchResolvedInvocation = async (
   }
 
   commands.generation.submitResolved({
+    runtime: captureInvocationRuntimeInputs(route.sourceId),
     backendSupportsCancellation: true,
     models,
     ...expansion,

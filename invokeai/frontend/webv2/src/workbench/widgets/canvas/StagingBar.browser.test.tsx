@@ -412,7 +412,7 @@ describe('StagingBar thumbnail strip', () => {
     }
   );
 
-  // The bar's floor is a 360px canvas (see the compact breakpoints); the pending pill adds nothing to it.
+  // The bar's floor is a 360px canvas (see the compact breakpoints); the pending status adds nothing to it.
   it.each([false, true])(
     'keeps Accept inside the narrowest canvas (generating: %s), the pending count read but not shown',
     async (isGenerating) => {

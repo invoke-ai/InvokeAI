@@ -16,10 +16,8 @@ import {
   type WorkflowFitViewTarget,
   type WorkflowFlowInstance,
 } from './flowInstanceStore';
+import { UNMEASURED_WORKFLOW_NODE_SIZE } from './performanceConstants';
 import { clearNodeSelectionRequest, workflowSelectionStore } from './selectionStore';
-
-// A large graph renders only visible nodes, so xyflow never measures the rest; they count at a typical node size.
-const UNMEASURED_NODE_SIZE = { height: 160, width: 288 };
 
 /** A node whose template exists renders as a placeholder card until its rebuilt data carries that template. */
 const isAwaitingTemplate = (internal: InternalNode<WorkflowFlowNode>, templates: InvocationTemplates): boolean => {
@@ -70,8 +68,8 @@ const getWorkflowFitBounds = (
       return null;
     }
 
-    const width = isMeasured ? internal.measured.width! : UNMEASURED_NODE_SIZE.width;
-    const height = isMeasured ? internal.measured.height! : UNMEASURED_NODE_SIZE.height;
+    const width = isMeasured ? internal.measured.width! : UNMEASURED_WORKFLOW_NODE_SIZE.width;
+    const height = isMeasured ? internal.measured.height! : UNMEASURED_WORKFLOW_NODE_SIZE.height;
 
     minX = Math.min(minX, position.x);
     minY = Math.min(minY, position.y);

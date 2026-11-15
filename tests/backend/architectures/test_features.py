@@ -88,18 +88,18 @@ def test_reference_images_and_the_conditions_on_them() -> None:
     """Qwen-Image and Anima are the bases whose answer depends on the variant: Qwen-Image takes
     reference images only as `edit`, Anima only on the Qwen3-conditioned releases the IP-Adapter was
     trained on (not Anima-3.8B's Qwen3.5 variant). Qwen-Image-2.1 is the only one whose answer depends
-    on the format."""
+    on the encoder carrying a vision tower."""
     supported = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_reference_images
     }
     assert supported == {"flux", "flux2", "flux3", "sd-1", "sdxl", "qwen-image", "krea-2", "anima", "qwen-image-2-1"}
 
-    by_format = {
-        b.value: f.reference_images_require_format
+    needs_tower = {
+        b.value
         for b in generative_bases()
-        if (f := get(b, FeaturesFacet)) is not None and f.reference_images_require_format is not None
+        if (f := get(b, FeaturesFacet)) is not None and f.reference_images_require_vision_tower
     }
-    assert by_format == {"qwen-image-2-1": "diffusers"}
+    assert needs_tower == {"qwen-image-2-1"}
 
     conditional = {
         b.value: f.reference_images_require_variant
@@ -118,10 +118,8 @@ def test_regional_guidance_and_its_negative_subset() -> None:
     decides whether a region reaches the graph at all, `regional_negative` whether its negative
     prompt and auto-negative do. A wrong declaration here is a region silently applied globally.
 
-    Regional negative prompts are a strict subset: only the SD family's `compel` /
-    `sdxl_compel_prompt` path masks both prompt polarities. The FLUX / FLUX.2 / Krea-2 / Z-Image /
-    Anima denoisers mask positive conditioning only -- Z-Image and Anima accept a negative list but
-    discard its masks, so a "regional" negative there would act globally and webv2 rejects it.
+    Regional negative prompts are a strict subset: SD, Krea-2, Z-Image and Anima mask both
+    prompt polarities. FLUX / FLUX.2 mask positive conditioning only.
     MOSS-Image, Ideogram 4 and FLUX.3 mask nothing: their regions become boxes in a JSON layout
     prompt, structured caption or box table, which has no negative counterpart.
     """
@@ -142,7 +140,7 @@ def test_regional_guidance_and_its_negative_subset() -> None:
         "ideogram-4",
         "flux3",
     }
-    assert negative == {"sd-1", "sd-2", "sdxl"}
+    assert negative == {"sd-1", "sd-2", "sdxl", "krea-2", "z-image", "anima"}
     assert negative < regional, "a regional negative prompt without regional guidance is meaningless"
 
 

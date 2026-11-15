@@ -45,7 +45,7 @@ export const LayerStackMenu = ({ anchor, document, editingLocked, engine, stack,
                 <HStack gap="2" minW="0" w="full">
                   <Icon as={action.icon} boxSize="3.5" color="fg.muted" flexShrink={0} />
                   <Text flex="1" fontSize="md">
-                    {action.label}
+                    {action.status ?? action.label}
                   </Text>
                 </HStack>
               </Menu.Item>

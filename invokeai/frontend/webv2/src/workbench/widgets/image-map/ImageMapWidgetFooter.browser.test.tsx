@@ -8,9 +8,22 @@ import i18next from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { initReactI18next } from 'react-i18next';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 
 import { ImageMapWidgetFooter } from './ImageMapWidgetFooter';
+
+const api = vi.hoisted(() => ({
+  fetchImageMapClusterLabels: vi.fn(),
+  fetchImageMapPoints: vi.fn(),
+  fetchImageMapStatus: vi.fn(),
+  requestImageMapRefresh: vi.fn(),
+}));
+
+vi.mock('@workbench/image-map/api', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ...api,
+}));
 
 // The components read the global instance; give it the English catalog.
 await i18next.use(initReactI18next).init({
@@ -139,6 +152,23 @@ describe('ImageMapWidgetFooter', () => {
     const tooltip = document.querySelector('[role="tooltip"]');
 
     expect(tooltip?.textContent).toBe('Cluster count: 2, largest cluster: 3 media points, unclustered: 1 media point');
+  });
+
+  it('asks the server for a refit when Refresh is clicked, not only for the current points', async () => {
+    await renderFooter([0, 1]);
+    const { data } = imageMapStore.getSnapshot();
+    api.requestImageMapRefresh.mockResolvedValue(true);
+    api.fetchImageMapPoints.mockResolvedValue(data);
+    api.fetchImageMapStatus.mockResolvedValue({ index: null, modelId: null, modelName: null, state: 'ready' });
+    api.fetchImageMapClusterLabels.mockResolvedValue({ labels: {}, updatedAt: null, visibleHash: null });
+
+    await act(async () => {
+      (page.getByRole('button', { name: 'Refresh map' }).element() as HTMLElement).click();
+      await vi.waitFor(() => expect(imageMapStore.getSnapshot().loadState).toBe('loaded'));
+    });
+
+    expect(api.requestImageMapRefresh).toHaveBeenCalledTimes(1);
+    expect(api.fetchImageMapPoints).toHaveBeenCalledTimes(1);
   });
 
   it('says so when nothing clustered', async () => {

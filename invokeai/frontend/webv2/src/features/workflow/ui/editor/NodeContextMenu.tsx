@@ -11,6 +11,7 @@ import {
   CopyIcon,
   Link2Icon,
   CopyPlusIcon,
+  MaximizeIcon,
   PlusIcon,
   Trash2Icon,
 } from 'lucide-react';
@@ -48,6 +49,7 @@ export const NodeContextMenu = ({
   onCopy,
   onDelete,
   onDuplicate,
+  onFitSelection,
   onPaste,
   onToggleOpen,
   onUpdate,
@@ -59,6 +61,7 @@ export const NodeContextMenu = ({
   onCopy: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onFitSelection: () => void;
   onPaste: WorkflowContextMenuPaste;
   onToggleOpen: () => void;
   onUpdate: () => void;
@@ -108,6 +111,10 @@ export const NodeContextMenu = ({
                   <Menu.ItemCommand>
                     <CommandShortcut commandId="workflows.duplicateSelection" />
                   </Menu.ItemCommand>
+                </Menu.Item>
+                <Menu.Item value="fit-selection" onClick={onFitSelection}>
+                  <Icon as={MaximizeIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('nodes.contextFitSelection')}</Menu.ItemText>
                 </Menu.Item>
                 {menuState.isNodeOpen !== null ? (
                   <Menu.Item value="toggle-open" onClick={onToggleOpen}>

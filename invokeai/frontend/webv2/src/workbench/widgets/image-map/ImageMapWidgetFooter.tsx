@@ -3,7 +3,7 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 import { HStack, Icon, Text } from '@chakra-ui/react';
 import { IconButton, Tooltip } from '@platform/ui';
 import { describeClusters, summarizeClusters } from '@workbench/image-map/clusterStats';
-import { imageMapStore, refreshImageIndexStatus, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
+import { imageMapStore, refreshImageIndexStatus, requestImageMapRecompute } from '@workbench/image-map/imageMapStore';
 import { isIndexing } from '@workbench/image-map/indexProgress';
 import { RefreshCwIcon } from 'lucide-react';
 import { useMemo } from 'react';
@@ -15,7 +15,7 @@ import { ImageIndexProgressInline } from './ImageIndexProgress';
 const NO_POINTS: never[] = [];
 
 const handleRefresh = () => {
-  void refreshImageMapPoints();
+  void requestImageMapRecompute();
   // Refresh counts too, recovering final status events missed while offline.
   refreshImageIndexStatus();
 };

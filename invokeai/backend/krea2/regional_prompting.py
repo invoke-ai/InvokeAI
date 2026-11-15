@@ -23,9 +23,18 @@ class Krea2RegionalTextConditioning:
 class Krea2RegionalPromptingExtension:
     """Concatenates Krea-2 text conditionings and lazily builds Flux-style regional attention masks."""
 
-    def __init__(self, regional_text_conditioning: Krea2RegionalTextConditioning, image_seq_len: int) -> None:
+    def __init__(
+        self,
+        regional_text_conditioning: Krea2RegionalTextConditioning,
+        image_seq_len: int,
+        *,
+        unmasked_covers_whole_image: bool = False,
+    ) -> None:
         self.regional_text_conditioning = regional_text_conditioning
         self.image_seq_len = image_seq_len
+        # Unmasked conditionings reach every image token rather than only the background. Set for the negative
+        # pass, whose global negative must stay image-wide.
+        self.unmasked_covers_whole_image = unmasked_covers_whole_image
         self._attention_mask: torch.Tensor | None = None
 
     @property
@@ -48,7 +57,11 @@ class Krea2RegionalPromptingExtension:
 
     @classmethod
     def from_text_conditionings(
-        cls, text_conditionings: list[Krea2TextConditioning], image_seq_len: int
+        cls,
+        text_conditionings: list[Krea2TextConditioning],
+        image_seq_len: int,
+        *,
+        unmasked_covers_whole_image: bool = False,
     ) -> "Krea2RegionalPromptingExtension":
         if not text_conditionings:
             raise ValueError("At least one Krea-2 text conditioning is required.")
@@ -73,7 +86,11 @@ class Krea2RegionalPromptingExtension:
             image_masks=image_masks,
             embedding_ranges=embedding_ranges,
         )
-        return cls(regional_text_conditioning=regional_text_conditioning, image_seq_len=image_seq_len)
+        return cls(
+            regional_text_conditioning=regional_text_conditioning,
+            image_seq_len=image_seq_len,
+            unmasked_covers_whole_image=unmasked_covers_whole_image,
+        )
 
     def get_attention_mask(self) -> torch.Tensor | None:
         if not self.has_regional_masks:
@@ -93,11 +110,15 @@ class Krea2RegionalPromptingExtension:
         for image_mask in conditioning.image_masks:
             if image_mask is not None:
                 background_mask &= ~(image_mask.reshape(-1) > 0.5)
-        # Canvas graphs always include an unmasked global prompt. If regional masks cover the full image,
-        # there is no background for it; fall back to image-wide text/image attention instead of silently
-        # disconnecting that conditioning. Keep background_mask unchanged so regional image/image isolation
-        # remains intact.
-        unmasked_conditioning_mask = background_mask | ~background_mask.any()
+        if self.unmasked_covers_whole_image:
+            # The global negative must not yield to regions, or Auto-Negative would confine it to their insides.
+            unmasked_conditioning_mask = torch.ones_like(background_mask)
+        else:
+            # Canvas graphs always include an unmasked global prompt. If regional masks cover the full image,
+            # there is no background for it; fall back to image-wide text/image attention instead of silently
+            # disconnecting that conditioning. Keep background_mask unchanged so regional image/image isolation
+            # remains intact.
+            unmasked_conditioning_mask = background_mask | ~background_mask.any()
 
         image_attention_mask = attention_mask[text_seq_len:, text_seq_len:]
         for image_mask, embedding_range in zip(conditioning.image_masks, conditioning.embedding_ranges, strict=True):

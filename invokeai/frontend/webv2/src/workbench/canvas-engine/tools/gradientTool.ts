@@ -82,10 +82,12 @@ export const createGradientTool = (): Tool => {
       clearPreview(ctx);
     },
     onKeyCommand: (ctx, command) => {
-      if (command === 'cancel' && state) {
-        state = null;
-        clearPreview(ctx);
+      if (command !== 'cancel' || !state) {
+        return false;
       }
+      state = null;
+      clearPreview(ctx);
+      return true;
     },
     onPointerCancel: (ctx) => {
       state = null;

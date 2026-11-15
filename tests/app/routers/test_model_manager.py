@@ -408,6 +408,8 @@ def test_update_model_record_answers_with_the_service_outcome(client: TestClient
     renamed = client.patch(f"/api/v2/models/i/{key}", json={"name": "renamed"})
     unknown = client.patch("/api/v2/models/i/no-such-model", json={"name": "renamed"})
     rejected = client.patch(f"/api/v2/models/i/{key}", json={"path": "x" * 800})
+    # A VAE has no trigger phrases: the change is refused rather than dropped behind a success response.
+    unsupported = client.patch(f"/api/v2/models/i/{key}", json={"trigger_phrases": ["phrase"]})
 
     assert renamed.status_code == 200
     assert renamed.json()["name"] == "renamed"
@@ -416,6 +418,13 @@ def test_update_model_record_answers_with_the_service_outcome(client: TestClient
     assert unknown.status_code == 404
     assert rejected.status_code == 409
     assert "at most" in rejected.json()["detail"]
+    assert unsupported.status_code == 409
+    assert "trigger_phrases" in unsupported.json()["detail"]
+
+    # Older clients still send `upcast_attention`, which no record stores; it is not a change, so it is ignored.
+    legacy = client.patch(f"/api/v2/models/i/{key}", json={"name": "legacy", "upcast_attention": False})
+    assert legacy.status_code == 200
+    assert model_record_routes.store.get_model(key).name == "legacy"
 
 
 def test_reidentify_model_answers_with_the_service_outcome(

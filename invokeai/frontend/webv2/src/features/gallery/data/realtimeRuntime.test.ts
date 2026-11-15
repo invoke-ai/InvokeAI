@@ -29,6 +29,9 @@ describe('gallery realtime runtime', () => {
   };
   const invalidate = vi.fn();
   let sessionUserId: string | null = 'alice';
+  let visible = true;
+  let visibilityHandler: (() => void) | null = null;
+  const detachVisibility = vi.fn();
   const getSessionUserId = () => sessionUserId;
   const onRevealRequest = vi.fn();
   const CLIENT_ORIGIN = 'this-client';
@@ -39,6 +42,14 @@ describe('gallery realtime runtime', () => {
       invalidate,
       isClientQueueItemOrigin: (origin) => origin === CLIENT_ORIGIN,
       onRevealRequest,
+      isVisible: () => visible,
+      onVisibilityChange: (handler) => {
+        visibilityHandler = handler;
+        return () => {
+          visibilityHandler = null;
+          detachVisibility();
+        };
+      },
     });
   const emitStatusChanged = (event: {
     destination?: string | null;
@@ -63,6 +74,9 @@ describe('gallery realtime runtime', () => {
     connectionHandler = null;
     initialStatus = 'connected';
     sessionUserId = 'alice';
+    visible = true;
+    visibilityHandler = null;
+    detachVisibility.mockReset();
     backend.on.mockClear();
     backend.onConnectionChange.mockClear();
     invalidate.mockReset();
@@ -118,6 +132,44 @@ describe('gallery realtime runtime', () => {
     // The last file's echo landed after the final pass and must not be lost.
     expect(invalidate).toHaveBeenCalledTimes(passesDuringStream + 1);
     runtime.dispose();
+  });
+
+  it('defers hidden-tab bursts until visible and cancels a queued pass when hidden', () => {
+    const runtime = createRuntime();
+    runtime.start();
+    emitStatusChanged({ origin: CLIENT_ORIGIN });
+    visible = false;
+    visibilityHandler?.();
+    expect(vi.getTimerCount()).toBe(0);
+    for (let item_id = 0; item_id < 20; item_id += 1) {
+      emitStatusChanged({ origin: CLIENT_ORIGIN, item_id, destination: 'gallery:reveal' });
+      vi.advanceTimersByTime(1000);
+    }
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(onRevealRequest).not.toHaveBeenCalled();
+    visible = true;
+    visibilityHandler?.();
+    vi.advanceTimersByTime(250);
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1000);
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    runtime.dispose();
+    expect(detachVisibility).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops hidden pending work on disposal or account expiration', () => {
+    visible = false;
+    const runtime = createRuntime();
+    runtime.start();
+    emitStatusChanged({ origin: CLIENT_ORIGIN });
+    accountLifecycle.invalidate();
+    visible = true;
+    visibilityHandler?.();
+    vi.advanceTimersByTime(1000);
+    expect(invalidate).not.toHaveBeenCalled();
+    runtime.dispose();
+    expect(visibilityHandler).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('refetches after an outage but not on the boot-time connect', () => {
@@ -190,16 +242,15 @@ describe('gallery realtime runtime', () => {
     runtime.dispose();
   });
 
-  it('ignores completions that cannot add to this gallery or that Queue already refreshes for', () => {
+  it('ignores other-account completions and non-completed items', () => {
     const runtime = createRuntime();
     const destination = 'gallery:reveal';
 
     runtime.start();
     // Another user's item, as an admin receives it, and as everyone else receives it.
     emitStatusChanged({ destination, user_id: 'bob' });
+    emitStatusChanged({ destination, user_id: 'bob', origin: CLIENT_ORIGIN });
     emitStatusChanged({ destination: null, origin: null, user_id: 'redacted' });
-    // An item this client enqueued, which Queue refreshes for in the tab tracking it.
-    emitStatusChanged({ destination, origin: CLIENT_ORIGIN });
 
     for (const status of ['pending', 'in_progress', 'waiting', 'failed', 'canceled'] as const) {
       emitStatusChanged({ destination, status });
@@ -208,6 +259,19 @@ describe('gallery realtime runtime', () => {
     vi.advanceTimersByTime(1000);
 
     expect(invalidate).not.toHaveBeenCalled();
+    expect(onRevealRequest).not.toHaveBeenCalled();
+    runtime.dispose();
+  });
+
+  it('coalesces frontend completions from this and other tabs without revealing', () => {
+    const runtime = createRuntime();
+    runtime.start();
+    for (let item_id = 1; item_id <= 20; item_id += 1) {
+      emitStatusChanged({ destination: 'gallery:reveal', origin: CLIENT_ORIGIN, item_id });
+      emitStatusChanged({ destination: 'gallery:reveal', origin: CLIENT_ORIGIN, item_id });
+    }
+    vi.advanceTimersByTime(250);
+    expect(invalidate).toHaveBeenCalledTimes(1);
     expect(onRevealRequest).not.toHaveBeenCalled();
     runtime.dispose();
   });

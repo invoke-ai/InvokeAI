@@ -227,7 +227,8 @@ def apply_minimax_h3_adaln_overlay(
                     "be AdaLN-pruned or both be full checkpoints."
                 )
             original_weights.save(path, param, copy=param.device.type != "cpu")
-            param.data = tensor.to(device=param.device, dtype=param.dtype)
+            # A device weight never aliases the (cached) overlay tensor, which `.to` returns itself when nothing changes.
+            param.data = tensor.to(device=param.device, dtype=param.dtype, copy=param.device.type != "cpu")
         yield
     finally:
         for path, weight in original_weights.get_changed_weights():

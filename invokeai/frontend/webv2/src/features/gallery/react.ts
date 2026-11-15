@@ -12,6 +12,7 @@ export {
   useOptionalGalleryHostProjectContext,
 } from './ui/GalleryUiContext';
 export { useGalleryImageRecovery } from './ui/useGalleryImageRecovery';
+export { GalleryMediaUsagePanel } from './ui/GalleryMediaUsagePanel';
 export type { GalleryProjectRef } from './core/types';
 // Only the eager UI port and leaf hooks live here. This entry is bundled with the eager gallery-state chunk;
 // reaching a lazy gallery module (uploads, the picker) from it makes that chunk and the picker chunk import each

@@ -465,6 +465,21 @@ export const GalleryImageGrid = ({
     (item: GalleryItem) => sparseSelectionPages.get(toGalleryItemKey(item)),
     [sparseSelectionPages]
   );
+  // The right-clicked thumbnail, or, once a deletion removed it, the grid's tab stop.
+  const getItemReturnFocus = useCallback(
+    (item: GalleryItem) => () => {
+      const viewport = viewportRef.current;
+      const selector = `button[data-gallery-item-key="${CSS.escape(toGalleryItemKey(item))}"]`;
+
+      return (
+        viewport?.querySelector<HTMLElement>(selector) ??
+        viewport?.querySelector<HTMLElement>(GALLERY_TAB_STOP_SELECTOR) ??
+        viewport ??
+        null
+      );
+    },
+    []
+  );
 
   const {
     actionSelectionRefs,
@@ -479,7 +494,7 @@ export const GalleryImageGrid = ({
     shouldStarSelection,
     syncRangeInteractionContext,
     toggleItem,
-  } = useGalleryGridSelection({ getSelectionPage });
+  } = useGalleryGridSelection({ getItemReturnFocus, getSelectionPage });
 
   const columnCount = getGalleryColumnCount({ imageDensityPercent, widthPx: viewportWidth });
   const sparseRecentItems = usesSparseListing ? sparseListing.recentItems : EMPTY_GALLERY_ITEMS;

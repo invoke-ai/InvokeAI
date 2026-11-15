@@ -8,7 +8,7 @@ import { createLogger } from '@platform/logging/logger';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { useDebouncedValue } from '@platform/react/useDebouncedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { captureAccountScope, type AccountScope } from '@platform/state/accountLifecycle';
+import { captureAccountScope, isAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
 import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { createContext, use, useSyncExternalStore, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +28,7 @@ import {
   type LiveCanvasEngines,
 } from './projects/projectAssets';
 import { describeRefusedProjects } from './projects/projectLoadRefusal';
+import { reloadWorkbench, WorkbenchReloadError } from './projects/reloadWorkbench';
 import {
   createSyncedWorkbenchPersistence,
   type SyncedWorkbenchPersistence,
@@ -416,4 +417,35 @@ export const useOptionalWorkbench = (): WorkbenchContextValue | null => {
   );
 
   return store && snapshot ? snapshot : null;
+};
+
+/** Recovery is an explicit action, independent of the editor's terminal exit checkpoint. */
+export const useWorkbenchReload = () => {
+  const store = use(WorkbenchStoreContext);
+  const persistence = use(WorkbenchPersistenceContext);
+  const engines = use(WorkbenchLiveCanvasEnginesContext);
+  const owner = captureAccountScope();
+  return async (isCurrent: () => boolean) => {
+    if (!store || !persistence || !engines) {
+      throw new WorkbenchReloadError('unavailable');
+    }
+    const current = () => isAccountScopeCurrent(owner) && isCurrent();
+    if (!current()) {
+      return;
+    }
+    try {
+      await reloadWorkbench({
+        owner,
+        isCurrent: current,
+        store,
+        persistence,
+        engines,
+        reload: () => window.location.reload(),
+      });
+    } catch (error) {
+      if (current()) {
+        throw error;
+      }
+    }
+  };
 };

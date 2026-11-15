@@ -1,4 +1,3 @@
-import type { AspectRatioId } from '@features/generation/contracts';
 import type { LayerTransform } from '@workbench/canvas-engine/api';
 import type {
   ToolFormProps,
@@ -7,10 +6,12 @@ import type {
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
 import { Flex, Text } from '@chakra-ui/react';
-import { AspectRatioLockButton, AspectRatioSelect } from '@features/generation/components';
-import { ASPECT_RATIO_MAP, deriveAspectRatioId } from '@features/generation/settings';
+import { AspectRatioLockButton, AspectRatioPicker } from '@features/generation/components';
+import { getLockedAspectRatioSettings } from '@features/generation/settings';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { constrainBboxToRatio, lookupDocumentLeaf } from '@workbench/canvas-engine/api';
+import { bboxMinSize, lookupDocumentLeaf } from '@workbench/canvas-engine/api';
+import { useAspectRatioPresets } from '@workbench/settings/aspectRatioPresets';
+import { getBboxSizeForRatio, resizeBboxAroundCentre } from '@workbench/widgets/canvas/bboxGrid';
 import {
   useCanvasActiveTool,
   useCanvasHasFloatingSelection,
@@ -25,7 +26,7 @@ import {
 import { PropertyControlRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useBboxEditor } from './useBboxEditor';
@@ -33,7 +34,6 @@ import { useBboxEditor } from './useBboxEditor';
 const RAD_TO_DEG = 180 / Math.PI;
 const DEG_TO_RAD = Math.PI / 180;
 const MIN_SCALE_PERCENT = 1;
-const ASPECT_TRIGGER_PROPS = { minW: '7.5rem' } as const;
 
 export const round2 = (n: number): number => Math.round(n * 100) / 100;
 /** Degrees in (-180, 180], so 270 reads and stores as -90. */
@@ -189,56 +189,57 @@ export const TransformScaleSettings = ({ engine }: ToolFormProps) => {
 const FrameSizeSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const { generation } = useWorkbenchCommands();
+  const aspectRatioPresets = useAspectRatioPresets();
   const isLinked = useActiveProjectSelector((project) => project.invocation.sourceId === 'canvas');
   const { bbox, commitBbox, grid, options, setHeight, setWidth } = useBboxEditor(engine);
   const onWidth = useNumberCommit(setWidth);
   const onHeight = useNumberCommit(setHeight);
   const bboxRatio = bbox.height > 0 ? bbox.width / bbox.height : 1;
-  // Derived from the live frame so a lock captured from a hand-drawn bbox reports the preset it matches.
-  const selectedId: AspectRatioId = options.aspectLocked ? deriveAspectRatioId(bbox.width, bbox.height) : 'Free';
+  // The lock's own ratio, not the frame's: a grid-snapped frame is only close to the ratio it holds.
+  const lockedRatio = options.aspectLocked ? (options.aspectRatio > 0 ? options.aspectRatio : bboxRatio) : null;
+  const currentSize = useMemo(() => ({ height: bbox.height, width: bbox.width }), [bbox.height, bbox.width]);
 
-  const setLock = useCallback(
-    (aspectLocked: boolean, aspectRatio: number) => {
+  /** Locks the Frame tool (and Generate, while linked) to `aspectRatio`, or unlocks; returns the ratio stored. */
+  const applyLock = useCallback(
+    (aspectRatio: number | null): number | null => {
+      const locked = aspectRatio === null ? null : getLockedAspectRatioSettings(aspectRatio);
       if (isLinked) {
         // Generate's fields; the feed brings the lock back to the Frame tool.
-        generation.patchSettings({
-          aspectRatioId: aspectLocked ? deriveAspectRatioId(bbox.width, bbox.height) : 'Free',
-          aspectRatioIsLocked: aspectLocked,
-          aspectRatioValue: aspectRatio,
-        });
+        generation.patchSettings(
+          locked ?? { aspectRatioId: 'Free', aspectRatioIsLocked: false, aspectRatioValue: bboxRatio }
+        );
       }
-      engine.interaction.set('bboxOptions', { aspectLocked, aspectRatio });
+      engine.interaction.set('bboxOptions', {
+        aspectLocked: locked !== null,
+        aspectRatio: locked?.aspectRatioValue ?? bboxRatio,
+      });
+      return locked?.aspectRatioValue ?? null;
     },
-    [bbox.height, bbox.width, engine, generation, isLinked]
+    [bboxRatio, engine, generation, isLinked]
   );
 
-  const onAspectPresetChange = useCallback(
-    (id: AspectRatioId) => {
-      if (id === 'Free') {
-        setLock(false, bboxRatio);
-        return;
-      }
-      const ratio = ASPECT_RATIO_MAP[id].ratio;
-      if (isLinked) {
-        generation.patchSettings({ aspectRatioId: id, aspectRatioIsLocked: true, aspectRatioValue: ratio });
-      }
-      engine.interaction.set('bboxOptions', { aspectLocked: true, aspectRatio: ratio });
-      commitBbox(constrainBboxToRatio(bbox, ratio, grid));
-    },
-    [bbox, bboxRatio, commitBbox, engine, generation, grid, isLinked, setLock]
+  // The size a ratio sets keeps the frame's pixel count on its grid, as choosing it in Generate does, without
+  // Generate's maximum: the frame may be larger than any one generation.
+  const getSizeForRatio = useCallback(
+    (ratio: number) => getBboxSizeForRatio(bbox.width * bbox.height, ratio, grid, bboxMinSize(grid)),
+    [bbox.height, bbox.width, grid]
   );
 
-  const onLockToggle = useCallback(() => {
-    const checked = !options.aspectLocked;
-    // Locking a frame that matches no preset captures its current ratio.
-    const aspectRatio =
-      checked && bbox.height > 0 && deriveAspectRatioId(bbox.width, bbox.height) === 'Free'
-        ? bboxRatio
-        : options.aspectRatio > 0
-          ? options.aspectRatio
-          : 1;
-    setLock(checked, checked ? aspectRatio : bboxRatio);
-  }, [bbox, bboxRatio, options.aspectLocked, options.aspectRatio, setLock]);
+  const onAspectRatioChange = useCallback(
+    (ratio: number | null) => {
+      const locked = applyLock(ratio);
+      if (locked !== null) {
+        commitBbox(resizeBboxAroundCentre(bbox, getSizeForRatio(locked)));
+      }
+    },
+    [applyLock, bbox, commitBbox, getSizeForRatio]
+  );
+
+  // Locking captures the frame's current ratio (a built-in's exact value when it matches one).
+  const onLockToggle = useCallback(
+    () => applyLock(options.aspectLocked ? null : bboxRatio),
+    [applyLock, bboxRatio, options.aspectLocked]
+  );
 
   return (
     <>
@@ -262,12 +263,15 @@ const FrameSizeSettings = ({ engine }: ToolFormProps) => {
       </PropertyControlRow>
       <PropertyControlRow label={t('widgets.properties.rows.aspect')}>
         <Flex align="center" gap="2" gridColumn="2 / -1">
-          <AspectRatioSelect
-            fallbackRatio={bboxRatio}
-            triggerProps={ASPECT_TRIGGER_PROPS}
-            value={selectedId}
-            onChange={onAspectPresetChange}
-          />
+          <Flex flex="1" minW="7.5rem">
+            <AspectRatioPicker
+              currentSize={currentSize}
+              getSizeForRatio={getSizeForRatio}
+              lockedRatio={lockedRatio}
+              presets={aspectRatioPresets}
+              onChange={onAspectRatioChange}
+            />
+          </Flex>
           <AspectRatioLockButton isLocked={options.aspectLocked} onToggle={onLockToggle} />
         </Flex>
       </PropertyControlRow>

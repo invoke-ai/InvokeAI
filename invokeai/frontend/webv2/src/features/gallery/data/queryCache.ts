@@ -511,6 +511,30 @@ export const canAddToCachedGalleryBoard = (boardId: string, client: QueryClient 
   return false;
 };
 
+/** Value snapshot of the same newest-listing policy used by uploads and destination controls. */
+export const getGalleryBoardDestinationIds = (client: QueryClient = queryClient): readonly string[] => {
+  const decided = new Set<string>();
+  const destinations: string[] = [];
+  let hasNewerLiveListing = false;
+  for (const listing of getCachedGalleryBoardListings(client)) {
+    for (const board of listing.state.data as GalleryBoard[]) {
+      if (decided.has(board.id)) {
+        continue;
+      }
+      decided.add(board.id);
+      if ((!hasNewerLiveListing || board.archived) && canOnBoard(board, 'add_media')) {
+        destinations.push(board.id);
+      }
+    }
+    // This listing would contain every remaining readable board, so older data cannot restore one.
+    if (isArchivedBoardsListing(listing)) {
+      break;
+    }
+    hasNewerLiveListing = true;
+  }
+  return destinations;
+};
+
 const GALLERY_BOARD_DESTINATIONS_STALE_MS = 60_000;
 
 /**

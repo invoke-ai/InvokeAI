@@ -34,6 +34,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { shallowEqual } from '@platform/state/selectors';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Field, Select } from '@platform/ui';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -79,8 +80,8 @@ export const ModelEditForm = ({
   onSaved: () => void;
 }) => {
   const { t } = useTranslation();
-  // `config_path` only exists on checkpoint-style config classes; its absence
-  // (not emptiness) hides the field, since the PATCH would silently drop it.
+  // The backend serializes these (null when unset) only on config classes that store them, and refuses a value for a
+  // field the class lacks, so absence (not emptiness) hides the field and keeps it out of the PATCH.
   const hasConfigPath = model.config_path !== undefined;
   const serverValues = useMemo(() => toModelIdentityValues(model), [model]);
   const draft = useModelDraft(model.key, selectIdentityDraft);
@@ -148,6 +149,11 @@ export const ModelEditForm = ({
       variantOptions: options,
     };
   }, [form.values.base, form.values.type, form.values.variant, t]);
+  // Variant and prediction type also follow the edited type and base: reclassifying a model into a class that requires
+  // them (an SD main needs both) must be able to supply them. Untouched, they submit null, which any class accepts; a
+  // value the resulting class cannot store comes back as the backend's refusal.
+  const showsVariant = model.variant !== undefined || variantOptions.length > 0;
+  const showsPredictionType = model.prediction_type !== undefined || form.values.type === 'main';
 
   const handleSave = () => {
     clearModelIdentitySaveError(model.key);
@@ -169,10 +175,14 @@ export const ModelEditForm = ({
             description: values.description || null,
             format: values.format,
             name: values.name,
-            prediction_type: values.predictionType === '' ? null : (values.predictionType as PredictionType),
             source_url: values.sourceUrl === '' ? null : values.sourceUrl,
             type: values.type,
-            variant: values.variant === '' ? null : values.variant,
+            ...(showsPredictionType
+              ? {
+                  prediction_type: values.predictionType === '' ? null : (values.predictionType as PredictionType),
+                }
+              : {}),
+            ...(showsVariant ? { variant: values.variant === '' ? null : values.variant } : {}),
             ...(hasConfigPath ? { config_path: values.configPath === '' ? null : values.configPath } : {}),
           },
           owner.signal
@@ -192,7 +202,7 @@ export const ModelEditForm = ({
           model.key,
           'identity',
           serverValues,
-          error instanceof Error ? error.message : t('common.somethingWentWrong')
+          getApiErrorMessage(error, t('common.somethingWentWrong'))
         );
       }
     });
@@ -248,46 +258,52 @@ export const ModelEditForm = ({
           />
         </Field>
       </HStack>
-      <HStack align="start" gap="2">
-        <Field error={form.errors.variant} helpText={t('models.variantHelp')} label={t('models.variant')}>
-          {variantOptions.length > 0 ? (
-            <Select
-              aria-label={t('models.variant')}
-              collection={variantCollection}
-              size="lg"
-              value={[form.values.variant]}
-              onValueChange={({ value }) => {
-                const variant = value[0];
+      {showsVariant || showsPredictionType ? (
+        <HStack align="start" gap="2">
+          {showsVariant ? (
+            <Field error={form.errors.variant} helpText={t('models.variantHelp')} label={t('models.variant')}>
+              {variantOptions.length > 0 ? (
+                <Select
+                  aria-label={t('models.variant')}
+                  collection={variantCollection}
+                  size="lg"
+                  value={[form.values.variant]}
+                  onValueChange={({ value }) => {
+                    const variant = value[0];
 
-                if (variant !== undefined) {
-                  setField('variant', variant);
-                }
-              }}
-            />
-          ) : (
-            <Input
-              size="lg"
-              value={form.values.variant}
-              onChange={(event) => setField('variant', event.currentTarget.value)}
-            />
-          )}
-        </Field>
-        <Field error={form.errors.predictionType} label={t('models.predictionType')}>
-          <Select
-            aria-label={t('models.predictionType')}
-            collection={predictionTypeCollection}
-            size="lg"
-            value={[form.values.predictionType]}
-            onValueChange={({ value }) => {
-              const predictionType = value[0];
+                    if (variant !== undefined) {
+                      setField('variant', variant);
+                    }
+                  }}
+                />
+              ) : (
+                <Input
+                  size="lg"
+                  value={form.values.variant}
+                  onChange={(event) => setField('variant', event.currentTarget.value)}
+                />
+              )}
+            </Field>
+          ) : null}
+          {showsPredictionType ? (
+            <Field error={form.errors.predictionType} label={t('models.predictionType')}>
+              <Select
+                aria-label={t('models.predictionType')}
+                collection={predictionTypeCollection}
+                size="lg"
+                value={[form.values.predictionType]}
+                onValueChange={({ value }) => {
+                  const predictionType = value[0];
 
-              if (predictionType !== undefined) {
-                setField('predictionType', predictionType as ModelEditFormValues['predictionType']);
-              }
-            }}
-          />
-        </Field>
-      </HStack>
+                  if (predictionType !== undefined) {
+                    setField('predictionType', predictionType as ModelEditFormValues['predictionType']);
+                  }
+                }}
+              />
+            </Field>
+          ) : null}
+        </HStack>
+      ) : null}
       <HStack align="start" gap="2">
         <Field error={form.errors.format} helpText={t('models.formatHelp')} label={t('models.format')}>
           <Select

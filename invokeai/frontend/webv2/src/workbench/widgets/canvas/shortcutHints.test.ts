@@ -68,6 +68,19 @@ describe('Canvas gesture guidance', () => {
     expect(notifications).toBe(afterRelease);
     unsubscribe();
   });
+  it('teaches the Shape modifiers each kind honors', () => {
+    const shape = { ...state, activeTool: 'shape' as const };
+    const center = 'workbench.shortcuts.actions.drawFromCenter';
+    const cutOut = 'workbench.shortcuts.actions.cutOutShape';
+    expect(hintLabels({ ...shape, shapeKind: 'ellipse' })).toEqual(expect.arrayContaining([center, cutOut]));
+    for (const shapeKind of ['polygon', 'freehand']) {
+      const labels = hintLabels({ ...shape, shapeKind });
+      expect(labels).toContain(cutOut);
+      expect(labels).not.toContain(center);
+      expect(labels).not.toContain('workbench.shortcuts.actions.constrain');
+    }
+  });
+
   it('removes painting/session instructions during prompt-mode object selection and Filter', () => {
     expect(hintLabels({ ...state, operation: 'select-object', samVisual: false })).toEqual([
       'workbench.shortcuts.actions.pan',

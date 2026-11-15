@@ -250,7 +250,7 @@ export const createTransformTool = (): Tool => {
     onKeyCommand: (ctx, command) => {
       if (gesture) {
         // Ignore apply/cancel during captured drags to avoid tearing down the still-active pointer session.
-        return;
+        return false;
       }
       if (ctx.getFloatingSelection?.()) {
         if (command === 'apply') {
@@ -258,13 +258,15 @@ export const createTransformTool = (): Tool => {
         } else {
           ctx.cancelFloatingSelection?.();
         }
-        return;
+        return true;
       }
+      const open = ctx.stores.transformSession.get() !== null;
       if (command === 'apply') {
         ctx.applyTransform?.();
-      } else {
+      } else if (open) {
         ctx.cancelTransform?.();
       }
+      return open;
     },
     onPointerCancel: (ctx) => {
       // Revert just this drag (keep the session / the float); Escape's own
