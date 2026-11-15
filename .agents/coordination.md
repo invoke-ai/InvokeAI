@@ -4,8 +4,8 @@ For the main agent. Implementers and reviewers need only root `AGENTS.md`, the s
 
 ## Form coherent work
 
-- Before dispatching related reports, check their source, affected revision/environment, current reproduction, and existing work. Group by the owning invariant or shared cause instead of opening one implementation task per symptom. New evidence updates the acceptance criteria and reaches affected implementers; it does not silently expand scope or authorization.
-- For recurring corrections, collect concrete locations, failure scenarios, and evidence in `.scratch/agents/<task>/`, then group observations before choosing a structural fix. Promote confirmed work into the owning implementation, check, or durable contract; never commit the observation log. Do not delay a serious defect while waiting for recurrence.
+- Before dispatching related reports, check source, affected revision/environment, current reproduction, and existing work. Group by owning invariant or shared cause, not one task per symptom. New evidence updates acceptance criteria and reaches affected implementers; it never silently expands scope or authorization.
+- Recurring corrections: log locations, failure scenarios, and evidence in `.scratch/agents/<task>/`. Group them before choosing a structural fix. Promote confirmed work into the owning implementation, check, or durable contract. Never commit the log. Never delay a serious defect waiting for recurrence.
 
 ## Delegation
 

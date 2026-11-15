@@ -9,7 +9,7 @@ Shared generated API contracts and their CI gates: [../api/AGENTS.md](../api/AGE
 - Direction `app -> workbench/features -> platform`, enforced by `src/architecture/`. App composes dependencies. Platform owns domain-neutral infrastructure. Features own domain behavior. Workbench owns project aggregate, shell, Canvas.
 - Import Features only through registered top-level public entries. Never reach into another owner's internals, not even to avoid barrel cost. Pure cores import no React/UI/transport code, type-only imports included.
 - Production Canvas callers use `src/workbench/canvas-engine/api.ts`. Engine changes follow `src/workbench/canvas-engine/ARCHITECTURE.md`. Contracts live with the owner of their invariants. Check the ownership manifest before adding Workbench modules.
-- `pnpm architecture:check` checks these import boundaries; failures name the rule, source, target, and repair direction. Never add architecture exceptions to pass checks. Passing the check does not establish that an interface belongs to the right owner.
+- `pnpm architecture:check` enforces these import boundaries; failures name rule, source, target, and repair. Never add architecture exceptions to pass checks. Passing does not prove an interface has the right owner.
 - Typography: `xs` = 10px, `sm` = 11px, `lg` = 14px. [The typography guard](src/architecture/typographyPolicy.test.ts) rejects retired `2xs` literals; review must still catch indirect values and `sm` used with its old 14px meaning.
 
 ## Ownership and state decisions
@@ -43,8 +43,8 @@ No Python backend: `pnpm dev:mock` serves the app against the in-repo mock backe
 
 - Check rendering/subscriptions, galleries/lists, pointer handlers, Canvas resources, lazy loading, request scheduling. Use existing virtualization/lazy boundaries. Memoize only identified costs.
 - Preserve disposal, bounded memory, account transitions, responsive input. Never update goldens/baselines to hide regressions.
-- Run pnpm from this package directory. Install: `pnpm install --frozen-lockfile`.
-- Shared development machines can opt into the [bounded local verification profile](VERIFICATION.md#bounded-local-verification). It preserves the gates and documents setup, resource ownership, and failure reporting.
+- Install from this directory: `pnpm install --frozen-lockfile`.
+- Shared development machine: use the [bounded local verification profile](VERIFICATION.md#bounded-local-verification). Same gates, fewer test workers.
 
 | Change/check                            | Command                                                               |
 | --------------------------------------- | --------------------------------------------------------------------- |
@@ -65,4 +65,4 @@ No Python backend: `pnpm dev:mock` serves the app against the in-repo mock backe
 
 Unit tests cache transformed modules between runs in ignored `node_modules/.vitest-cache`.
 
-Focused checks during development. `check:release` before code-milestone readiness: lint, all tests, architecture performance/build, project-file journeys, accessibility, three-engine lifecycle smoke. CI splits completion between `lint:code` and `check:release:tests`; together they run each gate once. Routine browser performance checks take two resource observations per fixture; `test:performance:browser:profile` and baseline updates use full timing sampling. Docs-only changes: formatting and `node --test scripts/guidance-links.test.mjs` (part of `test:fixtures`), which resolves relative links and heading anchors in this package's Markdown; no application tests. Architecture inventories and performance reports stay in ignored `artifacts/`, never committed.
+Focused checks during development. `check:release` before code-milestone readiness: lint, all tests, architecture performance/build, project-file journeys, accessibility, three-engine lifecycle smoke. CI splits it between `lint:code` and `check:release:tests`; together they run each gate once. Routine browser performance checks take two resource observations per fixture; `test:performance:browser:profile` and baseline updates use full timing sampling. Docs-only changes: formatting and `node --test scripts/guidance-links.test.mjs` (Markdown links and anchors); no application tests. Architecture inventories and performance reports stay in ignored `artifacts/`, never committed.

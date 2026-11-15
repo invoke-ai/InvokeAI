@@ -7,9 +7,7 @@
 
 ## Find the right owner
 
-Before editing, read every `AGENTS.md` along each target path. Scoped rules add to this file. Policy lives in `AGENTS.md` files and the `.agents/` file they link.
-
-Keep cross-cutting decisions here, area-specific decisions in scoped guidance, and implementation contracts beside their owner. Link to executable rules and package commands instead of restating their detection logic.
+Before editing, read every `AGENTS.md` along each target path. Scoped rules add to this file. Policy lives in `AGENTS.md` files and the `.agents/` files they link. Cross-cutting decisions go here, area decisions in scoped guidance, implementation contracts beside their owner. Link executable rules and package commands; never restate their detection logic.
 
 | Area | Guidance and source of truth |
 | --- | --- |
@@ -24,19 +22,18 @@ Keep cross-cutting decisions here, area-specific decisions in scoped guidance, a
 
 Frontend work targets **webv2**, served by default. `--webv2` is a compatibility alias; `--web-legacy` selects legacy web. UI investigations: verify build and launch target first. `frontend/api` owns generated OpenAPI/type artifacts.
 
-Before these steps, read:
+Read first:
 
 - Delegating work or running a milestone review: [.agents/coordination.md](.agents/coordination.md).
 - Running Python tests: [tests/AGENTS.md](tests/AGENTS.md).
 - Committing or opening a PR: [.github/AGENTS.md](.github/AGENTS.md).
-
-For a targeted evaluation of material agent-guidance changes, use [.agents/evaluation.md](.agents/evaluation.md). This is not a gate for every edit.
+- Evaluating a material agent-guidance change (optional, not a gate): [.agents/evaluation.md](.agents/evaluation.md).
 
 ## Engineering standard
 
 - Before designing: read implementations, callers, contracts, tests. Define observable outcome and validation. Reproduce bugs where feasible. Fix root causes. Rethink designs that pile up patches.
-- When implementation conflicts with policy, establish the intended invariant before changing either. Existing violations do not authorize relaxing the constraint; a policy change needs its own explicit design decision.
-- When a correction reveals a recurring failure, first consider preventing it through the owning API, types, architecture check, or behavioral test. Use prose for judgment and constraints those mechanisms cannot express; keep the response proportional to the failure.
+- Code conflicts with policy: establish the intended invariant before changing either. Existing violations never authorize relaxing a constraint; a policy change is its own explicit decision.
+- Recurring failure: prevent it first through the owning API, types, architecture check, or behavioral test. Use prose only for judgment those cannot express. Keep the fix proportional to the failure.
 - Keep ownership and interfaces clear. Cover edge cases, failures, data lifecycles, operational limits.
 - Every function, dependency, fallback, test earns its place. Abstractions must translate contracts, isolate dependencies, own lifecycles, prevent drift, or simplify callers. No pass-through wrappers, speculative extensibility, redundant validation/config, or abstraction justified only by similar-looking code.
 - Remove obsolete code, tests, scaffolding. Preserve unrelated work. Comment only non-obvious intent, constraints, trade-offs.
@@ -68,8 +65,8 @@ Milestone = one coherent, commit-ready unit. Run relevant checks and self-review
 
 - Reviewers did not implement the change. Self-review is never independent, including review by an implementing agent. Required independent review unavailable: self-review the matching focuses and tell the user. Ordinary low-risk self-review needs no disclaimer.
 - Never declare ready with material findings or unexplained failing gates. Report resolved findings, passed/failed/unavailable checks, remaining limits. PRs omit subagent counts, tiers, process narration.
-- Match evidence to the claimed behavior: name the exercised scenario and environment, and what remains unverified. Static checks prove encoded boundaries; mocks prove only their modeled behavior. A screenshot cannot prove retry safety, nor a passing suite every platform or failure mode. Required package gates still apply.
-- Verification reduces uncertainty; it does not make irreversible actions reversible or grant authority to act. Readiness does not authorize commits or pushes. Follow the user's existing authorization. No automatic per-subtask commits.
+- Match evidence to the claim: name the scenario and environment exercised, and what stays unverified. Static checks prove only encoded boundaries; mocks prove only their modeled behavior. A screenshot never proves retry safety; a passing suite never proves every platform or failure mode. Required package gates still apply.
+- Verification reduces uncertainty. It never makes an irreversible action reversible or grants authority to act. Readiness does not authorize commits or pushes: follow the user's existing authorization. No automatic per-subtask commits.
 
 ## Commands and environments
 

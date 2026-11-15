@@ -11,7 +11,7 @@
 ## Persistence and lifecycle
 
 - Preserve atomicity, revision checks, idempotency, explicit conflicts. Stored-data change: read migrations and old-record readers; add needed migration/compatibility tests.
-- SQL lives only in `services/shared/database/`, reached through `Database.queries`. [The database access guard](../../tests/app/test_database_access_guard.py) enforces the boundary; add queries with that owner rather than exempting callers. It does not prove transaction, authorization, or concurrency correctness.
+- SQL lives only in `services/shared/database/`, reached through `Database.queries`. The [database access guard](../../tests/app/test_database_access_guard.py) enforces this: add queries there, never exempt callers. The guard proves nothing about transactions, authorization, or concurrency.
 - Query modules build statements once, at module level, with `bindparam()` (per-call building costs several times execution). Read rows by position; build DTOs with `@mapped(...)` outside the transaction. Shape-dependent statement: cached builder whose shapes a client cannot multiply (normalize lists and flags, round list lengths; see the guide).
 - Multi-record writes: one transaction owner, `with db.queries.transaction() as q:`, pass `q` to helpers. Second transaction on the same thread raises `NestedTransactionError`. See `services/shared/database/database.py`.
 - Concurrency. SQLite serialises everything behind one lock; MySQL/MariaDB do not.
@@ -32,4 +32,4 @@
 - Transaction, migration, revision, ownership tests: real temporary SQLite. Cover affected malformed input, cross-user access, cancellation, repeated requests, partial failures. Database-fixture tests also run against MySQL and MariaDB when `INVOKEAI_TEST_DB_URL` is set (`tests/fixtures/database.py`).
 - Read `tests/AGENTS.md`. Use `tests/app/` or the existing owning suite. Run focused pytest and root Ruff. Milestones: broaden to relevant service/router/invocation suites.
 - Graph execution: read `services/shared/README.md`. Test scheduling and invocation lifecycles through owning interfaces.
-- Report schema generation, migration validation, unavailable integration/hardware checks. Name the database dialect exercised: SQLite coverage alone does not establish MySQL/MariaDB locking or interrupted-DDL recovery.
+- Report schema generation, migration validation, unavailable integration/hardware checks, and the database dialects exercised. SQLite alone does not prove MySQL/MariaDB locking or interrupted-DDL recovery.
