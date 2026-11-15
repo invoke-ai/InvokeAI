@@ -1079,7 +1079,8 @@ export const getFlux2ComponentSource = (
 
 export const getAutoFlux2ComponentSourceModel = (
   model: GenerateModelConfig | undefined,
-  settings: Pick<GenerateSettings, 'mistralEncoderModel' | 'qwen3EncoderModel' | 'vae'>,
+  settings: Pick<GenerateSettings, 'mistralEncoderModel' | 'qwen3EncoderModel' | 'vae'> &
+    Partial<Pick<GenerateSettings, 'componentSourceModel'>>,
   models: readonly ComponentSourceCandidate[]
 ): MainModelConfig | null | undefined => {
   if (!model || model.type === 'external_image_generator' || model.base !== 'flux2') {
@@ -1094,6 +1095,13 @@ export const getAutoFlux2ComponentSourceModel = (
 
   const pipelines = models.filter(isFlux2SourceFor(model));
   const encoderSource = pipelines.find(isFlux2EncoderSourceForModel(model));
+  // A stored source stays while it is installed and still supplies what the model lacks: the encoder where no
+  // standalone one is set, otherwise the VAE any FLUX.2 pipeline gives.
+  const stored = pipelines.find(({ key }) => key === settings.componentSourceModel?.key);
+
+  if (stored && (encoderModel || isFlux2EncoderSourceForModel(model)(stored))) {
+    return stored;
+  }
 
   if (!encoderModel && settings.vae) {
     return encoderSource ?? null;

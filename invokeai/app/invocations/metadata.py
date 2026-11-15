@@ -237,7 +237,7 @@ class MiniMaxH3ReferenceMetadataField(BaseModel):
 # other 1.x, ignoring unknown keys); a major bump renames, removes or retypes one. A record
 # without the key predates versioning and is read with the same rules. Documented, with the
 # field table, in docs/development/Architecture/media-metadata.
-CORE_METADATA_VERSION = "1.2.0"
+CORE_METADATA_VERSION = "1.3.0"
 
 
 @invocation(
@@ -245,7 +245,7 @@ CORE_METADATA_VERSION = "1.2.0"
     title="Core Metadata",
     tags=["metadata"],
     category="metadata",
-    version="2.9.0",
+    version="2.10.0",
     classification=Classification.Internal,
 )
 class CoreMetadataInvocation(BaseInvocation):
@@ -296,6 +296,14 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The VAE used for decoding, if the main model's default was not used",
     )
+    vae_precision: Optional[Literal["fp16", "fp32"]] = InputField(
+        default=None,
+        description="The precision the VAE decoded and encoded at (SD 1.x, SD 2.x, SDXL)",
+    )
+    color_compensation: Optional[bool] = InputField(
+        default=None,
+        description="Whether the SDXL image encode applied VAE color compensation",
+    )
     qwen3_encoder: Optional[ModelIdentifierField] = InputField(
         default=None,
         description="The Qwen3 text encoder model used for Z-Image inference",
@@ -305,6 +313,10 @@ class CoreMetadataInvocation(BaseInvocation):
     mistral_encoder: Optional[ModelIdentifierField] = InputField(
         default=None,
         description="The Mistral text encoder model used for FLUX.2 [dev] or ERNIE-Image inference",
+    )
+    mistral_source: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The FLUX.2 [dev] Diffusers install that supplied the Mistral encoder or VAE the main model lacks",
     )
     # Ideogram 4 assembles its structured JSON caption at generation time (ideogram4_caption_builder),
     # so this is a declared field rather than a static extra: the graph wires the builder's output to it

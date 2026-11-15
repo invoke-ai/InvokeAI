@@ -16,8 +16,10 @@ import {
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
 import {
+  flux2DevSourceRecallCase,
   fullyFilledSettingsFor,
   generateGraphCases,
+  recallCatalogFor,
   satisfiedSettingsFor,
 } from '@features/generation/core/graphCoverage.testing';
 import { compileGenerateGraph } from '@features/generation/graph';
@@ -3282,3 +3284,67 @@ it.each(['array', 'entities'] as const)(
     ).toEqual([]);
   }
 );
+
+describe('Diffusers main that records itself as its component source', () => {
+  const projectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
+  const sourceOf = (graph: { nodes: Record<string, Record<string, unknown>> }, field: string) => {
+    const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+
+    return (metadata![field] as { key: string }).key;
+  };
+
+  it.each([
+    ['z-image', 'qwen3_source'],
+    ['wan', 'wan_component_source'],
+  ] as const)('recalls a %s record onto a panel holding another source without keeping it', (base, key) => {
+    const { model, settings } = satisfiedSettingsFor(base, { label: 'diffusers', overrides: { format: 'diffusers' } });
+    const original = compileGenerateGraph(
+      { ...settings, componentSourceModel: null },
+      model,
+      'gallery',
+      projectSettings
+    );
+    const other = { ...model, key: `other-${base}-source`, name: 'Other source' } as MainModelConfig;
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ ...settings, componentSourceModel: other }),
+      image,
+      kind: 'all',
+      metadata: Object.values(original.backendGraph.nodes).find((node) => node.type === 'core_metadata'),
+      models: [model, other],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+    const recalled = compileGenerateGraph(result!.values, result!.values.model, 'gallery', projectSettings);
+
+    expect(sourceOf(original.backendGraph, key)).toBe(model.key);
+    expect(result?.values.componentSourceModel).toBeNull();
+    expect(sourceOf(recalled.backendGraph, key)).toBe(model.key);
+  });
+});
+
+describe('FLUX.2 dev record whose source supplies only the VAE', () => {
+  it('restores the recorded source beside the recorded standalone encoder, ahead of another pipeline', () => {
+    const { model, otherModels, settings } = flux2DevSourceRecallCase();
+    // A Klein pipeline gives a dev model its VAE but not its encoder, so the Mistral encoder stays standalone.
+    const vaeSource = { ...settings.componentSourceModel!, key: 'flux2-klein-vae-source', variant: 'klein_9b' };
+    const recorded = { ...settings, componentSourceModel: vaeSource };
+    const record = compileGenerateGraph(recorded, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph.nodes;
+    const catalog = recallCatalogFor(model, recorded);
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ ...recorded, componentSourceModel: null, mistralEncoderModel: null }),
+      image,
+      kind: 'all',
+      metadata: Object.values(record).find((node) => node.type === 'core_metadata'),
+      models: [...otherModels, ...catalog.models],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.mistralEncoderModel?.key).toBe(settings.mistralEncoderModel?.key);
+    expect(result?.values.componentSourceModel?.key).toBe(vaeSource.key);
+  });
+});

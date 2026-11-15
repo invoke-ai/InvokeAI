@@ -420,6 +420,12 @@ const getMetadataVae = (
   return vae && isVaeCompatibleWithGenerateModel(model, vae) ? vae : undefined;
 };
 
+const getMetadataVaePrecision = (metadata: unknown): 'fp16' | 'fp32' | null => {
+  const precision = getString(metadata, 'vae_precision');
+
+  return precision === 'fp16' || precision === 'fp32' ? precision : null;
+};
+
 const getPromptPatch = (
   metadata: unknown
 ): Partial<
@@ -936,9 +942,6 @@ interface RecalledComponent {
  * recorded key wins for a shared setting.
  */
 const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
-  { isMainModel: true, metadataKey: 'qwen3_source', setting: 'componentSourceModel' },
-  { isMainModel: true, metadataKey: 'qwen_image_component_source', setting: 'componentSourceModel' },
-  { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'ideogram4_unconditional_model', setting: 'ideogram4UnconditionalModel' },
   { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
   { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
@@ -956,6 +959,12 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { metadataKey: 'qwen_image_qwen_vl_encoder', setting: 'qwenVLEncoderModel' },
   { metadataKey: 't5_encoder', setting: 't5EncoderModel' },
   { metadataKey: 'wan_t5_encoder_model', setting: 'wanT5EncoderModel' },
+  // After the encoders: the model selection keeps a stored FLUX.2 source only beside the encoder it leaves to a
+  // standalone pick, and each entry is judged beside the ones before it.
+  { isMainModel: true, metadataKey: 'mistral_source', setting: 'componentSourceModel' },
+  { isMainModel: true, metadataKey: 'qwen3_source', setting: 'componentSourceModel' },
+  { isMainModel: true, metadataKey: 'qwen_image_component_source', setting: 'componentSourceModel' },
+  { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
 ];
 
 const getRecalledComponent = (
@@ -1558,6 +1567,14 @@ export const buildImageRecallSettings = ({
     for (const setting of recordedSettings) {
       const component = componentPatch[setting];
 
+      // A Diffusers main records itself as its own source, which the builders fall back to without a pick. Clearing
+      // the slot reproduces that, where a source left in the panel would supply the components instead.
+      if (setting === 'componentSourceModel' && component?.key === effectiveModel.key) {
+        values = { ...values, componentSourceModel: null };
+        fittingSettings.push(setting);
+        continue;
+      }
+
       if (!component || isComponentCompatibleWithModel(effectiveModel, values, setting, component)) {
         values = { ...values, [setting]: component };
         fittingSettings.push(setting);
@@ -1620,6 +1637,22 @@ export const buildImageRecallSettings = ({
       // automatic FLUX.2 component source.
       const { settings } = getGenerateModelSelectionResult({ currentValues: values, model: values.model, models });
       values = { ...values, ...settings };
+    }
+
+    // After the transition, which resets what the model's panel does not show. Older records carry none.
+    const vaePolicy = getGenerationUiPolicy(values.model);
+    const vaePrecision = getMetadataVaePrecision(metadata);
+    const colorCompensation = getBoolean(metadata, 'color_compensation');
+    const vaeSettings = {
+      ...(vaePrecision !== null && vaePolicy.vaePrecisionVisible ? { vaePrecision } : {}),
+      ...(colorCompensation !== null && vaePolicy.colorCompensationVisible ? { colorCompensation } : {}),
+    };
+
+    if (Object.keys(vaeSettings).length > 0) {
+      values = { ...values, ...vaeSettings };
+      if (!fields.includes('vae')) {
+        fields.push('vae');
+      }
     }
 
     // Judged after the transition, which can complete or undo a recorded pick. The adapter switch is a component

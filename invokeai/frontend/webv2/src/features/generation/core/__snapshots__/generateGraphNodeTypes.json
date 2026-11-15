@@ -741,6 +741,10 @@
         "clip_skip": [
           0
         ],
+        "color_compensation": [
+          false,
+          true
+        ],
         "control_layers": [],
         "controlnets": [],
         "dype_exponent": [
@@ -917,6 +921,9 @@
           true
         ],
         "vae": [],
+        "vae_precision": [
+          "fp32"
+        ],
         "wan_component_source": [],
         "wan_guidance_scale_low_noise": [
           null

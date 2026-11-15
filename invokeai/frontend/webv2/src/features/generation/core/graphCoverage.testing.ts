@@ -17,6 +17,7 @@ import type {
   GenerateSettings,
   MainModelConfig,
   ModelIdentifierConfig,
+  VaeModelConfig,
 } from './types';
 
 import {
@@ -31,6 +32,7 @@ import {
   SUPPORTED_GENERATE_BASES,
   withAddedReferenceImages,
 } from './baseGenerationPolicies';
+import { isVaeCompatibleWithGenerateModel } from './componentCompatibility';
 import { getIsPidSupportedBase } from './pid';
 import { clampDimension, deriveAspectRatioId } from './settings';
 
@@ -339,6 +341,18 @@ const RECALL_REFERENCE_IMAGE: GenerateReferenceImageAsset = {
  * one shows. Values a family does not record are harmless to carry. Seamless tiling and CFG rescale stay at their
  * defaults where the panel hides them: recall restores them on every family.
  */
+/** The VAE override an SD panel offers beside the model's own, which the graph loads through a `vae_loader`. */
+const sdVaeOverrideFor = (model: GenerateModelConfig): VaeModelConfig | null => {
+  const vae: VaeModelConfig = {
+    base: model.base,
+    key: `${model.base}-vae-override`,
+    name: `${model.base} VAE`,
+    type: 'vae',
+  };
+
+  return getGenerationUiPolicy(model).sdVaeVisible && isVaeCompatibleWithGenerateModel(model, vae) ? vae : null;
+};
+
 const withRecallTuning = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
@@ -360,6 +374,8 @@ const withRecallTuning = (
         ? defaults.cfgScale
         : Math.min(policy.guidanceMax ?? Number.POSITIVE_INFINITY, defaults.cfgScale + 0.5),
     clipSkip: policy.clipSkipMax === null ? defaults.clipSkip : 2,
+    // The Canvas encode reads it where the panel shows the switch.
+    colorCompensation: policy.colorCompensationVisible,
     fluxDypeExponent: 1,
     fluxDypePreset: 'manual',
     fluxDypeScale: 3,
@@ -402,6 +418,9 @@ const withRecallTuning = (
     seamlessXAxis: policy.seamlessVisible,
     seamlessYAxis: policy.seamlessVisible,
     steps: defaults.steps + 1,
+    vae: sdVaeOverrideFor(model) ?? settings.vae,
+    // Recall restores it only where the panel shows the control.
+    vaePrecision: policy.vaePrecisionVisible ? 'fp16' : defaults.vaePrecision,
     wanGuidanceScaleLowNoise: 3.5,
     width: size.width,
     zImageSeedVarianceEnabled: true,
@@ -496,6 +515,51 @@ export const sdxlRefinerRecallCase = () => {
       refinerScheduler: 'dpmpp_2m',
       refinerStart: 0.7,
       refinerSteps: 21,
+    },
+  };
+};
+
+/**
+ * FLUX.2 dev with a standalone encoder and a FLUX.2 pipeline for the VAE: no VAE of its own, so the loader takes a
+ * source.
+ */
+export const flux2DevSourceRecallCase = () => {
+  const { model, settings } = recallTunedSettingsFor('flux2', {
+    label: 'dev-standalone',
+    overrides: { format: 'gguf_quantized', variant: 'dev' },
+  });
+  const source: MainModelConfig = {
+    base: 'flux2',
+    format: 'diffusers',
+    key: 'flux2-dev-source',
+    name: 'FLUX.2 dev pipeline',
+    type: 'main',
+    variant: 'dev',
+  };
+
+  // Another installed pipeline the model selection would pick first, were the stored source not kept.
+  const otherSource: MainModelConfig = { ...source, key: 'flux2-dev-first-source', name: 'FLUX.2 dev first pipeline' };
+
+  return {
+    label: 'flux2 / dev-standalone-with-source',
+    model,
+    otherModels: [otherSource],
+    settings: { ...settings, componentSourceModel: source, vae: null },
+  };
+};
+
+/** FLUX.3 with the prompt upsampler on, which only then adds its node and records the model. */
+export const flux3UpsamplerRecallCase = () => {
+  const shape = SHAPE_OVERRIDES.flux3![0]!;
+  const { model, settings } = recallTunedSettingsFor('flux3', shape);
+
+  return {
+    label: 'flux3 / klein-diffusers-with-upsampler',
+    model,
+    settings: {
+      ...settings,
+      flux3PromptUpsamplerEnabled: true,
+      flux3PromptUpsamplerModel: tunedSettingsFor('flux3', shape).settings.flux3PromptUpsamplerModel,
     },
   };
 };

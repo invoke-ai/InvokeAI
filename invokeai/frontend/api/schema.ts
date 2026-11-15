@@ -11408,6 +11408,18 @@ export type components = {
              */
             vae?: components["schemas"]["ModelIdentifierField"] | null;
             /**
+             * Vae Precision
+             * @description The precision the VAE decoded and encoded at (SD 1.x, SD 2.x, SDXL)
+             * @default null
+             */
+            vae_precision?: ("fp16" | "fp32") | null;
+            /**
+             * Color Compensation
+             * @description Whether the SDXL image encode applied VAE color compensation
+             * @default null
+             */
+            color_compensation?: boolean | null;
+            /**
              * @description The Qwen3 text encoder model used for Z-Image inference
              * @default null
              */
@@ -11417,6 +11429,11 @@ export type components = {
              * @default null
              */
             mistral_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description The FLUX.2 [dev] Diffusers install that supplied the Mistral encoder or VAE the main model lacks
+             * @default null
+             */
+            mistral_source?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * Ideogram4 Caption
              * @description The structured JSON caption encoded for Ideogram 4 inference

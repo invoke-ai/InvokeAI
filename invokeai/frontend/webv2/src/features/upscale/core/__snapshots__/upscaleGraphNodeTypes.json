@@ -571,8 +571,10 @@
         "mistral_encoder": [],
         "model": [],
         "qwen_image_qwen_vl_encoder": [],
+        "qwen_image_vae": [],
         "qwen3_5_encoder": [],
         "qwen3_encoder": [],
+        "qwen3_source": [],
         "qwen3_vl_encoder": [],
         "rand_device": [
           "cpu"
@@ -604,7 +606,10 @@
         "use_cache": [
           true
         ],
-        "vae": []
+        "vae": [],
+        "vae_precision": [
+          "fp32"
+        ]
       },
       "outputs": [
         "metadata"

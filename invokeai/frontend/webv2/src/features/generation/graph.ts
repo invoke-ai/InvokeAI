@@ -11,6 +11,7 @@ export {
   createId,
   getActiveCompatibleLoras,
   getLoadedLoras,
+  getRecordedComponents,
   toGraphContract,
   toModelIdentifier,
 } from './core/graphBuilder';

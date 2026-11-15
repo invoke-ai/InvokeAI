@@ -32072,6 +32072,41 @@
             "orig_default": null,
             "orig_required": false
           },
+          "vae_precision": {
+            "anyOf": [
+              {
+                "enum": ["fp16", "fp32"],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The precision the VAE decoded and encoded at (SD 1.x, SD 2.x, SDXL)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Vae Precision"
+          },
+          "color_compensation": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether the SDXL image encode applied VAE color compensation",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Color Compensation"
+          },
           "qwen3_encoder": {
             "anyOf": [
               {
@@ -32099,6 +32134,22 @@
             ],
             "default": null,
             "description": "The Mistral text encoder model used for FLUX.2 [dev] or ERNIE-Image inference",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "mistral_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The FLUX.2 [dev] Diffusers install that supplied the Mistral encoder or VAE the main model lacks",
             "field_kind": "input",
             "input": "any",
             "orig_default": null,
@@ -32669,7 +32720,7 @@
         "tags": ["metadata"],
         "title": "Core Metadata",
         "type": "object",
-        "version": "2.9.0",
+        "version": "2.10.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
