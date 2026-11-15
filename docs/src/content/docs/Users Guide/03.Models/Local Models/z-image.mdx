@@ -149,6 +149,9 @@ Z-Image LoRAs are supported in Kohya, PEFT/Diffusers and LyCORIS formats. They a
 transformer and the Qwen3 encoder. In the workflow editor, use **Apply LoRA - Z-Image** or **Apply LoRA
 Collection - Z-Image**.
 
+DoRA LoRAs apply with their magnitudes in the `lora_A`/`lora_B` layout (LyCORIS `dora_scale`, PEFT
+`lora_magnitude_vector`, ai-toolkit `.magnitude`) as well as in the kohya layout. DoRA runs on the GGUF, SDNQ, NVFP4, fp8 and int8 builds, but not on bitsandbytes NF4 or LLM.int8 weights.
+
 ## Seed Variance Enhancer
 
 Z-Image Turbo tends to produce similar images across different seeds. **Seed variance**, next to the seed
