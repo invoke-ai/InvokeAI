@@ -1602,6 +1602,7 @@ const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>
   'flux3',
   'ideogram-4',
   'krea-2',
+  'moss-image',
   'qwen-image',
   'qwen-image-2-1',
   'sd-1',
