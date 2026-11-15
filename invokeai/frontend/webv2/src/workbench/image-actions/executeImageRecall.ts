@@ -10,7 +10,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
-import { galleryImages, galleryVideos } from '@features/gallery';
+import { GALLERY_REQUEST_MAX_NAMES, galleryImages, galleryVideos } from '@features/gallery';
 import { fetchGalleryImageMetadata } from '@features/gallery/queries';
 import {
   getCompatibleReferenceImages,
@@ -205,7 +205,7 @@ export const executeLoadMediaWorkflow = async ({
 const getReferenceImageName = (referenceImage: GenerateReferenceImage): string | null =>
   referenceImage.config.image ? getEffectiveReferenceImage(referenceImage.config.image).image_name : null;
 
-/** Sequential, deduplicated lookups respect the Gallery API's 1,000-name request limit. */
+/** Sequential, deduplicated lookups, one per request the Gallery API accepts, so a stale recall stops between them. */
 const resolveReferenceImages = async (
   names: readonly string[],
   signal: AbortSignal,
@@ -213,11 +213,11 @@ const resolveReferenceImages = async (
 ): Promise<Map<string, GalleryImage>> => {
   const assets = new Map<string, GalleryImage>();
   const distinctNames = [...new Set(names)];
-  for (let offset = 0; offset < distinctNames.length; offset += 1000) {
+  for (let offset = 0; offset < distinctNames.length; offset += GALLERY_REQUEST_MAX_NAMES) {
     if (signal.aborted || !isCurrent()) {
       throw new DOMException('Recall is no longer current', 'AbortError');
     }
-    const batch = distinctNames.slice(offset, offset + 1000);
+    const batch = distinctNames.slice(offset, offset + GALLERY_REQUEST_MAX_NAMES);
     const images = await galleryImages.resolveMany(batch, signal);
     if (signal.aborted || !isCurrent()) {
       throw new DOMException('Recall is no longer current', 'AbortError');

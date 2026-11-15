@@ -6062,6 +6062,8 @@
           "workflow": "Library workflow “{{name}}”",
           "workflowUnnamed": "Untitled library workflow"
         },
+        "itemCountAtLeast_one": "at least {{count}} item",
+        "itemCountAtLeast_other": "at least {{count}} items",
         "itemCount_one": "{{count}} item",
         "itemCount_other": "{{count}} items",
         "listLabel": "Where the media is used",
@@ -6090,7 +6092,6 @@
           "video": "Video panel",
           "workflow": "Workflow “{{name}}”"
         },
-        "tooManyItems": "Too many items to check them all: only projects open here were checked. Select fewer to check all.",
         "unchecked": "Other projects, workflows and jobs weren’t checked. Retry to complete the list.",
         "uncheckedNone_one": "Nothing open here uses it. Other projects, workflows and jobs weren’t checked: retry to check them.",
         "uncheckedNone_other": "Nothing open here uses them. Other projects, workflows and jobs weren’t checked: retry to check them.",
@@ -6159,7 +6160,11 @@
         },
         "download": {
           "partial": "{{succeeded}} of {{count}} items downloaded; {{failed}} failed or were skipped.",
-          "success": "Download ready"
+          "preparingArchives_one": "Preparing {{count}} .zip file of images.",
+          "preparingArchives_other": "Preparing {{count}} .zip files: one holds at most 1,000 images, so this selection downloads in parts.",
+          "success": "Download ready",
+          "successArchives_one": "{{count}} download ready",
+          "successArchives_other": "{{count}} downloads ready"
         },
         "move": {
           "failure_one": "Could not move {{count}} item to {{board}}.",

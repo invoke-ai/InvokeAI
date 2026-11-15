@@ -97,6 +97,7 @@ const mocks = vi.hoisted(() => ({
 const preferences = vi.hoisted(() => ({ confirmImageDeletion: false }));
 
 vi.mock('@features/gallery', () => ({
+  GALLERY_REQUEST_MAX_NAMES: 1000,
   galleryImages: {
     metadata: (...args: unknown[]) => mocks.imageMetadata(...args),
     resolve: (...args: unknown[]) => mocks.imageResolve(...args),
@@ -274,7 +275,10 @@ vi.mock('react-i18next', () => ({
       if (key === 'widgets.gallery.itemActions.move.success') {
         return `Moved to ${String(values?.board)}`;
       }
-      if (key.startsWith('widgets.gallery.itemActions.undoStale.')) {
+      if (
+        key.startsWith('widgets.gallery.itemActions.undoStale.') ||
+        key.startsWith('widgets.gallery.itemActions.download.')
+      ) {
         return `${key}:${JSON.stringify(values)}`;
       }
       if (key.startsWith('widgets.gallery.itemActions.loadWorkflow.loadedLabel')) {
@@ -2796,6 +2800,72 @@ describe('mixed item downloads', () => {
     });
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'images.zip');
+  });
+
+  it('downloads a selection larger than one archive request takes as several archives', async () => {
+    const imageNames = Array.from({ length: 2500 }, (_, index) => `image-${index}.png`);
+    mocks.downloadArchive.mockImplementation(({ imageNames: archiveNames }: { imageNames: string[] }) =>
+      Promise.resolve({ blob: new Blob(['archive']), fileName: `${archiveNames[0]}.zip` })
+    );
+    vi.stubGlobal('fetch', vi.fn());
+
+    await act(async () => {
+      await getItemActions().downloadItems(imageNames.map((name) => ({ kind: 'image', name })));
+    });
+
+    expect(mocks.downloadArchive.mock.calls.map(([request]) => request.imageNames)).toEqual([
+      imageNames.slice(0, 1000),
+      imageNames.slice(1000, 2000),
+      imageNames.slice(2000),
+    ]);
+    expect(mocks.downloadBlob.mock.calls.map(([, name]) => name)).toEqual([
+      'image-0.png.zip',
+      'image-1000.png.zip',
+      'image-2000.png.zip',
+    ]);
+    expect(mocks.notificationsAdd.mock.calls.map(([notice]) => notice)).toEqual([
+      {
+        kind: 'info',
+        message: 'widgets.gallery.itemActions.download.preparingArchives:{"count":3}',
+        title: 'widgets.gallery.preparingDownload',
+      },
+      { kind: 'success', title: 'widgets.gallery.itemActions.download.successArchives:{"count":3}' },
+    ]);
+  });
+
+  it('says nothing is being prepared in parts for a selection one archive holds', async () => {
+    const imageNames = Array.from({ length: 1000 }, (_, index) => `image-${index}.png`);
+    mocks.downloadArchive.mockResolvedValue({ blob: new Blob(['archive']), fileName: 'images.zip' });
+    vi.stubGlobal('fetch', vi.fn());
+
+    await act(async () => {
+      await getItemActions().downloadItems(imageNames.map((name) => ({ kind: 'image', name })));
+    });
+
+    expect(mocks.downloadArchive).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd.mock.calls.map(([notice]) => notice)).toEqual([
+      { kind: 'success', title: 'widgets.gallery.itemActions.download.success:{"count":1000}' },
+    ]);
+  });
+
+  it('keeps preparing the later archives when a middle one fails, and reports the partial outcome', async () => {
+    const imageNames = Array.from({ length: 2500 }, (_, index) => `image-${index}.png`);
+    mocks.downloadArchive
+      .mockResolvedValueOnce({ blob: new Blob(['first']), fileName: 'first.zip' })
+      .mockRejectedValueOnce(new Error('archive failed'))
+      .mockResolvedValueOnce({ blob: new Blob(['third']), fileName: 'third.zip' });
+    vi.stubGlobal('fetch', vi.fn());
+
+    await act(async () => {
+      await getItemActions().downloadItems(imageNames.map((name) => ({ kind: 'image', name })));
+    });
+
+    expect(mocks.downloadArchive).toHaveBeenCalledTimes(3);
+    expect(mocks.downloadBlob.mock.calls.map(([, name]) => name)).toEqual(['first.zip', 'third.zip']);
+    expect(mocks.reportError).toHaveBeenCalledOnce();
+    expect(mocks.reportError.mock.calls[0]?.[0]).toMatchObject({
+      message: 'widgets.gallery.itemActions.download.partial:{"count":2500,"failed":1000,"succeeded":1500}',
+    });
   });
 
   it('downloads a single video from its protected full URL with its actual name', async () => {

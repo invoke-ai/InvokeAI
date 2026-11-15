@@ -1,6 +1,7 @@
 import { galleryItems } from '@features/gallery';
+import { configureLogging, getLoggingConfig, getLogSnapshot, resetLogging } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   apiFetchJson: vi.fn(),
@@ -22,7 +23,6 @@ import { ApiError } from '@platform/transport/http';
 import {
   ALL_READABLE_BOARDS_ID,
   addImagesToGalleryBoard,
-  checkGalleryMediaUsage,
   createGalleryBoard,
   galleryBoardExists,
   deleteGalleryBoard,
@@ -103,152 +103,6 @@ describe('deleteGalleryBoard outcomes', () => {
       method: 'DELETE',
       signal: undefined,
     });
-  });
-});
-
-describe('checkGalleryMediaUsage', () => {
-  const usageBody = (overrides: Record<string, unknown> = {}) => ({
-    checked_image_count: 2,
-    checked_video_count: 1,
-    documents: [
-      {
-        id: 'legacy_editor',
-        image_count: 1,
-        image_names: ['a.png'],
-        kind: 'legacy_editor',
-        name: null,
-        revision: null,
-        video_count: 0,
-        video_names: [],
-        workspace_revision: null,
-      },
-      {
-        id: 'project-1',
-        image_count: 1200,
-        image_names: ['a.png', 'b.png'],
-        kind: 'project',
-        name: 'Harbor Tower',
-        revision: 7,
-        video_count: 1,
-        video_names: ['c.mp4'],
-        workspace_revision: 3,
-      },
-      {
-        id: 'later-kind',
-        image_count: 1,
-        image_names: ['b.png'],
-        kind: 'storyboard',
-        name: '  ',
-        // Revisions are only a hint: a malformed one reads as unknown rather than failing the check.
-        revision: '2',
-        video_count: 0,
-        video_names: [],
-        workspace_revision: -1,
-      },
-    ],
-    documents_total: 140,
-    in_use_image_count: 2,
-    in_use_video_count: 1,
-    other_accounts: { document_count: 3, image_count: 1, queue_item_count: 2, video_count: 0 },
-    queue: { image_count: 1, image_names: ['a.png'], item_count: 2, video_count: 0, video_names: [] },
-    ...overrides,
-  });
-
-  beforeEach(() => {
-    accountLifecycle.activate('user-a');
-    mocks.apiFetchJson.mockReset();
-  });
-
-  it('asks about the items by kind, or about a whole board, and maps the answer', async () => {
-    mocks.apiFetchJson.mockResolvedValue(usageBody());
-
-    const usage = await checkGalleryMediaUsage({
-      kind: 'items',
-      refs: [
-        { kind: 'image', name: 'a.png' },
-        { kind: 'video', name: 'c.mp4' },
-        { kind: 'image', name: 'b.png' },
-      ],
-    });
-    await checkGalleryMediaUsage({ boardId: 'board-1', kind: 'board' });
-
-    expect(JSON.parse(String(mocks.apiFetchJson.mock.calls[0]?.[1]?.body))).toEqual({
-      image_names: ['a.png', 'b.png'],
-      video_names: ['c.mp4'],
-    });
-    expect(mocks.apiFetchJson.mock.calls[0]?.[0]).toBe('/api/v1/gallery/usage');
-    expect(mocks.apiFetchJson.mock.calls[0]?.[1]?.method).toBe('POST');
-    expect(JSON.parse(String(mocks.apiFetchJson.mock.calls[1]?.[1]?.body))).toEqual({ board_id: 'board-1' });
-    expect(usage).toEqual({
-      checkedImageCount: 2,
-      checkedVideoCount: 1,
-      documents: [
-        {
-          id: 'legacy_editor',
-          imageCount: 1,
-          imageNames: ['a.png'],
-          kind: 'legacyEditor',
-          name: null,
-          revision: null,
-          videoCount: 0,
-          videoNames: [],
-          workspaceRevision: null,
-        },
-        {
-          id: 'project-1',
-          imageCount: 1200,
-          imageNames: ['a.png', 'b.png'],
-          kind: 'project',
-          name: 'Harbor Tower',
-          revision: 7,
-          videoCount: 1,
-          videoNames: ['c.mp4'],
-          workspaceRevision: 3,
-        },
-        // A kind this build does not know still uses the media; a blank name reads as none.
-        {
-          id: 'later-kind',
-          imageCount: 1,
-          imageNames: ['b.png'],
-          kind: 'other',
-          name: null,
-          revision: null,
-          videoCount: 0,
-          videoNames: [],
-          workspaceRevision: null,
-        },
-      ],
-      documentsTotal: 140,
-      inUseImageCount: 2,
-      inUseVideoCount: 1,
-      otherAccounts: { documentCount: 3, imageCount: 1, queueItemCount: 2, videoCount: 0 },
-      queue: { imageCount: 1, imageNames: ['a.png'], itemCount: 2, videoCount: 0, videoNames: [] },
-    });
-  });
-
-  it('fails on a malformed answer rather than reading it as nothing in use', async () => {
-    mocks.apiFetchJson.mockResolvedValue(usageBody({ in_use_image_count: undefined }));
-
-    await expect(checkGalleryMediaUsage({ boardId: 'board-1', kind: 'board' })).rejects.toThrow(TypeError);
-  });
-
-  it('drops an answer that arrives after the account changed', async () => {
-    let answer: (value: unknown) => void = () => {};
-    mocks.apiFetchJson.mockReturnValue(
-      new Promise((resolve) => {
-        answer = resolve;
-      })
-    );
-
-    const check = checkGalleryMediaUsage({ boardId: 'board-1', kind: 'board' });
-    const signal = mocks.apiFetchJson.mock.calls[0]?.[1]?.signal as AbortSignal;
-
-    accountLifecycle.invalidate();
-    accountLifecycle.activate('user-b');
-    answer(usageBody());
-
-    await expect(check).rejects.toThrow('no longer active');
-    expect(signal.aborted).toBe(true);
   });
 });
 
@@ -1102,6 +956,155 @@ describe('deleteGalleryImages partial failures', () => {
   it('skips the request entirely for an empty selection', async () => {
     await expect(deleteGalleryImages([])).resolves.toEqual({ deletedImageNames: [], failedImageNames: [] });
     expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+  });
+});
+
+describe('name lists past the server’s per-request cap', () => {
+  const names = (count: number) => Array.from({ length: count }, (_, index) => `image-${index}.png`);
+  const sentNames = () =>
+    mocks.apiFetchJson.mock.calls.map(
+      ([, init]) => (JSON.parse(String(init.body)) as { image_names: string[] }).image_names
+    );
+  // Deletes what it is sent, except that it reports every name ending in 7 as failed.
+  const deleteServer = (_url: string, init: { body: string }) => {
+    const sent = (JSON.parse(init.body) as { image_names: string[] }).image_names;
+
+    if (sent.length > 1000) {
+      return Promise.reject(new ApiError('List should have at most 1000 items', 422));
+    }
+
+    return Promise.resolve({
+      affected_boards: [`board-${sent[0]}`],
+      deleted_images: sent.filter((name) => !name.endsWith('7.png')),
+      failed_images: sent.filter((name) => name.endsWith('7.png')),
+    });
+  };
+
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('sends 2,500 names as 1,000, 1,000 and 500, in order, and merges the answers', async () => {
+    mocks.apiFetchJson.mockImplementation(deleteServer);
+    const requested = names(2500);
+
+    const result = await deleteGalleryImages(requested);
+
+    expect(sentNames()).toEqual([requested.slice(0, 1000), requested.slice(1000, 2000), requested.slice(2000)]);
+    expect(result).toEqual({
+      deletedImageNames: requested.filter((name) => !name.endsWith('7.png')),
+      failedImageNames: requested.filter((name) => name.endsWith('7.png')),
+    });
+  });
+
+  it('sends exactly 1,000 names as one request', async () => {
+    mocks.apiFetchJson.mockImplementation(deleteServer);
+
+    await deleteGalleryImages(names(1000));
+
+    expect(sentNames()).toEqual([names(1000)]);
+  });
+
+  it('reports the earlier batches’ successes when a later batch fails, and the rest as failed', async () => {
+    configureLogging({ ...getLoggingConfig(), level: 'debug' });
+    onTestFinished(resetLogging);
+    mocks.apiFetchJson
+      .mockImplementationOnce(deleteServer)
+      .mockRejectedValueOnce(new ApiError('{"detail":"Server error"}', 500));
+    const requested = names(2500);
+
+    const result = await deleteGalleryImages(requested);
+
+    // The third batch is never sent, and the cause is kept in the log.
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+    expect(getLogSnapshot().entries).toContainEqual(
+      expect.objectContaining({ level: 'debug', name: 'gallery.batch-request-failed' })
+    );
+    expect(result).toEqual({
+      deletedImageNames: requested.slice(0, 1000).filter((name) => !name.endsWith('7.png')),
+      failedImageNames: [
+        ...requested.slice(0, 1000).filter((name) => name.endsWith('7.png')),
+        ...requested.slice(1000),
+      ],
+    });
+  });
+
+  it('rejects as one request would when the first batch fails', async () => {
+    const failure = new ApiError('{"detail":"Server error"}', 500);
+    mocks.apiFetchJson.mockRejectedValueOnce(failure);
+
+    await expect(deleteGalleryImages(names(2500))).rejects.toBe(failure);
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects as one request would when the caller aborts during the first batch', async () => {
+    const controller = new AbortController();
+    mocks.apiFetchJson.mockImplementationOnce((url: string, init: { body: string }) => {
+      controller.abort();
+      return deleteServer(url, init);
+    });
+
+    await expect(starGalleryImages(names(2500), controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports what earlier batches did when the caller aborts later, and sends nothing after', async () => {
+    const controller = new AbortController();
+    const requested = names(2500);
+    mocks.apiFetchJson.mockImplementation((url: string, init: { body: string }) => {
+      if (mocks.apiFetchJson.mock.calls.length === 2) {
+        controller.abort();
+      }
+      return deleteServer(url, init);
+    });
+
+    const result = await deleteGalleryImages(requested, controller.signal);
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+    // The aborted batch's answer is never read, so its names are unconfirmed.
+    expect(result).toEqual({
+      deletedImageNames: requested.slice(0, 1000).filter((name) => !name.endsWith('7.png')),
+      failedImageNames: [
+        ...requested.slice(0, 1000).filter((name) => name.endsWith('7.png')),
+        ...requested.slice(1000),
+      ],
+    });
+  });
+
+  it('sends no further batch once the account changes', async () => {
+    mocks.apiFetchJson.mockImplementationOnce(() => {
+      accountLifecycle.invalidate();
+      accountLifecycle.activate('user-b');
+      return Promise.resolve({ affected_boards: [], removed_images: names(1000) });
+    });
+
+    await expect(removeImagesFromGalleryBoard(names(2500))).rejects.toThrow('no longer active');
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves 1,500 images by name in two requests, in the requested order', async () => {
+    const requested = names(1500);
+    mocks.apiFetchJson.mockImplementation((_url: string, init: { body: string }) =>
+      Promise.resolve(
+        (JSON.parse(init.body) as { image_names: string[] }).image_names.map((imageName) => ({
+          board_id: 'none',
+          created_at: '2026-07-09T12:00:00.000Z',
+          height: 512,
+          image_category: 'general',
+          image_name: imageName,
+          image_url: `/images/${imageName}`,
+          is_intermediate: false,
+          thumbnail_url: `/thumbnails/${imageName}`,
+          width: 512,
+        }))
+      )
+    );
+
+    const images = await getGalleryImagesByNames(requested);
+
+    expect(sentNames()).toEqual([requested.slice(0, 1000), requested.slice(1000)]);
+    expect(images.map((image) => image.imageName)).toEqual(requested);
   });
 });
 

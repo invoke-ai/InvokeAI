@@ -62,6 +62,7 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteInUse.surface.workflow': `Workflow “${String(values?.name)}”`,
         'widgets.gallery.deleteInUse.unchecked': 'Other projects couldn’t be checked.',
         'widgets.gallery.deleteInUse.itemCount': count === 1 ? '1 item' : `${count} items`,
+        'widgets.gallery.deleteInUse.itemCountAtLeast': count === 1 ? 'at least 1 item' : `at least ${count} items`,
         'widgets.gallery.deleteInUse.warning':
           count === 1
             ? 'Work that uses it will point at missing media.'
@@ -229,7 +230,8 @@ describe('useDeletionConfirmation', () => {
                 { count: 1, label: 'Upscale pass', surface: 'workflow' },
               ],
             },
-            { count: 1, kind: 'projectUnchecked', name: 'Harbor Tower' },
+            // A batched check could not name all of its uses.
+            { count: 1, countAtLeast: true, kind: 'projectUnchecked', name: 'Harbor Tower' },
             // Open in this tab, its saved version unread: what it uses here, and a note.
             { count: 1, kind: 'project', name: 'Atlas', savedCopyUnchecked: true, surfaces: [] },
             { count: 1, kind: 'workflow', name: 'Portraits' },
@@ -258,7 +260,7 @@ describe('useDeletionConfirmation', () => {
       'Canvas raster layers · 1 item',
       'Workflow “Upscale pass” · 2 items',
       'Workflow “Upscale pass” · 1 item',
-      'Project “Harbor Tower” · 1 item',
+      'Project “Harbor Tower” · at least 1 item',
       'Project “Atlas” · 1 item',
       'Library workflow “Portraits” · 1 item',
       '2 queued or running jobs · 1 item',

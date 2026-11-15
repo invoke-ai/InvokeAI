@@ -6,6 +6,7 @@ import type { VideoConditioningRole } from '@features/video';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import {
+  GALLERY_REQUEST_MAX_NAMES,
   galleryItemOrganization,
   galleryItems,
   galleryTransfers,
@@ -1028,25 +1029,39 @@ export const useImageActions = ({
       const loadedByKey = new Map(loadedItems.map((item) => [toGalleryItemKey(item), item]));
       const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
       const videoRefs = items.filter((item) => item.kind === 'video');
+      // One archive request names at most the server's cap, so a larger selection downloads as several archives.
+      const archiveCount = Math.ceil(imageNames.length / GALLERY_REQUEST_MAX_NAMES);
       let failedCount = 0;
+      let savedFileCount = 0;
       let succeededCount = 0;
 
-      if (imageNames.length > 0) {
+      if (archiveCount > 1) {
+        notifications.add({
+          kind: 'info',
+          message: t('widgets.gallery.itemActions.download.preparingArchives', { count: archiveCount }),
+          title: t('widgets.gallery.preparingDownload'),
+        });
+      }
+
+      for (let offset = 0; offset < imageNames.length; offset += GALLERY_REQUEST_MAX_NAMES) {
+        const archiveNames = imageNames.slice(offset, offset + GALLERY_REQUEST_MAX_NAMES);
+
         try {
           const { blob, fileName } = await galleryTransfers.downloadArchive({
-            imageNames,
+            imageNames: archiveNames,
             signal: owner.signal,
           });
 
           assertAccountScopeCurrent(owner);
           downloadBlob(blob, fileName);
-          succeededCount += imageNames.length;
+          savedFileCount += 1;
+          succeededCount += archiveNames.length;
         } catch {
           if (!isAccountScopeCurrent(owner)) {
             return;
           }
 
-          failedCount += imageNames.length;
+          failedCount += archiveNames.length;
         }
       }
 
@@ -1064,6 +1079,7 @@ export const useImageActions = ({
 
           assertAccountScopeCurrent(owner);
           downloadBlob(blob, item.name);
+          savedFileCount += 1;
           succeededCount += 1;
         } catch {
           if (!isAccountScopeCurrent(owner)) {
@@ -1086,9 +1102,9 @@ export const useImageActions = ({
         );
       } else {
         recordSuccess(
-          t('widgets.gallery.itemActions.download.success', {
-            count: succeededCount,
-          })
+          archiveCount > 1
+            ? t('widgets.gallery.itemActions.download.successArchives', { count: savedFileCount })
+            : t('widgets.gallery.itemActions.download.success', { count: succeededCount })
         );
       }
     };
