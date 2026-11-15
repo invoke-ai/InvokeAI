@@ -67460,7 +67460,7 @@
         "tags": ["image", "mask", "value", "threshold"],
         "title": "Image Value Thresholds",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.2.1",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
