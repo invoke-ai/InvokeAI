@@ -25,6 +25,7 @@ const setup = (historyBytes?: number) => {
   layer.fillEnabled = true;
   layer.strokeEnabled = true;
   layer.fillColor = '#ff0000';
+  layer.strokeWidth = 4;
   const h = createLayerOperationHarness(documentFrom([layer], 'v'), { historyBytes });
   const doc = h.document();
   const createPath = () =>
@@ -34,8 +35,7 @@ const setup = (historyBytes?: number) => {
       document: doc,
       layerId: 'v',
       appearance: true,
-      width: 4,
-      color: '#000000',
+
       id: 'output',
       ctx: h.ctx,
       backend: h.backend,

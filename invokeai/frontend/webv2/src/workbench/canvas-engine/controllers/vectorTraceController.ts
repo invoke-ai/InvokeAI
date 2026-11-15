@@ -4,6 +4,7 @@ import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/documen
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
+import { DEFAULT_VECTOR_STROKE_COLOR, DEFAULT_VECTOR_STROKE_WIDTH } from '@workbench/canvas-engine/contracts';
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { polygonBounds } from '@workbench/canvas-engine/freehand';
 import { approximateBezierPath } from '@workbench/canvas-engine/math/bezierPath';
@@ -31,8 +32,6 @@ type Options = {
   pathId?: string;
   appearance?: boolean;
   fillOnly?: boolean;
-  width: number;
-  color: string;
   ctx: CanvasMutationContext;
   backend: RasterBackend;
   id: string;
@@ -71,7 +70,8 @@ export const traceVectorLayer = async (o: Options): Promise<VectorTraceResult> =
   if (!fill && !stroke) {
     return { status: 'empty' };
   }
-  const width = Math.max(1, Math.min(600, Math.round(o.width)));
+  const width = Math.max(1, Math.min(600, Math.round(layer.strokeWidth ?? DEFAULT_VECTOR_STROKE_WIDTH)));
+  const color = layer.strokeColor ?? DEFAULT_VECTOR_STROKE_COLOR;
   const paths = o.pathId === undefined ? layer.paths : layer.paths.filter((path) => path.id === o.pathId);
   const sampleCount = paths.reduce(
     (sum, path) => sum + Math.max(0, path.points.length - (path.isClosed ? 0 : 1)) * 24,
@@ -150,8 +150,8 @@ export const traceVectorLayer = async (o: Options): Promise<VectorTraceResult> =
       const pixels = o.backend.createSurface(rect.width, rect.height),
         draw = pixels.ctx;
       draw.setTransform(1, 0, 0, 1, -rect.x, -rect.y);
-      draw.fillStyle = o.color;
-      draw.strokeStyle = o.color;
+      draw.fillStyle = color;
+      draw.strokeStyle = color;
       draw.lineWidth = width;
       draw.lineCap = 'round';
       draw.lineJoin = 'round';
@@ -166,7 +166,7 @@ export const traceVectorLayer = async (o: Options): Promise<VectorTraceResult> =
         }
         draw.fillStyle = layer.fillColor ?? '#ffffff';
         draw.fill(regionPath);
-        draw.fillStyle = o.color;
+        draw.fillStyle = color;
       }
       if (stroke) {
         for (const trace of traces) {

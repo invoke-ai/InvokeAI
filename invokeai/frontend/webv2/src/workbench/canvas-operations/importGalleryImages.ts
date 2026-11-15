@@ -52,7 +52,7 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import { nextLayerName } from '@workbench/workbenchState';
 
 import { uploadCanvasImage } from './backend/canvasImages';
-import { getCanvasEngine } from './engineRegistry';
+import { getCanvasEngine } from './operationAccess';
 
 /** Keep the legacy raster renderer out of Canvas startup and current-record recall. */
 export const prepareLegacyCanvasMetadata = async (

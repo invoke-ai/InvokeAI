@@ -181,6 +181,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   // The topbar (editor boot) and the image menus' keycaps read effective bindings; alone it cost a boot request.
   '/workbench/hotkeys/useShortcutBinding.ts',
   '/workbench/widget-frame/compactWidgetCapacity.tsx',
+  // Preview and the deferred Canvas engine share zoom geometry; keep its existing boot request folded in.
+  '/workbench/panZoom.ts',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.
   '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
@@ -262,6 +264,9 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/features/queue/runtime/coordinator.ts',
   '/features/queue/runtime/deliveryClaims.ts',
   '/features/queue/runtime/receiptAcknowledgements.ts',
+  // Image actions already load utility graphs at boot; the deferred Canvas engine shares the same runtime.
+  '/features/queue/utility.ts',
+  '/features/queue/runtime/utilityGraph.ts',
   '/features/queue/ui/useDeviceLabel.ts',
   '/features/upscale/core/settings.ts',
   '/features/upscale/ui/UpscaleUiContext.tsx',
@@ -416,6 +421,15 @@ const IMAGE_MAP_DATA_MODULES = [
 // Group Canvas/Layer interaction dependencies to avoid extra text-tool activation requests.
 const CANVAS_LAYER_SHARED_MODULES = [
   '/features/workflow/core/layerWorkflow.ts',
+  // Only Canvas composition reaches these creation roots; keep them with its lazy owner instead of extra chunks.
+  '/workbench/canvas-operations/engineRegistry.ts',
+  '/workbench/canvas-operations/createCanvasEngine.ts',
+  '/workbench/canvas-engine/engine.ts',
+  // Layers and the deferred engine share these public helpers; avoid extracting their creation graph again.
+  '/workbench/canvas-engine/tools/bboxHitTest.ts',
+  '/workbench/canvas-engine/editing/controlPixelEdit.ts',
+  '/workbench/canvas-engine/render/thumbnail.ts',
+  '/workbench/canvas-engine/tools/shapeTarget.ts',
   '/workbench/canvas-operations/react.ts',
   '/workbench/canvas-operations/useCanvasEngine.ts',
   '/workbench/canvasProjectMutationPort.ts',

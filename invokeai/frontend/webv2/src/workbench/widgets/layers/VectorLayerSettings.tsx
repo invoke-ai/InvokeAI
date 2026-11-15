@@ -5,18 +5,23 @@ import { Stack, Text } from '@chakra-ui/react';
 import { Button, ToggleIconButton } from '@platform/ui/Button';
 import { ColorPicker } from '@platform/ui/ColorPicker';
 import { ScrubberField } from '@platform/ui/ScrubberField';
-import { DEFAULT_VECTOR_GUIDE_COLOR } from '@workbench/canvas-engine/api';
-import { useActiveColorCommands } from '@workbench/widgets/canvas/color-system/useActiveColors';
-import { useBrushOptions } from '@workbench/widgets/canvas/engineStoreHooks';
+import {
+  DEFAULT_VECTOR_GUIDE_COLOR,
+  DEFAULT_VECTOR_STROKE_COLOR,
+  DEFAULT_VECTOR_STROKE_WIDTH,
+} from '@workbench/canvas-engine/api';
 import { PropertyControlRow, PropertySwitchRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
-import { baselineConfig, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
-import { vectorTraceErrorKey } from '@workbench/widgets/canvas/vectorTraceFeedback';
+import {
+  baselineConfig,
+  useStructuralPreview,
+  vectorTraceErrorKey,
+} from '@workbench/widgets/canvas/useStructuralCommit';
 import { PaintBucketIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-type Engine = Pick<CanvasEngineHandle, 'document' | 'layers' | 'tools' | 'interaction'>;
+type Engine = Pick<CanvasEngineHandle, 'document' | 'layers' | 'tools'>;
 const TAPER_MARKS = [1, 100, 250, 500];
 const formatPixels = (value: number) => `${value}px`;
 const formatPercent = (value: number) => `${value}%`;
@@ -88,8 +93,6 @@ const VectorTraceSettings = ({
   layer: Extract<CanvasLayerContract, { type: 'vector' }>;
 }) => {
   const { t } = useTranslation();
-  const brush = useBrushOptions(engine);
-  const colorCommands = useActiveColorCommands();
   const sampleColor = useColorSampler(engine);
   const [failure, setFailure] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -106,6 +109,8 @@ const VectorTraceSettings = ({
       traceTaperEnds?: boolean;
       traceTaper?: number;
       fillColor?: string;
+      strokeColor?: string;
+      strokeWidth?: number;
       fillEnabled?: boolean;
       strokeEnabled?: boolean;
     }) => {
@@ -130,10 +135,31 @@ const VectorTraceSettings = ({
     (strokeEnabled: boolean) => commitSettings({ strokeEnabled }),
     [commitSettings]
   );
-  const setStrokeWidth = useCallback(
-    (size: number) =>
-      engine.interaction.set('brushOptions', { ...engine.interaction.get('brushOptions'), size: Math.round(size) }),
-    [engine]
+  const previewStrokeColor = useCallback(
+    (strokeColor: string) =>
+      preview({ type: 'updateCanvasLayerConfig', id: layer.id, config: { layerType: 'vector', strokeColor } }),
+    [preview, layer.id]
+  );
+  const commitStrokeColor = useCallback((strokeColor: string) => commitSettings({ strokeColor }), [commitSettings]);
+  const clampStrokeWidth = useCallback(
+    (value: number) =>
+      Math.round(
+        Math.min(600, Math.max(1, Number.isFinite(value) ? value : (layer.strokeWidth ?? DEFAULT_VECTOR_STROKE_WIDTH)))
+      ),
+    [layer.strokeWidth]
+  );
+  const previewStrokeWidth = useCallback(
+    (value: number) =>
+      preview({
+        type: 'updateCanvasLayerConfig',
+        id: layer.id,
+        config: { layerType: 'vector', strokeWidth: clampStrokeWidth(value) },
+      }),
+    [preview, layer.id, clampStrokeWidth]
+  );
+  const commitStrokeWidth = useCallback(
+    (value: number) => commitSettings({ strokeWidth: clampStrokeWidth(value) }),
+    [commitSettings, clampStrokeWidth]
   );
   const commitTaperEnds = useCallback(
     (traceTaperEnds: boolean) => commitSettings({ traceTaperEnds }),
@@ -195,10 +221,10 @@ const VectorTraceSettings = ({
         <ColorPicker
           aria-label={label('traceColor')}
           disabled={disabled || layer.strokeEnabled === false}
-          value={brush.color}
+          value={layer.strokeColor ?? DEFAULT_VECTOR_STROKE_COLOR}
           onSampleColor={sampleColor}
-          onValueChange={colorCommands.applySampledColor}
-          onValueChangeEnd={colorCommands.applySampledColor}
+          onValueChange={previewStrokeColor}
+          onValueChangeEnd={commitStrokeColor}
         />
         <ToggleIconButton
           checked={layer.strokeEnabled ?? true}
@@ -211,13 +237,14 @@ const VectorTraceSettings = ({
       <ScrubberField
         label={label('strokeWidth')}
         disabled={disabled || layer.strokeEnabled === false}
-        value={brush.size}
+        value={layer.strokeWidth ?? DEFAULT_VECTOR_STROKE_WIDTH}
         min={1}
         max={600}
         step={1}
-        defaultValue={50}
+        defaultValue={DEFAULT_VECTOR_STROKE_WIDTH}
         formatValue={formatPixels}
-        onChange={setStrokeWidth}
+        onChange={previewStrokeWidth}
+        onChangeEnd={commitStrokeWidth}
       />
       <PropertySwitchRow
         label={label('taperEnds')}

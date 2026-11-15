@@ -55,7 +55,7 @@ export const CANVAS_COMPANION_HOTKEYS = [
   ['canvas.tool.marquee', 'widgets.canvas.commands.selectMarqueeTool', ['m']],
   ['canvas.tool.shape', 'widgets.canvas.commands.selectShapeTool', ['u']],
   ['canvas.tool.text', 'widgets.canvas.commands.selectTextTool', ['t']],
-  ['canvas.tool.spline', 'widgets.canvas.commands.selectSplineTool', []],
+  ['canvas.tool.spline', 'widgets.canvas.commands.selectSplineTool', ['s']],
   ['canvas.tool.gradient', 'widgets.canvas.commands.selectGradientTool', ['g']],
   // A sticky picker for those who would rather not hold Alt; Alt still picks from tools that do not read it.
   ['canvas.tool.colorPicker', 'widgets.canvas.commands.selectColorPickerTool', ['i']],

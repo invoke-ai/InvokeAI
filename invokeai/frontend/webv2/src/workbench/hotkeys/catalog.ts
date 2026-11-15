@@ -177,7 +177,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'tool.lasso', ['l'], { title: 'Select Lasso Tool' }),
   hotkey('canvas', 'tool.marquee', ['m'], { title: 'Select Marquee Tool' }),
   hotkey('canvas', 'tool.shape', ['u'], { title: 'Select Shape Tool' }),
-  hotkey('canvas', 'tool.spline', [], { title: 'Select Spline Edit Tool' }),
+  hotkey('canvas', 'tool.spline', ['s'], { title: 'Select Spline Edit Tool' }),
   hotkey('canvas', 'tool.text', ['t'], { title: 'Select Text Tool' }),
   hotkey('canvas', 'tool.gradient', ['g'], { title: 'Select Gradient Tool' }),
   hotkey('canvas', 'tool.colorPicker', ['i'], { title: 'Select Color Picker' }),

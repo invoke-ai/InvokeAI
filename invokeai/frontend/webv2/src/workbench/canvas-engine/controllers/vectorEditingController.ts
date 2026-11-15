@@ -433,6 +433,8 @@ export class VectorEditingController implements Tool {
     layer.blendMode = leaf.layer.blendMode;
     layer.guideColor = leaf.layer.guideColor;
     layer.fillColor = leaf.layer.fillColor;
+    layer.strokeColor = leaf.layer.strokeColor;
+    layer.strokeWidth = leaf.layer.strokeWidth;
     layer.fillEnabled = leaf.layer.fillEnabled;
     layer.strokeEnabled = leaf.layer.strokeEnabled;
     layer.traceTaperEnds = leaf.layer.traceTaperEnds;

@@ -11,6 +11,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { DEFAULT_VECTOR_STROKE_COLOR, DEFAULT_VECTOR_STROKE_WIDTH } from '@workbench/canvas-engine/contracts';
 import { createDefaultControlAdapter } from '@workbench/controlAdapters';
 
 export const DEFAULT_INPAINT_MASK_FILL = { color: '#e07575', style: 'diagonal' } as const;
@@ -50,6 +51,8 @@ export const createVectorLayer = (input: { id: string; name: string }): CanvasVe
   name: input.name,
   opacity: 1,
   paths: [],
+  strokeColor: DEFAULT_VECTOR_STROKE_COLOR,
+  strokeWidth: DEFAULT_VECTOR_STROKE_WIDTH,
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
   type: 'vector',
 });

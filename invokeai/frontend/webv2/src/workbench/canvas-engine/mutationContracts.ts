@@ -52,6 +52,8 @@ export type CanvasLayerConfigPatch =
       paths?: CanvasBezierPathContract[];
       guideColor?: string;
       fillColor?: string;
+      strokeColor?: string;
+      strokeWidth?: number;
       fillEnabled?: boolean;
       strokeEnabled?: boolean;
       traceTaperEnds?: boolean;

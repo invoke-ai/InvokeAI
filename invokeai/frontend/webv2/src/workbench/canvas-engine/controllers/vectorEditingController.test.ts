@@ -244,6 +244,11 @@ describe('permanent vector editing', () => {
   });
   it('reports refused edits, restores committed geometry, and extracts a copy without retargeting', () => {
     const h = harness();
+    h.apply({
+      type: 'updateCanvasLayerConfig',
+      id: 'v',
+      config: { layerType: 'vector', strokeColor: '#987654', strokeWidth: 19 },
+    });
     h.controller.targetContextMenu({ x: 50, y: 0 });
     h.controller.extractPath();
     expect(h.document().selectedLayerId).toBe('v');
@@ -252,10 +257,11 @@ describe('permanent vector editing', () => {
     if (copy.type !== 'vector') {
       throw new Error('Expected vector');
     }
+    expect(copy).toMatchObject({ strokeColor: '#987654', strokeWidth: 19 });
     expect(copy.paths[0]!.id).not.toBe('p');
     expect(copy.paths[0]!.points).toEqual(h.state().paths[0]!.points);
     const loaded = normalizeCanvasDocumentContract(JSON.parse(JSON.stringify(h.document())));
-    expect(loaded?.version).toBe(7);
+    expect(loaded?.version).toBe(8);
     expect(loaded?.stacks.vector?.[0]).toEqual(copy);
     h.refuse();
     h.controller.nudge(10, 0);

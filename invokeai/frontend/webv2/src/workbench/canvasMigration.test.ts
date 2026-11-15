@@ -1,6 +1,6 @@
 import type { CanvasStateContractV3 } from '@workbench/canvas-engine/api';
 
-import { createControlLayer } from '@workbench/canvas-engine/api';
+import { createControlLayer, createVectorLayer } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it } from 'vitest';
 
@@ -1293,5 +1293,64 @@ describe('loadCanvasState ingress repair', () => {
       stagingArea: { autoSwitchMode: 'bogus', isVisible: false, pendingImages: 'nope' },
     });
     expect(loaded.stagingArea).toEqual({ ...state.stagingArea, isVisible: false });
+  });
+});
+
+describe('vector layer appearance persistence', () => {
+  it('round-trips independent layer appearance in the live document and snapshots with schema 8', () => {
+    const first = {
+      ...createVectorLayer({ id: 'a', name: 'A' }),
+      strokeColor: '#123456',
+      strokeWidth: 17,
+      fillColor: '#abcdef',
+      fillEnabled: true,
+      traceTaperEnds: true,
+      traceTaper: 240,
+    };
+    const second = {
+      ...createVectorLayer({ id: 'b', name: 'B' }),
+      strokeColor: '#ff0000',
+      strokeWidth: 3,
+      fillColor: '#00ff00',
+      strokeEnabled: false,
+    };
+    const state = createEmptyCanvasState();
+    const document = { ...state.document, stacks: stacksFrom([first, second]) };
+    const saved = load({ ...state, document, snapshots: [{ id: 'saved', name: 'Saved', createdAt: 'now', document }] });
+    expect(saved.version).toBe(8);
+    expect(saved.document.version).toBe(8);
+    expect(saved.snapshots[0]?.document.version).toBe(8);
+    const reopened = load(JSON.parse(JSON.stringify(saved)));
+    expect(reopened).toEqual(saved);
+    expect(reopened.document.stacks.vector).toEqual([first, second]);
+    expect(reopened.snapshots[0]?.document.stacks.vector).toEqual([first, second]);
+    // A snapshot alone raises the live canvas floor so an older writer cannot drop its appearance.
+    expect(load({ ...state, snapshots: saved.snapshots }).version).toBe(8);
+    expect(writableCanvasSchemaVersion([8], { stacks: stacksFrom([]) })).toBe(8);
+    expect(writableCanvasSchemaVersion([8], { stacks: { ...stacksFrom([]), vector: [] } })).toBe(8);
+  });
+
+  it('keeps older vector documents readable without synthesizing brush-dependent appearance', () => {
+    const { strokeColor: _color, strokeWidth: _width, ...legacy } = createVectorLayer({ id: 'legacy', name: 'Legacy' });
+    const state = createEmptyCanvasState();
+    const saved = load({
+      ...state,
+      version: 7,
+      document: { ...state.document, version: 7, stacks: stacksFrom([legacy]) },
+    });
+    expect(saved.version).toBe(7);
+    expect(saved.document.stacks.vector).toEqual([legacy]);
+  });
+
+  it('drops malformed optional stroke values while retaining the vector geometry', () => {
+    const legacy = {
+      ...createVectorLayer({ id: 'legacy', name: 'Legacy' }),
+      strokeColor: 'not a color',
+      strokeWidth: -3,
+    };
+    const state = createEmptyCanvasState();
+    const saved = load({ ...state, document: { ...state.document, stacks: stacksFrom([legacy]) } });
+    expect(saved.document.stacks.vector?.[0]).toMatchObject({ id: 'legacy', paths: [] });
+    expect(saved.document.stacks.vector?.[0]).toMatchObject({ strokeColor: undefined, strokeWidth: undefined });
   });
 });

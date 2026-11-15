@@ -31,7 +31,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { EngineDeps, RegistryTimers } from './engineRegistry';
 
-import { createEngineRegistry, getCanvasEngine, getOrCreateEngine, isBlankCanvasDocument } from './engineRegistry';
+import { createEngineRegistry, getOrCreateEngine, releaseEngine } from './engineRegistry';
+import { getCanvasEngine, isBlankCanvasDocument } from './operationAccess';
 import { TOOL_MEMORY_WRITE_DELAY_MS } from './toolMemory';
 
 const createDeferred = <T>() => {
@@ -153,15 +154,30 @@ describe('createEngineRegistry', () => {
   it('disposes the process registry synchronously when its account expires', () => {
     accountLifecycle.activate('user-a');
     const liveEngines = createLiveCanvasEngines();
+    expect(getCanvasEngine('shared-project-id')).toBeUndefined();
     const engine = getOrCreateEngine('shared-project-id', { ...createFakeDeps(), liveEngines });
     const dispose = vi.spyOn(engine.lifecycle, 'dispose');
+    expect(getCanvasEngine('shared-project-id')).toBe(engine);
     expect(liveEngines.heldAssets('shared-project-id')).toEqual({ images: [], videos: [] });
+    releaseEngine('shared-project-id');
+    expect(getCanvasEngine('shared-project-id')).toBe(engine);
 
     accountLifecycle.invalidate();
 
     expect(getCanvasEngine('shared-project-id')).toBeUndefined();
     expect(liveEngines.heldAssets('shared-project-id')).toBeUndefined();
     expect(dispose).toHaveBeenCalledOnce();
+  });
+
+  it('does not expose an isolated registry through the default engine lookup', () => {
+    const registry = createEngineRegistry();
+    try {
+      const engine = registry.getOrCreateEngine('isolated-project', createFakeDeps());
+      expect(registry.getEngine('isolated-project')).toBe(engine);
+      expect(getCanvasEngine('isolated-project')).toBeUndefined();
+    } finally {
+      registry.disposeAll();
+    }
   });
 
   it('keeps a released engine for its own Workbench but replaces it for a remounted one', () => {

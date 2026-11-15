@@ -3097,7 +3097,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     const controller = new AbortController();
     vectorTraceAbort = controller;
     const document = mirror.getDocument();
-    const brush = stores.brushOptions.get();
     try {
       if (!document) {
         return { status: 'not-ready' as const };
@@ -3110,16 +3109,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         fillOnly: mode === 'fill',
         ctx: mutationContext,
         backend,
-        width: brush.size,
-        color: brush.color,
         id: createLayerId(),
         anchor: captureInsertionAnchor('raster', null),
         signal: controller.signal,
-        isCurrent: () =>
-          !disposed &&
-          mirror.getDocument() === document &&
-          stores.brushOptions.get().size === brush.size &&
-          stores.brushOptions.get().color === brush.color,
+        isCurrent: () => !disposed && mirror.getDocument() === document,
       });
     } finally {
       if (vectorTraceAbort === controller) {

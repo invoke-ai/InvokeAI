@@ -8,7 +8,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useVectorEditSession } from './engineStoreHooks';
-import { vectorTraceErrorKey } from './vectorTraceFeedback';
+import { vectorTraceErrorKey } from './useStructuralCommit';
 
 export interface VectorPathMenuTarget {
   x: number;

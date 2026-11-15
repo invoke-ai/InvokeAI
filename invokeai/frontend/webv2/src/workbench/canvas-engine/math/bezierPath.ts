@@ -21,8 +21,6 @@ type CubicBezierSegment = [Vec2, Vec2, Vec2, Vec2];
 
 const DEFAULT_BEZIER_PATH_SAMPLES_PER_SEGMENT = 24;
 
-const ELLIPSE_BEZIER_CONTROL_POINT_RATIO = (4 * (Math.sqrt(2) - 1)) / 3;
-
 const BEZIER_FIT_EPSILON = 1e-12;
 
 const SMOOTH_HANDLE_MAX_SEGMENT_RATIO = 2 / 3;
@@ -519,12 +517,13 @@ export const rectToBezierPoints = (rect: Rect): CanvasBezierPointContract[] => {
 };
 
 export const ovalToBezierPoints = (rect: Rect): CanvasBezierPointContract[] => {
+  const controlPointRatio = (4 * (Math.sqrt(2) - 1)) / 3;
   const radiusX = rect.width / 2;
   const radiusY = rect.height / 2;
   const centerX = rect.x + radiusX;
   const centerY = rect.y + radiusY;
-  const controlOffsetX = radiusX * ELLIPSE_BEZIER_CONTROL_POINT_RATIO;
-  const controlOffsetY = radiusY * ELLIPSE_BEZIER_CONTROL_POINT_RATIO;
+  const controlOffsetX = radiusX * controlPointRatio;
+  const controlOffsetY = radiusY * controlPointRatio;
 
   return [
     {

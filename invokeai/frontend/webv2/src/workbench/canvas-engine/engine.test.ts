@@ -37,6 +37,7 @@ import type { SpatialAdjustmentExecutor } from '@workbench/canvas-engine/render/
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
+import { createVectorLayer } from '@workbench/canvas-engine/document/layerFactories';
 import { haveSameStructure } from '@workbench/canvas-engine/document/layerStacks';
 import * as compositor from '@workbench/canvas-engine/render/compositor';
 import { DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
@@ -20909,6 +20910,57 @@ it('aborts pending vector region work on Escape and document changes without cre
     h.setDocument({ ...doc, selectedLayerId: null });
     expect(await second).toEqual({ status: 'aborted' });
     expect(h.store.dispatch).not.toHaveBeenCalled();
+  } finally {
+    engine.lifecycle.dispose();
+  }
+});
+
+it('keeps pending vector rendering independent of brush color and size changes', async () => {
+  vi.stubGlobal(
+    'Path2D',
+    class {
+      moveTo() {}
+      lineTo() {}
+      closePath() {}
+      quadraticCurveTo() {}
+      bezierCurveTo() {}
+    }
+  );
+  const vector = {
+    ...createVectorLayer({ id: 'v', name: 'Vector' }),
+    fillEnabled: true,
+    fillColor: '#00ff00',
+    strokeColor: '#ff0000',
+    strokeWidth: 8,
+    paths: [
+      {
+        id: 'p',
+        name: null,
+        isClosed: true,
+        points: [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+          { x: 100, y: 100 },
+        ].map((anchor) => ({ anchor, inHandle: null, outHandle: null, type: 'corner' as const })),
+      },
+    ],
+  };
+  const h = createReducerBackedStore({ ...makeDoc(), stacks: stacksFrom([vector]), selectedLayerId: 'v' });
+  const engine = createCanvasEngine({
+    backend: createTestStubRasterBackend(),
+    imageResolver: () => Promise.resolve(new Blob()),
+    projectId: h.projectId,
+    store: h.store,
+  });
+  try {
+    const pending = engine.layers.traceFillVectorLayer('v');
+    engine.interaction.set('brushOptions', { ...engine.interaction.get('brushOptions'), color: '#0000ff', size: 99 });
+    expect(await pending).toEqual({ status: 'committed' });
+    expect(getDocumentLayer(h.store.getState().projects[0]!.canvas.document, 'v')).toMatchObject({
+      strokeColor: '#ff0000',
+      strokeWidth: 8,
+      fillColor: '#00ff00',
+    });
   } finally {
     engine.lifecycle.dispose();
   }

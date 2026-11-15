@@ -35,8 +35,7 @@ describe('vector Trace/Fill pixels', () => {
           document: doc,
           layerId: 'v',
           appearance: true,
-          width: 4,
-          color: '#000000',
+
           ctx: h.ctx,
           backend: h.backend,
           id: 'output',
@@ -62,6 +61,8 @@ describe('vector Trace/Fill pixels', () => {
     const layer = createVectorLayer({ id: 'v', name: 'Vector' });
     layer.fillEnabled = true;
     layer.fillColor = '#00ff00';
+    layer.strokeColor = '#0000ff';
+    layer.strokeWidth = 8;
     layer.paths = [
       {
         id: 'p',
@@ -84,8 +85,7 @@ describe('vector Trace/Fill pixels', () => {
             document: doc,
             layerId: 'v',
             appearance: true,
-            width: 8,
-            color: '#0000ff',
+
             ctx: h.ctx,
             backend: h.backend,
             id: 'output',
@@ -105,6 +105,7 @@ describe('vector Trace/Fill pixels', () => {
     }
     layer.fillEnabled = false;
     layer.traceTaperEnds = true;
+    layer.strokeWidth = 20;
     layer.paths = [
       {
         id: 'line',
@@ -124,8 +125,7 @@ describe('vector Trace/Fill pixels', () => {
           await traceVectorLayer({
             document: before,
             layerId: 'v',
-            width: 20,
-            color: '#000000',
+
             ctx: tapered.ctx,
             backend: tapered.backend,
             id: 'taper',
@@ -143,4 +143,58 @@ describe('vector Trace/Fill pixels', () => {
       tapered.layers.dispose();
     }
   });
+});
+
+it('uses each layer’s stroke color and width for individual path rendering', async () => {
+  const paths = [
+    {
+      id: 'line',
+      name: null,
+      isClosed: false,
+      points: anchorsToBezierPoints([
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+      ]),
+    },
+  ];
+  const thin = { ...createVectorLayer({ id: 'thin', name: 'Thin' }), paths, strokeColor: '#ff0000', strokeWidth: 4 };
+  const thick = {
+    ...createVectorLayer({ id: 'thick', name: 'Thick' }),
+    paths,
+    strokeColor: '#0000ff',
+    strokeWidth: 20,
+  };
+  const legacy = { ...thin, id: 'legacy', strokeColor: undefined, strokeWidth: undefined };
+  for (const [id, expected, edgeAlpha] of [
+    ['thin', [255, 0, 0, 255], 0],
+    ['thick', [0, 0, 255, 255], 255],
+    ['legacy', [0, 0, 0, 255], 255],
+  ] as const) {
+    const h = createLayerOperationHarness(documentFrom([thin, thick, legacy], id), {
+      backend: createDomRasterBackend(),
+    });
+    const document = h.document();
+    try {
+      expect(
+        await traceVectorLayer({
+          document,
+          layerId: id,
+          pathId: 'line',
+          ctx: h.ctx,
+          backend: h.backend,
+          id: 'raster',
+          anchor: stackTopAnchor(h.ctx.projectId),
+          isCurrent: () => h.document() === document,
+        })
+      ).toEqual({ status: 'committed' });
+      const entry = h.installed[0]!;
+      const pixel = (y: number) =>
+        Array.from(entry.surface.ctx.getImageData(50 - entry.rect.x, y - entry.rect.y, 1, 1).data);
+      expect(pixel(0)).toEqual(expected);
+      expect(pixel(4)[3]).toBe(edgeAlpha);
+    } finally {
+      h.ctx.dispose();
+      h.layers.dispose();
+    }
+  }
 });

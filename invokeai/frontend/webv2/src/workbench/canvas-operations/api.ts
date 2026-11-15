@@ -59,9 +59,8 @@ export type {
   SamSessionErrorCode,
   SamSessionSnapshot,
 } from './operationTypes';
-export { getCanvasOperations } from './operationAccess';
+export { getCanvasEngine, getCanvasOperations, isBlankCanvasDocument } from './operationAccess';
 export { IDLE_CONTROL_DETECTION_STATUS } from './controlDetectionStatusStore';
-export { getCanvasEngine, isBlankCanvasDocument } from './engineRegistry';
 export {
   recordCanvasMetadata,
   resolveCanvasSaveBoardId,
