@@ -71,6 +71,8 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
       update: () => undefined,
     },
     CanvasRenderSize: harness.slot,
+    // The Size section names a base's defaults by its label, as the App adapter's `getModelBaseLabel` does.
+    models: { getBaseLabel: (base: string) => base },
     project: { invocationSourceId: harness.invocationSourceId },
     sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionsOpen: () => undefined },
   }),
