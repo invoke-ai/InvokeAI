@@ -532,8 +532,8 @@ class TestFusedAndInt8Checkpoints:
 
         assert all(isinstance(model.layers[0].proj[name], Int8ConvrotLinear) for name in ("k", "v", "o", "ffn_down"))
         assert model.layers[0].proj["q"].weight.dtype is torch.float32
-        # The dense Linears nothing reads the dtype of are the ones that took the cast.
-        assert model.text_embedder.blocks[0].qkv.weight.dtype is torch.float8_e4m3fn
+        # An int8 build is left as loaded: the dense Linears keep the precision the build shipped.
+        assert model.text_embedder.blocks[0].qkv.weight.dtype is torch.float32
         expected = forward(with_state_dict(meant))
         assert (forward(model) - expected).norm() / expected.norm() < 0.1
 

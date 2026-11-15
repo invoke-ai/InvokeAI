@@ -475,7 +475,8 @@ class WanCheckpointModel(ModelLoader):
     compute dtype at load time), and plain ``float8_e4m3fn`` weights with no
     scales (cast the same way as any other non-bf16 dtype). ComfyUI ``int8_tensorwise`` (convrot) builds keep
     their marked layers in int8 as ``Int8ConvrotLinear`` and dequantize them per forward; layers the model
-    reads outside a matmul (``condition_embedder``) are widened at load instead.
+    reads outside a matmul (``condition_embedder``) are widened at load instead. FP8 Storage leaves such a
+    build as loaded.
 
     Like the GGUF loader, one file is one expert; A14B pairing happens at the
     WanModelLoaderInvocation layer.
