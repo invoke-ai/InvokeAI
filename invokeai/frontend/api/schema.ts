@@ -25085,7 +25085,7 @@ export type components = {
          *         noise_dtype: The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.<br>Valid values: `float32`, `float16`
          *         wan_memory_optimization: Enable experimental Wan memory optimizations at the cost of slower generation.
          *         pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.
-         *         tiny_autoencoder_previews: Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs a few tens of ms and up to about 1.1 GB of transient VRAM on an RTX 4090 (image decoders 0.15-0.65 GB, Wan video windows up to 1.1 GB); not recommended on CPU-only installs, where one takes about 2 s.
+         *         tiny_autoencoder_previews: Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs a few tens of ms and up to about 1.1 GB of transient VRAM on an RTX 4090 (image decoders 0.15-0.65 GB, Wan video windows up to 1.1 GB); a TAE that does not fit in VRAM next to the running model can instead run on the CPU (its `Decode previews on CPU` setting in the model manager): previews are capped at 512 px there and a frame takes about 0.3-0.4 s (TAESDXL, TAEF2), 0.8-1.1 s (TAEW2.1, one frame) or 1.0-1.9 s (Wan two-frame window) on a Ryzen 9 7900 with 8 threads in float32, so previews update less often.
          *         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
          *         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
          *         attention_backend: Attention kernel for the attention inside diffusion models. `auto` uses PyTorch's exact SDPA kernels ranked flash, cuDNN, memory-efficient, math, taking the first one the GPU and build support for each call; it never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA. `cudnn`, `flash`, `efficient` and `math` rank that PyTorch kernel first for all attention on CUDA and ROCm GPUs, ahead of the `auto` order. That is never exclusive: a call the kernel cannot serve runs on the next kernel, and the log reports that once per node type and reason (not for the PiD decoder, whose attention is ranked the same but not reported). `math` materializes the full attention score matrix, so it is slow and needs much more memory, which the working-memory estimates of most model families do not reserve, so generations can run out of memory; it is meant for debugging. Images can differ slightly between kernels.<br>Valid values: `auto`, `sage`, `cudnn`, `flash`, `efficient`, `math`
@@ -25577,7 +25577,7 @@ export type components = {
             pid_memory_optimization?: boolean;
             /**
              * Tiny Autoencoder Previews
-             * @description Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs a few tens of ms and up to about 1.1 GB of transient VRAM on an RTX 4090 (image decoders 0.15-0.65 GB, Wan video windows up to 1.1 GB); not recommended on CPU-only installs, where one takes about 2 s.
+             * @description Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs a few tens of ms and up to about 1.1 GB of transient VRAM on an RTX 4090 (image decoders 0.15-0.65 GB, Wan video windows up to 1.1 GB); a TAE that does not fit in VRAM next to the running model can instead run on the CPU (its `Decode previews on CPU` setting in the model manager): previews are capped at 512 px there and a frame takes about 0.3-0.4 s (TAESDXL, TAEF2), 0.8-1.1 s (TAEW2.1, one frame) or 1.0-1.9 s (Wan two-frame window) on a Ryzen 9 7900 with 8 threads in float32, so previews update less often.
              * @default false
              */
             tiny_autoencoder_previews?: boolean;
@@ -26788,6 +26788,12 @@ export type components = {
              */
             qwen3_vl_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
+             * Vision Tower
+             * @description Qwen3-VL 4B vision tower (the llama.cpp mmproj file). Lets a GGUF encoder read edit reference images.
+             * @default null
+             */
+            qwen3_vl_vision_tower_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
              * type
              * @default krea2_model_loader
              * @constant
@@ -27186,7 +27192,7 @@ export type components = {
             qwen3_vl_encoder?: components["schemas"]["Qwen3VLEncoderField"] | null;
             /**
              * Reference Images
-             * @description Up to three reference images for an edit LoRA, read by the Qwen3-VL vision tower in this order (Picture 1, 2, 3). Needs a safetensors or Diffusers encoder: a GGUF encoder has no vision tower.
+             * @description Up to three reference images for an edit LoRA, read by the Qwen3-VL vision tower in this order (Picture 1, 2, 3). A GGUF encoder reads them through the selected Vision Tower model (the mmproj file).
              * @default []
              */
             reference_images?: components["schemas"]["ImageField"][];
@@ -32766,8 +32772,9 @@ export type components = {
          * @description Model config for FLUX.3 Image single-file transformers.
          *
          *     BFL's `model.safetensors` and its quantized `variants/fp8r` (per-row scaled fp8) and `variants/nvfp4` (NVIDIA
-         *     ModelOpt layout), and Comfy-Org's bf16, `int8_convrot` and nvfp4 repackages. The record is the same for all of
-         *     them: the loader reads the scheme off the file.
+         *     ModelOpt layout), Comfy-Org's bf16, `int8_convrot` and nvfp4 repackages, and unsloth's torchao FP8 build (diffusers
+         *     key names, one scale per output row). The record is the same for all of them: the loader reads the scheme off the
+         *     file.
          */
         Main_Checkpoint_Flux3_Config: {
             /**
@@ -33347,7 +33354,7 @@ export type components = {
         };
         /**
          * Main_Checkpoint_QwenImage21_Config
-         * @description Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled or int8 convrot).
+         * @description Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled, torchao fp8 or int8 convrot).
          */
         Main_Checkpoint_QwenImage21_Config: {
             /**
@@ -44720,7 +44727,7 @@ export type components = {
             /** @description Info to load text_encoder submodel */
             text_encoder: components["schemas"]["ModelIdentifierField"];
             /**
-             * @description Info to load the vision tower of a GGUF encoder, which has none of its own (Qwen-Image-2.1 only)
+             * @description Info to load the vision tower of a GGUF encoder, which has none of its own
              * @default null
              */
             vision_tower?: components["schemas"]["ModelIdentifierField"] | null;
@@ -52777,6 +52784,11 @@ export type components = {
              */
             latent_channels: number;
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /**
              * Base
              * @default flux
              * @constant
@@ -52859,6 +52871,11 @@ export type components = {
              * @description Latent channels the decoder consumes.
              */
             latent_channels: number;
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default flux2
@@ -52943,6 +52960,11 @@ export type components = {
              */
             latent_channels: number;
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /**
              * Base
              * @default ltx-2
              * @constant
@@ -53025,6 +53047,11 @@ export type components = {
              * @description Latent channels the decoder consumes.
              */
             latent_channels: number;
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default qwen-image-2-1
@@ -53109,6 +53136,11 @@ export type components = {
              */
             latent_channels: number;
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /**
              * Base
              * @default sd-1
              * @constant
@@ -53192,6 +53224,11 @@ export type components = {
              */
             latent_channels: number;
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /**
              * Base
              * @default sd-3
              * @constant
@@ -53274,6 +53311,11 @@ export type components = {
              * @description Latent channels the decoder consumes.
              */
             latent_channels: number;
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default sdxl
@@ -53360,6 +53402,11 @@ export type components = {
              * @description Latent channels the decoder consumes.
              */
             latent_channels: number;
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Base
              * @default wan

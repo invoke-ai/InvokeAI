@@ -1532,6 +1532,40 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     });
   });
 
+  it('sends the Krea-2 Vision Tower only beside a GGUF 4B encoder, and never a stale or 8B one', () => {
+    const ggufEncoder: ComponentModelConfig = { ...qwen3VlEncoder, format: 'gguf_quantized' };
+    const tower = (variant: 'qwen3_vl_4b' | 'qwen3_vl_8b'): ComponentModelConfig => ({
+      base: 'any',
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    });
+    const tower4b = tower('qwen3_vl_4b');
+    const nodes = (encoder: ComponentModelConfig, vision: ComponentModelConfig) => {
+      const graph = compile(krea2Checkpoint, {
+        qwen3VLEncoderModel: encoder,
+        qwen3VLVisionTowerModel: vision,
+        vae: krea2Vae,
+      });
+
+      return { loader: graph.nodes.model_loader, metadata: getNodeByType(graph, 'core_metadata') };
+    };
+
+    const sent = nodes(ggufEncoder, tower4b);
+
+    expect(sent.loader).toMatchObject({ qwen3_vl_vision_tower_model: tower4b });
+    expect(sent.metadata).toMatchObject({ qwen3_vl_vision_tower: tower4b });
+    expect(
+      (nodes(ggufEncoder, tower('qwen3_vl_8b')).loader as Record<string, unknown>)?.qwen3_vl_vision_tower_model
+    ).toBeUndefined();
+    expect(
+      (nodes(qwen3VlEncoder, tower4b).loader as Record<string, unknown>)?.qwen3_vl_vision_tower_model
+    ).toBeUndefined();
+    expect((nodes(qwen3VlEncoder, tower4b).metadata as Record<string, unknown>)?.qwen3_vl_vision_tower).toBeUndefined();
+  });
+
   it('sends an anima-registered Qwen-Image VAE to the Krea-2 loader', () => {
     // Graph compilation accepts compatible cross-registration VAEs.
     const animaRegisteredVae: VaeModelConfig = {
