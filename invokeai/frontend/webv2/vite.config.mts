@@ -5,6 +5,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
 import { chunkSourceManifest } from './scripts/chunk-source-manifest.mjs';
+import { desktopThemePlugin } from './scripts/desktop-theme-plugin.mjs';
 import { localeAssetsPlugin } from './scripts/locale-assets-plugin.mjs';
 import { serviceWorkerPlugin } from './scripts/service-worker-plugin.mjs';
 
@@ -631,6 +632,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    desktopThemePlugin({ enabled: process.env.INVOKEAI_DESKTOP_THEME === '1' }),
     react(),
     babel({
       presets: [reactCompilerPreset()],

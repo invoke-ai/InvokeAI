@@ -98,6 +98,15 @@ describe('loadWorkbenchSettings', () => {
     }
   );
 
+  it('loads and saves the System theme through account preferences', async () => {
+    seedBackendPreferences({ themeId: 'system' });
+    const preferences = await store.loadWorkbenchSettings();
+    expect(preferences.themeId).toBe('system');
+    await store.patchWorkbenchPreferences({ themeId: 'classic' });
+    await store.patchWorkbenchPreferences({ themeId: 'system' });
+    expect(readBackendPreferences().themeId).toBe('system');
+  });
+
   it('migrates a preference stored under a renamed theme id', async () => {
     seedBackendPreferences({ themeId: 'forest' });
 

@@ -1,5 +1,6 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
 import type { WorkbenchThemeId } from '@theme/themes';
+import type { ColorMode } from '@xyflow/react';
 
 import { WORKFLOW_NODE_SURFACE_TOKEN } from '@features/workflow/ui/nodeChrome';
 import { THEMES_BY_ID } from '@theme/themes';
@@ -25,4 +26,7 @@ export const flowThemeCss: SystemStyleObject = {
 };
 
 /** The xyflow color mode matching a workbench theme. */
-export const getFlowColorMode = (themeId: WorkbenchThemeId): 'light' | 'dark' => THEMES_BY_ID[themeId].colorScheme;
+export const getFlowColorMode = (themeId: WorkbenchThemeId): ColorMode => {
+  const scheme = THEMES_BY_ID[themeId].colorScheme;
+  return scheme === 'light dark' ? 'system' : scheme;
+};

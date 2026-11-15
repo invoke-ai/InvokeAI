@@ -24,7 +24,8 @@ describe('ramp + mapping structure', () => {
   it('emits every neutral ramp step for every theme', () => {
     for (const theme of THEMES) {
       for (const step of STEPS) {
-        expect(resolveToken(sys, theme, `neutral.${step}`)).toMatch(/^oklch\(/);
+        const color = resolveToken(sys, theme, `neutral.${step}`);
+        expect(color).toMatch(theme === 'system' ? /^color-mix\(/ : /^oklch\(/);
       }
     }
   });
@@ -80,7 +81,8 @@ describe('ramp + mapping structure', () => {
   });
 
   it('keeps each ramp strictly decreasing in lightness 50 → 950', () => {
-    for (const theme of THEMES) {
+    // System colors are browser-resolved; SystemTheme.browser.test.tsx verifies both ramps by rendered luminance.
+    for (const theme of THEMES.filter((id) => id !== 'system')) {
       const ls = STEPS.map((step) => lightnessOf(resolveToken(sys, theme, `neutral.${step}`)));
       for (let i = 1; i < ls.length; i++) {
         expect(ls[i], `${theme} neutral.${STEPS[i]} should be darker than neutral.${STEPS[i - 1]}`).toBeLessThan(
@@ -96,7 +98,7 @@ describe('high contrast conditions', () => {
     const layer = sys.getTokenCss()['@layer tokens']!;
     const varOf = (name: string) => sys.tokens.getByName(`colors.${name}`)!.extensions.cssVar.var;
     const cases: [string, number][] = [
-      ['&:root[data-high-contrast=true]:not([data-theme=light])', 200],
+      ['&:root[data-high-contrast=true]:not([data-theme=light], [data-theme=system])', 200],
       ['&:root[data-high-contrast=true]:is([data-theme=light])', 800],
     ];
     for (const [selector, step] of cases) {
@@ -135,7 +137,7 @@ describe('native Chakra integration', () => {
 
 describe('brand palette derives from its two seeds (like accent)', () => {
   it('border equals solid; subtle/muted/emphasized mix solid into the surface', () => {
-    for (const theme of THEMES) {
+    for (const theme of THEMES.filter((id) => id !== 'system')) {
       const solid = resolveToken(sys, theme, 'brand.solid');
       const surface = resolveToken(sys, theme, 'bg.subtle');
       // Darken brand.fg on light backgrounds to preserve contrast.

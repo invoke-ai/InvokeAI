@@ -3,6 +3,8 @@ import type * as projectsApi from '@workbench/projects/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { applyThemeToRoot } from '@theme/applyTheme';
+import { toRgb } from '@theme/contrastRatio.testing';
 import { system, THEMES } from '@theme/system';
 import { createInstance } from 'i18next';
 import { act } from 'react';
@@ -66,6 +68,31 @@ afterEach(async () => {
 });
 
 describe('custom setting modified indicators', () => {
+  it('previews the local System palette while a fixed theme is selected', async () => {
+    applyThemeToRoot('classic');
+    const desktopStyle = document.createElement('style');
+    desktopStyle.textContent = `:root {
+      --invokeai-desktop-background: #ffffff;
+      --invokeai-desktop-foreground: #222222;
+      --invokeai-desktop-accent: #006b5f;
+      --invokeai-desktop-accent-contrast: #ffffff;
+      --invokeai-desktop-color-scheme: light;
+    }`;
+    document.head.append(desktopStyle);
+    try {
+      await render(appearanceSettings.fields.find((field) => field.id === 'themeId')!);
+      const preview = host.querySelector<HTMLElement>('[data-system-theme-preview]')!;
+      expect(getWorkbenchPreferences().themeId).toBe('classic');
+      expect(getComputedStyle(document.documentElement).colorScheme).toBe('dark');
+      expect(getComputedStyle(preview).colorScheme).toBe('light');
+      expect(toRgb(getComputedStyle(preview.children[0]!).backgroundColor)).toEqual([255, 255, 255]);
+      expect(toRgb(getComputedStyle(preview.children[2]!).backgroundColor)).toEqual([0, 107, 95]);
+    } finally {
+      desktopStyle.remove();
+      applyThemeToRoot('classic');
+    }
+  });
+
   it('marks a changed theme and clears the marker when the default theme is selected', async () => {
     await render(appearanceSettings.fields.find((field) => field.id === 'themeId')!);
     expect(modifiedIndicators()).toHaveLength(0);

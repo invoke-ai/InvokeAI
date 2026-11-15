@@ -70,7 +70,11 @@ const ThemeCard = ({
 
   return (
     <chakra.button type="button" aria-pressed={selected} css={styles.root} onClick={handleSelect}>
-      <Flex css={styles.preview}>
+      <Flex
+        colorScheme={theme.colorScheme}
+        css={styles.preview}
+        data-system-theme-preview={theme.id === 'system' ? '' : undefined}
+      >
         <Box css={styles.swatch} bg={surface} />
         <Box css={styles.swatch} bg={control} />
         <Box css={styles.swatch} bg={brandColor} />

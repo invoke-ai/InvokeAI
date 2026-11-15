@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="invokeai-desktop-theme" content="" />
     <meta name="theme-color" content="#16181d" />
     <title>Invoke Workbench</title>
     <link rel="icon" href="./invoke-icon.svg" type="image/svg+xml" />
@@ -13,6 +15,7 @@
         try {
           var themeColorSchemes = {
             classic: 'dark',
+            system: 'light dark',
             forest: 'dark',
             light: 'light',
             mono: 'dark',
@@ -27,12 +30,15 @@
           }
           var colorScheme = themeColorSchemes[id];
           var root = document.documentElement;
+          if (id === 'system') {
+            colorScheme =
+              getComputedStyle(root).getPropertyValue('--invokeai-desktop-color-scheme').trim() || colorScheme;
+          }
           if (colorScheme) {
-            var isLight = colorScheme === 'light';
             root.setAttribute('data-theme', id);
             root.style.colorScheme = colorScheme;
-            root.classList.toggle('dark', !isLight);
-            root.classList.toggle('light', isLight);
+            root.classList.toggle('dark', colorScheme === 'dark');
+            root.classList.toggle('light', colorScheme === 'light');
           }
           if (localStorage.getItem('invokeai:v7:webv2:reduce-motion') === 'true') {
             root.setAttribute('data-reduce-motion', 'true');
