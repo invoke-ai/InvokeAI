@@ -1,6 +1,7 @@
 """Probes on a safetensors file a loader has already read."""
 
 import functools
+import itertools
 import os
 import tempfile
 from pathlib import Path
@@ -45,3 +46,23 @@ needs_mapping_that_shows_file_writes = pytest.mark.skipif(
     not mapping_shows_file_writes(),
     reason="safetensors' mapping does not show in-place writes here, so overwrite_payloads can't tell a view from a copy",
 )
+
+
+def tensors_reading_the_file(module: torch.nn.Module, path: Path) -> list[str]:
+    """The parameters and buffers of ``module`` that are still views of ``path``'s mapping, by `overwrite_payloads`.
+
+    Each one pins the whole file for as long as the model is cached, outside the cache's size calculation. Bytes are
+    compared, so a float8 tensor, which `torch.equal` cannot compare on CPU, is checked like any other. Not
+    `state_dict()`: it leaves out non-persistent buffers, and the scales of kept fp8 layers are registered as those.
+    """
+
+    def as_bytes() -> dict[str, torch.Tensor]:
+        tensors = itertools.chain(
+            module.named_parameters(remove_duplicate=False), module.named_buffers(remove_duplicate=False)
+        )
+        return {name: tensor.detach().contiguous().reshape(-1).view(torch.uint8).clone() for name, tensor in tensors}
+
+    before = as_bytes()
+    overwrite_payloads(path)
+    after = as_bytes()
+    return [name for name in before if not torch.equal(before[name], after[name])]

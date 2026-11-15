@@ -121,6 +121,24 @@ def test_a_mixed_nvfp4_build_with_real_float8_weights_is_read_into_owned_storage
     assert safetensors_backend(path) == "pread"
 
 
+def test_a_torchao_fp8_build_is_read_into_owned_storage(tmp_path: Path) -> None:
+    """torchao stores its codes under `._weight_qdata`, not `.weight`. Mapped, its dense tensors pin the file whether
+    the codes are then folded or kept."""
+    path = _write(
+        tmp_path / "torchao.safetensors",
+        {
+            "block.norm.weight": _NORM,
+            "block.proj.bias": _BIAS,
+            "block.proj._weight_qdata": torch.ones(64, 64).to(torch.float8_e4m3fn),
+            "block.proj._weight_scale": torch.ones(64, 1),
+        },
+    )
+
+    sd = load_safetensors_checkpoint(path)
+
+    assert not _tensors_share_one_mapping(sd, read_safetensors_header(path), ["block.norm.weight", "block.proj.bias"])
+
+
 @pytest.mark.parametrize("dtype", FLOAT8, ids=["e4m3", "e5m2"])
 def test_both_paths_return_the_same_tensors(tmp_path: Path, dtype: torch.dtype) -> None:
     path = _fp8_checkpoint(tmp_path / "fp8.safetensors", dtype)

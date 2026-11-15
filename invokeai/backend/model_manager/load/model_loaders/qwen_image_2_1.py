@@ -24,7 +24,6 @@ from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tow
 from invokeai.backend.quantization.fp8_scaled import (
     attach_fp8_scales,
     cast_state_dict,
-    clone_unreplaced_tensors,
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
@@ -271,17 +270,11 @@ class QwenImage21CheckpointModel(ModelLoader):
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
             )
-            mapped = dict(sd) if fp8_layers and not keep_fp8 else None
             if fp8_layers and not keep_fp8:
                 dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
                 fp8_layers = {}
             fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
             kept = cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
-            if mapped is not None:
-                # Parameters the fold and cast left as they were are slices of the file mapping and would pin it,
-                # uncounted. Only on this path: kept fp8 codes stay mapped, as copying them would defeat the keep.
-                clone_unreplaced_tensors(sd, mapped)
-                mapped.clear()
 
         load_state_dict_ignoring_extras(
             model, sd, source="Qwen-Image-2.1 single-file checkpoint", assign=True, allow_missing=True

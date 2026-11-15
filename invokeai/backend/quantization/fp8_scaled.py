@@ -105,15 +105,17 @@ def safetensors_backend(path: Path | str) -> Literal["pread", "mmap"]:
     The default mmap backend maps the whole file and every tensor is a slice of that mapping. A loader that
     widens float8 weights to bf16 replaces the float8 sources, but tensors already in the target dtype (norms,
     biases) stay views because ``.to`` is a no-op for them, and those few views pin the entire file for the
-    model's lifetime, uncounted by the RAM cache. A float8 ``.weight`` is the trigger because that is what gets
-    widened while its neighbours stay views. Float8 scales (nvfp4 block scales under ``.weight_scale``) and the
-    empty ``scaled_fp8`` marker are not widened, so a file with only those keeps the lazy mmap load. With
-    ``pread`` every tensor owns its storage.
+    model's lifetime, uncounted by the RAM cache. A float8 weight is the trigger because that is what gets
+    widened while its neighbours stay views: ``.weight``, or torchao's ``._weight_qdata``. A load that keeps its fp8
+    codes is read this way all the same: the codes and the dense layers the cast leaves alone would otherwise pin the
+    file just as well. Float8 scales (nvfp4 block scales under ``.weight_scale``) and the empty ``scaled_fp8`` marker are
+    not widened, so a file with only those keeps the lazy mmap load. With ``pread`` every tensor owns its storage.
     """
     from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
 
     header = read_safetensors_header(Path(path))
-    return "pread" if any(k.endswith(".weight") and v["dtype"].startswith("F8_") for k, v in header.items()) else "mmap"
+    weights = (".weight", TORCHAO_QDATA_SUFFIX)
+    return "pread" if any(k.endswith(weights) and v["dtype"].startswith("F8_") for k, v in header.items()) else "mmap"
 
 
 def load_safetensors_checkpoint(path: Path | str) -> dict[str, torch.Tensor]:
@@ -618,23 +620,6 @@ def translate_torchao_fp8_layers(sd: dict[Any, Any]) -> int:
         # layer to bf16. Flat `[out]` is the per-output-channel form.
         sd[f"{layer}.weight_scale"] = sd.pop(layer + TORCHAO_SCALE_SUFFIX).reshape(-1)
     return len(layers)
-
-
-def clone_unreplaced_tensors(sd: dict[Any, Any], before: Mapping[Any, Any]) -> int:
-    """Clone every tensor in ``sd`` that is still the very object ``before`` held; return how many.
-
-    ``before`` is a shallow ``dict(sd)`` taken ahead of a fold and cast. Those leave a tensor in place when
-    nothing needed changing (a bf16 weight cast to bf16 is the same object), and ``load_file`` tensors are slices of
-    one file mapping, so each kept one pins the whole mapping for the model's cached life without the cache's size
-    calculation seeing it. Tensors the fold or cast replaced are already fresh and are not copied again. Their
-    storage cannot tell the two apart: every ``load_file`` tensor reports its own storage and size.
-    """
-    cloned = 0
-    for key, tensor in sd.items():
-        if before.get(key) is tensor and isinstance(tensor, torch.Tensor):
-            sd[key] = tensor.clone()
-            cloned += 1
-    return cloned
 
 
 def reject_undecoded_mx_scale(path: str, scale: Any) -> None:

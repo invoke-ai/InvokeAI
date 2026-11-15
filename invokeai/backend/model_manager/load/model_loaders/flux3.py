@@ -49,7 +49,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     Fp8ScaledLayer,
     attach_fp8_scales,
     cast_state_dict,
-    clone_unreplaced_tensors,
     count_fp8_weights,
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
@@ -195,7 +194,6 @@ def flux3_transformer_from_single_file(
             fp8_layers=fp8_layers,
             nvfp4_payloads=nvfp4_payloads,
         )
-        mapped = dict(sd) if fp8_layers and not keep_fp8 else None
         if fp8_layers and not keep_fp8:
             # Kept, they would be dequantized on every forward to save memory nobody asked to save.
             dequantize_fp8_scaled(sd, fp8_layers, dtype)
@@ -204,11 +202,6 @@ def flux3_transformer_from_single_file(
         # layer whose scale `scaled_mm` cannot apply.
         fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, dtype, model=model, skip_patterns=skip_patterns)
         cast_state_dict(sd, dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
-        if mapped is not None:
-            # Tensors the fold and cast left as they were are slices of the file mapping and would pin it, uncounted.
-            # Only on this path: kept fp8 codes stay mapped, as copying them would defeat the keep.
-            clone_unreplaced_tensors(sd, mapped)
-            mapped.clear()
         if nvfp4_payloads:
             if modelopt:
                 # After the reservation: the copies it makes are what the reservation counts for the packed layers.
