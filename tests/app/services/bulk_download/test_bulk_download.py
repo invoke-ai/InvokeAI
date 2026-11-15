@@ -6,9 +6,13 @@ from zipfile import ZipFile
 
 import pytest
 
-from invokeai.app.services.board_records.board_records_common import BoardRecord, BoardRecordNotFoundException
+from invokeai.app.services.board_records.board_records_common import (
+    BOARD_NAME_MAX_LENGTH,
+    BoardRecord,
+    BoardRecordNotFoundException,
+)
 from invokeai.app.services.bulk_download.bulk_download_common import BulkDownloadTargetException
-from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
+from invokeai.app.services.bulk_download.bulk_download_default import MAX_BOARD_NAME_BYTES, BulkDownloadService
 from invokeai.app.services.events.events_common import (
     BulkDownloadCompleteEvent,
     BulkDownloadErrorEvent,
@@ -158,19 +162,7 @@ def test_archive_is_not_downloadable_until_complete(
     assert [p.name for p in (tmp_path / "bulk_downloads").iterdir()] == ["test.zip"]
 
 
-def test_archive_with_longest_valid_filename_is_created(
-    tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
-):
-    """A board download whose archive name uses the full 255-character filename limit must still work."""
-    expected_zip_path, expected_image_path, mock_image_contents = prepare_handler_test(
-        tmp_path, monkeypatch, mock_image_dto, mock_invoker
-    )
-    service = BulkDownloadService()
-    service.start(mock_invoker)
-
-    max_filename_length = 255  # component limit of ext4, APFS and NTFS
-    # The item id is "<board name>_test" (uuid_string is patched) and the archive adds ".zip".
-    board_name = "b" * (max_filename_length - len("_test.zip"))
+def patch_board_name(mock_invoker: Invoker, monkeypatch: Any, board_name: str) -> None:
     monkeypatch.setattr(
         mock_invoker.services.board_records,
         "get",
@@ -184,8 +176,19 @@ def test_archive_with_longest_valid_filename_is_created(
         ),
     )
 
+
+def test_board_download_with_maximum_length_board_name_completes(
+    tmp_path: Path, monkeypatch: Any, mock_image_dto: ImageDTO, mock_invoker: Invoker
+):
+    """A board name of the maximum allowed length must not push the archive name past filesystem limits."""
+    _, _, mock_image_contents = prepare_handler_test(tmp_path, monkeypatch, mock_image_dto, mock_invoker)
+    service = BulkDownloadService()
+    service.start(mock_invoker)
+    patch_board_name(mock_invoker, monkeypatch, "b" * BOARD_NAME_MAX_LENGTH)
+
     item_id = service.generate_item_id("12345")
-    assert len(item_id + ".zip") == max_filename_length
+    # uuid_string is patched to "test": the id is "<truncated name>_test", a prefix of the full name.
+    assert item_id == "b" * MAX_BOARD_NAME_BYTES + "_test"
     service.handler(None, "12345", item_id)
 
     zip_path = Path(service.get_path(item_id + ".zip"))
@@ -193,6 +196,25 @@ def test_archive_with_longest_valid_filename_is_created(
         assert zip_file.read(f"general/{mock_image_dto.image_name}").decode() == mock_image_contents
     assert [p.name for p in zip_path.parent.iterdir()] == [zip_path.name]
     assert isinstance(mock_invoker.services.events.events[-1], BulkDownloadCompleteEvent)
+
+
+def test_board_name_is_cut_at_a_character_boundary(monkeypatch: Any, mock_invoker: Invoker):
+    """Multi-byte letters are kept whole when the byte cap falls inside one."""
+    service = BulkDownloadService()
+    service.start(mock_invoker)
+    monkeypatch.setattr("invokeai.app.services.bulk_download.bulk_download_default.uuid_string", lambda: "test")
+    # One ASCII letter first so the 2-byte letters straddle the cap when it is even.
+    board_name = "a" + "ä" * 100
+    patch_board_name(mock_invoker, monkeypatch, board_name)
+
+    item_id = service.generate_item_id("12345")
+    name_part = item_id.removesuffix("_test")
+
+    assert board_name.startswith(name_part)
+    assert name_part.startswith("aä")
+    assert len(name_part.encode("utf-8")) <= MAX_BOARD_NAME_BYTES
+    # No further whole character would have fit.
+    assert len((name_part + "ä").encode("utf-8")) > MAX_BOARD_NAME_BYTES
 
 
 def test_failed_archive_leaves_no_file_behind(
