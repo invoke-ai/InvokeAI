@@ -23,6 +23,10 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_kohya_keys,
     has_cosmos_dit_peft_keys,
 )
+from invokeai.backend.patches.lora_conversions.dora_magnitude_keys import (
+    DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY,
+    DORA_MAGNITUDE_VALUE_KEYS,
+)
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 
@@ -149,25 +153,20 @@ def _make_layer_patch(layer_dict: dict[str, torch.Tensor]) -> BaseLayerPatch:
     return any_lora_layer_from_state_dict(layer_dict)
 
 
-# Known suffixes for Kohya format
-_KOHYA_KNOWN_SUFFIXES = [
-    ".lora_A.weight",
-    ".lora_B.weight",
-    ".lora_down.weight",
-    ".lora_up.weight",
-    ".dora_scale",
-    ".alpha",
-]
+# Known suffixes for Kohya format, with the value key each is stored under
+_KOHYA_KNOWN_SUFFIXES = {
+    ".lora_A.weight": "lora_A.weight",
+    ".lora_B.weight": "lora_B.weight",
+    ".lora_down.weight": "lora_down.weight",
+    ".lora_up.weight": "lora_up.weight",
+    ".alpha": "alpha",
+    **DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY,
+}
 
 # Additional suffixes for PEFT/LoKR format
-_PEFT_EXTRA_SUFFIXES = [
-    ".lokr_w1",
-    ".lokr_w2",
-    ".lokr_w1_a",
-    ".lokr_w1_b",
-    ".lokr_w2_a",
-    ".lokr_w2_b",
-]
+_PEFT_EXTRA_SUFFIXES = {
+    f".{key}": key for key in ("lokr_w1", "lokr_w2", "lokr_w1_a", "lokr_w1_b", "lokr_w2_a", "lokr_w2_b")
+}
 
 
 _DIFFUSERS_NON_BLOCK_KEY_MAP = {
@@ -214,7 +213,7 @@ def _convert_diffusers_transformer_key(key: str) -> str:
 
 def _group_keys_by_layer(
     state_dict: Dict[str, torch.Tensor],
-    extra_suffixes: list[str] | None = None,
+    extra_suffixes: dict[str, str] | None = None,
 ) -> dict[str, dict[str, torch.Tensor]]:
     """Group state dict keys by layer name based on known suffixes.
 
@@ -227,9 +226,7 @@ def _group_keys_by_layer(
     """
     layer_dict: dict[str, dict[str, torch.Tensor]] = {}
 
-    known_suffixes = list(_KOHYA_KNOWN_SUFFIXES)
-    if extra_suffixes:
-        known_suffixes.extend(extra_suffixes)
+    known_suffixes = {**_KOHYA_KNOWN_SUFFIXES, **(extra_suffixes or {})}
 
     for key in state_dict:
         if not isinstance(key, str):
@@ -237,10 +234,10 @@ def _group_keys_by_layer(
 
         layer_name = None
         key_name = None
-        for suffix in known_suffixes:
+        for suffix, value_key in known_suffixes.items():
             if key.endswith(suffix):
                 layer_name = key[: -len(suffix)]
-                key_name = suffix[1:]  # Remove leading dot
+                key_name = value_key
                 break
 
         if layer_name is None:
@@ -266,6 +263,9 @@ def _get_lora_layer_values(layer_dict: dict[str, torch.Tensor], alpha: float | N
             values["alpha"] = layer_dict["alpha"]
         elif alpha is not None:
             values["alpha"] = torch.tensor(alpha)
+        for magnitude_key in DORA_MAGNITUDE_VALUE_KEYS:
+            if magnitude_key in layer_dict:
+                values[magnitude_key] = layer_dict[magnitude_key]
         return values
     elif "lora_down.weight" in layer_dict:
         return layer_dict

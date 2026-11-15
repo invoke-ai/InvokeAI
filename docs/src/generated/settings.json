@@ -805,7 +805,7 @@
     {
       "category": "GENERATION",
       "default": false,
-      "description": "Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs a few tens of ms and up to about 1.1 GB of transient VRAM on an RTX 4090 (image decoders 0.15-0.65 GB, Wan video windows up to 1.1 GB); not recommended on CPU-only installs, where one takes about 2 s.",
+      "description": "Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs a few tens of ms and up to about 1.1 GB of transient VRAM on an RTX 4090 (image decoders 0.15-0.65 GB, Wan video windows up to 1.1 GB); a TAE that does not fit in VRAM next to the running model can instead run on the CPU (its `Decode previews on CPU` setting in the model manager): previews are capped at 512 px there and a frame takes about 0.3-0.4 s (TAESDXL, TAEF2), 0.8-1.1 s (TAEW2.1, one frame) or 1.0-1.9 s (Wan two-frame window) on a Ryzen 9 7900 with 8 threads in float32, so previews update less often.",
       "env_var": "INVOKEAI_TINY_AUTOENCODER_PREVIEWS",
       "literal_values": [],
       "name": "tiny_autoencoder_previews",

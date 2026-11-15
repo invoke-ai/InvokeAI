@@ -1581,6 +1581,40 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     });
   });
 
+  it('sends the Krea-2 Vision Tower only beside a GGUF 4B encoder, and never a stale or 8B one', () => {
+    const ggufEncoder: ComponentModelConfig = { ...qwen3VlEncoder, format: 'gguf_quantized' };
+    const tower = (variant: 'qwen3_vl_4b' | 'qwen3_vl_8b'): ComponentModelConfig => ({
+      base: 'any',
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    });
+    const tower4b = tower('qwen3_vl_4b');
+    const nodes = (encoder: ComponentModelConfig, vision: ComponentModelConfig) => {
+      const graph = compile(krea2Checkpoint, {
+        qwen3VLEncoderModel: encoder,
+        qwen3VLVisionTowerModel: vision,
+        vae: krea2Vae,
+      });
+
+      return { loader: graph.nodes.model_loader, metadata: getNodeByType(graph, 'core_metadata') };
+    };
+
+    const sent = nodes(ggufEncoder, tower4b);
+
+    expect(sent.loader).toMatchObject({ qwen3_vl_vision_tower_model: tower4b });
+    expect(sent.metadata).toMatchObject({ qwen3_vl_vision_tower: tower4b });
+    expect(
+      (nodes(ggufEncoder, tower('qwen3_vl_8b')).loader as Record<string, unknown>)?.qwen3_vl_vision_tower_model
+    ).toBeUndefined();
+    expect(
+      (nodes(qwen3VlEncoder, tower4b).loader as Record<string, unknown>)?.qwen3_vl_vision_tower_model
+    ).toBeUndefined();
+    expect((nodes(qwen3VlEncoder, tower4b).metadata as Record<string, unknown>)?.qwen3_vl_vision_tower).toBeUndefined();
+  });
+
   it('sends an anima-registered Qwen-Image VAE to the Krea-2 loader', () => {
     // Graph compilation accepts compatible cross-registration VAEs.
     const animaRegisteredVae: VaeModelConfig = {
@@ -2232,6 +2266,32 @@ describe('MOSS-Image graphs', () => {
     name: `Qwen3.5 ${variant}`,
     type: 'qwen3_5_encoder',
     variant,
+  });
+
+  it('routes the transformer through MOSS-Image LoRAs and records only those it applied', () => {
+    const mossLora: LoraModelConfig = { base: 'moss-image', key: 'moss-lora', name: 'MOSS LoRA', type: 'lora' };
+    const zImageLora: LoraModelConfig = { base: 'z-image', key: 'z-image-lora', name: 'Z-Image LoRA', type: 'lora' };
+
+    const graph = compile(mossDiffusers, {
+      cfgScale: 4,
+      loras: [
+        { isEnabled: true, model: mossLora, weight: 0.6 },
+        { isEnabled: true, model: zImageLora, weight: 1 },
+      ],
+    });
+    const loraLoader = getNodeByType(graph, 'moss_image_lora_collection_loader');
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(loraLoader).toBeDefined();
+    expect(getEdge(graph, loraLoader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    // LoRAs train the transformer only: the VAE and both prompt encoders stay on the model loader.
+    expect(getEdge(graph, 'denoise_latents', 'vae')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'pos_cond', 'qwen3_5_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'neg_cond', 'qwen3_5_encoder')?.source.node_id).toBe('model_loader');
+    expect(metadata?.loras).toEqual([
+      { model: { base: 'moss-image', key: 'moss-lora', name: 'MOSS LoRA', type: 'lora' }, weight: 0.6 },
+    ]);
   });
 
   it('builds a Diffusers pipeline graph that conditions without a collector and decodes as FLUX.2', () => {

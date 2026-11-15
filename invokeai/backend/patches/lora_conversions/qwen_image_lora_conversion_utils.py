@@ -20,6 +20,10 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+from invokeai.backend.patches.lora_conversions.dora_magnitude_keys import (
+    DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY,
+    DORA_MAGNITUDE_VALUE_KEYS,
+)
 from invokeai.backend.patches.lora_conversions.kohya_key_utils import (
     INDEX_PLACEHOLDER,
     ParsingTree,
@@ -182,6 +186,7 @@ def _convert_kohya_format(state_dict: Dict[str, torch.Tensor], alpha: float | No
         if not isinstance(key, str):
             continue
         layer_name, param_name = key.split(".", 1)
+        param_name = DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY.get(f".{param_name}", param_name)
         if layer_name not in grouped:
             grouped[layer_name] = {}
         grouped[layer_name][param_name] = value
@@ -270,9 +275,10 @@ def _normalize_lora_keys(layer_dict: dict[str, torch.Tensor], alpha: float | Non
             values["alpha"] = layer_dict["alpha"]
         elif alpha is not None:
             values["alpha"] = torch.tensor(alpha)
-        # A PEFT DoRA magnitude indexes the output dim; dropping it would apply the adapter as a plain LoRA.
-        if "lora_magnitude_vector.weight" in layer_dict:
-            values["dora_magnitude"] = layer_dict["lora_magnitude_vector.weight"]
+        # Dropping a DoRA magnitude would apply the adapter as a plain LoRA.
+        for magnitude_key in DORA_MAGNITUDE_VALUE_KEYS:
+            if magnitude_key in layer_dict:
+                values[magnitude_key] = layer_dict[magnitude_key]
         return values
     elif "lora_down.weight" in layer_dict:
         return layer_dict
@@ -284,30 +290,34 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
     """Group state dict keys by layer path."""
     layer_dict: dict[str, dict[str, torch.Tensor]] = {}
 
-    known_suffixes = [
-        ".lora_A.weight",
-        ".lora_B.weight",
-        ".lora_down.weight",
-        ".lora_up.weight",
-        ".lora_magnitude_vector.weight",
-        ".dora_scale",
-        ".alpha",
-        ".scalar",
+    known_suffixes = {
+        ".lora_A.weight": "lora_A.weight",
+        ".lora_B.weight": "lora_B.weight",
+        ".lora_down.weight": "lora_down.weight",
+        ".lora_up.weight": "lora_up.weight",
+        ".alpha": "alpha",
+        ".scalar": "scalar",
+        **DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY,
         # LoKr and LoHa parameters
-        ".lokr_w1",
-        ".lokr_w1_a",
-        ".lokr_w1_b",
-        ".lokr_w2",
-        ".lokr_w2_a",
-        ".lokr_w2_b",
-        ".lokr_t2",
-        ".hada_w1_a",
-        ".hada_w1_b",
-        ".hada_w2_a",
-        ".hada_w2_b",
-        ".hada_t1",
-        ".hada_t2",
-    ]
+        **{
+            suffix: suffix[1:]
+            for suffix in (
+                ".lokr_w1",
+                ".lokr_w1_a",
+                ".lokr_w1_b",
+                ".lokr_w2",
+                ".lokr_w2_a",
+                ".lokr_w2_b",
+                ".lokr_t2",
+                ".hada_w1_a",
+                ".hada_w1_b",
+                ".hada_w2_a",
+                ".hada_w2_b",
+                ".hada_t1",
+                ".hada_t2",
+            )
+        },
+    }
 
     for key in state_dict:
         if not isinstance(key, str):
@@ -315,10 +325,10 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
 
         layer_name = None
         key_name = None
-        for suffix in known_suffixes:
+        for suffix, value_key in known_suffixes.items():
             if key.endswith(suffix):
                 layer_name = key[: -len(suffix)]
-                key_name = suffix[1:]
+                key_name = value_key
                 break
 
         if layer_name is None:

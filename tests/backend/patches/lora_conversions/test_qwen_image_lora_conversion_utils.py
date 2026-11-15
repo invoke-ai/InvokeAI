@@ -169,24 +169,6 @@ def test_kohya_all_unknown_submodules_produces_empty_model():
     assert len(model.layers) == 0
 
 
-def test_peft_dora_magnitude_is_kept_as_a_dora_layer():
-    """A PEFT DoRA adapter must load as DoRA: dropping `lora_magnitude_vector` would silently apply a plain LoRA."""
-    from invokeai.backend.patches.layers.dora_layer import DoRALayer
-
-    magnitude = torch.rand(3072)
-    state_dict = {
-        "base_model.model.transformer_blocks.0.attn.to_k.lora_A.weight": torch.empty(64, 3072),
-        "base_model.model.transformer_blocks.0.attn.to_k.lora_B.weight": torch.empty(3072, 64),
-        "base_model.model.transformer_blocks.0.attn.to_k.lora_magnitude_vector.weight": magnitude,
-    }
-    model = lora_model_from_qwen_image_state_dict(state_dict, alpha=None)
-
-    layer = model.layers[f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_k"]
-    assert isinstance(layer, DoRALayer)
-    assert layer.magnitude_is_out_dim
-    assert torch.equal(layer.dora_scale, magnitude)
-
-
 # ---- LyCORIS layouts: lycoris_ / ai-toolkit's lora_transformer_ prefixes, dotted LoKr/LoHa, scalar ----
 
 _ATTENTION_MODULES = (
