@@ -1998,6 +1998,40 @@ def _outer_and_nested_frames_into_root_if(computed_condition: bool) -> Graph:
     )
 
 
+def _root_if_through_passthrough(computed_condition: bool, nested: bool) -> Graph:
+    graph = (
+        _outer_and_nested_frames_into_root_if(computed_condition)
+        if nested
+        else _sibling_reiterate_into_if(computed_condition, src=["a", "b"], levels=1, condition=False)
+    )
+    graph.delete_edge(create_edge("if", "value", "out2", "item"))
+    graph.add_node(Marked(id="middle", marker="P:"))
+    graph.add_edge(create_edge("if", "value", "middle", "value"))
+    graph.add_edge(create_edge("middle", "value", "out2", "item"))
+    graph.validate_self()
+    return graph
+
+
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
+@pytest.mark.parametrize(("nested", "expected_count"), [(False, 3), (True, 5)], ids=["flat", "nested"])
+@pytest.mark.parametrize("reload", [False, True], ids=["fresh", "reload"])
+def test_root_if_passthrough_preserves_reiterated_values(
+    computed_condition: bool,
+    nested: bool,
+    expected_count: int,
+    reload: bool,
+    compatibility_scheduler: bool,
+) -> None:
+    graph = _root_if_through_passthrough(computed_condition, nested)
+    runs = (
+        _run_with_reload(graph, compatibility_scheduler, 12, "out2")
+        if reload
+        else _collect_runs(graph, compatibility_scheduler, "out2")
+    )
+
+    assert _values(runs["out2"]) == ["P:RR"] * expected_count
+
+
 @pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
 def test_root_if_after_reiterating_outer_and_nested_frames_runs_once_per_item(
     computed_condition: bool, compatibility_scheduler: bool

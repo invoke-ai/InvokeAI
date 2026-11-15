@@ -10,7 +10,7 @@ import pytest
 from invokeai.app.invocations.collections import CollectionConcatInvocation
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.primitives import BooleanInvocation
-from invokeai.app.services.shared import graph_if_dependencies
+from invokeai.app.services.shared import graph_if_dependencies, graph_if_runtime
 from invokeai.app.services.shared.execution_engine import ActivationDependency
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, IterateInvocation, _ExecutionScheduler
 from invokeai.app.services.shared.graph_validation import _EdgeList
@@ -77,6 +77,24 @@ class _CountingNodeOrder(tuple[str, ...]):
         for index in range(len(self) - 1, -1, -1):
             self.counts["traversal_nodes"] += 1
             yield tuple.__getitem__(self, index)
+
+
+class _CountingIterationPaths(list[tuple[int, ...]]):
+    def __init__(self, paths: list[tuple[int, ...]]) -> None:
+        super().__init__(paths)
+        self.work = 0
+
+    def __iter__(self) -> Iterator[tuple[int, ...]]:
+        for path in list.__iter__(self):
+            self.work += 1
+            yield path
+
+    def __contains__(self, item: object) -> bool:
+        for path in list.__iter__(self):
+            self.work += 1
+            if path == item:
+                return True
+        return False
 
 
 def _add_if(graph: Graph, if_id: str, true_source: str, false_source: str) -> None:
@@ -353,3 +371,46 @@ def test_if_dependency_frame_visits_scale_linearly(force_compatibility: bool) ->
     assert owner_id_visits[16] <= max(1, owner_id_visits[8]) * 3, f"owner execution visits: {owner_id_visits}"
     assert owner_id_visits[32] <= max(1, owner_id_visits[16]) * 3, f"owner execution visits: {owner_id_visits}"
     assert owner_id_visits[32] <= 20 * 32, f"owner execution visits exceeded linear work: {owner_id_visits}"
+
+
+@pytest.mark.platform_independent
+def test_literal_root_if_preparation_path_membership_scales_linearly(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_get_paths = graph_if_runtime._get_if_iteration_paths_with_ancestry
+    counted_path_lists: list[_CountingIterationPaths] = []
+
+    def count_if_paths(state: GraphExecutionState, node_id: str, *args: Any, **kwargs: Any) -> list[tuple[int, ...]]:
+        paths = original_get_paths(state, node_id, *args, **kwargs)
+        if node_id == "if":
+            paths = _CountingIterationPaths(paths)
+            counted_path_lists.append(paths)
+        return paths
+
+    monkeypatch.setattr(graph_if_runtime, "_get_if_iteration_paths_with_ancestry", count_if_paths)
+    work_by_item_count: dict[int, int] = {}
+    for item_count in (100, 200, 400):
+        graph = Graph()
+        graph.add_node(CollectionConcatInvocation(id="src", first=list(range(item_count))))
+        graph.add_node(IterateInvocation(id="it"))
+        graph.add_node(AnyTypeTestInvocation(id="selected"))
+        graph.add_node(AnyTypeTestInvocation(id="fallback", value="F"))
+        graph.add_node(IfInvocation(id="if", condition=True))
+        graph.add_node(AnyTypeTestInvocation(id="sink"))
+        for edge in (
+            ("src", "collection", "it", "collection"),
+            ("it", "item", "selected", "value"),
+            ("selected", "value", "if", "true_input"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "sink", "value"),
+        ):
+            graph.add_edge(create_edge(*edge))
+        graph.validate_self()
+
+        counted_path_lists.clear()
+        state = GraphExecutionState(graph=graph)
+        while (node := state.next()) is not None:
+            state.complete(node.id, node.invoke(Mock()))
+        assert state.is_complete()
+        work_by_item_count[item_count] = sum(paths.work for paths in counted_path_lists)
+
+    assert work_by_item_count[200] <= 3 * work_by_item_count[100], work_by_item_count
+    assert work_by_item_count[400] <= 3 * work_by_item_count[200], work_by_item_count

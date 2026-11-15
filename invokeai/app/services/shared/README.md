@@ -855,13 +855,14 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
   those parent groups. This runtime behavior is separate from static graph validation and admissibility. A `Collect` of
   a `For` final output groups in the `For`'s parent frame, so it keeps that frame open.
 - A `For` whose loop body belongs to an `If` branch (its body feeds the `ForReturn`, which reaches the `For` only
-  through the loop linkage) is gated with that branch: for a frame that rejects the branch, neither the `For` nor its
-  body runs. A gated `For` brings in a `For` nested in its body together with that body. Two `For`s stay ungated. A
-  `For` nested in the body of an ungated `For` runs with that loop. A `For` whose final output feeds the `If` directly
-  attaches after it finalizes; with a per-item condition, rejected frames do not run the `For` or its body, and selected
-  frames wait for its final output before the `If` input is attached. A literal condition establishes the gate from its
-  selected-branch ancestry. After that gate resolves, eager fallback admits the other branch too, so its `For` final
-  input may run and must finish before the `If` resolves; a private lazy candidate does not admit it.
+  through the loop linkage) is admitted when that branch's frame gate opens; a `For` nested in that body comes along
+  with the branch closure. After the frame-local condition resolves, eager execution admits both closures, so an
+  unselected branch's `For`, body, or nested `For` may run and a failure there fails the execution. A `For` nested in
+  the body of an ungated `For` runs with that loop, while two sibling `For`s remain independent. A `For` whose final
+  output feeds the `If` directly attaches its output after finalization. With a per-item condition, selected frames wait
+  for that final output before the `If` input is attached, while eager execution may run the unselected final-output
+  branch as well; the `If` attaches only the selected value after all required inputs are ready. A literal condition
+  establishes the initial gate from its selected-branch ancestry, then admits the other branch before the `If` resolves.
 - An `If` has no execution in a frame where the innermost iterator in its ancestry has no items. When an `Iterate` in
   its iterator ancestry, whether it feeds `If.condition` or a branch, has no items at all, no `If` execution is created,
   the branch sources are retired empty, the downstream `Collect` produces an empty collection, and the state completes

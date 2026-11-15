@@ -664,8 +664,8 @@ def test_v2_sibling_reiterate_snapshot_preserves_raw_frames_and_axis_metadata(
         ("if", (0,), "F:['c', 'a']"),
         ("out", (), ("F:['c', 'a']", "np")),
         ("out2", (), ("RR", "RR")),
-        ("rif", (), "RR"),
-        ("rif", (), "RR"),
+        ("rif", (0,), "RR"),
+        ("rif", (1,), "RR"),
     )
 
 

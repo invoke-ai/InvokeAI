@@ -33,6 +33,9 @@ if TYPE_CHECKING:
     from invokeai.app.services.shared.graph import GraphExecutionState
 
 
+_ProjectedRootIfFrames = dict[tuple[int, ...], list[tuple[tuple[int, ...], tuple[str, ...]]]]
+
+
 class UnsupportedSharedIfCollectBranchesError(ValueError):
     """Raised when one sibling Collect-backed Iterate must serve multiple If owners."""
 
@@ -2609,12 +2612,15 @@ class _ExecutionNodeBuilder:
         iterator_graph: "nx.DiGraph",
         iterator_ancestry: _IteratorAncestry,
         iteration_paths: list[tuple[int, ...]],
-    ) -> dict[tuple[int, ...], int]:
-        """Count projected sibling frames per requested outer path for a root-scoped selected branch."""
+    ) -> tuple[
+        dict[tuple[int, ...], int],
+        Optional[_ProjectedRootIfFrames],
+    ]:
+        """Count root If copies and retain source frame identities for valid sibling projections."""
         counts = dict.fromkeys(iteration_paths, 1)
         selected_edges = self._state.graph._get_input_edges(node_id, selected_field)
         if self._get_ordered_iterator_axes_for_edges(selected_edges, iterator_graph):
-            return counts
+            return counts, None
 
         other_field = "false_input" if selected_field == "true_input" else "true_input"
         other_edges = self._state.graph._get_input_edges(node_id, other_field)
@@ -2624,23 +2630,44 @@ class _ExecutionNodeBuilder:
         )
         axis_id = next((axis_id for axis_id in reversed(other_axes) if axis_id in reiterated_axes), None)
         if axis_id is None:
-            return counts
+            return counts, None
 
         prepared_ids = self._get_prepared_nodes_for_source(axis_id)
         if not prepared_ids:
-            return counts
+            return counts, None
 
         counts = dict.fromkeys(iteration_paths, 0)
         requested_prefixes_by_depth: dict[int, set[tuple[int, ...]]] = defaultdict(set)
         for iteration_path in iteration_paths:
             requested_prefixes_by_depth[len(iteration_path)].add(iteration_path)
+        registry = self._state._prepared_registry()
+        prepared_frames: list[tuple[tuple[int, ...], tuple[str, ...]]] = []
+        has_missing_axes = False
         for prepared_id in prepared_ids:
             prepared_path = self._state._get_iteration_path(prepared_id)
             for depth, requested_prefixes in requested_prefixes_by_depth.items():
                 prefix = prepared_path[:depth]
                 if prefix in requested_prefixes:
                     counts[prefix] += 1
-        return counts
+            prepared_axes = registry.get_iteration_axes(prepared_id)
+            if prepared_axes is None:
+                has_missing_axes = True
+                continue
+            prepared_frames.append((prepared_path, prepared_axes))
+
+        projected_paths = graph_if_runtime._project_prepared_iteration_paths(prepared_frames, reiterated_axes)
+        prepared_paths = [path for path, _ in prepared_frames]
+        if has_missing_axes or projected_paths is None or len(prepared_paths) != len(set(prepared_paths)):
+            return counts, None
+
+        frames_by_path = {path: [] for path in iteration_paths}
+        for prepared_path, prepared_axes in prepared_frames:
+            projected_path = projected_paths[prepared_path]
+            if projected_path in frames_by_path:
+                frames_by_path[projected_path].append((prepared_path, prepared_axes))
+        if any(len(frames_by_path[path]) != counts[path] for path in iteration_paths):
+            return counts, None
+        return counts, frames_by_path
 
     def _get_if_condition_iteration_mappings(
         self, node_id: str, graph: "nx.DiGraph"
@@ -3920,7 +3947,13 @@ class _ExecutionNodeBuilder:
                                 )
                             )
                     else:
-                        root_frame_counts_by_field: dict[str, dict[tuple[int, ...], int]] = {}
+                        root_frame_counts_by_field: dict[
+                            str,
+                            tuple[
+                                dict[tuple[int, ...], int],
+                                Optional[_ProjectedRootIfFrames],
+                            ],
+                        ] = {}
                         if not condition_axes:
                             for iteration_mapping in iteration_mappings:
                                 condition_exec_id = dict(iteration_mapping).get(condition_edges[0].source.node_id)
@@ -3987,17 +4020,28 @@ class _ExecutionNodeBuilder:
                                     and getattr(self._state.results[condition_exec_id], condition_edges[0].source.field)
                                     else "false_input"
                                 )
-                                root_frame_count = root_frame_counts_by_field.get(selected_field, {}).get(
-                                    iteration_path, 1
+                                frame_counts, projected_frames = root_frame_counts_by_field.get(
+                                    selected_field, ({}, None)
                                 )
-                                for _ in range(root_frame_count):
-                                    create_results = self.create_execution_node(
-                                        next_node_id,
-                                        iteration_mapping,
-                                        iteration_path,
-                                        input_fields={"condition"},
-                                    )
-                                    new_node_ids.extend(create_results)
+                                if projected_frames is None:
+                                    for _ in range(frame_counts.get(iteration_path, 1)):
+                                        create_results = self.create_execution_node(
+                                            next_node_id,
+                                            iteration_mapping,
+                                            iteration_path,
+                                            input_fields={"condition"},
+                                        )
+                                        new_node_ids.extend(create_results)
+                                else:
+                                    for frame_path, frame_axes in projected_frames[iteration_path]:
+                                        create_results = self.create_execution_node(
+                                            next_node_id,
+                                            iteration_mapping,
+                                            frame_path,
+                                            input_fields={"condition"},
+                                            iteration_axes=frame_axes,
+                                        )
+                                        new_node_ids.extend(create_results)
                 elif not self.get_node_iterators(
                     next_node_id
                 ) and not graph_if_runtime._has_empty_selected_for_final_frame(
@@ -4048,24 +4092,35 @@ class _ExecutionNodeBuilder:
                                 )
                         projected_paths = graph_if_runtime._project_prepared_iteration_paths(prepared_frames, set())
                         if projected_paths is not None:
+                            condition_path_set = set(condition_paths)
                             for path, axes in prepared_frames:
-                                if path in condition_paths:
+                                if path in condition_path_set:
                                     prepared_path_axes.setdefault(path, axes)
-                    root_frame_counts = self._get_root_if_projected_sibling_frame_counts(
+                    root_frame_counts, projected_frames = self._get_root_if_projected_sibling_frame_counts(
                         next_node_id, selected_field, iterator_graph, iterator_ancestry, condition_paths
                     )
                     for iteration_path in condition_paths:
                         iteration_axes = prepared_path_axes.get(iteration_path)
                         if iteration_axes is None and len(frame_axes) >= len(iteration_path):
                             iteration_axes = frame_axes[: len(iteration_path)]
-                        for _ in range(root_frame_counts[iteration_path]):
-                            create_results = self.create_execution_node(
-                                next_node_id,
-                                [],
-                                iteration_path,
-                                iteration_axes=iteration_axes,
-                            )
-                            new_node_ids.extend(create_results)
+                        if projected_frames is None:
+                            for _ in range(root_frame_counts[iteration_path]):
+                                create_results = self.create_execution_node(
+                                    next_node_id,
+                                    [],
+                                    iteration_path,
+                                    iteration_axes=iteration_axes,
+                                )
+                                new_node_ids.extend(create_results)
+                        else:
+                            for frame_path, frame_axes in projected_frames[iteration_path]:
+                                create_results = self.create_execution_node(
+                                    next_node_id,
+                                    [],
+                                    frame_path,
+                                    iteration_axes=frame_axes,
+                                )
+                                new_node_ids.extend(create_results)
         else:
             parent_iterator_nodes = self.get_node_iterators(next_node_id)
             iteration_mappings_iter = (
