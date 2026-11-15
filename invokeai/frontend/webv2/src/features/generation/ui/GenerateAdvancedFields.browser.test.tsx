@@ -2,6 +2,11 @@
 import type { GenerateSettings, MainModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities';
+import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { normalizeGenerateSettings } from '@features/generation/core/settings';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
@@ -16,7 +21,9 @@ import { userEvent } from 'vitest/browser';
 import { GenerateAdvancedFields } from './GenerateAdvancedFields';
 
 vi.mock('./GenerationUiContext', () => ({
-  GenerationModelSelect: () => null,
+  GenerationModelSelect: ({ emptyLabel, placeholder }: { emptyLabel?: string; placeholder?: string }) => (
+    <span data-select-empty-label={emptyLabel} data-select-placeholder={placeholder} />
+  ),
   useGenerationUi: () => ({
     sectionPreferences: { sectionsOpen: { advanced: true }, setSectionOpen: vi.fn() },
   }),
@@ -107,6 +114,26 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+});
+
+describe('GenerateAdvancedFields VAE picker', () => {
+  it('names the main model whose bundled VAE an empty override leaves in use', async () => {
+    // Only the served capabilities show the picker; the other tests here do not need them.
+    setArchitectureCapabilities(architectureCapabilitiesFixture);
+
+    try {
+      await render(sd1Model, false);
+
+      expect(host?.querySelector('[data-select-placeholder]')?.getAttribute('data-select-placeholder')).toBe(
+        'From SD 1.5'
+      );
+      expect(host?.querySelector('[data-select-placeholder]')?.getAttribute('data-select-empty-label')).toBe(
+        'From SD 1.5'
+      );
+    } finally {
+      resetArchitectureCapabilities();
+    }
+  });
 });
 
 describe('GenerateAdvancedFields HiDiffusion controls', () => {

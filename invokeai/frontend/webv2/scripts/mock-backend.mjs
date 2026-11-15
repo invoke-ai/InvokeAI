@@ -474,6 +474,8 @@ const createState = (profile, clock) => {
     ]),
     externalProviders: createExternalProviderConfigs(fixture.models),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
+    /** The generation metadata `GET /images/i/{name}/metadata` serves per image name; only `POST /__image-metadata` seeds entries. */
+    imageMetadata: new Map(),
     imageStorage: createImageStorage(),
     models,
     /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
@@ -1399,6 +1401,19 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           }
         }
         return json(200, { keys: entries.map(({ record }) => record.key), ok: true });
+      }
+
+      if (method === 'POST' && path === '/__image-metadata') {
+        // Test seam: the generation metadata an image's record serves, which the fixtures leave empty.
+        const body = await readJsonBody(request);
+        if (!state.images.has(body.image_name)) {
+          return json(404, { detail: 'Image not found' });
+        }
+        if (!body.metadata || typeof body.metadata !== 'object' || Array.isArray(body.metadata)) {
+          return json(400, { detail: 'metadata must be an object' });
+        }
+        state.imageMetadata.set(body.image_name, clone(body.metadata));
+        return json(200, { ok: true });
       }
 
       if (path === '/__faults') {
@@ -3155,7 +3170,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
 
       const imageMetadataMatch = /^\/api\/v1\/images\/i\/([^/]+)\/metadata$/.exec(path);
       if (method === 'GET' && imageMetadataMatch) {
-        return json(200, {});
+        return json(200, state.imageMetadata.get(decodeURIComponent(imageMetadataMatch[1])) ?? {});
       }
 
       const imageMatch = /^\/api\/v1\/images\/i\/([^/]+)$/.exec(path);

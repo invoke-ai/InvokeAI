@@ -9,6 +9,7 @@ Paths and commands are relative to this package. This map links user vocabulary 
   - `anima-lllite`, `spandrel`: adapters and upscalers installed before their channels or scale were recorded; re-identify fills those fields.
   - `control-sdxl`: SDXL ControlNets naming their preprocessor in both id forms, a Union, an unpurposed model, and a T2I-Adapter.
   - `control-flux`: FLUX dev with a depth Control LoRA and a Union ControlNet.
+- Image metadata: `POST /__image-metadata` with `{"image_name": "<name>", "metadata": {...}}` makes `GET /api/v1/images/i/<name>/metadata` serve that record (an object; every image serves `{}` otherwise), so the Preview details panel and image recall can be checked against a record. An unknown image returns 404. `/__reset` drops it.
 - The mock serves in-memory HTTP without Socket.IO. It proves nothing about real authorization, persistence, or model execution.
 - Production-build journeys start and stop their own preview and backend. Run their package commands; do not write a new driver. Their setup, fault injection, and selectors are working examples. Focused runs use a spare port and respect the one-performance-gate-per-machine rule.
 

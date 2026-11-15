@@ -1,5 +1,13 @@
 import type { TFunction } from 'i18next';
 
+import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import {
+  canvasRecordCases,
+  compileCanvasRecordCase,
+  compileGenerateRecordCase,
+  generateRecordCases,
+} from '@workbench/image-actions/imageRecordCases.testing';
+import { recordOf } from '@workbench/image-actions/recallContract.testing';
 import i18n from 'i18next';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -19,6 +27,8 @@ beforeAll(async () => {
     resources: { en: { translation: englishCatalog } },
   });
 });
+
+seedArchitectureCapabilities();
 
 const image = { kind: 'image', t } as const;
 const video = { kind: 'video', t } as const;
@@ -274,3 +284,87 @@ it.each(['array', 'entities'] as const)(
     }
   }
 );
+
+describe('record rows of newer keys', () => {
+  it('names component models, writes booleans as On or Off and lists numbers', () => {
+    const rows = values(
+      parsePreviewMetadata(
+        {
+          clip_l_model: { key: 'l', name: 'CLIP L model' },
+          color_compensation: true,
+          moss_image_uncond_skip_layers: [10, 22],
+          pid_mode: 'fit',
+          pid_steps: 6,
+          vae_precision: 'fp16',
+        },
+        image
+      )
+    );
+
+    expect(rows).toEqual({
+      clip_l_model: 'CLIP L model',
+      color_compensation: 'On',
+      moss_image_uncond_skip_layers: '10, 22',
+      pid_mode: 'fit',
+      pid_steps: '6',
+      vae_precision: 'fp16',
+    });
+  });
+});
+
+/** Keys of a record the panel shows under another row, or not as one, with the reason. */
+const NOT_ROWS: Readonly<Record<string, string>> = {
+  canvas_v3_metadata: 'the Canvas document; its layer stacks show as the canvas layer rows',
+  controlnets: 'the legacy alias of control_layers, which shows each executed control once',
+  guidance: 'shown only for a record without cfg_scale; a record with both leaves open which one drove the run',
+  height: 'shown with width as the size row',
+  t2iAdapters: 'the legacy alias of control_layers, which shows each executed control once',
+  width: 'shown with height as the size row',
+};
+const ROW_OF: Readonly<Record<string, string>> = {
+  cfg_scale: 'cfgScale',
+  clip_skip: 'clipSkip',
+  negative_prompt: 'negativePrompt',
+  positive_prompt: 'positivePrompt',
+};
+/** Keys whose values are a list: one row per entry, none for an empty list. */
+const LISTS = new Set(['control_layers', 'loras', 'ref_images', 'regions']);
+
+describe('image record keys', () => {
+  it('shows a row for every key the shared image record cases write, or names why it does not', () => {
+    const records = [
+      ...generateRecordCases().map((testCase) => ({
+        label: testCase.label,
+        record: recordOf(compileGenerateRecordCase(testCase), testCase.settings),
+      })),
+      ...canvasRecordCases().map((testCase) => ({
+        label: testCase.label,
+        record: recordOf(compileCanvasRecordCase(testCase), testCase.settings),
+      })),
+    ];
+    const failures = new Set<string>();
+    const shownKeys = new Set<string>();
+
+    for (const { label, record } of records) {
+      const rows = new Set(parsePreviewMetadata(record, image).map((entry) => entry.key));
+
+      for (const [key, value] of Object.entries(record)) {
+        shownKeys.add(key);
+
+        const isShown = LISTS.has(key)
+          ? Array.isArray(value) && (value.length === 0 || [...rows].some((row) => row.startsWith(`${key}-`)))
+          : rows.has(ROW_OF[key] ?? key);
+
+        if (!isShown && !NOT_ROWS[key]) {
+          failures.add(
+            `\`${key}\` written by \`${label}\` has no row in the preview panel and is not listed as hidden`
+          );
+        }
+      }
+    }
+
+    expect([...failures]).toEqual([]);
+    // A hidden entry for a key no case writes is stale.
+    expect(Object.keys(NOT_ROWS).filter((key) => !shownKeys.has(key))).toEqual([]);
+  });
+});

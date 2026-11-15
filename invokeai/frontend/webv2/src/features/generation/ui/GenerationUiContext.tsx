@@ -11,6 +11,7 @@ import { createContext, use } from 'react';
 export interface GenerationModelSelectProps {
   className?: string;
   disabled?: boolean;
+  emptyLabel?: string;
   excludeKeys?: ReadonlySet<string>;
   filter?: (model: GenerationModelCatalogItem) => boolean;
   id?: string;

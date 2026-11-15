@@ -99,6 +99,7 @@ const useLazyRelatedModelKeys = (modelKey: string | null): readonly string[] | n
 export const ModelSelect = ({
   className,
   disabled,
+  emptyLabel,
   excludeKeys,
   filter,
   id,
@@ -116,6 +117,8 @@ export const ModelSelect = ({
 }: {
   className?: string;
   disabled?: boolean;
+  /** Shown on the inert trigger instead of the empty-library message, for a slot whose empty value is itself meaningful. */
+  emptyLabel?: string;
   excludeKeys?: ReadonlySet<string>;
   filter?: (model: ModelConfig) => boolean;
   id?: string;
@@ -323,7 +326,9 @@ export const ModelSelect = ({
                 <ModelButtonContent id={valueTextId} model={selectedModel} />
               ) : (
                 <Text as="span" id={valueTextId} color="fg.muted" minW="0" truncate>
-                  {isEmpty ? emptyMessage : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
+                  {isEmpty
+                    ? (emptyLabel ?? emptyMessage)
+                    : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
                 </Text>
               )}
               {canClear || isEmpty ? null : <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />}

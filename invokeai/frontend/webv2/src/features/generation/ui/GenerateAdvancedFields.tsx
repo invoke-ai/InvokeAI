@@ -8,6 +8,7 @@ import type {
 import { Badge, Box, chakra, createListCollection, HStack, Stack, useRecipe } from '@chakra-ui/react';
 import {
   getDefaultGenerateSettings,
+  getEmptyComponentSupplier,
   getGenerationUiPolicy,
   getKrea2EditLoraState,
 } from '@features/generation/core/baseGenerationPolicies';
@@ -163,6 +164,7 @@ export const GenerateAdvancedFields = ({
   };
 
   const customVae = policy.sdVaeVisible && Boolean(settings.vae?.key);
+  const bundledVaeSupplier = getEmptyComponentSupplier(selectedModel, {}, 'vae');
 
   if (
     !policy.sdVaeVisible &&
@@ -218,9 +220,18 @@ export const GenerateAdvancedFields = ({
             >
               <HStack gap="1">
                 <ModelSelect
+                  emptyLabel={
+                    bundledVaeSupplier
+                      ? t('widgets.generate.componentFrom', { name: bundledVaeSupplier.name })
+                      : undefined
+                  }
                   filter={(model) => model.base === modelBase}
                   modelTypes={['vae']}
-                  placeholder={t('widgets.generate.modelDefault')}
+                  placeholder={
+                    bundledVaeSupplier
+                      ? t('widgets.generate.componentFrom', { name: bundledVaeSupplier.name })
+                      : t('widgets.generate.modelDefault')
+                  }
                   relatedTo={selectedModel?.key ?? null}
                   value={settings.vae?.key ?? null}
                   onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}

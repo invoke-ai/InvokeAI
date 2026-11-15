@@ -2032,6 +2032,31 @@ test('queue chain rules: prune keeps finished children of an active root, and ca
   });
 });
 
+test('image metadata is empty until the test seam seeds it, and a reset clears it', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const name = 'fixture-image-0001.png';
+    const metadata = { model: { key: 'm', name: 'Seeded model' }, steps: 12 };
+    const post = (path, body) =>
+      fetch(`${backend.origin}${path}`, {
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+    const served = (imageName) => getJson(backend, `/api/v1/images/i/${imageName}/metadata`);
+
+    assert.deepEqual(await served(name), {});
+    assert.equal((await post('/__image-metadata', { image_name: 'missing.png', metadata })).status, 404);
+    assert.equal((await post('/__image-metadata', { image_name: name, metadata: [] })).status, 400);
+    assert.equal((await post('/__image-metadata', { image_name: name, metadata })).status, 200);
+
+    assert.deepEqual(await served(name), metadata);
+    assert.deepEqual(await served('fixture-image-0002.png'), {});
+
+    await getJson(backend, '/__reset', { method: 'POST' });
+    assert.deepEqual(await served(name), {});
+  });
+});
+
 test('model seed sets are opt-in, and re-identify fills what the probe would record', async () => {
   await withRepresentativeBackend(async (backend) => {
     const listed = async () => (await getJson(backend, '/api/v2/models/')).models;

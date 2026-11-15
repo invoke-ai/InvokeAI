@@ -158,6 +158,31 @@ describe('ModelSelect loading states', () => {
     expect(host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!.disabled).toBe(false);
   });
 
+  it('shows the label of a slot whose empty value is meaningful instead of the empty-library message', async () => {
+    setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
+            <ModelSelect
+              emptyLabel="From Some pipeline"
+              modelTypes={CONTROLNET_TYPES}
+              showManagerButton={false}
+              value={null}
+              onChange={vi.fn()}
+            />
+          </ModelsUiProvider>
+        </ChakraProvider>
+      );
+    });
+
+    const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
+    expect(trigger.disabled).toBe(true);
+    expect(trigger.textContent).toContain('From Some pipeline');
+    expect(trigger.textContent).not.toContain('scopeNoCompatibleInstalled');
+  });
+
   it('leads a required picker with nothing installed to the Model Manager, filtered to its type', async () => {
     setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
     const renderRequired = (canManageModels: boolean) =>

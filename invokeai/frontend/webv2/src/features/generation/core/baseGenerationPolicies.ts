@@ -928,6 +928,7 @@ const pidDecoderSlot = (): ComponentSlotPolicy =>
     modelTypes: TYPE_PID_DECODER,
     valueKind: 'component',
     helpText: 'Required while PiD is on. Must match the main model’s base.',
+    placeholder: 'None',
     filter: (candidate, ctx) =>
       candidate.type === 'pid_decoder' && candidate.base === getPidDecoderBaseForMainBase(ctx.model.base),
     required: isPidOn,
@@ -942,6 +943,7 @@ const gemma2EncoderSlot = (): ComponentSlotPolicy =>
     modelTypes: TYPE_GEMMA2,
     valueKind: 'component',
     helpText: 'Required while PiD is on. Shared by every PiD decoder.',
+    placeholder: 'None',
     filter: (candidate) => candidate.type === 'gemma2_encoder',
     required: isPidOn,
     inUse: isPidOn,
@@ -1060,7 +1062,7 @@ const hasFlux2EncoderSource = (ctx: ComponentPolicyContext): boolean =>
 /** The saved component source the FLUX.2 loader can use: its VAE always, its encoder unless a standalone one is set. */
 export const getFlux2ComponentSource = (
   model: MainModelConfig,
-  settings: GenerateSettings
+  settings: Pick<GenerateSettings, 'componentSourceModel' | 'mistralEncoderModel' | 'qwen3EncoderModel'>
 ): MainModelConfig | undefined => {
   const source = settings.componentSourceModel;
 
@@ -1075,6 +1077,104 @@ export const getFlux2ComponentSource = (
   }
 
   return isFlux2EncoderSourceForModel(model)(source) ? source : undefined;
+};
+
+/** Slots a bundled main fills while they are empty, by base. FLUX.2 and the sourced bases have their own rules below. */
+const BUNDLED_MAIN_SLOTS: Partial<Record<string, readonly GenerateComponentValueKey[]>> = {
+  'ernie-image': ['mistralEncoderModel', 'vae'],
+  flux: ['t5EncoderModel', 'clipEmbedModel', 'vae'],
+  flux3: ['qwen3VLEncoderModel', 'vae'],
+  'ideogram-4': ['ideogram4UnconditionalModel', 'qwen3VLEncoderModel', 'vae'],
+  'krea-2': ['qwen3VLEncoderModel', 'vae'],
+  'moss-image': ['qwen35EncoderModel', 'vae'],
+  'qwen-image-2-1': ['qwen3VLEncoderModel', 'vae'],
+};
+
+/** Slots a compatible Diffusers component source can fill while they are empty; which wins is `SOURCE_FIRST_BASES`. */
+const SOURCED_SLOTS: Partial<Record<string, readonly GenerateComponentValueKey[]>> = {
+  'qwen-image': ['qwenVLEncoderModel', 'vae'],
+  wan: ['wanT5EncoderModel', 'vae'],
+  'z-image': ['qwen3EncoderModel', 'vae'],
+};
+
+/** SD 3's loader takes any component left out from the main model itself. */
+/**
+ * Where the loader looks first, after a standalone model, per base (invokeai/app/invocations):
+ * - Z-Image (`z_image_model_loader.py`): the component source, then the main when it is a self-contained pipeline.
+ * - Qwen-Image (`qwen_image/qwen_image_model_loader.py`), Wan (`wan/wan_model_loader.py`) and both FLUX.2 loaders
+ *   (`flux2/flux2_dev_model_loader.py`, `flux2/flux2_klein_model_loader.py`): the main when it bundles its components,
+ *   the component source only otherwise.
+ */
+const SOURCE_FIRST_BASES: ReadonlySet<string> = new Set(['z-image']);
+
+const SD3_MAIN_SLOTS: readonly GenerateComponentValueKey[] = [
+  'clipGEmbedModel',
+  'clipLEmbedModel',
+  't5EncoderModel',
+  'vae',
+];
+
+/**
+ * The model the loader takes component `key` from while its slot is empty, or null where that is not one model for
+ * certain (a slot that means "none", a PiD component, a component the family cannot do without). It repeats no
+ * compatibility rule: each case asks the predicate the graph builder uses to pick its source. Which of main and source wins follows the Python
+ * loader per base (`SOURCE_FIRST_BASES`, FLUX.2: the bundled main first).
+ */
+export const getEmptyComponentSupplier = (
+  model: GenerateModelConfig | undefined,
+  components: Partial<Pick<GenerateSettings, 'componentSourceModel' | 'mistralEncoderModel' | 'qwen3EncoderModel'>>,
+  key: GenerateComponentValueKey
+): MainModelConfig | null => {
+  if (!model || model.type === 'external_image_generator') {
+    return null;
+  }
+
+  if (key === 'vae' && getGenerationUiPolicy(model).sdVaeVisible) {
+    return model;
+  }
+
+  if (model.base === 'flux2') {
+    const encoderKey = model.variant === 'dev' ? 'mistralEncoderModel' : 'qwen3EncoderModel';
+
+    if (key !== encoderKey && key !== 'vae') {
+      return null;
+    }
+
+    if (isBundledFlux2Main(model)) {
+      return model;
+    }
+
+    // A selection of this very slot is not empty, so the source is judged without it.
+    return (
+      getFlux2ComponentSource(model, {
+        componentSourceModel: components.componentSourceModel ?? null,
+        mistralEncoderModel: components.mistralEncoderModel ?? null,
+        qwen3EncoderModel: components.qwen3EncoderModel ?? null,
+        ...(key === 'vae' ? {} : { [key]: null }),
+      }) ?? null
+    );
+  }
+
+  if (model.base === 'sd-3') {
+    return SD3_MAIN_SLOTS.includes(key) ? model : null;
+  }
+
+  if (SOURCED_SLOTS[model.base]?.includes(key)) {
+    const source = getCompatibleDiffusersComponentSource(model, components.componentSourceModel);
+    const main = isBundledMainForBase(model.base)(model) ? model : null;
+
+    return SOURCE_FIRST_BASES.has(model.base) ? (source ?? main) : (main ?? source ?? null);
+  }
+
+  if (BUNDLED_MAIN_SLOTS[model.base]?.includes(key)) {
+    // A Diffusers FLUX.1 install still needs its encoders and VAE: only the self-contained SDNQ pipeline holds them.
+    const bundles =
+      model.base === 'flux' ? isSelfContainedSDNQFlux1Pipeline(model) : isBundledMainForBase(model.base)(model);
+
+    return bundles ? model : null;
+  }
+
+  return null;
 };
 
 export const getAutoFlux2ComponentSourceModel = (
