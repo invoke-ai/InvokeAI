@@ -1784,6 +1784,8 @@
     "retryInstall": "Retry install",
     "runOnCpu": "Run on CPU",
     "runOnCpuHelp": "Run this encoder on CPU only to reduce VRAM usage. This may be slower.",
+    "runTaeOnCpu": "Decode previews on CPU",
+    "runTaeOnCpuHelp": "When Tiny AutoEncoder previews are enabled, decode them on the CPU so they also work when the generation model fills the VRAM. Each preview takes longer on the CPU, so previews update less often.",
     "runVaeOnCpu": "Run on CPU",
     "runVaeOnCpuHelp": "Run this VAE on CPU only to reduce VRAM usage. This may be slower.",
     "saveDefaults": "Save Defaults",

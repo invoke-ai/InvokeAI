@@ -1783,6 +1783,13 @@ const buildMossImageGraph = (
     type: 'moss_image_model_loader',
     vae_model: vaeModel ?? undefined,
   });
+  // MOSS-Image LoRAs train the transformer only; the VAE and the Qwen3.5 encoder stay on the model loader.
+  const activeLoras = getActiveCompatibleLoras(settings, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'moss_image_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'moss_image_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'moss_image_text_encoder' }) : null;
   const denoiseSize = getDenoiseSize(settings, model);
@@ -1810,7 +1817,7 @@ const buildMossImageGraph = (
     vaeSource: modelLoader,
   });
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   // The denoise node reads the VAE's BatchNorm statistics, which define the latent space it works in.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');

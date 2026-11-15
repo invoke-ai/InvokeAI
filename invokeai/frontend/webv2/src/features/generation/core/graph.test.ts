@@ -2219,6 +2219,32 @@ describe('MOSS-Image graphs', () => {
     variant,
   });
 
+  it('routes the transformer through MOSS-Image LoRAs and records only those it applied', () => {
+    const mossLora: LoraModelConfig = { base: 'moss-image', key: 'moss-lora', name: 'MOSS LoRA', type: 'lora' };
+    const zImageLora: LoraModelConfig = { base: 'z-image', key: 'z-image-lora', name: 'Z-Image LoRA', type: 'lora' };
+
+    const graph = compile(mossDiffusers, {
+      cfgScale: 4,
+      loras: [
+        { isEnabled: true, model: mossLora, weight: 0.6 },
+        { isEnabled: true, model: zImageLora, weight: 1 },
+      ],
+    });
+    const loraLoader = getNodeByType(graph, 'moss_image_lora_collection_loader');
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(loraLoader).toBeDefined();
+    expect(getEdge(graph, loraLoader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    // LoRAs train the transformer only: the VAE and both prompt encoders stay on the model loader.
+    expect(getEdge(graph, 'denoise_latents', 'vae')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'pos_cond', 'qwen3_5_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'neg_cond', 'qwen3_5_encoder')?.source.node_id).toBe('model_loader');
+    expect(metadata?.loras).toEqual([
+      { model: { base: 'moss-image', key: 'moss-lora', name: 'MOSS LoRA', type: 'lora' }, weight: 0.6 },
+    ]);
+  });
+
   it('builds a Diffusers pipeline graph that conditions without a collector and decodes as FLUX.2', () => {
     const graph = compile(mossDiffusers);
 
