@@ -285,3 +285,30 @@ def flux3_model_from_native(native: dict[str, torch.Tensor], flow_map: bool) -> 
     model = Flux3Transformer2DModel(**TINY_CONFIG, flow_map=flow_map).eval()
     model.load_state_dict(convert_flux3_native_to_diffusers(dict(native)))
     return model
+
+
+_TORCHAO_BLOCKS = (
+    "mode_blocks.image.0",
+    "mode_blocks.image_cond.0",
+    "single_transformer_blocks.0",
+    "single_transformer_blocks.1",
+)
+_TORCHAO_LINEARS = ("attn.to_q", "attn.to_k", "attn.to_v", "attn.to_out.0", "ff.linear_in", "ff.linear_out")
+
+
+def quantize_flux3_torchao(model: Flux3Transformer2DModel, *, adaln: bool = False) -> QuantizedFlux3:
+    """``model`` written the way unsloth's torchao FP8 build is, under diffusers' own names: each block linear but the
+    text blocks' as e4m3 ``<layer>._weight_qdata`` with a float32 ``[out, 1]`` ``<layer>._weight_scale`` per output
+    row, everything else dense. ``adaln`` quantizes ``norm_out.linear`` too, which that build does not.
+
+    ``meant`` holds every weight dense under diffusers' names, in diffusers' row order.
+    """
+    stored = {key: value.clone() for key, value in model.state_dict().items()}
+    meant = dict(stored)
+    layers = [f"{block}.{linear}" for block in _TORCHAO_BLOCKS for linear in _TORCHAO_LINEARS]
+    for layer in [*layers, *(["norm_out.linear"] if adaln else [])]:
+        fp8 = quantize_per_row_fp8(stored.pop(f"{layer}.weight"))
+        stored[f"{layer}._weight_qdata"] = fp8.codes
+        stored[f"{layer}._weight_scale"] = fp8.scale[:, None]
+        meant[f"{layer}.weight"] = fp8.dequantized
+    return QuantizedFlux3(stored, meant, {"unsloth_format": "unsloth_prequant_transformer_state_dict_v1"})

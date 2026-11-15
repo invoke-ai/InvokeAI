@@ -30,6 +30,7 @@ export const CpuOnlySetting = ({
   const { t } = useTranslation();
   const { isBusy: isPending, run } = useScopedAction();
   const isVae = model.type === 'vae';
+  const isTae = model.type === 'tiny_autoencoder';
   const helpId = useId();
 
   const handleCheckedChange = useCallback(
@@ -73,11 +74,11 @@ export const CpuOnlySetting = ({
           <Switch.Thumb />
         </Switch.Control>
         <Switch.Label fontSize="md" fontWeight="600">
-          {isVae ? t('models.runVaeOnCpu') : t('models.runOnCpu')}
+          {isVae ? t('models.runVaeOnCpu') : isTae ? t('models.runTaeOnCpu') : t('models.runOnCpu')}
         </Switch.Label>
       </Switch.Root>
       <Text color="fg.subtle" fontSize="xs" id={helpId}>
-        {isVae ? t('models.runVaeOnCpuHelp') : t('models.runOnCpuHelp')}
+        {isVae ? t('models.runVaeOnCpuHelp') : isTae ? t('models.runTaeOnCpuHelp') : t('models.runOnCpuHelp')}
       </Text>
     </Stack>
   );

@@ -118,6 +118,9 @@ _NON_BLOCK_RENAMES: dict[str, str] = {
     "final_layer.linear": "proj_out",
     "time_in.in_layer": "time_guidance_embed.timestep_embedder.linear_1",
     "time_in.out_layer": "time_guidance_embed.timestep_embedder.linear_2",
+    # Only FLUX.2 [dev] has a guidance embedder.
+    "guidance_in.in_layer": "time_guidance_embed.guidance_embedder.linear_1",
+    "guidance_in.out_layer": "time_guidance_embed.guidance_embedder.linear_2",
 }
 
 # The final-layer modulation also orders its output halves differently: (shift, scale) in BFL's LastLayer,

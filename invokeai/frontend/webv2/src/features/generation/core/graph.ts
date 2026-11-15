@@ -35,9 +35,11 @@ import {
   isBundledFlux2Main,
   isBundledMainForBase,
   isErnieImageMistralEncoder,
+  isGgufQwen3Vl4bEncoder,
   isGgufQwen3Vl8bEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
+  isQwen3Vl4bVisionTower,
   isQwen3Vl8bEncoder,
   isQwen3Vl8bVisionTower,
   isMossImageQwen35Encoder,
@@ -1469,6 +1471,11 @@ const buildKrea2Graph = (
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
   const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl4bEncoder);
+  // The loader refuses a tower beside any other encoder, so a stale pick is never sent.
+  const qwen3VlVisionTowerModel =
+    qwen3VlEncoderModel && isGgufQwen3Vl4bEncoder(qwen3VlEncoderModel)
+      ? getCompatibleComponent(settings.qwen3VLVisionTowerModel, isQwen3Vl4bVisionTower)
+      : null;
 
   if (!isDiffusers) {
     requireComponent(vaeModel, 'Krea-2 VAE');
@@ -1484,6 +1491,7 @@ const buildKrea2Graph = (
     id: 'model_loader',
     model,
     qwen3_vl_encoder_model: qwen3VlEncoderModel ?? undefined,
+    qwen3_vl_vision_tower_model: qwen3VlVisionTowerModel ?? undefined,
     type: 'krea2_model_loader',
     vae_model: vaeModel ?? undefined,
   });
@@ -1582,6 +1590,7 @@ const buildKrea2Graph = (
     ...(styleReference ? { krea2_style_strength: styleReference.config.styleStrength } : {}),
     ...(referenceKvCache === undefined ? {} : { krea2_reference_kv_cache: referenceKvCache }),
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
+    qwen3_vl_vision_tower: qwen3VlVisionTowerModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
   addReferenceImageMetadata(graph, output, settings);
@@ -1773,6 +1782,13 @@ const buildMossImageGraph = (
     type: 'moss_image_model_loader',
     vae_model: vaeModel ?? undefined,
   });
+  // MOSS-Image LoRAs train the transformer only; the VAE and the Qwen3.5 encoder stay on the model loader.
+  const activeLoras = getActiveCompatibleLoras(settings, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'moss_image_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'moss_image_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'moss_image_text_encoder' }) : null;
   const denoiseSize = getDenoiseSize(settings, model);
@@ -1800,7 +1816,7 @@ const buildMossImageGraph = (
     vaeSource: modelLoader,
   });
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   // The denoise node reads the VAE's BatchNorm statistics, which define the latent space it works in.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
