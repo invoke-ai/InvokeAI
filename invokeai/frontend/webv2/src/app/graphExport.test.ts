@@ -248,6 +248,37 @@ describe('graph export', () => {
     }
   });
 
+  it('opens the Krea-2 Vision Tower slot from a GGUF 4B encoder pick, and has no slot beside any other encoder', () => {
+    const krea2Models = [
+      ...MODELS,
+      model('k2-gguf', 'krea-2', 'main', { format: 'gguf_quantized', variant: 'krea2_base' }),
+      model('k2-encoder-gguf', 'any', 'qwen3_vl_encoder', { format: 'gguf_quantized', variant: 'qwen3_vl_4b' }),
+      model('k2-encoder-st', 'any', 'qwen3_vl_encoder', { format: 'checkpoint', variant: 'qwen3_vl_4b' }),
+      model('k2-mmproj', 'any', 'qwen3_vl_vision_tower', { format: 'gguf_quantized', variant: 'qwen3_vl_4b' }),
+      model('k2-vae', 'qwen-image', 'vae', { format: 'checkpoint' }),
+    ];
+    const exportWith = (encoder: string) =>
+      exportOne(
+        sdxlCase('k2', {
+          components: { qwen3VLEncoderModel: encoder, qwen3VLVisionTowerModel: 'k2-mmproj', vae: 'k2-vae' },
+          model_key: 'k2-gguf',
+        }),
+        krea2Models
+      );
+
+    const gguf = exportWith('k2-encoder-gguf');
+
+    expect(gguf.components).toEqual({
+      qwen3VLEncoderModel: 'k2-encoder-gguf',
+      qwen3VLVisionTowerModel: 'k2-mmproj',
+      vae: 'k2-vae',
+    });
+    expect(gguf.batch.graph.nodes.model_loader).toMatchObject({ qwen3_vl_vision_tower_model: { key: 'k2-mmproj' } });
+
+    // A safetensors encoder has no tower slot, so a tower pick is rejected rather than sent.
+    expect(() => exportWith('k2-encoder-st')).toThrow(/Unknown component slot .{1,4}qwen3VLVisionTowerModel/);
+  });
+
   // The working-memory calibration planner (`default_vae`) restates this: it sizes each case for the VAE that decodes.
   it("decodes with the main model's default VAE, which a pick replaces where the model has a VAE slot", () => {
     const withDefaultVae = (key: string, vaeKey: string) => [

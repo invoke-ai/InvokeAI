@@ -16,6 +16,7 @@ from invokeai.backend.util.devices import TorchDevice
 from tests.backend.flux3.flux3_fixture import (
     QUANTIZED_SCHEMES,
     quantize_flux3_native,
+    quantize_flux3_torchao,
     tiny_flux3_model,
     to_native,
     write_flux3_gguf,
@@ -24,7 +25,7 @@ from tests.backend.model_manager.load.test_fp8_review_regressions import _device
 from tests.backend.model_manager.load.test_layerwise_storage_policy import _public_load
 
 
-@pytest.mark.parametrize("scheme", ["raw_fp8", *QUANTIZED_SCHEMES])
+@pytest.mark.parametrize("scheme", ["raw_fp8", "torchao", *QUANTIZED_SCHEMES])
 @pytest.mark.parametrize("consumer", ["compute", "storage"])
 def test_native_policy_partitions_partial_devices_and_adopts_matching_cpu_weights(
     scheme, consumer, monkeypatch, tmp_path
@@ -34,6 +35,9 @@ def test_native_policy_partitions_partial_devices_and_adopts_matching_cpu_weight
     if scheme == "raw_fp8":
         native[weight] = native[weight].to(torch.float8_e4m3fn)
         metadata = {}
+    elif scheme == "torchao":
+        build = quantize_flux3_torchao(tiny_flux3_model(True))
+        native, metadata = build.state_dict, build.metadata
     else:
         build = quantize_flux3_native(native, scheme)
         native, metadata = build.state_dict, build.metadata
@@ -43,13 +47,13 @@ def test_native_policy_partitions_partial_devices_and_adopts_matching_cpu_weight
     monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda d: consumer == "compute" and d.index == 0)
     monkeypatch.setattr(load_default, "_device_supports_fp8_storage", lambda d, _logger: d.index == 0)
     calls = []
-    factory = flux3.flux3_transformer_from_native
+    factory = flux3.flux3_transformer_from_single_file
 
     def build(sd, dtype, reserve, **kwargs):
         calls.append((dtype, kwargs["keep_fp8"], kwargs["metadata"]))
         return factory(sd, dtype, reserve, **kwargs)
 
-    monkeypatch.setattr(flux3, "flux3_transformer_from_native", build)
+    monkeypatch.setattr(flux3, "flux3_transformer_from_single_file", build)
     capable, incapable, peer = _device_loaders(flux3.Flux3CheckpointModel, tmp_path, ["cuda:0", "cuda:1", "cuda:0"])
 
     def config():
@@ -70,12 +74,12 @@ def test_native_policy_partitions_partial_devices_and_adopts_matching_cpu_weight
         name = "single_transformer_blocks.0.attn.to_q.weight"
         a, b, c = (model.get_submodule(name.removesuffix(".weight")).weight for model in (folded, kept, adopted))
         assert a.data_ptr() != b.data_ptr() == c.data_ptr()
-        if scheme in ("fp8r", "raw_fp8"):
+        if scheme in ("fp8r", "raw_fp8", "torchao"):
             assert a.dtype == torch.float32
             assert b.dtype == torch.float8_e4m3fn
             # This compares the decoded values, with the real checkpoint scale when present.
             expected = b.float()
-            if scheme == "fp8r":
+            if scheme in ("fp8r", "torchao"):
                 expected = expected * kept.get_submodule(name.removesuffix(".weight")).weight_scale[:, None]
             torch.testing.assert_close(a, expected)
         else:
