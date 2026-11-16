@@ -856,7 +856,7 @@ describe('compileGenerateGraph', () => {
           referenceImages: [animaReference()],
           vae: qwenImageVae,
         })
-      ).toThrow('cannot use reference image 1');
+      ).toThrow('cannot use Reference image 1');
     });
   });
 
@@ -1061,7 +1061,7 @@ describe('compileGenerateGraph', () => {
     expect(getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id).toContain('ip_adapter_collector');
   });
 
-  it('generates from the crop while serializing complete original and crop metadata', () => {
+  it('generates from the crop while serializing complete original and crop metadata, with the name', () => {
     const croppedReferenceImage = {
       crop: {
         box: { height: 256, width: 320, x: 40, y: 50 },
@@ -1084,6 +1084,7 @@ describe('compileGenerateGraph', () => {
           },
           id: 'cropped-ref',
           isEnabled: true,
+          name: 'Hero pose',
         },
       ],
     });
@@ -1095,6 +1096,8 @@ describe('compileGenerateGraph', () => {
         config: { image: croppedReferenceImage },
         id: 'cropped-ref',
         isEnabled: true,
+        // The user's label travels with the record so recall can restore it.
+        name: 'Hero pose',
       },
     ]);
   });

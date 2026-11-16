@@ -3,6 +3,7 @@ import type { QueueItemReadModel } from '@features/queue/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { buildQueueItemOrigin } from '@features/queue/data/events';
+import { createMenuPartLoader, MenuActionItem } from '@platform/ui/Menu';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -264,5 +265,82 @@ describe('QueueItemRow', () => {
     root = createRoot(host);
     await render(adapter({ canManageItem: () => false }), item({ id: 14, status: 'canceled' }));
     expect(host.querySelector('button[aria-label="widgets.queue.retryItem"]')).toBeNull();
+  });
+
+  const openMenu = async () => {
+    await act(() =>
+      primary().dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 20, clientY: 20 })
+      )
+    );
+
+    return vi.waitFor(() => {
+      const open = document.querySelector<HTMLElement>('[role="menu"]');
+      expect(open).not.toBeNull();
+      return open!;
+    });
+  };
+  const RecallEntries = () => <MenuActionItem label="Recall entries" value="recall" onSelect={() => undefined} />;
+
+  it('opens its menu at once and lets Escape close it while the recall entries still load', async () => {
+    const itemRecallMenuGroup = createMenuPartLoader(() => new Promise<() => null>(() => {}));
+    await render(adapter({ itemRecallMenuGroup }), item());
+
+    const menu = await openMenu();
+    // Only menu items while loading: an unavailable one in the entries' place.
+    const items = [...menu.children].filter((child) => child.getAttribute('role') !== 'presentation');
+    expect(items.map((child) => [child.getAttribute('role'), child.getAttribute('aria-disabled')])).toEqual([
+      ['menuitem', 'true'],
+    ]);
+    expect(menu.textContent).toContain('common.loading');
+    expect(menu.getAttribute('aria-busy')).toBe('true');
+
+    await act(() => menu.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).toBeNull());
+  });
+
+  it('opens on the recall entries’ first frame once intent has loaded them', async () => {
+    const importer = vi.fn(() => Promise.resolve(RecallEntries));
+    await render(adapter({ itemRecallMenuGroup: createMenuPartLoader(importer) }), item());
+    await act(async () => {
+      primary().dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+      await new Promise(requestAnimationFrame);
+    });
+    expect(importer).toHaveBeenCalledOnce();
+    // Records whether the placeholder ever mounts while the menu opens.
+    const placeholders: Node[] = [];
+    const observer = new MutationObserver(() =>
+      placeholders.push(...document.querySelectorAll('[data-value="menu-part-placeholder"]'))
+    );
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    const menu = await openMenu();
+    observer.disconnect();
+
+    expect(placeholders).toEqual([]);
+    expect(menu.textContent).toContain('Recall entries');
+    expect(menu.getAttribute('aria-busy')).toBe('false');
+    expect(importer).toHaveBeenCalledOnce();
+  });
+
+  it('says the recall entries could not load, without unmounting the queue, and loads them on a later open', async () => {
+    const importer = vi
+      .fn<() => Promise<typeof RecallEntries>>()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch dynamically imported module'))
+      .mockResolvedValue(RecallEntries);
+    await render(adapter({ itemRecallMenuGroup: createMenuPartLoader(importer) }), item());
+
+    let menu = await openMenu();
+    await vi.waitFor(() => expect(menu.textContent).toContain('common.menuPartLoadFailed'));
+    expect(menu.querySelector('[role="menuitem"]')?.getAttribute('aria-disabled')).toBe('true');
+    expect(menu.getAttribute('aria-busy')).toBe('false');
+    expect(primary().isConnected).toBe(true);
+
+    await act(() => menu.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).toBeNull());
+    menu = await openMenu();
+
+    await vi.waitFor(() => expect(menu.textContent).toContain('Recall entries'));
+    expect(importer).toHaveBeenCalledTimes(2);
   });
 });

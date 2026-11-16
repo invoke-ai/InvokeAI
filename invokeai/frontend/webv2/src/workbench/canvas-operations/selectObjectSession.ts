@@ -44,9 +44,36 @@ export interface SelectObjectSessionState<T> {
   isolatedPreview: boolean;
   status: SelectObjectSessionStatus;
   error: SamSessionError | null;
+  /** A `process()` asked for while a run's error showed is still in flight (see `SamSessionSnapshot.retrying`). */
+  retrying: boolean;
   preview: SelectObjectSessionPreview<T> | null;
   sourceGuard: LayerExportGuard | null;
 }
+
+const SAM_ERROR_FROM_RUN: Record<SamSessionErrorCode, boolean> = {
+  'adjustment-error': true,
+  'adjustment-over-budget': true,
+  'adjustment-too-large': true,
+  'commit-failed': false,
+  decode: true,
+  empty: true,
+  invalid: true,
+  locked: false,
+  'no-output': true,
+  'not-ready': true,
+  'output-dimension': true,
+  queue: true,
+  reconcile: true,
+  unknown: true,
+  unreadable: true,
+  upload: true,
+};
+
+/**
+ * Whether a run (source preparation, upload, SAM, preview decode) reported the error, so running again is its retry;
+ * applying or saving the preview reports `commit-failed` or `locked`, which Apply and Save as retry instead.
+ */
+export const isSamRunError = (code: SamSessionErrorCode): boolean => SAM_ERROR_FROM_RUN[code];
 
 export interface SelectObjectSessionDeps<T> {
   captureGuard(): LayerExportGuard | null;
@@ -62,24 +89,30 @@ export interface SelectObjectSessionDeps<T> {
 
 export interface CreateSelectObjectSessionOptions<T> {
   deps: SelectObjectSessionDeps<T>;
-  /** Auto Process is an account preference; the session starts from it and Reset keeps it. */
-  initialAutoProcess?: boolean;
+  /** Auto-update is an account preference; the session starts from it and Reset keeps it. */
+  initialAutoProcess: boolean;
   operation: CanvasOperationSession;
 }
 
 export type SelectObjectSessionProcessResult = CanvasOperationRunResult | 'deduped' | 'invalid';
 
+export type SelectObjectSessionChanges<T> = Partial<
+  Pick<
+    SelectObjectSessionState<T>,
+    'applyPolygonRefinement' | 'autoProcess' | 'input' | 'invert' | 'isolatedPreview' | 'model'
+  >
+> & {
+  /**
+   * Switches between visual and prompt input: the current input is kept aside and the requested type's last input
+   * (or an empty one) comes back. An explicit `input` in the same update wins; one of the other type is a switch too.
+   */
+  inputType?: SamInput['type'];
+};
+
 export interface SelectObjectSession<T> {
   getSnapshot(): SelectObjectSessionState<T>;
   subscribe(listener: () => void): () => void;
-  update(
-    changes: Partial<
-      Pick<
-        SelectObjectSessionState<T>,
-        'applyPolygonRefinement' | 'autoProcess' | 'input' | 'invert' | 'isolatedPreview' | 'model'
-      >
-    >
-  ): void;
+  update(changes: SelectObjectSessionChanges<T>): void;
   process(): Promise<SelectObjectSessionProcessResult>;
   reportError(error: SamSessionError | string): void;
   reset(): void;
@@ -87,15 +120,23 @@ export interface SelectObjectSession<T> {
   dispose(): void;
 }
 
+type StashedSamInputs = { [K in SamInput['type']]?: Extract<SamInput, { type: K }> };
+
+const EMPTY_INPUTS: Required<StashedSamInputs> = {
+  prompt: { prompt: '', type: 'prompt' },
+  visual: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' },
+};
+
 const defaultState = <T>(autoProcess: boolean): SelectObjectSessionState<T> => ({
   applyPolygonRefinement: false,
   autoProcess,
   error: null,
-  input: { prompt: '', type: 'prompt' },
+  input: EMPTY_INPUTS.visual,
   invert: false,
   isolatedPreview: true,
   model: 'segment-anything-2-large',
   preview: null,
+  retrying: false,
   sourceGuard: null,
   status: 'ready',
 });
@@ -168,23 +209,28 @@ class SamSessionFailure extends Error {
 
 export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionOptions<T>): SelectObjectSession<T> => {
   const { deps, operation } = options;
-  let state = defaultState<T>(options.initialAutoProcess ?? false);
+  let state = defaultState<T>(options.initialAutoProcess);
+  // The input of the type not in use, so switching back restores it; not part of the snapshot.
+  let stashedInputs: StashedSamInputs = {};
   let source: SelectObjectPreparedSource | null = null;
   let requestToken = 0;
   let lastPublishedHash: string | null = null;
   let pendingHash: string | null = null;
   let pendingPhase: SelectObjectSessionStatus | null = null;
   let pendingProcess: Promise<SelectObjectSessionProcessResult> | null = null;
+  /** The request a retry started; it stays `retrying` until that request settles or is superseded. */
+  let retryToken: number | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
   let unsubscribeController: (() => void) | null = null;
   const listeners = new Set<() => void>();
 
   const publishState = (next: SelectObjectSessionState<T>): void => {
+    const retrying = retryToken === requestToken && pendingHash !== null;
     if (next.status === 'error') {
-      state = next.error === null ? { ...next, status: 'ready' } : next;
+      state = next.error === null ? { ...next, retrying, status: 'ready' } : { ...next, retrying };
     } else {
-      state = next.error === null ? next : { ...next, error: null };
+      state = { ...next, error: null, retrying };
     }
     for (const listener of listeners) {
       try {
@@ -418,6 +464,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       lastPublishedHash = null;
       publishState({ ...state, preview: null, sourceGuard: null, status: 'ready' });
     }
+    const retry = state.error !== null && isSamRunError(state.error.code);
     const hash = stableInputHash(state);
     if (hash === pendingHash && pendingProcess) {
       publishState({ ...state, error: null, status: pendingPhase ?? 'preparing-source' });
@@ -442,12 +489,16 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       return Promise.resolve('error');
     }
     pendingHash = hash;
+    retryToken = retry ? token : null;
     const requestState = state;
     const promise = runRequest(token, hash, requestState, guard).finally(() => {
       if (token === requestToken) {
         pendingHash = null;
         pendingPhase = null;
         pendingProcess = null;
+        if (state.retrying) {
+          publishState(state);
+        }
       }
     });
     pendingProcess = promise;
@@ -523,6 +574,7 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       operation.reset();
       source = null;
       lastPublishedHash = null;
+      stashedInputs = {};
       publishState(defaultState<T>(state.autoProcess));
     },
     subscribe: (listener) => {
@@ -532,9 +584,18 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    update: (changes) => {
+    update: ({ inputType, ...requested }) => {
       if (disposed) {
         return;
+      }
+      const changes: Omit<SelectObjectSessionChanges<T>, 'inputType'> = inputType &&
+      inputType !== state.input.type &&
+      !('input' in requested)
+        ? { ...requested, input: stashedInputs[inputType] ?? EMPTY_INPUTS[inputType] }
+        : requested;
+      // Any switch of input type keeps the outgoing input, an explicit cross-type input included.
+      if (changes.input && changes.input.type !== state.input.type) {
+        stashedInputs = { ...stashedInputs, [state.input.type]: state.input };
       }
       const processingChanged =
         ('input' in changes && changes.input !== state.input) ||

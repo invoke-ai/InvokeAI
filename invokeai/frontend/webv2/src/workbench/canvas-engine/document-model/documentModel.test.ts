@@ -1260,9 +1260,10 @@ describe('createDocumentModel', () => {
       const project = projectWith([layer('a'), layer('b'), group('G', [layer('c'), layer('d')]), layer('e')], 'a');
       const model = modelOf(project);
       expect(model.canMergeDown('a')).toEqual({ lowerId: 'b', status: 'eligible', upperId: 'a' });
-      expect(model.canMergeDown('b')).toEqual({ reason: 'no-layer-below', status: 'invalid-target', targetId: 'b' });
+      expect(model.canMergeDown('b')).toEqual({ reason: 'group-below', status: 'invalid-target', targetId: 'G' });
       expect(model.canMergeDown('c')).toEqual({ lowerId: 'd', status: 'eligible', upperId: 'c' });
-      expect(model.canMergeDown('d')).toEqual({ reason: 'no-layer-below', status: 'invalid-target', targetId: 'd' });
+      expect(model.canMergeDown('d')).toEqual({ reason: 'bottom-of-group', status: 'invalid-target', targetId: 'd' });
+      expect(model.canMergeDown('e')).toEqual({ reason: 'no-layer-below', status: 'invalid-target', targetId: 'e' });
       expect(model.canMergeDown('G')).toEqual({ actual: 'group', expected: ['raster'], status: 'wrong-type' });
     });
 
@@ -1270,11 +1271,8 @@ describe('createDocumentModel', () => {
       const locked = projectWith([group('G', [layer('a'), layer('b')], { isLocked: true })], null);
       expect(modelOf(locked).canMergeDown('a')).toEqual({ ids: ['G'], status: 'locked' });
       const off = projectWith([group('G', [layer('a'), layer('b')], { isEnabled: false })], null);
-      expect(modelOf(off).canMergeDown('a')).toEqual({
-        reason: 'not-mergeable',
-        status: 'invalid-target',
-        targetId: 'a',
-      });
+      // The group that disables the pair is named, not the layer.
+      expect(modelOf(off).canMergeDown('a')).toEqual({ reason: 'disabled', status: 'invalid-target', targetId: 'G' });
     });
 
     it.each<[string, CanvasNodeContract[], string, object]>([
@@ -1291,7 +1289,19 @@ describe('createDocumentModel', () => {
         'a disabled upper layer',
         [layer('a', 'raster', { isEnabled: false }), layer('b')],
         'a',
-        { reason: 'not-mergeable', status: 'invalid-target', targetId: 'a' },
+        { reason: 'disabled', status: 'invalid-target', targetId: 'a' },
+      ],
+      [
+        'paint above a disabled shape layer, for its kind first',
+        [
+          layer('a'),
+          layer('b', 'raster', {
+            isEnabled: false,
+            source: { fill: '#fff', height: 4, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 4 },
+          } as never),
+        ],
+        'a',
+        { reason: 'not-mergeable', status: 'invalid-target', targetId: 'b' },
       ],
     ])('refuses %s', (_label, nodes, upperId, refusal) => {
       expect(modelOf(projectWith(nodes, null)).canMergeDown(upperId)).toEqual(refusal);

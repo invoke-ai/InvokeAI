@@ -228,7 +228,20 @@ describe('IndexedDB queue run journal', () => {
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
     const baseItem = createItem({ backendBatchId: 'batch-1', backendItemIds: [11], status: 'running' });
-    const item = { ...baseItem, snapshot: { ...baseItem.snapshot, prepend: true } };
+    const item = {
+      ...baseItem,
+      snapshot: {
+        ...baseItem.snapshot,
+        prepend: true,
+        backendSubmission: {
+          batchCount: 1,
+          graph: { edges: [], id: 'backend-graph-1', nodes: {} },
+          kind: 'workflow' as const,
+          projectWorkflowId: 'original-project-workflow',
+          libraryWorkflowSource: { libraryWorkflowId: 'original-template', ownerUserId: 'user-a' },
+        },
+      },
+    };
     await journal.record(projectId, item);
 
     const loaded = await journal.listForProject(projectId);
@@ -244,6 +257,7 @@ describe('IndexedDB queue run journal', () => {
         backendItemIds: [11],
         id: item.id,
         snapshot: expect.objectContaining({
+          backendSubmission: item.snapshot.backendSubmission,
           canvas: item.snapshot.canvas,
           graph: { id: 'graph-1', label: 'Graph' },
           prepend: true,

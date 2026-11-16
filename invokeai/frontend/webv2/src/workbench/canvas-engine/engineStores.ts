@@ -545,6 +545,8 @@ export interface EngineStores {
   documentEditingLayerId: ScalarStore<string | null>;
   /** The control layer displayed as its original (or original under map); null displays every map. */
   controlLayerView: ScalarStore<ControlLayerView | null>;
+  /** Whether a staged or progress preview, shown or toggled off, hides the overlay stacks from the screen. */
+  stagingHidesOverlays: ScalarStore<boolean>;
 }
 
 const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
@@ -741,6 +743,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   showBbox: createScalarStore<boolean>(true),
   showGrid: createScalarStore<boolean>(false),
   snapToGrid: createScalarStore<boolean>(true),
+  stagingHidesOverlays: createScalarStore<boolean>(false),
   textEditSession: createScalarStore<TextEditSession | null>(null, textEditSessionEqual),
   textOptions: createScalarStore<TextToolOptions>({ ...DEFAULT_TEXT_OPTIONS }, textOptionsEqual),
   thumbnailVersion: createKeyedVersionStore(),

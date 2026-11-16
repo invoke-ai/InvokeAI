@@ -55,7 +55,7 @@ afterEach(async () => {
   host = null;
 });
 
-/** The engine's interaction store as the footer reads it: a value per key and a listener set per key. */
+/** The engine's interaction store as the actions row reads it: a value per key and a listener set per key. */
 const createEngine = () => {
   const state: Partial<CanvasInteractionState> = {
     hasFloatingSelection: false,
@@ -83,9 +83,9 @@ const createEngine = () => {
   return { engine: engine as unknown as ToolFormProps['engine'], setPending };
 };
 
-/** Renders the footer `width` px wide. */
-const renderFooter = async (engine: ToolFormProps['engine'], width = 320) => {
-  const Footer = transformForm.footer!;
+/** Renders the actions row `width` px wide. */
+const renderActions = async (engine: ToolFormProps['engine'], width = 320) => {
+  const Actions = transformForm.actions!;
   host = document.createElement('div');
   host.style.width = `${width}px`;
   document.body.append(host);
@@ -94,17 +94,17 @@ const renderFooter = async (engine: ToolFormProps['engine'], width = 320) => {
     root!.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <Footer engine={engine} />
+          <Actions engine={engine} />
         </ChakraProvider>
       </I18nextProvider>
     )
   );
 };
 
-describe('Transform footer', () => {
+describe('Transform actions', () => {
   it('says while a transform waits for its stroke to save, in a polite live region, and clears after', async () => {
     const { engine, setPending } = createEngine();
-    await renderFooter(engine);
+    await renderActions(engine);
     const status = page.getByRole('status');
     await expect.element(status).toBeInTheDocument();
     await expect.element(status).toHaveTextContent('');
@@ -119,7 +119,7 @@ describe('Transform footer', () => {
 
   it('shows the whole status in a tooltip where a narrow pane truncates it', async () => {
     const { engine, setPending } = createEngine();
-    await renderFooter(engine, 180);
+    await renderActions(engine, 180);
     await setPending('layer-1');
     const status = page.getByRole('status');
     const line = status.element() as HTMLElement;

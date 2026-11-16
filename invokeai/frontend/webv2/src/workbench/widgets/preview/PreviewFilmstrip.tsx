@@ -12,11 +12,14 @@ import { ProgressBadge } from '@platform/ui/ProgressBadge';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
+import { releaseFocusOnRemoval } from '@workbench/focusRegions';
 import { PinIcon } from 'lucide-react';
 import { memo, useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
+
+import { getPreviewDockBarHeight, PREVIEW_DOCK_BAR_PROPS } from './previewDockBar';
 
 /**
  * Render board thumbnails below the stage in the gallery's order: the starred strip, the live GPU slots, then the
@@ -86,18 +89,13 @@ export const PreviewFilmstrip = ({
     // Set explicit ScrollArea height and inline-size containment so the strip neither consumes widget height nor
     // expands its width.
     <Scrollable
-      bg="bg.subtle"
-      borderColor="border.subtle"
-      borderTopWidth="1px"
+      {...PREVIEW_DOCK_BAR_PROPS}
       contentProps={FILMSTRIP_CONTENT_PROPS}
       css={FILMSTRIP_CONTAIN_CSS}
       data-preview-filmstrip
-      flexShrink={0}
-      h={density === 'full' ? '3.75rem' : '2.75rem'}
+      h={getPreviewDockBarHeight(density)}
       minW="0"
       orientation="horizontal"
-      px="2"
-      w="full"
     >
       <HStack align="center" gap="1" h="full">
         {items.slice(0, leadingItemCount).map(renderItem)}
@@ -186,20 +184,8 @@ const FilmstripLiveThumb = ({
       if (isFollowed) {
         node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       }
-      const region = node.closest<HTMLElement>('[role="region"]');
 
-      // React re-runs this cleanup when `isFollowed` flips while the node is
-      // still mounted — exactly the click that focused it — so only a node
-      // that really left the document gives focus away.
-      return () => {
-        if (document.activeElement === node) {
-          queueMicrotask(() => {
-            if (!node.isConnected) {
-              region?.focus({ preventScroll: true });
-            }
-          });
-        }
-      };
+      return releaseFocusOnRemoval(node);
     },
     [isFollowed]
   );
@@ -285,20 +271,31 @@ const FilmstripThumb = memo(function FilmstripThumb({
     },
     [item, onContextMenu]
   );
-  const scrollIntoView = useCallback(
+  // A deletion can take the thumb away while it holds focus, in whatever later render its listing drops it.
+  const thumbRef = useCallback(
     (node: HTMLElement | null) => {
       setNodeRef(node);
 
-      if (node && isSelected) {
+      if (!node) {
+        return;
+      }
+      if (isSelected) {
         node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       }
+
+      const releaseFocus = releaseFocusOnRemoval(node);
+
+      return () => {
+        setNodeRef(null);
+        releaseFocus();
+      };
     },
     [isSelected, setNodeRef]
   );
 
   return (
     <Box
-      ref={scrollIntoView}
+      ref={thumbRef}
       {...listeners}
       as="button"
       aria-current={isSelected || undefined}
