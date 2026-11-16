@@ -7,6 +7,7 @@ import { ListOrderedIcon } from 'lucide-react';
 export const queueWidgetManifest: WidgetManifest = {
   allowMultiple: false,
   allowedRegions: ['right'],
+  chrome: { body: 'fill' },
   failurePolicy: {
     isolateRenderFailure: true,
     onRegistrationFailure: 'disable',

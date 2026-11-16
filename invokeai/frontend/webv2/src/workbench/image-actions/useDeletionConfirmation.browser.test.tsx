@@ -11,7 +11,7 @@ import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences
 import { act, createRef, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 
@@ -62,6 +62,7 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteInUse.surface.workflow': `Workflow “${String(values?.name)}”`,
         'widgets.gallery.deleteInUse.unchecked': 'Other projects couldn’t be checked.',
         'widgets.gallery.deleteInUse.itemCount': count === 1 ? '1 item' : `${count} items`,
+        'widgets.gallery.deleteInUse.itemCountAtLeast': count === 1 ? 'at least 1 item' : `at least ${count} items`,
         'widgets.gallery.deleteInUse.warning':
           count === 1
             ? 'Work that uses it will point at missing media.'
@@ -229,7 +230,8 @@ describe('useDeletionConfirmation', () => {
                 { count: 1, label: 'Upscale pass', surface: 'workflow' },
               ],
             },
-            { count: 1, kind: 'projectUnchecked', name: 'Harbor Tower' },
+            // A batched check could not name all of its uses.
+            { count: 1, countAtLeast: true, kind: 'projectUnchecked', name: 'Harbor Tower' },
             // Open in this tab, its saved version unread: what it uses here, and a note.
             { count: 1, kind: 'project', name: 'Atlas', savedCopyUnchecked: true, surfaces: [] },
             { count: 1, kind: 'workflow', name: 'Portraits' },
@@ -258,7 +260,7 @@ describe('useDeletionConfirmation', () => {
       'Canvas raster layers · 1 item',
       'Workflow “Upscale pass” · 2 items',
       'Workflow “Upscale pass” · 1 item',
-      'Project “Harbor Tower” · 1 item',
+      'Project “Harbor Tower” · at least 1 item',
       'Project “Atlas” · 1 item',
       'Library workflow “Portraits” · 1 item',
       '2 queued or running jobs · 1 item',
@@ -276,6 +278,56 @@ describe('useDeletionConfirmation', () => {
     await clickButton('Delete');
     expect(executeDeletion).toHaveBeenCalledOnce();
     consoleError.mockRestore();
+  });
+
+  it('sits centred in the window like other confirmations, and a report taller than the window scrolls', async () => {
+    let settleCheck: (report: GalleryMediaUsageReport) => void = () => {};
+    const checkUsage = () =>
+      new Promise<GalleryMediaUsageReport>((resolve) => {
+        settleCheck = resolve;
+      });
+    // Once the enter animation is over, so its transform does not shift the box.
+    const settledBox = async () => {
+      const dialog = openDialog()!;
+      await Promise.all(dialog.getAnimations().map((animation) => animation.finished));
+      return dialog.getBoundingClientRect();
+    };
+    const verticalOffset = (box: DOMRect) => (box.top + box.bottom) / 2 - window.innerHeight / 2;
+
+    const original = { height: window.innerHeight, width: window.innerWidth };
+
+    try {
+      await page.viewport(1000, 700);
+      await act(() => {
+        void confirmationRef.current!.requestDeletionConfirmation(imageRefs, async () => {}, { checkUsage });
+      });
+
+      expect(Math.abs(verticalOffset(await settledBox()))).toBeLessThanOrEqual(1);
+
+      await page.viewport(1000, 320);
+      await act(() =>
+        settleCheck(
+          usageReport({
+            groups: Array.from({ length: 12 }, (_, index) => ({
+              count: 1,
+              kind: 'workflow' as const,
+              name: `Workflow ${index + 1}`,
+            })),
+            inUseCount: 1,
+          })
+        )
+      );
+      await vi.waitFor(() => expect(openDialog()?.querySelector('[role="group"]')).not.toBeNull(), REPORT_WAIT);
+
+      // Taller than the window: its top stays reachable, and the rest scrolls into view.
+      const tallBox = await settledBox();
+      const positioner = openDialog()!.parentElement!;
+      expect(tallBox.height).toBeGreaterThan(window.innerHeight);
+      expect(tallBox.top).toBeGreaterThanOrEqual(0);
+      expect(positioner.scrollHeight).toBeGreaterThan(positioner.clientHeight);
+    } finally {
+      await page.viewport(original.width, original.height);
+    }
   });
 
   it('warns when the check failed, offers Retry, and still offers the deletion', async () => {

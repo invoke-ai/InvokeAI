@@ -63,6 +63,15 @@ const selectStarterModels = (snapshot: {
   response: { starter_models: { source: string }[] } | null;
 }) => (snapshot.status === 'loaded' ? (snapshot.response?.starter_models ?? null) : null);
 
+/**
+ * The checks' context for one revision of the capability table, which the checks read when they run. The revision is
+ * an argument, not only a dependency: the React Compiler infers a memo's dependencies from what its callback reads,
+ * and prunes a side-effect-free `void revision`, so a context made from `base` and `remembered` alone would outlive
+ * the table's arrival, and every check memoized on it with it.
+ */
+const getCheckContext = (base: string | null, remembered: Record<string, string>, _capabilitiesRevision: number) =>
+  createControlLayerCheckContext(base, remembered);
+
 /** Read from the engine in place of a reason when the layer does not contribute: its ambient warning applies. */
 const AMBIENT = 'ambient';
 
@@ -87,7 +96,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
   const navigate = useNavigate();
   const projectId = useActiveProjectId();
   const { canManageModels } = useCapabilities();
-  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const editingLocked = useCanvasDocumentEditingLocked(engine);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const mainModel = useSelectedMainModel();
@@ -111,10 +120,10 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
     getArchitectureCapabilitiesSnapshot,
     selectCapabilitiesRevision
   );
-  const checkContext = useMemo(() => {
-    void capabilitiesRevision;
-    return createControlLayerCheckContext(baseId, remembered);
-  }, [baseId, capabilitiesRevision, remembered]);
+  const checkContext = useMemo(
+    () => getCheckContext(baseId, remembered, capabilitiesRevision),
+    [baseId, capabilitiesRevision, remembered]
+  );
   const described = useMemo(
     () => describeControlLayer(layer, { ...checkContext, mainModel, models }),
     [checkContext, layer, mainModel, models]
@@ -252,7 +261,6 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
   );
   const adapterEditing = useMemo<ControlAdapterEditing>(
     () => ({
-      cancel: cancelPreview,
       commit: commitAdapter,
       preview: (patch) => {
         previewStructural({
@@ -262,7 +270,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
         });
       },
     }),
-    [cancelPreview, commitAdapter, layer.id, previewStructural]
+    [commitAdapter, layer.id, previewStructural]
   );
 
   const memoryKey = baseId && layer.controlType ? controlModelMemoryKey(baseId, layer.controlType) : null;

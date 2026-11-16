@@ -26,8 +26,17 @@ const AUTO_SWITCH_POSITIONING = { placement: 'bottom-end' } as const;
 export const PreviewHeaderActions = (_props: WidgetViewProps) => {
   const livePreview = useLivePreviewFollow();
   const autoSwitch = useActiveProjectSelector((project) => project.settings.viewerAutoSwitch);
-  const { actionItem, actions, copyCurrentVideoFrame, isVideoFrameCopyAvailable, openItemMenu, position, zoom } =
-    usePreviewHeaderContext();
+  const {
+    actionItem,
+    actions,
+    cancelCompare,
+    copyCurrentVideoFrame,
+    getRegion,
+    isVideoFrameCopyAvailable,
+    openItemMenu,
+    position,
+    zoom,
+  } = usePreviewHeaderContext();
   const { density, stageElement, zoom: zoomReadout } = usePreviewStageContext();
   const zoomControls = useMemo<PreviewZoomControls | null>(
     () => (zoom && zoomReadout ? { ...zoom, ...zoomReadout } : null),
@@ -61,8 +70,10 @@ export const PreviewHeaderActions = (_props: WidgetViewProps) => {
             actions={actions}
             // The strip has a band of its own below compact; until the view measures, it is compact.
             density={density ?? 'compact'}
+            getRegion={getRegion ?? undefined}
             isVideoFrameCopyAvailable={isVideoFrameCopyAvailable}
             item={actionItem}
+            onCancelCompare={cancelCompare ?? undefined}
             onCopyCurrentFrame={copyCurrentVideoFrame ?? undefined}
             onOpenMenu={openItemMenu}
           />

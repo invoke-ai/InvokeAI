@@ -628,7 +628,7 @@ describe('compositeDocument', () => {
     expect(target.callLog.some((entry) => entry.op === 'strokeRect')).toBe(false);
   });
 
-  it('lands the staged preview above raster and control layers and below masks and regions', () => {
+  it('lands the staged preview above raster layers and below control layers, masks and regions', () => {
     const backend = createTestStubRasterBackend();
     const caches = createLayerCacheStore(backend);
     // Identify each blit by its source width, as the stack-order test does.
@@ -660,7 +660,8 @@ describe('compositeDocument', () => {
       .filter((e) => e.op === 'drawImage')
       .map((e) => widthToId[(e.args[0] as { width: number }).width])
       .filter((id): id is string => id !== undefined);
-    expect(order.indexOf('control')).toBeLessThan(order.indexOf('staged'));
+    expect(order.indexOf('raster')).toBeLessThan(order.indexOf('staged'));
+    expect(order.indexOf('staged')).toBeLessThan(order.indexOf('control'));
     expect(order.indexOf('staged')).toBeLessThan(order.indexOf('regional'));
     expect(order.indexOf('staged')).toBeLessThan(order.indexOf('inpaint'));
   });
