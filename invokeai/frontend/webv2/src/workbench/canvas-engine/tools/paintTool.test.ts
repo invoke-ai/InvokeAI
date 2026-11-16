@@ -678,6 +678,88 @@ describe('paint tool: target resolution', () => {
     const h = createHarness(makeDoc([paintLayer('paint1')], 'paint1'));
     expect(createBrushTool().cursor?.(h.ctx)).toBe('crosshair');
   });
+
+  it.each([
+    ['brush', createBrushTool],
+    ['eraser', createEraserTool],
+  ] as const)('%s refuses a mask hidden on the canvas only, so it never paints unseen', (_, createTool) => {
+    const doc = makeDoc([{ ...inpaintMaskLayer('mask1'), isHidden: true } as CanvasLayerContract], 'mask1');
+    const h = createHarness(doc);
+    const tool = createTool();
+
+    expect(tool.cursor?.(h.ctx)).toBe('not-allowed');
+    expect(tool.editsSelectedLayer?.(h.ctx)).toBe(false);
+    down(tool, h.ctx, pointer(20, 20));
+    up(tool, h.ctx, pointer(40, 40));
+
+    expect(h.strokeEdits).toHaveLength(0);
+    expect(h.strokes).toHaveLength(0);
+    expect(h.refusals).toEqual([{ layerId: 'mask1', layerName: 'mask1', status: 'layer-display-hidden' }]);
+  });
+});
+
+describe('eraser targets', () => {
+  const group = (id: string, children: CanvasLayerContract[]) =>
+    ({ children, id, isEnabled: true, isLocked: false, name: id, type: 'group' }) as unknown as CanvasLayerContract;
+
+  it.each([
+    ['a text layer', [textLayer('sel')]],
+    ['a group', [group('sel', [paintLayer('child')])]],
+  ] as const)('refuses %s with a notice, creating no layer and keeping the selection', (_, layers) => {
+    const doc = makeDoc([...layers], 'sel');
+    const h = createHarness(doc);
+    const eraser = createEraserTool();
+
+    expect(eraser.cursor?.(h.ctx)).toBe('not-allowed');
+    down(eraser, h.ctx, pointer(20, 20));
+    move(eraser, h.ctx, pointer(40, 40), [pointer(40, 40)]);
+    up(eraser, h.ctx, pointer(40, 40));
+
+    expect(h.dispatched).toEqual([]);
+    expect(h.strokeEdits).toHaveLength(0);
+    expect(h.refusals).toEqual([{ layerId: 'sel', layerName: 'sel', status: 'erase-unsupported' }]);
+  });
+
+  it.each([
+    ['brush', createBrushTool],
+    ['eraser', createEraserTool],
+  ] as const)('%s refuses a control layer whose empty shape has no pixels, as its cursor said', (_, createTool) => {
+    const control: CanvasControlLayerContract = {
+      ...controlPaintLayer('ctl'),
+      source: {
+        fill: '#fff',
+        height: 10,
+        kind: 'polygon',
+        points: [],
+        stroke: null,
+        strokeWidth: 0,
+        type: 'shape',
+        width: 10,
+      },
+    };
+    const h = createHarness(makeDoc([control], 'ctl'), controlTransaction('ctl'));
+    const tool = createTool();
+
+    expect(tool.cursor?.(h.ctx)).toBe('not-allowed');
+    down(tool, h.ctx, pointer(20, 20));
+    up(tool, h.ctx, pointer(20, 20));
+
+    expect(h.beginPixelEdit).not.toHaveBeenCalled();
+    expect(h.dispatched).toEqual([]);
+    expect(h.refusals).toEqual([{ layerId: 'ctl', layerName: 'ctl', status: 'layer-unpaintable' }]);
+  });
+
+  it('refuses a press with nothing selected', () => {
+    const h = createHarness(makeDoc([paintLayer('paint1')], null));
+    const eraser = createEraserTool();
+
+    expect(eraser.cursor?.(h.ctx)).toBe('not-allowed');
+    down(eraser, h.ctx, pointer(20, 20));
+    up(eraser, h.ctx, pointer(20, 20));
+
+    expect(h.dispatched).toEqual([]);
+    expect(h.refusals).toEqual([{ status: 'erase-no-target' }]);
+  });
 });
 
 describe('transparency lock', () => {

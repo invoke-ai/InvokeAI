@@ -9,7 +9,11 @@ import {
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
-import { getGalleryMoveTargets } from '@features/gallery/contracts';
+import {
+  getGalleryCompareImage,
+  getGalleryMoveTargets,
+  getSelectedGalleryItemFromValues,
+} from '@features/gallery/contracts';
 import { galleryKeys } from '@features/gallery/queries';
 import { canCopyImage } from '@platform/browser/clipboard';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
@@ -19,6 +23,7 @@ import { MenuItem } from '@platform/ui/Menu';
 import { useQuery } from '@tanstack/react-query';
 import { formatHotkeyPartLabel } from '@workbench/hotkeys/keys';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
+import { useWidgetValuesSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   BoxIcon,
   CopyIcon,
@@ -32,6 +37,7 @@ import {
   StarIcon,
   Trash2Icon,
   WorkflowIcon,
+  XIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
@@ -124,6 +130,7 @@ export const ImageContextMenu = ({
   actions,
   boards,
   previewVideoActions,
+  returnFocus: hostReturnFocus,
   target,
   variant = 'full',
   onClose,
@@ -132,6 +139,11 @@ export const ImageContextMenu = ({
   /** The host's board listing as it shows it: folded through `useHostGalleryBoards` where boards cannot be shared. */
   boards: GalleryBoard[];
   previewVideoActions?: PreviewVideoContextActions;
+  /**
+   * Where focus goes when a deletion confirmation the menu opened closes, unless the target names its own. Without
+   * either the dialog returns focus to what had it as it opened, which the deletion may have removed.
+   */
+  returnFocus?: () => HTMLElement | null;
   target: ImageContextMenuTarget | null;
   variant?: ImageContextMenuVariant;
   onClose: () => void;
@@ -143,7 +155,7 @@ export const ImageContextMenu = ({
     () => (itemTarget && isCompleteImageTarget ? { images, x: itemTarget.x, y: itemTarget.y } : null),
     [images, isCompleteImageTarget, itemTarget]
   );
-  const returnFocus = itemTarget?.returnFocus;
+  const returnFocus = itemTarget?.returnFocus ?? hostReturnFocus;
   const requestDeletion = useCallback(
     (itemRefs: GalleryItemRef[]) => void actions.deleteItems(itemRefs, { returnFocus }),
     [actions, returnFocus]
@@ -640,7 +652,6 @@ const SingleImageMenuItems = ({
   const handleDelete = useCallback(() => onRequestDeletion([image.imageName]), [image.imageName, onRequestDeletion]);
   const imageSourceBoardIds = useMemo(() => [image.boardId], [image.boardId]);
   const imageItemRef = useMemo<GalleryItemRef>(() => ({ kind: 'image', name: image.imageName }), [image.imageName]);
-  const handleSelectForCompare = useCallback(() => actions.selectForCompare(image), [actions, image]);
   const handleLoadWorkflow = useCallback(() => void actions.loadImageWorkflow(image), [actions, image]);
   const handleGeneratePbrMaps = useCallback(() => void actions.generatePbrMaps(image), [actions, image]);
 
@@ -676,14 +687,7 @@ const SingleImageMenuItems = ({
           <Menu.Separator borderColor="border.subtle" />
         </>
       ) : null}
-      <ContextMenuItem
-        // The grid's shortcut for the same action, otherwise found only by accident.
-        detail={t('widgets.gallery.itemMenu.compareShortcut', { key: formatHotkeyPartLabel('alt') })}
-        icon={ImagesIcon}
-        label={t('widgets.preview.selectForCompare')}
-        value="select-for-compare"
-        onClick={handleSelectForCompare}
-      />
+      <SelectForCompareMenuItem actions={actions} image={image} />
       <ContextMenuItem
         icon={BoxIcon}
         label={t('widgets.gallery.itemActions.pbrMaps.label')}
@@ -890,6 +894,48 @@ const ChangeBoardSubMenu = ({
       )}
       <GalleryBoardDestinationGroups boards={destinations} onSelect={handleSelectBoard} />
     </ContextSubMenu>
+  );
+};
+
+/** The image Select for compare is waiting with, if any: the comparison image that is also the selection. */
+const selectArmedCompareImageName = (values: Record<string, unknown>): string | null => {
+  const compareImage = getGalleryCompareImage(values);
+  const selectedItem = getSelectedGalleryItemFromValues(values);
+
+  return compareImage && selectedItem?.kind === 'image' && selectedItem.name === compareImage.imageName
+    ? compareImage.imageName
+    : null;
+};
+
+/**
+ * Select for compare, or on the image it is already waiting with, the way to call it off, as the Preview toggle does.
+ * It reads the comparison itself, so the shared actions stay independent of the selection.
+ */
+const SelectForCompareMenuItem = ({ actions, image }: { actions: ImageActions; image: GalleryImage }) => {
+  const { t } = useTranslation();
+  const { gallery } = useWorkbenchCommands();
+  const isArmedWithImage = useWidgetValuesSelector('gallery', selectArmedCompareImageName) === image.imageName;
+  const handleClick = useCallback(
+    () => (isArmedWithImage ? gallery.setCompareItem(null) : actions.selectForCompare(image)),
+    [actions, gallery, image, isArmedWithImage]
+  );
+
+  return isArmedWithImage ? (
+    <ContextMenuItem
+      icon={XIcon}
+      label={t('widgets.preview.cancelCompare')}
+      value="cancel-compare"
+      onClick={handleClick}
+    />
+  ) : (
+    <ContextMenuItem
+      // The grid's shortcut for the same action, otherwise found only by accident.
+      detail={t('widgets.gallery.itemMenu.compareShortcut', { key: formatHotkeyPartLabel('alt') })}
+      icon={ImagesIcon}
+      label={t('widgets.preview.selectForCompare')}
+      value="select-for-compare"
+      onClick={handleClick}
+    />
   );
 };
 

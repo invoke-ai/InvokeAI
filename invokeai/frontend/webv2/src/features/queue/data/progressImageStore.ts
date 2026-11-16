@@ -5,8 +5,8 @@ import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
 
 /**
- * Hold bounded bridge frames between batch slots and swap frames until image decode. Retain frames across
- * disconnects while HTTP reconciles the continuing run.
+ * Hold a finished slot's last frame as a bounded swap frame until its image decodes. Retain frames across disconnects
+ * while HTTP reconciles the continuing run.
  */
 
 export type ProgressImageSnapshot = QueueProgressImage;
@@ -37,7 +37,6 @@ interface SwapFrame {
 const snapshotsByTarget = createKeyedTransientStore<string, ProgressImageSnapshot>();
 /** Insertion order is recency: `set` re-inserts, so the last entry is the most recently updated slot. */
 const targetsByKey = new Map<string, ProgressImageTarget>();
-const bridgeFrames = createKeyedTransientStore<string, ProgressImageSnapshot>();
 const swapFrames = createKeyedTransientStore<string, SwapFrame>();
 const swapExpiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -63,10 +62,6 @@ const evictOldest = <Value>(
   }
 };
 
-const dropBridge = (queueItemId: string): void => {
-  bridgeFrames.delete(queueItemId);
-};
-
 const dropSwap = (queueItemId: string): void => {
   const timer = swapExpiryTimers.get(queueItemId);
 
@@ -76,12 +71,6 @@ const dropSwap = (queueItemId: string): void => {
   }
 
   swapFrames.delete(queueItemId);
-};
-
-const holdBridge = (queueItemId: string, image: ProgressImageSnapshot): void => {
-  dropBridge(queueItemId);
-  bridgeFrames.set(queueItemId, image);
-  evictOldest(bridgeFrames, dropBridge);
 };
 
 const holdSwap = (queueItemId: string, image: ProgressImageSnapshot): void => {
@@ -100,7 +89,6 @@ export const progressImageStore = {
       latestSnapshotStore.patchSnapshot({ latestSnapshot: null });
       snapshotsByTarget.clear();
       targetsByKey.clear();
-      bridgeFrames.clear();
 
       for (const timer of swapExpiryTimers.values()) {
         clearTimeout(timer);
@@ -130,25 +118,21 @@ export const progressImageStore = {
 
     if (entry) {
       // A workflow may save unrelated images in several boards. One preview
-      // bridges only to the latest output selected by result routing while it decodes.
+      // swaps only to the latest output selected by result routing while it decodes.
       swapFrames.set(queueItemId, { image: entry.image, imageNames: imageNames.slice(-1) });
     }
   },
   /** Forget a queue item's held frames: its run is gone (detached or canceled). */
   clearHeld(queueItemId: string): void {
-    dropBridge(queueItemId);
     dropSwap(queueItemId);
   },
-  /** Hold the final frame for bridging and swapping; retain the live slot until result fetch completes. */
+  /** Hold the final frame for swapping; retain the live slot until result fetch completes. */
   hold(target: ProgressImageTarget): void {
     const image = snapshotsByTarget.get(getTargetKey(target));
 
-    if (!image) {
-      return;
+    if (image) {
+      holdSwap(target.queueItemId, image);
     }
-
-    holdBridge(target.queueItemId, image);
-    holdSwap(target.queueItemId, image);
   },
   set(image: ProgressImageSnapshot, target?: ProgressImageTarget): void {
     latestSnapshotStore.patchSnapshot({ latestSnapshot: target ? { ...image, target } : image });
@@ -190,9 +174,6 @@ export const consumeQueueItemSwapProgressImage = (queueItemId: string): void => 
 export const getLatestProgressImage = (): LatestProgressImageSnapshot | null =>
   latestSnapshotStore.getSnapshot().latestSnapshot;
 
-export const getQueueItemBridgeProgressImage = (queueItemId: string): ProgressImageSnapshot | null =>
-  bridgeFrames.get(queueItemId) ?? null;
-
 const selectSwapProgressImage = (entry: SwapFrame | undefined, imageName: string): ProgressImageSnapshot | null =>
   entry?.imageNames?.includes(imageName) ? entry.image : null;
 
@@ -204,10 +185,6 @@ export const useProgressImage = (): LatestProgressImageSnapshot | null =>
 
 export const useQueueItemProgressImage = (queueItemId: string, itemIndex: number): ProgressImageSnapshot | null =>
   snapshotsByTarget.useValue(getTargetKey({ itemIndex, queueItemId })) ?? null;
-
-/** The frame to show for a slot of this queue item that has none of its own yet. */
-export const useQueueItemBridgeProgressImage = (queueItemId: string): ProgressImageSnapshot | null =>
-  bridgeFrames.useValue(queueItemId) ?? null;
 
 /**
  * The frame to show in place of this just-finished image until it has decoded;

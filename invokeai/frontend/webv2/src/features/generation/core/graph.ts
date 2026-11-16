@@ -655,7 +655,10 @@ const buildSD3Graph = (
   addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
   addEdge(graph, seed, 'value', denoise, 'seed');
   addMetadata(graph, output, settings, model, 'sd3_txt2img', projectSettings, {
+    clip_g_model: modelLoader.clip_g_model,
+    clip_l_model: modelLoader.clip_l_model,
     scheduler: undefined,
+    t5_encoder: modelLoader.t5_encoder_model,
     vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
@@ -759,9 +762,8 @@ const buildFluxGraph = (
   addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
   addEdge(graph, posCondCollect, 'collection', denoise, 'positive_text_conditioning');
   addEdge(graph, graph.nodes.seed, 'value', denoise, 'seed');
-  if (model.name.toLowerCase().includes('kontext')) {
-    addFluxKontextReferenceImages(graph, settings, denoise, 'flux_kontext_reference_image');
-  }
+  // Generation validation has checked that the enabled Kontext references belong to this model.
+  addFluxKontextReferenceImages(graph, settings, denoise, 'flux_kontext_reference_image');
   const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
   const fluxReduxCollector = addFluxReduxReferenceImages(graph, settings, model, denoise);
   addMetadata(graph, output, settings, model, 'flux_txt2img', projectSettings, {
@@ -1783,6 +1785,13 @@ const buildMossImageGraph = (
     type: 'moss_image_model_loader',
     vae_model: vaeModel ?? undefined,
   });
+  // MOSS-Image LoRAs train the transformer only; the VAE and the Qwen3.5 encoder stay on the model loader.
+  const activeLoras = getActiveCompatibleLoras(settings, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'moss_image_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'moss_image_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'moss_image_text_encoder' }) : null;
   const denoiseSize = getDenoiseSize(settings, model);
@@ -1810,7 +1819,7 @@ const buildMossImageGraph = (
     vaeSource: modelLoader,
   });
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   // The denoise node reads the VAE's BatchNorm statistics, which define the latent space it works in.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');

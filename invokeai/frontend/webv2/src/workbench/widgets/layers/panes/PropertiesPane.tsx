@@ -1,4 +1,4 @@
-import { Flex, Stack } from '@chakra-ui/react';
+import { Box, Flex, Stack } from '@chakra-ui/react';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { useCanvasActiveTool, useCanvasOperation } from '@workbench/widgets/canvas/engineStoreHooks';
@@ -12,11 +12,12 @@ import { useTranslation } from 'react-i18next';
 
 import { GroupSelectedNotice } from './GroupSelectedNotice';
 import { LayerSection } from './LayerSection';
+import { createOperationSection } from './OperationSection';
 import { PropertiesSection } from './PropertiesSection';
 
-const OPERATION_TITLE_KEYS = {
-  filter: 'widgets.layers.rasterFilter.title',
-  'select-object': 'widgets.layers.selectObject.title',
+const OPERATION_SECTIONS = {
+  filter: createOperationSection(OPERATION_PRESENTATION_ADAPTERS.filter),
+  'select-object': createOperationSection(OPERATION_PRESENTATION_ADAPTERS['select-object']),
 } as const;
 
 /** Show active operation before tool forms; use existing engine stores/transactions without mirrored state. */
@@ -44,15 +45,15 @@ const ConnectedProperties = ({ engine }: { engine: CanvasEngineHandle }) => {
   const activeTool = useCanvasActiveTool(engine);
   const operation = useCanvasOperation(engine);
   const running = operation.status === 'active' ? OPERATION_PRESENTATION_ADAPTERS[operation.identity.kind] : null;
+  const RunningSection = operation.status === 'active' ? OPERATION_SECTIONS[operation.identity.kind] : null;
   const tool = TOOL_PRESENTATION_ADAPTERS[activeTool];
   const toolName = t(`widgets.canvas.tools.${tool.id}`);
   const Preview = tool.preview;
   const regionProps = { engine };
-  // The pane has ONE sticky footer: a running operation's, else the tool
-  // form's; the operation always wins because the tool section is inert then.
-  const Footer = running ? running.footer : tool.footer;
+  const ToolActions = tool.actions;
 
-  // `inert` will blur a focused tool control once an operation starts; hand focus to the operation's Cancel first.
+  // `inert` will blur a focused tool control once an operation starts; hand focus to the operation's Cancel first. The
+  // Operation section comes first, so its Cancel is the first match; focusing it scrolls it into view.
   const root = useRef<HTMLDivElement>(null);
   const toolSection = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -63,19 +64,8 @@ const ConnectedProperties = ({ engine }: { engine: CanvasEngineHandle }) => {
 
   return (
     <Stack ref={root} gap="0">
-      {running ? (
-        <PropertiesSection
-          subtitle={t(OPERATION_TITLE_KEYS[running.kind])}
-          title={t('widgets.properties.sections.operation')}
-        >
-          {running.groups.map((group) => (
-            <PropertyGroup key={group.id} collapsible={group.collapsible} id={group.id} label={t(group.labelKey)}>
-              <group.body {...regionProps} />
-            </PropertyGroup>
-          ))}
-        </PropertiesSection>
-      ) : null}
-      {tool.groups.length > 0 || Preview ? (
+      {RunningSection ? <RunningSection engine={engine} /> : null}
+      {tool.groups.length > 0 || Preview || ToolActions ? (
         <PropertiesSection
           ref={toolSection}
           disabled={running !== null}
@@ -91,22 +81,14 @@ const ConnectedProperties = ({ engine }: { engine: CanvasEngineHandle }) => {
               <group.body {...regionProps} />
             </PropertyGroup>
           ))}
+          {ToolActions ? (
+            <Box pt="1">
+              <ToolActions engine={engine} />
+            </Box>
+          ) : null}
         </PropertiesSection>
       ) : null}
       <LayerSection disabled={running !== null} />
-      {Footer ? (
-        <Flex
-          bg="bg.panel"
-          borderColor="border.subtle"
-          borderTopWidth="1px"
-          bottom="0"
-          position="sticky"
-          px="3"
-          py="1.5"
-        >
-          <Footer engine={engine} />
-        </Flex>
-      ) : null}
     </Stack>
   );
 };

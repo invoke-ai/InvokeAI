@@ -34,6 +34,11 @@ export interface GalleryMediaUsageDocument extends GalleryMediaUsageNames {
    * caller has none there. Null for other kinds.
    */
   workspaceRevision: number | null;
+  /**
+   * A check sent in several requests could not list this document in all of them: its names and counts are only
+   * some of what it uses.
+   */
+  namesIncomplete?: true;
 }
 
 export interface GalleryMediaUsage {
@@ -73,31 +78,36 @@ export interface GalleryMediaUsageSurfaceRow {
   surface: GalleryMediaUsageSurface;
 }
 
-/** One line of the report; `count` is how many checked items the source uses. */
-export type GalleryMediaUsageGroup =
+/**
+ * One line of the report; `count` is how many checked items the source uses, at least that many when `countAtLeast`
+ * (the server could not name all of the source's uses).
+ */
+export type GalleryMediaUsageGroup = { countAtLeast?: true } &
   /** The project the deletion is made from; `savedCopyUnchecked` as for `project`. */
-  | { count: number; kind: 'openProject'; savedCopyUnchecked?: true; surfaces: GalleryMediaUsageSurfaceRow[] }
-  | {
-      count: number;
-      kind: 'project';
-      name: string | null;
-      /**
-       * The project is open, but its saved version, which the server says uses more of the media, could not be
-       * checked; `count` includes those uses, `surfaces` only what the open copy uses.
-       */
-      savedCopyUnchecked?: true;
-      surfaces: GalleryMediaUsageSurfaceRow[];
-    }
-  /** A project the host could not open to see where it uses the media. */
-  | { count: number; kind: 'projectUnchecked'; name: string | null }
-  | { count: number; kind: 'quarantinedProject'; name: string | null }
-  | { count: number; kind: 'workflow'; name: string | null }
-  | { count: number; kind: 'legacyEditor' }
-  | { count: number; kind: 'otherDocument'; name: string | null }
-  /** Documents past the server's listing cap. */
-  | { documentCount: number; kind: 'moreDocuments' }
-  | { count: number; jobCount: number; kind: 'queue' }
-  | { count: number; kind: 'otherAccounts' };
+  (
+    | { count: number; kind: 'openProject'; savedCopyUnchecked?: true; surfaces: GalleryMediaUsageSurfaceRow[] }
+    | {
+        count: number;
+        kind: 'project';
+        name: string | null;
+        /**
+         * The project is open, but its saved version, which the server says uses more of the media, could not be
+         * checked; `count` includes those uses, `surfaces` only what the open copy uses.
+         */
+        savedCopyUnchecked?: true;
+        surfaces: GalleryMediaUsageSurfaceRow[];
+      }
+    /** A project the host could not open to see where it uses the media. */
+    | { count: number; kind: 'projectUnchecked'; name: string | null }
+    | { count: number; kind: 'quarantinedProject'; name: string | null }
+    | { count: number; kind: 'workflow'; name: string | null }
+    | { count: number; kind: 'legacyEditor' }
+    | { count: number; kind: 'otherDocument'; name: string | null }
+    /** Documents past the server's listing cap. */
+    | { documentCount: number; kind: 'moreDocuments' }
+    | { count: number; jobCount: number; kind: 'queue' }
+    | { count: number; kind: 'otherAccounts' }
+  );
 
 export interface GalleryMediaUsageReport {
   /** Items checked: the requested items, or the board's as the server counted them (the items deleting it removes). */
@@ -109,12 +119,11 @@ export interface GalleryMediaUsageReport {
   onlyImages: boolean;
   scope: 'board' | 'items';
   /**
-   * Whether the server check ran: `unavailable` when it did not finish (offline, an older server, a timeout),
-   * `tooManyItems` when the selection is past what one check takes. Either way only projects open in this tab were
-   * checked, not other projects, workflows, the legacy editor, queued jobs or other accounts. A board's report always
-   * has the server's answer, which alone knows the board's items.
+   * Whether the server check ran: `unavailable` when it did not finish (offline, an older server, a timeout), so only
+   * projects open in this tab were checked, not other projects, workflows, the legacy editor, queued jobs or other
+   * accounts. A board's report always has the server's answer, which alone knows the board's items.
    */
-  serverCheck: 'complete' | 'tooManyItems' | 'unavailable';
+  serverCheck: 'complete' | 'unavailable';
 }
 
 /** What a deletion dialog shows while the check runs, when it failed outright, and once it has a report. */

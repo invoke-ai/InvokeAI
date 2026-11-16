@@ -24,10 +24,8 @@ import {
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   isComponentCompatibleWithModel,
-  getModelDefaultVae,
   getSettingsWithModelDefaults,
   hasArchitectureCapabilities,
-  hasModelDefaultVae,
   isKnownScheduler,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
@@ -63,6 +61,8 @@ import {
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeMossImageSkipLayers,
   normalizeReferenceImages,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
 } from '@features/generation/settings';
 import { SEED_MAX } from '@platform/core/seed';
 
@@ -906,6 +906,8 @@ type RecalledComponentSetting = keyof Pick<
   GenerateWidgetValues,
   | 'animaInpaintAdapterModel'
   | 'clipEmbedModel'
+  | 'clipGEmbedModel'
+  | 'clipLEmbedModel'
   | 'componentSourceModel'
   | 'flux3PromptUpsamplerModel'
   | 'gemma2EncoderModel'
@@ -941,6 +943,8 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
   { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
   { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
+  { metadataKey: 'clip_g_model', setting: 'clipGEmbedModel' },
+  { metadataKey: 'clip_l_model', setting: 'clipLEmbedModel' },
   { metadataKey: 'flux3_prompt_upsampler', setting: 'flux3PromptUpsamplerModel' },
   { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
   { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },
@@ -1536,11 +1540,8 @@ export const buildImageRecallSettings = ({
 
     if (model) {
       const valuesWithModelDefaults = getSettingsWithModelDefaults(values, model);
-      values = {
-        ...valuesWithModelDefaults,
-        model,
-        ...(hasModelDefaultVae(model) ? { vae: getModelDefaultVae(model, vaeModels) } : {}),
-      };
+      const vae = getRecallDefaultVae(resolveModelDefaultVae(model, valuesWithModelDefaults, vaeModels));
+      values = { ...valuesWithModelDefaults, model, ...(vae === undefined ? {} : { vae }) };
       fields.push('model');
     }
 

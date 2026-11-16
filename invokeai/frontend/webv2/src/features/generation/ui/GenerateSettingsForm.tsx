@@ -2,7 +2,7 @@ import type { GenerationModelCatalogItem as ModelConfig } from '@features/genera
 import type { GenerationIssue, GenerationIssueFix } from '@features/generation/core/generationIssues';
 import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
-import { Separator, Stack } from '@chakra-ui/react';
+import { Stack } from '@chakra-ui/react';
 import { getGenerateInvocationIssues } from '@features/generation/core/baseGenerationPolicies';
 import { getGenerationIssueFixPatch } from '@features/generation/core/generationIssues';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
@@ -288,27 +288,27 @@ export const GenerateSettingsForm = ({
 
   return (
     <GenerateIssuesProvider applyFix={applyIssueFix} issues={issues}>
-      <Stack gap={1} p={1}>
-        <GenerateModelCard
-          draft={draft}
-          isLoadingModels={isLoadingModels}
-          loadError={loadError}
-          models={models}
-          selectedModel={selectedModel}
-          supportedModels={supportedModels}
-          onCommitSettings={commitSettingsImmediately}
-        />
+      <Stack gap={0}>
+        {/* The prompt fields carry their own space below, which matches the side inset here. */}
+        <Stack gap={1} px={2} pt={2}>
+          <GenerateModelCard
+            draft={draft}
+            isLoadingModels={isLoadingModels}
+            loadError={loadError}
+            models={models}
+            selectedModel={selectedModel}
+            supportedModels={supportedModels}
+            onCommitSettings={commitSettingsImmediately}
+          />
 
-        {/* The same hairline the collapsible sections draw between one another. */}
-        <Separator />
-
-        <GeneratePromptFields
-          draft={draft}
-          projectId={projectId}
-          selectedModel={selectedModel}
-          onCommit={commitPromptDraftPatch}
-          onCommitImmediate={commitPatchImmediately}
-        />
+          <GeneratePromptFields
+            draft={draft}
+            projectId={projectId}
+            selectedModel={selectedModel}
+            onCommit={commitPromptDraftPatch}
+            onCommitImmediate={commitPatchImmediately}
+          />
+        </Stack>
 
         <GenerateDimensionFields
           draft={draft}
