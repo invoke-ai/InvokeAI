@@ -44,6 +44,12 @@ vi.mock('./workflowImageExport', () => ({
 }));
 
 const { EditorToolbar } = await import('./EditorToolbar');
+const { registerWorkflowFlowInstance, releaseWorkflowFlowInstance } = await import('./flowInstanceStore');
+const { registerWorkflowPngExportHost } = await import('./workflowPngExport');
+// The export's run loads on first use; loading it here keeps that first load out of each test's waits.
+await import('./workflowPngExportRun');
+const flowInstance = toolbarMocks as unknown as Parameters<typeof registerWorkflowFlowInstance>[0];
+let releaseExportHost: (() => void) | null = null;
 
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({
@@ -85,6 +91,13 @@ const render = async (
   document.body.append(host);
   root = createRoot(host);
   toolbarMocks.onExportPrepare.mockResolvedValue(host);
+  // The editor lends the export its offscreen view and flow instance; here the mocks stand in for both.
+  releaseExportHost?.();
+  releaseExportHost = registerWorkflowPngExportHost({
+    complete: toolbarMocks.onExportComplete,
+    prepare: toolbarMocks.onExportPrepare,
+  });
+  registerWorkflowFlowInstance(flowInstance);
 
   await settle(() => {
     root?.render(
@@ -94,8 +107,6 @@ const render = async (
             {...arrangeProps}
             nodeOpacity={nodeOpacity}
             tool="pan"
-            onExportPrepare={toolbarMocks.onExportPrepare}
-            onExportComplete={toolbarMocks.onExportComplete}
             onNodeOpacityChange={vi.fn()}
             onToolChange={vi.fn()}
           />
@@ -124,6 +135,9 @@ const buttonBoxes = (): string[] =>
   });
 
 afterEach(async () => {
+  releaseExportHost?.();
+  releaseExportHost = null;
+  releaseWorkflowFlowInstance(flowInstance);
   await settle(() => root?.unmount());
   host?.remove();
   host = null;
@@ -166,8 +180,6 @@ describe('editor toolbar', () => {
               nodeOpacity={1}
               tool="pan"
               updatableNodeCount={2}
-              onExportPrepare={toolbarMocks.onExportPrepare}
-              onExportComplete={toolbarMocks.onExportComplete}
               onNodeOpacityChange={vi.fn()}
               onToolChange={vi.fn()}
               onUpdateNodes={onUpdateNodes}

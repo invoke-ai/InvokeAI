@@ -5300,6 +5300,29 @@ describe('workbenchReducer Phase 5 generation flow', () => {
         expect(getActiveProjectGraph(getActiveProject(state)).nodes).toEqual([]);
       });
 
+      it('captures the library binding on the queued snapshot', () => {
+        let state = primeWorkflow(42, 'increment', 1);
+        const original = workflowIdOf(state);
+        const source = { libraryWorkflowId: 'template-original', ownerUserId: 'user-a', revision: 3 };
+        state = {
+          ...state,
+          projects: state.projects.map((project) => ({
+            ...project,
+            workflows: {
+              ...project.workflows,
+              entries: project.workflows.entries.map((entry) => ({ ...entry, source })),
+            },
+          })),
+        };
+        state = submitFrom(state, original);
+        const submission = getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
+        source.libraryWorkflowId = 'template-relinked';
+        expect(submission).toMatchObject({
+          kind: 'workflow',
+          libraryWorkflowSource: { libraryWorkflowId: 'template-original', ownerUserId: 'user-a' },
+        });
+      });
+
       it('queues nothing and says so when the captured workflow was removed meanwhile', () => {
         let state = primeWorkflow(42, 'increment', 1);
         const original = workflowIdOf(state);

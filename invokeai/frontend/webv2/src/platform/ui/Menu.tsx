@@ -25,6 +25,18 @@ import { useRegisterWidgetOverlay } from './widgetOverlays';
 
 type MenuContentProps = Omit<ComponentProps<typeof Menu.Content>, 'ref'>;
 
+/**
+ * The layout of menu content whose list scrolls (`ScrollableMenuContent`, or `ScrollableMenuList` inside it): it grows to
+ * the context menus' cap or the room the positioner measured beside its anchor, then the list scrolls. The column gives
+ * the list the content's padded box, so its last row is never cut off by the padding, and rows after it stay in view.
+ */
+export const SCROLLABLE_MENU_CONTENT_PROPS = {
+  display: 'flex',
+  flexDirection: 'column',
+  maxH: 'min(28rem, var(--available-height))',
+  overflow: 'hidden',
+} as const;
+
 /** Zag's cancelable event on the content for a press outside it; cancelling it keeps the menu open. */
 const POINTER_DOWN_OUTSIDE_EVENT = 'pointerdown.outside';
 

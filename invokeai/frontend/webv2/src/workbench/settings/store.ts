@@ -82,7 +82,10 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   workflowEdgeStyle: 'curved',
   workflowEdgesBehindNodes: false,
   workflowGroupNodesByCategory: true,
+  workflowLibraryCardSize: 'small',
+  workflowLibraryLayout: 'grid',
   workflowLibrarySort: 'updated',
+  workflowLibrarySortDirection: 'desc',
   workflowLibraryThumbnailFit: 'cover',
   workflowShowMinimap: true,
   workflowSnapToGrid: false,
@@ -158,7 +161,14 @@ const isProjectSortId = (value: unknown): value is ProjectSortId =>
   value === 'edited' || value === 'created' || value === 'name';
 
 const isWorkflowLibrarySortId = (value: unknown): value is WorkflowLibrarySortId =>
-  value === 'updated' || value === 'opened' || value === 'created' || value === 'name';
+  value === 'updated' || value === 'opened' || value === 'created' || value === 'name' || value === 'lastRun';
+
+/**
+ * A stored direction, or the stored key's natural one (dates newest first, names A to Z): accounts that chose a key
+ * before directions existed keep the order they had.
+ */
+const normalizeWorkflowLibrarySortDirection = (direction: unknown, sort: WorkflowLibrarySortId) =>
+  direction === 'asc' || direction === 'desc' ? direction : sort === 'name' ? 'asc' : 'desc';
 
 const normalizePinnedProjectIds = (values: unknown): string[] =>
   Array.isArray(values) ? [...new Set(values.filter((value): value is string => typeof value === 'string'))] : [];
@@ -402,7 +412,10 @@ type WorkbenchPreferencesInput = Omit<
   | 'queueJobsScope'
   | 'startupDestination'
   | 'workflowEdgeStyle'
+  | 'workflowLibraryCardSize'
+  | 'workflowLibraryLayout'
   | 'workflowLibrarySort'
+  | 'workflowLibrarySortDirection'
   | 'workflowLibraryThumbnailFit'
 > & {
   launchpadProjectsSort?: unknown;
@@ -410,7 +423,10 @@ type WorkbenchPreferencesInput = Omit<
   queueJobsScope?: unknown;
   startupDestination?: unknown;
   workflowEdgeStyle?: unknown;
+  workflowLibraryCardSize?: unknown;
+  workflowLibraryLayout?: unknown;
   workflowLibrarySort?: unknown;
+  workflowLibrarySortDirection?: unknown;
   workflowLibraryThumbnailFit?: unknown;
   /** Pre-beta name of `betaNoticeAcknowledged`; accounts that dismissed the alpha notice skip the beta one. */
   alphaNoticeAcknowledged?: unknown;
@@ -534,9 +550,19 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.workflowGroupNodesByCategory === 'boolean'
       ? preferences.workflowGroupNodesByCategory
       : DEFAULT_PREFERENCES.workflowGroupNodesByCategory,
+  workflowLibraryCardSize:
+    preferences?.workflowLibraryCardSize === 'large' ? 'large' : DEFAULT_PREFERENCES.workflowLibraryCardSize,
+  workflowLibraryLayout:
+    preferences?.workflowLibraryLayout === 'list' ? 'list' : DEFAULT_PREFERENCES.workflowLibraryLayout,
   workflowLibrarySort: isWorkflowLibrarySortId(preferences?.workflowLibrarySort)
     ? preferences.workflowLibrarySort
     : DEFAULT_PREFERENCES.workflowLibrarySort,
+  workflowLibrarySortDirection: normalizeWorkflowLibrarySortDirection(
+    preferences?.workflowLibrarySortDirection,
+    isWorkflowLibrarySortId(preferences?.workflowLibrarySort)
+      ? preferences.workflowLibrarySort
+      : DEFAULT_PREFERENCES.workflowLibrarySort
+  ),
   workflowLibraryThumbnailFit:
     preferences?.workflowLibraryThumbnailFit === 'contain'
       ? 'contain'

@@ -31,17 +31,18 @@ const keepOpenThroughMenuTeardown = (event: LayerDismissEvent) => {
 
 type FocusOutsideEvent = Parameters<NonNullable<ChakraDialog.RootProps['onFocusOutside']>>[0];
 
-/**
- * A modal dialog traps focus, so focus landing outside it is never the user leaving: it is a programmatic move or a
- * stale trap. Under StrictMode a dialog mounted open traps focus twice: a lazily loaded one's first mount returns focus
- * to its opener mid-open, and when one stacked over another closes, a trap returns focus into it after its layer left
- * the stack. Only a press outside and Escape dismiss a modal dialog; the caller's handler still sees the event first.
- */
 const DialogRoot = ({ children, onFocusOutside, ...props }: Dialog.RootProps) => {
   const isModal = props.modal !== false;
+  /**
+   * A modal dialog traps focus, so focus landing outside it is never the user leaving; Escape, a close control or a
+   * press outside are. Focus still lands outside programmatically, mostly under StrictMode: a dialog that mounts open
+   * arms a second focus trap after focus has entered it, and on close that trap returns focus into the closed dialog,
+   * which would dismiss the dialog that opened it.
+   */
   const handleFocusOutside = useCallback(
     (event: FocusOutsideEvent) => {
       onFocusOutside?.(event);
+
       if (isModal) {
         event.preventDefault();
       }
