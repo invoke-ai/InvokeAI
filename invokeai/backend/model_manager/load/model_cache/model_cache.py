@@ -490,7 +490,8 @@ class CacheModelsClearedCallback(Protocol):
 
 
 # Below this, torch's releasable cache cannot matter to the driver's share of a working-memory reserve (kernel modules
-# and library workspaces run to hundreds of MB), and releasing it would cost a device synchronization per lock.
+# and library workspaces run to hundreds of MB), and releasing it would cost a device synchronization per lock. The
+# same size is the least shortfall worth a trim, or a rescue offload, to close.
 _MIN_RELEASABLE_FOR_RESERVE = 256 * MB
 
 
@@ -2144,7 +2145,11 @@ class ModelCache:
         # 1. If the model can fit entirely in VRAM, then make enough room for it to be loaded fully.
         # 2. If the model can't fit fully into VRAM, then unload all other models and load as much of the model as
         #    possible.
-        vram_bytes_freed = self._offload_unlocked_models(model_vram_needed, working_mem_bytes)
+        # Only the first pass of a paced lock may trim the pool first: later passes would repeat a trim that found
+        # nothing (see `_offload_unlocked_models`).
+        vram_bytes_freed = self._offload_unlocked_models(
+            model_vram_needed, working_mem_bytes, pretrim=stream_started_at is None
+        )
         self._logger.debug(f"Unloaded models (if necessary): vram_bytes_freed={(vram_bytes_freed / MB):.2f}MB")
 
         # Check the updated vram_available after offloading.
@@ -2260,6 +2265,12 @@ class ModelCache:
         exactly on multi-GPU machines; the peer then stalls for the rest of its step, which beats a hang. Elsewhere an
         allocation that does not fit fails instead of hanging, so the deferral (and the convoy it avoids, see
         `TorchDevice.empty_cache`) stays.
+
+        Under cudaMallocAsync the trim can return less than the pool's unused bytes (chunks with a live allocation
+        stay). What it returned is measured, and when the reserve is still short the unlocked models' weights are
+        offloaded as well, with the same forced trims on Windows: nothing else is left to give back. (The offload
+        itself also trims once past a busy peer, on every platform, when it had to defer its own trims: see
+        `_offload_unlocked_models`.)
         """
         if self._execution_device.type != "cuda":
             return
@@ -2267,8 +2278,9 @@ class ModelCache:
         driver_free, _ = TorchDevice.cuda_mem_get_info(self._execution_device)
         if driver_free >= reserve:
             return
-        if expandable_segments_enabled():
-            # Freed pages inside a segment are not counted as reclaimable there, but empty_cache() unmaps them.
+        if expandable_segments_enabled() or self._uses_cuda_async_pool():
+            # Neither mode counts its unused bytes as reclaimable, but empty_cache() unmaps freed pages and trims the
+            # chunks without live allocations; the driver-free measurement after it says how much that was.
             releasable = torch.cuda.memory_reserved(self._execution_device) - torch.cuda.memory_allocated(
                 self._execution_device
             )
@@ -2276,10 +2288,51 @@ class ModelCache:
             releasable = self._get_reclaimable_allocator_bytes()
         if releasable < _MIN_RELEASABLE_FOR_RESERVE:
             return
-        TorchDevice.empty_cache(force=sys.platform == "win32")
+        if not TorchDevice.empty_cache(force=self._trim_past_busy_peer()):
+            return
+        released_free, _ = TorchDevice.cuda_mem_get_info(self._execution_device)
         self._logger.debug(
-            f"Returned {releasable / MB:.0f}MB of the allocator's unused blocks to the driver: {driver_free / MB:.0f}MB "
-            f"driver-free was short of the {reserve / MB:.0f}MB working-memory reserve."
+            f"Returned {max(0, released_free - driver_free) / MB:.0f}MB of the allocator's unused blocks to the driver "
+            f"({releasable / MB:.0f}MB were believed releasable): {released_free / MB:.0f}MB driver-free, against "
+            f"the {reserve / MB:.0f}MB working-memory reserve."
+        )
+        if self._uses_cuda_async_pool() and reserve - released_free >= _MIN_RELEASABLE_FOR_RESERVE:
+            # A fragmented cudaMallocAsync pool keeps its chunks with live allocations: the trim returned less than
+            # believed, and unlocked weights are the only memory left to give back before the node runs short. The
+            # driver's free memory is what is short, so it is measured, not the cache's cap.
+            believed = self._offload_unlocked_models(
+                0,
+                working_mem_bytes,
+                vram_available_fn=lambda: self._get_physical_vram_available(working_mem_bytes),
+                pretrim=False,
+                force_empty_cache=self._trim_past_busy_peer(),
+            )
+            if believed > 0:
+                rescued_free, _ = TorchDevice.cuda_mem_get_info(self._execution_device)
+                self._logger.info(
+                    f"Driver-free memory stayed short after returning the allocator's unused blocks "
+                    f"({released_free / MB:.0f}MB of the {reserve / MB:.0f}MB working-memory reserve): offloaded "
+                    f"{believed / MB:.0f}MB of unlocked weights, {rescued_free / MB:.0f}MB driver-free now."
+                )
+
+    @staticmethod
+    def _trim_past_busy_peer() -> bool:
+        """Whether a trim runs despite a busy peer device: where a driver allocation that does not fit hangs instead of
+        failing (Windows), waiting would leave the node short of memory it cannot do without; see
+        `_release_allocator_blocks_for_reserve`."""
+        return sys.platform == "win32"
+
+    def _uses_cuda_async_pool(self) -> bool:
+        """Whether this cache's device allocates from a cudaMallocAsync pool.
+
+        That backend reports no inactive splits and `empty_cache()` (`cudaMemPoolTrimTo`) returns only chunks without
+        a live allocation, so a pool's unused bytes say nothing about what the driver would get back. CPU-only torch
+        builds have no allocator backend to ask.
+        """
+        return (
+            self._execution_device.type == "cuda"
+            and torch.cuda.is_available()
+            and torch.cuda.get_allocator_backend() == "cudaMallocAsync"
         )
 
     def _move_model_to_vram(
@@ -2424,8 +2477,12 @@ class ModelCache:
         credited budget claimed would fit). empty_cache() does unmap the freed pages, which is why
         `_offload_unlocked_models` runs one after each offload in that mode; what it cannot do is
         make the credit trustworthy before it runs.
+
+        Likewise 0 under cudaMallocAsync (`_uses_cuda_async_pool`): the pool reports no inactive splits, so a
+        fragmented pool's whole reserved-minus-allocated gap would count while a trim can return only the chunks
+        without a live allocation.
         """
-        if expandable_segments_enabled():
+        if expandable_segments_enabled() or self._uses_cuda_async_pool():
             return 0
         try:
             if self._execution_device.type == "cuda":
@@ -2454,8 +2511,9 @@ class ModelCache:
 
         The device measurement is the same one `lock()` budgets from, including its credit for the allocator's
         reclaimable reserve (`_get_reclaimable_allocator_bytes`), where offloaded weights sit until the offload's
-        trailing `empty_cache()`. Crediting the raw reserved-minus-allocated figure instead over-reports under
-        expandable segments and by intra-segment slack — the measured-OOM cases that helper exists to exclude.
+        `empty_cache()`; under expandable segments and cudaMallocAsync there is no credit, and the offload trims after
+        each model. Crediting the raw reserved-minus-allocated figure instead over-reports in both and by
+        intra-segment slack — the measured-OOM cases that helper exists to exclude.
         """
         return self._get_vram_available(working_mem_bytes, honor_cap=False)
 
@@ -2631,6 +2689,8 @@ class ModelCache:
         vram_bytes_required: int,
         working_mem_bytes: Optional[int] = None,
         vram_available_fn: Optional[Callable[[], int]] = None,
+        pretrim: bool = True,
+        force_empty_cache: bool = False,
     ) -> int:
         """Offload models from the execution_device until vram_bytes_required bytes are available, or all models are
         offloaded. Of course, locked models are not offloaded.
@@ -2639,49 +2699,86 @@ class ModelCache:
         (`_get_vram_available`, which honours `max_vram_cache_size_gb`). An out-of-cache load passes
         `_get_physical_vram_available` instead, because the cap does not apply to it.
 
+        `pretrim`: under cudaMallocAsync, trim the allocator's pool once before the first offload when it holds enough
+        unused bytes to matter. Off for a caller that just trimmed it and for the follow-up passes of a paced lock.
+        `force_empty_cache`: the trims after each offload run past a busy peer's deferral.
+
         Returns:
             int: The number of bytes freed based on believed model sizes. The actual change in VRAM may be different.
         """
+        # The cache's own budget is measured against the cap: a trim cannot show up in it, and an offload shows up
+        # at once through the allocated bytes.
+        capped = vram_available_fn is None and self._max_vram_cache_size_gb is not None
         if vram_available_fn is None:
             vram_available_fn = lambda: self._get_vram_available(working_mem_bytes)  # noqa: E731
         self._logger.debug(
             f"Offloading unlocked models with goal of making room for {vram_bytes_required / MB:.2f}MB of VRAM."
         )
         vram_bytes_freed = 0
-        # Under expandable segments the measurement credits no allocator-held blocks, so an offload
-        # only shows up once empty_cache() unmaps its pages; without it every unlocked model would
+        # Under expandable segments and cudaMallocAsync the measurement credits no allocator-held blocks, so an
+        # offload only shows up once empty_cache() returns its pages; without it every unlocked model would
         # be unloaded by the full shortfall. When a peer device is mid-session that release is
         # deferred, and the bytes just freed are credited to the measurement instead. That credit is
-        # the same optimistic figure `_get_reclaimable_allocator_bytes` refuses to grant -- the
+        # the optimistic figure `_get_reclaimable_allocator_bytes` refuses to grant -- the
         # allocator holds those bytes, but a large contiguous allocation may not be servable from
         # them -- so it is deliberately loop-local: it stops this loop offloading everything, and
         # the load that follows re-measures for itself (`lock`, `make_room_in_vram`) and streams
         # from RAM if the room did not materialize.
-        empty_cache_per_offload = expandable_segments_enabled()
+        async_pool = self._uses_cuda_async_pool()
+        empty_cache_per_offload = expandable_segments_enabled() or async_pool
         vram_bytes_freed_uncounted = 0
+        if async_pool and pretrim and not capped:
+            # A trim returns the pool's unused bytes, which may cover part or all of the shortfall (an earlier node's
+            # activations): offload only for what is still short afterwards.
+            shortfall = vram_bytes_required - vram_available_fn()
+            unused_in_pool = torch.cuda.memory_reserved(self._execution_device) - self._get_vram_in_use()
+            if shortfall > 0 and unused_in_pool >= _MIN_RELEASABLE_FOR_RESERVE:
+                TorchDevice.empty_cache()
+        # A partial offload that returned less than believed is followed up on the same entry, which only a device
+        # with memory of its own can tell: on shared memory (MPS, an integrated GPU) moving weights frees nothing net.
+        remeasure_entry = device_has_dedicated_vram(self._execution_device)
         # TODO(ryand): Give more thought to the offloading policy used here.
         cache_entries_increasing_size = sorted(self._cached_models.values(), key=lambda x: x.cached_model.total_bytes())
         for cache_entry in cache_entries_increasing_size:
             # We do not fully trust the count of bytes freed, so we check again on each iteration.
             vram_available = vram_available_fn() + vram_bytes_freed_uncounted
-            vram_bytes_to_free = vram_bytes_required - vram_available
-            if vram_bytes_to_free <= 0:
+            vram_bytes_shortfall = vram_bytes_required - vram_available
+            if vram_bytes_shortfall <= 0:
                 break
             if cache_entry.is_locked:
                 # TODO(ryand): In the future, we may want to partially unload locked models, but this requires careful
                 # handling of model patches (e.g. LoRA).
                 continue
-            cache_entry_bytes_freed = self._move_model_to_ram(cache_entry, vram_bytes_to_free)
-            if cache_entry_bytes_freed > 0:
-                self._logger.debug(
-                    f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed / MB):.0f} MB."
-                )
-                if empty_cache_per_offload:
-                    if TorchDevice.empty_cache():
-                        vram_bytes_freed_uncounted = 0
-                    else:
-                        vram_bytes_freed_uncounted += cache_entry_bytes_freed
-            vram_bytes_freed += cache_entry_bytes_freed
+            vram_bytes_to_free = vram_bytes_shortfall
+            follow_ups = 0
+            while True:
+                cache_entry_bytes_freed = self._move_model_to_ram(cache_entry, vram_bytes_to_free)
+                if cache_entry_bytes_freed > 0:
+                    self._logger.debug(
+                        f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed / MB):.0f} MB."
+                    )
+                    if empty_cache_per_offload:
+                        if TorchDevice.empty_cache(force=force_empty_cache):
+                            vram_bytes_freed_uncounted = 0
+                        elif not capped:
+                            vram_bytes_freed_uncounted += cache_entry_bytes_freed
+                vram_bytes_freed += cache_entry_bytes_freed
+                # A partial unload frees believed sizes, and the driver gets back less (granularity, pages unmapped
+                # late). Re-measure and keep taking from this entry until the shortfall is met or it has nothing left
+                # on the device; otherwise the last, largest entry would end the loop with the shortfall unmet. A step
+                # that freed nothing ends it, so it cannot spin. Each follow-up asks for double the multiple of the
+                # remaining shortfall the previous one did, so a model that returns little costs a logarithmic number
+                # of steps (each walks the state dict and, in the modes above, synchronizes and trims) instead of one
+                # per small remainder.
+                if cache_entry_bytes_freed <= 0 or not remeasure_entry:
+                    break
+                vram_bytes_shortfall = vram_bytes_required - (vram_available_fn() + vram_bytes_freed_uncounted)
+                if vram_bytes_shortfall <= 0 or cache_entry.cached_model.cur_vram_bytes() <= 0:
+                    break
+                follow_ups += 1
+                vram_bytes_to_free = vram_bytes_shortfall * 2**follow_ups
+            if vram_bytes_shortfall <= 0:
+                break
 
         # Only pay for empty_cache() when something was actually offloaded. Paced VRAM moves run
         # this method once per pass, and on most passes there is nothing left to offload —
@@ -2689,6 +2786,12 @@ class ModelCache:
         # (and synchronize the device on ROCm) dozens of times per stream for no benefit.
         if vram_bytes_freed > 0 and not empty_cache_per_offload:
             TorchDevice.empty_cache()
+        if async_pool and vram_bytes_freed_uncounted > 0:
+            # A busy peer deferred the trims, so the pool still holds what the loop freed, and an async pool is
+            # credited nothing: the load that follows (every lock runs in paced passes, each measuring for itself)
+            # would see no room and stream the model at its minimum weights. Trim once past the peer instead of
+            # crediting a believed amount. Costs the peer one stall per offloading lock, only in this case.
+            TorchDevice.empty_cache(force=True)
         return vram_bytes_freed
 
     def _log_cache_state(self, title: str = "Model cache state:", include_entry_details: bool = True):

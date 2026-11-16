@@ -9,7 +9,9 @@ to 0% VRAM residency while the allocator happily reused the "missing" memory for
 """
 
 import logging
+import re
 import sys
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -294,7 +296,7 @@ def test_offloading_under_expandable_segments_stops_once_enough_is_free(monkeypa
         device["unmappable"] += 4 * GB
         return 4 * GB
 
-    def empty_cache() -> bool:
+    def empty_cache(force: bool = False) -> bool:
         if peer_busy:  # deferred: nothing is released, and the driver keeps reporting the old figure
             return False
         device["free"] += device["unmappable"]
@@ -351,7 +353,9 @@ class TestReserveRelease:
         )
         monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: releasable_mb * MB)
         monkeypatch.setattr(model_cache_module, "expandable_segments_enabled", lambda: False)
-        monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda cls, force=False: calls.append(force)))
+        monkeypatch.setattr(
+            TorchDevice, "empty_cache", classmethod(lambda cls, force=False: calls.append(force) or True)
+        )
         cache._release_allocator_blocks_for_reserve(None if working_mb is None else working_mb * MB)
         return calls
 
@@ -390,11 +394,426 @@ class TestReserveRelease:
         monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
         monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device=None: 9 * GB)
         monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device=None: 6 * GB)
-        monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda cls, force=False: calls.append(force)))
+        monkeypatch.setattr(
+            TorchDevice, "empty_cache", classmethod(lambda cls, force=False: calls.append(force) or True)
+        )
 
         cache._release_allocator_blocks_for_reserve(4 * GB)
 
         assert calls == [True]
+
+
+class _Pool:
+    """A GPU's driver and torch's caching allocator, as far as the cache's budget reads them.
+
+    `fragmented` bytes of the unused reserve sit in chunks that hold live allocations: a trim cannot return them.
+    cudaMallocAsync reports no inactive splits; the native allocator reports the fragmented bytes as such. With
+    `busy_peer`, an unforced `empty_cache` defers (returns False), as `TorchDevice.empty_cache` does while another
+    generation device is mid-session.
+    """
+
+    def __init__(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        backend: str,
+        reserved: int,
+        allocated: int,
+        fragmented: int,
+        busy_peer: bool = False,
+    ):
+        self.total = 24 * GB
+        self.reserved = reserved
+        self.allocated = allocated
+        self.fragmented = fragmented
+        self.busy_peer = busy_peer
+        self.trims: list[bool] = []  # `force` of each empty_cache() that was asked for
+        stats = {} if backend == "cudaMallocAsync" else {"inactive_split_bytes.all.current": fragmented}
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+        monkeypatch.setattr(torch.cuda, "get_allocator_backend", lambda: backend)
+        monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device=None: self.reserved)
+        monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device=None: self.allocated)
+        monkeypatch.setattr(torch.cuda, "memory_stats", lambda device=None: stats)
+        monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device=None: (self.driver_free, self.total))
+        monkeypatch.setattr(model_cache_module, "expandable_segments_enabled", lambda: False)
+        monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda cls, force=False: self.empty_cache(force)))
+
+    @property
+    def driver_free(self) -> int:
+        return self.total - self.reserved
+
+    def empty_cache(self, force: bool = False) -> bool:
+        self.trims.append(force)
+        if self.busy_peer and not force:
+            return False
+        self.reserved -= max(0, self.reserved - self.allocated - self.fragmented)
+        return True
+
+
+class _Resident:
+    """An unlocked cache entry as the offload reads it: its size and how much of it is still on the device."""
+
+    is_locked = False
+
+    def __init__(self, key: str, size: int):
+        self.key = key
+        self.size = size
+        self.on_device = size
+        self.cached_model = self
+
+    def total_bytes(self) -> int:
+        return self.size
+
+    def cur_vram_bytes(self) -> int:
+        return self.on_device
+
+
+def _pool_cache(logger: logging.Logger | None = None, **kwargs) -> ModelCache:
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=logger or MagicMock(),
+        shared_cpu_weights=None,
+        **kwargs,
+    )
+    cache._execution_device = torch.device("cuda")  # policy only; every VRAM query is faked by `_Pool`
+    return cache
+
+
+def _resident_models(
+    monkeypatch: pytest.MonkeyPatch, cache: ModelCache, pool: _Pool, sizes: dict[str, int], fragmenting=()
+) -> dict[str, _Resident]:
+    """Unlocked entries, smallest first, whose offload returns their weights to the pool; those named in `fragmenting`
+    leave them in chunks that other live allocations share."""
+    models = {key: _Resident(key, size) for key, size in sizes.items()}
+
+    def move_to_ram(entry, bytes_to_free, keep_required_weights_in_vram=None):
+        model = models.get(entry.key)
+        if model is None:  # the model being locked: it has no weights on the device
+            return 0
+        freed, model.on_device = model.on_device, 0
+        pool.allocated -= freed
+        if entry.key in fragmenting:
+            pool.fragmented += freed
+        return freed
+
+    monkeypatch.setattr(cache, "_move_model_to_ram", move_to_ram)
+    cache._cached_models.update(models)  # type: ignore[arg-type]
+    return models
+
+
+def _megabytes(caplog: pytest.LogCaptureFixture, marker: str) -> list[list[int]]:
+    """The MB figures of each log message that contains `marker`."""
+    return [
+        [int(n) for n in re.findall(r"(\d+)MB", record.getMessage())]
+        for record in caplog.records
+        if marker in record.getMessage()
+    ]
+
+
+def test_an_async_pool_gets_no_credit_for_its_unused_bytes_and_a_native_one_keeps_its_credit(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Without inactive splits to tell, a fragmented cudaMallocAsync pool's whole reserved-minus-allocated gap would
+    count as releasable, but a trim returns only the chunks without a live allocation."""
+    _Pool(monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=12 * GB, fragmented=9 * GB)
+    assert _pool_cache()._get_reclaimable_allocator_bytes() == 0
+
+    _Pool(monkeypatch, backend="native", reserved=22 * GB, allocated=12 * GB, fragmented=4 * GB)
+    assert _pool_cache()._get_reclaimable_allocator_bytes() == 6 * GB
+
+
+def test_a_release_logs_what_the_driver_got_back_and_offloads_weights_when_the_pool_kept_the_rest(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    pool = _Pool(monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=12 * GB, fragmented=9 * GB)
+    cache = _pool_cache(logging.getLogger("pool_release"))
+    models = _resident_models(monkeypatch, cache, pool, {"idle": 4 * GB})
+
+    with caplog.at_level(logging.DEBUG, logger="pool_release"):
+        cache._release_allocator_blocks_for_reserve(5 * GB)  # 2 GB driver-free; 10 GB of the pool's gap look free
+
+    # 3 GB driver-free after the trim, 2 GB short of the reserve: the unlocked weights go back to the driver.
+    assert models["idle"].on_device == 0
+    assert pool.driver_free == 7 * GB
+    # Returned, believed releasable, driver-free after the trim, reserve -- then offloaded, driver-free after that.
+    assert _megabytes(caplog, "Returned") == [[1024, 10240, 3072, 5120]]
+    assert _megabytes(caplog, "stayed short") == [[3072, 5120, 4096, 7168]]
+
+
+def test_the_offload_after_a_release_measures_the_driver_not_the_cache_cap(monkeypatch: pytest.MonkeyPatch):
+    pool = _Pool(monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=12 * GB, fragmented=9 * GB)
+    cache = _pool_cache(max_vram_cache_size_gb=20.0)  # the capped budget: 20 - 5 working - 12 in use, with room left
+    models = _resident_models(monkeypatch, cache, pool, {"idle": 4 * GB})
+
+    cache._release_allocator_blocks_for_reserve(5 * GB)
+
+    assert models["idle"].on_device == 0
+    assert pool.driver_free == 7 * GB
+
+
+@pytest.mark.parametrize("peer_busy", [False, True], ids=["alone", "peer-busy"])
+def test_on_windows_the_offload_after_a_release_runs_past_a_busy_peer_like_the_release(
+    monkeypatch: pytest.MonkeyPatch, peer_busy: bool
+):
+    monkeypatch.setattr(sys, "platform", "win32")
+    pool = _Pool(
+        monkeypatch,
+        backend="cudaMallocAsync",
+        reserved=22 * GB,
+        allocated=12 * GB,
+        fragmented=9 * GB,
+        busy_peer=peer_busy,
+    )
+    cache = _pool_cache()
+    _resident_models(monkeypatch, cache, pool, {"idle": 4 * GB})
+
+    cache._release_allocator_blocks_for_reserve(5 * GB)
+
+    assert pool.trims == [True, True]
+    assert pool.driver_free == 7 * GB
+
+
+def test_off_windows_a_release_deferred_by_a_busy_peer_changes_nothing(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(sys, "platform", "linux")
+    pool = _Pool(
+        monkeypatch,
+        backend="cudaMallocAsync",
+        reserved=22 * GB,
+        allocated=12 * GB,
+        fragmented=9 * GB,
+        busy_peer=True,
+    )
+    cache = _pool_cache()
+    models = _resident_models(monkeypatch, cache, pool, {"idle": 4 * GB})
+
+    cache._release_allocator_blocks_for_reserve(5 * GB)
+
+    assert pool.trims == [False]
+    assert models["idle"].on_device == 4 * GB
+
+
+def test_a_native_allocator_that_is_still_short_after_the_trim_offloads_nothing(monkeypatch: pytest.MonkeyPatch):
+    pool = _Pool(monkeypatch, backend="native", reserved=22 * GB, allocated=12 * GB, fragmented=8 * GB)
+    cache = _pool_cache()
+    models = _resident_models(monkeypatch, cache, pool, {"idle": 4 * GB})
+
+    cache._release_allocator_blocks_for_reserve(5 * GB)
+
+    assert pool.driver_free == 4 * GB
+    assert models["idle"].on_device == 4 * GB
+
+
+def test_a_trim_deferred_by_a_busy_peer_credits_the_offloaded_weights_once(monkeypatch: pytest.MonkeyPatch):
+    """The driver cannot see an offload before the trim runs, and an async pool credits nothing for it, so the loop's
+    own credit for the deferred trim is the only one: 1 GB available, 7 GB needed, three 4 GB models."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    pool = _Pool(
+        monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=22 * GB, fragmented=0, busy_peer=True
+    )
+    cache = _pool_cache()
+    models = _resident_models(monkeypatch, cache, pool, {"a": 4 * GB, "b": 4 * GB, "c": 4 * GB})
+    assert cache._get_vram_available(None) == 1 * GB
+
+    cache._offload_unlocked_models(7 * GB)
+
+    assert [m.on_device for m in models.values()] == [0, 0, 4 * GB]
+
+
+def test_a_trim_after_each_offload_shows_what_the_driver_got_back(monkeypatch: pytest.MonkeyPatch):
+    """The first model's weights sat in chunks that live allocations share: its trim returned nothing, so the second
+    has to go too."""
+    pool = _Pool(monkeypatch, backend="cudaMallocAsync", reserved=12 * GB, allocated=12 * GB, fragmented=0)
+    cache = _pool_cache()
+    models = _resident_models(monkeypatch, cache, pool, {"a": 4 * GB, "b": 5 * GB}, fragmenting={"a"})
+
+    cache._offload_unlocked_models(14 * GB)  # 11 GB available
+
+    assert [m.on_device for m in models.values()] == [0, 0]
+    assert pool.trims == [False, False]
+    assert pool.driver_free == 17 * GB
+
+
+@pytest.mark.parametrize(
+    ("reserved", "fragmented", "on_device_after", "trims"),
+    [
+        (22 * GB, 0, {"a": 2 * GB, "b": 4 * GB}, [False]),
+        (22 * GB, 9 * GB, {"a": 0, "b": 0}, [False, False, False]),
+        (16 * GB, 0, {"a": 0, "b": 4 * GB}, [False, False]),
+    ],
+    ids=["pool-covers-it", "pool-is-fragmented", "pool-covers-part-of-it"],
+)
+def test_the_pool_is_trimmed_once_before_a_model_is_offloaded_for_a_shortfall_it_may_cover(
+    monkeypatch: pytest.MonkeyPatch, reserved: int, fragmented: int, on_device_after: dict[str, int], trims: list[bool]
+):
+    """Smallest first: `a` is offloaded only for what the trimmed pool did not cover, `b` only after that. Each
+    offload is followed by a trim of its own."""
+    pool = _Pool(monkeypatch, backend="cudaMallocAsync", reserved=reserved, allocated=12 * GB, fragmented=fragmented)
+    cache = _pool_cache()
+    models = _resident_models(monkeypatch, cache, pool, {"a": 2 * GB, "b": 4 * GB})
+    required = cache._get_vram_available(None) + 5 * GB
+
+    cache._offload_unlocked_models(required)
+
+    assert {key: model.on_device for key, model in models.items()} == on_device_after
+    assert pool.trims == trims
+
+
+@pytest.mark.parametrize(("unused", "trims"), [(255 * MB, []), (256 * MB, [False])], ids=["below-minimum", "minimum"])
+def test_the_pool_is_not_trimmed_before_an_offload_for_fewer_unused_bytes_than_the_minimum(
+    monkeypatch: pytest.MonkeyPatch, unused: int, trims: list[bool]
+):
+    pool = _Pool(monkeypatch, backend="cudaMallocAsync", reserved=12 * GB + unused, allocated=12 * GB, fragmented=0)
+    cache = _pool_cache()
+
+    cache._offload_unlocked_models(cache._get_vram_available(None) + GB)
+
+    assert pool.trims == trims
+
+
+def test_the_trim_before_an_offload_is_not_forced_past_a_busy_peer(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(sys, "platform", "win32")
+    pool = _Pool(
+        monkeypatch,
+        backend="cudaMallocAsync",
+        reserved=22 * GB,
+        allocated=12 * GB,
+        fragmented=0,
+        busy_peer=True,
+    )
+    cache = _pool_cache()
+    _resident_models(monkeypatch, cache, pool, {"idle": 4 * GB})
+
+    cache._offload_unlocked_models(cache._get_vram_available(None) + 5 * GB)
+
+    assert pool.trims[0] is False
+
+
+def test_a_capped_budget_is_not_trimmed_for_and_does_not_count_deferred_trims(monkeypatch: pytest.MonkeyPatch):
+    """The cap's measurement is the allocated bytes: no trim shows up in it, and an offload shows up at once, so a
+    deferred trim must not credit the offloaded bytes a second time. 14 GB cap - 1 GB working - 12 GB allocated =
+    1 GB; 7 GB needed: two 4 GB models."""
+    monkeypatch.setattr(sys, "platform", "linux")
+    pool = _Pool(
+        monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=12 * GB, fragmented=0, busy_peer=True
+    )
+    cache = _pool_cache(max_vram_cache_size_gb=14.0)
+    models = _resident_models(monkeypatch, cache, pool, {"a": 4 * GB, "b": 4 * GB, "c": 4 * GB})
+    assert cache._get_vram_available(None) == 1 * GB
+
+    cache._offload_unlocked_models(7 * GB)
+
+    assert [m.on_device for m in models.values()] == [0, 0, 4 * GB]
+    assert pool.trims == [False, False]  # one per offload; none before the first
+
+
+def _paced_victim(monkeypatch: pytest.MonkeyPatch, cache: ModelCache, pool: _Pool, total: int):
+    """A cached model of `total` bytes whose moves to the device are faked against `pool`; returns it and a reader of
+    how much of it is on the device."""
+    cache.put("victim", torch.nn.Linear(256, 256, bias=False), execution_device=torch.device("cuda"))
+    victim = cache.get("victim")
+    loaded = 0
+    monkeypatch.setattr(victim.cached_model, "total_bytes", lambda: total)
+    monkeypatch.setattr(victim.cached_model, "cur_vram_bytes", lambda: loaded)
+
+    def move_to_vram(entry, vram_available, max_move_bytes=None):
+        nonlocal loaded
+        moved = min(total - loaded, max(0, vram_available), max_move_bytes or total)
+        loaded += moved
+        pool.allocated += moved
+        pool.reserved += moved  # new chunks from the driver
+        return moved, loaded < total and moved == max_move_bytes
+
+    monkeypatch.setattr(cache, "_move_model_to_vram", move_to_vram)
+    return victim, lambda: loaded
+
+
+def _lock_in_passes(cache: ModelCache, victim, working_mem_bytes: int) -> int:
+    """What `_lock_paced` does: a first pass through `lock`, then `continue_lock` until the move settles. Returns the
+    number of passes."""
+    passes = 1
+    started = time.time()
+    settled = cache.lock(victim, working_mem_bytes, max_move_bytes=GB)
+    while not settled:
+        passes += 1
+        settled = cache.continue_lock(victim, working_mem_bytes, max_move_bytes=GB, stream_started_at=started)
+    return passes
+
+
+@pytest.mark.parametrize("platform", ["linux", "win32"])
+def test_a_paced_lock_is_not_left_at_minimum_weights_by_trims_a_busy_peer_deferred(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, platform: str
+):
+    """2 GB driver-free, 1 GB working memory, a 3 GB model to stream in 1 GB passes, a 4 GB unlocked model to give up.
+    With a peer mid-session the offload's own trim is deferred and an async pool is credited nothing, so every pass
+    would find no room: the offload trims once past the peer instead, and the model loads in full."""
+    monkeypatch.setattr(sys, "platform", platform)
+    pool = _Pool(
+        monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=22 * GB, fragmented=0, busy_peer=True
+    )
+    cache = _pool_cache(logging.getLogger("pool_busy_peer"))
+    try:
+        victim, loaded = _paced_victim(monkeypatch, cache, pool, 3 * GB)
+        models = _resident_models(monkeypatch, cache, pool, {"idle": 4 * GB})
+
+        with caplog.at_level(logging.WARNING, logger="pool_busy_peer"):
+            passes = _lock_in_passes(cache, victim, GB)
+        cache.unlock(victim)
+
+        assert models["idle"].on_device == 0
+        assert (passes, loaded()) == (3, 3 * GB)
+        assert pool.trims == [False, True]  # the offload's deferred trim, then one past the peer
+        assert "short by" not in caplog.text
+    finally:
+        cache._cached_models.pop("idle", None)
+        cache._execution_device = torch.device("cpu")
+        cache.shutdown()
+
+
+def test_a_paced_lock_trims_the_pool_on_its_first_pass_only(monkeypatch: pytest.MonkeyPatch):
+    """A 16 GB model streams in 1 GB passes against a pool whose unused 7 GB cannot be trimmed: the first pass finds
+    that out, the others must not pay for a synchronizing trim each."""
+    monkeypatch.setattr(sys, "platform", "win32")
+    pool = _Pool(monkeypatch, backend="cudaMallocAsync", reserved=10 * GB, allocated=2 * GB, fragmented=7 * GB)
+    cache = _pool_cache(logging.getLogger("pool_paced"))
+    try:
+        victim, _ = _paced_victim(monkeypatch, cache, pool, 16 * GB)
+
+        assert _lock_in_passes(cache, victim, GB) > 4
+        cache.unlock(victim)
+
+        # The first pass's trim, then the release the settled pass ends with (forced on Windows).
+        assert pool.trims == [False, True]
+    finally:
+        cache._execution_device = torch.device("cpu")
+        cache.shutdown()
+
+
+def test_a_lock_that_stays_short_after_offloading_still_warns(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
+    pool = _Pool(monkeypatch, backend="cudaMallocAsync", reserved=22 * GB, allocated=12 * GB, fragmented=9 * GB)
+    cache = _pool_cache(logging.getLogger("pool_short"))
+    try:
+        cache.put("victim", torch.nn.Linear(256, 256, bias=False), execution_device=torch.device("cuda"))
+        victim = cache.get("victim")
+        _resident_models(monkeypatch, cache, pool, {"other": 4 * GB})
+        monkeypatch.setattr(cache, "_move_model_to_vram", lambda entry, available, max_move_bytes=None: (0, False))
+
+        with caplog.at_level(logging.WARNING, logger="pool_short"):
+            cache.lock(victim, 20 * GB)
+        cache.unlock(victim)
+
+        # 7 GB driver-free once the other model is offloaded and the pool trimmed, against 20 GB working memory.
+        assert pool.driver_free == 7 * GB
+        assert "VRAM budget for 'victim' is short by 13312MB even after offloading" in caplog.text
+    finally:
+        cache._cached_models.pop("other", None)  # a stand-in entry without the lifecycle fields shutdown() reads
+        cache._execution_device = torch.device("cpu")
+        cache.shutdown()
 
 
 @pytest.mark.slow

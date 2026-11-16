@@ -448,7 +448,8 @@ class TorchDevice:
         its current step: a model about to run without the driver-free working memory it needs, which on Windows
         hangs instead of failing (see `ModelCache._release_allocator_blocks_for_reserve`), and the opt-in
         `clear_vram_after_session` release, whose next session would otherwise budget its first load against memory
-        the allocator still holds.
+        the allocator still holds, and (under cudaMallocAsync) the model cache's offload, which would otherwise
+        leave the freed weights in the pool for the load that follows to find no room in.
 
         ``torch.cuda.empty_cache()`` is process-global: it takes EVERY device's
         caching-allocator mutex and cudaFree/hipFrees their cached blocks, and a free on a
