@@ -11,7 +11,7 @@ from invokeai.backend.flux.sampling_utils import pack
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
 from invokeai.backend.util.vae_tiling_scope import scoped_vae_tiling
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux, vae_compute_dtype
 
 
 def generate_img_ids_with_offset(
@@ -140,7 +140,7 @@ class KontextExtension:
 
             with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
                 assert isinstance(vae, AutoencoderKL)
-                vae_dtype = next(iter(vae.parameters())).dtype
+                vae_dtype = vae_compute_dtype(vae)
                 image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
 
                 def encode_reference(x: torch.Tensor = image_tensor) -> torch.Tensor:

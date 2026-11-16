@@ -27,6 +27,7 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import (
     estimate_vae_working_memory_flux2,
     flux2_vae_attention_materializes,
+    vae_compute_dtype,
 )
 
 # Maximum pixel counts for reference images (matches BFL FLUX.2 sampling.py)
@@ -133,7 +134,7 @@ def encode_reference_image(
     )
 
     with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
-        vae_dtype = next(iter(vae.parameters())).dtype
+        vae_dtype = vae_compute_dtype(vae)
         image_tensor = image_tensor.to(device=device, dtype=vae_dtype)
 
         # Where SDPA materializes the encoder mid-block's attention matrix (ROCm, MPS), an untiled

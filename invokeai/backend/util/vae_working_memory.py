@@ -221,15 +221,15 @@ def dtype_name(dtype: torch.dtype) -> str:
     return name
 
 
-def _compute_dtype(vae: torch.nn.Module) -> torch.dtype:
-    """The dtype a VAE no node casts computes in.
+def vae_compute_dtype(vae: torch.nn.Module) -> torch.dtype:
+    """The dtype a VAE computes in: what the nodes cast its input to, and what the estimators price it at.
 
     An SDNQ VAE computes in its packed weights' `compute_dtype`: they dequantize to it, and the layer casts every other
     operand to it, an fp32 bias included. Otherwise it is that of the first floating-point parameter wider than a byte:
     narrower weights (fp8 storage) are what a layer dequantizes from, not what its activations are.
 
-    A packed parameter's `compute_dtype` wins over any floating-point one, so an SDNQ VAE that kept whole layers
-    unquantized in fp32 would be priced below its real cost; that case is not verified for the shipped SDNQ VAEs.
+    A packed parameter's `compute_dtype` wins over any floating-point one. That holds because the SDNQ VAE loaders cast
+    the parameters they leave unpacked to the same dtype (`cast_unpacked_floats`), so no layer is left in another one.
     """
     first_wide_float: torch.dtype | None = None
     for param in vae.parameters():
@@ -644,7 +644,7 @@ def _single_pass_features(
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
     height = latent_scale_factor_for_operation * image_tensor.shape[-2]
     width = latent_scale_factor_for_operation * image_tensor.shape[-1]
-    dtype = _compute_dtype(vae)
+    dtype = vae_compute_dtype(vae)
     return {
         "operation": operation,
         "height": height,
@@ -691,7 +691,7 @@ def estimate_vae_working_memory_cogview4(
         "operation": operation,
         "height": latent_scale_factor_for_operation * image_tensor.shape[-2],
         "width": latent_scale_factor_for_operation * image_tensor.shape[-1],
-        "dtype": dtype_name(_compute_dtype(vae)),
+        "dtype": dtype_name(vae_compute_dtype(vae)),
     }
     return _estimate(VAE_COGVIEW4_SPEC, features, device)
 
@@ -708,8 +708,8 @@ def _flux_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float
     return _peak_of_two_phases(convolutions, cast(int, features["score_matrix_bytes"]))
 
 
-# The FLUX.1 loaders avoid fp16, which this autoencoder is broken in, except one: an SDNQ VAE folder loads through the
-# generic VAE loader and computes in the configured precision, which `auto` makes fp16 on CUDA.
+# The FLUX.1 loaders avoid fp16, which this autoencoder is broken in, an SDNQ VAE folder included. The one way fp16
+# reaches `vae.flux` is Z-Image's `choose_bfloat16_safe_dtype` fallback on a device without bf16.
 VAE_FLUX_SPEC = register(
     EstimatorSpec(
         id="vae.flux",
@@ -750,7 +750,7 @@ def estimate_vae_working_memory_flux(
     backend's coefficients. Defaults to the session device.
     """
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
-    dtype = _compute_dtype(vae)
+    dtype = vae_compute_dtype(vae)
     device = device if device is not None else TorchDevice.choose_torch_device()
     batch_size = image_tensor.shape[0] if image_tensor.dim() >= 4 else 1
 
@@ -836,7 +836,7 @@ def flux2_vae_attention_materializes(image_tensor: torch.Tensor, vae: Autoencode
     return (
         sdpa_score_matrix_bytes(
             device=device,
-            dtype=next(vae.parameters()).dtype,
+            dtype=vae_compute_dtype(vae),
             num_heads=_FLUX2_VAE_MID_BLOCK_HEADS,
             head_dim=_FLUX2_VAE_MID_BLOCK_HEAD_DIM,
             seq_len=seq_len,
@@ -898,7 +898,7 @@ def estimate_vae_working_memory_flux2(
     bound. The score matrix is shaped (batch, heads, S, S), so it scales the same way. The encode
     call sites all pass batch 1 today; the shared estimator does not assume it.
     """
-    dtype = _compute_dtype(vae)
+    dtype = vae_compute_dtype(vae)
     device = device if device is not None else TorchDevice.choose_torch_device()
     batch_size = image_tensor.shape[0] if image_tensor.dim() >= 4 else 1
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1

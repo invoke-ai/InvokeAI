@@ -18,7 +18,7 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_t
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
 from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_vae_tiling
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux, vae_compute_dtype
 
 
 @invocation(
@@ -92,7 +92,7 @@ class FluxVaeEncodeInvocation(BaseInvocation):
         generator = torch.Generator(device=vae_info.compute_device).manual_seed(0)
         with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoencoderKL)
-            vae_dtype = next(iter(vae.parameters())).dtype
+            vae_dtype = vae_compute_dtype(vae)
             # The VAE's own device, as in the decode nodes: a cpu_only VAE (or another worker's GPU)
             # is not the session device, and encoding there would fail or run on the wrong card (#9373).
             image_tensor = image_tensor.to(device=vae_info.compute_device, dtype=vae_dtype)
