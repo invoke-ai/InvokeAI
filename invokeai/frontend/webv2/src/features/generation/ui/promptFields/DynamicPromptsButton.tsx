@@ -1,3 +1,4 @@
+import type { PromptSyntaxProfile } from '@features/generation/core/prompt/compel';
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 import type { PromptEditor } from '@features/generation/ui/promptFields/promptEditor';
 import type { DynamicPromptsExpansion } from '@features/generation/ui/useDynamicPrompts';
@@ -31,6 +32,7 @@ interface DynamicPromptsButtonProps {
   showSyntaxHighlighting: boolean;
   /** Expanded prompts keep only attention syntax, so they follow the model rather than the authoring preference. */
   highlightExpandedPrompts: boolean;
+  syntaxProfile: PromptSyntaxProfile;
   onUsePrompt: (prompt: string) => void;
   onInsertText: (text: string) => void;
 }
@@ -40,6 +42,7 @@ export const DynamicPromptsButton = ({
   config,
   expansion,
   highlightExpandedPrompts,
+  syntaxProfile,
   onInsertText,
   onUsePrompt,
   promptEditor,
@@ -156,6 +159,7 @@ export const DynamicPromptsButton = ({
                       config={config}
                       expansion={expansion}
                       showSyntaxHighlighting={highlightExpandedPrompts}
+                      syntaxProfile={syntaxProfile}
                       onUsePrompt={handleUsePrompt}
                     />
                   ) : (

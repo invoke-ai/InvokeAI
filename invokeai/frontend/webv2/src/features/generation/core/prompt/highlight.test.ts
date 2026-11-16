@@ -126,14 +126,14 @@ describe('prompt highlight segments', () => {
     it('leaves weights, groups, embeddings, functions and bracket errors plain', () => {
       const prompt = "cat+ (dog)1.2 <emb> ('a', 'b').and() \\( unclosed(";
 
-      expect(buildPromptHighlightSegments(prompt, { attentionSyntax: false })).toEqual([
+      expect(buildPromptHighlightSegments(prompt, { syntaxProfile: 'none' })).toEqual([
         { kind: 'text', range: { start: 0, end: prompt.length }, text: prompt },
       ]);
     });
 
     it('still marks dynamic-prompt syntax, which is expanded before any encoder reads the prompt', () => {
       const prompt = '{red+|green} # note';
-      const segments = buildPromptHighlightSegments(prompt, { attentionSyntax: false, dynamicPrompts: true });
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'none', dynamicPrompts: true });
 
       expect(segments).toEqual([
         { kind: 'variantBrace', range: { start: 0, end: 1 }, text: '{' },
@@ -144,6 +144,80 @@ describe('prompt highlight segments', () => {
         { kind: 'text', range: { start: 12, end: 13 }, text: ' ' },
         { kind: 'comment', range: { start: 13, end: 19 }, text: '# note' },
       ]);
+    });
+  });
+
+  describe('Anima attention-only syntax', () => {
+    it.each([
+      ['(cat)-1', '-', 'attention'],
+      ['(cat)+1', '+', 'attention'],
+      ['(cat).5', '.5', 'attentionNumeric'],
+      ['(cat)2.', '2.', 'attentionNumeric'],
+      ['(cat)2next', '2', 'attentionNumeric'],
+      ['(cat)++dog', '++', 'attention'],
+    ] as const)('highlights the supported group suffix in %s', (prompt, suffix, kind) => {
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+      expect(segments).toContainEqual(expect.objectContaining({ text: suffix, kind }));
+      expect(segments.map((segment) => segment.text).join('')).toBe(prompt);
+    });
+
+    it('keeps earlier weights visible when later text has unsupported syntax', () => {
+      const prompt = 'foo++bar.baz foo++bar=2 foo"bar+ foo|bar+';
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+      expect(segments.filter((segment) => segment.kind === 'attention').map((segment) => segment.text)).toEqual([
+        '++',
+        '++',
+        '+',
+      ]);
+      expect(segments.map((segment) => segment.text).join('')).toBe(prompt);
+    });
+
+    it('highlights supported word and group weights across Compel-style word boundaries', () => {
+      const prompt = 'blue-green+ hair!+ a+b+ foo++bar+ (long hair)2';
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+
+      expect(segments.filter((segment) => segment.kind === 'attention').map((segment) => segment.text)).toEqual([
+        '+',
+        '+',
+        '+',
+        '++',
+        '+',
+      ]);
+      expect(segments.find((segment) => segment.kind === 'attentionNumeric')?.text).toBe('2');
+      expect(segments.map((segment) => segment.text).join('')).toBe(prompt);
+    });
+
+    it('leaves Compel-only functions, embeddings, and dot/equal suffixes plain', () => {
+      const prompt = 'foo.bar+ foo=bar+ <embedding> (red, blue).blend(0.5, 0.5)';
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+
+      expect(segments.find((segment) => segment.text.includes('foo.bar+'))?.kind).toBe('text');
+      expect(segments.find((segment) => segment.text.includes('foo=bar+'))?.kind).toBe('text');
+      expect(segments.find((segment) => segment.text.includes('<embedding>'))?.kind).toBe('text');
+      expect(segments.find((segment) => segment.text.includes('.blend(0.5, 0.5)'))?.kind).toBe('text');
+      expect(segments.some((segment) => segment.kind === 'promptFunctionMethod' || segment.kind === 'embedding')).toBe(
+        false
+      );
+    });
+
+    it('keeps dynamic expansion highlighting while Anima methods are plain', () => {
+      const prompt = '{red+|blue} .and()';
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima', dynamicPrompts: true });
+
+      expect(segments.some((segment) => segment.kind === 'variantBrace')).toBe(true);
+      expect(segments.find((segment) => segment.text.includes('.and()'))?.kind).toBe('text');
+    });
+
+    it('highlights attention in the group before a plain Compel-only method', () => {
+      const prompt = 'blue-green+ (red+, blue).and()';
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+
+      expect(segments.filter((segment) => segment.kind === 'attention').map((segment) => segment.text)).toEqual([
+        '+',
+        '+',
+      ]);
+      expect(segments.find((segment) => segment.text.includes('.and()'))?.kind).toBe('text');
+      expect(segments.map((segment) => segment.text).join('')).toBe(prompt);
     });
   });
 });
@@ -167,4 +241,93 @@ describe('buildPromptHighlightSegments on a large prompt', () => {
 
     expect(performance.now() - started).toBeLessThan(150);
   });
+});
+
+describe('Anima painting follows parsed attention', () => {
+  it.each(['red\\+', 'cat)2', '((red)2', '(red (blue)2', 'a(b)2', 'foo.bar+'])(
+    'leaves literal suffixes plain in %s',
+    (prompt) => {
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+      expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+      expect(segments.every(({ kind }) => kind === 'text')).toBe(true);
+    }
+  );
+
+  it.each([
+    '.and(dog+)',
+    '.and(dog+',
+    '.and(.blend(dog+))',
+    '(red, blue).and(dog+)',
+    '(red).and((dog)+, cat+)',
+    '(cat)2.and(dog+)',
+  ])('shows supported attention inside unsupported operations: %s', (prompt) => {
+    const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+    expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+    expect(segments.some(({ text, kind }) => text.includes('+') && kind === 'attention')).toBe(true);
+    const method = prompt.indexOf('.and');
+    expect(segments.find(({ range }) => range.start <= method && range.end > method)?.kind).toBe('text');
+  });
+
+  it.each(['red\\.blue+', '"red (blue)2"+', '(foo.bar+)2', 'red+(blue)2', 'red .attend (2)'])(
+    'paints attention accepted by the backend in %s',
+    (prompt) => {
+      const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+      expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+      expect(segments.some(({ kind }) => kind === 'attention' || kind === 'attentionNumeric')).toBe(true);
+    }
+  );
+
+  it('paints 1500 nested groups without recursion and keeps malformed input plain', () => {
+    const valid = `${'('.repeat(1500)}red${')'.repeat(1500)}2`;
+    expect(buildPromptHighlightSegments(valid, { syntaxProfile: 'anima' }).at(-1)?.kind).toBe('attentionNumeric');
+    const invalid = `${'('.repeat(20_000)}red)2`;
+    expect(buildPromptHighlightSegments(invalid, { syntaxProfile: 'anima' })).toEqual([
+      { kind: 'text', range: { start: 0, end: invalid.length }, text: invalid },
+    ]);
+  });
+});
+
+it.each(['red .attend (2)', '(red) .attend(++)', '"red".attend(--)'])(
+  'keeps the method marker plain and colours its supported weight: %s',
+  (prompt) => {
+    const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+    const marker = prompt.indexOf('.attend');
+    expect(segments.find(({ range }) => range.start <= marker && range.end > marker)?.kind).toBe('text');
+    expect(segments.some(({ kind }) => kind === 'attention' || kind === 'attentionNumeric')).toBe(true);
+    expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+  }
+);
+
+it.each(['("cat(")2', '("cat(")65505', String.raw`"cat\fdog"2`])(
+  'keeps rejected quoted attention plain: %s',
+  (prompt) => {
+    const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+    expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+    expect(segments.every(({ kind }) => kind === 'text')).toBe(true);
+  }
+);
+
+it.each(['n', 't', 'r'])('paints source ranges after a quoted \\%s separator', (escape) => {
+  const prompt = `"cat\\${escape}dog+"2`;
+  const plus = prompt.indexOf('+');
+  const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+  expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+  expect(segments.find(({ range }) => range.start <= plus && range.end > plus)?.kind).toBe('attention');
+  expect(segments.find(({ range }) => range.start <= 4 && range.end > 4)?.kind).toBe('text');
+});
+
+it.each([
+  String.raw`"cat\fdog+"2 bird+`,
+  '"cat("2 bird+',
+  '"cat)"2 bird+',
+  String.raw`"cat\fdog+"2,bird+`,
+  String.raw`.and("cat\fdog+"2, bird+)`,
+])('paints only the valid following weight after a closed rejected quote: %s', (prompt) => {
+  const segments = buildPromptHighlightSegments(prompt, { syntaxProfile: 'anima' });
+  expect(segments.map(({ text }) => text).join('')).toBe(prompt);
+  const bird = prompt.indexOf('bird');
+  expect(
+    segments.filter(({ kind }) => kind === 'attention' || kind === 'attentionNumeric').map(({ text }) => text)
+  ).toEqual(['+']);
+  expect(segments.find(({ range }) => range.start <= bird + 4 && range.end > bird + 4)?.kind).toBe('attention');
 });

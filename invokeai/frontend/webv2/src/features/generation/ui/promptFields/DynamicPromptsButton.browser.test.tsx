@@ -49,6 +49,7 @@ const ExpandingButton = ({ onUsePrompt, prompt }: { onUsePrompt: (prompt: string
     config={config}
     expansion={useDynamicPrompts(prompt, config)}
     highlightExpandedPrompts
+    syntaxProfile="compel"
     promptEditor={NO_PROMPT_ELEMENT}
     showSyntaxHighlighting
     onInsertText={vi.fn()}
