@@ -250,6 +250,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     variant_type_adapter,
 )
+from invokeai.backend.quantization.fp8_scaled import header_has_mx_block_scales
 from invokeai.backend.quantization.gguf.loaders import COMFY_QUANT_KEY_PREFIX, parse_gguf_convrot_markers
 
 logger = logging.getLogger(__name__)
@@ -282,6 +283,10 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
     layers the file ships in full precision, a lossy trade rather than the lossless keep a scaled-fp8 file gets, so
     it is left to the user instead of switched on. An nvfp4 file that also stores scaled fp8 weights (Qwen-Image's
     nvfp4 build) still counts.
+
+    An MXFP8 file does not count either (`header_has_mx_block_scales`). The loaders unpack its block-scaled layers to
+    bf16, and FP8 Storage would cast them back to fp8 without the block scale: blocks whose scale is far below 1 flush
+    to zero. Like bf16, it is left to the user, who can still switch it on knowingly.
     """
     if mod.path.is_file():
         candidates = [mod.path]
@@ -293,6 +298,7 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
         ]
 
     stores_float8 = False
+    stores_mxfp8 = False
     for path in candidates:
         if path.suffix != ".safetensors":
             continue
@@ -302,12 +308,13 @@ def _denoiser_stores_float8_weights(mod: ModelOnDisk) -> bool:
             logger.debug(f"Could not read the safetensors header of {path} to look for float8 weights: {e}")
             continue
         denoiser = {key: info for key, info in header.items() if not key.startswith(_BUNDLED_COMPONENT_KEY_PREFIXES)}
+        stores_mxfp8 = stores_mxfp8 or header_has_mx_block_scales(denoiser)
         stores_float8 = stores_float8 or any(
             isinstance(info, dict) and info.get("dtype") in _FP8_SAFETENSORS_DTYPES
             for key, info in denoiser.items()
             if not key.endswith("_scale")
         )
-    return stores_float8
+    return stores_float8 and not stores_mxfp8
 
 
 def _identified_default_settings(

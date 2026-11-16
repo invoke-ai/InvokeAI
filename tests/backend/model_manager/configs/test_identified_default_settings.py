@@ -18,7 +18,13 @@ from safetensors.torch import save_file
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_QwenImage_Config
 from invokeai.backend.model_manager.taxonomy import ModelType
-from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_codes, nvfp4_tensors
+from tests.fixtures.quantized_payloads import (
+    comfy_quant_marker,
+    mxfp8_marker,
+    mxfp8_tensors,
+    nvfp4_codes,
+    nvfp4_tensors,
+)
 
 _DIFFUSERS_FIXTURE = Path(__file__).parents[1] / "data" / "test_files" / "test-diffusers-main"
 
@@ -100,6 +106,25 @@ def test_an_nvfp4_file_that_also_stores_float8_weights_gets_it(tmp_path: Path) -
 
     assert config.default_settings is not None
     assert config.default_settings.fp8_storage is True
+
+
+def test_an_mxfp8_file_is_left_to_the_user(tmp_path: Path) -> None:
+    """The loaders unpack MXFP8 layers to bf16, and FP8 Storage would re-encode them as fp8 without the block scale,
+    flushing blocks with a small scale to zero. The weights are float8 and the file also has a per-tensor fp8 layer,
+    so only the block-scale layout keeps it off. Switching it on stays possible."""
+    mx, _ = mxfp8_tensors("img_in", torch.full((128, 4), 127.0))
+    path = _qwen_image_checkpoint(
+        tmp_path / "qwen_image_mxfp8.safetensors",
+        torch.float8_e4m3fn,
+        **mx,
+        **{"img_in.comfy_quant": comfy_quant_marker(mxfp8_marker()), "txt_in.weight_scale": torch.ones(1)},
+    )
+
+    config = _identify(path)
+    forced = _identify(path, {"default_settings": {"fp8_storage": True}})
+
+    assert config.default_settings is None or config.default_settings.fp8_storage is None
+    assert forced.default_settings is not None and forced.default_settings.fp8_storage is True
 
 
 def test_a_full_precision_file_named_fp8_is_left_alone(tmp_path: Path) -> None:
