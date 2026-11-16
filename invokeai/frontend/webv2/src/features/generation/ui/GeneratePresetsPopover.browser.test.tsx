@@ -219,7 +219,7 @@ describe('GeneratePresetsPopover', () => {
   });
 
   it('saves a preset without prompts when asked, remembers the choice, and keeps the prompts it is applied over', async () => {
-    const save = vi.fn();
+    const save = vi.fn((label: string, values: Record<string, unknown>) => ({ id: 'saved', label, values }));
     const setIncludePrompts = vi.fn();
     const patchGenerateSettings = vi.fn();
     const saved = { ...getDefaultGenerateSettings(model), positivePrompt: 'a castle', steps: 12 };
@@ -268,6 +268,104 @@ describe('GeneratePresetsPopover', () => {
       expect.objectContaining({ positivePrompt: 'a lighthouse', steps: 12 }),
       'project-1'
     );
+  });
+
+  it('updates the loaded preset once the settings change, keeping its prompt choice, and Undo restores it', async () => {
+    const presetValues: Record<string, unknown> = { ...getDefaultGenerateSettings(model), steps: 12 };
+    delete presetValues.positivePrompt;
+    delete presetValues.negativePrompt;
+    const stored = { current: [{ id: 'p', label: 'Mine', values: presetValues }] as GeneratePresetRecord[] };
+    const values = { current: { ...getDefaultGenerateSettings(model), model, steps: 30 } as Record<string, unknown> };
+    const undoable = vi.fn();
+    const update = vi.fn((id: string, next: Record<string, unknown>) => {
+      stored.current = stored.current.map((preset) => (preset.id === id ? { ...preset, values: next } : preset));
+    });
+    const buildAdapter = () =>
+      ({
+        ...ADAPTER,
+        generateValues: { getSnapshot: () => values.current, subscribe: () => () => {} },
+        models: { ...ADAPTER.models, catalog: [model] },
+        notifications: { ...ADAPTER.notifications, undoable },
+        presets: { ...ADAPTER.presets, presets: stored.current, update },
+        settings: {
+          ...ADAPTER.settings,
+          patchGenerateSettings: (patch: Record<string, unknown>) => {
+            values.current = { ...values.current, ...patch };
+          },
+        },
+      }) as unknown as GenerationUiAdapter;
+    const updateButton = () =>
+      document.querySelector<HTMLButtonElement>('[aria-label^="widgets.generate.updatePreset"]')!;
+    await renderAdapter(buildAdapter());
+    await openPresets();
+
+    // Nothing loaded yet: the settings differ from the preset, but there is nothing to update.
+    expect(updateButton().disabled).toBe(true);
+
+    await clickPreset('Mine');
+    await renderAdapter(buildAdapter());
+    // The trigger now names the active preset after the section label.
+    await act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label^="widgets.generate.presets"]')!));
+
+    // Just loaded, the settings match it.
+    expect(values.current).toMatchObject({ steps: 12 });
+    expect(updateButton().disabled).toBe(true);
+
+    values.current = { ...values.current, positivePrompt: 'a castle', steps: 20 };
+    await renderAdapter(buildAdapter());
+
+    expect(updateButton().disabled).toBe(false);
+    await act(() => userEvent.click(updateButton()));
+
+    expect(update).toHaveBeenCalledOnce();
+    expect(stored.current[0]!.values).toMatchObject({ steps: 20 });
+    expect(stored.current[0]!.values).not.toHaveProperty('positivePrompt');
+    await renderAdapter(buildAdapter());
+    expect(updateButton().disabled).toBe(true);
+
+    expect(undoable).toHaveBeenLastCalledWith('widgets.generate.presetUpdated', {
+      onUndo: expect.any(Function),
+      supersedes: 'generate-preset-update:p',
+    });
+    undoable.mock.lastCall![1].onUndo();
+    expect(stored.current[0]!.values).toBe(presetValues);
+  });
+
+  it('leaves the update off after an applied preset is undone back to the earlier settings', async () => {
+    const presetValues = { ...getDefaultGenerateSettings(model), steps: 12 };
+    const values = { current: { ...getDefaultGenerateSettings(model), model, steps: 30 } as Record<string, unknown> };
+    const undoable = vi.fn();
+    const buildAdapter = () =>
+      ({
+        ...ADAPTER,
+        generateValues: { getSnapshot: () => values.current, subscribe: () => () => {} },
+        models: { ...ADAPTER.models, catalog: [model] },
+        notifications: { ...ADAPTER.notifications, undoable },
+        presets: { ...ADAPTER.presets, presets: [{ id: 'p', label: 'Mine', values: presetValues }] },
+        settings: {
+          ...ADAPTER.settings,
+          patchGenerateSettings: (patch: Record<string, unknown>) => {
+            values.current = { ...values.current, ...patch };
+          },
+          readGenerateValues: () => values.current,
+        },
+      }) as unknown as GenerationUiAdapter;
+    const updateButton = () =>
+      document.querySelector<HTMLButtonElement>('[aria-label^="widgets.generate.updatePreset"]')!;
+    await renderAdapter(buildAdapter());
+    await openPresets();
+    await clickPreset('Mine');
+    await act(() => undoable.mock.calls[0]![1].onUndo());
+    await renderAdapter(buildAdapter());
+    await openPresets();
+
+    expect(values.current).toMatchObject({ steps: 30 });
+    expect(updateButton().disabled).toBe(true);
+
+    values.current = { ...values.current, steps: 31 };
+    await renderAdapter(buildAdapter());
+
+    expect(updateButton().disabled).toBe(false);
   });
 
   it('deletes a preset at once, and its Undo puts it back where it was, active again while the settings match', async () => {

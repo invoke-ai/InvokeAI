@@ -10,7 +10,7 @@ import { GENERATE_TOOL_MODEL_PICK_KEYS, normalizeGenerateSettings } from '@featu
 import { resolveGenerateWidgetValues } from '@features/generation/settings';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { Button, IconButton, PopoverContent, RenameDialog, Row, Scrollable, Tooltip } from '@platform/ui';
-import { BookmarkIcon, CheckIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-react';
+import { BookmarkIcon, CheckIcon, PencilIcon, PlusIcon, SaveIcon, SearchIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -103,6 +103,19 @@ const getStoredPresetKey = (preset: GeneratePresetRecord): { key: string; keptKe
   );
 
   return settings ? { key: getPresetComparisonKey(settings, keptKeys), keptKeys } : null;
+};
+
+/** What a preset stores of `settings`: without the prompts unless `includePrompts`. */
+const getPresetValues = (settings: GenerateSettings, includePrompts: boolean): Record<string, unknown> => {
+  const values: Record<string, unknown> = { ...settings };
+
+  if (!includePrompts) {
+    for (const key of PRESET_PROMPT_KEYS) {
+      delete values[key];
+    }
+  }
+
+  return values;
 };
 
 const PresetRow = ({
@@ -226,6 +239,21 @@ export const GeneratePresetsPopover = () => {
     return index >= 0 ? (presets[index] ?? null) : null;
   }, [presetKeys, presets, settings]);
 
+  // The preset last applied or saved in this project; Update overwrites it once the settings stop matching it. Back at
+  // the settings from before the apply (its Undo), the user has left the preset, so there is nothing to update.
+  const [loaded, setLoaded] = useState<{ beforeKey?: string; presetId: string; projectId: typeof projectId } | null>(
+    null
+  );
+  const loadedIndex = loaded?.projectId === projectId ? presets.findIndex((p) => p.id === loaded.presetId) : -1;
+  const loadedPreset = presets[loadedIndex] ?? null;
+  const loadedKey = presetKeys[loadedIndex];
+  const currentLoadedKey = settings && loadedKey ? getPresetComparisonKey(settings, loadedKey.keptKeys) : null;
+  const canUpdate =
+    canSave &&
+    currentLoadedKey !== null &&
+    currentLoadedKey !== loadedKey?.key &&
+    currentLoadedKey !== loaded?.beforeKey;
+
   const handleOpenChange = useCallback((event: { open: boolean }) => {
     setIsOpen(event.open);
 
@@ -280,6 +308,14 @@ export const GeneratePresetsPopover = () => {
         title: t('widgets.generate.presetApplied', { name: record.label }),
         ui,
       });
+      const beforeSettings = normalizeGenerateSettings(before);
+      const keptKeys = getPresetKeptKeys(record);
+
+      setLoaded({
+        beforeKey: beforeSettings ? getPresetComparisonKey(beforeSettings, keptKeys) : undefined,
+        presetId: record.id,
+        projectId,
+      });
       setIsOpen(false);
     },
     [i18n.resolvedLanguage, models, projectId, supportedModels, t, ui]
@@ -314,22 +350,43 @@ export const GeneratePresetsPopover = () => {
         return;
       }
 
-      const values: Record<string, unknown> = { ...snapshot };
+      const saved = ui.presets.save(label, getPresetValues(snapshot, includePrompts));
 
-      if (!includePrompts) {
-        for (const key of PRESET_PROMPT_KEYS) {
-          delete values[key];
-        }
-      }
-
-      ui.presets.save(label, values);
+      setLoaded({ presetId: saved.id, projectId });
 
       if (includePrompts !== ui.presets.includePrompts) {
         ui.presets.setIncludePrompts(includePrompts);
       }
     },
-    [dialogSubject, includePrompts, ui.generateValues, ui.presets]
+    [dialogSubject, includePrompts, projectId, ui.generateValues, ui.presets]
   );
+
+  // Keeps the preset's choice about prompts; undoable like a delete.
+  const updateLoadedPreset = useCallback(() => {
+    if (!loadedPreset) {
+      return;
+    }
+
+    flushGenerateDrafts();
+    const snapshot = normalizeGenerateSettings(ui.generateValues.getSnapshot());
+
+    if (!snapshot) {
+      return;
+    }
+
+    const { id, label, values: previous } = loadedPreset;
+    const { update } = ui.presets;
+
+    update(id, getPresetValues(snapshot, 'positivePrompt' in previous));
+    ui.notifications.undoable(t('widgets.generate.presetUpdated', { name: label }), {
+      onUndo: () => update(id, previous),
+      // A later update's Undo withdraws this one, which would discard it.
+      supersedes: `generate-preset-update:${id}`,
+    });
+  }, [loadedPreset, t, ui.generateValues, ui.notifications, ui.presets]);
+  const updateLabel = loadedPreset
+    ? t('widgets.generate.updatePresetNamed', { name: loadedPreset.label })
+    : t('widgets.generate.updatePreset');
 
   // Deleting is undoable, so it asks nothing. The active preset is derived from the settings, which a delete leaves
   // alone: Undo brings the preset back as active if the settings still match it.
@@ -394,16 +451,30 @@ export const GeneratePresetsPopover = () => {
               <Popover.Body p="2.5">
                 <Stack gap="2">
                   <PromptPanelHeader label={presetsLabel}>
-                    <Button
-                      disabled={!canSave}
-                      h={PANEL_HEADER_CONTROL_HEIGHT}
-                      size="sm"
-                      variant="ghost"
-                      onClick={openSaveDialog}
-                    >
-                      <PlusIcon />
-                      {t('widgets.generate.savePresetTitle')}
-                    </Button>
+                    <HStack gap="0.5">
+                      <Tooltip content={updateLabel}>
+                        <IconButton
+                          aria-label={updateLabel}
+                          disabled={!canUpdate}
+                          h={PANEL_HEADER_CONTROL_HEIGHT}
+                          size="sm"
+                          variant="ghost"
+                          onClick={updateLoadedPreset}
+                        >
+                          <SaveIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Button
+                        disabled={!canSave}
+                        h={PANEL_HEADER_CONTROL_HEIGHT}
+                        size="sm"
+                        variant="ghost"
+                        onClick={openSaveDialog}
+                      >
+                        <PlusIcon />
+                        {t('widgets.generate.savePresetTitle')}
+                      </Button>
+                    </HStack>
                   </PromptPanelHeader>
                   {presets.length >= SEARCH_VISIBLE_MIN_PRESETS ? (
                     <InputGroup startElement={SEARCH_START_ELEMENT}>
