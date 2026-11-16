@@ -28,8 +28,9 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.model_manager.load.model_loaders import z_image
 from invokeai.backend.model_manager.load.model_loaders.z_image import Qwen3EncoderCheckpointLoader
-from invokeai.backend.model_manager.taxonomy import Qwen3VariantType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, Qwen3VariantType, SubModelType
 from invokeai.backend.quantization.block_scale_tiles import block_scale_grid
+from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.quantized_payloads import comfy_quant_marker
 
 FP8 = torch.float8_e4m3fn
@@ -166,6 +167,8 @@ def _decide(
 def _loader() -> Qwen3EncoderCheckpointLoader:
     loader = object.__new__(Qwen3EncoderCheckpointLoader)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    # What `ModelLoader.__init__` reads, on the device `_decide` set.
+    loader._torch_device, loader._logger = z_image.TorchDevice.choose_torch_device(), MagicMock()
     return loader
 
 
@@ -361,3 +364,84 @@ def test_an_mxfp8_layer_nothing_names_is_refused_before_the_cache_is_evicted(
         loader._load_from_singlefile(_config(checkpoint))
 
     loader._ram_cache.make_room.assert_not_called()
+
+
+def test_the_cache_key_and_the_stored_format_come_from_one_capability_decision(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The key is computed before the load lock and the build runs under it; a probe that turns positive in between
+    # must not store float8 under a key that says folded, where an incapable device would adopt it.
+    checkpoint = _write(tmp_path)
+    _decide(monkeypatch)
+    loader = _loader()
+    assert loader._cache_key_variant(_config(checkpoint), SubModelType.TextEncoder) == "float32"
+
+    _decide(monkeypatch, storage=True)
+    model = loader._load_from_singlefile(_config(checkpoint))
+
+    assert all(param.dtype is torch.float32 for param in model.parameters())
+
+
+def _device_loader(store, budget, device: str, tmp_path: Path) -> Qwen3EncoderCheckpointLoader:
+    """A loader on its own device cache that shares `store` with the others."""
+    from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=InvokeAILogger.get_logger("test"),
+        shared_cpu_weights=store,
+        ram_budget=budget,
+    )
+    loader = object.__new__(Qwen3EncoderCheckpointLoader)
+    loader._app_config = MagicMock(log_memory_usage=False, models_path=tmp_path)
+    loader._logger = InvokeAILogger.get_logger("test")
+    loader._ram_cache = cache
+    loader._torch_device = torch.device(device)
+    return loader
+
+
+@pytest.mark.parametrize("capable_first", [True, False], ids=["capable_loads_first", "incapable_loads_first"])
+def test_device_caches_share_weights_only_with_a_device_that_builds_the_same_format(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capable_first: bool
+) -> None:
+    # Device caches share one canonical CPU copy per cache key and adopt it without rerunning the loader. Whether the
+    # projections stay float8 depends on the device, so the second device must neither adopt float8 it cannot hold nor
+    # the folded copy that throws away a capable device's saving. Two GPUs, only the first passing the storage probe.
+    from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
+    from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
+
+    checkpoint = _write(tmp_path)
+    monkeypatch.setattr(z_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
+    monkeypatch.setattr(z_image, "should_keep_fp8_weights", lambda _device: False)
+    monkeypatch.setattr(z_image, "_device_supports_fp8_storage", lambda d, _logger=None: d == torch.device("cuda:0"))
+    config = Qwen3Encoder_Checkpoint_Config.model_construct(
+        key="qwen3",
+        path=checkpoint.path.name,
+        name="qwen_3_4b_fp8_scaled",
+        base=BaseModelType.Any,
+        type=ModelType.Qwen3Encoder,
+        variant=Qwen3VariantType.Qwen3_4B,
+        cpu_only=None,
+    )
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    # Both caches stay alive: a device's cache entry holds the shared weights only while its cache lives.
+    loaders = {"capable": _device_loader(store, budget, "cuda:0", tmp_path)}
+    loaders["incapable"] = _device_loader(store, budget, "cuda:1", tmp_path)
+
+    records = {}
+    for name in ["capable", "incapable"] if capable_first else ["incapable", "capable"]:
+        records[name], _claim = loaders[name]._load_and_cache(config, SubModelType.TextEncoder)
+
+    capable, incapable = (records[name].cached_model.model.model.layers[0] for name in ("capable", "incapable"))
+    for name in PROJECTIONS:
+        kept = capable.get_submodule(name)
+        assert kept.weight.dtype is FP8, name
+        assert torch.equal(kept.weight_scale.reshape(-1), checkpoint.scales[f"{LAYER}.{name}"].reshape(-1)), name
+        folded = incapable.get_submodule(name).weight
+        assert folded.dtype is torch.float32 and torch.equal(folded, checkpoint.dense[f"{LAYER}.{name}.weight"]), name
+    assert records["capable"].key != records["incapable"].key

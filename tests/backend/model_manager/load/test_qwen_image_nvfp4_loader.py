@@ -268,6 +268,7 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
     checkpoint.touch()
     loader = object.__new__(QwenVLEncoderCheckpointLoader)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._torch_device, loader._logger = torch.device("cpu"), MagicMock()
     _record_fold(monkeypatch, loader, log)
     q_bias = state_dict["model.layers.0.self_attn.q_proj.bias"]
     visual_weight = state_dict["visual.proj.weight"]

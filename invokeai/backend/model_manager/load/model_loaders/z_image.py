@@ -1051,6 +1051,29 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
     compute dtype. Embeddings are always folded; nvfp4 and int8 convrot layers stay packed.
     """
 
+    def _storage_format(self, config: AnyModelConfig) -> tuple[bool, torch.dtype]:
+        """Whether float8 Linear weights stay float8, and the compute dtype everything else is held in.
+
+        Decided once per loader (a fresh one serves each load): the cache key and the built weights must agree, and the
+        capability probes can flip between the key computation and the build under the load lock. Float8 follows the
+        execution device, because a CPU-only encoder reads its weights on the CPU whatever the session's device is.
+        """
+        device = self._get_execution_device(config, SubModelType.TextEncoder) or self._torch_device
+        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
+        if device not in decisions:
+            keep_fp8 = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
+            decisions[device] = (keep_fp8, TorchDevice.choose_bfloat16_safe_dtype(self._torch_device))
+        return decisions[device]
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        # Device caches share one canonical CPU copy per key: a device must not adopt float8 it cannot hold, nor folded
+        # weights that throw away a capable device's saving. Keyed by the device's decision, not the file's contents,
+        # which would take a header read on every cache lookup.
+        if submodel_type == SubModelType.TextEncoder:
+            keep_fp8, dtype = self._storage_format(config)
+            return f"{'fp8-' if keep_fp8 else ''}{str(dtype).removeprefix('torch.')}"
+        return ""
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -1098,9 +1121,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             )
         model_path = Path(config.path)
 
-        # Determine safe dtype based on target device capabilities
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        device_keeps_fp8, model_dtype = self._storage_format(config)
 
         # Load the state dict from safetensors file
         sd = load_file(model_path)
@@ -1273,16 +1294,12 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             fp8_layers.pop("lm_head", None)
             sd.pop("lm_head.weight", None)
 
-            # Text encoders have no FP8 Storage setting, so the device decides, as for the other encoders: float8
-            # where the device can hold it or multiply in it, folded into the compute dtype elsewhere. The execution
-            # device, because a CPU-only encoder reads its weights on the CPU whatever the session's device is.
-            device = self._get_execution_device(config, SubModelType.TextEncoder) or target_device
+            # Text encoders have no FP8 Storage setting, so the device decides (`_storage_format`), as for the other
+            # encoders: float8 where the device can hold it or multiply in it, folded into the compute dtype elsewhere.
             source_is_fp8 = bool(fp8_layers) or any(
                 getattr(tensor, "dtype", None) in FP8_WEIGHT_DTYPES for tensor in sd.values()
             )
-            keep_fp8 = source_is_fp8 and (
-                should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, logger)
-            )
+            keep_fp8 = source_is_fp8 and device_keeps_fp8
 
             # One reservation, before the fold or the split widens a weight: `make_room` makes that much room rather
             # than adding to an earlier one.

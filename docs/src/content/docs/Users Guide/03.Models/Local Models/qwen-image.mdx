@@ -43,7 +43,7 @@ consumer GPU, use a **GGUF** or **fp8** transformer together with the standalone
 
 The Qwen2.5-VL encoder is loaded in addition to the transformer (~9.4 GB for the fp8 build). If your GPU
 cannot hold both, enable [Low-VRAM mode](/configuration/optimization/low-vram-mode/). Single-file
-checkpoints that ship fp8 weights are kept in fp8 with
+transformer checkpoints that ship fp8 weights are kept in fp8 with
 [FP8 Storage](/configuration/optimization/fp8-storage/), which is switched on for them when they are installed.
 
 ComfyUI's `int8_tensorwise` builds, rotated (`int8_convrot`) or not, load for the transformer and for the Qwen2.5-VL
