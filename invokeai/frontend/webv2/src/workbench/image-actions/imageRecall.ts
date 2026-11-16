@@ -24,10 +24,8 @@ import {
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   isComponentCompatibleWithModel,
-  getModelDefaultVae,
   getSettingsWithModelDefaults,
   hasArchitectureCapabilities,
-  hasModelDefaultVae,
   isKnownScheduler,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
@@ -63,6 +61,8 @@ import {
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeMossImageSkipLayers,
   normalizeReferenceImages,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
 } from '@features/generation/settings';
 import { SEED_MAX } from '@platform/core/seed';
 
@@ -1549,11 +1549,8 @@ export const buildImageRecallSettings = ({
 
     if (model) {
       const valuesWithModelDefaults = getSettingsWithModelDefaults(values, model);
-      values = {
-        ...valuesWithModelDefaults,
-        model,
-        ...(hasModelDefaultVae(model) ? { vae: getModelDefaultVae(model, vaeModels) } : {}),
-      };
+      const vae = getRecallDefaultVae(resolveModelDefaultVae(model, valuesWithModelDefaults, vaeModels));
+      values = { ...valuesWithModelDefaults, model, ...(vae === undefined ? {} : { vae }) };
       fields.push('model');
     }
 

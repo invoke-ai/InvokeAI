@@ -93,6 +93,15 @@ export interface WorkbenchState {
   widgetFailures: WidgetFailure[];
   /** Mirror of the user's `WorkbenchPreferences.scopedDefaults`: reads resolve pins over defaults in one snapshot. */
   scopedDefaults: ScopedDefaults;
+  /**
+   * Canvas staging Auto-switch's follow state, by open project: the placeholders that have shown a frame of their own
+   * (the reducer hears each first frame once) and the generating slot the user picked, which Auto-switch keeps shown
+   * over newer slots (`pickAutoSwitch`). Transient, as Preview's follow state is: never persisted, synced across tabs
+   * or undone; entries go with their placeholders and with closed projects.
+   */
+  canvasStagingFollow?: Readonly<
+    Record<string, { readonly framedSlotIds: readonly string[]; readonly pinnedSlotId: string | null }>
+  >;
 }
 
 export interface BackendConnectionState {

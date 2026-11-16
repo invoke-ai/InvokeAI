@@ -12,7 +12,8 @@ export const QUEUE_FILTER_TABS_ID = 'queue-filter';
 
 /**
  * The queue's counts are its filters: each status tab carries how many items the scope holds in it, failures tinted
- * while there are any (All · Active · Done · Failed · Canceled).
+ * while there are any (All · Active · Done · Failed · Canceled). A narrow widget scrolls the strip rather than clipping
+ * labels or counts.
  */
 export const QueueFilterTabs = ({
   localRunCount,
@@ -55,6 +56,7 @@ export const QueueFilterTabs = ({
   return (
     <SegmentTabs
       isCompact
+      isScrollable
       activeId={value}
       ariaLabel={t('widgets.queue.filterRecentByStatus')}
       idBase={QUEUE_FILTER_TABS_ID}

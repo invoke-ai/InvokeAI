@@ -91,7 +91,10 @@ export type InvalidTargetReason =
   | 'depth-exceeded'
   | 'node-limit'
   | 'no-layer-below'
-  | 'not-mergeable';
+  | 'bottom-of-group'
+  | 'group-below'
+  | 'not-mergeable'
+  | 'disabled';
 
 export type EditHistoryPolicy = 'record' | 'none';
 

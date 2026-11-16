@@ -1182,14 +1182,57 @@ test('the workflow list orders as the server does: names ignoring case, dates wi
     assert.deepEqual(await names('ASC'), ['alpha', 'Bravo', 'charlie', 'Delta']);
     assert.deepEqual(await names('DESC'), ['Delta', 'charlie', 'Bravo', 'alpha']);
 
-    const opened = (
-      await getJson(backend, '/api/v1/workflows/?categories=user&order_by=opened_at&direction=DESC&per_page=100')
-    ).items.map((item) => item.opened_at);
-    const firstNever = opened.indexOf(null);
+    for (const direction of ['ASC', 'DESC']) {
+      const opened = (
+        await getJson(
+          backend,
+          `/api/v1/workflows/?categories=user&order_by=opened_at&direction=${direction}&per_page=100`
+        )
+      ).items.map((item) => item.opened_at);
+      const firstNever = opened.indexOf(null);
+      const ascending = opened.slice(0, firstNever).sort();
 
-    assert.ok(firstNever > 0);
-    assert.ok(opened.slice(firstNever).every((value) => value === null));
-    assert.deepEqual(opened.slice(0, firstNever), opened.slice(0, firstNever).sort().reverse());
+      assert.ok(firstNever > 0);
+      assert.ok(opened.slice(firstNever).every((value) => value === null));
+      assert.deepEqual(opened.slice(0, firstNever), direction === 'ASC' ? ascending : ascending.reverse());
+    }
+  });
+});
+
+test('workflow runs order the list by last run, and has_been_opened narrows lists and tag counts', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    // Run against id order, so only the run times can put them in the expected order.
+    const ranFirst = 'fixture-workflow-003';
+    const ranLast = 'fixture-workflow-002';
+    for (const ran of [ranFirst, ranLast]) {
+      await getJson(backend, `/api/v1/workflows/i/${ran}/last_run_at`, { method: 'PUT' });
+    }
+    const ids = async (direction) =>
+      (
+        await getJson(
+          backend,
+          `/api/v1/workflows/?categories=user&order_by=last_run_at&direction=${direction}&per_page=100`
+        )
+      ).items.map((item) => item.workflow_id);
+
+    // Workflows never run come after the runs either way.
+    assert.deepEqual((await ids('DESC')).slice(0, 2), [ranLast, ranFirst]);
+    assert.deepEqual((await ids('ASC')).slice(0, 2), [ranFirst, ranLast]);
+
+    const listed = async (opened) =>
+      (await getJson(backend, `/api/v1/workflows/?categories=user&has_been_opened=${opened}&per_page=100`)).items;
+    const openedItems = await listed(true);
+    const neverOpened = await listed(false);
+
+    assert.ok(openedItems.length > 0 && neverOpened.length > 0);
+    assert.ok(openedItems.every((item) => item.opened_at !== null));
+    assert.ok(neverOpened.every((item) => !item.opened_at));
+
+    const counts = await getJson(
+      backend,
+      '/api/v1/workflows/counts_by_tag?categories=user&tags=fixture&has_been_opened=true'
+    );
+    assert.deepEqual(counts, { fixture: openedItems.length });
   });
 });
 

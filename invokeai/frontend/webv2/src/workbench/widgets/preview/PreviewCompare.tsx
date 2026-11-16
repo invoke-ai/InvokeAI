@@ -2,7 +2,7 @@ import type { GeneratedImageContract } from '@features/gallery';
 import type { WidgetRuntimeApi } from '@workbench/widgetContracts';
 
 import { Badge, Box, Flex, HStack, SegmentGroup, Stack } from '@chakra-ui/react';
-import { Button } from '@platform/ui';
+import { Button, IconButton } from '@platform/ui/Button';
 import { ArrowLeftRightIcon, XIcon } from 'lucide-react';
 import {
   useCallback,
@@ -18,8 +18,9 @@ import { useTranslation } from 'react-i18next';
 
 import type { PreviewComparisonMode } from './previewSettings';
 
-import { previewStageStore } from './previewHeaderStore';
-import { getFittedFrameCss, PreviewStage } from './PreviewStage';
+import { getPreviewDockBarHeight, PREVIEW_DOCK_BAR_PROPS } from './previewDockBar';
+import { previewStageStore, usePreviewStageDensity } from './previewHeaderStore';
+import { getFittedFrameCss, getPreviewStagePadding, PreviewStage } from './PreviewStage';
 import { useCompareLoupe, type CompareLoupePane } from './useCompareLoupe';
 
 const { setStageElement } = previewStageStore;
@@ -74,15 +75,19 @@ export const PreviewCompare = ({
   runtime: WidgetRuntimeApi;
 }) => {
   const { t } = useTranslation();
+  // Full until the view has measured, as the view itself first guesses.
+  const density = usePreviewStageDensity() ?? 'full';
   const [dividerPercent, setDividerPercent] = useState(50);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDraggingRef = useRef(false);
-  // Zoom-synced side-by-side: one shared transform drives both panes. Gated to
-  // matching-dimension pairs, where fraction-space sync is exact.
-  const dimensionsMatch = baseImage.width === compareImage.width && baseImage.height === compareImage.height;
+  // Zoom-synced side-by-side: one shared pane-fraction transform drives both panes, so it links any pair of sizes.
   const compareLoupe = useCompareLoupe({
-    enabled: mode === 'side-by-side' && dimensionsMatch,
-    naturalWidth: baseImage.width,
+    enabled: mode === 'side-by-side',
+    // Pane order: the comparison image left, the selection right.
+    images: [
+      { id: compareImage.imageName, naturalWidth: compareImage.width },
+      { id: baseImage.imageName, naturalWidth: baseImage.width },
+    ],
   });
   const nextMode = useEffectEvent(() => onModeChange(getNextPreviewComparisonMode(mode)));
   const nextComparisonModeLabel = t('widgets.preview.commands.nextComparisonMode');
@@ -155,9 +160,9 @@ export const PreviewCompare = ({
   const clipStyle = useMemo(() => ({ clipPath: `inset(0 ${100 - dividerPercent}% 0 0)` }), [dividerPercent]);
 
   return (
-    <Stack gap="3" h="full" minH="0" w="full">
+    <Stack gap="0" h="full" minH="0" w="full">
       {/* Details pins to this stage, above the mode controls, as it pins to the single item's. */}
-      <PreviewStage ref={setStageElement} fill="flex" padding="6">
+      <PreviewStage ref={setStageElement} fill="flex" padding={getPreviewStagePadding(density)}>
         {mode === 'slider' ? (
           // Use a plain frame for capture/drag behavior without introducing FittedFrame's shadow.
           <Box
@@ -224,7 +229,19 @@ export const PreviewCompare = ({
           </HStack>
         )}
       </PreviewStage>
-      <HStack flexShrink={0} gap="1" justify="center">
+      {/* Docked where the filmstrip docks, on the same surface. Narrow widths turn swap and exit into icons, then wrap;
+          `safe` keeps a row wider than the bar scrollable from its start. */}
+      <Flex
+        {...PREVIEW_DOCK_BAR_PROPS}
+        align="center"
+        columnGap="1"
+        flexWrap="wrap"
+        justify="safe center"
+        minH={getPreviewDockBarHeight(density)}
+        overflowX="auto"
+        py="1"
+        rowGap="1"
+      >
         <SegmentGroup.Root value={mode} onValueChange={handleModeChange}>
           <SegmentGroup.Indicator />
           {COMPARISON_MODES.map((item) => (
@@ -234,15 +251,42 @@ export const PreviewCompare = ({
             </SegmentGroup.Item>
           ))}
         </SegmentGroup.Root>
-        <Button size="sm" variant="outline" onClick={onSwap}>
-          <ArrowLeftRightIcon />
-          {t('common.swap')}
-        </Button>
-        <Button size="sm" variant="outline" onClick={onExit}>
-          <XIcon />
-          {t('widgets.preview.exitCompare')}
-        </Button>
-      </HStack>
+        {density === 'full' ? (
+          <>
+            <Button size="sm" variant="outline" onClick={onSwap}>
+              <ArrowLeftRightIcon />
+              {t('common.swap')}
+            </Button>
+            <Button size="sm" variant="outline" onClick={onExit}>
+              <XIcon />
+              {t('widgets.preview.exitCompare')}
+            </Button>
+          </>
+        ) : (
+          <>
+            <IconButton
+              aria-label={t('common.swap')}
+              size="sm"
+              tooltip={t('common.swap')}
+              tooltipPlacement="top"
+              variant="outline"
+              onClick={onSwap}
+            >
+              <ArrowLeftRightIcon />
+            </IconButton>
+            <IconButton
+              aria-label={t('widgets.preview.exitCompare')}
+              size="sm"
+              tooltip={t('widgets.preview.exitCompare')}
+              tooltipPlacement="top"
+              variant="outline"
+              onClick={onExit}
+            >
+              <XIcon />
+            </IconButton>
+          </>
+        )}
+      </Flex>
     </Stack>
   );
 };
@@ -401,12 +445,12 @@ const CompareSidePane = ({
       cursor={isZoomed ? 'grab' : undefined}
       overflow="hidden"
       position="relative"
-      // Suppress native pan/pinch only when the shared loupe can replace them; mismatched dimensions retain
-      // browser gestures.
+      // Suppress native pan/pinch only when the shared loupe replaces them.
       touchAction={pane ? 'none' : undefined}
       {...pane?.frameProps}
     >
       <img
+        key={image.imageName}
         ref={pane?.imageRefCallback}
         alt={image.imageName}
         draggable={false}

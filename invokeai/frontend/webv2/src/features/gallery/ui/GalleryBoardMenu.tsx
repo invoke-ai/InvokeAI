@@ -418,14 +418,7 @@ const BoardDeleteDialog = ({
 
   return (
     // Cancel takes focus, not the checkbox that would delete the media.
-    // Top-anchored: the usage report arrives after the dialog opens, and grows it downward instead of moving it.
-    <Dialog.Root
-      initialFocusEl={getInitialFocus}
-      open={board !== null}
-      placement="top"
-      role="alertdialog"
-      onOpenChange={onOpenChange}
-    >
+    <Dialog.Root initialFocusEl={getInitialFocus} open={board !== null} role="alertdialog" onOpenChange={onOpenChange}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

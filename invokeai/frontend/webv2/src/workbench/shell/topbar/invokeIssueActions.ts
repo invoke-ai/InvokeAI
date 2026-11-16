@@ -1,6 +1,6 @@
 import type { GenerationIssue } from '@features/generation/contracts';
 
-import { flushGenerateDrafts, focusPositivePrompt, revealGenerateIssue } from '@features/generation/react';
+import { flushGenerateDrafts, revealGenerateIssue, revealPositivePrompt } from '@features/generation/react';
 import {
   describeGenerationIssueFix,
   getGenerationIssueFixPatch,
@@ -8,6 +8,7 @@ import {
 } from '@features/generation/settings';
 import { useCapabilities } from '@features/identity';
 import { openModelManager } from '@features/models';
+import { UPSCALE_SECTION_IDS } from '@features/upscale';
 import { revealWorkflowNode } from '@features/workflow/react';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { getWidgetTypeIdForSourceId } from '@workbench/graphWidgets';
@@ -114,8 +115,17 @@ export const useInvokeIssueActions = (): ((issue: InvocationIssue) => InvokeIssu
         case 'prompt':
           return [
             show(() => {
+              // Upscale's prompt, and the note saying why it cannot expand, sit in its Detail guidance section.
+              if (target.widgetId === 'upscale') {
+                void patchWorkbenchPreferences({
+                  generateSectionsOpen: {
+                    ...getWorkbenchPreferences().generateSectionsOpen,
+                    [UPSCALE_SECTION_IDS.detailGuidance]: true,
+                  },
+                });
+              }
               reveal(target.widgetId);
-              requestAnimationFrame(() => focusPositivePrompt(target.widgetId));
+              revealPositivePrompt(target.widgetId);
             }),
           ];
         case 'layer':
