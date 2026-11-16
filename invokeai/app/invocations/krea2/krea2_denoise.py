@@ -675,7 +675,13 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             cache_references=cache_references,
             cfg=do_cfg,
             loras=[(lora_info.model, lora_info.config.file_size) for _, lora_info in loaded_loras],
-            regional_mask_bytes=self._regional_attention_mask_bytes(pos_extension, neg_extension, inference_dtype),
+            regional_mask_bytes=self._regional_attention_mask_bytes(
+                pos_extension,
+                neg_extension,
+                inference_dtype,
+                # The reference is encoded at the target's size: its tokens join every injected block's keys.
+                style_reference_seq_len=image_seq_len if style_extension is not None else 0,
+            ),
             style_kv_bytes=style_extension.kv_cache_bytes(inference_dtype) if style_extension is not None else 0,
             device=device,
             dtype=inference_dtype,
@@ -954,15 +960,26 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         pos_extension: Krea2RegionalPromptingExtension,
         neg_extension: Krea2RegionalPromptingExtension | None,
         attention_dtype: torch.dtype,
+        style_reference_seq_len: int = 0,
     ) -> int:
-        """Return final masks plus peak construction scratch and SDPA's transient additive bias."""
+        """Return final masks plus peak construction scratch and SDPA's transient additive bias.
+
+        With a style reference every injected block attends over the reference's keys too: `pad_attention_mask` widens
+        each boolean (S, S) mask to (S, S + R) and caches the copy (the positive's and the negative's at most), and
+        the additive bias SDPA builds from it is that wide.
+        """
         extensions = [pos_extension] if neg_extension is None else [pos_extension, neg_extension]
         final_mask_bytes = sum(extension.attention_mask_numel for extension in extensions)
         peak_build_scratch_bytes = max(extension.attention_mask_build_scratch_numel for extension in extensions)
         attention_dtype_bytes = torch.empty((), dtype=attention_dtype).element_size()
-        peak_attention_bias_bytes = max(extension.attention_mask_numel for extension in extensions)
-        peak_attention_bias_bytes *= attention_dtype_bytes
-        return final_mask_bytes + peak_build_scratch_bytes + peak_attention_bias_bytes
+        # A mask is square over the whole sequence, so its row count is its root.
+        key_numels = [
+            extension.attention_mask_numel + math.isqrt(extension.attention_mask_numel) * style_reference_seq_len
+            for extension in extensions
+        ]
+        padded_mask_bytes = sum(key_numels) if style_reference_seq_len else 0
+        peak_attention_bias_bytes = max(key_numels) * attention_dtype_bytes
+        return final_mask_bytes + padded_mask_bytes + peak_build_scratch_bytes + peak_attention_bias_bytes
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
