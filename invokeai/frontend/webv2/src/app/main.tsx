@@ -1,6 +1,7 @@
 import '@fontsource/inter/index.css';
 import '@platform/i18n/client';
 import { identityTransportAuthAdapter, startIdentityCredentialSync } from '@features/identity';
+import { preventFileDropNavigation } from '@platform/browser/fileDropNavigation';
 import { registerServiceWorker } from '@platform/pwa/registerServiceWorker';
 import { configureHttpAuth } from '@platform/transport/http';
 import { StrictMode } from 'react';
@@ -17,6 +18,8 @@ configureHttpAuth(identityTransportAuthAdapter);
 // Follows other tabs' sign-in, sign-out and token renewals for the page's lifetime.
 startIdentityCredentialSync();
 registerServiceWorker();
+// A file dropped where nothing takes it must not navigate away from the app, for the page's lifetime.
+preventFileDropNavigation();
 
 const rootElement = document.getElementById('root');
 

@@ -252,6 +252,15 @@ export const isFormContainerElement = (
 ): element is ContainerFormElement | CollapsibleFormElement =>
   element?.type === 'container' || element?.type === 'collapsible';
 
+/** Branch per discriminant so TypeScript preserves each container variant's data correlation. */
+export const withFormContainerChildren = (
+  element: ContainerFormElement | CollapsibleFormElement,
+  children: string[]
+): ContainerFormElement | CollapsibleFormElement =>
+  element.type === 'container'
+    ? { ...element, data: { ...element.data, children } }
+    : { ...element, data: { ...element.data, children } };
+
 /** The Linear UI description: a tree of form elements rooted in a column container. */
 export interface WorkflowForm {
   rootElementId: string;

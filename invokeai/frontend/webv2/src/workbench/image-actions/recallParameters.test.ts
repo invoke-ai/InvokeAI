@@ -154,6 +154,42 @@ describe('buildRecallParametersSettings', () => {
     expect(result.values.vae).toBeNull();
   });
 
+  describe("the new model's default VAE", () => {
+    const fluxVae = makeModel('flux-vae', 'flux', 'vae');
+    const sdxlNamingMissingVae = makeModel('sdxl-missing-vae', 'sdxl', 'main', { default_settings: { vae: 'gone' } });
+    // The Model Manager stores "default" when the VAE default is on with no VAE picked; FLUX bundles no VAE.
+    const fluxDefaultVae = makeModel('flux-default-vae', 'flux', 'main', { default_settings: { vae: 'default' } });
+    const sd3DefaultVae = makeModel('sd3-default-vae', 'sd-3', 'main', { default_settings: { vae: 'default' } });
+    const sd3Vae = makeModel('sd3-vae', 'sd-3', 'vae');
+    const catalog = [...models, fluxVae, sdxlNamingMissingVae, fluxDefaultVae, sd3DefaultVae, sd3Vae];
+    const buildWith = (currentValues: ReturnType<typeof currentFor>, parameters: Record<string, unknown>) =>
+      buildRecallParametersSettings({
+        currentValues,
+        models: catalog,
+        parameters,
+        supportedModels: catalog.filter(isSupportedGenerateModel) as GenerateModelConfig[],
+        vaeModels: catalog.filter(isVaeModelConfig) as VaeModelConfig[],
+      });
+
+    it('uses the bundled VAE when the default names one that is not installed, as recall always has', () => {
+      const result = buildWith(currentFor(sdxl, { vae: sdxlVae }), { model: sdxlNamingMissingVae.key });
+
+      expect(result.values.vae).toBeNull();
+    });
+
+    it("clears an optional VAE override for the 'default' sentinel", () => {
+      const result = buildWith(currentFor(sd3, { vae: sd3Vae }), { model: sd3DefaultVae.key });
+
+      expect(result.values.vae).toBeNull();
+    });
+
+    it("keeps a family's required VAE for the 'default' sentinel", () => {
+      const result = buildWith(currentFor(flux, { vae: fluxVae }), { model: fluxDefaultVae.key });
+
+      expect(result.values.vae?.key).toBe(fluxVae.key);
+    });
+  });
+
   it('reports an unknown model and a VAE from another family without changing the selection', () => {
     const current = currentFor(sdxl);
     const result = build(current, { model: 'not-installed', vae_model: sdxlVae.name });

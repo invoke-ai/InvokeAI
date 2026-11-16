@@ -68,7 +68,7 @@ vi.mock('@features/workflow/react', async (importOriginal) => ({
 }));
 
 vi.mock('@features/generation/ui/GenerationUiContext', () => ({
-  useGenerationUi: () => ({ sectionPreferences: { sectionsOpen: {}, setSectionOpen: vi.fn() } }),
+  useGenerationUi: () => ({ sectionPreferences: { sectionsOpen: {}, setSectionsOpen: vi.fn() } }),
 }));
 
 const i18n = createInstance();
@@ -246,17 +246,15 @@ const renderForm = async (projectGraph = graph, withNativeReference = false) => 
   });
 };
 
-const visibleBoundaries = () =>
-  [...host.querySelectorAll<HTMLElement>('*')].filter((element) => {
-    const style = getComputedStyle(element, '::before');
-    return (
-      element.getBoundingClientRect().width > 0 &&
-      style.content === '""' &&
-      style.borderTopWidth === '1px' &&
-      style.opacity === '1' &&
-      style.pointerEvents === 'none'
-    );
-  });
+const isTransparentColor = (color: string) =>
+  color === 'transparent' || color === 'rgba(0, 0, 0, 0)' || /\/\s*0\)$/.test(color);
+
+const isVisibleHairline = (element: HTMLElement, edge: 'top' | 'bottom' = 'top') => {
+  const style = getComputedStyle(element);
+  const width = edge === 'top' ? style.borderTopWidth : style.borderBottomWidth;
+  const color = edge === 'top' ? style.borderTopColor : style.borderBottomColor;
+  return element.getBoundingClientRect().width > 0 && width === '1px' && !isTransparentColor(color);
+};
 
 beforeEach(() => {
   snapshot = { id: 'project-1', projectGraph: graph, workflowValues: {} };
@@ -321,12 +319,28 @@ describe('native workflow-form accordion', () => {
     expect(second.getBoundingClientRect().left).toBeGreaterThanOrEqual(first.getBoundingClientRect().right);
   });
 
-  it('keeps a column section vertical instead of inheriting row behavior globally', async () => {
-    await renderForm(layoutGraph('column', true));
+  it('keeps a column section and nested column containers vertical with 10px field spacing', async () => {
+    const projectGraph = layoutGraph('column', true);
+    const section = projectGraph.form.elements.section!;
+    if (section.type === 'collapsible') {
+      section.data.children = ['col-inner'];
+    }
+    projectGraph.form.elements['col-inner'] = {
+      id: 'col-inner',
+      type: 'container',
+      parentId: 'section',
+      data: { layout: 'column', children: ['first', 'second'] },
+    };
+    projectGraph.form.elements.first!.parentId = 'col-inner';
+    projectGraph.form.elements.second!.parentId = 'col-inner';
+    await renderForm(projectGraph);
     const first = host.querySelector<HTMLInputElement>('input[aria-label="First value"]')!;
     const second = host.querySelector<HTMLInputElement>('input[aria-label="Second value"]')!;
     expect(second.getBoundingClientRect().top).toBeGreaterThanOrEqual(first.getBoundingClientRect().bottom);
     expect(second.getBoundingClientRect().left).toBe(first.getBoundingClientRect().left);
+    const firstField = first.closest<HTMLElement>('[data-scope="field"][data-part="root"]')!;
+    const secondField = second.closest<HTMLElement>('[data-scope="field"][data-part="root"]')!;
+    expect(Math.round(secondField.getBoundingClientRect().top - firstField.getBoundingClientRect().bottom)).toBe(10);
   });
 
   it('keeps a nested collapsible independent and reports descendant errors when closed', async () => {
@@ -412,8 +426,10 @@ describe('native workflow-form accordion', () => {
     await renderForm(graph, true);
     const native = host.querySelector<HTMLElement>('[data-testid="native-reference"] [data-part="trigger"]')!;
     const workflow = page.getByRole('button', { name: 'Output section' }).element();
-    const nativeLabel = native.querySelector('span')!;
-    const workflowLabel = workflow.querySelector('span')!;
+    const nativeChip = native.querySelector<HTMLElement>('[data-section-chip]')!;
+    const workflowChip = workflow.querySelector<HTMLElement>('[data-section-chip]')!;
+    const nativeLabel = nativeChip.querySelector('span')!;
+    const workflowLabel = workflowChip.querySelector('span')!;
     for (const property of [
       'fontSize',
       'fontWeight',
@@ -424,15 +440,25 @@ describe('native workflow-form accordion', () => {
     ] as const) {
       expect(getComputedStyle(workflowLabel)[property]).toBe(getComputedStyle(nativeLabel)[property]);
     }
-    for (const property of ['height', 'paddingInlineStart', 'paddingInlineEnd'] as const) {
-      expect(getComputedStyle(workflow)[property]).toBe(getComputedStyle(native)[property]);
+    for (const property of ['height', 'paddingInlineStart', 'paddingInlineEnd', 'backgroundColor'] as const) {
+      expect(getComputedStyle(workflowChip)[property]).toBe(getComputedStyle(nativeChip)[property]);
     }
-    expect(getComputedStyle(host.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('4px');
-    const section = workflow.closest<HTMLElement>('[data-part="root"]')!;
-    expect(getComputedStyle(section).borderTopWidth).toBe('0px');
+    const outputSection = workflow.closest<HTMLElement>('[data-part="root"]')!;
+    const tailSection = page
+      .getByRole('button', { name: 'Final section' })
+      .element()
+      .closest<HTMLElement>('[data-part="root"]')!;
+    const inputSection = page
+      .getByRole('button', { name: /^Input section/ })
+      .element()
+      .closest<HTMLElement>('[data-part="root"]')!;
+    const introText = page.getByText('Always visible').element();
+    expect(Math.round(tailSection.getBoundingClientRect().top - outputSection.getBoundingClientRect().bottom)).toBe(0);
+    expect(Math.round(inputSection.getBoundingClientRect().top - introText.getBoundingClientRect().bottom)).toBe(10);
+    expect(isTransparentColor(getComputedStyle(outputSection).borderTopColor)).toBe(true);
   });
 
-  it('shows the native thin boundary only between two closed column sections, centered in the 4px gap', async () => {
+  it('shows the native thin boundary only between two closed column sections', async () => {
     const projectGraph = layoutGraph('column', true);
     const rootElement = projectGraph.form.elements.root!;
     if (rootElement.type === 'container') {
@@ -452,27 +478,27 @@ describe('native workflow-form accordion', () => {
     const second = page.getByRole('button', { name: 'Additional section' });
     const firstRoot = first.element().closest<HTMLElement>('[data-part="root"]')!;
     const secondRoot = second.element().closest<HTMLElement>('[data-part="root"]')!;
-    const boundary = () => getComputedStyle(secondRoot, '::before');
-    expect(boundary().opacity).toBe('0');
-    expect(boundary().borderTopWidth).toBe('1px');
-    expect(boundary().top).toBe('-2px');
-    expect(boundary().pointerEvents).toBe('none');
+    await expect.poll(() => isVisibleHairline(secondRoot)).toBe(false);
     await act(() => userEvent.click(second));
     await expect.element(second).toHaveAttribute('aria-expanded', 'false');
-    expect(boundary().opacity).toBe('0');
+    await expect.poll(() => isVisibleHairline(secondRoot)).toBe(false);
     await act(() => userEvent.click(first));
-    await expect.poll(() => boundary().opacity).toBe('1');
-    expect(getComputedStyle(firstRoot, '::before').opacity).toBe('0');
+    await act(() => userEvent.unhover(first));
+    await expect.poll(() => isVisibleHairline(secondRoot)).toBe(true);
+    expect(isVisibleHairline(firstRoot, 'bottom')).toBe(false);
     await act(() => userEvent.click(page.getByRole('button', { name: 'Native section' })));
     await act(() => userEvent.click(page.getByRole('button', { name: 'Native second section' })));
+    await act(() => userEvent.unhover(page.getByRole('button', { name: 'Native second section' })));
     const nativeRoot = page
       .getByRole('button', { name: 'Native second section' })
       .element()
       .closest<HTMLElement>('[data-part="root"]')!;
-    await expect.poll(() => getComputedStyle(nativeRoot, '::before').opacity).toBe('1');
-    expect(boundary().borderTopColor).toBe(getComputedStyle(nativeRoot, '::before').borderTopColor);
+    await expect.poll(() => isVisibleHairline(nativeRoot)).toBe(true);
+    await expect
+      .poll(() => getComputedStyle(nativeRoot).borderTopColor)
+      .toBe(getComputedStyle(secondRoot).borderTopColor);
     await act(() => userEvent.click(first));
-    await expect.poll(() => boundary().opacity).toBe('0');
+    await expect.poll(() => isVisibleHairline(secondRoot)).toBe(false);
   });
 
   it('keeps a single boundary across layout-only column wrappers and hides it when interrupted', async () => {
@@ -492,21 +518,89 @@ describe('native workflow-form accordion', () => {
       extra: { id: 'extra', type: 'text', parentId: 'additional', data: { content: 'Second section content' } },
     });
     await renderForm(projectGraph);
+    const firstRoot = page
+      .getByRole('button', { name: 'Numeric section' })
+      .element()
+      .closest<HTMLElement>('[data-part="root"]')!;
+    const secondRoot = page
+      .getByRole('button', { name: 'Additional section' })
+      .element()
+      .closest<HTMLElement>('[data-part="root"]')!;
     await act(() => userEvent.click(page.getByRole('button', { name: 'Numeric section' })));
-    expect(visibleBoundaries()).toHaveLength(0);
+    await act(() => userEvent.unhover(page.getByRole('button', { name: 'Numeric section' })));
+    expect(isVisibleHairline(secondRoot)).toBe(false);
     await act(() => userEvent.click(page.getByRole('button', { name: 'Additional section' })));
-    await expect.poll(() => visibleBoundaries().length).toBe(1);
+    await act(() => userEvent.unhover(page.getByRole('button', { name: 'Additional section' })));
+    await expect.poll(() => isVisibleHairline(secondRoot)).toBe(true);
+    expect(isVisibleHairline(firstRoot, 'bottom')).toBe(false);
+    expect(Math.round(secondRoot.getBoundingClientRect().top - firstRoot.getBoundingClientRect().bottom)).toBe(0);
     if (rootElement.type === 'container') {
       rootElement.data.children.splice(1, 0, 'between');
     }
     elements.between = { id: 'between', type: 'text', parentId: 'root', data: { content: 'Visible interruption' } };
     await renderForm(structuredClone(projectGraph));
-    await expect.poll(() => visibleBoundaries().length).toBe(0);
+    const interruptingText = page.getByText('Visible interruption').element();
+    await expect
+      .poll(() => Math.round(secondRoot.getBoundingClientRect().top - interruptingText.getBoundingClientRect().bottom))
+      .toBe(10);
+  });
+
+  it('preserves hairlines and flush spacing around a section inside a single-child row wrapper', async () => {
+    const projectGraph = layoutGraph('column');
+    const elements = projectGraph.form.elements;
+    const group = elements.group!;
+    if (group.type === 'container') {
+      group.data.layout = 'row';
+    }
+    const rootElement = elements.root!;
+    if (rootElement.type === 'container') {
+      rootElement.data.children = ['leading', 'group', 'trailing'];
+    }
+    Object.assign(elements, {
+      leading: {
+        id: 'leading',
+        type: 'collapsible',
+        parentId: 'root',
+        data: { content: 'Leading section', children: ['lead-text'] },
+      },
+      'lead-text': { id: 'lead-text', type: 'text', parentId: 'leading', data: { content: 'Lead' } },
+      trailing: {
+        id: 'trailing',
+        type: 'collapsible',
+        parentId: 'root',
+        data: { content: 'Trailing section', children: ['trail-text'] },
+      },
+      'trail-text': { id: 'trail-text', type: 'text', parentId: 'trailing', data: { content: 'Trail' } },
+    });
+    await renderForm(projectGraph);
+    const leadingRoot = page
+      .getByRole('button', { name: 'Leading section' })
+      .element()
+      .closest<HTMLElement>('[data-part="root"]')!;
+    const middleRoot = page
+      .getByRole('button', { name: 'Numeric section' })
+      .element()
+      .closest<HTMLElement>('[data-part="root"]')!;
+    const trailingRoot = page
+      .getByRole('button', { name: 'Trailing section' })
+      .element()
+      .closest<HTMLElement>('[data-part="root"]')!;
+
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Leading section' })));
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Numeric section' })));
+    await act(() => userEvent.click(page.getByRole('button', { name: 'Trailing section' })));
+    await act(() => userEvent.unhover(page.getByRole('button', { name: 'Trailing section' })));
+
+    await expect.poll(() => isVisibleHairline(middleRoot)).toBe(true);
+    await expect.poll(() => isVisibleHairline(trailingRoot)).toBe(true);
+    expect(isVisibleHairline(leadingRoot, 'bottom')).toBe(false);
+    expect(isVisibleHairline(middleRoot, 'bottom')).toBe(false);
+    expect(Math.round(middleRoot.getBoundingClientRect().top - leadingRoot.getBoundingClientRect().bottom)).toBe(0);
+    expect(Math.round(trailingRoot.getBoundingClientRect().top - middleRoot.getBoundingClientRect().bottom)).toBe(0);
   });
 
   it('collapses only children of the clicked collapsible section, preserving errors and siblings outside it', async () => {
     await renderForm();
-    expect(getComputedStyle(host.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('4px');
     const input = page.getByRole('button', { name: /^Input section/ });
     await expect.element(input).toHaveAttribute('aria-expanded', 'true');
     await act(() => userEvent.click(input));
@@ -583,7 +677,6 @@ describe('native workflow-form accordion', () => {
 
     const viewHost = host.querySelector<HTMLElement>('[data-testid="live-view"]')!;
     expect(viewHost.querySelector('[data-scope="collapsible"]')).not.toBeNull();
-    expect(getComputedStyle(viewHost.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('4px');
 
     const titleInput = host.querySelector<HTMLInputElement>('input[aria-label="Section title"]')!;
     expect(titleInput).not.toBeNull();

@@ -16,24 +16,32 @@ const POSITIVE_PROMPT_NODE_PATH = 'positive_prompt';
 const NEGATIVE_PROMPT_NODE_PATH = 'negative_prompt';
 const SEED_NODE_PATH = 'seed';
 
-export const extractGenerationMeta = (item: QueueItemReadModel): QueueGenerationMeta => {
-  const fieldValues = item.fieldValues ?? [];
+/**
+ * The prompts and seed by the node ids webv2's compiled Generate, Canvas, Video and Upscale graphs give them, which
+ * every one of their submissions writes. A webv2 item without them ran something else, such as a workflow.
+ */
+export const extractNamedGenerationMeta = (item: QueueItemReadModel): QueueGenerationMeta => {
   const meta: QueueGenerationMeta = {};
-  let namedPrompt = false;
 
-  for (const { nodePath, value } of fieldValues) {
+  for (const { nodePath, value } of item.fieldValues ?? []) {
     if (nodePath === POSITIVE_PROMPT_NODE_PATH && typeof value === 'string') {
       // Recorded verbatim, empty included: an empty positive is a real
       // submission, not a missing field.
       meta.positivePrompt = value;
-      namedPrompt = true;
     } else if (nodePath === NEGATIVE_PROMPT_NODE_PATH && typeof value === 'string') {
       meta.negativePrompt = value;
-      namedPrompt = true;
     } else if (nodePath === SEED_NODE_PATH && typeof value === 'number') {
       meta.seed = value;
     }
   }
+
+  return meta;
+};
+
+export const extractGenerationMeta = (item: QueueItemReadModel): QueueGenerationMeta => {
+  const fieldValues = item.fieldValues ?? [];
+  const meta = extractNamedGenerationMeta(item);
+  const namedPrompt = meta.positivePrompt !== undefined || meta.negativePrompt !== undefined;
 
   if (namedPrompt && meta.seed !== undefined) {
     return meta;

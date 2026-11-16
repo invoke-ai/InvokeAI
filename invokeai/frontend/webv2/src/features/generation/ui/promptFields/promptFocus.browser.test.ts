@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { editTextareaText, isOtherTextEntry } from './promptFocus';
+import { editTextareaText, focusPositivePrompt, isOtherTextEntry, registerPositivePromptElement } from './promptFocus';
 
 const mount = (html: string) => {
   const host = document.createElement('div');
@@ -71,5 +71,41 @@ describe('isOtherTextEntry', () => {
     expect(isOtherTextEntry(byId('check'), prompt)).toBe(false);
     expect(isOtherTextEntry(byId('button'), prompt)).toBe(false);
     expect(isOtherTextEntry(byId('search'), prompt)).toBe(false);
+  });
+});
+
+describe('focusPositivePrompt', () => {
+  it("focuses the named surface's field, whichever mounted last", () => {
+    const host = mount('<textarea data-owner="generate"></textarea><textarea data-owner="upscale"></textarea>');
+    const generate = host.querySelector<HTMLTextAreaElement>('[data-owner="generate"]')!;
+    const upscale = host.querySelector<HTMLTextAreaElement>('[data-owner="upscale"]')!;
+
+    registerPositivePromptElement('generate', generate, null);
+    // Upscale mounts after Generate; the focus-prompt command still means Generate's.
+    registerPositivePromptElement('upscale', upscale, null);
+
+    try {
+      expect(focusPositivePrompt()).toBe(true);
+      expect(document.activeElement).toBe(generate);
+      expect(focusPositivePrompt('upscale')).toBe(true);
+      expect(document.activeElement).toBe(upscale);
+    } finally {
+      registerPositivePromptElement('generate', null, generate);
+      registerPositivePromptElement('upscale', null, upscale);
+    }
+  });
+
+  it('does not take a field a collapsed section hides', () => {
+    const host = mount('<div hidden><textarea></textarea></div>');
+    const textarea = host.querySelector('textarea')!;
+
+    registerPositivePromptElement('upscale', textarea, null);
+
+    try {
+      expect(focusPositivePrompt('upscale')).toBe(false);
+      expect(document.activeElement).not.toBe(textarea);
+    } finally {
+      registerPositivePromptElement('upscale', null, textarea);
+    }
   });
 });

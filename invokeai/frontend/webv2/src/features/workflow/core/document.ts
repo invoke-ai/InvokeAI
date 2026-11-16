@@ -35,7 +35,7 @@ import {
 } from './callSavedWorkflow';
 import { getConnectorDeletionSpliceConnections } from './connectors';
 import { isHiDiffusionNode, isHiDiffusionRatioField, normalizeHiDiffusionInputs } from './fields';
-import { isFormContainerElement, isInvocationNode, isNotesNode } from './types';
+import { isFormContainerElement, isInvocationNode, isNotesNode, withFormContainerChildren } from './types';
 
 export { isFormContainerElement };
 
@@ -270,15 +270,6 @@ const getRootContainer = (form: WorkflowForm): ContainerFormElement => {
   return recovered.elements[recovered.rootElementId] as ContainerFormElement;
 };
 
-/** Branch per discriminant so TypeScript preserves each container variant's data correlation. */
-const withContainerChildren = (
-  element: ContainerFormElement | CollapsibleFormElement,
-  children: string[]
-): ContainerFormElement | CollapsibleFormElement =>
-  element.type === 'container'
-    ? { ...element, data: { ...element.data, children } }
-    : { ...element, data: { ...element.data, children } };
-
 const collectDescendantIds = (form: WorkflowForm, elementId: string): string[] => {
   const element = form.elements[elementId];
 
@@ -317,7 +308,7 @@ const removeFormElement = (form: WorkflowForm, elementId: string): WorkflowForm 
     }
 
     elements[id] = isFormContainerElement(element)
-      ? withContainerChildren(
+      ? withFormContainerChildren(
           element,
           element.data.children.filter((childId) => !removedIds.has(childId))
         )
@@ -364,10 +355,10 @@ const moveFormElementTo = (form: WorkflowForm, elementId: string, parentId: stri
   const elements: Record<string, WorkflowFormElement> = {
     ...form.elements,
     [elementId]: { ...element, parentId: nextParent.id },
-    [previousParent.id]: withContainerChildren(previousParent, withoutElement),
+    [previousParent.id]: withFormContainerChildren(previousParent, withoutElement),
   };
 
-  elements[nextParent.id] = withContainerChildren(
+  elements[nextParent.id] = withFormContainerChildren(
     elements[nextParent.id] as ContainerFormElement | CollapsibleFormElement,
     targetChildren
   );
@@ -397,7 +388,7 @@ const moveFormElement = (form: WorkflowForm, elementId: string, direction: -1 | 
 
   return {
     ...form,
-    elements: { ...form.elements, [parent.id]: withContainerChildren(parent, children) },
+    elements: { ...form.elements, [parent.id]: withFormContainerChildren(parent, children) },
   };
 };
 

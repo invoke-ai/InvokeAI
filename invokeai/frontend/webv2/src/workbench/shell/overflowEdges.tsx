@@ -2,6 +2,7 @@ import type { MouseEvent } from 'react';
 
 import { Flex, Icon, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui/Button';
+import { measureHiddenEdges, SCROLL_EDGE_TOLERANCE_PX } from '@platform/ui/scrollStripEdges';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { forwardWheelToStrip, wheelScrollsHorizontally } from '@platform/ui/wheelScrollsHorizontally';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
@@ -25,9 +26,6 @@ export interface HiddenEdges {
 
 const NO_HIDDEN_EDGES: HiddenEdges = { end: false, endCount: 0, start: false };
 
-// A fractional zoom can leave a sub-pixel remainder at either end of a fully scrolled row; that hides nothing.
-const EDGE_TOLERANCE_PX = 1;
-
 /** Fade plus the cue's button and the island's inline padding beside it. */
 export const CUE_WIDTH = '2.75rem';
 /** The row's inline padding; the cue covers the end padding, the start padding stays in front of the first control. */
@@ -44,8 +42,6 @@ const CUE_CSS: Record<Edge, object> = {
 };
 
 const MIRRORED_IN_RTL = { _rtl: { transform: 'scaleX(-1)' } } as const;
-
-export const HIDDEN_SCROLLBAR_CSS = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' } as const;
 
 const prefersReducedMotion = (): boolean =>
   document.documentElement.dataset.reduceMotion === 'true' ||
@@ -72,18 +68,16 @@ const createHiddenEdgesStore = ({ itemSelector, keepInViewSelector }: OverflowEd
     if (!scroller) {
       return;
     }
-    // Right-to-left rows scroll toward negative offsets; the distance from the start is the same either way.
-    const offset = Math.abs(scroller.scrollLeft);
-    const range = scroller.scrollWidth - scroller.clientWidth;
-    const start = offset >= EDGE_TOLERANCE_PX;
-    const end = range - offset >= EDGE_TOLERANCE_PX;
+    const { end, start } = measureHiddenEdges(scroller);
     const bounds = end && itemSelector ? scroller.getBoundingClientRect() : null;
     const isRtl = bounds !== null && getComputedStyle(scroller).direction === 'rtl';
     const endCount = bounds
       ? [...scroller.querySelectorAll(itemSelector!)].filter((item) => {
           const rect = item.getBoundingClientRect();
 
-          return isRtl ? rect.left < bounds.left - EDGE_TOLERANCE_PX : rect.right > bounds.right + EDGE_TOLERANCE_PX;
+          return isRtl
+            ? rect.left < bounds.left - SCROLL_EDGE_TOLERANCE_PX
+            : rect.right > bounds.right + SCROLL_EDGE_TOLERANCE_PX;
         }).length
       : 0;
 
@@ -108,7 +102,7 @@ const createHiddenEdgesStore = ({ itemSelector, keepInViewSelector }: OverflowEd
     const bounds = scroller.getBoundingClientRect();
     const rect = item.getBoundingClientRect();
 
-    if (rect.left < bounds.left - EDGE_TOLERANCE_PX || rect.right > bounds.right + EDGE_TOLERANCE_PX) {
+    if (rect.left < bounds.left - SCROLL_EDGE_TOLERANCE_PX || rect.right > bounds.right + SCROLL_EDGE_TOLERANCE_PX) {
       item.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'nearest' });
     }
   };

@@ -9,7 +9,7 @@ import type {
 
 import { getResolvedWorkflowEdges } from './connectors';
 import { getEffectiveWorkflowFieldDescription, isDirectInputField, isWorkflowFieldValueValid } from './fields';
-import { isInvocationNode } from './types';
+import { isFormContainerElement, isInvocationNode, withFormContainerChildren } from './types';
 import { validateConnectionTypes } from './validation';
 
 /** Prefix used by the backend to distinguish child-workflow inputs from node inputs. */
@@ -44,7 +44,7 @@ const getFormElementsInOrder = (form: WorkflowForm): WorkflowFormElement[] => {
     visited.add(elementId);
     ordered.push(element);
 
-    if (element.type === 'container' || element.type === 'collapsible') {
+    if (isFormContainerElement(element)) {
       element.data.children.forEach(visit);
     }
   };
@@ -199,16 +199,11 @@ const removeFormElement = (form: WorkflowForm, elementId: string): WorkflowForm 
   const elements = Object.fromEntries(Object.entries(form.elements).filter(([id]) => id !== elementId));
 
   for (const [id, element] of Object.entries(elements)) {
-    if (element.type === 'container') {
-      elements[id] = {
-        ...element,
-        data: { ...element.data, children: element.data.children.filter((childId) => childId !== elementId) },
-      };
-    } else if (element.type === 'collapsible') {
-      elements[id] = {
-        ...element,
-        data: { ...element.data, children: element.data.children.filter((childId) => childId !== elementId) },
-      };
+    if (isFormContainerElement(element) && element.data.children.includes(elementId)) {
+      elements[id] = withFormContainerChildren(
+        element,
+        element.data.children.filter((childId) => childId !== elementId)
+      );
     }
   }
 
