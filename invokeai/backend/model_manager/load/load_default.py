@@ -231,6 +231,15 @@ def _is_quantized_param(param: torch.nn.Parameter) -> bool:
     return not param.data.is_floating_point() or type(param.data) is not torch.Tensor
 
 
+def _declared_patterns(model: torch.nn.Module, attr: str) -> tuple[str, ...]:
+    """The string entries of a class attribute that lists module-name patterns, tolerating odd declarations."""
+    declared = getattr(model, attr, None) or ()
+    # Diffusers stores these as lists of strings, but a subclass could set a bare string.
+    if isinstance(declared, str):
+        declared = (declared,)
+    return tuple(p for p in declared if isinstance(p, str))
+
+
 def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
     """The precision-sensitive modules a model declares for itself, as skip patterns.
 
@@ -251,11 +260,7 @@ def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
     """
     patterns: list[str] = []
     for attr in ("_skip_layerwise_casting_patterns", "_keep_in_fp32_modules"):
-        declared = getattr(model, attr, None) or ()
-        # Diffusers stores these as lists of strings, but a subclass could set a bare string.
-        if isinstance(declared, str):
-            declared = (declared,)
-        patterns.extend(p for p in declared if isinstance(p, str) and p not in patterns)
+        patterns.extend(p for p in _declared_patterns(model, attr) if p not in patterns)
     return tuple(patterns)
 
 
@@ -638,10 +643,22 @@ class ModelLoader(ModelLoaderBase):
         # widen every other layer to `uint8` and `get_model_compute_dtype` would hand `uint8` to the
         # denoise loop — finite garbage, nothing logged. A float8 leading param is skipped for the
         # same reason `set_fp8_compute_dtype` rejects one: it is storage, not arithmetic.
+        #
+        # Parameters of `_keep_in_fp32_modules` are skipped too, by the same name rule as diffusers'
+        # `get_parameter_dtype`: they stay float32 on purpose and say nothing about the dtype the
+        # other layers compute in (Wan's `scale_shift_table` is registered first and would make
+        # every fp8 weight widen to float32).
         if isinstance(model, torch.nn.Module):
+            keep_fp32 = _declared_patterns(model, "_keep_in_fp32_modules")
+            float_params = [
+                (name, p)
+                for name, p in model.named_parameters()
+                if p.is_floating_point() and p.dtype not in FP8_STORAGE_DTYPES
+            ]
+            # When every float is kept in float32 there is nothing else to read; like diffusers, take the first.
             compute_dtype = next(
-                (p.dtype for p in model.parameters() if p.is_floating_point() and p.dtype not in FP8_STORAGE_DTYPES),
-                compute_dtype,
+                (p.dtype for name, p in float_params if not any(m in name for m in keep_fp32)),
+                float_params[0][1].dtype if float_params else compute_dtype,
             )
 
         # We use our own hook-based path for every nn.Module — including diffusers ModelMixin —
