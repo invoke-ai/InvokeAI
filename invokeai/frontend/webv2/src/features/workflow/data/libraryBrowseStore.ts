@@ -818,7 +818,7 @@ const probePlaceTotal = (place: WorkflowLibraryPlace): Promise<void> => {
         }
       },
       () => {
-        // A failed probe leaves that total unknown.
+        // A failed probe leaves the previous total in place, or unknown until the first successful probe.
       }
     )
     .finally(() => {
@@ -1184,7 +1184,6 @@ onWorkflowLibraryCacheInvalidated(() => {
   selectedValidation = store.getSnapshot().selectedEntry ? listGeneration + 1 : null;
   scheduleCurrentViewRefresh();
   store.patchSnapshot({
-    placeTotals: EMPTY_PLACE_TOTALS,
     entries: store.getSnapshot().entries.map((entry) => ({ ...entry, enrichment: PENDING_ENRICHMENT })),
     selectedEntry: store.getSnapshot().selectedEntry
       ? { ...store.getSnapshot().selectedEntry!, enrichment: PENDING_ENRICHMENT }

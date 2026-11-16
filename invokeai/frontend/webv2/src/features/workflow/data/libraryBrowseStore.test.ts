@@ -1081,6 +1081,34 @@ describe('workflow library place totals', () => {
     expect(browse.getWorkflowLibraryBrowseSnapshot().placeTotals).toEqual({ recent: 2, user: 4 });
   });
 
+  it('retains place totals while mutation refreshes are pending, then replaces them', async () => {
+    api.listLibraryWorkflows.mockResolvedValue(buildPage([], { total: 3 }));
+    await browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'updated' });
+    await browse.loadWorkflowLibraryPlaceTotals(['recent']);
+
+    const listing = createDeferred<WorkflowLibraryPage>();
+    const probe = createDeferred<WorkflowLibraryPage>();
+    api.listLibraryWorkflows.mockImplementation(({ perPage }: { perPage: number }) =>
+      perPage === 1 ? probe.promise : listing.promise
+    );
+    api.listLibraryWorkflows.mockClear();
+
+    invalidate();
+    expect(browse.getWorkflowLibraryBrowseSnapshot().placeTotals).toEqual({ recent: 3, user: 3 });
+    await flushAsyncWork();
+    expect(api.listLibraryWorkflows).toHaveBeenCalledWith(expect.objectContaining({ hasBeenOpened: true, perPage: 1 }));
+    expect(browse.getWorkflowLibraryBrowseSnapshot().placeTotals).toEqual({ recent: 3, user: 3 });
+
+    probe.resolve(buildPage([], { total: 2 }));
+    await vi.waitFor(() =>
+      expect(browse.getWorkflowLibraryBrowseSnapshot().placeTotals).toEqual({ recent: 2, user: 3 })
+    );
+    listing.resolve(buildPage([], { total: 4 }));
+    await vi.waitFor(() =>
+      expect(browse.getWorkflowLibraryBrowseSnapshot().placeTotals).toEqual({ recent: 2, user: 4 })
+    );
+  });
+
   it('shares a probe in flight and follows the current place’s unfiltered listings', async () => {
     api.listLibraryWorkflows.mockImplementation(({ perPage }: { perPage: number }) =>
       Promise.resolve(buildPage([buildItem('a')], { total: perPage === 1 ? 7 : 9 }))

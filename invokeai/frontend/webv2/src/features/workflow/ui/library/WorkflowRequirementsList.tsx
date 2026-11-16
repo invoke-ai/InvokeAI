@@ -66,7 +66,10 @@ export const getMissingNodePacks = (enrichment: ReadyEnrichment, templates: Invo
   const packs = new Set<string>();
 
   for (const node of enrichment.document.nodes) {
-    if (node.type === 'invocation' && templates[node.data.type] === undefined) {
+    if (
+      node.type === 'invocation' &&
+      (!Object.hasOwn(templates, node.data.type) || templates[node.data.type] === undefined)
+    ) {
       packs.add(node.data.nodePack || node.data.type);
     }
   }

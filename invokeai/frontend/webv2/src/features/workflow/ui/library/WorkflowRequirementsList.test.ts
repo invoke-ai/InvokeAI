@@ -44,6 +44,19 @@ describe('getMissingNodePacks', () => {
     expect(getMissingNodePacks(ready(document), { integer: known })).toEqual(['face-tools', 'wobbly']);
   });
 
+  it.each(['toString', 'constructor', '__proto__'])('requires an own template for node type %s', (type) => {
+    const inheritedName = template(type, 'custom-tools');
+    const enrichment = ready({
+      ...createProjectGraph('inherited-type'),
+      nodes: [buildInvocationNode(inheritedName, { x: 0, y: 0 })],
+    });
+
+    expect(getMissingNodePacks(enrichment, {})).toEqual(['custom-tools']);
+    expect(getMissingNodePacks(enrichment, { [type]: inheritedName })).toEqual([]);
+    const unavailable = Object.defineProperty({}, type, { value: undefined });
+    expect(getMissingNodePacks(enrichment, unavailable)).toEqual(['custom-tools']);
+  });
+
   it('answers from cache for the same enrichment and templates, and recomputes for new templates', () => {
     const enrichment = ready(document);
     const templates = { integer: known };
