@@ -252,7 +252,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
         sigmas = []
         for i in range(num_steps + 1):
             t = 1.0 - i / num_steps  # Goes from 1.0 to 0.0
-            # The ends are fixed. Evaluated, t = 0 would divide by zero, and so would t = 1 at a shift of 0.
+            # The ends are fixed. Evaluated, t = 0 would divide by zero.
             sigmas.append(1.0 if t >= 1 else 0.0 if t <= 0 else time_shift(shift, t))
         return sigmas
 
@@ -317,8 +317,9 @@ class ZImageDenoiseInvocation(BaseInvocation):
             )
             neg_prompt_embeds = negative_regional_extension.regional_text_conditioning.prompt_embeds
 
-        # Calculate shift based on image sequence length, or use override
-        if self.shift is not None:
+        # Calculate shift based on image sequence length, or use override. Only a positive shift counts as set: the
+        # workflow editor sends 0 for an optional float field the user left alone, and a shift of 0 is no schedule.
+        if self.shift is not None and self.shift > 0:
             shift = self.shift
         else:
             shift = Z_IMAGE_SHIFT_FIT.shift(img_seq_len)
@@ -335,15 +336,6 @@ class ZImageDenoiseInvocation(BaseInvocation):
             sigmas = sigmas[start_idx:end_idx]
 
         is_heun = self.scheduler == "heun"
-        if is_heun:
-            # Heun divides by every sigma it evaluates the model at, so an interval of zero length at sigma 0 is
-            # 0/0 and turns the latents into NaN; an explicit shift of 0 schedules [1, 0, ..., 0]. Such an interval
-            # has nothing to integrate (Euler steps through it unchanged), so Heun runs only the others and counts
-            # its progress over them. With none left, the pass returns the blended latents, as Euler would.
-            sigmas = [
-                sigma for sigma, sigma_next in zip(sigmas[:-1], sigmas[1:], strict=True) if sigma != sigma_next
-            ] + sigmas[-1:]
-
         total_steps = len(sigmas) - 1
 
         # Load input latents if provided (image-to-image)

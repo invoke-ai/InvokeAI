@@ -18,6 +18,7 @@ import torch
 from gguf.quants import quantize
 
 from invokeai.app.invocations.fields import Ideogram4ConditioningField
+from invokeai.app.invocations.ideogram4 import ideogram4_denoise
 from invokeai.app.invocations.ideogram4.ideogram4_denoise import Ideogram4DenoiseInvocation
 from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
 from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Config, Ideogram4Transformer
@@ -656,3 +657,49 @@ def test_an_explicitly_capped_cache_is_left_to_its_own_budget(monkeypatch) -> No
     assert uncond.unloaded == []
     assert emptied == []
     assert calls == [("cond", RESERVATION), ("uncond", RESERVATION)]
+
+
+def _mu_the_denoise_runs_with(monkeypatch, **fields) -> float:
+    """Run `invoke` up to the sampler call and return the mu it was handed."""
+    seen: list[float] = []
+    invocation = _invocation(
+        transformer=_field("cond"),
+        positive_conditioning=Ideogram4ConditioningField(conditioning_name="cond-1"),
+        sampler_preset="V4_TURBO_12",
+        steps=None,
+        guidance_scale=None,
+        width=1024,
+        height=1024,
+        seed=0,
+        **fields,
+    )
+
+    def run(*, mu: float, **_kwargs):
+        seen.append(mu)
+        raise _StopAfterLoad
+
+    monkeypatch.setattr(ideogram4_denoise, "run_ideogram4_denoise", run)
+    monkeypatch.setattr(invocation, "_load_branches", lambda *_args, **_kwargs: (None, None))
+    conditioning = ConditioningFieldData(
+        conditionings=[Ideogram4ConditioningInfo(prompt_embeds=torch.zeros(TEXT_TOKENS, 32))]
+    )
+    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda _name: conditioning))
+
+    with pytest.raises(_StopAfterLoad):
+        invocation.invoke(context)
+
+    return seen[0]
+
+
+@pytest.mark.parametrize(
+    ("mu", "expected"),
+    [
+        pytest.param(None, 0.5, id="unset"),
+        pytest.param(0.0, 0.5, id="zero-from-the-editor"),
+        pytest.param(-1.5, -1.5, id="negative"),
+        pytest.param(2.0, 2.0, id="positive"),
+    ],
+)
+def test_only_a_nonzero_mu_overrides_the_preset(monkeypatch, mu: float | None, expected: float) -> None:
+    # V4_TURBO_12 carries mu 0.5; the workflow editor sends 0 for an optional float field left alone.
+    assert _mu_the_denoise_runs_with(monkeypatch, mu=mu) == expected

@@ -151,7 +151,9 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         resolution-dependent fit over the target image's tokens, held at its end.
         """
         scheduler = load_scheduler(model_path, QWEN_IMAGE_SCHEDULER_CONFIG)
-        if shift is not None:
+        # Only a positive shift counts as set: the workflow editor sends 0 for an optional float field the user left
+        # alone, and log(0) is undefined.
+        if shift is not None and shift > 0:
             return scheduler, math.log(shift)
         image_seq_len = (height // LATENT_SCALE_FACTOR) * (width // LATENT_SCALE_FACTOR) // patch_size**2
         return scheduler, ShiftFit.from_scheduler_config(scheduler.config).mu(image_seq_len)
