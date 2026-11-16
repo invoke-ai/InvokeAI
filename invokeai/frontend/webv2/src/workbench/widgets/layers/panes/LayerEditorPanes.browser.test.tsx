@@ -119,6 +119,7 @@ vi.mock('@workbench/canvas-operations/api', async (importOriginal) => ({
 
 import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { clearMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
+import { revealLayerSection } from '@workbench/widgets/layers/revealLayerProperties';
 
 import type { LayerEditorPaneLayout } from './editorPaneLayout';
 
@@ -271,7 +272,11 @@ const GRADIENT_SOURCE = {
 const mount = async (
   View: typeof PropertiesPane,
   selection: Selection = 'none',
-  { extraNodes = [], width = 450 }: { extraNodes?: Parameters<typeof stacksFrom>[0]; width?: number } = {}
+  {
+    extraNodes = [],
+    height = 600,
+    width = 450,
+  }: { extraNodes?: Parameters<typeof stacksFrom>[0]; height?: number; width?: number } = {}
 ) => {
   const base = { ...createInitialWorkbenchState().projects[0]!, id: 'p' };
   const nodes =
@@ -304,7 +309,7 @@ const mount = async (
     type: 'replaceCanvasDocument',
   });
   host = document.createElement('div');
-  host.style.cssText = `width:${width}px;height:600px;`;
+  host.style.cssText = `width:${width}px;height:${height}px;`;
   document.body.append(host);
   root = createRoot(host);
   registry = createEngineRegistry({ gracePeriodMs: 0 });
@@ -723,6 +728,46 @@ describe('Control layer properties', () => {
     );
     expect(overflowing.map((element) => element.outerHTML.slice(0, 80))).toEqual([]);
     expect(host!.scrollWidth).toBeLessThanOrEqual(320);
+  });
+});
+
+describe('Layer section reveal', () => {
+  it('scrolls the Layer section below the tool settings into view', async () => {
+    await mount(PropertiesPane, 'control', { height: 240 });
+    await act(() => engine!.tools.setTool('brush'));
+    await settle();
+    const section = host!.querySelector<HTMLElement>('[data-properties-section="layer"]')!;
+    const inView = () => section.getBoundingClientRect().top < host!.getBoundingClientRect().bottom;
+    expect(inView()).toBe(false);
+
+    revealLayerSection();
+
+    await expect.poll(inView).toBe(true);
+    await expect.element(page.getByRole('combobox', { exact: true, name: 'Type' })).toBeInViewport();
+  });
+
+  it('brings the start of a tall Layer section back into view after the user scrolled down within it', async () => {
+    await mount(PropertiesPane, 'control', { height: 160 });
+    await act(() => engine!.tools.setTool('brush'));
+    await settle();
+    const section = host!.querySelector<HTMLElement>('[data-properties-section="layer"]')!;
+    let scroller = section.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight) {
+      scroller = scroller.parentElement;
+    }
+    const viewTop = () => scroller!.getBoundingClientRect().top;
+    const startInView = () => Math.abs(section.getBoundingClientRect().top - viewTop()) < 2;
+    expect(section.getBoundingClientRect().height).toBeGreaterThan(scroller!.clientHeight);
+
+    revealLayerSection();
+    await expect.poll(startInView).toBe(true);
+
+    scroller!.scrollTop += 80;
+    expect(section.getBoundingClientRect().top).toBeLessThan(viewTop());
+
+    revealLayerSection();
+    await expect.poll(startInView).toBe(true);
+    await expect.element(page.getByRole('combobox', { exact: true, name: 'Type' })).toBeInViewport();
   });
 });
 

@@ -83,6 +83,7 @@ describe('getLayerContextMenuLayout', () => {
       {
         id: 'primary',
         items: [
+          'open-properties',
           'transform',
           'rename',
           'fit-to-bbox',
@@ -126,12 +127,12 @@ describe('getLayerContextMenuLayout', () => {
 
     expect(summarize(inpaint)[1]).toEqual({
       id: 'primary',
-      items: ['rename', 'fit-to-bbox', 'add-noise', 'add-denoise-limit', 'extract-masked-area'],
+      items: ['open-properties', 'rename', 'fit-to-bbox', 'add-noise', 'add-denoise-limit', 'extract-masked-area'],
       presentation: 'list',
     });
     expect(summarize(regional)[1]).toEqual({
       id: 'primary',
-      items: ['rename', 'fit-to-bbox', 'regional-auto-negative', 'add-reference-image'],
+      items: ['open-properties', 'rename', 'fit-to-bbox', 'regional-auto-negative', 'add-reference-image'],
       presentation: 'list',
     });
   });
@@ -144,7 +145,15 @@ describe('getLayerContextMenuLayout', () => {
 
     expect(summarize(control)[1]).toEqual({
       id: 'primary',
-      items: ['transform', 'rename', 'fit-to-bbox', 'select-object', 'run-workflow', 'control-transparency-effect'],
+      items: [
+        'open-properties',
+        'transform',
+        'rename',
+        'fit-to-bbox',
+        'select-object',
+        'run-workflow',
+        'control-transparency-effect',
+      ],
       presentation: 'list',
     });
     expect(summarize(control)[2]).toEqual({
