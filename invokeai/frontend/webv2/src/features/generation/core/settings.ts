@@ -583,17 +583,24 @@ const areModelSnapshotsEqual = (a: unknown, b: unknown): boolean => {
   }
 };
 
+const hasSameModelKind = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  candidate.type === saved.type &&
+  candidate.base === saved.base &&
+  (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
+
 /**
  * Whether an installed model is the same file as a saved choice that is no longer installed: a reinstall gives the
  * file a new key but keeps its hash. Type, base and (where the saved choice names one) variant must agree as well, so
  * a file registered differently is not taken for it.
  */
 export const isSameModelFile = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
-  Boolean(saved.hash) &&
-  candidate.hash === saved.hash &&
-  candidate.type === saved.type &&
-  candidate.base === saved.base &&
-  (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
+  Boolean(saved.hash) && candidate.hash === saved.hash && hasSameModelKind(candidate, saved);
+
+/** Match an existing installation, comparing the file hashes when both are available. */
+export const isSameInstalledModel = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  candidate.key === saved.key &&
+  hasSameModelKind(candidate, saved) &&
+  (!candidate.hash || !saved.hash || candidate.hash === saved.hash);
 
 /** Refreshes each concept from the catalog, finding a reinstalled LoRA again by its file hash. */
 export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: readonly unknown[]): GenerateLora[] => {
@@ -699,9 +706,19 @@ const syncReferenceImageConfigWithModels = (
 ): GenerateReferenceImageConfig => {
   switch (config.type) {
     case 'flux_kontext_reference_image': {
-      const model = syncModelIdentifierWithModels(config.model, modelsByKey);
+      const boundModel = config.model;
+      const model = syncModelIdentifierWithModels(boundModel, modelsByKey);
+      // Keep the original binding if the catalog record points to a different model.
+      if (
+        !boundModel ||
+        model === boundModel ||
+        !isMainModelConfig(model) ||
+        !isSameInstalledModel(model, boundModel)
+      ) {
+        return config;
+      }
 
-      return model === config.model ? config : { ...config, model: isMainModelConfig(model) ? model : config.model };
+      return { ...config, model };
     }
     case 'flux_redux':
     case 'ip_adapter': {

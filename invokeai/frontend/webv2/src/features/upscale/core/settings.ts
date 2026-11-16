@@ -25,6 +25,7 @@ import {
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
+  isMossImageQwen35Encoder,
   isModelIdentifierConfig,
   isQwen3Vl4bEncoder,
   isVaeCompatibleWithGenerateModel,
@@ -189,6 +190,12 @@ const ANIMA_QWEN35_SLOT: UpscaleComponentSlot = {
   field: 'qwen35EncoderModel',
   label: 'Qwen3.5 encoder',
 };
+// MOSS-Image reads the Qwen3.5 9B; the 4B Anima-3.8B uses is the same model type and its hidden size does not fit.
+const MOSS_IMAGE_QWEN35_SLOT: UpscaleComponentSlot = {
+  accepts: isMossImageQwen35Encoder,
+  field: 'qwen35EncoderModel',
+  label: 'Qwen3.5 9B encoder',
+};
 // Krea-2 reads the 4B; Ideogram 4's 8B is the same model type and `krea2_model_loader` refuses it.
 const KREA2_QWEN3_VL_SLOT: UpscaleComponentSlot = {
   accepts: isQwen3Vl4bEncoder,
@@ -319,8 +326,9 @@ export interface UpscaleArchitecture {
    * Whether a new main model sets CFG to that model's served default. Z-Image Turbo and Krea-2 Turbo are
    * distilled for CFG 1, and anything above runs a second, unconditional pass per step at upscale
    * resolution; Z-Image Base, Anima, Krea-2 Raw and Qwen Image want 4 to 6, and FLUX.2 [dev] a guidance of
-   * 3.5 (Klein reads none). SD and FLUX.1 keep the user's CFG -- SD's multi-diffusion pass is tuned to the
-   * widget's 2 -- and get that 2 back when the user comes from one of the others.
+   * 3.5 (Klein reads none); MOSS-Image takes its served 3. SD and FLUX.1 keep the user's CFG -- SD's
+   * multi-diffusion pass is tuned to the widget's 2 -- and get that 2 back when the user comes from one of the
+   * others.
    */
   readonly takesModelGuidance: boolean;
   /**
@@ -438,6 +446,23 @@ export const UPSCALE_ARCHITECTURES = {
     // `krea2_denoise` has no scheduler input: it steps with Euler.
     schedulers: ['euler'],
     takesModelGuidance: true,
+    takesModelSteps: false,
+    tileControlNet: null,
+  },
+  'moss-image': {
+    // `moss_image_model_loader` takes a Diffusers install's own Qwen3.5 and VAE; any other format needs both.
+    components: (model) =>
+      model.format === 'diffusers' ? NO_COMPONENTS : { slots: [MOSS_IMAGE_QWEN35_SLOT], vae: true },
+    denoiseGrid: 16,
+    // `moss_image_denoise` clips by sigma value like FLUX, then re-spaces the window to the requested steps.
+    indexClipping: null,
+    label: 'MOSS-Image',
+    negativePrompt: 'cfg-gated',
+    // `moss_image_denoise` has no scheduler input: it steps its own shifted Euler schedule.
+    schedulers: ['euler'],
+    takesModelGuidance: true,
+    // Not distilled: the served 50 is a full-schedule txt2img default, and the re-spaced window would run all of it
+    // at upscale resolution, two transformer passes each at CFG 3.
     takesModelSteps: false,
     tileControlNet: null,
   },
