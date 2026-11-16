@@ -77,9 +77,10 @@ class TestMistralEncoderFold:
 
 
 class TestSharedComfyFold:
-    """`_dequantize_comfyui_fp8`, the copy the Wan loader (`wan.py`) reaches. Its local loop compared
-    `scale.shape[dim] != weight.shape[dim]`, so a per-output-channel scale -- whose length already equals the row
-    count -- was expanded by nothing and left to broadcasting."""
+    """`_dequantize_comfyui_fp8`, the copy the Qwen2.5-VL encoder loader
+    (`qwen_image.py`) reaches. Its local loop compared `scale.shape[dim] !=
+    weight.shape[dim]`, so a per-output-channel scale -- whose length already equals the row count
+    -- was expanded by nothing and left to broadcasting."""
 
     def _fold(self, weight: torch.Tensor, scale: torch.Tensor, spelling: str = ".weight_scale") -> torch.Tensor:
         sd = {"layer.weight": weight, f"layer{spelling}": scale}
@@ -153,9 +154,8 @@ class TestSharedComfyFold:
             _dequantize_comfyui_fp8(tensors, torch.float32)
 
     def test_a_layer_whose_packed_payload_was_taken_out_first_still_folds(self) -> None:
-        """Two loaders reach this fold: Wan, which has no nvfp4 support at all, and the Qwen2.5-VL
-        encoder, which calls `pop_nvfp4_layers` first (`qwen_image.py:473`) and ships the layers
-        packed. That pop takes the weight and both scales out together, so by the time the fold runs
+        """The Qwen2.5-VL encoder reaches this fold. It calls `pop_nvfp4_layers` first (`qwen_image.py`)
+        and ships the layers packed. That pop takes the weight and both scales out together, so by the time the fold runs
         there is nothing for the guard to see -- asserted, because a guard that fired here anyway
         would break the one supported nvfp4 build that passes through."""
         tensors, _ = nvfp4_signed_tensors("packed", torch.randint(0, 2, (128, 64), dtype=torch.bool))
