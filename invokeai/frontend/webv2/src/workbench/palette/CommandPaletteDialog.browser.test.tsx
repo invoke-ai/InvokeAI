@@ -884,6 +884,12 @@ describe('CommandPaletteDialog interaction', () => {
     await act(() => userEvent.keyboard('{End}'));
     expect(input.selectionStart).toBe('Command'.length);
     await expectHighlighted('Command 01');
+    // Alt does not hand them to the highlight either.
+    await act(() => userEvent.keyboard('{Alt>}{Home}{/Alt}'));
+    expect(input.selectionStart).toBe(0);
+    await act(() => userEvent.keyboard('{Alt>}{End}{/Alt}'));
+    expect(input.selectionStart).toBe('Command'.length);
+    await expectHighlighted('Command 01');
   });
 
   it('highlights on hover and runs on click without taking focus from the search field', async () => {
@@ -906,7 +912,7 @@ describe('CommandPaletteDialog interaction', () => {
 
   it('leaves keys that compose IME text to the composition', async () => {
     const run = vi.fn();
-    const { input } = await renderPalette({
+    const { input, onClose } = await renderPalette({
       entries: [entry('first', 'First command', run), entry('second', 'Second command')],
     });
     const highlighted = () => document.getElementById(input.getAttribute('aria-activedescendant') ?? '')?.textContent;
@@ -929,6 +935,8 @@ describe('CommandPaletteDialog interaction', () => {
       expect(highlighted()).toBe('First command');
       await act(() => composingKeyDown('Enter', flag));
       expect(run).not.toHaveBeenCalled();
+      await act(() => composingKeyDown('Escape', flag));
+      expect(onClose).not.toHaveBeenCalled();
     }
 
     await act(() => userEvent.keyboard('{PageDown}'));

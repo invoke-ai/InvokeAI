@@ -14,6 +14,9 @@ const PAGE_JUMP_ROWS = 8;
 
 const getRowText = (row: NavigablePaletteRow): string => (row.kind === 'entry' ? row.entry.title : row.label);
 
+// Keys that compose IME text belong to the composition; 229 is how some engines report them.
+const isCompositionKey = (event: KeyboardEvent<HTMLElement>) => event.nativeEvent.isComposing || event.keyCode === 229;
+
 const moveCaretToEdge = (input: HTMLInputElement, key: 'End' | 'Home') => {
   const position = key === 'Home' ? 0 : input.value.length;
 
@@ -169,9 +172,13 @@ export const usePaletteNavigation = ({
 
   const onContentKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === 'Escape') {
+      if (event.key !== 'Escape') {
+        return;
+      }
+      // An Escape that cancels IME composition stays inside the palette but neither pops nor closes it.
+      event.stopPropagation();
+      if (!isCompositionKey(event)) {
         event.preventDefault();
-        event.stopPropagation();
         onEscape();
       }
     },
@@ -180,13 +187,13 @@ export const usePaletteNavigation = ({
 
   /**
    * Keys the combobox does not own; it handles arrows, plain Enter and pointer highlight. It runs after this handler
-   * and skips prevented events, so Home/End are prevented here and move the caret by hand: the combobox would move
-   * the highlight instead. Mod+Enter is the keyboard's only way to a secondary action; a modified click stays primary.
+   * and skips prevented events, so Home/End, with Alt too, are prevented here and move the caret by hand: the combobox
+   * would move the highlight instead. It leaves Ctrl, ⌘ and Shift with Home/End to the input. Mod+Enter is the
+   * keyboard's only way to a secondary action; a modified click stays primary.
    */
   const onSearchKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
-      // Keys that compose IME text belong to the composition; 229 is how some engines report them.
-      if (event.nativeEvent.isComposing || event.keyCode === 229) {
+      if (isCompositionKey(event)) {
         return;
       }
 
@@ -201,13 +208,7 @@ export const usePaletteNavigation = ({
       } else if (event.key === 'PageDown' || event.key === 'PageUp') {
         event.preventDefault();
         jumpActive(event.key === 'PageDown' ? PAGE_JUMP_ROWS : -PAGE_JUMP_ROWS);
-      } else if (
-        (event.key === 'Home' || event.key === 'End') &&
-        !event.altKey &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.shiftKey
-      ) {
+      } else if ((event.key === 'Home' || event.key === 'End') && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
         event.preventDefault();
         moveCaretToEdge(event.currentTarget, event.key);
       } else if (event.key === 'Tab' && activeRow?.kind === 'scope') {
