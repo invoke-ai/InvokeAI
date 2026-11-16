@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next';
 import type { GalleryWidgetProps } from './GalleryUiContext';
 
 import { BoardCover, BoardCoverIcon } from './GalleryBoardCover';
+import { useGalleryLayoutMode } from './galleryDensity';
 import { getGalleryProjectBoardId, getGallerySelectedBoardId } from './galleryStateView';
 import { useGalleryUi, useHostGalleryBoards } from './GalleryUiContext';
 import { useGalleryDestination } from './useGalleryDestination';
@@ -89,6 +90,7 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
       ? t('widgets.gallery.inboxOf', { project: selectedBoard.name })
       : getGalleryBoardLabel(selectedBoard, t);
   const isCollapsed = settings.boardPanelCollapsed;
+  const layout = useGalleryLayoutMode(region);
 
   const toggleBoards = useCallback(
     () => gallery.updateSettings({ boardPanelCollapsed: !isCollapsed }),
@@ -122,8 +124,8 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
       >
         {selectedBoard ? <BoardCover board={selectedBoard} /> : <BoardCoverIcon icon={ImageIcon} />}
         <MiddleTruncate fontWeight="600" minW="0" text={boardName} />
-        {/* The center view shows the boards as a sidebar beside the grid; the rails stack them above it. */}
-        {region === 'center' ? (
+        {/* The icon follows the body's measured layout: a sidebar beside the grid, or a panel stacked above it. */}
+        {layout === 'wide' ? (
           <Icon
             _rtl={MIRRORED_IN_RTL}
             as={isCollapsed ? PanelLeftOpenIcon : PanelLeftCloseIcon}

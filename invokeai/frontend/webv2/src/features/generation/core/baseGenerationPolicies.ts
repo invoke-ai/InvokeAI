@@ -29,6 +29,7 @@ import type {
   GenerateSettings,
   MainModelConfig,
   PidMode,
+  VaeModelConfig,
 } from './types';
 
 import {
@@ -57,6 +58,7 @@ import {
   isQwen3Vl4bEncoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeAcceptedByBase,
+  isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
@@ -118,6 +120,7 @@ import {
   isGenerateModelConfig,
   isGenerateSettings,
   isLoraCompatibleWithModel,
+  isSameInstalledModel,
   isValidKrea2RebalanceWeights,
   isValidMossImageSkipLayers,
   KREA2_REBALANCE_WEIGHT_COUNT,
@@ -381,12 +384,11 @@ export const getPromptPolicy = (
   };
 };
 
-const HF_REPO_ID = /^[A-Za-z0-9][\w.-]*\/[\w.-]+$/;
+const HF_REPO_SOURCE = /^([A-Za-z0-9][\w.-]*\/[\w.-]+)(?::[\w.-]+)?$/;
 
 /**
- * Whether an installed model's source is the Hugging Face repo `repoId`: the repo itself (also `repo::subfolder` or a
- * huggingface.co URL), or a local folder named like the repo, as an in-place install of a downloaded copy is.
- * Case-insensitive, as Hugging Face repo ids are.
+ * Whether an installed model's source is the Hugging Face repo `repoId`: the repo itself (also with a `:variant` or
+ * `::subfolder` suffix), a huggingface.co URL, or a local folder named like the repo. Matching is case-insensitive.
  */
 export const isModelFromRepo = (source: string | null | undefined, repoId: string): boolean => {
   if (!source) {
@@ -394,10 +396,15 @@ export const isModelFromRepo = (source: string | null | undefined, repoId: strin
   }
   const wanted = repoId.toLowerCase();
   const withoutSubfolder = source.split('::')[0]!.trim();
-  const hfPath = /^https?:\/\/(?:www\.)?huggingface\.co\/([^?#]+)/i.exec(withoutSubfolder)?.[1];
-  const candidate = (hfPath ? hfPath.split('/').slice(0, 2).join('/') : withoutSubfolder).replace(/[/\\]+$/, '');
-  if (HF_REPO_ID.test(candidate)) {
-    return candidate.toLowerCase() === wanted;
+  if (/^https?:\/\//i.test(withoutSubfolder)) {
+    const repo = /^https?:\/\/(?:www\.)?huggingface\.co\/([^/?#]+\/[^/?#]+)/i.exec(withoutSubfolder)?.[1];
+    return repo?.toLowerCase() === wanted;
+  }
+
+  const candidate = withoutSubfolder.replace(/[/\\]+$/, '');
+  const repo = HF_REPO_SOURCE.exec(candidate)?.[1];
+  if (repo !== undefined) {
+    return repo.toLowerCase() === wanted;
   }
   const folder = candidate.split(/[/\\]/).pop() ?? '';
   return folder.toLowerCase() === wanted.split('/').pop();
@@ -678,6 +685,67 @@ export const getSettingsWithModelDefaults = (
     width: modelDefaults.width,
   };
 };
+
+/** The VAE a model's defaults choose, classified; each context states what it does with `missing`. */
+export type ModelDefaultVae =
+  /** Sets none, or the "default" sentinel where the VAE is a required component with nothing bundled. */
+  | { kind: 'none' }
+  /**
+   * Names a VAE that is not installed or does not fit the model. `hasBundledVae` says whether the model and settings
+   * have a bundled VAE to fall back to (the VAE component is not required).
+   */
+  | { kind: 'missing'; hasBundledVae: boolean }
+  /** `null` is the bundled VAE, which the "default" sentinel asks for wherever there is one. */
+  | { kind: 'apply'; vae: VaeModelConfig | null };
+
+/** Whether the model and settings need a VAE component, having no bundled VAE (or component source) to use. */
+const isVaeComponentRequired = (model: MainModelConfig, settings: GenerateSettings): boolean => {
+  const vaeSlotPolicy = getComponentSectionPolicy(model, settings).slots.find((slotPolicy) => slotPolicy.key === 'vae');
+
+  return Boolean(vaeSlotPolicy?.required?.(getComponentPolicyContext(model, settings)));
+};
+
+/**
+ * The one classification of a model's default VAE. The Model Manager stores "default" when the VAE default is on with
+ * no VAE picked: that is the bundled VAE, which only a model whose VAE is a required component lacks. Requiredness
+ * follows the component policy, so it reads the settings (a component source can bundle one).
+ */
+export const resolveModelDefaultVae = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  vaeModels: readonly VaeModelConfig[]
+): ModelDefaultVae => {
+  const key = (model.default_settings as { vae?: unknown } | null | undefined)?.vae;
+
+  if (model.type !== 'main' || typeof key !== 'string') {
+    return { kind: 'none' };
+  }
+
+  const hasBundledVae = !isVaeComponentRequired(model, settings);
+
+  if (key === '' || key === 'default') {
+    return hasBundledVae ? { kind: 'apply', vae: null } : { kind: 'none' };
+  }
+
+  const vae = vaeModels.find(
+    (candidate) => candidate.key === key && isVaeCompatibleWithGenerateModel(model, candidate)
+  );
+
+  return vae ? { kind: 'apply', vae } : { kind: 'missing', hasBundledVae };
+};
+
+/**
+ * Recall's policy (a model switch from recalled parameters or an image, and graph export): the model's default VAE,
+ * else the bundled VAE when the default cannot apply, as recall always did, so an image made with the bundled VAE is
+ * reproduced. Only where the VAE is required and nothing is bundled does the current VAE stay (`undefined`), since
+ * clearing it would leave the form unable to run.
+ */
+export const getRecallDefaultVae = (defaultVae: ModelDefaultVae): VaeModelConfig | null | undefined =>
+  defaultVae.kind === 'apply'
+    ? defaultVae.vae
+    : defaultVae.kind === 'missing' && defaultVae.hasBundledVae
+      ? null
+      : undefined;
 
 export type GenerateComponentValueKey =
   | 't5EncoderModel'
@@ -1582,13 +1650,22 @@ export const isComponentCompatibleWithModel = (
 
 type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };
 
-const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
-  Boolean(
-    model &&
-    model.type !== 'external_image_generator' &&
-    model.base === 'flux' &&
-    model.name.toLowerCase().includes('kontext')
-  );
+// FLUX.1 Kontext starter sources from invokeai/backend/model_manager/starter_models/flux.py.
+const FLUX_KONTEXT_REPOS = [
+  'black-forest-labs/flux.1-kontext-dev',
+  'comfy-org/flux1-kontext-dev_comfyui',
+  'unsloth/flux.1-kontext-dev-gguf',
+];
+
+const isFluxMainModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
+  model?.type === 'main' && model.base === 'flux';
+
+const isKnownFluxKontextModel = ({ name, source }: MainModelConfig): boolean =>
+  name.toLowerCase().includes('kontext') ||
+  (typeof source === 'string' && FLUX_KONTEXT_REPOS.some((repo) => isModelFromRepo(source, repo)));
+
+const isBoundKontextReference = (model: MainModelConfig, config: GenerateReferenceImageConfig): boolean =>
+  config.type === 'flux_kontext_reference_image' && config.model !== null && isSameInstalledModel(model, config.model);
 
 /**
  * Families whose Generate graph loads LoRAs. The backend installs no LoRAs for the others, so their concept picker
@@ -1790,10 +1867,6 @@ const getFamilyDefaultReferenceImageConfig = (
     return { image, type: 'qwen_image_2_1_reference_image' };
   }
 
-  if (isFluxKontextModel(model)) {
-    return { image, model, type: 'flux_kontext_reference_image' };
-  }
-
   const adapterModel =
     models.find((candidate) => candidate.type === 'ip_adapter' && candidate.base === modelBase) ?? null;
 
@@ -1826,7 +1899,10 @@ const getReferenceImageConfigSupported = (
       // The encoder decides whether they run (see `isReferenceImageSupported`); the type fits the base alone.
       return model.type !== 'external_image_generator' && model.base === 'qwen-image-2-1';
     case 'flux_kontext_reference_image':
-      return isFluxKontextModel(model);
+      return (
+        isFluxMainModel(model) &&
+        (isBoundKontextReference(model, referenceImage.config) || isKnownFluxKontextModel(model))
+      );
     case 'flux_redux':
       return model.type !== 'external_image_generator' && model.base === 'flux';
     case 'ip_adapter':
@@ -1873,6 +1949,13 @@ const getDefaultReferenceImageConfigs = (
   additions: readonly ReferenceImageAddition[],
   referenceImages: readonly GenerateReferenceImage[]
 ): GenerateReferenceImageConfig[] => {
+  if (
+    isFluxMainModel(model) &&
+    (isKnownFluxKontextModel(model) || referenceImages.some(({ config }) => isBoundKontextReference(model, config)))
+  ) {
+    return additions.map(({ image }) => ({ image, model, type: 'flux_kontext_reference_image' }));
+  }
+
   if (model?.type !== 'main' || model.base !== 'krea-2') {
     return additions.map(({ image }) => getFamilyDefaultReferenceImageConfig(model, models, image));
   }
@@ -2049,6 +2132,46 @@ export const getCompatibleReferenceImages = (
   });
 };
 
+/**
+ * References as a switch to `model` leaves them, for every path that puts references in front of a model they were
+ * not set up for (a model switch, an Undo that brings removed ones back). Incompatible ones are retargeted (see
+ * `getCompatibleReferenceImages`); enabled ones the family cannot run together are switched off rather than deleted,
+ * so Invoke is not left blocked, the first enabled ones keep running, and a model that takes the rest can turn them on
+ * again. A model without references keeps them as they are, all switched off, for the next model that takes them.
+ * `retargetedReferenceImages` is the list before the switch-off, for reporting what each step changed. No changes
+ * return the same array.
+ */
+export const reconcileReferenceImagesWithModel = (
+  referenceImages: GenerateReferenceImage[],
+  model: GenerateModelConfig,
+  models: readonly ReferenceModelCandidate[]
+): { referenceImages: GenerateReferenceImage[]; retargetedReferenceImages: GenerateReferenceImage[] } => {
+  const referencesSupported = takesReferenceImages(model);
+  const retargetedReferenceImages = referencesSupported
+    ? getCompatibleReferenceImages(referenceImages, model, models)
+    : referenceImages;
+  const enabledKept: GenerateReferenceImage[] = [];
+  let didSwitchOff = false;
+  const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
+    if (!isReferenceImageActive(referenceImage)) {
+      return referenceImage;
+    }
+
+    if (referencesSupported && canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
+      enabledKept.push(referenceImage);
+      return referenceImage;
+    }
+
+    didSwitchOff = true;
+    return { ...referenceImage, isEnabled: false };
+  });
+
+  return {
+    referenceImages: didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages,
+    retargetedReferenceImages,
+  };
+};
+
 const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
@@ -2120,29 +2243,11 @@ const getSettingsWithCompatibleModelSelections = (
     change('concepts', 'turnedOff', stoppedConcepts);
   }
 
-  // Enabled references the new family cannot run together are switched off rather than deleted: Invoke is not left
-  // blocked, the first enabled ones keep running, and switching back can turn the rest on again. A model without
-  // references keeps them as they are, all switched off, for the next model that takes them.
-  const referencesSupported = takesReferenceImages(model);
-  const retargetedReferenceImages = referencesSupported
-    ? getCompatibleReferenceImages(settings.referenceImages, model, models)
-    : settings.referenceImages;
-  const enabledKept: GenerateReferenceImage[] = [];
-  let didSwitchOff = false;
-  const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
-    if (!isReferenceImageActive(referenceImage)) {
-      return referenceImage;
-    }
-
-    if (referencesSupported && canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
-      enabledKept.push(referenceImage);
-      return referenceImage;
-    }
-
-    didSwitchOff = true;
-    return { ...referenceImage, isEnabled: false };
-  });
-  const compatibleReferenceImages = didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages;
+  const { referenceImages: compatibleReferenceImages, retargetedReferenceImages } = reconcileReferenceImagesWithModel(
+    settings.referenceImages,
+    model,
+    models
+  );
 
   if (compatibleReferenceImages !== settings.referenceImages) {
     nextSettings.referenceImages = compatibleReferenceImages;
@@ -2166,7 +2271,7 @@ const getSettingsWithCompatibleModelSelections = (
       (referenceImage, index) => retargetedReferenceImages[index] !== referenceImage
     );
     const tunedRetargets = retargeted.filter((referenceImage) => !isPreviousDefault(referenceImage)).length;
-    const switchedOff = keptOrSwitchedOff.filter(
+    const switchedOff = compatibleReferenceImages.filter(
       (referenceImage, index) => referenceImage.isEnabled !== retargetedReferenceImages[index]?.isEnabled
     ).length;
 
@@ -2317,6 +2422,20 @@ const issue = (
 });
 
 const MODEL_TARGET: GenerationIssue['target'] = { section: 'model' };
+
+/**
+ * How an issue names one reference: its own name, else its position. `describeGenerationIssue` turns the position
+ * into the localized default ("Reference image 2"), so the message reads as the reference's row does.
+ */
+const referenceNameValues = (
+  referenceImage: Pick<GenerateReferenceImage, 'name'>,
+  position: number
+): Record<string, number | string> => ({
+  index: position,
+  ...(referenceImage.name === undefined ? {} : { referenceName: referenceImage.name }),
+});
+const englishReferenceName = (referenceImage: Pick<GenerateReferenceImage, 'name'>, position: number): string =>
+  referenceImage.name ?? `Reference image ${position}`;
 /** The reference images as a group (their count, or a rule over all of them); the section lists it above the cards. */
 const REFERENCE_IMAGES_TARGET: GenerationIssue['target'] = { field: 'referenceImages', section: 'guidance' };
 /** One reference image: its card shows the issue. */
@@ -2425,9 +2544,9 @@ export const getGenerationModelAvailabilityIssues = (
         issue(
           `referenceImages:modelNotInstalled:${referenceImage.id}`,
           'referenceModelNotInstalled',
-          `Reference image ${index + 1} uses "${config.model.name}", which is not installed. Turn it off, or choose another model for it.`,
+          `${englishReferenceName(referenceImage, index + 1)} uses "${config.model.name}", which is not installed. Turn it off, or choose another model for it.`,
           referenceImageTarget(referenceImage.id),
-          { index: index + 1, name: config.model.name },
+          { ...referenceNameValues(referenceImage, index + 1), name: config.model.name },
           { kind: 'turnOffReferenceImages', referenceImageIds: [referenceImage.id] }
         )
       );
@@ -2605,9 +2724,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:unsupported:${id}`,
           'referenceImageUnsupported',
-          `${model.name} cannot use reference image ${index}. Turn it off, or remove it.`,
+          `${model.name} cannot use ${englishReferenceName(referenceImage, index)}. Turn it off, or remove it.`,
           referenceImageTarget(id),
-          { index, name: model.name },
+          { ...referenceNameValues(referenceImage, index), name: model.name },
           turnOff
         )
       );
@@ -2619,9 +2738,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsImage:${id}`,
           'referenceImageNeedsImage',
-          `Reference image ${index} needs an image.`,
+          `${englishReferenceName(referenceImage, index)} needs an image.`,
           referenceImageTarget(id),
-          { index },
+          referenceNameValues(referenceImage, index),
           turnOff
         )
       );
@@ -2633,9 +2752,9 @@ const getReferenceImageValidationIssues = (
           issue(
             `referenceImages:needsIpAdapter:${id}`,
             'referenceImageNeedsIpAdapter',
-            `Reference image ${index} needs an IP Adapter model for ${model.name}.`,
+            `${englishReferenceName(referenceImage, index)} needs an IP Adapter model for ${model.name}.`,
             referenceImageTarget(id),
-            { index, name: model.name },
+            { ...referenceNameValues(referenceImage, index), name: model.name },
             turnOff
           )
         );
@@ -2648,9 +2767,9 @@ const getReferenceImageValidationIssues = (
           issue(
             `referenceImages:strength:${id}`,
             'referenceImageStrength',
-            `Reference image ${index} strength must be between 0 and 2.`,
+            `${englishReferenceName(referenceImage, index)} strength must be between 0 and 2.`,
             referenceImageTarget(id),
-            { index },
+            referenceNameValues(referenceImage, index),
             turnOff
           )
         );
@@ -2665,9 +2784,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsRedux:${id}`,
           'referenceImageNeedsRedux',
-          `Reference image ${index} needs a FLUX Redux model for ${model.name}.`,
+          `${englishReferenceName(referenceImage, index)} needs a FLUX Redux model for ${model.name}.`,
           referenceImageTarget(id),
-          { index, name: model.name },
+          { ...referenceNameValues(referenceImage, index), name: model.name },
           turnOff
         )
       );
@@ -2681,9 +2800,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsKontext:${id}`,
           'referenceImageNeedsKontext',
-          `Reference image ${index} needs the selected FLUX Kontext model.`,
+          `${englishReferenceName(referenceImage, index)} needs the selected FLUX Kontext model.`,
           referenceImageTarget(id),
-          { index },
+          referenceNameValues(referenceImage, index),
           turnOff
         )
       );

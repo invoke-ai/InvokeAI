@@ -31,6 +31,7 @@ Reference modes:
 
 ## Running
 
+- On a shared development machine, the [bounded local verification profile](../VERIFICATION.md#bounded-local-verification) caps Vitest workers while preserving the release chain. It does not relax the exclusive performance-run requirement below.
 - CI’s 30-minute job timeout covers completion, including the three-engine lifecycle smoke and cold exact-base measurements; completion has already reached about 19 minutes.
 - CI splits `check:release` between `lint:code` in the checks job and `check:release:tests` in the tests job. Architecture tests run in the complete unit suite; inventories are generated once and the performance build serves all subsequent browser journeys.
 - `check:release` stops at the first failing gate; later gates did not run. In CI logs the failure sits at the tail, after passing test summaries.

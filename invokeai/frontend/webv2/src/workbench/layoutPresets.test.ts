@@ -36,7 +36,7 @@ describe('built-in layout preset descriptors', () => {
         defaultKeys: ['alt+2'],
         defaultRoute: { destination: 'canvas', sourceId: 'canvas' },
         hotkeyId: 'selectEditPreset',
-        iconId: 'layers',
+        iconId: 'pencil-ruler',
         label: 'Edit',
         presetId: 'edit',
       },

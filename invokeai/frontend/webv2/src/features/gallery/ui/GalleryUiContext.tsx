@@ -11,7 +11,8 @@ import type {
 import type { QueueProgressSession } from '@features/queue/contracts';
 
 import { asSingleAccountBoards } from '@features/gallery/core/boardAccess';
-import { createContext, use, useMemo, type ComponentType, type ReactNode } from 'react';
+import { createKeyedTransientStore, type KeyedTransientStore } from '@platform/state/externalStore';
+import { createContext, use, useMemo, useState, type ComponentType, type ReactNode } from 'react';
 
 export interface GalleryItemActions {
   /**
@@ -195,9 +196,29 @@ export const useGalleryItemActions = (): GalleryItemActions => {
   return actions;
 };
 
-export const GalleryUiProvider = ({ adapter, children }: { adapter: GalleryUiAdapter; children: ReactNode }) => (
-  <GalleryUiContext value={adapter}>{children}</GalleryUiContext>
-);
+export type GalleryLayoutMode = 'stacked' | 'wide';
+
+/**
+ * The layout each placement's gallery body measured (`galleryDensity` measures and reads it). The workbench renders the
+ * header label apart from the body, so the label reads the arrangement here rather than guessing it from the region.
+ * Keyed by region: a gallery moving to another placement never reads the one it left. Lives beside the provider, which
+ * boots with the editor, so the lazily loaded gallery keeps the measuring hooks out of startup.
+ */
+export const GalleryLayoutStoreContext = createContext<KeyedTransientStore<
+  GalleryWidgetProps['region'],
+  GalleryLayoutMode
+> | null>(null);
+
+export const GalleryUiProvider = ({ adapter, children }: { adapter: GalleryUiAdapter; children: ReactNode }) => {
+  // The workbench renders the header label apart from the body; both sit under this provider.
+  const [layoutStore] = useState(() => createKeyedTransientStore<GalleryWidgetProps['region'], GalleryLayoutMode>());
+
+  return (
+    <GalleryUiContext value={adapter}>
+      <GalleryLayoutStoreContext value={layoutStore}>{children}</GalleryLayoutStoreContext>
+    </GalleryUiContext>
+  );
+};
 
 export const useGalleryUi = (): GalleryUiAdapter => {
   const adapter = use(GalleryUiContext);

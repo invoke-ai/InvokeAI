@@ -1,7 +1,6 @@
 import type * as QueuePublicApi from '@features/queue/publicApi';
 import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
-import type { ComponentType } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { loadQueueWidgetImplementation } from '@features/queue/widget';
@@ -37,6 +36,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
       isEqual
     ),
   useWorkbenchCommands: () => store.commands,
+  useWorkbenchQueries: () => store.queries,
   useWorkbenchSelector: (selector: (snapshot: WorkbenchSnapshot) => unknown, isEqual = shallowEqual) =>
     useExternalStoreSelector(store.subscribe, store.getSnapshot, selector, isEqual),
 }));
@@ -51,6 +51,7 @@ await i18n.use(initReactI18next).init({
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const RUN_ID = 'local-run';
+const NO_COMMANDS_RUNTIME = { commands: { register: () => () => undefined } };
 let projectId: string;
 let host: HTMLDivElement;
 let root: Root;
@@ -110,9 +111,7 @@ const recordServerError = (failureCount: number) =>
   );
 
 it("lists the Workbench's unaccepted run, follows each recorded retry, and drops it once the backend accepts it", async () => {
-  const { view: QueueWidgetView } = (await loadQueueWidgetImplementation()) as {
-    view: ComponentType<{ region: 'right' }>;
-  };
+  const { view: QueueWidgetView } = await loadQueueWidgetImplementation();
   const client = new QueryClient();
   client.setQueryData(['queue'], {
     current: null,
@@ -140,7 +139,7 @@ it("lists the Workbench's unaccepted run, follows each recorded retry, and drops
         <ChakraProvider value={system}>
           <QueryClientProvider client={client}>
             <QueueUiAdapterProvider>
-              <QueueWidgetView region="right" />
+              <QueueWidgetView region="right" runtime={NO_COMMANDS_RUNTIME} />
             </QueueUiAdapterProvider>
           </QueryClientProvider>
         </ChakraProvider>

@@ -17,6 +17,7 @@ import {
   getGenerationValidationIssues,
   isSupportedGenerateModel,
   type SupportedGenerateBase,
+  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { compileGenerateGraph, getFamilyGraphBuilder, GRAPH_BUILDERS, resolveGenerateSeed } from './graph';
 import {
@@ -28,6 +29,7 @@ import {
 import { isPidDecodeNodeType } from './pidGraph';
 import { getReferenceImagePromptTags } from './referenceImage';
 import { REFINER_DENOISE_NODE_ID } from './sdxlRefinerGraph';
+import { syncGenerateWidgetValuesWithModels } from './settings';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
@@ -854,7 +856,7 @@ describe('compileGenerateGraph', () => {
           referenceImages: [animaReference()],
           vae: qwenImageVae,
         })
-      ).toThrow('cannot use reference image 1');
+      ).toThrow('cannot use Reference image 1');
     });
   });
 
@@ -1059,7 +1061,7 @@ describe('compileGenerateGraph', () => {
     expect(getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id).toContain('ip_adapter_collector');
   });
 
-  it('generates from the crop while serializing complete original and crop metadata', () => {
+  it('generates from the crop while serializing complete original and crop metadata, with the name', () => {
     const croppedReferenceImage = {
       crop: {
         box: { height: 256, width: 320, x: 40, y: 50 },
@@ -1082,6 +1084,7 @@ describe('compileGenerateGraph', () => {
           },
           id: 'cropped-ref',
           isEnabled: true,
+          name: 'Hero pose',
         },
       ],
     });
@@ -1093,6 +1096,8 @@ describe('compileGenerateGraph', () => {
         config: { image: croppedReferenceImage },
         id: 'cropped-ref',
         isEnabled: true,
+        // The user's label travels with the record so recall can restore it.
+        name: 'Hero pose',
       },
     ]);
   });
@@ -1132,6 +1137,102 @@ describe('compileGenerateGraph', () => {
 
     expect(getNodeByType(graph, 'flux_kontext')).toBeDefined();
     expect(getEdge(graph, 'denoise_latents', 'kontext_conditioning')?.source.node_id).toContain('flux_kontext_collect');
+  });
+
+  it.each([
+    ['hf_repo_id', 'black-forest-labs/FLUX.1-Kontext-dev:fp16'],
+    ['url', 'https://www.huggingface.co/black-forest-labs/FLUX.1-Kontext-dev/tree/main'],
+    ['path', '/models/FLUX.1-Kontext-dev/'],
+    ['url', 'https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF/resolve/main/flux1-kontext-dev-Q4_K_M.gguf'],
+    [
+      'url',
+      'https://huggingface.co/Comfy-Org/flux1-kontext-dev_ComfyUI/resolve/main/split_files/diffusion_models/flux1-dev-kontext_fp8_scaled.safetensors',
+    ],
+  ])('creates a Kontext reference for a renamed model with %s source %s', (sourceType, source) => {
+    const renamed = { ...fluxKontextModel, name: 'Portrait editor', source, source_type: sourceType, variant: 'dev' };
+    const referenceImages = withAddedReferenceImages(renamed, [], [], [{ id: 'reference', image: refImage }]);
+
+    expect(referenceImages[0]?.config).toMatchObject({
+      model: { key: renamed.key },
+      type: 'flux_kontext_reference_image',
+    });
+    const graph = compile(renamed, {
+      clipEmbedModel: clipEmbed,
+      referenceImages,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+    });
+    expect(getEdge(graph, 'denoise_latents', 'kontext_conditioning')).toBeDefined();
+  });
+
+  it.each([
+    ['url', 'https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev-preview/resolve/main/flux1-dev.safetensors'],
+    ['url', 'https://example.test/black-forest-labs/FLUX.1-Kontext-dev/resolve/main/flux1-dev.safetensors'],
+    ['path', '/models/kontext/flux1-dev.safetensors'],
+  ])('leaves an ordinary FLUX model with %s source %s on IP-Adapter', (sourceType, source) => {
+    const model = { ...fluxModel, source, source_type: sourceType };
+    const referenceImages = withAddedReferenceImages(model, [], [], [{ id: 'reference', image: refImage }]);
+
+    expect(referenceImages[0]?.config.type).toBe('ip_adapter');
+  });
+
+  it('preserves and adds local Kontext references after a display-only catalog rename', () => {
+    const installed = {
+      ...fluxKontextModel,
+      hash: 'original-file',
+      source: '/models/portrait.safetensors',
+      variant: 'dev',
+    };
+    const renamed = { ...installed, name: 'Portrait editor' };
+    const settings = {
+      ...createSettings(installed, {
+        clipEmbedModel: clipEmbed,
+        referenceImages: withAddedReferenceImages(installed, [], [], [{ id: 'reference', image: refImage }]),
+        t5EncoderModel: t5Encoder,
+        vae: fluxVae,
+      }),
+      model: installed,
+    };
+    const synced = syncGenerateWidgetValuesWithModels(settings, [renamed]);
+
+    expect(synced.model.name).toBe(renamed.name);
+    expect(synced.referenceImages[0]?.config).toMatchObject({
+      model: { key: renamed.key, name: renamed.name },
+      type: 'flux_kontext_reference_image',
+    });
+    const second = {
+      id: 'second-reference',
+      image: { original: { image: { ...refImage.original.image, image_name: 'second.png' } } },
+    };
+    const referenceImages = withAddedReferenceImages(synced.model, [], synced.referenceImages, [second]);
+    const graph = compile(synced.model, { ...synced, referenceImages });
+
+    expect(getEdge(graph, 'denoise_latents', 'kontext_conditioning')).toBeDefined();
+    expect(Object.values(graph.nodes).filter(({ type }) => type === 'flux_kontext')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ image: { image_name: 'reference.png' } }),
+        expect.objectContaining({ image: { image_name: 'second.png' } }),
+      ])
+    );
+
+    const anotherModel = { ...renamed, key: 'different-install', name: 'FLUX dev' };
+    expect(() => compile(anotherModel, synced)).toThrow(/cannot use reference image/i);
+    expect(withAddedReferenceImages(anotherModel, [], synced.referenceImages, [second])[1]?.config.type).toBe(
+      'ip_adapter'
+    );
+
+    const replacement = { ...renamed, hash: 'replacement-file', name: 'FLUX dev' };
+    const replaced = syncGenerateWidgetValuesWithModels(synced, [replacement]);
+    expect(() => compile(replaced.model, replaced)).toThrow(/cannot use reference image/i);
+    expect(withAddedReferenceImages(replaced.model, [], replaced.referenceImages, [second])[1]?.config.type).toBe(
+      'ip_adapter'
+    );
+
+    const otherVariant = { ...renamed, variant: 'schnell' };
+    const updated = syncGenerateWidgetValuesWithModels(synced, [otherVariant]);
+    expect(withAddedReferenceImages(updated.model, [], updated.referenceImages, [second])[1]?.config.type).toBe(
+      'ip_adapter'
+    );
   });
 
   it('wires FLUX.2 built-in reference images into denoise', () => {

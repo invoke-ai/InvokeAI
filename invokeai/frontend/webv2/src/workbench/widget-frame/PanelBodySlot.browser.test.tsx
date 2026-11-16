@@ -69,4 +69,42 @@ describe('PanelBodySlot', () => {
     // The wrap actually engaged: eight buttons cannot fit one 300px line.
     expect(strip.getBoundingClientRect().height).toBeGreaterThan(row.getBoundingClientRect().height * 1.5);
   });
+
+  it('grows and shrinks its scroll content with a flowing view, so the scrollbar follows sections opening', async () => {
+    host = document.createElement('div');
+    host.style.cssText = `display:flex;flex-direction:column;height:400px;width:${PANEL_WIDTH}px;`;
+    document.body.append(host);
+    root = createRoot(host);
+    const renderSections = (heightsPx: number[]) =>
+      interact(() => {
+        root?.render(
+          <ChakraProvider value={system}>
+            <PanelBodySlot>
+              <div>
+                {heightsPx.map((heightPx, index) => (
+                  <div key={index} style={{ height: heightPx }} />
+                ))}
+              </div>
+            </PanelBodySlot>
+          </ChakraProvider>
+        );
+      });
+    const viewport = () => host!.querySelector<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
+    const content = () => host!.querySelector<HTMLElement>('[data-scope="scroll-area"][data-part="content"]')!;
+    const scrollbar = () => host!.querySelector<HTMLElement>('[data-part="scrollbar"][data-orientation="vertical"]')!;
+    await renderSections([100, 100]);
+    expect(content().getBoundingClientRect().height).toBeCloseTo(400, 0);
+    expect(scrollbar().hasAttribute('data-overflow-y')).toBe(false);
+
+    // A section opens past the fold: the content element itself grows, which is what the thumb is measured from.
+    await renderSections([100, 100, 700]);
+    expect(content().getBoundingClientRect().height).toBeCloseTo(900, 0);
+    expect(viewport().scrollHeight).toBeGreaterThan(viewport().clientHeight);
+    await expect.poll(() => scrollbar().hasAttribute('data-overflow-y')).toBe(true);
+
+    // It folds again: content and scrollbar return to the viewport's height and nothing to scroll.
+    await renderSections([100, 100]);
+    expect(content().getBoundingClientRect().height).toBeCloseTo(400, 0);
+    await expect.poll(() => scrollbar().hasAttribute('data-overflow-y')).toBe(false);
+  });
 });

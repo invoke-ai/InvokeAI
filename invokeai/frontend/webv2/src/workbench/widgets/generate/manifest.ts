@@ -1,13 +1,13 @@
 import type { WidgetManifest } from '@workbench/widgetContracts';
 
-import { SlidersHorizontalIcon } from 'lucide-react';
+import { Settings2Icon } from 'lucide-react';
 
 export const generateWidgetManifest: WidgetManifest = {
   allowMultiple: false,
   allowedRegions: ['left'],
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   graphBearing: { defaultGraphId: 'generate-graph', sourceId: 'generate', surfaces: ['left'] },
-  icon: SlidersHorizontalIcon,
+  icon: Settings2Icon,
   id: 'generate',
   label: (t) => t('widgets.labels.generate'),
   // The project's generation flags: they apply to every generation the project runs (Canvas and Upscale included),
