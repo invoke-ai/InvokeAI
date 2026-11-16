@@ -370,7 +370,8 @@ const recordCanvasInputs = (graph: BackendGraphContract, input: CompileCanvasGra
       begin_step_percent: control.begin_step_percent,
       end_step_percent: control.end_step_percent,
     }));
-  const layoutRegions = graph.nodes.layout_prompt?.regions ?? graph.nodes.caption_builder?.regions;
+  const layoutRegions =
+    graph.nodes.layout_prompt?.regions ?? graph.nodes.prompt_upsampler?.regions ?? graph.nodes.caption_builder?.regions;
   if (Array.isArray(layoutRegions) && layoutRegions.length > 0) {
     metadata.regions = layoutRegions;
   } else if (!['moss-image', 'ideogram-4', 'flux3'].includes(input.model.base)) {
@@ -991,7 +992,8 @@ const toFlux3Region = (region: RegionalGuidanceInput, options: AddLayoutRegionsO
  * FLUX.3 regions: each becomes a row of the box table that ends the caption, boxed around its mask and normalized to
  * the bbox like Ideogram 4's. The base graph's `layout_prompt` appends them at run time, as object rows or, when the
  * builder wired reference images, as edit rows for the output; core metadata then records the caption encoded. Regions
- * the table cannot place are left out, and without any the graph stays untouched.
+ * the table cannot place are left out, and without any the graph stays untouched. With the prompt upsampler on, the
+ * `prompt_upsampler` node takes the layout node's place and the same elements.
  */
 const addFlux3LayoutRegions = (family: FamilyGraph, options: AddLayoutRegionsOptions): void => {
   const { graph, layoutPrompt } = family;
@@ -1004,7 +1006,8 @@ const addFlux3LayoutRegions = (family: FamilyGraph, options: AddLayoutRegionsOpt
   }
   layoutPrompt.regions = regions;
   const metadata = findMetadataNode(graph);
-  if (metadata) {
+  // The prompt upsampler's builder records its own caption.
+  if (metadata && layoutPrompt.type === 'flux3_layout_prompt') {
     addEdge(graph, layoutPrompt, 'value', metadata, 'flux3_caption');
   }
 };

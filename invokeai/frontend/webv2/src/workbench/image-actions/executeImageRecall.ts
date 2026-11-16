@@ -10,7 +10,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
-import { galleryImages, galleryVideos } from '@features/gallery';
+import { GALLERY_REQUEST_MAX_NAMES, galleryImages, galleryVideos } from '@features/gallery';
 import { fetchGalleryImageMetadata } from '@features/gallery/queries';
 import {
   getCompatibleReferenceImages,
@@ -205,7 +205,7 @@ export const executeLoadMediaWorkflow = async ({
 const getReferenceImageName = (referenceImage: GenerateReferenceImage): string | null =>
   referenceImage.config.image ? getEffectiveReferenceImage(referenceImage.config.image).image_name : null;
 
-/** Sequential, deduplicated lookups respect the Gallery API's 1,000-name request limit. */
+/** Sequential, deduplicated lookups, one per request the Gallery API accepts, so a stale recall stops between them. */
 const resolveReferenceImages = async (
   names: readonly string[],
   signal: AbortSignal,
@@ -213,11 +213,11 @@ const resolveReferenceImages = async (
 ): Promise<Map<string, GalleryImage>> => {
   const assets = new Map<string, GalleryImage>();
   const distinctNames = [...new Set(names)];
-  for (let offset = 0; offset < distinctNames.length; offset += 1000) {
+  for (let offset = 0; offset < distinctNames.length; offset += GALLERY_REQUEST_MAX_NAMES) {
     if (signal.aborted || !isCurrent()) {
       throw new DOMException('Recall is no longer current', 'AbortError');
     }
-    const batch = distinctNames.slice(offset, offset + 1000);
+    const batch = distinctNames.slice(offset, offset + GALLERY_REQUEST_MAX_NAMES);
     const images = await galleryImages.resolveMany(batch, signal);
     if (signal.aborted || !isCurrent()) {
       throw new DOMException('Recall is no longer current', 'AbortError');
@@ -293,19 +293,32 @@ export const getCurrentGenerateValues = ({
     : null;
 };
 
-export const executeImageRecall = async ({
-  commands,
-  canvasTarget,
-  getGenerateValues,
-  image,
-  isCanvasFrame,
-  kind,
-  models,
-  owner: callerOwner,
-  projectId,
-  queryClient,
-  t,
-}: {
+let canvasRecallHolder: { owner: AccountScope } | null = null;
+
+/**
+ * Claims the one Canvas recall that may run at a time, or returns null while another reads or commits (a double
+ * click, a second key press): a Canvas recall that started before another commits finds the document changed and
+ * recalls only in part. Recalls that leave the Canvas alone need no claim: they re-read Generate values after every
+ * await. A claim left over from an account that has since ended holds nothing back. Release once the recall has
+ * committed, before saving its Canvas images, so a slow save holds no later recall back. Releasing again, or after
+ * another claim took over, does nothing. API-driven recalls (`recall_parameters_updated`) queue among themselves
+ * and do not claim.
+ */
+export const claimCanvasRecall = (owner: AccountScope): (() => void) | null => {
+  if (canvasRecallHolder && isAccountScopeCurrent(canvasRecallHolder.owner)) {
+    return null;
+  }
+  const claim = { owner };
+  canvasRecallHolder = claim;
+
+  return () => {
+    if (canvasRecallHolder === claim) {
+      canvasRecallHolder = null;
+    }
+  };
+};
+
+interface ImageRecallInput {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   canvasTarget?: CanvasRecallTarget;
   /** Re-read after every await: the commit writes the whole Generate record, so a snapshot would revert newer edits. */
@@ -321,7 +334,22 @@ export const executeImageRecall = async ({
   /** Holds the gallery's shared image metadata entry, which menus and Preview Details may already have read. */
   queryClient: QueryClient;
   t: TFunction;
-}): Promise<boolean> => {
+}
+
+/** Recalls an image's recorded settings; a Canvas recall pressed while another runs says so (see `claimCanvasRecall`). */
+export const executeImageRecall = async ({
+  commands,
+  canvasTarget,
+  getGenerateValues,
+  image,
+  isCanvasFrame,
+  kind,
+  models,
+  owner: callerOwner,
+  projectId,
+  queryClient,
+  t,
+}: ImageRecallInput): Promise<boolean> => {
   const owner = callerOwner ?? captureAccountScope();
   const originalProject = canvasTarget?.getProject();
   if (canvasTarget && !originalProject) {
@@ -333,6 +361,7 @@ export const executeImageRecall = async ({
 
   const supportedModels = models.filter(isSupportedGenerateModel);
   const vaeModels = models.filter(isVaeModelConfig).map((model) => model as VaeModelConfig);
+  let releaseCanvasRecall: (() => void) | null = null;
 
   try {
     if (!isImageRecallKindAvailable(kind)) {
@@ -395,7 +424,7 @@ export const executeImageRecall = async ({
     if (canvasTarget && !canvasTarget.getProject()) {
       return false;
     }
-    const canvasRecall =
+    const touchesCanvas = Boolean(
       (kind === 'all' || kind === 'remix') &&
       canvasTarget &&
       originalProject &&
@@ -407,8 +436,19 @@ export const executeImageRecall = async ({
         't2iAdapters' in metadata ||
         'strength' in metadata ||
         'denoise_strength' in metadata)
-        ? await import('./canvasRecall')
-        : null;
+    );
+    if (touchesCanvas) {
+      releaseCanvasRecall = claimCanvasRecall(owner);
+      if (!releaseCanvasRecall) {
+        commands.notifications.add({
+          kind: 'info',
+          message: t('widgets.gallery.itemActions.recall.recallInProgress'),
+          title: getImageRecallTitle(kind, t),
+        });
+        return false;
+      }
+    }
+    const canvasRecall = touchesCanvas ? await import('./canvasRecall') : null;
     const initialValues = canvasRecall ? readGenerateValues() : null;
     const initialResult = initialValues
       ? buildImageRecallSettings({
@@ -554,6 +594,7 @@ export const executeImageRecall = async ({
         title: t('widgets.gallery.itemActions.recall.partiallyRecalled'),
       });
     }
+    releaseCanvasRecall?.();
     if (canvasApplied && canvasPlan && canvasRecall && canvasTarget) {
       const durable = await canvasRecall.finalizeCanvasRecallAssets(canvasPlan, canvasTarget, owner);
       if (!durable && isAccountScopeCurrent(owner) && canvasTarget.getProject()) {
@@ -577,5 +618,7 @@ export const executeImageRecall = async ({
       projectId,
     });
     return false;
+  } finally {
+    releaseCanvasRecall?.();
   }
 };

@@ -208,6 +208,8 @@ const PALETTE_HIDDEN_COMMANDS = new Set([
   'gallery.moveFocusRight',
   'gallery.moveFocusUp',
   'gallery.toggleFocusedInSelection',
+  // Acts on the focused queue row, which the palette has taken focus from.
+  'queue.recallAll',
   'viewer.nextItem',
   'viewer.previousItem',
 ]);

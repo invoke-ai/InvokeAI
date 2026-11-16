@@ -28,7 +28,7 @@ const SINGLE_SELECTION: GalleryPickerSelection = { mode: 'single' };
 
 export interface GalleryPickerPopoverProps {
   accept: GalleryPickerAccept;
-  /** The trigger element; must accept a ref and a click handler. */
+  /** The trigger element; must accept a ref and a click handler. It takes `data-hover` while the picker is open. */
   children: ReactElement;
   /** Shared with a Tooltip wrapping an icon-only trigger (see `useTooltipTriggerIds`). */
   ids?: { trigger: string };
@@ -74,7 +74,11 @@ export const GalleryPickerPopover = ({
       unmountOnExit
       onOpenChange={handleOpenChange}
     >
-      <Popover.Trigger asChild>{children}</Popover.Trigger>
+      {/* Pointed while its picker is open: `data-hover` is what the theme's hover styles (buttons, rows, drop zones)
+          already match, so each trigger keeps its own hover look rather than a new one. */}
+      <Popover.Trigger asChild data-hover={isOpen ? '' : undefined}>
+        {children}
+      </Popover.Trigger>
       <Portal>
         <Popover.Positioner>
           <PopoverContent

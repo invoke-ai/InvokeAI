@@ -181,6 +181,9 @@ const EDITOR_BOOT_SHARED_MODULES = [
   // The topbar (editor boot) and the image menus' keycaps read effective bindings; alone it cost a boot request.
   '/workbench/hotkeys/useShortcutBinding.ts',
   '/workbench/widget-frame/compactWidgetCapacity.tsx',
+  // The status bar and rails (editor boot) and the lazy Layers, Gallery and drop surfaces share this portal guard;
+  // alone it costs a boot request.
+  '/platform/react/isEventFromOwnDom.ts',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.
   '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
@@ -204,6 +207,9 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/features/generation/ui/promptFields/promptAttentionHotkeys.ts',
   '/platform/ui/ResizeHandle.tsx',
   '/platform/ui/SeedInput.tsx',
+  // The Generate form (editor boot) and the lazy quick-settings popovers share the scrubber; alone it costs a boot
+  // request.
+  '/platform/ui/ScrubberField.tsx',
   '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
   '/workbench/shell/topbar/LayoutPresetStrip.tsx',
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
@@ -236,9 +242,17 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/notifications/toastPolicy.ts',
   // The boot UI adapters and the lazy palette, image menu and canvas saves find gallery items through it.
   '/workbench/image-actions/useFindGalleryItem.ts',
+  // The queue runtime (editor boot) and the lazy recall menus share the recall cache; alone it costs a boot request.
+  '/workbench/queue-integration/queueRecallCache.ts',
   // Invoke (editor boot), the lazy workflow editor and canvas header actions share the modifier-key hook; alone it
   // costs a boot request.
   '/platform/react/useModifierHeld.ts',
+  // The Preview (open at boot) and the lazy Canvas share their drop zones' label and the desktop file drop: its drag
+  // tracking, zone lookup and the upload start that loads the rest on the first drop. Alone they cost a boot request.
+  '/platform/browser/dropZones.ts',
+  '/platform/react/useNativeFileDrag.ts',
+  '/workbench/widgets/shared/DropZoneLabel.tsx',
+  '/workbench/widgets/shared/useDroppedFileUpload.ts',
 ] as const;
 
 // Editor runtime the workbench store reaches: the editor boots it, and the settings field bindings (lazy on both
@@ -300,6 +314,17 @@ const WORKFLOW_CORE_MODULES = [
   '/workbench/projectWorkflows.ts',
 ] as const;
 
+// The workflow queries entry and the library transport behind it are one chunk: the editor's boot hosts (publication,
+// copy choice, pending load) and the lazy library dialog both read the transport, and the Launchpad palette reaches the
+// entry lazily, so splitting the transport out by importer costs every editor boot a request.
+const WORKFLOW_QUERIES_MODULES = [
+  '/features/workflow/data/api.ts',
+  '/features/workflow/data/libraryCache.ts',
+  '/features/workflow/data/publication.ts',
+  '/features/workflow/data/savedWorkflowQueries.ts',
+  '/features/workflow/queries.ts',
+] as const;
+
 // Keep widget metadata separate so Launchpad settings cannot import editor boot UI.
 const WIDGET_METADATA_MODULES = [
   '/features/gallery/settingsContribution.ts',
@@ -333,6 +358,8 @@ const GALLERY_PICKER_MODULES = [
   '/features/gallery/core/mediaCounts.ts',
   '/features/gallery/data/queries.ts',
   '/features/gallery/data/queryCache.ts',
+  // Where uploads from Canvas and Preview drops land; published by the queries entry beside the cache it reads.
+  '/features/gallery/data/uploadDestination.ts',
   '/features/gallery/ui/GallerySearchHelp.tsx',
   '/platform/state/compareAndSwapRollback.ts',
   '/features/gallery/picker.ts',
@@ -405,6 +432,28 @@ const WIDGET_HOST_MODULES = [
   '/workbench/widgets/image-map/ImageMapDataRuntime.tsx',
 ] as const;
 
+// The image menus and actions the Gallery and Preview boot with, which the lazy queue recall chunks (the queue row and
+// details actions, the staging menu's recall verbs, the queue's Recall all) import as well. The lazy Canvas reaches only
+// their import notices and reference append, so without the group Rolldown splits those out, costing every editor boot
+// a request.
+const IMAGE_ACTIONS_MODULES = [
+  '/workbench/canvas-operations/canvasImportNotice.ts',
+  '/workbench/image-actions/ContextSubMenu.tsx',
+  '/workbench/image-actions/ImageContextMenu.tsx',
+  '/workbench/image-actions/ImageItemMenuGroups.tsx',
+  '/workbench/image-actions/RecallActionButtons.tsx',
+  '/workbench/image-actions/appendReferenceImage.ts',
+  '/workbench/image-actions/canvasImportError.ts',
+  '/workbench/image-actions/executeVideoRecall.ts',
+  '/workbench/image-actions/galleryOptimisticRollback.ts',
+  '/workbench/image-actions/index.ts',
+  '/workbench/image-actions/pbrMapsGraph.ts',
+  '/workbench/image-actions/useDeletionConfirmation.tsx',
+  '/workbench/image-actions/useImageActions.ts',
+  '/workbench/image-actions/useImageRecallCapabilities.ts',
+  '/workbench/image-actions/videoRecall.ts',
+] as const;
+
 // Keep the Image Map data modules in one chunk. Its API is also reached through the Gallery's lazily loaded label
 // cache, and without this group Rolldown splits the API out, costing every editor boot a request.
 const IMAGE_MAP_DATA_MODULES = [
@@ -449,6 +498,15 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/widgets/layers/layerMenuState.ts',
   '/workbench/widgets/layers/runLayerWorkflow.ts',
   '/workbench/widgets/layers/useSelectedModelBase.ts',
+];
+
+/**
+ * The Canvas widget's frame readout, the lazy Size section and the canvas compiler share the render-size policy. Its
+ * public entry only re-exports the policy, so it rides in the policy's chunk; alone it costs the Canvas a boot request.
+ */
+const CANVAS_PROCESSING_SIZE_MODULES = [
+  '/features/generation/canvasProcessingSize.ts',
+  '/features/generation/core/canvas/canvasProcessingSize.ts',
 ];
 
 const matchesAnySuffix = (id: string, suffixes: readonly string[]) => suffixes.some((suffix) => id.endsWith(suffix));
@@ -546,6 +604,12 @@ export default defineConfig({
             },
             {
               includeDependenciesRecursively: false,
+              name: 'canvasProcessingSize',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, CANVAS_PROCESSING_SIZE_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
               name: 'gallery-picker',
               priority: 30,
               test: (id) => matchesAnySuffix(id, GALLERY_PICKER_MODULES),
@@ -588,6 +652,12 @@ export default defineConfig({
             },
             {
               includeDependenciesRecursively: false,
+              name: 'workflow-queries',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, WORKFLOW_QUERIES_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
               name: 'widget-metadata',
               priority: 30,
               test: (id) =>
@@ -598,6 +668,12 @@ export default defineConfig({
               name: 'widget-hosts',
               priority: 30,
               test: (id) => matchesAnySuffix(id, WIDGET_HOST_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'image-actions',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, IMAGE_ACTIONS_MODULES),
             },
             {
               includeDependenciesRecursively: false,

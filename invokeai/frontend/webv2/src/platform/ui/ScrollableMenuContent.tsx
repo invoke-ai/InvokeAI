@@ -1,10 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react';
 
-import { MenuContent } from './Menu';
+import { MenuContent, SCROLLABLE_MENU_CONTENT_PROPS } from './Menu';
 import { Scrollable } from './Scrollable';
-
-/** A long menu's height: the context menus' cap, shrunk to the room the positioner measured beside its anchor. */
-const SCROLLABLE_MENU_MAX_H = 'min(28rem, var(--available-height))';
 
 /**
  * Re-implements Zag's highlight-follow. Zag scrolls a highlighted item into view only when the menu content itself
@@ -29,18 +26,19 @@ const followHighlightedItem = (viewport: HTMLDivElement | null) => {
   return () => observer.disconnect();
 };
 
-/**
- * Menu content for long lists, such as boards to move items to: it grows to the shared cap or the available height,
- * then scrolls in a Scrollable. The column layout gives the Scrollable the content's padded box, so the last row is
- * never cut off by the content's padding.
- */
+/** A menu's scrolling list, in content laid out with `SCROLLABLE_MENU_CONTENT_PROPS`, above any rows that stay in view. */
+export const ScrollableMenuList = ({ children }: { children: ReactNode }) => (
+  <Scrollable minH="0" viewportRef={followHighlightedItem}>
+    {children}
+  </Scrollable>
+);
+
+/** Menu content for long lists, such as boards to move items to: the list scrolls within the menu's cap. */
 export const ScrollableMenuContent = ({
   children,
   ...props
 }: ComponentProps<typeof MenuContent> & { children: ReactNode }) => (
-  <MenuContent display="flex" flexDirection="column" maxH={SCROLLABLE_MENU_MAX_H} overflow="hidden" {...props}>
-    <Scrollable minH="0" viewportRef={followHighlightedItem}>
-      {children}
-    </Scrollable>
+  <MenuContent {...SCROLLABLE_MENU_CONTENT_PROPS} {...props}>
+    <ScrollableMenuList>{children}</ScrollableMenuList>
   </MenuContent>
 );

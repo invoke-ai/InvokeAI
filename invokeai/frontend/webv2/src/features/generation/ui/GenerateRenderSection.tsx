@@ -7,7 +7,7 @@ import type {
 } from '@features/generation/core/types';
 import type { ReactNode } from 'react';
 
-import { Badge, Box, createListCollection, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
+import { Box, createListCollection, HStack, Image, Input, Stack, Text } from '@chakra-ui/react';
 import {
   getDefaultGenerateSettings,
   getGenerationUiPolicy,
@@ -64,6 +64,7 @@ import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection'
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 import { GenerateIssueNotes } from './shared/GenerateIssues';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
+import { type DefaultSource, getDefaultSource, getFieldResetLabel } from './shared/modelDefaultSettings';
 import { SeedField as SharedSeedField } from './shared/SeedField';
 import { useDynamicPrompts } from './useDynamicPrompts';
 
@@ -102,6 +103,7 @@ const selectRenderSettings = pickGenerateSettings([
   'fluxDypeExponent',
   'fluxDypePreset',
   'fluxDypeScale',
+  'flux3PromptUpsamplerEnabled',
   'ideogram4ColorPalette',
   'ideogram4GuidanceScale',
   'ideogram4Mu',
@@ -151,7 +153,7 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
 
   return (
     <>
-      <Field label={t('widgets.generate.ideogram4SamplerPreset')}>
+      <Field label={t('widgets.generate.ideogram4SamplerPreset')} labelPlacement="inside">
         <Select
           aria-label={t('widgets.generate.ideogram4SamplerPreset')}
           collection={IDEOGRAM4_PRESET_COLLECTION}
@@ -284,7 +286,8 @@ const MossImageSkipLayersField = ({
     <GenerateFieldContextMenu
       copyValue={() => formatSkipLayers(stored)}
       fieldLabel={label}
-      isAtDefault={isSameSkipLayers(stored, DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS)}
+      // Disabled while CFG is off, when the layers are not used: no change to undo then.
+      isAtDefault={isCfgOff || isSameSkipLayers(stored, DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS)}
       onReset={() => {
         setDraft(null);
         onCommitImmediate({ mossImageUncondSkipLayers: [...DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS] });
@@ -341,6 +344,20 @@ const WanLowNoiseGuidanceField = ({ onCommit, settings }: RenderFieldsProps) => 
         />
       ) : null}
     </GenerateToggleSwitch>
+  );
+};
+
+/** Off by default: every new prompt loads a 9B model. The model slot appears in Components while this is on. */
+const Flux3PromptUpsamplerField = ({ onCommit, settings }: RenderFieldsProps) => {
+  const { t } = useTranslation();
+
+  return (
+    <GenerateToggleSwitch
+      checked={settings.flux3PromptUpsamplerEnabled}
+      helpText={t('widgets.generate.flux3PromptUpsamplerHelp')}
+      label={t('widgets.generate.flux3PromptUpsampler')}
+      onCheckedChange={(flux3PromptUpsamplerEnabled) => onCommit({ flux3PromptUpsamplerEnabled })}
+    />
   );
 };
 
@@ -457,7 +474,7 @@ const FluxDypeFields = ({ onCommit, settings }: RenderFieldsProps) => {
 
   return (
     <>
-      <Field hint="dypePreset" label={t('widgets.generate.dypePreset')}>
+      <Field hint="dypePreset" label={t('widgets.generate.dypePreset')} labelPlacement="inside">
         <Select
           aria-label={t('widgets.generate.dypePreset')}
           collection={presetCollection}
@@ -594,6 +611,20 @@ const SeedField = ({ onCommit, settings }: RenderFieldsProps) => {
   );
 };
 
+/** The section reset's wording by where its values come from. */
+const RENDER_RESET_LABEL_KEYS = {
+  withScheduler: {
+    base: 'widgets.generate.sectionMenu.resetStepsGuidanceAndSchedulerBase',
+    mixed: 'widgets.generate.sectionMenu.resetStepsGuidanceAndSchedulerMixed',
+    model: 'widgets.generate.sectionMenu.resetStepsGuidanceAndScheduler',
+  },
+  withoutScheduler: {
+    base: 'widgets.generate.sectionMenu.resetStepsAndGuidanceBase',
+    mixed: 'widgets.generate.sectionMenu.resetStepsAndGuidanceMixed',
+    model: 'widgets.generate.sectionMenu.resetStepsAndGuidance',
+  },
+} as const satisfies Record<string, Record<DefaultSource, string>>;
+
 export const GenerateRenderSection = ({
   draft,
   onCommit,
@@ -601,7 +632,7 @@ export const GenerateRenderSection = ({
   selectedModel,
 }: GenerateRenderSectionProps) => {
   const { t } = useTranslation();
-  const { CanvasDenoisingStrength: CanvasDenoisingStrengthSlot, project } = useGenerationUi();
+  const { CanvasDenoisingStrength: CanvasDenoisingStrengthSlot, models, project } = useGenerationUi();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectRenderSettings);
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const uiPolicy = getGenerationUiPolicy(selectedModel);
@@ -621,18 +652,44 @@ export const GenerateRenderSection = ({
     onCommit({ [key]: value });
   };
 
-  const seedBadge = uiPolicy.seedVisible ? (
-    <Badge>
-      {settings.seedMode === 'random'
-        ? t('common.seedMode.random')
-        : settings.seedMode === 'fixed'
-          ? settings.seed
-          : t('widgets.generate.seedSummary', {
-              mode: t(`common.seedMode.${settings.seedMode}`),
-              seed: settings.seed,
-            })}
-    </Badge>
-  ) : null;
+  const seedSummary = uiPolicy.seedVisible
+    ? settings.seedMode === 'random'
+      ? t('common.seedMode.random')
+      : settings.seedMode === 'fixed'
+        ? settings.seed
+        : t('widgets.generate.seedSummary', {
+            mode: t(`common.seedMode.${settings.seedMode}`),
+            seed: settings.seed,
+          })
+    : null;
+
+  // The model-governed values this section shows, as the header's reset-all restores them.
+  const modelDefaultsPatch: Partial<GenerateSettings> | null = modelDefaults
+    ? {
+        cfgScale: modelDefaults.cfgScale,
+        steps: modelDefaults.steps,
+        ...(uiPolicy.schedulerVisible ? { scheduler: modelDefaults.scheduler } : {}),
+      }
+    : null;
+  const isAtModelDefaults =
+    modelDefaultsPatch !== null &&
+    Object.entries(modelDefaultsPatch).every(([key, value]) => settings[key as keyof typeof settings] === value);
+  const resetLabel = (setting: 'scheduler' | 'steps' | 'cfgScale') =>
+    getFieldResetLabel(setting, selectedModel, models.getBaseLabel, t);
+  const sectionSettings: ('scheduler' | 'steps' | 'cfgScale')[] = uiPolicy.schedulerVisible
+    ? ['steps', 'cfgScale', 'scheduler']
+    : ['steps', 'cfgScale'];
+  const sectionSource = selectedModel ? getDefaultSource(selectedModel, sectionSettings) : 'base';
+  const baseLabel = selectedModel?.type === 'main' ? models.getBaseLabel(selectedModel.base) : null;
+  // An external model's fallbacks belong to no base, so they are plain defaults.
+  const sectionResetLabel =
+    sectionSource !== 'model' && baseLabel === null
+      ? t('widgets.generate.sectionMenu.reset')
+      : t(RENDER_RESET_LABEL_KEYS[uiPolicy.schedulerVisible ? 'withScheduler' : 'withoutScheduler'][sectionSource], {
+          base: baseLabel,
+          // Named as the field is: CFG, or Guidance on distilled-guidance models.
+          guidance: uiPolicy.guidanceLabel,
+        });
 
   const renderFields = (strengthField: ReactNode) => (
     <>
@@ -640,6 +697,7 @@ export const GenerateRenderSection = ({
         fieldLabel={t('widgets.generate.steps')}
         copyValue={() => String(settings.steps)}
         isAtDefault={modelDefaults !== null && settings.steps === modelDefaults.steps}
+        resetLabel={resetLabel('steps')}
         onReset={modelDefaults ? () => onCommit({ steps: modelDefaults.steps }) : undefined}
       >
         <ScrubberField
@@ -659,6 +717,7 @@ export const GenerateRenderSection = ({
         fieldLabel={uiPolicy.guidanceLabel}
         copyValue={() => String(settings.cfgScale)}
         isAtDefault={modelDefaults !== null && settings.cfgScale === modelDefaults.cfgScale}
+        resetLabel={resetLabel('cfgScale')}
         onReset={modelDefaults ? () => onCommit({ cfgScale: modelDefaults.cfgScale }) : undefined}
       >
         <ScrubberField
@@ -682,14 +741,11 @@ export const GenerateRenderSection = ({
         <MossImageSkipLayersField settings={settings} onCommitImmediate={onCommitImmediate} />
       ) : null}
       {familyBase === 'krea-2' ? (
-        <>
-          <Separator borderColor="border.subtle" />
-          <GenerateConditioningRebalanceField
-            settings={settings}
-            onCommit={onCommit}
-            onCommitImmediate={onCommitImmediate}
-          />
-        </>
+        <GenerateConditioningRebalanceField
+          settings={settings}
+          onCommit={onCommit}
+          onCommitImmediate={onCommitImmediate}
+        />
       ) : null}
       {familyBase === 'wan' ? <WanLowNoiseGuidanceField settings={settings} onCommit={onCommit} /> : null}
       {familyBase === 'z-image' ? (
@@ -707,14 +763,16 @@ export const GenerateRenderSection = ({
         />
       ) : null}
       {familyBase === 'flux' ? <FluxDypeFields settings={settings} onCommit={onCommit} /> : null}
+      {familyBase === 'flux3' ? <Flux3PromptUpsamplerField settings={settings} onCommit={onCommit} /> : null}
       {uiPolicy.schedulerVisible ? (
         <GenerateFieldContextMenu
           fieldLabel={t('widgets.generate.scheduler')}
           copyValue={() => settings.scheduler}
           isAtDefault={modelDefaults !== null && settings.scheduler === modelDefaults.scheduler}
+          resetLabel={resetLabel('scheduler')}
           onReset={modelDefaults ? () => onCommit({ scheduler: modelDefaults.scheduler }) : undefined}
         >
-          <Field hint="scheduler" label={t('widgets.generate.scheduler')}>
+          <Field hint="scheduler" label={t('widgets.generate.scheduler')} labelPlacement="inside">
             <Combobox
               aria-label={t('widgets.generate.scheduler')}
               options={getSchedulerOptions(selectedModel, settings.scheduler)}
@@ -725,20 +783,9 @@ export const GenerateRenderSection = ({
         </GenerateFieldContextMenu>
       ) : null}
       {familyBase === 'ideogram-4' ? <Ideogram4SamplingFields settings={settings} onCommit={onCommit} /> : null}
-      <Separator borderColor="border.subtle" />
       {uiPolicy.seedVisible ? <SeedField settings={settings} onCommit={onCommit} /> : null}
-      {familyBase === 'krea-2' ? (
-        <>
-          <Separator borderColor="border.subtle" />
-          <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} />
-        </>
-      ) : null}
-      {familyBase === 'z-image' ? (
-        <>
-          <Separator borderColor="border.subtle" />
-          <ZImageSeedVarianceFields settings={settings} onCommit={onCommit} />
-        </>
-      ) : null}
+      {familyBase === 'krea-2' ? <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} /> : null}
+      {familyBase === 'z-image' ? <ZImageSeedVarianceFields settings={settings} onCommit={onCommit} /> : null}
     </>
   );
 
@@ -746,18 +793,14 @@ export const GenerateRenderSection = ({
     <GenerateCollapsibleSection
       label={t('widgets.generate.render')}
       defaultOpen={false}
-      badges={
-        <>
-          <Badge>
-            {settings.steps} · {uiPolicy.guidanceLabel} {settings.cfgScale}
-          </Badge>
-          {canvas?.badges}
-          {seedBadge}
-        </>
-      }
+      isChanged={modelDefaultsPatch !== null && !isAtModelDefaults}
       sectionId="render"
+      summary={[settings.steps, `${uiPolicy.guidanceLabel} ${settings.cfgScale}`, canvas?.summary, seedSummary]}
+      onReset={modelDefaultsPatch ? () => onCommit(modelDefaultsPatch) : undefined}
+      // The seed, strength and family fields keep their values: only these have model defaults to return to.
+      resetLabel={sectionResetLabel}
     >
-      <Stack gap="2" p="2">
+      <Stack gap="2.5">
         <GenerateIssueNotes section="render" />
         {renderFields(canvas?.field ?? null)}
       </Stack>

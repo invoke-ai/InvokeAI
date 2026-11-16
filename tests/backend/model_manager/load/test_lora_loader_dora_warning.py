@@ -22,6 +22,9 @@ def test_factorized_dora_layers_warn_once_per_lora_with_name_and_count(tmp_path,
         "loha.hada_w2_a": torch.randn(6, 2),
         "loha.hada_w2_b": torch.randn(2, 6),
         "loha.dora_magnitude": torch.ones(6, 1),
+        "peft_lokr.lokr_w1": torch.randn(2, 2),
+        "peft_lokr.lokr_w2": torch.randn(3, 3),
+        "peft_lokr.lora_magnitude_vector": torch.ones(6),
         "dora.lora_down.weight": torch.randn(2, 6),
         "dora.lora_up.weight": torch.randn(6, 2),
         "dora.dora_scale": torch.ones(6, 1),
@@ -42,9 +45,10 @@ def test_factorized_dora_layers_warn_once_per_lora_with_name_and_count(tmp_path,
     model = loader._load_model(config)  # type: ignore[arg-type]
 
     assert isinstance(model.layers["lokr"], LoKRLayer)
+    assert isinstance(model.layers["peft_lokr"], LoKRLayer)
     assert isinstance(model.layers["loha"], LoHALayer)
     assert isinstance(model.layers["dora"], DoRALayer)
     logger.warning.assert_called_once_with(
-        "LoRA 'factorized-dora' contains 2 LoKr/LoHa layers with unsupported DoRA magnitudes; "
+        "LoRA 'factorized-dora' contains 3 LoKr/LoHa layers with unsupported DoRA magnitudes; "
         "applying those layers as plain LoKr/LoHa."
     )

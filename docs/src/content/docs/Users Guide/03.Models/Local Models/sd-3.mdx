@@ -59,8 +59,9 @@ you can replace any of them with a model you have installed separately:
 - **VAE**: only SD3 VAEs are offered
 
 The T5 encoder can also be one of the single files ComfyUI uses: `t5xxl_fp16`, or `t5xxl_fp8_e4m3fn_scaled` for
-about half the VRAM. A single-file T5 run on the CPU is held in float32 (about 19 GB of RAM for
-T5-XXL).
+about half the VRAM. A standalone T5 encoder (single-file, Diffusers folder or GGUF) run on the CPU is held in float32
+(about 19 GB of RAM for T5-XXL, except GGUF, which stays quantized); see
+[Model Format Support](/users-guide/models/model-format-support/#text-encoders).
 
 The CLIP encoders can also be the single files ComfyUI uses, `clip_l` and `clip_g`; SD 3 then still tokenizes
 with the main model's tokenizers.

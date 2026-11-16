@@ -85,6 +85,23 @@ describe('GenerateFieldContextMenu', () => {
     expect(openMenus()[0]?.textContent).toContain('Reset CFG');
   });
 
+  it('opens at the pointer with nothing to point at: no arrow, and no arrow-sized gap below the click', async () => {
+    await renderFields();
+    const steps = field('Steps');
+
+    await rightClick(steps);
+    await expect.poll(() => openMenus()[0]?.textContent).toContain('Reset Steps');
+    await settle();
+    const menu = openMenus()[0]!;
+
+    const arrow = menu.parentElement!.querySelector<HTMLElement>('[data-part="arrow"]');
+    expect(arrow?.querySelector<HTMLElement>('[data-part="arrow-tip"]')?.offsetWidth ?? 0).toBe(0);
+    // The click lands 8px into the field; the menu opens the default 8px gutter below it, where an arrow would add 6.
+    const gap = menu.getBoundingClientRect().top - (steps.getBoundingClientRect().top + 8);
+    expect(gap).toBeGreaterThanOrEqual(7);
+    expect(gap).toBeLessThan(11);
+  });
+
   it('keeps a menu open when right-clicked itself, then still moves to the next field', async () => {
     await renderFields();
 
@@ -143,5 +160,56 @@ describe('GenerateFieldContextMenu', () => {
     await act(() => userEvent.keyboard('{Escape}'));
     await expect.poll(() => openMenus()).toHaveLength(0);
     expect(document.activeElement).toBe(cfg);
+  });
+
+  it('keeps the changed dot inside the 8px gutter at rest, on hover and with its focus ring', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <I18nextProvider i18n={i18n}>
+            {/* The panel and its 8px field inset, as a section lays fields out. */}
+            <Box data-testid="panel" overflow="hidden" px="2" w="30rem">
+              <GenerateFieldContextMenu copyValue={FIELDS[0]!.copyValue} fieldLabel="Steps" onReset={onReset}>
+                <Box as="button" borderWidth="1px" data-field="Steps" h="7" w="full">
+                  Steps
+                </Box>
+              </GenerateFieldContextMenu>
+            </Box>
+          </I18nextProvider>
+        </ChakraProvider>
+      )
+    );
+    const panel = host.querySelector<HTMLElement>('[data-testid="panel"]')!.getBoundingClientRect();
+    const fieldLeft = field('Steps').getBoundingClientRect().left;
+    const button = host.querySelector<HTMLElement>('[data-modified-dot]')!;
+    const dot = () => button.querySelector<HTMLElement>('[data-part="dot"]')!.getBoundingClientRect();
+    /** The dot's extent, with `ring` px of focus ring around it, must clear the panel edge and the field's border. */
+    const expectInGutter = (ring: number) => {
+      const rect = dot();
+      expect(rect.left - ring).toBeGreaterThanOrEqual(panel.left);
+      expect(rect.right + ring).toBeLessThanOrEqual(fieldLeft);
+    };
+
+    expect(fieldLeft - panel.left).toBe(8);
+    expect(dot().width).toBe(4);
+    expectInGutter(1);
+
+    await userEvent.hover(button);
+    await expect.poll(() => Math.round(dot().width)).toBe(6);
+    expectInGutter(0);
+
+    await userEvent.unhover(button);
+    // From the keyboard: the ring is drawn on the dot itself, not the 16px button.
+    host.querySelector<HTMLElement>('[data-testid="panel"]')!.focus();
+    await userEvent.keyboard('{Tab}');
+    expect(document.activeElement).toBe(button);
+    await expect.poll(() => Math.round(dot().width)).toBe(6);
+    // A real outline, which stays in forced colors, 1px around the dot and still inside the gutter.
+    const dotStyle = getComputedStyle(button.querySelector<HTMLElement>('[data-part="dot"]')!);
+    expect([dotStyle.outlineStyle, dotStyle.outlineWidth, dotStyle.outlineOffset]).toEqual(['solid', '1px', '0px']);
+    expectInGutter(1);
   });
 });

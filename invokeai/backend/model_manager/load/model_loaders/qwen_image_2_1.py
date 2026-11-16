@@ -24,6 +24,7 @@ from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_visual_tow
 from invokeai.backend.quantization.fp8_scaled import (
     attach_fp8_scales,
     cast_state_dict,
+    clone_unreplaced_tensors,
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
@@ -31,6 +32,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     read_safetensors_metadata,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
+    translate_torchao_fp8_layers,
     warn_on_unattached_scales,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
@@ -199,9 +201,9 @@ def _load_vision_tower(folder: Path, dtype: torch.dtype) -> torch.nn.Module:
 class QwenImage21CheckpointModel(ModelLoader):
     """Loads a Qwen-Image-2.1 transformer from a single safetensors file.
 
-    Plain bf16/fp16 files, ComfyUI 'scaled fp8' (fp8 weights + `weight_scale`) and ComfyUI `int8_tensorwise`
-    (+convrot) files, with or without ComfyUI's prefix. The fused `img_mlp.gate_up` is split before any
-    quantization side channel is read, so every quantized layer names a diffusers Linear.
+    Plain bf16/fp16 files, ComfyUI 'scaled fp8' (fp8 weights + `weight_scale`), unsloth's torchao fp8 (renamed to it)
+    and ComfyUI `int8_tensorwise` (+convrot) files, with or without ComfyUI's prefix. The fused `img_mlp.gate_up` is
+    split before any quantization side channel is read, so every quantized layer names a diffusers Linear.
     """
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
@@ -217,6 +219,8 @@ class QwenImage21CheckpointModel(ModelLoader):
 
         sd = load_file(model_path)
         sd = CheckpointPrefix.detect(sd).strip(sd)
+        # unsloth's torchao FP8 build, renamed to the ComfyUI scaled-fp8 form everything below reads.
+        translate_torchao_fp8_layers(sd)
         header_layers = split_fused_layer_names(
             strip_layer_path_prefix(parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger)))
         )
@@ -268,11 +272,17 @@ class QwenImage21CheckpointModel(ModelLoader):
                 fp8_layers=fp8_layers,
                 nvfp4_payloads={},
             )
+            mapped = dict(sd) if fp8_layers and not keep_fp8 else None
             if fp8_layers and not keep_fp8:
                 dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
                 fp8_layers = {}
             fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
             kept = cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+            if mapped is not None:
+                # Parameters the fold and cast left as they were are slices of the file mapping and would pin it,
+                # uncounted. Only on this path: kept fp8 codes stay mapped, as copying them would defeat the keep.
+                clone_unreplaced_tensors(sd, mapped)
+                mapped.clear()
 
         load_state_dict_ignoring_extras(
             model, sd, source="Qwen-Image-2.1 single-file checkpoint", assign=True, allow_missing=True
