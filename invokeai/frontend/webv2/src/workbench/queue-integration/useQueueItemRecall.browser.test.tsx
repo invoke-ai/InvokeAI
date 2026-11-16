@@ -16,9 +16,10 @@ import {
 } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createDefaultVideoWidgetValues } from '@features/video';
-import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { recordCanvasMetadata } from '@workbench/canvas-operations/saveCanvasToGallery';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
+import { claimCanvasRecall } from '@workbench/image-actions';
 import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
@@ -340,6 +341,53 @@ it('retains prompt tool edits made while canvas assets load and recalls the snap
   expect(snapshot.activeProject.canvas.document.stacks.raster[0]).toMatchObject({ name: 'Recorded image' });
 });
 
+it('drops a second recall pressed while one is under way, rather than recalling the canvas in part', async () => {
+  accountLifecycle.activate('queue-canvas-repeated-recall');
+  const main = { base: 'sdxl', key: 'queue-main', name: 'SDXL', type: 'main' } as MainModelConfig &
+    ModelsModule.ModelConfig;
+  mocks.models = [main];
+  const store = (mocks.store = createWorkbenchStore());
+  let resolveAssets!: (images: Awaited<ReturnType<typeof galleryImages.resolveMany>>) => void;
+  const resolveMany = vi.spyOn(galleryImages, 'resolveMany').mockReturnValue(
+    new Promise((resolve) => {
+      resolveAssets = resolve;
+    })
+  );
+  await render({
+    sourceId: 'canvas',
+    generateValues: { ...getDefaultGenerateSettings(main), model: main, modelKey: main.key },
+    canvasMetadata: makeCanvasMetadata(),
+  });
+  let first!: Promise<void>;
+  let second!: Promise<void>;
+  await act(() => {
+    first = Promise.resolve(handle.current!.recall('all'));
+  });
+  await vi.waitFor(() => expect(resolveMany).toHaveBeenCalledOnce());
+  await act(() => {
+    second = Promise.resolve(handle.current!.recall('all'));
+  });
+  await act(async () => {
+    resolveAssets([{ imageName: 'recorded.png' }] as Awaited<ReturnType<typeof galleryImages.resolveMany>>);
+    await Promise.all([first, second]);
+  });
+
+  expect(resolveMany).toHaveBeenCalledOnce();
+  expect(mocks.notifyInfo).toHaveBeenCalledExactlyOnceWith(
+    expect.any(String),
+    'widgets.gallery.itemActions.recall.recallInProgress'
+  );
+  expect(mocks.notifySuccess).toHaveBeenCalledOnce();
+  expect(store.queries.getSnapshot().activeProject.canvas.snapshots).toHaveLength(1);
+
+  // Once it has committed, the next press recalls again.
+  resolveMany.mockResolvedValue([{ imageName: 'recorded.png' }] as Awaited<
+    ReturnType<typeof galleryImages.resolveMany>
+  >);
+  await recall('all');
+  expect(mocks.notifySuccess).toHaveBeenCalledTimes(2);
+});
+
 it('recalls Generate settings and reports a partial result when canvas assets cannot load', async () => {
   accountLifecycle.activate('queue-canvas-failed-recall');
   const main = { base: 'sdxl', key: 'queue-main', name: 'SDXL', type: 'main' } as MainModelConfig &
@@ -492,6 +540,10 @@ it.each(['project', 'account', 'promotion-failure', 'project-promotion-failure']
       );
       expect(mocks.openWidget).toHaveBeenCalledOnce();
       expect(mocks.notifySuccess).toHaveBeenCalledOnce();
+      // Committed, so saving the images holds no other recall back.
+      const nextRecall = claimCanvasRecall(captureAccountScope());
+      expect(nextRecall).not.toBeNull();
+      nextRecall!();
       mocks.store!.commands.generation.setSettings(
         { ...getDefaultGenerateSettings(main), model: main, steps: 47 },
         projectId

@@ -6189,6 +6189,7 @@
           "nothingRecalledVideo": "No recallable video data",
           "nothingRecalledVideoSize": "Size not recalled",
           "partiallyRecalled": "Some image data was not recalled",
+          "recallInProgress": "Another recall is still under way. Try again once it finishes.",
           "unnamedConcept": "unnamed concept",
           "unnamedRefiner": "unnamed refiner",
           "videoMetadataUnsupported": "This video does not include supported Video metadata.",
