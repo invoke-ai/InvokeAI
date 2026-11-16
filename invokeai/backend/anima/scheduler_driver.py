@@ -4,10 +4,10 @@ Encapsulates the per-scheduler API quirks that ``anima_denoise._run_diffusion``
 would otherwise have to know about:
 
 * Schedulers that accept ``set_timesteps(sigmas=...)`` get the pre-shifted
-  Anima schedule passed directly.
-* Schedulers that don't accept ``sigmas=`` use ``set_begin_index()`` over their
-  own internal flow-shifted schedule. For Heun, the doubled-array index
-  translation (logical step ``k`` → doubled index ``2k``) is handled here.
+  Anima schedule passed directly. Heun's doubled layout and LCM's terminal sigma
+  are set through the helpers in ``invokeai.backend.flux.schedulers``.
+* Schedulers that don't accept ``sigmas=`` (DPM++) use ``set_begin_index()`` over
+  their own internal flow-shifted schedule.
 * SDE-style schedulers receive a seeded ``torch.Generator`` on every step.
 
 The denoise loop iterates :meth:`AnimaSchedulerDriver.iterations` and calls
@@ -26,7 +26,11 @@ import torch
 from diffusers import FlowMatchHeunDiscreteScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
-from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP
+from invokeai.backend.flux.schedulers import (
+    ANIMA_SCHEDULER_MAP,
+    set_heun_timesteps_from_sigmas,
+    set_timesteps_from_sigmas,
+)
 
 
 @dataclass(frozen=True)
@@ -44,7 +48,6 @@ class AnimaSchedulerIteration:
     sigma_curr: float
     sigma_prev: float
     completes_user_step: bool
-    order: int
 
 
 class AnimaSchedulerDriver:
@@ -68,29 +71,28 @@ class AnimaSchedulerDriver:
         self._begin_index: int = 0
         self._step_generator = torch.Generator(device=device).manual_seed(seed)
 
-        is_lcm = scheduler_name == "lcm"
         accepts_sigmas = "sigmas" in inspect.signature(self.scheduler.set_timesteps).parameters
         clipped = denoising_start > 0 or denoising_end < 1
 
-        if not is_lcm and accepts_sigmas:
+        if self.is_heun:
+            # ``sigmas`` is the clipped schedule, so Heun starts at the img2img blend sigma and ends at the
+            # requested terminal sigma.
+            set_heun_timesteps_from_sigmas(self.scheduler, sigmas[:-1], sigmas[-1], device)
+            self._num_iterations = len(self.scheduler.timesteps)
+        elif scheduler_name == "lcm":
+            # LCM would otherwise build its own linear schedule from 1.0.
+            set_timesteps_from_sigmas(self.scheduler, sigmas[:-1], sigmas[-1], device)
+            self._num_iterations = len(self.scheduler.timesteps)
+        elif accepts_sigmas:
             self.scheduler.set_timesteps(sigmas=sigmas, device=device)
             self._num_iterations = len(self.scheduler.timesteps)
-        elif not is_lcm and clipped and hasattr(self.scheduler, "set_begin_index"):
+        elif clipped and hasattr(self.scheduler, "set_begin_index"):
+            # DPM++ takes no sigmas: clip its own flow-shifted schedule by index.
             k_start = int(denoising_start * steps)
             k_end = int(denoising_end * steps)
             self.scheduler.set_timesteps(num_inference_steps=steps, device=device)
-            if self.is_heun:
-                # Heun's timesteps array is 2N-1 entries; logical step k maps to
-                # doubled index 2k. min() clamps denoising_end=1.0 to the
-                # unpaired terminal first-order step.
-                self._begin_index = 2 * k_start
-                self._num_iterations = min(
-                    2 * (k_end - k_start),
-                    len(self.scheduler.timesteps) - self._begin_index,
-                )
-            else:
-                self._begin_index = k_start
-                self._num_iterations = k_end - self._begin_index
+            self._begin_index = k_start
+            self._num_iterations = k_end - self._begin_index
             self.scheduler.set_begin_index(self._begin_index)
         else:
             self.scheduler.set_timesteps(num_inference_steps=len(sigmas) - 1, device=device)
@@ -118,17 +120,16 @@ class AnimaSchedulerDriver:
             sigma_prev = self.scheduler.sigmas[next_idx].item() if next_idx < len(self.scheduler.sigmas) else 0.0
 
             # For Heun, a user step completes on the second-order half of each
-            # pair AND on the unpaired terminal first-order step (sigma_prev==0).
-            is_terminal = sigma_prev == 0.0
+            # pair AND on the unpaired terminal first-order step, which ends at the requested
+            # terminal sigma (not 0 when denoising_end < 1).
+            is_terminal = next_idx >= len(self.scheduler.timesteps)
             completes_user_step = (not self.is_heun) or (not in_first_order) or is_terminal
-            order = 2 if self.is_heun else 1
 
             yield AnimaSchedulerIteration(
                 sched_timestep=sched_timestep,
                 sigma_curr=sigma_curr,
                 sigma_prev=sigma_prev,
                 completes_user_step=completes_user_step,
-                order=order,
             )
 
     def step(

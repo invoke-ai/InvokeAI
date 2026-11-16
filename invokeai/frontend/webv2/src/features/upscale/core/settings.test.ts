@@ -719,10 +719,9 @@ describe('schedulers per architecture', () => {
     const offered = (base: string) =>
       upscaleSchedulerOptions(model(base, 'main', base) as never).map((option) => option.value);
 
-    // LCM builds its own schedule from pure noise, so it would ignore Creativity.
-    expect(offered('flux')).toEqual(['euler', 'heun']);
-    expect(offered('z-image')).toEqual(['euler', 'heun']);
-    expect(offered('anima')).toEqual(['euler', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde']);
+    expect(offered('flux')).toEqual(['euler', 'heun', 'lcm']);
+    expect(offered('z-image')).toEqual(['euler', 'heun', 'lcm']);
+    expect(offered('anima')).toEqual(['euler', 'heun', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde', 'lcm']);
     // `krea2_denoise` and `qwen_image_denoise` have no scheduler input.
     expect(offered('krea-2')).toEqual(['euler']);
     expect(offered('qwen-image')).toEqual(['euler']);

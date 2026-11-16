@@ -873,16 +873,16 @@ describe('Creativity on index-clipping architectures', () => {
 });
 
 describe('schedulers on the upscale pass', () => {
-  // A stored LCM on a flow model, or Heun on Anima -- left from SD, recalled, or picked before the
-  // list was narrowed -- would start the pass from pure noise, or on Anima below the blend. FLUX.2
-  // steps with Euler whenever the pass starts above pure noise.
+  // A scheduler stored from another base is coerced to one the base offers. FLUX.2 steps with Euler
+  // whenever the pass starts above pure noise.
   it.each([
-    ['flux', () => createFluxValues(), 'lcm', 'euler'],
+    ['flux', () => createFluxValues(), 'lcm', 'lcm'],
     ['flux', () => createFluxValues(), 'heun', 'heun'],
     ['flux2', () => createFlux2Values('klein_4b'), 'heun', 'euler'],
-    ['z-image', () => createZImageValues(), 'lcm', 'euler'],
+    ['z-image', () => createZImageValues(), 'lcm', 'lcm'],
     ['z-image', () => createZImageValues(), 'heun', 'heun'],
-    ['anima', () => createAnimaValues(), 'heun', 'euler'],
+    ['anima', () => createAnimaValues(), 'heun', 'heun'],
+    ['anima', () => createAnimaValues(), 'lcm', 'lcm'],
     ['anima', () => createAnimaValues(), 'dpmpp_2m', 'dpmpp_2m'],
     ['sd-1', () => createValues('sd-1'), 'heun', 'heun'],
   ] as const)('runs %s with %s stored as %s, and records what ran', (_base, createBaseValues, stored, runs) => {

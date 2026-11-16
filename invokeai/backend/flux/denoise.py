@@ -58,21 +58,12 @@ def denoise(
 
     # Initialize scheduler with timesteps
     # The timesteps list contains values in [0, 1] range (sigmas)
-    # Euler and Heun use InvokeAI's custom sigmas; LCM owns its schedule.
+    # Every scheduler runs InvokeAI's schedule, so img2img starts at the sigma of the preblend.
     if isinstance(scheduler, FlowMatchHeunDiscreteScheduler):
         set_heun_timesteps_from_sigmas(scheduler, timesteps[:-1], timesteps[-1], img.device)
-    elif isinstance(scheduler, FlowMatchEulerDiscreteScheduler):
+    elif isinstance(scheduler, FlowMatchEulerDiscreteScheduler) or is_flow_match_lcm_scheduler(scheduler):
         # InvokeAI supplies model-evaluation sigmas plus its requested terminal endpoint.
         set_timesteps_from_sigmas(scheduler, timesteps[:-1], timesteps[-1], img.device)
-    elif is_flow_match_lcm_scheduler(scheduler):
-        # LCM owns its schedule; clipping controls the requested evaluation count,
-        # while its exact start/end sigmas remain scheduler-defined.
-        #
-        # Important for img2img callers: if the initial latent/noise blend was
-        # computed from a separate pre-scheduler schedule, that preblend may not
-        # match this scheduler's true first step exactly.
-        num_inference_steps = len(timesteps) - 1
-        scheduler.set_timesteps(num_inference_steps=num_inference_steps, device=img.device)
     else:
         raise TypeError(f"Unsupported FLUX scheduler: {type(scheduler).__name__}")
 

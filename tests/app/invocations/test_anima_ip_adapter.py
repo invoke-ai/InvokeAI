@@ -15,6 +15,7 @@ from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.anima.anima_ip_adapter import AnimaIPAdapterField, AnimaIPAdapterInvocation
 from invokeai.app.invocations.fields import AnimaConditioningField
 from invokeai.app.invocations.model import ModelIdentifierField
+from invokeai.app.util.step_callback import calc_percentage
 from invokeai.backend.anima.ip_adapter import AnimaIPAdapter
 from invokeai.backend.model_manager.starter_models.common import siglip, siglip2_base_512
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
@@ -143,6 +144,19 @@ def _denoise(
     )  # fmt: skip
     invocation._run_diffusion(context)
     return transformer, patches, adapters
+
+
+@pytest.mark.parametrize("scheduler", ["heun", "lcm"])
+def test_progress_advances_one_user_step_at_a_time(monkeypatch, scheduler) -> None:
+    """Heun runs two evaluations per step, but progress counts user steps: a Heun pass must not report order 2,
+    which would make `calc_percentage` advance in pairs."""
+    steps = 5
+    context = MagicMock()
+    _denoise(monkeypatch, None, steps=steps, scheduler=scheduler, context=context)
+
+    states = [call.args[0] for call in context.util.sd_step_callback.call_args_list]
+    assert [state.step for state in states] == list(range(1, steps + 1))
+    assert [calc_percentage(state) for state in states] == pytest.approx([k / steps for k in range(1, steps + 1)])
 
 
 @pytest.mark.parametrize("scheduler", ["euler", "dpmpp_2m"])

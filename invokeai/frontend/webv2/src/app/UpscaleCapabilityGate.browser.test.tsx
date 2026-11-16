@@ -398,7 +398,7 @@ describe('Upscale without the served architecture table', () => {
         ?.click()
     );
 
-    // Euler and Heun both start where the blend left the latents on Z-Image; LCM does not.
+    // Every Z-Image scheduler starts where the blend left the latents.
     expect(host.textContent).toContain('widgets.upscale.cfgScale');
     const scheduler = host.querySelector<HTMLInputElement>('input[aria-label="widgets.upscale.scheduler"]');
     expect(scheduler?.value).toBe('Euler');
@@ -411,7 +411,7 @@ describe('Upscale without the served architecture table', () => {
     );
 
     const offered = [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent);
-    expect(offered).toEqual(['Euler', 'Heun (2nd order)']);
+    expect(offered).toEqual(['Euler', 'Heun (2nd order)', 'LCM']);
   });
 });
 
