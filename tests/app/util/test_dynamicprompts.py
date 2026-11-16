@@ -4,7 +4,7 @@ import pytest
 from dynamicprompts.generators import CombinatorialPromptGenerator
 from dynamicprompts.wildcards import WildcardManager
 
-from invokeai.app.util.dynamicprompts import find_missing_wildcards
+from invokeai.app.util.dynamicprompts import ExpandedPrompts, expand_dynamic_prompt, find_missing_wildcards
 
 
 @pytest.fixture
@@ -67,3 +67,156 @@ def test_resolvable_wildcard_in_a_variant_generates_instead_of_hanging(
     generated = CombinatorialPromptGenerator(wildcard_manager).generate("{__colors__|x}", max_prompts=5)
 
     assert sorted(generated) == ["blue", "green", "red", "x"]
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "${c={__nope__|x}} a ${c}",
+        "${c=__nope__} a ${c}",
+        "a ${c:{__nope__|x}}",
+    ],
+)
+def test_find_missing_wildcards_detects_unknown_wildcards_in_variables(prompt: str) -> None:
+    # A variable's value (or an access's default) is expanded exactly like an inline prompt, so an
+    # unresolvable wildcard there hangs or collapses the combinatorial generator the same way.
+    assert find_missing_wildcards(prompt) == ["nope"]
+
+
+def test_find_missing_wildcards_reports_nothing_for_resolvable_wildcards_in_variables(
+    wildcard_manager: WildcardManager,
+) -> None:
+    assert find_missing_wildcards("${c={__colors__|x}} a ${c}", wildcard_manager) == []
+    assert find_missing_wildcards("a ${c:__colors__} ${d}", wildcard_manager) == []
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        # `c` is set, so the default never runs.
+        "${c=red} a ${c:{__nope__|x}}",
+        # The lazy value is never read.
+        "${c={__nope__|x}} a",
+        # The lazy value is replaced before `c` is read.
+        "${c={__nope__|x}} ${c=red} a ${c}",
+        # An immediate value is sampled once, keeping only its first result.
+        "${c=!{red|__nope__}} a ${c}",
+        "${c=!{__nope__|x}} a {b|d}",
+        # The first result of a bare unknown wildcard is its wrapped name.
+        "${c=!__nope__ {a|b}} a ${c}",
+        # Allowing zero options makes the first result an empty string.
+        "${c=!{0-1$$__nope__|{__nope__}}} a ${c}",
+        # Picking several options keeps the first combination, the first options in order, when
+        # they are distinct literals.
+        "${c=!{2$$red|blue|__nope__}} a ${c}",
+        "${c=!{2-3$$red|blue|{__nope__}}} a ${c}",
+        # The same when the first option is itself a variant.
+        "${c=!{2$${red|green}|blue|__nope__}} a ${c}",
+        # Duplicate literals in the first combination are deduped away, but the next combination
+        # still produces a result before the `{__nope__}` option is reached.
+        "${c=!{2$$red|red|__nope__|{__nope__}}} a ${c}",
+    ],
+)
+def test_find_missing_wildcards_ignores_variable_values_that_never_run(prompt: str) -> None:
+    assert find_missing_wildcards(prompt) == []
+    result = expand_dynamic_prompt(prompt, max_prompts=10, combinatorial=True)
+    assert result.error is None
+
+
+@pytest.mark.timeout(5)
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        # Picking two distinct options from values that all sample to `__nope__` never finishes,
+        # so the immediate assignment hangs before its first result.
+        "${c=!{2$$__nope__|{__nope__}|red}} a ${c}",
+        # A `{__wildcard__}` variant of an unknown wildcard has no options, so the first result
+        # never comes and the sampler raises instead.
+        "${c=!{__nope__}} a ${c}",
+        # The same, reached through the first option, a variable default and an overwritten assignment.
+        "${c=!{{2$$__nope__|{__nope__}}|red}} a ${c}",
+        "${c=!x ${d:{__nope__}}} a ${c}",
+        "${c=!{__nope__}} ${c=red} a ${c}",
+        # Every combination of two distinct options needs `{__nope__}` or a second `__nope__`.
+        "${c=!{2$$red|red|{__nope__}}} a ${c}",
+    ],
+)
+def test_find_missing_wildcards_detects_immediate_values_that_cannot_produce_a_result(prompt: str) -> None:
+    assert find_missing_wildcards(prompt) == ["nope"]
+    result = expand_dynamic_prompt(prompt, max_prompts=1, combinatorial=True)
+    assert result.error is not None
+
+
+@pytest.mark.timeout(5)
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        # A cyclical variant repeats `red` forever and the two-pick dedupes every repeat away, so the
+        # immediate value never produces a result even though it reads no unknown wildcard.
+        "${c=!{2$$${x:{@red}}|red}} __nope__",
+        # A cyclical multi-pick with fewer distinct options than picks has no combination to cycle
+        # over, so the sampler spins without ever drawing a result, alone or inside a larger value.
+        "${c=!{@2$$red|red}} __nope__",
+        "${c=!x {@2$$red|red}} __nope__",
+        "${c=!{@3$$red|blue|red}} __nope__",
+    ],
+)
+def test_find_missing_wildcards_does_not_hang_on_an_immediate_value_that_never_produces_a_result(
+    prompt: str,
+) -> None:
+    assert find_missing_wildcards(prompt) == ["nope"]
+    result = expand_dynamic_prompt(prompt, max_prompts=1, combinatorial=True)
+    assert result.error is not None
+
+
+@pytest.mark.parametrize(
+    ("prompt", "expected"),
+    [
+        # Enough distinct options for every pick: the cyclical variant has combinations, so the dry
+        # run still samples it.
+        ("${c=!{@2$$red|blue}} a ${c} __nope__", ["nope"]),
+        ("${c=!{@2$$red|blue}} a ${c}", []),
+        # A `{__wildcard__}` variant of an unknown wildcard is expanded first, so it is reported.
+        ("${c=!{@2$$__nope__}} a", ["nope"]),
+    ],
+)
+def test_find_missing_wildcards_samples_cyclical_multi_picks_with_enough_options(
+    prompt: str, expected: list[str]
+) -> None:
+    assert find_missing_wildcards(prompt) == expected
+
+
+def test_immediate_assignment_keeps_only_the_first_result() -> None:
+    result = expand_dynamic_prompt("${c=!{red|__nope__}} a ${c}", max_prompts=10, combinatorial=True)
+
+    assert result == ExpandedPrompts(prompts=[" a red"])
+
+
+def test_immediate_multi_pick_assignment_keeps_the_first_combination() -> None:
+    result = expand_dynamic_prompt("${c=!{2$$red|blue|__nope__}} a ${c}", max_prompts=10, combinatorial=True)
+
+    assert result == ExpandedPrompts(prompts=[" a red,blue"])
+
+
+@pytest.mark.parametrize(
+    ("prompt", "expected"),
+    [
+        ("${c=!{2$${red|green}|blue|__nope__}} a ${c}", " a red,blue"),
+        ("${c=!{2$$red|red|__nope__|{__nope__}}} a ${c}", " a red,__nope__"),
+    ],
+)
+def test_immediate_multi_pick_assignment_matches_the_sampler(prompt: str, expected: str) -> None:
+    result = expand_dynamic_prompt(prompt, max_prompts=10, combinatorial=True)
+
+    assert result == ExpandedPrompts(prompts=[expected])
+
+
+@pytest.mark.timeout(5)
+def test_find_missing_wildcards_walks_a_shared_variable_expression_once() -> None:
+    # Every variable reads the previous one twice, so walking each reference separately would take
+    # 2**40 steps.
+    chain = "".join(f"${{v{i}=${{v{i - 1}}} ${{v{i - 1}}}}} " for i in range(1, 41))
+    prompt = "${v0={a|b}} " + chain + "${v40}"
+
+    assert find_missing_wildcards(prompt) == []
+    assert find_missing_wildcards(prompt.replace("{a|b}", "{a|__nope__}")) == ["nope"]
