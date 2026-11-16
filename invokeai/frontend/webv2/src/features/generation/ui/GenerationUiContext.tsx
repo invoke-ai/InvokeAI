@@ -69,8 +69,8 @@ export interface CanvasRenderSizeProps {
 
 /** What the canvas adds to the Render section. */
 export interface CanvasDenoisingStrength {
-  /** The strength summary, shown with the section's header badges. */
-  badges: ReactNode;
+  /** The strength summary, shown in the section's title row while it is folded. */
+  summary: ReactNode;
   /** The strength control, laid out under guidance. */
   field: ReactNode;
 }
@@ -123,6 +123,8 @@ export interface GenerationUiAdapter {
     openInModelManager?: (key: string) => void;
     /** Apply the optional model-type filter when opening Add Models. */
     openManager(options?: { modelType?: string }): void;
+    /** The catalog as it is now, for an Undo that runs long after the render that offered it. */
+    readCatalog(): readonly GenerationModelCatalogItem[];
     /** Reads the catalog again, even after a read that half failed; settles when the read does. */
     refresh(): Promise<void>;
     status: 'error' | 'idle' | 'loaded' | 'loading';
@@ -195,7 +197,8 @@ export interface GenerationUiAdapter {
   sectionPreferences: {
     /** Persisted per-user open/closed overrides for panel sections; absent = section default. */
     sectionsOpen: Readonly<Record<string, boolean>>;
-    setSectionOpen(sectionId: string, open: boolean): void;
+    /** Records several sections' open states as one preference write (a panel-wide fold or expand). */
+    setSectionsOpen(changes: Readonly<Record<string, boolean>>): void;
   };
   settings: {
     patchGenerateSettings(values: Partial<GenerateSettings>, projectId?: string, origin?: 'user' | 'system'): void;

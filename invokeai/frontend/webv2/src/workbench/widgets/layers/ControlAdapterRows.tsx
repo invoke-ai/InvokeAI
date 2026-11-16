@@ -6,13 +6,9 @@ import { getControlAdapterMinWeight } from '@features/generation/graph';
 import { SegmentedControl } from '@platform/ui/SegmentedControl';
 import { Slider } from '@platform/ui/Slider';
 import { Tooltip } from '@platform/ui/Tooltip';
-import {
-  FormNumberField,
-  useNumberCommit,
-  useSliderGesture,
-} from '@workbench/widgets/canvas/tool-presentation/FormControls';
+import { FormNumberField, useNumberCommit } from '@workbench/widgets/canvas/tool-presentation/FormControls';
 import { PropertyControlRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatPanelText, type ControlPanelModel, type ControlPriority } from './controlPanelModel';
@@ -32,9 +28,8 @@ type AdapterPatch = Partial<Pick<CanvasControlAdapterContract, 'weight' | 'begin
 export interface ControlAdapterEditing {
   /** Shows a gesture's value live; the commit that ends it records one undo step. */
   preview(patch: AdapterPatch): void;
+  /** Records the patch from the value its gesture's preview replaced; one that changes nothing drops the preview. */
   commit(patch: AdapterPatch, label: string): void;
-  /** Ends a gesture that came back to where it began, restoring what it previewed. */
-  cancel(): void;
 }
 
 /** Weight, Steps and Priority: the adapter's own values, edited the same way whatever drives the layer. */
@@ -55,28 +50,64 @@ export const ControlAdapterRows = ({
   const priorityLabel = t('widgets.layers.control.rows.priority');
   const priorityReasonId = useId();
 
+  // Previews reach the document, so `adapter` already carries a dragged value: every gesture end commits, and the
+  // commit compares with the value the preview replaced, dropping a gesture that changed nothing. Drafts keep the
+  // thumbs on the pointer between previews, which land at most once per frame.
+  // The held gesture's last preview, committed as its release would if the rows unmount mid-gesture.
+  const pendingRef = useRef<{ label: string; patch: AdapterPatch } | null>(null);
+  const previewGesture = useCallback(
+    (patch: AdapterPatch, label: string) => {
+      pendingRef.current = { label, patch };
+      editing.preview(patch);
+    },
+    [editing]
+  );
+  const commitGesture = useCallback(
+    (patch: AdapterPatch, label: string) => {
+      pendingRef.current = null;
+      editing.commit(patch, label);
+    },
+    [editing]
+  );
+  const flushGestureOnUnmount = useCallback(
+    (node: HTMLDivElement | null) =>
+      node
+        ? () => {
+            const pending = pendingRef.current;
+            if (pending) {
+              commitGesture(pending.patch, pending.label);
+            }
+          }
+        : undefined,
+    [commitGesture]
+  );
+
   // Weight: the slider covers 0–2; typed values reach the kind's lower bound.
   const commitWeight = useCallback((weight: number) => editing.commit({ weight }, weightLabel), [editing, weightLabel]);
-  const previewWeight = useCallback((weight: number) => editing.preview({ weight }), [editing]);
-  const weightGesture = useSliderGesture(adapter.weight, commitWeight, previewWeight);
+  const [weightDraft, setWeightDraft] = useState<number | null>(null);
+  const weight = weightDraft ?? adapter.weight;
   const weightValue = useMemo(
-    () => [clamp(weightGesture.value, CONTROL_WEIGHT_BOUNDS.sliderMin, CONTROL_WEIGHT_BOUNDS.sliderMax)],
-    [weightGesture.value]
+    () => [clamp(weight, CONTROL_WEIGHT_BOUNDS.sliderMin, CONTROL_WEIGHT_BOUNDS.sliderMax)],
+    [weight]
   );
   const weightAria = useMemo(() => [weightLabel], [weightLabel]);
   const handleWeightChange = useCallback(
-    ({ value }: SliderValueChangeDetails) => weightGesture.onChange(value[0]!),
-    [weightGesture]
-  );
-  const handleWeightChangeEnd = useCallback(
-    ({ value }: SliderValueChangeDetails) => {
-      const next = value[0]!;
-      weightGesture.onChangeEnd(next);
-      if (next === adapter.weight) {
-        editing.cancel();
+    ({ value: [next] }: SliderValueChangeDetails) => {
+      if (next !== undefined) {
+        setWeightDraft(next);
+        previewGesture({ weight: next }, weightLabel);
       }
     },
-    [adapter.weight, editing, weightGesture]
+    [previewGesture, weightLabel]
+  );
+  const handleWeightChangeEnd = useCallback(
+    ({ value: [next] }: SliderValueChangeDetails) => {
+      setWeightDraft(null);
+      if (next !== undefined) {
+        commitGesture({ weight: next }, weightLabel);
+      }
+    },
+    [commitGesture, weightLabel]
   );
   const minWeight = getControlAdapterMinWeight(model.kind);
   const handleWeightTyped = useNumberCommit(
@@ -96,25 +127,19 @@ export const ControlAdapterRows = ({
       if (value.length === 2) {
         const next: [number, number] = [value[0]!, value[1]!];
         setRangeDraft(next);
-        editing.preview({ beginEndStepPct: next });
+        previewGesture({ beginEndStepPct: next }, stepsLabel);
       }
     },
-    [editing]
+    [previewGesture, stepsLabel]
   );
   const handleRangeChangeEnd = useCallback(
     ({ value }: SliderValueChangeDetails) => {
       setRangeDraft(null);
-      if (value.length !== 2) {
-        return;
+      if (value.length === 2) {
+        commitGesture({ beginEndStepPct: [value[0]!, value[1]!] }, stepsLabel);
       }
-      const [begin, end] = adapter.beginEndStepPct;
-      if (value[0] === begin && value[1] === end) {
-        editing.cancel();
-        return;
-      }
-      editing.commit({ beginEndStepPct: [value[0]!, value[1]!] }, stepsLabel);
     },
-    [adapter.beginEndStepPct, editing, stepsLabel]
+    [commitGesture, stepsLabel]
   );
   const stepsReadout = rangeDraft
     ? t('widgets.layers.control.stepsReadout', {
@@ -152,7 +177,8 @@ export const ControlAdapterRows = ({
     : null;
 
   return (
-    <>
+    // `contents` keeps the rows in the panel's own layout; the box only marks when they unmount.
+    <Box ref={flushGestureOnUnmount} display="contents">
       <PropertyControlRow label={weightLabel}>
         <Slider
           aria-label={weightAria}
@@ -172,7 +198,7 @@ export const ControlAdapterRows = ({
           max={CONTROL_WEIGHT_BOUNDS.inputMax}
           min={minWeight}
           step={CONTROL_WEIGHT_BOUNDS.step}
-          value={formatWeight(weightGesture.value)}
+          value={formatWeight(weight)}
           onValueCommit={handleWeightTyped}
         />
       </PropertyControlRow>
@@ -216,6 +242,6 @@ export const ControlAdapterRows = ({
           ) : null}
         </Box>
       </PropertyControlRow>
-    </>
+    </Box>
   );
 };

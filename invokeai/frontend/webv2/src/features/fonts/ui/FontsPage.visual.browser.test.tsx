@@ -139,7 +139,7 @@ it('renders the font library with the real English locale', async () => {
     .element(page.getByRole('menuitemradio', { name: 'My fonts', exact: true }))
     .toHaveAttribute('aria-checked', 'true');
   await userEvent.keyboard('{Escape}');
-  await expect.element(page.getByRole('button', { name: 'Filter fonts' })).toHaveFocus();
+  await expect.element(page.getByRole('button', { name: 'Filter fonts, 1 filter active' })).toHaveFocus();
   await page.getByRole('tab', { name: 'Add Fonts' }).click();
   await expect.element(page.getByRole('button', { name: 'Upload fonts' })).toBeVisible();
   await settleAnimations();

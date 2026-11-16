@@ -91,8 +91,8 @@ def test_an_int8_weight_with_no_marker_is_refused() -> None:
 
 def test_a_scaled_fp8_layer_is_untouched_by_the_check() -> None:
     """The population this fold exists for. The guard keys on the int8 dtype, so an fp8 layer never
-    reaches it -- asserted, because a guard that fired here would break every Wan and Qwen-Image
-    scaled-fp8 checkpoint."""
+    reaches it -- asserted, because a guard that fired here would break every Qwen2.5-VL
+    encoder scaled-fp8 checkpoint."""
     payload = quantize_scaled_fp8(torch.randn(8, 16))
     state_dict = {"lin.weight": payload.codes, "lin.weight_scale": payload.scale}
 

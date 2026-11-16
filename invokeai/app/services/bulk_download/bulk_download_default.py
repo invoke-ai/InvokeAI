@@ -17,6 +17,11 @@ from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.misc import uuid_string
 
+# Board names may be far longer than a filename allows. The archive name is "<board name>_<uuid>.zip", which must stay
+# within the 255-byte filename limit and, on Windows without long paths, MAX_PATH including the temp-dir prefix. The
+# uuid keeps truncated names unique.
+MAX_BOARD_NAME_BYTES = 100
+
 
 class BulkDownloadService(BulkDownloadBase):
     def start(self, invoker: Invoker) -> None:
@@ -91,7 +96,9 @@ class BulkDownloadService(BulkDownloadBase):
         if board_id == "none":
             return "Uncategorized"
 
-        return self._clean_string_to_path_safe(self._invoker.services.board_records.get(board_id).board_name)
+        clean_name = self._clean_string_to_path_safe(self._invoker.services.board_records.get(board_id).board_name)
+        # Cut by UTF-8 bytes (the filesystem limit) without splitting a character; a cut can leave trailing spaces.
+        return clean_name.encode("utf-8")[:MAX_BOARD_NAME_BYTES].decode("utf-8", "ignore").rstrip()
 
     def _create_zip_file(self, image_dtos: list[ImageDTO], bulk_download_item_id: str) -> str:
         """
@@ -105,7 +112,7 @@ class BulkDownloadService(BulkDownloadBase):
 
         # Clients poll for the final name, so it must only appear once the archive is complete. The ".partial" name
         # fails get_path's ".zip" check, and the rename within the same folder is atomic. The temp name is short and
-        # independent of the item id: a board-derived id can already use the whole filename length limit.
+        # independent of the item id, so it never adds to the archive name's length.
         partial_path = self._bulk_downloads_folder / f"{uuid_string()}.zip.partial"
         try:
             with ZipFile(partial_path, "w") as zip_file:

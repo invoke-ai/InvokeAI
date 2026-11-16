@@ -17,7 +17,6 @@ import { RenameDialog } from '@platform/ui/RenameDialog';
 import { toaster } from '@platform/ui/toaster';
 import { QueueCircularProgress } from '@workbench/components/QueueProgressIndicator';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
-import { OpenProjectDialog } from '@workbench/projects/components';
 import { refreshProjectLibrary, renameLibraryProject, useProjectLibrarySelector } from '@workbench/projects/library';
 import { useProjectSyncAttention } from '@workbench/projects/syncStore';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
@@ -45,7 +44,7 @@ import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { projectSwitcherStore, setProjectSwitcherOpen } from './projectSwitcherStore';
-import { HIDE_BELOW_PROJECT_NAME_WIDTH, SHOW_BELOW_PROJECT_NAME_WIDTH } from './topbarBreakpoints';
+import { HIDE_BELOW_PROJECT_NAME_WIDTH } from './topbarBreakpoints';
 import { TopbarMenuChevron } from './TopbarMenuChevron';
 
 // The dialog reads the gallery's board query, and this host sits in a boot graph the performance gates pin by source
@@ -53,6 +52,12 @@ import { TopbarMenuChevron } from './TopbarMenuChevron';
 const LazyDeleteProjectDialog = lazy(() =>
   import('@workbench/projects/components/DeleteProjectDialog').then((module) => ({
     default: module.DeleteProjectDialog,
+  }))
+);
+// The project list's virtualized rows are not boot code either; loaded the first time Open Project is asked for.
+const LazyOpenProjectDialog = lazy(() =>
+  import('@workbench/projects/components/OpenProjectDialog').then((module) => ({
+    default: module.OpenProjectDialog,
   }))
 );
 // Modal from the request onward: while the dialog's module is still on its way, shortcuts must already be off.
@@ -79,8 +84,9 @@ export const ProjectSwitcher = () => {
   const returnFocus = useCallback(() => triggerRef.current, []);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
-  // Once mounted the dialog stays, so its close animation and the lazy chunk are paid for once.
+  // Once mounted a dialog stays, so its close animation and the lazy chunk are paid for once.
   const [hasRequestedDelete, setHasRequestedDelete] = useState(false);
+  const [hasRequestedOpenDialog, setHasRequestedOpenDialog] = useState(false);
   const [isOpenDialogVisible, setIsOpenDialogVisible] = useState(false);
 
   const isMenuOpen = projectSwitcherStore.useSelector((snapshot) => snapshot.isOpen);
@@ -106,7 +112,10 @@ export const ProjectSwitcher = () => {
   const createProject = useCallback(() => {
     projects.create();
   }, [projects]);
-  const showOpenDialog = useCallback(() => setIsOpenDialogVisible(true), []);
+  const showOpenDialog = useCallback(() => {
+    setHasRequestedOpenDialog(true);
+    setIsOpenDialogVisible(true);
+  }, []);
   const hideOpenDialog = useCallback(() => setIsOpenDialogVisible(false), []);
   const closeRenameDialog = useCallback(() => setRenameTarget(null), []);
   const closeDeleteDialog = useCallback(() => setDeleteTarget(null), []);
@@ -207,11 +216,12 @@ export const ProjectSwitcher = () => {
               { name: activeProjectName }
             )}
             className="group"
+            px="2"
             size="lg"
             variant="ghost"
             onContextMenu={handleTriggerContextMenu}
           >
-            <Icon as={FolderIcon} boxSize="4" css={SHOW_BELOW_PROJECT_NAME_WIDTH} flexShrink={0} />
+            <Icon as={isMenuOpen ? FolderOpenIcon : FolderIcon} boxSize="4" flexShrink={0} />
             <MiddleTruncate css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" text={activeProjectName} />
             {hasProjectNeedingAttention ? (
               <Icon as={TriangleAlertIcon} boxSize="3.5" color="fg.warning" flexShrink={0} />
@@ -310,11 +320,11 @@ export const ProjectSwitcher = () => {
           />
         </Suspense>
       ) : null}
-      {/*
-       * Keep the dialog mounted by open state; its lazyMount/unmountOnExit handle closed cost and preserve exit
-       * animation.
-       */}
-      <OpenProjectDialog isOpen={isOpenDialogVisible} onClose={hideOpenDialog} />
+      {hasRequestedOpenDialog ? (
+        <Suspense fallback={isOpenDialogVisible ? PENDING_DIALOG : null}>
+          <LazyOpenProjectDialog isOpen={isOpenDialogVisible} onClose={hideOpenDialog} />
+        </Suspense>
+      ) : null}
     </>
   );
 };
