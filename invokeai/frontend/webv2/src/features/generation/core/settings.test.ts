@@ -25,13 +25,14 @@ import {
   cloneGenerateWidgetValues,
   deriveAspectRatioId,
   getDefaultLoraWeight,
-  getModelDefaultVae,
-  hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isGenerateSettings,
   isValidMossImageSkipLayers,
+  MAX_REFERENCE_IMAGE_NAME_LENGTH,
   moveReferenceImage,
   normalizeGenerateSettings,
+  normalizeReferenceImages,
+  renameReferenceImage,
   parseMossImageSkipLayers,
   syncGenerateWidgetValuesWithModels,
   syncGenerateLorasWithModels,
@@ -540,6 +541,38 @@ describe('normalizeGenerateSettings', () => {
   });
 });
 
+describe('the FLUX.3 prompt upsampler settings', () => {
+  const upsampler = {
+    base: 'any',
+    key: 'pup',
+    name: 'FLUX.3 Prompt Upsampler',
+    supports_images: true,
+    type: 'text_llm',
+  };
+
+  it('defaults a project saved without them to off with no model, and keeps what a later one stored', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      flux3PromptUpsamplerEnabled: false,
+      flux3PromptUpsamplerModel: null,
+    });
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        flux3PromptUpsamplerEnabled: true,
+        flux3PromptUpsamplerModel: upsampler,
+      })
+    ).toMatchObject({ flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: upsampler });
+    // Only a real `true` turns it on, and a malformed model is dropped.
+    expect(
+      normalizeGenerateSettings({
+        ...legacyStoredValues,
+        flux3PromptUpsamplerEnabled: 'yes',
+        flux3PromptUpsamplerModel: { key: 'no-name' },
+      })
+    ).toMatchObject({ flux3PromptUpsamplerEnabled: false, flux3PromptUpsamplerModel: null });
+  });
+});
+
 describe('the Anima inpaint adapter settings', () => {
   it('defaults the weight, clamps it to the node bounds, and drops a malformed adapter', () => {
     expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
@@ -668,6 +701,16 @@ describe('Generate widget value snapshots', () => {
     expect(synced.qwen3EncoderModel).toBe(currentComponent);
     expect(synced.vae).toBe(currentVae);
     expect(synced.loras[0]?.model).toBe(currentLora);
+  });
+
+  it('refreshes the saved prompt upsampler from the catalog and clones it', () => {
+    const upsampler = { base: 'any', key: 'pup', name: 'Old Upsampler', type: 'text_llm' };
+    const saved = { ...values, flux3PromptUpsamplerModel: upsampler };
+    const renamed = { ...upsampler, name: 'Renamed' };
+
+    expect(syncGenerateWidgetValuesWithModels(saved, [model, renamed]).flux3PromptUpsamplerModel).toBe(renamed);
+    expect(cloneGenerateWidgetValues(saved).flux3PromptUpsamplerModel).toEqual(upsampler);
+    expect(cloneGenerateWidgetValues(saved).flux3PromptUpsamplerModel).not.toBe(upsampler);
   });
 
   it('notices a CPU Only change on the GGUF encoder and its tower, and the policy then blocks references', () => {
@@ -819,31 +862,6 @@ describe('LoRA settings helpers', () => {
   });
 });
 
-describe('model defaults', () => {
-  it('uses shared VAE compatibility for cross-base default VAEs', () => {
-    const zImageModel: MainModelConfig = {
-      base: 'z-image',
-      default_settings: { vae: 'flux-vae' },
-      key: 'z-image',
-      name: 'Z-Image',
-      type: 'main',
-    };
-    const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
-
-    expect(getModelDefaultVae(zImageModel, [fluxVae])).toBe(fluxVae);
-  });
-
-  it('distinguishes absent VAE defaults from explicit VAE defaults', () => {
-    expect(hasModelDefaultVae({ base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' })).toBe(false);
-    expect(
-      hasModelDefaultVae({ base: 'sdxl', default_settings: { vae: null }, key: 'sdxl', name: 'SDXL', type: 'main' })
-    ).toBe(false);
-    expect(
-      hasModelDefaultVae({ base: 'sdxl', default_settings: { vae: 'vae' }, key: 'sdxl', name: 'SDXL', type: 'main' })
-    ).toBe(true);
-  });
-});
-
 describe('dimension helpers', () => {
   it('derives the closest preset aspect ratio', () => {
     expect(deriveAspectRatioId(1024, 1024)).toBe('1:1');
@@ -906,6 +924,59 @@ describe('dimension helpers', () => {
     expect(moveReferenceImage(referenceImages, 'c', 1)).toBe(referenceImages);
     expect(moveReferenceImage(referenceImages, 'missing', 1)).toBe(referenceImages);
     expect(moveReferenceImage([], 'a', 1)).toEqual([]);
+  });
+
+  it('keeps a reference name through normalizing, trimmed and capped, and drops one that is empty or not text', () => {
+    const config = { image: null, type: 'flux2_reference_image' as const };
+    const long = `${'é'.repeat(MAX_REFERENCE_IMAGE_NAME_LENGTH)}tail`;
+    const [named, untouched, blank, wrongType, capped] = normalizeReferenceImages([
+      { config, id: 'named', isEnabled: true, name: '  Hero pose  ' },
+      { config, id: 'untouched', isEnabled: true },
+      { config, id: 'blank', isEnabled: true, name: '   ' },
+      { config, id: 'wrong-type', isEnabled: true, name: 7 },
+      { config, id: 'capped', isEnabled: true, name: long },
+    ]);
+
+    expect(named?.name).toBe('Hero pose');
+    // Data without names reads back exactly as before, with no name key added.
+    expect(untouched).toEqual({ config, id: 'untouched', isEnabled: true });
+    expect(blank && 'name' in blank).toBe(false);
+    expect(wrongType && 'name' in wrongType).toBe(false);
+    expect(capped?.name).toBe('é'.repeat(80));
+  });
+
+  it('renames one reference, storing nothing for an empty name or any positional default', () => {
+    const config = { image: null, type: 'flux2_reference_image' as const };
+    const referenceImages = [
+      { config, id: 'a', isEnabled: true },
+      { config, id: 'b', isEnabled: false, name: 'Palette' },
+    ];
+    const isDefaultName = (name: string) => /^reference image \d+$/i.test(name);
+
+    const renamed = renameReferenceImage(referenceImages, 'a', ' Hero pose ', isDefaultName);
+    expect(renamed[0]).toEqual({ config, id: 'a', isEnabled: true, name: 'Hero pose' });
+    expect(renamed[1]).toBe(referenceImages[1]);
+
+    // Its own default, another row's default, or nothing: the row keeps following its position.
+    for (const cleared of ['', '   ', 'Reference image 2', 'Reference image 1', 'reference image 7']) {
+      const result = renameReferenceImage(referenceImages, 'b', cleared, isDefaultName);
+      expect(result[1]).toEqual({ config, id: 'b', isEnabled: false });
+      expect(result[1] && 'name' in result[1]).toBe(false);
+    }
+
+    // The cap is in characters (code points), whatever the field allowed.
+    const long = renameReferenceImage(
+      referenceImages,
+      'a',
+      '😀'.repeat(MAX_REFERENCE_IMAGE_NAME_LENGTH + 5),
+      isDefaultName
+    );
+    expect(Array.from(long[0]?.name ?? '')).toHaveLength(MAX_REFERENCE_IMAGE_NAME_LENGTH);
+
+    // No change, or no such reference, returns the same array so callers can skip the commit.
+    expect(renameReferenceImage(referenceImages, 'b', 'Palette ', isDefaultName)).toBe(referenceImages);
+    expect(renameReferenceImage(referenceImages, 'a', 'Reference image 1', isDefaultName)).toBe(referenceImages);
+    expect(renameReferenceImage(referenceImages, 'missing', 'Name', isDefaultName)).toBe(referenceImages);
   });
 
   it('uses larger dimension grids for model families that require them', () => {

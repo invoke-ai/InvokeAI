@@ -189,6 +189,7 @@ const workflowRequest: QueueEnqueueWorkflowRequest = {
 interface Harness {
   activeProgressTarget: {
     clear: ReturnType<typeof vi.fn>;
+    markFramed: ReturnType<typeof vi.fn>;
     set: ReturnType<typeof vi.fn>;
     settle: ReturnType<typeof vi.fn>;
   };
@@ -268,7 +269,12 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
     started: vi.fn(),
   };
   const progressImage = { bindSwapImages: vi.fn(), clear: vi.fn(), clearHeld: vi.fn(), hold: vi.fn(), set: vi.fn() };
-  const activeProgressTarget = { clear: vi.fn(), set: vi.fn(), settle: vi.fn() } satisfies ActiveProgressTargetSink;
+  const activeProgressTarget = {
+    clear: vi.fn(),
+    markFramed: vi.fn(),
+    set: vi.fn(),
+    settle: vi.fn(),
+  } satisfies ActiveProgressTargetSink;
   const hub = createSocketHub({ createSocket: () => socket });
 
   hub.connect();
@@ -643,6 +649,74 @@ describe('queueCoordinator', () => {
 
     expect(harness.activeProgressTarget.set).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
     expect(harness.progressImage.set).not.toHaveBeenCalled();
+    expect(harness.activeProgressTarget.markFramed).not.toHaveBeenCalled();
+  });
+
+  it("signals each slot's first frame of its own once, after the frame is stored", async () => {
+    harness.callbacks.onFirstProgressFrame = vi.fn(() => {
+      // Live surfaces follow the slot from here; its frame must already be there to show.
+      expect(harness.progressImage.set).toHaveBeenCalled();
+    });
+    harness.coordinator.connect();
+    harness.api.enqueueGenerate.mockResolvedValueOnce({
+      batchId: 'batch-1',
+      enqueued: 2,
+      itemIds: [1, 2],
+      requested: 2,
+    });
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const frame = (itemId: number, revision: number) => ({
+      ...createStatusEvent({ item_id: itemId }),
+      image: { dataURL: `data:image/png;base64,${itemId}-${revision}`, height: 32, width: 64 },
+      message: 'Denoising',
+      percentage: 0.5,
+      revision,
+    });
+
+    // Model loading and text encoding report progress without a frame.
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 1 }),
+      message: 'Loading',
+      percentage: null,
+    });
+    expect(harness.callbacks.onFirstProgressFrame).not.toHaveBeenCalled();
+
+    harness.socket.fire('invocation_progress', frame(1, 1));
+    harness.socket.fire('invocation_progress', frame(1, 2));
+    harness.socket.fire('invocation_progress', frame(2, 1));
+
+    expect(harness.callbacks.onFirstProgressFrame).toHaveBeenCalledTimes(2);
+    expect(harness.callbacks.onFirstProgressFrame).toHaveBeenNthCalledWith(1, { itemIndex: 1, queueItemId: 'local-1' });
+    expect(harness.callbacks.onFirstProgressFrame).toHaveBeenNthCalledWith(2, { itemIndex: 2, queueItemId: 'local-1' });
+    expect(harness.activeProgressTarget.markFramed.mock.calls).toEqual([
+      [{ itemIndex: 1, queueItemId: 'local-1' }],
+      [{ itemIndex: 2, queueItemId: 'local-1' }],
+    ]);
+  });
+
+  it('signals a first frame again for a slot sent back to the queue, whose frames start a new leg', async () => {
+    harness.callbacks.onFirstProgressFrame = vi.fn();
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const frame = (session: string) => ({
+      ...createStatusEvent({ item_id: 1, session_id: session }),
+      image: { dataURL: `data:image/png;base64,${session}`, height: 32, width: 64 },
+      message: 'Denoising',
+      percentage: 0.5,
+      revision: 1,
+    });
+
+    harness.socket.fire('invocation_progress', frame('first-leg'));
+    // Requeued (a server restart puts it back): the slot is cleared and shows nothing of its own until its next frame.
+    harness.socket.fire(
+      'queue_item_status_changed',
+      createStatusEvent({ item_id: 1, status: 'pending', status_sequence: 2 })
+    );
+    expect(harness.activeProgressTarget.clear).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
+    harness.socket.fire('invocation_progress', frame('second-leg'));
+
+    expect(harness.callbacks.onFirstProgressFrame).toHaveBeenCalledTimes(2);
+    expect(harness.activeProgressTarget.markFramed).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the followed slot and its last frame across a connection drop', async () => {

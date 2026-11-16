@@ -8,11 +8,13 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { getGalleryUploadAccept, legacyGeneratedImageToGalleryItem } from '@features/gallery/core/items';
 import { GalleryUiProvider } from '@features/gallery/react';
 import { GalleryHostProvider } from '@features/gallery/ui/GalleryUiContext';
+import { Row } from '@platform/ui/Row';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { getGalleryPickerSelectionAfterPick, type GalleryPickerSelection } from './galleryPicker';
 import { GalleryPickerPopover } from './GalleryPickerPopover';
@@ -301,6 +303,39 @@ afterEach(async () => {
 });
 
 describe('GalleryPickerPopover', () => {
+  it('keeps its trigger in the hover look while the picker is open, and lets it go on close', async () => {
+    // A list-row trigger, as Generate's "Add reference image" is: its hover look is the row fill.
+    const trigger = await renderPicker(
+      <GalleryPickerPopover accept={['image']} label="Choose image" onPick={onPick}>
+        <Row asChild>
+          <button type="button">Choose image</button>
+        </Row>
+      </GalleryPickerPopover>
+    );
+    // Read once the row's background transition has finished, so no reading is a frame between two looks.
+    const background = async () => {
+      await vi.waitFor(() => expect(trigger.getAnimations()).toHaveLength(0));
+      return getComputedStyle(trigger).backgroundColor;
+    };
+    const resting = await background();
+
+    await userEvent.hover(trigger);
+    const hovered = await background();
+    expect(hovered).not.toBe(resting);
+    await userEvent.unhover(trigger);
+    expect(await background()).toBe(resting);
+
+    await act(() => trigger.click());
+    await vi.waitFor(() => expect(document.querySelector(OPEN_DIALOG)).not.toBeNull());
+    expect(trigger.hasAttribute('data-hover')).toBe(true);
+    expect(await background()).toBe(hovered);
+
+    await act(() => userEvent.keyboard('{Escape}'));
+    await vi.waitFor(() => expect(document.querySelector(OPEN_DIALOG)).toBeNull());
+    expect(trigger.hasAttribute('data-hover')).toBe(false);
+    expect(await background()).toBe(resting);
+  });
+
   it('opens with the search focused and the gallery selection ready to pick with Enter', async () => {
     const { dialog, trigger } = await openPicker();
     const input = getSearchInput(dialog);
@@ -878,6 +913,20 @@ describe('GalleryPickerPopover', () => {
       expect(getOptions(dialog).map((option) => option.dataset.itemKey)).toEqual(['image:loose.png'])
     );
     expect(galleryCommands.selectBoard).not.toHaveBeenCalled();
+  });
+
+  // Popover content sets a larger text style than the workbench body the Gallery widget's rows sit in.
+  it("lists boards at the Gallery widget's board label size", async () => {
+    const { dialog } = await openPicker();
+
+    await act(() => dialog.querySelector<HTMLButtonElement>('[aria-expanded]')?.click());
+    const label = await vi.waitFor(() => {
+      const found = getBoardRow(dialog, 'Dogs')?.querySelector('p');
+      expect(found).toBeTruthy();
+      return found!;
+    });
+
+    expect(getComputedStyle(label).fontSize).toBe(getComputedStyle(document.body).fontSize);
   });
 
   // Assert video acceptance through the rendered picker; the regression was view wiring rather than the

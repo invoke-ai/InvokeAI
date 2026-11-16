@@ -77,9 +77,6 @@ class ExecutionEngineRuntime(BaseModel):
         except KeyError as exc:
             raise KeyError(f"stream not registered: {stream_id}") from exc
 
-    def replace_stream(self, stream: StreamBuffer[Any]) -> None:
-        self.streams[stream.stream_id] = stream
-
     def remove_stream(self, stream_id: str) -> None:
         self.streams.pop(stream_id, None)
 

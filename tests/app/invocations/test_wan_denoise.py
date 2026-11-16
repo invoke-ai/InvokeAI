@@ -9,7 +9,9 @@ runner. End-to-end tests against real Wan checkpoints are gated behind
 
 from __future__ import annotations
 
+import gc
 import os
+import weakref
 from collections import Counter
 from contextlib import contextmanager
 from pathlib import Path
@@ -1582,3 +1584,53 @@ class TestWanVideoDenoiseMultiFrame:
             num_latent_frames=t_lat,
         )
         assert torch.allclose(latents[:, :, 1:], expected_noise[:, :, 1:], atol=1e-5)
+
+
+@pytest.mark.parametrize("invocation_type", ["image", "video"])
+def test_outgoing_expert_is_collectable_when_the_denoise_loop_loads_the_next(
+    invocation_type: str, fake_model_root: Path
+) -> None:
+    """The loop's own `transformer` local would keep the high-noise expert alive through the low-noise
+    load, so both experts would be resident during every swap."""
+    ctx = _build_context(
+        nn.Identity(),
+        transformer_low=nn.Identity(),
+        variant=WanVariantType.T2V_A14B,
+        model_root=fake_model_root,
+        pos_cond=_make_conditioning(),
+        neg_cond=None,
+    )
+    high_ref: list[weakref.ref] = []
+    outgoing_collected: list[bool] = []
+
+    def load(model_id) -> MagicMock:
+        if str(getattr(model_id, "submodel_type", None)) == "SubModelType.Transformer2":
+            gc.collect()
+            outgoing_collected.append(high_ref[0]() is None)
+            expert = _ZeroTransformer(label="low")
+        else:
+            expert = _ZeroTransformer(label="high")
+            high_ref.append(weakref.ref(expert))
+        loaded = _make_loaded_model(expert)
+        # A plain int, as on the real LoadedModel: a mock attribute would point back at `loaded`.
+        loaded.weight_bytes = 0
+        return loaded
+
+    ctx.models.load.side_effect = load
+    field = _wan_transformer_field(dual=True, boundary_ratio=0.5)
+    if invocation_type == "image":
+        inv = _make_invocation(
+            field,
+            WanConditioningField(conditioning_name="pos"),
+            None,
+            width=64,
+            height=64,
+            steps=6,
+            guidance_scale=1.0,
+        )
+    else:
+        inv = _make_video_invocation(transformer_field=field, num_frames=5, steps=6)
+
+    inv._run_diffusion(ctx)
+
+    assert outgoing_collected == [True]

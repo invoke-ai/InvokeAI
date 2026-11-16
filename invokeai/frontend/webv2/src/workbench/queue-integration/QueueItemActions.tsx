@@ -1,15 +1,21 @@
 import type { QueueItemReadModel } from '@features/queue/contracts';
 import type { QueueItemDetailReadModel } from '@features/queue/react';
 
-import { ButtonGroup, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { ButtonGroup, Icon, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useQueueItemDetail } from '@features/queue/react';
 import { Button, CloseButton } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { JsonPreview } from '@platform/ui/JsonPreview';
+import { MenuContent } from '@platform/ui/Menu';
 import { Tabs } from '@platform/ui/Tabs';
-import { FileTextIcon, TriangleAlertIcon } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { getImageRecallVerb } from '@workbench/image-actions';
+import { ChevronDownIcon, FileTextIcon, TriangleAlertIcon } from 'lucide-react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { readQueueItemRecallInput } from './queueRecall';
+import { QueueRecallMenuGroup } from './QueueRecallMenuGroup';
+import { useQueueItemRecall } from './useQueueItemRecall';
 
 type DetailView = 'error' | 'graph' | 'item' | 'results' | 'workflow';
 
@@ -149,6 +155,55 @@ const QueueItemDetailBody = ({ item, open }: { item: QueueItemReadModel; open: b
   );
 };
 
+/** Recall for one item, read only while its row is expanded or its menu is open. */
+const useItemRecall = (item: QueueItemReadModel) => {
+  const { isNonGenerateRun, meta } = useMemo(() => readQueueItemRecallInput(item), [item]);
+
+  return useQueueItemRecall(item.origin, meta, { isNonGenerateRun });
+};
+
+/** The queue row context menu's recall entries. */
+export const QueueItemRecallMenuGroup = ({ item }: { item: QueueItemReadModel }) => (
+  <QueueRecallMenuGroup recall={useItemRecall(item)} />
+);
+
+/** Recall all leads, as the A key does on the row; the menu holds every recall verb. */
+const QueueItemRecallActions = ({ item }: { item: QueueItemReadModel }) => {
+  const { t } = useTranslation();
+  const recall = useItemRecall(item);
+  const recallAll = getImageRecallVerb('all', t);
+  const allReason = recall.reasons.all;
+  const onRecallAll = useCallback(() => void recall.recall('all'), [recall]);
+
+  return (
+    <>
+      <Button
+        disabled={!recall.capabilities.all}
+        unavailableReason={allReason ? t(allReason) : undefined}
+        onClick={onRecallAll}
+      >
+        <Icon as={recallAll.icon} boxSize="3" />
+        {recallAll.label}
+      </Button>
+      <Menu.Root lazyMount unmountOnExit>
+        <Menu.Trigger asChild>
+          <Button>
+            {t('widgets.canvas.staging.recall')}
+            <Icon as={ChevronDownIcon} boxSize="3" />
+          </Button>
+        </Menu.Trigger>
+        <Portal>
+          <Menu.Positioner>
+            <MenuContent minW="13rem" py="1">
+              <QueueRecallMenuGroup recall={recall} />
+            </MenuContent>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
+    </>
+  );
+};
+
 export const QueueItemActions = ({ item }: { item: QueueItemReadModel }) => {
   const { t } = useTranslation();
   const [jsonOpen, setJsonOpen] = useState(false);
@@ -160,6 +215,7 @@ export const QueueItemActions = ({ item }: { item: QueueItemReadModel }) => {
   return (
     <>
       <ButtonGroup flexWrap="wrap" minW="0" rowGap="1" size="sm" variant="subtle">
+        <QueueItemRecallActions item={item} />
         <Button onClick={openJson}>
           <Icon as={isFailed ? TriangleAlertIcon : FileTextIcon} boxSize="3" />
           {isFailed ? t('widgets.queue.viewError') : t('common.viewJson')}

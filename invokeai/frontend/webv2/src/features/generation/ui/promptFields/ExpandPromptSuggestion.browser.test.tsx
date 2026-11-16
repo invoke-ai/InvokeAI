@@ -5,6 +5,7 @@ import type { ChangeEvent } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
+import { getImageExpandPromptSuggestion } from '@features/generation/core/baseGenerationPolicies';
 import { expandPrompt, imageToPrompt } from '@features/generation/data/promptUtilities';
 import { PositivePromptField } from '@features/generation/ui/promptFields/PositivePromptField';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -62,6 +63,28 @@ const MOSS_SUGGESTION: ExpandPromptSuggestion = {
   systemPromptId: MOSS_PROMPT_ID,
 };
 
+const FLUX3_PROMPT_ID = '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0012';
+// The suggestion the real policy hands Expand Prompt for a FLUX.3 main model.
+const FLUX3_SUGGESTION = getImageExpandPromptSuggestion({
+  base: 'flux3',
+  key: 'klein',
+  name: 'FLUX.3 Klein',
+  type: 'main',
+} as never)!;
+const FLUX3_FOLDER = {
+  ...ENHANCER,
+  key: 'pup-bf16',
+  name: 'FLUX.3 Prompt Upsampler',
+  source: 'black-forest-labs/flux-3-image-klein-pup',
+};
+const FLUX3_COMFY_FILE = {
+  ...ENHANCER,
+  key: 'pup-int8',
+  name: 'FLUX.3 Prompt Upsampler (int8)',
+  source:
+    'https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/feef60b0/text_encoders/qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors',
+};
+
 const prompt = (id: string, content: string) => ({
   content,
   id,
@@ -78,6 +101,7 @@ const PROMPTS = [
   prompt('t2v', 'T2V'),
   prompt('i2v', 'I2V'),
   prompt(MOSS_PROMPT_ID, 'MOSS'),
+  prompt(FLUX3_PROMPT_ID, 'FLUX3'),
 ];
 
 const FRAME = { height: 512, image_name: 'frame.png', width: 768 };
@@ -698,4 +722,28 @@ it("starts another project from its own saved Image to Prompt model, not the pre
 
   await act(() => renderField(null, savedModels({ imageToPromptModelKey: 'llava-a' }), undefined, 'project-2'));
   expect(select('text llm')?.value).toBe('llava-a');
+});
+
+it.each([
+  ['the bf16 folder', FLUX3_FOLDER],
+  ["ComfyUI's int8 file", FLUX3_COMFY_FILE],
+])(
+  'preselects the FLUX.3 prompt upsampler installed as %s and rewrites text-only with its system prompt',
+  async (_, model) => {
+    catalog = [TEXT_ONLY, ENHANCER, model];
+    await renderAndOpen(FLUX3_SUGGESTION, savedModels());
+
+    expect(select('text llm')?.value).toBe(model.key);
+    expect(document.body.textContent).not.toContain('is not installed');
+    const request = await runExpand();
+    expect(request).toMatchObject({ model_key: model.key, system_prompt: 'FLUX3' });
+    expect(request.image_name).toBeUndefined();
+  }
+);
+
+it('points to the FLUX.3 Prompt Upsampler starter model when neither build is installed', async () => {
+  await renderAndOpen(FLUX3_SUGGESTION, savedModels({ expandPromptModelKey: 'e2b' }));
+
+  expect(select('text llm')?.value).toBe('e2b');
+  expect(document.body.textContent).toContain('FLUX.3 Prompt Upsampler is not installed');
 });

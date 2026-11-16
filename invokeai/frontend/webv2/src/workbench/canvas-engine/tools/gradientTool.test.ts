@@ -1,10 +1,11 @@
+import type { CanvasEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { layerContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import { describe, expect, it, vi } from 'vitest';
@@ -67,6 +68,7 @@ interface StructuralCommit {
 const createHarness = (doc: CanvasDocumentContractV3) => {
   const dispatched: CanvasProjectMutation[] = [];
   const commits: StructuralCommit[] = [];
+  const refusals: CanvasEditRefusal[] = [];
   const stores = createEngineStores();
   let idCounter = 0;
   const ctx: ToolContext = {
@@ -85,13 +87,14 @@ const createHarness = (doc: CanvasDocumentContractV3) => {
     invalidate: vi.fn(),
     layers: null as never,
     notifyLayerPainted: vi.fn(),
+    reportEditRefusal: (refusal) => refusals.push(refusal),
     setLayerTransformOverride: vi.fn(),
     setOverlayCursor: vi.fn(),
     stores,
     updateCursor: vi.fn(),
     viewport: identityViewport,
   };
-  return { commits, ctx, dispatched, previewOf: () => stores.gradientPreview.get(), stores };
+  return { commits, ctx, dispatched, previewOf: () => stores.gradientPreview.get(), refusals, stores };
 };
 
 const down = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerDown?.(ctx, i);
@@ -245,19 +248,35 @@ describe('gradient tool: edit selected gradient layer', () => {
     }
   });
 
-  it('is a no-op when the selected gradient layer is locked', () => {
-    const layer = gradientLayer({ isLocked: true });
+  it.each([
+    ['locked', { isLocked: true }, 'layer-locked'],
+    ['hidden', { isEnabled: false }, 'layer-hidden'],
+  ] as const)('refuses a %s selected gradient at the press, drawing no preview', (_, overrides, status) => {
+    const layer = gradientLayer(overrides);
     const doc = makeDoc({ stacks: stacksFrom([layer]), selectedLayerId: 'grad-existing' });
     const h = createHarness(doc);
     const tool = createGradientTool();
 
+    expect(tool.cursor?.(h.ctx)).toBe('not-allowed');
     down(tool, h.ctx, pointer(0, 0));
+    expect(h.refusals).toEqual([{ layerId: 'grad-existing', layerName: layer.name, status }]);
     move(tool, h.ctx, pointer(100, 0));
+    expect(h.previewOf()).toBeNull();
     up(tool, h.ctx, pointer(100, 0));
 
+    expect(h.refusals).toHaveLength(1);
     expect(h.commits).toHaveLength(0);
     expect(h.dispatched).toHaveLength(0);
-    expect(h.previewOf()).toBeNull();
+  });
+
+  it('shows the crosshair over an editable gradient or any other selection', () => {
+    const tool = createGradientTool();
+    expect(
+      tool.cursor?.(
+        createHarness(makeDoc({ stacks: stacksFrom([gradientLayer()]), selectedLayerId: 'grad-existing' })).ctx
+      )
+    ).toBe('crosshair');
+    expect(tool.cursor?.(createHarness(makeDoc()).ctx)).toBe('crosshair');
   });
 
   it("reads the drag in the layer's local space when it is moved, scaled and rotated", () => {
@@ -329,6 +348,38 @@ describe('gradient tool: edit selected gradient layer', () => {
     move(tool, h.ctx, pointer(50, 50));
     up(tool, h.ctx, pointer(50, 50));
 
+    expect(h.commits[0]?.forward.type).toBe('addCanvasLayer');
+  });
+
+  it.each([
+    ['an inpaint mask', 'inpaint_mask'],
+    ['a regional guidance layer', 'regional_guidance'],
+  ] as const)('refuses at the press with %s selected, adding no layer', (_, type) => {
+    const doc = makeDoc({ stacks: stacksFrom([layerContract('mask-1', type)]), selectedLayerId: 'mask-1' });
+    const h = createHarness(doc);
+    const tool = createGradientTool();
+
+    expect(tool.cursor?.(h.ctx)).toBe('not-allowed');
+    down(tool, h.ctx, pointer(0, 0));
+    move(tool, h.ctx, pointer(50, 50));
+    up(tool, h.ctx, pointer(50, 50));
+
+    expect(h.refusals).toEqual([{ layerId: 'mask-1', layerName: 'mask-1', status: 'gradient-unsupported' }]);
+    expect(h.previewOf()).toBeNull();
+    expect(h.commits).toHaveLength(0);
+    expect(h.dispatched).toHaveLength(0);
+  });
+
+  it('still adds a raster gradient with a control layer selected', () => {
+    const doc = makeDoc({ stacks: stacksFrom([layerContract('control-1', 'control')]), selectedLayerId: 'control-1' });
+    const h = createHarness(doc);
+    const tool = createGradientTool();
+
+    down(tool, h.ctx, pointer(0, 0));
+    move(tool, h.ctx, pointer(50, 50));
+    up(tool, h.ctx, pointer(50, 50));
+
+    expect(h.refusals).toEqual([]);
     expect(h.commits[0]?.forward.type).toBe('addCanvasLayer');
   });
 });

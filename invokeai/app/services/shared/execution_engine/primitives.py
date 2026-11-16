@@ -418,7 +418,7 @@ class StreamBuffer(_InternalModel, Generic[T]):
         return self.model_dump(mode="json") == other.model_dump(mode="json")
 
 
-ContinuationStatus = Literal["pending", "waiting", "running", "completed", "failed", "cancelled"]
+ContinuationStatus = Literal["pending", "waiting", "running", "completed", "failed", "canceled"]
 
 
 class ContinuationRecord(_InternalModel, Generic[T]):
@@ -459,7 +459,7 @@ class ContinuationRecord(_InternalModel, Generic[T]):
 
     @property
     def terminal(self) -> bool:
-        return self.status in ("completed", "failed", "cancelled")
+        return self.status in ("completed", "failed", "canceled")
 
     def assert_scope(self, owner_id: str, frame: ExecutionFrame) -> None:
         if owner_id != self.owner_id:
@@ -480,12 +480,12 @@ class ContinuationRecord(_InternalModel, Generic[T]):
             _validate_name(error)
         _validate_json_value(result)
         allowed: dict[ContinuationStatus, frozenset[ContinuationStatus]] = {
-            "pending": frozenset({"waiting", "running", "failed", "cancelled"}),
-            "waiting": frozenset({"running", "failed", "cancelled"}),
-            "running": frozenset({"completed", "failed", "cancelled"}),
+            "pending": frozenset({"waiting", "running", "failed", "canceled"}),
+            "waiting": frozenset({"running", "failed", "canceled"}),
+            "running": frozenset({"completed", "failed", "canceled"}),
             "completed": frozenset(),
             "failed": frozenset(),
-            "cancelled": frozenset(),
+            "canceled": frozenset(),
         }
 
         with self._lock:
@@ -494,8 +494,8 @@ class ContinuationRecord(_InternalModel, Generic[T]):
                     raise ValueError("completed continuation has conflicting result")
                 if status == "failed" and self.error != error:
                     raise ValueError("failed continuation has conflicting error")
-                if status == "cancelled" and self.error != error:
-                    raise ValueError("cancelled continuation has conflicting error")
+                if status == "canceled" and self.error != error:
+                    raise ValueError("canceled continuation has conflicting error")
                 return False
             if status not in allowed[self.status]:
                 if self.terminal:
@@ -531,7 +531,7 @@ class ContinuationRecord(_InternalModel, Generic[T]):
         return self.transition("failed", error=error)
 
     def cancel(self, reason: str | None = None) -> bool:
-        return self.transition("cancelled", error=reason)
+        return self.transition("canceled", error=reason)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ContinuationRecord):

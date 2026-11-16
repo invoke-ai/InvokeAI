@@ -1,4 +1,7 @@
+import { createMenuPartLoader } from '@platform/ui/Menu';
+
 import type { QueueLocalRun, QueueUiAdapter } from './QueueUiContext';
+import type { QueueWidgetRuntime } from './QueueWidgetView';
 
 const noLoadingModel = { getLabel: (): string | null => null, subscribe: () => () => undefined };
 
@@ -16,12 +19,14 @@ export const createTestQueueUiAdapter = (overrides: Partial<QueueUiAdapter> = {}
   cancelLocalRuns: () => undefined,
   isConnected: true,
   isProjectOpen: () => true,
+  itemRecallMenuGroup: createMenuPartLoader(() => Promise.resolve(() => null)),
   loadingModel: noLoadingModel,
   localRuns: [],
   notify: { error: () => undefined, info: () => undefined, success: () => undefined },
   openQueue: () => undefined,
   preloadItemActions: () => undefined,
   queueJobsScope: 'all',
+  recallAllFromItem: () => undefined,
   viewer: 'single',
   ...overrides,
 });
@@ -34,4 +39,9 @@ export const createTestLocalRun = (overrides: Partial<QueueLocalRun> = {}): Queu
   retry: null,
   submittedAt: 0,
   ...overrides,
+});
+
+/** A widget runtime that takes registrations and runs nothing. */
+export const createTestQueueWidgetRuntime = (): QueueWidgetRuntime => ({
+  commands: { register: () => () => undefined },
 });

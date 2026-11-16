@@ -92,8 +92,25 @@ def build_flux3_layout_prompt(prompt: str, regions: Sequence[Flux3LayoutRegion],
     """
     if not regions:
         return prompt
+    caption, rows = flux3_locked_rows(prompt, regions, edit_targets=edit_targets)
+    return f"{caption} {json.dumps(rows, ensure_ascii=False)}"
 
+
+def flux3_locked_rows(
+    prompt: str, regions: Sequence[Flux3LayoutRegion], *, edit_targets: bool = False
+) -> tuple[str, list[dict[str, Any]]]:
+    """``(caption, rows)``: the box table ``build_flux3_layout_prompt`` appends to the caption, as rows.
+
+    The rows are those of a box table that ends the prompt, kept as they are, then one row per region, written and
+    numbered as ``build_flux3_layout_prompt`` does. Unlike it, a prompt that ends with a box table has rows without
+    regions. The caption is stripped when there are rows; a prompt with neither table nor regions comes back unchanged
+    with no rows.
+
+    Raises ValueError when there are rows and the caption is blank: the boxes place parts of the scene it describes.
+    """
     found = _detect_box_table(prompt)
+    if found is None and not regions:
+        return prompt, []
     caption, rows = found if found is not None else (prompt, [])
     caption = caption.strip()
     if not caption:
@@ -110,7 +127,7 @@ def build_flux3_layout_prompt(prompt: str, regions: Sequence[Flux3LayoutRegion],
             )
         else:
             rows.append({"id": row_id, "bbox": region.bbox, "desc": region.desc})
-    return f"{caption} {json.dumps(rows, ensure_ascii=False)}"
+    return caption, rows
 
 
 def _detect_box_table(prompt: str) -> tuple[str, list[dict[str, Any]]] | None:

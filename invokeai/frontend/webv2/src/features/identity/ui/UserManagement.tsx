@@ -1,9 +1,9 @@
-import { Avatar, Badge, Box, Center, Flex, HStack, Spinner, Stack, Switch, Table, Text } from '@chakra-ui/react';
+import { Avatar, Badge, Box, Center, HStack, Spinner, Stack, Switch, Table, Text } from '@chakra-ui/react';
 import { deleteUser, listUsers, updateUser, type UserDTO } from '@features/identity/data/api';
 import { useAuthSession } from '@features/identity/session';
 import { useIdentityNotify } from '@features/identity/ui/useIdentityNotify';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { Button, IconButton, ConfirmDialog, Scrollable, Tooltip } from '@platform/ui';
+import { Button, IconButton, ConfirmDialog, Tooltip } from '@platform/ui';
 import { BrushCleaningIcon, PencilIcon, Trash2Icon, UserPlusIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,18 +14,10 @@ const ROW_HOVER_STYLES = { bg: 'bg.muted' };
 const SWITCH_CHECKED_STYLES = { bg: 'accent.solid' };
 const DELETE_BUTTON_HOVER_STYLES = { color: 'fg.error' };
 
-/** Guard admin access inline as well as in the widget manifest to cover stale persisted layouts. */
-export const UserManagement = () => {
-  const { t } = useTranslation();
-
-  return (
-    <Scrollable flex="1" h="full" label={t('users.management')}>
-      <UsersManagementPanel />
-    </Scrollable>
-  );
-};
-
-/** `onManageIntermediates` is supplied by the shell that owns the intermediates manager's home. */
+/**
+ * The account directory, under a page header that names it. Admin access is checked here as well as by the host.
+ * `onManageIntermediates` is supplied by the shell that owns the intermediates manager's home.
+ */
 export const UsersManagementPanel = ({
   onManageIntermediates,
 }: {
@@ -112,75 +104,68 @@ const UsersDirectory = ({
 
   return (
     <>
-      <Flex justify="center" px="4" py="6" w="full">
-        <Stack gap="4" w="full">
-          <HStack align="flex-start" justify="space-between">
-            <Stack gap="0.5">
-              <Text fontSize="xl" fontWeight="700">
-                {t('users.title')}
-              </Text>
-              <Text color="fg.muted" fontSize="md">
-                {users ? t('users.accountCount', { count: users.length }) : t('users.description')}
-              </Text>
-            </Stack>
-            <Button variant="solid" onClick={openCreateForm}>
-              <UserPlusIcon />
-              {t('users.addUser')}
-            </Button>
-          </HStack>
-          <Box bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" overflowX="auto" rounded="lg">
-            {users === null ? (
-              <Center minH="40">
-                {loadError ? (
-                  <Stack align="center" gap="2" p="4">
-                    <Text color="fg.error" fontSize="md" textAlign="center">
-                      {loadError}
-                    </Text>
-                    <Button variant="outline" onClick={retryLoad}>
-                      {t('common.retry')}
-                    </Button>
-                  </Stack>
-                ) : (
-                  <Spinner color="fg.muted" size="lg" />
-                )}
-              </Center>
-            ) : (
-              <Table.Root minW="42rem">
-                <Table.Header>
-                  <Table.Row bg="bg.muted">
-                    <Table.ColumnHeader borderColor="border.subtle" color="fg.muted" ps="4">
-                      {t('users.user')}
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader borderColor="border.subtle" color="fg.muted">
-                      {t('users.role')}
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader borderColor="border.subtle" color="fg.muted">
-                      {t('users.lastSignIn')}
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader borderColor="border.subtle" color="fg.muted">
-                      {t('common.active')}
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader borderColor="border.subtle" pe="4" />
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {users.map((user) => (
-                    <UserRow
-                      onManageIntermediates={onManageIntermediates}
-                      key={user.user_id}
-                      isSelf={user.user_id === currentUserId}
-                      setDeleteTarget={setDeleteTarget}
-                      setFormTarget={setFormTarget}
-                      setUserActive={setUserActive}
-                      user={user}
-                    />
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            )}
-          </Box>
-        </Stack>
-      </Flex>
+      <Stack gap="3" w="full">
+        <HStack justify="space-between">
+          <Text color="fg.muted" fontSize="md">
+            {users ? t('users.accountCount', { count: users.length }) : null}
+          </Text>
+          <Button variant="solid" onClick={openCreateForm}>
+            <UserPlusIcon />
+            {t('users.addUser')}
+          </Button>
+        </HStack>
+        <Box bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" overflowX="auto" rounded="lg">
+          {users === null ? (
+            <Center minH="40">
+              {loadError ? (
+                <Stack align="center" gap="2" p="4">
+                  <Text color="fg.error" fontSize="md" textAlign="center">
+                    {loadError}
+                  </Text>
+                  <Button variant="outline" onClick={retryLoad}>
+                    {t('common.retry')}
+                  </Button>
+                </Stack>
+              ) : (
+                <Spinner color="fg.muted" size="lg" />
+              )}
+            </Center>
+          ) : (
+            <Table.Root minW="42rem">
+              <Table.Header>
+                <Table.Row bg="bg.muted">
+                  <Table.ColumnHeader borderColor="border.subtle" color="fg.muted" ps="4">
+                    {t('users.user')}
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader borderColor="border.subtle" color="fg.muted">
+                    {t('users.role')}
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader borderColor="border.subtle" color="fg.muted">
+                    {t('users.lastSignIn')}
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader borderColor="border.subtle" color="fg.muted">
+                    {t('common.active')}
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader borderColor="border.subtle" pe="4" />
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {users.map((user) => (
+                  <UserRow
+                    onManageIntermediates={onManageIntermediates}
+                    key={user.user_id}
+                    isSelf={user.user_id === currentUserId}
+                    setDeleteTarget={setDeleteTarget}
+                    setFormTarget={setFormTarget}
+                    setUserActive={setUserActive}
+                    user={user}
+                  />
+                ))}
+              </Table.Body>
+            </Table.Root>
+          )}
+        </Box>
+      </Stack>
       <UserFormDialog target={formTarget} onClose={closeForm} onSaved={refreshAfterSave} />
       <ConfirmDialog
         body={t('users.deleteBody', { name: deleteTarget ? getUserLabel(deleteTarget) : t('users.thisUser') })}
