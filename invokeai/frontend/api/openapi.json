@@ -74349,6 +74349,14 @@
             "title": "Cover Image",
             "description": "Url for image to preview model"
           },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/ModelRole"
+            },
+            "type": "array",
+            "title": "Roles",
+            "description": "Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh."
+          },
           "type": {
             "type": "string",
             "const": "lora",
@@ -74408,6 +74416,7 @@
           "source_api_response",
           "source_url",
           "cover_image",
+          "roles",
           "type",
           "trigger_phrases",
           "default_settings",
@@ -76784,6 +76793,14 @@
             "title": "Cover Image",
             "description": "Url for image to preview model"
           },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/ModelRole"
+            },
+            "type": "array",
+            "title": "Roles",
+            "description": "Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh."
+          },
           "type": {
             "type": "string",
             "const": "lora",
@@ -76843,6 +76860,7 @@
           "source_api_response",
           "source_url",
           "cover_image",
+          "roles",
           "type",
           "trigger_phrases",
           "default_settings",
