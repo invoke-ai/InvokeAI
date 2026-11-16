@@ -55,12 +55,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@features/queue/react', () => ({
   consumeQueueItemSwapProgressImage: () => undefined,
   useItemProgress: () => mocks.itemProgress,
-  useQueueItemBridgeProgressImage: () => null,
   useQueueItemProgressImage: () => mocks.progressImage,
   useQueueItemSwapProgressImage: () => null,
   useActiveProgressTargets: () => [],
   useActiveProgressTarget: () => null,
   useFollowedProgressTargets: () => [],
+  useFramedProgressTargets: () => [],
+  useQueueItemProgress: () => null,
   useActiveProgressItemIds: () => [],
   useProgressImage: () => null,
 }));

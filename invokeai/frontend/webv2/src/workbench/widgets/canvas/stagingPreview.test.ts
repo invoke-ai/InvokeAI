@@ -24,10 +24,10 @@ describe('selectStagedPreviewSource', () => {
     });
   });
 
-  it('returns null for a selected candidate when the preview is hidden', () => {
+  it('keeps a selected candidate the eye hid as a hidden preview, so the comparison stays unmasked', () => {
     expect(
       selectStagedPreviewSource({ ...base, isVisible: false, selectedCandidate: { imageName: 'img-1', placement } })
-    ).toBeNull();
+    ).toEqual({ hidden: true, imageName: 'img-1', placement });
   });
 
   it('pins the selected placeholder progress frame to its submitted rect, scaled to fill it', () => {
@@ -59,6 +59,10 @@ describe('stagedPreviewKey', () => {
     expect(stagedPreviewKey({ imageName: 'a', placement })).not.toBe(stagedPreviewKey({ imageName: 'b', placement }));
     // A new progress frame (different data URL) yields a new key so the effect re-fires.
     expect(stagedPreviewKey({ dataUrl: 'AA', placement })).not.toBe(stagedPreviewKey({ dataUrl: 'BB', placement }));
+    // Toggling the eye republishes the candidate.
+    expect(stagedPreviewKey({ hidden: true, imageName: 'a', placement })).not.toBe(
+      stagedPreviewKey({ imageName: 'a', placement })
+    );
   });
 
   it('includes every placement field', () => {

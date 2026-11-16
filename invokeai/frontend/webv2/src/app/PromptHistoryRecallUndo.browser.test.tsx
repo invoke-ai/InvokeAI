@@ -44,7 +44,7 @@ const RECALLED: PromptHistoryItem = {
 } as PromptHistoryItem;
 const noop = () => undefined;
 const generationAdapter = {
-  sectionPreferences: { sectionsOpen: {}, setSectionOpen: noop },
+  sectionPreferences: { sectionsOpen: {}, setSectionsOpen: noop },
 } as unknown as GenerationUiAdapter;
 
 let store: WorkbenchInternalStore;
