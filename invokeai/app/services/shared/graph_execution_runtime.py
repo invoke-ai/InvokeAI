@@ -43,6 +43,7 @@ class _ExecutionRuntime:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
         self._iterator_ancestry = _IteratorAncestry(state)
+        self._static_selected_collect_iterate_owners: Optional[dict[str, tuple[tuple[str, str], ...]]] = None
 
     def _get_cached_iteration_path(self, exec_node_id: str) -> Optional[tuple[int, ...]]:
         return self._state._prepared_registry().get_iteration_path(exec_node_id)
@@ -224,7 +225,14 @@ class _ExecutionRuntime:
 
     def _prepare_if_inputs(self, node: IfInvocation, input_edges: list[Edge]) -> None:
         selected_field = self._state._resolved_if_exec_branches.get(node.id)
-        allowed_fields = {"condition", selected_field} if selected_field is not None else {"condition"}
+        if selected_field is None:
+            allowed_fields = {"condition"}
+        elif self._state._legacy_snapshot_loaded:
+            allowed_fields = {"condition", selected_field}
+        elif self._state._is_fresh_lazy_if_candidate(self._state.prepared_source_mapping[node.id]):
+            allowed_fields = {"condition", selected_field}
+        else:
+            allowed_fields = {"condition", "true_input", "false_input"}
 
         for edge in input_edges:
             if edge.destination.field not in allowed_fields:
