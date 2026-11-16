@@ -370,8 +370,8 @@ export interface CanvasVectorLayerContract extends CanvasLayerBaseContract {
   /** Display-only guide color; absent uses DEFAULT_VECTOR_GUIDE_COLOR. */
   guideColor?: string;
   fillColor?: string;
-  strokeColor?: string;
-  strokeWidth?: number;
+  strokeColor: string;
+  strokeWidth: number;
   fillEnabled?: boolean;
   strokeEnabled?: boolean;
   traceTaperEnds?: boolean;
@@ -536,13 +536,13 @@ export const CANVAS_MAX_NODE_COUNT = 10_000;
 export interface CanvasDocumentContractV3 {
   /**
    * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise or spatial
-   * (clarity, texture, dehaze) adjustments, 6 for control-layer derivation fields, 7 for vector stacks, 8 for per-vector
-   * stroke appearance. Each mutation
+   * (clarity, texture, dehaze) adjustments, 6 for control-layer derivation fields, 7 for vector geometry and
+   * layer appearance. Each mutation
    * raises it to the newer of its content's need and the canvas state's version. A restored snapshot keeps its own,
    * possibly lower, version until the next mutation; the state's version and the project's compatibility floor stay
    * put meanwhile.
    */
-  version: 3 | 4 | 5 | 6 | 7 | 8;
+  version: 3 | 4 | 5 | 6 | 7;
   width: number;
   height: number;
   background: 'transparent' | { color: string };
@@ -580,10 +580,10 @@ export interface CanvasStateContractV3 {
   /**
    * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's
    * (3 plain, 4 custom-font typography, 5 noise or spatial adjustments, 6 control-layer derivation fields,
-   * 7 vector guides, 8 per-vector stroke appearance). Sticky:
+   * 7 vector geometry and layer appearance). Sticky:
    * removing that content never lowers it.
    */
-  version: 3 | 4 | 5 | 6 | 7 | 8;
+  version: 3 | 4 | 5 | 6 | 7;
   document: CanvasDocumentContractV3;
   /**
    * Monotonic wholesale-replacement counter. The mirror clears pixel history whenever it changes, including

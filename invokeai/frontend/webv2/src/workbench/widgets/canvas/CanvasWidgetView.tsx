@@ -314,7 +314,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         return;
       }
       event.preventDefault();
-      openSurfaceContextMenu(event.currentTarget, event.clientX, event.clientY, event.button === 0);
+      openSurfaceContextMenu(event.currentTarget, event.clientX, event.clientY, event.button <= 0);
     },
     [openSurfaceContextMenu]
   );

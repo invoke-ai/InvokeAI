@@ -20833,13 +20833,7 @@ describe('edit feedback on the surface', () => {
 
 it('reactivates Spline Edit on the same selected vector after engine cooldown', async () => {
   const vector = {
-    id: 'v',
-    name: 'Vector',
-    type: 'vector' as const,
-    isEnabled: true,
-    isLocked: false,
-    opacity: 1,
-    blendMode: 'normal' as const,
+    ...createVectorLayer({ id: 'v', name: 'Vector' }),
     transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
     paths: [],
   };
@@ -20870,13 +20864,7 @@ it('reactivates Spline Edit on the same selected vector after engine cooldown', 
 
 it('aborts pending vector region work on Escape and document changes without creating raster output', async () => {
   const vector = {
-    id: 'v',
-    name: 'Vector',
-    type: 'vector' as const,
-    isEnabled: true,
-    isLocked: false,
-    opacity: 1,
-    blendMode: 'normal' as const,
+    ...createVectorLayer({ id: 'v', name: 'Vector' }),
     fillEnabled: true,
     strokeEnabled: false,
     transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },

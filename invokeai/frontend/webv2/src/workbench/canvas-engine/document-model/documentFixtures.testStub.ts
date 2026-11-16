@@ -8,7 +8,6 @@ import type {
 
 import { createEmptyStacks } from '@workbench/canvas-engine/document/documentTree';
 import { LAYER_STACK_ORDER, layerStackOf } from '@workbench/canvas-engine/document/layerStacks';
-
 const base = (id: string) => ({
   blendMode: 'normal' as const,
   id,
@@ -30,7 +29,7 @@ export const layerContract = (
   const contract = ((): CanvasLayerContract => {
     switch (type) {
       case 'vector':
-        return { ...base(id), paths: [], type };
+        return { ...base(id), paths: [], strokeColor: '#000000', strokeWidth: 50, type };
       case 'raster':
         return { ...base(id), source: { bitmap: null, type: 'paint' }, type };
       case 'control':

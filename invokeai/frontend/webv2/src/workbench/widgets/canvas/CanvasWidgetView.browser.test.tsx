@@ -305,6 +305,30 @@ describe('Canvas spline context menu', () => {
     }
   );
 
+  it('keeps the active path when a keyboard keydown is followed by a native contextmenu event', async () => {
+    const { engine, owner } = await renderSpline();
+    const bounds = owner.getBoundingClientRect();
+    const key = new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true });
+    await act(() => owner.dispatchEvent(key));
+    expect(key.defaultPrevented).toBe(true);
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+
+    // Chromium emits this after the key, with coordinates unrelated to the selected path.
+    const nativeMenu = new PointerEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      button: -1,
+      pointerType: 'mouse',
+      clientX: bounds.left + 750,
+      clientY: bounds.top + 450,
+    });
+    await act(() => owner.dispatchEvent(nativeMenu));
+
+    expect(nativeMenu.defaultPrevented).toBe(true);
+    expect(engine.interaction.get('vectorEditSession')?.activePathId).toBe('selected-path');
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+  });
+
   it('keeps pointer targeting and native menus in inline editors, without handling other widgets', async () => {
     const { engine, owner } = await renderSpline();
     const bounds = owner.getBoundingClientRect();

@@ -4,7 +4,6 @@ import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/documen
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { DEFAULT_VECTOR_STROKE_COLOR, DEFAULT_VECTOR_STROKE_WIDTH } from '@workbench/canvas-engine/contracts';
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { polygonBounds } from '@workbench/canvas-engine/freehand';
 import { approximateBezierPath } from '@workbench/canvas-engine/math/bezierPath';
@@ -70,8 +69,8 @@ export const traceVectorLayer = async (o: Options): Promise<VectorTraceResult> =
   if (!fill && !stroke) {
     return { status: 'empty' };
   }
-  const width = Math.max(1, Math.min(600, Math.round(layer.strokeWidth ?? DEFAULT_VECTOR_STROKE_WIDTH)));
-  const color = layer.strokeColor ?? DEFAULT_VECTOR_STROKE_COLOR;
+  const width = Math.max(1, Math.min(600, Math.round(layer.strokeWidth)));
+  const color = layer.strokeColor;
   const paths = o.pathId === undefined ? layer.paths : layer.paths.filter((path) => path.id === o.pathId);
   const sampleCount = paths.reduce(
     (sum, path) => sum + Math.max(0, path.points.length - (path.isClosed ? 0 : 1)) * 24,

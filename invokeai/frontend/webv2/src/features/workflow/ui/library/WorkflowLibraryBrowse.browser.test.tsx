@@ -447,8 +447,6 @@ it.each([
 ])(
   'returns to the measured deep row at %ix%i (%i columns) through the real browse owner',
   async (width, height, columns) => {
-    // This case measures fresh cached restoration; real scrolling and layout timing remain independent.
-    // Let animation/scroll deadlines advance; this journey completes inside the cache freshness window.
     await open();
     const scroll = viewport()!;
     for (let top = 0; top <= 39600; top += 1200) {
@@ -456,6 +454,8 @@ it.each([
       expect(document.querySelectorAll('[data-workflow-card]').length).toBeLessThan(48);
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries.length).toBeLessThanOrEqual(60);
     }
+    // Revalidate the resident deep window so fresh cached restoration does not depend on scroll journey duration.
+    await act(() => browse.refreshWorkflowLibraryBrowse());
     await settle();
     const before = firstVisibleRow(scroll);
     expect(Number(before.id?.slice(3))).toBeGreaterThan(400);

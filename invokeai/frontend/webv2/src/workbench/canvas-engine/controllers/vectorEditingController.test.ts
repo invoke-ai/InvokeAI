@@ -261,7 +261,7 @@ describe('permanent vector editing', () => {
     expect(copy.paths[0]!.id).not.toBe('p');
     expect(copy.paths[0]!.points).toEqual(h.state().paths[0]!.points);
     const loaded = normalizeCanvasDocumentContract(JSON.parse(JSON.stringify(h.document())));
-    expect(loaded?.version).toBe(8);
+    expect(loaded?.version).toBe(7);
     expect(loaded?.stacks.vector?.[0]).toEqual(copy);
     h.refuse();
     h.controller.nudge(10, 0);

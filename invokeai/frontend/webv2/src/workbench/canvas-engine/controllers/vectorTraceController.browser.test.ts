@@ -164,13 +164,11 @@ it('uses each layer’s stroke color and width for individual path rendering', a
     strokeColor: '#0000ff',
     strokeWidth: 20,
   };
-  const legacy = { ...thin, id: 'legacy', strokeColor: undefined, strokeWidth: undefined };
   for (const [id, expected, edgeAlpha] of [
     ['thin', [255, 0, 0, 255], 0],
     ['thick', [0, 0, 255, 255], 255],
-    ['legacy', [0, 0, 0, 255], 255],
   ] as const) {
-    const h = createLayerOperationHarness(documentFrom([thin, thick, legacy], id), {
+    const h = createLayerOperationHarness(documentFrom([thin, thick], id), {
       backend: createDomRasterBackend(),
     });
     const document = h.document();

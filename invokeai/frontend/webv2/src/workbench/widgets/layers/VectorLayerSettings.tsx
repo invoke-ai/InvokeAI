@@ -5,11 +5,7 @@ import { Stack, Text } from '@chakra-ui/react';
 import { Button, ToggleIconButton } from '@platform/ui/Button';
 import { ColorPicker } from '@platform/ui/ColorPicker';
 import { ScrubberField } from '@platform/ui/ScrubberField';
-import {
-  DEFAULT_VECTOR_GUIDE_COLOR,
-  DEFAULT_VECTOR_STROKE_COLOR,
-  DEFAULT_VECTOR_STROKE_WIDTH,
-} from '@workbench/canvas-engine/api';
+import { DEFAULT_VECTOR_GUIDE_COLOR, DEFAULT_VECTOR_STROKE_WIDTH } from '@workbench/canvas-engine/api';
 import { PropertyControlRow, PropertySwitchRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
 import {
@@ -142,10 +138,7 @@ const VectorTraceSettings = ({
   );
   const commitStrokeColor = useCallback((strokeColor: string) => commitSettings({ strokeColor }), [commitSettings]);
   const clampStrokeWidth = useCallback(
-    (value: number) =>
-      Math.round(
-        Math.min(600, Math.max(1, Number.isFinite(value) ? value : (layer.strokeWidth ?? DEFAULT_VECTOR_STROKE_WIDTH)))
-      ),
+    (value: number) => Math.round(Math.min(600, Math.max(1, Number.isFinite(value) ? value : layer.strokeWidth))),
     [layer.strokeWidth]
   );
   const previewStrokeWidth = useCallback(
@@ -221,7 +214,7 @@ const VectorTraceSettings = ({
         <ColorPicker
           aria-label={label('traceColor')}
           disabled={disabled || layer.strokeEnabled === false}
-          value={layer.strokeColor ?? DEFAULT_VECTOR_STROKE_COLOR}
+          value={layer.strokeColor}
           onSampleColor={sampleColor}
           onValueChange={previewStrokeColor}
           onValueChangeEnd={commitStrokeColor}
@@ -237,7 +230,7 @@ const VectorTraceSettings = ({
       <ScrubberField
         label={label('strokeWidth')}
         disabled={disabled || layer.strokeEnabled === false}
-        value={layer.strokeWidth ?? DEFAULT_VECTOR_STROKE_WIDTH}
+        value={layer.strokeWidth}
         min={1}
         max={600}
         step={1}

@@ -278,12 +278,8 @@ const zCanvasLayer = z.discriminatedUnion('type', [
       .optional()
       .catch(undefined),
     fillEnabled: z.boolean().optional().catch(undefined),
-    strokeColor: z
-      .string()
-      .regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i)
-      .optional()
-      .catch(undefined),
-    strokeWidth: z.number().int().min(1).max(600).optional().catch(undefined),
+    strokeColor: z.string().regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i),
+    strokeWidth: z.number().int().min(1).max(600),
     strokeEnabled: z.boolean().optional().catch(undefined),
     traceTaperEnds: z.boolean().optional().catch(undefined),
     traceTaper: z.number().int().min(1).max(500).optional().catch(undefined),
@@ -474,9 +470,6 @@ const controlLayerRequiresV6 = (node: Record<string, unknown>): boolean =>
   node.type === 'control' && CONTROL_DERIVATION_KEYS.some((key) => node[key] !== undefined);
 
 const ownSchemaRequirement = (node: Record<string, unknown>): CanvasSchemaVersion => {
-  if (node.type === 'vector' && (node.strokeColor !== undefined || node.strokeWidth !== undefined)) {
-    return 8;
-  }
   if (controlLayerRequiresV6(node)) {
     return 6;
   }
@@ -488,7 +481,7 @@ const ownSchemaRequirement = (node: Record<string, unknown>): CanvasSchemaVersio
 
 /**
  * The newest schema a node or any descendant needs. v4: custom-font typography. v5: a noise or spatial adjustment,
- * enabled or not, which a v4 reader would drop. v6: control derivation fields. v8: per-vector stroke appearance.
+ * enabled or not, which a v4 reader would drop. v6: control derivation fields.
  */
 const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
   if (!isRecord(node)) {
