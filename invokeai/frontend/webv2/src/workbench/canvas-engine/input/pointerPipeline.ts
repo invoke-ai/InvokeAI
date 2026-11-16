@@ -656,6 +656,12 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         endTempTool();
       }
       clearBboxTapTimer();
+      // Tool-owned holds can outlive a press (polygon drafts) and miss keyup while the window is unfocused.
+      const tool = deps.getActiveTool();
+      const ctx = deps.getToolContext();
+      for (const modifier of ['Space', 'Alt', 'Shift'] as const) {
+        tool?.onModifierKey?.(ctx, modifier, false);
+      }
       altPending = false;
       altClaimed = false;
       hovered = false;

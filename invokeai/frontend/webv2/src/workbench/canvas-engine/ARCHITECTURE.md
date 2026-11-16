@@ -343,6 +343,8 @@ The spline tool owns an optional active-path transform frame in `vectorEditSessi
 
 Vector layer Properties owns Trace controls. Stroke color and width, Fill/Stroke switches and colors, and optional traceTaperEnds/traceTaper config properties persist per layer. New layers store black strokes at 50 pixels. Appearance edits use structural preview/commit and global undo/redo. vectorTraceController samples Bezier curves and renders ordinary round strokes or v6-style tapered pressure outlines into layer-local paint pixels. It uses the standard mutation transaction and publishAddedRasterLayer for reserved allocation, atomic insertion, pixel persistence and global replay. The new raster layer inherits the vector transform; source geometry and display guide color are unaffected.
 
+Input reset releases tool-owned Space, Alt and Shift holds after restoring any temporary tool. This clears modifiers whose keyup was lost while the window was unfocused, including between polygon clicks.
+
 ### Vector layer Trace/Fill and path-menu scope
 
 Layer Properties exposes Shapes-style Appearance rows with independent Fill/Stroke toggles and colors, stroke width, taper settings, and one Trace/Fill action. Fill defaults off and Stroke defaults on. The required `strokeColor` and `strokeWidth`, and optional `fillColor`, `fillEnabled`, `strokeEnabled`, `traceTaperEnds` and `traceTaper` properties persist on the vector layer. Trace Path, Fill Path and layer-wide Trace/Fill read that layer snapshot. Brush changes do not change vector appearance. New layers store black strokes at 50 pixels.
