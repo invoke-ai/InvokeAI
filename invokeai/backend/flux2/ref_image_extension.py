@@ -34,7 +34,7 @@ from invokeai.backend.util.vae_working_memory import (
 MAX_PIXELS_SINGLE_REF = 2024**2  # ~4.1M pixels
 MAX_PIXELS_MULTI_REF = 1024**2  # ~1M pixels
 
-# Tile size (in pixels) forced on the VAE for reference-image encoding, see _prepare_ref_images().
+# Tile size (in pixels) forced on the VAE for reference-image encoding, see encode_reference_image().
 REF_ENCODE_TILE_SIZE = 512
 # An untiled reference encode is taken only while its estimated peak stays within this share of the device's
 # memory. The rest is for what the cache cannot evict for it: the VAE itself, models locked by the running
@@ -289,7 +289,7 @@ class Flux2RefImageExtension:
             # Resize large images to max pixel count (matches BFL FLUX.2 sampling.py)
             image = resize_image_to_max_pixels(image, max_pixels)
 
-            ref_image_latents_unpacked = encode_reference_image(vae_info, image)
+            ref_image_latents_unpacked = encode_reference_image(vae_info, image, tiling="if_attention_materializes")
 
             # Extract tensor dimensions (B, 32, H, W for FLUX.2)
             batch_size, _, latent_height, latent_width = ref_image_latents_unpacked.shape
