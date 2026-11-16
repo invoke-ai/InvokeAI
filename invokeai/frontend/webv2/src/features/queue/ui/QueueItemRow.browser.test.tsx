@@ -287,7 +287,7 @@ describe('QueueItemRow', () => {
     await render(adapter({ itemRecallMenuGroup }), item());
 
     const menu = await openMenu();
-    // Only menu items while loading: a disabled one in the entries' place.
+    // Only menu items while loading: an unavailable one in the entries' place.
     const items = [...menu.children].filter((child) => child.getAttribute('role') !== 'presentation');
     expect(items.map((child) => [child.getAttribute('role'), child.getAttribute('aria-disabled')])).toEqual([
       ['menuitem', 'true'],

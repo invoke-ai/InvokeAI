@@ -85,6 +85,19 @@ it('says the items could not load, leaves the editor standing, and loads them on
 
   await userEvent.keyboard('{Escape}');
   await expect.element(page.getByRole('menu')).not.toBeInTheDocument();
+
+  // The keyboard reaches the failed item, and it says how to recover.
+  trigger.element().focus();
+  await userEvent.keyboard('{Enter}');
+  await expect.element(failed).toBeInTheDocument();
+  await userEvent.keyboard('{ArrowDown}');
+  await expect.element(failed).toHaveAttribute('data-highlighted');
+  expect(page.getByRole('menu').element().getAttribute('aria-activedescendant')).toBe(failed.element().id);
+  await expect.element(failed).toHaveAccessibleDescription('common.menuPartLoadFailedReason');
+  await userEvent.keyboard('{Enter}');
+  await expect.element(page.getByRole('menu')).toBeVisible();
+  await userEvent.keyboard('{Escape}');
+  await expect.element(page.getByRole('menu')).not.toBeInTheDocument();
   load.fail = false;
   await userEvent.click(trigger);
 

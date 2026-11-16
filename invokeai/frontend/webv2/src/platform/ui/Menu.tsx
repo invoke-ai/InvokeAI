@@ -297,14 +297,19 @@ export const useMenuPart = <Part,>(loader: MenuPartLoader<Part>): MenuPartSnapsh
 
 const ignoreSelect = () => undefined;
 
-/** A disabled item in the place of a part still loading or that failed to, so the menu holds only menu items. */
+/**
+ * An unavailable item in the place of a part still loading or that failed to, so the menu holds only menu items. Not
+ * `disabled`: Zag skips disabled items in keyboard navigation, so a menu holding only this one would leave the
+ * keyboard nothing to reach and the state unannounced.
+ */
 export const MenuPartPlaceholder = ({ status }: { status: MenuPartSnapshot<unknown>['status'] }) => {
   const { t } = useTranslation();
+  const failed = status === 'failed';
 
   return (
     <MenuActionItem
-      disabled
-      label={t(status === 'failed' ? 'common.menuPartLoadFailed' : 'common.loading')}
+      label={t(failed ? 'common.menuPartLoadFailed' : 'common.loading')}
+      unavailableReason={t(failed ? 'common.menuPartLoadFailedReason' : 'common.menuPartLoading')}
       value="menu-part-placeholder"
       onSelect={ignoreSelect}
     />
