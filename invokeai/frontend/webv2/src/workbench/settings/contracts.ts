@@ -9,8 +9,17 @@ export type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/project
 
 export type { WorkbenchLanguage } from '@platform/i18n/languages';
 
-/** What the workflow library's own templates are ordered by (dates newest first, names A to Z). */
-export type WorkflowLibrarySortId = 'updated' | 'opened' | 'created' | 'name';
+/** What the workflow library's own templates are ordered by. */
+export type WorkflowLibrarySortId = 'updated' | 'opened' | 'created' | 'name' | 'lastRun';
+
+/** The library order's direction; changing the key resets it to the key's natural one (dates newest first, names A to Z). */
+export type WorkflowLibrarySortDirection = 'asc' | 'desc';
+
+/** How large the workflow library's cards are. */
+export type WorkflowLibraryCardSize = 'small' | 'large';
+
+/** Whether the workflow library shows its workflows as a card grid or as list rows. */
+export type WorkflowLibraryLayout = 'grid' | 'list';
 
 /** How workflow thumbnails fill their 3:2 box: cropped to fill it, or letterboxed to fit whole. */
 export type WorkflowLibraryThumbnailFit = 'cover' | 'contain';
@@ -142,6 +151,10 @@ export interface WorkbenchPreferences {
   workflowEdgesBehindNodes: boolean;
   /** Order of the workflow library's own templates. */
   workflowLibrarySort: WorkflowLibrarySortId;
+  workflowLibrarySortDirection: WorkflowLibrarySortDirection;
+  workflowLibraryCardSize: WorkflowLibraryCardSize;
+  /** The workflow library's and This project's layout; card size and thumbnail fit apply to the grid. */
+  workflowLibraryLayout: WorkflowLibraryLayout;
   /** How workflow library and project cards show their thumbnails. */
   workflowLibraryThumbnailFit: WorkflowLibraryThumbnailFit;
   /** Raise text and border contrast on every theme (a11y). */

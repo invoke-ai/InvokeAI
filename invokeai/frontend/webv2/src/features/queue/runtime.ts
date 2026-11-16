@@ -359,6 +359,7 @@ export const createQueueItemBackendSubmission = (
   const {
     kind: _,
     projectWorkflowId: _projectWorkflowId,
+    libraryWorkflowSource: _libraryWorkflowSource,
     ...compiled
   } = submission as typeof submission & {
     libraryWorkflowId?: string;

@@ -85,6 +85,8 @@ export type QueueCompiledSubmission =
        * on records queued before projects owned several workflows; those results keep their destination only.
        */
       projectWorkflowId?: string;
+      /** Library binding captured at enqueue, independent of later relinking or removing the project copy. */
+      libraryWorkflowSource?: { libraryWorkflowId: string; ownerUserId?: string };
     }
   | {
       batchCount: number;

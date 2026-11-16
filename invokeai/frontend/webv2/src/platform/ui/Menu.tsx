@@ -24,6 +24,18 @@ import { useRegisterWidgetOverlay } from './widgetOverlays';
 
 type MenuContentProps = ComponentProps<typeof Menu.Content>;
 
+/**
+ * The layout of menu content whose list scrolls (`ScrollableMenuContent`, or `ScrollableMenuList` inside it): it grows to
+ * the context menus' cap or the room the positioner measured beside its anchor, then the list scrolls. The column gives
+ * the list the content's padded box, so its last row is never cut off by the padding, and rows after it stay in view.
+ */
+export const SCROLLABLE_MENU_CONTENT_PROPS = {
+  display: 'flex',
+  flexDirection: 'column',
+  maxH: 'min(28rem, var(--available-height))',
+  overflow: 'hidden',
+} as const;
+
 /** Menu content closes with its owning widget; the theme recipe owns chrome. */
 export const MenuContent = (props: MenuContentProps) => {
   const menu = useMenuContext();

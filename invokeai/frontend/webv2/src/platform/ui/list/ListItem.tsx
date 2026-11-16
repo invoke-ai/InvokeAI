@@ -54,6 +54,17 @@ export interface ListItemProps {
   checkLabel?: string;
   /** Identifies the row to its owning List for focus management. */
   itemKey?: string;
+  /**
+   * DOM id of the primary button, so a menu or dialog opened from outside the row can name it as the trigger focus
+   * returns to.
+   */
+  id?: string;
+  /**
+   * Id of the popup the primary button discloses, named with aria-controls only while the button is expanded
+   * (`isExpanded`, or `isMenuOpen` for a row whose press opens its menu). A modal dialog's focus trap admits focus only
+   * into portalled content that an expanded control inside it names.
+   */
+  controls?: string;
   /** `presentation` when a caller's own list item wraps this row together with content that belongs to it. */
   role?: 'listitem' | 'presentation';
   /** Roving tabindex from the owning List; standalone rows are tab stops. */
@@ -86,9 +97,11 @@ export const ListItem = ({
   actions,
   badges,
   checkLabel,
+  controls,
   density = 'regular',
   description,
   detail,
+  id,
   isActive = false,
   isBusy = false,
   isChecked = false,
@@ -122,6 +135,7 @@ export const ListItem = ({
   // A row with actions is pointed like an interactive one, so its buttons read as belonging to it; only a row with
   // nothing to act on stays static.
   const isStatic = !isInteractive && (actions === undefined || actions === null);
+  const isPrimaryExpanded = onContextMenu && !onPress ? isMenuOpen : isExpanded;
 
   const openContextMenu = useCallback(
     (row: HTMLElement, point?: { x: number; y: number }) => {
@@ -261,13 +275,15 @@ export const ListItem = ({
       ) : null}
       {isInteractive ? (
         <chakra.button
+          aria-controls={isPrimaryExpanded ? controls : undefined}
           aria-current={isActive || undefined}
           aria-disabled={isBusy || undefined}
-          aria-expanded={onContextMenu && !onPress ? isMenuOpen : isExpanded}
+          aria-expanded={isPrimaryExpanded}
           aria-haspopup={onContextMenu && !onPress ? 'menu' : undefined}
           aria-label={pressLabel}
           css={styles.primary}
           data-list-primary=""
+          id={id}
           tabIndex={tabIndex}
           type="button"
           onClick={handlePress}

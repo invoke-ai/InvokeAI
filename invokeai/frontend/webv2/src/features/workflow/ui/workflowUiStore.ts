@@ -19,8 +19,19 @@ export type AddNodeConnectionFilter =
 
 /** Bridge transient menu actions to always-mounted workflow dialogs and file input through session UI state. */
 
-/** The library dialog's views: project workflows, bundled templates, owned templates, or public templates. */
-export type WorkflowLibraryTab = 'project' | 'default' | 'user' | 'shared';
+/**
+ * The library dialog's places: project workflows, recently opened templates, owned templates, bundled templates, or
+ * public templates.
+ */
+export type WorkflowLibraryTab = 'project' | 'recent' | 'user' | 'default' | 'shared';
+
+/** How This project orders its workflows: the project's own order, or a key. Client side, kept for the session. */
+export type ProjectWorkflowSort = 'order' | 'name' | 'updated' | 'lastRun';
+
+export interface ProjectWorkflowOrder {
+  direction: 'asc' | 'desc';
+  sort: ProjectWorkflowSort;
+}
 
 /** What a surface asked the publication host to do with one project workflow. */
 export type WorkflowPublicationIntent =
@@ -32,8 +43,12 @@ export interface WorkflowUiSnapshot {
   addNodePosition: XYPosition | null;
   isAddNodeOpen: boolean;
   isLibraryOpen: boolean;
-  /** Which view the library dialog shows; remembered for the session. */
+  /** Which place the library dialog shows; remembered for the session. */
   libraryTab: WorkflowLibraryTab;
+  /** The library's search text and checked tags. Closing the dialog clears both; a place change clears the tags. */
+  libraryQuery: { search: string; tags: readonly string[] };
+  /** This project's order; the template places' order is an account preference. */
+  libraryProjectOrder: ProjectWorkflowOrder;
   /**
    * The project workflow selected on the This-project view; only meaningful for the project it was made in, and only
    * for the opening it was made in. Null shows the active workflow.
@@ -81,6 +96,8 @@ export interface WorkflowLoadRequest {
 
 let nextWorkflowLoadRequestId = 0;
 
+const EMPTY_LIBRARY_QUERY: WorkflowUiSnapshot['libraryQuery'] = { search: '', tags: [] };
+
 const INITIAL_WORKFLOW_UI_SNAPSHOT: WorkflowUiSnapshot = {
   addNodeConnection: null,
   addNodePosition: null,
@@ -88,6 +105,8 @@ const INITIAL_WORKFLOW_UI_SNAPSHOT: WorkflowUiSnapshot = {
   isAddNodeOpen: false,
   renameRequest: null,
   isLibraryOpen: false,
+  libraryProjectOrder: { direction: 'asc', sort: 'order' },
+  libraryQuery: EMPTY_LIBRARY_QUERY,
   librarySelection: null,
   libraryTab: 'project',
   pendingWorkflowLoad: null,
@@ -107,20 +126,47 @@ registerAccountOwnedResource({
 /**
  * Opens or closes the library. An opening that names no workflow starts This project on the active workflow: a
  * selection left from an earlier opening would point the rail's actions (Update library template among them) at a
- * workflow the user has since moved away from.
+ * workflow the user has since moved away from. Closing clears the search and the checked tags, so the next opening
+ * never starts on a filtered, possibly empty, view; the place stays.
  */
 export const setWorkflowLibraryOpen = (isOpen: boolean): void => {
   const wasOpen = workflowUiStore.getSnapshot().isLibraryOpen;
 
   workflowUiStore.patchSnapshot(
-    isOpen && !wasOpen ? { isLibraryOpen: true, librarySelection: null } : { isLibraryOpen: isOpen }
+    isOpen
+      ? wasOpen
+        ? { isLibraryOpen: true }
+        : { isLibraryOpen: true, librarySelection: null }
+      : { isLibraryOpen: false, libraryQuery: EMPTY_LIBRARY_QUERY }
   );
 };
 
+/** Switches place. Tags belong to the place they were checked in, so they clear; the search carries over. */
 export const setWorkflowLibraryTab = (libraryTab: WorkflowLibraryTab): void => {
-  if (workflowUiStore.getSnapshot().libraryTab !== libraryTab) {
-    workflowUiStore.patchSnapshot({ libraryTab });
+  const { libraryQuery, libraryTab: current } = workflowUiStore.getSnapshot();
+
+  if (current !== libraryTab) {
+    workflowUiStore.patchSnapshot({
+      libraryQuery: libraryQuery.tags.length > 0 ? { ...libraryQuery, tags: [] } : libraryQuery,
+      libraryTab,
+    });
   }
+};
+
+export const setWorkflowLibrarySearch = (search: string): void => {
+  const { libraryQuery } = workflowUiStore.getSnapshot();
+
+  if (libraryQuery.search !== search) {
+    workflowUiStore.patchSnapshot({ libraryQuery: { ...libraryQuery, search } });
+  }
+};
+
+export const setWorkflowLibraryTags = (tags: readonly string[]): void => {
+  workflowUiStore.patchSnapshot({ libraryQuery: { ...workflowUiStore.getSnapshot().libraryQuery, tags } });
+};
+
+export const setWorkflowLibraryProjectOrder = (libraryProjectOrder: ProjectWorkflowOrder): void => {
+  workflowUiStore.patchSnapshot({ libraryProjectOrder });
 };
 
 export const setWorkflowLibrarySelection = (selection: { projectId: string; workflowId: string } | null): void => {

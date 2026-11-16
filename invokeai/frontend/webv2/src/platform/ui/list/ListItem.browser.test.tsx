@@ -107,6 +107,20 @@ describe('ListItem', () => {
     expect(surface()).not.toBe(resting);
   });
 
+  it('names its primary button by id, and the popup it discloses while expanded, for menus opened from outside', async () => {
+    await render(<ListItem controls="row-a-menu" id="row-a" title="A workflow" onPress={vi.fn()} />);
+
+    // Collapsed, the button names nothing: aria-controls follows the expanded state.
+    expect(document.getElementById('row-a')).toBe(primary());
+    expect(primary().hasAttribute('aria-controls')).toBe(false);
+    expect(primary().hasAttribute('aria-expanded')).toBe(false);
+
+    await render(<ListItem controls="row-a-menu" id="row-a" isExpanded title="A workflow" onPress={vi.fn()} />);
+
+    expect(primary().getAttribute('aria-controls')).toBe('row-a-menu');
+    expect(primary().getAttribute('aria-expanded')).toBe('true');
+  });
+
   it('renders a static row without a press handler as plain content, not a button', async () => {
     await render(<ListItem title="Read only" />);
 
