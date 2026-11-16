@@ -41,7 +41,7 @@ consumer GPU, use a **GGUF** or **fp8** transformer together with the standalone
 | fp8 (Qwen Image 2512)            | ~20.4 GB |
 | fp8 mixed (Qwen Image Edit 2511) | ~20.5 GB |
 
-The Qwen2.5-VL encoder is loaded in addition to the transformer (~7 GB for the fp8 build). If your GPU
+The Qwen2.5-VL encoder is loaded in addition to the transformer (~9.4 GB for the fp8 build). If your GPU
 cannot hold both, enable [Low-VRAM mode](/configuration/optimization/low-vram-mode/). Single-file
 checkpoints that ship fp8 weights are kept in fp8 with
 [FP8 Storage](/configuration/optimization/fp8-storage/), which is switched on for them when they are installed.
@@ -74,7 +74,7 @@ Qwen Image needs three components:
   includes everything.
 - **GGUF** (from `unsloth/Qwen-Image-2512-GGUF` and `unsloth/Qwen-Image-Edit-2511-GGUF`): the file
   contains only the transformer. The GGUF starter models install the **Qwen Image VAE** (~250 MB) and
-  the **Qwen2.5-VL Encoder (fp8 scaled)** (~7 GB) as dependencies, so you never need the full pipeline.
+  the **Qwen2.5-VL Encoder (fp8 scaled)** (~9.4 GB) as dependencies, so you never need the full pipeline.
 - **Single-file `.safetensors`** checkpoints (bf16/fp16, and ComfyUI-style plain fp8, fp8-scaled or nvfp4
   builds) can be installed by path or URL; like GGUF, they need a standalone VAE and encoder. The two fp8
   starter models (from `Comfy-Org/Qwen-Image` and `Comfy-Org/Qwen-Image-Edit`) install the same VAE and
@@ -83,10 +83,11 @@ Qwen Image needs three components:
   keep part of it in RAM. The 2512 file is plain fp8 without scales: loading it briefly needs about 41 GB of
   free system RAM, because it is widened to bf16 before FP8 Storage casts it back.
 
-Four Qwen2.5-VL encoder builds are available as starter models: **fp8 scaled** (~7 GB, the one the
+Four Qwen2.5-VL encoder builds are available as starter models: **fp8 scaled** (~9.4 GB, the one the
 bundle installs), **NVFP4** (~5.7 GB download, about 6.7 GB once loaded), **GGUF Q4_K_M** (~4.7 GB, text
 only) and **Diffusers** (~16 GB, full precision). The single-file and GGUF encoders ship with their
-tokenizer and config inside InvokeAI.
+tokenizer and config inside InvokeAI. The fp8 scaled encoder stays fp8 in memory on a GPU that can hold it, about
+the size of the file instead of the about 16.6 GB it takes widened to bf16; on a CPU it is widened.
 
 The **GGUF** encoders are llama.cpp builds of Qwen2.5-VL-7B-Instruct (e.g. from
 `unsloth/Qwen2.5-VL-7B-Instruct-GGUF`) and hold only the language model. They encode text prompts, but cannot

@@ -128,13 +128,13 @@ def test_an_fp4_mixed_encoder_loads_packed_and_encodes_like_its_dense_weights(
     loader = object.__new__(Qwen3EncoderCheckpointLoader)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
     reserved_before_fold: list[bool] = []
-    fold = z_image._fold_comfy_scaled_weights
+    fold = z_image.dequantize_fp8_scaled
 
-    def recording_fold(sd: dict, dtype: torch.dtype) -> int:
+    def recording_fold(*args, **kwargs):
         reserved_before_fold.append(loader._ram_cache.make_room.called)
-        return fold(sd, dtype)
+        return fold(*args, **kwargs)
 
-    monkeypatch.setattr(z_image, "_fold_comfy_scaled_weights", recording_fold)
+    monkeypatch.setattr(z_image, "dequantize_fp8_scaled", recording_fold)
     config = Qwen3Encoder_Checkpoint_Config.model_construct(path=str(checkpoint), variant=Qwen3VariantType.Qwen3_4B)
 
     model = loader._load_from_singlefile(config)
@@ -217,9 +217,9 @@ def test_an_int8_convrot_encoder_stays_int8_resident_and_encodes_like_its_dense_
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
 
     def refuse(*_args, **_kwargs) -> int:
-        raise AssertionError("the scaled-fp8 fold must not see an int8 checkpoint")
+        raise AssertionError("the scaled-fp8 extraction must not see an int8 checkpoint")
 
-    monkeypatch.setattr(z_image, "_fold_comfy_scaled_weights", refuse)
+    monkeypatch.setattr(z_image, "extract_fp8_scaled_layers", refuse)
     config = Qwen3Encoder_Checkpoint_Config.model_construct(path=str(checkpoint), variant=Qwen3VariantType.Qwen3_8B)
 
     model = loader._load_from_singlefile(config)

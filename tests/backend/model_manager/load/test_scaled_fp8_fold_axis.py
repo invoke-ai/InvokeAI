@@ -23,7 +23,6 @@ from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils 
 )
 from invokeai.backend.model_manager.load.model_loaders.flux import Flux2CheckpointModel
 from invokeai.backend.model_manager.load.model_loaders.mistral_encoder import _drop_quantization_metadata
-from invokeai.backend.model_manager.load.model_loaders.z_image import _fold_comfy_scaled_weights
 from invokeai.backend.quantization.fp8_scaled import (
     WEIGHT_SCALE_SUFFIXES,
 )
@@ -77,68 +76,10 @@ class TestMistralEncoderFold:
             _drop_quantization_metadata(sd, MagicMock(), target_dtype=torch.bfloat16)
 
 
-class TestZImageQwen3EncoderFold:
-    """The Z-Image Qwen3 encoder's single-file loader folds the same way."""
-
-    def _fold(self, sd: dict, dtype: torch.dtype = torch.bfloat16) -> dict:
-        # The real call site. It was a loop inside `_load_from_singlefile` -- unreachable without a
-        # checkpoint and a transformers model -- so it was extracted; re-inlining it as a local
-        # multiply fails these tests instead of passing CI.
-        _fold_comfy_scaled_weights(sd, dtype)
-        return sd
-
-    def test_per_channel_scale_multiplies_rows(self) -> None:
-        weight, scale, expected = _per_channel_case()
-        sd = self._fold({"layer.weight": weight, "layer.weight_scale": scale})
-        assert torch.equal(sd["layer.weight"], expected)
-
-    def test_non_square_weight_does_not_raise(self) -> None:
-        weight, scale, _ = _per_channel_case(out_features=6, in_features=2)
-        sd = self._fold({"layer.weight": weight, "layer.weight_scale": scale})
-        assert sd["layer.weight"].shape == (6, 2)
-
-    def test_block_wise_scale_is_expanded_rather_than_rejected(self) -> None:
-        sd = self._fold(
-            {
-                "layer.weight": torch.ones(4, 2).to(torch.float8_e4m3fn),
-                "layer.weight_scale": torch.tensor([[1.0], [2.0]]),  # one entry per 2-row block
-            }
-        )
-        assert torch.equal(
-            sd["layer.weight"],
-            torch.tensor([[1.0, 1.0], [1.0, 1.0], [2.0, 2.0], [2.0, 2.0]], dtype=torch.bfloat16),
-        )
-
-    def test_a_scale_matching_neither_layout_is_reported(self) -> None:
-        with pytest.raises(ValueError, match="neither per-tensor nor per-output-channel"):
-            self._fold(
-                {
-                    "layer.weight": torch.ones(4, 2).to(torch.float8_e4m3fn),
-                    "layer.weight_scale": torch.full((3,), 2.0),
-                }
-            )
-
-    def test_an_mx_block_scale_is_refused_rather_than_folded_as_a_multiplier(self) -> None:
-        """An MXFP8 grid is E8M0 exponent *bytes*: 127 means 2**0, i.e. a scale of 1.0. Folded as a
-        linear multiplier it makes every weight ~127x too large, at the right shape and the right
-        dtype, with nothing raised and nothing logged. `extract_fp8_scaled_layers` decodes these grids
-        (`decode_mx_block_scales`) -- but these folds do not go through it, so they took the bytes as
-        numbers.
-        """
-        sd = {
-            "layer.weight": torch.ones(128, 128).to(torch.float8_e4m3fn),
-            "layer.weight_scale": torch.full((128, 4), 127, dtype=torch.uint8),
-        }
-
-        with pytest.raises(NotImplementedError, match="MXFP8"):
-            _fold_comfy_scaled_weights(sd, torch.bfloat16)
-
-
 class TestSharedComfyFold:
-    """`_dequantize_comfyui_fp8`, the copy the Wan (`wan.py:511`) and Qwen-Image
-    (`qwen_image.py:520`) loaders reach. Its local loop compared `scale.shape[dim] !=
-    weight.shape[dim]`, so a per-output-channel scale -- whose length already equals the row count
-    -- was expanded by nothing and left to broadcasting."""
+    """`_dequantize_comfyui_fp8`, the copy the Wan loader (`wan.py`) reaches. Its local loop compared
+    `scale.shape[dim] != weight.shape[dim]`, so a per-output-channel scale -- whose length already equals the row
+    count -- was expanded by nothing and left to broadcasting."""
 
     def _fold(self, weight: torch.Tensor, scale: torch.Tensor, spelling: str = ".weight_scale") -> torch.Tensor:
         sd = {"layer.weight": weight, f"layer{spelling}": scale}

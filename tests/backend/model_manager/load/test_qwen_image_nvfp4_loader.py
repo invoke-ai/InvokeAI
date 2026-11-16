@@ -4,7 +4,8 @@ Both Comfy files mix nvfp4 with scaled fp8, and an fp8 fold multiplies every `.w
 block scales included. So what these tests pin is the order: the nvfp4 layers leave the state dict before any fp8
 handling, come back packed under the paths the model uses (the encoder's legacy `model.X` keys become
 `model.language_model.X`), and one reservation is made before anything is widened. The transformer's scaled fp8 layers
-are folded unless fp8 compute or the model's fp8 storage setting keeps them; the encoder's are always folded. The compute
+are folded unless fp8 compute or the model's fp8 storage setting keeps them; the encoder's are folded unless the
+device can hold or multiply float8 (`test_qwen_image_encoder_fp8.py`). The compute
 dtype is bf16, as in production: the packed global scale must not be cast.
 """
 
@@ -77,7 +78,7 @@ def _patch_common(monkeypatch: pytest.MonkeyPatch, state_dict: dict, metadata: d
 
 def _record_fold(monkeypatch: pytest.MonkeyPatch, loader, log: list[bool], *names: str) -> None:
     """At every call of the named `qwen_image` functions, log whether room had been made yet."""
-    for name in names or ("_dequantize_comfyui_fp8",):
+    for name in names or ("dequantize_fp8_scaled",):
         original = getattr(qwen_image, name)
 
         def recording(*args, _original=original, **kwargs):
@@ -288,11 +289,13 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
     assert torch.equal(model.model.visual.proj.weight, visual_weight.to(COMPUTE_DTYPE))
     assert log == [True]
 
-    # Counted by hand: the packed layers as stored, the q_proj bias, the folded LM head with its two scale scalars and
-    # the vision projection at bf16, and the LM head's 27-byte marker as stored.
+    # Counted by hand: the packed layers as stored, the q_proj bias, the folded LM head and the vision projection at
+    # bf16, and the LM head's recovered scale (the 1.0 `scale_input` is an uncalibrated placeholder, charged nothing).
+    # Its marker is consumed by the extraction before the reservation.
     packed = 2 * _packed_bytes(128, 64)
-    widened = 128 + (32 * 64 + 2) + (4 * 8 + 4)
-    loader._ram_cache.make_room.assert_called_once_with(packed + widened * COMPUTE_DTYPE.itemsize + fp8_marker.numel())
+    widened = 128 + 32 * 64 + (4 * 8 + 4)
+    recovered_scale = torch.tensor(0.5).element_size()
+    loader._ram_cache.make_room.assert_called_once_with(packed + widened * COMPUTE_DTYPE.itemsize + recovered_scale)
 
 
 #: The shared encoder seam computes in float32; the int8 cells need bf16, since a blanket cast to it is what would ruin
