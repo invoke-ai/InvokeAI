@@ -120,6 +120,7 @@ import {
   isGenerateModelConfig,
   isGenerateSettings,
   isLoraCompatibleWithModel,
+  isSameInstalledModel,
   isValidKrea2RebalanceWeights,
   isValidMossImageSkipLayers,
   KREA2_REBALANCE_WEIGHT_COUNT,
@@ -383,12 +384,11 @@ export const getPromptPolicy = (
   };
 };
 
-const HF_REPO_ID = /^[A-Za-z0-9][\w.-]*\/[\w.-]+$/;
+const HF_REPO_SOURCE = /^([A-Za-z0-9][\w.-]*\/[\w.-]+)(?::[\w.-]+)?$/;
 
 /**
- * Whether an installed model's source is the Hugging Face repo `repoId`: the repo itself (also `repo::subfolder` or a
- * huggingface.co URL), or a local folder named like the repo, as an in-place install of a downloaded copy is.
- * Case-insensitive, as Hugging Face repo ids are.
+ * Whether an installed model's source is the Hugging Face repo `repoId`: the repo itself (also with a `:variant` or
+ * `::subfolder` suffix), a huggingface.co URL, or a local folder named like the repo. Matching is case-insensitive.
  */
 export const isModelFromRepo = (source: string | null | undefined, repoId: string): boolean => {
   if (!source) {
@@ -396,10 +396,15 @@ export const isModelFromRepo = (source: string | null | undefined, repoId: strin
   }
   const wanted = repoId.toLowerCase();
   const withoutSubfolder = source.split('::')[0]!.trim();
-  const hfPath = /^https?:\/\/(?:www\.)?huggingface\.co\/([^?#]+)/i.exec(withoutSubfolder)?.[1];
-  const candidate = (hfPath ? hfPath.split('/').slice(0, 2).join('/') : withoutSubfolder).replace(/[/\\]+$/, '');
-  if (HF_REPO_ID.test(candidate)) {
-    return candidate.toLowerCase() === wanted;
+  if (/^https?:\/\//i.test(withoutSubfolder)) {
+    const repo = /^https?:\/\/(?:www\.)?huggingface\.co\/([^/?#]+\/[^/?#]+)/i.exec(withoutSubfolder)?.[1];
+    return repo?.toLowerCase() === wanted;
+  }
+
+  const candidate = withoutSubfolder.replace(/[/\\]+$/, '');
+  const repo = HF_REPO_SOURCE.exec(candidate)?.[1];
+  if (repo !== undefined) {
+    return repo.toLowerCase() === wanted;
   }
   const folder = candidate.split(/[/\\]/).pop() ?? '';
   return folder.toLowerCase() === wanted.split('/').pop();
@@ -1645,13 +1650,22 @@ export const isComponentCompatibleWithModel = (
 
 type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };
 
-const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
-  Boolean(
-    model &&
-    model.type !== 'external_image_generator' &&
-    model.base === 'flux' &&
-    model.name.toLowerCase().includes('kontext')
-  );
+// FLUX.1 Kontext starter sources from invokeai/backend/model_manager/starter_models/flux.py.
+const FLUX_KONTEXT_REPOS = [
+  'black-forest-labs/flux.1-kontext-dev',
+  'comfy-org/flux1-kontext-dev_comfyui',
+  'unsloth/flux.1-kontext-dev-gguf',
+];
+
+const isFluxMainModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
+  model?.type === 'main' && model.base === 'flux';
+
+const isKnownFluxKontextModel = ({ name, source }: MainModelConfig): boolean =>
+  name.toLowerCase().includes('kontext') ||
+  (typeof source === 'string' && FLUX_KONTEXT_REPOS.some((repo) => isModelFromRepo(source, repo)));
+
+const isBoundKontextReference = (model: MainModelConfig, config: GenerateReferenceImageConfig): boolean =>
+  config.type === 'flux_kontext_reference_image' && config.model !== null && isSameInstalledModel(model, config.model);
 
 /**
  * Families whose Generate graph loads LoRAs. The backend installs no LoRAs for the others, so their concept picker
@@ -1853,10 +1867,6 @@ const getFamilyDefaultReferenceImageConfig = (
     return { image, type: 'qwen_image_2_1_reference_image' };
   }
 
-  if (isFluxKontextModel(model)) {
-    return { image, model, type: 'flux_kontext_reference_image' };
-  }
-
   const adapterModel =
     models.find((candidate) => candidate.type === 'ip_adapter' && candidate.base === modelBase) ?? null;
 
@@ -1889,7 +1899,10 @@ const getReferenceImageConfigSupported = (
       // The encoder decides whether they run (see `isReferenceImageSupported`); the type fits the base alone.
       return model.type !== 'external_image_generator' && model.base === 'qwen-image-2-1';
     case 'flux_kontext_reference_image':
-      return isFluxKontextModel(model);
+      return (
+        isFluxMainModel(model) &&
+        (isBoundKontextReference(model, referenceImage.config) || isKnownFluxKontextModel(model))
+      );
     case 'flux_redux':
       return model.type !== 'external_image_generator' && model.base === 'flux';
     case 'ip_adapter':
@@ -1936,6 +1949,13 @@ const getDefaultReferenceImageConfigs = (
   additions: readonly ReferenceImageAddition[],
   referenceImages: readonly GenerateReferenceImage[]
 ): GenerateReferenceImageConfig[] => {
+  if (
+    isFluxMainModel(model) &&
+    (isKnownFluxKontextModel(model) || referenceImages.some(({ config }) => isBoundKontextReference(model, config)))
+  ) {
+    return additions.map(({ image }) => ({ image, model, type: 'flux_kontext_reference_image' }));
+  }
+
   if (model?.type !== 'main' || model.base !== 'krea-2') {
     return additions.map(({ image }) => getFamilyDefaultReferenceImageConfig(model, models, image));
   }

@@ -3692,6 +3692,7 @@ describe('isModelFromRepo', () => {
     expect(isModelFromRepo('google/gemma-4-E4B-it', REPO)).toBe(true);
     expect(isModelFromRepo('Google/Gemma-4-e4b-IT', REPO)).toBe(true);
     expect(isModelFromRepo('google/gemma-4-E4B-it::text_encoder', REPO)).toBe(true);
+    expect(isModelFromRepo('google/gemma-4-E4B-it:fp16::text_encoder', REPO)).toBe(true);
     expect(isModelFromRepo('https://huggingface.co/google/gemma-4-E4B-it/tree/main', REPO)).toBe(true);
   });
 
@@ -3704,6 +3705,8 @@ describe('isModelFromRepo', () => {
   it('refuses other repos, other folders and a missing source', () => {
     expect(isModelFromRepo('google/gemma-4-E2B-it', REPO)).toBe(false);
     expect(isModelFromRepo('someone/gemma-4-E4B-it', REPO)).toBe(false);
+    expect(isModelFromRepo('someone/gemma-4-E4B-it:fp16', REPO)).toBe(false);
+    expect(isModelFromRepo('https://example.test/google/gemma-4-E4B-it', REPO)).toBe(false);
     expect(isModelFromRepo('E:/ModelStuffSSD/gemma-4-E4B-it-q4', REPO)).toBe(false);
     expect(isModelFromRepo('E:/ModelStuffSSD/gemma-4-E4B-it/model.safetensors', REPO)).toBe(false);
     expect(isModelFromRepo(null, REPO)).toBe(false);

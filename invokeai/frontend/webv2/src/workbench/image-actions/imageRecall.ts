@@ -906,6 +906,8 @@ type RecalledComponentSetting = keyof Pick<
   GenerateWidgetValues,
   | 'animaInpaintAdapterModel'
   | 'clipEmbedModel'
+  | 'clipGEmbedModel'
+  | 'clipLEmbedModel'
   | 'componentSourceModel'
   | 'flux3PromptUpsamplerModel'
   | 'gemma2EncoderModel'
@@ -941,6 +943,8 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
   { metadataKey: 'anima_inpaint_adapter', setting: 'animaInpaintAdapterModel' },
   { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
+  { metadataKey: 'clip_g_model', setting: 'clipGEmbedModel' },
+  { metadataKey: 'clip_l_model', setting: 'clipLEmbedModel' },
   { metadataKey: 'flux3_prompt_upsampler', setting: 'flux3PromptUpsamplerModel' },
   { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
   { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },

@@ -70,7 +70,7 @@ flux2_vae = StarterModel(
     name="FLUX.2 VAE",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-4B::vae",
-    description="FLUX.2 VAE (16-channel, same architecture as FLUX.1 VAE). ~168MB",
+    description="FLUX.2 VAE (32-channel AutoencoderKLFlux2). ~168MB",
     type=ModelType.VAE,
 )
 
