@@ -1165,6 +1165,7 @@ def install_int8_convrot_layers(
     reserve: Callable[[int], None],
     skip_patterns: Iterable[str] = (),
     extra_reserved_bytes: int = 0,
+    read: Callable[[str], torch.Tensor] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Take a marked int8 or int4 checkpoint from state dict to installed ``Int8ConvrotLinear`` and
     ``Int4ConvrotLinear`` modules.
@@ -1191,12 +1192,24 @@ def install_int8_convrot_layers(
 
     ``reserve`` is the cache's ``make_room``; ``extra_reserved_bytes`` is for a loader whose file
     also holds layers of another scheme -- Krea-2 and Z-Image add what their nvfp4 layers will cost,
-    so the one reservation covers the whole load. Returns the layers that stayed int8.
+    so the one reservation covers the whole load. ``read`` is for a loader that hands over the file's header as
+    ``meta`` tensors: steps 1 and 2 need only keys, shapes and dtypes, so each ``meta`` entry is read through it after
+    the reservation, and no payload lands on an unreserved cache. Returns the layers that stayed int8.
     """
     reject_foreign_quantization_scales(sd, quantized, architecture, model)
     reserve(
         predict_int8_cast_size(sd, dtype, quantized, model=model, skip_patterns=skip_patterns) + extra_reserved_bytes
     )
+    if read is not None:
+        # The reservation is each tensor at its width after the cast, so a dense tensor is cast as it arrives: reading
+        # an fp32 file's dense tensors first and casting them afterwards holds twice what was reserved, in anonymous
+        # memory. The marked layers' payloads stay as stored for the split to keep or decode. No local holds the payload:
+        # it would keep the stored tensor alive through the next read.
+        marked = _pinned_quantized_keys(quantized)
+        for key in [key for key, tensor in sd.items() if tensor.is_meta]:
+            sd[key] = read(key)
+            if key not in marked and is_castable_float(sd[key]):
+                sd[key] = sd[key].to(dtype)
     surviving = split_int8_convrot_layers(sd, quantized, dtype, model=model, skip_patterns=skip_patterns)
     cast_unquantized(sd, dtype, surviving)
     swap_in_int8_linears(model, sd, surviving)

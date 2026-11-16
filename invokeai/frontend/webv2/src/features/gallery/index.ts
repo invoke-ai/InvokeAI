@@ -66,6 +66,9 @@ import {
   uploadGalleryVideo,
 } from './data/backend';
 
+/** The most media names one gallery request may carry; the gallery's own transports batch past it. */
+export { GALLERY_REQUEST_MAX_NAMES } from './data/backend';
+
 /** Resolve backend Gallery images without exposing transport DTOs or endpoints. */
 export const galleryImages = {
   metadata: getGalleryImageMetadata,

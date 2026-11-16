@@ -176,6 +176,7 @@
         "flux3_layout_prompt",
         "flux3_lora_collection_loader",
         "flux3_model_loader",
+        "flux3_prompt_upsampler",
         "flux3_text_encoder",
         "flux_kontext",
         "img_nsfw",
@@ -304,6 +305,10 @@
           "qwen3VLEncoderModel",
           "vae"
         ],
+        "standalone-gguf-encoder": [
+          "qwen3VLEncoderModel",
+          "vae"
+        ],
         "diffusers-with-edit-references": []
       },
       "nodeTypes": [
@@ -416,13 +421,16 @@
         ]
       },
       "nodeTypes": [
+        "collect",
         "core_metadata",
         "flux2_vae_decode",
         "img_nsfw",
         "img_watermark",
         "integer",
+        "lora_selector",
         "moss_image_denoise",
         "moss_image_layout_prompt",
+        "moss_image_lora_collection_loader",
         "moss_image_model_loader",
         "moss_image_text_encoder",
         "string"
@@ -714,6 +722,7 @@
     },
     "core_metadata": {
       "inputs": [
+        "flux3_caption",
         "ideogram4_caption",
         "moss_image_layout_prompt",
         "negative_prompt",
@@ -734,6 +743,8 @@
           7
         ],
         "clip_embed_model": [],
+        "clip_g_model": [],
+        "clip_l_model": [],
         "clip_skip": [
           0
         ],
@@ -749,6 +760,7 @@
         "dype_scale": [
           3
         ],
+        "flux3_prompt_upsampler": [],
         "generation_mode": [
           "anima_txt2img",
           "cogview4_txt2img",
@@ -1573,6 +1585,24 @@
         "vae"
       ]
     },
+    "flux3_prompt_upsampler": {
+      "inputs": [
+        "prompt",
+        "reference_images"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "upsampler_model": [],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "value"
+      ]
+    },
     "flux3_text_encoder": {
       "inputs": [
         "prompt",
@@ -1888,6 +1918,7 @@
         ],
         "model": [],
         "qwen3_vl_encoder_model": [],
+        "qwen3_vl_vision_tower_model": [],
         "use_cache": [
           true
         ],
@@ -2080,6 +2111,23 @@
       },
       "outputs": [
         "value"
+      ]
+    },
+    "moss_image_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "transformer"
       ]
     },
     "moss_image_model_loader": {

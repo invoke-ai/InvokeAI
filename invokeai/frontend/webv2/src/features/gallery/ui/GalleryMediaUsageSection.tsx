@@ -126,7 +126,10 @@ const SurfaceRows = ({
 
 const UsageGroup = ({ group, showCounts }: { group: GalleryMediaUsageGroup; showCounts: boolean }) => {
   const { t } = useTranslation();
-  const count = showCounts && group.kind !== 'moreDocuments' ? t(`${KEY}.itemCount`, { count: group.count }) : null;
+  const count =
+    showCounts && group.kind !== 'moreDocuments'
+      ? t(group.countAtLeast ? `${KEY}.itemCountAtLeast` : `${KEY}.itemCount`, { count: group.count })
+      : null;
 
   return (
     <List.Item>
@@ -192,16 +195,10 @@ const UsageReport = ({
   ) : report.serverCheck === 'complete' ? null : (
     <UsageWarning
       isRetryDisabled={isRetryDisabled}
-      message={t(
-        report.serverCheck === 'tooManyItems'
-          ? `${KEY}.tooManyItems`
-          : report.groups.length === 0
-            ? `${KEY}.uncheckedNone`
-            : `${KEY}.unchecked`,
-        { count: report.checkedCount }
-      )}
-      // Retrying cannot shrink a selection past the limit.
-      onRetry={report.serverCheck === 'unavailable' ? onRetry : undefined}
+      message={t(report.groups.length === 0 ? `${KEY}.uncheckedNone` : `${KEY}.unchecked`, {
+        count: report.checkedCount,
+      })}
+      onRetry={onRetry}
     />
   );
 

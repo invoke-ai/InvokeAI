@@ -478,9 +478,11 @@ const BuilderElementBase = ({
         <BuilderCard element={element} title={title}>
           <Input
             aria-label={t('widgets.workflow.formBuilder.headingLabel')}
-            fontSize="lg"
-            fontWeight="700"
+            fontSize="xs"
+            fontWeight="semibold"
+            letterSpacing="wider"
             placeholder={t('widgets.workflow.formBuilder.headingPlaceholder')}
+            textTransform="uppercase"
             value={element.data.content}
             variant="flushed"
             onChange={(event: ChangeEvent<HTMLInputElement>) =>

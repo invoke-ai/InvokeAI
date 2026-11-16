@@ -31,7 +31,8 @@ const identityMocks = vi.hoisted(() => ({
   refreshProtectedMediaCookie: vi.fn<() => Promise<boolean>>(),
 }));
 
-vi.mock('@features/identity', () => ({
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getAuthSession: () => ({ accountEpoch: identityMocks.accountEpoch }),
   refreshProtectedMediaCookie: identityMocks.refreshProtectedMediaCookie,
 }));

@@ -430,7 +430,7 @@ const CenterViewMenuRow = ({
       {...intentPreloadProps}
       onClick={handleClick}
     >
-      <Icon as={CheckIcon} boxSize="3" opacity={isActive ? 1 : 0} />
+      <Icon as={CheckIcon} boxSize="3" color="fg" opacity={isActive ? 1 : 0} />
       <WidgetIcon icon={item.icon} boxSize="3.5" />
       <Menu.ItemText>{item.label}</Menu.ItemText>
     </Menu.Item>

@@ -1,3 +1,4 @@
+import type { AutoSwitchMode } from '@features/queue/contracts';
 import type { WorkbenchLanguage } from '@platform/i18n/languages';
 import type { LogLevel, LogNamespace } from '@platform/logging/contracts';
 import type { SettingsTarget } from '@platform/ui/settings/contracts';
@@ -5,12 +6,24 @@ import type { PromptFontSize } from '@theme/scale';
 import type { WorkbenchThemeId } from '@theme/themes';
 import type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
+/** Select Object starts with auto-update on until the person turns it off. */
+export const DEFAULT_SELECT_OBJECT_AUTO_UPDATE = true;
+
 export type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
 export type { WorkbenchLanguage } from '@platform/i18n/languages';
 
-/** What the workflow library's own templates are ordered by (dates newest first, names A to Z). */
-export type WorkflowLibrarySortId = 'updated' | 'opened' | 'created' | 'name';
+/** What the workflow library's own templates are ordered by. */
+export type WorkflowLibrarySortId = 'updated' | 'opened' | 'created' | 'name' | 'lastRun';
+
+/** The library order's direction; changing the key resets it to the key's natural one (dates newest first, names A to Z). */
+export type WorkflowLibrarySortDirection = 'asc' | 'desc';
+
+/** How large the workflow library's cards are. */
+export type WorkflowLibraryCardSize = 'small' | 'large';
+
+/** Whether the workflow library shows its workflows as a card grid or as list rows. */
+export type WorkflowLibraryLayout = 'grid' | 'list';
 
 /** How workflow thumbnails fill their 3:2 box: cropped to fill it, or letterboxed to fit whole. */
 export type WorkflowLibraryThumbnailFit = 'cover' | 'contain';
@@ -40,11 +53,8 @@ export interface ProjectSettings {
   viewerAutoSwitch: ViewerAutoSwitchMode;
 }
 
-/**
- * `latest`: each finished result takes the selection. `progress`: the same, and live frames show while it runs.
- * `off`: results land in the Gallery only (one still takes an empty selection). The canvas staging bar's values.
- */
-export type ViewerAutoSwitchMode = 'off' | 'latest' | 'progress';
+/** The Preview's Auto-switch: the shared policy's modes (`AutoSwitchMode`, rules in `@features/queue/contracts`). */
+export type ViewerAutoSwitchMode = AutoSwitchMode;
 
 /** {@link ProjectSettings} with every layered flag resolved: project pin, then the user's default, then built-in. */
 export type EffectiveProjectSettings = Required<ProjectSettings>;
@@ -142,12 +152,20 @@ export interface WorkbenchPreferences {
   workflowEdgesBehindNodes: boolean;
   /** Order of the workflow library's own templates. */
   workflowLibrarySort: WorkflowLibrarySortId;
+  workflowLibrarySortDirection: WorkflowLibrarySortDirection;
+  workflowLibraryCardSize: WorkflowLibraryCardSize;
+  /** The workflow library's and This project's layout; card size and thumbnail fit apply to the grid. */
+  workflowLibraryLayout: WorkflowLibraryLayout;
   /** How workflow library and project cards show their thumbnails. */
   workflowLibraryThumbnailFit: WorkflowLibraryThumbnailFit;
   /** Raise text and border contrast on every theme (a11y). */
   highContrast: boolean;
-  /** Select Object processes each prompt edit automatically; kept across sessions, Reset, and reloads. */
-  selectObjectAutoProcess: boolean;
+  /**
+   * Select Object updates its preview after each input change; kept across sessions, Reset, and reloads. Stored under
+   * a new name since auto-update became the default: the old `selectObjectAutoProcess` field was written as `false` by
+   * any settings save, so it cannot tell a choice from the old default, and normalization drops it.
+   */
+  selectObjectAutoUpdate: boolean;
   /** Account-bound overrides keyed by hotkey id (`app.invoke`, `gallery.galleryNavLeft`, etc.). */
   customHotkeys: Record<string, string[]>;
   /** Generate panel section open/closed overrides keyed by section id; absent = section default. */

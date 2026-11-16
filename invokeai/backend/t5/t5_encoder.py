@@ -14,6 +14,17 @@ import torch
 from transformers import T5Config
 
 from invokeai.backend.quantization.fp8_scaled import FP8_WEIGHT_DTYPES
+from invokeai.backend.util.devices import TorchDevice
+
+
+def t5_dtype_for_device(device: torch.device) -> torch.dtype:
+    """The dtype a T5 encoder is held and computed in on ``device``.
+
+    float32 on the CPU, twice the bf16 size: bf16 GEMM on the CPU faults with an illegal instruction on part of
+    the Windows fleet and is emulated slowly without a native bf16 unit, and ``choose_bfloat16_safe_dtype`` only
+    checks that a bf16 tensor can be allocated there. Any other device takes ``choose_bfloat16_safe_dtype``.
+    """
+    return torch.float32 if device.type == "cpu" else TorchDevice.choose_bfloat16_safe_dtype(device)
 
 
 def infer_t5_encoder_config(sd: dict[str, Any]) -> T5Config:

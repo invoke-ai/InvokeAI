@@ -29,12 +29,14 @@ import type {
   GenerateSettings,
   MainModelConfig,
   PidMode,
+  VaeModelConfig,
 } from './types';
 
 import {
   getCompatibleDiffusersComponentSource,
   isBundledMainForBase,
   isAnimaInpaintAdapter,
+  isVisionTextLlm,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isClipVariant,
@@ -46,7 +48,9 @@ import {
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
+  isGgufQwen3Vl4bEncoder,
   isGgufQwen3Vl8bEncoder,
+  isQwen3Vl4bVisionTower,
   isQwen3Vl8bEncoder,
   isQwen3Vl8bVisionTower,
   isIdeogram4UnconditionalBranch,
@@ -54,6 +58,7 @@ import {
   isQwen3Vl4bEncoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeAcceptedByBase,
+  isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
@@ -115,6 +120,7 @@ import {
   isGenerateModelConfig,
   isGenerateSettings,
   isLoraCompatibleWithModel,
+  isSameInstalledModel,
   isValidKrea2RebalanceWeights,
   isValidMossImageSkipLayers,
   KREA2_REBALANCE_WEIGHT_COUNT,
@@ -378,12 +384,11 @@ export const getPromptPolicy = (
   };
 };
 
-const HF_REPO_ID = /^[A-Za-z0-9][\w.-]*\/[\w.-]+$/;
+const HF_REPO_SOURCE = /^([A-Za-z0-9][\w.-]*\/[\w.-]+)(?::[\w.-]+)?$/;
 
 /**
- * Whether an installed model's source is the Hugging Face repo `repoId`: the repo itself (also `repo::subfolder` or a
- * huggingface.co URL), or a local folder named like the repo, as an in-place install of a downloaded copy is.
- * Case-insensitive, as Hugging Face repo ids are.
+ * Whether an installed model's source is the Hugging Face repo `repoId`: the repo itself (also with a `:variant` or
+ * `::subfolder` suffix), a huggingface.co URL, or a local folder named like the repo. Matching is case-insensitive.
  */
 export const isModelFromRepo = (source: string | null | undefined, repoId: string): boolean => {
   if (!source) {
@@ -391,19 +396,43 @@ export const isModelFromRepo = (source: string | null | undefined, repoId: strin
   }
   const wanted = repoId.toLowerCase();
   const withoutSubfolder = source.split('::')[0]!.trim();
-  const hfPath = /^https?:\/\/(?:www\.)?huggingface\.co\/([^?#]+)/i.exec(withoutSubfolder)?.[1];
-  const candidate = (hfPath ? hfPath.split('/').slice(0, 2).join('/') : withoutSubfolder).replace(/[/\\]+$/, '');
-  if (HF_REPO_ID.test(candidate)) {
-    return candidate.toLowerCase() === wanted;
+  if (/^https?:\/\//i.test(withoutSubfolder)) {
+    const repo = /^https?:\/\/(?:www\.)?huggingface\.co\/([^/?#]+\/[^/?#]+)/i.exec(withoutSubfolder)?.[1];
+    return repo?.toLowerCase() === wanted;
+  }
+
+  const candidate = withoutSubfolder.replace(/[/\\]+$/, '');
+  const repo = HF_REPO_SOURCE.exec(candidate)?.[1];
+  if (repo !== undefined) {
+    return repo.toLowerCase() === wanted;
   }
   const folder = candidate.split(/[/\\]/).pop() ?? '';
   return folder.toLowerCase() === wanted.split('/').pop();
 };
 
+/**
+ * Whether an installed model's source is the single file `fileName`: a Hugging Face file URL or a local path ending in
+ * it. Case-insensitive.
+ */
+const isModelFromFile = (source: string | null | undefined, fileName: string): boolean => {
+  const file = source?.split('::')[0]!.split(/[?#]/)[0]!.split(/[/\\]/).pop();
+  return Boolean(file) && file!.toLowerCase() === fileName.toLowerCase();
+};
+
+/** Whether an installed model's source is the model Expand Prompt suggests, in any of its builds. */
+export const isSuggestedExpandPromptModel = (
+  source: string | null | undefined,
+  suggestion: Pick<ExpandPromptSuggestion, 'modelFileNames' | 'modelSource'>
+): boolean =>
+  (suggestion.modelSource !== null && isModelFromRepo(source, suggestion.modelSource)) ||
+  (suggestion.modelFileNames ?? []).some((fileName) => isModelFromFile(source, fileName));
+
 /** A family's released prompt enhancer, which Expand Prompt preselects for a text-only rewrite. */
 interface ImagePromptEnhancer {
   /** Starter source of the enhancer model; an installed text LLM with this source is preselected. */
   modelSource: string;
+  /** Single-file builds of the same model, which Expand Prompt preselects too. */
+  modelFileNames?: readonly string[];
   /** The starter model's name, for the hint shown when it is not installed. */
   modelName: string;
   /** Seeded public system prompt. */
@@ -417,6 +446,17 @@ const IMAGE_PROMPT_ENHANCERS: Partial<Record<string, ImagePromptEnhancer>> = {
     modelSource: 'google/gemma-4-E4B-it',
     systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011',
   },
+  // The text-only rewrite uses BFL's `t2i` system prompt; reference images and boxes only reach the upsampler node.
+  // The bf16 folder and ComfyUI's two single files (int8 convrot, bf16) are the same model.
+  flux3: {
+    modelFileNames: [
+      'qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors',
+      'qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors',
+    ],
+    modelName: 'FLUX.3 Prompt Upsampler',
+    modelSource: 'black-forest-labs/flux-3-image-klein-pup',
+    systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0012',
+  },
 };
 
 /** What Expand Prompt starts from for this image family, or null when the family ships no enhancer. */
@@ -428,6 +468,7 @@ export const getImageExpandPromptSuggestion = (
     ? {
         image: null,
         imageSystemPromptId: null,
+        modelFileNames: enhancer.modelFileNames,
         modelName: enhancer.modelName,
         modelSource: enhancer.modelSource,
         systemPromptId: enhancer.systemPromptId,
@@ -560,6 +601,8 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     animaInpaintAdapterModel: null,
     animaInpaintAdapterEnabled: true,
     animaInpaintAdapterWeight: DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
+    flux3PromptUpsamplerEnabled: false,
+    flux3PromptUpsamplerModel: null,
     wanT5EncoderModel: null,
     ideogram4UnconditionalModel: null,
     wanLowNoiseModel: null,
@@ -643,6 +686,67 @@ export const getSettingsWithModelDefaults = (
   };
 };
 
+/** The VAE a model's defaults choose, classified; each context states what it does with `missing`. */
+export type ModelDefaultVae =
+  /** Sets none, or the "default" sentinel where the VAE is a required component with nothing bundled. */
+  | { kind: 'none' }
+  /**
+   * Names a VAE that is not installed or does not fit the model. `hasBundledVae` says whether the model and settings
+   * have a bundled VAE to fall back to (the VAE component is not required).
+   */
+  | { kind: 'missing'; hasBundledVae: boolean }
+  /** `null` is the bundled VAE, which the "default" sentinel asks for wherever there is one. */
+  | { kind: 'apply'; vae: VaeModelConfig | null };
+
+/** Whether the model and settings need a VAE component, having no bundled VAE (or component source) to use. */
+const isVaeComponentRequired = (model: MainModelConfig, settings: GenerateSettings): boolean => {
+  const vaeSlotPolicy = getComponentSectionPolicy(model, settings).slots.find((slotPolicy) => slotPolicy.key === 'vae');
+
+  return Boolean(vaeSlotPolicy?.required?.(getComponentPolicyContext(model, settings)));
+};
+
+/**
+ * The one classification of a model's default VAE. The Model Manager stores "default" when the VAE default is on with
+ * no VAE picked: that is the bundled VAE, which only a model whose VAE is a required component lacks. Requiredness
+ * follows the component policy, so it reads the settings (a component source can bundle one).
+ */
+export const resolveModelDefaultVae = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  vaeModels: readonly VaeModelConfig[]
+): ModelDefaultVae => {
+  const key = (model.default_settings as { vae?: unknown } | null | undefined)?.vae;
+
+  if (model.type !== 'main' || typeof key !== 'string') {
+    return { kind: 'none' };
+  }
+
+  const hasBundledVae = !isVaeComponentRequired(model, settings);
+
+  if (key === '' || key === 'default') {
+    return hasBundledVae ? { kind: 'apply', vae: null } : { kind: 'none' };
+  }
+
+  const vae = vaeModels.find(
+    (candidate) => candidate.key === key && isVaeCompatibleWithGenerateModel(model, candidate)
+  );
+
+  return vae ? { kind: 'apply', vae } : { kind: 'missing', hasBundledVae };
+};
+
+/**
+ * Recall's policy (a model switch from recalled parameters or an image, and graph export): the model's default VAE,
+ * else the bundled VAE when the default cannot apply, as recall always did, so an image made with the bundled VAE is
+ * reproduced. Only where the VAE is required and nothing is bundled does the current VAE stay (`undefined`), since
+ * clearing it would leave the form unable to run.
+ */
+export const getRecallDefaultVae = (defaultVae: ModelDefaultVae): VaeModelConfig | null | undefined =>
+  defaultVae.kind === 'apply'
+    ? defaultVae.vae
+    : defaultVae.kind === 'missing' && defaultVae.hasBundledVae
+      ? null
+      : undefined;
+
 export type GenerateComponentValueKey =
   | 't5EncoderModel'
   | 'clipEmbedModel'
@@ -655,6 +759,7 @@ export type GenerateComponentValueKey =
   | 'qwen3VLVisionTowerModel'
   | 'qwen35EncoderModel'
   | 'animaInpaintAdapterModel'
+  | 'flux3PromptUpsamplerModel'
   | 'wanT5EncoderModel'
   | 'wanLowNoiseModel'
   | 'ideogram4UnconditionalModel'
@@ -666,7 +771,11 @@ export type GenerateComponentValueKey =
 /** The settings component slot rules read beyond the selected components themselves. */
 export type ComponentPolicySettings = Pick<
   GenerateSettings,
-  'componentSourceModel' | 'pidMode' | 'qwen3VLEncoderModel'
+  | 'animaInpaintAdapterEnabled'
+  | 'componentSourceModel'
+  | 'flux3PromptUpsamplerEnabled'
+  | 'pidMode'
+  | 'qwen3VLEncoderModel'
 >;
 
 export interface ComponentPolicyContext {
@@ -681,10 +790,17 @@ export interface ComponentSlotPolicy {
   modelTypes: readonly ModelTaxonomyType[];
   valueKind: 'component' | 'vae' | 'main';
   helpText?: string;
+  /** Shown while the slot is empty and not required; a required slot always asks for a component. */
   placeholder?: string;
   defaultOpen?: boolean;
   filter?: (candidate: ModelConfig, ctx: ComponentPolicyContext) => boolean;
   required?: (ctx: ComponentPolicyContext) => boolean;
+  /**
+   * Whether a generation may load the selection. A slot behind a switch keeps its selection while the switch is off,
+   * and nothing loads it then, so a kept selection that is no longer installed does not block Invoke. Absent, a set
+   * selection is always in use.
+   */
+  inUse?: (ctx: ComponentPolicyContext) => boolean;
   missingMessage?: string;
   /**
    * Reported whenever the selected value fails `filter`, required or not, so a saved selection the graph cannot use
@@ -748,6 +864,7 @@ const TYPE_QWEN3_VL_VISION_TOWER: ModelTaxonomyType[] = ['qwen3_vl_vision_tower'
 const TYPE_QWEN35: ModelTaxonomyType[] = ['qwen3_5_encoder'];
 const TYPE_WAN_T5: ModelTaxonomyType[] = ['wan_t5_encoder'];
 const TYPE_CONTROLNET: ModelTaxonomyType[] = ['controlnet'];
+const TYPE_TEXT_LLM: ModelTaxonomyType[] = ['text_llm'];
 const TYPE_PID_DECODER: ModelTaxonomyType[] = ['pid_decoder'];
 const TYPE_GEMMA2: ModelTaxonomyType[] = ['gemma2_encoder'];
 const TYPE_T5: ModelTaxonomyType[] = ['t5_encoder'];
@@ -811,8 +928,8 @@ const qwen3VlEncoderSlot = (helpText: string, filter: GenerateComponentFilter): 
     filter,
   });
 
-/** Optional; only a GGUF 8B encoder needs it, so the slot appears with such an encoder alone. */
-const qwen3VlVisionTowerSlot = (helpText: string): ComponentSlotPolicy =>
+/** Optional; only a GGUF encoder needs it, so the slot appears with such an encoder alone. */
+const qwen3VlVisionTowerSlot = (helpText: string, filter: GenerateComponentFilter): ComponentSlotPolicy =>
   slot({
     key: 'qwen3VLVisionTowerModel',
     label: 'Vision Tower',
@@ -820,7 +937,7 @@ const qwen3VlVisionTowerSlot = (helpText: string): ComponentSlotPolicy =>
     valueKind: 'component',
     helpText,
     placeholder: 'None',
-    filter: isQwen3Vl8bVisionTower,
+    filter,
   });
 
 const qwen35EncoderSlot = (helpText: string, filter: GenerateComponentFilter): ComponentSlotPolicy =>
@@ -843,7 +960,28 @@ const animaInpaintAdapterSlot = (): ComponentSlotPolicy =>
     helpText: 'Optional 4-channel ControlNet-LLLite adapter, used only when inpainting or outpainting on the Canvas.',
     placeholder: 'None',
     filter: wrapFilter(isAnimaInpaintAdapter),
+    inUse: (ctx) => ctx.settings.animaInpaintAdapterEnabled,
   });
+
+const isFlux3PromptUpsamplerOn = (ctx: ComponentPolicyContext): boolean => ctx.settings.flux3PromptUpsamplerEnabled;
+
+/** Exposed before the switch is on, like PiD's; required only while it is. The node reads images, so the model must see them. */
+const flux3PromptUpsamplerSlot = (): ComponentSlotPolicy =>
+  slot({
+    key: 'flux3PromptUpsamplerModel',
+    label: 'Prompt Upsampler',
+    modelTypes: TYPE_TEXT_LLM,
+    valueKind: 'component',
+    placeholder: 'None',
+    helpText:
+      'The FLUX.3 Prompt Upsampler starter model (bf16 or int8), used while Prompt upsampler is on. Other Text LLMs that read images run, but are not trained for its instructions.',
+    filter: (candidate) => isVisionTextLlm(candidate),
+    required: isFlux3PromptUpsamplerOn,
+    inUse: isFlux3PromptUpsamplerOn,
+    missingMessage: 'Generate needs a Prompt Upsampler model while Prompt upsampler is on.',
+  });
+
+const isPidOn = (ctx: ComponentPolicyContext): boolean => getIsPidActive(ctx.settings.pidMode, ctx.model.base);
 
 /** Expose PiD slots before enabling it; Z-Image uses FLUX's decoder. */
 const pidDecoderSlot = (): ComponentSlotPolicy =>
@@ -855,7 +993,8 @@ const pidDecoderSlot = (): ComponentSlotPolicy =>
     helpText: 'Required while PiD is on. Must match the main model’s base.',
     filter: (candidate, ctx) =>
       candidate.type === 'pid_decoder' && candidate.base === getPidDecoderBaseForMainBase(ctx.model.base),
-    required: (ctx) => getIsPidActive(ctx.settings.pidMode, ctx.model.base),
+    required: isPidOn,
+    inUse: isPidOn,
     missingMessage: 'Generate needs a PiD decoder while PiD is on.',
   });
 
@@ -867,7 +1006,8 @@ const gemma2EncoderSlot = (): ComponentSlotPolicy =>
     valueKind: 'component',
     helpText: 'Required while PiD is on. Shared by every PiD decoder.',
     filter: (candidate) => candidate.type === 'gemma2_encoder',
-    required: (ctx) => getIsPidActive(ctx.settings.pidMode, ctx.model.base),
+    required: isPidOn,
+    inUse: isPidOn,
     missingMessage: 'Generate needs a Gemma-2 encoder while PiD is on.',
   });
 
@@ -1254,6 +1394,7 @@ const getBaseComponentSectionPolicy = (
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers FLUX.3 models.',
         },
+        flux3PromptUpsamplerSlot(),
       ]);
     case 'krea-2':
       // Bundled Krea models supply components; standalone models need a separate encoder and VAE.
@@ -1271,6 +1412,17 @@ const getBaseComponentSectionPolicy = (
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers Krea-2 models.',
         },
+        // Same rule as Qwen-Image-2.1: the loader refuses a tower beside any other encoder. Style references skip it.
+        ...(settings.qwen3VLEncoderModel && isGgufQwen3Vl4bEncoder(settings.qwen3VLEncoderModel)
+          ? [
+              qwen3VlVisionTowerSlot(
+                'The mmproj file of the GGUF encoder (mmproj-Qwen3VL-4B-Instruct-F16.gguf, the "Qwen3-VL 4B Vision ' +
+                  'Tower" starter model). It lets the GGUF encoder read edit reference images; text-to-image and ' +
+                  'style references work without it. Install it from the Model Manager.',
+                isQwen3Vl4bVisionTower
+              ),
+            ]
+          : []),
       ]);
     case 'qwen-image-2-1':
       // A Diffusers pipeline brings its own VAE and encoder; single-file and GGUF transformers need both.
@@ -1299,7 +1451,8 @@ const getBaseComponentSectionPolicy = (
               qwen3VlVisionTowerSlot(
                 'The mmproj file of the GGUF encoder (for example mmproj-Qwen3VL-8B-Instruct-F16.gguf from ' +
                   'Qwen/Qwen3-VL-8B-Instruct-GGUF). It lets the GGUF encoder read reference images; ' +
-                  'text-to-image works without it. Install it from the Model Manager.'
+                  'text-to-image works without it. Install it from the Model Manager.',
+                isQwen3Vl8bVisionTower
               ),
             ]
           : []),
@@ -1464,6 +1617,7 @@ export const getComponentPolicyContext = (
     qwen3VLVisionTowerModel: settings.qwen3VLVisionTowerModel,
     qwen35EncoderModel: settings.qwen35EncoderModel,
     animaInpaintAdapterModel: settings.animaInpaintAdapterModel,
+    flux3PromptUpsamplerModel: settings.flux3PromptUpsamplerModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     ideogram4UnconditionalModel: settings.ideogram4UnconditionalModel,
@@ -1486,6 +1640,7 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   qwen3VLVisionTowerModel: 'Qwen3-VL vision tower',
   qwen35EncoderModel: 'Qwen3.5 encoder',
   animaInpaintAdapterModel: 'Inpaint adapter',
+  flux3PromptUpsamplerModel: 'Prompt upsampler',
   wanT5EncoderModel: 'Wan T5 encoder',
   wanLowNoiseModel: 'Low-noise expert',
   ideogram4UnconditionalModel: 'Unconditional transformer',
@@ -1537,13 +1692,22 @@ export const isComponentCompatibleWithModel = (
 
 type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };
 
-const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
-  Boolean(
-    model &&
-    model.type !== 'external_image_generator' &&
-    model.base === 'flux' &&
-    model.name.toLowerCase().includes('kontext')
-  );
+// FLUX.1 Kontext starter sources from invokeai/backend/model_manager/starter_models/flux.py.
+const FLUX_KONTEXT_REPOS = [
+  'black-forest-labs/flux.1-kontext-dev',
+  'comfy-org/flux1-kontext-dev_comfyui',
+  'unsloth/flux.1-kontext-dev-gguf',
+];
+
+const isFluxMainModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
+  model?.type === 'main' && model.base === 'flux';
+
+const isKnownFluxKontextModel = ({ name, source }: MainModelConfig): boolean =>
+  name.toLowerCase().includes('kontext') ||
+  (typeof source === 'string' && FLUX_KONTEXT_REPOS.some((repo) => isModelFromRepo(source, repo)));
+
+const isBoundKontextReference = (model: MainModelConfig, config: GenerateReferenceImageConfig): boolean =>
+  config.type === 'flux_kontext_reference_image' && config.model !== null && isSameInstalledModel(model, config.model);
 
 /**
  * Families whose Generate graph loads LoRAs. The backend installs no LoRAs for the others, so their concept picker
@@ -1557,6 +1721,7 @@ const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>
   'flux3',
   'ideogram-4',
   'krea-2',
+  'moss-image',
   'qwen-image',
   'qwen-image-2-1',
   'sd-1',
@@ -1744,10 +1909,6 @@ const getFamilyDefaultReferenceImageConfig = (
     return { image, type: 'qwen_image_2_1_reference_image' };
   }
 
-  if (isFluxKontextModel(model)) {
-    return { image, model, type: 'flux_kontext_reference_image' };
-  }
-
   const adapterModel =
     models.find((candidate) => candidate.type === 'ip_adapter' && candidate.base === modelBase) ?? null;
 
@@ -1780,7 +1941,10 @@ const getReferenceImageConfigSupported = (
       // The encoder decides whether they run (see `isReferenceImageSupported`); the type fits the base alone.
       return model.type !== 'external_image_generator' && model.base === 'qwen-image-2-1';
     case 'flux_kontext_reference_image':
-      return isFluxKontextModel(model);
+      return (
+        isFluxMainModel(model) &&
+        (isBoundKontextReference(model, referenceImage.config) || isKnownFluxKontextModel(model))
+      );
     case 'flux_redux':
       return model.type !== 'external_image_generator' && model.base === 'flux';
     case 'ip_adapter':
@@ -1827,6 +1991,13 @@ const getDefaultReferenceImageConfigs = (
   additions: readonly ReferenceImageAddition[],
   referenceImages: readonly GenerateReferenceImage[]
 ): GenerateReferenceImageConfig[] => {
+  if (
+    isFluxMainModel(model) &&
+    (isKnownFluxKontextModel(model) || referenceImages.some(({ config }) => isBoundKontextReference(model, config)))
+  ) {
+    return additions.map(({ image }) => ({ image, model, type: 'flux_kontext_reference_image' }));
+  }
+
   if (model?.type !== 'main' || model.base !== 'krea-2') {
     return additions.map(({ image }) => getFamilyDefaultReferenceImageConfig(model, models, image));
   }
@@ -2003,6 +2174,46 @@ export const getCompatibleReferenceImages = (
   });
 };
 
+/**
+ * References as a switch to `model` leaves them, for every path that puts references in front of a model they were
+ * not set up for (a model switch, an Undo that brings removed ones back). Incompatible ones are retargeted (see
+ * `getCompatibleReferenceImages`); enabled ones the family cannot run together are switched off rather than deleted,
+ * so Invoke is not left blocked, the first enabled ones keep running, and a model that takes the rest can turn them on
+ * again. A model without references keeps them as they are, all switched off, for the next model that takes them.
+ * `retargetedReferenceImages` is the list before the switch-off, for reporting what each step changed. No changes
+ * return the same array.
+ */
+export const reconcileReferenceImagesWithModel = (
+  referenceImages: GenerateReferenceImage[],
+  model: GenerateModelConfig,
+  models: readonly ReferenceModelCandidate[]
+): { referenceImages: GenerateReferenceImage[]; retargetedReferenceImages: GenerateReferenceImage[] } => {
+  const referencesSupported = takesReferenceImages(model);
+  const retargetedReferenceImages = referencesSupported
+    ? getCompatibleReferenceImages(referenceImages, model, models)
+    : referenceImages;
+  const enabledKept: GenerateReferenceImage[] = [];
+  let didSwitchOff = false;
+  const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
+    if (!isReferenceImageActive(referenceImage)) {
+      return referenceImage;
+    }
+
+    if (referencesSupported && canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
+      enabledKept.push(referenceImage);
+      return referenceImage;
+    }
+
+    didSwitchOff = true;
+    return { ...referenceImage, isEnabled: false };
+  });
+
+  return {
+    referenceImages: didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages,
+    retargetedReferenceImages,
+  };
+};
+
 const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
@@ -2074,29 +2285,11 @@ const getSettingsWithCompatibleModelSelections = (
     change('concepts', 'turnedOff', stoppedConcepts);
   }
 
-  // Enabled references the new family cannot run together are switched off rather than deleted: Invoke is not left
-  // blocked, the first enabled ones keep running, and switching back can turn the rest on again. A model without
-  // references keeps them as they are, all switched off, for the next model that takes them.
-  const referencesSupported = takesReferenceImages(model);
-  const retargetedReferenceImages = referencesSupported
-    ? getCompatibleReferenceImages(settings.referenceImages, model, models)
-    : settings.referenceImages;
-  const enabledKept: GenerateReferenceImage[] = [];
-  let didSwitchOff = false;
-  const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
-    if (!isReferenceImageActive(referenceImage)) {
-      return referenceImage;
-    }
-
-    if (referencesSupported && canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
-      enabledKept.push(referenceImage);
-      return referenceImage;
-    }
-
-    didSwitchOff = true;
-    return { ...referenceImage, isEnabled: false };
-  });
-  const compatibleReferenceImages = didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages;
+  const { referenceImages: compatibleReferenceImages, retargetedReferenceImages } = reconcileReferenceImagesWithModel(
+    settings.referenceImages,
+    model,
+    models
+  );
 
   if (compatibleReferenceImages !== settings.referenceImages) {
     nextSettings.referenceImages = compatibleReferenceImages;
@@ -2120,7 +2313,7 @@ const getSettingsWithCompatibleModelSelections = (
       (referenceImage, index) => retargetedReferenceImages[index] !== referenceImage
     );
     const tunedRetargets = retargeted.filter((referenceImage) => !isPreviousDefault(referenceImage)).length;
-    const switchedOff = keptOrSwitchedOff.filter(
+    const switchedOff = compatibleReferenceImages.filter(
       (referenceImage, index) => referenceImage.isEnabled !== retargetedReferenceImages[index]?.isEnabled
     ).length;
 
@@ -2271,6 +2464,20 @@ const issue = (
 });
 
 const MODEL_TARGET: GenerationIssue['target'] = { section: 'model' };
+
+/**
+ * How an issue names one reference: its own name, else its position. `describeGenerationIssue` turns the position
+ * into the localized default ("Reference image 2"), so the message reads as the reference's row does.
+ */
+const referenceNameValues = (
+  referenceImage: Pick<GenerateReferenceImage, 'name'>,
+  position: number
+): Record<string, number | string> => ({
+  index: position,
+  ...(referenceImage.name === undefined ? {} : { referenceName: referenceImage.name }),
+});
+const englishReferenceName = (referenceImage: Pick<GenerateReferenceImage, 'name'>, position: number): string =>
+  referenceImage.name ?? `Reference image ${position}`;
 /** The reference images as a group (their count, or a rule over all of them); the section lists it above the cards. */
 const REFERENCE_IMAGES_TARGET: GenerationIssue['target'] = { field: 'referenceImages', section: 'guidance' };
 /** One reference image: its card shows the issue. */
@@ -2280,7 +2487,10 @@ const referenceImageTarget = (referenceImageId: string): GenerationIssue['target
   section: 'guidance',
 });
 
-/** Installed-model checks: the main model, its components, concepts and enabled references must all be installed. */
+/**
+ * Installed-model checks: the main model, the components the generation can load, concepts and enabled references must
+ * all be installed.
+ */
 export const getGenerationModelAvailabilityIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
@@ -2300,10 +2510,20 @@ export const getGenerationModelAvailabilityIssues = (
     );
   }
 
+  const componentContext = getComponentPolicyContext(model, settings);
+  const slotsByKey = new Map(
+    getComponentSectionPolicy(model, settings).slots.map((slotPolicy) => [slotPolicy.key, slotPolicy])
+  );
+
   for (const key of GENERATE_COMPONENT_VALUE_KEYS) {
     const value = settings[key];
 
-    if (value && !hasModelKey(models, value.key, value.type)) {
+    // A selection nothing loads (its switch is off) may stay uninstalled; turning the switch on asks for it again.
+    if (!value || slotsByKey.get(key)?.inUse?.(componentContext) === false) {
+      continue;
+    }
+
+    if (!hasModelKey(models, value.key, value.type)) {
       issues.push(
         issue(
           `components:notInstalled:${key}`,
@@ -2366,9 +2586,9 @@ export const getGenerationModelAvailabilityIssues = (
         issue(
           `referenceImages:modelNotInstalled:${referenceImage.id}`,
           'referenceModelNotInstalled',
-          `Reference image ${index + 1} uses "${config.model.name}", which is not installed. Turn it off, or choose another model for it.`,
+          `${englishReferenceName(referenceImage, index + 1)} uses "${config.model.name}", which is not installed. Turn it off, or choose another model for it.`,
           referenceImageTarget(referenceImage.id),
-          { index: index + 1, name: config.model.name },
+          { ...referenceNameValues(referenceImage, index + 1), name: config.model.name },
           { kind: 'turnOffReferenceImages', referenceImageIds: [referenceImage.id] }
         )
       );
@@ -2498,8 +2718,13 @@ export const QWEN_IMAGE_21_NO_VISION_TOWER_REASON =
 export const QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON =
   "Reference images need this encoder's Vision Tower (the mmproj file). Select it under Components.";
 
-const QWEN_IMAGE_21_VISION_TOWER_CPU_ONLY_REASON =
+const VISION_TOWER_CPU_ONLY_REASON =
   'The Vision Tower and the encoder must have the same CPU Only setting. Change it in the Model Manager.';
+
+const KREA2_VISION_TOWER_TARGET = { field: 'qwen3VLVisionTowerModel', section: 'components' } as const;
+
+const KREA2_GGUF_VISION_TOWER_REASON =
+  "Edit references need this GGUF encoder's Vision Tower (the mmproj file). Select it under Components.";
 
 const getReferenceImageValidationIssues = (
   model: GenerateModelConfig,
@@ -2541,9 +2766,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:unsupported:${id}`,
           'referenceImageUnsupported',
-          `${model.name} cannot use reference image ${index}. Turn it off, or remove it.`,
+          `${model.name} cannot use ${englishReferenceName(referenceImage, index)}. Turn it off, or remove it.`,
           referenceImageTarget(id),
-          { index, name: model.name },
+          { ...referenceNameValues(referenceImage, index), name: model.name },
           turnOff
         )
       );
@@ -2555,9 +2780,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsImage:${id}`,
           'referenceImageNeedsImage',
-          `Reference image ${index} needs an image.`,
+          `${englishReferenceName(referenceImage, index)} needs an image.`,
           referenceImageTarget(id),
-          { index },
+          referenceNameValues(referenceImage, index),
           turnOff
         )
       );
@@ -2569,9 +2794,9 @@ const getReferenceImageValidationIssues = (
           issue(
             `referenceImages:needsIpAdapter:${id}`,
             'referenceImageNeedsIpAdapter',
-            `Reference image ${index} needs an IP Adapter model for ${model.name}.`,
+            `${englishReferenceName(referenceImage, index)} needs an IP Adapter model for ${model.name}.`,
             referenceImageTarget(id),
-            { index, name: model.name },
+            { ...referenceNameValues(referenceImage, index), name: model.name },
             turnOff
           )
         );
@@ -2584,9 +2809,9 @@ const getReferenceImageValidationIssues = (
           issue(
             `referenceImages:strength:${id}`,
             'referenceImageStrength',
-            `Reference image ${index} strength must be between 0 and 2.`,
+            `${englishReferenceName(referenceImage, index)} strength must be between 0 and 2.`,
             referenceImageTarget(id),
-            { index },
+            referenceNameValues(referenceImage, index),
             turnOff
           )
         );
@@ -2601,9 +2826,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsRedux:${id}`,
           'referenceImageNeedsRedux',
-          `Reference image ${index} needs a FLUX Redux model for ${model.name}.`,
+          `${englishReferenceName(referenceImage, index)} needs a FLUX Redux model for ${model.name}.`,
           referenceImageTarget(id),
-          { index, name: model.name },
+          { ...referenceNameValues(referenceImage, index), name: model.name },
           turnOff
         )
       );
@@ -2617,9 +2842,9 @@ const getReferenceImageValidationIssues = (
         issue(
           `referenceImages:needsKontext:${id}`,
           'referenceImageNeedsKontext',
-          `Reference image ${index} needs the selected FLUX Kontext model.`,
+          `${englishReferenceName(referenceImage, index)} needs the selected FLUX Kontext model.`,
           referenceImageTarget(id),
-          { index },
+          referenceNameValues(referenceImage, index),
           turnOff
         )
       );
@@ -2688,7 +2913,7 @@ const getReferenceImageValidationIssues = (
     (encoder.cpu_only === true) !== (tower.cpu_only === true)
   ) {
     issues.push(
-      createUntranslatedGenerationIssue(QWEN_IMAGE_21_VISION_TOWER_CPU_ONLY_REASON, {
+      createUntranslatedGenerationIssue(VISION_TOWER_CPU_ONLY_REASON, {
         field: 'qwen3VLVisionTowerModel',
         section: 'components',
       })
@@ -2718,33 +2943,42 @@ export const getGuidanceBoundReason = (
 
 /**
  * Combinations the backend refuses only after queueing. The encoder reads edit references with its vision tower, which
- * a GGUF Qwen3-VL encoder does not carry; a Diffusers main without an encoder override uses its bundled one. A
- * standalone encoder folder may lack the vision weights too, but its config does not say so, so the message names
- * what the encoder needs rather than a format that always has it.
+ * a GGUF Qwen3-VL encoder replaces with its mmproj Vision Tower; a Diffusers main without an encoder override uses its
+ * bundled one.
  */
-const getKrea2ReferenceValidationReasons = (settings: GenerateSettings): string[] => {
+const getKrea2ReferenceValidationReasons = (
+  settings: GenerateSettings
+): Array<{ reason: string; target: GenerationIssue['target'] }> => {
   const styleCount = settings.referenceImages.filter(
     (referenceImage) => isReferenceImageActive(referenceImage) && referenceImage.config.type === 'krea2_reference_image'
   ).length;
   const hasEditReferences = hasEnabledKrea2EditReferences(settings.referenceImages);
-  const reasons: string[] = [];
+  const reasons: Array<{ reason: string; target: GenerationIssue['target'] }> = [];
 
   if (styleCount > 1) {
-    reasons.push('Krea-2 uses one style reference at a time. Turn off all but one, or switch all of them to Edit.');
+    reasons.push({
+      reason: 'Krea-2 uses one style reference at a time. Turn off all but one, or switch all of them to Edit.',
+      target: REFERENCE_IMAGES_TARGET,
+    });
   }
 
   if (styleCount > 0 && hasEditReferences) {
-    reasons.push(
-      'Krea-2 cannot combine a style reference with edit references. Switch the style reference to Edit, or turn off one kind.'
-    );
+    reasons.push({
+      reason:
+        'Krea-2 cannot combine a style reference with edit references. Switch the style reference to Edit, or turn off one kind.',
+      target: REFERENCE_IMAGES_TARGET,
+    });
   }
 
   const encoder = settings.qwen3VLEncoderModel;
+  const tower = settings.qwen3VLVisionTowerModel;
 
-  if (hasEditReferences && encoder && isQwen3Vl4bEncoder(encoder) && encoder.format === 'gguf_quantized') {
-    reasons.push(
-      `Krea-2 edit references need a Qwen3-VL encoder with vision weights, which the GGUF encoder "${encoder.name}" does not have. Select a safetensors file or Diffusers folder that includes the vision weights.`
-    );
+  if (hasEditReferences && encoder && isGgufQwen3Vl4bEncoder(encoder)) {
+    if (!tower || !isQwen3Vl4bVisionTower(tower)) {
+      reasons.push({ reason: KREA2_GGUF_VISION_TOWER_REASON, target: KREA2_VISION_TOWER_TARGET });
+    } else if ((encoder.cpu_only === true) !== (tower.cpu_only === true)) {
+      reasons.push({ reason: VISION_TOWER_CPU_ONLY_REASON, target: KREA2_VISION_TOWER_TARGET });
+    }
   }
 
   return reasons;
@@ -2756,8 +2990,8 @@ const getModelFamilyValidationIssues = (model: MainModelConfig, settings: Genera
 
   if (model.base === 'krea-2') {
     issues.push(
-      ...getKrea2ReferenceValidationReasons(settings).map((reason) =>
-        createUntranslatedGenerationIssue(reason, REFERENCE_IMAGES_TARGET)
+      ...getKrea2ReferenceValidationReasons(settings).map(({ reason, target }) =>
+        createUntranslatedGenerationIssue(reason, target)
       )
     );
   }

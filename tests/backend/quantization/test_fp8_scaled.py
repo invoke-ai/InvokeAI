@@ -23,6 +23,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     expand_weight_scale,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    find_torchao_fp8_problem,
     forget_inconclusive_fp8_matmul_probe,
     is_matmul_usable_scale,
     is_scale_metadata_key,
@@ -37,6 +38,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
+    translate_torchao_fp8_layers,
     warn_on_unattached_scales,
 )
 from tests.fixtures.quantized_payloads import (
@@ -1679,3 +1681,97 @@ class TestTheDecodeWidensTheGridOutsideThisPrediction:
             predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=True, model=model, scaled_layers=layers)
             == sd["lin.weight"].nelement() * 2
         )
+
+
+def _torchao_layer(layer: str, out_f: int = 32, in_f: int = 16) -> tuple[dict[str, torch.Tensor], torch.Tensor]:
+    """One layer as unsloth's torchao FP8 build stores it, and the weight it means (`q.float() * scale`)."""
+    torch.manual_seed(0)
+    q = (torch.randn(out_f, in_f) * 40).to(FP8_DTYPE)
+    scale = torch.rand(out_f, 1) + 0.5
+    return {f"{layer}._weight_qdata": q, f"{layer}._weight_scale": scale}, q.float() * scale
+
+
+class TestTorchaoFp8:
+    def test_a_translated_layer_dequantizes_to_the_weight_the_file_means(self) -> None:
+        sd, meant = _torchao_layer("lin")
+
+        assert translate_torchao_fp8_layers(sd) == 1
+
+        assert set(sd) == {"lin.weight", "lin.weight_scale"}
+        layers = extract_fp8_scaled_layers(sd)
+        dequantize_fp8_scaled(sd, layers, torch.float32)
+        assert torch.equal(sd["lin.weight"], meant)
+
+    def test_a_translated_layer_stays_fp8_with_a_flat_scale_through_the_split(self) -> None:
+        """The `[out, 1]` scale reads as block-wise unless flattened; the split would then fold the layer to bf16."""
+        sd, meant = _torchao_layer("lin")
+        model = torch.nn.Sequential()
+        model.add_module("lin", torch.nn.Linear(16, 32))
+        translate_torchao_fp8_layers(sd)
+        layers = extract_fp8_scaled_layers(sd)
+
+        assert layers["lin"].weight_scale.shape == (32,)
+        kept = split_fp8_scaled_layers(sd, layers, torch.bfloat16, model=model)
+
+        assert set(kept) == {"lin"}
+        assert sd["lin.weight"].dtype is FP8_DTYPE
+        assert torch.equal(dequantize_weight(sd["lin.weight"], kept["lin"].weight_scale, torch.float32), meant)
+
+    @pytest.mark.parametrize("scale_shape", [(32, 1), (32,)])
+    def test_a_per_row_scale_is_accepted_flat_or_not(self, scale_shape: tuple[int, ...]) -> None:
+        sd, _ = _torchao_layer("lin")
+        sd["lin._weight_scale"] = sd["lin._weight_scale"].reshape(scale_shape)
+        assert find_torchao_fp8_problem(sd) is None
+
+    def test_a_state_dict_without_torchao_keys_has_nothing_to_translate(self) -> None:
+        sd = {"lin.weight": torch.zeros(4, 4), 7: torch.zeros(1)}
+        assert find_torchao_fp8_problem(sd) is None
+        assert translate_torchao_fp8_layers(sd) == 0
+        assert set(sd) == {"lin.weight", 7}
+
+    @pytest.mark.parametrize(
+        ("label", "edit", "fragment"),
+        [
+            ("int8 payload", lambda sd: sd.update({"b._weight_qdata": torch.zeros(32, 16, dtype=torch.int8)}), "int8"),
+            (
+                "zero point",
+                lambda sd: sd.update({"b._weight_zero_point": torch.zeros(32, 1, dtype=torch.int8)}),
+                "zero point",
+            ),
+            ("per-tensor scale", lambda sd: sd.update({"b._weight_scale": torch.ones(1)}), "per-tensor"),
+            ("block-wise scale", lambda sd: sd.update({"b._weight_scale": torch.ones(32, 4)}), "block-wise"),
+            ("half precision scale", lambda sd: sd.update({"b._weight_scale": torch.ones(32, 1).half()}), "float32"),
+            ("orphaned payload", lambda sd: sd.pop("b._weight_scale"), "no torchao scale"),
+            ("orphaned scale", lambda sd: sd.pop("b._weight_qdata"), "no quantized weight"),
+            (
+                "torchao tensor this decode does not apply",
+                lambda sd: sd.update({"b._weight_act_pre_scale": torch.ones(16)}),
+                "_weight_act_pre_scale",
+            ),
+            ("plain weight beside it", lambda sd: sd.update({"b.weight": torch.zeros(32, 16)}), "plain weight"),
+            (
+                "3-D payload",
+                lambda sd: sd.update({"b._weight_qdata": torch.zeros(32, 4, 4).to(FP8_DTYPE)}),
+                "3-D",
+            ),
+        ],
+    )
+    def test_anything_but_the_per_row_fp8_layout_is_refused_by_name(self, label: str, edit, fragment: str) -> None:
+        # A good layer sorts before the bad one: a check that stops at the first layer would pass.
+        sd = {**_torchao_layer("a")[0], **_torchao_layer("b")[0]}
+        edit(sd)
+        before = dict(sd)
+
+        problem = find_torchao_fp8_problem(sd)
+
+        assert problem is not None and "'b'" in problem and fragment in problem, label
+        with pytest.raises(ValueError, match="torchao"):
+            translate_torchao_fp8_layers(sd)
+        assert sd == before, "a refused state dict must be left as it was"
+
+    def test_identification_can_check_meta_tensors(self) -> None:
+        sd, _ = _torchao_layer("a")
+        meta = {key: value.to("meta") for key, value in sd.items()}
+        assert find_torchao_fp8_problem(meta) is None
+        meta["a._weight_scale"] = torch.empty(32, 4, device="meta")
+        assert find_torchao_fp8_problem(meta) is not None

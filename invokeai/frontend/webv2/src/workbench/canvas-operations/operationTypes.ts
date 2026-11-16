@@ -27,6 +27,8 @@ export type SamSessionErrorCode =
   | 'output-dimension'
   | 'decode'
   | 'locked'
+  /** Applying or saving the preview failed; its message is kept as `detail`. */
+  | 'commit-failed'
   /** The layer's image could not be read (it is gone or does not decode). */
   | 'unreadable'
   | 'unknown';
@@ -61,6 +63,8 @@ export interface SamSessionSnapshot {
     | 'committing'
     | 'error';
   error: SamSessionError | null;
+  /** A run asked for after a failed run is still in flight, so the retry control stays for it. */
+  retrying: boolean;
   hasPreview: boolean;
 }
 export type LayerFilterSettings = RasterFilterSettings;

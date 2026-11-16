@@ -2,7 +2,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { createWorkbenchStore, type WorkbenchInternalStore } from '@workbench/workbenchStore';
-import { act, useSyncExternalStore } from 'react';
+import { act, StrictMode, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -14,6 +14,7 @@ vi.mock('react-i18next', () => ({
     t: (key: string, options?: { name?: string }) =>
       ({
         'common.done': 'Done',
+        'topbar.presets.edit': 'Edit layout preset',
         'topbar.presets.deleteNamed': `Delete ${options?.name ?? ''}`,
         'topbar.presets.editNamed': `Edit ${options?.name ?? ''}`,
         'topbar.presets.manage': 'Manage presets',
@@ -31,6 +32,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   ) => selector(useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)),
 }));
 
+import { LayoutPresetAdminDialogs } from './LayoutPresetAdminDialogs';
 import { LayoutPresetManagerDialog } from './LayoutPresetManagerDialog';
 import { LayoutPresetManagerDialogBody } from './LayoutPresetManagerDialogBody';
 import { closeLayoutPresetManager, openLayoutPresetManager } from './layoutPresetManagerStore';
@@ -59,9 +61,7 @@ const renderManager = async () => {
 };
 
 const presetRowIds = () =>
-  Array.from(document.querySelectorAll<HTMLElement>('[data-layout-preset-id]')).map(
-    (element) => element.dataset.layoutPresetId
-  );
+  Array.from(document.querySelectorAll<HTMLElement>('[data-list-row]')).map((element) => element.dataset.listRow);
 
 const pointer = (type: string, target: EventTarget, clientX: number, clientY: number): void => {
   target.dispatchEvent(
@@ -72,8 +72,35 @@ const pointer = (type: string, target: EventTarget, clientX: number, clientY: nu
 const dragHandle = (name: string): HTMLButtonElement | null =>
   document.querySelector<HTMLButtonElement>(`button[aria-label="Reorder ${name}"]`);
 
-const presetRow = (id: string): HTMLElement | null =>
-  document.querySelector<HTMLElement>(`[data-layout-preset-id="${id}"]`);
+const presetRow = (id: string): HTMLElement | null => document.querySelector<HTMLElement>(`[data-list-row="${id}"]`);
+
+/** Both topbar hosts, as the app mounts them (StrictMode included), so the edit dialog stacks over the manager. */
+const renderTopBarDialogs = async () => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await act(() =>
+    root?.render(
+      <StrictMode>
+        <ChakraProvider value={system}>
+          <LayoutPresetManagerDialog />
+          <LayoutPresetAdminDialogs />
+        </ChakraProvider>
+      </StrictMode>
+    )
+  );
+};
+
+const dialogNamed = (title: string): HTMLElement | null =>
+  Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]')).find(
+    (dialog) => dialog.querySelector('[data-part="title"]')?.textContent === title
+  ) ?? null;
+
+const buttonNamed = (container: Element, text: string): HTMLButtonElement =>
+  Array.from(container.querySelectorAll('button')).find((button) => button.textContent === text)!;
+
+const editButton = (name: string): HTMLButtonElement | null =>
+  document.querySelector<HTMLButtonElement>(`button[aria-label="Edit ${name}"]`);
 
 beforeEach(() => {
   store = createWorkbenchStore();
@@ -112,6 +139,31 @@ describe('LayoutPresetManagerDialogBody', () => {
     // An unmounted dialog never reaches its closed state, so it cannot animate out; a retained one does, then leaves.
     expect(closingFrames(frames)).not.toHaveLength(0);
     await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it.each([
+    ['Cancel', () => userEvent.click(buttonNamed(dialogNamed('Edit layout preset')!, 'common.cancel'))],
+    ['Escape', () => userEvent.keyboard('{Escape}')],
+    [
+      'the close button',
+      () => userEvent.click(dialogNamed('Edit layout preset')!.querySelector('[data-part="close-trigger"]')!),
+    ],
+  ])('closes only the edit dialog stacked over the manager on %s', async (_way, dismiss) => {
+    await renderTopBarDialogs();
+    await act(() => openLayoutPresetManager());
+    await expect.poll(() => dialogNamed('Manage presets')?.getAttribute('data-state')).toBe('open');
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await act(() => userEvent.click(editButton('Writing')!));
+      await expect.poll(() => dialogNamed('Edit layout preset')?.getAttribute('data-state')).toBe('open');
+      await expect.poll(() => dialogNamed('Edit layout preset')?.contains(document.activeElement)).toBe(true);
+
+      await act(dismiss);
+
+      await expect.poll(() => dialogNamed('Edit layout preset')).toBeNull();
+      expect(dialogNamed('Manage presets')?.getAttribute('data-state')).toBe('open');
+      await expect.poll(() => document.activeElement).toBe(editButton('Writing'));
+    }
   });
 
   it('renders one account-ordered list without preset descriptions', async () => {

@@ -17,6 +17,7 @@ import torch
 
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
+from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_MossImage_Config
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_MossImage_Config,
     Main_Diffusers_MossImage_Config,
@@ -156,19 +157,26 @@ def test_the_vae_is_one_flux2_vae(tmp_path: Path) -> None:
     assert result.match_count == 1
 
 
-def test_a_lora_for_the_transformer_is_not_a_main_model(tmp_path: Path) -> None:
+def test_a_lora_for_the_transformer_is_a_moss_image_lora_not_a_main_model(tmp_path: Path) -> None:
     # A LoRA addresses the same modules, so the fingerprint's module names are all there.
     keys: Keys = {}
-    for module in ("shared_block_modulation", "final_linear_video", "text_embedder.blocks.0.qkv", "layers.0.proj.q"):
-        keys[f"diffusion_model.{module}.lora_A.weight"] = ([16, 3072], "BF16")
-        keys[f"diffusion_model.{module}.lora_B.weight"] = ([3072, 16], "BF16")
-        keys[f"diffusion_model.{module}.weight"] = ([3072, 3072], "BF16")
+    for module, rows, columns in (
+        ("shared_block_modulation", 18432, 3072),
+        ("final_linear_video", 128, 3072),
+        ("text_embedder.blocks.0.qkv", 9216, 3072),
+        ("layers.0.proj.q", 3072, 3072),
+    ):
+        keys[f"diffusion_model.{module}.lora_A.weight"] = ([16, columns], "BF16")
+        keys[f"diffusion_model.{module}.lora_B.weight"] = ([rows, 16], "BF16")
+        keys[f"diffusion_model.{module}.weight"] = ([rows, columns], "BF16")
 
     result = ModelConfigFactory.from_model_on_disk(
         write_header_only_safetensors(tmp_path / "moss-lora.safetensors", keys), allow_unknown=True
     )
 
     assert isinstance(result.details[Main_Checkpoint_MossImage_Config.__name__], NotAMatchError)
+    # Its weights are no LoRA parameter, so the file is refused for them instead of installing as a partial LoRA.
+    assert isinstance(result.details[LoRA_LyCORIS_MossImage_Config.__name__], InvalidMatchError)
 
 
 @pytest.mark.parametrize(

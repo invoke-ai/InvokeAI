@@ -153,11 +153,9 @@ const createPersistence = (load: WorkbenchPersistencePort['loadWorkbench']) => {
   let pending = false;
   let closedSession = false;
   let unloadWouldLose = false;
-  let unloadAtRisk = false;
   const sessionReopenedListeners = new Set<() => void>();
   const persistence: WorkbenchPersistencePort = {
     hasChangesUnloadWouldLose: () => unloadWouldLose,
-    isUnloadAtRisk: () => unloadAtRisk,
     hasClosedSession: () => closedSession,
     hasPendingChanges: () => pending,
     journalBeforeUnload: vi.fn(() => ({ kind: 'nothing-to-journal' as const })),
@@ -182,10 +180,6 @@ const createPersistence = (load: WorkbenchPersistencePort['loadWorkbench']) => {
     },
     setPending(next: boolean) {
       pending = next;
-    },
-    /** Local recovery could lose an edit (a project too large for the journal is open, or storage is failing). */
-    setUnloadAtRisk(next: boolean) {
-      unloadAtRisk = next;
     },
     /** What local recovery reports after the latest journal: an unsaved document it could not take. */
     setUnloadWouldLose(next: boolean) {
@@ -1334,7 +1328,7 @@ describe('Workbench persistence runtime unload journal', () => {
     return journaledNames;
   };
 
-  it('journals committed drafts before the hidden-page save, including a revision whose save is in flight', async () => {
+  it('journals held drafts before saving once across repeated unload and hidden checkpoints, including an in-flight save', async () => {
     const page = createPage();
     const draft = createHeldDraft();
     const { aggregate, clock, persistence } = await startLoaded({ commitDrafts: draft.commit, page: page.port });
@@ -1345,10 +1339,12 @@ describe('Workbench persistence runtime unload journal', () => {
     expect(journaledNames).toEqual([]);
 
     draft.held.name = 'Typed just before hiding';
+    expect(page.beforeUnload()).toBe(false);
+    // Before unload, pagehide and becoming hidden checkpoint the same revision.
     page.hide();
-    // Unloading fires both `pagehide` and becoming hidden; the second has nothing new to journal.
     page.hide();
     expect(journaledNames).toEqual(['Typed just before hiding']);
+    expect(savedNames(persistence)).toEqual(['Typed just before hiding']);
     expect(vi.mocked(persistence.journalBeforeUnload!).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(persistence.saveWorkbench).mock.invocationCallOrder[0]!
     );
@@ -1491,34 +1487,17 @@ describe('Workbench persistence runtime unload prompt', () => {
     return journaledNames;
   };
 
-  it('listens for unloads only while local recovery reports a risk', async () => {
+  it('checkpoints on every unload and asks when journaling fails outright', async () => {
     const page = createPage();
-    const loaded = await startLoaded({ page: page.port });
-    const { aggregate, clock, persistence, setUnloadAtRisk } = loaded;
-    expect(page.isListeningBeforeUnload).toBe(false);
-
-    // A project too large for the journal opens, say: the next persisted revision registers the listener.
-    setUnloadAtRisk(true);
-    aggregate.edit('Opened a large project');
+    const { aggregate, persistence } = await startLoaded({ page: page.port });
     expect(page.isListeningBeforeUnload).toBe(true);
-
-    // The save that settles it finds the risk gone (the project closed, or storage recovered).
-    const save = deferred<WorkbenchSaveResult>();
-    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => save.promise);
-    clock.runAll();
-    setUnloadAtRisk(false);
-    save.resolve(saveResult(aggregate.state));
-    await flushPromises();
-    expect(page.isListeningBeforeUnload).toBe(false);
-
-    // A journal that fails outright leaves nothing known about recovery, so it listens until one succeeds.
+    expect(page.beforeUnload()).toBe(false);
     persistence.journalBeforeUnload = vi.fn(() => {
       throw new Error('storage gone');
     });
     aggregate.edit('Unjournaled');
-    page.hide();
-    expect(page.isListeningBeforeUnload).toBe(true);
     expect(page.beforeUnload()).toBe(true);
+    expect(savedNames(persistence)).toEqual(['Unjournaled']);
   });
 
   it('asks only when the journal could not take the unsaved revision, journaling it first', async () => {
@@ -1528,7 +1507,6 @@ describe('Workbench persistence runtime unload prompt', () => {
     const { aggregate, clock, persistence } = loaded;
     draft.held.commitTo = aggregate;
     const journaledNames = journalTo(loaded);
-    loaded.setUnloadAtRisk(true);
     aggregate.edit('At risk');
     clock.runAll();
     await flushPromises();
@@ -1538,6 +1516,8 @@ describe('Workbench persistence runtime unload prompt', () => {
     expect(journaledNames).toEqual([]);
 
     // An ordinary edit, still held in a debounced field: the journal keeps it, so leaving needs no prompt.
+    const save = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => save.promise);
     draft.held.name = 'Typed';
     expect(page.beforeUnload()).toBe(false);
     expect(journaledNames).toEqual(['Typed']);
@@ -1547,24 +1527,21 @@ describe('Workbench persistence runtime unload prompt', () => {
     // Asked again (the user stayed, then left once more) without journaling the same revision twice.
     expect(page.beforeUnload()).toBe(true);
     // The unload that follows has nothing new to journal.
-    const save = deferred<WorkbenchSaveResult>();
-    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => save.promise);
     page.hide();
     expect(journaledNames).toEqual(['Typed', tooLarge]);
 
     // Once the server has it, nothing is left to lose.
     save.resolve(saveResult(aggregate.state));
+    await vi.waitFor(() => expect(savedNames(persistence)).toEqual(['At risk', 'Typed', tooLarge]));
     await flushPromises();
-    clock.runAll();
     expect(page.beforeUnload()).toBe(false);
   });
 
-  it('never listens before loading, while the session is closed, or after the account lifetime ended', async () => {
+  it('does not checkpoint or prompt before load, while closed, or after its account lifetime ended', async () => {
     const page = createPage();
     const aggregate = createAggregate();
     const load = deferred<HydratedWorkbenchSnapshot | null>();
     const fake = createPersistence(() => load.promise);
-    fake.setUnloadAtRisk(true);
     fake.setUnloadWouldLose(true);
     const controller = new AbortController();
     const runtime = createWorkbenchPersistenceRuntime({
@@ -1576,7 +1553,9 @@ describe('Workbench persistence runtime unload prompt', () => {
     });
     runtime.start();
     aggregate.edit('While loading');
-    expect(page.isListeningBeforeUnload).toBe(false);
+    expect(page.beforeUnload()).toBe(false);
+    expect(fake.persistence.journalBeforeUnload).not.toHaveBeenCalled();
+    expect(fake.persistence.saveWorkbench).not.toHaveBeenCalled();
 
     load.resolve(null);
     await flushPromises();
@@ -1585,9 +1564,12 @@ describe('Workbench persistence runtime unload prompt', () => {
     fake.setClosedSession(true);
     expect(page.beforeUnload()).toBe(false);
     aggregate.edit('Closed');
-    expect(page.isListeningBeforeUnload).toBe(false);
+    expect(page.beforeUnload()).toBe(false);
+    expect(fake.persistence.journalBeforeUnload).not.toHaveBeenCalled();
+    expect(fake.persistence.saveWorkbench).not.toHaveBeenCalled();
     fake.reopenSession();
     expect(page.beforeUnload()).toBe(true);
+    expect(fake.persistence.journalBeforeUnload).toHaveBeenCalledOnce();
 
     controller.abort();
     expect(page.isListeningBeforeUnload).toBe(false);
@@ -1598,7 +1580,6 @@ describe('Workbench persistence runtime unload prompt', () => {
     const loaded = await startLoaded({ page: page.port });
     const { aggregate, persistence, runtime } = loaded;
     const journaledNames = journalTo(loaded);
-    loaded.setUnloadAtRisk(true);
     const checkpointSave = deferred<WorkbenchSaveResult>();
     vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => checkpointSave.promise);
     aggregate.edit(tooLarge);
@@ -1618,7 +1599,6 @@ describe('Workbench persistence runtime unload prompt', () => {
   it('stops listening when the exit checkpoint settles', async () => {
     const page = createPage();
     const loaded = await startLoaded({ page: page.port });
-    loaded.setUnloadAtRisk(true);
     loaded.aggregate.edit('Left the editor');
     expect(page.isListeningBeforeUnload).toBe(true);
 
