@@ -126,7 +126,7 @@ dependencies = [
   "picklescan",
   "pillow>=13.0.0",
   "prompt-toolkit",
-  "pypatchmatch",
+  "pypatchmatch>=2.2.0", # wheels ship the native library; 1.x downloads or compiles it at import
   "PyJWT>=2.15.0",
   "python-multipart",
   "requests",
