@@ -74,12 +74,13 @@ def _line(features: Mapping[str, FeatureValue]) -> Line | None:
     if line.sits_on is not None:
         beneath, tile_area = line.sits_on
         size = tile_area if features.get("conv_backend") == "miopen" else line.size
-        # shortcut: on MIOpen nothing here grows with the frame, but tile peaks do: on the W7900 bf16 decodes grow by ~78
-        # B/px at a 512px tile, ~136 at 768 and ~220 at 1024 between 4096 and 5120px (fp32 flat), which passes the
-        # reservation near 5472px (512px tiles) and 5856px (768 and 1024). The reservation covers the measured frames
-        # only. W7900: decodes to 5120px, encodes to 4096px, every dtype and tile. RX 9060 XT (Windows), largest frame
-        # per tile 512/768/1024: bf16 decodes 6144 at each; fp32 decodes 5120/2048/none; bf16 encodes 2048/2048/5120;
-        # fp32 encodes -/-/4096. Past them it is not guaranteed; measure larger frames, add a frame term if they pass it.
+        # shortcut: on MIOpen nothing here grows with the frame, but tile peaks do (W7900 bf16 decodes by ~78 B/px at a
+        # 512px tile, ~136 at 768, ~220 at 1024; fp32 512px tiles ~19). The reservation covers the measured frames only.
+        # W7900: decodes to 5120px, encodes to 4096px, every dtype and tile. RX 9060 XT (Windows), largest frame per tile
+        # 512/768/1024: bf16 decodes 6144 at each; fp32 decodes 5120/2048/3072; bf16 encodes 5120/5120/5120; fp32
+        # encodes 4096/4096/4096. Extending each line's last measured segment crosses its reservation from ~4200px
+        # (encodes: W7900 bf16 768px tiles, RX fp32 512px tiles) and ~5260px (decodes: RX fp32 512px tiles; W7900 bf16
+        # 512px tiles ~5490). Past the measured frames it is not guaranteed; measure them and add a frame term if needed.
         return line._replace(size=size, sits_on=(_untiled_line(beneath, tile_area, features), tile_area), assembly=None)
     return line._replace(suffix=_untiled_line(line.suffix, line.size, features))
 
@@ -147,8 +148,10 @@ def estimate_working_memory(
 @functools.cache
 def _measured_untiled_peaks(operation: str, platform: Platform, dtype: str) -> tuple[tuple[int, int, int, int], ...]:
     """The shipped untiled points of `operation` in `dtype` that cap the line where `platform` is priced, as (area,
-    bytes, height, width) by area; the larger where two shapes share an area. A platform with none (cuDNN under
-    `cudaMallocAsync`) reads its backend's native allocator's, which `priced_as` documents as the larger."""
+    bytes, height, width) by area, the bytes a running maximum: the W7900's 1024x1536 decode peaked below the smaller
+    1248x1248 one, and the decision must not fall as a frame grows. Where a non-native allocator has no point of this
+    operation and dtype (cuDNN under `cudaMallocAsync`), the native allocator's, which `priced_as` documents as the
+    larger."""
     data = shipped_data().values()
     entries = [entry for file in data for entry in file.coefficients]
     priced = {key: str(value) for key, value in dataclasses.asdict(priced_as(platform)).items()}
@@ -172,7 +175,12 @@ def _measured_untiled_peaks(operation: str, platform: Platform, dtype: str) -> t
                     peaks[height * width] = (point.measured_bytes, height, width)
     if not peaks and platform.allocator != "native":
         return _measured_untiled_peaks(operation, dataclasses.replace(platform, allocator="native"), dtype)
-    return tuple((area, *peak) for area, peak in sorted(peaks.items()))
+    running = 0
+    measured = []
+    for area, (peak, height, width) in sorted(peaks.items()):
+        running = max(running, peak)
+        measured.append((area, running, height, width))
+    return tuple(measured)
 
 
 def untiled_peak_bytes(
@@ -184,13 +192,12 @@ def untiled_peak_bytes(
     that fit, and tiled output is not pixel-identical. So within the measured untiled points of the platform the device
     is priced as (each OS-specific entry has its own) this is the chord between the two neighbouring points, in bytes,
     and past the last one that point's bytes plus what the peak grows by from it. One point decides from its own size
-    on: cuDNN's, so a 1024px decode on NVIDIA tiles on its measured 8.38 GiB rather than on what it reserves. Where no
-    point decides, the peak is the reservation without `fit.SHIPPED_MARGIN`: below the first point (which keeps the
-    line's base that a proportional scaling of the point would drop, but never more than the first point's bytes, so
-    the decision does not fall as a frame grows into it), its growth past the last, and with no point at all. On cuDNN
-    only the bf16 decode stand-in carries that margin (raised to its 1024px point x1.05); the fp32 decode, both encodes
-    and decode_large_bf16 are the original pricing without one, so there this is a ~5% discount, which the ceiling's
-    10% headroom covers. cuDNN is measured at 1024px only: its growth past that rests on the stand-in slope.
+    on: cuDNN's, so a 1024px decode on NVIDIA tiles on its measured 8.38 GiB rather than on what it reserves. Around
+    the points the peak is the reservation without `fit.SHIPPED_MARGIN`, which a line fitted or raised on them carries:
+    below the first point (which keeps the line's base that a proportional scaling of the point would drop, but never
+    more than the first point's bytes, so the decision does not fall as a frame grows into it) and its growth past the
+    last. cuDNN is measured at 1024px only, so its growth past that rests on the stand-in slope. With no point at all
+    (cuDNN's fp32 decode and both encodes, the original pricing, which carries no margin) it is the reservation.
     """
     peaks = _measured_untiled_peaks(operation, platform_for(device), _dtype(element_size))
 
@@ -200,7 +207,7 @@ def untiled_peak_bytes(
 
     area = height * width
     if not peaks:
-        return reserved(height, width)
+        return estimate_working_memory(operation, height, width, None, element_size, device).reservation_bytes
     if area < peaks[0][0]:
         return min(reserved(height, width), peaks[0][1])
     last_area, last_bytes, last_height, last_width = peaks[-1]

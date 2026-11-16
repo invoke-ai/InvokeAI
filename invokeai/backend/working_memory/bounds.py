@@ -265,9 +265,10 @@ own, rounded up to two decimals, so a refit that moves one shows in the data tes
   1536 px, the untiled demand at the tile: held at 1.43x. The 768 px tile of a 1536 px frame took 9.04 GiB, and
   7.39-7.43 GiB at 2048-4096 px: held at 1.31-1.32x. The 512 px tile took 4.24-4.38 GiB at 1536, 3072 and 5120 px,
   but 3.35 GiB at 2048 px, where the allocator has not yet jumped: held at 1.40x. On the RX 9060 XT on Windows the
-  line is flat, 1.32 GiB, from the 512 px tile, which took 4.24-4.25 GiB against 3.00 untiled at 1536 and 3072 px and
-  3.35 GiB at 2048 px: held at 1.51x, the untiled line's 1.24x headroom at 512 px on top; and a 512x1536 frame in 1024 px tiles, 5.91 GiB,
-  at 1.48x, whose 512x1024 tiles nobody measured untiled."""
+  line is flat, 1.45 GiB, set by the 512 px tile of a 5120 px frame, which took 4.38 GiB against 3.00 untiled; the
+  tile took 4.05-4.25 GiB at 1536, 3072 and 6144 px, but 3.35 GiB at 2048 px and 3.69 GiB at 4096 px, where the
+  allocator has not yet jumped: held at 1.55x and 1.40x, the untiled line's 1.24x headroom at 512 px on top; and a
+  512x1536 frame in 1024 px tiles, 5.91 GiB, at 1.50x, whose 512x1024 tiles nobody measured untiled."""
 
 
 def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:
