@@ -213,7 +213,9 @@ export const GenerateAdvancedFields = ({
     </GenerateFieldContextMenu>
   );
 
-  const customVae = policy.sdVaeVisible && Boolean(settings.vae?.key);
+  // The VAE the model's defaults name is no change from them, as Apply model defaults sets it.
+  const isVaeAtDefault = !settings.vae || isModelDefaultVae(selectedModel, settings.vae);
+  const customVae = policy.sdVaeVisible && !isVaeAtDefault;
 
   if (
     !policy.sdVaeVisible &&
@@ -262,9 +264,8 @@ export const GenerateAdvancedFields = ({
           {policy.sdVaeVisible ? (
             <GenerateFieldContextMenu
               fieldLabel={t('widgets.generate.vae')}
-              copyValue={() => settings.vae?.name ?? t('widgets.generate.modelDefault')}
-              // The VAE the model's defaults name is no change from them, as Apply model defaults sets it.
-              isAtDefault={!settings.vae || isModelDefaultVae(selectedModel, settings.vae)}
+              copyValue={() => settings.vae?.name ?? t('widgets.generate.bundledVae')}
+              isAtDefault={isVaeAtDefault}
               resetLabel={t('widgets.generate.useBundledVae')}
               onReset={() => onCommitImmediate({ vae: null })}
             >
@@ -274,10 +275,12 @@ export const GenerateAdvancedFields = ({
                 labelPlacement="inside"
                 helpText={settings.vae ? undefined : t('widgets.generate.usingBundledVae')}
               >
+                {/* Clearable: at the model's default VAE the reset is off, and clearing is how to reach the bundled one. */}
                 <ModelSelect
+                  isClearable
                   filter={(model) => model.base === modelBase}
                   modelTypes={['vae']}
-                  placeholder={t('widgets.generate.modelDefault')}
+                  placeholder={t('widgets.generate.bundledVae')}
                   relatedTo={selectedModel?.key ?? null}
                   value={settings.vae?.key ?? null}
                   onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}

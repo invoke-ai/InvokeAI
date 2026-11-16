@@ -3370,6 +3370,7 @@
       "resetToModelDefault": "Reset to model default",
       "resetToBaseDefault": "Reset to {{base}} default",
       "resetToModelAndBaseDefault": "Reset to model and {{base}} default",
+      "bundledVae": "Bundled VAE",
       "useBundledVae": "Use the bundled VAE",
       "resetToConceptDefault": "Reset to concept default",
       "resetToDefault": "Reset to default",

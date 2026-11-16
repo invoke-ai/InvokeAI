@@ -532,6 +532,12 @@ describe('GenerateAdvancedFields reset dots', () => {
     await render({ ...sd1Model, default_settings: { vae: 'vae-1' } }, false, { vae });
 
     expect(dot('VAE', 'Use the bundled VAE')).toBeNull();
+    // The section agrees with the field: no override to count.
+    expect(host?.textContent).not.toContain('1 override');
+
+    await settle(() => root?.unmount());
+    await render(sd1Model, false, { vae });
+    expect(host?.textContent).toContain('1 override');
   });
 
   it.each([

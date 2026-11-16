@@ -271,7 +271,7 @@ const formatSettingValue = (
         settings.scheduler
       );
     case 'vae':
-      return settings.vae?.name ?? t('widgets.generate.modelDefault');
+      return settings.vae?.name ?? t('widgets.generate.bundledVae');
     case 'vaePrecision':
       return settings.vaePrecision.toUpperCase();
     // Exactly as the fields show them, so two values that differ there never read the same here.

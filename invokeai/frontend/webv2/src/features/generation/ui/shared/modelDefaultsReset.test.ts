@@ -143,7 +143,7 @@ describe('getApplyModelDefaultsPlan', () => {
     // SD3 has no VAE override field; the default the model sets is applied and told all the same.
     expect(plan.patch).toEqual({ vae: null });
     expect(describeChanges(plan.changed, settings, after(settings, plan.patch), sd3, t, 'en')).toBe(
-      'VAE SD3 VAE → Model default'
+      'VAE SD3 VAE → Bundled VAE'
     );
     // With the bundled VAE in use, the model's defaults hold: it does set one.
     expect(getApplyModelDefaultsPlan({ ...settings, vae: null }, sd3, [sd3Vae]).defined).toEqual(['vae']);

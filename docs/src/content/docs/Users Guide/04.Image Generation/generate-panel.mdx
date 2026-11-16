@@ -94,7 +94,7 @@ The **Refiner** section appears for SDXL models. Pick an **SDXL Refiner** model 
 
 The **Advanced** section appears for models with extra options. Each setting you have changed from the model's default shows the reset dot, and while the section is folded its title shows how many of them there are. Depending on the model it can include:
 
-* **VAE** and **VAE precision** — for SD 1.5 and SDXL, choose a different VAE or decode at FP32 precision. The VAE's dot, **Use the bundled VAE**, returns to the VAE bundled with the model; it does not show for the VAE the model's default settings name. Other families set their VAE in the Components section.
+* **VAE** and **VAE precision** — for SD 1.5 and SDXL, choose a different VAE or decode at FP32 precision. The VAE's dot, **Use the bundled VAE**, returns to the VAE bundled with the model. The VAE the model's default settings name counts as unchanged, so it shows no dot and adds no override; to use the bundled VAE instead, clear the VAE field with its × button. Other families set their VAE in the Components section.
 * **CLIP skip** and **CFG rescale** — SD 1.5 and SD 2.x only.
 * **HiDiffusion** — improves structure at large sizes for SD 1.5 and SDXL; see [HiDiffusion](/users-guide/image-generation/advanced-topics/hidiffusion/).
 * **Color compensation** — SDXL only.
