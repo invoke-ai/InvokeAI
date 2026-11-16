@@ -947,3 +947,45 @@ describe('upscale metadata', () => {
     expect(recorded).toEqual(loaded);
   });
 });
+
+describe('compileUpscaleGraph for MOSS-Image', () => {
+  const createMossImageValues = () => {
+    const models = [
+      { ...model('main', 'main', 'moss-image'), format: 'diffusers' },
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('lora', 'lora', 'moss-image'),
+    ] as ModelConfig[];
+
+    return {
+      ...createDefaultUpscaleWidgetValues(models),
+      inputImage: { height: 101, image_name: 'input.png', width: 203 },
+      loras: [{ isEnabled: true, model: models[2] as GenerateLora['model'], weight: 0.7 }],
+      positivePrompt: 'detail',
+    };
+  };
+
+  it('patches the refine pass transformer with the active LoRAs and leaves the encoder and VAE on the loader', () => {
+    const { edges, nodes } = compileUpscaleGraph(createMossImageValues(), 'gallery', {
+      useCpuNoise: true,
+    }).backendGraph;
+    const loraLoaderId = Object.entries(nodes).find(
+      ([, node]) => node.type === 'moss_image_lora_collection_loader'
+    )?.[0];
+
+    expect(loraLoaderId).toBeDefined();
+    expect(hasEdge(edges, 'model_loader', 'transformer', loraLoaderId ?? '', 'transformer')).toBe(true);
+    expect(hasEdge(edges, loraLoaderId ?? '', 'transformer', 'denoise_latents', 'transformer')).toBe(true);
+    expect(hasEdge(edges, 'model_loader', 'transformer', 'denoise_latents', 'transformer')).toBe(false);
+    expect(hasEdge(edges, 'model_loader', 'qwen3_5_encoder', 'pos_cond', 'qwen3_5_encoder')).toBe(true);
+    expect(hasEdge(edges, 'model_loader', 'vae', 'denoise_latents', 'vae')).toBe(true);
+  });
+
+  it('takes the transformer straight from the model loader without LoRAs', () => {
+    const { edges, nodes } = compileUpscaleGraph({ ...createMossImageValues(), loras: [] }, 'gallery', {
+      useCpuNoise: true,
+    }).backendGraph;
+
+    expect(Object.values(nodes).some((node) => node.type === 'moss_image_lora_collection_loader')).toBe(false);
+    expect(hasEdge(edges, 'model_loader', 'transformer', 'denoise_latents', 'transformer')).toBe(true);
+  });
+});

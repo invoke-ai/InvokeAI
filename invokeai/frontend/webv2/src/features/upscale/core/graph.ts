@@ -956,7 +956,7 @@ const addPromptConditioning = (
 /**
  * MOSS-Image runs the pass whole like FLUX.2, whose VAE it shares: `moss_image_denoise` takes and returns the FLUX.2
  * VAE's raw latent layout, so the FLUX.2 encode and decode nodes, tiled at both ends, work on either side of it. It
- * clips by sigma value like FLUX. It has no LoRA loader and no tile ControlNet, so the pass is anchored only by where
+ * clips by sigma value like FLUX. Its LoRAs load on the transformer only. It has no tile ControlNet, so the pass is anchored only by where
  * it starts. Generate's layout prompt is left out: it only turns a layout draft or canvas regions into the prompt.
  */
 const buildMossImageUpscalePath: UpscalePathBuilder = ({
@@ -979,6 +979,13 @@ const buildMossImageUpscalePath: UpscalePathBuilder = ({
     type: 'moss_image_model_loader',
     vae_model: settings.vae ? toModelIdentifier(settings.vae) : undefined,
   });
+  // MOSS-Image LoRAs train the transformer only; the VAE and the Qwen3.5 encoder stay on the model loader.
+  const activeLoras = getActiveCompatibleLoras({ loras: settings.loras }, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'moss_image_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   const imageToLatents = addNode(graph, {
     id: 'i2l',
     tile_size: settings.tileSize,
@@ -1013,7 +1020,7 @@ const buildMossImageUpscalePath: UpscalePathBuilder = ({
     negativePrompt: wiresUpscaleNegativePrompt(model, settings.cfgScale) ? negativePrompt : null,
     positivePrompt,
   });
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, seed, 'value', denoise, 'seed');
   const fitted = fitFrameToDenoiseSize(graph, frame, denoiseSize);
 
