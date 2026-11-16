@@ -24,7 +24,7 @@ import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { normalizeControlAdapter } from '@workbench/controlAdapters';
 import { resetPropertyGroupCollapse } from '@workbench/widgets/canvas/tool-presentation/propertyGroupStore';
 import { createInstance } from 'i18next';
-import { act } from 'react';
+import { act, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -143,12 +143,28 @@ const retries: string[] = [];
 let intentResult: ControlLayerIntentResult = 'updated';
 const statuses = createControlDetectionStatusStore();
 
+type LiveDocumentModel = ReturnType<typeof createDocumentModel>;
+/** The live document each fake engine shows, read by the panel as the layers pane reads the project's document. */
+const liveDocuments = new WeakMap<
+  Engine,
+  { read: () => LiveDocumentModel | null; subscribe: (listener: () => void) => () => void }
+>();
+const noLiveDocument = { read: () => null, subscribe: () => () => undefined };
+
 const engineWith = (layers: CanvasLayerContract[], { hasContent = true } = {}): Engine => {
   const document = { ...createEmptyCanvasDocument(), stacks: stacksFrom(layers) };
   const context = { editRevision: 0, projectId: 'test-project' };
   const documentModel = createDocumentModel(document, context);
-  // Previews show in the live document, as the engine's do, so an edit prepared without its baseline would see them.
+  // Previews show in the live document, as the engine's do: an edit prepared without its baseline would see them, and
+  // the panel re-renders with the previewed values before the gesture that made them ends.
   let liveModel = documentModel;
+  const listeners = new Set<() => void>();
+  const showLive = (next: LiveDocumentModel) => {
+    liveModel = next;
+    for (const listener of listeners) {
+      listener();
+    }
+  };
   const showPreview = (action: CanvasLayerPreviewMutation) => {
     if (action.type !== 'updateCanvasLayerConfig' || action.config.layerType !== 'control') {
       return;
@@ -158,7 +174,7 @@ const engineWith = (layers: CanvasLayerContract[], { hasContent = true } = {}): 
     const shown = [...live.stacks.control].map((node) =>
       node.id === action.id && node.type === 'control' ? { ...node, adapter: { ...node.adapter, ...adapter } } : node
     );
-    liveModel = createDocumentModel({ ...live, stacks: { ...live.stacks, control: shown } }, context);
+    showLive(createDocumentModel({ ...live, stacks: { ...live.stacks, control: shown } }, context));
   };
   const engine = {
     document: { getDocument: () => document, model: () => liveModel },
@@ -179,7 +195,7 @@ const engineWith = (layers: CanvasLayerContract[], { hasContent = true } = {}): 
           },
           baseline: () => baseline,
           cancel: () => {
-            liveModel = documentModel;
+            showLive(documentModel);
             if (baseline) {
               restores.push(baseline);
             }
@@ -213,7 +229,22 @@ const engineWith = (layers: CanvasLayerContract[], { hasContent = true } = {}): 
     },
     subscribeControlDetectionStatus: statuses.subscribe,
   } as never);
+  liveDocuments.set(engine, {
+    read: () => (liveModel === documentModel ? null : liveModel),
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  });
   return engine;
+};
+
+/** The panel with `layer` as the engine's live document shows it, once a preview has changed it. */
+const LiveControlLayerSettings = ({ engine, layer }: { engine: Engine | null; layer: CanvasControlLayerContract }) => {
+  const live = (engine && liveDocuments.get(engine)) ?? noLiveDocument;
+  const liveModel = useSyncExternalStore(live.subscribe, live.read);
+  const shown = liveModel?.getNode(layer.id);
+  return <ControlLayerSettings engine={engine} layer={shown?.type === 'control' ? shown : layer} />;
 };
 
 const render = async (
@@ -230,7 +261,7 @@ const render = async (
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <QueryClientProvider client={queryClient}>
-            <ControlLayerSettings engine={engine} layer={layer} />
+            <LiveControlLayerSettings engine={engine} layer={layer} />
           </QueryClientProvider>
         </ChakraProvider>
       </I18nextProvider>
@@ -703,19 +734,14 @@ describe('ControlLayerSettings model', () => {
 });
 
 describe('ControlLayerSettings adapter rows', () => {
-  const weightSlider = () => page.getByRole('slider', { name: 'Weight' });
-
-  it('records one step for a weight drag, from the weight it started at', async () => {
-    const layer = detectedLayer('depth', 'depth_anything_depth_estimation', {
-      adapter: { ...controlLayer().adapter, weight: 1 },
-    });
-    await render(layer);
-    const control = weightSlider()
+  /** The control of the slider holding thumb `name`, and pointer events across its centre line. */
+  const sliderControl = (name: string) => {
+    const element = page
+      .getByRole('slider', { name })
       .element()
       .closest<HTMLElement>('[data-part="root"]')!
       .querySelector<HTMLElement>('[data-part="control"]')!;
-    const rect = control.getBoundingClientRect();
-    const xAt = (weight: number) => rect.left + (rect.width * weight) / 2;
+    const rect = element.getBoundingClientRect();
     const pointer = (target: EventTarget, type: string, x: number) =>
       settle(() =>
         target.dispatchEvent(
@@ -728,10 +754,19 @@ describe('ControlLayerSettings adapter rows', () => {
           })
         )
       );
-    await pointer(control, 'pointerdown', xAt(1));
-    await pointer(document, 'pointermove', xAt(1.25));
-    await pointer(document, 'pointermove', xAt(1.5));
-    await pointer(document, 'pointerup', xAt(1.5));
+    return { element, pointer, rect };
+  };
+
+  it('records one step for a weight drag, from the weight it started at', async () => {
+    await render(
+      detectedLayer('depth', 'depth_anything_depth_estimation', { adapter: { ...controlLayer().adapter, weight: 1 } })
+    );
+    const control = sliderControl('Weight');
+    const xAt = (weight: number) => control.rect.left + (control.rect.width * weight) / 2;
+    await control.pointer(control.element, 'pointerdown', xAt(1));
+    await control.pointer(document, 'pointermove', xAt(1.25));
+    await control.pointer(document, 'pointermove', xAt(1.5));
+    await control.pointer(document, 'pointerup', xAt(1.5));
 
     expect(previews.length).toBeGreaterThanOrEqual(2);
     expect(commits).toHaveLength(1);
@@ -745,6 +780,48 @@ describe('ControlLayerSettings adapter rows', () => {
       (previews.at(-1) as { config: { adapter: { weight: number } } }).config.adapter.weight
     );
     expect(inverse.config.adapter.weight).toBe(1);
+  });
+
+  it('records nothing for a weight drag released where it began, and restores the weight it began at', async () => {
+    await render(
+      detectedLayer('depth', 'depth_anything_depth_estimation', { adapter: { ...controlLayer().adapter, weight: 1 } })
+    );
+    const control = sliderControl('Weight');
+    const xAt = (weight: number) => control.rect.left + (control.rect.width * weight) / 2;
+    await control.pointer(control.element, 'pointerdown', xAt(1));
+    await control.pointer(document, 'pointermove', xAt(1.5));
+    await control.pointer(document, 'pointermove', xAt(1));
+    await control.pointer(document, 'pointerup', xAt(1));
+
+    expect(previews.length).toBeGreaterThanOrEqual(2);
+    expect(commits).toHaveLength(0);
+    expect(restores).toHaveLength(1);
+    expect(restores[0]).toMatchObject({ config: { adapter: { weight: 1 } } });
+  });
+
+  it('records one step for a step-range drag, from the range it started at', async () => {
+    await render(
+      detectedLayer('depth', 'depth_anything_depth_estimation', {
+        adapter: { ...controlLayer().adapter, beginEndStepPct: [0, 0.75] },
+      })
+    );
+    const control = sliderControl('End step');
+    const xAt = (pct: number) => control.rect.left + control.rect.width * pct;
+    await control.pointer(control.element, 'pointerdown', xAt(0.75));
+    await control.pointer(document, 'pointermove', xAt(0.6));
+    await control.pointer(document, 'pointermove', xAt(0.5));
+    await control.pointer(document, 'pointerup', xAt(0.5));
+
+    expect(previews.length).toBeGreaterThanOrEqual(2);
+    expect(commits).toHaveLength(1);
+    const { forward, inverse } = commits[0]!.edit as Record<
+      'forward' | 'inverse',
+      { config: { adapter: { beginEndStepPct: [number, number] } } }
+    >;
+    expect(forward.config.adapter.beginEndStepPct[0]).toBe(0);
+    expect(forward.config.adapter.beginEndStepPct[1]).toBeCloseTo(0.5, 1);
+    expect(inverse.config.adapter.beginEndStepPct).toEqual([0, 0.75]);
+    expect(restores).toHaveLength(0);
   });
 
   it('clamps typed weights to the bounds the model allows', async () => {

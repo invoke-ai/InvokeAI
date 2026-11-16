@@ -6,11 +6,7 @@ import { getControlAdapterMinWeight } from '@features/generation/graph';
 import { SegmentedControl } from '@platform/ui/SegmentedControl';
 import { Slider } from '@platform/ui/Slider';
 import { Tooltip } from '@platform/ui/Tooltip';
-import {
-  FormNumberField,
-  useNumberCommit,
-  useSliderGesture,
-} from '@workbench/widgets/canvas/tool-presentation/FormControls';
+import { FormNumberField, useNumberCommit } from '@workbench/widgets/canvas/tool-presentation/FormControls';
 import { PropertyControlRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -33,8 +29,6 @@ export interface ControlAdapterEditing {
   /** Shows a gesture's value live; the commit that ends it records one undo step. */
   preview(patch: AdapterPatch): void;
   commit(patch: AdapterPatch, label: string): void;
-  /** Ends a gesture that came back to where it began, restoring what it previewed. */
-  cancel(): void;
 }
 
 /** Weight, Steps and Priority: the adapter's own values, edited the same way whatever drives the layer. */
@@ -55,28 +49,34 @@ export const ControlAdapterRows = ({
   const priorityLabel = t('widgets.layers.control.rows.priority');
   const priorityReasonId = useId();
 
-  // Weight: the slider covers 0–2; typed values reach the kind's lower bound.
-  const commitWeight = useCallback((weight: number) => editing.commit({ weight }, weightLabel), [editing, weightLabel]);
-  const previewWeight = useCallback((weight: number) => editing.preview({ weight }), [editing]);
-  const weightGesture = useSliderGesture(adapter.weight, commitWeight, previewWeight);
+  // Weight: the slider covers 0–2; typed values reach the kind's lower bound. A slider gesture previews into the
+  // document `adapter` comes from, so `adapter` holds the dragged value before the release. The release therefore
+  // always commits, and the commit compares against the value the gesture started from: a release where it began
+  // records nothing and ends the preview.
+  const [weightDraft, setWeightDraft] = useState<number | null>(null);
+  const weight = weightDraft ?? adapter.weight;
+  const commitWeight = useCallback(
+    (value: number) => editing.commit({ weight: value }, weightLabel),
+    [editing, weightLabel]
+  );
   const weightValue = useMemo(
-    () => [clamp(weightGesture.value, CONTROL_WEIGHT_BOUNDS.sliderMin, CONTROL_WEIGHT_BOUNDS.sliderMax)],
-    [weightGesture.value]
+    () => [clamp(weight, CONTROL_WEIGHT_BOUNDS.sliderMin, CONTROL_WEIGHT_BOUNDS.sliderMax)],
+    [weight]
   );
   const weightAria = useMemo(() => [weightLabel], [weightLabel]);
   const handleWeightChange = useCallback(
-    ({ value }: SliderValueChangeDetails) => weightGesture.onChange(value[0]!),
-    [weightGesture]
+    ({ value }: SliderValueChangeDetails) => {
+      setWeightDraft(value[0]!);
+      editing.preview({ weight: value[0]! });
+    },
+    [editing]
   );
   const handleWeightChangeEnd = useCallback(
     ({ value }: SliderValueChangeDetails) => {
-      const next = value[0]!;
-      weightGesture.onChangeEnd(next);
-      if (next === adapter.weight) {
-        editing.cancel();
-      }
+      setWeightDraft(null);
+      commitWeight(value[0]!);
     },
-    [adapter.weight, editing, weightGesture]
+    [commitWeight]
   );
   const minWeight = getControlAdapterMinWeight(model.kind);
   const handleWeightTyped = useNumberCommit(
@@ -86,7 +86,7 @@ export const ControlAdapterRows = ({
     )
   );
 
-  // Steps: the readout follows the thumbs; one step is recorded on release.
+  // Steps: the readout follows the thumbs; the release commits as Weight's does.
   const [rangeDraft, setRangeDraft] = useState<[number, number] | null>(null);
   const range = rangeDraft ?? adapter.beginEndStepPct;
   const rangeValue = useMemo(() => [range[0], range[1]], [range]);
@@ -104,17 +104,11 @@ export const ControlAdapterRows = ({
   const handleRangeChangeEnd = useCallback(
     ({ value }: SliderValueChangeDetails) => {
       setRangeDraft(null);
-      if (value.length !== 2) {
-        return;
+      if (value.length === 2) {
+        editing.commit({ beginEndStepPct: [value[0]!, value[1]!] }, stepsLabel);
       }
-      const [begin, end] = adapter.beginEndStepPct;
-      if (value[0] === begin && value[1] === end) {
-        editing.cancel();
-        return;
-      }
-      editing.commit({ beginEndStepPct: [value[0]!, value[1]!] }, stepsLabel);
     },
-    [adapter.beginEndStepPct, editing, stepsLabel]
+    [editing, stepsLabel]
   );
   const stepsReadout = rangeDraft
     ? t('widgets.layers.control.stepsReadout', {
@@ -172,7 +166,7 @@ export const ControlAdapterRows = ({
           max={CONTROL_WEIGHT_BOUNDS.inputMax}
           min={minWeight}
           step={CONTROL_WEIGHT_BOUNDS.step}
-          value={formatWeight(weightGesture.value)}
+          value={formatWeight(weight)}
           onValueCommit={handleWeightTyped}
         />
       </PropertyControlRow>
