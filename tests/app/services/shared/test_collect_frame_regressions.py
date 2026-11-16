@@ -2053,3 +2053,61 @@ def test_root_if_after_reiterating_outer_and_nested_frames_runs_once_per_item_af
     )["out2"]
 
     assert _values(runs) == ["RR"] * 5
+
+
+def _root_sibling_in_second_reiterate_into_root_if(computed_condition: bool) -> Graph:
+    """`rit` re-iterates `out` (2 frames). Inside each, `ita` items and a root-level `sibling` value feed `inner`, which
+    `rit2` re-iterates: 4 items in all (`aa`, `ab`, `ac`, `sq`). An If after `rit2` selects the root `RR` value."""
+    condition_node: list[BaseInvocation] = [BooleanInvocation(id="cond", value=False)] if computed_condition else []
+    return _graph(
+        [["a", "b"], ["c"]],
+        1,
+        [
+            Value(id="item"),
+            Collect(id="out"),
+            Iterate(id="rit"),
+            Concat(id="rcc"),
+            Iterate(id="ita"),
+            Marked(id="nested", marker="a"),
+            Concat(id="sibling_src", first=["q"]),
+            Iterate(id="sibling"),
+            Marked(id="sibling_value", marker="s"),
+            Collect(id="inner"),
+            Iterate(id="rit2"),
+            Marked(id="re", marker="r"),
+            Value(id="other", value="RR"),
+            If(id="if", condition=False),
+            Collect(id="out2"),
+            *condition_node,
+        ],
+        """
+        it0.item -> item.value
+        item.value -> out.item
+        out.collection -> rit.collection
+        rit.item -> rcc.first
+        rcc.collection -> ita.collection
+        ita.item -> nested.value
+        nested.value -> inner.item
+        sibling_src.collection -> sibling.collection
+        sibling.item -> sibling_value.value
+        sibling_value.value -> inner.item
+        inner.collection -> rit2.collection
+        rit2.item -> re.value
+        re.value -> if.true_input
+        other.value -> if.false_input
+        if.value -> out2.item
+        """
+        + ("cond.value -> if.condition" if computed_condition else ""),
+    )
+
+
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
+def test_root_if_after_root_sibling_in_second_reiterate_runs_once_per_item(
+    computed_condition: bool, compatibility_scheduler: bool
+) -> None:
+    """`rit2` yields 4 items across frames at two depths, so the If selects `RR` exactly 4 times."""
+    runs = _collect_runs(
+        _root_sibling_in_second_reiterate_into_root_if(computed_condition), compatibility_scheduler, "out2"
+    )["out2"]
+
+    assert _values(runs) == ["RR"] * 4
