@@ -149,12 +149,9 @@ export const SeedInput = ({
   const { t } = useTranslation();
   const previewId = useId();
   const isRandom = seedMode === 'random';
-  // Preserve Field helper/error descriptions alongside the seed preview; error IDs come from Ark input props.
+  // Preserve the Field's helper and error descriptions alongside the seed preview.
   const field = useFieldContext();
-  const describedBy =
-    [field?.ariaDescribedby, field?.getInputProps()['aria-errormessage'], plan ? previewId : undefined]
-      .filter(Boolean)
-      .join(' ') || undefined;
+  const describedBy = [field?.ariaDescribedby, plan ? previewId : undefined].filter(Boolean).join(' ') || undefined;
   // Pass host IDs through Zag's ID map; overriding the DOM ID breaks external value synchronization.
   const inputIds = useMemo(() => (id ? { input: id } : undefined), [id]);
   const stepperTranslations = useMemo(
