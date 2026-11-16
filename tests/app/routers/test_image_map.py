@@ -1412,11 +1412,8 @@ def test_search_by_image_rejects_nat64_mapped_loopback(monkeypatch, client: Test
         "socket.getaddrinfo",
         lambda host, port, **kw: [(None, None, None, None, ("64:ff9b::7f00:1", port, 0, 0))],
     )
-    import requests
-
     calls: list[str] = []
-    monkeypatch.setattr(requests, "get", lambda url, **kw: calls.append(url))
-    monkeypatch.setattr(image_map_router_module, "build_guarded_session", _fake_guarded_session(calls), raising=False)
+    monkeypatch.setattr(image_map_router_module, "build_guarded_session", _fake_guarded_session(calls))
     for bad_url in ("http://[64:ff9b::7f00:1]/a.png", "http://nat64.example/a.png"):
         response = client.post("/api/v1/image_map/search_by_image", params={"image_url": bad_url})
         assert response.status_code == 422, bad_url

@@ -795,32 +795,30 @@ def _download_search_image(url: str) -> bytes:
         # The guarded session ignores HTTP(S)_PROXY/ALL_PROXY and validates the address
         # each socket actually connects to, so neither a proxy nor an address the
         # up-front check misjudges can redirect the fetch to an internal host.
-        for _ in range(_URL_MAX_REDIRECTS + 1):
-            _assert_url_host_allowed(url)
-            hop_timeout = min(_URL_TIMEOUT_SECONDS, _remaining())
-            with (
-                build_guarded_session() as session,
-                session.get(url, stream=True, timeout=hop_timeout, allow_redirects=False) as response,
-            ):
-                if response.is_redirect:
-                    location = response.headers.get("location")
-                    if not location:
-                        break
-                    url = urljoin(url, location)
-                    continue
-                response.raise_for_status()
-                chunks: list[bytes] = []
-                received = 0
-                for chunk in response.iter_content(chunk_size=64 * 1024):
-                    received += len(chunk)
-                    if received > MAX_SEARCH_IMAGE_BYTES:
-                        raise HTTPException(
-                            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                            detail="The reference image is too large",
-                        )
-                    _remaining()
-                    chunks.append(chunk)
-                return b"".join(chunks)
+        with build_guarded_session() as session:
+            for _ in range(_URL_MAX_REDIRECTS + 1):
+                _assert_url_host_allowed(url)
+                hop_timeout = min(_URL_TIMEOUT_SECONDS, _remaining())
+                with session.get(url, stream=True, timeout=hop_timeout, allow_redirects=False) as response:
+                    if response.is_redirect:
+                        location = response.headers.get("location")
+                        if not location:
+                            break
+                        url = urljoin(url, location)
+                        continue
+                    response.raise_for_status()
+                    chunks: list[bytes] = []
+                    received = 0
+                    for chunk in response.iter_content(chunk_size=64 * 1024):
+                        received += len(chunk)
+                        if received > MAX_SEARCH_IMAGE_BYTES:
+                            raise HTTPException(
+                                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                                detail="The reference image is too large",
+                            )
+                        _remaining()
+                        chunks.append(chunk)
+                    return b"".join(chunks)
     except HTTPException:
         raise
     except Exception:
