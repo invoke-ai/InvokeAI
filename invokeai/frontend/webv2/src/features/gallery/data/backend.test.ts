@@ -1,3 +1,4 @@
+import openapi from '@api/openapi.json';
 import { galleryItems } from '@features/gallery';
 import { configureLogging, getLoggingConfig, getLogSnapshot, resetLogging } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -22,6 +23,7 @@ import { ApiError } from '@platform/transport/http';
 
 import {
   ALL_READABLE_BOARDS_ID,
+  GALLERY_REQUEST_MAX_NAMES,
   addImagesToGalleryBoard,
   createGalleryBoard,
   galleryBoardExists,
@@ -959,7 +961,31 @@ describe('deleteGalleryImages partial failures', () => {
   });
 });
 
+type SchemaNode = { anyOf?: SchemaNode[]; maxItems?: number; properties?: Record<string, SchemaNode> };
+
+/** `maxItems` of every media-name list a request body carries, by schema and property. */
+const capsOnNameLists = (): Record<string, number> =>
+  Object.fromEntries(
+    Object.entries(openapi.components.schemas as Record<string, SchemaNode>).flatMap(([schema, { properties }]) =>
+      Object.entries(properties ?? {})
+        .filter(([property]) => property.endsWith('_names'))
+        .flatMap(([property, node]) =>
+          [node, ...(node.anyOf ?? [])]
+            .filter((variant) => variant.maxItems !== undefined)
+            .map((variant) => [`${schema}.${property}`, variant.maxItems!] as const)
+        )
+    )
+  );
+
 describe('name lists past the server’s per-request cap', () => {
+  it('batches by the cap the server publishes for every name list', () => {
+    const caps = capsOnNameLists();
+
+    // The star, delete, board, copy, download and lookup bodies, among others.
+    expect(Object.keys(caps).length).toBeGreaterThan(5);
+    expect(Object.entries(caps).filter(([, cap]) => cap !== GALLERY_REQUEST_MAX_NAMES)).toEqual([]);
+  });
+
   const names = (count: number) => Array.from({ length: count }, (_, index) => `image-${index}.png`);
   const sentNames = () =>
     mocks.apiFetchJson.mock.calls.map(
