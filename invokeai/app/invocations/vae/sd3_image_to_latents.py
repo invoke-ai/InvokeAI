@@ -47,8 +47,7 @@ class SD3ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
             with torch.inference_mode():
                 image_tensor_dist = vae.encode(image_tensor).latent_dist
-                # TODO: Use seed to make sampling reproducible.
-                latents: torch.Tensor = image_tensor_dist.sample().to(dtype=vae.dtype)
+                latents: torch.Tensor = image_tensor_dist.mode().to(dtype=vae.dtype)
 
             latents = vae.config.scaling_factor * latents
 
