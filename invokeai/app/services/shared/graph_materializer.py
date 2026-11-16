@@ -2616,7 +2616,7 @@ class _ExecutionNodeBuilder:
         dict[tuple[int, ...], int],
         Optional[_ProjectedRootIfFrames],
     ]:
-        """Count root If copies and retain source frame identities for valid sibling projections."""
+        """Count each root If copy at its deepest matching path and retain valid sibling frame identities."""
         counts = dict.fromkeys(iteration_paths, 1)
         selected_edges = self._state.graph._get_input_edges(node_id, selected_field)
         if self._get_ordered_iterator_axes_for_edges(selected_edges, iterator_graph):
@@ -2643,12 +2643,14 @@ class _ExecutionNodeBuilder:
         registry = self._state._prepared_registry()
         prepared_frames: list[tuple[tuple[int, ...], tuple[str, ...]]] = []
         has_missing_axes = False
+        requested_depths = sorted(requested_prefixes_by_depth, reverse=True)
         for prepared_id in prepared_ids:
             prepared_path = self._state._get_iteration_path(prepared_id)
-            for depth, requested_prefixes in requested_prefixes_by_depth.items():
+            for depth in requested_depths:
                 prefix = prepared_path[:depth]
-                if prefix in requested_prefixes:
+                if prefix in requested_prefixes_by_depth[depth]:
                     counts[prefix] += 1
+                    break
             prepared_axes = registry.get_iteration_axes(prepared_id)
             if prepared_axes is None:
                 has_missing_axes = True

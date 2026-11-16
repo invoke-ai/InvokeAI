@@ -2111,3 +2111,14 @@ def test_root_if_after_root_sibling_in_second_reiterate_runs_once_per_item(
     )["out2"]
 
     assert _values(runs) == ["RR"] * 4
+
+
+@pytest.mark.parametrize("computed_condition", [False, True], ids=["literal-condition", "computed-condition"])
+def test_root_if_after_root_sibling_in_second_reiterate_runs_once_per_item_after_reload(
+    computed_condition: bool, compatibility_scheduler: bool
+) -> None:
+    runs = _run_with_reload(
+        _root_sibling_in_second_reiterate_into_root_if(computed_condition), compatibility_scheduler, 12, "out2"
+    )["out2"]
+
+    assert _values(runs) == ["RR"] * 4
