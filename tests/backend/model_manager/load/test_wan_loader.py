@@ -1,6 +1,7 @@
-"""Tests for Wan loader helpers (native -> diffusers key conversion)."""
+"""Tests for the Wan GGUF and Diffusers loaders and the native -> diffusers key conversion."""
 
 from contextlib import nullcontext
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -8,13 +9,15 @@ import gguf
 import pytest
 import torch
 
+from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.load.model_loaders.wan import (
+    WanDiffusersModel,
     WanGGUFCheckpointModel,
     _convert_wan_native_to_diffusers,
-    _unwrap_unquantized_to_compute_dtype,
 )
-from invokeai.backend.model_manager.taxonomy import WanVariantType
+from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, SubModelType, WanVariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from tests.fixtures.safetensors_files import needs_mapping_that_shows_file_writes, overwrite_payloads
 
 
 def test_converts_text_and_time_embedders():
@@ -128,60 +131,6 @@ def test_non_string_keys_pass_through():
     assert "condition_embedder.text_embedder.linear_1.weight" in out
 
 
-def _ggml(data: torch.Tensor, qtype: gguf.GGMLQuantizationType, compute_dtype: torch.dtype) -> GGMLTensor:
-    return GGMLTensor(
-        data=data,
-        ggml_quantization_type=qtype,
-        tensor_shape=data.shape,
-        compute_dtype=compute_dtype,
-    )
-
-
-class TestUnwrapUnquantized:
-    """The QuantStack GGUFs store ``patch_embedding.bias`` as F16 while latents
-    flow through the model as bf16. Conv3d isn't in GGMLTensor's dispatch table,
-    so without unwrapping the F16 wrapper goes into conv3d as-is and crashes
-    with ``Input type (c10::BFloat16) and bias type (c10::Half) should be the same``.
-    These tests guard the unwrap step that prevents that."""
-
-    def test_f16_compatible_qtype_is_unwrapped_and_cast(self):
-        # F16 storage that should become bf16 plain tensor.
-        f16_data = torch.zeros((4,), dtype=torch.float16)
-        sd = {"bias": _ggml(f16_data, gguf.GGMLQuantizationType.F16, torch.bfloat16)}
-        out = _unwrap_unquantized_to_compute_dtype(sd)
-
-        result = out["bias"]
-        assert not isinstance(result, GGMLTensor)
-        assert result.dtype == torch.bfloat16
-
-    def test_f32_compatible_qtype_is_unwrapped_and_cast(self):
-        # patch_embedding.weight in QuantStack is F32 — same path.
-        f32_data = torch.zeros((4,), dtype=torch.float32)
-        sd = {"weight": _ggml(f32_data, gguf.GGMLQuantizationType.F32, torch.bfloat16)}
-        out = _unwrap_unquantized_to_compute_dtype(sd)
-
-        result = out["weight"]
-        assert not isinstance(result, GGMLTensor)
-        assert result.dtype == torch.bfloat16
-
-    def test_quantized_tensor_stays_wrapped(self):
-        # Q4_K and friends must remain GGMLTensor so on-demand dequant works
-        # via the linear/addmm dispatch path. The byte storage shape is fake
-        # but irrelevant for this test.
-        q4_data = torch.zeros((1,), dtype=torch.uint8)
-        sd = {"linear.weight": _ggml(q4_data, gguf.GGMLQuantizationType.Q4_K, torch.bfloat16)}
-        out = _unwrap_unquantized_to_compute_dtype(sd)
-
-        assert isinstance(out["linear.weight"], GGMLTensor)
-        assert out["linear.weight"]._ggml_quantization_type == gguf.GGMLQuantizationType.Q4_K
-
-    def test_plain_torch_tensor_passes_through(self):
-        plain = torch.zeros((4,), dtype=torch.bfloat16)
-        sd = {"plain": plain}
-        out = _unwrap_unquantized_to_compute_dtype(sd)
-        assert out["plain"] is plain
-
-
 def _run_gguf_loader(extra_keys: list[str], native_layout: bool = False) -> dict:
     """Drive WanGGUFCheckpointModel over a state dict carrying `extra_keys`.
 
@@ -223,13 +172,10 @@ def _run_gguf_loader(extra_keys: list[str], native_layout: bool = False) -> dict
     )
     config = SimpleNamespace(path="/models/wan.gguf", variant=WanVariantType.T2V_A14B)
     loader = object.__new__(WanGGUFCheckpointModel)
+    loader._ram_cache = MagicMock()
 
     with (
         patch("invokeai.backend.model_manager.load.model_loaders.wan.gguf_sd_loader", return_value=state_dict),
-        patch(
-            "invokeai.backend.model_manager.load.model_loaders.wan._unwrap_unquantized_to_compute_dtype",
-            side_effect=lambda value: value,
-        ),
         patch("invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_torch_device"),
         patch(
             "invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_bfloat16_safe_dtype",
@@ -241,6 +187,120 @@ def _run_gguf_loader(extra_keys: list[str], native_layout: bool = False) -> dict
         loader._load_from_singlefile(config)
 
     return model.load_state_dict.call_args.args[0]
+
+
+def _tiny_wan_state_dict() -> dict[str, torch.Tensor]:
+    """Random weights of a one-block, one-head Wan transformer the config inference can size."""
+    from diffusers import WanTransformer3DModel
+
+    torch.manual_seed(0)
+    model = WanTransformer3DModel(
+        patch_size=(1, 2, 2),
+        in_channels=16,
+        out_channels=16,
+        num_layers=1,
+        attention_head_dim=128,
+        num_attention_heads=1,
+        ffn_dim=256,
+        text_dim=64,
+    )
+    return {key: torch.randn_like(value) * 0.1 for key, value in model.state_dict().items()}
+
+
+def _q8_0(weight: torch.Tensor) -> GGMLTensor:
+    packed = gguf.quants.quantize(weight.numpy(), gguf.GGMLQuantizationType.Q8_0)
+    return GGMLTensor(
+        torch.from_numpy(packed),
+        ggml_quantization_type=gguf.GGMLQuantizationType.Q8_0,
+        tensor_shape=weight.shape,
+        compute_dtype=torch.float32,
+    )
+
+
+def test_gguf_loader_unpacks_bf16_and_quantized_condition_embedder_weights() -> None:
+    """A release storing the embedders as BF16 (or Q8_0) loaded them packed, and their uint8 storage dtype leaked out.
+
+    diffusers' `WanTimeTextImageEmbedding` reads the time embedder's dtype off its first weight and casts the
+    timestep to it, so a packed weight turned the timestep into uint8 and the linear failed with "mat1 and mat2
+    must have the same dtype, but got Byte and ...". The block Linears must stay packed.
+    """
+    reference = _tiny_wan_state_dict()
+    time_1 = "condition_embedder.time_embedder.linear_1.weight"
+    time_2 = "condition_embedder.time_embedder.linear_2.weight"
+    text_1 = "condition_embedder.text_embedder.linear_1.weight"
+    block_q = "blocks.0.attn1.to_q.weight"
+
+    sd: dict[str, torch.Tensor] = dict(reference)
+    bf16_values = {key: reference[key].to(torch.bfloat16) for key in (time_1, text_1)}
+    for key, values in bf16_values.items():
+        sd[key] = GGMLTensor(
+            values.contiguous().view(torch.uint8).reshape(values.shape[0], -1),
+            ggml_quantization_type=gguf.GGMLQuantizationType.BF16,
+            tensor_shape=values.shape,
+            compute_dtype=torch.float32,
+        )
+    sd[time_2] = _q8_0(reference[time_2])
+    sd[block_q] = _q8_0(reference[block_q])
+    # QuantStack-style files store the Conv3d patch embedding, the modulation table and the norms unquantized (F16/F32).
+    # conv3d is not in GGMLTensor's dispatch table, so an F16 bias reaching it crashed against the latents' dtype.
+    unquantized = {
+        key: GGMLTensor(
+            value.to(storage),
+            ggml_quantization_type=qtype,
+            tensor_shape=value.shape,
+            compute_dtype=torch.float32,
+        )
+        for key, value in reference.items()
+        for storage, qtype in [
+            (torch.float16, gguf.GGMLQuantizationType.F16)
+            if key.startswith("patch_embedding.") or key == "scale_shift_table"
+            else (torch.float32, gguf.GGMLQuantizationType.F32)
+        ]
+        if key.startswith("patch_embedding.") or key == "scale_shift_table" or ".norm" in key
+    }
+    assert "patch_embedding.bias" in unquantized and any(".norm" in key for key in unquantized)
+    sd.update(unquantized)
+
+    config = SimpleNamespace(path="/models/wan.gguf", variant=WanVariantType.T2V_A14B)
+    loader = object.__new__(WanGGUFCheckpointModel)
+    loader._ram_cache = MagicMock()
+    with (
+        patch("invokeai.backend.model_manager.load.model_loaders.wan.gguf_sd_loader", return_value=sd),
+        patch("invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_torch_device"),
+        patch(
+            "invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_bfloat16_safe_dtype",
+            return_value=torch.float32,
+        ),
+    ):
+        model = loader._load_from_singlefile(config)
+
+    params = dict(model.named_parameters())
+    for key in (time_1, time_2, text_1):
+        assert not isinstance(params[key], GGMLTensor), key
+        assert params[key].dtype == torch.float32, key
+    assert torch.equal(params[time_1].detach(), bf16_values[time_1].float())
+    assert torch.equal(params[text_1].detach(), bf16_values[text_1].float())
+    q8_expected = torch.from_numpy(
+        gguf.quants.dequantize(
+            gguf.quants.quantize(reference[time_2].numpy(), gguf.GGMLQuantizationType.Q8_0),
+            gguf.GGMLQuantizationType.Q8_0,
+        )
+    )
+    torch.testing.assert_close(params[time_2].detach(), q8_expected, rtol=0, atol=5e-4)
+    assert isinstance(params[block_q], GGMLTensor)
+
+    temb, timestep_proj, encoder_hidden_states, _ = model.condition_embedder(
+        torch.tensor([500.0]), torch.randn(1, 3, 64)
+    )
+    assert torch.isfinite(temb).all() and torch.isfinite(timestep_proj).all()
+    assert encoder_hidden_states.dtype == torch.float32
+
+    for key in unquantized:
+        assert not isinstance(params[key], GGMLTensor), key
+        assert params[key].dtype == torch.float32, key
+    output = model(torch.randn(1, 16, 1, 4, 4), torch.tensor([500.0]), torch.randn(1, 3, 64)).sample
+    assert output.shape == (1, 16, 1, 4, 4)
+    assert torch.isfinite(output).all()
 
 
 def test_gguf_loader_drops_all_in_one_bundled_components_before_loading() -> None:
@@ -320,13 +380,10 @@ def test_gguf_loader_rejects_missing_model_parameter() -> None:
     )
     config = SimpleNamespace(path="/models/wan.gguf", variant=WanVariantType.T2V_A14B)
     loader = object.__new__(WanGGUFCheckpointModel)
+    loader._ram_cache = MagicMock()
 
     with (
         patch("invokeai.backend.model_manager.load.model_loaders.wan.gguf_sd_loader", return_value=state_dict),
-        patch(
-            "invokeai.backend.model_manager.load.model_loaders.wan._unwrap_unquantized_to_compute_dtype",
-            side_effect=lambda value: value,
-        ),
         patch("invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_torch_device"),
         patch(
             "invokeai.backend.model_manager.load.model_loaders.wan.TorchDevice.choose_bfloat16_safe_dtype",
@@ -337,3 +394,101 @@ def test_gguf_loader_rejects_missing_model_parameter() -> None:
         pytest.raises(RuntimeError, match="missing"),
     ):
         loader._load_from_singlefile(config)
+
+
+class TestDiffusersFolderLoad:
+    """`WanDiffusersModel` against real tiny transformer folders, read through diffusers' own memory mapping."""
+
+    @staticmethod
+    def _model():
+        from diffusers import WanTransformer3DModel
+
+        return WanTransformer3DModel(
+            patch_size=(1, 2, 2),
+            in_channels=16,
+            out_channels=16,
+            num_layers=1,
+            attention_head_dim=128,
+            num_attention_heads=1,
+            ffn_dim=64,
+            text_dim=32,
+        )
+
+    @staticmethod
+    def _config(root: Path, repo_variant: ModelRepoVariant | None = None) -> Diffusers_Config_Base:
+        config = MagicMock(spec=Diffusers_Config_Base)
+        config.path = str(root)
+        config.repo_variant = repo_variant
+        return config
+
+    @staticmethod
+    def _load(config: Diffusers_Config_Base) -> tuple[torch.nn.Module, dict[str, int]]:
+        """The loaded model, and where each of its tensors lived when `from_pretrained` handed it over."""
+        from diffusers import WanTransformer3DModel
+
+        as_loaded: dict[str, int] = {}
+
+        class Recorded(WanTransformer3DModel):
+            @classmethod
+            def from_pretrained(cls, *args, **kwargs):
+                model = WanTransformer3DModel.from_pretrained(*args, **kwargs)
+                as_loaded.update({name: value.data_ptr() for name, value in model.state_dict().items()})
+                return model
+
+        loader = object.__new__(WanDiffusersModel)
+        loader.get_hf_load_class = lambda *_args, **_kwargs: Recorded
+        loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+        return loader._load_model(config, SubModelType.Transformer), as_loaded
+
+    @staticmethod
+    def _tensors_reading_the_file(root: Path, model: torch.nn.Module) -> set[str]:
+        """The state dict entries that change when the folder's weight files are rewritten underneath them."""
+        loaded = {name: value.clone() for name, value in model.state_dict().items()}
+        for file in (root / "transformer").glob("*.safetensors"):
+            overwrite_payloads(file)
+        return {name for name, value in model.state_dict().items() if not torch.equal(value, loaded[name])}
+
+    @needs_mapping_that_shows_file_writes
+    @pytest.mark.parametrize("repo_variant", [None, ModelRepoVariant.FP16], ids=["default", "fp16-variant-fallback"])
+    def test_an_fp32_folder_leaves_nothing_reading_the_file(
+        self, tmp_path: Path, repo_variant: ModelRepoVariant | None
+    ) -> None:
+        """Wan ships fp32. Everything is cast to bf16 except `_keep_in_fp32_modules`, whose cast is a no-op: left as
+        they come out of `from_pretrained`, those tensors are views of the mapping and hold every shard mapped.
+
+        The fp16 variant is absent, so with it requested the fallback does the loading."""
+        from diffusers import WanTransformer3DModel
+
+        self._model().save_pretrained(tmp_path / "transformer")
+
+        model, _ = self._load(self._config(tmp_path, repo_variant))
+
+        keep_fp32 = set(WanTransformer3DModel._keep_in_fp32_modules)
+        for name, value in model.state_dict().items():
+            expected = torch.float32 if keep_fp32 & set(name.split(".")) else torch.bfloat16
+            assert value.dtype == expected, name
+        assert self._tensors_reading_the_file(tmp_path, model) == set()
+
+    @needs_mapping_that_shows_file_writes
+    @pytest.mark.parametrize("norms_on_disk", ["bf16", "fp32"])
+    def test_a_bf16_folder_keeps_its_weights_on_the_mapping(self, tmp_path: Path, norms_on_disk: str) -> None:
+        """A bf16 file needs no cast: its weights stay on the file's pages, as upstream loads them, with no second copy.
+        Only what is kept in fp32 gets memory of its own -- cast from a bf16 norm, or copied off an fp32 one, the way
+        `save_pretrained` writes a model loaded in bf16."""
+        from diffusers import WanTransformer3DModel
+
+        if norms_on_disk == "bf16":
+            self._model().to(torch.bfloat16).save_pretrained(tmp_path / "transformer")
+        else:
+            self._model().save_pretrained(tmp_path / "fp32")
+            mixed = WanTransformer3DModel.from_pretrained(tmp_path / "fp32", torch_dtype=torch.bfloat16)
+            mixed.save_pretrained(tmp_path / "transformer")
+
+        model, as_loaded = self._load(self._config(tmp_path))
+
+        bf16 = {name for name, value in model.state_dict().items() if value.dtype == torch.bfloat16}
+        assert bf16 and len(bf16) < len(model.state_dict())
+        assert self._tensors_reading_the_file(tmp_path, model) == bf16
+        # Upcast from a bf16 norm, the fp32 tensors already have memory of their own and are not copied again.
+        copied = {name for name, value in model.state_dict().items() if value.data_ptr() != as_loaded[name]}
+        assert copied == (set() if norms_on_disk == "bf16" else set(model.state_dict()) - bf16)

@@ -583,17 +583,24 @@ const areModelSnapshotsEqual = (a: unknown, b: unknown): boolean => {
   }
 };
 
+const hasSameModelKind = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  candidate.type === saved.type &&
+  candidate.base === saved.base &&
+  (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
+
 /**
  * Whether an installed model is the same file as a saved choice that is no longer installed: a reinstall gives the
  * file a new key but keeps its hash. Type, base and (where the saved choice names one) variant must agree as well, so
  * a file registered differently is not taken for it.
  */
 export const isSameModelFile = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
-  Boolean(saved.hash) &&
-  candidate.hash === saved.hash &&
-  candidate.type === saved.type &&
-  candidate.base === saved.base &&
-  (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
+  Boolean(saved.hash) && candidate.hash === saved.hash && hasSameModelKind(candidate, saved);
+
+/** Match an existing installation, comparing the file hashes when both are available. */
+export const isSameInstalledModel = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  candidate.key === saved.key &&
+  hasSameModelKind(candidate, saved) &&
+  (!candidate.hash || !saved.hash || candidate.hash === saved.hash);
 
 /** Refreshes each concept from the catalog, finding a reinstalled LoRA again by its file hash. */
 export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: readonly unknown[]): GenerateLora[] => {
@@ -681,6 +688,7 @@ export const cloneGenerateWidgetValues = (
   qwen3VLVisionTowerModel: values.qwen3VLVisionTowerModel ? { ...values.qwen3VLVisionTowerModel } : null,
   qwen35EncoderModel: values.qwen35EncoderModel ? { ...values.qwen35EncoderModel } : null,
   animaInpaintAdapterModel: values.animaInpaintAdapterModel ? { ...values.animaInpaintAdapterModel } : null,
+  flux3PromptUpsamplerModel: values.flux3PromptUpsamplerModel ? { ...values.flux3PromptUpsamplerModel } : null,
   wanT5EncoderModel: values.wanT5EncoderModel ? { ...values.wanT5EncoderModel } : null,
   wanLowNoiseModel: values.wanLowNoiseModel ? { ...values.wanLowNoiseModel } : null,
   ideogram4UnconditionalModel: values.ideogram4UnconditionalModel ? { ...values.ideogram4UnconditionalModel } : null,
@@ -698,9 +706,19 @@ const syncReferenceImageConfigWithModels = (
 ): GenerateReferenceImageConfig => {
   switch (config.type) {
     case 'flux_kontext_reference_image': {
-      const model = syncModelIdentifierWithModels(config.model, modelsByKey);
+      const boundModel = config.model;
+      const model = syncModelIdentifierWithModels(boundModel, modelsByKey);
+      // Keep the original binding if the catalog record points to a different model.
+      if (
+        !boundModel ||
+        model === boundModel ||
+        !isMainModelConfig(model) ||
+        !isSameInstalledModel(model, boundModel)
+      ) {
+        return config;
+      }
 
-      return model === config.model ? config : { ...config, model: isMainModelConfig(model) ? model : config.model };
+      return { ...config, model };
     }
     case 'flux_redux':
     case 'ip_adapter': {
@@ -781,6 +799,7 @@ export const syncGenerateWidgetValuesWithModels = (
     qwen3VLVisionTowerModel: syncModelIdentifierWithModels(values.qwen3VLVisionTowerModel, modelsByKey),
     qwen35EncoderModel: syncModelIdentifierWithModels(values.qwen35EncoderModel, modelsByKey),
     animaInpaintAdapterModel: syncModelIdentifierWithModels(values.animaInpaintAdapterModel, modelsByKey),
+    flux3PromptUpsamplerModel: syncModelIdentifierWithModels(values.flux3PromptUpsamplerModel, modelsByKey),
     referenceImages: syncReferenceImagesWithModels(values.referenceImages, models),
     refinerModel: isMainModelConfig(refinerModel) ? refinerModel : values.refinerModel,
     t5EncoderModel: syncModelIdentifierWithModels(values.t5EncoderModel, modelsByKey),
@@ -801,6 +820,7 @@ export const syncGenerateWidgetValuesWithModels = (
     nextValues.qwen3VLVisionTowerModel === values.qwen3VLVisionTowerModel &&
     nextValues.qwen35EncoderModel === values.qwen35EncoderModel &&
     nextValues.animaInpaintAdapterModel === values.animaInpaintAdapterModel &&
+    nextValues.flux3PromptUpsamplerModel === values.flux3PromptUpsamplerModel &&
     nextValues.referenceImages === values.referenceImages &&
     nextValues.componentSourceModel === values.componentSourceModel &&
     nextValues.refinerModel === values.refinerModel &&
@@ -1014,6 +1034,8 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     qwen3VLVisionTowerModel: getModelIdentifierOrNull(values.qwen3VLVisionTowerModel),
     qwen35EncoderModel: getModelIdentifierOrNull(values.qwen35EncoderModel),
     animaInpaintAdapterModel: getModelIdentifierOrNull(values.animaInpaintAdapterModel),
+    flux3PromptUpsamplerEnabled: values.flux3PromptUpsamplerEnabled === true,
+    flux3PromptUpsamplerModel: getModelIdentifierOrNull(values.flux3PromptUpsamplerModel),
     // Projects saved before the toggle existed wired the adapter whenever one was selected.
     animaInpaintAdapterEnabled: values.animaInpaintAdapterEnabled !== false,
     animaInpaintAdapterWeight: clampAnimaInpaintAdapterWeight(

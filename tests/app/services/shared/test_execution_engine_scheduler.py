@@ -73,6 +73,52 @@ def test_generic_scheduler_honors_opaque_readiness_predicate() -> None:
     assert scheduler.pop_next() == "blocked"
 
 
+def test_ready_ids_lists_each_queued_node_once_in_pop_order() -> None:
+    plan = ExecutionPlan()
+    plan.add_node("a1", "x")
+    plan.add_node("a2", "x", dependencies=("a1",))
+    plan.add_node("b1", "y")
+    plan.add_node("q1", "w")
+    scheduler = ExecutionScheduler(plan, ready_order=("x", "y"))
+
+    assert scheduler.pop_next() == "a1"
+    assert scheduler.complete("a1") == ("a2",)
+
+    listed = scheduler.ready_ids
+
+    popped: list[str] = []
+    while (node_id := scheduler.pop_next()) is not None:
+        popped.append(node_id)
+
+    assert listed == tuple(popped) == ("a2", "b1", "q1")
+
+
+def test_ready_ids_lists_the_active_class_first_when_it_is_not_first_in_ready_order() -> None:
+    plan = ExecutionPlan()
+    plan.add_node("a1", "x")
+    plan.add_node("a3", "x")
+    plan.add_node("a2", "x", dependencies=("a1",))
+    plan.add_node("b1", "y")
+    plan.add_node("b2", "y")
+    plan.add_node("q1", "w")
+    scheduler = ExecutionScheduler(plan, ready_order=("x", "y"))
+
+    # Drain class x so the scheduler moves to class y, then make new class x work available while
+    # class y still has a queued node. The active class sits at ready_order index 1 here.
+    assert scheduler.pop_next() == "a1"
+    assert scheduler.pop_next() == "a3"
+    assert scheduler.pop_next() == "b1"
+    assert scheduler.complete("a1") == ("a2",)
+
+    listed = scheduler.ready_ids
+
+    popped: list[str] = []
+    while (node_id := scheduler.pop_next()) is not None:
+        popped.append(node_id)
+
+    assert listed == tuple(popped) == ("b2", "a2", "q1")
+
+
 def test_generic_scheduler_discards_node_with_unmet_prerequisites() -> None:
     plan = ExecutionPlan()
     plan.add_node("prerequisite", "Prerequisite")

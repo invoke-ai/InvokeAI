@@ -100,7 +100,7 @@ sizes in the same bucket don't pay it again.
 | Running in FP32 | The kernels run in BF16 and FP16 only. |
 
 LoRAs work as usual: they are applied beside the int8 layer in the compute precision, never quantized, and do not change
-which path the layer takes. DoRA patches don't load on int8 builds, with or without `int8_compute`.
+which path the layer takes. DoRA patches work too, with or without `int8_compute`: they get the dequantized weight. DoRA layers on a quantized transformer dequantize their weight again on every step, so they are slower than plain LoRA layers: with a 400-layer DoRA LoRA, Anima-2.9B int8 denoises 1024² in 30 steps in about 30 s, against 18 s with the same LoRA as plain LoRA.
 
 <details>
 <summary>Memory</summary>

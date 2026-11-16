@@ -207,7 +207,9 @@ FLUX.2 [dev]** (and their *Collection* versions). Supported layouts include LyCO
 ComfyUI/OneTrainer PEFT files whose module names start with `diffusion_model.`. Per-layer `.alpha` values in
 these `diffusion_model.` files set the LoRA scale.
 LyCORIS LoKr and LoHA files are supported in BFL and kohya layouts; each LoKr operand may be stored whole
-or as a factorized `_a` / `_b` pair.
+or as a factorized `_a` / `_b` pair. kohya LoRAs that also train layers outside the transformer blocks (`img_in`,
+`txt_in`, the time embedder, the guidance embedder of FLUX.2 [dev], the last layer and the shared modulations) are
+supported, as long as they train at least one block.
 
 ## PiD super-resolution decode
 

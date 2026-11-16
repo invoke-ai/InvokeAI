@@ -116,6 +116,7 @@ export {
   isDiffusersMainForBase,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
+  isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
@@ -132,6 +133,7 @@ export {
   type RebalancePreset,
 } from './core/conditioningRebalance';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
+export { clampPidSteps, isPidMode } from './core/pid';
 export {
   getActiveRefiner,
   isRefinerModel,

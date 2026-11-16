@@ -278,6 +278,8 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   animaInpaintAdapterModel: null,
   animaInpaintAdapterEnabled: true,
   animaInpaintAdapterWeight: 1,
+  flux3PromptUpsamplerEnabled: false,
+  flux3PromptUpsamplerModel: null,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
   ideogram4UnconditionalModel: null,
