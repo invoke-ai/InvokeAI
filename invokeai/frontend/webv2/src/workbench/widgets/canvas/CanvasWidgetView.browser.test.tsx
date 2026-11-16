@@ -268,12 +268,15 @@ describe('Canvas spline context menu', () => {
     await renderView('completed', {
       selectedLayer: layer,
       staged: false,
-      beforeRender: (engine) => {
-        engine.tools.setTool('spline');
-        if (selectPath) {
-          expect(engine.layers.vectorEdit.targetContextMenu({ x: 350, y: 300 })).toBe(true);
-        }
-      },
+    });
+    await act(async () => {
+      await harness.engine!.layers.vectorEdit.prepare();
+    });
+    await act(() => {
+      harness.engine!.tools.setTool('spline');
+      if (selectPath) {
+        expect(harness.engine!.layers.vectorEdit.targetContextMenu({ x: 350, y: 300 })).toBe(true);
+      }
     });
     const owner = host!.querySelector<HTMLDivElement>('[data-canvas-context-menu-owner]')!;
     owner.tabIndex = -1;

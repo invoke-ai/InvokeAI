@@ -6,7 +6,7 @@ import { applyToPoint, multiply } from '@workbench/canvas-engine/math/mat2d';
 
 import type { RasterSurface } from './raster';
 
-import { drawPolylineVertices, SHAPE_PREVIEW_COLOR, SHAPE_PREVIEW_DASH } from './shapePreview';
+import { drawPolylineVertices, SHAPE_PREVIEW_COLOR, SHAPE_PREVIEW_DASH } from './rasterizers/shapeRasterizer';
 
 export interface VectorGuideLayer {
   paths: readonly CanvasBezierPathContract[];

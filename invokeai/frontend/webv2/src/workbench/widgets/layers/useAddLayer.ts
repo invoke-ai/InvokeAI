@@ -2,11 +2,9 @@ import type { CanvasNodeContract } from '@workbench/canvas-engine/api';
 
 import {
   createControlLayer,
-  createVectorLayer,
   getDocumentIndex,
   getDocumentLeaves,
   nextControlLayerName,
-  nextVectorLayerName,
 } from '@workbench/canvas-engine/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { setLayerGroupExpanded } from '@workbench/layerPanelState';
@@ -61,8 +59,23 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
         );
       switch (id) {
         case 'vector': {
-          const layer = createVectorLayer({ id: createLayerId(), name: nextVectorLayerName(layerNames) });
-          add(t('widgets.layers.actions.addVectorLayer'), layer);
+          if (!engine) {
+            return;
+          }
+          const document = engine.document.getDocument();
+          void engine.layers.vectorEdit
+            .createLayer({
+              id: createLayerId(),
+            })
+            .then((layer) => {
+              if (
+                layer &&
+                engine.lifecycle.getLifecycleState() === 'active' &&
+                engine.document.getDocument() === document
+              ) {
+                add(t('widgets.layers.actions.addVectorLayer'), layer);
+              }
+            });
           return;
         }
         case 'group': {
@@ -126,6 +139,6 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
         }
       }
     },
-    [base, commitPrepared, layerNames, projectId, regionalGuidanceCount, t]
+    [engine, base, commitPrepared, layerNames, projectId, regionalGuidanceCount, t]
   );
 };

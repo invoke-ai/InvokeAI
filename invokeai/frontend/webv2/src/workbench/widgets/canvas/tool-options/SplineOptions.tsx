@@ -1,4 +1,4 @@
-import type { ToolFormProps, ToolPropertyForm } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
+import type { ToolFormProps } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
 import { Box, Grid, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
@@ -48,7 +48,7 @@ const SplineActionRow = ({
   </Grid>
 );
 
-const SplineSettings = ({ engine }: ToolFormProps) => {
+export const SplineSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const editing = useVectorEditSession(engine);
   const api = engine.layers.vectorEdit;
@@ -136,9 +136,4 @@ const SplineSettings = ({ engine }: ToolFormProps) => {
       </Stack>
     </Stack>
   );
-};
-
-export const splineForm: ToolPropertyForm = {
-  id: 'spline',
-  groups: [{ body: SplineSettings, id: 'spline-points', labelKey: 'widgets.layers.vector.pointsTitle' }],
 };

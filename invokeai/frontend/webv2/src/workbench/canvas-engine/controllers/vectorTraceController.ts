@@ -5,9 +5,8 @@ import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
-import { polygonBounds } from '@workbench/canvas-engine/freehand';
 import { approximateBezierPath } from '@workbench/canvas-engine/math/bezierPath';
-import { roundOut, union } from '@workbench/canvas-engine/math/rect';
+import { polygonBounds, roundOut, union } from '@workbench/canvas-engine/math/rect';
 import {
   findVectorFillRegionsAsync,
   VectorFillLimitError,

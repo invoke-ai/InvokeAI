@@ -16,11 +16,10 @@ import { TRANSFORM_ROTATE_NUB_PX } from '@workbench/canvas-engine/transform/tran
 
 import type { RgbaSample } from './colorSample';
 import type { RasterSurface } from './raster';
+import type { VectorEditOverlay } from './vectorEditOverlay';
 import type { VectorGuideLayer, VectorShapePreview } from './vectorGuides';
 
-import { drawPolylineVertices, SHAPE_PREVIEW_COLOR, SHAPE_PREVIEW_DASH } from './shapePreview';
-import { drawVectorEditOverlay, type VectorEditOverlay } from './vectorEditOverlay';
-import { drawVectorGuides } from './vectorGuides';
+import { drawPolylineVertices, SHAPE_PREVIEW_COLOR, SHAPE_PREVIEW_DASH } from './rasterizers/shapeRasterizer';
 
 /** Minimum screen-space grid spacing (px) below which the grid is too dense to draw. */
 export const MIN_GRID_SPACING_PX = 8;
@@ -644,7 +643,11 @@ const drawBboxHandles = (ctx: Ctx, state: OverlayState): void => {
 };
 
 /** Clears the backing store, then redraws the overlay in CSS pixels under the state's device-pixel ratio. */
-export const renderOverlay = (target: RasterSurface, state: OverlayState): void => {
+export const renderOverlay = (
+  target: RasterSurface,
+  state: OverlayState,
+  renderVectors?: (ctx: RasterSurface['ctx'], state: OverlayState) => void
+): void => {
   const ctx = target.ctx;
   const base: Mat2d = { a: state.dpr, b: 0, c: 0, d: state.dpr, e: 0, f: 0 };
 
@@ -677,8 +680,7 @@ export const renderOverlay = (target: RasterSurface, state: OverlayState): void 
 
   drawSamPreview(ctx, state, base);
   drawSamGeometry(ctx, state);
-  drawVectorGuides(ctx, state.view, state.vectorGuides ?? [], state.vectorShapePreview ?? null);
-  drawVectorEditOverlay(ctx, state.view, state.vectorEdit ?? null);
+  renderVectors?.(ctx, state);
   drawLayerOutline(ctx, state);
   drawBboxHandles(ctx, state);
   drawTransformFrame(ctx, state);

@@ -15,6 +15,7 @@ import type { StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 
+import type { CanvasVectorLayerContract } from './contracts';
 import type { BooleanRasterResult } from './controllers/booleanMergeController';
 import type { CopyLayerResult } from './controllers/copyLayerController';
 import type { CropAllLayersResult, CropLayerResult } from './controllers/cropLayerController';
@@ -191,6 +192,7 @@ export type PsdExportStatus = 'idle' | 'preparing' | 'serializing' | 'downloadin
 
 export interface CanvasInteractionState {
   vectorEditSession: VectorEditSession | null;
+  vectorToolsStatus: 'idle' | 'loading' | 'ready' | 'failed';
   psdExportStatus: PsdExportStatus;
   activeTool: ToolId;
   bboxGrid: number;
@@ -756,6 +758,9 @@ export type BeginTransformResult =
   | SubsetOf<CanvasTransactionOutcome, 'busy'>;
 
 export interface CanvasVectorEditCapability {
+  /** Loads vector support before exposing its synchronous editing commands. */
+  prepare(): Promise<boolean>;
+  createLayer(input: { id: string; name?: string }): Promise<CanvasVectorLayerContract | null>;
   transformPath(): void;
   extractPath(): void;
   targetContextMenu(screenPoint: Vec2): boolean;

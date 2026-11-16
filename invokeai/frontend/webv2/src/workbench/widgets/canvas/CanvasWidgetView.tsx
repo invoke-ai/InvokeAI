@@ -39,6 +39,8 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { VectorPathMenuTarget } from './VectorPathContextMenu';
+
 import { useModelGridSize } from './bboxGrid';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
 import { decodeImageBlob, readClipboardImage } from './canvasClipboard';
@@ -84,7 +86,10 @@ import { useStagingRecovery } from './useCanvasRecovery';
 import { useCreateFromBbox } from './useCreateFromBbox';
 import { useStagedResultGallerySave } from './useStagedResultGallerySave';
 import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
-import { VectorPathContextMenu, type VectorPathMenuTarget } from './VectorPathContextMenu';
+
+const VectorPathContextMenu = lazy(() =>
+  import('./VectorPathContextMenu').then((module) => ({ default: module.VectorPathContextMenu }))
+);
 
 const isFileDrag = (dataTransfer: DataTransfer): boolean => dataTransfer.types.includes('Files');
 
@@ -664,11 +669,20 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         onContextMenu={handleSurfaceContextMenu}
         onKeyDown={handleSurfaceMenuKeyDown}
       >
+        {!engine ? (
+          <Box role="status" position="absolute" inset="0" display="grid" placeItems="center" color="fg.muted">
+            {t('common.loading')}
+          </Box>
+        ) : null}
         <CanvasImageDropOverlay isDocumentEditingLocked={isDocumentEditingLocked} />
         {engine ? (
           <>
             <ToolStrip engine={engine} />
-            <VectorPathContextMenu engine={engine} target={vectorMenuTarget} onClose={closeVectorMenu} />
+            {vectorMenuTarget ? (
+              <Suspense fallback={null}>
+                <VectorPathContextMenu engine={engine} target={vectorMenuTarget} onClose={closeVectorMenu} />
+              </Suspense>
+            ) : null}
             <ControlLayerCanvasOverlay engine={engine} />
             <CanvasLayerContextMenu
               beforeDangerItems={compositeSubmenus}

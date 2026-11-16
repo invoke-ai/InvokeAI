@@ -25,9 +25,15 @@ Port `dispatch()` returns whether named project's canvas identity changed. User-
 
 Paint persistence clears dirty result only after intended layer accepts bitmap reference. Rejected update keeps dirty pixels for retry; layer or project deletion is terminal and discards obsolete persistence work. Rule applies equally to raster/control paint sources and paint-backed masks.
 
+## Vector runtime readiness
+
+The engine loads `vectorRuntime.ts` on the first vector-layer creation, Spline tool request, or explicit `layers.vectorEdit.prepare()`. That runtime owns editing, vector Shape sessions, guide rendering, and Trace/Fill geometry. Raster tools and ordinary document bounds stay synchronous and do not import it. `interaction.vectorToolsStatus` reports idle/loading/ready/failed; pending requests share one load, failures report through the engine notification port and an explicit request can retry.
+
+`canvas-operations/useCanvasEngine.ts` prepares saved vector documents before exposing an interactive engine, and withholds the handle while loading. Layer creation waits for readiness and checks the original document and active engine lifetime before returning its descriptor; a tool request also checks that no later tool superseded it. Cooldown cancels pending user intents, while a completed module remains reusable until disposal. A load completing after disposal creates no runtime state. Vector Properties, path menus and Spline settings load on demand through React boundaries.
+
 ## Document contract and hierarchy
 
-Triangle and Star creation share their vertex geometry with raster Shapes in `math/shapeGeometry.ts`. Shape creation overlays share dashed styling and polyline vertex/closure markers through `render/shapePreview.ts`; completed vector guides remain solid blue.
+Triangle and Star creation share their vertex geometry with raster Shapes in `math/shapeGeometry.ts`. Shape creation overlays share dashed styling and polyline vertex/closure markers through `render/rasterizers/shapeRasterizer.ts`; completed vector guides remain solid blue.
 
 Shapes on a selected vector layer use `tools/vectorShapeTool.ts`; other targets keep the raster Shapes behavior. Vector Rect/Oval drags commit closed Bezier paths, Polygon clicks continue until explicit open/closed completion, and Freehand fits an open path with the v6 geometry math. Selected/New target chooses appending a path or creating another vector layer. Previews remain engine-local until completion; a completed edit records one structural history entry through the vector config patch. `render/overlayFrame.ts` supplies committed, visible vector paths and creation previews to `render/vectorGuides.ts`, which projects control points into CSS space before drawing constant-width blue guides. Layer changes, document replacement, cancellation and real tool switches drop stale creation sessions. Tool-owned modifier hooks let Space move a box or pan during an unfinished polyline/freehand, and Alt center a box without selecting the color picker.
 

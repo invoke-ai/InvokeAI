@@ -12,9 +12,8 @@ import type {
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
-import { getBezierPathBounds } from '@workbench/canvas-engine/math/bezierPath';
 import { applyToPoint, fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
-import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
+import { getBezierPathBounds, isEmpty, union } from '@workbench/canvas-engine/math/rect';
 
 type LayerTransform = CanvasLayerBaseContract['transform'];
 

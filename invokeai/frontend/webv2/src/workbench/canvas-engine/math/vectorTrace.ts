@@ -1,6 +1,6 @@
 import type { Vec2 } from '@workbench/canvas-engine/types';
 
-import { polygonBounds } from '@workbench/canvas-engine/freehand';
+import { polygonBounds } from '@workbench/canvas-engine/math/rect';
 
 /** v6 taper profile: smoothstep pressure over up to half the path at either end. */
 export const buildTaperedTracePoints = (
