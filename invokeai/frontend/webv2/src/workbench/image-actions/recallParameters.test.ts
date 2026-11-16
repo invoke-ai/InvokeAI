@@ -159,7 +159,11 @@ describe('buildRecallParametersSettings', () => {
     const sdxlNamingMissingVae = makeModel('sdxl-missing-vae', 'sdxl', 'main', { default_settings: { vae: 'gone' } });
     // The Model Manager stores "default" when the VAE default is on with no VAE picked; FLUX bundles no VAE.
     const fluxDefaultVae = makeModel('flux-default-vae', 'flux', 'main', { default_settings: { vae: 'default' } });
-    const sd3DefaultVae = makeModel('sd3-default-vae', 'sd-3', 'main', { default_settings: { vae: 'default' } });
+    // A Diffusers pipeline: its VAE is an optional override. A GGUF SD3 transformer needs one, as FLUX does.
+    const sd3DefaultVae = makeModel('sd3-default-vae', 'sd-3', 'main', {
+      default_settings: { vae: 'default' },
+      format: 'diffusers',
+    });
     const sd3Vae = makeModel('sd3-vae', 'sd-3', 'vae');
     const catalog = [...models, fluxVae, sdxlNamingMissingVae, fluxDefaultVae, sd3DefaultVae, sd3Vae];
     const buildWith = (currentValues: ReturnType<typeof currentFor>, parameters: Record<string, unknown>) =>
