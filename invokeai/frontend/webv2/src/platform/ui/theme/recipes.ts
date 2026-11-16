@@ -589,7 +589,12 @@ export const numberInputSlotRecipe = defineSlotRecipe({
   base: {
     ...chakraSlotRecipes.numberInput.base,
     // The steppers fill the root inside the field's border. The stock height follows the size's `--input-height`,
-    // so steppers would stand taller than a field sized apart from its root's size.
+    // so steppers would stand taller than a field sized apart from its root's size. The root keeps to its content,
+    // so a stretching flex or grid parent cannot make it taller than the field.
+    root: {
+      ...chakraSlotRecipes.numberInput.base?.root,
+      height: 'fit-content',
+    },
     control: {
       ...chakraSlotRecipes.numberInput.base?.control,
       height: 'calc(100% - 2px)',

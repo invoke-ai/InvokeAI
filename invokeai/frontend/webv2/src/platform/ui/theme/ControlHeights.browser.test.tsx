@@ -115,6 +115,26 @@ describe('control heights', () => {
     expectStepperFitsNumberField(CONTROL_HEIGHT_PX.md);
   });
 
+  it('fits the number steppers to a field whose root a parent stretches', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <div style={{ alignItems: 'stretch', display: 'flex', height: '120px' }}>
+            <NumberInput.Root>
+              <NumberInput.Control data-testid="number-steppers" />
+              <NumberInput.Input aria-label="Number" />
+            </NumberInput.Root>
+          </div>
+        </ChakraProvider>
+      );
+    });
+
+    expectStepperFitsNumberField(CONTROL_HEIGHT_PX.md);
+  });
+
   it('renders controls that name no size at md', async () => {
     const controls = await renderControls();
 
