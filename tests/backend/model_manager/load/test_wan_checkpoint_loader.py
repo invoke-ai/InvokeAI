@@ -503,7 +503,9 @@ class TestHeaderFirstRead:
 
         model, events, alive_at_read = self._load_recording(path)
 
-        assert events[0] == ("reserve", sum(v.numel() for v in reference.state_dict().values()) * 2)
+        # The folded size, plus the one fold in flight: the weight's float32 copy and product, and its float32 scale.
+        in_flight = 2 * 128 * 128 * torch.float32.itemsize + 128 * torch.float32.itemsize
+        assert events[0] == ("reserve", sum(v.numel() for v in reference.state_dict().values()) * 2 + in_flight)
         read = {key for kind, key in events if kind == "read"}
         assert read == set(reference.state_dict()) | {"blocks.0.attn1.to_q.scale_weight"}
         # Only the fp8 weight is still alive while its scale is read; it is folded right after.
@@ -1219,7 +1221,9 @@ class TestScaledFp8:
         """The reservation is planned from the header, before any scale is read, so it has to agree with what the read
         ends up holding: kept per-tensor layers with both input-scale spellings, an e5m2 layer and the embedders the
         split folds, a scaled weight that is not fp8, and dense float32 tensors. Measured before the FP8 Storage cast,
-        which shrinks the model afterwards; the slack is the scalars the plan counts for layers that end up folded."""
+        which shrinks the model afterwards. The slack is exactly the largest fold in flight, here the 768x128
+        `time_proj` with its float32 copy and product and its scalar scale, and, where the layers are kept, the
+        placeholder input scale the plan counts and the extraction drops."""
         e5m2 = ATTENTION[1]
         _, sd, _ = _scaled_fp8_checkpoint(ATTENTION + EMBEDDERS, e5m2=(e5m2,))
         sd[f"{ATTENTION[0]}.scale_input"] = torch.tensor(0.5)
@@ -1240,8 +1244,35 @@ class TestScaledFp8:
         )
         reserved = loader._ram_cache.make_room.call_args_list
         assert len(reserved) == 1
-        slack = reserved[0].args[0] - held
-        assert 0 <= slack <= 16 * torch.float32.itemsize
+        in_flight = 2 * 768 * 128 * torch.float32.itemsize + torch.float32.itemsize
+        placeholder = torch.float32.itemsize if storage or fp8_matmul else 0
+        assert reserved[0].args[0] - held == in_flight + placeholder
         if storage or fp8_matmul:
             assert model.get_submodule(ATTENTION[0]).weight.dtype is torch.float8_e4m3fn
-            assert slack > 0, "nothing was folded after the plan counted it, so this would not test the bound"
+
+    @pytest.mark.parametrize("storage", [False, True], ids=["storage-off", "storage-on"])
+    @pytest.mark.parametrize("slab_rows", [None, 32], ids=["whole", "slabs"])
+    def test_an_mxfp8_file_reserves_for_its_largest_grid_in_flight(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, slab_rows: int | None, storage: bool
+    ) -> None:
+        """Every MXFP8 layer is folded, with FP8 Storage or without, so no grid stays resident, but each is alive
+        through its own fold, and the fold widens it across the weight. The reservation covers what the model holds
+        plus one such layer, not every grid at once: its float32 grid, and the fold's float32 weight copy, product and
+        widened grid over the rows it folds at once (with the row index that picks a slab's grid rows). Measured before
+        the FP8 Storage cast, which shrinks the dense layers afterwards."""
+        from invokeai.backend.quantization import fp8_scaled
+
+        if slab_rows is not None:
+            monkeypatch.setattr(fp8_scaled, "_FOLD_SLAB_ELEMENTS", slab_rows * 128)
+        _, sd = _mxfp8_checkpoint(ATTENTION)
+        path = _write(tmp_path, sd)
+        loader = _storage_loader(monkeypatch, storage=storage)
+        loader._apply_fp8_to_nn_module = lambda *_args, **_kwargs: None
+
+        model = _load(path, loader=loader, dtype=torch.float32)
+
+        held = sum(t.nelement() * t.element_size() for t in model.parameters())
+        grid = 128 * (128 // MX_BLOCK) * torch.float32.itemsize
+        rows = 128 if slab_rows is None else slab_rows
+        fold = 3 * rows * 128 * torch.float32.itemsize + (0 if slab_rows is None else rows * torch.int64.itemsize)
+        loader._ram_cache.make_room.assert_called_once_with(held + grid + fold)

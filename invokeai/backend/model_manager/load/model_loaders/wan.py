@@ -55,6 +55,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    fold_transient_bytes,
     is_scale_metadata_key,
     iter_weight_scale_pairs,
     parse_quantization_metadata,
@@ -62,6 +63,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     reject_undecoded_mx_scale,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
+    survives_split_and_cast,
     unparsed_fp8_scale_keys,
     warn_on_unattached_scales,
 )
@@ -486,6 +488,23 @@ def _planned_fp8_layers(
     return planned
 
 
+def _fold_in_flight_bytes(sd: Mapping[str, torch.Tensor], folded_scales: Mapping[str, torch.Tensor]) -> int:
+    """The most a fold holds at once beyond the state dict a reservation sizes, from the header's ``meta`` tensors.
+
+    The layers fold one at a time, each as it is read, so this is the largest single layer's: its scale at the float32
+    width the fold multiplies by (a decoded MXFP8 grid included), and the fold's own transient. The stored weight in
+    flight is not counted, as for any tensor the read casts. Neither is the MXFP8 decode, which holds a few copies of
+    the grid before the fold and stays below the fold's transient for any layer under about 400M weights.
+    """
+    return max(
+        (
+            scale.numel() * torch.float32.itemsize + fold_transient_bytes(sd[f"{path}.weight"], scale)
+            for path, scale in folded_scales.items()
+        ),
+        default=0,
+    )
+
+
 def _read_converted(
     sd: dict[str, torch.Tensor],
     read: Callable[[str], torch.Tensor],
@@ -520,8 +539,11 @@ def _read_converted(
                 # folded here, through the same fold, and never kept.
                 scale = one.pop(layer_keys[path][0])
                 reject_undecoded_mx_scale(path, scale)
-                dequantize_fp8_scaled(one, {path: Fp8ScaledLayer(weight_scale=scale.float())}, dtype)
+                layers = {path: Fp8ScaledLayer(weight_scale=scale.float())}
+                # Only the float32 scale is in flight during the fold, as the reservation counts it.
                 del scale
+                dequantize_fp8_scaled(one, layers, dtype)
+                layers = {}
             else:
                 layers = extract_fp8_scaled_layers(one, layer_hints={path: hints[path]} if path in hints else {})
                 if keep_fp8:
@@ -698,20 +720,37 @@ class WanCheckpointModel(ModelLoader):
                     ]
                     for path, scale_key in weight_scales.items()
                 }
-                # One reservation, before the first read: kept layers at their stored width plus their float32
-                # scales, everything else at the compute dtype.
+                # Which layers stay fp8, decided as the split will decide it.
+                planned = _planned_fp8_layers({p: layer_keys[p] for p in fp8_scaled}, side_channel) if keep_fp8 else {}
+                kept = {
+                    path: layer
+                    for path, layer in planned.items()
+                    if survives_split_and_cast(f"{path}.weight", sd[f"{path}.weight"], model, skip_patterns, layer)
+                }
+                folded = [path for path in weight_scales if path not in kept]
+                # One reservation, before the first read: kept layers at their stored width with their float32 scales,
+                # which stay resident, everything else at the compute dtype, and the largest fold in flight. Folded
+                # weights are planned at the compute dtype they end at, so only the kept layers' scales are charged in
+                # full: a folded layer's scale lives only through its own fold.
+                in_flight = _fold_in_flight_bytes(sd, {path: side_channel[weight_scales[path]] for path in folded})
+                planned_sd = {
+                    **sd,
+                    **{
+                        f"{path}.weight": torch.empty(sd[f"{path}.weight"].shape, dtype=model_dtype, device="meta")
+                        for path in folded
+                    },
+                }
                 reserve_for_load(
-                    self._ram_cache.make_room,
-                    sd,
+                    lambda planned_bytes: self._ram_cache.make_room(planned_bytes + in_flight),
+                    planned_sd,
                     model_dtype,
                     keep_fp8=keep_fp8,
                     model=model,
-                    fp8_layers=_planned_fp8_layers({p: layer_keys[p] for p in fp8_scaled}, side_channel)
-                    if keep_fp8
-                    else {},
+                    fp8_layers=kept,
                     nvfp4_payloads={},
                     skip_patterns=skip_patterns,
                 )
+                del planned_sd
                 fp8_layers = _read_converted(
                     sd,
                     read,
