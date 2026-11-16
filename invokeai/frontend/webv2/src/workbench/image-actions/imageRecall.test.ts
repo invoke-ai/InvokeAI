@@ -2039,7 +2039,12 @@ describe('model-family tuning recall', () => {
       image,
       kind: 'all',
       // The legacy UI recorded only the strength of the style reference it used.
-      metadata: { krea2_style_strength: 0.6, model: { key: krea2Model.key } },
+      metadata: {
+        app_version: '6.12.0',
+        generation_mode: 'krea2_txt2img',
+        krea2_style_strength: 0.6,
+        model: { key: krea2Model.key },
+      },
       models: [],
       supportedModels: [krea2Model],
       vaeModels: [],
@@ -2903,7 +2908,7 @@ describe('legacy records', () => {
 
     it('clears the current references when a generation record omits them', () => {
       const result = recall(
-        { model: { key: sdxlModel.key }, positive_prompt: 'silent' },
+        { app_version: '6.0.0', generation_mode: 'txt2img', model: { key: sdxlModel.key }, positive_prompt: 'silent' },
         { referenceImages: currentReferenceImages },
         [sdxlModel]
       );
@@ -2916,7 +2921,77 @@ describe('legacy records', () => {
       // v6.3–6.10 recorded Kontext references as a list nested inside `ref_images`.
       const nested = [[{ config: { image: { image_name: 'kontext.png' }, type: 'flux_kontext' }, id: 'kontext' }]];
       const result = recall(
-        { model: { key: sdxlModel.key }, positive_prompt: 'nested', ref_images: nested },
+        {
+          app_version: '7.0.0',
+          generation_mode: 'txt2img',
+          model: { key: sdxlModel.key },
+          positive_prompt: 'nested',
+          ref_images: nested,
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references on a record that is not a generation record', () => {
+      // An upscale or hand-built workflow record names a model without saying what references ran.
+      const result = recall(
+        { app_version: '7.0.0', model: { key: sdxlModel.key }, positive_prompt: 'upscaled' },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('keeps the current references for a model that takes none', () => {
+      const zImageModel: MainModelConfig = { base: 'z-image', key: 'z-model', name: 'Z-Image', type: 'main' };
+      const result = recall(
+        {
+          app_version: '7.0.0',
+          generation_mode: 'z_image_txt2img',
+          model: { key: zImageModel.key },
+          positive_prompt: 'no references',
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel, zImageModel]
+      );
+
+      expect(result?.values.model.key).toBe(zImageModel.key);
+      expect(result?.values.referenceImages.map((reference) => reference.id)).toEqual(['current-reference']);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references for a v4.2 record that kept its IP-Adapters in control layers', () => {
+      const result = recall(
+        {
+          app_version: '6.0.0',
+          control_layers: { layers: [{ type: 'ip_adapter_layer' }], version: 2 },
+          generation_mode: 'txt2img',
+          model: { key: sdxlModel.key },
+          positive_prompt: 'v4.2',
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references on a v5 record, which may have dropped the ones it used', () => {
+      // v5 Canvas-staged images saved to the Gallery lost `canvas_v2_metadata`, and their references with it.
+      const result = recall(
+        {
+          app_version: '5.15.0',
+          generation_mode: 'sdxl_txt2img',
+          model: { key: sdxlModel.key },
+          positive_prompt: 'v5',
+        },
         { referenceImages: currentReferenceImages },
         [sdxlModel]
       );
@@ -2927,7 +3002,12 @@ describe('legacy records', () => {
 
     it('leaves the current references when the record names no recallable model', () => {
       const result = recall(
-        { model: { key: 'not-installed' }, positive_prompt: 'silent' },
+        {
+          app_version: '7.0.0',
+          generation_mode: 'txt2img',
+          model: { key: 'not-installed' },
+          positive_prompt: 'silent',
+        },
         { referenceImages: currentReferenceImages },
         [sdxlModel]
       );
@@ -3288,6 +3368,9 @@ it.each(['array', 'entities'] as const)(
     ]);
     const reference = { id: 'old', ipAdapter: { type: 'ip_adapter', image: null } };
     const metadata = {
+      app_version: '6.0.0',
+      generation_mode: 'txt2img',
+      model: { key: sdxlModel.key },
       positive_prompt: 'still recallable',
       canvas_v2_metadata: {
         rasterLayers: [],
@@ -3305,7 +3388,7 @@ it.each(['array', 'entities'] as const)(
       supportedModels: [sdxlModel],
       vaeModels: [],
     };
-    expect(readMetadataReferenceImages(metadata)).toEqual({ images: null, names: [], partial: true });
+    expect(readMetadataReferenceImages(metadata)).toEqual({ absent: false, images: null, names: [], partial: true });
     const refused = buildImageRecallSettings({ ...input, metadata });
     expect(refused?.values.referenceImages).toEqual(current);
     expect(refused?.fields).not.toContain('referenceImages');
@@ -3324,6 +3407,7 @@ it.each(['array', 'entities'] as const)(
       buildImageRecallSettings({ ...input, metadata: recovered })?.values.referenceImages[0]?.config.image
     ).toEqual({ original: { image: fallback.image } });
     expect(readMetadataReferenceImages({ ...recovered, ref_images: [] })).toEqual({
+      absent: false,
       images: [],
       names: [],
       partial: false,

@@ -37,6 +37,7 @@ import {
   isSupportedGenerateModel,
   isVaeModelConfig,
   normalizeReferenceImages,
+  takesReferenceImages,
 } from '@features/generation/settings';
 import { compileModelOnlyUpscaleGraph, compileUpscaleGraph } from '@features/upscale/core/graph';
 import { CASES as UPSCALE_CASES, INSTALLED, valuesForCase } from '@features/upscale/core/upscaleGraphCoverage.testing';
@@ -960,6 +961,16 @@ describe('image recall contract', () => {
     });
 
     expect(failures).toEqual([]);
+  });
+
+  it('records the reference list on every generation record of a family that takes references', () => {
+    // Recall reads a missing list as "none", so a builder that forgets to record its references would clear them.
+    const missing = getCases()
+      .filter(({ model, record }) => typeof record.generation_mode === 'string' && takesReferenceImages(model))
+      .filter(({ record }) => !Array.isArray(record.ref_images))
+      .map(({ label }) => label);
+
+    expect(missing).toEqual([]);
   });
 
   it('G8: restores the default a generation record implies for each key it lacks', () => {

@@ -63,6 +63,7 @@ import {
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeMossImageSkipLayers,
   normalizeReferenceImages,
+  takesReferenceImages,
 } from '@features/generation/settings';
 import { SEED_MAX } from '@platform/core/seed';
 
@@ -1187,8 +1188,8 @@ const getMetadataConcepts = (
   return { loras, skipped };
 };
 
-/** Bases whose legacy-UI graphs used reference images without recording `ref_images`. */
-const UNRECORDED_LEGACY_REFERENCE_BASES = new Set(['external', 'krea-2', 'wan']);
+/** Legacy-UI Krea-2 generation graphs used a style reference without recording `ref_images`. */
+const LEGACY_UNRECORDED_REFERENCE_BASE = 'krea-2';
 
 // A refused sentinel makes truncation partial without inspecting entries beyond the recall limit.
 const boundReferenceEntries = (entries: unknown[]): unknown[] =>
@@ -1291,10 +1292,13 @@ export const readMetadataReferenceImages = (
   assets?: ReadonlyMap<string, Pick<GalleryImage, 'width' | 'height'>>,
   models?: readonly ComponentModelConfig[],
   mainModel?: GenerateModelConfig
-): { images: GenerateReferenceImage[] | null; names: string[]; partial: boolean } => {
+): { absent: boolean; images: GenerateReferenceImage[] | null; names: string[]; partial: boolean } => {
   const entries = getMetadataReferenceEntries(metadata);
   if (entries === null) {
-    return { images: null, names: [], partial: false };
+    // `absent`: the record has no reference entry at all. An unreadable `ref_images` (v6.3–6.10 nested Kontext lists)
+    // or a v4.2 object-form `control_layers`, whose global IP-Adapter layers are not read here, still lists some.
+    const absent = isRecord(metadata) && !('ref_images' in metadata) && !isRecord(metadata.control_layers);
+    return { absent, images: null, names: [], partial: false };
   }
   const names = new Set<string>();
   const ipAdapterModels = models?.filter((model) => model.type === 'ip_adapter');
@@ -1346,6 +1350,7 @@ export const readMetadataReferenceImages = (
   });
   const images = normalizeReferenceImages(hydrated).filter((ref) => ref.config.image !== null);
   return {
+    absent: false,
     images: images.length > 0 || entries.length === 0 ? images : null,
     names: [...names],
     partial: images.length < entries.length,
@@ -1649,16 +1654,17 @@ export const buildImageRecallSettings = ({
     // metadata model was not recalled (e.g. uninstalled), `values.model` is
     // still the current one and incompatible configs are re-targeted or dropped.
     referenceRecall = readMetadataReferenceImages(metadata, referenceAssets, models, values.model);
-    // Older graphs omitted `ref_images` when no references were used, so a record that names its model and has no
-    // reference entry had none, except for families whose legacy graphs used references without recording them. A
-    // `ref_images` that is present but unreadable (v6.3–6.10 nested Kontext lists) still says references were used.
+    // v6+ generation graphs omitted `ref_images` only when no references were used, so such a record without a
+    // reference entry had none. v5 Canvas-staged records dropped the references they used along with
+    // `canvas_v2_metadata`, so older records prove nothing. A model that takes no references keeps them, switched off.
     const recordedReferenceImages =
       referenceRecall.images ??
-      (model &&
-      !UNRECORDED_LEGACY_REFERENCE_BASES.has(model.base) &&
-      !(isRecord(metadata) && 'ref_images' in metadata) &&
-      referenceRecall.names.length === 0 &&
-      !referenceRecall.partial
+      (referenceRecall.absent &&
+      model &&
+      isGenerationRecord(metadata) &&
+      Number.parseInt(getString(metadata, 'app_version') ?? '', 10) >= 6 &&
+      takesReferenceImages(values.model) &&
+      values.model.base !== LEGACY_UNRECORDED_REFERENCE_BASE
         ? []
         : null);
     // Only the base decides; an encoder without a vision tower is flagged by validation, not recalled away.
