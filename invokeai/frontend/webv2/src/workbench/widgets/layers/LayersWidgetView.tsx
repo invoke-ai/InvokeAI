@@ -1,6 +1,7 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Flex, Icon, Stack, Text } from '@chakra-ui/react';
+import { isEventFromOwnDom } from '@platform/react/isEventFromOwnDom';
 import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { getDocumentIndex } from '@workbench/canvas-engine/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
@@ -108,7 +109,12 @@ export const LayersWidgetView = ({ runtime }: WidgetViewProps) => {
   );
   const [addMenuAnchor, setAddMenuAnchor] = useState<LayerSurfaceAnchor | null>(null);
   const handleEmptyAreaContextMenu = useCallback((event: MouseEvent<HTMLElement>) => {
-    if (event.defaultPrevented || (event.target as HTMLElement).closest('[role="treeitem"]')) {
+    // Layer menus and their dialogs are portalled; a right-click in them is theirs.
+    if (
+      event.defaultPrevented ||
+      !isEventFromOwnDom(event) ||
+      (event.target as HTMLElement).closest('[role="treeitem"]')
+    ) {
       return;
     }
     event.preventDefault();

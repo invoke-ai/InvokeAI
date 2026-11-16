@@ -1,7 +1,6 @@
-import { Box, HStack, Icon, Popover, Portal, Slider, Stack, Text } from '@chakra-ui/react';
+import { Box, Icon, Popover, Portal, Slider, Stack, Text } from '@chakra-ui/react';
 import {
   useWorkflowNotifications,
-  useWorkflowUi,
   useWorkflowPreferencesSelector,
   useWorkflowProjectSelector,
 } from '@features/workflow/ui/WorkflowUiContext';
@@ -17,8 +16,6 @@ import {
   LayoutGridIcon,
   CircleArrowUpIcon,
   MaximizeIcon,
-  Redo2Icon,
-  Undo2Icon,
   ZoomInIcon,
   ZoomOutIcon,
 } from 'lucide-react';
@@ -53,32 +50,23 @@ const EDITOR_TOOLBAR_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2
 
 export const EditorToolbar = ({
   arrangeScope = null,
-  canRedo = false,
-  canUndo = false,
   nodeOpacity,
   tool,
   updatableNodeCount = 0,
   onArrangeNodes,
   onNodeOpacityChange,
-  onRedo,
   onToolChange,
-  onUndo,
   onUpdateNodes,
 }: {
   /** What Arrange would lay out: the selection, the whole graph, or nothing (fewer than two nodes). */
   arrangeScope?: 'all' | 'selection' | null;
-  /** Whether the workflow's session history has an edit to redo or undo. */
-  canRedo?: boolean;
-  canUndo?: boolean;
   nodeOpacity: number;
   tool: EditorTool;
   /** Nodes with a newer same-major template; the update button shows only while there are some. */
   updatableNodeCount?: number;
   onArrangeNodes?: () => void;
   onNodeOpacityChange: (opacity: number) => void;
-  onRedo?: () => void;
   onToolChange: (tool: EditorTool) => void;
-  onUndo?: () => void;
   onUpdateNodes?: () => void;
 }) => {
   const { t } = useTranslation();
@@ -132,23 +120,6 @@ export const EditorToolbar = ({
             onToolChange={onToolChange}
           />
         ))}
-        <ToolbarSeparator />
-        <HistoryButton
-          commandId="workflows.undo"
-          disabled={!canUndo}
-          icon={Undo2Icon}
-          label={t('widgets.workflow.toolbar.undo')}
-          tooltip={t('widgets.workflow.commands.undo')}
-          onClick={onUndo}
-        />
-        <HistoryButton
-          commandId="workflows.redo"
-          disabled={!canRedo}
-          icon={Redo2Icon}
-          label={t('widgets.workflow.toolbar.redo')}
-          tooltip={t('widgets.workflow.commands.redo')}
-          onClick={onRedo}
-        />
         <ToolbarSeparator />
         <ToolbarButton icon={ZoomInIcon} label={t('widgets.workflow.toolbar.zoomIn')} onClick={onZoomInClick} />
         <ToolbarButton icon={ZoomOutIcon} label={t('widgets.workflow.toolbar.zoomOut')} onClick={onZoomOutClick} />
@@ -233,49 +204,6 @@ export const EditorToolbar = ({
         </Popover.Root>
       </Toolbar>
     </Box>
-  );
-};
-
-/** A toolbar button whose tooltip also shows the editor command's current shortcut. */
-const HistoryButton = ({
-  commandId,
-  disabled,
-  icon,
-  label,
-  onClick,
-  tooltip,
-}: {
-  commandId: string;
-  disabled: boolean;
-  icon: typeof HandIcon;
-  label: string;
-  onClick?: () => void;
-  tooltip: string;
-}) => {
-  const { CommandShortcut } = useWorkflowUi();
-  // The click event must not reach a command that takes an optional target, and an unavailable step does nothing.
-  const onButtonClick = useCallback(() => {
-    if (!disabled) {
-      onClick?.();
-    }
-  }, [disabled, onClick]);
-  const content = useMemo(
-    () => (
-      <HStack gap="2">
-        <span>{tooltip}</span>
-        <CommandShortcut commandId={commandId} />
-      </HStack>
-    ),
-    [CommandShortcut, commandId, tooltip]
-  );
-
-  return (
-    <Tooltip content={content} positioning={TOOLTIP_POSITIONING}>
-      {/* aria-disabled, not disabled: stepping to the end of the history must not drop the button's focus. */}
-      <IconButton aria-disabled={disabled || undefined} aria-label={label} variant="ghost" onClick={onButtonClick}>
-        <Icon as={icon} boxSize="3.5" />
-      </IconButton>
-    </Tooltip>
   );
 };
 

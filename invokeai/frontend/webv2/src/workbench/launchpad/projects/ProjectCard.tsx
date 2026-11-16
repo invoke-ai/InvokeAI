@@ -23,6 +23,8 @@ import { ProjectCover } from './ProjectCover';
 
 const CARD_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const;
 const REVEAL_ON_HOVER = { opacity: 1 } as const;
+// The pin sits on the cover, so it carries its own scrim and edge: a tint alone vanishes on a light image.
+const PIN_HOVER = { bg: 'bg' } as const;
 // The card clips its overlay link's own outline, so the card draws the keyboard focus ring around itself.
 const LINK_STYLE = { cursor: 'default', inset: 0, outline: 'none', position: 'absolute' } as const;
 const CARD_FOCUS_RING = {
@@ -95,12 +97,16 @@ export const ProjectCard = ({
           <IconButton
             aria-label={pinLabel}
             aria-pressed={isPinned}
+            bg="bg/85"
+            borderColor="border.subtle"
             color={isPinned ? 'fg' : 'fg.muted'}
             opacity={isPinned ? 1 : 0}
+            shadow="xs"
             size="sm"
-            variant="subtle"
+            variant="outline"
             _focusVisible={REVEAL_ON_HOVER}
             _groupHover={REVEAL_ON_HOVER}
+            _hover={PIN_HOVER}
             onClick={handleTogglePin}
           >
             <Icon as={PinIcon} boxSize="3" fill={isPinned ? 'currentColor' : 'none'} />

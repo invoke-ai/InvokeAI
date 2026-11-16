@@ -1,0 +1,52 @@
+diff --git a/dist/presence.machine.js b/dist/presence.machine.js
+index 9b104c4..4e2b701 100644
+--- a/dist/presence.machine.js
++++ b/dist/presence.machine.js
+@@ -49,6 +49,10 @@ var machine = (0, import_core.createMachine)({
+       }))
+     };
+   },
++  // Starting again after React Activity hid the subtree resumes the stored state, but the machine was stopped while
++  // hidden and dropped what was sent meanwhile: the frame that suspends an exit, the animation events that finish it,
++  // the node. A closed tip or menu then stays shown until it opens and closes again. Hidden content showed no exit.
++  entry: ["reconcilePresence"],
+   exit: ["cleanupNode"],
+   watch({ track, prop, send }) {
+     track([() => prop("present")], () => {
+@@ -150,6 +154,10 @@ var machine = (0, import_core.createMachine)({
+       },
+       clearPrevAnimationName: ({ context }) => {
+         context.set("prevAnimationName", null);
++      },
++      reconcilePresence: ({ prop, send, state }) => {
++        if (prop("present") || state.matches("unmounted")) return;
++        send({ type: "UNMOUNT", src: "reconnect" });
+       }
+     },
+     effects: {
+diff --git a/dist/presence.machine.mjs b/dist/presence.machine.mjs
+index 5c11a9e..9d66955 100644
+--- a/dist/presence.machine.mjs
++++ b/dist/presence.machine.mjs
+@@ -25,6 +25,10 @@ var machine = createMachine({
+       }))
+     };
+   },
++  // Starting again after React Activity hid the subtree resumes the stored state, but the machine was stopped while
++  // hidden and dropped what was sent meanwhile: the frame that suspends an exit, the animation events that finish it,
++  // the node. A closed tip or menu then stays shown until it opens and closes again. Hidden content showed no exit.
++  entry: ["reconcilePresence"],
+   exit: ["cleanupNode"],
+   watch({ track, prop, send }) {
+     track([() => prop("present")], () => {
+@@ -126,6 +130,10 @@ var machine = createMachine({
+       },
+       clearPrevAnimationName: ({ context }) => {
+         context.set("prevAnimationName", null);
++      },
++      reconcilePresence: ({ prop, send, state }) => {
++        if (prop("present") || state.matches("unmounted")) return;
++        send({ type: "UNMOUNT", src: "reconnect" });
+       }
+     },
+     effects: {

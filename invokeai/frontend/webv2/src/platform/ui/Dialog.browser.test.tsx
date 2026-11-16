@@ -1,11 +1,12 @@
-import { ChakraProvider, Portal } from '@chakra-ui/react';
+import { ChakraProvider, Menu, Portal } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { act, StrictMode, useCallback, useState } from 'react';
+import { act, StrictMode, useCallback, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { Dialog } from './Dialog';
+import { MenuContent, MenuItem } from './Menu';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -19,58 +20,109 @@ afterEach(async () => {
   root = null;
 });
 
-const nextFrame = () =>
-  new Promise<void>((resolve) => {
-    requestAnimationFrame(() => resolve());
-  });
+/** As the app mounts it: under StrictMode, with a control outside every dialog. */
+const render = async (content: ReactNode) => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await act(() =>
+    root?.render(
+      <StrictMode>
+        <ChakraProvider value={system}>
+          <button type="button">Outside</button>
+          {content}
+        </ChakraProvider>
+      </StrictMode>
+    )
+  );
+};
+
+const dialogNamed = (title: string) => page.getByRole('dialog', { name: title });
+const isOpen = (title: string) => dialogNamed(title).query()?.getAttribute('data-state') === 'open';
+
+const SimpleDialog = ({
+  children,
+  modal,
+  onFocusOutside,
+  onOpenChange,
+  open,
+  title,
+}: {
+  children?: ReactNode;
+  modal?: boolean;
+  onFocusOutside?: () => void;
+  onOpenChange: (details: Dialog.OpenChangeDetails) => void;
+  open: boolean;
+  title: string;
+}) => (
+  <Dialog.Root
+    closeOnInteractOutside
+    modal={modal}
+    open={open}
+    onFocusOutside={onFocusOutside}
+    onOpenChange={onOpenChange}
+  >
+    <Portal>
+      {modal === false ? null : <Dialog.Backdrop />}
+      <Dialog.Positioner>
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>{title}</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>{children}</Dialog.Body>
+        </Dialog.Content>
+      </Dialog.Positioner>
+    </Portal>
+  </Dialog.Root>
+);
+
+const getEditInitialFocus = () => document.querySelector<HTMLInputElement>('input[name="item-name"]');
 
 /**
- * A dialog that opens a sibling dialog from inside itself, the way the workflow library opens its graph preview: the
- * child mounts already open and unmounts once it has animated out.
+ * A dialog that opens a second one over itself, mounted open and released after it animates out, as the layout preset
+ * manager opens its edit dialog.
  */
-const ParentWithChild = () => {
-  const [isParentOpen, setIsParentOpen] = useState(true);
-  const [isChildMounted, setIsChildMounted] = useState(false);
-  const [isChildOpen, setIsChildOpen] = useState(false);
-  const handleParentOpenChange = useCallback((details: Dialog.OpenChangeDetails) => setIsParentOpen(details.open), []);
-  const openChild = useCallback(() => {
-    setIsChildMounted(true);
-    setIsChildOpen(true);
-  }, []);
-  const handleChildOpenChange = useCallback((details: Dialog.OpenChangeDetails) => setIsChildOpen(details.open), []);
-  const closeChild = useCallback(() => setIsChildOpen(false), []);
-  const unmountChild = useCallback(() => setIsChildMounted(false), []);
+const StackedDialogs = () => {
+  const [isManagerOpen, setIsManagerOpen] = useState(true);
+  const [isEditMounted, setIsEditMounted] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const openEdit = () => {
+    setIsEditMounted(true);
+    setIsEditOpen(true);
+  };
+  const changeManagerOpen = useCallback((details: Dialog.OpenChangeDetails) => setIsManagerOpen(details.open), []);
+  const changeEditOpen = useCallback((details: Dialog.OpenChangeDetails) => setIsEditOpen(details.open), []);
+  const releaseEdit = useCallback(() => setIsEditMounted(false), []);
 
   return (
     <>
-      <Dialog.Root open={isParentOpen} onOpenChange={handleParentOpenChange}>
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content aria-label="Parent">
-              <Dialog.Body>
-                <input aria-label="Search" />
-                <button type="button" onClick={openChild}>
-                  Open child
-                </button>
-              </Dialog.Body>
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
-      {isChildMounted ? (
-        <Dialog.Root open={isChildOpen} onExitComplete={unmountChild} onOpenChange={handleChildOpenChange}>
+      <SimpleDialog open={isManagerOpen} title="Manager" onOpenChange={changeManagerOpen}>
+        <button type="button" onClick={openEdit}>
+          Edit
+        </button>
+      </SimpleDialog>
+      {isEditMounted ? (
+        <Dialog.Root
+          initialFocusEl={getEditInitialFocus}
+          lazyMount
+          open={isEditOpen}
+          unmountOnExit
+          onExitComplete={releaseEdit}
+          onOpenChange={changeEditOpen}
+        >
           <Portal>
             <Dialog.Backdrop />
             <Dialog.Positioner>
-              <Dialog.Content aria-label="Child">
+              <Dialog.Content>
+                <Dialog.Header>
+                  <Dialog.Title>Edit item</Dialog.Title>
+                </Dialog.Header>
                 <Dialog.Body>
-                  {/* The child's first tabbable, where a trap armed after focus entered the child would return it. */}
-                  <button type="button">Graph</button>
+                  <input aria-label="Name" name="item-name" />
                 </Dialog.Body>
                 <Dialog.Footer>
-                  <button type="button" onClick={closeChild}>
-                    Close
+                  <button type="button" onClick={() => setIsEditOpen(false)}>
+                    Cancel
                   </button>
                 </Dialog.Footer>
               </Dialog.Content>
@@ -82,95 +134,122 @@ const ParentWithChild = () => {
   );
 };
 
-/** Closes on any dismissal, so a focus-outside dismissal that got through would close it. */
-const ModalWithFocusOutside = ({ onFocusOutside }: { onFocusOutside: () => void }) => {
-  const [isOpen, setIsOpen] = useState(true);
-  const handleOpenChange = useCallback((details: Dialog.OpenChangeDetails) => setIsOpen(details.open), []);
-
+/** A modal or non-modal dialog the test opens and observes. */
+const Observed = ({
+  children,
+  modal,
+  onFocusOutside,
+}: {
+  children?: ReactNode;
+  modal?: boolean;
+  onFocusOutside?: () => void;
+}) => {
+  const [open, setOpen] = useState(true);
+  const changeOpen = useCallback((details: Dialog.OpenChangeDetails) => setOpen(details.open), []);
   return (
-    <Dialog.Root open={isOpen} onFocusOutside={onFocusOutside} onOpenChange={handleOpenChange}>
-      <Portal>
-        <Dialog.Positioner>
-          <Dialog.Content aria-label="Modal">
-            <button type="button">Inside</button>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+    <SimpleDialog modal={modal} open={open} title="Observed" onFocusOutside={onFocusOutside} onOpenChange={changeOpen}>
+      {children ?? <button type="button">Inside</button>}
+    </SimpleDialog>
   );
 };
 
-const getDialog = (label: string) => document.querySelector<HTMLElement>(`[role="dialog"][aria-label="${label}"]`);
-const getButton = (dialog: HTMLElement, text: string) =>
-  [...dialog.querySelectorAll('button')].find((button) => button.textContent === text)!;
-
-const renderParent = async () => {
-  host = document.createElement('div');
-  document.body.append(host);
-  root = createRoot(host);
-  await act(() =>
-    root!.render(
-      <StrictMode>
-        <ChakraProvider value={system}>
-          <ParentWithChild />
-        </ChakraProvider>
-      </StrictMode>
-    )
+/** The dialog's Escape and outside handling is armed in the frame after it opens. */
+const settled = async (title: string) => {
+  await expect.poll(() => isOpen(title)).toBe(true);
+  await act(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      })
   );
-  await expect.poll(() => getDialog('Parent')?.getAttribute('data-state')).toBe('open');
-
-  return getDialog('Parent')!;
 };
 
 describe('Dialog', () => {
-  it('stays open when a dialog it opened closes and focus returns to it', async () => {
-    const parent = await renderParent();
+  it.each([
+    ['Cancel', () => userEvent.click(page.getByRole('button', { name: 'Cancel' }))],
+    ['Escape', () => userEvent.keyboard('{Escape}')],
+  ])('closes only a dialog stacked over another on %s, leaving focus in the one below', async (_way, dismiss) => {
+    await render(<StackedDialogs />);
+    await settled('Manager');
 
-    await act(() => userEvent.click(getButton(parent, 'Open child')));
-    await expect.poll(() => getDialog('Child')?.getAttribute('data-state')).toBe('open');
-    await act(() => userEvent.click(getButton(getDialog('Child')!, 'Close')));
-    await expect.poll(() => getDialog('Child')).toBeNull();
-    await expect.poll(() => document.activeElement).toBe(getButton(parent, 'Open child'));
-    // Let the restored focus's outside handler run before checking that it did not dismiss the parent.
-    await act(nextFrame);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await act(() => userEvent.click(page.getByRole('button', { name: 'Edit' })));
+      await settled('Edit item');
+      await expect.poll(() => dialogNamed('Edit item').element().contains(document.activeElement)).toBe(true);
 
-    expect(parent.isConnected).toBe(true);
-    expect(parent.getAttribute('data-state')).toBe('open');
-    expect(document.activeElement).toBe(getButton(parent, 'Open child'));
+      await act(dismiss);
+
+      await expect.poll(() => dialogNamed('Edit item').query()).toBeNull();
+      expect(isOpen('Manager')).toBe(true);
+      await expect.poll(() => document.activeElement).toBe(page.getByRole('button', { name: 'Edit' }).element());
+    }
   });
 
-  it('still closes on a pointer press outside it', async () => {
-    const parent = await renderParent();
-    // The outside handling is set up in the frame after the dialog opens.
-    await act(nextFrame);
-
-    await act(() => userEvent.click(document.body, { position: { x: 4, y: 4 } }));
-
-    await expect.poll(() => parent.getAttribute('data-state')).toBe('closed');
-  });
-
-  it('still tells the caller when focus lands outside a modal dialog, which stays open', async () => {
+  it('keeps a modal open when focus is moved outside it, still telling its own handler', async () => {
     const onFocusOutside = vi.fn();
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
-    await act(() =>
-      root!.render(
-        <ChakraProvider value={system}>
-          <button type="button">Outside</button>
-          <ModalWithFocusOutside onFocusOutside={onFocusOutside} />
-        </ChakraProvider>
-      )
+    await render(<Observed onFocusOutside={onFocusOutside} />);
+    await settled('Observed');
+
+    await act(() => host!.querySelector<HTMLButtonElement>('button')!.focus());
+
+    await expect.poll(() => onFocusOutside).toHaveBeenCalled();
+    // Two frames on, so a dismissal the handler let through has re-rendered the dialog closed.
+    await settled('Observed');
+    expect(isOpen('Observed')).toBe(true);
+  });
+
+  it.each([
+    [
+      'a press outside',
+      () => userEvent.click(document.querySelector('[data-part="positioner"]')!, { position: { x: 4, y: 4 } }),
+    ],
+    ['Escape', () => userEvent.keyboard('{Escape}')],
+  ])('dismisses a modal on %s', async (_way, dismiss) => {
+    await render(<Observed />);
+    await settled('Observed');
+
+    await act(dismiss);
+
+    await expect.poll(() => isOpen('Observed')).toBe(false);
+  });
+
+  it('dismisses a non-modal dialog when focus moves outside it, as before', async () => {
+    await render(<Observed modal={false} />);
+    await settled('Observed');
+
+    await act(() => host!.querySelector<HTMLButtonElement>('button')!.focus());
+
+    await expect.poll(() => isOpen('Observed')).toBe(false);
+  });
+
+  it('stays open while a menu opened inside it is used', async () => {
+    const onSelect = vi.fn();
+    await render(
+      <Observed>
+        <Menu.Root>
+          <Menu.Trigger>Actions</Menu.Trigger>
+          <Portal>
+            <Menu.Positioner>
+              <MenuContent>
+                <MenuItem value="rename" onSelect={onSelect}>
+                  Rename
+                </MenuItem>
+              </MenuContent>
+            </Menu.Positioner>
+          </Portal>
+        </Menu.Root>
+      </Observed>
     );
-    const dialog = getDialog('Modal')!;
-    await expect.poll(() => dialog.getAttribute('data-state')).toBe('open');
-    // The outside handling is set up in the frame after the dialog opens.
-    await act(nextFrame);
+    await settled('Observed');
 
-    await act(() => host!.querySelector('button')!.focus());
+    await userEvent.click(page.getByRole('button', { name: 'Actions' }));
+    // The menu's content is portalled outside the dialog's, yet nested in its layer.
+    await expect.poll(() => document.querySelector('[role="menu"]')?.contains(document.activeElement)).toBe(true);
+    await userEvent.click(page.getByRole('menuitem', { name: 'Rename' }));
 
-    await expect.poll(() => onFocusOutside.mock.calls.length).toBe(1);
-    await act(nextFrame);
-    expect(dialog.getAttribute('data-state')).toBe('open');
+    expect(onSelect).toHaveBeenCalledOnce();
+    await expect.poll(() => document.querySelector('[role="menu"]')?.checkVisibility() ?? false).toBe(false);
+    expect(isOpen('Observed')).toBe(true);
+    await expect.element(page.getByRole('button', { name: 'Actions' })).toHaveFocus();
   });
 });
