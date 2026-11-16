@@ -36,6 +36,7 @@ import {
   getGenerationUiPolicy,
   isSupportedGenerateModel,
   isVaeModelConfig,
+  normalizeReferenceImages,
 } from '@features/generation/settings';
 import { compileModelOnlyUpscaleGraph, compileUpscaleGraph } from '@features/upscale/core/graph';
 import { CASES as UPSCALE_CASES, INSTALLED, valuesForCase } from '@features/upscale/core/upscaleGraphCoverage.testing';
@@ -411,6 +412,17 @@ const baselineValues = (): GenerateWidgetValues => ({
   positivePrompt: 'the baseline prompt',
   promptTemplate: { id: 'template', name: 'Template', negativePrompt: 'lowres', positivePrompt: '{prompt}, detailed' },
   promptTemplateViewMode: true,
+  referenceImages: normalizeReferenceImages([
+    {
+      config: {
+        image: { height: 512, image_name: 'baseline-reference.png', width: 512 },
+        model: { base: 'sdxl', key: 'baseline-adapter', name: 'Baseline adapter', type: 'ip_adapter' },
+        type: 'ip_adapter',
+      },
+      id: 'baseline-reference',
+      isEnabled: true,
+    },
+  ]),
   seed: 123,
   seedMode: 'random',
 });

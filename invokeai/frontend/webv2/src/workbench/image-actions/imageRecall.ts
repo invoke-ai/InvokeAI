@@ -1187,6 +1187,9 @@ const getMetadataConcepts = (
   return { loras, skipped };
 };
 
+/** Bases whose legacy-UI graphs used reference images without recording `ref_images`. */
+const UNRECORDED_LEGACY_REFERENCE_BASES = new Set(['external', 'krea-2', 'wan']);
+
 // A refused sentinel makes truncation partial without inspecting entries beyond the recall limit.
 const boundReferenceEntries = (entries: unknown[]): unknown[] =>
   entries.length > 10000 ? [...entries.slice(0, 10000), null] : entries;
@@ -1646,7 +1649,18 @@ export const buildImageRecallSettings = ({
     // metadata model was not recalled (e.g. uninstalled), `values.model` is
     // still the current one and incompatible configs are re-targeted or dropped.
     referenceRecall = readMetadataReferenceImages(metadata, referenceAssets, models, values.model);
-    const recordedReferenceImages = referenceRecall.images;
+    // Older graphs omitted `ref_images` when no references were used, so a record that names its model and has no
+    // reference entry had none, except for families whose legacy graphs used references without recording them. A
+    // `ref_images` that is present but unreadable (v6.3–6.10 nested Kontext lists) still says references were used.
+    const recordedReferenceImages =
+      referenceRecall.images ??
+      (model &&
+      !UNRECORDED_LEGACY_REFERENCE_BASES.has(model.base) &&
+      !(isRecord(metadata) && 'ref_images' in metadata) &&
+      referenceRecall.names.length === 0 &&
+      !referenceRecall.partial
+        ? []
+        : null);
     // Only the base decides; an encoder without a vision tower is flagged by validation, not recalled away.
     const referenceImages = getCompatibleReferenceImages(
       resolveReferenceImageModels(recordedReferenceImages ?? [], models),

@@ -108,11 +108,7 @@ const addReferenceImageMetadata = (
   const enabled = settings.referenceImages.filter(
     (referenceImage) => referenceImage.isEnabled && referenceImage.config.image
   );
-
-  if (enabled.length === 0) {
-    return;
-  }
-
+  // Recorded even when empty: recall clears the current references only for a record that lists none.
   const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
 
   if (metadata) {

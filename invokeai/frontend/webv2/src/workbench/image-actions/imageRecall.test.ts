@@ -2022,6 +2022,33 @@ describe('model-family tuning recall', () => {
     expect(result?.fields).toContain('referenceImages');
   });
 
+  it('keeps the current Krea-2 style reference for a legacy record that did not list its references', () => {
+    const styleReference = normalizeReferenceImages([
+      {
+        config: {
+          image: { original: { image: { height: 512, image_name: 'current.png', width: 512 } } },
+          styleStrength: 1,
+          type: 'krea2_reference_image',
+        },
+        id: 'current-style',
+        isEnabled: true,
+      },
+    ]);
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: krea2Model, modelKey: krea2Model.key, referenceImages: styleReference }),
+      image,
+      kind: 'all',
+      // The legacy UI recorded only the strength of the style reference it used.
+      metadata: { krea2_style_strength: 0.6, model: { key: krea2Model.key } },
+      models: [],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages).toEqual(styleReference);
+    expect(result?.fields).not.toContain('referenceImages');
+  });
+
   it('restores Krea-2 edit references and the K/V cache from the metadata their graph recorded', () => {
     const krea2PoseLora: LoraModelConfig = { base: 'krea-2', key: 'krea2-pose', name: 'Krea-2 Pose', type: 'lora' };
     const krea2Diffusers: MainModelConfig = { ...krea2Model, format: 'diffusers' };
@@ -2874,9 +2901,33 @@ describe('legacy records', () => {
       expect(capabilities.all).toBe(true);
     });
 
-    it('leaves the current references when the record says nothing about them', () => {
+    it('clears the current references when a generation record omits them', () => {
       const result = recall(
         { model: { key: sdxlModel.key }, positive_prompt: 'silent' },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual([]);
+      expect(result?.fields).toContain('referenceImages');
+    });
+
+    it('leaves the current references when the recorded list cannot be read', () => {
+      // v6.3–6.10 recorded Kontext references as a list nested inside `ref_images`.
+      const nested = [[{ config: { image: { image_name: 'kontext.png' }, type: 'flux_kontext' }, id: 'kontext' }]];
+      const result = recall(
+        { model: { key: sdxlModel.key }, positive_prompt: 'nested', ref_images: nested },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references when the record names no recallable model', () => {
+      const result = recall(
+        { model: { key: 'not-installed' }, positive_prompt: 'silent' },
         { referenceImages: currentReferenceImages },
         [sdxlModel]
       );
