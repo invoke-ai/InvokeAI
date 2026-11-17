@@ -75,12 +75,14 @@ def _line(features: Mapping[str, FeatureValue]) -> Line | None:
         beneath, tile_area = line.sits_on
         size = tile_area if features.get("conv_backend") == "miopen" else line.size
         # shortcut: on MIOpen nothing here grows with the frame, but tile peaks do (W7900 bf16 decodes by ~78 B/px at a
-        # 512px tile, ~136 at 768, ~220 at 1024; fp32 512px tiles ~19). The reservation covers the measured frames only.
-        # W7900: decodes to 5120px, encodes to 4096px, every dtype and tile. RX 9060 XT (Windows), largest frame per tile
-        # 512/768/1024: bf16 decodes 6144 at each; fp32 decodes 5120/2048/3072; bf16 encodes 5120/5120/5120; fp32
-        # encodes 4096/4096/4096. Extending each line's last measured segment crosses its reservation from ~4200px
-        # (encodes: W7900 bf16 768px tiles, RX fp32 512px tiles) and ~5260px (decodes: RX fp32 512px tiles; W7900 bf16
-        # 512px tiles ~5490). Past the measured frames it is not guaranteed; measure them and add a frame term if needed.
+        # 512px tile, ~136 at 768, ~220 at 1024; fp32 512px tiles ~19, ~26-28 on the RX with expandable segments). The
+        # reservation covers the measured frames only. W7900: decodes to 5120px, encodes to 4096px, every dtype and
+        # tile. RX 9060 XT (Windows), largest frame per tile 512/768/1024: bf16 decodes 6144 at each; fp32 decodes
+        # 6144/2048/3072; bf16 encodes 5120/5120/5120; fp32 encodes 4096/4096/4096. Extending each line's last measured
+        # segment crosses its reservation from ~4200px (encodes: W7900 bf16 768px tiles, RX fp32 512px tiles) and
+        # ~5490px (decodes: W7900 bf16 512px tiles; RX from ~5870, fp32 1024px tiles). Tiles above 1024px are measured
+        # nowhere: their reservations extrapolate the lines, and an AMD encode there reserves less than the formula this
+        # replaced. Measure them and add terms if needed.
         return line._replace(size=size, sits_on=(_untiled_line(beneath, tile_area, features), tile_area), assembly=None)
     return line._replace(suffix=_untiled_line(line.suffix, line.size, features))
 

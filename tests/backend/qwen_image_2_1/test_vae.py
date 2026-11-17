@@ -414,7 +414,7 @@ def test_one_point_decides_the_tiling_decision_from_its_size_on(monkeypatch: pyt
     assert untiled_peak_bytes("decode", 1152, 1152, 2, GPU) == at_point + grown
 
 
-def test_the_tiling_decision_never_falls_as_a_frame_grows_across_the_miopen_step(
+def test_the_tiling_decision_never_falls_across_the_w7900s_dip_below_the_step(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _pin(monkeypatch, "miopen")
@@ -477,8 +477,17 @@ def test_under_cuda_malloc_async_the_tiling_decision_reads_the_native_allocators
     )
     native = template.model_copy(
         update={
-            "features": {**template.features, "height": 1024, "width": 1024, "tile": None, "dtype": "fp32"},
+            "features": {
+                **template.features,
+                "operation": "decode",
+                "height": 1024,
+                "width": 1024,
+                "tile": None,
+                "dtype": "fp32",
+            },
             "measured_bytes": reserved // 2,
+            "method": "reserved_peak",
+            "in_fit": True,
         }
     )
     data["qwen_image_2_1_vae.json"] = file.model_copy(update={"points": [*file.points, native]})

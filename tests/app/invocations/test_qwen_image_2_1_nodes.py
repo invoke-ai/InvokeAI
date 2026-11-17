@@ -455,9 +455,14 @@ def test_a_decode_reserves_its_estimate_on_the_vaes_compute_device(meta_is_miope
     assert expected != estimate_working_memory("decode", 1536, 1536, 1024, 4, torch.device("cpu"))
 
 
-@pytest.mark.parametrize(("tiled", "tile"), [(False, None), (True, 512)], ids=["whole", "tiled"])
+@pytest.mark.parametrize(
+    ("tiled", "tile_size", "side", "tile"),
+    # A 2560x2560 fp32 encode prices past the device's 20 GiB untiled: tiled up front at the largest tile, unasked.
+    [(False, 0, 1536, None), (True, 512, 1536, 512), (False, 0, 2560, 1024)],
+    ids=["whole", "tiled", "tiled_up_front"],
+)
 def test_an_encode_reserves_its_estimate_on_the_vaes_compute_device(
-    meta_is_miopen, tiled: bool, tile: int | None
+    meta_is_miopen, tiled: bool, tile_size: int, side: int, tile: int | None
 ) -> None:
     from PIL import Image
 
@@ -486,22 +491,22 @@ def test_an_encode_reserves_its_estimate_on_the_vaes_compute_device(
     context = _vae_context(
         _EncodingVAE(),
         reservations,
-        images=SimpleNamespace(get_pil=lambda _name: Image.new("RGB", (1536, 1536))),
+        images=SimpleNamespace(get_pil=lambda _name: Image.new("RGB", (side, side))),
         tensors=SimpleNamespace(save=lambda tensor: "latents"),
     )
     QwenImage21ImageToLatentsInvocation.model_construct(
-        image=ImageField(image_name="in.png"), vae=SimpleNamespace(vae=None), tiled=tiled, tile_size=tile or 0
+        image=ImageField(image_name="in.png"), vae=SimpleNamespace(vae=None), tiled=tiled, tile_size=tile_size
     ).invoke(context)
 
     # An fp32 encode of 1536x1536 measured ~10 GiB untiled: it stays whole on the 20 GiB device, where a decode would
     # be tiled, unless the node asks for tiles; then it reserves its tile.
-    expected = estimate_working_memory("encode", 1536, 1536, tile, 4, META)
+    expected = estimate_working_memory("encode", side, side, tile, 4, META)
     assert reservations == [{"working_memory": expected}]
-    assert expected != estimate_working_memory("decode", 1536, 1536, tile, 4, META)
-    assert expected != estimate_working_memory("encode", 1536, 1536, tile, 4, torch.device("cpu"))
+    assert expected != estimate_working_memory("decode", side, side, tile, 4, META)
+    assert expected != estimate_working_memory("encode", side, side, tile, 4, torch.device("cpu"))
     if tile is not None:
         assert (
-            expected.reservation_bytes < estimate_working_memory("encode", 1536, 1536, None, 4, META).reservation_bytes
+            expected.reservation_bytes < estimate_working_memory("encode", side, side, None, 4, META).reservation_bytes
         )
 
 

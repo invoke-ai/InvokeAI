@@ -145,20 +145,20 @@
         "b_decode_bf16": 0,
         "k_decode_large_bf16": 18548,
         "b_decode_large_bf16": 0,
-        "k_decode_fp32": 20054,
-        "b_decode_fp32": 0,
-        "k_encode_bf16": 5057,
-        "b_encode_bf16": 5242880,
-        "k_encode_fp32": 4975,
-        "b_encode_fp32": 1048576,
+        "k_decode_fp32": 19928,
+        "b_decode_fp32": 149946368,
+        "k_encode_bf16": 5054,
+        "b_encode_bf16": 14680064,
+        "k_encode_fp32": 4982,
+        "b_encode_fp32": 0,
         "k_tiled_decode_bf16": 0,
         "b_tiled_decode_bf16": 1552941056,
-        "k_tiled_decode_fp32": 1470,
-        "b_tiled_decode_fp32": 1018167296,
-        "k_tiled_encode_bf16": 215,
-        "b_tiled_encode_bf16": 348127232,
-        "k_tiled_encode_fp32": 1665,
-        "b_tiled_encode_fp32": 246415360
+        "k_tiled_decode_fp32": 1176,
+        "b_tiled_decode_fp32": 1326448640,
+        "k_tiled_encode_bf16": 233,
+        "b_tiled_encode_bf16": 329252864,
+        "k_tiled_encode_fp32": 1666,
+        "b_tiled_encode_fp32": 245366784
       },
       "stand_ins": [
         "b_decode_large_bf16",
@@ -181,18 +181,18 @@
         "b_decode_large_bf16": 150994944,
         "k_decode_fp32": 18393,
         "b_decode_fp32": 270532608,
-        "k_encode_bf16": 3859,
-        "b_encode_bf16": 6291456,
-        "k_encode_fp32": 4570,
-        "b_encode_fp32": 9437184,
+        "k_encode_bf16": 3856,
+        "b_encode_bf16": 15728640,
+        "k_encode_fp32": 4587,
+        "b_encode_fp32": 0,
         "k_tiled_decode_bf16": 787,
         "b_tiled_decode_bf16": 367001600,
-        "k_tiled_decode_fp32": 1423,
-        "b_tiled_decode_fp32": 0,
-        "k_tiled_encode_bf16": 223,
-        "b_tiled_encode_bf16": 275775488,
-        "k_tiled_encode_fp32": 840,
-        "b_tiled_encode_fp32": 201326592
+        "k_tiled_decode_fp32": 199,
+        "b_tiled_decode_fp32": 1225785344,
+        "k_tiled_encode_bf16": 234,
+        "b_tiled_encode_bf16": 264241152,
+        "k_tiled_encode_fp32": 833,
+        "b_tiled_encode_fp32": 208666624
       },
       "stand_ins": [
         "b_decode_large_bf16",
@@ -4331,6 +4331,342 @@
       "method": "reserved_peak",
       "device": "AMD Radeon RX 9060 XT (gfx1200)",
       "provenance": "Measured by Pfannkuchensack on PR #10043 at 5a543797f5: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, the native allocator. Peaks past the card's 15.09 GiB budget ran with Windows paging the excess into shared memory; two repeated shipped points (the 2048px fp32 decode at a 768px tile, both allocators) matched to the byte."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 512,
+        "width": 512,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 4510973952,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, expandable segments. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 6144,
+        "width": 6144,
+        "tile": 512,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 5727322112,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, expandable segments. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1216,
+        "width": 1216,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 5431623680,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, expandable segments. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1280,
+        "width": 1280,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 6018826240,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, expandable segments. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1344,
+        "width": 1344,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 6647971840,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, expandable segments. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1216,
+        "width": 1216,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 6459228160,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, expandable segments. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1280,
+        "width": 1280,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 7151288320,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, expandable segments. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1344,
+        "width": 1344,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 7864320000,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, expandable segments. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 512,
+        "width": 512,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 5117050880,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, the native allocator. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 6144,
+        "width": 6144,
+        "tile": 512,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 6673137664,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, the native allocator. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1216,
+        "width": 1216,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 7130316800,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, the native allocator. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1280,
+        "width": 1280,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 7893680128,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, the native allocator. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1344,
+        "width": 1344,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 8707375104,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, the native allocator. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1216,
+        "width": 1216,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 7014973440,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, the native allocator. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1280,
+        "width": 1280,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 7763656704,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, the native allocator. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native",
+        "os": "windows"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1344,
+        "width": 1344,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 8564768768,
+      "method": "reserved_peak",
+      "device": "AMD Radeon RX 9060 XT (gfx1200)",
+      "provenance": "Measured by Pfannkuchensack on PR #10043 at 0c1d40836b: AMD Radeon RX 9060 XT (gfx1200), 16 GB, Windows, torch 2.13.0+rocm10.0.0, real weights, one fresh process per point, torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, in exact bytes, under patch_qwen_image_vae_tiling, MIOPEN_FIND_MODE=FAST, the native allocator. The untiled 512px fp32 decodes are the references of the 512px tile; the untiled 1216-1344px encodes check the chord between 1024px and 1536px."
     }
   ]
 }

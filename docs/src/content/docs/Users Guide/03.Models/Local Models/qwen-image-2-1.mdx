@@ -1,7 +1,7 @@
 ---
 title: Qwen-Image-2.1
 description: Generate images with Qwen-Image-2.1 and its 8-step Turbo variant, from the Diffusers folders, a GGUF or an int8 transformer, including transparent (RGBA) output.
-lastUpdated: 2026-11-15
+lastUpdated: 2026-11-16
 sidebar:
   order: 9
 ---
@@ -86,10 +86,10 @@ With `precision: float32` a 1024×1024 decode reserves 16.2 GiB on NVIDIA to 19.
 
 Known limits:
 
-- With the native allocator, the cost per pixel of an AMD decode steps up at about 1.6 megapixels, between 1248×1248 and 1280×1280. On Windows, bf16 decodes with the native allocator are measured only up to 1088×1088, so a conservative figure prices larger images there, and some that would fit are tiled.
+- With the native allocator, the cost per pixel of an AMD decode steps up at about 1.6 megapixels, between 1248×1248 and 1280×1280. On Windows, bf16 decodes with the native allocator are measured only up to 1088×1088: up to the step, at about 1256×1256, the measured line is extrapolated, and past it a conservative figure prices them, so some that would fit are tiled.
 - NVIDIA cards are measured only for an untiled 1024×1024 bf16 decode and three tiled 2048×2048 bf16 decodes. Larger images decoded in one piece are decided and reserved on an unmeasured line, and encodes and float32 are not measured at all.
 - Near the tiling threshold an image left whole can reserve more than the card holds: on a 48 GiB W7900 a 1664×1664 float32 decode is expected to peak at 41.8 GiB but reserves 49.9 GiB. The VAE then runs partly from system memory, and Invoke warns that its memory budget is short.
-- Tiled operations on AMD are measured up to 5120×5120 (decodes) and 4096×4096 (encodes) on Linux, and on Windows up to 6144×6144 (bf16 decodes), 5120×5120 (bf16 encodes, and float32 decodes in 512-pixel tiles; 2048×2048 in 768-pixel and 3072×3072 in 1024-pixel tiles) and 4096×4096 (float32 encodes). Larger images can peak above what Invoke reserves for them, from about 4200×4200 for some encodes and 5300×5300 for some decodes. What happens then depends on the system. Windows pages the excess into shared system memory: the operation runs slowly but does not fail. On Linux, ROCm may spill the excess into system memory (it did on our W7900) or fail with out of memory, especially with other models on the card.
+- Tiled operations on AMD are measured up to 5120×5120 (decodes) and 4096×4096 (encodes) on Linux, and on Windows up to 6144×6144 (bf16 decodes), 5120×5120 (bf16 encodes), 6144×6144, 2048×2048 and 3072×3072 (float32 decodes in 512-, 768- and 1024-pixel tiles) and 4096×4096 (float32 encodes). Larger images can peak above what Invoke reserves for them, from about 4200×4200 for some encodes and 5500×5500 for some decodes. Tiles above 1024 pixels, which only a workflow can set, are measured nowhere: what Invoke reserves for them is extrapolated, and on AMD an encode in such tiles reserves less than earlier versions did (4096×4096 in 2048-pixel bf16 tiles: 16 to 22 GiB, against 31.85 GiB before). What happens then depends on the system. Windows pages the excess into shared system memory: the operation runs slowly but does not fail. On Linux, ROCm may spill the excess into system memory (it did on our W7900) or fail with out of memory, especially with other models on the card.
 - Qwen-Image-2.1 does not retry a decode or encode that runs out of memory. If one does, use a workflow and turn on **Tiled** with a smaller **Tile Size** on the *Latents to Image - Qwen-Image-2.1* or *Image to Latents - Qwen-Image-2.1* node.
 
 ### Reference images
