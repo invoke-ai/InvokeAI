@@ -103,8 +103,8 @@ export interface SubmitResolvedInvocationDeps {
    * submitResolvedInvocationSnapshot.
    */
   prepareCanvasInvocation: (args: PrepareCanvasInvocationArgs) => Promise<void> | void;
-  /** Words a control-layer rejection from the locale; its error message is for logs only. */
-  formatControlLayerError: PrepareCanvasInvocationArgs['formatControlLayerError'];
+  /** Words a failed Canvas preparation from the locale for its notice. */
+  formatCanvasInvocationFailure: PrepareCanvasInvocationArgs['formatCanvasInvocationFailure'];
   /** Words, from the locale, a Model only upscale whose input image's metadata could not be read. */
   formatUpscaleMetadataFailure: (imageName: string) => string;
 }
@@ -209,7 +209,7 @@ const resolveWorkflowGeneratorsForRoute = async (
 
 export const submitResolvedInvocation = async ({
   commands,
-  formatControlLayerError,
+  formatCanvasInvocationFailure,
   formatUpscaleMetadataFailure,
   models,
   owner,
@@ -289,7 +289,7 @@ export const submitResolvedInvocation = async ({
     await dispatchResolvedInvocation(
       {
         commands,
-        formatControlLayerError,
+        formatCanvasInvocationFailure,
         formatUpscaleMetadataFailure,
         models,
         owner,
@@ -313,7 +313,7 @@ export const submitResolvedInvocation = async ({
   await dispatchResolvedInvocation(
     {
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       models,
       owner,
@@ -335,7 +335,7 @@ export const submitResolvedInvocation = async ({
 const dispatchResolvedInvocation = async (
   {
     commands,
-    formatControlLayerError,
+    formatCanvasInvocationFailure,
     formatUpscaleMetadataFailure,
     models,
     owner,
@@ -387,7 +387,7 @@ const dispatchResolvedInvocation = async (
       compositing: readCanvasCompositingSettings(canvasValues),
       destination: route.destination,
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       generateValues: getProjectWidgetValues(project, 'generate'),
       models,
       owner,

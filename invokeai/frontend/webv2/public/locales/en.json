@@ -4566,6 +4566,22 @@
         "success_other": "Added {{count}} images as canvas layers",
         "controlFilled": "Filled {{name}}"
       },
+      "invoke": {
+        "adjustmentRefused": {
+          "error": "Clarity, Texture or Dehaze failed on “{{name}}”. Change a setting or disable them, then invoke again.",
+          "overBudget": "Not enough canvas memory to apply Clarity, Texture or Dehaze to “{{name}}”. Delete layers you no longer need, then invoke again.",
+          "tooLarge": "Clarity, Texture and Dehaze can’t run on “{{name}}”: its content is larger than 16.8 megapixels (4096 × 4096 px). Disable or remove them, or crop the content, then invoke again."
+        },
+        "captureFailed": "The canvas could not be captured for generation ({{status}}).",
+        "failed": "Canvas generation failed",
+        "noDocument": "The canvas has no active document to generate from.",
+        "noModel": "Select a supported model before invoking the canvas.",
+        "notOpen": "Open the canvas before invoking it.",
+        "notReady": "Some layers are still loading. Wait a moment, then invoke again.",
+        "overBudget": "Generation exceeds the browser’s canvas-memory limit. Try again after layers finish loading. If it still fails, crop or resize large source images, or disable unnecessary layers. A smaller generation frame alone may not help.",
+        "stale": "The canvas changed while generation was being prepared. Please invoke again.",
+        "unreadable": "“{{name}}” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then invoke again."
+      },
       "nextStagedCandidate": "Next staged candidate",
       "previousStagedCandidate": "Previous staged candidate",
       "selectStagedCandidate": "Select staged candidate {{number}}",

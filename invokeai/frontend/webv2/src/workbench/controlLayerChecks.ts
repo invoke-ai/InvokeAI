@@ -1,5 +1,5 @@
 import type { ModelConfig } from '@features/models';
-import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/canvas-engine/api';
+import type { CanvasControlLayerContract } from '@workbench/canvas-engine/api';
 
 import {
   createControlValidationSequence,
@@ -9,7 +9,7 @@ import {
 } from '@features/generation/graph';
 import { hasArchitectureCapabilities } from '@features/generation/settings';
 import { getControlDetectionInput, isControlMapCurrent, needsControlDetection } from '@workbench/canvas-engine/api';
-import { hasControlLayerContent, isCompositableControlLayer } from '@workbench/canvasLayerContent';
+import { hasControlLayerContent } from '@workbench/canvasLayerContent';
 
 import { resolveControlModel, type ControlModelMemory, type ControlModelResolution } from './controlModelResolution';
 
@@ -55,7 +55,7 @@ export interface ControlLayerJudgement {
 
 /**
  * Judges control layers in generation order, as the invocation does: per-generation limits count only layers that
- * passed. Invoke readiness, the settings panel and the invocation collector share it.
+ * passed. The canvas input judge (Invoke readiness and the invocation) and the settings panel share it.
  */
 export const createControlLayerSequence = (
   mainModel: MainModel,
@@ -83,32 +83,6 @@ export const createControlLayerSequence = (
       }) ?? (needsControlDetection(layer) ? 'detection_pending' : null);
     return { reason, resolution, skip: resolution.unresolved === 'missing_type' };
   };
-};
-
-/**
- * Validate the same enabled, content-bearing layers as createControlLayerCollector; invalid layers do not consume
- * per-generation limits, and layers without a type or model are left out.
- */
-export const getBlockingControlLayerIssues = (params: {
-  layers: readonly CanvasLayerContract[];
-  mainModel: MainModel;
-  models: readonly ModelConfig[];
-  context?: ControlLayerCheckContext;
-}): ControlLayerIssue[] => {
-  const { layers, mainModel, models } = params;
-  const judge = createControlLayerSequence(mainModel, models, params.context);
-  const issues: ControlLayerIssue[] = [];
-
-  for (const layer of layers) {
-    if (!isCompositableControlLayer(layer)) {
-      continue;
-    }
-    const { reason, skip } = judge(layer);
-    if (reason && !skip) {
-      issues.push({ code: reason, layerId: layer.id, layerName: layer.name });
-    }
-  }
-  return issues;
 };
 
 /**

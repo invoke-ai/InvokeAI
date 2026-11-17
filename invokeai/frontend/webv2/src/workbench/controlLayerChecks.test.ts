@@ -1,7 +1,6 @@
 import type { ModelConfig } from '@features/models';
 import type { CanvasControlLayerContract } from '@workbench/canvas-engine/api';
 
-import { resetArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { CONTROL_ADAPTER_KINDS, CONTROL_VALIDATION_REASONS } from '@features/generation/graph';
 import { createInstance } from 'i18next';
@@ -12,7 +11,6 @@ import {
   describeControlLayer,
   describeControlLayerIssue,
   describeControlLayerReason,
-  getBlockingControlLayerIssues,
   hasControlLayerContent,
 } from './controlLayerChecks';
 
@@ -69,160 +67,6 @@ describe('hasControlLayerContent', () => {
       )
     ).toBe(true);
     expect(hasControlLayerContent(controlLayer('empty', { source: { bitmap: null, type: 'paint' } }))).toBe(false);
-  });
-});
-
-describe('getBlockingControlLayerIssues', () => {
-  it('leaves out a content-bearing layer with neither a type nor a model: it warns but contributes nothing', () => {
-    const layer = controlLayer('Control Layer 1');
-
-    expect(getBlockingControlLayerIssues({ layers: [layer], mainModel: sdxl, models })).toEqual([]);
-    expect(ambientReason(layer, sdxl, models)).toBe('missing_type');
-  });
-
-  it('blocks an untyped layer whose model is no longer installed', () => {
-    expect(
-      getBlockingControlLayerIssues({
-        layers: [controlLayer('legacy', { model: 'uninstalled' })],
-        mainModel: sdxl,
-        models,
-      })
-    ).toMatchObject([{ code: 'missing_model', layerId: 'legacy' }]);
-  });
-
-  it('reports a typed content-bearing layer no model resolves, in structured form', () => {
-    const issues = getBlockingControlLayerIssues({
-      layers: [controlLayer('Control Layer 1', { derivation: { controlType: 'pose', detection: null } })],
-      mainModel: sdxl,
-      models,
-    });
-
-    expect(issues).toEqual([
-      {
-        code: 'no_model_for_type',
-        layerId: 'Control Layer 1',
-        layerName: 'Control Layer 1',
-      },
-    ]);
-  });
-
-  it('skips disabled, content-less, and non-control layers', () => {
-    const issues = getBlockingControlLayerIssues({
-      layers: [
-        controlLayer('disabled', { isEnabled: false }),
-        controlLayer('empty', { source: { bitmap: null, type: 'paint' } }),
-      ],
-      mainModel: sdxl,
-      models,
-    });
-
-    expect(issues).toEqual([]);
-  });
-
-  it('reports an incompatible base model', () => {
-    const issues = getBlockingControlLayerIssues({
-      layers: [controlLayer('mismatch', { model: 'sd1-control' })],
-      mainModel: sdxl,
-      models,
-    });
-
-    expect(issues).toMatchObject([{ code: 'incompatible_base' }]);
-  });
-
-  it('advances the control LoRA limit counter only past valid layers', () => {
-    const fluxModels = [model('flux-lora', 'flux', 'control_lora')];
-    const issues = getBlockingControlLayerIssues({
-      layers: [
-        controlLayer('first', { kind: 'control_lora', model: 'flux-lora' }),
-        controlLayer('second', { kind: 'control_lora', model: 'flux-lora' }),
-      ],
-      mainModel: { base: 'flux' },
-      models: fluxModels,
-    });
-
-    expect(issues).toEqual([
-      {
-        code: 'control_lora_limit',
-        layerId: 'second',
-        layerName: 'second',
-      },
-    ]);
-  });
-
-  it('reports Anima LLLite layers the denoiser would refuse, and only those', () => {
-    const animaModels = [
-      { ...model('sketch', 'anima', 'controlnet'), cond_in_channels: 3 },
-      { ...model('depth', 'anima', 'controlnet'), cond_in_channels: 3 },
-      { ...model('inpaint', 'anima', 'controlnet'), cond_in_channels: 4 },
-    ];
-    const lllite = (id: string, key: string) => controlLayer(id, { kind: 'anima_lllite', model: key });
-
-    const issues = getBlockingControlLayerIssues({
-      layers: [
-        lllite('sketch', 'sketch'),
-        lllite('depth', 'depth'),
-        lllite('again', 'sketch'),
-        lllite('inpaint', 'inpaint'),
-        controlLayer('saved-as-controlnet', { model: 'depth' }),
-      ],
-      mainModel: { base: 'anima' },
-      models: animaModels,
-    });
-
-    expect(issues.map(({ code, layerId }) => [layerId, code])).toEqual([
-      ['again', 'duplicate_lllite_model'],
-      ['inpaint', 'lllite_inpaint_adapter'],
-      ['saved-as-controlnet', 'switch_adapter_kind'],
-    ]);
-  });
-
-  it('lets one Qwen-Image control through, and none on an Edit model', () => {
-    const qwenModels = [model('qwen-union', 'qwen-image', 'controlnet')];
-    const layers = [
-      controlLayer('first', { kind: 'qwen_image_control', model: 'qwen-union', weight: 0.85 }),
-      controlLayer('second', { kind: 'qwen_image_control', model: 'qwen-union', weight: 0.85 }),
-    ];
-    const codes = (mainModel: { base: string; variant?: string }) =>
-      getBlockingControlLayerIssues({ layers, mainModel, models: qwenModels }).map(({ code, layerId }) => [
-        layerId,
-        code,
-      ]);
-
-    expect(codes({ base: 'qwen-image' })).toEqual([['second', 'qwen_image_control_limit']]);
-    expect(codes({ base: 'qwen-image', variant: 'edit' })).toEqual([
-      ['first', 'qwen_image_edit_control'],
-      ['second', 'qwen_image_edit_control'],
-    ]);
-  });
-
-  it('lets one FLUX.2 control through on [dev], and none on Klein', () => {
-    const flux2Models = [model('flux2-union', 'flux2', 'controlnet')];
-    const layers = [
-      controlLayer('first', { kind: 'flux2_control', model: 'flux2-union', weight: 0.75 }),
-      controlLayer('second', { kind: 'flux2_control', model: 'flux2-union', weight: 0.75 }),
-    ];
-    const codes = (mainModel: { base: string; variant?: string }) =>
-      getBlockingControlLayerIssues({ layers, mainModel, models: flux2Models }).map(({ code, layerId }) => [
-        layerId,
-        code,
-      ]);
-
-    expect(codes({ base: 'flux2', variant: 'dev' })).toEqual([['second', 'flux2_control_limit']]);
-    expect(codes({ base: 'flux2', variant: 'klein_9b' })).toEqual([
-      ['first', 'flux2_klein_control'],
-      ['second', 'flux2_klein_control'],
-    ]);
-  });
-
-  it('reports issues in document order', () => {
-    const pose = { derivation: { controlType: 'pose', detection: null } } as const;
-    const issues = getBlockingControlLayerIssues({
-      layers: [controlLayer('top', pose), controlLayer('bottom', pose)],
-      mainModel: sdxl,
-      models,
-    });
-
-    expect(issues.map((issue) => issue.layerName)).toEqual(['top', 'bottom']);
   });
 });
 
@@ -284,75 +128,17 @@ describe('typed control layers', () => {
     derivation: Partial<Pick<CanvasControlLayerContract, 'detection' | 'filter' | 'original'>> = {},
     overrides: Parameters<typeof controlLayer>[1] = {}
   ) => controlLayer(id, { ...overrides, derivation: { controlType: 'depth', detection: null, ...derivation } });
-  const depthDetection = { settings: {}, type: 'depth_anything_depth_estimation' };
 
-  it('asks for a model when several fit, and resolves with the remembered pick', () => {
-    const layers = [typed('depth')];
-
-    expect(getBlockingControlLayerIssues({ layers, mainModel: sdxl, models: depthModels })).toMatchObject([
-      { code: 'choose_model' },
-    ]);
-    expect(
-      getBlockingControlLayerIssues({
-        context: createControlLayerCheckContext('sdxl', { 'sdxl:depth': 'sdxl-depth-b' }),
-        layers,
-        mainModel: sdxl,
-        models: depthModels,
-      })
-    ).toEqual([]);
+  it('still warns that an empty layer needs one of several fitting models', () => {
+    expect(ambientReason(typed('empty', {}, { source: { bitmap: null, type: 'paint' } }), sdxl, depthModels)).toBe(
+      'choose_model'
+    );
   });
 
-  it('tells no control models apart from none for the type', () => {
-    expect(getBlockingControlLayerIssues({ layers: [typed('depth')], mainModel: sdxl, models: [] })).toMatchObject([
-      { code: 'no_control_models' },
-    ]);
-  });
+  it('warns of a map detection has not caught up with', () => {
+    const pending = typed('pending', { detection: { settings: {}, type: 'depth_anything_depth_estimation' } });
 
-  it('never blocks on an empty layer, though it still warns', () => {
-    const empty = typed('empty', {}, { source: { bitmap: null, type: 'paint' } });
-
-    expect(getBlockingControlLayerIssues({ layers: [empty], mainModel: sdxl, models: depthModels })).toEqual([]);
-    expect(ambientReason(empty, sdxl, depthModels)).toBe('choose_model');
-  });
-
-  it('blocks on a map detection has not caught up with, after the model reasons', () => {
-    const pending = typed('pending', { detection: depthDetection });
-
-    expect(
-      getBlockingControlLayerIssues({ layers: [pending], mainModel: sdxl, models: [depthModels[0]!] })
-    ).toMatchObject([{ code: 'detection_pending' }]);
-    expect(getBlockingControlLayerIssues({ layers: [pending], mainModel: sdxl, models: depthModels })).toMatchObject([
-      { code: 'choose_model' },
-    ]);
     expect(ambientReason(pending, sdxl, [depthModels[0]!])).toBe('detection_pending');
-  });
-
-  it('counts per-generation limits by the kind the resolved model runs, not the stored kind', () => {
-    const fluxDepth = [model('flux-depth-lora', 'flux', 'control_lora')];
-    const issues = getBlockingControlLayerIssues({
-      layers: [typed('first'), typed('second')],
-      mainModel: { base: 'flux' },
-      models: fluxDepth,
-    });
-
-    expect(issues.map(({ code, layerId }) => [layerId, code])).toEqual([['second', 'control_lora_limit']]);
-  });
-
-  it('still resolves models before capabilities load, and reports that they have not', () => {
-    const context = createControlLayerCheckContext('flux');
-    const judge = () =>
-      getBlockingControlLayerIssues({
-        context,
-        layers: [typed('depth')],
-        mainModel: { base: 'flux' },
-        models: [model('flux-depth-t2i', 'flux', 't2i_adapter')],
-      });
-
-    // Loaded, FLUX runs no T2I-Adapter, so no model fits.
-    expect(judge()).toMatchObject([{ code: 'no_control_models' }]);
-    // The context reads capabilities when it judges, not when it is made.
-    resetArchitectureCapabilities();
-    expect(judge()).toMatchObject([{ code: 'capabilities_unavailable' }]);
   });
 });
 

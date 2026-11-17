@@ -1,6 +1,6 @@
 import type { GenerationIssue } from '@features/generation/contracts';
 import type { InvocationTemplatesSnapshot, WorkflowReadinessReason } from '@features/workflow/contracts';
-import type { ControlLayerIssue } from '@workbench/controlLayerChecks';
+import type { CanvasInputIssue } from '@workbench/canvasGenerationInputs';
 
 export type InvocationSourceId = 'generate' | 'workflow' | 'upscale' | 'video' | 'canvas';
 
@@ -39,9 +39,9 @@ export interface InvocationRoute {
   destinationLocked: boolean;
 }
 
-/** A blocking control layer, kept structured so the shell words it from the locale. */
-export interface ControlLayerValidationReason {
-  controlLayerIssue: ControlLayerIssue;
+/** A canvas layer or the frame's content blocking the Canvas source, kept structured so the shell words it. */
+export interface CanvasInputValidationReason {
+  canvasInputIssue: CanvasInputIssue;
 }
 
 /**
@@ -67,7 +67,7 @@ export interface RouteValidationReason {
 export type InvocationValidationReason =
   | string
   | WorkflowReadinessReason
-  | ControlLayerValidationReason
+  | CanvasInputValidationReason
   | GenerationValidationReason
   | RouteValidationReason;
 

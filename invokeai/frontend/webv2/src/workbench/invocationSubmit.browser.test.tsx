@@ -106,7 +106,7 @@ const submitGenerate = () => {
 
   const submission = submitResolvedInvocation({
     commands,
-    formatControlLayerError: ({ code, layerName }) => `${layerName}: ${code}`,
+    formatCanvasInvocationFailure: () => ({ message: 'canvas failure', title: 'canvas failure' }),
     formatUpscaleMetadataFailure: (name) => name,
     scopedDefaults: {},
     models: undefined,

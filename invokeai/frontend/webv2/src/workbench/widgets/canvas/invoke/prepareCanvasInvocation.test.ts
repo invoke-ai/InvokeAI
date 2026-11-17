@@ -5,8 +5,6 @@ import type {
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
   CanvasStateContractV3,
-  RegionalGuidanceReferenceImage,
-  RegionalGuidanceReferenceImageAsset,
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -27,17 +25,15 @@ import {
   type GenerationCompositeHost,
 } from '@workbench/canvas-operations/api';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
+import { createInstance } from 'i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RunCanvasInvocationDeps } from './prepareCanvasInvocation';
 
 import { DEFAULT_CANVAS_COMPOSITING } from './canvasCompositing';
+import { describeCanvasInvocationFailure } from './canvasInvocationFailure';
 import { DEFAULT_CANVAS_SCALING } from './canvasScaling';
-import {
-  prepareCanvasInvocation,
-  resolveRegionalReferenceImages,
-  runCanvasInvocation,
-} from './prepareCanvasInvocation';
+import { prepareCanvasInvocation, runCanvasInvocation } from './prepareCanvasInvocation';
 
 const canvasBoundaryMocks = vi.hoisted(() => ({
   getCanvasEngine: vi.fn(),
@@ -68,6 +64,19 @@ vi.mock('@features/queue/devices', async (importOriginal) => {
     }),
   };
 });
+
+const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
+  eager: true,
+  import: 'default',
+});
+const english = createInstance();
+await english.init({
+  initAsync: false,
+  interpolation: { escapeValue: false },
+  lng: 'en',
+  resources: { en: { translation: Object.values(englishCatalogModules)[0] as Record<string, unknown> } },
+});
+const t = english.t.bind(english) as (key: string, options?: Record<string, unknown>) => string;
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const externalModel: GenerateModelConfig = {
@@ -278,8 +287,11 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
       } as WorkbenchCommands['notifications'],
     },
     flushPendingUploads: flushPendingUploads as () => Promise<void>,
-    // Production words rejections from the locale; the harness records the structured rejection it was handed.
-    formatControlLayerError: ({ code, layerName }) => `${layerName}: ${code}`,
+    // English, as production words it; control-layer issues read as `layer: code`, naming the rule that blocked.
+    formatCanvasInvocationFailure: (failure) =>
+      failure.kind === 'canvas_input' && failure.issue.kind === 'control_layer'
+        ? { message: `${failure.issue.layerName}: ${failure.issue.code}`, title: 'Canvas generation failed' }
+        : describeCanvasInvocationFailure(t, failure),
     generateValues: { ...generateValuesFor(model), ...options.generateValues },
     inFlight: options.inFlight ?? new Set<string>(),
     models: options.models,
@@ -360,7 +372,7 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
 
     await prepareCanvasInvocation({
       commands: harness.deps.commands,
-      formatControlLayerError: harness.deps.formatControlLayerError,
+      formatCanvasInvocationFailure: harness.deps.formatCanvasInvocationFailure,
       compositing: harness.deps.compositing,
       destination: harness.deps.destination,
       generateValues: harness.deps.generateValues,
@@ -395,7 +407,7 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
         positivePrompts: ['a green cat'],
         positivePromptsSampleSeed: 7,
       },
-      formatControlLayerError: harness.deps.formatControlLayerError,
+      formatCanvasInvocationFailure: harness.deps.formatCanvasInvocationFailure,
       generateValues: harness.deps.generateValues,
       models: harness.deps.models,
       projectId: harness.deps.projectId,
@@ -406,6 +418,30 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
     expect(harness.submittedGraphs()).toEqual([
       expect.objectContaining({ positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 }),
     ]);
+  });
+
+  it('asks for the canvas to be opened, in the locale, when no engine serves the project', async () => {
+    const harness = makeHarness();
+    canvasBoundaryMocks.getCanvasEngine.mockReturnValue(undefined);
+
+    await prepareCanvasInvocation({
+      commands: harness.deps.commands,
+      destination: harness.deps.destination,
+      formatCanvasInvocationFailure: harness.deps.formatCanvasInvocationFailure,
+      generateValues: harness.deps.generateValues,
+      projectId: harness.deps.projectId,
+      projectSettings: harness.deps.projectSettings,
+      strength: harness.deps.strength,
+    });
+
+    expect(harness.notices()).toEqual([
+      expect.objectContaining({
+        kind: 'error',
+        message: 'Open the canvas before invoking it.',
+        title: 'Canvas generation failed',
+      }),
+    ]);
+    expect(harness.submittedGraphs()).toHaveLength(0);
   });
 });
 
@@ -534,6 +570,21 @@ describe('runCanvasInvocation', () => {
     expect(submitted).toHaveLength(1);
     expect(submitted[0]?.destination).toBe('canvas');
     expect(submitted[0]!.graph.backendGraph!.nodes.canvas_output!.is_intermediate).toBe(true);
+  });
+
+  it('asks for a supported model before capturing anything', async () => {
+    const harness = makeHarness({ generateValues: { model: null } });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toEqual([
+      expect.objectContaining({
+        kind: 'error',
+        message: 'Select a supported model before invoking the canvas.',
+        title: 'Canvas generation failed',
+      }),
+    ]);
+    expect(harness.flushPendingUploads).not.toHaveBeenCalled();
   });
 
   it('awaits the upload flush before compositing', async () => {
@@ -1022,16 +1073,6 @@ describe('runCanvasInvocation', () => {
     expect(harness.notices().map((notice) => notice.message)).toEqual(['control: models_unavailable']);
   });
 
-  it('blocks an untyped control layer whose model is no longer installed', async () => {
-    const harness = makeHarness({
-      document: docWithLayers([controlLayer('control', { model: 'uninstalled' })]),
-      models: [],
-    });
-    await runCanvasInvocation(harness.deps);
-    expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices().map((notice) => notice.message)).toEqual(['control: missing_model']);
-  });
-
   it('leaves out a nonempty control layer with neither a type nor a model, without blocking', async () => {
     const harness = makeHarness({ document: docWithLayers([controlLayer('control')]), models: [] });
     await runCanvasInvocation(harness.deps);
@@ -1058,33 +1099,11 @@ describe('runCanvasInvocation', () => {
       controlType: NonNullable<CanvasControlLayerContract['controlType']>,
       detection: CanvasControlLayerContract['detection'] = null
     ): CanvasControlLayerContract => ({ ...controlLayer(id), controlType, detection });
-    const fluxMain = { ...sd1Model, base: 'flux' as const, key: 'flux', name: 'FLUX' };
-
-    it('runs the only model made for the type, as the kind that model runs', async () => {
-      const harness = makeHarness({
-        document: docWithLayers([typed('depth-layer', 'depth')]),
-        models: [controlModel('sd1-depth', 'sd-1', 'controlnet', 'control_v11f1p_sd15_depth')],
-      });
-
-      await runCanvasInvocation(harness.deps);
-
-      expect(harness.notices()).toHaveLength(0);
-      expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes['control_net_depth-layer']).toMatchObject({
-        control_model: { key: 'sd1-depth' },
-        type: 'controlnet',
-      });
-    });
-
-    it('runs the remembered pick when several models fit, and asks without one', async () => {
+    it('runs the remembered pick and records it in the canvas metadata', async () => {
       const models = [
         controlModel('depth-a', 'sd-1', 'controlnet', 'depth a'),
         controlModel('depth-b', 'sd-1', 'controlnet', 'depth b'),
       ];
-      const asking = makeHarness({ document: docWithLayers([typed('depth-layer', 'depth')]), models });
-      await runCanvasInvocation(asking.deps);
-      expect(asking.submittedGraphs()).toHaveLength(0);
-      expect(asking.notices()[0]?.message).toBe('depth-layer: choose_model');
-
       const remembered = makeHarness({
         controlModelMemory: { 'sd-1:depth': 'depth-b' },
         document: docWithLayers([typed('depth-layer', 'depth')]),
@@ -1106,53 +1125,6 @@ describe('runCanvasInvocation', () => {
       expect(outputMetadata?.control_layers).toMatchObject([
         { layer_id: 'depth-layer', model: { key: 'depth-b' }, type: 'controlnet' },
       ]);
-    });
-
-    it('gives a FLUX union model the InstantX mode of the layer type', async () => {
-      const components = {
-        clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP Embed', type: 'clip_embed', variant: 'large' },
-        t5EncoderModel: { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' },
-        vae: { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' },
-      };
-      const harness = makeHarness({
-        document: docWithLayers([typed('pose-layer', 'pose')]),
-        generateValues: components,
-        model: fluxMain,
-        models: [
-          controlModel('flux-union', 'flux', 'controlnet', 'FLUX.1-dev-Controlnet-Union-Pro'),
-          ...(Object.values(components) as unknown as NonNullable<RunCanvasInvocationDeps['models']>),
-        ],
-      });
-
-      await runCanvasInvocation(harness.deps);
-
-      expect(harness.notices()).toEqual([]);
-      expect(harness.submittedGraphs()[0]?.graph.backendGraph?.nodes['control_net_pose-layer']).toMatchObject({
-        instantx_control_mode: 4,
-        type: 'flux_controlnet',
-      });
-    });
-
-    it('blocks a layer whose type has no installed model', async () => {
-      const harness = makeHarness({
-        document: docWithLayers([typed('pose-layer', 'pose')]),
-        models: [controlModel('sd1-depth', 'sd-1', 'controlnet', 'sd15 depth')],
-      });
-      await runCanvasInvocation(harness.deps);
-      expect(harness.submittedGraphs()).toHaveLength(0);
-      expect(harness.notices()[0]?.message).toBe('pose-layer: no_model_for_type');
-    });
-
-    it('blocks a layer whose map detection has not caught up', async () => {
-      const harness = makeHarness({
-        document: docWithLayers([
-          typed('depth-layer', 'depth', { settings: {}, type: 'depth_anything_depth_estimation' }),
-        ]),
-        models: [controlModel('sd1-depth', 'sd-1', 'controlnet', 'sd15 depth')],
-      });
-      await runCanvasInvocation(harness.deps);
-      expect(harness.submittedGraphs()).toHaveLength(0);
-      expect(harness.notices()[0]?.message).toBe('depth-layer: detection_pending');
     });
   });
 
@@ -1194,33 +1166,6 @@ describe('runCanvasInvocation', () => {
     expect(harness.submittedGraphs()).toHaveLength(1);
     expect(harness.notices()).toHaveLength(0);
     expect(harness.surfaceIds).toEqual([]);
-  });
-
-  it('blocks the second enabled nonempty Control LoRA', async () => {
-    const model = {
-      base: 'flux',
-      file_size: 1,
-      format: 'checkpoint',
-      hash: 'hash',
-      key: 'control-lora',
-      name: 'Control LoRA',
-      path: 'control-lora',
-      source: 'control-lora',
-      source_type: 'path' as const,
-      type: 'control_lora',
-    };
-    const flux = { ...sd1Model, base: 'flux' as const, key: 'flux', name: 'FLUX' };
-    const harness = makeHarness({
-      document: docWithLayers([
-        controlLayer('first', { kind: 'control_lora', model: model.key }),
-        controlLayer('second', { kind: 'control_lora', model: model.key }),
-      ]),
-      model: flux,
-      models: [model],
-    });
-    await runCanvasInvocation(harness.deps);
-    expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices()[0]?.message).toBe('second: control_lora_limit');
   });
 
   it('prepares a Z-Image control with exact adapter and model configuration', async () => {
@@ -1275,41 +1220,6 @@ describe('runCanvasInvocation', () => {
       type: 'z_image_control',
     });
     expect(harness.surfaceIds).toEqual(['z-layer']);
-  });
-
-  it('blocks a second enabled nonempty Z-Image control', async () => {
-    const zImage = {
-      ...sd1Model,
-      base: 'z-image' as const,
-      format: 'diffusers' as const,
-      key: 'z-image',
-      name: 'Z-Image',
-    };
-    const controlModel = {
-      base: 'z-image',
-      file_size: 1,
-      format: 'checkpoint',
-      hash: 'hash',
-      key: 'z-control',
-      name: 'Z Control',
-      path: 'z-control',
-      source: 'z-control',
-      source_type: 'path' as const,
-      type: 'controlnet',
-    };
-    const harness = makeHarness({
-      document: docWithLayers([
-        controlLayer('first', { kind: 'z_image_control', model: controlModel.key }),
-        controlLayer('second', { kind: 'z_image_control', model: controlModel.key }),
-      ]),
-      model: zImage,
-      models: [controlModel],
-    });
-
-    await runCanvasInvocation(harness.deps);
-
-    expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices()[0]?.message).toBe('second: z_image_control_limit');
   });
 
   describe('Qwen Image ControlNet', () => {
@@ -1409,32 +1319,6 @@ describe('runCanvasInvocation', () => {
       expect(nodes['qwen_image_control_mask_q-layer']).toBeUndefined();
       expect(nodes.create_gradient_mask).toBeDefined();
     });
-
-    it('blocks a second enabled nonempty control', async () => {
-      const harness = makeHarness({
-        document: docWithLayers([qwenLayer('first'), qwenLayer('second')]),
-        model: qwenImage,
-        models: [union],
-      });
-
-      await runCanvasInvocation(harness.deps);
-
-      expect(harness.submittedGraphs()).toHaveLength(0);
-      expect(harness.notices()[0]?.message).toBe('second: qwen_image_control_limit');
-    });
-
-    it('blocks the control on a Qwen Image Edit model', async () => {
-      const harness = makeHarness({
-        document: docWithLayers([qwenLayer('layer')]),
-        model: { ...qwenImage, variant: 'edit' },
-        models: [union],
-      });
-
-      await runCanvasInvocation(harness.deps);
-
-      expect(harness.submittedGraphs()).toHaveLength(0);
-      expect(harness.notices()[0]?.message).toBe('layer: qwen_image_edit_control');
-    });
   });
 
   describe('FLUX.2 [dev] ControlNet', () => {
@@ -1499,32 +1383,6 @@ describe('runCanvasInvocation', () => {
         type: 'img_lerp',
       });
     });
-
-    it('blocks a second enabled nonempty control', async () => {
-      const harness = makeHarness({
-        document: docWithLayers([flux2Layer('first'), flux2Layer('second')]),
-        model: flux2Dev,
-        models: [union],
-      });
-
-      await runCanvasInvocation(harness.deps);
-
-      expect(harness.submittedGraphs()).toHaveLength(0);
-      expect(harness.notices()[0]?.message).toBe('second: flux2_control_limit');
-    });
-
-    it('blocks the control on a FLUX.2 Klein model', async () => {
-      const harness = makeHarness({
-        document: docWithLayers([flux2Layer('layer')]),
-        model: { ...flux2Dev, key: 'flux2-klein', name: 'FLUX.2 Klein 9B', variant: 'klein_9b' },
-        models: [union],
-      });
-
-      await runCanvasInvocation(harness.deps);
-
-      expect(harness.submittedGraphs()).toHaveLength(0);
-      expect(harness.notices()[0]?.message).toBe('layer: flux2_klein_control');
-    });
   });
 
   describe('Anima ControlNet-LLLite', () => {
@@ -1581,21 +1439,6 @@ describe('runCanvasInvocation', () => {
       expect(
         graph?.edges.filter((edge) => edge.destination.field === 'control_lllite').map((edge) => edge.source.node_id)
       ).toEqual(['control_lllite_collector']);
-    });
-
-    it.each([
-      ['the same model twice', () => [lllite('a', sketch.key), lllite('b', sketch.key)], 'b: duplicate_lllite_model'],
-      ['an inpainting adapter', () => [lllite('a', inpainting.key)], 'a: lllite_inpaint_adapter'],
-      [
-        'a layer saved as ControlNet before LLLite was supported',
-        () => [controlLayer('old', { kind: 'controlnet', model: sketch.key })],
-        'old: switch_adapter_kind',
-      ],
-    ])('blocks %s before submitting', async (_label, layers, message) => {
-      const harness = await run(layers());
-
-      expect(harness.submittedGraphs()).toHaveLength(0);
-      expect(harness.notices()[0]?.message).toBe(message);
     });
   });
 
@@ -1973,75 +1816,5 @@ describe('runCanvasInvocation — inpaint / outpaint dispatch', () => {
       layer_base: expect.objectContaining({ image_name: expect.any(String) }),
       type: 'invokeai_img_blend',
     });
-  });
-});
-
-// Regional references require an assigned image and compatible model before reaching graph inputs.
-describe('resolveRegionalReferenceImages', () => {
-  const asset = { imageName: 'ref.png' } as RegionalGuidanceReferenceImageAsset;
-  const ipAdapterModel = { base: 'sd-1', key: 'ipa', name: 'IP Adapter', type: 'ip_adapter' };
-  const fluxReduxModel = { base: 'flux', key: 'redux', name: 'FLUX Redux', type: 'flux_redux' };
-
-  const ipAdapterRef = (image: RegionalGuidanceReferenceImageAsset | null): RegionalGuidanceReferenceImage => ({
-    config: {
-      beginEndStepPct: [0, 1],
-      clipVisionModel: 'ViT-H',
-      image,
-      method: 'full',
-      model: ipAdapterModel,
-      type: 'ip_adapter',
-      weight: 1,
-    },
-    id: 'ref-ipa',
-    isEnabled: true,
-  });
-
-  const fluxReduxRef = (image: RegionalGuidanceReferenceImageAsset | null): RegionalGuidanceReferenceImage => ({
-    config: { image, imageInfluence: 'highest', model: fluxReduxModel, type: 'flux_redux' },
-    id: 'ref-redux',
-    isEnabled: true,
-  });
-
-  it('drops an IP-Adapter ref with no image assigned', () => {
-    expect(resolveRegionalReferenceImages({ referenceImages: [ipAdapterRef(null)] }, 'sd-1')).toEqual([]);
-  });
-
-  it('keeps an IP-Adapter ref once an image is assigned for a supported SD base', () => {
-    const inputs = resolveRegionalReferenceImages({ referenceImages: [ipAdapterRef(asset)] }, 'sd-1');
-    expect(inputs).toHaveLength(1);
-    expect(inputs[0]).toMatchObject({ id: 'ref-ipa', imageName: 'ref.png', type: 'ip_adapter' });
-  });
-
-  it('drops regional reference images for FLUX.2', () => {
-    expect(resolveRegionalReferenceImages({ referenceImages: [ipAdapterRef(asset)] }, 'flux2')).toEqual([]);
-  });
-
-  it.each(['krea-2', 'z-image', 'anima'])('drops regional reference images for %s', (base) => {
-    const ref = ipAdapterRef(asset);
-    const matchingBase = { ...ref, config: { ...ref.config, model: { ...ipAdapterModel, base } } };
-    expect(resolveRegionalReferenceImages({ referenceImages: [matchingBase] }, base)).toEqual([]);
-  });
-
-  it('keeps an SD2 IP-Adapter ref whose model matches the base', () => {
-    const sd2Ref = {
-      ...ipAdapterRef(asset),
-      config: { ...ipAdapterRef(asset).config, model: { ...ipAdapterModel, base: 'sd-2' } },
-    };
-    expect(resolveRegionalReferenceImages({ referenceImages: [sd2Ref] }, 'sd-2')).toHaveLength(1);
-  });
-
-  it('drops a FLUX Redux ref with no image assigned', () => {
-    expect(resolveRegionalReferenceImages({ referenceImages: [fluxReduxRef(null)] }, 'flux')).toEqual([]);
-  });
-
-  it('keeps a FLUX Redux ref once an image is assigned (FLUX base)', () => {
-    const inputs = resolveRegionalReferenceImages({ referenceImages: [fluxReduxRef(asset)] }, 'flux');
-    expect(inputs).toHaveLength(1);
-    expect(inputs[0]).toMatchObject({ id: 'ref-redux', imageName: 'ref.png', type: 'flux_redux' });
-  });
-
-  it('drops a disabled ref even when an image is assigned', () => {
-    const disabled = { ...ipAdapterRef(asset), isEnabled: false };
-    expect(resolveRegionalReferenceImages({ referenceImages: [disabled] }, 'sd-1')).toEqual([]);
   });
 });
