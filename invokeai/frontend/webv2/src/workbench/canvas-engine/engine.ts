@@ -43,6 +43,8 @@ import type {
   CaptureRasterSnapshotResult,
   RasterReadLease,
 } from '@workbench/canvas-engine/rasterTransactions';
+
+import type { TransformResampler } from './controllers/transformEditingController';
 export type {
   BooleanRasterResult,
   CanvasDiagnosticsCapability,
@@ -265,13 +267,15 @@ export interface CanvasEngineErrorReport {
     | 'Structural edit could not be mirrored'
     | 'Structural history replay was refused'
     | 'Structural history replay could not be mirrored'
-    | 'History replay failed';
+    | 'History replay failed'
+    | 'Transform resampling failed';
   namespace: 'canvas';
   projectId: string;
 }
 
 /** Options for {@link createCanvasEngine}. */
 export interface CanvasEngineOptions {
+  resampleTransform?: TransformResampler;
   projectId: string;
   /** Undo steps the project's previous engine was disposed with; History reports them until it is next cleared. */
   droppedHistorySteps?: number;
@@ -421,6 +425,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     stagingHidesOverlays: stores.stagingHidesOverlays,
     textEditSession: stores.textEditSession,
     textOptions: stores.textOptions,
+    transformOptions: stores.transformOptions,
     transformSession: stores.transformSession,
     pendingTransformLayerId: stores.pendingTransformLayerId,
     viewportReady: stores.viewportReady,
@@ -1026,6 +1031,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
     transform: {
       backend,
+      getOptions: stores.transformOptions.get,
+      resample: opts.resampleTransform,
+      runSpatial: (request) => rasterController.spatial.run(request),
+      reportFailure: (layerId, error) => reportError('Transform resampling failed', layerId, error),
       canEdit: () => canEditDocument(),
       commitStructural: (label, forward, inverse) => commitStructural(label, forward, inverse),
       ctx: mutationContext,
@@ -1040,7 +1049,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       pending: stores.pendingTransformLayerId,
       reportRefusal: reportEditRefusal,
       rebaseLineEnd: (layerId, from) => paintLineEnds.rebase(layerId, from),
-      restoreCache: restoreLayerCache,
       select: (layerId) => dispatchCanvasMutation({ id: layerId, type: 'setCanvasSelectedLayer' }),
       session: stores.transformSession,
       setOverride: (layerId, transform) => {
