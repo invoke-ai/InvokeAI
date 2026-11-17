@@ -28,7 +28,7 @@ Roles are read from the database on every request, so promoting or demoting some
 
 ## Set up multi-user mode
 
-Multi-user mode is on by default. An install that upgrades from a version where single-user mode was the default switches to multi-user mode unless its `invokeai.yaml` sets `multiuser: false`. After that switch, the projects made in single-user mode are hidden from every account, including the new administrator, until you return to single-user mode; boards, images and workflows stay available to administrators. See [What happens to existing data](#what-happens-to-existing-data) and [Single-user mode](#single-user-mode). Browsers that had InvokeAI open before the switch need a hard refresh.
+Multi-user mode is on by default. See [Upgrading from single-user mode](#upgrading-from-single-user-mode) if your install predates this default.
 
 <Steps>
 
@@ -69,6 +69,16 @@ Set `multiuser: false` in `invokeai.yaml` and restart to run without accounts or
 :::caution[Single-user mode is deprecated]
 Single-user mode will be removed in a future release.
 :::
+
+### Upgrading from single-user mode
+
+Earlier versions ran in single-user mode by default. On upgrade, an install switches to multi-user mode unless its `invokeai.yaml` contains `multiuser: false`:
+
+- **The first visit asks for an administrator account**, and from then on everyone signs in. Scripts that call the API need a token; see the [API guide](/configuration/multi-user-mode/api-guide/).
+- **Projects made in single-user mode are hidden** from every account, including the new administrator, until you return to single-user mode. Boards, images and workflows stay available to administrators. No data is changed. See [What happens to existing data](#what-happens-to-existing-data).
+- **Check `invokeai.yaml` even if you chose single-user mode.** Earlier versions removed `multiuser: false` from the file whenever they rewrote it (for example after you saved a setting in the app), because `false` was the default then. If the line is gone, add it back to stay in single-user mode. See [Single-user mode](#single-user-mode).
+- **Browser tabs left open across the upgrade stop working** until you reload them with a hard refresh, which brings up the setup or sign-in screen.
+- **A server other computers can reach shows the setup page to anyone until the administrator exists.** This includes Docker, which listens on every interface. Create the administrator account as soon as the server starts, or publish the port on this computer only (`--publish 127.0.0.1:9090:9090`) until you have.
 
 ### What happens to existing data
 
