@@ -320,6 +320,42 @@ describe('image recall', () => {
     expect(result?.fields).toContain('seed');
   });
 
+  describe("the recorded model's default VAE", () => {
+    const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' };
+    const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
+    const sdxlVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
+    const recall = (current: GenerateWidgetValues, model: MainModelConfig, vaeModels: VaeModelConfig[]) =>
+      buildImageRecallSettings({
+        currentValues: current,
+        image,
+        kind: 'all',
+        // No VAE recorded, so only the model's default could change it.
+        metadata: { model: { key: model.key }, positive_prompt: 'a recalled prompt' },
+        models: [model, ...vaeModels],
+        supportedModels: [model],
+        vaeModels,
+      });
+
+    it("keeps a family's required VAE for the 'default' sentinel", () => {
+      const model = { ...fluxModel, default_settings: { vae: 'default' } };
+      const result = recall(createValues({ model: fluxModel, modelKey: fluxModel.key, vae: fluxVae }), model, [
+        fluxVae,
+      ]);
+
+      expect(result?.values.vae).toEqual(fluxVae);
+    });
+
+    // An image made with the bundled VAE records none; recalling it must not keep another VAE.
+    it('uses the bundled VAE when the default names one that is not installed, as recall always has', () => {
+      const model = { ...sdxlModel, default_settings: { vae: 'gone' } };
+      const result = recall(createValues({ model: sdxlModel, modelKey: sdxlModel.key, vae: sdxlVae }), model, [
+        sdxlVae,
+      ]);
+
+      expect(result?.values.vae).toBeNull();
+    });
+  });
+
   it('recalls reference images from metadata, re-targeting configs to the effective model', () => {
     // The metadata model is not installed, so the current SDXL model stays
     // selected and the Qwen reference config is rebuilt for SDXL.
@@ -332,6 +368,7 @@ describe('image recall', () => {
           {
             id: 'ref-1',
             isEnabled: true,
+            name: 'Hero pose',
             config: {
               image: {
                 height: 770,
@@ -357,6 +394,8 @@ describe('image recall', () => {
       image: { original: { image: { height: 770, image_name: 'reference.png', width: 513 } } },
       type: 'ip_adapter',
     });
+    // The user's name stays with its image through the retarget to another family.
+    expect(result?.values.referenceImages[0]?.name).toBe('Hero pose');
     expect(result?.fields).toContain('referenceImages');
   });
 
@@ -2430,6 +2469,61 @@ describe('FLUX.3 prompt upsampler recall', () => {
     // The record leaves the switch alone; the new model has no such slot, so the pick goes like any component.
     expect(result?.values.flux3PromptUpsamplerEnabled).toBe(true);
     expect(result?.values.flux3PromptUpsamplerModel).toBeNull();
+  });
+});
+
+describe('SD 3 encoder recall', () => {
+  const model: MainModelConfig = { base: 'sd-3', key: 'sd3-model', name: 'SD 3', type: 'main' };
+  const t5: ComponentModelConfig = { base: 'any', key: 'sd3-t5', name: 'T5', type: 't5_encoder' };
+  const clipL: ComponentModelConfig = {
+    base: 'any',
+    key: 'sd3-clip-l',
+    name: 'CLIP L',
+    type: 'clip_embed',
+    variant: 'large',
+  };
+  const clipG: ComponentModelConfig = { ...clipL, key: 'sd3-clip-g', name: 'CLIP G', variant: 'gigantic' };
+  const currentComponents = {
+    clipGEmbedModel: { ...clipG, key: 'current-clip-g' },
+    clipLEmbedModel: { ...clipL, key: 'current-clip-l' },
+    t5EncoderModel: { ...t5, key: 'current-t5' },
+  };
+  const recall = (metadata: Record<string, unknown>, kind: ImageRecallKind = 'all') =>
+    buildImageRecallSettings({
+      currentValues: createValues({ model, modelKey: model.key, ...currentComponents }),
+      image,
+      kind,
+      metadata: { model: { key: model.key }, ...metadata },
+      models: [model, t5, clipL, clipG, ...Object.values(currentComponents)],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+
+  it.each(['all', 'remix'] as const)('restores the recorded overrides with %s on the same main model', (kind) => {
+    const result = recall(
+      { clip_g_model: { key: clipG.key }, clip_l_model: { key: clipL.key }, t5_encoder: { key: t5.key } },
+      kind
+    );
+
+    expect(result?.values).toMatchObject({
+      clipGEmbedModel: clipG,
+      clipLEmbedModel: clipL,
+      model,
+      t5EncoderModel: t5,
+    });
+    expect(result?.fields).toContain('components');
+  });
+
+  it.each([
+    ['missing metadata', {}],
+    ['unavailable encoders', { clip_g_model: { key: 'missing-g' }, clip_l_model: { key: 'missing-l' } }],
+    ['a non-CLIP model', { clip_g_model: { key: t5.key }, clip_l_model: { key: t5.key } }],
+    ['swapped CLIP variants', { clip_g_model: { key: clipL.key }, clip_l_model: { key: clipG.key } }],
+  ] as const)('keeps the current compatible overrides with %s', (_label, metadata) => {
+    const result = recall(metadata);
+
+    expect(result?.values).toMatchObject(currentComponents);
+    expect(result?.fields).not.toContain('components');
   });
 });
 

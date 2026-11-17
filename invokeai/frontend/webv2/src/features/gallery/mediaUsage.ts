@@ -11,4 +11,5 @@ export {
   type GalleryMediaUsageSurface,
   type GalleryMediaUsageSurfaceRow,
 } from './core/mediaUsage';
-export { checkGalleryMediaUsage } from './data/backend';
+export { GALLERY_REQUEST_MAX_NAMES } from './data/backend';
+export { checkGalleryMediaUsage } from './data/mediaUsage';

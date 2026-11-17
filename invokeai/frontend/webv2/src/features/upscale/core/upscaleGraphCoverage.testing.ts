@@ -30,6 +30,7 @@ export const INSTALLED = [
   model('qwen3-8b', 'qwen3_encoder', 'any', { variant: 'qwen3_8b' }),
   model('qwen3-06b', 'qwen3_encoder', 'any', { variant: 'qwen3_06b' }),
   model('qwen35', 'qwen3_5_encoder', 'any', { variant: 'qwen3_5_4b' }),
+  model('qwen35-9b', 'qwen3_5_encoder', 'any', { variant: 'qwen3_5_9b' }),
   model('qwen3vl-4b', 'qwen3_vl_encoder', 'any', { variant: 'qwen3_vl_4b' }),
   model('qwen-vl', 'qwen_vl_encoder', 'any'),
   model('mistral', 'mistral_encoder', 'any', { variant: 'mistral3_24b' }),
@@ -43,7 +44,7 @@ export const INSTALLED = [
 
 /**
  * One case per path a builder can take: CFG above 1 where the negative branch is CFG-gated, the
- * optional Z-Image ControlNet, a bundled Z-Image, Krea-2, FLUX.2 or Qwen Image install, Anima-3.8B's
+ * optional Z-Image ControlNet, a bundled Z-Image, Krea-2, FLUX.2, MOSS-Image or Qwen Image install, Anima-3.8B's
  * second encoder, and FLUX.2 Klein at either encoder size and [dev] with its own loaders.
  */
 export const CASES: { label: string; main: ModelConfig; patch?: Partial<UpscaleWidgetValues> }[] = [
@@ -89,6 +90,12 @@ export const CASES: { label: string; main: ModelConfig; patch?: Partial<UpscaleW
   {
     label: 'flux2-diffusers',
     main: model('klein-diffusers', 'main', 'flux2', { format: 'diffusers', variant: 'klein_9b' }),
+  },
+  { label: 'moss-image', main: model('moss', 'main', 'moss-image', { format: 'gguf_quantized' }) },
+  {
+    label: 'moss-image-diffusers',
+    main: model('moss-diffusers', 'main', 'moss-image', { format: 'diffusers' }),
+    patch: { cfgScale: 1 },
   },
   {
     label: 'qwen-image',

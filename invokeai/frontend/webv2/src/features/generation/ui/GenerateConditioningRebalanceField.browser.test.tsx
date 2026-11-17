@@ -46,6 +46,8 @@ await i18n.use(initReactI18next).init({
             krea2RebalanceTapReadout: 'tap {{tap}} · {{value}}',
             krea2RebalanceWeights: 'Per-tap weights',
             krea2RebalanceWeightsInvalid: 'Enter exactly {{count}} comma-separated numbers.',
+            resetFieldNamed: '{{reset}}: {{field}}',
+            resetToDefault: 'Reset to default',
           },
         },
       },
@@ -216,24 +218,63 @@ describe('GenerateConditioningRebalanceField', () => {
     expect(bars()[0]?.getAttribute('aria-label')).toBe('Tap 1, encoder layer 2');
   });
 
-  it('disables reset at the backend defaults and restores them once edited', async () => {
+  it('marks the preset with the reset dot once edited, and the dot restores the backend defaults', async () => {
     await renderField();
+    const dot = () => byLabel('Reset to default curve: Rebalance preset');
 
-    const reset = byLabel('Reset to default curve');
-
-    expect(reset?.getAttribute('disabled')).not.toBeNull();
+    // The dot replaced a separate reset button, and shows only off the defaults.
+    expect(document.querySelector('button[aria-label="Reset to default curve"]')).toBeNull();
+    expect(dot()).toBeNull();
 
     await interact(() => typeInto(weightsInput(), NEUTRAL_KREA2_REBALANCE_WEIGHTS));
+    expect(dot()).not.toBeNull();
 
-    expect(byLabel('Reset to default curve')?.getAttribute('disabled')).toBeNull();
-
-    await interact(() => byLabel('Reset to default curve')?.click());
+    await interact(() => dot()?.click());
 
     expect(onCommitImmediate).toHaveBeenLastCalledWith({
       krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER,
       krea2RebalanceWeights: DEFAULT_KREA2_REBALANCE_WEIGHTS,
     });
     expect(weightsInput().value).toBe(DEFAULT_KREA2_REBALANCE_WEIGHTS);
+    expect(dot()).toBeNull();
+    // Focus moves to the preset select rather than falling to the page with the dot.
+    await vi.waitFor(() =>
+      expect(document.activeElement?.matches('[data-scope="select"][data-part="trigger"]')).toBe(true)
+    );
+  });
+
+  describe('with only the gain changed', () => {
+    const presetDot = () => byLabel('Reset to default curve: Rebalance preset');
+    const gainDot = () => byLabel('Reset to default: Gain');
+    const changedGain = DEFAULT_KREA2_REBALANCE_MULTIPLIER + 0.5;
+
+    it('marks both the preset, now custom, and the gain; the gain dot resets the gain alone', async () => {
+      await renderField({ krea2RebalanceMultiplier: changedGain });
+
+      expect(presetDot()).not.toBeNull();
+      expect(gainDot()).not.toBeNull();
+
+      await interact(() => gainDot()?.click());
+
+      expect(onCommit).toHaveBeenLastCalledWith({ krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER });
+      expect(onCommitImmediate).not.toHaveBeenCalled();
+      // The weights were the default curve all along, so the preset is back at it too.
+      expect(gainDot()).toBeNull();
+      expect(presetDot()).toBeNull();
+    });
+
+    it('resets the whole curve, gain included, from the preset dot', async () => {
+      await renderField({ krea2RebalanceMultiplier: changedGain });
+
+      await interact(() => presetDot()?.click());
+
+      expect(onCommitImmediate).toHaveBeenLastCalledWith({
+        krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER,
+        krea2RebalanceWeights: DEFAULT_KREA2_REBALANCE_WEIGHTS,
+      });
+      expect(presetDot()).toBeNull();
+      expect(gainDot()).toBeNull();
+    });
   });
 
   it('commits a typed vector the backend would accept', async () => {

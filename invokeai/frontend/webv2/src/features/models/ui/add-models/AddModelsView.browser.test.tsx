@@ -682,7 +682,7 @@ describe('AddModelsView bundle preview decoder', () => {
         return item!;
       });
     await act(() =>
-      userEvent.click(document.querySelector<HTMLElement>('[aria-label="models.filterAndSortStarterModels"]')!)
+      userEvent.click(document.querySelector<HTMLElement>('[aria-label^="models.filterAndSortStarterModels"]')!)
     );
     await act(async () => userEvent.click(await menuItem(submenu)));
     await act(async () => userEvent.click(await menuItem(item)));

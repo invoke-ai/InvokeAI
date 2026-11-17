@@ -1,7 +1,7 @@
 ---
 title: MOSS-Image
 description: Generate and edit images with OpenMOSS's MOSS-Image Base and SFT, from the Diffusers pipelines or a single-file transformer, including JSON layout prompts, layouts from canvas regions and a prompt enhancer.
-lastUpdated: 2026-11-06
+lastUpdated: 2026-11-14
 sidebar:
   order: 8
 ---
@@ -298,9 +298,36 @@ Small language models of about 1.5 to 1.7B parameters, such as **Qwen2.5 1.5B In
 models, are not recommended for this system prompt: they write layouts for nearly every request, and their
 drafts are often invalid.
 
+## LoRA
+
+MOSS-Image LoRAs install like any other and appear under **Concepts** in the Generate panel. They work on Base and
+SFT, and on GGUF, int8 and FP8 Storage builds; on GGUF and int8 transformers and with FP8 Storage the LoRA runs beside the
+weights instead of being merged into them.
+
+- These layouts load: ai-toolkit and ComfyUI files (`diffusion_model.` keys), kohya/LyCORIS files (`lora_unet_`
+  keys), diffusers/PEFT files (`transformer.` keys, also as a Diffusers folder with
+  `pytorch_lora_weights.safetensors`) and DiffSynth-Studio files (keys without a prefix).
+- A LoRA may store the attention projections fused (ComfyUI and ai-toolkit `proj.qkv`) or split into q, k and v.
+  InvokeAI places a fused `qkv` onto the transformer's separate q, k and v layers exactly.
+- LoRA, DoRA, LoKr, LoHa and full-weight layers are recognized.
+- LoRAs change the transformer only. These files are refused at install, with the reason shown: LoRAs that change
+  norm weights or biases (`.diff` on norms, `.diff_b`, `w_norm`), other adapter kinds such as OFT, control files that
+  widen the patch embedder (such as Comfy-Org's MOSS-Image color/depth control LoRA), LoRAs with text-encoder layers,
+  and raw PEFT adapters (`base_model.model.` keys), whose alpha is stored in a separate `adapter_config.json` that
+  InvokeAI does not read.
+- These are not recognized and install as an unknown model: SimpleTuner LyCORIS files with `lycoris_` key names, and
+  MOSS-Image edit LoRAs whose keys end in `lora_A`/`lora_B` without `.weight`, such as Comfy-Org's official
+  MOSS-Image edit LoRA.
+- Edit, character-reference and "ControlNet" LoRAs in the layouts above install and run, but they condition on
+  reference images, which MOSS-Image does not take in InvokeAI yet, so they do not do what they are made for.
+- For turbo and distillation LoRAs, use the steps and CFG Scale on their model card. DMD repositories that also ship
+  `time_embedding.safetensors` and `dataspace.safetensors` need those files and their own sampler, which InvokeAI does
+  not load, so the LoRA alone is only a partial speed-up.
+- An older version of InvokeAI registered MOSS-Image LoRAs as Z-Image LoRAs or as unknown models. Select one in the
+  Model Manager and use **Re-identify model**.
+
 ## Limitations
 
-- LoRA is not supported.
 - fp8, nvfp4, w4a8 and ComfyUI-GGUF `Q8_CR`/`Q4_CR` transformers are refused at install (see [Installing](#installing)).
 - ControlNet, reference images and seamless tiling are not available.
 - Regional guidance places boxes in a layout; it has no regional negative prompts or regional reference images.
@@ -313,6 +340,7 @@ drafts are often invalid.
 | **Main Model - MOSS-Image**       | Loads the transformer, and the Qwen3.5 9B encoder and VAE from the pipeline or from the standalone models selected |
 | **Layout Prompt - MOSS-Image**    | Builds the prompt the model encodes from a prompt, the image size and a list of regions, each with a type, a caption, visible text for text regions, and a pixel box `[x1, y1, x2, y2]` from the image's top-left. Compiles a layout draft at the given size. Every MOSS-Image graph from the Generate tab and the Canvas uses it; its regions input has no editor widget |
 | **Prompt - MOSS-Image**           | Encodes a prompt with the Qwen3.5 9B encoder                               |
+| **Apply LoRA - MOSS-Image** / **Apply LoRA Collection - MOSS-Image** | Apply one LoRA, or a collection of them, to the transformer |
 | **Denoise - MOSS-Image**          | Runs sampling; accepts image-to-image latents and an inpainting mask, and takes the skip layers as **Uncond Skip Layers** |
 | **Image to Latents - FLUX2**      | VAE encode, for image-to-image and inpainting                              |
 | **Latents to Image - FLUX2**      | VAE decode                                                                 |

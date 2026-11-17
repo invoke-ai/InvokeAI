@@ -16,27 +16,36 @@ _POOLING_NEEDS_DIVISIBLE_SIZES: Final = frozenset({"mps"})
 """Device types whose adaptive average pooling, behind `F.interpolate(mode="area")`, refuses an output size that does
 not divide the input ("input sizes must be divisible by output sizes", pytorch#96056); macOS stays on torch 2.7."""
 
+CPU_MAX_PREVIEW_EDGE: Final = 512
+"""Longest preview edge, in pixels, decoded on a CPU, whatever the decoder's own `max_preview_edge`. On a Ryzen 9 7900
+(8 threads, float32) a full `decode_preview` of TAESDXL or TAEF2 took 1.70 s at 1024x1024 and 0.38-0.40 s at 512x512;
+TAEW2.1, already capped at 512, took 1.07 s."""
+
 TinyAutoencoderConfig = TypeVar("TinyAutoencoderConfig", bound=TinyAutoencoder_Checkpoint_Config_Base)
 
 
-def _preview_latent_size(decoder: TinyAutoencoderDecoder, height: int, width: int) -> tuple[int, int]:
-    """The latent size a `(height, width)` latent is decoded at: downsampled until the image fits the decoder's
-    `max_preview_edge`."""
+def _preview_latent_size(
+    decoder: TinyAutoencoderDecoder, device: torch.device, height: int, width: int
+) -> tuple[int, int]:
+    """The latent size a `(height, width)` latent is decoded at on `device`: downsampled until the image fits the
+    decoder's `max_preview_edge`, and on a CPU `CPU_MAX_PREVIEW_EDGE`."""
+    max_edge = decoder.max_preview_edge if device.type != "cpu" else min(decoder.max_preview_edge, CPU_MAX_PREVIEW_EDGE)
     longest_edge = max(height, width) * decoder.spatial_compression
-    if longest_edge <= decoder.max_preview_edge:
+    if longest_edge <= max_edge:
         return height, width
-    scale = decoder.max_preview_edge / longest_edge
+    scale = max_edge / longest_edge
     return max(1, math.floor(height * scale)), max(1, math.floor(width * scale))
 
 
-def decode_working_memory_bytes(decoder: TinyAutoencoderDecoder, sample: torch.Tensor) -> int:
-    """The working memory `decode_preview(decoder, sample)` needs on its device besides the decoder's weights: the
-    decoder's own bound (`preview_working_memory_bytes`) at the capped size, for every latent frame of a window.
+def decode_working_memory_bytes(decoder: TinyAutoencoderDecoder, sample: torch.Tensor, device: torch.device) -> int:
+    """The working memory `decode_preview(decoder, sample, device)` needs on its device besides the decoder's
+    weights: the decoder's own bound (`preview_working_memory_bytes`) at the capped size, for every latent frame of a
+    window.
 
     The cache's working-memory floor (`device_working_mem_gb`, 3 GB by default) covers every supported decoder's, so
     the reservation matters only where that floor is set lower.
     """
-    height, width = _preview_latent_size(decoder, *sample.shape[-2:])
+    height, width = _preview_latent_size(decoder, device, *sample.shape[-2:])
     frames = sample.shape[2] if sample.dim() == 5 else 1
     return decoder.preview_working_memory_bytes(height, width, frames)
 
@@ -53,7 +62,8 @@ def _area_downsample(latents: torch.Tensor, size: tuple[int, int]) -> torch.Tens
 def decode_preview(
     decoder: TinyAutoencoderDecoder, sample: torch.Tensor, device: torch.device | None = None
 ) -> Image.Image:
-    """Decode the first latent of `sample` into an RGB preview no larger than `decoder.max_preview_edge`.
+    """Decode the first latent of `sample` into an RGB preview no larger than `decoder.max_preview_edge` (on a CPU,
+    no larger than `CPU_MAX_PREVIEW_EDGE`).
 
     `sample` is `(C, h, w)` or `(B, C, h, w)` in the decoder's latent space, or a `(B, C, T, h, w)` window
     of latent frames, which a video decoder renders as its last frame with the earlier ones as temporal
@@ -78,9 +88,10 @@ def decode_preview(
         )
 
     parameter = next(decoder.parameters())
+    device = device or parameter.device
     with torch.inference_mode():
-        latents = sample[0:1].to(device=device or parameter.device, dtype=parameter.dtype)
-        size = _preview_latent_size(decoder, *latents.shape[-2:])
+        latents = sample[0:1].to(device=device, dtype=parameter.dtype)
+        size = _preview_latent_size(decoder, device, *latents.shape[-2:])
         if size != tuple(latents.shape[-2:]):
             if latents.dim() == 5:
                 # A window's frames are folded into the batch, so they are pooled in space only and through

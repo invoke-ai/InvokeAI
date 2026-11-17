@@ -11,8 +11,10 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
+import { withAddedReferenceImages } from '@features/generation/core/baseGenerationPolicies';
 import { getPidDecoderBaseForMainBase } from '@features/generation/core/pid';
 import { isPidDecodeNodeType } from '@features/generation/core/pidGraph';
+import { syncGenerateWidgetValuesWithModels } from '@features/generation/core/settings';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ControlLayerGraphInput } from './addControlLayers';
@@ -35,7 +37,7 @@ import {
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
-const sd3Model: MainModelConfig = { base: 'sd-3', key: 'sd3-model', name: 'SD3', type: 'main' };
+const sd3Model: MainModelConfig = { base: 'sd-3', format: 'diffusers', key: 'sd3-model', name: 'SD3', type: 'main' };
 const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX dev', type: 'main' };
 const flux2Model: MainModelConfig = {
   base: 'flux2',
@@ -256,6 +258,47 @@ const BASE_CASES: BaseCase[] = [
 seedArchitectureCapabilities();
 
 describe('compileCanvasGraph', () => {
+  it('uses a local Kontext reference added after a synced Canvas model is renamed', () => {
+    const installed = {
+      ...fluxModel,
+      hash: 'original-file',
+      name: 'FLUX.1 Kontext dev',
+      source: '/models/portrait.safetensors',
+      variant: 'dev',
+    };
+    const renamed = { ...installed, name: 'Portrait editor' };
+    const referenceImages = withAddedReferenceImages(
+      installed,
+      [],
+      [],
+      [{ id: 'reference', image: { original: { image: { height: 768, image_name: 'reference.png', width: 512 } } } }]
+    );
+    const settings = syncGenerateWidgetValuesWithModels(
+      { ...settingsFor(installed, { ...COMPONENT_OVERRIDES.flux, referenceImages }), model: installed },
+      [renamed]
+    );
+
+    const withSecondReference = withAddedReferenceImages(settings.model, [], settings.referenceImages, [
+      { id: 'second', image: { original: { image: { height: 768, image_name: 'second.png', width: 512 } } } },
+    ]);
+    const { backendGraph } = compile(settings.model, 'img2img', {
+      settings: { ...settings, referenceImages: withSecondReference },
+    });
+
+    expect(settings.model.name).toBe(renamed.name);
+    expect(backendGraph.edges).toContainEqual(
+      expect.objectContaining({
+        destination: { node_id: 'denoise_latents', field: 'kontext_conditioning' },
+      })
+    );
+    expect(Object.values(backendGraph.nodes).filter(({ type }) => type === 'flux_kontext')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ image: { image_name: 'reference.png' } }),
+        expect.objectContaining({ image: { image_name: 'second.png' } }),
+      ])
+    );
+  });
+
   describe('txt2img per base', () => {
     it.each(BASE_CASES)(
       'builds a $model.base txt2img graph sized to the bbox',
@@ -349,6 +392,45 @@ describe('compileCanvasGraph', () => {
         expect(mode).toBe('img2img');
       }
     );
+
+    it('records the SD 3 encoder overrides used for a Canvas image', () => {
+      const clipL: ComponentModelConfig = {
+        base: 'any',
+        key: 'clip-l',
+        name: 'CLIP L',
+        type: 'clip_embed',
+        variant: 'large',
+      };
+      const clipG = { ...clipL, key: 'clip-g', name: 'CLIP G', variant: 'gigantic' };
+      const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
+      const { backendGraph } = compile(sd3Model, 'img2img', {
+        settings: { clipGEmbedModel: clipG, clipLEmbedModel: clipL, t5EncoderModel: t5Encoder },
+      });
+
+      expect(backendGraph.nodes.model_loader).toMatchObject({
+        clip_g_model: clipG,
+        clip_l_model: clipL,
+        t5_encoder_model: t5Encoder,
+      });
+      const metadata = getNodeByType(backendGraph, 'core_metadata');
+      expect(metadata).toMatchObject({
+        clip_g_model: clipG,
+        clip_l_model: clipL,
+        generation_mode: 'sd3_img2img',
+        t5_encoder: t5Encoder,
+      });
+      expect(getEdge(backendGraph, 'canvas_output', 'metadata')?.source.node_id).toBe(metadata?.id);
+    });
+
+    it('leaves bundled SD 3 encoders unrecorded when no override was selected', () => {
+      const { backendGraph } = compile(sd3Model, 'img2img');
+      const metadata = getNodeByType(backendGraph, 'core_metadata');
+
+      expect(metadata).toBeDefined();
+      expect(metadata?.clip_g_model).toBeUndefined();
+      expect(metadata?.clip_l_model).toBeUndefined();
+      expect(metadata?.t5_encoder).toBeUndefined();
+    });
 
     it('feeds the encode node from the same VAE source as the decode node', () => {
       const { backendGraph } = compile(sd1Model, 'img2img');

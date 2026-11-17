@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@chakra-ui/react';
 import type { LucideIcon } from 'lucide-react';
 
 import { Box, Icon, Separator, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { AccountMenu, useHasAccountMenu } from '@features/identity';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -30,7 +31,8 @@ const TOOLTIP_PLACEMENT = 'right';
 
 /**
  * Sections are routes, so the rail is route links in visual order: Workspace, the open projects, Manage, then the
- * footer (Preferences, then the What's New and Help actions). Tab and reading order follow what the rail shows.
+ * footer (Preferences, then the What's New and Help actions, then the signed-in account in multi-user mode). Tab and
+ * reading order follow what the rail shows.
  */
 
 export type LaunchpadNavGroupId = 'workspace' | 'manage' | 'footer';
@@ -182,6 +184,7 @@ export const LaunchpadNav = ({ activeId, items }: { activeId: string; items: Lau
   // Show headings only when multiple groups need distinguishing.
   const showGroupLabels = workspaceItems.length > 0 && manageItems.length > 0;
   const compact = useSyncExternalStore(subscribeCompact, getCompact);
+  const hasAccount = useHasAccountMenu();
 
   return (
     // The landmark wraps the scroll area: Zag gives the area's root a presentation role.
@@ -226,6 +229,12 @@ export const LaunchpadNav = ({ activeId, items }: { activeId: string; items: Lau
           ))}
           <WhatsNewButton compact={compact} />
           <HelpMenu compact={compact} />
+          {hasAccount ? (
+            <>
+              <Separator my={compact ? '1' : '1.5'} />
+              <AccountMenu compact={compact} />
+            </>
+          ) : null}
         </Stack>
       </Scrollable>
     </Box>

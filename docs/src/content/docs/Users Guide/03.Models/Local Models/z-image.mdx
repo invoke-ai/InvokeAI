@@ -64,7 +64,8 @@ The starter models:
 | Z-Image Turbo (SDNQ uint4 + SVD)   | SDNQ Diffusers pipeline     | ~5 GB   | nothing, everything is bundled                 |
 
 A full-precision **Z-Image Qwen3 Text Encoder** (~8 GB) and its community **int8** build (~4.4 GB download,
-about 4.4 GB once loaded) are also available as separate starters.
+about 4.4 GB once loaded) are also available as separate starters. A scaled-fp8 Qwen3 4B encoder file
+also stays fp8 in memory on a GPU that can hold it, about 4.4 GB instead of about 8.0 GB.
 
 The NVFP4 build keeps its quantized layers packed in memory and decodes them on the fly, so it needs about
 a third of the full-precision transformer's memory. The int8 build keeps its int8 layers as well, about 6.2 GB
@@ -148,6 +149,9 @@ either one conditioning or a collection of them.
 Z-Image LoRAs are supported in Kohya, PEFT/Diffusers and LyCORIS formats. They are applied to both the
 transformer and the Qwen3 encoder. In the workflow editor, use **Apply LoRA - Z-Image** or **Apply LoRA
 Collection - Z-Image**.
+
+DoRA LoRAs apply with their magnitudes in the `lora_A`/`lora_B` layout (LyCORIS `dora_scale`, PEFT
+`lora_magnitude_vector`, ai-toolkit `.magnitude`) as well as in the kohya layout. DoRA runs on the GGUF, SDNQ, NVFP4, fp8 and int8 builds, but not on bitsandbytes NF4 or LLM.int8 weights.
 
 ## Seed Variance Enhancer
 

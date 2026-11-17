@@ -82,19 +82,14 @@ interface TransformSubject {
 const identityPoint = (point: Vec2): Vec2 => point;
 
 /**
- * Whether a transform session may open on `layer`: an editable, non-empty leaf that is not a mask. `liveRect` also
- * counts pixels the live cache holds but persistence has not acknowledged yet.
+ * Whether a transform session may open on `layer`: an editable, non-empty leaf. `liveRect` also counts pixels the
+ * live cache holds but persistence has not acknowledged yet.
  */
 export const isTransformEligible = (
   layer: CanvasLayerContract,
   doc: CanvasDocumentContractV3,
   liveRect?: Rect
-): boolean =>
-  // Masks lack an applyTransform bake path, so reject sessions that would preview but fail to apply.
-  isLeafEditable(lookupDocumentLeaf(doc, layer.id)) &&
-  layer.type !== 'inpaint_mask' &&
-  layer.type !== 'regional_guidance' &&
-  hittableLayerRect(layer, doc, liveRect) !== null;
+): boolean => isLeafEditable(lookupDocumentLeaf(doc, layer.id)) && hittableLayerRect(layer, doc, liveRect) !== null;
 
 /** Creates a fresh transform tool with its own session/gesture state. */
 export const createTransformTool = (): Tool => {

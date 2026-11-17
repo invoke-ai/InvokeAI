@@ -745,10 +745,11 @@ export const FloatingWidgetWindow = ({
           flexShrink={0}
           gap="1.5"
           // Tighter than a docked panel's header: a window's chrome should take as little of it as it can. The
-          // end padding keeps the Dock button clear of the top-right resize corner, which reaches 12px inside.
+          // side padding on each end equals the space above and below what sits there: the 16px title icon at the
+          // start, the 24px controls at the end.
           h={8}
-          pe="3"
-          ps="3"
+          pe="1"
+          ps="2"
           tabIndex={isMaximized ? undefined : 0}
           // `preventDefault` on pointerdown does not stop touch panning: without
           // this the browser claims the gesture and cancels the drag.
@@ -800,7 +801,8 @@ export const FloatingWidgetWindow = ({
               </HStack>
             </Suspense>
           ) : null}
-          <HStack flexShrink={0} gap="1" data-floating-controls="">
+          {/* Above the resize handles: the top-right corner's handle reaches 12px inside, over the last button. */}
+          <HStack flexShrink={0} gap="1" data-floating-controls="" position="relative" zIndex="2">
             {isEnabled && widget ? <Separator h="4" mx="0.5" orientation="vertical" /> : null}
             <Tooltip content={isShaded ? t('widgets.floating.unshade') : t('widgets.floating.shade')}>
               <IconButton

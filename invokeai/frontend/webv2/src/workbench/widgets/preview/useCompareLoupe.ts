@@ -12,8 +12,9 @@ import { useCallback, useRef, useState, type MouseEvent, type PointerEvent as Re
 import { capturePointer, releasePointer, trackPointerDown } from './loupeGestures';
 
 /**
- * Apply one imperative fraction-space transform to matching-size comparison panes. Pinch zooms/pans together; one
- * finger pans an already-zoomed pair.
+ * Apply one imperative transform to both comparison panes in pane-fraction space: each image stays fitted to its own
+ * pane, and the shared zoom and pan (fractions of each pane) keep the same region of both pictures in view, whatever
+ * their pixel sizes or aspect ratios. Pinch zooms/pans together; one finger pans an already-zoomed pair.
  */
 
 const MAX_ACTUAL_ZOOM = 8;
@@ -54,12 +55,19 @@ export interface CompareLoupePane {
 const clampFraction = (f: number, scale: number): number =>
   scale <= 1 ? (1 - scale) / 2 : Math.min(0, Math.max(1 - scale, f));
 
+/** The image a pane shows: its identity, and its width in its own pixels. */
+export interface CompareLoupeImage {
+  id: string;
+  naturalWidth: number;
+}
+
 export const useCompareLoupe = ({
   enabled,
-  naturalWidth,
+  images,
 }: {
   enabled: boolean;
-  naturalWidth: number;
+  /** Each pane's image, by pane index. */
+  images: readonly [CompareLoupeImage, CompareLoupeImage];
 }): { getPane: (index: 0 | 1) => CompareLoupePane | null; isZoomed: boolean } => {
   const transformRef = useRef<FractionTransform>({ fx: 0, fy: 0, scale: 1 });
   const panesRef = useRef<[PaneElements, PaneElements]>([
@@ -71,10 +79,36 @@ export const useCompareLoupe = ({
   /** Every pointer currently down on either pane, in client space, in arrival order. */
   const pointersRef = useRef(new Map<number, PanZoomPoint>());
   const pinchRef = useRef<PinchGesture | null>(null);
-  const naturalWidthRef = useRef(naturalWidth);
+  const imagesRef = useRef(images);
   // eslint-disable-next-line react/refs
-  naturalWidthRef.current = naturalWidth;
+  imagesRef.current = images;
+  /** The image ids the current transform was set on, by pane. */
+  const pairRef = useRef<readonly [string, string] | null>(null);
   const [isZoomed, setIsZoomed] = useState(false);
+
+  const writeStyles = useCallback(() => {
+    const { fx, fy, scale } = transformRef.current;
+    const isFit = scale === 1;
+
+    for (const [index, pane] of panesRef.current.entries()) {
+      const { frame, image } = pane;
+
+      if (!frame || !image) {
+        continue;
+      }
+
+      image.style.transform = isFit
+        ? ''
+        : `translate(${fx * frame.clientWidth}px, ${fy * frame.clientHeight}px) scale(${scale})`;
+      image.style.transformOrigin = '0 0';
+
+      const actualZoom = (scale * frame.clientWidth) / Math.max(1, imagesRef.current[index]?.naturalWidth ?? 1);
+
+      image.style.imageRendering = !isFit && actualZoom >= PIXELATED_ACTUAL_ZOOM ? 'pixelated' : '';
+    }
+
+    setIsZoomed(!isFit);
+  }, []);
 
   const apply = useCallback(() => {
     if (rafRef.current !== null) {
@@ -83,29 +117,19 @@ export const useCompareLoupe = ({
 
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = null;
-      const { fx, fy, scale } = transformRef.current;
-      const isFit = scale === 1;
-
-      for (const pane of panesRef.current) {
-        const { frame, image } = pane;
-
-        if (!frame || !image) {
-          continue;
-        }
-
-        image.style.transform = isFit
-          ? ''
-          : `translate(${fx * frame.clientWidth}px, ${fy * frame.clientHeight}px) scale(${scale})`;
-        image.style.transformOrigin = '0 0';
-
-        const actualZoom = (scale * frame.clientWidth) / Math.max(1, naturalWidthRef.current);
-
-        image.style.imageRendering = !isFit && actualZoom >= PIXELATED_ACTUAL_ZOOM ? 'pixelated' : '';
-      }
-
-      setIsZoomed(!isFit);
+      writeStyles();
     });
-  }, []);
+  }, [writeStyles]);
+
+  /** Writes the transform now, before paint, superseding a pending frame. */
+  const flush = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+
+    writeStyles();
+  }, [writeStyles]);
 
   const setTransform = useCallback(
     (next: FractionTransform) => {
@@ -120,14 +144,22 @@ export const useCompareLoupe = ({
     [apply]
   );
 
-  /** Never below fit, never past `MAX_ACTUAL_ZOOM` of the images' own pixels. */
+  /**
+   * Never below fit, never past `MAX_ACTUAL_ZOOM` of the sharper image's own pixels, so a pair of different
+   * resolutions can still be inspected down to the larger one's detail; the other pane goes pixelated first.
+   */
   const constrainScale = useCallback((scale: number): number => {
-    const firstFrame = panesRef.current.find((pane) => pane.frame)?.frame ?? null;
-    const maxScale = firstFrame
-      ? Math.max(1, (MAX_ACTUAL_ZOOM * naturalWidthRef.current) / Math.max(1, firstFrame.clientWidth))
-      : MAX_ACTUAL_ZOOM;
+    let maxScale = 0;
 
-    return Math.max(1, Math.min(scale, maxScale));
+    for (const [index, { frame }] of panesRef.current.entries()) {
+      if (frame) {
+        const naturalWidth = imagesRef.current[index]?.naturalWidth ?? 1;
+
+        maxScale = Math.max(maxScale, (MAX_ACTUAL_ZOOM * naturalWidth) / Math.max(1, frame.clientWidth));
+      }
+    }
+
+    return Math.max(1, Math.min(scale, maxScale === 0 ? MAX_ACTUAL_ZOOM : maxScale));
   }, []);
 
   const zoomAroundFraction = useCallback(
@@ -204,7 +236,8 @@ export const useCompareLoupe = ({
           zoomAroundFraction(
             (event.clientX - rect.left) / rect.width,
             (event.clientY - rect.top) / rect.height,
-            Math.max(1, naturalWidthRef.current / frame.clientWidth)
+            // One image pixel per screen pixel for the image double-clicked.
+            Math.max(1, imagesRef.current[index].naturalWidth / frame.clientWidth)
           );
         },
         onPointerDown: (event) => {
@@ -297,14 +330,36 @@ export const useCompareLoupe = ({
           ownerDocument.removeEventListener('pointercancel', handleDocumentPointerEnd);
         };
       },
+      // Panes key their image by id, so this runs, before paint, whenever a pane's image changes.
       imageRefCallback: (node) => {
         panesRef.current[index].image = node;
 
         if (node) {
-          apply();
+          reconcilePair();
+          flush();
         }
       },
     });
+    /**
+     * Carry the zoom to a pair that keeps an image (a new selection against the same comparison image, or a swap),
+     * zooming out around the view's centre where the new pair's limit is lower; a wholly new pair opens at fit.
+     */
+    const reconcilePair = (): void => {
+      const [first, second] = imagesRef.current;
+      const previous = pairRef.current;
+
+      pairRef.current = [first.id, second.id];
+
+      if (!previous || (previous[0] === first.id && previous[1] === second.id)) {
+        return;
+      }
+
+      if (previous.includes(first.id) || previous.includes(second.id)) {
+        zoomAroundFraction(0.5, 0.5, transformRef.current.scale);
+      } else {
+        setTransform({ fx: 0, fy: 0, scale: 1 });
+      }
+    };
     /** Starts a pan from the given pointer's position, at the current transform. */
     const beginPan = (pointerId: number, from: PanZoomPoint): void => {
       panRef.current = {
