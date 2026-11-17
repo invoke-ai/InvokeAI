@@ -77,7 +77,12 @@
     "sd-3": {
       "componentsFilled": {
         "diffusers": [],
-        "standalone-components": []
+        "standalone-components": [
+          "clipGEmbedModel",
+          "clipLEmbedModel",
+          "t5EncoderModel",
+          "vae"
+        ]
       },
       "nodeTypes": [
         "collect",
@@ -738,6 +743,8 @@
           7
         ],
         "clip_embed_model": [],
+        "clip_g_model": [],
+        "clip_l_model": [],
         "clip_skip": [
           0
         ],
@@ -2536,13 +2543,17 @@
     "sd3_model_loader": {
       "inputs": [],
       "literalInputs": {
+        "clip_g_model": [],
+        "clip_l_model": [],
         "is_intermediate": [
           true
         ],
         "model": [],
+        "t5_encoder_model": [],
         "use_cache": [
           true
-        ]
+        ],
+        "vae_model": []
       },
       "outputs": [
         "clip_g",

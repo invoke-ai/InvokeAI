@@ -919,6 +919,47 @@ describe('component policies', () => {
     expect(clipFilter?.(clipG as GenerateModelConfig, ctx)).toBe(false);
   });
 
+  it('requires all four SD3 components for a GGUF transformer and none for a Diffusers pipeline', () => {
+    const gguf = createModel('sd-3', { format: 'gguf_quantized' });
+    const diffusers = createModel('sd-3', { format: 'diffusers' });
+    const clipG = { ...clipEmbed, key: 'clip-g', variant: 'gigantic' };
+    const sd3Vae: VaeModelConfig = { base: 'sd-3', key: 'sd3-vae', name: 'SD3 VAE', type: 'vae' };
+
+    expect(getGenerationValidationReasons(gguf, createSettings(gguf))).toEqual([
+      'Generate needs a T5 Encoder for non-Diffusers SD3 models.',
+      'Generate needs a CLIP L encoder for non-Diffusers SD3 models.',
+      'Generate needs a CLIP G encoder for non-Diffusers SD3 models.',
+      'Generate needs a VAE for non-Diffusers SD3 models.',
+    ]);
+    // What the pickers would not offer -- CLIP-G in the CLIP-L slot, a FLUX.1 VAE -- does not fill a slot either.
+    expect(
+      getGenerationValidationReasons(
+        gguf,
+        createSettings(gguf, {
+          clipGEmbedModel: clipG,
+          clipLEmbedModel: clipG,
+          t5EncoderModel: t5Encoder,
+          vae: fluxVae,
+        })
+      )
+    ).toEqual([
+      'Generate needs a CLIP L encoder for non-Diffusers SD3 models.',
+      'Generate needs a VAE for non-Diffusers SD3 models.',
+    ]);
+    expect(
+      getGenerationValidationReasons(
+        gguf,
+        createSettings(gguf, {
+          clipGEmbedModel: clipG,
+          clipLEmbedModel: clipEmbed,
+          t5EncoderModel: t5Encoder,
+          vae: sd3Vae,
+        })
+      )
+    ).toEqual([]);
+    expect(getGenerationValidationReasons(diffusers, createSettings(diffusers))).toEqual([]);
+  });
+
   it('offers complete SDNQ Z-Image pipelines as component sources but rejects partial folders', () => {
     const model = createModel('z-image', { format: 'checkpoint' });
     const settings = createSettings(model);
@@ -1481,8 +1522,13 @@ describe('component policies', () => {
 
   describe('a default VAE', () => {
     const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
-    const resolve = (base: string, vae: string | null | undefined, vaeModels: VaeModelConfig[] = [fluxVae]) => {
-      const model = createModel(base, vae === undefined ? {} : { default_settings: { vae } });
+    const resolve = (
+      base: string,
+      vae: string | null | undefined,
+      vaeModels: VaeModelConfig[] = [fluxVae],
+      format?: MainModelConfig['format']
+    ) => {
+      const model = createModel(base, { format, ...(vae === undefined ? {} : { default_settings: { vae } }) });
 
       return resolveModelDefaultVae(model, createSettings(model), vaeModels);
     };
@@ -1494,18 +1540,21 @@ describe('component policies', () => {
       expect(resolve('sdxl', null)).toEqual({ kind: 'none' });
     });
 
-    // Bundled: SDXL has no VAE slot; SD3's is an optional override. Required: FLUX.1's VAE is a component.
+    // Bundled: SDXL has no VAE slot; a Diffusers SD3 pipeline's is an optional override. Required: FLUX.1's VAE and
+    // a GGUF SD3 transformer's VAE are components.
     it.each([
-      ['sdxl', 'default', { kind: 'apply', vae: null }],
-      ['sd-3', 'default', { kind: 'apply', vae: null }],
-      ['flux', 'default', { kind: 'none' }],
-      ['sdxl', 'gone', { hasBundledVae: true, kind: 'missing' }],
+      ['sdxl', undefined, 'default', { kind: 'apply', vae: null }],
+      ['sd-3', 'diffusers', 'default', { kind: 'apply', vae: null }],
+      ['sd-3', 'gguf_quantized', 'default', { kind: 'none' }],
+      ['flux', undefined, 'default', { kind: 'none' }],
+      ['sdxl', undefined, 'gone', { hasBundledVae: true, kind: 'missing' }],
       // Installed, but for another family.
-      ['sdxl', 'flux-vae', { hasBundledVae: true, kind: 'missing' }],
-      ['sd-3', 'gone', { hasBundledVae: true, kind: 'missing' }],
-      ['flux', 'gone', { hasBundledVae: false, kind: 'missing' }],
-    ] as const)('classifies %s with %s by whether a VAE is bundled', (base, vae, expected) => {
-      expect(resolve(base, vae)).toEqual(expected);
+      ['sdxl', undefined, 'flux-vae', { hasBundledVae: true, kind: 'missing' }],
+      ['sd-3', 'diffusers', 'gone', { hasBundledVae: true, kind: 'missing' }],
+      ['sd-3', 'gguf_quantized', 'gone', { hasBundledVae: false, kind: 'missing' }],
+      ['flux', undefined, 'gone', { hasBundledVae: false, kind: 'missing' }],
+    ] as const)('classifies %s (%s) with %s by whether a VAE is bundled', (base, format, vae, expected) => {
+      expect(resolve(base, vae, [fluxVae], format)).toEqual(expected);
     });
 
     it('recalls the bundled VAE for one that cannot apply, and keeps the current VAE only where one is required', () => {
@@ -1851,7 +1900,7 @@ describe('component policies', () => {
     });
 
     expect(getGenerationValidationReasons(krea2, styleSettings)).toEqual([]);
-    expect(getGenerationValidationReasons(createModel('sd-3'), styleSettings)).toEqual([
+    expect(getGenerationValidationReasons(createModel('sd-3', { format: 'diffusers' }), styleSettings)).toEqual([
       'sd-3 model cannot use Reference image 1. Turn it off, or remove it.',
     ]);
   });

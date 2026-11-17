@@ -5,7 +5,7 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.qwen_image_2_1.vae import SPATIAL_SCALE, choose_tile_size, to_image, working_memory_bytes
+from invokeai.backend.qwen_image_2_1.vae import SPATIAL_SCALE, choose_tile_size, estimate_working_memory, to_image
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.qwen_image_vae import patch_qwen_image_vae_tiling
 
@@ -39,6 +39,7 @@ class QwenImage21LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoar
         config = context.config.get()
         element_size = next(vae_info.model.parameters()).element_size()
         tile_size = choose_tile_size(
+            "decode",
             height,
             width,
             element_size,
@@ -47,9 +48,9 @@ class QwenImage21LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoar
             tile_size=self.tile_size,
             auto_tile=config.auto_tiled_decode,
         )
-        working_memory = working_memory_bytes(height, width, tile_size, element_size)
+        working_memory = estimate_working_memory("decode", height, width, tile_size, element_size, device)
 
-        with vae_info.model_on_device(working_mem_bytes=working_memory) as (_, vae):
+        with vae_info.model_on_device(working_memory=working_memory) as (_, vae):
             context.util.signal_progress("Running VAE")
             # Denormalized in the VAE's dtype, as the pipeline does: the latents cast first, the float32 statistics
             # cast to them, so a bf16 decode reads the same input as the pipeline's. The device is the VAE's
