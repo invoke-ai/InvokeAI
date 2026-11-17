@@ -1,4 +1,5 @@
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
+import type { GenerateSettings, MainModelConfig } from '@features/generation/core/types';
 
 /** A node output that feeds an input: the node and its output field. */
 export interface GraphOutput {
@@ -8,8 +9,9 @@ export interface GraphOutput {
 
 /**
  * A family builder's graph with the facts callers compose over. Canvas grafts image encodes, masks, control and
- * regional conditioning onto the nodes the builder names here, so it neither guesses node ids nor scans edges for these
- * facts. The `seed` and `canvas_output` ids stay shared contracts outside this record.
+ * regional conditioning onto the nodes the builder names here, and Upscale feeds its enlarged frame through `latents`
+ * into `denoise`, so neither guesses node ids nor scans edges for these facts. The `seed` and output ids stay shared
+ * contracts outside this record.
  */
 export interface FamilyGraph {
   graph: BackendGraphContract;
@@ -53,4 +55,62 @@ export interface FamilyConditioning {
    * regional references are FLUX Redux (FLUX).
    */
   fluxReduxCollector: BackendInvocationContract | null;
+}
+
+/**
+ * The settings a family pipeline reads. Generate hands over its own settings; Upscale maps its widget fields onto
+ * these, so widening this type fails Upscale's build until it decides what the new field is there.
+ */
+export type FamilyPipelineSettings = Pick<
+  GenerateSettings,
+  | 'cfgRescaleMultiplier'
+  | 'cfgScale'
+  | 'clipEmbedModel'
+  | 'clipSkip'
+  | 'componentSourceModel'
+  | 'loras'
+  | 'mistralEncoderModel'
+  | 'qwen35EncoderModel'
+  | 'qwen3EncoderModel'
+  | 'qwen3VLEncoderModel'
+  | 'qwenVLEncoderModel'
+  | 'scheduler'
+  | 'steps'
+  | 't5EncoderModel'
+  | 'vae'
+  | 'vaePrecision'
+>;
+
+/**
+ * What a family's image pipeline is asked to build: prompts and seed, model loader, LoRAs, text encoders, the denoise
+ * and its decode. Nothing Generate adds on top (references, PiD, the refiner, enhancers, metadata) can be asked for
+ * here; Generate passes those to its builders separately.
+ */
+export interface FamilyPipelineInput {
+  model: MainModelConfig;
+  settings: FamilyPipelineSettings;
+  /** The size the denoise runs at, already on the family's grid. */
+  denoiseSize: { width: number; height: number };
+  /** Where the denoise enters its schedule, in the denoise node's own terms (see `getDenoisingStartClipping`). */
+  denoisingStart: number;
+  /** SD's noise node runs on the CPU, so a seed gives the same image on any device. */
+  useCpuNoise: boolean;
+  /** The decode node's id and whether its image is an intermediate. */
+  output: { id: string; isIntermediate: boolean };
+  /**
+   * Tile the decode at this size where the family's decode node has the switch (`anima_l2i` tiles on its own); null
+   * decodes whole. The caller tiles its own encode.
+   */
+  vaeTileSize: number | null;
+  /**
+   * SD only: denoise in overlapping tiles (`tiled_multi_diffusion_denoise_latents`) instead of whole. The tiled node
+   * takes one conditioning per side, so the graph has no collectors and no `conditioning` to graft onto.
+   */
+  multiDiffusion: { tileSize: number; tileOverlap: number } | null;
+}
+
+/** A family's image pipeline: its graph, the facts callers compose over, and the node whose image is the result. */
+export interface FamilyPipeline extends FamilyGraph {
+  /** The decode node, `input.output.id`. */
+  output: BackendInvocationContract;
 }

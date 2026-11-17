@@ -2,9 +2,12 @@
 export {
   addLoraCollectionLoader,
   addTransformerLoraCollectionLoader,
+  buildImageToImagePipeline,
   compileGenerateGraph,
+  type ImageToImagePipelineBase,
   resolveGenerateSeed,
 } from './core/graph';
+export type { FamilyPipelineSettings } from './core/familyGraph';
 export {
   addEdge,
   addNode,

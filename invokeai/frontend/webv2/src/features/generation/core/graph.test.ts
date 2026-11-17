@@ -19,7 +19,14 @@ import {
   type SupportedGenerateBase,
   withAddedReferenceImages,
 } from './baseGenerationPolicies';
-import { compileGenerateGraph, getFamilyGraphBuilder, GRAPH_BUILDERS, resolveGenerateSeed } from './graph';
+import {
+  buildImageToImagePipeline,
+  compileGenerateGraph,
+  getFamilyGraphBuilder,
+  GRAPH_BUILDERS,
+  type ImageToImagePipelineBase,
+  resolveGenerateSeed,
+} from './graph';
 import {
   fullyFilledSettingsFor,
   generateGraphCases,
@@ -1408,6 +1415,73 @@ describe('getFamilyGraphBuilder', () => {
     expect(getFamilyGraphBuilder('constructor')).toBeNull();
     expect(getFamilyGraphBuilder('toString')).toBeNull();
     expect(getFamilyGraphBuilder('__proto__')).toBeNull();
+  });
+});
+
+describe('buildImageToImagePipeline', () => {
+  // What only another feature asks for: a partial pass, its own output node, tiled VAE ends and SD's tiled denoise.
+  it.each([
+    ['sd-1', 'tiled_multi_diffusion_denoise_latents', true],
+    ['sdxl', 'tiled_multi_diffusion_denoise_latents', true],
+    ['flux', 'flux_denoise', true],
+    ['flux2', 'flux2_denoise', true],
+    ['z-image', 'z_image_denoise', true],
+    // `anima_l2i` has no tiling switch: it tiles on its own.
+    ['anima', 'anima_denoise', false],
+    ['krea-2', 'krea2_denoise', true],
+    ['qwen-image', 'qwen_image_denoise', true],
+    ['moss-image', 'moss_image_denoise', true],
+  ] as const satisfies readonly (readonly [ImageToImagePipelineBase, string, boolean])[])(
+    'builds the %s pass the input asks for',
+    (base, denoiseType, decodeTiles) => {
+      const { shape } = generateGraphCases.find((testCase) => testCase.base === base)!;
+      const { model, settings } = satisfiedSettingsFor(base, shape);
+      const sd = base === 'sd-1' || base === 'sdxl';
+      const pipeline = buildImageToImagePipeline({
+        denoiseSize: { height: 768, width: 1024 },
+        denoisingStart: 0.4,
+        model,
+        multiDiffusion: sd ? { tileOverlap: 64, tileSize: 512 } : null,
+        output: { id: 'pass_output', isIntermediate: true },
+        settings,
+        useCpuNoise: true,
+        vaeTileSize: 640,
+      });
+      const { nodes } = pipeline.graph;
+
+      expect(pipeline.output).toBe(nodes.pass_output);
+      expect(nodes.canvas_output).toBeUndefined();
+      expect(nodes.pass_output).toMatchObject({ is_intermediate: true, use_cache: false });
+      expect(pipeline.denoise).toMatchObject({ denoising_end: 1, denoising_start: 0.4, type: denoiseType });
+      if (decodeTiles) {
+        expect(nodes.pass_output).toMatchObject({ tile_size: 640, tiled: true });
+      } else {
+        expect(nodes.pass_output).not.toHaveProperty('tiled');
+      }
+      if (sd) {
+        expect(pipeline.denoise).toMatchObject({ tile_height: 512, tile_overlap: 64, tile_width: 512 });
+        // The tiled denoise takes one conditioning per side, so there are no collectors to graft onto.
+        expect(pipeline.conditioning).toBeNull();
+      }
+    }
+  );
+
+  it('refuses a family without an image-to-image pipeline', () => {
+    const { shape } = generateGraphCases.find((testCase) => testCase.base === 'wan')!;
+    const { model, settings } = satisfiedSettingsFor('wan', shape);
+
+    expect(() =>
+      buildImageToImagePipeline({
+        denoiseSize: { height: 768, width: 1024 },
+        denoisingStart: 0,
+        model,
+        multiDiffusion: null,
+        output: { id: 'pass_output', isIntermediate: false },
+        settings,
+        useCpuNoise: false,
+        vaeTileSize: null,
+      })
+    ).toThrow(/no image-to-image pipeline/);
   });
 });
 

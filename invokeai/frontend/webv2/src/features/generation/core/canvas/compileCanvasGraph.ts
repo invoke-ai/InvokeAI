@@ -10,6 +10,7 @@ import type { FamilyGraph, FamilyLatentSpace } from '@features/generation/core/f
 import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import {
+  getDenoisingStartClipping,
   getGenerationValidationReasons,
   hasEnabledKrea2EditReferences,
 } from '@features/generation/core/baseGenerationPolicies';
@@ -60,19 +61,14 @@ import { type CanvasSize, resolveCanvasProcessingSize } from './canvasProcessing
 import { isAnimaInpaintAdapterModel } from './controlValidation';
 
 /**
- * SD-3, FLUX, FLUX.2, FLUX.3 and MOSS-Image use start = 1 - strength^0.2; MOSS-Image clips its shifted schedule in
- * sigma space like FLUX.2. FLUX Fill always starts at 0; other bases use 1 - strength.
+ * Families whose denoise clips its schedule by sigma value use start = 1 - strength^0.2. FLUX Fill always starts at 0;
+ * other bases use 1 - strength.
  */
 const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): number => {
   if (model.base === 'flux' && model.variant === 'dev_fill') {
     return 0;
   }
-  const usesOptimizedCurve =
-    model.base === 'sd-3' ||
-    model.base === 'flux' ||
-    model.base === 'flux2' ||
-    model.base === 'flux3' ||
-    model.base === 'moss-image';
+  const usesOptimizedCurve = getDenoisingStartClipping(model)?.kind === 'sigma';
   return 1 - strength ** (usesOptimizedCurve ? 0.2 : 1);
 };
 

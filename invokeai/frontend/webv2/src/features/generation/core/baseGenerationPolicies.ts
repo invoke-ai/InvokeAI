@@ -3,7 +3,11 @@ import type {
   GenerationModelTaxonomyType as ModelTaxonomyType,
   PromptHistoryItem,
 } from '@features/generation/core/contracts';
-import type { BaseGenerationConfig, GuidanceLabel } from '@features/generation/core/generationConfig';
+import type {
+  BaseGenerationConfig,
+  GuidanceLabel,
+  NegativePromptUsage,
+} from '@features/generation/core/generationConfig';
 
 import {
   getArchitectureFeatures,
@@ -354,6 +358,10 @@ export const coerceSchedulerForGraph = (
       return KNOWN_SCHEDULERS.has(scheduler) ? scheduler : config.defaults.scheduler;
   }
 };
+
+/** Whether a local model's denoise reads a negative prompt: always, only above CFG 1, or never. */
+export const getNegativePromptUsage = (model: GenerateModelConfig | undefined): NegativePromptUsage =>
+  getBaseGenerationConfig(model).negativePrompt.usage;
 
 export const getPromptPolicy = (
   model: GenerateModelConfig | undefined,
@@ -1123,7 +1131,7 @@ const hasFlux2EncoderSource = (ctx: ComponentPolicyContext): boolean =>
 /** The saved component source the FLUX.2 loader can use: its VAE always, its encoder unless a standalone one is set. */
 export const getFlux2ComponentSource = (
   model: MainModelConfig,
-  settings: GenerateSettings
+  settings: Pick<GenerateSettings, 'componentSourceModel' | 'mistralEncoderModel' | 'qwen3EncoderModel'>
 ): MainModelConfig | undefined => {
   const source = settings.componentSourceModel;
 
@@ -3244,3 +3252,133 @@ export const getGenerateInvocationIssues = (
     ...(models ? getGenerationModelAvailabilityIssues(model, values, models) : []),
   ];
 };
+
+// How each family's denoise node clips `denoising_start`, the fact a caller needs to start a partial pass where it
+// means to. Canvas picks its strength curve from it; Upscale translates Creativity with it and validates Steps by it.
+
+/** The denoise node clips its schedule by sigma value: a start `s` enters at sigma `1 - s`, whatever the shift. */
+interface SigmaClipping {
+  kind: 'sigma';
+}
+
+/**
+ * The denoise node clips its shifted schedule by step index, so the same start enters far noisier than a sigma-clipped
+ * node would. `tests/app/invocations/test_upscale_index_clipped_starts.py` replays Upscale's starts against the real
+ * nodes and fails when one of these schedules or rules moves, or when a node changes to clipping by value.
+ */
+export interface StepClipping {
+  kind: 'step';
+  /**
+   * The sigmas the node steps this main model through at `size` and `steps`, noisiest first and without the final 0,
+   * which would leave nothing to denoise.
+   */
+  sigmas: (model: Pick<MainModelConfig, 'variant'>, size: { width: number; height: number }, steps: number) => number[];
+  /**
+   * Whether the node keeps `int(start * steps)` or Python's `int(round(start * steps))`, which rounds a half to even
+   * and so cannot be aimed at the middle of a step.
+   */
+  rounding: 'floor' | 'round';
+}
+
+export type DenoisingStartClipping = SigmaClipping | StepClipping;
+
+/**
+ * The first `steps` sigmas of a flow schedule shifted by `shift`, `shift * t / (1 + (shift - 1) * t)` at
+ * `t = 1 - i / steps`, without the final 0. Z-Image, Anima and Krea-2 step exactly this; diffusers' exponential time
+ * shift at `mu` is the same curve with `shift = exp(mu)`.
+ */
+const shiftedSigmas = (shift: number, steps: number): number[] =>
+  Array.from({ length: steps }, (_, index) => {
+    const t = 1 - index / steps;
+
+    return (shift * t) / (1 + (shift - 1) * t);
+  });
+
+/** `mu` on a line through two token counts, one token per 16x16 pixels, held at the line's upper end. */
+const tokenFitMu = (
+  { width, height }: { width: number; height: number },
+  fit: { minSeqLen: number; maxSeqLen: number; baseShift: number; maxShift: number }
+): number => {
+  const seqLen = Math.min(Math.floor(width / 16) * Math.floor(height / 16), fit.maxSeqLen);
+  const slope = (fit.maxShift - fit.baseShift) / (fit.maxSeqLen - fit.minSeqLen);
+
+  return seqLen * slope + fit.baseShift - slope * fit.minSeqLen;
+};
+
+/** `z_image_denoise.Z_IMAGE_SHIFT_FIT`, held at the fit's 4096-token end since the clamp (#378). */
+const Z_IMAGE_SHIFT_FIT = { baseShift: 0.5, maxSeqLen: 4096, maxShift: 1.15, minSeqLen: 256 };
+
+/** `ANIMA_SHIFT`: Anima's schedule is shifted by a constant, not by resolution. */
+const ANIMA_SCHEDULE_SHIFT = 3;
+
+/**
+ * `krea2/sampling_utils.py`: Turbo's fixed mu, and Raw's fit by token count, held at its 6400-token end as
+ * `krea2_denoise` holds it. A Diffusers install samples with its own `scheduler/scheduler_config.json`; Krea's ships
+ * these same numbers, and one that did not would move Raw's starts below 1280x1280 without the backend contract
+ * noticing. Like the node, anything that is not Raw (`krea2_base`) counts as distilled.
+ */
+const KREA2_DISTILLED_MU = 1.15;
+const KREA2_SHIFT_FIT = { baseShift: 0.5, maxSeqLen: 6400, maxShift: 1.15, minSeqLen: 256 };
+
+/**
+ * `qwen_image_denoise`'s stock scheduler: mu on a line from 256 tokens (0.5) to 8192 (0.9), held at the end since
+ * #9892, and a schedule stretched to end at sigma 0.02. A Diffusers install samples with its own
+ * `scheduler/scheduler_config.json`; Qwen's ships these same numbers, and one that did not would move every start
+ * without the backend contract noticing.
+ */
+const QWEN_IMAGE_SHIFT_FIT = { baseShift: 0.5, maxSeqLen: 8192, maxShift: 0.9, minSeqLen: 256 };
+const QWEN_IMAGE_SHIFT_TERMINAL = 0.02;
+
+/**
+ * Qwen Image's sigmas as diffusers' `FlowMatchEulerDiscreteScheduler` builds them for the node: the exponential shift
+ * at the fit's mu, then `stretch_shift_to_terminal`, which moves every sigma toward 0 so the last lands on the terminal
+ * rather than on the shifted `1 / steps`. Without the stretch a pass would start a step off at some sizes.
+ */
+const qwenImageSigmas = (size: { width: number; height: number }, steps: number): number[] => {
+  const shifted = shiftedSigmas(Math.exp(tokenFitMu(size, QWEN_IMAGE_SHIFT_FIT)), steps);
+  const scale = (1 - (shifted[steps - 1] ?? 0)) / (1 - QWEN_IMAGE_SHIFT_TERMINAL);
+
+  return shifted.map((sigma) => 1 - (1 - sigma) / scale);
+};
+
+const SIGMA_CLIPPING: SigmaClipping = { kind: 'sigma' };
+
+// The schedules below track the nodes' default shift. Neither Upscale nor Canvas sends a shift with a partial pass.
+const DENOISING_START_CLIPPING: Partial<Record<string, DenoisingStartClipping>> = {
+  anima: {
+    kind: 'step',
+    rounding: 'floor',
+    sigmas: (_model, _size, steps) => shiftedSigmas(ANIMA_SCHEDULE_SHIFT, steps),
+  },
+  flux: SIGMA_CLIPPING,
+  flux2: SIGMA_CLIPPING,
+  flux3: SIGMA_CLIPPING,
+  'krea-2': {
+    kind: 'step',
+    rounding: 'round',
+    sigmas: (model, size, steps) =>
+      shiftedSigmas(
+        Math.exp(model.variant === 'krea2_base' ? tokenFitMu(size, KREA2_SHIFT_FIT) : KREA2_DISTILLED_MU),
+        steps
+      ),
+  },
+  'moss-image': SIGMA_CLIPPING,
+  'qwen-image': { kind: 'step', rounding: 'round', sigmas: (_model, size, steps) => qwenImageSigmas(size, steps) },
+  'sd-3': SIGMA_CLIPPING,
+  'z-image': {
+    kind: 'step',
+    rounding: 'floor',
+    sigmas: (_model, size, steps) => shiftedSigmas(Math.exp(tokenFitMu(size, Z_IMAGE_SHIFT_FIT)), steps),
+  },
+};
+
+/**
+ * How the model's denoise node clips `denoising_start`; null where it follows neither rule (SD clips its scheduler's
+ * timesteps, and the remaining families are not described here), so a start is passed as it is.
+ */
+export const getDenoisingStartClipping = (
+  model: Pick<GenerateModelConfig, 'base' | 'type'>
+): DenoisingStartClipping | null =>
+  model.type !== 'external_image_generator' && Object.hasOwn(DENOISING_START_CLIPPING, model.base)
+    ? (DENOISING_START_CLIPPING[model.base] ?? null)
+    : null;
