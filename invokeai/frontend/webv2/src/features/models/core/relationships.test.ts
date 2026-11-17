@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { RelatableModel } from './relationships';
 import type { ModelBase, ModelTaxonomyType } from './types';
 
+import { seedArchitectureCapabilities } from './architectureCapabilities.testing';
 import {
   CROSS_BASE_ALLOWANCES,
   hasLinkableBase,
@@ -14,11 +15,16 @@ import {
 } from './relationships';
 
 const model = (base: ModelBase, type: ModelTaxonomyType = 'lora'): RelatableModel => ({ base, type });
+const main = (base: ModelBase, variant?: string): RelatableModel => ({ base, type: 'main', variant });
+const vae = (base: ModelBase, latentChannels?: number): RelatableModel => ({
+  base,
+  latent_channels: latentChannels,
+  type: 'vae',
+});
 
 describe('isBaseCompatible', () => {
   it('allows models from the same concrete base', () => {
     expect(isBaseCompatible(model('sdxl', 'main'), model('sdxl'))).toBe(true);
-    expect(isBaseCompatible(model('flux', 'main'), model('flux', 'vae'))).toBe(true);
   });
 
   it('rejects differing concrete bases', () => {
@@ -26,30 +32,18 @@ describe('isBaseCompatible', () => {
   });
 
   it('allows curated cross-base helpers with their consuming bases', () => {
-    // z_image_model_loader takes a FLUX VAE; krea2_model_loader takes Qwen-Image or Anima VAEs.
-    expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'vae'))).toBe(true);
-    expect(isBaseCompatible(model('krea-2', 'main'), model('qwen-image', 'vae'))).toBe(true);
-    expect(isBaseCompatible(model('krea-2', 'main'), model('anima', 'vae'))).toBe(true);
-    // flux2_klein_model_loader takes a FLUX VAE; anima_model_loader takes Wan/Qwen-Image/FLUX VAEs.
-    expect(isBaseCompatible(model('flux2', 'main'), model('flux', 'vae'))).toBe(true);
-    expect(isBaseCompatible(model('anima', 'main'), model('wan', 'vae'))).toBe(true);
-    expect(isBaseCompatible(model('anima', 'main'), model('qwen-image', 'vae'))).toBe(true);
-    expect(isBaseCompatible(model('anima', 'main'), model('flux', 'vae'))).toBe(true);
     // z_image_pid_decode reuses the FLUX PiD decoder.
     expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'pid_decoder'))).toBe(true);
-    // moss_image_model_loader takes the FLUX.2 VAE, and MOSS-Image decodes with flux2_pid_decode.
-    expect(isBaseCompatible(model('moss-image', 'main'), model('flux2', 'vae'))).toBe(true);
+    // MOSS-Image decodes with flux2_pid_decode.
     expect(isBaseCompatible(model('moss-image', 'main'), model('flux2', 'pid_decoder'))).toBe(true);
-    // The pairing is the VAE's and decoder's, not the base pair's: FLUX.2 LoRAs do not fit MOSS-Image.
+    // The pairing is the decoder's, not the base pair's: FLUX.2 LoRAs do not fit MOSS-Image.
     expect(isBaseCompatible(model('moss-image', 'main'), model('flux2', 'lora'))).toBe(false);
   });
 
   it('limits cross-base allowances to the helper type and cited pairs', () => {
-    // The allowance belongs to the VAE type, not to the base pair.
+    // The allowance belongs to the decoder type, not to the base pair.
     expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'lora'))).toBe(false);
     expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'main'))).toBe(false);
-    // No loader feeds an SD-3 VAE to a Z-Image pipeline.
-    expect(isBaseCompatible(model('z-image', 'main'), model('sd-3', 'vae'))).toBe(false);
     // Only the FLUX decoder is shared; other PiD pairings must match exactly.
     expect(isBaseCompatible(model('qwen-image', 'main'), model('flux', 'pid_decoder'))).toBe(false);
     expect(isBaseCompatible(model('sdxl', 'main'), model('sdxl', 'pid_decoder'))).toBe(true);
@@ -137,9 +131,62 @@ describe('isLinkablePair', () => {
   });
 
   it('defers to base compatibility for cross-type pairs', () => {
-    expect(isLinkablePair(model('sdxl', 'main'), model('sdxl', 'vae'))).toBe(true);
-    expect(isLinkablePair(model('z-image', 'main'), model('flux', 'vae'))).toBe(true);
-    expect(isLinkablePair(model('sdxl', 'main'), model('flux', 'vae'))).toBe(false);
+    expect(isLinkablePair(model('sdxl', 'main'), model('sdxl', 'lora'))).toBe(true);
+    expect(isLinkablePair(model('z-image', 'main'), model('flux', 'pid_decoder'))).toBe(true);
+    expect(isLinkablePair(model('sdxl', 'main'), model('flux', 'lora'))).toBe(false);
+  });
+});
+
+describe('VAE pairs', () => {
+  // The served table decides; these expectations follow the backend's VAE facets, not a copy kept here.
+  seedArchitectureCapabilities();
+
+  it("follow the host architecture's served VAE facet across bases", () => {
+    expect(isLinkablePair(main('sdxl'), vae('sdxl'))).toBe(true);
+    expect(isLinkablePair(main('ernie-image'), vae('flux2'))).toBe(true);
+    expect(isLinkablePair(main('qwen-image'), vae('anima'))).toBe(true);
+    // A FLUX VAE decodes an Anima latent without raising and returns a smear.
+    expect(isLinkablePair(main('anima'), vae('flux'))).toBe(false);
+    expect(isLinkablePair(main('flux2'), vae('flux'))).toBe(false);
+  });
+
+  it("use a main's variant row: Wan A14B and TI2V-5B decode with VAEs of different widths", () => {
+    expect(isLinkablePair(main('wan', 'i2v_a14b'), vae('wan', 16))).toBe(true);
+    expect(isLinkablePair(main('wan', 'i2v_a14b'), vae('wan', 48))).toBe(false);
+    expect(isLinkablePair(main('wan', 'ti2v_5b'), vae('wan', 48))).toBe(true);
+    expect(isLinkablePair(main('wan', 'ti2v_5b'), vae('wan', 16))).toBe(false);
+  });
+
+  it('let other hosts take any VAE some variant of their base decodes with, width for width', () => {
+    // Wan LoRA variants (`a14b`, `5b`) are not main variants; the backend offers every Wan VAE to them.
+    const wan5bLora: RelatableModel = { base: 'wan', type: 'lora', variant: '5b' };
+    expect(isLinkablePair(wan5bLora, vae('wan', 48))).toBe(true);
+    expect(isLinkablePair(wan5bLora, vae('wan', 16))).toBe(true);
+    // Anima accepts only the 16-channel Wan VAE in every row.
+    expect(isLinkablePair(model('anima'), vae('wan', 16))).toBe(true);
+    expect(isLinkablePair(model('anima'), vae('wan', 48))).toBe(false);
+    // An architecture without a VAE facet takes its own base only.
+    expect(isLinkablePair(model('sdxl'), vae('sdxl'))).toBe(true);
+    expect(isLinkablePair(model('sdxl'), vae('flux'))).toBe(false);
+  });
+
+  it('answer the same from either side of the pair', () => {
+    expect(isLinkablePair(vae('flux2'), main('ernie-image'))).toBe(true);
+    expect(isLinkablePair(vae('flux'), main('anima'))).toBe(false);
+    expect(isLinkablePair(vae('wan', 48), main('wan', 'ti2v_5b'))).toBe(true);
+  });
+});
+
+describe('without the architecture table', () => {
+  it('links no VAE pair, not even one of a single base', () => {
+    expect(isLinkablePair(main('sdxl'), vae('sdxl'))).toBe(false);
+    expect(isLinkablePair(vae('flux'), main('z-image'))).toBe(false);
+  });
+
+  it('still links pairs the table does not decide', () => {
+    expect(isLinkablePair(main('sdxl'), model('sdxl', 'lora'))).toBe(true);
+    expect(isLinkablePair(model('any', 't5_encoder'), main('flux'))).toBe(true);
+    expect(isLinkablePair(main('z-image'), model('flux', 'pid_decoder'))).toBe(true);
   });
 });
 

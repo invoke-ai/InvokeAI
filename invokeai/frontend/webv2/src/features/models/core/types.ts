@@ -189,6 +189,8 @@ export interface ModelConfig {
   repo_variant?: string | null;
   /** InvokeAI-format IP adapters: the paired image encoder's model id. */
   image_encoder_model_id?: string;
+  /** VAEs: latent width. Only `wan` ships more than one, and its two are different decoders. */
+  latent_channels?: number | null;
   /** Anima ControlNet-LLLite: 3 = control image, 4 = inpainting; null when installed before it was recorded. */
   cond_in_channels?: number | null;
   /** Qwen-Image ControlNets: `fun_union` also conditions on an inpainted region, `instantx_union` does not. */

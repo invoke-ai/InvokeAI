@@ -1880,6 +1880,8 @@
     "updatePath": "Update path",
     "updatePathDescription": "If the model file moved on disk, point Invoke at its new location. The file is not moved or copied.",
     "useSupportedImage": "Use a PNG, JPEG, or WebP image.",
+    "vaePairingLoadFailed": "Couldn't load VAE pairings, so VAEs aren't listed.",
+    "vaePairingLoading": "Loading VAE pairings…",
     "variant": "Variant",
     "variantHelp": "Architecture variant, e.g. inpaint or dev.",
     "viewModel": "View model",

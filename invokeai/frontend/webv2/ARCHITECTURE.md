@@ -64,7 +64,7 @@ Behavior specs live beside their owning code. Read the owner's document before c
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | Identity credential and session lifetimes                     | [features/identity/README.md](src/features/identity/README.md)                         |
 | Application and project event logging                         | [platform/logging/README.md](src/platform/logging/README.md)                           |
-| Models catalog and read fencing                               | [features/models/README.md](src/features/models/README.md)                             |
+| Models catalog, read fencing, and architecture table          | [features/models/README.md](src/features/models/README.md)                             |
 | Queue backend port and active sessions                        | [features/queue/README.md](src/features/queue/README.md)                               |
 | Gallery listings and reveal                                   | [features/gallery/README.md](src/features/gallery/README.md)                           |
 | Intermediates manager and cleanup                             | [features/intermediates/README.md](src/features/intermediates/README.md)               |
@@ -111,6 +111,7 @@ Feature interfaces stay ordinary module interfaces unless two adapters add lever
 - Queue backend port: production transport/realtime adapter plus test adapter.
 - Identity token/session port: browser-session adapter plus test adapter.
 - Models and Nodes: production event/transport adapters. Their sinks (model-load activity, node execution) are injected into Queue's runtime at the App composition root; Queue runtime tests use doubles.
+- Models owns the served architecture table and its VAE pairing question. Generation maps the table onto its own policy; the Generate VAE picker, validator and compiler and Related Models' VAE links ask the same question, so pairings change only in the backend's `VaeFacet`. Pure cores read it through `features/models/architectures`; it loads on demand, off the Launchpad startup graph ([features/models/README.md](src/features/models/README.md#architecture-table)).
 - Gallery, Generation, Workflow, Upscale keep compilation and UI seams internal until a feature ticket shows another independent adapter. Workbench image actions also stay internal, not a shallow Image Feature.
 - Gallery picker and media slots read a narrow `GalleryHost`: gallery scope, notifications, optional Gallery-widget reveal. Workbench derives it from the Gallery UI adapter. Launchpad's model manager has no workbench and supplies its own.
 - Media slots accept dragged gallery items only inside `GalleryDragScope`, provided by the workbench shell with its drag context. Widget dialog hosts and the Launchpad sit outside it.

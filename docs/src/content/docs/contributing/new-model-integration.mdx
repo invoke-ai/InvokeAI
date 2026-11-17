@@ -162,7 +162,7 @@ It checks only that the facets are *present*, not that their values are right.
 | `DefaultSettingsFacet` | yes | Steps, CFG or guidance, scheduler and size per variant (`None` is the fallback); optional `by_name_hint` | Stored on the model config at identification; prefills the UI |
 | `ModalityFacet` | yes | Modes (`txt2img`, `img2img`, `inpaint`, `outpaint`, video modes) and `metadata_slug` | Must equal `GENERATION_MODES`; which canvas tools the UI offers |
 | `FeaturesFacet` | yes | Negative prompt, `dimension_grid`, guidance label and range, scheduler set, control kinds, reference images, regional guidance, and more | Served to webv2 at `GET /api/v2/models/capabilities` |
-| `VaeFacet` | no | VAE bases (and channel counts) the architecture decodes with | Model loader VAE field, VAE picker, loader validation |
+| `VaeFacet` | no | VAE bases (and channel counts) the architecture decodes with | Model loader VAE field, the Generate VAE picker, which VAEs Related Models lets you link, loader validation |
 | `VariantFacet` | no | Variant enum per `ModelType` | Variant consistency tests |
 | `UNetDownscaleFacet` | no | UNet downscale factor | SD-family UNets only |
 
@@ -743,7 +743,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
    REGEN_CAPABILITIES_FIXTURE=1 uv run --no-sync pytest tests/backend/architectures/test_capabilities_fixture.py
    ```
 
-   This rewrites `__fixtures__/architectureCapabilities.json`. The mock backend and the unit tests read it.
+   This rewrites `invokeai/frontend/webv2/src/features/models/core/__fixtures__/architectureCapabilities.json`. The mock backend and the unit tests read it. The Models feature owns the served table; Generation maps it onto its policy, and the Generate VAE picker and Related Models' VAE links both read the base's `VaeFacet` from it.
 
 2. **Mark the base as buildable**
 
@@ -859,8 +859,7 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
    - `src/features/models/core/baseIdentity.ts`: `MODEL_BASES`, plus its pinned test
    - `src/features/models/core/types.ts`: `ModelBase`
    - `src/features/models/core/taxonomy.ts`: variant values -- labels in `MODEL_VARIANT_LABELS`, main-model variants in `MAIN_VARIANTS_BY_BASE`, the variants of other types in `VARIANTS_BY_TYPE`
-   - `src/features/models/core/relationships.ts`: which encoder and VAE types may link to the base
-   - `src/features/workflow/core/modelRequirements.ts`: `BASE_LABELS`
+   - `src/features/models/core/relationships.ts`: which encoder types may link to the base (VAE links follow the served `VaeFacet`)
    - New user-facing strings go in `invokeai/frontend/webv2/public/locales/en.json`.
 
    A new **model type** (an encoder family) has its own set:
@@ -1073,12 +1072,11 @@ A minimal txt2img integration with a Diffusers main model, reusing an existing V
       - supportedBases.ts
       - graph.ts
       - baseGenerationPolicies.ts
-      - \_\_fixtures\_\_/architectureCapabilities.json regenerated
       - \_\_snapshots\_\_/generateGraphNodeTypes.json regenerated
     - models/core
+      - \_\_fixtures\_\_/architectureCapabilities.json regenerated
       - baseIdentity.ts
       - types.ts
-    - workflow/core/modelRequirements.ts
 - tests
   - backend/architectures the tables in section 13
   - app/invocations/test_frontend_graph_node_types.py
