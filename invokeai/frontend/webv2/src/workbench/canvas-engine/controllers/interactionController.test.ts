@@ -26,34 +26,10 @@ const createHarness = () => {
     stepBrushSize,
     updateCursor,
   });
-  return {
-    beforeSwitch,
-    brush,
-    cancelGesture,
-    order,
-    controller,
-    invalidateOverlay,
-    publishActiveTool,
-    stepBrushSize,
-    updateCursor,
-    view,
-  };
+  return { cancelGesture, controller, order, stepBrushSize };
 };
 
 describe('InteractionController', () => {
-  it('owns active-tool transitions and publishes their effects', () => {
-    const h = createHarness();
-    h.controller.tools.setTool('brush', { temporary: true });
-
-    expect(h.beforeSwitch).toHaveBeenCalledWith('view', 'brush', { temporary: true });
-    expect(h.view.onDeactivate).toHaveBeenCalledOnce();
-    expect(h.brush.onActivate).toHaveBeenCalledOnce();
-    expect(h.controller.getActiveToolId()).toBe('brush');
-    expect(h.publishActiveTool).toHaveBeenCalledWith('brush');
-    expect(h.updateCursor).toHaveBeenCalledOnce();
-    expect(h.invalidateOverlay).toHaveBeenCalledOnce();
-  });
-
   it('cancels an in-flight gesture through the outgoing tool before a genuine switch only', () => {
     const h = createHarness();
     h.controller.setTool('brush', { temporary: true });

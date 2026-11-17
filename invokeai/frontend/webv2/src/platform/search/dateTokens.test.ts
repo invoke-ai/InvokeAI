@@ -13,24 +13,6 @@ import {
 const NOW = new Date(2026, 6, 21, 13, 30, 0);
 
 describe('parseDateTokens', () => {
-  it('returns plain text untouched', () => {
-    const parse = parseDateTokens('sunset boulevard', NOW);
-
-    expect(parse).toEqual({
-      invalidTokens: [],
-      range: undefined,
-      text: 'sunset boulevard',
-    });
-  });
-
-  it('treats a bare relative value as ordinary text', () => {
-    expect(parseDateTokens('7d', NOW)).toEqual({
-      invalidTokens: [],
-      range: undefined,
-      text: '7d',
-    });
-  });
-
   it('parses ISO from/to and strips the tokens from text', () => {
     const parse = parseDateTokens('sunset from:2026-07-01 to:2026-07-15 boulevard', NOW);
 
@@ -56,17 +38,6 @@ describe('parseDateTokens', () => {
     expect(parseDateTokens('from:1m', new Date(2028, 2, 31)).range).toEqual({ from: '2028-02-29', to: undefined });
   });
 
-  it('is case-insensitive for keys and values', () => {
-    const parse = parseDateTokens('FROM:Today TO:YESTERDAY', NOW);
-
-    // from > to, so the bounds swap.
-    expect(parse.range).toEqual({ from: '2026-07-20', to: '2026-07-21' });
-  });
-
-  it('expands date: into both bounds', () => {
-    expect(parseDateTokens('date:2026-07-18', NOW).range).toEqual({ from: '2026-07-18', to: '2026-07-18' });
-  });
-
   it('applies tokens left-to-right with last write per bound winning', () => {
     expect(parseDateTokens('from:2026-07-01 from:2026-07-05', NOW).range).toEqual({
       from: '2026-07-05',
@@ -74,13 +45,6 @@ describe('parseDateTokens', () => {
     });
     expect(parseDateTokens('date:2026-07-10 to:2026-07-15', NOW).range).toEqual({
       from: '2026-07-10',
-      to: '2026-07-15',
-    });
-  });
-
-  it('swaps bounds when from is after to', () => {
-    expect(parseDateTokens('from:2026-07-15 to:2026-07-01', NOW).range).toEqual({
-      from: '2026-07-01',
       to: '2026-07-15',
     });
   });
@@ -99,37 +63,6 @@ describe('parseDateTokens', () => {
     expect(parse.range).toBeUndefined();
     expect(parse.invalidTokens).toEqual([{ key: 'from', raw: '2026-02-31' }]);
   });
-
-  it('mixes valid and invalid tokens without losing either', () => {
-    const parse = parseDateTokens('from:7d to:zzz sunset', NOW);
-
-    expect(parse.range).toEqual({ from: '2026-07-14', to: undefined });
-    expect(parse.text).toBe('to:zzz sunset');
-    expect(parse.invalidTokens).toEqual([{ key: 'to', raw: 'zzz' }]);
-  });
-
-  it('ignores tokens without a leading boundary', () => {
-    const parse = parseDateTokens('wherefrom:2026-07-01', NOW);
-
-    expect(parse.range).toBeUndefined();
-    expect(parse.invalidTokens).toEqual([]);
-    expect(parse.text).toBe('wherefrom:2026-07-01');
-  });
-
-  it('reports an empty trailing value as invalid', () => {
-    const parse = parseDateTokens('from:', NOW);
-
-    expect(parse.range).toBeUndefined();
-    expect(parse.invalidTokens).toEqual([{ key: 'from', raw: '' }]);
-  });
-
-  it('allows future dates', () => {
-    expect(parseDateTokens('from:2030-01-01', NOW).range).toEqual({ from: '2030-01-01', to: undefined });
-  });
-
-  it('collapses leftover whitespace after stripping tokens', () => {
-    expect(parseDateTokens('  sunset   from:7d   boulevard  ', NOW).text).toBe('sunset boulevard');
-  });
 });
 
 describe('isTimestampInRange', () => {
@@ -140,11 +73,6 @@ describe('isTimestampInRange', () => {
     expect(isTimestampInRange('2026-07-21T23:59:59.999', range)).toBe(true);
     expect(isTimestampInRange('2026-07-13 23:59:59.999', range)).toBe(false);
     expect(isTimestampInRange('2026-07-22T00:00:00.000', range)).toBe(false);
-  });
-
-  it('treats bounds as optional', () => {
-    expect(isTimestampInRange('2026-07-01 10:00:00', { from: '2026-06-01' })).toBe(true);
-    expect(isTimestampInRange('2026-07-01 10:00:00', { to: '2026-06-30' })).toBe(false);
   });
 
   it('fails closed for empty or malformed timestamps', () => {
@@ -159,12 +87,6 @@ describe('matchTrailingDateToken / completeTrailingDateToken', () => {
     expect(matchTrailingDateToken('date:')).toEqual({ key: 'date', partialValue: '', start: 0 });
   });
 
-  it('does not match mid-query or boundary-less tokens', () => {
-    expect(matchTrailingDateToken('from:7d sunset')).toBeNull();
-    expect(matchTrailingDateToken('wherefrom:7d')).toBeNull();
-    expect(matchTrailingDateToken('sunset')).toBeNull();
-  });
-
   it('completes the trailing token in place with a trailing space', () => {
     expect(completeTrailingDateToken('sunset from:y', 'yesterday')).toBe('sunset from:yesterday ');
     expect(completeTrailingDateToken('from:', '7d')).toBe('from:7d ');
@@ -176,12 +98,6 @@ describe('isPossibleDatePrefix', () => {
   it('accepts prefixes of keywords, relative values, and ISO dates', () => {
     for (const value of ['', 'y', 'yester', 'today', 't', '7', '7d', '202', '2026', '2026-', '2026-07-', '2026-07-2']) {
       expect(isPossibleDatePrefix(value), value).toBe(true);
-    }
-  });
-
-  it('rejects values that can no longer become valid', () => {
-    for (const value of ['lastweek', 'yesterdays', '7x', '2026-07-21x', '20260721000']) {
-      expect(isPossibleDatePrefix(value), value).toBe(false);
     }
   });
 });

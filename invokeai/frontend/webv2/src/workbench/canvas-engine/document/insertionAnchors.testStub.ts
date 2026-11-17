@@ -15,7 +15,6 @@ export const stackTopAnchor = (projectId: string, stack: LayerStackKind = 'raste
   stack,
 });
 
-/** Captures the way the engine does, against whatever `getStacks` returns at call time. */
 export const createTestInsertionAnchorCapture =
   (projectId: string, getStacks: () => CanvasStackForests = () => EMPTY_STACKS) =>
   (stack: LayerStackKind, aboveId: string | null): CanvasNodeInsertionAnchor =>

@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createImagePatchEntry } from './imagePatch';
 
-/** A fake ImageData carrier sized to `w`x`h` (byteLength = w*h*4). */
 const fakeImageData = (w: number, h: number): ImageData =>
   ({ colorSpace: 'srgb', data: new Uint8ClampedArray(w * h * 4), height: h, width: w }) as unknown as ImageData;
 

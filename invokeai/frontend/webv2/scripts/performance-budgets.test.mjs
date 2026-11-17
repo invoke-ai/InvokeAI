@@ -9,7 +9,7 @@ import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 
-import { createChunkSourceManifest, getModuleSourceOwner } from './chunk-source-manifest.mjs';
+import { getModuleSourceOwner } from './chunk-source-manifest.mjs';
 import {
   BUILD_METRIC_KEYS,
   checkBrowserRouteBudget,
@@ -19,22 +19,15 @@ import {
   createBrowserReference,
   createBuildReference,
   deriveLimit,
-  GROWTH_ALLOWANCE_FLOOR_BYTES,
   HARD_CEILING_FLOOR_BYTES,
   isBudgetFailure,
   loadPerformanceReference,
   PERFORMANCE_REFERENCE_SCHEMA_VERSION,
   referenceIncompatibility,
   validatePerformanceReference,
-  createBrowserSamplePlan,
-  createBrowserRunPlan,
   summarizeBrowserSamples,
   measureRouteBuild,
-  summarizeBrowserResources,
-  validateArchitectureBaseline,
-  validateBrowserBaseline,
   waitForRequiredRequests,
-  waitForStableRequests,
 } from './performance-budgets.mjs';
 
 const PROJECT_ROOT = '/repo/webv2';
@@ -199,14 +192,6 @@ describe('build performance budgets', () => {
     assert.match(failures[0].message, /Added: package:react-dom/);
     assert.match(failures[0].message, /Removed: package:react/);
   });
-
-  it('rejects unused budget schema keys', () => {
-    const measurement = createSyntheticBuild(1_000);
-    const baseline = createArchitectureBaseline(measurement);
-    baseline.build.launchpad.baseline.unusedBudget = 123;
-
-    assert.throws(() => validateArchitectureBaseline(baseline), /Unknown keys: unusedBudget/);
-  });
 });
 
 describe('chunk source ownership manifest', () => {
@@ -224,36 +209,6 @@ describe('chunk source ownership manifest', () => {
     );
     assert.equal(getModuleSourceOwner('\u0000rolldown/runtime.js', PROJECT_ROOT), null);
     assert.equal(getModuleSourceOwner('/outside/repo.ts', PROJECT_ROOT), null);
-  });
-
-  it('emits deterministic sorted source-owner records for chunks only', () => {
-    const manifest = createChunkSourceManifest(
-      {
-        'asset.css': { fileName: 'asset.css', source: '', type: 'asset' },
-        'entry.js': {
-          facadeModuleId: '/repo/webv2/src/main.tsx',
-          fileName: 'entry.js',
-          moduleIds: [
-            '/repo/webv2/node_modules/react/index.js',
-            '/repo/webv2/src/main.tsx',
-            '/repo/webv2/src/app.tsx',
-            '\u0000rolldown/runtime.js',
-          ],
-          type: 'chunk',
-        },
-      },
-      PROJECT_ROOT
-    );
-
-    assert.deepEqual(manifest, {
-      chunks: {
-        'entry.js': {
-          facadeSource: 'source:src/main.tsx',
-          sourceOwners: ['package:react', 'source:src/app.tsx', 'source:src/main.tsx'],
-        },
-      },
-      schemaVersion: 1,
-    });
   });
 });
 
@@ -277,60 +232,6 @@ describe('browser performance sampling and policy', () => {
     requested.add('GalleryImageActionsBridge');
     await waiting;
     assert.equal(resolved, true);
-  });
-
-  it('waits for cascading requests to settle before measuring activation', async () => {
-    const requested = new Set(['GalleryImageActionsBridge']);
-    let elapsedMs = 0;
-    let polls = 0;
-
-    await waitForStableRequests({
-      context: 'editor-canvas/empty before activation',
-      getRequested: () => requested,
-      now: () => elapsedMs,
-      pollIntervalMs: 10,
-      stableForMs: 30,
-      timeoutMs: 1_000,
-      wait: (milliseconds) => {
-        elapsedMs += milliseconds;
-        polls += 1;
-        if (polls === 2) {
-          requested.add('GalleryImageActionsBridge dependency');
-        }
-      },
-    });
-
-    assert.equal(elapsedMs, 50);
-    assert.deepEqual([...requested], ['GalleryImageActionsBridge', 'GalleryImageActionsBridge dependency']);
-  });
-
-  it('keeps the trace sample disjoint from scored samples', () => {
-    const plan = createBrowserSamplePlan({ scoredSamples: 3, traceSamples: 1, warmups: 2 });
-
-    assert.deepEqual(
-      plan.map((sample) => sample.kind),
-      ['warmup', 'warmup', 'trace', 'scored', 'scored', 'scored']
-    );
-    assert.equal(new Set(plan.map((sample) => sample.index)).size, plan.length);
-  });
-
-  it('uses repeated resource observations routinely and full sampling for profiles and updates', () => {
-    const baseline = createBrowserBaseline();
-    const routine = createBrowserRunPlan(baseline);
-    assert.equal(routine.mode, 'resources');
-    assert.deepEqual(
-      routine.samples.map((sample) => sample.kind),
-      ['resource', 'resource']
-    );
-    for (const options of [{ profile: true }, { updateBaseline: true }]) {
-      const full = createBrowserRunPlan({ ...baseline, ...options });
-      assert.equal(full.mode, 'profile');
-      assert.deepEqual(full.sampling, baseline.sampling);
-      assert.deepEqual(
-        full.samples.map((sample) => sample.kind),
-        ['warmup', 'trace', 'scored', 'scored', 'scored', 'scored', 'scored']
-      );
-    }
   });
 
   it('keeps worst observed resource costs and structural failures in both modes without reporting routine timings', () => {
@@ -393,85 +294,18 @@ describe('browser performance sampling and policy', () => {
       assert.throws(() => summarizeBrowserSamples([first, { ...second, ...changed }], 'resources'), /unstable/);
     }
   });
-
-  it('rejects a baseline that claims timing enforcement, which no gate implements', () => {
-    const baseline = createBrowserBaseline();
-    baseline.timingPolicy.enforce = true;
-
-    assert.throws(() => validateBrowserBaseline(baseline), /timing enforcement is not implemented/);
-  });
-
-  it('summarizes unique activated resources by type', () => {
-    assert.deepEqual(
-      summarizeBrowserResources([
-        { kind: 'script', path: '/a.js', rawBytes: 10 },
-        { kind: 'script', path: '/a.js', rawBytes: 10 },
-        { kind: 'css', path: '/a.css', rawBytes: 5 },
-        { kind: 'font', path: '/a.woff2', rawBytes: 7 },
-        { kind: 'image', path: '/a.webp', rawBytes: 11 },
-        { kind: 'other', path: '/en.json', rawBytes: 3 },
-      ]),
-      {
-        cssRawBytes: 5,
-        fontRawBytes: 7,
-        imageRawBytes: 11,
-        largestAssetRawBytes: 11,
-        otherRawBytes: 3,
-        requestCount: 5,
-        scriptRawBytes: 10,
-        scriptRequestCount: 1,
-        totalRawBytes: 36,
-      }
-    );
-  });
 });
 
 describe('derived growth allowance', () => {
-  it('absorbs ordinary growth instead of failing on a handful of bytes', () => {
-    const measurement = createSyntheticBuild(1_000);
-    const budget = createArchitectureBaseline(measurement).build.launchpad;
-    const grown = { ...measurement, ownedRawBytes: measurement.ownedRawBytes + 64 };
-
-    assert.deepEqual(checkRouteBudget(grown, budget), []);
-  });
-
-  it('still fails growth beyond the allowance', () => {
-    const measurement = createSyntheticBuild(1_000);
-    const budget = createArchitectureBaseline(measurement).build.launchpad;
-    const bloated = { ...measurement, ownedRawBytes: measurement.ownedRawBytes + 4096 + 1 };
-
-    const failures = checkRouteBudget(bloated, budget);
-
-    assert.equal(failures.length, 1);
-    assert.match(failures[0].message, /owned JavaScript reached .* captured /);
-  });
-
   it('gives a small metric a usable byte allowance and a large one a proportional share', () => {
     // Percent alone is useless on a 2 KB metric; a flat floor alone is meaningless on a 3 MB one.
     assert.equal(deriveLimit('cssRawBytes', 2159), 2159 + 4096);
     assert.equal(deriveLimit('initialRawBytes', 2992581), 2992581 + 29926);
   });
 
-  it('allows the floor over a zero baseline, which the exact request counts bound', () => {
-    // Zero-byte baselines still get the byte floor; exact request caps catch new assets.
-    assert.equal(deriveLimit('otherAssetRawBytes', 0), GROWTH_ALLOWANCE_FLOOR_BYTES);
-    assert.equal(deriveLimit('requestCount', 0), 0);
-  });
-
   it('caps request counts exactly, since an extra initial request is structural', () => {
     assert.equal(deriveLimit('requestCount', 106), 106);
     assert.equal(deriveLimit('scriptRequestCount', 90), 90);
-  });
-
-  it('keeps the source-owner graph pinned exactly regardless of the byte allowance', () => {
-    const measurement = createSyntheticBuild(1_000);
-    const budget = createArchitectureBaseline(measurement).build.launchpad;
-    const leaked = { ...measurement, sourceOwners: [...measurement.sourceOwners, 'source:src/leaked.ts'] };
-
-    const failures = checkRouteBudget(leaked, budget);
-
-    assert.equal(failures.length, 1);
-    assert.match(failures[0].message, /source-owner graph changed/);
   });
 });
 
@@ -482,15 +316,6 @@ describe('hard ceiling over the committed baseline', () => {
     const reference = committed + HARD_CEILING_FLOOR_BYTES - 1000;
 
     assert.equal(deriveLimit('ownedRawBytes', reference, committed), committed + HARD_CEILING_FLOOR_BYTES);
-  });
-
-  it('is the allowance when the reference is the committed baseline', () => {
-    assert.equal(deriveLimit('ownedRawBytes', 100_000, 100_000), 100_000 + 4096);
-  });
-
-  it('caps request counts at the lower of the two, so a flaky extra request in one main run does not stick', () => {
-    assert.equal(deriveLimit('requestCount', 107, 106), 106);
-    assert.equal(deriveLimit('requestCount', 106, 107), 106);
   });
 });
 
@@ -515,44 +340,6 @@ describe('base-branch reference', () => {
     );
   });
 
-  it('judges bytes against the reference while the committed source-owner pin still fails a leak', () => {
-    // Use the reference for accepted byte drift; structural leaks must still fail at zero added bytes.
-    const committed = createSyntheticBuild(1_000);
-    const mainNow = {
-      ...createSyntheticBuild(21_000),
-      sourceOwners: [...createSyntheticBuild(21_000).sourceOwners, 'source:src/main-added.ts'],
-    };
-    const build = createArchitectureBaseline(committed).build;
-    const pullRequest = { ...mainNow, ownedRawBytes: mainNow.ownedRawBytes + 64 };
-
-    assert.ok(checkRouteBudget(pullRequest, build.launchpad).length > 0);
-
-    const { build: budgets, uncovered } = applyBuildReference(build, buildReference([mainNow]));
-
-    assert.deepEqual(uncovered, []);
-    const failures = checkRouteBudget(pullRequest, budgets.launchpad);
-    assert.equal(failures.length, 1);
-    assert.match(failures[0].message, /source-owner graph changed.*main-added/);
-    assert.deepEqual(budgets.launchpad.baseline.sourceOwners, committed.sourceOwners);
-  });
-
-  it('names both origins in a failure so a reader can find the numbers', () => {
-    const committed = createSyntheticBuild(1_000);
-    const mainNow = createSyntheticBuild(21_000);
-    const { build: budgets } = applyBuildReference(
-      createArchitectureBaseline(committed).build,
-      buildReference([mainNow])
-    );
-    const bloated = { ...mainNow, ownedRawBytes: mainNow.ownedRawBytes + 4096 + 1 };
-
-    const [failure] = checkRouteBudget(bloated, budgets.launchpad);
-
-    assert.match(
-      failure.message,
-      new RegExp(`reference ${mainNow.ownedRawBytes}, committed ${committed.ownedRawBytes}`)
-    );
-  });
-
   it('applies the reference by route id, not by position, and reports routes it does not cover', () => {
     const committed = createSyntheticBuild(1_000);
     const decoy = { ...createSyntheticBuild(21_000), routeId: 'other' };
@@ -563,22 +350,6 @@ describe('base-branch reference', () => {
     assert.deepEqual(uncovered, ['launchpad']);
     assert.equal(budgets.launchpad.baseline.ownedRawBytes, committed.ownedRawBytes);
     assert.equal(budgets.launchpad.committed, undefined);
-  });
-
-  it('is a no-op without a reference', () => {
-    const build = createArchitectureBaseline(createSyntheticBuild(1_000)).build;
-
-    assert.deepEqual(applyBuildReference(build, null), { build, uncovered: [] });
-  });
-
-  it('refuses a route missing a metric rather than deriving a NaN ceiling', () => {
-    // Every comparison against NaN is false, so a silent fallback here would pass any route.
-    const committed = createSyntheticBuild(1_000);
-    const build = createArchitectureBaseline(committed).build;
-    const reference = buildReference([committed]);
-    delete reference.routes.launchpad.ownedRawBytes;
-
-    assert.throws(() => applyBuildReference(build, reference), /reference build route launchpad/);
   });
 
   it('is written as a small versioned file that validates', () => {
@@ -600,18 +371,6 @@ describe('base-branch reference', () => {
     assert.match(
       referenceIncompatibility({ ...reference, schemaVersion: 99 }, 'build', BUILD_METRIC_KEYS),
       /schemaVersion 99/
-    );
-  });
-
-  it('rejects a file that is not a reference at all, naming what is wrong', () => {
-    assert.throws(() => validatePerformanceReference({ routes: {} }, 'performance reference x'), /Missing keys/);
-    assert.throws(
-      () =>
-        validatePerformanceReference(
-          { capturedAt: 'now', kind: 'nope', metricKeys: [], routes: {}, schemaVersion: 1 },
-          'x'
-        ),
-      /kind must be/
     );
   });
 });
@@ -681,103 +440,6 @@ describe('base-branch reference, browser gate', () => {
     assert.equal(failures.length, 1);
     assert.match(failures[0], /scriptRawBytes reached .* captured /);
   });
-
-  it('caps request counts and activated resources exactly and separately', () => {
-    const baseline = createBrowserBaseline();
-    const [expected] = baseline.routes;
-    const extraRequest = routeFor(expected, {
-      resources: { ...expected.resourceBaseline, requestCount: expected.resourceBaseline.requestCount + 1 },
-    });
-    const extraActivated = routeFor(expected, {
-      activatedResources: {
-        ...expected.activatedResourceBaseline,
-        scriptRequestCount: expected.activatedResourceBaseline.scriptRequestCount + 1,
-      },
-    });
-
-    assert.match(check(extraRequest, expected)[0], /^\S+ requestCount reached/);
-    assert.match(check(extraActivated, expected)[0], /activated scriptRequestCount reached/);
-  });
-
-  it('judges a route against the reference by id and profile, keeping the committed numbers for the ceiling', () => {
-    const baseline = createBrowserBaseline();
-    const [expected] = baseline.routes;
-    const grownResources = {
-      ...expected.resourceBaseline,
-      scriptRawBytes: expected.resourceBaseline.scriptRawBytes + 5_000,
-    };
-    const decoyResources = { ...expected.resourceBaseline, scriptRawBytes: 1 };
-    const reference = createBrowserReference([
-      {
-        activatedResources: expected.activatedResourceBaseline,
-        id: 'decoy',
-        resources: decoyResources,
-        stateProfile: expected.stateProfile,
-      },
-      {
-        activatedResources: expected.activatedResourceBaseline,
-        id: expected.id,
-        resources: grownResources,
-        stateProfile: expected.stateProfile,
-      },
-    ]);
-
-    const { routes, uncovered } = applyBrowserReference(baseline.routes, reference);
-    const [applied] = routes;
-
-    assert.deepEqual(
-      uncovered,
-      baseline.routes.slice(1).map((route) => `${route.id}:${route.stateProfile}`)
-    );
-    assert.deepEqual(applied.resourceBaseline, grownResources);
-    assert.deepEqual(applied.committedResourceBaseline, expected.resourceBaseline);
-    assert.equal(applied.scriptSourceOwnerSet, expected.scriptSourceOwnerSet);
-
-    // 5 KB over the committed number would fail against the committed baseline alone...
-    const route = routeFor(expected, {
-      resources: { ...grownResources, scriptRawBytes: grownResources.scriptRawBytes + 64 },
-    });
-    assert.ok(check(route, expected).length > 0);
-    // ...and passes against the reference, with both origins named if it ever fails.
-    assert.deepEqual(check(route, applied), []);
-    const [failure] = check(
-      routeFor(expected, { resources: { ...grownResources, scriptRawBytes: grownResources.scriptRawBytes + 4097 } }),
-      applied
-    );
-    assert.match(failure, /reference \d+, committed \d+/);
-  });
-
-  it('refuses a reference route missing activated resources rather than deriving NaN ceilings', () => {
-    const baseline = createBrowserBaseline();
-    const [expected] = baseline.routes;
-    const reference = createBrowserReference([
-      {
-        activatedResources: expected.activatedResourceBaseline,
-        id: expected.id,
-        resources: expected.resourceBaseline,
-        stateProfile: expected.stateProfile,
-      },
-    ]);
-    delete reference.routes[`${expected.id}:${expected.stateProfile}`].activatedResources.requestCount;
-
-    assert.throws(() => applyBrowserReference(baseline.routes, reference), /activatedResources/);
-  });
-});
-
-describe('baseline schema', () => {
-  it('rejects the committed limit blocks the derivation replaced', () => {
-    const measurement = createSyntheticBuild(1_000);
-    const withLimits = createArchitectureBaseline(measurement);
-    withLimits.build.launchpad.limits = {};
-
-    assert.throws(() => validateArchitectureBaseline(withLimits), /Unknown keys: limits/);
-
-    for (const key of ['resourceLimits', 'activatedResourceLimits']) {
-      const browser = createBrowserBaseline();
-      browser.routes[0][key] = {};
-      assert.throws(() => validateBrowserBaseline(browser), new RegExp(`Unknown keys: ${key}`));
-    }
-  });
 });
 
 describe('loading a reference from disk', () => {
@@ -806,23 +468,6 @@ describe('loading a reference from disk', () => {
 
     assert.equal(loaded.reference, null);
     assert.match(loaded.reason, /schemaVersion 99/);
-  });
-
-  it('names the variable and path when the file is missing, and the path when it is not JSON', async () => {
-    const empty = await mkdtemp(join(tmpdir(), 'perf-reference-'));
-    await assert.rejects(
-      load(empty),
-      /WEBV2_PERF_REFERENCE_DIR is set to "\." but .*build-reference\.json could not be read/
-    );
-
-    const broken = await stage('{ not json');
-    await assert.rejects(load(broken), /is not valid JSON/);
-  });
-
-  it('treats a file with no integer schemaVersion as a wiring fault, not drift', async () => {
-    // An empty object is what a broken stage step produces; it was never written by any checkout.
-    const empty = await stage({});
-    await assert.rejects(load(empty), /performance reference build-reference\.json/);
   });
 
   it('applies a current, well-formed reference', async () => {

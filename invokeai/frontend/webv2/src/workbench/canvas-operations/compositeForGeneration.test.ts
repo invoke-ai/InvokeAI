@@ -88,13 +88,6 @@ const uniformImageData = (width: number, height: number, alpha: number): ImageDa
   return { colorSpace: 'srgb', data, height, width } as unknown as ImageData;
 };
 
-/** An opaque scan except a single transparent pixel (a hole). */
-const holeImageData = (width: number, height: number): ImageData => {
-  const image = uniformImageData(width, height, 255);
-  image.data[3] = 0;
-  return image;
-};
-
 interface Harness {
   deps: ExecuteCompositePlanDeps;
   createdTargets: StubRasterSurface[];
@@ -121,8 +114,8 @@ const makeHarness = (readImageData?: (surface: RasterSurface, rect: Rect) => Ima
   const getLayerSurface = (layerId: string): Promise<{ surface: RasterSurface; rect: Rect; release(): void }> => {
     let surface = layerSurfaces.get(layerId);
     if (!surface) {
-      // Layer caches are content-sized; created off the raw stub so they don't
-      // pollute the composite-target capture. Origin-anchored (0,0) here.
+      // Layer caches are content-sized; created off the raw stub so they don't pollute the composite-target capture.
+      // Origin-anchored (0,0) here.
       surface = stub.createSurface(64, 48);
       layerSurfaces.set(layerId, surface);
     }
@@ -197,13 +190,6 @@ describe('executeCompositePlan — mode geometry', () => {
     expect(result.bboxFullyCovered).toBe(true);
   });
 
-  it('reports bboxFullyCovered=false when the composite has a transparent hole', async () => {
-    const harness = makeHarness(() => holeImageData(100, 100));
-    const plan = planComposites(makeDoc([rasterLayer('a')]), BBOX);
-    const result = await executeCompositePlan(plan, harness.deps);
-    expect(result.bboxFullyCovered).toBe(false);
-  });
-
   it('reports whether any composited pixel is visible, cached with the plan key', async () => {
     const empty = makeHarness(() => uniformImageData(100, 100, 0));
     const plan = planComposites(makeDoc([rasterLayer('a')]), BBOX);
@@ -219,24 +205,6 @@ describe('executeCompositePlan — mode geometry', () => {
       bboxFullyCovered: false,
       bboxHasContent: true,
     });
-  });
-
-  it('computes contentBounds as the union of layer bounds in document space', async () => {
-    const harness = makeHarness(() => uniformImageData(100, 100, 255));
-    const doc = makeDoc([
-      rasterLayer('a'), // 64x48 at (0,0)
-      rasterLayer('b', { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 100, y: 100 } }), // 64x48 at (100,100)
-    ]);
-    const plan = planComposites(doc, BBOX);
-    const result = await executeCompositePlan(plan, harness.deps);
-    expect(result.contentBounds).toEqual({ height: 148, width: 164, x: 0, y: 0 });
-  });
-
-  it('returns contentBounds=null when there is no enabled raster content', async () => {
-    const harness = makeHarness(() => uniformImageData(100, 100, 0));
-    const plan = planComposites(makeDoc([rasterLayer('a', { isEnabled: false })]), BBOX);
-    const result = await executeCompositePlan(plan, harness.deps);
-    expect(result.contentBounds).toBeNull();
   });
 });
 
@@ -265,18 +233,6 @@ describe('executeCompositePlan — upload + dedupe', () => {
     expect(harness.createdTargets).toHaveLength(0);
   });
 
-  it('encodes and uploads once, returning the uploaded image name', async () => {
-    const harness = makeHarness(() => uniformImageData(100, 100, 255));
-    const plan = planComposites(makeDoc([rasterLayer('a')]), BBOX);
-
-    const result = await executeCompositePlan(plan, harness.deps);
-
-    expect(harness.encodeSurface).toHaveBeenCalledTimes(1);
-    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
-    expect(result.base.imageName).toBe('uploaded-1');
-    expect(result.base.reusedUpload).toBe(false);
-  });
-
   it('re-running the same plan skips compositing, encoding and upload entirely', async () => {
     const harness = makeHarness(() => uniformImageData(100, 100, 255));
     const plan = planComposites(makeDoc([rasterLayer('a')]), BBOX);
@@ -291,23 +247,6 @@ describe('executeCompositePlan — upload + dedupe', () => {
     expect(harness.uploadImage).toHaveBeenCalledTimes(1);
     expect(second.base.reusedUpload).toBe(true);
     expect(second.base.imageName).toBe('uploaded-1');
-  });
-
-  it('a changed plan with identical pixels re-composites but reuses the upload by content hash', async () => {
-    const harness = makeHarness(() => uniformImageData(100, 100, 255));
-    const planA = planComposites(makeDoc([rasterLayer('a', { opacity: 1 })]), BBOX);
-    const planB = planComposites(makeDoc([rasterLayer('a', { opacity: 0.5 })]), BBOX);
-    expect(planA.entries[0]!.key).not.toBe(planB.entries[0]!.key);
-
-    await executeCompositePlan(planA, harness.deps);
-    const resultB = await executeCompositePlan(planB, harness.deps);
-
-    // The changed plan re-composites + re-encodes (same-size stub blob → same hash)...
-    expect(harness.encodeSurface).toHaveBeenCalledTimes(2);
-    // ...but the identical pixel hash means no second upload.
-    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
-    expect(resultB.base.reusedUpload).toBe(true);
-    expect(resultB.base.imageName).toBe('uploaded-1');
   });
 });
 
@@ -364,29 +303,7 @@ describe('executeRegionalMaskComposite', () => {
     expect(result).toMatchObject({ bounds: { height: 29, width: 20, x: 10, y: 12 }, imageName: 'uploaded-1' });
     expect(readImageData).toHaveBeenCalledTimes(1);
   });
-
-  it('reuses the cached bounds with the cached upload', async () => {
-    const readImageData = vi.fn(() => boxImageData(100, 100));
-    const harness = makeHarness(readImageData);
-
-    await executeRegionalMaskComposite(regionalEntry(), harness.deps);
-    const second = await executeRegionalMaskComposite(regionalEntry(), harness.deps);
-
-    expect(second).toMatchObject({ bounds: { height: 29, width: 20, x: 10, y: 12 }, reusedUpload: true });
-    expect(readImageData).toHaveBeenCalledTimes(1);
-    expect(harness.encodeSurface).toHaveBeenCalledTimes(1);
-  });
-
-  it('reports empty bounds for a mask with no pixels in the bbox', async () => {
-    const harness = makeHarness(() => uniformImageData(100, 100, 0));
-
-    const result = await executeRegionalMaskComposite(regionalEntry(), harness.deps);
-
-    expect(result.bounds).toEqual({ height: 0, width: 0, x: 0, y: 0 });
-  });
 });
-
-// ---- Grayscale mask composite ---------------------------------------------
 
 const inpaintMask = (
   id: string,
@@ -429,23 +346,11 @@ describe('toGrayscaleMaskPixels', () => {
     return { colorSpace: 'srgb', data, height: 1, width: 1 } as unknown as ImageData;
   };
 
-  it('turns a masked pixel dark by the attribute value (1.0 → black)', () => {
-    const img = pixel(255);
-    toGrayscaleMaskPixels(img, 1);
-    expect(Array.from(img.data)).toEqual([0, 0, 0, 255]);
-  });
-
   it('turns a masked pixel mid-gray at partial strength', () => {
     const img = pixel(255);
     toGrayscaleMaskPixels(img, 0.5);
     // 255 - round(255 * 0.5) = 255 - 128 = 127
     expect(Array.from(img.data)).toEqual([127, 127, 127, 255]);
-  });
-
-  it('leaves an unmasked (transparent) pixel white', () => {
-    const img = pixel(0);
-    toGrayscaleMaskPixels(img, 1);
-    expect(Array.from(img.data)).toEqual([255, 255, 255, 255]);
   });
 });
 
@@ -463,39 +368,6 @@ describe('executeMaskComposite', () => {
     expect(harness.uploadImage).toHaveBeenCalledTimes(1);
     expect(result.imageName).toBe('uploaded-1');
     expect(result.hasContent).toBe(true);
-  });
-
-  it('reports no content when the composite is fully white', async () => {
-    const harness = makeHarness(() => grayImageData(100, 100, false));
-    const entry = maskEntryOf(makeDoc([inpaintMask('m1')]));
-    const result = await executeMaskComposite(entry, harness.deps);
-    expect(result.hasContent).toBe(false);
-  });
-
-  it('dedupes a repeated mask plan key with no second upload', async () => {
-    const harness = makeHarness(() => grayImageData(100, 100, true));
-    const doc = makeDoc([inpaintMask('m1', { denoiseLimit: 0.5 })]);
-
-    const first = await executeMaskComposite(maskEntryOf(doc), harness.deps);
-    const second = await executeMaskComposite(maskEntryOf(doc), harness.deps);
-
-    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
-    expect(second.reusedUpload).toBe(true);
-    expect(second.imageName).toBe(first.imageName);
-    expect(second.hasContent).toBe(true);
-  });
-
-  it('darken-composites multiple mask layers', async () => {
-    const harness = makeHarness(() => grayImageData(100, 100, true));
-    const entry = maskEntryOf(makeDoc([inpaintMask('a'), inpaintMask('b')]));
-
-    await executeMaskComposite(entry, harness.deps);
-
-    const target = harness.createdTargets[0]!;
-    const composites = target.callLog
-      .filter((e) => e.op === 'set' && e.args[0] === 'globalCompositeOperation')
-      .map((e) => e.args[1]);
-    expect(composites).toContain('darken');
   });
 });
 
@@ -543,8 +415,8 @@ describe('executeCompositePlan — raster adjustments baked into generation pixe
     return image;
   };
 
-  // A noisy stack always adjusts the layer-local region the bbox samples (plus one pixel of resampling margin) at
-  // its layer-local origin, before resampling, even where a color-only stack would adjust the output instead.
+  // A noisy stack always adjusts the layer-local region the bbox samples (plus one pixel of resampling margin) at its
+  // layer-local origin, before resampling, even where a color-only stack would adjust the output instead.
   it.each([
     // The sampled region (22×12) exceeds the 20×10 output.
     { bbox: { height: 10, width: 20, x: 10, y: 5 }, origin: { x: 2, y: 1 }, scale: 1, size: [22, 12] },

@@ -56,7 +56,6 @@ describe(`layers panel budgets over ${NODE_COUNT} nodes`, () => {
     const groups = groupIds(document);
     const expanded = new Set(groups);
     const before = buildLayerStackRows(document.stacks, expanded);
-    // Selection lives beside the document, so nothing here can change.
     const again = buildLayerStackRows(document.stacks, expanded);
     for (const stack of Object.keys(before) as (keyof typeof before)[]) {
       before[stack].rows.forEach((row, position) => expect(again[stack].rows[position]).toBe(row));

@@ -21,7 +21,6 @@ const base = (id: string) => ({
 
 const mask = () => ({ bitmap: null, fill: { color: '#e07575', style: 'diagonal' as const } });
 
-/** A complete layer contract of `type`, accepted by the reducer's normaliser as-is. */
 export const layerContract = (
   id: string,
   type: CanvasLayerContract['type'] = 'raster',
@@ -83,7 +82,6 @@ const stackOfNode = (node: CanvasNodeContract): CanvasLayerContract['type'] | nu
   return null;
 };
 
-/** Partitions top-level nodes into forests by the stack of their first leaf; leafless groups go to raster. */
 export const stacksFrom = (nodes: readonly CanvasNodeContract[]): CanvasStackForests => {
   const stacks = createEmptyStacks();
   for (const node of nodes) {
@@ -107,10 +105,8 @@ export const documentFrom = (
   width: 512,
 });
 
-/** A document from a flat top-first node list, partitioned into stacks in order. */
 export const flatDocument = documentFrom;
 
-/** `count` leaves cycling through every stack, ids `l0` … `l{count-1}`, at the root of each forest. */
 export const createLargeFlatDocument = (
   count: number,
   selectedLayerId: string | null = 'l0'
@@ -122,10 +118,6 @@ export const createLargeFlatDocument = (
     selectedLayerId
   );
 
-/**
- * Cycles `count` nodes through all stacks, grouping every `fanout` leaves and groups to exercise depth and
- * inherited state.
- */
 export const createLargeTreeDocument = (
   count: number,
   fanout = 8,

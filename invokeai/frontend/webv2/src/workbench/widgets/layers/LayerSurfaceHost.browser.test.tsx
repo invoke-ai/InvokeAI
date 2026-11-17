@@ -38,7 +38,6 @@ import { buildLayerStackRows } from './layerTreeRows';
 const PROJECT_ID = 'surface-project';
 const mocks = vi.hoisted(() => ({
   commands: { notifications: { add: vi.fn() }, widgets: { open: () => undefined } },
-  // Only a layer menu reads workflow availability, once per render, so its calls show a layer menu is mounted.
   layerMenuRender: vi.fn(),
   project: null as unknown as Project,
   upload: vi.fn(() => Promise.resolve()),
@@ -61,7 +60,6 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useOptionalWorkbenchCommands: () => mocks.commands,
   useWorkbenchCommands: () => mocks.commands,
 }));
-// A workflow with an image input and output, so the layer menu offers Run workflow.
 vi.mock('./RunLayerWorkflowDialog', async (importOriginal) => {
   const availability = {
     canRunWorkflow: true,
@@ -127,7 +125,6 @@ const Harness = ({ ref }: { ref: Ref<OpenSurface> }) => {
       editingLocked={false}
       engine={engine}
       surface={surface}
-      // The panel clears its surface as soon as the menu closes.
       onClose={() => setSurface(null)}
     />
   );
@@ -182,7 +179,6 @@ it.each([
 
     await expect.element(page.getByRole('dialog', { name: title })).toBeVisible();
     const dialog = document.querySelector('[role="dialog"]')!;
-    // Still open once the menu has gone: a dialog dismissed by the menu's teardown would already be closing.
     expect(dialog).toHaveAttribute('data-state', 'open');
 
     const frames = closingFrames(await recordDialogExit(dialog, () => act(() => userEvent.keyboard('{Escape}'))));
@@ -198,7 +194,6 @@ it.each([
 // A closed menu stays in the DOM until its own exit animation ends.
 const openMenu = () => document.querySelector('[role="menu"][data-state="open"]');
 
-/** Choose a menu's rename item, then hold its real exit animation while a successor opens. */
 const renameThenDismiss = async (id: string) => {
   await act(() => openSurface({ anchor, id, kind: 'menu' }));
   await act(() => page.getByRole('menuitem', { name: 'Rename layer', exact: true }).click());
@@ -228,7 +223,6 @@ it('drops a layer rename still animating out when another layer opens its menu',
   await act(() => userEvent.keyboard('{Escape}'));
   await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
 
-  // With every surface closed, no layer menu may come back for the rename its successor cut short.
   expect(mocks.layerMenuRender).not.toHaveBeenCalled();
 });
 
@@ -297,7 +291,6 @@ it('offers an adjustment every other raster layer and group the model accepts un
   const offered = Array.from(document.querySelectorAll('[role="menuitem"][data-value^="move-to:"]')).map(
     (item) => item.textContent
   );
-  // The locked layer and the control layer cannot take the entry; the source is where it already is.
   expect(offered).toEqual(['Target', 'Group', 'Member']);
 
   await act(() => page.getByRole('menuitem', { name: 'Group', exact: true }).click());
@@ -329,7 +322,6 @@ const sketchesBoard: GalleryBoard = {
   videoCount: 0,
 };
 
-/** Lists boards as the Gallery panel did, then as the listing of every readable board did afterwards. */
 const listBoards = (panelBoards: GalleryBoard[], destinationBoards: GalleryBoard[]) => {
   const listing = galleryBoardsOptions(
     getGalleryListingBoardsQuery(getGallerySettings(getProjectWidgetValues(mocks.project, 'gallery')))

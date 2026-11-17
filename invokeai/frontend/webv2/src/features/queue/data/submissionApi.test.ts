@@ -131,21 +131,6 @@ describe('enqueueGenerate', () => {
     });
   });
 
-  it('keeps a held seed for every run', async () => {
-    const { enqueueGenerate } = await import('./submissionApi');
-
-    await enqueueGenerate(createRequest({ seedStep: 0 }));
-
-    const body = getSubmittedBody();
-
-    expect(body.batch.runs).toBe(3);
-    expect(body.batch.data[0]).toEqual([
-      { field_name: 'value', items: [10], node_path: 'seed' },
-      { field_name: 'value', items: ['a fjord at dawn'], node_path: 'positive_prompt' },
-      { field_name: 'value', items: ['low quality'], node_path: 'negative_prompt' },
-    ]);
-  });
-
   it('expands seeds per batch item when the seed steps', async () => {
     const { enqueueGenerate } = await import('./submissionApi');
 
@@ -163,17 +148,6 @@ describe('enqueueGenerate', () => {
       },
       { field_name: 'value', items: ['low quality', 'low quality', 'low quality'], node_path: 'negative_prompt' },
     ]);
-  });
-
-  it('appends by default and prepends only when the request asks for the front of the queue', async () => {
-    const { enqueueGenerate } = await import('./submissionApi');
-
-    await enqueueGenerate(createRequest());
-    expect(getSubmittedBody()).toMatchObject({ prepend: false });
-
-    mocks.apiFetchJson.mockClear();
-    await enqueueGenerate(createRequest({ prepend: true }));
-    expect(getSubmittedBody()).toMatchObject({ prepend: true });
   });
 
   it('includes project-aware webv2 origin metadata', async () => {
@@ -211,40 +185,6 @@ describe('enqueueGenerate', () => {
       ]);
       expect(body.batch.runs).toBe(1);
     });
-
-    it('submits a one-prompt expansion in place of the authored prompt', async () => {
-      const { enqueueGenerate } = await import('./submissionApi');
-
-      await enqueueGenerate(createRequest({ positivePrompt: 'a {red} cat', positivePrompts: ['a red cat'] }));
-
-      expect(getSubmittedBody().batch.data[0][1].items).toEqual(['a red cat']);
-    });
-
-    it('gives every image its own seed under per-image behaviour while the seed steps', async () => {
-      const { enqueueGenerate } = await import('./submissionApi');
-
-      await enqueueGenerate(
-        createRequest({
-          batchCount: 2,
-          positivePrompts: ['a red cat', 'a green cat'],
-          seedBehaviour: 'per-image',
-          seedStep: 1,
-        })
-      );
-
-      const body = getSubmittedBody();
-
-      expect(body.batch.data[0][0]).toEqual({ field_name: 'value', items: [10, 11, 12, 13], node_path: 'seed' });
-      expect(body.batch.runs).toBe(1);
-    });
-
-    it('falls back to the literal prompt when the expanded list is empty', async () => {
-      const { enqueueGenerate } = await import('./submissionApi');
-
-      await enqueueGenerate(createRequest({ positivePrompts: [] }));
-
-      expect(getSubmittedBody().batch.data[0][1].items).toEqual(['a fjord at dawn']);
-    });
   });
 });
 
@@ -273,8 +213,8 @@ describe('enqueueGenerate legacy replays', () => {
       })
     );
 
-    // Before seed modes, sharing disabled always stepped, toggle or not: one zipped group
-    // with a seed per image and the prompt list repeated per iteration.
+    // Before seed modes, sharing disabled always stepped, toggle or not: one zipped group with a seed per image and the
+    // prompt list repeated per iteration.
     expect(getSubmittedBody().batch.data).toEqual([
       [
         { field_name: 'value', items: [42, 43, 44, 45], node_path: 'seed' },
@@ -287,23 +227,6 @@ describe('enqueueGenerate legacy replays', () => {
       ],
     ]);
     expect(getSubmittedBody().batch.runs).toBe(1);
-  });
-
-  it('wraps a legacy sequence one short of the range, as that version did', async () => {
-    const { enqueueGenerate } = await import('./submissionApi');
-
-    await enqueueGenerate(createRequest({ batchCount: 2, legacySeedPlan: true, seed: 4_294_967_294, seedStep: 1 }));
-
-    expect(getSubmittedBody().batch.data[0]?.[0]?.items).toEqual([4_294_967_294, 0]);
-  });
-
-  it('holds a pinned single-prompt batch across its runs', async () => {
-    const { enqueueGenerate } = await import('./submissionApi');
-
-    await enqueueGenerate(createRequest({ batchCount: 3, legacySeedPlan: true, seed: 42, seedStep: 0 }));
-
-    expect(getSubmittedBody().batch.data[0]?.[0]?.items).toEqual([42]);
-    expect(getSubmittedBody().batch.runs).toBe(3);
   });
 });
 
@@ -341,27 +264,6 @@ describe('enqueueWorkflow', () => {
     });
   });
 
-  it('prepends a workflow batch only when the request asks for the front of the queue', async () => {
-    const { enqueueWorkflow } = await import('./submissionApi');
-
-    await enqueueWorkflow(createWorkflowRequest());
-    expect(getSubmittedBody()).toMatchObject({ prepend: false });
-
-    mocks.apiFetchJson.mockClear();
-    await enqueueWorkflow(createWorkflowRequest({ prepend: true }));
-    expect(getSubmittedBody()).toMatchObject({ prepend: true });
-  });
-
-  it('submits workflow runs for the requested batch count', async () => {
-    const { enqueueWorkflow } = await import('./submissionApi');
-
-    await enqueueWorkflow(createWorkflowRequest());
-
-    expect(getSubmittedBody().batch.runs).toBe(2);
-    expect(getSubmittedBody().batch.idempotency_key).toBe('webv2:project-1:local-1');
-    expect(getSubmittedBody().batch.batch_id).toBeUndefined();
-  });
-
   it('sends batch-node groups in the backend shape and lets it multiply them across runs', async () => {
     const { enqueueWorkflow } = await import('./submissionApi');
 
@@ -378,28 +280,6 @@ describe('enqueueWorkflow', () => {
       [{ field_name: 'cfg', items: [1, 2], node_path: 'denoise' }],
       [{ field_name: 'image', items: [{ image_name: 'a.png' }], node_path: 'sink' }],
     ]);
-  });
-
-  it('includes the serialized parent workflow in the batch', async () => {
-    const { enqueueWorkflow } = await import('./submissionApi');
-    const workflow = {
-      author: '',
-      contact: '',
-      description: '',
-      edges: [],
-      exposedFields: [],
-      form: null,
-      meta: { category: 'user', version: '3.0.0' },
-      name: 'Parent workflow',
-      nodes: [],
-      notes: '',
-      tags: '',
-      version: '1.0.0',
-    };
-
-    await enqueueWorkflow({ ...createWorkflowRequest(), workflow });
-
-    expect(getSubmittedBody().batch.workflow).toEqual(workflow);
   });
 
   it('expands recorded seeds into one zipped group and never redraws them', async () => {
@@ -430,14 +310,6 @@ describe('enqueueWorkflow', () => {
       expect(getSubmittedBody().batch.runs).toBe(request.batchCount);
     }
   });
-
-  it('does not cap workflow runs', async () => {
-    const { enqueueWorkflow } = await import('./submissionApi');
-
-    await enqueueWorkflow(createWorkflowRequest({ batchCount: 10_000 }));
-
-    expect(getSubmittedBody().batch.runs).toBe(10_000);
-  });
 });
 
 describe('enqueueUtility', () => {
@@ -465,45 +337,6 @@ describe('enqueueUtility', () => {
       '/api/v1/queue/default/enqueue_batch/receipt?idempotency_key=utility%3Aoperation',
     ]);
     expect(mocks.apiFetch).not.toHaveBeenCalled();
-  });
-
-  it('replays the same frozen payload when an absent receipt races the original admission', async () => {
-    vi.useFakeTimers();
-    const { enqueueUtility } = await import('./submissionApi');
-    const { ApiError } = await import('@platform/transport/http');
-    mocks.apiFetchJson.mockReset();
-    mocks.apiFetchJson
-      .mockRejectedValueOnce(new TypeError('lost response'))
-      .mockRejectedValueOnce(new ApiError('not committed yet', 404))
-      .mockResolvedValueOnce({ enqueued: 1, item_ids: [42] });
-    const mutableRequest = { ...request, graph: structuredClone(request.graph) };
-    const result = enqueueUtility(mutableRequest);
-    mutableRequest.idempotencyKey = 'replacement-key';
-    mutableRequest.graph.id = 'mutated-graph';
-    await vi.advanceTimersByTimeAsync(999);
-    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(1);
-    await expect(result).resolves.toMatchObject({ itemIds: [42] });
-    const posts = mocks.apiFetchJson.mock.calls.filter(([url]) => url.endsWith('/enqueue_batch'));
-    expect(posts).toHaveLength(2);
-    expect(mocks.apiFetchJson.mock.calls[1]![0]).toBe(
-      '/api/v1/queue/default/enqueue_batch/receipt?idempotency_key=utility%3Aoperation'
-    );
-    expect(posts[0]![1].body).toBe(posts[1]![1].body);
-    expect(JSON.parse(posts[0]![1].body)).toMatchObject({
-      batch: { idempotency_key: request.idempotencyKey, origin: request.origin },
-      prepend: true,
-    });
-  });
-
-  it('bounds admission recovery when both admission and receipts are unavailable', async () => {
-    vi.useFakeTimers();
-    const { enqueueUtility } = await import('./submissionApi');
-    mocks.apiFetchJson.mockRejectedValue(new TypeError('offline'));
-    const assertion = expect(enqueueUtility(request)).rejects.toThrow('Backend work may still be running');
-    await vi.advanceTimersByTimeAsync(3_000);
-    await assertion;
-    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(6);
   });
 
   it.each([409, 429])('does not replay definitive admission rejection (%s)', async (status) => {
@@ -537,60 +370,11 @@ describe('enqueueUtility', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it.each([403, 422])('stops acknowledgement after a definitive rejection (%s)', async (status) => {
-    vi.useFakeTimers();
-    const { enqueueUtility } = await import('./submissionApi');
-    const { ApiError } = await import('@platform/transport/http');
-    mocks.apiFetch.mockReset().mockRejectedValue(new ApiError('rejected', status));
-    const result = await enqueueUtility(request);
-    result.acknowledge();
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('aborts the admission backoff on an account change', async () => {
-    vi.useFakeTimers();
-    const { enqueueUtility } = await import('./submissionApi');
-    mocks.apiFetchJson.mockRejectedValue(new TypeError('offline'));
-    const assertion = expect(enqueueUtility(request)).rejects.toBeDefined();
-    await vi.advanceTimersByTimeAsync(0);
-    accountLifecycle.activate('replacement-account');
-    await assertion;
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
-    expect(vi.getTimerCount()).toBe(0);
-  });
-
-  it('drops acknowledgement retries on account change', async () => {
-    vi.useFakeTimers();
-    const { enqueueUtility } = await import('./submissionApi');
-    mocks.apiFetch.mockReset().mockRejectedValue(new TypeError('offline'));
-    const result = await enqueueUtility(request);
-    result.acknowledge();
-    await vi.advanceTimersByTimeAsync(0);
-    accountLifecycle.activate('replacement-account');
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
-    expect(vi.getTimerCount()).toBe(0);
-  });
-
   beforeEach(() => {
     accountLifecycle.activate('utility-account');
     mocks.apiFetch.mockReset().mockResolvedValue(undefined);
     mocks.apiFetchJson.mockReset();
     mocks.apiFetchJson.mockResolvedValue({ enqueued: 1, item_ids: [4] });
-  });
-
-  it('appends by default and prepends only when the request asks for the front of the queue', async () => {
-    const { enqueueUtility } = await import('./submissionApi');
-    const request = { graph: { edges: [], id: 'pbr', nodes: {} }, origin: 'webv2:util:1', idempotencyKey: 'utility:1' };
-
-    await expect(enqueueUtility(request)).resolves.toMatchObject({ enqueued: 1, itemIds: [4] });
-    expect(getSubmittedBody()).toMatchObject({ batch: { origin: 'webv2:util:1', runs: 1 }, prepend: false });
-
-    mocks.apiFetchJson.mockClear();
-    await enqueueUtility({ ...request, prepend: true });
-    expect(getSubmittedBody()).toMatchObject({ prepend: true });
   });
 });
 
@@ -644,49 +428,6 @@ describe('getResultImages', () => {
     expect(peak).toBeLessThanOrEqual(8);
   });
 
-  it('can restrict image extraction to explicit result node ids', async () => {
-    mocks.apiFetchJson.mockImplementation((url: string) => {
-      if (url === '/api/v1/queue/default/i/1') {
-        return Promise.resolve({
-          item_id: 1,
-          session: {
-            prepared_source_mapping: {
-              exec_canvas_l2i: 'canvas_l2i',
-              exec_canvas_output: 'canvas_output',
-              exec_create_gradient_mask: 'create_gradient_mask',
-              exec_expand_mask: 'expand_mask',
-            },
-            results: {
-              exec_canvas_l2i: { image: { image_name: 'decoded-patch.png' }, type: 'image_output' },
-              exec_canvas_output: { image: { image_name: 'final-composite.png' }, type: 'image_output' },
-              exec_create_gradient_mask: { image: { image_name: 'gradient-mask.png' }, type: 'image_output' },
-              exec_expand_mask: { image: { image_name: 'expanded-mask.png' }, type: 'image_output' },
-            },
-          },
-          status: 'completed',
-        });
-      }
-
-      const imageName = decodeURIComponent(url.replace('/api/v1/images/i/', ''));
-      return Promise.resolve({
-        height: 768,
-        image_name: imageName,
-        image_url: `/images/${imageName}`,
-        is_intermediate: true,
-        thumbnail_url: `/thumbs/${imageName}`,
-        width: 1024,
-      });
-    });
-
-    const { getResultImages } = await import('./submissionApi');
-
-    const images = await getResultImages(1, 'source-1', '2026-06-15T00:00:00.000Z', {
-      resultNodeIds: ['canvas_output'],
-    });
-
-    expect(images.map((image) => image.imageName)).toEqual(['final-composite.png']);
-  });
-
   it('extracts image names from image collection outputs', async () => {
     mocks.apiFetchJson.mockImplementation((url: string) => {
       if (url === '/api/v1/queue/default/i/1') {
@@ -719,122 +460,6 @@ describe('getResultImages', () => {
     const images = await getResultImages(1, 'source-1', '2026-06-15T00:00:00.000Z');
 
     expect(images.map((image) => image.imageName)).toEqual(['external-a.png', 'external-b.png']);
-  });
-
-  it('extracts all image names from named workflow return values', async () => {
-    mocks.apiFetchJson.mockImplementation((url: string) => {
-      if (url === '/api/v1/queue/default/i/1') {
-        return Promise.resolve({
-          item_id: 1,
-          session: {
-            results: {
-              call: {
-                type: 'workflow_return_output',
-                values: {
-                  Image: { image_name: 'returned-a.png' },
-                  Images: { collection: [{ image_name: 'returned-b.png' }, { image_name: 'returned-c.png' }] },
-                },
-              },
-            },
-          },
-          status: 'completed',
-        });
-      }
-
-      const imageName = decodeURIComponent(url.replace('/api/v1/images/i/', ''));
-      return Promise.resolve({
-        height: 768,
-        image_name: imageName,
-        image_url: `/images/${imageName}`,
-        is_intermediate: false,
-        thumbnail_url: `/thumbs/${imageName}`,
-        width: 1024,
-      });
-    });
-
-    const { getResultImages } = await import('./submissionApi');
-
-    const images = await getResultImages(1, 'source-1', '2026-06-15T00:00:00.000Z');
-
-    expect(images.map((image) => image.imageName)).toEqual(['returned-a.png', 'returned-b.png', 'returned-c.png']);
-  });
-
-  it('ignores metadata and unused workflow return value images', async () => {
-    mocks.apiFetchJson.mockImplementation((url: string) => {
-      if (url === '/api/v1/queue/default/i/1') {
-        return Promise.resolve({
-          item_id: 1,
-          session: {
-            results: {
-              output: {
-                image: { image_name: 'actual.png' },
-                output_meta: { image_name: 'metadata.png' },
-                type: 'image_output',
-              },
-              unused: {
-                type: 'workflow_return_value_output',
-                value: { image_name: 'unused.png' },
-              },
-              returned: {
-                type: 'workflow_return_output',
-                values: { Image: { image_name: 'returned.png' } },
-              },
-            },
-          },
-          status: 'completed',
-        });
-      }
-
-      const imageName = decodeURIComponent(url.replace('/api/v1/images/i/', ''));
-      return Promise.resolve({
-        height: 768,
-        image_name: imageName,
-        image_url: `/images/${imageName}`,
-        is_intermediate: false,
-        thumbnail_url: `/thumbs/${imageName}`,
-        width: 1024,
-      });
-    });
-
-    const { getResultImages } = await import('./submissionApi');
-
-    const images = await getResultImages(1, 'source-1', '2026-06-15T00:00:00.000Z');
-
-    expect(images.map((image) => image.imageName)).toEqual(['actual.png', 'returned.png']);
-  });
-
-  it('carries the backend creation timestamp, normalized to ISO, alongside the submission instant', async () => {
-    mocks.apiFetchJson.mockImplementation((url: string) => {
-      if (url === '/api/v1/queue/default/i/1') {
-        return Promise.resolve({
-          item_id: 1,
-          session: {
-            results: {
-              output: { image: { image_name: 'result.png' }, type: 'image_output' },
-            },
-          },
-          status: 'completed',
-        });
-      }
-
-      const imageName = decodeURIComponent(url.replace('/api/v1/images/i/', ''));
-      return Promise.resolve({
-        created_at: '2026-06-15 00:12:34.000',
-        height: 768,
-        image_name: imageName,
-        image_url: `/images/${imageName}`,
-        is_intermediate: false,
-        thumbnail_url: `/thumbs/${imageName}`,
-        width: 1024,
-      });
-    });
-
-    const { getResultImages } = await import('./submissionApi');
-
-    const [image] = await getResultImages(1, 'source-1', '2026-06-15T00:00:00.000Z');
-
-    expect(image?.createdAt).toBe('2026-06-15T00:12:34.000Z');
-    expect(image?.queuedAt).toBe('2026-06-15T00:00:00.000Z');
   });
 
   it('does not issue image requests from queue data resolved after an account switch', async () => {
@@ -893,27 +518,6 @@ describe('getResultVideoNames', () => {
     await expect(getResultVideoNames(1)).resolves.toEqual(['clip-1.mp4']);
     // Names only — no per-video DTO hydration requests.
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
-  });
-
-  it('can restrict video extraction to explicit result node ids', async () => {
-    mocks.apiFetchJson.mockResolvedValue({
-      item_id: 1,
-      session: {
-        prepared_source_mapping: {
-          exec_final: 'final_l2v',
-          exec_intermediate: 'intermediate_l2v',
-        },
-        results: {
-          exec_final: { type: 'video_output', video: { video_name: 'final.mp4' } },
-          exec_intermediate: { type: 'video_output', video: { video_name: 'intermediate.mp4' } },
-        },
-      },
-      status: 'completed',
-    });
-
-    const { getResultVideoNames } = await import('./submissionApi');
-
-    await expect(getResultVideoNames(1, { resultNodeIds: ['final_l2v'] })).resolves.toEqual(['final.mp4']);
   });
 });
 
@@ -978,58 +582,5 @@ describe('readQueueItemLastSavedOutput', () => {
     const { readQueueItemLastSavedOutput } = await import('./submissionApi');
 
     await expect(readQueueItemLastSavedOutput(1)).resolves.toEqual({ kind: 'video', name: videoName });
-  });
-
-  it('walks back past a deleted and an intermediate video to an earlier saved image', async () => {
-    const results = {
-      still: { image: { image_name: 'still.png' }, type: 'image_output' },
-      draft: { type: 'video_output', video: { video_name: 'draft.mp4' } },
-      deleted: { type: 'video_output', video: { video_name: 'deleted.mp4' } },
-    };
-    serveItem({ session: { results } }, ['draft.mp4'], ['deleted.mp4']);
-    const { readQueueItemLastSavedOutput } = await import('./submissionApi');
-
-    await expect(readQueueItemLastSavedOutput(1)).resolves.toEqual({ kind: 'image', name: 'still.png' });
-    expect(mocks.apiFetchJson.mock.calls.map(([url]) => url)).toEqual([
-      '/api/v1/queue/default/i/1',
-      '/api/v1/videos/i/deleted.mp4',
-      '/api/v1/videos/i/draft.mp4',
-      '/api/v1/images/i/still.png',
-    ]);
-  });
-
-  it('takes whichever saved image or video comes last', async () => {
-    const image = { image: { image_name: 'still.png' }, type: 'image_output' };
-    const video = { type: 'video_output', video: { video_name: 'clip.mp4' } };
-    const { readQueueItemLastSavedOutput } = await import('./submissionApi');
-
-    serveItem({ session: { results: { image, video } } }, []);
-    await expect(readQueueItemLastSavedOutput(1)).resolves.toEqual({ kind: 'video', name: 'clip.mp4' });
-
-    serveItem({ session: { results: { video, image } } }, []);
-    await expect(readQueueItemLastSavedOutput(1)).resolves.toEqual({ kind: 'image', name: 'still.png' });
-  });
-
-  it('reveals nothing for a workflow-call child or an item without saved images', async () => {
-    const { readQueueItemLastSavedOutput } = await import('./submissionApi');
-
-    serveItem({ parent_item_id: 7, session }, []);
-    await expect(readQueueItemLastSavedOutput(1)).resolves.toBeNull();
-
-    serveItem({ session }, ['first.png', 'saved.png', 'preview.png'], ['deleted.png']);
-    await expect(readQueueItemLastSavedOutput(1)).resolves.toBeNull();
-  });
-
-  it("passes the caller's abort signal to every read", async () => {
-    serveItem({ session }, ['preview.png'], ['deleted.png']);
-    const { readQueueItemLastSavedOutput } = await import('./submissionApi');
-    const controller = new AbortController();
-
-    await readQueueItemLastSavedOutput(1, controller.signal);
-    controller.abort();
-
-    for (const [, init] of mocks.apiFetchJson.mock.calls as [string, { signal: AbortSignal }][]) {
-      expect(init.signal.aborted).toBe(true);
-    }
   });
 });

@@ -94,8 +94,8 @@ describe('measureDroppableVisibleRect', () => {
 });
 
 describe('widgetCollisionDetection pointer visibility', () => {
-  // dnd-kit shifts cached drag-start edges on scroll without remeasuring dimensions; test against the stale rect
-  // and live DOM.
+  // dnd-kit shifts cached drag-start edges on scroll without remeasuring dimensions; test against the stale rect and
+  // live DOM.
   const createCollisionArgs = (options: {
     droppables: Array<{ id: string; node: HTMLElement; rect: ClientRect }>;
     pointerCoordinates: { x: number; y: number };
@@ -158,8 +158,8 @@ describe('widgetCollisionDetection pointer visibility', () => {
 
     scroller.scrollTop = 60;
 
-    // What dnd-kit's Rect getters report after the scroll: edges shifted by
-    // the delta, width/height still frozen from drag start.
+    // What dnd-kit's Rect getters report after the scroll: edges shifted by the delta, width/height still frozen from
+    // drag start.
     const adjustedRect = { ...dragStartRect, bottom: dragStartRect.bottom - 60, top: dragStartRect.top - 60 };
     const collisions = widgetCollisionDetection(
       createCollisionArgs({

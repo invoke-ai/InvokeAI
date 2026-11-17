@@ -27,7 +27,6 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useOptionalWorkbenchCommands: () => null,
   useWorkbenchCommands: () => ({ generation: { patchSettings: frame.patchSettings } }),
 }));
-// Saved ratios are account preferences, synced through the backend's client state; this keeps them in memory.
 vi.mock('@workbench/projects/api', async (importOriginal) => {
   const clientState = new Map<string, string>();
   return {
@@ -55,7 +54,6 @@ afterEach(async () => {
   host = null;
 });
 
-/** The engine's interaction store as the actions row reads it: a value per key and a listener set per key. */
 const createEngine = () => {
   const state: Partial<CanvasInteractionState> = {
     hasFloatingSelection: false,
@@ -83,7 +81,6 @@ const createEngine = () => {
   return { engine: engine as unknown as ToolFormProps['engine'], setPending };
 };
 
-/** Renders the actions row `width` px wide. */
 const renderActions = async (engine: ToolFormProps['engine'], width = 320) => {
   const Actions = transformForm.actions!;
   host = document.createElement('div');
@@ -131,7 +128,6 @@ describe('Transform actions', () => {
   });
 });
 
-/** The Frame tool's engine: its bbox options and grid as the form reads and writes them, and the frame commit. */
 const createFrameEngine = (bboxOptions = { aspectLocked: false, aspectRatio: 1 }) => {
   const state: Partial<CanvasInteractionState> = { bboxGrid: 8, bboxOptions };
   const listeners = new Map<string, Set<() => void>>();
@@ -194,7 +190,6 @@ describe('Frame aspect ratio', () => {
   it('keeps the pixel count when a saved ratio is picked, locking it on the frame and on Generate', async () => {
     const { commits, state } = await renderFrame();
 
-    // The size column shows the size the pick sets.
     await userEvent.click(page.getByRole('button', { name: 'Cinema, 2.39:1, 1584×664' }));
 
     expect(commits).toEqual([CINEMA_FRAME]);

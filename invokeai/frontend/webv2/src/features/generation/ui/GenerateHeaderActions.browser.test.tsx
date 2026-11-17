@@ -45,7 +45,6 @@ vi.mock('@platform/ui/Menu', async (importOriginal) => {
 
 seedArchitectureCapabilities();
 
-// The real catalog, so the tooltip and toast read as users see them.
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
@@ -66,7 +65,6 @@ afterEach(async () => {
   root = null;
 });
 
-/** A turbo SDXL model that sets steps and CFG in the Model Manager, and no size. */
 const turbo: MainModelConfig = {
   base: 'sdxl',
   default_settings: { cfg_scale: 1, steps: 8 },
@@ -122,11 +120,9 @@ const openMenu = async () => {
   await expect.element(page.getByRole('menu')).toBeVisible();
 };
 
-/** Waits for the warm-up that pointing at or focusing the button starts, without loading the items itself. */
 const settleWarmUp = () =>
   vi.waitFor(() => expect(menuParts.loaders.map((loader) => loader.getSnapshot().status)).toEqual(['loaded']));
 
-/** Records whether the placeholder ever mounts while `open` runs. */
 const placeholdersDuring = async (open: () => Promise<unknown>): Promise<Node[]> => {
   const placeholders: Node[] = [];
   const observer = new MutationObserver(() =>
@@ -194,7 +190,6 @@ describe('GenerateHeaderActions', () => {
       supersedes: 'generate-settings:project-1',
     });
 
-    // Nothing is left to apply, and the item says why.
     await openMenu();
     await expect.element(item('Apply model defaults')).toHaveAttribute('aria-disabled', 'true');
     await expect
@@ -202,7 +197,6 @@ describe('GenerateHeaderActions', () => {
       .toHaveAccessibleDescription(expect.stringContaining("Already using SDXL Turbo's defaults."));
     await userEvent.keyboard('{Escape}');
 
-    // Steps were changed again since; the Undo keeps that edit and restores the rest.
     values.patchSnapshot({ steps: 50 });
     await act(() => undoable.mock.calls[0]![1].onUndo());
 
@@ -218,7 +212,6 @@ describe('GenerateHeaderActions', () => {
     await expect
       .element(item('Reset everything to defaults'))
       .toHaveAccessibleDescription('Size 1216×832 → 1024×1024, Aspect ratio Free → 1:1, Steps 30 → 8, CFG 7 → 1');
-    // The menu takes focus once open and tracks the highlighted item, the first, by attribute.
     await vi.waitFor(() => expect(document.activeElement?.getAttribute('role')).toBe('menu'));
     await userEvent.keyboard('{ArrowDown}');
     // Zag focuses the menu a frame after each move; Enter in the same frame would race that focus.
@@ -272,7 +265,6 @@ describe('GenerateHeaderActions', () => {
 
     await openMenu();
     await expect.element(item('Apply model defaults')).toHaveAttribute('aria-disabled', 'true');
-    // Told once, in the reason.
     await expect
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(

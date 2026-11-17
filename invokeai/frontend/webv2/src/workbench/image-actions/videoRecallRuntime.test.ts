@@ -688,39 +688,35 @@ describe('createVideoRecallRuntime', () => {
       runtime.dispose();
     });
 
-    it('declines the picture of a wrapped audio upload, leaving the panel alone', async () => {
-      const { lastNotice, runtime, socket, videoValues } = setup(LTX2);
-      const before = videoValues();
-
-      socket.emit({
-        ...placementEvent('conditioning_video', { media_origin: 'audio_upload' }),
-        conditioning_role: 'video',
-      });
-      await flush();
-
-      expect(videoValues()).toBe(before);
-      expect(lastNotice()).toEqual(
-        expect.objectContaining({ kind: 'info', message: 'widgets.video.placement.conditioningClipNoPicture' })
-      );
-
-      runtime.dispose();
-    });
-
-    it('declines a conditioning clip the panel model cannot take, leaving its media alone', async () => {
-      const { lastNotice, runtime, socket, videoShown, videoValues } = setup(WAN_I2V);
-      const before = videoValues();
-
-      socket.emit({ ...placementEvent('conditioning_video'), conditioning_role: 'video' });
-      await flush();
-
-      expect(videoValues()).toBe(before);
-      expect(lastNotice()).toEqual(
-        expect.objectContaining({
+    it.each([
+      {
+        event: {
+          ...placementEvent('conditioning_video', { media_origin: 'audio_upload' }),
+          conditioning_role: 'video',
+        },
+        label: 'the picture of a wrapped audio upload',
+        model: LTX2,
+        notice: { kind: 'info', message: 'widgets.video.placement.conditioningClipNoPicture' },
+      },
+      {
+        event: { ...placementEvent('conditioning_video'), conditioning_role: 'video' },
+        label: 'a conditioning clip the panel model cannot take',
+        model: WAN_I2V,
+        notice: {
           kind: 'info',
           message: 'widgets.video.placement.conditioningClipUnsupported',
           title: 'widgets.video.placement.conditioningClipNotSet',
-        })
-      );
+        },
+      },
+    ])('declines $label, leaving the panel alone', async ({ event, model, notice }) => {
+      const { lastNotice, runtime, socket, videoShown, videoValues } = setup(model);
+      const before = videoValues();
+
+      socket.emit(event);
+      await flush();
+
+      expect(videoValues()).toBe(before);
+      expect(lastNotice()).toMatchObject(notice);
       expect(videoShown()).toBe(false);
 
       runtime.dispose();

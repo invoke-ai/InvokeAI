@@ -16,7 +16,6 @@ import { groupContract, layerContract, stacksFrom } from './documentFixtures.tes
 import { createDocumentModel } from './documentModel';
 import { checkEditPostconditions } from './postconditions';
 
-/** Deterministic 32-bit generator so a failing seed reproduces exactly. */
 const rng = (seed: number) => {
   let state = seed >>> 0;
   return (): number => {
@@ -42,7 +41,6 @@ const sample = <T>(random: () => number, items: readonly T[], max: number): T[] 
 let created = 0;
 const nextId = (): string => `n${created++}`;
 
-/** A random forest: every stack gets a few leaves, some wrapped in groups up to `depth`. */
 const randomTree = (random: () => number, depth: number, budget: { left: number }): CanvasNodeContract[] => {
   const nodes: CanvasNodeContract[] = [];
   const count = 1 + Math.floor(random() * 3);
@@ -72,7 +70,6 @@ const randomDocument = (random: () => number, depth: number): CanvasDocumentCont
   return { ...createEmptyCanvasDocument(), selectedLayerId: ids[0] ?? null, stacks };
 };
 
-/** Rebuilds a raster fixture subtree for `stack`; overlay groups may start display-hidden. */
 const retype = (
   node: CanvasNodeContract,
   stack: (typeof LAYER_STACK_ORDER)[number],
@@ -146,7 +143,6 @@ const randomCommand = (random: () => number, document: CanvasDocumentContractV3)
     case 'remove':
       return { ids: sample(random, ids, 3), type: 'remove' };
     case 'duplicate': {
-      // Half the time pick a group and something inside it, so nested selections fold.
       const nested = groups.length > 0 && random() < 0.5 ? pick(random, groups) : null;
       const inner = nested ? index.nodes.filter((entry) => entry.path.includes(nested.node.id)) : [];
       const chosen =
@@ -160,7 +156,6 @@ const randomCommand = (random: () => number, document: CanvasDocumentContractV3)
         type: 'move',
       };
     case 'reparent': {
-      // Parent and moving ids come from one stack, so the stack rule is not what usually refuses.
       const stack = pick(random, LAYER_STACK_ORDER);
       const inStack = index.nodes.filter((entry) => entry.stack === stack);
       if (inStack.length === 0) {
@@ -181,7 +176,6 @@ const randomCommand = (random: () => number, document: CanvasDocumentContractV3)
       };
     }
     case 'group': {
-      // Siblings most of the time, so the depth and lock rules get exercised, not just not-siblings.
       const anchor = pick(random, index.nodes);
       const siblings = index.nodes
         .filter((entry) => entry.stack === anchor.stack && entry.parentId === anchor.parentId)
@@ -218,8 +212,7 @@ const randomCommand = (random: () => number, document: CanvasDocumentContractV3)
             ? { opacity: random() }
             : roll < 0.8
               ? { transform: { x: Math.round(random() * 50) } }
-              : // Clears exercise the explicit-undefined inverse path.
-                { colorLabel: random() < 0.3 ? undefined : random() < 0.5 ? ('red' as const) : ('blue' as const) };
+              : { colorLabel: random() < 0.3 ? undefined : random() < 0.5 ? ('red' as const) : ('blue' as const) };
       return { id, patch, type: 'patch' };
     }
     case 'translate':
@@ -232,7 +225,6 @@ const randomCommand = (random: () => number, document: CanvasDocumentContractV3)
   }
 };
 
-/** Every invariant the definition of done names for a document at rest. */
 const assertInvariants = (document: CanvasDocumentContractV3): void => {
   const index = getDocumentIndex(document);
   expect(index.byId.size).toBe(index.nodes.length);

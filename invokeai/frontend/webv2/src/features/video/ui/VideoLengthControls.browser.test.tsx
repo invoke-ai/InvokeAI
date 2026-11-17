@@ -9,11 +9,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { VideoLengthControls } from './VideoLengthControls';
 
-/**
- * Auto duration turns Frames from a length into a ceiling. These pin what the panel says about
- * that, because the number that sizes the run's memory must stay visible and editable.
- */
-
 const i18n = createInstance();
 
 void i18n.use(initReactI18next).init({
@@ -103,7 +98,6 @@ describe('VideoLengthControls', () => {
     expect(input?.labels?.[0]?.textContent).toBe('Auto duration');
     expect(framesLabel()).toBe('Max frames');
     expect(host.textContent).toContain('Up to 121 frames (5.0 s).');
-    // The ceiling sizes the run's memory, so it stays editable.
     expect(frames()?.getAttribute('aria-disabled')).toBeNull();
   });
 

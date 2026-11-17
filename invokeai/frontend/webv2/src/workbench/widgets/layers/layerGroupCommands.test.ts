@@ -21,11 +21,9 @@ const projectWith = (nodes: CanvasNodeContract[]): Project =>
     type: 'replaceCanvasDocument',
   });
 
-/** Stacks top first, each node in preorder, indented by depth. */
 const outline = (document: CanvasDocumentContractV3): string[] =>
   getDocumentIndex(document).nodes.map((entry) => `${'  '.repeat(entry.path.length)}${entry.node.id}`);
 
-/** A prepared-edit engine over a real document model whose commits apply through the real reducer. */
 const createEngine = (initial: Project) => {
   let project = initial;
   const edits: PreparedDocumentEdit[] = [];
@@ -50,7 +48,6 @@ const createEngine = (initial: Project) => {
   };
 };
 
-/** raster: r1, G[r2, H[r3, r4], r5], r6 */
 const tree = (overrides: { lockH?: boolean } = {}): CanvasNodeContract[] => [
   layer('r1'),
   group('G', [
