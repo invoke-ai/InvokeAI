@@ -227,19 +227,9 @@ export const cancelAll = (scope: QueueQueryScope = {}, signal?: AbortSignal): Pr
     signal,
   });
 
-export const cancelQueueItem = (itemId: number, signal?: AbortSignal): Promise<unknown> =>
-  apiFetchJson(buildQueueUrl(`i/${itemId}/cancel`), { method: 'PUT', signal });
-
-export const cancelCurrentQueueItem = async (): Promise<void> => {
-  const owner = captureAccountScope();
-  const current = await getCurrentQueueItem({}, owner.signal);
-
-  assertAccountScopeCurrent(owner);
-  if (current) {
-    await cancelQueueItem(current.item_id, owner.signal);
-    assertAccountScopeCurrent(owner);
-  }
-};
+/** The item as the cancel left it: unchanged, and so not canceled, when it had already finished. */
+export const cancelQueueItem = (itemId: number, signal?: AbortSignal): Promise<QueueServerItemDTO> =>
+  apiFetchJson<QueueServerItemDTO>(buildQueueUrl(`i/${itemId}/cancel`), { method: 'PUT', signal });
 
 /** Cancels the scope in one server-side sweep; `keepCurrent` spares whatever is in progress. */
 export const cancelScopedQueueItems = async (

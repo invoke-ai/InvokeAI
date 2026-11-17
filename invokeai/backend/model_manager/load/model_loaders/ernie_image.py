@@ -21,7 +21,6 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.quantization.fp8_scaled import reject_quantized_side_channel
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
-from invokeai.backend.util.devices import TorchDevice
 
 # The geometry of the released ERNIE-Image transformer, from the pipeline's `transformer/config.json`.
 # A single file carries no config, and `ErnieImageTransformer2DModel`'s own defaults describe a
@@ -147,6 +146,7 @@ class ErnieImageGGUFModel(ModelLoader):
     """
 
     _default_submodel_type = SubModelType.Transformer
+    _bfloat16_safe = True
 
     def _load_model(
         self,
@@ -163,8 +163,7 @@ class ErnieImageGGUFModel(ModelLoader):
 
         from diffusers import ErnieImageTransformer2DModel
 
-        target_device = TorchDevice.choose_torch_device()
-        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        compute_dtype = self._decision(config, SubModelType.Transformer).dtype
 
         sd = gguf_sd_loader(Path(config.path), compute_dtype=compute_dtype)
 

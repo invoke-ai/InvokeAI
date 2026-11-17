@@ -13,7 +13,7 @@ import { registerNotificationUndo } from '@workbench/shell/notifications/undoReg
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import i18next from 'i18next';
-import { act, StrictMode } from 'react';
+import { act, StrictMode, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -58,21 +58,32 @@ let root: Root | null = null;
 let stopToasts: (() => void) | null = null;
 const popoverProps = { presentation: 'expanded', region: 'popover' } as WidgetViewProps;
 
+/** The list loads with the popover, not with the chip; wait for it rather than for its loading fallback. */
+const listLoaded = () =>
+  vi.waitFor(() =>
+    expect(
+      host?.querySelector('[role="list"][aria-label="Notifications"], [role="group"][aria-label="No notifications"]')
+    ).not.toBeNull()
+  );
+
+const renderView = async (view: ReactNode) => {
+  await act(() => root?.render(<ChakraProvider value={system}>{view}</ChakraProvider>));
+  await listLoaded();
+};
+
 const renderPopover = () =>
-  act(() =>
-    root?.render(
-      <ChakraProvider value={system}>
-        <AppToaster />
-        <NotificationsWidgetView {...popoverProps} />
-      </ChakraProvider>
-    )
+  renderView(
+    <>
+      <AppToaster />
+      <NotificationsWidgetView {...popoverProps} />
+    </>
   );
 
 const button = (name: string) =>
   [...document.querySelectorAll<HTMLButtonElement>('button')].find(
     (candidate) => candidate.textContent === name || candidate.getAttribute('aria-label') === name
   );
-const cards = () => [...(host?.querySelectorAll<HTMLElement>('li') ?? [])];
+const cards = () => [...(host?.querySelectorAll<HTMLElement>('[role="listitem"]') ?? [])];
 const cardNamed = (title: string) => cards().find((card) => card.textContent?.includes(title));
 const buttonsOf = (element: HTMLElement | undefined) =>
   [...(element?.querySelectorAll<HTMLButtonElement>('button') ?? [])].map((candidate) => candidate.textContent);
@@ -200,7 +211,7 @@ describe('notifications widget', () => {
     await renderPopover();
     const dismissOf = (index: number) =>
       cards()[index]!.querySelector<HTMLButtonElement>('button[aria-label="Dismiss notification"]')!;
-    const focusedCard = () => document.activeElement?.closest('li')?.textContent ?? '';
+    const focusedCard = () => document.activeElement?.closest('[role="listitem"]')?.textContent ?? '';
     const titles = () =>
       store()
         .getSnapshot()
@@ -219,8 +230,8 @@ describe('notifications widget', () => {
 
     await act(() => userEvent.keyboard('{Enter}'));
     expect(titles()).toEqual([]);
-    // With no notice left, focus rests on the list, visibly, not on the page.
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('Notifications');
+    // With no notice left, focus rests on the empty state that says so, visibly, not on the page.
+    await vi.waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('No notifications'));
     expect(document.activeElement?.matches(':focus-visible')).toBe(true);
   });
 
@@ -235,6 +246,7 @@ describe('notifications widget', () => {
         </StrictMode>
       )
     );
+    await listLoaded();
 
     // StrictMode's extra detach must not count as seen.
     expect(store().getSnapshot().notifications[0]?.isRead).toBe(false);
@@ -245,14 +257,10 @@ describe('notifications widget', () => {
     for (let index = 0; index < 20; index += 1) {
       store().commands.notifications.add({ kind: 'info', message: `Notice ${index}`, title: `Notice ${index}` });
     }
-    await act(() =>
-      root?.render(
-        <ChakraProvider value={system}>
-          <Box display="flex" flexDirection="column" h="160px">
-            <NotificationsWidgetView {...popoverProps} />
-          </Box>
-        </ChakraProvider>
-      )
+    await renderView(
+      <Box display="flex" flexDirection="column" h="160px">
+        <NotificationsWidgetView {...popoverProps} />
+      </Box>
     );
     const isRead = (title: string) =>
       store()
@@ -302,6 +310,8 @@ describe('notifications widget', () => {
     await renderPopover();
     await act(() => recordUndoable('Deleted curve', onUndo));
     await vi.waitFor(() => expect(buttonsOf(toastNamed('Deleted curve'))).toContain('Undo'));
+    // The first row of an empty list mounts once the list has measured its viewport.
+    await vi.waitFor(() => expect(buttonsOf(cardNamed('Deleted curve'))).toContain('Undo'));
 
     await act(() => userEvent.click(buttonIn(cardNamed('Deleted curve')!, 'Undo')));
 
@@ -341,7 +351,151 @@ describe('notifications widget', () => {
     await act(() => Promise.resolve());
     expect(toastNamed('Deleted preset')).toBeUndefined();
     expect(toastNamed('Kept')).toBeUndefined();
+    await vi.waitFor(() => expect(buttonsOf(cardNamed('Deleted preset'))).toContain('Undo'));
     await act(() => userEvent.click(buttonIn(cardNamed('Deleted preset')!, 'Undo')));
     expect(onUndo).toHaveBeenCalledOnce();
+  });
+
+  it('names each row by its kind and unread state, which Mark read clears', async () => {
+    store().commands.notifications.add({ kind: 'success', title: 'Saved' });
+    store().commands.notifications.add({ kind: 'error', title: 'Upload failed' });
+    // Checked before the rows have been on screen long enough to count as seen.
+    await renderPopover();
+    const rowName = (title: string) => cardNamed(title)?.querySelector('[data-list-primary]')?.textContent ?? '';
+
+    // Kind is said in words and drawn as a distinct icon, never by colour alone.
+    expect(rowName('Upload failed')).toMatch(/^Unread, Error: Upload failed/);
+    expect(rowName('Saved')).toMatch(/^Unread, Success: Saved/);
+    const iconOf = (title: string) => cardNamed(title)?.querySelector('svg')?.outerHTML;
+    expect(iconOf('Upload failed')).not.toBe(iconOf('Saved'));
+
+    await act(() => userEvent.click(button('Mark read')!));
+
+    expect(
+      store()
+        .getSnapshot()
+        .notifications.every((notification) => notification.isRead)
+    ).toBe(true);
+    expect(rowName('Upload failed')).toMatch(/^Error: Upload failed/);
+    expect(button('Mark read')?.disabled).toBe(true);
+  });
+
+  it('shows the empty state once nothing is left, with the header actions disabled', async () => {
+    await renderPopover();
+
+    expect(host?.textContent).toContain('No notifications');
+    expect(host?.textContent).toContain('Successful operations, errors, and system messages appear here.');
+    expect(host?.querySelector('[role="list"]')).toBeNull();
+    expect(button('Mark read')?.disabled).toBe(true);
+    expect(button('Clear')?.disabled).toBe(true);
+  });
+
+  it('wraps a long message in full instead of clipping it', async () => {
+    const message = `CUDA out of memory. ${'Tried to allocate 2.00 GiB on a card that is already nearly full. '.repeat(6)}`;
+    store().commands.notifications.add({ kind: 'error', message, title: 'Run failed' });
+    await renderView(
+      <Box display="flex" flexDirection="column" maxH="28rem" w="26rem">
+        <NotificationsWidgetView {...popoverProps} />
+      </Box>
+    );
+    const card = cardNamed('Run failed')!;
+    const text = [...card.querySelectorAll('span')].find((span) => span.textContent === message)!;
+
+    expect(text).toBeDefined();
+    // Several lines tall, inside its row, and no wider than the row.
+    expect(text.getBoundingClientRect().height).toBeGreaterThan(40);
+    expect(text.getBoundingClientRect().bottom).toBeLessThanOrEqual(card.getBoundingClientRect().bottom);
+    expect(text.scrollWidth).toBeLessThanOrEqual(text.clientWidth);
+  });
+
+  it('scrolls a long list inside a height-capped popover, mounting only the rows near view', async () => {
+    for (let index = 0; index < 60; index += 1) {
+      store().commands.notifications.add({ kind: 'info', title: `Notice ${index}` });
+    }
+    await renderView(
+      <Box display="flex" flexDirection="column" maxH="240px" w="26rem">
+        <NotificationsWidgetView {...popoverProps} />
+      </Box>
+    );
+    const viewport = host!.querySelector<HTMLElement>('[data-list-viewport]')!;
+
+    expect(viewport.clientHeight).toBeLessThan(240);
+    expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
+    expect(cards().length).toBeLessThan(60);
+  });
+
+  it('moves between rows with the arrow keys and reaches a row’s actions with Tab', async () => {
+    store().commands.notifications.add({
+      actions: [{ itemIds: [7], kind: 'retry-queue-item' }],
+      kind: 'error',
+      title: 'First',
+    });
+    store().commands.notifications.add({ kind: 'info', title: 'Second' });
+    store().commands.notifications.add({ kind: 'info', title: 'Third' });
+    await renderPopover();
+    const primaryOf = (title: string) => cardNamed(title)!.querySelector<HTMLElement>('[data-list-primary]')!;
+    const focusedRow = () => document.activeElement?.closest('[role="listitem"]')?.textContent ?? '';
+
+    // One tab stop for the rows: the newest.
+    expect(
+      [...host!.querySelectorAll<HTMLElement>('[data-list-primary]')].filter((primary) => primary.tabIndex === 0)
+    ).toEqual([primaryOf('Third')]);
+
+    primaryOf('Third').focus();
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    expect(document.activeElement).toBe(primaryOf('Second'));
+    await act(() => userEvent.keyboard('{End}'));
+    expect(document.activeElement).toBe(primaryOf('First'));
+
+    await act(() => userEvent.keyboard('{Tab}'));
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Dismiss notification');
+    expect(focusedRow()).toContain('First');
+    await act(() => userEvent.keyboard('{Tab}'));
+    expect(document.activeElement?.textContent).toBe('Retry');
+
+    // Arrows from a row's action move on to the neighbouring row.
+    await act(() => userEvent.keyboard('{ArrowUp}'));
+    expect(document.activeElement).toBe(primaryOf('Second'));
+    await act(() => userEvent.keyboard('{Home}'));
+    expect(document.activeElement).toBe(primaryOf('Third'));
+  });
+
+  it('opens a row’s menu from its button, offering the notice’s actions and Dismiss', async () => {
+    store().commands.notifications.add({ kind: 'info', title: 'Older' });
+    store().commands.notifications.add({
+      actions: [
+        { itemId: 41, kind: 'reveal-queue-item' },
+        { itemIds: [41], kind: 'retry-queue-item' },
+      ],
+      kind: 'error',
+      title: 'Run failed',
+    });
+    await renderPopover();
+    const primary = cardNamed('Run failed')!.querySelector<HTMLElement>('[data-list-primary]')!;
+    const menuItems = () =>
+      [...document.querySelectorAll<HTMLElement>('[data-scope="menu"][data-part="item"]')].map(
+        (item) => item.textContent
+      );
+
+    // The row's button says it opens a menu, and pressing it does.
+    expect(primary.getAttribute('aria-haspopup')).toBe('menu');
+    primary.focus();
+    await act(() => userEvent.keyboard('{Enter}'));
+    await vi.waitFor(() => expect(menuItems()).toEqual(['Show in queue', 'Retry', 'Dismiss notification']));
+    expect(primary.getAttribute('aria-expanded')).toBe('true');
+
+    const dismiss = [...document.querySelectorAll<HTMLElement>('[data-scope="menu"][data-part="item"]')].find(
+      (item) => item.textContent === 'Dismiss notification'
+    )!;
+    await act(() => userEvent.click(dismiss));
+
+    expect(
+      store()
+        .getSnapshot()
+        .notifications.map((notification) => notification.title)
+    ).toEqual(['Older']);
+    // As with the inline Dismiss, focus moves on to the next notice's dismiss.
+    await vi.waitFor(() => expect(document.activeElement?.getAttribute('aria-label')).toBe('Dismiss notification'));
+    expect(document.activeElement?.closest('[role="listitem"]')?.textContent).toContain('Older');
   });
 });

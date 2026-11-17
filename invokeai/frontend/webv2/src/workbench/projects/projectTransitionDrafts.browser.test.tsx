@@ -73,7 +73,7 @@ const target = { id: '', name: '' };
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const generationUi = {
-  sectionPreferences: { sectionsOpen: {}, setSectionOpen: () => undefined },
+  sectionPreferences: { sectionsOpen: {}, setSectionsOpen: () => undefined },
 } as unknown as GenerationUiAdapter;
 
 const HarnessBody = () => {

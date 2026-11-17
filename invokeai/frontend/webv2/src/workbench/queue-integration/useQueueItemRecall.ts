@@ -1,55 +1,81 @@
 import type { QueueGenerationMeta } from '@features/queue/contracts';
-import type { ImageRecallCapabilities, ImageRecallKind } from '@workbench/image-actions';
-import type * as CanvasRecallModule from '@workbench/image-actions/canvasRecall';
+import type { ImageRecallKind } from '@workbench/image-actions';
 
+import { createGenerateFormValuesSelector } from '@features/generation/react';
+import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { hasArchitectureCapabilities, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import {
-  EMPTY_IMAGE_RECALL_CAPABILITIES,
-  getCurrentGenerateValues,
-  getImageRecallTitle,
-} from '@workbench/image-actions';
+import { useExternalStoreSelector } from '@platform/state/selectors';
+import { EMPTY_IMAGE_RECALL_CAPABILITIES, getCurrentGenerateValues } from '@workbench/image-actions';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
-import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { useWidgetValuesSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getQueueRecallCapabilities, getVideoQueueRecallCapabilities, planQueueRecall } from './queueRecall';
+import { executeQueueItemRecall } from './executeQueueItemRecall';
+import {
+  getQueueRecallAvailability,
+  getQueueRecallSource,
+  getQueueRecallTargetState,
+  type QueueRecallAvailability,
+} from './queueRecall';
 import { useLocalRecallSnapshot } from './useLocalRecallSnapshot';
 
+export interface QueueItemRecall extends QueueRecallAvailability {
+  /** The durable snapshot lookup has not answered yet: everything is unavailable, with no reason to give. */
+  isPending: boolean;
+  recall: (kind: ImageRecallKind) => Promise<void>;
+}
+
+const selectGenerateValues = createGenerateFormValuesSelector();
+const NO_REASONS: QueueRecallAvailability['reasons'] = {};
+
 /**
- * Recall local submission snapshots or foreign session prompts/seed into the active project, then reveal the
- * destination panel.
+ * What an item's recall menus offer, and the recall itself. Mount it only for the item whose menu or details are
+ * open: it reads the durable snapshot and loads the model catalog.
  */
 export const useQueueItemRecall = (
   origin: string | null | undefined,
-  meta: QueueGenerationMeta
-): { capabilities: ImageRecallCapabilities; isPending: boolean; recall: (kind: ImageRecallKind) => void } => {
+  meta: QueueGenerationMeta,
+  /** The server names a workflow the item ran: without a snapshot, the only sign it holds no Generate settings. */
+  { isNonGenerateRun = false }: { isNonGenerateRun?: boolean } = {}
+): QueueItemRecall => {
   const { t } = useTranslation();
   const commands = useWorkbenchCommands();
-  const { generation, widgets } = commands;
   const queries = useWorkbenchQueries();
   const openWidget = useOpenWorkbenchWidget();
   const notify = useNotify();
   const snapshot = useLocalRecallSnapshot(origin);
   const isPending = snapshot === undefined;
-  const localGenerateValues = snapshot?.generateValues ?? null;
-  const videoSnapshot = snapshot?.videoValues ?? null;
-  const isVideoItem = snapshot?.sourceId === 'video';
   const models = useModelsSelector((state) => state.models);
+  const isCatalogSettled = useModelsSelector((state) => state.status === 'loaded' || state.status === 'error');
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
-  const capabilities = useMemo(
+  const generateValues = useWidgetValuesSelector('generate', selectGenerateValues);
+  // Read under the capability store: Generate values synthesized from architecture policy appear with its table.
+  const target = useExternalStoreSelector(
+    subscribeArchitectureCapabilities,
+    getArchitectureCapabilitiesSnapshot,
+    useCallback(
+      () =>
+        getQueueRecallTargetState({
+          hasCapabilityTable: hasArchitectureCapabilities(),
+          hasCurrentValues: getCurrentGenerateValues({ generateValues, supportedModels }) !== null,
+          isCatalogSettled,
+        }),
+      [generateValues, isCatalogSettled, supportedModels]
+    )
+  );
+  const source = getQueueRecallSource(snapshot?.sourceId ?? null, isNonGenerateRun);
+  const generateSnapshot = snapshot?.generateValues ?? null;
+  const videoSnapshot = snapshot?.videoValues ?? null;
+  const availability = useMemo<QueueRecallAvailability>(
     () =>
       isPending
-        ? EMPTY_IMAGE_RECALL_CAPABILITIES
-        : isVideoItem
-          ? getVideoQueueRecallCapabilities(videoSnapshot, meta)
-          : getQueueRecallCapabilities(localGenerateValues, meta),
-    [isPending, isVideoItem, localGenerateValues, meta, videoSnapshot]
+        ? { capabilities: EMPTY_IMAGE_RECALL_CAPABILITIES, reasons: NO_REASONS }
+        : getQueueRecallAvailability({ meta, snapshot: generateSnapshot, source, target, videoSnapshot }),
+    [generateSnapshot, isPending, meta, source, target, videoSnapshot]
   );
 
   useMountEffect(() => {
@@ -57,153 +83,21 @@ export const useQueueItemRecall = (
   });
 
   const recall = useCallback(
-    async (kind: ImageRecallKind) => {
-      const owner = captureAccountScope();
-      const originalProject = queries.getSnapshot().activeProject;
-      if (isPending) {
-        return;
+    (kind: ImageRecallKind) => {
+      if (snapshot === undefined) {
+        return Promise.resolve();
       }
-      const readCurrentValues = () => {
-        const project = queries.getProject(originalProject.id);
-        return project
-          ? getCurrentGenerateValues({
-              generateValues: getResolvedProjectWidgetValues(project, 'generate', queries.getSnapshot().scopedDefaults),
-              supportedModels,
-            })
-          : null;
-      };
-      const current = readCurrentValues();
-      let plan = planQueueRecall(kind, { current, isVideoItem, meta, snapshot: localGenerateValues, videoSnapshot });
-
-      if (!plan) {
-        // Use a generic unavailable reason: Video and missing capabilities are not missing Generate models.
-        const reason = isVideoItem
-          ? 'widgets.queue.recallUnavailableForItem'
-          : !current && !hasArchitectureCapabilities()
-            ? 'widgets.queue.recallUnavailableCapabilities'
-            : 'widgets.queue.recallUnavailable';
-        notify.info(getImageRecallTitle(kind, t), t(reason));
-        return;
-      }
-
-      if (plan.target === 'video') {
-        widgets.patchValues('video', plan.patch);
-        openWidget('video', { preferredRegions: ['left'] });
-        notify.success(getImageRecallTitle(kind, t), t('widgets.queue.settingsRecalledIntoVideoDescription'));
-        return;
-      }
-
-      let canvasRecall: typeof CanvasRecallModule | null = null;
-      let canvasPlan: CanvasRecallModule.CanvasRecallPlan | null = null;
-      let canvasProblem: string | null = null;
-      let canvasApplied = false;
-      const preparedModelKey = plan.values.model?.key;
-      if ((kind === 'all' || kind === 'remix') && snapshot?.canvasMetadata) {
-        try {
-          canvasRecall = await import('@workbench/image-actions/canvasRecall');
-          canvasPlan = await canvasRecall.prepareCanvasRecall({
-            metadata: snapshot.canvasMetadata,
-            model: plan.values.model,
-            models,
-            owner,
-            isCurrent: () =>
-              queries.isActiveProject(originalProject.id) &&
-              queries.getProject(originalProject.id)?.canvas.document === originalProject.canvas.document,
-          });
-          await canvasRecall.settleCanvasRecall(
-            canvasPlan,
-            {
-              commands,
-              projectId: originalProject.id,
-              getProject: () => queries.getProject(originalProject.id) ?? null,
-            },
-            owner
-          );
-        } catch (error) {
-          canvasPlan = null;
-          canvasProblem = error instanceof Error ? error.message : 'unavailable';
-        }
-      }
-      if (!isAccountScopeCurrent(owner) || !queries.isActiveProject(originalProject.id)) {
-        return;
-      }
-      // Asset reads and paint persistence may yield; retain edits made while the canvas was loading.
-      plan = planQueueRecall(kind, {
-        current: readCurrentValues(),
-        isVideoItem,
+      return executeQueueItemRecall({
+        context: { commands, notify, openWidget, queries, t },
+        isNonGenerateRun,
+        kind,
         meta,
-        snapshot: localGenerateValues,
-        videoSnapshot,
+        models,
+        snapshot,
       });
-      if (!plan || plan.target !== 'generate') {
-        return;
-      }
-      if (canvasPlan && canvasRecall) {
-        try {
-          if (preparedModelKey !== plan.values.model?.key) {
-            canvasPlan.problems.push('model-changed');
-          } else {
-            canvasApplied = canvasRecall.commitCanvasRecall({
-              plan: canvasPlan,
-              expectedDocument: originalProject.canvas.document,
-              target: {
-                commands,
-                projectId: originalProject.id,
-                getProject: () =>
-                  queries.isActiveProject(originalProject.id) ? (queries.getProject(originalProject.id) ?? null) : null,
-              },
-              restorePointName: t('widgets.gallery.itemActions.recall.beforeCanvasRecall'),
-            });
-          }
-          if (canvasPlan.problems.length) {
-            canvasProblem = canvasRecall.getCanvasRecallProblemsMessage(canvasPlan.problems, t);
-          }
-        } catch (error) {
-          canvasProblem = error instanceof Error ? error.message : 'unavailable';
-        }
-      }
-      if (canvasProblem) {
-        notify.info(
-          getImageRecallTitle(kind, t),
-          t('widgets.gallery.itemActions.recall.canvasPartial', { items: canvasProblem })
-        );
-      }
-      generation.setSettings(plan.values, originalProject.id);
-      openWidget('generate', { preferredRegions: ['left'] });
-      notify.success(getImageRecallTitle(kind, t), t('widgets.queue.settingsRecalledDescription'));
-      if (canvasApplied && canvasPlan && canvasRecall) {
-        const durable = await canvasRecall.finalizeCanvasRecallAssets(
-          canvasPlan,
-          {
-            commands,
-            projectId: originalProject.id,
-            getProject: () => queries.getProject(originalProject.id) ?? null,
-          },
-          owner
-        );
-        if (!durable && isAccountScopeCurrent(owner) && queries.isActiveProject(originalProject.id)) {
-          notify.info(getImageRecallTitle(kind, t), t('widgets.gallery.itemActions.recall.canvasImagesTemporary'));
-        }
-      }
     },
-    [
-      commands,
-      queries,
-      snapshot,
-      models,
-      generation,
-      isPending,
-      isVideoItem,
-      localGenerateValues,
-      meta,
-      notify,
-      openWidget,
-      supportedModels,
-      t,
-      videoSnapshot,
-      widgets,
-    ]
+    [commands, isNonGenerateRun, meta, models, notify, openWidget, queries, snapshot, t]
   );
 
-  return { capabilities, isPending, recall };
+  return { ...availability, isPending, recall };
 };

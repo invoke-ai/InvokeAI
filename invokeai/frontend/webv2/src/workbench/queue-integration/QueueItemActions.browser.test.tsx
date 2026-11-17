@@ -21,6 +21,11 @@ vi.mock('@features/queue/publicApi', async (importOriginal) => ({
   }),
 }));
 
+// Recall has its own coverage (`app/QueueItemRecall.browser.test.tsx`); these cases are about the saved data.
+vi.mock('./useQueueItemRecall', () => ({
+  useQueueItemRecall: () => ({ capabilities: {}, isPending: true, reasons: {}, recall: () => Promise.resolve() }),
+}));
+
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const item = { batchId: 'batch-9', id: 9, status: 'failed' } as QueueItemReadModel;

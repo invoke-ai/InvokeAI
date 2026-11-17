@@ -29,17 +29,17 @@ afterEach(async () => {
   root = null;
 });
 
-const TRACK_INSET_PX = 10;
+const TRACK_INSET_PX = 6;
 const HOST_WIDTH_PX = 400;
 
 /** Hundredths below 1 (and leaving 1 downwards), whole units above. */
 const stepFor = (value: number, direction: 1 | -1) => (value < 1 || (direction < 0 && value === 1) ? 0.01 : 1);
 
-const mount = async (props: Partial<ScrubberFieldProps> = {}) => {
+const mount = async (props: Partial<ScrubberFieldProps> = {}, width = HOST_WIDTH_PX) => {
   const onChange = vi.fn();
 
   host = document.createElement('div');
-  host.style.width = `${HOST_WIDTH_PX}px`;
+  host.style.width = `${width}px`;
   document.body.append(host);
   root = createRoot(host);
 
@@ -158,6 +158,36 @@ describe('ScrubberField', () => {
     // The fill's rounded end wraps the thumb but stays close to it.
     expect(emptyClearance).toBeGreaterThan(0);
     expect(emptyClearance).toBeLessThanOrEqual(3.5);
+  });
+
+  it.each([425, 160])('keeps the thumb clear of the text at either end of a %ipx track', async (width) => {
+    const box = (element: Element) => element.getBoundingClientRect();
+    // The glyphs' own box, not the padded element.
+    const textBox = (element: Element) => {
+      const range = document.createRange();
+
+      range.selectNodeContents(element);
+
+      return range.getBoundingClientRect();
+    };
+    const part = (frame: HTMLElement, name: string) => frame.querySelector(`[data-part="${name}"]`)!;
+    // A visible gap rather than a thumb touching the first or last glyph.
+    const minGap = 4;
+
+    const empty = await mount({ label: 'HiDiffusion: T2 Ratio', max: 1, min: 0, step: 0.01, value: 0 }, width);
+    const label = textBox(part(empty.frame, 'label'));
+
+    expect(label.left - box(part(empty.frame, 'thumb')).right).toBeGreaterThanOrEqual(minGap);
+    // The fill's rounded end frames the thumb without reaching under the label.
+    expect(box(part(empty.frame, 'fill')).right).toBeLessThanOrEqual(label.left);
+    await act(() => root?.unmount());
+    host?.remove();
+
+    const full = await mount({ label: 'CFG rescale', max: 1, min: 0, step: 0.01, value: 1 }, width);
+
+    expect(box(part(full.frame, 'thumb')).left - textBox(part(full.frame, 'value')).right).toBeGreaterThanOrEqual(
+      minGap
+    );
   });
 
   it('scrubs relative to the current value from wherever the press lands, snapped to the step', async () => {
