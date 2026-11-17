@@ -32,7 +32,7 @@ Roles are read from the database on every request, so promoting or demoting some
 
 1. **Back up.** Stop InvokeAI and copy the `databases` folder in your root directory. See [Backups](#backups).
 
-2. **Edit `invokeai.yaml`** in your root directory and add `multiuser: true`. To let other computers on your network reach the server, also add `host: 0.0.0.0`:
+2. **Edit `invokeai.yaml`** in your root directory and add `multiuser: true`. To let other computers on your network reach the server, also add `host: 0.0.0.0`. Any `host` other than a loopback address (`127.0.0.1`, `::1`, `localhost`) turns multi-user mode on by itself, as a security feature, so a server on the network always requires sign-in:
 
    ```yaml
    multiuser: true

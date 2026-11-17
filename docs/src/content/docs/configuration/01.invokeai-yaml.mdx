@@ -69,6 +69,13 @@ The settings in this file will override the defaults. You only need
 to change this file if the default for a particular setting doesn't
 work for you.
 
+:::note[Serving to the network turns on sign-in]
+When `host` is anything other than a loopback address (`127.0.0.1`, `::1` or `localhost`), Invoke turns on
+[multi-user mode](/configuration/multi-user-mode/admin-guide/) even if `multiuser` is not set, and the first browser to
+open it is asked to create an administrator account. This is a security feature: without sign-in, anyone who can reach
+the server could view, change or delete your images, models and settings.
+:::
+
 You'll find an example file next to `invokeai.yaml` that shows the default values.
 
 Some settings, like [Model Marketplace API Keys], require the YAML
