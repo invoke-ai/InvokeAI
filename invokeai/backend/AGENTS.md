@@ -19,7 +19,7 @@
 
 ## Verification
 
-- Read `tests/AGENTS.md` and relevant suites in `tests/backend/`, `tests/model_identification/`, `tests/test_model_manager/`.
+- Read `tests/AGENTS.md` and relevant suites in `tests/backend/`, `tests/model_identification/`.
 - Small CPU fixtures plus targeted device checks. Use real tensor operations: they expose shape/dtype/numerical/memory errors mocks hide.
 - Cover affected failure cleanup, unsupported configurations, boundary shapes, cancellation. Unit tests never use user model/output directories and never routinely download large models.
 - Run focused pytest and root Ruff. Material inference changes: report hardware, dtype, shapes, measurements, untested platforms/model paths. CPU passes do not prove accelerator behavior.

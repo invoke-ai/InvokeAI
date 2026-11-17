@@ -135,7 +135,8 @@ describe('getApplyModelDefaultsPlan', () => {
   });
 
   it("applies the bundled VAE for the 'default' sentinel where the VAE is an optional component", () => {
-    const sd3: MainModelConfig = { ...sdxl({ vae: 'default' }), base: 'sd-3' };
+    // A Diffusers pipeline; a GGUF SD3 transformer requires its VAE.
+    const sd3: MainModelConfig = { ...sdxl({ vae: 'default' }), base: 'sd-3', format: 'diffusers' };
     const sd3Vae: VaeModelConfig = { base: 'sd-3', key: 'sd3-vae', name: 'SD3 VAE', type: 'vae' };
     const settings = { ...getDefaultGenerateSettings(sd3), vae: sd3Vae };
     const plan = getApplyModelDefaultsPlan(settings, sd3, [sd3Vae]);

@@ -1,3 +1,0 @@
-t2i --positive_prompt 'banana sushi' --seed 42
-compel --prompt 'strawberry sushi' | compel | noise | t2l --scheduler heun --steps 3 --scheduler ddim --link -3 conditioning positive_conditioning --link -2 conditioning negative_conditioning | l2i
-compel --prompt 'banana sushi' | compel | noise | t2l --scheduler heun --steps 3 --scheduler euler_a --link -3 conditioning positive_conditioning --link -2 conditioning negative_conditioning

@@ -67,6 +67,9 @@ vi.mock('@platform/browser/clipboard', async (importOriginal) => ({
   canCopyText: clipboard.canCopyText,
 }));
 
+/** These menus have no trigger; Zag keeps a menu it cannot place off-screen, so give it an anchor. */
+const ANCHORED_AT_ORIGIN = { getAnchorRect: () => ({ height: 0, width: 0, x: 0, y: 0 }) };
+
 const TRANSLATIONS: Record<string, string> = {
   'projects.exportFailed': 'Export failed',
   'widgets.labels.workflow': 'Workflow',
@@ -241,7 +244,7 @@ describe('WorkflowMenuItems', () => {
       root.render(
         <ChakraProvider value={system}>
           <WorkflowUiProvider adapter={adapter}>
-            <Menu.Root open>
+            <Menu.Root open positioning={ANCHORED_AT_ORIGIN}>
               <Menu.Positioner>
                 <Menu.Content>
                   <WorkflowMenuItems region="center" runtime={TEST_RUNTIME} />
@@ -598,7 +601,7 @@ describe('WorkflowHeaderActions', () => {
               <div style={{ containerType: 'inline-size', width }}>
                 <WorkflowHeaderActions region="center" runtime={TEST_RUNTIME} />
               </div>
-              <Menu.Root open>
+              <Menu.Root open positioning={ANCHORED_AT_ORIGIN}>
                 <Menu.Positioner>
                   <Menu.Content>
                     <WorkflowMenuItems region="center" runtime={TEST_RUNTIME} />
@@ -655,7 +658,7 @@ describe('WorkflowHeaderActions', () => {
         <div style={{ containerType: 'inline-size', width }}>
           <WorkflowHeaderActions region={region} runtime={TEST_RUNTIME} />
         </div>
-        <Menu.Root open>
+        <Menu.Root open positioning={ANCHORED_AT_ORIGIN}>
           <Menu.Positioner>
             <Menu.Content>
               <WorkflowMenuItems region={region} runtime={TEST_RUNTIME} />

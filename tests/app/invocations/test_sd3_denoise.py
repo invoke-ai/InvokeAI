@@ -15,10 +15,10 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 DENOISE = "invokeai.app.invocations.sd3.sd3_denoise"
 
 
-class _Transformer:
+class _Transformer(torch.nn.Module):
     config = SimpleNamespace(in_channels=16, joint_attention_dim=8)
 
-    def __call__(self, *, hidden_states: torch.Tensor, **_kwargs) -> tuple[torch.Tensor]:
+    def forward(self, *, hidden_states: torch.Tensor, **_kwargs) -> tuple[torch.Tensor]:
         return (torch.zeros_like(hidden_states),)
 
 

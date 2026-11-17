@@ -125,15 +125,8 @@ export const Select = <T extends CollectionItem>({
   // before it (or the trigger grows to hold it) instead of running under it.
   const isIndicatorInTrigger = insideLabel !== null || fitContent;
   // Zag names the trigger by the field's label but leaves its help and error text to the hidden select.
-  const fieldControlProps = field?.getInputProps();
   const describedBy =
-    [
-      fieldControlProps?.['aria-describedby'],
-      fieldControlProps?.['aria-errormessage'],
-      triggerProps?.['aria-describedby'],
-    ]
-      .filter(Boolean)
-      .join(' ') || undefined;
+    [field?.ariaDescribedby, triggerProps?.['aria-describedby']].filter(Boolean).join(' ') || undefined;
   const itemsRef = useRef<HTMLDivElement>(null);
   const scrollToIndexFn = useCallback(({ index }: { index: number }) => {
     const options = itemsRef.current?.querySelectorAll('[role="option"]');
