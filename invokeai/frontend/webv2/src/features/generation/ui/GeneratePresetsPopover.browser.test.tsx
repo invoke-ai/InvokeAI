@@ -331,17 +331,26 @@ describe('GeneratePresetsPopover', () => {
     expect(stored.current[0]!.values).toBe(presetValues);
   });
 
-  it('leaves the update off after an applied preset is undone back to the earlier settings', async () => {
-    const presetValues = { ...getDefaultGenerateSettings(model), steps: 12 };
+  it("puts back the update target an apply's Undo returns to, so Update never overwrites the undone preset", async () => {
+    const presetA = { ...getDefaultGenerateSettings(model), steps: 12 };
+    const presetB = { ...getDefaultGenerateSettings(model), steps: 20 };
     const values = { current: { ...getDefaultGenerateSettings(model), model, steps: 30 } as Record<string, unknown> };
     const undoable = vi.fn();
+    const update = vi.fn();
     const buildAdapter = () =>
       ({
         ...ADAPTER,
         generateValues: { getSnapshot: () => values.current, subscribe: () => () => {} },
         models: { ...ADAPTER.models, catalog: [model] },
         notifications: { ...ADAPTER.notifications, undoable },
-        presets: { ...ADAPTER.presets, presets: [{ id: 'p', label: 'Mine', values: presetValues }] },
+        presets: {
+          ...ADAPTER.presets,
+          presets: [
+            { id: 'a', label: 'Alpha', values: presetA },
+            { id: 'b', label: 'Beta', values: presetB },
+          ],
+          update,
+        },
         settings: {
           ...ADAPTER.settings,
           patchGenerateSettings: (patch: Record<string, unknown>) => {
@@ -350,22 +359,39 @@ describe('GeneratePresetsPopover', () => {
           readGenerateValues: () => values.current,
         },
       }) as unknown as GenerationUiAdapter;
+    const openTrigger = () =>
+      act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label^="widgets.generate.presets"]')!));
     const updateButton = () =>
       document.querySelector<HTMLButtonElement>('[aria-label^="widgets.generate.updatePreset"]')!;
+    const applyAndUndo = async (label: string) => {
+      await openTrigger();
+      await clickPreset(label);
+      await act(() => undoable.mock.lastCall![1].onUndo());
+      await renderAdapter(buildAdapter());
+    };
     await renderAdapter(buildAdapter());
-    await openPresets();
-    await clickPreset('Mine');
-    await act(() => undoable.mock.calls[0]![1].onUndo());
-    await renderAdapter(buildAdapter());
-    await openPresets();
 
-    expect(values.current).toMatchObject({ steps: 30 });
-    expect(updateButton().disabled).toBe(true);
-
+    // Nothing was loaded before the apply, so after its Undo there is nothing to update, even after an edit.
+    await applyAndUndo('Alpha');
     values.current = { ...values.current, steps: 31 };
     await renderAdapter(buildAdapter());
+    await openTrigger();
+    expect(updateButton().disabled).toBe(true);
+    await act(() => userEvent.keyboard('{Escape}'));
 
-    expect(updateButton().disabled).toBe(false);
+    // Apply A, apply B, undo B, edit: Update targets A.
+    await openTrigger();
+    await clickPreset('Alpha');
+    await renderAdapter(buildAdapter());
+    await applyAndUndo('Beta');
+    expect(values.current).toMatchObject({ steps: 12 });
+    values.current = { ...values.current, steps: 13 };
+    await renderAdapter(buildAdapter());
+    await openTrigger();
+
+    expect(updateButton().getAttribute('aria-label')).toBe('widgets.generate.updatePresetNamed');
+    await act(() => userEvent.click(updateButton()));
+    expect(update).toHaveBeenCalledExactlyOnceWith('a', expect.objectContaining({ steps: 13 }));
   });
 
   it('deletes a preset at once, and its Undo puts it back where it was, active again while the settings match', async () => {

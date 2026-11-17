@@ -239,20 +239,14 @@ export const GeneratePresetsPopover = () => {
     return index >= 0 ? (presets[index] ?? null) : null;
   }, [presetKeys, presets, settings]);
 
-  // The preset last applied or saved in this project; Update overwrites it once the settings stop matching it. Back at
-  // the settings from before the apply (its Undo), the user has left the preset, so there is nothing to update.
-  const [loaded, setLoaded] = useState<{ beforeKey?: string; presetId: string; projectId: typeof projectId } | null>(
-    null
-  );
+  // The preset last applied or saved in this project; Update overwrites it once the settings stop matching it. An
+  // apply's Undo puts back the one loaded before it.
+  const [loaded, setLoaded] = useState<{ presetId: string; projectId: typeof projectId } | null>(null);
   const loadedIndex = loaded?.projectId === projectId ? presets.findIndex((p) => p.id === loaded.presetId) : -1;
   const loadedPreset = presets[loadedIndex] ?? null;
   const loadedKey = presetKeys[loadedIndex];
   const currentLoadedKey = settings && loadedKey ? getPresetComparisonKey(settings, loadedKey.keptKeys) : null;
-  const canUpdate =
-    canSave &&
-    currentLoadedKey !== null &&
-    currentLoadedKey !== loadedKey?.key &&
-    currentLoadedKey !== loaded?.beforeKey;
+  const canUpdate = canSave && currentLoadedKey !== null && currentLoadedKey !== loadedKey?.key;
 
   const handleOpenChange = useCallback((event: { open: boolean }) => {
     setIsOpen(event.open);
@@ -302,23 +296,21 @@ export const GeneratePresetsPopover = () => {
         after: { ...before, ...patch },
         before,
         message,
+        // Only while this apply's preset is still the target; a Save since keeps its own.
+        onUndone: () =>
+          setLoaded((current) =>
+            current?.presetId === record.id && current.projectId === projectId ? loaded : current
+          ),
         projectId,
         slot: 'settings',
         t,
         title: t('widgets.generate.presetApplied', { name: record.label }),
         ui,
       });
-      const beforeSettings = normalizeGenerateSettings(before);
-      const keptKeys = getPresetKeptKeys(record);
-
-      setLoaded({
-        beforeKey: beforeSettings ? getPresetComparisonKey(beforeSettings, keptKeys) : undefined,
-        presetId: record.id,
-        projectId,
-      });
+      setLoaded({ presetId: record.id, projectId });
       setIsOpen(false);
     },
-    [i18n.resolvedLanguage, models, projectId, supportedModels, t, ui]
+    [i18n.resolvedLanguage, loaded, models, projectId, supportedModels, t, ui]
   );
 
   const [includePrompts, setIncludePrompts] = useState(ui.presets.includePrompts);
