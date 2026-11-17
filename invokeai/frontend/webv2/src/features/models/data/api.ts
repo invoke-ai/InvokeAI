@@ -2,6 +2,7 @@ import type {
   BulkDeleteModelsResponse,
   BulkReidentifyModelsResponse,
   DeleteOrphanedModelsResponse,
+  EmptyModelCacheResponse,
   FoundModel,
   HFTokenStatus,
   HuggingFaceModels,
@@ -214,9 +215,8 @@ export const deleteOrphanedModels = (paths: string[], signal?: AbortSignal): Pro
     signal,
   });
 
-export const emptyModelCache = async (signal?: AbortSignal): Promise<void> => {
-  await request(`${MODELS_BASE}/empty_model_cache`, { method: 'POST', signal });
-};
+export const emptyModelCache = (signal?: AbortSignal): Promise<EmptyModelCacheResponse> =>
+  requestJson<EmptyModelCacheResponse>(`${MODELS_BASE}/empty_model_cache`, { method: 'POST', signal });
 
 /** External image-provider credentials (OpenAI, Gemini, ...). */
 
