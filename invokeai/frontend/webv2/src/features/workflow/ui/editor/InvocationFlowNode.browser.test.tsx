@@ -2778,8 +2778,8 @@ describe('InvocationFlowNode header, states and field rows', () => {
     // The reason is read with the control but not drawn under it.
     const description = node('row-node').querySelector<HTMLElement>('[data-part="error-text"]')!;
     expect(description.textContent).toBe('A is required.');
-    // The field links it as the control's error message, as it does in the form view.
-    expect(control.getAttribute('aria-errormessage')).toBe(description.id);
+    // The field links it to the control's description, as it does in the form view.
+    expect(control.getAttribute('aria-describedby')?.split(' ')).toContain(description.id);
     expect(description.getBoundingClientRect().height).toBeLessThanOrEqual(1);
 
     await act(() => userEvent.hover(title));
