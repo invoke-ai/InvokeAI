@@ -41,7 +41,7 @@ const getArchitectureCapabilities = vi.fn<() => Promise<ArchitectureCapabilities
 const modelManager = vi.hoisted(() => ({ open: null as ((modelKey: string) => void) | null }));
 const noop = () => undefined;
 const generationAdapter = {
-  sectionPreferences: { sectionsOpen: {}, setSectionOpen: noop },
+  sectionPreferences: { sectionsOpen: {}, setSectionsOpen: noop },
 } as unknown as GenerationUiAdapter;
 
 let store: WorkbenchInternalStore;
@@ -52,7 +52,9 @@ vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => getArchitectureCapabilities(),
 }));
 vi.mock('react-i18next', () => {
-  const t = (key: string) => key;
+  // A count shows after its key, so a section's issue count can be read.
+  const t = (key: string, values?: { count?: number }) =>
+    values?.count === undefined ? key : `${key}:${values.count}`;
   return { useTranslation: () => ({ i18n: { resolvedLanguage: 'en' }, t }) };
 });
 vi.mock('@features/models', async (importOriginal) => ({
@@ -192,6 +194,141 @@ describe('Upscale Refine and Model only modes', () => {
     expect(storedValues()).toMatchObject({ creativity: 5, mode: 'refine' });
     expect(sectionLabels()).toHaveLength(3);
     expect(host.textContent).not.toContain('widgets.upscale.nativeScale');
+  });
+});
+
+describe('Upscale section issues', () => {
+  const title = (label: string) =>
+    [...host.querySelectorAll<HTMLElement>('.generate-section > [data-part="trigger"]')].find((trigger) =>
+      trigger.textContent?.startsWith(label)
+    )!;
+  const chip = (label: string) => title(label).querySelector<HTMLElement>('[data-section-chip]')!;
+  const issueCount = (label: string) => {
+    const count = title(label).querySelector('[data-section-issues]');
+
+    return count
+      ? { shown: count.querySelector(':scope > span[aria-hidden]')?.textContent, spoken: count.textContent }
+      : null;
+  };
+
+  it("counts and tints the sections holding Invoke's issues, and leaves the rest plain", async () => {
+    getArchitectureCapabilities.mockResolvedValue(architectureCapabilitiesFixture);
+    store.commands.widgets.patchValues('upscale', {
+      ...createDefaultUpscaleWidgetValues(),
+      inputImage: null,
+      scale: 99,
+      upscaleModel: modelSnapshot.models[1] as never,
+    });
+
+    await renderUpscale();
+
+    // No input image and a Scale past its range, both fixed under Source & treatment.
+    expect(issueCount('widgets.upscale.sourceAndTreatment')).toEqual({
+      shown: '2',
+      spoken: '2widgets.generate.issueCount:2',
+    });
+    expect(chip('widgets.upscale.sourceAndTreatment').hasAttribute('data-issues')).toBe(true);
+    expect(issueCount('widgets.upscale.detailGuidance')).toBeNull();
+    expect(chip('widgets.upscale.detailGuidance').hasAttribute('data-issues')).toBe(false);
+    expect(getComputedStyle(chip('widgets.upscale.sourceAndTreatment')).backgroundColor).not.toBe(
+      getComputedStyle(chip('widgets.upscale.detailGuidance')).backgroundColor
+    );
+
+    // Fixing one leaves the other counted.
+    await settle(() => store.commands.widgets.patchValues('upscale', { scale: 2 }));
+
+    expect(issueCount('widgets.upscale.sourceAndTreatment')?.shown).toBe('1');
+  });
+
+  it('counts as soon as the served table arrives, while the model list is still loading', async () => {
+    let serveTable: (rows: ArchitectureCapabilitiesRow[]) => void = noop;
+    getArchitectureCapabilities.mockReturnValue(
+      new Promise((resolve) => {
+        serveTable = resolve;
+      })
+    );
+    store.commands.widgets.patchValues('upscale', {
+      ...createDefaultUpscaleWidgetValues(),
+      inputImage: null,
+      upscaleModel: modelSnapshot.models[1] as never,
+    });
+    modelSnapshot.status = 'loading';
+
+    try {
+      await renderUpscale();
+      await settle(() => serveTable(architectureCapabilitiesFixture));
+
+      // Invoke lists the missing input image now, so Source & treatment counts it now.
+      expect(issueCount('widgets.upscale.sourceAndTreatment')?.shown).toBe('1');
+    } finally {
+      modelSnapshot.status = 'loaded';
+    }
+  });
+});
+
+describe('Upscale field limits from the served table', () => {
+  it("bounds CFG by the model's served cap as soon as the table arrives, while the model list is still loading", async () => {
+    let serveTable: (rows: ArchitectureCapabilitiesRow[]) => void = noop;
+    getArchitectureCapabilities.mockReturnValue(
+      new Promise((resolve) => {
+        serveTable = resolve;
+      })
+    );
+    // `flux2_denoise` takes guidance up to 20.
+    const flux2Dev = {
+      base: 'flux2',
+      format: 'diffusers',
+      hash: 'f',
+      key: 'flux2-dev',
+      name: 'FLUX.2 dev',
+      type: 'main',
+      variant: 'dev',
+    };
+    store.commands.widgets.patchValues('upscale', {
+      ...createDefaultUpscaleWidgetValues(),
+      cfgScale: 25,
+      model: flux2Dev as never,
+    });
+    modelSnapshot.status = 'loading';
+
+    try {
+      await renderUpscale();
+      await settle(() => serveTable(architectureCapabilitiesFixture));
+
+      expect(host.textContent).toContain('widgets.upscale.cfgScale must be between 1 and 20.');
+    } finally {
+      modelSnapshot.status = 'loaded';
+    }
+  });
+});
+
+describe('Upscale scheduler options from the served table', () => {
+  it("lists the model's served schedulers as soon as the table arrives, while the model list is still loading", async () => {
+    let serveTable: (rows: ArchitectureCapabilitiesRow[]) => void = noop;
+    getArchitectureCapabilities.mockReturnValue(
+      new Promise((resolve) => {
+        serveTable = resolve;
+      })
+    );
+    // FLUX.1 runs the flow schedulers, whose Heun is the second-order one.
+    const flux = { base: 'flux', format: 'diffusers', hash: 'x', key: 'flux-dev', name: 'FLUX.1 dev', type: 'main' };
+    store.commands.widgets.patchValues('upscale', {
+      ...createDefaultUpscaleWidgetValues(),
+      model: flux as never,
+      scheduler: 'heun',
+    });
+    modelSnapshot.status = 'loading';
+
+    try {
+      await renderUpscale();
+      await settle(() => serveTable(architectureCapabilitiesFixture));
+
+      expect(host.querySelector<HTMLInputElement>('input[aria-label="widgets.upscale.scheduler"]')?.value).toBe(
+        'Heun (2nd order)'
+      );
+    } finally {
+      modelSnapshot.status = 'loaded';
+    }
   });
 });
 

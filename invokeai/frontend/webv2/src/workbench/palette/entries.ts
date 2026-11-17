@@ -206,6 +206,8 @@ const PALETTE_HIDDEN_COMMANDS = new Set([
   'gallery.moveFocusRight',
   'gallery.moveFocusUp',
   'gallery.toggleFocusedInSelection',
+  // Acts on the focused queue row, which the palette has taken focus from.
+  'queue.recallAll',
   'viewer.nextItem',
   'viewer.previousItem',
 ]);
@@ -229,6 +231,7 @@ const APP_COMMAND_GROUPS: Record<string, string> = {
   'app.selectQueueTab': 'Navigation',
   'app.selectUpscalingTab': 'Navigation',
   'app.selectWorkflowsTab': 'Navigation',
+  'app.switchWorkflowView': 'Workflows',
   'app.toggleLeftPanel': 'Layout',
   'app.togglePanels': 'Layout',
   'app.togglePreview': 'Layout',
