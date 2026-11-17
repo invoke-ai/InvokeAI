@@ -15,10 +15,11 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 DENOISE = "invokeai.app.invocations.sd3.sd3_denoise"
 
 
-class _RecordingTransformer:
+class _RecordingTransformer(torch.nn.Module):
     config = SimpleNamespace(in_channels=16, joint_attention_dim=8)
 
     def __init__(self) -> None:
+        super().__init__()
         self.calls: list[dict[str, torch.Tensor]] = []
 
     def __call__(
