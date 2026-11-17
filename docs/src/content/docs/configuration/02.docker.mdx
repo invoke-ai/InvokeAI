@@ -31,7 +31,11 @@ Ensure your Docker setup is able to use your GPU. The CUDA image needs an Nvidia
 docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai
 ```
 
-Once the container starts up, open [http://localhost:9090](http://localhost:9090) in your browser, install some models, and start generating.
+Once the container starts up, open [http://localhost:9090](http://localhost:9090) in your browser, create the administrator account, install some models, and start generating.
+
+:::note[Sign-in is always on in Docker]
+The image listens on `0.0.0.0` so that the published port reaches it, and Invoke turns on [multi-user mode](/configuration/multi-user-mode/admin-guide/) whenever it listens beyond loopback. This is a security feature: without sign-in, anyone who can reach the port could view, change or delete your images, models and settings. The first browser to open Invoke is asked to create the administrator account. Projects made before this in single-user mode stay hidden while sign-in is on (see [What happens to existing data](/configuration/multi-user-mode/admin-guide/#what-happens-to-existing-data)). Scripts that call the API need a token; see the [API guide](/configuration/multi-user-mode/api-guide/).
+:::
 
 ### AMD GPUs (ROCm)
 
@@ -95,7 +99,7 @@ b: set `GPU_DRIVER=rocm` in the `.env` file and use the `build.sh` script, provi
 
 Use the standard `docker compose up` command, and generally the `docker compose` [CLI](https://docs.docker.com/compose/reference/) as usual.
 
-Once the container starts up (and configures the InvokeAI root directory if this is a new installation), you can access InvokeAI at [http://localhost:9090](http://localhost:9090)
+Once the container starts up (and configures the InvokeAI root directory if this is a new installation), you can access InvokeAI at [http://localhost:9090](http://localhost:9090) and create the administrator account
 
 ## Troubleshooting / FAQ
 

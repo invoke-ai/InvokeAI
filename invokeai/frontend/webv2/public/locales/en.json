@@ -384,7 +384,7 @@
     "sessionEndingTitle": "Your session ends soon",
     "sessionEndingDescription": "You'll be signed out at {{time}} if nothing is edited, saved or queued before then. Signing back in returns you here.",
     "setupFooter": "You can add more users later from Users in the Launchpad.",
-    "setupSubtitle": "Create the administrator account to get started. Invoke requires sign-in whenever other computers can reach it. This is a security feature: it keeps anyone who finds this server from viewing, changing or deleting your work.",
+    "setupSubtitle": "Create the administrator account to get started. Sign-in is a security feature: it keeps anyone else who can reach this server from viewing, changing or deleting your work.",
     "setupTitle": "Set up Invoke",
     "showPassword": "Show password",
     "signIn": "Sign in",

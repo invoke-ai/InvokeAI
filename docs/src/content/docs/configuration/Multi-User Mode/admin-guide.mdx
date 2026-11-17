@@ -61,7 +61,7 @@ Browsers turn off the clipboard and Web Locks for plain-HTTP pages at a network 
 InvokeAI cannot recover a password. If you lose the last administrator's password, reset it from the command line with [`invoke-usermod`](#troubleshooting).
 :::
 
-To go back to single-user mode, set `multiuser: false` (or remove the line) and restart. Browsers that had InvokeAI open may need a hard refresh.
+To go back to single-user mode, set `multiuser: false` (or remove the line), set `host` to a loopback address such as `127.0.0.1` (any other `host` keeps multi-user mode on), and restart. Browsers that had InvokeAI open may need a hard refresh.
 
 ### What happens to existing data
 

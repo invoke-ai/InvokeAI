@@ -93,11 +93,11 @@ def require_auth_off_loopback(config: "InvokeAIAppConfig", logger: logging.Logge
         return
     config.multiuser = True
     logger.warning(
-        f"Invoke is listening on {config.host}, which other computers can reach, so multiuser mode is on even though "
-        "`multiuser` is not set. This is a security feature: without sign-in, anyone who can reach the server could "
+        f"Invoke is listening on {config.host}, which other computers can reach, so multiuser mode is on whatever "
+        "`multiuser` says. This is a security feature: without sign-in, anyone who can reach the server could "
         "view, change or delete your images, models and settings. If no administrator account exists yet, open Invoke "
-        "in a browser to create one. To use Invoke without signing in, set `host: 127.0.0.1` so that only this "
-        "computer can reach it."
+        "in a browser to create one. Projects made in single-user mode stay hidden until single-user mode returns. "
+        "To use Invoke without signing in, set `host: 127.0.0.1` so that only this computer can reach it."
     )
 
 
