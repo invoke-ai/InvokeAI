@@ -16,7 +16,15 @@ import {
 } from '@features/workflow/utility';
 import { describe, expect, it } from 'vitest';
 
-import { getWorkflowEdgeData, toFlowEdges, toFlowNodes, withNodeSelection } from './flowAdapters';
+import {
+  getCollapsedEdgeLayout,
+  getWorkflowEdgeData,
+  toFlowEdges,
+  toFlowNodes,
+  withCollapsedEdgeSiblings,
+  withCollapsedGroupSelection,
+  withNodeSelection,
+} from './flowAdapters';
 
 const single = (name: string): FieldType => ({ batch: false, cardinality: 'SINGLE', name });
 const collection = (name: string): FieldType => ({ batch: false, cardinality: 'COLLECTION', name });
@@ -369,5 +377,135 @@ describe('flowAdapters identity preservation', () => {
     expect(highlighted[0]?.animated).toBeUndefined();
     expect(highlighted[0]?.className).toBe('workflow-selected-node-edge');
     expect(highlighted[0]?.style).toEqual({ strokeWidth: 2 });
+  });
+});
+
+describe('collapsed edges', () => {
+  const collapsed = (id: string): WorkflowInvocationNode => ({
+    ...createNode(id),
+    data: { ...createNode(id).data, isOpen: false },
+  });
+  // a and b are collapsed with two edges between them; c is open, fed by collapsed a.
+  const doc = createDoc({
+    edges: [createEdge('ab1', 'a', 'b'), createEdge('ab2', 'a', 'b', 'value', 'b2'), createEdge('ac', 'a', 'c')],
+    nodes: [collapsed('a'), collapsed('b'), createNode('c')],
+  });
+
+  it('draws the edges between two collapsed nodes as one, with its count, and leaves the rest as they are', () => {
+    const edges = toFlowEdges(doc, [], 'default', undefined, createTemplates());
+    const byId = new Map(edges.map((edge) => [edge.id, edge]));
+
+    expect(byId.get('ab1')?.hidden).toBeUndefined();
+    expect(byId.get('ab1')?.data?.collapsedEdgeIds).toEqual(['ab1', 'ab2']);
+    expect(byId.get('ab2')?.hidden).toBe(true);
+    expect(byId.get('ac')?.hidden).toBeUndefined();
+    expect(byId.get('ac')?.data?.collapsedEdgeIds).toBeUndefined();
+    // Every flow edge keeps its document endpoints: collapsing changes only how they draw.
+    expect(
+      edges.map(({ id, source, sourceHandle, target, targetHandle }) => ({
+        id,
+        source,
+        sourceHandle,
+        target,
+        targetHandle,
+      }))
+    ).toEqual(
+      doc.edges.map(({ id, source, sourceHandle, target, targetHandle }) => ({
+        id,
+        source,
+        sourceHandle,
+        target,
+        targetHandle,
+      }))
+    );
+  });
+
+  it('keeps each edge’s own type data, so a view drawing every node open draws it as itself', () => {
+    const typed = toFlowEdges(doc, [], 'default', undefined, createTemplates());
+    const open = toFlowEdges(
+      { ...doc, nodes: [createNode('a'), createNode('b'), createNode('c')] },
+      [],
+      'default',
+      undefined,
+      createTemplates()
+    );
+
+    for (const edge of typed) {
+      const { collapsedEdgeIds: _collapsedEdgeIds, ...data } = edge.data ?? {};
+      expect(data).toEqual(open.find((other) => other.id === edge.id)?.data);
+    }
+  });
+
+  it('lets no end at a merged port be dragged, and keeps the open end of a single edge movable', () => {
+    const fed = { ...doc, edges: [...doc.edges, createEdge('cb', 'c', 'b')] };
+    const ends = new Map(
+      toFlowEdges(fed, [], 'default', undefined, createTemplates()).map((edge) => [edge.id, edge.reconnectable])
+    );
+
+    expect(ends.get('ab1')).toBe(false);
+    expect(ends.get('ab2')).toBe(false);
+    expect(ends.get('ac')).toBe('target');
+    expect(ends.get('cb')).toBe('source');
+    expect(toFlowEdges(createDoc(), [], 'default', undefined, createTemplates())[0]?.reconnectable).toBeUndefined();
+  });
+
+  it('selects a group as one, so its drawn edge and the edges it stands for always agree', () => {
+    // An edge selected while both nodes were open stays selected when they collapse: so is the rest of its group.
+    const openDoc = { ...doc, nodes: [createNode('a'), createNode('b'), createNode('c')] };
+    const selectedWhileOpen = toFlowEdges(openDoc).map((edge) => ({ ...edge, selected: edge.id === 'ab2' }));
+    const collapsedEdges = toFlowEdges(doc, selectedWhileOpen);
+
+    expect(collapsedEdges.filter((edge) => edge.selected).map((edge) => edge.id)).toEqual(['ab1', 'ab2']);
+    expect(collapsedEdges.find((edge) => edge.id === 'ac')?.selected).toBe(false);
+  });
+
+  it('selects a group by its drawn edge, ignoring changes xyflow reports for the hidden edges', () => {
+    const state = (selected: string[]) => ['ab1', 'ab2', 'ac'].map((id) => ({ id, selected: selected.includes(id) }));
+    const select = (id: string, selected: boolean) => ({ id, selected, type: 'select' as const });
+
+    expect(getCollapsedEdgeLayout(doc)).toBe(getCollapsedEdgeLayout(doc));
+    // Selecting the drawn edge selects the edge it hides.
+    expect(withCollapsedGroupSelection(doc, [select('ab1', true), select('ac', false)], state(['ac']))).toEqual([
+      select('ab1', true),
+      select('ac', false),
+      select('ab2', true),
+    ]);
+    // Clicking the selected drawn edge again: xyflow reports only the hidden edge's deselect. The group stays.
+    expect(withCollapsedGroupSelection(doc, [select('ab2', false)], state(['ab1', 'ab2']))).toEqual([]);
+    // Clicking the drawn edge while the group is half selected (a hidden edge selected with others): xyflow selects it
+    // and deselects the rest, the hidden edge among them. That deselect is dropped: the group is selected, the rest not.
+    expect(
+      withCollapsedGroupSelection(
+        doc,
+        [select('ab1', true), select('ab2', false), select('ac', false)],
+        state(['ab2', 'ac'])
+      )
+    ).toEqual([select('ab1', true), select('ac', false)]);
+    // Clearing everything deselects the drawn edge, and so the group.
+    expect(
+      withCollapsedGroupSelection(
+        doc,
+        [select('ab1', false), select('ab2', false), select('ac', false)],
+        state(['ab1', 'ab2', 'ac'])
+      )
+    ).toEqual([select('ab1', false), select('ac', false), select('ab2', false)]);
+    // Nothing collapsed: the changes pass through.
+    const open = [select('e1', true)];
+    expect(withCollapsedGroupSelection(createDoc(), open, [{ id: 'e1', selected: false }])).toEqual(open);
+  });
+
+  it('restores every edge when either node opens', () => {
+    const opened = { ...doc, nodes: [createNode('a'), collapsed('b'), createNode('c')] };
+    const edges = toFlowEdges(opened, toFlowEdges(doc), 'default', undefined, createTemplates());
+
+    expect(edges.every((edge) => edge.hidden === undefined && edge.data?.collapsedEdgeIds === undefined)).toBe(true);
+  });
+
+  it('widens a collapsed edge to every edge it stands for, and leaves other edges alone', () => {
+    expect(withCollapsedEdgeSiblings(doc, ['ab2'])).toEqual(['ab1', 'ab2']);
+    expect(withCollapsedEdgeSiblings(doc, ['ac', 'ab1'])).toEqual(['ac', 'ab1', 'ab2']);
+    expect(
+      withCollapsedEdgeSiblings({ ...doc, nodes: [createNode('a'), collapsed('b'), createNode('c')] }, ['ab1'])
+    ).toEqual(['ab1']);
   });
 });

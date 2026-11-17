@@ -1,7 +1,6 @@
-import { Box, HStack, Icon, Popover, Portal, Slider, Stack, Text } from '@chakra-ui/react';
+import { Box, Icon, Popover, Portal, Slider, Stack, Text } from '@chakra-ui/react';
 import {
   useWorkflowNotifications,
-  useWorkflowUi,
   useWorkflowPreferencesSelector,
   useWorkflowProjectSelector,
 } from '@features/workflow/ui/WorkflowUiContext';
@@ -17,16 +16,14 @@ import {
   LayoutGridIcon,
   CircleArrowUpIcon,
   MaximizeIcon,
-  Redo2Icon,
-  Undo2Icon,
   ZoomInIcon,
   ZoomOutIcon,
 } from 'lucide-react';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
+import { useCallback, useId, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { WORKFLOW_FIT_PADDING } from './flowInstanceStore';
+import { exportWorkflowPng, useWorkflowPngExportState } from './workflowPngExport';
 
 /**
  * Pane drag follows the selected pan/box/lasso tool; eraser clicks delete. Shift selects while panning, and middle
@@ -51,61 +48,36 @@ const TOOLTIP_POSITIONING = { placement: 'right-start' } as const;
  */
 const EDITOR_TOOLBAR_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 
-const waitForExportFrame = () =>
-  new Promise<void>((resolve) => {
-    if (document.visibilityState === 'hidden') {
-      window.setTimeout(resolve, 0);
-    } else {
-      window.requestAnimationFrame(() => resolve());
-    }
-  });
-
 export const EditorToolbar = ({
   arrangeScope = null,
-  canRedo = false,
-  canUndo = false,
   nodeOpacity,
   tool,
   updatableNodeCount = 0,
   onArrangeNodes,
-  onExportPrepare,
-  onExportComplete,
   onNodeOpacityChange,
-  onRedo,
   onToolChange,
-  onUndo,
   onUpdateNodes,
 }: {
   /** What Arrange would lay out: the selection, the whole graph, or nothing (fewer than two nodes). */
   arrangeScope?: 'all' | 'selection' | null;
-  /** Whether the workflow's session history has an edit to redo or undo. */
-  canRedo?: boolean;
-  canUndo?: boolean;
   nodeOpacity: number;
   tool: EditorTool;
   /** Nodes with a newer same-major template; the update button shows only while there are some. */
   updatableNodeCount?: number;
   onArrangeNodes?: () => void;
   onNodeOpacityChange: (opacity: number) => void;
-  onExportPrepare: () => Promise<HTMLElement>;
-  onExportComplete: () => void;
-  onRedo?: () => void;
   onToolChange: (tool: EditorTool) => void;
-  onUndo?: () => void;
   onUpdateNodes?: () => void;
 }) => {
   const { t } = useTranslation();
-  const { fitView, getNodes, getNodesBounds, zoomIn, zoomOut } = useReactFlow();
+  const { fitView, zoomIn, zoomOut } = useReactFlow();
   const reduceMotion = useWorkflowPreferencesSelector((preferences) => preferences.reduceMotion);
   const workflowName = useWorkflowProjectSelector((project) => project.activeWorkflow.document.name);
   const notifications = useWorkflowNotifications();
   const opacityTriggerId = useId();
-  const isExportingWorkflowRef = useRef(false);
   const exportButtonRef = useRef<HTMLButtonElement>(null);
-  const [isExportingWorkflow, setIsExportingWorkflow] = useState(false);
+  const { isExporting: isExportingWorkflow } = useWorkflowPngExportState();
   const fitViewDuration = reduceMotion ? 0 : 300;
-  const fallbackWorkflowName = t('widgets.workflow.untitled');
-  const exportFailedLabel = t('widgets.workflow.exportImageFailed');
   const opacityIds = useMemo(() => ({ trigger: opacityTriggerId }), [opacityTriggerId]);
   const opacityValue = useMemo(() => [Math.round(nodeOpacity * 100)], [nodeOpacity]);
   const onZoomInClick = useCallback(() => void zoomIn(), [zoomIn]);
@@ -115,61 +87,15 @@ export const EditorToolbar = ({
     [fitView, fitViewDuration]
   );
   const onExportWorkflowClick = useCallback(() => {
-    if (isExportingWorkflowRef.current) {
-      return;
-    }
-
-    isExportingWorkflowRef.current = true;
     const hadFocus = document.activeElement === exportButtonRef.current;
-    setIsExportingWorkflow(true);
-    void (async () => {
-      try {
-        const { exportWorkflowAsPng, preflightWorkflowImageExport } = await import('./workflowImageExport');
-        const bounds = getNodesBounds(getNodes());
-        // Refuse from the live editor's bounds before mounting the whole graph a second time.
-        let outcome = preflightWorkflowImageExport(bounds);
-        if (!outcome) {
-          const flowElement = await onExportPrepare();
-          await waitForExportFrame();
-          await waitForExportFrame();
-          outcome = await exportWorkflowAsPng({ bounds, fallbackWorkflowName, flowElement, workflowName });
-        }
-        if (outcome.status === 'busy') {
-          notifications.info(t('widgets.workflow.exportImageBusy'));
-        } else if (outcome.status === 'too-large') {
-          notifications.error(
-            t('widgets.workflow.exportImageTooLarge'),
-            t('widgets.workflow.exportImageTooLargeDetail')
-          );
-        } else if (outcome.status === 'exported' && outcome.reduced) {
-          notifications.info(
-            t('widgets.workflow.exportImageReduced'),
-            t('widgets.workflow.exportImageReducedDetail', { height: outcome.height, width: outcome.width })
-          );
-        }
-      } catch {
-        notifications.error(exportFailedLabel);
-      } finally {
-        isExportingWorkflowRef.current = false;
-        flushSync(() => setIsExportingWorkflow(false));
-        // The busy camera is disabled, which drops its focus; return it unless focus has moved on since.
-        if (hadFocus && document.activeElement === document.body) {
-          exportButtonRef.current?.focus();
-        }
-        onExportComplete();
+
+    void exportWorkflowPng({ notifications, t, workflowName }).then(() => {
+      // The busy camera is disabled, which drops its focus; return it unless focus has moved on since.
+      if (hadFocus && document.activeElement === document.body) {
+        exportButtonRef.current?.focus();
       }
-    })();
-  }, [
-    exportFailedLabel,
-    fallbackWorkflowName,
-    getNodes,
-    getNodesBounds,
-    notifications,
-    onExportPrepare,
-    onExportComplete,
-    t,
-    workflowName,
-  ]);
+    });
+  }, [notifications, t, workflowName]);
   const fitViewRef = useRef<HTMLButtonElement>(null);
   // The update button leaves with the last outdated node; keyboard focus steps to its stable neighbour first.
   const onUpdateNodesClick = useCallback(() => {
@@ -194,23 +120,6 @@ export const EditorToolbar = ({
             onToolChange={onToolChange}
           />
         ))}
-        <ToolbarSeparator />
-        <HistoryButton
-          commandId="workflows.undo"
-          disabled={!canUndo}
-          icon={Undo2Icon}
-          label={t('widgets.workflow.toolbar.undo')}
-          tooltip={t('widgets.workflow.commands.undo')}
-          onClick={onUndo}
-        />
-        <HistoryButton
-          commandId="workflows.redo"
-          disabled={!canRedo}
-          icon={Redo2Icon}
-          label={t('widgets.workflow.toolbar.redo')}
-          tooltip={t('widgets.workflow.commands.redo')}
-          onClick={onRedo}
-        />
         <ToolbarSeparator />
         <ToolbarButton icon={ZoomInIcon} label={t('widgets.workflow.toolbar.zoomIn')} onClick={onZoomInClick} />
         <ToolbarButton icon={ZoomOutIcon} label={t('widgets.workflow.toolbar.zoomOut')} onClick={onZoomOutClick} />
@@ -295,49 +204,6 @@ export const EditorToolbar = ({
         </Popover.Root>
       </Toolbar>
     </Box>
-  );
-};
-
-/** A toolbar button whose tooltip also shows the editor command's current shortcut. */
-const HistoryButton = ({
-  commandId,
-  disabled,
-  icon,
-  label,
-  onClick,
-  tooltip,
-}: {
-  commandId: string;
-  disabled: boolean;
-  icon: typeof HandIcon;
-  label: string;
-  onClick?: () => void;
-  tooltip: string;
-}) => {
-  const { CommandShortcut } = useWorkflowUi();
-  // The click event must not reach a command that takes an optional target, and an unavailable step does nothing.
-  const onButtonClick = useCallback(() => {
-    if (!disabled) {
-      onClick?.();
-    }
-  }, [disabled, onClick]);
-  const content = useMemo(
-    () => (
-      <HStack gap="2">
-        <span>{tooltip}</span>
-        <CommandShortcut commandId={commandId} />
-      </HStack>
-    ),
-    [CommandShortcut, commandId, tooltip]
-  );
-
-  return (
-    <Tooltip content={content} positioning={TOOLTIP_POSITIONING}>
-      {/* aria-disabled, not disabled: stepping to the end of the history must not drop the button's focus. */}
-      <IconButton aria-disabled={disabled || undefined} aria-label={label} variant="ghost" onClick={onButtonClick}>
-        <Icon as={icon} boxSize="3.5" />
-      </IconButton>
-    </Tooltip>
   );
 };
 

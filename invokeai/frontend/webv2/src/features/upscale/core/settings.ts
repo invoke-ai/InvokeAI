@@ -6,6 +6,7 @@ import type {
   ModelIdentifierConfig,
   VaePrecision,
 } from '@features/generation/contracts';
+import type { GenerateSubmissionSource, ProjectPromptDraft } from '@features/generation/settings';
 import type { ModelConfig } from '@features/models';
 
 import {
@@ -25,6 +26,7 @@ import {
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
+  isMossImageQwen35Encoder,
   isModelIdentifierConfig,
   isQwen3Vl4bEncoder,
   isVaeCompatibleWithGenerateModel,
@@ -189,6 +191,12 @@ const ANIMA_QWEN35_SLOT: UpscaleComponentSlot = {
   field: 'qwen35EncoderModel',
   label: 'Qwen3.5 encoder',
 };
+// MOSS-Image reads the Qwen3.5 9B; the 4B Anima-3.8B uses is the same model type and its hidden size does not fit.
+const MOSS_IMAGE_QWEN35_SLOT: UpscaleComponentSlot = {
+  accepts: isMossImageQwen35Encoder,
+  field: 'qwen35EncoderModel',
+  label: 'Qwen3.5 9B encoder',
+};
 // Krea-2 reads the 4B; Ideogram 4's 8B is the same model type and `krea2_model_loader` refuses it.
 const KREA2_QWEN3_VL_SLOT: UpscaleComponentSlot = {
   accepts: isQwen3Vl4bEncoder,
@@ -319,8 +327,9 @@ export interface UpscaleArchitecture {
    * Whether a new main model sets CFG to that model's served default. Z-Image Turbo and Krea-2 Turbo are
    * distilled for CFG 1, and anything above runs a second, unconditional pass per step at upscale
    * resolution; Z-Image Base, Anima, Krea-2 Raw and Qwen Image want 4 to 6, and FLUX.2 [dev] a guidance of
-   * 3.5 (Klein reads none). SD and FLUX.1 keep the user's CFG -- SD's multi-diffusion pass is tuned to the
-   * widget's 2 -- and get that 2 back when the user comes from one of the others.
+   * 3.5 (Klein reads none); MOSS-Image takes its served 3. SD and FLUX.1 keep the user's CFG -- SD's
+   * multi-diffusion pass is tuned to the widget's 2 -- and get that 2 back when the user comes from one of the
+   * others.
    */
   readonly takesModelGuidance: boolean;
   /**
@@ -438,6 +447,23 @@ export const UPSCALE_ARCHITECTURES = {
     // `krea2_denoise` has no scheduler input: it steps with Euler.
     schedulers: ['euler'],
     takesModelGuidance: true,
+    takesModelSteps: false,
+    tileControlNet: null,
+  },
+  'moss-image': {
+    // `moss_image_model_loader` takes a Diffusers install's own Qwen3.5 and VAE; any other format needs both.
+    components: (model) =>
+      model.format === 'diffusers' ? NO_COMPONENTS : { slots: [MOSS_IMAGE_QWEN35_SLOT], vae: true },
+    denoiseGrid: 16,
+    // `moss_image_denoise` clips by sigma value like FLUX, then re-spaces the window to the requested steps.
+    indexClipping: null,
+    label: 'MOSS-Image',
+    negativePrompt: 'cfg-gated',
+    // `moss_image_denoise` has no scheduler input: it steps its own shifted Euler schedule.
+    schedulers: ['euler'],
+    takesModelGuidance: true,
+    // Not distilled: the served 50 is a full-schedule txt2img default, and the re-spaced window would run all of it
+    // at upscale resolution, two transformer passes each at CFG 3.
     takesModelSteps: false,
     tileControlNet: null,
   },
@@ -940,9 +966,28 @@ export const selectUpscaleMainModel = (
       };
 };
 
-const addRangeReason = (reasons: string[], label: string, value: number, min: number, max: number): void => {
+/** The Upscale panel section whose fields fix an issue. */
+export type UpscaleSection = 'advanced' | 'generation' | 'source';
+
+/**
+ * One reason Upscale cannot run, in English, and the section that fixes it. Without a section the form itself is
+ * held back (the served architecture table has not loaded), so no section shows it.
+ */
+export interface UpscaleValidationIssue {
+  message: string;
+  section?: UpscaleSection;
+}
+
+const addRangeIssue = (
+  issues: UpscaleValidationIssue[],
+  section: UpscaleSection,
+  label: string,
+  value: number,
+  min: number,
+  max: number
+): void => {
   if (!Number.isFinite(value) || value < min || value > max) {
-    reasons.push(`${label} must be between ${min} and ${max}.`);
+    issues.push({ message: `${label} must be between ${min} and ${max}.`, section });
   }
 };
 
@@ -950,84 +995,104 @@ const addRangeReason = (reasons: string[], label: string, value: number, min: nu
  * Model only needs no main model, encoder, ControlNet or served architecture table: just an image, an installed
  * upscaler and a Scale in range.
  */
-const getModelOnlyValidationReasons = (values: UpscaleWidgetValues, models?: readonly ModelConfig[]): string[] => {
-  const reasons: string[] = [];
+const getModelOnlyValidationIssues = (
+  values: UpscaleWidgetValues,
+  models?: readonly ModelConfig[]
+): UpscaleValidationIssue[] => {
+  const issues: UpscaleValidationIssue[] = [];
 
   if (!values.inputImage) {
-    reasons.push('Upscale needs an input image. Upload one or send one from Gallery.');
+    issues.push({ message: 'Upscale needs an input image. Upload one or send one from Gallery.', section: 'source' });
   }
   if (!values.upscaleModel) {
-    reasons.push('Upscale needs a Spandrel image-to-image model.');
+    issues.push({ message: 'Upscale needs a Spandrel image-to-image model.', section: 'source' });
   }
-  addRangeReason(reasons, 'Scale', values.scale, UPSCALE_SCALE_MIN, UPSCALE_SCALE_MAX);
+  addRangeIssue(issues, 'source', 'Scale', values.scale, UPSCALE_SCALE_MIN, UPSCALE_SCALE_MAX);
 
   if (models && values.upscaleModel) {
     const installed = models.find((model) => model.key === values.upscaleModel?.key);
 
     if (!installed) {
-      reasons.push(`${values.upscaleModel.name} is no longer installed.`);
+      issues.push({ message: `${values.upscaleModel.name} is no longer installed.`, section: 'source' });
     } else if (!isSpandrelModelConfig(installed)) {
-      reasons.push(`${values.upscaleModel.name} is not an installed Spandrel model.`);
+      issues.push({ message: `${values.upscaleModel.name} is not an installed Spandrel model.`, section: 'source' });
     }
   }
 
-  return reasons;
+  return issues;
 };
 
-export const getUpscaleValidationReasons = (values: UpscaleWidgetValues, models?: readonly ModelConfig[]): string[] => {
+/** Why Upscale cannot run, each with the section that fixes it, in the order Invoke lists them. */
+export const getUpscaleValidationIssues = (
+  values: UpscaleWidgetValues,
+  models?: readonly ModelConfig[]
+): UpscaleValidationIssue[] => {
   if (values.mode === 'model-only') {
-    return getModelOnlyValidationReasons(values, models);
+    return getModelOnlyValidationIssues(values, models);
   }
 
   // As in Generate: without the served table every VAE reads as incompatible and the schedulers fall
   // back, so the other reasons would mislead and the graph would be wrong.
   if (!hasArchitectureCapabilities()) {
     return [
-      'Model capabilities are not available. Upscale is blocked until they load; if this persists, retry from the Upscale panel.',
+      {
+        message:
+          'Model capabilities are not available. Upscale is blocked until they load; if this persists, retry from the Upscale panel.',
+      },
     ];
   }
 
-  const reasons: string[] = [];
+  const issues: UpscaleValidationIssue[] = [];
 
   if (!values.inputImage) {
-    reasons.push('Upscale needs an input image. Upload one or send one from Gallery.');
+    issues.push({ message: 'Upscale needs an input image. Upload one or send one from Gallery.', section: 'source' });
   }
   if (!values.upscaleModel) {
-    reasons.push('Upscale needs a Spandrel image-to-image model.');
+    issues.push({ message: 'Upscale needs a Spandrel image-to-image model.', section: 'source' });
   }
   const architecture = upscaleArchitectureFor(values.model);
 
   if (!values.model) {
-    reasons.push(`Upscale needs a ${supportedUpscaleArchitectureLabels()} main model.`);
+    issues.push({
+      message: `Upscale needs a ${supportedUpscaleArchitectureLabels()} main model.`,
+      section: 'generation',
+    });
   } else if (!architecture) {
-    reasons.push(`Upscale supports only ${supportedUpscaleArchitectureLabels()} main models.`);
+    issues.push({
+      message: `Upscale supports only ${supportedUpscaleArchitectureLabels()} main models.`,
+      section: 'generation',
+    });
   }
 
   // `flux_denoise` refuses a Fill model without fill conditioning, which an upscale never supplies.
   if (values.model?.base === 'flux' && values.model.variant === 'dev_fill') {
-    reasons.push('Upscale cannot use a FLUX Fill model.');
+    issues.push({ message: 'Upscale cannot use a FLUX Fill model.', section: 'generation' });
   }
   // Without a reference image `qwen_image_denoise` gives an Edit model a zero reference the size of the output,
   // which doubles the image tokens of every transformer call, the negative pass's too: about 2.5 to 3 times the
   // time, and activation memory the cache does not reserve, for nothing the pass uses.
   if (values.model?.base === 'qwen-image' && values.model.variant === 'edit') {
-    reasons.push('Upscale cannot use a Qwen Image Edit model.');
+    issues.push({ message: 'Upscale cannot use a Qwen Image Edit model.', section: 'generation' });
   }
 
   const tileControlNet = architecture?.tileControlNet ?? null;
 
   if (tileControlNet?.required && !values.tileControlnetModel) {
-    reasons.push('Upscale needs a Tile or Union ControlNet compatible with the main model.');
+    issues.push({
+      message: 'Upscale needs a Tile or Union ControlNet compatible with the main model.',
+      section: 'advanced',
+    });
   } else if (
     tileControlNet &&
     values.tileControlnetModel &&
     !isTileControlNetCandidate(values.tileControlnetModel, values.model)
   ) {
-    reasons.push(
-      tileControlNet.required
+    issues.push({
+      message: tileControlNet.required
         ? 'The Tile ControlNet must match the main model base and be a Tile or Union model.'
-        : 'The Tile ControlNet must match the main model base and be a Tile model.'
-    );
+        : 'The Tile ControlNet must match the main model base and be a Tile model.',
+      section: 'advanced',
+    });
   }
 
   // A bare transformer cannot supply these itself, and its loader refuses to run without them.
@@ -1036,40 +1101,52 @@ export const getUpscaleValidationReasons = (values: UpscaleWidgetValues, models?
 
   for (const slot of components.slots) {
     if (!values[slot.field]) {
-      reasons.push(`Upscale needs a ${slot.label} for this main model.`);
+      issues.push({ message: `Upscale needs a ${slot.label} for this main model.`, section: 'advanced' });
     } else if (!slot.accepts(values[slot.field] as ModelConfig)) {
-      reasons.push(`${values[slot.field]?.name} is not a ${slot.label} this main model can use.`);
+      issues.push({
+        message: `${values[slot.field]?.name} is not a ${slot.label} this main model can use.`,
+        section: 'advanced',
+      });
     }
   }
   if (components.vae && !values.vae) {
-    reasons.push('Upscale needs a VAE for this main model.');
+    issues.push({ message: 'Upscale needs a VAE for this main model.', section: 'advanced' });
   }
 
-  addRangeReason(reasons, 'Scale', values.scale, UPSCALE_SCALE_MIN, UPSCALE_SCALE_MAX);
-  addRangeReason(reasons, 'Creativity', values.creativity, UPSCALE_CREATIVITY_MIN, UPSCALE_CREATIVITY_MAX);
-  addRangeReason(reasons, 'Structure', values.structure, UPSCALE_STRUCTURE_MIN, UPSCALE_STRUCTURE_MAX);
-  addRangeReason(reasons, 'Tile size', values.tileSize, UPSCALE_TILE_SIZE_MIN, UPSCALE_TILE_SIZE_MAX);
-  addRangeReason(reasons, 'Tile overlap', values.tileOverlap, UPSCALE_TILE_OVERLAP_MIN, UPSCALE_TILE_OVERLAP_MAX);
-  addRangeReason(reasons, 'Steps', values.steps, upscaleMinSteps(values.model), 1000);
-  addRangeReason(reasons, 'CFG scale', values.cfgScale, 1, upscaleMaxCfgScale(values.model));
-  addRangeReason(reasons, 'Seed', values.seed, 0, SEED_MAX);
+  addRangeIssue(issues, 'source', 'Scale', values.scale, UPSCALE_SCALE_MIN, UPSCALE_SCALE_MAX);
+  addRangeIssue(issues, 'source', 'Creativity', values.creativity, UPSCALE_CREATIVITY_MIN, UPSCALE_CREATIVITY_MAX);
+  addRangeIssue(issues, 'source', 'Structure', values.structure, UPSCALE_STRUCTURE_MIN, UPSCALE_STRUCTURE_MAX);
+  addRangeIssue(issues, 'advanced', 'Tile size', values.tileSize, UPSCALE_TILE_SIZE_MIN, UPSCALE_TILE_SIZE_MAX);
+  addRangeIssue(
+    issues,
+    'advanced',
+    'Tile overlap',
+    values.tileOverlap,
+    UPSCALE_TILE_OVERLAP_MIN,
+    UPSCALE_TILE_OVERLAP_MAX
+  );
+  addRangeIssue(issues, 'generation', 'Steps', values.steps, upscaleMinSteps(values.model), 1000);
+  addRangeIssue(issues, 'generation', 'CFG scale', values.cfgScale, 1, upscaleMaxCfgScale(values.model));
+  addRangeIssue(issues, 'generation', 'Seed', values.seed, 0, SEED_MAX);
 
   if (models) {
     const installedByKey = new Map(models.map((model) => [model.key, model]));
-    const required: ModelIdentifierConfig[] = [
-      ...(values.model ? [values.model] : []),
-      ...(values.upscaleModel ? [values.upscaleModel] : []),
-      ...(values.tileControlnetModel ? [values.tileControlnetModel] : []),
+    const required: (readonly [ModelIdentifierConfig, UpscaleSection])[] = [
+      ...(values.model ? [[values.model, 'generation'] as const] : []),
+      ...(values.upscaleModel ? [[values.upscaleModel, 'source'] as const] : []),
+      ...(values.tileControlnetModel ? [[values.tileControlnetModel, 'advanced'] as const] : []),
       // A deleted encoder must block the run rather than fail mid-graph.
-      ...UPSCALE_COMPONENT_FIELDS.flatMap((field) => (activeComponents[field] ? [activeComponents[field]] : [])),
-      ...(values.vae ? [values.vae] : []),
+      ...UPSCALE_COMPONENT_FIELDS.flatMap((field) =>
+        activeComponents[field] ? [[activeComponents[field], 'advanced'] as const] : []
+      ),
+      ...(values.vae ? [[values.vae, 'advanced'] as const] : []),
     ];
 
-    for (const selected of required) {
+    for (const [selected, section] of required) {
       const installed = installedByKey.get(selected.key);
 
       if (!installed) {
-        reasons.push(`${selected.name} is no longer installed.`);
+        issues.push({ message: `${selected.name} is no longer installed.`, section });
       }
     }
 
@@ -1080,47 +1157,62 @@ export const getUpscaleValidationReasons = (values: UpscaleWidgetValues, models?
       : undefined;
 
     if (values.model && installedMain && !isSupportedUpscaleMainModel(installedMain)) {
-      reasons.push(`${values.model.name} is not an installed ${supportedUpscaleArchitectureLabels()} main model.`);
+      issues.push({
+        message: `${values.model.name} is not an installed ${supportedUpscaleArchitectureLabels()} main model.`,
+        section: 'generation',
+      });
     }
     if (values.upscaleModel && installedSpandrel && !isSpandrelModelConfig(installedSpandrel)) {
-      reasons.push(`${values.upscaleModel.name} is not an installed Spandrel model.`);
+      issues.push({ message: `${values.upscaleModel.name} is not an installed Spandrel model.`, section: 'source' });
     }
     if (
       values.tileControlnetModel &&
       installedControlNet &&
       !isTileControlNetCandidate(installedControlNet, values.model)
     ) {
-      reasons.push(`${values.tileControlnetModel.name} is not an installed compatible Tile ControlNet.`);
+      issues.push({
+        message: `${values.tileControlnetModel.name} is not an installed compatible Tile ControlNet.`,
+        section: 'advanced',
+      });
     }
     if (values.vae) {
       const installedVae = installedByKey.get(values.vae.key);
 
       if (!installedVae) {
-        reasons.push(`${values.vae.name} is no longer installed.`);
+        issues.push({ message: `${values.vae.name} is no longer installed.`, section: 'advanced' });
       } else if (
         !values.model ||
         !isVaeModelConfig(installedVae) ||
         !isVaeCompatibleWithGenerateModel(values.model, installedVae)
       ) {
-        reasons.push(`${values.vae.name} is not compatible with ${values.model?.name ?? 'the main model'}.`);
+        issues.push({
+          message: `${values.vae.name} is not compatible with ${values.model?.name ?? 'the main model'}.`,
+          section: 'advanced',
+        });
       }
     }
     for (const lora of values.loras) {
       const installedLora = installedByKey.get(lora.model.key);
 
       if (!installedLora) {
-        reasons.push(`${lora.model.name} is no longer installed.`);
+        issues.push({ message: `${lora.model.name} is no longer installed.`, section: 'generation' });
       } else if (
         !isLoraModelConfig(installedLora) ||
         (values.model && !isLoraCompatibleWithModel(installedLora, values.model))
       ) {
-        reasons.push(`${lora.model.name} is not compatible with ${values.model?.name ?? 'the main model'}.`);
+        issues.push({
+          message: `${lora.model.name} is not compatible with ${values.model?.name ?? 'the main model'}.`,
+          section: 'generation',
+        });
       }
     }
   }
 
-  return reasons;
+  return issues;
 };
+
+export const getUpscaleValidationReasons = (values: UpscaleWidgetValues, models?: readonly ModelConfig[]): string[] =>
+  getUpscaleValidationIssues(values, models).map((issue) => issue.message);
 
 /** The upscaler's recorded native scale, or null for a record installed before the probe recorded it. */
 export const getSpandrelNativeScale = (model: SpandrelModelConfig | null | undefined): number | null =>
@@ -1204,6 +1296,10 @@ export const getUpscaleOutputDimensions = (
   };
 };
 
+/** Refine reads the prompt Upscale shares with Generate; Model only reads none, so nothing wraps or expands it. */
+export const readsUpscalePrompt = (values: Record<string, unknown>): boolean =>
+  normalizeUpscaleMode(values.mode) === 'refine';
+
 /** Model only runs the upscaler alone, which gives the same image every time, so iterations would only repeat it. */
 export const isUpscaleBatchCountFixed = (values: Record<string, unknown>): boolean =>
   normalizeUpscaleMode(values.mode) === 'model-only';
@@ -1226,7 +1322,7 @@ export const resolveUpscaleSubmissionValues = (
     promptDraft,
     sourceImageName,
   }: {
-    promptDraft: Pick<UpscaleWidgetValues, 'negativePrompt' | 'negativePromptEnabled' | 'positivePrompt'>;
+    promptDraft: Pick<ProjectPromptDraft, 'negativePrompt' | 'negativePromptEnabled' | 'positivePrompt'>;
     sourceImageName: string | undefined;
   }
 ): UpscaleWidgetValues | null => {
@@ -1234,10 +1330,38 @@ export const resolveUpscaleSubmissionValues = (
     return null;
   }
 
-  return values.mode === 'model-only'
-    ? { ...values, batchCount: 1, negativePrompt: '', positivePrompt: '', seedMode: 'fixed' }
-    : { ...values, ...promptDraft };
+  if (values.mode === 'model-only') {
+    return { ...values, batchCount: 1, negativePrompt: '', positivePrompt: '', seedMode: 'fixed' };
+  }
+
+  const { negativePrompt, negativePromptEnabled, positivePrompt } = promptDraft;
+
+  return { ...values, negativePrompt, negativePromptEnabled, positivePrompt };
 };
+
+/**
+ * What a resolved Upscale run submits its prompts and seeds from: its own iterations and seed, with the shared
+ * prompt's template and dynamic prompts, as Generate submits that prompt. Model only reads no prompt, so nothing
+ * wraps or expands it.
+ */
+export const getUpscaleSubmissionSource = (
+  values: UpscaleWidgetValues,
+  promptDraft: ProjectPromptDraft
+): GenerateSubmissionSource => ({
+  batchCount: values.batchCount,
+  negativePrompt: values.negativePrompt,
+  negativePromptEnabled: values.negativePromptEnabled,
+  positivePrompt: values.positivePrompt,
+  seed: values.seed,
+  seedMode: values.seedMode,
+  ...(values.mode === 'model-only'
+    ? { dynamicPromptsEnabled: false, promptTemplate: null }
+    : {
+        dynamicPromptsEnabled: promptDraft.dynamicPromptsEnabled,
+        dynamicPromptsSeedBehaviour: promptDraft.dynamicPromptsSeedBehaviour,
+        promptTemplate: promptDraft.promptTemplate,
+      }),
+});
 
 export const clearDeletedUpscaleInput = (
   values: UpscaleWidgetValues,

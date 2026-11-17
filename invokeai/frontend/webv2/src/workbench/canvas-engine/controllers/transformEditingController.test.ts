@@ -146,6 +146,28 @@ describe('TransformEditingController', () => {
     expect(h.calls.setOverride).toHaveBeenLastCalledWith('shape', null);
   });
 
+  it.each([
+    ['an inpaint mask', 'inpaint_mask'],
+    ['a regional guidance layer', 'regional_guidance'],
+  ] as const)('commits %s transform as a structural edit, never baking its coverage', (_, type) => {
+    const mask = layerContract('mask', type, {
+      mask: { bitmap: { height: 4, imageName: 'mask.png', width: 4 }, fill: { color: '#e07575', style: 'diagonal' } },
+    } as Partial<CanvasLayerContract>);
+    const h = createHarness(mask);
+    expect(h.controller.request('mask')).toBe('started');
+    expect(h.session()).toMatchObject({ layerId: 'mask' });
+    h.controller.update(MOVED);
+    h.controller.apply();
+
+    expect(h.calls.commitStructural).toHaveBeenCalledWith(
+      'Transform layer',
+      expect.objectContaining({ id: 'mask', patch: { transform: MOVED } }),
+      expect.objectContaining({ id: 'mask', patch: { transform: expect.objectContaining({ x: 0 }) } })
+    );
+    expect(h.calls.restoreCache).not.toHaveBeenCalled();
+    expect(h.session()).toBeNull();
+  });
+
   it('keeps the session open and reports a refused commit', () => {
     const h = createHarness(shape, { commitStatus: 'busy' });
     h.controller.begin('shape');
@@ -326,7 +348,7 @@ describe('TransformEditingController.request', () => {
 
   it.each([
     ['a locked leaf', { ...b, isLocked: true }, 'locked'],
-    ['a mask', layerContract('b', 'inpaint_mask'), 'ineligible'],
+    ['an empty mask', layerContract('b', 'inpaint_mask'), 'ineligible'],
     ['a missing leaf', null, 'missing'],
   ] as const)('refuses %s without selecting or switching tools', (_, target, status) => {
     const h = createHarness(target ? [a, target] : [a]);

@@ -1,26 +1,45 @@
 /**
  * Masked fill/erase primitives; engine callers own guards, history and persistence. Scratch compositing confines
- * edits to selection coverage. Rect coordinates are document=layer-local here; subtract target/mask origins to
- * address each content-sized surface.
+ * edits to selection coverage. `rect` and the target live in the layer's local space; the mask is placed through
+ * `maskToLocal`, so a moved, scaled or rotated layer is edited where the selection covers it.
  */
 
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
+import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-/** Shared inputs for a masked layer edit over a document-space `rect`. */
+import { identity, multiply, translate } from '@workbench/canvas-engine/math/mat2d';
+
+/** Shared inputs for a masked layer edit over a layer-local `rect`. */
 export interface MaskedEditParams {
   backend: RasterBackend;
-  /** The layer cache surface (content-sized) and its document-space origin. */
+  /** The layer cache surface (content-sized). */
   target: RasterSurface;
-  /** The target surface's document-space origin (its cache rect's `x`/`y`). */
+  /** The target surface's layer-local origin (its cache rect's `x`/`y`). */
   targetOrigin: Vec2;
   /** The selection mask surface (alpha 255 inside). */
   mask: RasterSurface;
-  /** The mask surface's document-space origin (its selection rect's `x`/`y`). */
+  /** The mask surface's origin in its own space (its selection rect's `x`/`y`). */
   maskOrigin: Vec2;
-  /** The dirty region to edit (document space), integer bounds. */
+  /** Maps the mask's space into the target's; absent when both share one space. */
+  maskToLocal?: Mat2d;
+  /** The dirty region to edit (layer-local), integer bounds. */
   rect: Rect;
 }
+
+/** Draws the mask into a scratch surface whose origin is `rect`'s, through `maskToLocal`. */
+const drawMask = (
+  ctx: RasterSurface['ctx'],
+  { mask, maskOrigin, maskToLocal, rect }: Pick<MaskedEditParams, 'mask' | 'maskOrigin' | 'maskToLocal' | 'rect'>
+): void => {
+  if (!maskToLocal) {
+    ctx.drawImage(mask.canvas, maskOrigin.x - rect.x, maskOrigin.y - rect.y);
+    return;
+  }
+  const m = multiply(translate(identity(), { x: -rect.x, y: -rect.y }), maskToLocal);
+  ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
+  ctx.drawImage(mask.canvas, maskOrigin.x, maskOrigin.y);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+};
 
 /**
  * Fill a region-local scratch, intersect the mask, then composite onto target. Default source-over fills coverage;
@@ -32,6 +51,7 @@ export const fillMaskedRegion = ({
   composite = 'source-over',
   mask,
   maskOrigin,
+  maskToLocal,
   rect,
   target,
   targetOrigin,
@@ -47,7 +67,7 @@ export const fillMaskedRegion = ({
   sctx.fillStyle = color;
   sctx.fillRect(0, 0, rect.width, rect.height);
   sctx.globalCompositeOperation = 'destination-in';
-  sctx.drawImage(mask.canvas, maskOrigin.x - rect.x, maskOrigin.y - rect.y);
+  drawMask(sctx, { mask, maskOrigin, maskToLocal, rect });
 
   const ctx = target.ctx;
   ctx.save();
@@ -62,6 +82,7 @@ export const eraseMaskedRegion = ({
   backend,
   mask,
   maskOrigin,
+  maskToLocal,
   rect,
   target,
   targetOrigin,
@@ -74,7 +95,7 @@ export const eraseMaskedRegion = ({
   sctx.setTransform(1, 0, 0, 1, 0, 0);
   sctx.globalCompositeOperation = 'source-over';
   sctx.globalAlpha = 1;
-  sctx.drawImage(mask.canvas, maskOrigin.x - rect.x, maskOrigin.y - rect.y);
+  drawMask(sctx, { mask, maskOrigin, maskToLocal, rect });
 
   const ctx = target.ctx;
   ctx.save();

@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import type { ComponentProps, ReactNode, Ref } from 'react';
+import type { ComponentProps, MouseEvent, ReactNode, Ref } from 'react';
 
 import {
   Box,
@@ -14,21 +14,90 @@ import {
   useMenuItemContext,
 } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { createExternalStore } from '@platform/state/externalStore';
-import { useCallback, useId, useMemo } from 'react';
+import { createExternalStore, createExternalStoreCore } from '@platform/state/externalStore';
+import { createContext, useCallback, useContext, useId, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { IconButton, useUnavailableControl } from './Button';
 import { MiddleTruncate } from './MiddleTruncate';
 import { Tooltip } from './Tooltip';
 import { useRegisterWidgetOverlay } from './widgetOverlays';
 
-type MenuContentProps = ComponentProps<typeof Menu.Content>;
+type MenuContentProps = Omit<ComponentProps<typeof Menu.Content>, 'ref'>;
 
-/** Menu content closes with its owning widget; the theme recipe owns chrome. */
-export const MenuContent = (props: MenuContentProps) => {
+/**
+ * The layout of menu content whose list scrolls (`ScrollableMenuContent`, or `ScrollableMenuList` inside it): it grows to
+ * the context menus' cap or the room the positioner measured beside its anchor, then the list scrolls. The column gives
+ * the list the content's padded box, so its last row is never cut off by the padding, and rows after it stay in view.
+ */
+export const SCROLLABLE_MENU_CONTENT_PROPS = {
+  display: 'flex',
+  flexDirection: 'column',
+  maxH: 'min(28rem, var(--available-height))',
+  overflow: 'hidden',
+} as const;
+
+/** Zag's cancelable event on the content for a press outside it; cancelling it keeps the menu open. */
+const POINTER_DOWN_OUTSIDE_EVENT = 'pointerdown.outside';
+
+/** The arrow takes no focus: a press on its tip would otherwise move focus to the page and end keyboard navigation. */
+const keepFocus = (event: MouseEvent<HTMLElement>) => event.preventDefault();
+
+/** A menu rooted inside another menu's content is its submenu, which opens flush beside its item. */
+const InsideMenuContentContext = createContext(false);
+
+/**
+ * Menu content closes with its owning widget; the theme recipe owns chrome.
+ *
+ * Every menu but a submenu has an arrow pointing at its anchor. The recipe sizes it from the anchor: a trigger or any
+ * other box gets one, and a context menu, anchored to the pointer's point, gets none. The arrow is the content's next
+ * sibling, not its child: menu content scrolls, which would clip an arrow poking out of it. Zag finds it in the
+ * positioner all the same. It must stay after the content: Zag reads the menu's z-index from the positioner's first
+ * child, and the recipe hides it with content kept mounted but hidden through a sibling selector.
+ */
+export const MenuContent = ({ children, ...props }: MenuContentProps) => {
   const menu = useMenuContext();
+  const isSubmenu = useContext(InsideMenuContentContext);
   const stale = useRegisterWidgetOverlay(menu.open, menu.setOpen);
-  return stale ? null : <Menu.Content {...props} />;
+  const arrowRef = useRef<HTMLDivElement>(null);
+  // Zag dismisses on a press outside the content, and the arrow, a sibling, counts as outside: a click on the visible
+  // tip would close the menu. Ark exposes the dismissal hook only on Menu.Root, so this listens for Zag's outside event
+  // by name on the content instead. Zag adds its own listener just before dispatching, so this one runs first.
+  const keepOpenOnArrow = useCallback((content: HTMLDivElement | null) => {
+    const handlePointerDownOutside = (event: Event) => {
+      const target = event instanceof CustomEvent ? (event.detail as { target?: unknown } | null)?.target : null;
+
+      if (target instanceof Node && arrowRef.current?.contains(target)) {
+        event.preventDefault();
+      }
+    };
+
+    content?.addEventListener(POINTER_DOWN_OUTSIDE_EVENT, handlePointerDownOutside);
+    return () => content?.removeEventListener(POINTER_DOWN_OUTSIDE_EVENT, handlePointerDownOutside);
+  }, []);
+  if (stale) {
+    return null;
+  }
+  // Zag puts the placement on the content's props; their React type lists only standard attributes.
+  const { 'data-placement': placement } = menu.getContentProps() as { 'data-placement'?: string };
+  return (
+    <>
+      <Menu.Content ref={keepOpenOnArrow} {...props}>
+        <InsideMenuContentContext value>{children}</InsideMenuContentContext>
+      </Menu.Content>
+      {isSubmenu ? null : (
+        // The content's own state and placement, so the recipe animates the arrow as Chakra animates the content.
+        <Menu.Arrow
+          ref={arrowRef}
+          data-placement={placement}
+          data-state={menu.open ? 'open' : 'closed'}
+          onMouseDown={keepFocus}
+        >
+          <Menu.ArrowTip />
+        </Menu.Arrow>
+      )}
+    </>
+  );
 };
 
 export interface MenuHeadingGroupProps {
@@ -195,6 +264,67 @@ export const MenuActionItem = ({
     >
       {content}
     </MenuItem>
+  );
+};
+
+export type MenuPartSnapshot<Part> = { part: Part; status: 'loaded' } | { status: 'failed' | 'idle' | 'loading' };
+
+export interface MenuPartLoader<Part> {
+  getSnapshot: () => MenuPartSnapshot<Part>;
+  /** Starts the import unless it has loaded or is under way; after a failure, imports again. Never throws or rejects. */
+  load: () => void;
+  subscribe: (listener: () => void) => () => void;
+}
+
+/**
+ * Loads part of a menu on demand into state, not through `lazy()`: a lazy boundary suspends on the open's first render
+ * even when its module has loaded, and React holds back the reveal, so the menu would open on its placeholder. Once
+ * loaded the part stays, so every later open renders it on its first frame. Call `load` on intent and on open.
+ */
+export const createMenuPartLoader = <Part,>(importPart: () => Promise<Part>): MenuPartLoader<Part> => {
+  const store = createExternalStoreCore<MenuPartSnapshot<Part>>({ status: 'idle' });
+
+  return {
+    getSnapshot: store.getSnapshot,
+    load: () => {
+      const { status } = store.getSnapshot();
+
+      if (status === 'idle' || status === 'failed') {
+        store.setSnapshot({ status: 'loading' });
+        // An importer that throws at once fails like one that rejects, rather than leaving the part loading for good.
+        new Promise<Part>((resolve) => {
+          resolve(importPart());
+        }).then(
+          (part) => store.setSnapshot({ part, status: 'loaded' }),
+          () => store.setSnapshot({ status: 'failed' })
+        );
+      }
+    },
+    subscribe: store.subscribe,
+  };
+};
+
+export const useMenuPart = <Part,>(loader: MenuPartLoader<Part>): MenuPartSnapshot<Part> =>
+  useSyncExternalStore(loader.subscribe, loader.getSnapshot, loader.getSnapshot);
+
+const ignoreSelect = () => undefined;
+
+/**
+ * An unavailable item in the place of a part still loading or that failed to, so the menu holds only menu items. Not
+ * `disabled`: Zag skips disabled items in keyboard navigation, so a menu holding only this one would leave the
+ * keyboard nothing to reach and the state unannounced.
+ */
+export const MenuPartPlaceholder = ({ status }: { status: MenuPartSnapshot<unknown>['status'] }) => {
+  const { t } = useTranslation();
+  const failed = status === 'failed';
+
+  return (
+    <MenuActionItem
+      label={t(failed ? 'common.menuPartLoadFailed' : 'common.loading')}
+      unavailableReason={t(failed ? 'common.menuPartLoadFailedReason' : 'common.menuPartLoading')}
+      value="menu-part-placeholder"
+      onSelect={ignoreSelect}
+    />
   );
 };
 

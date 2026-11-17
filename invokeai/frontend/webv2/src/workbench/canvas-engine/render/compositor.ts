@@ -1,7 +1,7 @@
 /**
  * Draws cached content: clear/checkerboard across the viewport, bottom-first transformed layers with
- * opacity/blend, then staged preview. Missing caches are skipped; callers own rasterization. RasterSurface
- * contexts make ordering testable.
+ * opacity/blend, and the staged preview between the raster stack and the overlay stacks. Missing caches are skipped;
+ * callers own rasterization. RasterSurface contexts make ordering testable.
  */
 
 import type {
@@ -67,8 +67,8 @@ export interface CompositeOptions {
   /** Clips document layers to this document-space rect without clipping the background or staged preview. */
   clipRect?: Rect | null;
   /**
-   * A staged generation candidate to draw at its placement (document space), above the raster and control stacks and
-   * below masks and regions, which show over it only when the staging view leaves them on. The overlay outlines it.
+   * A staged generation candidate to draw at its placement (document space), above the raster stack and below control
+   * layers, masks and regions, which show over it only when the staging view leaves them on. The overlay outlines it.
    */
   stagedPreview?: { surface: RasterSurface; rect: Rect; opacity?: number } | null;
   /**
@@ -223,7 +223,7 @@ export const prepareComposite = (
   opts: Pick<CompositeOptions, 'groupSurface' | 'isolationLayerId' | 'showOverlayStacks' | 'transformOverrides'> = {}
 ): CompositePreparation => {
   const isolationLayerId = opts.isolationLayerId ?? null;
-  // The plan lists the leaves to draw bottom first; the `stagedPreview` lands on top of every stack.
+  // The plan lists the leaves to draw bottom first; the `stagedPreview` lands above the raster stack.
   const { leaves } = planScreenComposition(compileDocumentLeaves(doc), {
     isolationLayerId,
     showOverlayStacks: opts.showOverlayStacks ?? ALL_OVERLAY_STACKS_SHOWN,
@@ -599,7 +599,7 @@ export const compositeDocument = (
   };
   applyClipRect();
 
-  // The staged preview lands once, unclipped, before the first mask or region leaf (or after every leaf).
+  // The staged preview lands once, unclipped, before the first overlay-stack leaf (or after every leaf).
   const staged = isIsolated(opts) ? null : (opts.stagedPreview ?? null);
   let stagedPending = staged !== null;
   const drawStaged = (): void => {
@@ -668,7 +668,7 @@ export const compositeDocument = (
   };
 
   for (let index = 0; index < leaves.length; index += 1) {
-    if (stagedPending && leaves[index]!.stack !== 'raster' && leaves[index]!.stack !== 'control') {
+    if (stagedPending && leaves[index]!.stack !== 'raster') {
       drawStaged();
     }
     const scope = scopeIndex < scopes.length ? scopes[scopeIndex]! : null;

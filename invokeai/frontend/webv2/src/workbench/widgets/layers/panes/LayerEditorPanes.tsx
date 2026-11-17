@@ -33,6 +33,8 @@ import { TransformPane } from './TransformPane';
 
 /** Parity with the shell panels: releasing at the floor stops there; collapse asks for a real push past it. */
 const COLLAPSE_OVERSHOOT_PX = 80;
+// While a drag is past the collapse point the block previews its strip, so its expanded floor must let go.
+const ARMED_BLOCK_CSS = { '&[data-collapse-armed]': { minHeight: `${SEGMENT_TABS_HEIGHT_PX}px` } };
 
 interface PaneBlockLabels {
   collapse: string;
@@ -162,10 +164,12 @@ const LayerPaneBlock = ({
       ref={blockRef}
       borderColor="border.subtle"
       data-layer-pane-block={blockId}
+      css={ARMED_BLOCK_CSS}
       data-pane-collapsed={isCollapsed ? '' : undefined}
       direction="column"
       flex={isCollapsed ? '0 0 auto' : `0 1 ${sizePx}px`}
-      minH={`${SEGMENT_TABS_HEIGHT_PX}px`}
+      // Expanded, a block never squeezes below its minimum: a short panel scrolls instead of hiding its content.
+      minH={`${isCollapsed ? SEGMENT_TABS_HEIGHT_PX : minSizePx}px`}
       overflow="hidden"
       {...(isCollapsed ? (edge === 'top' ? { borderBottomWidth: '1px' } : { borderTopWidth: '1px' }) : {})}
     >

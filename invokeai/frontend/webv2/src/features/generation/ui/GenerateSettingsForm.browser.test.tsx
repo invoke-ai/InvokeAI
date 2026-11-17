@@ -212,7 +212,7 @@ const createStableGroups = () => ({
   },
   queueInsights: { getSnapshot: () => NO_QUEUE_INSIGHTS, subscribe: () => noop },
   rebalancePresets: { presets: [], remove: noop, rename: noop, save: noop },
-  sectionPreferences: { sectionsOpen: ALL_SECTIONS_OPEN, setSectionOpen: noop },
+  sectionPreferences: { sectionsOpen: ALL_SECTIONS_OPEN, setSectionsOpen: noop },
   settings: {
     readGenerateValues: (projectId: string) => projectValues.get(projectId)?.getSnapshot() ?? null,
     patchGenerateSettings: (patch: Record<string, unknown>, projectId?: string) => {

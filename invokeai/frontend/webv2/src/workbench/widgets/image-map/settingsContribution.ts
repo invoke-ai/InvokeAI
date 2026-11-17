@@ -27,5 +27,7 @@ export const imageMapSettingsContribution: SettingsContribution = {
       keywords: 'click gallery selection',
     },
   ],
+  // The vocabulary joins this section from the application contributions; it stays in the dialog.
+  quick: ['showClusterLabels', 'clusterEps', 'clickSelectsCluster'],
   load: () => import('./settingsBindings'),
 };

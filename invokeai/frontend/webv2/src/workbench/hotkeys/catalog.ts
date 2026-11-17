@@ -14,6 +14,7 @@ const categoryScopes = {
   app: { kind: 'global' },
   canvas: { kind: 'widget', typeIds: ['canvas'] },
   gallery: { kind: 'widget', typeIds: ['gallery'] },
+  queue: { kind: 'widget', typeIds: ['queue'] },
   viewer: { kind: 'widget', typeIds: ['preview'] },
   workflows: { kind: 'widget', typeIds: ['workflow'] },
 } as const satisfies Record<HotkeyCategory, HotkeyScope>;
@@ -57,7 +58,11 @@ const hotkey = (
   category: HotkeyCategory,
   id: string,
   defaultKeys: string[],
-  { scope = categoryScopes[category], title = formatHotkeyTitle(id) }: { scope?: HotkeyScope; title?: string } = {}
+  {
+    ignoreRepeat,
+    scope = categoryScopes[category],
+    title = formatHotkeyTitle(id),
+  }: { ignoreRepeat?: boolean; scope?: HotkeyScope; title?: string } = {}
 ): HotkeyDefinition => {
   const commandId = `${category}.${id}`;
 
@@ -67,6 +72,7 @@ const hotkey = (
     commandId,
     defaultKeys,
     id: commandId,
+    ...(ignoreRepeat ? { ignoreRepeat } : {}),
     preventDefault: true,
     scope,
     title,
@@ -92,6 +98,12 @@ export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
  * syntax. Anywhere else Ctrl+Up/Down keeps its text-field meaning.
  */
 const PROMPT_ATTENTION_TARGET_SELECTOR = 'textarea[data-prompt-attention-target="true"]:not([readonly])';
+
+/**
+ * The Queue marks a row this way while it offers recall, so its A key works where the Gallery's does and keeps its
+ * meaning everywhere else in the queue.
+ */
+const QUEUE_RECALL_ITEM_TARGET_SELECTOR = '[data-queue-recall-item], [data-queue-recall-item] *';
 
 export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
 
@@ -141,13 +153,18 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'selectEditPreset', ['alt+2']),
   hotkey('app', 'selectVideoPreset', ['alt+3']),
   hotkey('app', 'selectAutomatePreset', ['alt+4'], { title: 'Select Workflow Preset' }),
-  hotkey('app', 'cancelQueueItem', ['shift+x']),
-  hotkey('app', 'clearQueue', ['mod+shift+x'], { title: 'Cancel all queue items' }),
+  // Each press stops one item; holding the key must not walk down the queue.
+  hotkey('app', 'cancelQueueItem', ['shift+x'], { ignoreRepeat: true, title: 'Cancel current or next queue item' }),
+  hotkey('app', 'clearQueue', ['mod+shift+x'], { ignoreRepeat: true, title: 'Cancel all queue items' }),
   // The ids keep "Tab" so saved bindings survive; each opens a widget, wherever the layout keeps it.
   hotkey('app', 'selectGenerateTab', ['1'], { title: 'Open Generate' }),
   hotkey('app', 'selectCanvasTab', ['2'], { title: 'Open Canvas' }),
   hotkey('app', 'selectUpscalingTab', ['3'], { title: 'Open Upscale' }),
   hotkey('app', 'selectWorkflowsTab', ['4'], { title: 'Open Workflow editor' }),
+  hotkey('app', 'switchWorkflowView', ['shift+z'], {
+    scope: categoryScopes.workflows,
+    title: 'Switch workflow view',
+  }),
   hotkey('app', 'selectModelsTab', ['5'], { title: 'Open Model Manager' }),
   hotkey('app', 'selectQueueTab', ['6'], { title: 'Open Queue' }),
   hotkey('app', 'openWidgets', [], { title: 'Show widgets' }),
@@ -238,13 +255,15 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('workflows', 'redo', ['mod+shift+z', 'mod+y']),
   hotkey('viewer', 'swapImages', ['c']),
   hotkey('viewer', 'nextComparisonMode', ['m']),
+  // Bound only while Select for compare waits for a second image or a comparison is open, so Esc is otherwise free.
+  hotkey('viewer', 'exitCompare', ['esc'], { title: 'Cancel or Exit Compare' }),
   hotkey('viewer', 'deleteImage', ['delete', 'backspace']),
   hotkey('viewer', 'loadWorkflow', ['w'], { scope: selectedImageScope }),
-  hotkey('viewer', 'recallAll', ['a'], { scope: selectedImageScope }),
-  hotkey('viewer', 'recallSeed', ['s'], { scope: selectedImageScope }),
-  hotkey('viewer', 'recallPrompts', ['p'], { scope: selectedImageScope }),
-  hotkey('viewer', 'remix', ['r']),
-  hotkey('viewer', 'useSize', ['d'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallAll', ['a'], { ignoreRepeat: true, scope: selectedImageScope }),
+  hotkey('viewer', 'recallSeed', ['s'], { ignoreRepeat: true, scope: selectedImageScope }),
+  hotkey('viewer', 'recallPrompts', ['p'], { ignoreRepeat: true, scope: selectedImageScope }),
+  hotkey('viewer', 'remix', ['r'], { ignoreRepeat: true }),
+  hotkey('viewer', 'useSize', ['d'], { ignoreRepeat: true, scope: selectedImageScope }),
   hotkey('viewer', 'toggleMetadata', ['i'], { title: 'Toggle Details' }),
   // Preview registers these while it shows an item; the arrows step saved items outside comparison.
   hotkey('viewer', 'toggleFilmstrip', ['t']),
@@ -277,7 +296,10 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('gallery', 'moveFocusLeft', ['mod+left']),
   hotkey('gallery', 'toggleFocusedInSelection', []),
   hotkey('gallery', 'deleteSelection', ['delete', 'backspace']),
-  hotkey('gallery', 'remix', ['r']),
+  hotkey('gallery', 'remix', ['r'], { ignoreRepeat: true }),
   hotkey('gallery', 'starImage', ['.']),
+  // Preview's compare Esc, answered where its second image is picked.
+  hotkey('gallery', 'exitCompare', ['esc'], { title: 'Cancel or Exit Compare' }),
   hotkey('gallery', 'toggleStarredOnly', []),
+  { ...hotkey('queue', 'recallAll', ['a'], { ignoreRepeat: true }), targetSelector: QUEUE_RECALL_ITEM_TARGET_SELECTOR },
 ];

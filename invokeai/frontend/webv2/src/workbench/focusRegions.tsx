@@ -513,3 +513,32 @@ export const useFloatingWindowFocus = (
 
   return { activate, isHighlighted: isActive && showsHighlight };
 };
+
+/**
+ * The ref cleanup for a control that a later render can remove while it holds focus: if the node leaves the document
+ * focused, focus goes to `getTarget()`, the nearest region by default, so the keys scoped there keep working, unless
+ * something else has taken focus since. React also runs the cleanup when the ref callback changes on a node that stays
+ * (a selection flipping on the click that focused it), so only a node really gone gives focus away; that is checked a
+ * microtask on, once the commit running the cleanup has removed it.
+ */
+export const releaseFocusOnRemoval = (
+  node: HTMLElement,
+  getTarget: () => HTMLElement | null = () => node.closest<HTMLElement>('[role="region"]')
+): (() => void) => {
+  return () => {
+    if (document.activeElement !== node) {
+      return;
+    }
+
+    // Resolved while the node is still in place: a region found through it cannot be found once it is gone.
+    const target = getTarget();
+
+    queueMicrotask(() => {
+      const { activeElement } = document;
+
+      if (!node.isConnected && (activeElement === null || activeElement === document.body)) {
+        target?.focus({ preventScroll: true });
+      }
+    });
+  };
+};
