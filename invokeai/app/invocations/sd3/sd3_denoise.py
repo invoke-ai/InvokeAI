@@ -1,4 +1,5 @@
 from contextlib import ExitStack
+from pathlib import Path
 from typing import Callable, Optional, Tuple
 
 import torch
@@ -39,6 +40,7 @@ from invokeai.backend.patches.lora_conversions.sd3_lora_constants import (
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
+from invokeai.backend.rectified_flow.schedule_shift import load_scheduler
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -46,6 +48,9 @@ from invokeai.backend.util.fp8 import FP8_STORAGE_DTYPES
 
 # How the sizes read in a message; the UI uses the same names.
 _SD3_SIZES = {SD3VariantType.Medium: "SD 3 / 3.5 Medium", SD3VariantType.Large: "SD 3.5 Large"}
+
+# The scheduler config of every SD3 / SD3.5 Diffusers release (Medium, Large, Large Turbo).
+SD3_SCHEDULER_CONFIG = {"num_train_timesteps": 1000, "shift": 3.0}
 
 # What one sidecar-patched layer holds while it computes its residual -- a second copy of the layer's output, or for a
 # LoKR/LoHA layer its full weight delta. Same margin as LTX-2 and ERNIE-Image.
@@ -116,7 +121,7 @@ def _delta_fits(layer: BaseLayerPatch, weight: torch.Tensor) -> bool:
     title="Denoise - SD3",
     tags=["image", "sd3"],
     category="latents",
-    version="1.3.0",
+    version="1.3.1",
 )
 class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Run denoising process with a SD3 model."""
@@ -251,6 +256,14 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             generator=torch.Generator(device=rand_device).manual_seed(seed),
         ).to(device=device, dtype=dtype)
 
+    def _get_sigmas(self, context: InvocationContext) -> list[float]:
+        """`steps + 1` sigmas from 1 to 0, the reference pipeline's schedule: the model's own scheduler config, or for a
+        transformer without one (GGUF) the shift every SD3 / SD3.5 release ships."""
+        model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
+        scheduler = load_scheduler(Path(model_path), SD3_SCHEDULER_CONFIG)
+        scheduler.set_timesteps(self.steps)
+        return scheduler.sigmas.tolist()
+
     def _prepare_cfg_scale(self, num_timesteps: int) -> list[float]:
         """Prepare the CFG scale list.
 
@@ -301,11 +314,11 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         prompt_embeds = torch.cat([neg_prompt_embeds, pos_prompt_embeds], dim=0)
         pooled_prompt_embeds = torch.cat([neg_pooled_prompt_embeds, pos_pooled_prompt_embeds], dim=0)
 
-        # Prepare the timestep schedule.
-        # We add an extra step to the end to account for the final timestep of 0.0.
-        timesteps: list[float] = torch.linspace(1, 0, self.steps + 1).tolist()
-        # Clip the timesteps schedule based on denoising_start and denoising_end.
-        timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
+        # The shifted sigmas, clipped like FLUX's: `denoising_start` is the noise level an image-to-image pass starts
+        # at, and a split chain meets exactly at its boundary.
+        timesteps = clip_timestep_schedule_fractional(
+            self._get_sigmas(context), self.denoising_start, self.denoising_end
+        )
         total_steps = len(timesteps) - 1
 
         # Prepare the CFG scale list.
