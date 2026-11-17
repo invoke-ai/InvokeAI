@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
-import { Box, ChakraProvider, HStack, Text } from '@chakra-ui/react';
+import { Box, ChakraProvider, HStack, Menu, Portal, Text } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { createWidgetRecovery } from '@workbench/widget-frame/widgetRecoveryStore';
 import { createInstance } from 'i18next';
@@ -449,17 +449,28 @@ describe('CenterArea with the workflow editor chrome at a narrow width', () => {
     const snapshot = {
       activeWorkflow: { document, source: linkedSource },
       activeWorkflowId: document.id,
+      // A step to undo and one to redo, so both history buttons are live targets.
+      canRedo: true,
+      canUndo: true,
       id: 'project-1',
       projectGraph: document,
       workflows: [{ document, source: linkedSource }],
     };
     const port = <T,>(value: T) => ({ getSnapshot: () => value, subscribe: () => () => {} });
     const adapter = {
+      CommandShortcut: () => null,
+      commands: { redo: () => undefined, undo: () => undefined },
+      getProjectGraph: () => document,
       persistence: port({ error: null, hasLocalRecovery: true, lastSavedAt: null, status: 'saved' }),
       project: port(snapshot),
+      widgets: { open: () => undefined, patchValues: () => undefined },
     } as unknown as Parameters<typeof WorkflowUiProvider>[0]['adapter'];
     const Label = implementation.headerLabel as ComponentType<{ region: 'center' }>;
-    const Actions = implementation.headerActions as ComponentType<{ region: 'center' }>;
+    // The frame hands both slots the same instance's runtime; the menu answers for the header beside it.
+    const runtime = { instanceId: 'workflow:center', region: 'center', typeId: 'workflow' };
+    const HeaderActions = implementation.headerActions as ComponentType<{ region: 'center'; runtime: typeof runtime }>;
+    const MenuItems = implementation.headerMenu as ComponentType<{ region: 'center'; runtime: typeof runtime }>;
+    const Actions = ({ region }: { region: 'center' }) => <HeaderActions region={region} runtime={runtime} />;
 
     centerAreaMocks.chromeSlots = { actions: Actions, label: Label };
     centerAreaMocks.activeItem.label = 'Workflow';
@@ -468,6 +479,16 @@ describe('CenterArea with the workflow editor chrome at a narrow width', () => {
       <QueryClientProvider client={new QueryClient()}>
         <WorkflowUiProvider adapter={adapter}>
           <CenterArea />
+          {/* The widget's ⋯ menu entries, held open beside the chrome the frame stand-in replaces. */}
+          <Menu.Root open>
+            <Portal>
+              <Menu.Positioner>
+                <Menu.Content>
+                  <MenuItems region="center" runtime={runtime} />
+                </Menu.Content>
+              </Menu.Positioner>
+            </Portal>
+          </Menu.Root>
         </WorkflowUiProvider>
       </QueryClientProvider>,
       320
@@ -495,10 +516,28 @@ describe('CenterArea with the workflow editor chrome at a narrow width', () => {
     ];
 
     expect(workflowsButton).not.toBeNull();
-    expect(actions.length).toBe(source ? 6 : 5);
+    // The library actions keep their place; Undo and Redo give way to the ⋯ menu, so nothing overflows into a scroll.
+    expect(
+      actions.filter((action) => action.checkVisibility()).map((action) => action.getAttribute('aria-label'))
+    ).toEqual([
+      'widgets.workflow.addNode',
+      'widgets.workflow.saveToLibraryWithEllipsis',
+      ...(source ? ['widgets.workflow.updateTemplateWithEllipsis'] : []),
+      'widgets.workflow.persistenceSaved',
+      'Widget settings',
+      'Widget menu',
+    ]);
+    await vi.waitFor(() =>
+      expect([...document.querySelectorAll('[role="menuitem"]')].slice(0, 2).map((item) => item.textContent)).toEqual([
+        'widgets.workflow.toolbar.undo',
+        'widgets.workflow.toolbar.redo',
+      ])
+    );
     expect(isHitTestable(workflowsButton!)).toBe(true);
     expect(
-      actions.filter((action) => !isHitTestable(action)).map((action) => action.getAttribute('aria-label'))
+      actions
+        .filter((action) => action.checkVisibility() && !isHitTestable(action))
+        .map((action) => action.getAttribute('aria-label'))
     ).toEqual([]);
   });
 });

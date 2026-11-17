@@ -1,18 +1,16 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
-import { Badge, Separator, Stack, Text } from '@chakra-ui/react';
-import {
-  getKrea2EditLoraState,
-  getReferenceImageUnavailableReason,
-  isReferenceImageSupported,
-} from '@features/generation/core/baseGenerationPolicies';
+import { Flex, Icon, Stack, Text } from '@chakra-ui/react';
+import { getKrea2EditLoraState, isReferenceImageSupported } from '@features/generation/core/baseGenerationPolicies';
 import {
   type GenerateDraft,
   type GenerateSettingsUpdate,
   pickGenerateSettings,
 } from '@features/generation/ui/generateDebounce';
 import { useExternalStoreSelector } from '@platform/state/selectors';
+import { TriangleAlertIcon } from 'lucide-react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerateConceptsContent, isCompatibleLora, isConceptInstalled } from './GenerateConceptsSection';
@@ -68,28 +66,48 @@ export const GenerateGuidanceSection = ({
   const activeCount = activeReferenceImages + activeConcepts;
   const totalCount = referenceImageCount + settings.loras.length;
 
-  const badges = (
-    <>
-      {hasIncompatible ? (
-        <Badge colorPalette="orange" variant="surface">
-          {t('widgets.generate.incompatible')}
-        </Badge>
-      ) : null}
-      {activeCount > 0 ? (
-        <Badge variant="surface">
-          {activeCount === totalCount
-            ? t('widgets.generate.activeCount', { count: activeCount })
-            : t('widgets.generate.activeOfTotal', { active: activeCount, total: totalCount })}
-        </Badge>
-      ) : totalCount > 0 ? (
-        <Badge variant="surface">{t('widgets.generate.offCount', { count: totalCount })}</Badge>
-      ) : null}
-    </>
+  // Whether something here cannot run, or is all switched off, holds open or folded; what is active is a summary.
+  // Both read as the title row's own summary text, so a section's state looks the same whichever kind it is.
+  const isAllOff = activeCount === 0 && totalCount > 0;
+  const status = useMemo(
+    () => (
+      <Flex align="center" fontSize="sm" gap="2">
+        {hasIncompatible ? (
+          <Flex as="span" align="center" color="fg.warning" gap="1">
+            <Icon as={TriangleAlertIcon} aria-hidden boxSize="3" flexShrink={0} />
+            {t('widgets.generate.incompatible')}
+          </Flex>
+        ) : null}
+        {isAllOff ? (
+          <Text as="span" color="fg.muted">
+            {t('widgets.generate.offCount', { count: totalCount })}
+          </Text>
+        ) : null}
+      </Flex>
+    ),
+    [hasIncompatible, isAllOff, t, totalCount]
+  );
+  const summary = useMemo(
+    () =>
+      activeCount === 0
+        ? undefined
+        : [
+            activeCount === totalCount
+              ? t('widgets.generate.activeCount', { count: activeCount })
+              : t('widgets.generate.activeOfTotal', { active: activeCount, total: totalCount }),
+          ],
+    [activeCount, t, totalCount]
   );
 
   return (
-    <GenerateCollapsibleSection label={t('widgets.generate.guidance')} defaultOpen badges={badges} sectionId="guidance">
-      <Stack gap="2" p="2">
+    <GenerateCollapsibleSection
+      label={t('widgets.generate.guidance')}
+      defaultOpen
+      sectionId="guidance"
+      status={status}
+      summary={summary}
+    >
+      <Stack gap="2.5">
         <GenerateReferenceImagesContent
           models={models}
           visionComponents={settings}
@@ -103,11 +121,6 @@ export const GenerateGuidanceSection = ({
           <Text color="fg.warning" fontSize="xs" role="status" textWrap="pretty">
             {t('widgets.generate.krea2EditReferencesNeedLora')}
           </Text>
-        ) : null}
-        {referenceImagesSupported ||
-        referenceImageCount > 0 ||
-        getReferenceImageUnavailableReason(selectedModel, settings) ? (
-          <Separator borderColor="bg.subtle" />
         ) : null}
         <GenerateConceptsContent
           loraModels={loraModels}

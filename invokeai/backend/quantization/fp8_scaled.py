@@ -818,6 +818,29 @@ def _fold_scale(weight: torch.Tensor, scale: torch.Tensor, dtype: torch.dtype, p
     return out
 
 
+def fold_transient_bytes(weight: Any, scale: Any) -> int:
+    """The most :func:`dequantize_fp8_scaled` holds beside its result while folding ``scale`` into ``weight``.
+
+    That is the float32 copy of the weight and the product, each over the whole weight or one slab of rows
+    (`_fold_scale`), plus, for a block-wise scale, its widened copy over the same rows and, in slabs, the row index
+    that picks each slab's scale rows. Exact in slabs; folded whole it is over by the result, which does not exist yet
+    while the multiply holds its copies. Reads shapes only, so a loader can reserve for it from a header's ``meta``
+    tensors before anything is read. ``scale`` is in the layout the fold receives, so a stored MXFP8 grid stands for
+    its decoded one. The result, the stored weight and the scale itself are the caller's to count.
+    """
+    numel = weight.numel()
+    rows = weight.shape[0] if weight.dim() else 1
+    block_wise = scale.numel() > 1 and scale.dim() > 1
+    index_bytes = 0
+    if numel > _FOLD_SLAB_ELEMENTS:
+        columns = numel // rows
+        slab_rows = min(rows, max(1, _FOLD_SLAB_ELEMENTS // columns))
+        numel = slab_rows * columns
+        if block_wise:
+            index_bytes = slab_rows * torch.int64.itemsize
+    return numel * torch.float32.itemsize * (3 if block_wise else 2) + index_bytes
+
+
 def attach_fp8_scales(
     model: torch.nn.Module,
     layers: Mapping[str, Fp8ScaledLayer],

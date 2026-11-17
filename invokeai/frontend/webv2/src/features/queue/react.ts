@@ -5,13 +5,13 @@ export {
   useActiveProgressTarget,
   useActiveProgressTargets,
   useFollowedProgressTargets,
+  useFramedProgressTargets,
 } from './data/activeProgressTargetStore';
 export { type ItemProgress, useActiveProgressItemIds, useItemProgress } from './data/itemProgressStore';
 export {
   consumeQueueItemSwapProgressImage,
   type LatestProgressImageSnapshot,
   useProgressImage,
-  useQueueItemBridgeProgressImage,
   useQueueItemProgressImage,
   useQueueItemSwapProgressImage,
 } from './data/progressImageStore';

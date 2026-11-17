@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
 from invokeai.backend.model_manager.load.fp8_capability import Unimplemented
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
+    _device_supports_fp8_storage,
     _model_declared_skip_patterns,
     resolve_submodel_path,
 )
@@ -45,21 +46,20 @@ from invokeai.backend.model_manager.util.llamacpp_keys import (
     is_llamacpp_decoder_state_dict,
 )
 from invokeai.backend.quantization.fp8_scaled import (
+    FP8_WEIGHT_DTYPES,
     QKV_SPLIT_SIDECHANNEL_SUFFIXES,
+    Fp8ScaledLayer,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
-    expand_weight_scale,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
-    is_scale_metadata_key,
-    iter_weight_scale_pairs,
     load_safetensors_checkpoint,
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
-    reject_undecoded_mx_scale,
+    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     split_qkv_sidechannel,
     strip_layer_path_prefix,
@@ -1042,43 +1042,37 @@ class ZImageFunControlNetLoader(ModelLoader):
         return control
 
 
-def _fold_comfy_scaled_weights(sd: dict[str, Any], dtype: torch.dtype) -> int:
-    """Fold every ComfyUI-style ``weight_scale`` into its weight, in place. Returns how many.
-
-    ComfyUI stores quantized weights with accompanying scale factors (``layer.weight`` quantized,
-    ``layer.weight_scale`` the factor, both spellings), so ``dequantized = weight * weight_scale``.
-    See https://github.com/Comfy-Org/ComfyUI/blob/master/QUANTIZATION.md.
-
-    A named function rather than a loop inside the loader so the scale-axis contract below is
-    reachable from a test. `expand_weight_scale` handles all three layouts (per-tensor,
-    per-output-channel, block-wise); the local loop this replaced left a 1-D per-channel scale
-    untouched, and ``(out, in) * (out,)`` then broadcasts on the *last* axis — scaling input
-    channels instead of output channels, which is a shape error on a non-square weight and a
-    silently wrong weight on a square one.
-
-    The multiply runs in float32 for precision but each result is stored as ``dtype`` immediately,
-    so the whole model is never materialized in float32: holding every dequantized weight at fp32
-    until the caller's later cast quadruples the per-parameter cost (4 bytes vs 1 on disk) and
-    dominates the cold-load RAM peak — enough to swap a 32 GB machine. Same fix as in the FLUX.2
-    and Krea-2 loaders.
-    """
-    folded = 0
-    for weight_key, scale_key in list(iter_weight_scale_pairs(sd)):
-        # Before the cast: `.float()` on an E8M0 grid turns the exponent bytes into ordinary numbers
-        # and loses the only evidence of what they were.
-        reject_undecoded_mx_scale(weight_key[: -len(".weight")], sd[scale_key])
-        # Float8 needs `.float()`; torch has no direct type promotion for it.
-        weight_float = sd[weight_key].float()
-        scale = expand_weight_scale(weight_float, sd[scale_key].float(), weight_key)
-        sd[weight_key] = (weight_float * scale).to(dtype)
-        del weight_float
-        folded += 1
-    return folded
-
-
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Qwen3Encoder, format=ModelFormat.Checkpoint)
 class Qwen3EncoderCheckpointLoader(ModelLoader):
-    """Class to load single-file Qwen3 Encoder models for Z-Image (safetensors format)."""
+    """Class to load single-file Qwen3 Encoder models for Z-Image (safetensors format).
+
+    ComfyUI 'scaled fp8' Linear layers stay float8 with the file's own scale where the device can hold float8, and are
+    dequantized per forward, never multiplied in fp8. Elsewhere, and for a CPU-only encoder, they are folded into the
+    compute dtype. Embeddings are always folded; nvfp4 and int8 convrot layers stay packed.
+    """
+
+    def _storage_format(self, config: AnyModelConfig) -> tuple[bool, torch.dtype]:
+        """Whether float8 Linear weights stay float8, and the compute dtype everything else is held in.
+
+        Decided once per loader (a fresh one serves each load): the cache key and the built weights must agree, and the
+        capability probes can flip between the key computation and the build under the load lock. Float8 follows the
+        execution device, because a CPU-only encoder reads its weights on the CPU whatever the session's device is.
+        """
+        device = self._get_execution_device(config, SubModelType.TextEncoder) or self._torch_device
+        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
+        if device not in decisions:
+            keep_fp8 = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
+            decisions[device] = (keep_fp8, TorchDevice.choose_bfloat16_safe_dtype(self._torch_device))
+        return decisions[device]
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        # Device caches share one canonical CPU copy per key: a device must not adopt float8 it cannot hold, nor folded
+        # weights that throw away a capable device's saving. Keyed by the device's decision, not the file's contents,
+        # which would take a header read on every cache lookup.
+        if submodel_type == SubModelType.TextEncoder:
+            keep_fp8, dtype = self._storage_format(config)
+            return f"{'fp8-' if keep_fp8 else ''}{str(dtype).removeprefix('torch.')}"
+        return ""
 
     def _load_model(
         self,
@@ -1126,9 +1120,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             )
         model_path = Path(config.path)
 
-        # Determine safe dtype based on target device capabilities
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        device_keeps_fp8, model_dtype = self._storage_format(config)
 
         # Load the state dict from safetensors file
         sd = load_safetensors_checkpoint(model_path)
@@ -1136,8 +1128,8 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
 
         # Three ComfyUI side channels reach this loader and a file carries one of them. int8 is
         # decided first because it is the one the others cannot be told apart from by structure: an
-        # int8 layer ships a `.weight_scale` too, so the scaled-fp8 fold further down would pair
-        # every int8 code tensor with its scale and widen it, and the blanket cast after that would
+        # int8 layer ships a `.weight_scale` too, so the scaled-fp8 extraction further down would pair
+        # every int8 code tensor with its scale and drop or fold it as fp8, and the cast after that would
         # turn what survived into bf16 integers. Neither raises.
         int8_markers = extract_int8_convrot_markers(sd)
 
@@ -1156,11 +1148,10 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                 sd.pop(f"lm_head.{suffix}", None)
 
         # Comfy's fp4_mixed encoders keep most projections in nvfp4, beside scaled fp8. Take those out before
-        # anything below reads the side channel: the fold pairs every `weight_scale` with its weight and would
-        # stretch nvfp4's block scales over the packed codes, and the cast further down would widen them.
-        nvfp4_payloads = pop_nvfp4_layers(
-            sd, header_layers=parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
-        )
+        # anything below reads the side channel: the fp8 extraction pops every `weight_scale`, nvfp4's block
+        # scales included, and the cast further down would widen the packed codes.
+        header_layers = parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
+        nvfp4_payloads = pop_nvfp4_layers(sd, header_layers=header_layers)
         # `lm_head` is tied to the embeddings below, which replaces the weight a packed module would hold.
         nvfp4_payloads.pop("lm_head", None)
 
@@ -1275,13 +1266,14 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             model = Qwen3ForCausalLM(qwen_config)
         skip_patterns = _model_declared_skip_patterns(model)
 
-        nvfp4_bytes = predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns)
+        fp8_layers: dict[str, Fp8ScaledLayer] = {}
 
         if int8_markers:
             # The projections stay int8-resident, which is the whole point of the build: 8.8 GiB on
             # disk stays 8.8 GiB, against the 15.3 GiB the bf16 release occupies. The reservation,
             # the split and the cast all have to agree on which layers those are, which is what the
             # shared install is for.
+            nvfp4_bytes = predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns)
             kept = install_int8_convrot_layers(
                 model,
                 sd,
@@ -1294,43 +1286,40 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             )
             logger.info(f"Kept {len(kept)} of {len(int8_markers)} layer(s) in int8 (dequantized per forward)")
         else:
-            # Handle memory management before anything below widens a weight: the scaled-fp8 fold turns every
-            # quantized layer into the compute dtype, and the base loader reserved only the file size. One
-            # reservation for what the state dict ends up holding -- every tensor but the scale metadata at the
-            # compute dtype, plus the nvfp4 layers as they will be held -- since `make_room` makes that much room
-            # rather than adding to an earlier one.
-            # The excluded scale keys are still in `sd` and still resident, so this sum is short by
-            # them -- bounded, not open-ended: `_fold_comfy_scaled_weights` refuses an MXFP8 grid by
-            # name before folding, so the residue here is per-tensor and per-channel float32 scales,
-            # kilobytes on this encoder. That is why this seam keeps its own sum rather than
-            # `reserve_for_load`, which sizes a dict the side channel has been *popped* out of.
-            new_sd_size = sum(
-                tensor.nelement() * model_dtype.itemsize for key, tensor in sd.items() if not is_scale_metadata_key(key)
+            # Pops every scale and marker, so what is left loads into a model that knows no fp8. An unparsed scale
+            # spelling beside an fp8 weight is refused here rather than cast unscaled.
+            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints={**extract_comfy_quant_hints(sd), **header_layers})
+            # `lm_head` is tied to the embeddings below, which replaces whatever it was loaded with.
+            fp8_layers.pop("lm_head", None)
+            sd.pop("lm_head.weight", None)
+
+            # Text encoders have no FP8 Storage setting, so the device decides (`_storage_format`), as for the other
+            # encoders: float8 where the device can hold it or multiply in it, folded into the compute dtype elsewhere.
+            source_is_fp8 = bool(fp8_layers) or any(
+                getattr(tensor, "dtype", None) in FP8_WEIGHT_DTYPES for tensor in sd.values()
             )
-            self._ram_cache.make_room(new_sd_size + nvfp4_bytes)
+            keep_fp8 = source_is_fp8 and device_keeps_fp8
 
-            # Handle ComfyUI quantized checkpoints
-            # ComfyUI stores quantized weights with accompanying scale factors:
-            # - layer.weight: quantized data (FP8)
-            # - layer.weight_scale: scale factor (FP32 scalar)
-            # Dequantization formula: dequantized = weight.to(dtype) * weight_scale
-            # Reference: https://github.com/Comfy-Org/ComfyUI/blob/master/QUANTIZATION.md
-            dequantized_count = _fold_comfy_scaled_weights(sd, model_dtype)
-
-            if dequantized_count > 0:
-                logger.info(f"Dequantized {dequantized_count} ComfyUI quantized weights")
-
-            # Filter out ComfyUI quantization metadata keys (comfy_quant, weight_scale)
-            # These are no longer needed after dequantization
-            comfy_metadata_keys = [k for k in sd.keys() if is_scale_metadata_key(k)]
-            for k in comfy_metadata_keys:
-                del sd[k]
-            if comfy_metadata_keys:
-                logger.info(f"Filtered out {len(comfy_metadata_keys)} ComfyUI quantization metadata keys")
-
-            # Convert to target dtype
-            for k in sd.keys():
-                sd[k] = sd[k].to(model_dtype)
+            # One reservation, before the fold or the split widens a weight: `make_room` makes that much room rather
+            # than adding to an earlier one.
+            reserve_for_load(
+                self._ram_cache.make_room,
+                sd,
+                model_dtype,
+                keep_fp8=keep_fp8,
+                model=model,
+                skip_patterns=skip_patterns,
+                fp8_layers=fp8_layers,
+                nvfp4_payloads=nvfp4_payloads,
+            )
+            if fp8_layers and not keep_fp8:
+                dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
+                logger.info(f"Qwen3 encoder: folded {len(fp8_layers)} scaled fp8 layer(s) into {model_dtype}.")
+                fp8_layers = {}
+            # Layers the cast would widen anyway (embeddings, block-wise scales) are folded here with their scale
+            # applied, so the cast never drops one.
+            fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
+            cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
 
         logger.info(f"Loaded state dict with {len(sd)} keys (originally {original_key_count})")
 
@@ -1378,6 +1367,20 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                 else:
                     # For other buffers, log warning
                     logger.warning(f"Re-initializing unknown meta buffer: {name}")
+
+        if fp8_layers:
+            # The scales go on the modules that kept their float8 weights; `CustomLinear` applies them per forward.
+            attached = attach_fp8_scales(model, fp8_layers)
+            warn_on_unattached_scales(logger, "Qwen3 encoder", attached, fp8_layers)
+        # Storage only, as for T5: the fp8 matmul quantizes the activations too, and one encoder pass per prompt gains
+        # nothing from it while outliers in the activations cost conditioning accuracy. Raw fp8 weights included.
+        kept = 0
+        for module in model.modules():
+            if isinstance(module, torch.nn.Linear) and module.weight.dtype in FP8_WEIGHT_DTYPES:
+                module._fp8_full_precision_matmul = True
+                kept += 1
+        if kept:
+            logger.info(f"Qwen3 encoder: kept {kept} Linear weight(s) in float8, dequantized per forward")
 
         return model
 

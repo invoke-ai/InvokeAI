@@ -25,7 +25,6 @@ import {
   CircleIcon,
   CircleOffIcon,
   CopyIcon,
-  EyeClosedIcon,
   EyeIcon,
   EyeOffIcon,
   FolderPlusIcon,
@@ -41,7 +40,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { COLOR_LABEL_ITEMS } from './colorLabels';
-import { ADJUSTMENT_ADD_ITEMS, adjustmentAddActionId } from './layerContextActions';
+import { ADJUSTMENT_ADD_ITEMS, adjustmentAddActionId, enabledToggleLabel } from './layerContextActions';
 import { canGroupSelection, groupLayers, ungroupLayers } from './layerGroupCommands';
 import { createAdjustmentEntry } from './layerOps';
 
@@ -148,9 +147,11 @@ export const LayerGroupContextMenu = ({
       onClose();
     }
   }, [menuOpen, onClose]);
+  const hideable = isOverlayStack(stack);
+  const enabledLabel = enabledToggleLabel(document, [group.id], group.isEnabled);
   const handleToggleEnabled = useCallback(
-    () => patch(t('widgets.layers.actions.toggleActive'), { isEnabled: !group.isEnabled }),
-    [group.isEnabled, patch, t]
+    () => patch(t(enabledLabel.key), { isEnabled: !group.isEnabled }),
+    [enabledLabel.key, group.isEnabled, patch, t]
   );
   const handleToggleLock = useCallback(
     () => patch(t('widgets.layers.actions.toggleLock'), { isLocked: !group.isLocked }),
@@ -208,7 +209,6 @@ export const LayerGroupContextMenu = ({
   );
 
   const locked = editingLocked;
-  const hideable = isOverlayStack(stack);
   const adjustable = stack === 'raster';
 
   const handleAddAdjustment = useCallback(
@@ -317,15 +317,15 @@ export const LayerGroupContextMenu = ({
       <Menu.Separator borderColor="border.subtle" />
       <MenuActionItem
         disabled={locked}
-        icon={group.isEnabled ? EyeOffIcon : EyeIcon}
-        label={t(group.isEnabled ? 'widgets.layers.actions.hideGroup' : 'widgets.layers.actions.showGroup')}
+        icon={enabledLabel.icon}
+        label={t(enabledLabel.key)}
         value="enabled"
         onSelect={handleToggleEnabled}
       />
       {hideable ? (
         <MenuActionItem
           disabled={locked}
-          icon={group.isHidden ? EyeIcon : EyeClosedIcon}
+          icon={group.isHidden ? EyeIcon : EyeOffIcon}
           label={t(
             group.isHidden ? 'widgets.layers.actions.showGroupOnCanvas' : 'widgets.layers.actions.hideGroupOnCanvas'
           )}

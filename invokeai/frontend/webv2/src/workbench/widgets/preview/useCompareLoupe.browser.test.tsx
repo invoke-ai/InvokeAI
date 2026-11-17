@@ -18,7 +18,13 @@ const interact = (action: () => void): Promise<void> =>
   });
 
 const Harness = () => {
-  const loupe = useCompareLoupe({ enabled: true, naturalWidth: 200 });
+  const loupe = useCompareLoupe({
+    enabled: true,
+    images: [
+      { id: 'pane-0', naturalWidth: 200 },
+      { id: 'pane-1', naturalWidth: 200 },
+    ],
+  });
 
   return ([0, 1] as const).map((index) => {
     const pane = loupe.getPane(index)!;

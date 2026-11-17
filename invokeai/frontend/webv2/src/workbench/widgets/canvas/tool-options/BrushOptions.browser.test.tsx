@@ -110,11 +110,11 @@ describe('paint size control', () => {
     });
   };
 
-  /** Where the thumb sits along the track, 0–1 (the track is inset 10px from the frame). */
+  /** Where the thumb sits along the track, 0–1 (the track is inset 6px from the frame). */
   const thumbFraction = () => {
     const frame = container!.querySelector<HTMLElement>('[data-scope="scrubber"]')!.getBoundingClientRect();
     const thumb = container!.querySelector<HTMLElement>('[data-part="thumb"]')!.getBoundingClientRect();
-    return (thumb.left + thumb.width / 2 - frame.left - 10) / (frame.width - 20);
+    return (thumb.left + thumb.width / 2 - frame.left - 6) / (frame.width - 12);
   };
 
   it('announces the actual size, including sub-pixel sizes', async () => {

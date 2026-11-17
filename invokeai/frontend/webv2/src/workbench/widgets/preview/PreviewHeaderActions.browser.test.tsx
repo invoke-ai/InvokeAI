@@ -72,6 +72,7 @@ void i18n.use(initReactI18next).init({
             },
           },
           preview: {
+            compareArmedTooltip: 'Pick another image to compare · click to cancel',
             details: 'Details',
             editOnCanvas: 'Edit on Canvas',
             editThisImage: 'Edit this image',
@@ -95,6 +96,8 @@ void i18n.use(initReactI18next).init({
 
 const state = vi.hoisted(() => ({
   actionItem: null as null | Record<string, unknown>,
+  /** Set while Select for compare waits for a second image, as Preview publishes it. */
+  cancelCompare: null as null | (() => void),
   density: 'full' as 'compact' | 'full' | 'minimal' | null,
   viewerAutoSwitch: 'progress' as 'latest' | 'off' | 'progress',
   zoom: null as null | {
@@ -151,6 +154,7 @@ vi.mock('./previewHeaderStore', async (importOriginal) => ({
   usePreviewHeaderContext: () => ({
     actionItem: state.actionItem,
     actions: state.actionItem ? itemActions : null,
+    cancelCompare: state.cancelCompare,
     copyCurrentVideoFrame: null,
     isVideoFrameCopyAvailable: false,
     openItemMenu,
@@ -240,7 +244,9 @@ const button = (label: string): HTMLButtonElement =>
 
 beforeEach(() => {
   state.actionItem = null;
+  state.cancelCompare = null;
   state.density = 'full';
+  itemActions.selectForCompare.mockClear();
   openItemMenu.mockClear();
   itemActions.canUseAsReferenceImage = false;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -562,6 +568,35 @@ describe('preview header Edit and Use', () => {
       expect.objectContaining({ imageName: 'still.png' }),
       'seed'
     );
+  });
+
+  it('shows Select for compare pressed while it waits for a second image, and switches it off again', async () => {
+    state.actionItem = STILL_IMAGE;
+    await render();
+    const compare = button('Select for Compare');
+
+    expect(compare).toHaveAttribute('aria-pressed', 'false');
+    await settle(() => compare.click());
+    expect(itemActions.selectForCompare).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ imageName: 'still.png' })
+    );
+
+    const cancelCompare = vi.fn();
+    state.cancelCompare = cancelCompare;
+    await settle(() => root?.unmount());
+    await render();
+    // The name stays put, so it never reads as "Cancel, pressed"; the state is the pressed one, and the tooltip says how
+    // to call it off.
+    const pressed = button('Select for Compare');
+
+    expect(pressed).toHaveAttribute('aria-pressed', 'true');
+    await settle(() => pressed.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse' })));
+    await expect
+      .element(page.getByRole('tooltip'))
+      .toHaveTextContent('Pick another image to compare · click to cancel');
+    await settle(() => pressed.click());
+    expect(cancelCompare).toHaveBeenCalledOnce();
+    expect(itemActions.selectForCompare).toHaveBeenCalledOnce();
   });
 
   it('keeps Edit and Use down to compact, icon-only there, and leaves minimal to star and the full ⋮', async () => {

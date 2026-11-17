@@ -1,3 +1,4 @@
+import type { UtilityGraphExecutionStatus } from '@features/queue/utility';
 import type {
   CommitGeneratedImageResult,
   LayerExportGuard,
@@ -51,6 +52,8 @@ export type SaveSelectObjectSessionResult =
   | ReplaceSelectionFromImageResult;
 export interface SelectObjectSessionUpdate {
   input?: SamInput;
+  /** Switch between visual and prompt input; each type keeps its last input until Reset. */
+  inputType?: SamInput['type'];
   pointLabel?: 'include' | 'exclude';
   model?: SamModel;
   invert?: boolean;
@@ -203,8 +206,8 @@ export interface CanvasSelectObjectCoordinatorDeps {
   readonly stores: CanvasApplicationOperationStores;
   readonly controller: CanvasOperationController;
   readonly projectId: string;
-  /** Reads the account's Auto Process preference when a session starts; absent means off. */
-  readAutoProcessPreference?(): boolean;
+  /** Reads the account's auto-update preference when a session starts; absent starts from the account default. */
+  readAutoUpdatePreference?(): boolean;
   prepareStart(layerId: string): SelectObjectStartContext;
   selectLayer(layerId: string): void;
   clearOtherOperation(): void;
@@ -295,6 +298,8 @@ export interface SelectObjectSessionState<T> {
   isolatedPreview: boolean;
   status: SelectObjectSessionStatus;
   error: SamSessionError | null;
+  /** A run asked for after a failed run is still in flight. */
+  retrying: boolean;
   preview: SelectObjectSessionPreview<T> | null;
   sourceGuard: LayerExportGuard | null;
 }
@@ -308,7 +313,7 @@ export interface SelectObjectSession<T> {
         SelectObjectSessionState<T>,
         'applyPolygonRefinement' | 'autoProcess' | 'input' | 'invert' | 'isolatedPreview' | 'model'
       >
-    >
+    > & { inputType?: SamInput['type'] }
   ): void;
   process(): Promise<SelectObjectSessionProcessResult>;
   reportError(error: SamSessionError | string): void;
@@ -388,7 +393,7 @@ export interface CreateSelectObjectSessionOptions<T> {
     cleanupPreview(): void;
     isGuardCurrent(guard: LayerExportGuard): boolean;
   };
-  initialAutoProcess?: boolean;
+  initialAutoProcess: boolean;
   operation: CanvasOperationSession;
 }
 
@@ -401,6 +406,8 @@ export interface CanvasApplicationPort {
     isGuardCurrent(guard: LayerExportGuard): boolean;
   }): CanvasOperationController;
   runGraph(options: {
+    onStatus?: (status: UtilityGraphExecutionStatus) => void;
+    prepend?: boolean;
     graph: BackendGraphContract;
     outputNodeId?: string;
     signal?: AbortSignal;

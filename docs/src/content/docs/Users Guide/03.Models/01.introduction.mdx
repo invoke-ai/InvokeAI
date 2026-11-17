@@ -149,7 +149,7 @@ Click a model in the library to open it. Its **⋯** menu, and right-clicking it
 | Trigger phrases | **Trigger Phrases** (main models, LoRAs, embeddings) | Offered in the prompt editor. |
 | Cover image | Click the model's image | Shown in the library and pickers. PNG, JPEG or WebP. |
 | Related models | **Related Models** | Linked models are suggested together elsewhere in the app. |
-| Run on CPU | **Run on CPU** (text encoders, VAEs, CLIP Vision, SigLIP, LLaVA OneVision, Text LLMs) | Saves VRAM; may be slower. |
+| Run on CPU | **Run on CPU** (text encoders, VAEs, CLIP Vision, SigLIP, LLaVA OneVision, Text LLMs); **Decode previews on CPU** (Tiny AutoEncoders) | Saves VRAM; may be slower. |
 | Moved file | **Update path** beside the path (models installed in place outside the models folder, or whose files are missing) | Points Invoke at the file's new location. Nothing is moved or copied. |
 | Convert to diffusers | **Convert to diffusers** (checkpoint main models of supported families) | Replaces the checkpoint file with a diffusers folder. |
 | Re-identify | **Re-identify model** in the menu | Re-reads the files to detect base, type, format and variant again. |
@@ -214,7 +214,7 @@ Invoke identifies a model from its files, and falls back to its name only where 
 | `name`, `description`, `source_url` | The model's name, description and Source URL. |
 | `default_settings` | Default steps, CFG or guidance, scheduler, size, FP8 storage, VAE precision and the other defaults. |
 | `trigger_phrases` | Trigger phrases. |
-| `cpu_only` | The **Run on CPU** choice. |
+| `cpu_only` | The **Run on CPU** choice, or **Decode previews on CPU** for a Tiny AutoEncoder. |
 | `cover_image` | The cover image, embedded as a data URL. |
 
 Fields you haven't set are left out. On import, top-level fields Invoke doesn't recognize are skipped, a field the model doesn't have is skipped and named in a notice, and the rest is applied. A default setting the receiving version doesn't know makes that model's import fail. A file is rejected if `source_url` is not an `http://` or `https://` URL or `cover_image` is not an image data URL.

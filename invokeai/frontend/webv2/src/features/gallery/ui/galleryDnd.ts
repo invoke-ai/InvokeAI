@@ -30,7 +30,7 @@ export interface GalleryBoardDropResolution {
   items: GalleryItemRef[];
 }
 
-export type GalleryItemDragSource = 'gallery-grid' | 'preview-filmstrip' | 'preview-frame';
+export type GalleryItemDragSource = 'gallery-grid' | 'preview-filmstrip' | 'preview-frame' | 'workflow-current-image';
 export type GalleryItemDragId = `${GalleryItemDragSource}${string}:${GalleryItemKey}`;
 
 /**

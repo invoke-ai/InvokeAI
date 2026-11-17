@@ -380,20 +380,25 @@ export const MASK_MODIFIER_DEFAULTS = { denoise: 0.8, noise: 0.25 } as const;
 export const fitLayerTransformToBbox = (
   layer: CanvasLayerContract,
   bbox: Rect,
-  documentRect: Rect = bbox
+  documentRect: Rect = bbox,
+  mode: 'contain' | 'cover' | 'fill' = 'contain'
 ): LayerTransform | null => {
   const doc = { height: documentRect.height, width: documentRect.width } as CanvasDocumentContractV3;
   const contentRect = getSourceContentRect(layer, doc);
   if (contentRect.width <= 0 || contentRect.height <= 0) {
     return null;
   }
-  const scale = Math.min(bbox.width / contentRect.width, bbox.height / contentRect.height);
+  const widthScale = bbox.width / contentRect.width;
+  const heightScale = bbox.height / contentRect.height;
+  const scale = mode === 'cover' ? Math.max(widthScale, heightScale) : Math.min(widthScale, heightScale);
+  const scaleX = mode === 'fill' ? widthScale : scale;
+  const scaleY = mode === 'fill' ? heightScale : scale;
   return {
     rotation: 0,
-    scaleX: scale,
-    scaleY: scale,
-    x: bbox.x + (bbox.width - contentRect.width * scale) / 2 - contentRect.x * scale,
-    y: bbox.y + (bbox.height - contentRect.height * scale) / 2 - contentRect.y * scale,
+    scaleX,
+    scaleY,
+    x: bbox.x + (bbox.width - contentRect.width * scaleX) / 2 - contentRect.x * scaleX,
+    y: bbox.y + (bbox.height - contentRect.height * scaleY) / 2 - contentRect.y * scaleY,
   };
 };
 

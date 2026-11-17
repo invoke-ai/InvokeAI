@@ -1,3 +1,4 @@
+import type { GraphPreviewInvoke } from '@features/workflow/contracts';
 import type {
   GraphBearingSurfaceContract,
   WidgetInstanceRuntimeMeta,
@@ -17,8 +18,10 @@ import { createGraphBearingSurface } from '@workbench/graphSurfaces';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
-import { Component, lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { Component, createElement, lazy, Suspense, use, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { GraphPreviewInvokeScopeContext } from './graphPreviewInvoke';
 
 /**
  * Combine graph actions and manifest headerMenu contributions in one menu. Floating has its own {@link
@@ -26,6 +29,33 @@ import { useTranslation } from 'react-i18next';
  */
 
 const GraphPreviewHost = lazy(() => import('./GraphPreviewHost'));
+
+/** The preview with its Invoke, which the shell provides (`GraphPreviewInvokeScopeContext`); without one, none. */
+const GraphPreview = ({
+  isOpen,
+  surface,
+  onExitComplete,
+  onOpenChange,
+}: {
+  isOpen: boolean;
+  surface: GraphBearingSurfaceContract;
+  onExitComplete: () => void;
+  onOpenChange: (isOpen: boolean) => void;
+}) => {
+  const InvokeScope = use(GraphPreviewInvokeScopeContext);
+  const host = (invoke?: GraphPreviewInvoke) => (
+    <GraphPreviewHost
+      invoke={invoke}
+      isOpen={isOpen}
+      surface={surface}
+      onExitComplete={onExitComplete}
+      onOpenChange={onOpenChange}
+    />
+  );
+
+  // The shell's component, the same one every render: created as an element, not declared here.
+  return InvokeScope ? createElement(InvokeScope, { onOpenChange, render: host, sourceId: surface.sourceId }) : host();
+};
 
 /** Contain preview errors as a toast and closed dialog, preserving the widget. Reopening creates a fresh boundary. */
 class GraphPreviewBoundary extends Component<
@@ -164,7 +194,7 @@ export const WidgetActionsMenu = ({
       {surface && isPreviewMounted ? (
         <GraphPreviewBoundary onError={handlePreviewError}>
           <Suspense fallback={null}>
-            <GraphPreviewHost
+            <GraphPreview
               isOpen={isPreviewOpen}
               surface={surface}
               onExitComplete={handlePreviewExitComplete}

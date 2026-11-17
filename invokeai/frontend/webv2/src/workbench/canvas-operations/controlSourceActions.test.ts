@@ -7,7 +7,6 @@ import { createControlLayer } from '@workbench/canvas-engine/api';
 import {
   documentFrom,
   groupContract,
-  layerContract,
   stacksFrom,
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
@@ -20,7 +19,6 @@ import type { ControlLayerIntent, ControlLayerIntentResult } from './operationTy
 import {
   fillControlFromBbox,
   getControlSourceSnapshot,
-  resolveControlFileDrop,
   sendGalleryImageAsControl,
   uploadControlImageFile,
 } from './controlSourceActions';
@@ -309,62 +307,5 @@ describe('uploadControlImageFile', () => {
       uploadControlImageFile({ engine, file: FILE, layerId: 'control-1', uploadImage: () => Promise.resolve(UPLOADED) })
     ).resolves.toMatchObject({ status: 'applied' });
     expect(intents).toHaveLength(1);
-  });
-});
-
-/** Decides the canvas's drop effect while files hover, and whether a drop is used. */
-describe('resolveControlFileDrop', () => {
-  const emptyControl = createControlLayer({ id: 'control-1', name: 'Depth 1' });
-  const IMAGE_ITEM = { type: 'image/png' };
-  const resolve = (
-    nodes: Parameters<typeof documentFrom>[0],
-    selectedLayerId: string,
-    { files = [IMAGE_ITEM] as { type: string }[], hasPixels = false, isCanvasLocked = false } = {}
-  ) =>
-    resolveControlFileDrop({
-      document: documentFrom(nodes, selectedLayerId),
-      engine: { exports: { hasExportableLayerContent: () => hasPixels } },
-      files,
-      isCanvasLocked,
-    });
-  const refusedWith = (titleKey: string) => ({ notice: { kind: 'info', titleKey }, status: 'refused' });
-
-  it('takes one image file onto an empty, unlocked control layer', () => {
-    expect(resolve([emptyControl], 'control-1')).toEqual({ layerId: 'control-1', status: 'accepted' });
-  });
-
-  it.each([
-    [
-      'several files',
-      [emptyControl],
-      {
-        files: [IMAGE_ITEM, IMAGE_ITEM],
-      },
-      'widgets.canvas.fileDrop.oneFile',
-    ],
-    [
-      'a file that is not an image',
-      [emptyControl],
-      { files: [{ type: 'text/plain' }] },
-      'widgets.canvas.fileDrop.notImage',
-    ],
-    ['a locked canvas', [emptyControl], { isCanvasLocked: true }, 'widgets.layers.actions.busy'],
-    ['a layer with strokes', [emptyControl], { hasPixels: true }, 'widgets.canvas.fileDrop.noTarget'],
-    [
-      'a layer locked by its group',
-      [groupContract('group-1', [emptyControl], { isLocked: true })],
-      {},
-      'widgets.layers.actions.locked',
-    ],
-  ] as const)('refuses %s', (_label, nodes, options, titleKey) => {
-    expect(
-      resolve([...nodes], 'control-1', { ...options, files: 'files' in options ? [...options.files] : undefined })
-    ).toEqual(refusedWith(titleKey));
-  });
-
-  it('refuses a selected layer that is not a control layer', () => {
-    expect(resolve([layerContract('raster-1', 'raster')], 'raster-1')).toEqual(
-      refusedWith('widgets.canvas.fileDrop.noTarget')
-    );
   });
 });

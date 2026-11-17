@@ -198,6 +198,14 @@ it.each([
 // A closed menu stays in the DOM until its own exit animation ends.
 const openMenu = () => document.querySelector('[role="menu"][data-state="open"]');
 
+/**
+ * Stretches only the exit animation of a marked element, so it keeps running through driver round trips that could
+ * outlast it on CI. It must run: presence unmounts at once when no exit animation is running when it closes.
+ */
+const holdExitStyle = document.createElement('style');
+holdExitStyle.textContent = '[data-hold-exit][data-state="closed"] { animation-duration: 600s !important; }';
+document.head.append(holdExitStyle);
+
 /** Choose a menu's rename item, then hold its real exit animation while a successor opens. */
 const renameThenDismiss = async (id: string) => {
   await act(() => openSurface({ anchor, id, kind: 'menu' }));
@@ -205,15 +213,14 @@ const renameThenDismiss = async (id: string) => {
   await expect.element(page.getByRole('dialog', { name: 'Rename layer' })).toBeVisible();
   const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
   await Promise.all(dialog.getAnimations().map((animation) => animation.finished));
-  // Driver round trips can outlast the exit animation on CI; hold it before sending Escape.
-  dialog.style.animationPlayState = 'paused';
+  dialog.dataset.holdExit = '';
   await act(() => userEvent.keyboard('{Escape}'));
   expect(dialog.isConnected).toBe(true);
   expect(dialog).toHaveAttribute('data-state', 'closed');
   const animations = dialog.getAnimations();
   expect(animations).not.toHaveLength(0);
   for (const animation of animations) {
-    expect(animation.playState).toBe('paused');
+    expect(animation.playState).toBe('running');
   }
   return dialog;
 };
@@ -238,7 +245,8 @@ it('opens a group menu requested while its rename animates out, and keeps it onc
   await act(() => openSurface({ anchor: { ...anchor }, id: 'group', kind: 'menu' }));
   await expect.poll(openMenu).not.toBeNull();
   expect(dialog.isConnected).toBe(true);
-  dialog.style.removeProperty('animation-play-state');
+  // Released, the exit falls back to its real duration and ends.
+  delete dialog.dataset.holdExit;
   await expect.poll(() => dialog.isConnected).toBe(false);
 
   expect(openMenu()).not.toBeNull();
