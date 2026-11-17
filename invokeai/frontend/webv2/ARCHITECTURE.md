@@ -44,7 +44,7 @@ Ownership follows invariants, not the first caller:
 - `patches/@zag-js__presence@1.43.3.patch` and `patches/@zag-js__tooltip@1.43.3.patch` reconcile Zag machines when a hidden React Activity reconnects. A machine stops while hidden and drops what arrives meanwhile, such as the end of an exit animation or the pointer leaving its trigger; restarting resumes the stored state. Presence unmounts content that should be gone, and Tooltip forgets a pointer open and closes an uncontrolled tip left open, so a tip closed by the click that hid its section neither returns stuck nor ignores the next hover. Both module formats receive each patch. `src/platform/ui/Tooltip.browser.test.tsx` ("shows a tip again only when hovered after its section was hidden mid-fade") fails without either patch; `src/platform/ui/Menu.browser.test.tsx` ("stay closed when their section returns after it was hidden while they faded out") fails without the presence patch, which every Zag presence (menus, popovers) shares. Zag 1.47.0 still has both faults: an upgrade must port both patches (the tooltip patch no longer applies as is) and rerun those tests. Remove them once upstream reconciles state on reconnect and the tests pass unpatched.
 - Platform State owns reusable projections of broad external stores into referentially stable read-only stores. App may build them for a feature port. Listener, caching, equality mechanics stay domain-neutral Platform code.
 
-`pnpm architecture:check` is the executable source of truth for dependency direction. It parses TypeScript and classifies static imports, type imports, dynamic imports, re-exports, inline imported types, after resolving aliases and relative paths. Temporary violations go in `src/architecture/migrationExceptions.ts` with owner and removal ticket. Architecture is complete only when that registry is empty.
+`pnpm architecture:check` is the executable source of truth for dependency direction. It parses TypeScript and classifies static imports, type imports, dynamic imports, re-exports, inline imported types, after resolving aliases and relative paths. It has no exception list: a violation is fixed, never excused.
 
 ## React adapters
 
@@ -83,14 +83,14 @@ Behavior specs live beside their owning code. Read the owner's document before c
 - Contracts live with the module owning their invariants. Retired `workbench/types.ts` path is an architecture violation. Workbench aggregate, widget, Canvas, persistence, settings, feature contracts each have an owner-local canonical path.
 - Persisted schemas and backend DTOs stay private versioned/wire values. They cross seams only through explicit serializers, hydrators, mappers.
 - `platform/core/outputImages.ts` is the explicit shared adapter for backend invocation-output image names. Platform owns it because Queue and Nodes both need the projection and cannot import each other's private code. It recognizes only direct image, image-collection, workflow-return output contracts. Never grow it into a recursive walker of arbitrary metadata or input fields.
-- Imports of another feature's `core/`, `data/`, `ui/`, or runtime implementation fail outside a ticketed migration exception.
+- Imports of another feature's `core/`, `data/`, `ui/`, or runtime implementation fail.
 - Wildcard exports may aggregate files inside one owner. Never across an ownership seam.
-- `pnpm architecture:check` generates the contract caller matrix; `pnpm test:performance:build` generates development-invalidation budgets.
+- `pnpm architecture:inventory` writes the contract caller matrix on demand; `pnpm test:performance:build` generates development-invalidation budgets.
 - Compatibility exports under `workbench/` are temporary. New behavior goes behind the target module interface. Compatibility files gain no new implementation logic.
 
 ## Workbench ownership destinations
 
-`src/architecture/workbenchOwnershipManifest.json` is the executable current-to-target ownership manifest. `pnpm architecture:check` proves every production Workbench module has exactly one target owner. It writes the import/export inventory to `artifacts/architecture/workbench-ownership-inventory.json`, regenerated as modules change; tests and type-test fixtures excluded on purpose.
+`src/architecture/workbenchOwnershipManifest.json` is the executable current-to-target ownership manifest. `pnpm architecture:check` proves every production Workbench module has exactly one target owner. `pnpm architecture:inventory` writes the import/export inventory to `artifacts/architecture/workbench-ownership-inventory.json` on demand; tests and type-test fixtures excluded on purpose.
 
 Every manifest directory rule targets Workbench. One override left: `workbench/components/QueueProgressIndicator.tsx` targets Queue, due to move to `features/queue/ui/`. Identity, Models, Nodes, Queue, Gallery, Generation, Workflow, Upscale code lives under `features/`. Domain-neutral React adapters `useMountEffect` and `useModifierHeld` live in `platform/react/`, with no Workbench import.
 
@@ -104,7 +104,7 @@ Every manifest directory rule targets Workbench. One override left: `workbench/c
 
 - Overrides are longest-prefix rules: a mixed folder's split is explicit, not inferred from imports.
 - Compatibility re-exports keep the target owner of what they forward. They are deletion work, never a fifth owner.
-- Owner dependency graph is acyclic. Only direction: `app -> workbench/features -> platform`. Cross-owner access only through public module interfaces or composition-root adapters. `src/architecture/workbenchOwnership.test.ts` fails on any strongly connected component among owners. `src/architecture/migrationExceptions.ts` is empty.
+- Owner dependency graph is acyclic. Only direction: `app -> workbench/features -> platform`. Cross-owner access only through public module interfaces or composition-root adapters. `src/architecture/workbenchOwnership.test.ts` fails on any strongly connected component among owners.
 
 Feature interfaces stay ordinary module interfaces unless two adapters add leverage.
 

@@ -167,16 +167,6 @@ const createBrowserBaseline = () => ({
   },
 });
 
-const fixtures = {
-  routes: [
-    {
-      id: 'launchpad',
-      readyMark: 'invokeai:ready:launchpad',
-      stateProfile: 'empty',
-    },
-  ],
-};
-
 describe('build performance budgets', () => {
   it('fails a 100 KB shared-vendor regression when entry bytes and source ownership are unchanged', () => {
     const baselineMeasurement = createSyntheticBuild(1_000);
@@ -324,7 +314,7 @@ describe('browser performance sampling and policy', () => {
     assert.equal(new Set(plan.map((sample) => sample.index)).size, plan.length);
   });
 
-  it('uses repeated resource observations routinely and full sampling for profiles, updates, and timing enforcement', () => {
+  it('uses repeated resource observations routinely and full sampling for profiles and updates', () => {
     const baseline = createBrowserBaseline();
     const routine = createBrowserRunPlan(baseline);
     assert.equal(routine.mode, 'resources');
@@ -332,11 +322,7 @@ describe('browser performance sampling and policy', () => {
       routine.samples.map((sample) => sample.kind),
       ['resource', 'resource']
     );
-    for (const options of [
-      { profile: true },
-      { updateBaseline: true },
-      { timingPolicy: { ...baseline.timingPolicy, enforce: true } },
-    ]) {
+    for (const options of [{ profile: true }, { updateBaseline: true }]) {
       const full = createBrowserRunPlan({ ...baseline, ...options });
       assert.equal(full.mode, 'profile');
       assert.deepEqual(full.sampling, baseline.sampling);
@@ -383,7 +369,7 @@ describe('browser performance sampling and policy', () => {
       assert.equal(restored.routes[0].resourceBaseline.scriptRawBytes, 1_000_000);
       assert.equal(restored.routes[0].resourceBaseline.scriptRequestCount, 2);
 
-      const failures = checkBrowserRouteBudget({ ...expected, ...summary }, expected, baseline.timingPolicy, owners);
+      const failures = checkBrowserRouteBudget({ ...expected, ...summary }, expected, owners);
       for (const failure of [
         'scriptRawBytes',
         'scriptRequestCount',
@@ -408,166 +394,11 @@ describe('browser performance sampling and policy', () => {
     }
   });
 
-  it('prevents timing enforcement without a stable runner', () => {
+  it('rejects a baseline that claims timing enforcement, which no gate implements', () => {
     const baseline = createBrowserBaseline();
     baseline.timingPolicy.enforce = true;
 
-    assert.throws(() => validateBrowserBaseline(baseline, fixtures), /identified stable runner/);
-  });
-
-  it('prevents timing enforcement without the configured semantic-ready mark', () => {
-    const baseline = createBrowserBaseline();
-    baseline.timingPolicy = {
-      ...baseline.timingPolicy,
-      enforce: true,
-      runner: {
-        id: 'ci-linux-x64',
-        minimumStableRuns: 20,
-        observedStableRuns: 20,
-        stable: true,
-      },
-    };
-    baseline.routes[0].readyMark = 'invokeai:ready:wrong';
-
-    assert.throws(() => validateBrowserBaseline(baseline, fixtures), /matching semantic-ready mark/);
-  });
-
-  it('fails a route whose layout-ack median exceeds its timing tolerance', () => {
-    const baseline = createBrowserBaseline();
-    baseline.timingPolicy = {
-      ...baseline.timingPolicy,
-      enforce: true,
-      runner: { id: 'ci-linux-x64', minimumStableRuns: 20, observedStableRuns: 20, stable: true },
-    };
-    const expected = baseline.routes[0];
-    expected.layoutAckMedianMs = 100;
-    const scriptSourceOwners = baseline.scriptSourceOwnerSets[expected.scriptSourceOwnerSet];
-    const route = {
-      activatedResources: expected.activatedResourceBaseline,
-      domContentLoadedMedianMs: expected.domContentLoadedMedianMs,
-      id: expected.id,
-      layoutAckMedianMs: 200,
-      layoutReturnSwitchMedianMs: expected.layoutReturnSwitchMedianMs,
-      layoutSwitchMedianMs: expected.layoutSwitchMedianMs,
-      loadMedianMs: expected.loadMedianMs,
-      longestTaskMaxMs: expected.longestTaskMaxMs,
-      owner: expected.owner,
-      projectSwitchMedianMs: expected.projectSwitchMedianMs,
-      remediationTicket: expected.remediationTicket,
-      resources: expected.resourceBaseline,
-      routeReadyMedianMs: expected.routeReadyMedianMs,
-      scriptSourceOwners,
-      stateProfile: expected.stateProfile,
-    };
-
-    const failures = checkBrowserRouteBudget(route, expected, baseline.timingPolicy, scriptSourceOwners);
-
-    assert.ok(
-      failures.some((failure) => failure.includes('layout-ack median')),
-      failures.join('\n')
-    );
-  });
-
-  it('passes a route whose layout-ack median stays at or under its timing tolerance', () => {
-    const baseline = createBrowserBaseline();
-    baseline.timingPolicy = {
-      ...baseline.timingPolicy,
-      enforce: true,
-      runner: { id: 'ci-linux-x64', minimumStableRuns: 20, observedStableRuns: 20, stable: true },
-    };
-    const expected = baseline.routes[0];
-    expected.layoutAckMedianMs = 100;
-    const scriptSourceOwners = baseline.scriptSourceOwnerSets[expected.scriptSourceOwnerSet];
-    const route = {
-      activatedResources: expected.activatedResourceBaseline,
-      domContentLoadedMedianMs: expected.domContentLoadedMedianMs,
-      id: expected.id,
-      layoutAckMedianMs: 100,
-      layoutReturnSwitchMedianMs: expected.layoutReturnSwitchMedianMs,
-      layoutSwitchMedianMs: expected.layoutSwitchMedianMs,
-      loadMedianMs: expected.loadMedianMs,
-      longestTaskMaxMs: expected.longestTaskMaxMs,
-      owner: expected.owner,
-      projectSwitchMedianMs: expected.projectSwitchMedianMs,
-      remediationTicket: expected.remediationTicket,
-      resources: expected.resourceBaseline,
-      routeReadyMedianMs: expected.routeReadyMedianMs,
-      scriptSourceOwners,
-      stateProfile: expected.stateProfile,
-    };
-
-    const failures = checkBrowserRouteBudget(route, expected, baseline.timingPolicy, scriptSourceOwners);
-
-    assert.deepEqual(failures, []);
-  });
-
-  it('fails a route whose layout-return-switch median exceeds its timing tolerance', () => {
-    const baseline = createBrowserBaseline();
-    baseline.timingPolicy = {
-      ...baseline.timingPolicy,
-      enforce: true,
-      runner: { id: 'ci-linux-x64', minimumStableRuns: 20, observedStableRuns: 20, stable: true },
-    };
-    const expected = baseline.routes[0];
-    expected.layoutReturnSwitchMedianMs = 100;
-    const scriptSourceOwners = baseline.scriptSourceOwnerSets[expected.scriptSourceOwnerSet];
-    const route = {
-      activatedResources: expected.activatedResourceBaseline,
-      domContentLoadedMedianMs: expected.domContentLoadedMedianMs,
-      id: expected.id,
-      layoutAckMedianMs: expected.layoutAckMedianMs,
-      layoutReturnSwitchMedianMs: 200,
-      layoutSwitchMedianMs: expected.layoutSwitchMedianMs,
-      loadMedianMs: expected.loadMedianMs,
-      longestTaskMaxMs: expected.longestTaskMaxMs,
-      owner: expected.owner,
-      projectSwitchMedianMs: expected.projectSwitchMedianMs,
-      remediationTicket: expected.remediationTicket,
-      resources: expected.resourceBaseline,
-      routeReadyMedianMs: expected.routeReadyMedianMs,
-      scriptSourceOwners,
-      stateProfile: expected.stateProfile,
-    };
-
-    const failures = checkBrowserRouteBudget(route, expected, baseline.timingPolicy, scriptSourceOwners);
-
-    assert.ok(
-      failures.some((failure) => failure.includes('layout-return-switch median')),
-      failures.join('\n')
-    );
-  });
-
-  it('passes a route whose layout-return-switch median stays at or under its timing tolerance', () => {
-    const baseline = createBrowserBaseline();
-    baseline.timingPolicy = {
-      ...baseline.timingPolicy,
-      enforce: true,
-      runner: { id: 'ci-linux-x64', minimumStableRuns: 20, observedStableRuns: 20, stable: true },
-    };
-    const expected = baseline.routes[0];
-    expected.layoutReturnSwitchMedianMs = 100;
-    const scriptSourceOwners = baseline.scriptSourceOwnerSets[expected.scriptSourceOwnerSet];
-    const route = {
-      activatedResources: expected.activatedResourceBaseline,
-      domContentLoadedMedianMs: expected.domContentLoadedMedianMs,
-      id: expected.id,
-      layoutAckMedianMs: expected.layoutAckMedianMs,
-      layoutReturnSwitchMedianMs: 100,
-      layoutSwitchMedianMs: expected.layoutSwitchMedianMs,
-      loadMedianMs: expected.loadMedianMs,
-      longestTaskMaxMs: expected.longestTaskMaxMs,
-      owner: expected.owner,
-      projectSwitchMedianMs: expected.projectSwitchMedianMs,
-      remediationTicket: expected.remediationTicket,
-      resources: expected.resourceBaseline,
-      routeReadyMedianMs: expected.routeReadyMedianMs,
-      scriptSourceOwners,
-      stateProfile: expected.stateProfile,
-    };
-
-    const failures = checkBrowserRouteBudget(route, expected, baseline.timingPolicy, scriptSourceOwners);
-
-    assert.deepEqual(failures, []);
+    assert.throws(() => validateBrowserBaseline(baseline), /timing enforcement is not implemented/);
   });
 
   it('summarizes unique activated resources by type', () => {
@@ -804,8 +635,7 @@ describe('base-branch reference, browser gate', () => {
     stateProfile: expected.stateProfile,
     ...overrides,
   });
-  const check = (route, expected, baseline) =>
-    checkBrowserRouteBudget(route, expected, baseline.timingPolicy, route.scriptSourceOwners);
+  const check = (route, expected) => checkBrowserRouteBudget(route, expected, route.scriptSourceOwners);
 
   for (const [baselineKey, resourceKey] of [
     ['resourceBaseline', 'resources'],
@@ -823,14 +653,14 @@ describe('base-branch reference, browser gate', () => {
         [resourceKey]: { ...recorded[baselineKey], scriptRawBytes: 20_064 },
       });
 
-      assert.ok(check(actual, previous, baseline).some((failure) => failure.includes('scriptRawBytes')));
+      assert.ok(check(actual, previous).some((failure) => failure.includes('scriptRawBytes')));
 
       const {
         routes: [updated],
       } = applyBrowserReference([recorded], reference);
-      assert.deepEqual(check(actual, updated, baseline), []);
+      assert.deepEqual(check(actual, updated), []);
       assert.match(
-        check({ ...actual, [resourceKey]: { ...actual[resourceKey], scriptRawBytes: 30_000 } }, updated, baseline)[0],
+        check({ ...actual, [resourceKey]: { ...actual[resourceKey], scriptRawBytes: 30_000 } }, updated)[0],
         /scriptRawBytes/
       );
     });
@@ -846,8 +676,8 @@ describe('base-branch reference, browser gate', () => {
       resources: { ...expected.resourceBaseline, scriptRawBytes: expected.resourceBaseline.scriptRawBytes + 4097 },
     });
 
-    assert.deepEqual(check(within, expected, baseline), []);
-    const failures = check(beyond, expected, baseline);
+    assert.deepEqual(check(within, expected), []);
+    const failures = check(beyond, expected);
     assert.equal(failures.length, 1);
     assert.match(failures[0], /scriptRawBytes reached .* captured /);
   });
@@ -865,8 +695,8 @@ describe('base-branch reference, browser gate', () => {
       },
     });
 
-    assert.match(check(extraRequest, expected, baseline)[0], /^\S+ requestCount reached/);
-    assert.match(check(extraActivated, expected, baseline)[0], /activated scriptRequestCount reached/);
+    assert.match(check(extraRequest, expected)[0], /^\S+ requestCount reached/);
+    assert.match(check(extraActivated, expected)[0], /activated scriptRequestCount reached/);
   });
 
   it('judges a route against the reference by id and profile, keeping the committed numbers for the ceiling', () => {
@@ -907,13 +737,12 @@ describe('base-branch reference, browser gate', () => {
     const route = routeFor(expected, {
       resources: { ...grownResources, scriptRawBytes: grownResources.scriptRawBytes + 64 },
     });
-    assert.ok(check(route, expected, baseline).length > 0);
+    assert.ok(check(route, expected).length > 0);
     // ...and passes against the reference, with both origins named if it ever fails.
-    assert.deepEqual(check(route, applied, baseline), []);
+    assert.deepEqual(check(route, applied), []);
     const [failure] = check(
       routeFor(expected, { resources: { ...grownResources, scriptRawBytes: grownResources.scriptRawBytes + 4097 } }),
-      applied,
-      baseline
+      applied
     );
     assert.match(failure, /reference \d+, committed \d+/);
   });
@@ -946,7 +775,7 @@ describe('baseline schema', () => {
     for (const key of ['resourceLimits', 'activatedResourceLimits']) {
       const browser = createBrowserBaseline();
       browser.routes[0][key] = {};
-      assert.throws(() => validateBrowserBaseline(browser, fixtures), new RegExp(`Unknown keys: ${key}`));
+      assert.throws(() => validateBrowserBaseline(browser), new RegExp(`Unknown keys: ${key}`));
     }
   });
 });
@@ -1023,9 +852,9 @@ describe('the remedy is offered only for budget failures', () => {
 describe('exact-base workflow measurements', () => {
   const packageRoot = fileURLToPath(new URL('../', import.meta.url));
   const workflow = parse(readFileSync(resolve(packageRoot, '../../../.github/workflows/frontend-tests.yml'), 'utf8'));
-  const measure = workflow.jobs['frontend-webv2-tests'].steps.find(
-    (step) => step.name === 'measure missing performance base'
-  );
+  const measure = Object.values(workflow.jobs)
+    .flatMap((job) => job.steps ?? [])
+    .find((step) => step.name === 'measure missing performance base');
 
   for (const scenario of [
     'complete',
