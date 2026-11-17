@@ -18,13 +18,15 @@ from invokeai.app.invocations.fields import (
     ImageField,
     InputField,
     LatentsField,
-    LoRAMetadataField,
     MetadataField,
     ModelIdentifierField,
     OutputField,
     TensorField,
     UIType,
     VideoField,
+)
+from invokeai.app.invocations.fields import (
+    LoRAMetadataField as LoRAMetadataField,
 )
 from invokeai.app.invocations.metadata_constants import (
     CORE_MODEL_LABELS as CORE_MODEL_LABELS,
@@ -48,21 +50,6 @@ from invokeai.version.invokeai_version import __version__
 class MetadataItemField(BaseModel):
     label: str = Field(description=FieldDescriptions.metadata_item_label)
     value: Any = Field(description=FieldDescriptions.metadata_item_value)
-
-
-class LoRAMetadataField(BaseModel):
-    """LoRA Metadata Field"""
-
-    model: ModelIdentifierField = Field(description=FieldDescriptions.lora_model)
-    weight: float = Field(description=FieldDescriptions.lora_weight)
-    target: Optional[Literal["high", "low", "both"]] = Field(
-        default=None,
-        description="Target expert for dual-expert models (e.g., Wan 2.2 A14B): 'high', 'low', or 'both'",
-    )
-    low_noise_weight: Optional[float] = Field(
-        default=None,
-        description="Weight for the low-noise expert when target is 'both' and it differs from the high-noise weight",
-    )
 
 
 class IPAdapterMetadataField(BaseModel):

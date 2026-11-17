@@ -384,6 +384,14 @@ class LoRAMetadataField(BaseModel):
 
     model: ModelIdentifierField = Field(description=FieldDescriptions.lora_model)
     weight: float = Field(description=FieldDescriptions.lora_weight)
+    target: Optional[Literal["high", "low", "both"]] = Field(
+        default=None,
+        description="Target expert for dual-expert models (e.g., Wan 2.2 A14B): 'high', 'low', or 'both'",
+    )
+    low_noise_weight: Optional[float] = Field(
+        default=None,
+        description="Weight for the low-noise expert when target is 'both' and it differs from the high-noise weight",
+    )
 
 
 class FluxConditioningField(BaseModel):
