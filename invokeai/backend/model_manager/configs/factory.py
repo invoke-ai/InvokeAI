@@ -66,6 +66,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_Diffusers_Flux3_Config,
     LoRA_Diffusers_FLUX_Config,
     LoRA_Diffusers_Ideogram4_Config,
+    LoRA_Diffusers_MossImage_Config,
     LoRA_Diffusers_SD1_Config,
     LoRA_Diffusers_SD2_Config,
     LoRA_Diffusers_SD3_Config,
@@ -80,6 +81,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_Krea2_Config,
     LoRA_LyCORIS_LTX2_Config,
     LoRA_LyCORIS_MiniMaxH3_Config,
+    LoRA_LyCORIS_MossImage_Config,
     LoRA_LyCORIS_QwenImage21_Config,
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_SD1_Config,
@@ -143,6 +145,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_MossImage_Config,
     Main_GGUF_QwenImage21_Config,
     Main_GGUF_QwenImage_Config,
+    Main_GGUF_SD3_Config,
     Main_GGUF_Wan_Config,
     Main_GGUF_ZImage_Config,
     Main_SDNQ_Diffusers_Flux2_Config,
@@ -499,6 +502,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_LTX2_Config, Main_GGUF_LTX2_Config.get_tag()],
         Annotated[Main_GGUF_MossImage_Config, Main_GGUF_MossImage_Config.get_tag()],
         Annotated[Main_GGUF_Anima_Config, Main_GGUF_Anima_Config.get_tag()],
+        Annotated[Main_GGUF_SD3_Config, Main_GGUF_SD3_Config.get_tag()],
         # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
         # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
         # first refusal. Main_SDNQ_FLUX_Config additionally rejects FLUX.2 state dicts to keep the
@@ -583,6 +587,10 @@ AnyModelConfig = Annotated[
         # ``test_minimax_h3_lora_probe_independence.py``).
         Annotated[LoRA_LyCORIS_LTX2_Config, LoRA_LyCORIS_LTX2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_MiniMaxH3_Config, LoRA_LyCORIS_MiniMaxH3_Config.get_tag()],
+        # MOSS-Image keys on its blocks' `proj.q`..`ffn_down` and its embedder and modulation modules, which no other
+        # supported transformer has; Z-Image's probe, whose block prefixes admit its files, rejects them, so the two are
+        # mutually exclusive regardless of order (locked in by `test_moss_image_lora_probe_independence.py`).
+        Annotated[LoRA_LyCORIS_MossImage_Config, LoRA_LyCORIS_MossImage_Config.get_tag()],
         # ERNIE-Image keys on its `self_attention` / `mlp` block names and top-level modules, which Z-Image's probe now
         # rejects, so the two are mutually exclusive regardless of order (locked in by
         # `test_ernie_image_lora_probe_independence.py`).
@@ -616,6 +624,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_Diffusers_Flux2_Config, LoRA_Diffusers_Flux2_Config.get_tag()],
         Annotated[LoRA_Diffusers_FLUX_Config, LoRA_Diffusers_FLUX_Config.get_tag()],
         Annotated[LoRA_Diffusers_Flux3_Config, LoRA_Diffusers_Flux3_Config.get_tag()],
+        Annotated[LoRA_Diffusers_MossImage_Config, LoRA_Diffusers_MossImage_Config.get_tag()],
         Annotated[LoRA_Diffusers_Ideogram4_Config, LoRA_Diffusers_Ideogram4_Config.get_tag()],
         Annotated[LoRA_Diffusers_ZImage_Config, LoRA_Diffusers_ZImage_Config.get_tag()],
         # ControlLoRA - diffusers format

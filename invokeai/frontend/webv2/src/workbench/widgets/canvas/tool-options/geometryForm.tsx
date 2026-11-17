@@ -450,7 +450,7 @@ const FrameSizeSettings = ({ engine }: ToolFormProps) => {
  * pixels instead of opening a layer session; the numerics meanwhile edit the
  * settled selected layer, matching the Transform pane.
  */
-const TransformFooter = ({ engine }: ToolFormProps) => {
+const TransformActions = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useTransformSession(engine);
   const hasFloat = useCanvasHasFloatingSelection(engine);
@@ -509,7 +509,7 @@ export const bboxForm: ToolPropertyForm = {
 };
 
 export const transformForm: ToolPropertyForm = {
-  footer: TransformFooter,
+  actions: TransformActions,
   groups: [
     { body: TransformResamplingSettings, id: 'transform-resampling', labelKey: 'widgets.transform.resampling' },
     { ...POSITION_GROUP, hideLabel: true },

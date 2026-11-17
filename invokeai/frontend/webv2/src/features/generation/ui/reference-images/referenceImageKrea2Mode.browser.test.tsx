@@ -9,7 +9,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-import { ReferenceImageCard } from './ReferenceImageCard';
+import { ReferenceImageRow } from './ReferenceImageRow';
 
 // The real catalog, so a mistyped key shows up as the key and fails the label lookups below.
 const i18n = i18next.createInstance();
@@ -32,7 +32,7 @@ const STYLE_REFERENCE: GenerateReferenceImage = {
 };
 
 /** Mirrors the section: each patch lands back on the rendered reference. */
-const Card = ({ initial }: { initial: GenerateReferenceImage }) => {
+const Row = ({ initial }: { initial: GenerateReferenceImage }) => {
   const [referenceImage, setReferenceImage] = useState(initial);
   const handlePatch = useCallback((id: string, patch: Partial<GenerateReferenceImage>) => {
     onPatch(id, patch);
@@ -40,7 +40,7 @@ const Card = ({ initial }: { initial: GenerateReferenceImage }) => {
   }, []);
 
   return (
-    <ReferenceImageCard
+    <ReferenceImageRow
       count={1}
       index={0}
       referenceImage={referenceImage}
@@ -49,17 +49,18 @@ const Card = ({ initial }: { initial: GenerateReferenceImage }) => {
       onMove={vi.fn()}
       onPatch={handlePatch}
       onRemove={vi.fn()}
+      onRename={vi.fn()}
       onUseSize={vi.fn()}
     />
   );
 };
 
-const renderCard = async (initial: GenerateReferenceImage) => {
+const renderRow = async (initial: GenerateReferenceImage) => {
   await act(() =>
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <Card initial={initial} />
+          <Row initial={initial} />
         </ChakraProvider>
       </I18nextProvider>
     )
@@ -81,6 +82,9 @@ const clickMode = async (label: 'Edit' | 'Style') => {
   });
 };
 const hasStrengthControl = () => host?.textContent?.includes('Style strength') ?? false;
+/** A Style reference keeps its mode under the row, with its strength on the row. */
+const openSettings = () =>
+  act(() => host?.querySelector<HTMLButtonElement>('button[aria-label="Reference image 1 settings"]')?.click());
 
 beforeEach(() => {
   host = document.createElement('div');
@@ -97,7 +101,9 @@ afterEach(async () => {
 
 describe('Krea-2 reference mode switch', () => {
   it('switches a reference to Edit and back to Style, keeping its image and restarting the strength', async () => {
-    await renderCard(STYLE_REFERENCE);
+    await renderRow(STYLE_REFERENCE);
+    expect(modeGroup()).toBeNull();
+    await openSettings();
 
     expect(modeGroup()?.getAttribute('aria-label')).toBe('Mode');
     expect(modeRadio('Style')?.checked).toBe(true);
@@ -109,7 +115,7 @@ describe('Krea-2 reference mode switch', () => {
       config: { image, type: 'krea2_edit_reference_image' },
     });
     expect(modeRadio('Edit')?.checked).toBe(true);
-    // Edit references have no strength; the card shows only the mode.
+    // Edit references have no strength; the mode is the row's control.
     expect(hasStrengthControl()).toBe(false);
 
     await clickMode('Style');
@@ -118,10 +124,13 @@ describe('Krea-2 reference mode switch', () => {
       config: { image, styleStrength: 1, type: 'krea2_reference_image' },
     });
     expect(hasStrengthControl()).toBe(true);
+    // Back under the row, which stays open so the mode just chosen is still in view.
+    expect(modeRadio('Style')?.checked).toBe(true);
   });
 
-  it('switches with the arrow keys from the focused mode', async () => {
-    await renderCard(STYLE_REFERENCE);
+  it('switches with the arrow keys from the focused mode, focus following the control to the row', async () => {
+    await renderRow(STYLE_REFERENCE);
+    await openSettings();
 
     await act(() => modeRadio('Style')?.focus());
     await act(async () => {
@@ -131,11 +140,12 @@ describe('Krea-2 reference mode switch', () => {
     expect(onPatch).toHaveBeenLastCalledWith('pose', {
       config: { image, type: 'krea2_edit_reference_image' },
     });
-    expect(document.activeElement).toBe(modeRadio('Edit'));
+    await expect.poll(() => document.activeElement).toBe(modeRadio('Edit'));
   });
 
   it('switches the mode of a switched-off reference, so it can join an edit set before it runs', async () => {
-    await renderCard({ ...STYLE_REFERENCE, isEnabled: false });
+    await renderRow({ ...STYLE_REFERENCE, isEnabled: false });
+    await openSettings();
 
     expect(modeRadio('Edit')?.disabled).toBe(false);
 

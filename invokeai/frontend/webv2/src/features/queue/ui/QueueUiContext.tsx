@@ -1,5 +1,6 @@
 import type { QueueSubmissionRetry } from '@features/queue/core/historyTypes';
 import type { QueueItemReadModel } from '@features/queue/core/types';
+import type { MenuPartLoader } from '@platform/ui/Menu';
 
 import { createContext, useContext, useSyncExternalStore, type ComponentType, type ReactNode } from 'react';
 
@@ -12,6 +13,11 @@ export interface QueueUiNotificationPort {
 /** This UI port preserves dependency direction: Queue cannot import Workbench. */
 export interface QueueUiAdapter {
   ItemActions: ComponentType<{ item: QueueItemReadModel }>;
+  /**
+   * A row's context menu entries for recalling its settings, loaded on demand; mounted only while that row's menu is
+   * open. The row loads them on intent and on open.
+   */
+  itemRecallMenuGroup: MenuPartLoader<ComponentType<{ item: QueueItemReadModel }>>;
   activeProjectId: string | null;
   /** Names the active-project scope in confirmations and results. */
   activeProjectName: string | null;
@@ -43,6 +49,8 @@ export interface QueueUiAdapter {
    */
   preloadItemActions?(): void;
   queueJobsScope: 'active-project' | 'all';
+  /** Recalls every setting the item records into the active project, as its menus' Recall all does. */
+  recallAllFromItem(item: QueueItemReadModel): void;
   /**
    * The first model the server is loading now, or null: a running item with no progress yet waits for it. A store, so
    * only the components that read it (`useLoadingModelLabel`) re-render as loads come and go.

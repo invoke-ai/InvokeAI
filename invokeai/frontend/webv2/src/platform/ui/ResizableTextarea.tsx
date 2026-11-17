@@ -33,12 +33,53 @@ const resizeHandleAfter = {
   w: '10',
 } as const;
 
-// Fades content under the handle; the edge strips keep the border and its rounded corners opaque.
+/*
+ * The content under the handle fades out. A host that paints its controls on an opaque well marks itself with
+ * `data-control-well` and sets the colour as `--wb-control-well`; the fade then ends in that colour. Any other host
+ * gets a mask that fades the control to whatever lies behind it, and its edge strips keep the border and the rounded
+ * corners opaque.
+ *
+ * The well's fade is an overlay rather than a mask because of scaled hosts such as the node editor. There the text
+ * area's inner bottom edge falls inside a device pixel, and that pixel row holds both the bottom border and text the
+ * clip lets through. A mask can only show or hide the whole row, and a fill that stops at the inner edge leaves a
+ * share of the row's text uncovered, so either way a slice of text shows below the fade. The overlay instead covers
+ * the bottom 1rem, border included, and repaints the border on top. Its fill is solid for the last 0.25rem.
+ */
 const resizeHandleFade = {
   maskImage: [
     'linear-gradient(to bottom, black calc(100% - 1rem), transparent calc(100% - 0.25rem), transparent calc(100% - 1px), black calc(100% - 1px))',
     'linear-gradient(to right, black {radii.control}, transparent {radii.control}, transparent calc(100% - {radii.control}), black calc(100% - {radii.control}))',
   ].join(', '),
+  '[data-control-well] &': { maskImage: 'none' },
+} as const;
+
+// The fill covers the border's rows too. The border goes back on top as a separate box: Chromium draws a gradient fill
+// short of a box's own opaque border, which would uncover that row again. The border follows the text area's own
+// border states (`formControlInteraction` in the theme recipes), later entries winning as they do there.
+const wellFade = {
+  backgroundImage: 'linear-gradient(to bottom, transparent, var(--wb-control-well) calc(100% - 0.25rem))',
+  borderBottomRadius: 'control',
+  bottom: '0',
+  display: 'none',
+  h: '1rem',
+  insetX: '0',
+  pointerEvents: 'none',
+  position: 'absolute',
+  _after: {
+    borderBottomRadius: 'inherit',
+    borderColor: 'border',
+    borderStyle: 'solid',
+    borderWidth: '0 1px 1px',
+    content: '""',
+    inset: '0',
+    position: 'absolute',
+    transitionDuration: 'fast',
+    transitionProperty: 'border-color',
+  },
+  '[data-control-well] &': { display: 'block' },
+  '[data-part="viewport"]:hover ~ &::after': { borderColor: 'border.emphasized' },
+  '[data-part="viewport"]:focus-visible ~ &::after': { borderColor: 'accent.solid' },
+  '[data-part="viewport"]:is([aria-invalid="true"], [data-invalid]) ~ &::after': { borderColor: 'border.error' },
 } as const;
 
 const resizeHandleFocusVisible = { bg: 'accent.solid/20', outline: '2px solid {colors.accent.solid}' } as const;
@@ -156,6 +197,7 @@ export const ResizableTextarea = ({
           </ScrollArea.Viewport>
           {/* Zag needs a content element to remeasure; the textarea itself is the viewport. */}
           <ScrollArea.Content h="0" minW="0" overflow="hidden" position="absolute" />
+          <Box aria-hidden data-resizable-textarea-fade="" css={wellFade} />
           <ScrollArea.Scrollbar>
             <ScrollArea.Thumb />
           </ScrollArea.Scrollbar>

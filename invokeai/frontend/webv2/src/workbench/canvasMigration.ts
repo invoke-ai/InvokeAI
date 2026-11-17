@@ -1,3 +1,4 @@
+import type { AutoSwitchMode } from '@features/queue/contracts';
 import type {
   CanvasDocumentContractV3,
   CanvasGroupContract,
@@ -496,11 +497,21 @@ export const placementToTransform = (
   y: placement.y,
 });
 
-const AUTO_SWITCH_MODES: CanvasStagingAreaContractV2['autoSwitchMode'][] = ['off', 'latest', 'progress'];
+type StagingAutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
+type IsSameUnion<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
-const asAutoSwitchMode = (value: unknown): CanvasStagingAreaContractV2['autoSwitchMode'] =>
-  AUTO_SWITCH_MODES.includes(value as CanvasStagingAreaContractV2['autoSwitchMode'])
-    ? (value as CanvasStagingAreaContractV2['autoSwitchMode'])
+/**
+ * Every mode the persisted staging area stores, keyed by its own union. Its values are `true` only while that union is
+ * the shared policy's (`AutoSwitchMode`): a mode added to either alone fails to compile here, so neither drifts from
+ * the other and a stored value is never reset to `off` for being unknown.
+ */
+const STAGING_AUTO_SWITCH_MODES: Readonly<
+  Record<StagingAutoSwitchMode, IsSameUnion<StagingAutoSwitchMode, AutoSwitchMode>>
+> = { latest: true, off: true, progress: true };
+
+const asAutoSwitchMode = (value: unknown): StagingAutoSwitchMode =>
+  typeof value === 'string' && Object.hasOwn(STAGING_AUTO_SWITCH_MODES, value)
+    ? (value as StagingAutoSwitchMode)
     : 'off';
 
 /** Fills the known optional defaults of a staging area. */

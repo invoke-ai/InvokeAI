@@ -24,7 +24,6 @@ import type {
 } from './types';
 
 import { sanitizeBatchCount } from './batch';
-import { isVaeCompatibleWithGenerateModel } from './componentCompatibility';
 import {
   DEFAULT_KREA2_REBALANCE_MULTIPLIER,
   DEFAULT_KREA2_REBALANCE_WEIGHTS,
@@ -205,6 +204,16 @@ export const calculateNewSize = (
 export const isAspectRatioLocked = (
   settings: Pick<GenerateSettings, 'aspectRatioId' | 'aspectRatioIsLocked'>
 ): boolean => settings.aspectRatioId !== 'Free' || settings.aspectRatioIsLocked;
+
+/** The ratio a lock enforces, preferring the stored value and falling back to the current dimensions. */
+export const getActiveAspectRatio = (
+  settings: Pick<GenerateSettings, 'aspectRatioValue' | 'height' | 'width'>
+): number =>
+  settings.aspectRatioValue > 0
+    ? settings.aspectRatioValue
+    : settings.height > 0
+      ? settings.width / settings.height
+      : 1;
 
 /** How far apart two ratios may be and still count as the same one. */
 export const ASPECT_RATIO_TOLERANCE = 0.0001;
@@ -481,6 +490,51 @@ const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageCo
   return null;
 };
 
+/** Long enough for a descriptive label, short enough to stay one line in metadata and recall notices. */
+export const MAX_REFERENCE_IMAGE_NAME_LENGTH = 80;
+
+/** A reference's stored name: trimmed and capped by code point; empty or not a string is no name. */
+export const normalizeReferenceImageName = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const characters = Array.from(value.trim());
+  const name = (
+    characters.length > MAX_REFERENCE_IMAGE_NAME_LENGTH
+      ? characters.slice(0, MAX_REFERENCE_IMAGE_NAME_LENGTH).join('')
+      : characters.join('')
+  ).trim();
+
+  return name.length > 0 ? name : undefined;
+};
+
+/**
+ * Names one reference. A name that normalizes to nothing, or reads as a positional default (`isDefaultName`: its own
+ * or another position's, "Reference image 2" on the first row), stores no name: the default keeps following the
+ * reference's position, and no row can borrow another's default. No change returns the same array.
+ */
+export const renameReferenceImage = (
+  referenceImages: readonly GenerateReferenceImage[],
+  id: string,
+  name: string,
+  isDefaultName: (name: string) => boolean
+): readonly GenerateReferenceImage[] => {
+  const normalized = normalizeReferenceImageName(name);
+  const next = normalized === undefined || isDefaultName(normalized) ? undefined : normalized;
+  const index = referenceImages.findIndex((referenceImage) => referenceImage.id === id);
+  const current = referenceImages[index];
+
+  if (!current || current.name === next) {
+    return referenceImages;
+  }
+
+  const { name: _previous, ...unnamed } = current;
+  const renamed: GenerateReferenceImage = next === undefined ? unnamed : { ...unnamed, name: next };
+
+  return referenceImages.map((referenceImage, position) => (position === index ? renamed : referenceImage));
+};
+
 export const normalizeReferenceImages = (value: unknown): GenerateReferenceImage[] => {
   if (!Array.isArray(value)) {
     return [];
@@ -499,7 +553,9 @@ export const normalizeReferenceImages = (value: unknown): GenerateReferenceImage
       continue;
     }
 
-    images.push({ config, id: item.id, isEnabled: item.isEnabled !== false });
+    const name = normalizeReferenceImageName(item.name);
+
+    images.push({ config, id: item.id, isEnabled: item.isEnabled !== false, ...(name === undefined ? {} : { name }) });
   }
 
   return images;
@@ -583,17 +639,24 @@ const areModelSnapshotsEqual = (a: unknown, b: unknown): boolean => {
   }
 };
 
+const hasSameModelKind = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  candidate.type === saved.type &&
+  candidate.base === saved.base &&
+  (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
+
 /**
  * Whether an installed model is the same file as a saved choice that is no longer installed: a reinstall gives the
  * file a new key but keeps its hash. Type, base and (where the saved choice names one) variant must agree as well, so
  * a file registered differently is not taken for it.
  */
 export const isSameModelFile = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
-  Boolean(saved.hash) &&
-  candidate.hash === saved.hash &&
-  candidate.type === saved.type &&
-  candidate.base === saved.base &&
-  (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
+  Boolean(saved.hash) && candidate.hash === saved.hash && hasSameModelKind(candidate, saved);
+
+/** Match an existing installation, comparing the file hashes when both are available. */
+export const isSameInstalledModel = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  candidate.key === saved.key &&
+  hasSameModelKind(candidate, saved) &&
+  (!candidate.hash || !saved.hash || candidate.hash === saved.hash);
 
 /** Refreshes each concept from the catalog, finding a reinstalled LoRA again by its file hash. */
 export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: readonly unknown[]): GenerateLora[] => {
@@ -649,20 +712,6 @@ const syncModelIdentifierWithModels = <T extends ComponentModelConfig | null>(
     : value;
 };
 
-export const getModelDefaultVae = (
-  model: GenerateModelConfig,
-  vaeModels: readonly VaeModelConfig[]
-): VaeModelConfig | null => {
-  const defaultVaeKey = (model.default_settings as { vae?: string | null } | null | undefined)?.vae;
-
-  return defaultVaeKey
-    ? (vaeModels.find((vae) => vae.key === defaultVaeKey && isVaeCompatibleWithGenerateModel(model, vae)) ?? null)
-    : null;
-};
-
-export const hasModelDefaultVae = (model: GenerateModelConfig): boolean =>
-  typeof (model.default_settings as { vae?: unknown } | null | undefined)?.vae === 'string';
-
 export const cloneGenerateWidgetValues = (
   values: GenerateWidgetValues
 ): GenerateWidgetValues & Record<string, unknown> => ({
@@ -699,9 +748,19 @@ const syncReferenceImageConfigWithModels = (
 ): GenerateReferenceImageConfig => {
   switch (config.type) {
     case 'flux_kontext_reference_image': {
-      const model = syncModelIdentifierWithModels(config.model, modelsByKey);
+      const boundModel = config.model;
+      const model = syncModelIdentifierWithModels(boundModel, modelsByKey);
+      // Keep the original binding if the catalog record points to a different model.
+      if (
+        !boundModel ||
+        model === boundModel ||
+        !isMainModelConfig(model) ||
+        !isSameInstalledModel(model, boundModel)
+      ) {
+        return config;
+      }
 
-      return model === config.model ? config : { ...config, model: isMainModelConfig(model) ? model : config.model };
+      return { ...config, model };
     }
     case 'flux_redux':
     case 'ip_adapter': {

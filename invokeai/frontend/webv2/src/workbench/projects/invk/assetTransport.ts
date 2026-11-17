@@ -29,7 +29,11 @@ export const isRequestCancellation = (error: unknown): boolean =>
 /** Names per existence request, so one slow lookup cannot stall the whole check. */
 const EXISTENCE_BATCH_SIZE = 500;
 
-/** Maximum names the backend's synchronous batch routes accept. Adapters below own the split. */
+/**
+ * Maximum names the backend's synchronous batch routes accept (`MAX_IMAGE_BATCH_SIZE`, `MAX_VIDEO_BATCH_SIZE` and
+ * `MAX_COPY_BATCH_SIZE` in `invokeai/app/api/routers/_limits.py`); the gallery's transports split by the same limit.
+ * Adapters below own the split.
+ */
 const MEDIA_REQUEST_BATCH_SIZE = 1_000;
 
 const toBatches = <T>(items: readonly T[], size: number): T[][] => {
@@ -589,38 +593,25 @@ const toBulkStarResult = (requested: readonly string[], starred: readonly string
   return { failed: requested.filter((name) => !succeeded.has(name)) };
 };
 
-/** Star restored images. Starring is never part of an upload or a copy — it is always this call. */
-export const starImages = async (imageNames: readonly string[], signal?: AbortSignal): Promise<BulkStarResult> => {
-  if (imageNames.length === 0) {
-    return { failed: [] };
-  }
-
-  const body = await apiFetchJson<{ starred_images?: string[] }>(`${IMAGES_BASE}/star`, {
-    body: JSON.stringify({ image_names: imageNames }),
-    method: 'POST',
-    signal,
-  });
-
-  return toBulkStarResult(imageNames, body.starred_images ?? []);
-};
-
-/** The same, for videos. */
-export const starVideos = async (videoNames: readonly string[], signal?: AbortSignal): Promise<BulkStarResult> => {
-  if (videoNames.length === 0) {
-    return { failed: [] };
-  }
-
+/** Star in batches the server accepts; a failed batch's names are reported, not thrown, and later batches still run. */
+const starMedia = async (
+  names: readonly string[],
+  endpoint: string,
+  requestKey: 'image_names' | 'video_names',
+  responseKey: 'starred_images' | 'starred_videos',
+  signal?: AbortSignal
+): Promise<BulkStarResult> => {
   const failed: string[] = [];
 
-  for (const batch of toBatches(videoNames, MEDIA_REQUEST_BATCH_SIZE)) {
+  for (const batch of toBatches(names, MEDIA_REQUEST_BATCH_SIZE)) {
     try {
-      const body = await apiFetchJson<{ starred_videos?: string[] }>(`${VIDEOS_BASE}/star`, {
-        body: JSON.stringify({ video_names: batch }),
+      const body = await apiFetchJson<Partial<Record<typeof responseKey, string[]>>>(endpoint, {
+        body: JSON.stringify({ [requestKey]: batch }),
         method: 'POST',
         signal,
       });
 
-      failed.push(...toBulkStarResult(batch, body.starred_videos ?? []).failed);
+      failed.push(...toBulkStarResult(batch, body[responseKey] ?? []).failed);
     } catch (error) {
       if (isRequestCancellation(error)) {
         throw error;
@@ -631,6 +622,14 @@ export const starVideos = async (videoNames: readonly string[], signal?: AbortSi
 
   return { failed };
 };
+
+/** Star restored images. Starring is never part of an upload or a copy — it is always this call. */
+export const starImages = (imageNames: readonly string[], signal?: AbortSignal): Promise<BulkStarResult> =>
+  starMedia(imageNames, `${IMAGES_BASE}/star`, 'image_names', 'starred_images', signal);
+
+/** The same, for videos. */
+export const starVideos = (videoNames: readonly string[], signal?: AbortSignal): Promise<BulkStarResult> =>
+  starMedia(videoNames, `${VIDEOS_BASE}/star`, 'video_names', 'starred_videos', signal);
 
 /** Atomically claiming the staging board is the project-create commit point. */
 export const createStagingBoard = async (boardName: string, signal?: AbortSignal): Promise<string> => {
@@ -677,31 +676,22 @@ export const deleteStagingBoard = async (boardId: string, signal?: AbortSignal):
   });
 };
 
-/** Delete image identities created by a restore whose project could not be created. */
-export const deleteArchiveImages = async (imageNames: string[], signal?: AbortSignal): Promise<void> => {
-  if (imageNames.length === 0) {
-    return;
-  }
-
-  await apiFetchJson<unknown>(`${IMAGES_BASE}/delete`, {
-    body: JSON.stringify({ image_names: imageNames }),
-    method: 'POST',
-    signal,
-  });
-};
-
-/** Delete video identities created by a restore whose project could not be created. */
-export const deleteArchiveVideos = async (videoNames: string[], signal?: AbortSignal): Promise<void> => {
-  if (videoNames.length === 0) {
-    return;
-  }
-
+/**
+ * Delete in batches the server accepts. Every batch is sent even after one fails, so as much as possible is cleaned
+ * up; the first failure is thrown once all have run.
+ */
+const deleteArchiveMedia = async (
+  names: readonly string[],
+  endpoint: string,
+  requestKey: 'image_names' | 'video_names',
+  signal?: AbortSignal
+): Promise<void> => {
   let firstError: unknown = null;
 
-  for (const batch of toBatches(videoNames, MEDIA_REQUEST_BATCH_SIZE)) {
+  for (const batch of toBatches(names, MEDIA_REQUEST_BATCH_SIZE)) {
     try {
-      await apiFetchJson<unknown>(`${VIDEOS_BASE}/delete`, {
-        body: JSON.stringify({ video_names: batch }),
+      await apiFetchJson<unknown>(endpoint, {
+        body: JSON.stringify({ [requestKey]: batch }),
         method: 'POST',
         signal,
       });
@@ -716,9 +706,17 @@ export const deleteArchiveVideos = async (videoNames: string[], signal?: AbortSi
   if (firstError !== null) {
     throw firstError instanceof Error
       ? firstError
-      : new Error('One or more video cleanup requests failed.', { cause: firstError });
+      : new Error('One or more media cleanup requests failed.', { cause: firstError });
   }
 };
+
+/** Delete image identities created by a restore whose project could not be created. */
+export const deleteArchiveImages = (imageNames: string[], signal?: AbortSignal): Promise<void> =>
+  deleteArchiveMedia(imageNames, `${IMAGES_BASE}/delete`, 'image_names', signal);
+
+/** Delete video identities created by a restore whose project could not be created. */
+export const deleteArchiveVideos = (videoNames: string[], signal?: AbortSignal): Promise<void> =>
+  deleteArchiveMedia(videoNames, `${VIDEOS_BASE}/delete`, 'video_names', signal);
 
 const EXTENSION_BY_MIME: Readonly<Record<string, string>> = {
   'image/jpeg': 'jpg',
