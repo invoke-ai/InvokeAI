@@ -8,6 +8,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { legacyGeneratedImageToGalleryItem } from '@features/gallery/core/items';
 import { GalleryUiProvider } from '@features/gallery/react';
 import { GalleryHostProvider } from '@features/gallery/ui/GalleryUiContext';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, useCallback, useState } from 'react';
@@ -163,7 +164,7 @@ const MultiAddHost = ({ initialSelection }: { initialSelection: GalleryPickerSel
 const OPEN_DIALOG = '[role="dialog"][data-state="open"]';
 
 /** A host without a workbench (the Launchpad): no Gallery widget scope to seed from or reveal. */
-const launchpadHost: GalleryHost = { galleryValues: {}, notifications, projectName: '' };
+const launchpadHost: GalleryHost = { galleryValues: resolvedValues(), notifications, projectName: '' };
 
 const renderPicker = async (picker?: React.ReactElement, { withoutWorkbench = false } = {}) => {
   const content = picker ?? (

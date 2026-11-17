@@ -1,4 +1,5 @@
 import type { GalleryBoard, GalleryImage, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { IconRadioMenuProps } from '@platform/ui/Menu';
 import type { TFunction } from 'i18next';
 
@@ -197,7 +198,7 @@ export const settleGalleryValues = (
 };
 
 export const getGallerySearchScope = (values: Record<string, unknown>): GallerySearchScope =>
-  getGallerySettings(values).searchScope === 'all' && isGallerySearchActive(values) ? 'all' : 'board';
+  values.searchScope === 'all' && isGallerySearchActive(values) ? 'all' : 'board';
 
 export const getGalleryRawSelectedBoardId = (values: Record<string, unknown>): string | null =>
   typeof values.selectedBoardId === 'string' ? values.selectedBoardId : null;
@@ -222,7 +223,7 @@ export const getGalleryDefaultDestinationBoardId = (values: Record<string, unkno
 
 /** The selected board only while `followSelectedBoard` is on; a board `canAddTo` refuses sends results to the inbox. */
 export const getGalleryAutoAddBoardId = (
-  values: Record<string, unknown>,
+  values: ResolvedValues,
   canAddTo: (boardId: string) => boolean
 ): string | null => {
   const { autoAddBoardId, followSelectedBoard } = getGallerySettings(values);
@@ -302,7 +303,7 @@ export interface GallerySelectedImageQuery {
   starredOnly: boolean;
 }
 
-export const getGallerySelectedImageQuery = (values: Record<string, unknown>): GallerySelectedImageQuery => {
+export const getGallerySelectedImageQuery = (values: ResolvedValues): GallerySelectedImageQuery => {
   const query =
     values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
       ? (values.selectedImageQuery as Partial<GallerySelectedImageQuery>)
@@ -362,7 +363,7 @@ export const getGalleryCompareImage = (values: Record<string, unknown>): Gallery
     selectedImageName: null,
   });
 
-export const getGalleryAnchoredWindowPage = (values: Record<string, unknown>): number => {
+export const getGalleryAnchoredWindowPage = (values: ResolvedValues): number => {
   const page = getGalleryPage(values);
 
   return getGallerySettings(values).paginationMode === 'infinite' && page > 0 ? page : 0;
@@ -424,7 +425,7 @@ export const getGalleryListing = (
 };
 
 export const getGalleryStateView = (
-  values: Record<string, unknown>,
+  values: ResolvedValues,
   backendBoards: GalleryBoard[],
   backendItems: GalleryItem[] | null,
   starredStripItems: readonly GalleryItem[] = []

@@ -1,3 +1,4 @@
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
@@ -13,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 /** What a dropped upload is fenced to, captured at the drop. */
 export interface DroppedFileUploadContext {
   /** The project's resolved gallery values at the drop, which name its auto-add board. */
-  galleryValues: Record<string, unknown>;
+  galleryValues: ResolvedValues;
   owner: AccountScope;
   projectId: string;
 }

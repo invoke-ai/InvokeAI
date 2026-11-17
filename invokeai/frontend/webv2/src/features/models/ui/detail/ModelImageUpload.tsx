@@ -2,6 +2,7 @@
 import type { GalleryItem } from '@features/gallery';
 import type { GalleryHost, GalleryPickerAccept } from '@features/gallery/picker';
 import type { ModelConfig } from '@features/models/core/types';
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 
 import { Box, Image } from '@chakra-ui/react';
 import { GalleryMediaSlot } from '@features/gallery/mediaSlot';
@@ -18,7 +19,7 @@ import { useTranslation } from 'react-i18next';
 const ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const IMAGE_ONLY: GalleryPickerAccept = ['image'];
 /** The model manager lives on the Launchpad: no project board to seed from and no Gallery widget to reveal. */
-const NO_GALLERY_VALUES: Record<string, unknown> = {};
+const NO_GALLERY_VALUES = {} as ResolvedValues;
 
 interface ModelImageUploadProps {
   model: Pick<ModelConfig, 'cover_image' | 'key' | 'name'>;

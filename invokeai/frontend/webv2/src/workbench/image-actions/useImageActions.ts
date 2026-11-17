@@ -316,7 +316,7 @@ export const useImageActions = ({
     const getLatestWidgetValues = (widgetId: 'gallery' | 'generate' | 'video') => {
       const project = getLatestProject();
 
-      return project ? getResolvedProjectWidgetValues(project, widgetId, queries.getSnapshot().scopedDefaults) : {};
+      return getResolvedProjectWidgetValues(project, widgetId, queries.getSnapshot().scopedDefaults);
     };
     const getLatestGenerateValues = () => getLatestWidgetValues('generate');
     const getLatestVideoValues = () => getLatestWidgetValues('video');

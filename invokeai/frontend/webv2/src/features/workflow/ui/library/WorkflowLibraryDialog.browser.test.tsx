@@ -41,6 +41,7 @@ import {
 } from '@features/workflow/utility';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { settleAnimations } from '@platform/browser/settleAnimations.testing';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -60,7 +61,7 @@ const selectMenuItem = async (item: HTMLElement | null | undefined) => {
 };
 
 const GALLERY_HOST: GalleryHost = {
-  galleryValues: {},
+  galleryValues: resolvedValues(),
   notifications: { add: vi.fn(), reportError: vi.fn() },
   projectName: '',
 };

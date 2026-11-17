@@ -2,6 +2,7 @@ import type { GalleryItemRef } from '@features/gallery/contracts';
 import type { ProjectGraphState, ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
 import type { WorkflowLibrarySort, WorkflowLibrarySortDirection } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryCardSize } from '@features/workflow/ui/library/workflowThumbnail';
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { WorkbenchThemeId } from '@theme/themes';
 import type { ComponentType, ReactNode } from 'react';
 
@@ -47,7 +48,7 @@ export interface WorkflowProjectPersistence {
 }
 
 export interface WorkflowProjectSnapshot {
-  galleryValues: Record<string, unknown>;
+  galleryValues: ResolvedValues;
   id: string;
   isWorkflowRunning: boolean;
   /** The active workflow's editable document. */

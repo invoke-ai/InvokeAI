@@ -1,3 +1,4 @@
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { describe, expect, it } from 'vitest';
 
 import { getNextPreviewComparisonMode } from './PreviewCompare';
@@ -11,7 +12,7 @@ describe('preview comparison settings', () => {
     ['restores the side-by-side mode', { comparisonMode: 'side-by-side' }, 'side-by-side'],
     ['restores the hover mode', { comparisonMode: 'hover' }, 'hover'],
   ])('%s', (_, persisted, expected) => {
-    expect(getPreviewComparisonMode(persisted)).toBe(expected);
+    expect(getPreviewComparisonMode(resolvedValues(persisted))).toBe(expected);
   });
 
   it('cycles all three comparison modes in order', () => {
