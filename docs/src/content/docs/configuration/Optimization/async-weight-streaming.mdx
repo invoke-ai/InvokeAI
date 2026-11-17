@@ -86,7 +86,15 @@ async_weight_streaming: weights in RAM stream to cuda:0 asynchronously.
   the model stays in VRAM. A model that fits in VRAM is loaded whole as before. When the model is released, Invoke
   hands that memory back to the driver; on a system with several GPUs this waits while another GPU is mid-generation,
   so the memory stays reserved a little longer there.
-- **RAM.** Page-locking needs no extra RAM: the existing RAM copy of the layers is locked in place. A layer stays locked
+  Nodes that hold a second model within a VRAM limit (Wan 2.2's experts, Ideogram 4's second branch) count that
+  memory inside the limit: what they move to RAM streams from then on, so the resident weights stay that much under
+  it, also when the model was loaded partially to begin with. Nothing is kept free when the limit on locked RAM (see
+  below) leaves nothing to stream: such a model then keeps the blocking copy until its next load.
+- **RAM.** Page-locking makes no second copy: the existing RAM copy of the layers is locked in place. It does change
+  what that memory is. Weights that are still mapped from their file (see Loading below) are page cache, which the
+  system can reclaim; once locked, the driver has made a private copy of the pages. That copy stays private after
+  the layer is unlocked (it can then be swapped out, but it is no longer reclaimable page cache) until its model
+  leaves the RAM cache. A layer stays locked
   while its model is in the RAM cache, also while a later load keeps it in VRAM and between generations, so models
   that take turns in VRAM lock their layers only once. Locked memory cannot be moved to the page file or swap, so at
   most 40% of your physical RAM is locked. When a model needs more than that, Invoke unlocks layers that no running

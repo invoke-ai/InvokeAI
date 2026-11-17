@@ -1876,7 +1876,14 @@ class ModelCache:
         return self._locks_held
 
     def _pin(self, cache_entry: CacheRecord) -> None:
-        """Lock `cache_entry` and count the lock in `locks_held`. Caller holds the lock."""
+        """Lock `cache_entry` and count the lock in `locks_held`. Caller holds the lock.
+
+        A model with a RAM copy first locks its weights' storages in the registry of page-locked memory, which may wait
+        for one that another thread is unregistering. That thread needs none of this cache's locks.
+        """
+        cached_model = cache_entry.cached_model
+        if isinstance(cached_model, CachedModelWithPartialLoad):
+            cached_model.begin_streaming_lock()
         cache_entry.lock()
         self._locks_held += 1
 
@@ -1892,6 +1899,8 @@ class ModelCache:
         """
         cache_entry.unlock()
         self._locks_held -= 1
+        if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
+            cache_entry.cached_model.end_streaming_lock()
         if cache_entry.is_locked:
             return
         if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
@@ -2389,6 +2398,26 @@ class ModelCache:
             vram_bytes_to_free,
             keep_required_weights_in_vram=keep_required_weights_in_vram,
         )
+
+    @synchronized
+    def hold_model_residency(self, cache_entry: CacheRecord, max_resident_bytes: int) -> int:
+        """Trim a locked model that keeps running to at most ``max_resident_bytes`` of resident weights, counting what
+        it streams in: returns the bytes moved to RAM.
+
+        A model that streams from RAM (`async_weight_streaming`) holds up to `weight_streaming_reserve_bytes()` of
+        copies in flight on top of its resident weights, which the caller's limit has to leave room for, whether the
+        lock settled above the limit or already under it by the reserve its own load planned. The reserve is asked for
+        here, which also plans the streaming that follows (a lock that planned none registers nothing new). A model
+        that stays fully resident streams nothing.
+        """
+        cached_model = cache_entry.cached_model
+        resident = cached_model.cur_vram_bytes()
+        if isinstance(cached_model, CachedModelWithPartialLoad) and max_resident_bytes < cached_model.total_bytes():
+            resident += cached_model.weight_streaming_reserve_bytes()
+        excess = resident - max_resident_bytes
+        if excess <= 0:
+            return 0
+        return self._move_model_to_ram(cache_entry, excess, keep_required_weights_in_vram=True)
 
     def _get_vram_available(self, working_mem_bytes: Optional[int], honor_cap: bool = True) -> int:
         """Calculate the amount of additional VRAM available for the cache to use (takes into account the working

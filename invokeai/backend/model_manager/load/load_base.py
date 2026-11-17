@@ -364,12 +364,25 @@ class LoadedModelWithoutConfig:
                 vram_bytes_to_free,
                 keep_required_weights_in_vram=keep_required_weights_in_vram,
             )
+        self._pin_streamed_weights_of_a_trimmed_lock(freed)
+        return freed
+
+    def hold_resident_bytes(self, max_resident_bytes: int) -> int:
+        """Trim the locked model to at most ``max_resident_bytes`` of resident weights, leaving room within that for the
+        copies in flight when what it moved to RAM streams (`async_weight_streaming`). Returns the bytes moved. For a
+        node that holds a second model of the same size at the same time: prefer this to sizing an `unload_from_vram`
+        request from `resident_weight_bytes`, which does not know that reserve."""
+        with MODEL_LOAD_LOCK.read_lock():
+            freed = self._cache.hold_model_residency(self._cache_record, max_resident_bytes)
+        self._pin_streamed_weights_of_a_trimmed_lock(freed)
+        return freed
+
+    def _pin_streamed_weights_of_a_trimmed_lock(self, freed: int) -> None:
         cached_model = self._cache_record.cached_model
         if freed and self._cache_record.is_locked and isinstance(cached_model, CachedModelWithPartialLoad):
             # A node that makes room within its lock (a second expert or branch) runs on: what this moved to RAM
             # streams from now on. Outside the locks, as in `_lock_on_device`.
             cached_model.pin_streamed_weights()
-        return freed
 
 
 class LoadedModel(LoadedModelWithoutConfig):

@@ -58,6 +58,13 @@ class CachedModelWithPartialLoad:
         # worker) would otherwise both create a holder, or one would return while the other's update still runs.
         # Releases do not take it: eviction must not wait behind a slow first pin.
         self._pin_lock = threading.Lock()
+        # The cache locks of this wrapper (`begin_streaming_lock`), the storages they locked in the registry (None
+        # while the feature is not in use for them), and whether the lock planned VRAM for streaming copies.
+        self._streaming_locks = 0
+        self._locked_keys: frozenset | None = None
+        self._ram_storages: list[torch.UntypedStorage] | None = None
+        self._ram_keys: frozenset | None = None
+        self._registration_planned = True
 
         model_state_dict = model.state_dict()
         # A CPU read-only copy of the model's state dict. Used for faster model unloads from VRAM, and to speed up LoRA
@@ -290,14 +297,65 @@ class CachedModelWithPartialLoad:
             self._compute_device, has_ram_copy=self._cpu_state_dict is not None
         )
 
+    def _streamable_ram_storages(self) -> list[torch.UntypedStorage]:
+        """The storages of the RAM copy the custom modules could stream: all that can ever be registered for this model.
+        Fixed for the wrapper's life, so listed once."""
+        if self._ram_storages is None:
+            ram_copy = self._cpu_state_dict
+            assert ram_copy is not None  # Callers check `has_ram_copy`.
+            self._ram_storages = [
+                tensor.untyped_storage()
+                for key, tensor in ram_copy.items()
+                if key not in self._keys_in_modules_that_do_not_support_autocast
+                and weight_streaming.is_streamable_tensor(tensor)
+            ]
+        return self._ram_storages
+
+    def begin_streaming_lock(self) -> None:
+        """Called by the cache as it takes a lock on this model, under its lock and before anything moves.
+
+        While the lock lasts, the storages of the RAM copy are not unregistered (see `PinnedStorageRegistry`): the
+        cache's partial loads, the repair of required weights, the synchronous fallback copies and the unpatching of
+        LoRAs all copy from them on this thread's own streams, and the registry cannot see those copies. Another
+        thread that is unregistering one of them makes this wait for it. Also withdraws the plan for streaming copies
+        (`weight_streaming_reserve_bytes`) until this lock plans it again.
+        """
+        if self._streaming_locks == 0:
+            self._registration_planned = False
+            if weight_streaming.can_stream_weights_to(self._compute_device, self._cpu_state_dict is not None):
+                if self._ram_keys is None:
+                    self._ram_keys = weight_streaming.storage_keys(self._streamable_ram_storages())
+                weight_streaming.PINNED_STORAGES.lock(self._ram_keys)
+                self._locked_keys = self._ram_keys
+        self._streaming_locks += 1
+
+    def end_streaming_lock(self) -> None:
+        """Called by the cache as a lock on this model ends, whether or not it settled."""
+        self._streaming_locks -= 1
+        if self._streaming_locks == 0 and self._locked_keys is not None:
+            keys, self._locked_keys = self._locked_keys, None
+            registry = weight_streaming.PINNED_STORAGES
+            registry.unlock(keys)
+            # Unregisters what an eviction left pending behind this lock, unless a registration is under way (it does).
+            registry.drain_deferred()
+
     def weight_streaming_reserve_bytes(self) -> int:
         """VRAM a lock that leaves streamed weights in RAM needs beyond the model's resident weights and the working
         memory: the copies in flight, at most `weight_streaming.STREAM_BUDGET_BYTES`. The layer being computed needs
-        no reserve, the synchronous path holds it as well."""
+        no reserve, the synchronous path holds it as well.
+
+        The answer is the plan: when it is 0 (nothing streams, or the pinned-RAM cap leaves no room), this lock
+        registers nothing new, so no streaming starts that nobody reserved VRAM for.
+        """
+        self._registration_planned = False
         if self._streamable_bytes == 0 or not self._streams_weights():
             return 0
-        if not weight_streaming.PINNED_STORAGES.can_register():
+        registry = weight_streaming.PINNED_STORAGES
+        if not registry.can_register(self._compute_device):
             return 0
+        if not registry.has_room_for_any(self._streamable_ram_storages()):
+            return 0
+        self._registration_planned = True
         return min(weight_streaming.STREAM_BUDGET_BYTES, self._streamable_bytes)
 
     def pin_streamed_weights(self) -> None:
@@ -355,7 +413,7 @@ class CachedModelWithPartialLoad:
             and ram_copy[key].untyped_storage().data_ptr() == tensor.untyped_storage().data_ptr()
         ]
         try:
-            registry.update(holder, streamed)
+            registry.update(holder, streamed, self._compute_device, register_new=self._registration_planned)
         except BaseException:
             self._pins_stale = True
             raise

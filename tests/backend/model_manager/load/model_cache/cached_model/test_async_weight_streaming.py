@@ -576,7 +576,7 @@ def test_a_driver_that_rounds_registrations_to_pages_keeps_the_synchronous_copy(
     monkeypatch.setattr(
         weight_streaming,
         "_registration_self_test",
-        lambda: "this driver does not page-lock memory by exact ranges, so neighbouring weights could not be copied",
+        lambda device=None: "this driver does not page-lock memory by exact ranges, so neighbours could not be copied",
     )
     model = _build_model()
     cached = _half_loaded(model)
@@ -597,12 +597,14 @@ def test_an_eviction_during_the_first_pin_leaves_nothing_registered(streaming, m
     model = _build_model()
     cached = CachedModelWithPartialLoad(model=model, compute_device=DEVICE, keep_ram_copy=True)
     cached.partial_load_to_vram(cached.total_bytes() // 2)
+    # The lock plans the streaming VRAM, so this pin would register (without the eviction).
+    assert cached.weight_streaming_reserve_bytes() > 0
     update = streaming.registry.update
 
-    def evicted_while_registering(holder, storages):
+    def evicted_while_registering(holder, storages, device=None, **kwargs):
         # The cache evicts the record (another thread, under its own lock) before this update registers.
         cached.release_pinned_weights()
-        update(holder, storages)
+        update(holder, storages, device, **kwargs)
 
     monkeypatch.setattr(streaming.registry, "update", evicted_while_registering)
     cached.pin_streamed_weights()
@@ -699,7 +701,8 @@ def test_an_idle_model_gives_a_streaming_one_only_the_room_it_lacks(streaming, m
 
 @requires_cuda
 def test_only_the_last_unlock_makes_the_pins_reclaimable(streaming, monkeypatch: pytest.MonkeyPatch):
-    """Two holders of one record at once, as a session and the image index worker."""
+    """Two overlapping locks of one record, as a session and the image index worker take them (nested here: the lock
+    count does not depend on which thread holds it)."""
     model = _build_model()
     cache = _cache_with_room_for_half_of(model)
     other = weight_streaming.PinHolder()
