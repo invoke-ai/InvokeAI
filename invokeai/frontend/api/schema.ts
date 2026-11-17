@@ -12991,6 +12991,11 @@ export type components = {
             models_cleared: number;
             /** Bytes Freed */
             bytes_freed: number;
+            /**
+             * Vram Release Refused
+             * @description The device refused to return its cached memory to the driver after the models were dropped (for example an earlier error left it in a bad state). The models were still dropped; the memory stays reserved by this process.
+             */
+            vram_release_refused: boolean;
         };
         /** EnqueueBatchReceipt */
         EnqueueBatchReceipt: {

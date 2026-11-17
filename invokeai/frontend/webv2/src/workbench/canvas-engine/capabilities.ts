@@ -48,6 +48,7 @@ import type {
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
+  TransformOptions,
   TransformSession,
 } from './engineStores';
 import type { RasterCompositeExportRequest, RasterCompositeExportResult } from './exportRasterComposite';
@@ -238,6 +239,7 @@ export interface CanvasInteractionState {
   stagingHidesOverlays: boolean;
   textEditSession: TextEditSession | null;
   textOptions: TextToolOptions;
+  transformOptions: TransformOptions;
   transformSession: TransformSession | null;
   /**
    * The layer `layers.beginTransform` is waiting on: its session opens once the layer's fresh pixels are persisted.
@@ -271,6 +273,7 @@ export type CanvasWritableInteractionKey = Extract<
   | 'showGrid'
   | 'snapToGrid'
   | 'textOptions'
+  | 'transformOptions'
 >;
 
 export interface CanvasInteractionStateCapability {
@@ -990,6 +993,7 @@ export type {
   ShapeToolTarget,
   TextEditSession,
   TextToolOptions,
+  TransformOptions,
   TransformSession,
 } from './engineStores';
 export {
