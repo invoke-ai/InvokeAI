@@ -2,6 +2,7 @@ import type { ProjectGraphAction } from '@features/workflow/core/document';
 import type { ForLoopValidationReason } from '@features/workflow/core/forLoops';
 import type { ProjectGraphState, ProjectWorkflowSource, XYPosition } from '@features/workflow/core/types';
 import type { LogSource } from '@platform/logging/contracts';
+import type { ReactNode } from 'react';
 
 export type WorkflowRegion = 'left' | 'right' | 'bottom' | 'center' | 'dialog' | 'popover' | 'floating';
 
@@ -124,8 +125,20 @@ export interface GraphPreviewProvenance {
  * isLive distinguishes recompilation from current project state from replaying a saved compiled graph and controls
  * the dialog subtitle.
  */
+/** The host's Invoke for a graph preview's source, rendered by the host (the preview owns no route). */
+export interface GraphPreviewInvoke {
+  control: ReactNode;
+  /** Whether that Invoke can run now; its control says why not. */
+  isReady: boolean;
+}
+
 export interface GraphPreviewSourceState {
   graph: WorkflowPreviewGraph | null;
+  /**
+   * The workflow document the graph compiles from, when there is one: the preview draws it, so its labels, notes and
+   * form show; `graph` stays what runs.
+   */
+  document?: ProjectGraphState;
   /** Human-readable result destination (e.g. "Gallery"), set for every source by the builder. */
   destinationLabel: string | null;
   invalidReasons: Array<string | ForLoopValidationReason>;

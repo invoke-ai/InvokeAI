@@ -4,6 +4,7 @@ import { Box, HStack, Icon, Input, Text } from '@chakra-ui/react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { IconButton } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
+import { isOverlayStack } from '@workbench/canvas-engine/api';
 import {
   ApertureIcon,
   WandSparklesIcon,
@@ -317,7 +318,9 @@ const LayerChildRowComponent = ({
             content={
               child.parentContributing
                 ? t('widgets.layers.modifiers.toggleActive')
-                : t('widgets.layers.modifiers.parentDisabled')
+                : isOverlayStack(child.stack)
+                  ? t('widgets.layers.modifiers.parentExcluded')
+                  : t('widgets.layers.modifiers.parentDisabled')
             }
           >
             <IconButton

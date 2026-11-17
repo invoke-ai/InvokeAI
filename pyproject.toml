@@ -639,9 +639,10 @@ version = { attr = "invokeai.version.__version__" }
 # fixtures are set up once per file instead of in every worker that received part of it.
 # It is not isolation: a worker process runs many files, in an order that depends on the
 # worker count and on which file finished first, so a file must still set up its own
-# process-global state. It costs nothing -- per-test distribution measured the same wall
-# clock on the full suite -- and it lives here rather than in the CI command so that it
-# also holds when `-n` is passed by hand. Coverage is opt-in via `--cov`.
+# process-global state. For maximum local parallelism, pass `-n <cpus> --dist load`;
+# this overrides `loadfile` and can split a single file across workers, repeating
+# module-scoped fixture setup. This config default also applies when `-n` is passed by hand.
+# Coverage is opt-in via `--cov`.
 addopts = "--strict-markers --dist loadfile -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",

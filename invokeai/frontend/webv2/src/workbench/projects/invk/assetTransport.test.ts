@@ -1,7 +1,11 @@
+import openapi from '@api/openapi.json';
 import { ApiError } from '@platform/transport/http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { INVK_MAX_ARCHIVE_BYTES } from './archive';
+
+// The server's cap on one body's name list; the gallery's backend tests hold every name list to the same cap.
+const SERVER_CAP = openapi.components.schemas.Body_star_images_in_list.properties.image_names.maxItems;
 
 const mocks = vi.hoisted(() => ({ apiFetch: vi.fn(), apiFetchJson: vi.fn(), apiFetchRaw: vi.fn() }));
 
@@ -88,16 +92,29 @@ describe('import rollback transport', () => {
     });
   });
 
-  it('chunks video cleanup to the server request ceiling', async () => {
-    const names = Array.from({ length: 1_001 }, (_, index) => `video-${String(index)}.mp4`);
+  it.each([
+    ['image', deleteArchiveImages, 'image_names'],
+    ['video', deleteArchiveVideos, 'video_names'],
+  ] as const)('chunks %s cleanup to the server request ceiling', async (_, cleanUp, requestKey) => {
+    const names = Array.from({ length: SERVER_CAP + 1 }, (_, index) => `media-${String(index)}`);
 
     mocks.apiFetchJson.mockResolvedValue({});
-    await deleteArchiveVideos(names);
+    await cleanUp(names);
 
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
     expect(
-      mocks.apiFetchJson.mock.calls.map(([, options]) => JSON.parse(options.body as string).video_names.length)
-    ).toEqual([1_000, 1]);
+      mocks.apiFetchJson.mock.calls.map(([, options]) => JSON.parse(options.body as string)[requestKey].length)
+    ).toEqual([SERVER_CAP, 1]);
+  });
+
+  it('still sends later image cleanup batches after one fails, then reports the failure', async () => {
+    const names = Array.from({ length: 2_001 }, (_, index) => `image-${String(index)}.png`);
+    const failure = new ApiError('cleanup failed', 500);
+
+    mocks.apiFetchJson.mockResolvedValueOnce({}).mockRejectedValueOnce(failure).mockResolvedValueOnce({});
+
+    await expect(deleteArchiveImages(names)).rejects.toBe(failure);
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(3);
   });
 });
 
@@ -167,7 +184,7 @@ describe('board media transport', () => {
     'chunks project %s copies to the server request ceiling',
     async (_, copy, requestKey, nameKey, sourceKey) => {
       const extension = requestKey === 'image_names' ? 'png' : 'mp4';
-      const names = Array.from({ length: 1_001 }, (_, index) => `media-${String(index)}.${extension}`);
+      const names = Array.from({ length: SERVER_CAP + 1 }, (_, index) => `media-${String(index)}.${extension}`);
 
       mocks.apiFetchJson.mockImplementation((_path: string, options: { body: string }) => {
         const requested = JSON.parse(options.body)[requestKey] as string[];
@@ -182,13 +199,13 @@ describe('board media transport', () => {
       expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
       expect(
         mocks.apiFetchJson.mock.calls.map(([, options]) => JSON.parse(options.body as string)[requestKey].length)
-      ).toEqual([1_000, 1]);
+      ).toEqual([SERVER_CAP, 1]);
     }
   );
 
   it('finishes an in-flight copy batch after cancellation so its identities remain available for rollback', async () => {
     const controller = new AbortController();
-    const names = Array.from({ length: 1_001 }, (_, index) => `media-${String(index)}.png`);
+    const names = Array.from({ length: SERVER_CAP + 1 }, (_, index) => `media-${String(index)}.png`);
 
     mocks.apiFetchJson.mockImplementation((_path: string, options: { body: string; signal?: AbortSignal }) => {
       const requested = JSON.parse(options.body).image_names as string[];
@@ -201,24 +218,39 @@ describe('board media transport', () => {
     });
 
     await expect(copyImagesToBoard(names, 'staging', controller.signal)).resolves.toMatchObject({
-      copied: { length: 1_000 },
+      copied: { length: SERVER_CAP },
       failed: [names.at(-1)],
     });
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
     expect(mocks.apiFetchJson.mock.calls[0]![1].signal).toBeUndefined();
   });
 
-  it('chunks video starring to the server request ceiling', async () => {
-    const names = Array.from({ length: 1_001 }, (_, index) => `video-${String(index)}.mp4`);
+  it.each([
+    ['image', starImages, 'image_names', 'starred_images'],
+    ['video', starVideos, 'video_names', 'starred_videos'],
+  ] as const)('chunks %s starring to the server request ceiling', async (_, star, requestKey, responseKey) => {
+    const names = Array.from({ length: SERVER_CAP + 1 }, (_, index) => `media-${String(index)}`);
 
     mocks.apiFetchJson.mockImplementation((_path: string, options: { body: string }) => {
-      const requested = JSON.parse(options.body).video_names as string[];
+      const requested = JSON.parse(options.body)[requestKey] as string[];
 
-      return Promise.resolve({ starred_videos: requested });
+      return Promise.resolve({ [responseKey]: requested });
     });
 
-    await expect(starVideos(names)).resolves.toEqual({ failed: [] });
-    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+    await expect(star(names)).resolves.toEqual({ failed: [] });
+    expect(
+      mocks.apiFetchJson.mock.calls.map(([, options]) => JSON.parse(options.body as string)[requestKey].length)
+    ).toEqual([SERVER_CAP, 1]);
+  });
+
+  it('reports a failed image star batch as unstarred and still stars the rest', async () => {
+    const names = Array.from({ length: SERVER_CAP + 1 }, (_, index) => `image-${String(index)}.png`);
+
+    mocks.apiFetchJson
+      .mockRejectedValueOnce(new ApiError('star failed', 500))
+      .mockResolvedValueOnce({ starred_images: [names[SERVER_CAP]] });
+
+    await expect(starImages(names)).resolves.toEqual({ failed: names.slice(0, SERVER_CAP) });
   });
 
   it('creates a staging board by name and truncates it as the backend would', async () => {

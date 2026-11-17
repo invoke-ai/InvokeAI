@@ -20,7 +20,7 @@ export {
   type ImageRecallKind,
   type ImageRecallResult,
 } from './imageRecall';
-export { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
+export { claimCanvasRecall, executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
 export { readRecordedModelRef } from './recordedModel';
 export {
   appendReferenceVideo,

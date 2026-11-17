@@ -1,0 +1,46 @@
+diff --git a/dist/menu.machine.js b/dist/menu.machine.js
+index f35618ace4d14616c45ea4d874c167fb8b9ca721..1a89e6d4dbd5e3bfd94c601878901ddac7d48c47 100644
+--- a/dist/menu.machine.js
++++ b/dist/menu.machine.js
+@@ -581,14 +581,16 @@ var machine = (0, import_core.createMachine)({
+       trackFocusVisible({ scope }) {
+         return (0, import_focus_visible.trackFocusVisible)({ root: scope.getRootNode?.() });
+       },
+-      trackPositioning({ context, prop, scope, refs }) {
++      trackPositioning({ context, event, prop, scope, refs }) {
+         const hasContextTrigger = dom.getContextTriggerEl(scope) || dom.getContextTriggerEls(scope).length > 0;
+         if (hasContextTrigger) return;
+         const positioning = {
+           ...prop("positioning"),
+           ...refs.get("positioningOverride")
+         };
+-        context.set("currentPlacement", positioning.placement);
++        // Re-entering a closing submenu restarts this effect while its content is still shown. Keep its resolved
++        // placement: resetting a flipped submenu to the configured side restarts its placement-keyed open animation.
++        if (event.type !== "MENU_POINTERENTER") context.set("currentPlacement", positioning.placement);
+         const getPositionerEl2 = () => dom.getPositionerEl(scope);
+         const getTriggerEl2 = () => dom.getActiveTriggerEl(scope, context.get("triggerValue"));
+         return (0, import_popper.getPlacement)(getTriggerEl2, getPositionerEl2, {
+diff --git a/dist/menu.machine.mjs b/dist/menu.machine.mjs
+index b8facff3003d0f0d72352b323352956a7e898853..88d51b58f7b2c4135a8635d263c13e0dbb72995e 100644
+--- a/dist/menu.machine.mjs
++++ b/dist/menu.machine.mjs
+@@ -566,14 +566,16 @@ var machine = createMachine({
+       trackFocusVisible({ scope }) {
+         return trackFocusVisible({ root: scope.getRootNode?.() });
+       },
+-      trackPositioning({ context, prop, scope, refs }) {
++      trackPositioning({ context, event, prop, scope, refs }) {
+         const hasContextTrigger = dom.getContextTriggerEl(scope) || dom.getContextTriggerEls(scope).length > 0;
+         if (hasContextTrigger) return;
+         const positioning = {
+           ...prop("positioning"),
+           ...refs.get("positioningOverride")
+         };
+-        context.set("currentPlacement", positioning.placement);
++        // Re-entering a closing submenu restarts this effect while its content is still shown. Keep its resolved
++        // placement: resetting a flipped submenu to the configured side restarts its placement-keyed open animation.
++        if (event.type !== "MENU_POINTERENTER") context.set("currentPlacement", positioning.placement);
+         const getPositionerEl2 = () => dom.getPositionerEl(scope);
+         const getTriggerEl2 = () => dom.getActiveTriggerEl(scope, context.get("triggerValue"));
+         return getPlacement(getTriggerEl2, getPositionerEl2, {

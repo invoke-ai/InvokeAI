@@ -29,6 +29,8 @@ import {
   isGenerateModelSelectable,
   isLoraSupported,
   isReferenceImageSupported,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
   withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { compileCanvasGraph } from './canvas/compileCanvasGraph';
@@ -44,8 +46,6 @@ import { resolveGenerateWidgetValues } from './resolveGenerateWidgetValues';
 import {
   deriveAspectRatioId,
   GENERATE_UI_STATE_KEYS,
-  getModelDefaultVae,
-  hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
@@ -153,16 +153,16 @@ const getSelectableModel = (key: string, models: readonly ModelConfig[]): Genera
   return model;
 };
 
-/** Selecting the model, then "Reset to model defaults", which also applies the model's default VAE. */
+/** Selecting the model, then its default VAE by recall's policy (`getRecallDefaultVae`); otherwise the selection's. */
 const getModelDefaultValues = (model: GenerateModelConfig, models: readonly ModelConfig[]): GenerateWidgetValues => {
   const { settings } = getGenerateModelSelectionResult({
     currentValues: getDefaultGenerateSettings(model),
     model,
     models,
   });
-  const vae = hasModelDefaultVae(model) ? getModelDefaultVae(model, models.filter(isVaeModelConfig)) : settings.vae;
+  const vae = getRecallDefaultVae(resolveModelDefaultVae(model, settings, models.filter(isVaeModelConfig)));
 
-  return { ...settings, model, vae };
+  return { ...settings, model, vae: vae === undefined ? settings.vae : vae };
 };
 
 const withCaseValues = (values: GenerateWidgetValues, input: GraphExportCase): GenerateWidgetValues => ({
