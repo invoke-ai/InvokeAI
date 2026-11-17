@@ -28,6 +28,7 @@ import type { ProjectSyncInfo } from '@workbench/projects/syncStore';
 import { toGalleryItemKey } from '@features/gallery/contracts';
 import {
   checkGalleryMediaUsage,
+  GALLERY_REQUEST_MAX_NAMES,
   type GalleryMediaUsage,
   type GalleryMediaUsageDocument,
   type GalleryMediaUsageGroup,
@@ -41,8 +42,6 @@ import { deserializeProjectRecord } from '@workbench/projects/projectHydration';
 
 import { collectMediaUsage, mergeMediaUsage, type MediaUsage } from './mediaUsage';
 
-/** The server checks at most this many names of each kind per request. */
-export const MEDIA_USAGE_MAX_NAMES_PER_KIND = 1000;
 /**
  * Projects read from the server to narrow its answer, at most, a few at a time: first projects in memory whose scan
  * dropped a name the server found at revisions other than the ones the copy builds on, then closed projects. Each read
@@ -77,7 +76,10 @@ export interface MediaUsageHost {
 }
 
 export interface MediaUsageOptions {
-  /** How long the server check may take before the report says it could not finish. */
+  /**
+   * How long each request of the server check may take before the report says it could not finish: a selection past
+   * one request's cap is checked in several, and gets this long for each.
+   */
   serverTimeoutMs?: number;
   /** How long reading projects from the server may take; any not read by then are listed as the server counts them. */
   projectReadsTimeoutMs?: number;
@@ -109,8 +111,21 @@ const withDeadline = (signal: AbortSignal, ms: number): { clear: () => void; sig
   };
 };
 
-const isTruncated = (entry: GalleryMediaUsageDocument): boolean =>
-  entry.imageCount > entry.imageNames.length || entry.videoCount > entry.videoNames.length;
+/** Whether the server named only some of what the entry uses: its list was capped, or a batched check left it out. */
+const isTruncated = (entry: {
+  imageCount: number;
+  imageNames: readonly string[];
+  namesIncomplete?: true;
+  videoCount: number;
+  videoNames: readonly string[];
+}): boolean =>
+  entry.namesIncomplete === true ||
+  entry.imageCount > entry.imageNames.length ||
+  entry.videoCount > entry.videoNames.length;
+
+/** A count taken from a server entry that does not name all of its uses is a lower bound. */
+const countBoundOf = (entry: GalleryMediaUsageDocument): { countAtLeast?: true } =>
+  entry.namesIncomplete ? { countAtLeast: true } : {};
 
 const refsOf = (entry: GalleryMediaUsageDocument): GalleryItemRef[] => [
   ...entry.imageNames.map((name) => ({ kind: 'image' as const, name })),
@@ -230,24 +245,24 @@ export const resolveMediaUsage = async (
   const owner = captureAccountScope();
   const signal = callerSignal ? AbortSignal.any([callerSignal, owner.signal]) : owner.signal;
   const requestedRefs = request.kind === 'items' ? dedupeRefs(request.refs) : [];
-  const overServerLimit =
-    requestedRefs.filter((ref) => ref.kind === 'image').length > MEDIA_USAGE_MAX_NAMES_PER_KIND ||
-    requestedRefs.filter((ref) => ref.kind === 'video').length > MEDIA_USAGE_MAX_NAMES_PER_KIND;
   let server: GalleryMediaUsage | null = null;
+  const serverRequests = Math.max(
+    1,
+    ...(['image', 'video'] as const).map((kind) =>
+      Math.ceil(requestedRefs.filter((ref) => ref.kind === kind).length / GALLERY_REQUEST_MAX_NAMES)
+    )
+  );
+  const deadline = withDeadline(signal, serverTimeoutMs * serverRequests);
 
-  if (!overServerLimit) {
-    const deadline = withDeadline(signal, serverTimeoutMs);
-
-    try {
-      server = await checkGalleryMediaUsage(
-        request.kind === 'items' ? { kind: 'items', refs: requestedRefs } : request,
-        deadline.signal
-      );
-    } catch {
-      server = null;
-    } finally {
-      deadline.clear();
-    }
+  try {
+    server = await checkGalleryMediaUsage(
+      request.kind === 'items' ? { kind: 'items', refs: requestedRefs } : request,
+      deadline.signal
+    );
+  } catch {
+    server = null;
+  } finally {
+    deadline.clear();
   }
 
   signal.throwIfAborted();
@@ -282,7 +297,8 @@ export const resolveMediaUsage = async (
 
     const base = host.getSyncBase(project.id);
 
-    if (entry && dropsServerNames(entry, localKeys) && !isServerCopyOf(base, entry)) {
+    // A document a batched check could not name in full cannot vouch for a scan that dropped nothing it named.
+    if (entry && (entry.namesIncomplete || dropsServerNames(entry, localKeys)) && !isServerCopyOf(base, entry)) {
       // An edit here removed the name, or another tab or device saved a use this copy lacks: the server's copy decides.
       outcomes.set(project.id, { entry, kind: 'unchecked', local: usage });
       reads.push({ entry, local: { base, usage }, refs });
@@ -329,7 +345,7 @@ export const resolveMediaUsage = async (
   signal.throwIfAborted();
   assertAccountScopeCurrent(owner);
 
-  return buildReport({ documents, host, loadedProjects, outcomes, overServerLimit, request, requestedRefs, server });
+  return buildReport({ documents, host, loadedProjects, outcomes, request, requestedRefs, server });
 };
 
 const buildReport = ({
@@ -337,7 +353,6 @@ const buildReport = ({
   host,
   loadedProjects,
   outcomes,
-  overServerLimit,
   request,
   requestedRefs,
   server,
@@ -346,7 +361,6 @@ const buildReport = ({
   host: MediaUsageHost;
   loadedProjects: ReturnType<MediaUsageHost['getLoadedProjects']>;
   outcomes: ReadonlyMap<string, ProjectOutcome>;
-  overServerLimit: boolean;
   request: GalleryMediaUsageRequest;
   requestedRefs: readonly GalleryItemRef[];
   server: GalleryMediaUsage | null;
@@ -359,10 +373,10 @@ const buildReport = ({
   // A server project entry replaced by a scan that dropped one of its names: the server's own in-use total, which
   // counted that name, no longer holds.
   let narrowed = false;
-  const addNames = (entry: { imageCount: number; imageNames: string[]; videoCount: number; videoNames: string[] }) => {
+  const addNames = (entry: Parameters<typeof isTruncated>[0]) => {
     entry.imageNames.forEach((name) => inUse.add(toGalleryItemKey({ kind: 'image', name })));
     entry.videoNames.forEach((name) => inUse.add(toGalleryItemKey({ kind: 'video', name })));
-    if (entry.imageCount > entry.imageNames.length || entry.videoCount > entry.videoNames.length) {
+    if (isTruncated(entry)) {
       exact = false;
       lowerBound = Math.max(lowerBound, entry.imageCount + entry.videoCount);
     }
@@ -380,7 +394,7 @@ const buildReport = ({
 
       addNames(entry);
       if (!local) {
-        return { count: entry.imageCount + entry.videoCount, kind: 'projectUnchecked', name };
+        return { count: entry.imageCount + entry.videoCount, kind: 'projectUnchecked', name, ...countBoundOf(entry) };
       }
 
       // A project open here: what its copy uses, beside the server's names its saved version could not be checked for.
@@ -393,8 +407,8 @@ const buildReport = ({
 
       localKeys.forEach((key) => inUse.add(key));
       return projectId === host.openProjectId
-        ? { count, kind: 'openProject', savedCopyUnchecked: true, surfaces }
-        : { count, kind: 'project', name, savedCopyUnchecked: true, surfaces };
+        ? { count, kind: 'openProject', savedCopyUnchecked: true, surfaces, ...countBoundOf(entry) }
+        : { count, kind: 'project', name, savedCopyUnchecked: true, surfaces, ...countBoundOf(entry) };
     }
 
     const used = usedKeysOf(outcome.usage);
@@ -445,7 +459,7 @@ const buildReport = ({
     for (const entry of documents) {
       if (entry.kind === kind) {
         addNames(entry);
-        groups.push(toGroup(entry));
+        groups.push({ ...toGroup(entry), ...countBoundOf(entry) });
       }
     }
   };
@@ -486,7 +500,12 @@ const buildReport = ({
   // server's count, the items deleting it removes.
   const checkedCount =
     request.kind === 'items' || !server ? requestedRefs.length : server.checkedImageCount + server.checkedVideoCount;
-  const serverInUse = server && !narrowed ? server.inUseImageCount + server.inUseVideoCount : 0;
+  // A narrowing scan makes the server's total too high, but documents it did not list count nowhere else: with any of
+  // those, the higher total stands.
+  const serverInUse =
+    server && (!narrowed || server.documentsTotal > server.documents.length)
+      ? server.inUseImageCount + server.inUseVideoCount
+      : 0;
   const inUseCount = exact ? inUse.size : Math.max(inUse.size, lowerBound, serverInUse);
 
   return {
@@ -498,7 +517,7 @@ const buildReport = ({
         ? requestedRefs.every((ref) => ref.kind === 'image')
         : server !== null && server.checkedVideoCount === 0,
     scope: request.kind,
-    serverCheck: server ? 'complete' : overServerLimit ? 'tooManyItems' : 'unavailable',
+    serverCheck: server ? 'complete' : 'unavailable',
   };
 };
 

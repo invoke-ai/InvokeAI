@@ -67,6 +67,7 @@ const createSelectionPixelOptions = () => ({
   deleteDerived: vi.fn(),
   getDocument: () => null,
   getFillColor: () => '#000',
+  getTransformSessionLayerId: () => null,
   invalidateLayer: vi.fn(),
   isRasterCacheReady: () => true,
   isGestureActive: () => false,

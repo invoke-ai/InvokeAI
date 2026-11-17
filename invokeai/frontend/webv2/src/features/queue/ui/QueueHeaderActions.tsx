@@ -15,11 +15,10 @@ import { formatCount } from '@platform/i18n/languages';
 import { queryClient } from '@platform/query/client';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { Button, IconButton } from '@platform/ui/Button';
+import { Button } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
-import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { useQuery } from '@tanstack/react-query';
-import { DatabaseIcon } from 'lucide-react';
+import { DatabaseZapIcon } from 'lucide-react';
 import { useCallback, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -52,23 +51,21 @@ export const QueueHeaderActions = () => {
 
 const CachePopover = () => {
   const { t } = useTranslation();
-  const triggerIds = useTooltipTriggerIds();
   const titleId = useId();
   // Zag names the dialog by its title only when the title exists at mount; lazy content mounts later, so name it here.
-  const ids = useMemo(() => ({ ...triggerIds, title: titleId }), [titleId, triggerIds]);
+  const ids = useMemo(() => ({ title: titleId }), [titleId]);
   const contentRef = useRef<HTMLDivElement>(null);
   // Focus lands on the panel, not on its first control: that is a Clear button.
   const getInitialFocus = useCallback(() => contentRef.current, []);
 
   return (
     <Popover.Root ids={ids} initialFocusEl={getInitialFocus} lazyMount positioning={POSITIONING} unmountOnExit>
-      <Tooltip content={t('widgets.queue.cache.title')} ids={triggerIds}>
-        <Popover.Trigger asChild>
-          <IconButton aria-label={t('widgets.queue.cache.title')} color="fg.muted" size="sm" variant="ghost">
-            <Icon as={DatabaseIcon} boxSize="3.5" />
-          </IconButton>
-        </Popover.Trigger>
-      </Tooltip>
+      <Popover.Trigger asChild>
+        <Button color="fg.muted" size="sm" variant="ghost">
+          <Icon as={DatabaseZapIcon} boxSize="3.5" />
+          {t('widgets.queue.cache.title')}
+        </Button>
+      </Popover.Trigger>
       <Portal>
         <Popover.Positioner>
           <PopoverContent ref={contentRef} aria-labelledby={titleId} p="3" w="21rem">

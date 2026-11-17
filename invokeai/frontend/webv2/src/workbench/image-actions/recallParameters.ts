@@ -22,10 +22,8 @@ import {
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   getReferenceImageLimit,
-  getModelDefaultVae,
   getSettingsWithModelDefaults,
   hasArchitectureCapabilities,
-  hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
@@ -39,6 +37,8 @@ import {
   MIN_REFINER_CFG_SCALE,
   MIN_REFINER_START,
   MIN_REFINER_STEPS,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
   withAddedReferenceImages,
 } from '@features/generation/settings';
 
@@ -232,12 +232,8 @@ export const buildRecallParametersSettings = ({
         model,
         models,
       });
-      values = {
-        ...values,
-        ...settings,
-        model,
-        ...(hasModelDefaultVae(model) ? { vae: getModelDefaultVae(model, vaeModels) } : {}),
-      };
+      const vae = getRecallDefaultVae(resolveModelDefaultVae(model, settings, vaeModels));
+      values = { ...values, ...settings, model, ...(vae === undefined ? {} : { vae }) };
       fields.add('model');
     }
   }
@@ -261,7 +257,9 @@ export const buildRecallParametersSettings = ({
       fields.add('vae');
     }
   } else if (isReset('vae_model')) {
-    values = { ...values, vae: hasModelDefaultVae(values.model) ? getModelDefaultVae(values.model, vaeModels) : null };
+    // A strict null asks for the default, so anything the default cannot name is the bundled VAE, as before.
+    const defaultVae = resolveModelDefaultVae(values.model, values, vaeModels);
+    values = { ...values, vae: defaultVae.kind === 'apply' ? defaultVae.vae : null };
     fields.add('vae');
   }
 

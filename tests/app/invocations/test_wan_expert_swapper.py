@@ -735,3 +735,37 @@ def test_outgoing_expert_is_collectable_when_the_next_expert_loads():
     swapper.close()
 
     assert outgoing_collected == [True]
+
+
+def test_float8_weights_are_counted_in_the_working_memory_asked_for_the_expert():
+    """A kept scaled-fp8 layer is widened per forward with its scale applied: the widened weight and its product with the
+    scale are alive at once. The expert's working memory has to cover that largest layer, or the cache plans for a
+    dense one."""
+    log: list[str] = []
+    expert = nn.Sequential(nn.Linear(8, 16, bias=False), nn.Linear(16, 4, bias=False))
+    expert[0].weight = nn.Parameter(expert[0].weight.detach().to(torch.float8_e4m3fn), requires_grad=False)
+    expert[0].register_buffer("weight_scale", torch.tensor(2.0), persistent=False)
+    expert[1].weight = nn.Parameter(expert[1].weight.detach().to(torch.float8_e4m3fn), requires_grad=False)
+    asked: list[int | None] = []
+
+    class _RecordingInfo(_FakeInfo):
+        def model_on_device(self, working_mem_bytes=None):
+            asked.append(working_mem_bytes)
+            return super().model_on_device(working_mem_bytes)
+
+    ctx = _FakeContext({"high": _RecordingInfo("HIGH", expert, log)}, log)
+    stub, _calls = _stub_lora_context_manager(log)
+    with patch("invokeai.app.invocations.wan.wan_denoise.LayerPatcher.apply_smart_model_patches", side_effect=stub):
+        swapper = _ExpertSwapper(
+            context=ctx,
+            high_model="high",
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            high_lora_factory=_make_factory(log, "HIGH"),
+            low_lora_factory=None,
+        )
+        swapper.get(_ExpertSwapper.HIGH)
+        swapper.close()
+
+    # The scaled layer: two bf16 copies of 8 * 16 weights. The unscaled one (16 * 4) is smaller either way.
+    assert asked == [2 * 8 * 16 * torch.bfloat16.itemsize]

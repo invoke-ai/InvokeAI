@@ -41,6 +41,8 @@ import {
   getPromptPolicy,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
   isReferenceImageSupported,
   isComponentCompatibleWithModel,
   isGenerateModelSelectable,
@@ -52,7 +54,7 @@ import {
   QWEN_IMAGE_21_NO_VISION_TOWER_REASON,
   withAddedReferenceImages,
 } from './baseGenerationPolicies';
-import { describeGenerationIssue, getGenerationIssueFixPatch } from './generationIssues';
+import { describeGenerationIssue, type GenerationIssue, getGenerationIssueFixPatch } from './generationIssues';
 import { collectGenerationIssueScenarios } from './generationIssues.testing';
 import { getActiveRefiner } from './sdxlRefiner';
 import { SUPPORTED_GENERATE_BASES } from './supportedBases';
@@ -792,7 +794,7 @@ describe('component policies', () => {
             vae: qwenImageVae,
           })
         )
-      ).toEqual(['qwen-image model cannot use reference image 1. Turn it off, or remove it.']);
+      ).toEqual(['qwen-image model cannot use Reference image 1. Turn it off, or remove it.']);
     });
 
     it('allows text-only prompts, which is what the GGUF encoder is for', () => {
@@ -1014,7 +1016,7 @@ describe('component policies', () => {
       settings,
       'img2img'
     );
-    expect(reasons).toContain('External Model cannot use reference image 1. Turn it off, or remove it.');
+    expect(reasons).toContain('External Model cannot use Reference image 1. Turn it off, or remove it.');
     expect(reasons.filter((reason) => reason.includes('images total'))).toEqual([]);
   });
 
@@ -1437,6 +1439,43 @@ describe('component policies', () => {
     ).toBe(loras);
   });
 
+  describe('a default VAE', () => {
+    const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
+    const resolve = (base: string, vae: string | null | undefined, vaeModels: VaeModelConfig[] = [fluxVae]) => {
+      const model = createModel(base, vae === undefined ? {} : { default_settings: { vae } });
+
+      return resolveModelDefaultVae(model, createSettings(model), vaeModels);
+    };
+
+    it('applies one that is installed and fits, by shared VAE compatibility', () => {
+      // Cross-base by the shared rule: Z-Image takes the FLUX VAE.
+      expect(resolve('z-image', 'flux-vae')).toEqual({ kind: 'apply', vae: fluxVae });
+      expect(resolve('sdxl', undefined)).toEqual({ kind: 'none' });
+      expect(resolve('sdxl', null)).toEqual({ kind: 'none' });
+    });
+
+    // Bundled: SDXL has no VAE slot; SD3's is an optional override. Required: FLUX.1's VAE is a component.
+    it.each([
+      ['sdxl', 'default', { kind: 'apply', vae: null }],
+      ['sd-3', 'default', { kind: 'apply', vae: null }],
+      ['flux', 'default', { kind: 'none' }],
+      ['sdxl', 'gone', { hasBundledVae: true, kind: 'missing' }],
+      // Installed, but for another family.
+      ['sdxl', 'flux-vae', { hasBundledVae: true, kind: 'missing' }],
+      ['sd-3', 'gone', { hasBundledVae: true, kind: 'missing' }],
+      ['flux', 'gone', { hasBundledVae: false, kind: 'missing' }],
+    ] as const)('classifies %s with %s by whether a VAE is bundled', (base, vae, expected) => {
+      expect(resolve(base, vae)).toEqual(expected);
+    });
+
+    it('recalls the bundled VAE for one that cannot apply, and keeps the current VAE only where one is required', () => {
+      expect(getRecallDefaultVae({ kind: 'apply', vae: fluxVae })).toBe(fluxVae);
+      expect(getRecallDefaultVae({ hasBundledVae: true, kind: 'missing' })).toBeNull();
+      expect(getRecallDefaultVae({ hasBundledVae: false, kind: 'missing' })).toBeUndefined();
+      expect(getRecallDefaultVae({ kind: 'none' })).toBeUndefined();
+    });
+  });
+
   it('keeps selected VAE when applying model defaults without a VAE override', () => {
     const model = createModel('sdxl', { default_settings: { steps: 12 } });
     const settings = createSettings(model, { vae: sdxlVae });
@@ -1773,7 +1812,7 @@ describe('component policies', () => {
 
     expect(getGenerationValidationReasons(krea2, styleSettings)).toEqual([]);
     expect(getGenerationValidationReasons(createModel('sd-3'), styleSettings)).toEqual([
-      'sd-3 model cannot use reference image 1. Turn it off, or remove it.',
+      'sd-3 model cannot use Reference image 1. Turn it off, or remove it.',
     ]);
   });
 
@@ -1864,7 +1903,22 @@ describe('component policies', () => {
       type: 'qwen3_vl_encoder',
       variant: 'qwen3_vl_4b',
     };
-    const ggufReason = `Krea-2 edit references need a Qwen3-VL encoder with vision weights, which the GGUF encoder "${ggufEncoder.name}" does not have. Select a safetensors file or Diffusers folder that includes the vision weights.`;
+    const towerReason =
+      "Edit references need this GGUF encoder's Vision Tower (the mmproj file). Select it under Components.";
+    const cpuReason =
+      'The Vision Tower and the encoder must have the same CPU Only setting. Change it in the Model Manager.';
+    const ggufTower = (
+      variant: 'qwen3_vl_4b' | 'qwen3_vl_8b' = 'qwen3_vl_4b',
+      cpuOnly?: boolean
+    ): ComponentModelConfig => ({
+      base: 'any',
+      cpu_only: cpuOnly,
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    });
 
     it('types a new Krea-2 reference as style only when it is the one running reference', () => {
       const typesAfterAdding = (count: number, referenceImages: GenerateSettings['referenceImages'] = []) =>
@@ -1993,18 +2047,41 @@ describe('component policies', () => {
       );
     });
 
-    it('blocks edit references on a GGUF encoder, which has no vision tower, and only then', () => {
+    it('blocks edit references on a GGUF encoder without its 4B Vision Tower, and only then', () => {
       const checkpoint = createModel('krea-2', { format: 'checkpoint', key: 'krea2-checkpoint' });
       const vae: VaeModelConfig = { base: 'qwen-image', key: 'krea2-vae', name: 'Qwen VAE', type: 'vae' };
       const safetensorsEncoder: ComponentModelConfig = { ...ggufEncoder, format: 'checkpoint', key: 'qwen3-vl-st' };
+      const issuesFor = (model: MainModelConfig, overrides: Partial<GenerateSettings>) =>
+        getGenerationValidationIssues(model, createSettings(model, overrides)).filter(
+          (issue) => issue.message === towerReason
+        );
 
       expect(reasonsFor(checkpoint, { qwen3VLEncoderModel: ggufEncoder, referenceImages: [edit('a')], vae })).toEqual([
-        ggufReason,
+        towerReason,
       ]);
       // A Diffusers main reads with the GGUF override too, when one is selected.
       expect(reasonsFor(krea2, { qwen3VLEncoderModel: ggufEncoder, referenceImages: [edit('a')] })).toEqual([
-        ggufReason,
+        towerReason,
       ]);
+      // The issue points at the Vision Tower setting, where the fix is.
+      expect(issuesFor(krea2, { qwen3VLEncoderModel: ggufEncoder, referenceImages: [edit('a')] })).toEqual([
+        expect.objectContaining({ target: { field: 'qwen3VLVisionTowerModel', section: 'components' } }),
+      ]);
+      // An 8B tower does not fit the 4B encoder.
+      expect(
+        reasonsFor(krea2, {
+          qwen3VLEncoderModel: ggufEncoder,
+          qwen3VLVisionTowerModel: ggufTower('qwen3_vl_8b'),
+          referenceImages: [edit('a')],
+        })
+      ).toEqual([towerReason]);
+      expect(
+        reasonsFor(krea2, {
+          qwen3VLEncoderModel: ggufEncoder,
+          qwen3VLVisionTowerModel: ggufTower(),
+          referenceImages: [edit('a')],
+        })
+      ).toEqual([]);
       expect(reasonsFor(krea2, { referenceImages: [edit('a')] })).toEqual([]);
       expect(
         reasonsFor(checkpoint, { qwen3VLEncoderModel: safetensorsEncoder, referenceImages: [edit('a')], vae })
@@ -2017,6 +2094,43 @@ describe('component policies', () => {
           vae,
         })
       ).toEqual([]);
+    });
+
+    it('blocks edit references when the GGUF encoder and its Vision Tower differ in CPU Only', () => {
+      const withCpu = (encoderCpu: boolean | undefined, towerCpu: boolean | undefined, refs = [edit('a')]) =>
+        reasonsFor(krea2, {
+          qwen3VLEncoderModel: { ...ggufEncoder, cpu_only: encoderCpu },
+          qwen3VLVisionTowerModel: ggufTower('qwen3_vl_4b', towerCpu),
+          referenceImages: refs,
+        });
+
+      expect(withCpu(true, undefined)).toEqual([cpuReason]);
+      expect(withCpu(undefined, true)).toEqual([cpuReason]);
+      expect(withCpu(false, undefined)).toEqual([]);
+      expect(withCpu(true, true)).toEqual([]);
+      expect(withCpu(true, undefined, [style('s')] as never)).toEqual([]);
+    });
+
+    it('offers the Krea-2 Vision Tower slot below a GGUF 4B encoder only, and drops a stale 8B pick', () => {
+      const checkpoint = createModel('krea-2', { format: 'checkpoint', key: 'krea2-checkpoint' });
+      const slotKeys = (encoder: ComponentModelConfig | null) =>
+        getComponentSectionPolicy(checkpoint, createSettings(checkpoint, { qwen3VLEncoderModel: encoder })).slots.map(
+          (slot) => slot.key
+        );
+
+      expect(slotKeys(ggufEncoder)).toEqual(['vae', 'qwen3VLEncoderModel', 'qwen3VLVisionTowerModel']);
+      expect(slotKeys({ ...ggufEncoder, format: 'checkpoint' })).toEqual(['vae', 'qwen3VLEncoderModel']);
+      expect(slotKeys(null)).toEqual(['vae', 'qwen3VLEncoderModel']);
+
+      const select = (qwen3VLVisionTowerModel: ComponentModelConfig) =>
+        getGenerateModelSelectionResult({
+          currentValues: createSettings(checkpoint, { qwen3VLEncoderModel: ggufEncoder, qwen3VLVisionTowerModel }),
+          model: checkpoint,
+          models: [],
+        }).settings;
+
+      expect(select(ggufTower()).qwen3VLVisionTowerModel).toEqual(ggufTower());
+      expect(select(ggufTower('qwen3_vl_8b')).qwen3VLVisionTowerModel).toBeNull();
     });
 
     it('re-targets references into Krea-2 as one set and switches off the ones that cannot run together', () => {
@@ -2304,7 +2418,7 @@ describe('component policies', () => {
           ],
         })
       )
-    ).toContain('sd-3 model cannot use reference image 1. Turn it off, or remove it.');
+    ).toContain('sd-3 model cannot use Reference image 1. Turn it off, or remove it.');
   });
 
   it('blocks Qwen-Image-2.1 references whose encoder has no vision tower', () => {
@@ -3438,6 +3552,42 @@ describe('generation issues', () => {
     }
   });
 
+  it('names a reference image in its issues as its row does: its own name, else its position', async () => {
+    const instance = i18n.createInstance();
+    await instance.init({
+      initAsync: false,
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: englishCatalog } },
+    });
+    const t = (key: string, values?: Record<string, unknown>) => instance.t(key, values);
+    const aboutOneReference = (issues: GenerationIssue[]) =>
+      issues.filter((issue) => issue.target.referenceImageId !== undefined);
+    const named = aboutOneReference(collectGenerationIssueScenarios({ namedReferences: true }));
+
+    // Every kind: a missing image, adapter, Redux or Kontext model, a strength, an unsupported kind, a model not
+    // installed. Unnamed references keep their positional default, which the test above words.
+    expect(new Set(named.map(({ messageKey }) => messageKey?.replace('widgets.generate.issues.', '')))).toEqual(
+      new Set([
+        'referenceImageNeedsImage',
+        'referenceImageNeedsIpAdapter',
+        'referenceImageNeedsKontext',
+        'referenceImageNeedsRedux',
+        'referenceImageStrength',
+        'referenceImageUnsupported',
+        'referenceModelNotInstalled',
+      ])
+    );
+
+    for (const issue of named) {
+      const name = `Name of ${issue.target.referenceImageId}`;
+
+      expect(issue.message).toContain(name);
+      expect(issue.message).not.toMatch(/reference image \d/i);
+      expect(describeGenerationIssue(t, issue)).toBe(issue.message);
+    }
+  });
+
   it('names every subject a switch can report, and no others, in the locale', () => {
     expect(new Set(Object.keys(localeGroup('switchSubjects')).map(withoutPluralSuffix))).toEqual(
       new Set(GENERATE_MODEL_SWITCH_SUBJECTS)
@@ -3542,6 +3692,7 @@ describe('isModelFromRepo', () => {
     expect(isModelFromRepo('google/gemma-4-E4B-it', REPO)).toBe(true);
     expect(isModelFromRepo('Google/Gemma-4-e4b-IT', REPO)).toBe(true);
     expect(isModelFromRepo('google/gemma-4-E4B-it::text_encoder', REPO)).toBe(true);
+    expect(isModelFromRepo('google/gemma-4-E4B-it:fp16::text_encoder', REPO)).toBe(true);
     expect(isModelFromRepo('https://huggingface.co/google/gemma-4-E4B-it/tree/main', REPO)).toBe(true);
   });
 
@@ -3554,6 +3705,8 @@ describe('isModelFromRepo', () => {
   it('refuses other repos, other folders and a missing source', () => {
     expect(isModelFromRepo('google/gemma-4-E2B-it', REPO)).toBe(false);
     expect(isModelFromRepo('someone/gemma-4-E4B-it', REPO)).toBe(false);
+    expect(isModelFromRepo('someone/gemma-4-E4B-it:fp16', REPO)).toBe(false);
+    expect(isModelFromRepo('https://example.test/google/gemma-4-E4B-it', REPO)).toBe(false);
     expect(isModelFromRepo('E:/ModelStuffSSD/gemma-4-E4B-it-q4', REPO)).toBe(false);
     expect(isModelFromRepo('E:/ModelStuffSSD/gemma-4-E4B-it/model.safetensors', REPO)).toBe(false);
     expect(isModelFromRepo(null, REPO)).toBe(false);

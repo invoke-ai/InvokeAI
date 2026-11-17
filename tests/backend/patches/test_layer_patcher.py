@@ -1,6 +1,6 @@
 import gc
 import weakref
-from typing import Callable
+from typing import Callable, Iterable
 
 import pytest
 import torch
@@ -13,6 +13,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
 from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
@@ -866,3 +867,129 @@ def test_every_layer_of_a_multi_layer_patch_is_returned() -> None:
     for layer in patch.layers.values():
         assert layer.up.device.type == "cpu"
         assert layer.up.dtype == torch.bfloat16
+
+
+def _integer_lora(names: Iterable[str], features: int, rank: int = 4) -> ModelPatchRaw:
+    """Small integer factors keep `up @ down` exact in fp32 on every device, so results compare bit for bit."""
+    generator = torch.Generator().manual_seed(0)
+    layers = {}
+    for name in names:
+        layer = _lora_layer(features, features, rank, dtype=torch.float32)
+        layer.up = torch.randint(-2, 3, (features, rank), generator=generator).float()
+        layer.down = torch.randint(-2, 3, (rank, features), generator=generator).float()
+        layers[name] = layer
+    return ModelPatchRaw(layers=layers)
+
+
+requires_cuda = pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")
+
+
+@requires_cuda
+@torch.no_grad()
+def test_direct_patching_on_a_device_keeps_each_weights_memory_and_matches_out_of_place_math():
+    """Patching and restoring in place keeps every weight's allocation, so the allocator pool is not
+    left fragmented by a fresh tensor per patched weight."""
+    dtype = torch.bfloat16
+    model = DummyModuleWithTwoLayers(in_features=8, out_features=8, device="cuda", dtype=dtype)
+    apply_custom_layers_to_model(model)
+    names = ["linear_layer_1", "linear_layer_2"]
+    patch = _integer_lora(names, features=8)
+    patch_weight = 0.75
+
+    originals = {name: getattr(model, name).weight.detach().clone() for name in names}
+    pointers = {name: getattr(model, name).weight.data_ptr() for name in names}
+    expected = {
+        name: originals[name]
+        + (patch.layers[name].up @ patch.layers[name].down * patch_weight).to(device="cuda", dtype=dtype)
+        for name in names
+    }
+
+    with LayerPatcher.apply_smart_model_patches(
+        model=model, patches=[(patch, patch_weight)], prefix="", dtype=dtype, force_direct_patching=True
+    ):
+        for name in names:
+            weight = getattr(model, name).weight
+            assert weight.data_ptr() == pointers[name]
+            assert torch.equal(weight, expected[name])
+
+    for name in names:
+        weight = getattr(model, name).weight
+        assert weight.data_ptr() == pointers[name]
+        assert torch.equal(weight, originals[name])
+
+
+@requires_cuda
+@torch.no_grad()
+def test_direct_patching_does_not_reach_a_parameter_over_the_same_storage():
+    """The model cache binds tied weights (a text encoder's `lm_head` and `embed_tokens`) as separate parameters
+    over one tensor. An in-place patch of one would change the other, so that weight is replaced instead."""
+    dtype = torch.bfloat16
+    model = DummyModuleWithTwoLayers(in_features=8, out_features=8, device="cuda", dtype=dtype)
+    apply_custom_layers_to_model(model)
+    model.linear_layer_2.weight = torch.nn.Parameter(model.linear_layer_1.weight.data)
+    original = model.linear_layer_1.weight.detach().clone()
+
+    with LayerPatcher.apply_smart_model_patches(
+        model=model,
+        patches=[(_integer_lora(["linear_layer_1"], features=8), 1.0)],
+        prefix="",
+        dtype=dtype,
+        force_direct_patching=True,
+    ):
+        assert not torch.equal(model.linear_layer_1.weight, original)
+        assert torch.equal(model.linear_layer_2.weight, original)
+
+    assert torch.equal(model.linear_layer_1.weight, original)
+    assert torch.equal(model.linear_layer_2.weight, original)
+
+
+@pytest.mark.parametrize("device", ["cpu", pytest.param("cuda", marks=requires_cuda)])
+@torch.no_grad()
+def test_flux_control_lora_expands_the_weight_for_the_scope_and_restores_its_shape(device: str):
+    model = DummyModuleWithOneLayer(4, 16, device=device, dtype=torch.float32)
+    apply_custom_layers_to_model(model)
+    original = model.linear_layer_1.weight.detach().clone()
+    patch = ModelPatchRaw(
+        layers={
+            "linear_layer_1": FluxControlLoRALayer(
+                up=torch.ones(16, 4), mid=None, down=torch.ones(4, 8), alpha=torch.tensor(4.0), bias=None
+            )
+        }
+    )
+
+    with LayerPatcher.apply_smart_model_patches(
+        model=model, patches=[(patch, 1.0)], prefix="", dtype=torch.float32, force_direct_patching=True
+    ):
+        expanded = model.linear_layer_1.weight
+        assert expanded.shape == (16, 8)
+        # The original columns carry the patch and the new ones only the patch.
+        assert torch.equal(expanded[:, :4], original + 4.0)
+        assert torch.equal(expanded[:, 4:], torch.full((16, 4), 4.0, device=device))
+
+    assert model.linear_layer_1.weight.shape == original.shape
+    assert torch.equal(model.linear_layer_1.weight, original)
+
+
+@requires_cuda
+@torch.no_grad()
+def test_restore_follows_the_current_parameter_when_the_model_left_the_device_during_the_scope():
+    """An offload with a RAM copy rebinds the weight to the canonical CPU tensor. The restore must replace it
+    rather than write the original into the canonical copy."""
+    dtype = torch.bfloat16
+    model = DummyModuleWithOneLayer(8, 8, device="cuda", dtype=dtype)
+    apply_custom_layers_to_model(model)
+    original = model.linear_layer_1.weight.detach().clone()
+    canonical = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+    canonical_before = {k: v.clone() for k, v in canonical.items()}
+
+    with LayerPatcher.apply_smart_model_patches(
+        model=model,
+        patches=[(_integer_lora(["linear_layer_1"], features=8), 1.0)],
+        prefix="",
+        dtype=dtype,
+        force_direct_patching=True,
+    ):
+        model.load_state_dict(canonical, assign=True)
+
+    assert all(torch.equal(canonical[k], canonical_before[k]) for k in canonical)
+    assert torch.equal(model.linear_layer_1.weight.cpu(), original.cpu())

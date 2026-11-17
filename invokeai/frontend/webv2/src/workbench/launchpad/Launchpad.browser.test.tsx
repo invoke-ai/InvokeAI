@@ -1,4 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
+import type * as SessionModule from '@features/identity/session';
 import type { ModelConfig } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
 import type * as openProjects from '@workbench/projects/openProjects';
@@ -37,6 +38,19 @@ vi.mock('@features/identity', async (importOriginal) => ({
   UsersPage: () => null,
 }));
 vi.mock('@features/identity/launchpad', () => ({ UsersPage: () => null }));
+/** Single-user unless a test signs someone in. */
+const auth = vi.hoisted(() => ({ session: null as SessionModule.AuthSession | null }));
+vi.mock('@features/identity/session', async (importOriginal) => {
+  const original = await importOriginal<typeof SessionModule>();
+
+  return {
+    ...original,
+    useAuthSession: () => {
+      const session = original.useAuthSession();
+      return auth.session ?? session;
+    },
+  };
+});
 vi.mock('@features/intermediates', () => ({ INTERMEDIATES_SETTING_ID: 'x', requestIntermediatesFocus: () => {} }));
 vi.mock('@features/fonts/launchpad', () => ({ FontsPage: () => null }));
 vi.mock('@features/nodes', () => ({ NodesPage: () => null }));
@@ -129,6 +143,7 @@ const render = async () => {
 };
 
 const rail = () => page.getByRole('navigation', { name: 'launchpad.sectionsLabel' });
+
 const rect = (element: Element) => element.getBoundingClientRect();
 const row = (key: string) => document.querySelector<HTMLElement>(`[data-list-row="${key}"] [data-list-primary]`)!;
 
@@ -160,6 +175,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   projects.open = ['one', 'two'];
+  auth.session = null;
   await act(() => root.unmount());
   queryClient.clear();
   host.remove();
@@ -230,6 +246,89 @@ describe('Launchpad shell', () => {
     expect(await auditAccessibility(document.querySelector('[role="menu"]')!)).toEqual([]);
     await userEvent.keyboard('{Escape}');
     await expect.element(page.getByRole('button', { name: 'launchpad.help.label' })).toHaveFocus();
+  });
+
+  it('puts the signed-in account at the foot of the rail and opens its menu beside it', async () => {
+    const name = 'Maximiliana Bartholomew-Featherstonehaugh of the Very Long Name';
+    auth.session = {
+      accountEpoch: 1,
+      expiredUserId: null,
+      multiuserEnabled: true,
+      phase: 'ready',
+      sessionExpired: false,
+      setupRequired: false,
+      strictPasswordChecking: false,
+      switchingAccount: false,
+      user: {
+        created_at: '2026-01-01T00:00:00Z',
+        display_name: name,
+        email: 'max@example.com',
+        is_active: true,
+        is_admin: true,
+        last_login_at: null,
+        updated_at: '2026-01-01T00:00:00Z',
+        user_id: 'max',
+      },
+    };
+    // The row is named by its lines, the icon-only button by its label; both start from the name.
+    const account = page.getByRole('button', { name: new RegExp(name) });
+    const help = page.getByRole('button', { name: 'launchpad.help.label' });
+    await page.viewport(1280, 900);
+    await render();
+
+    // Last in the rail, after Help, in both tab and visual order; a long name truncates rather than widening the rail.
+    await expect.element(account).toBeVisible();
+    expect(rail().element().contains(account.element())).toBe(true);
+    expect(help.element().compareDocumentPosition(account.element()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rect(account.element()).top).toBeGreaterThan(rect(help.element()).bottom);
+    expect(rect(rail().element()).width).toBe(224);
+    expect(rect(account.element()).right).toBeLessThanOrEqual(rect(rail().element()).right);
+    // The name truncates inside the row, which keeps its chevron; the email shows under it.
+    const [nameLine, emailLine] = account.element().querySelectorAll('p');
+    expect(nameLine!.textContent).toBe(name);
+    expect(nameLine!.scrollWidth).toBeGreaterThan(nameLine!.clientWidth);
+    expect(emailLine!.textContent).toBe('max@example.com');
+    const chevron = [...account.element().querySelectorAll('svg')].at(-1)!;
+    expect(rect(chevron).right).toBeLessThanOrEqual(rect(account.element()).right);
+    expect(rect(chevron).left).toBeGreaterThan(rect(nameLine!).right);
+    expect(rail().element().querySelectorAll('[role="separator"]')).toHaveLength(1);
+    expect(await auditAccessibility(rail().element())).toEqual([]);
+
+    await account.click();
+    const menu = page.getByRole('menu');
+    await expect.element(page.getByRole('menuitem', { name: 'auth.accountSettings' })).toBeVisible();
+    // Beside the trigger, as Help's menu opens, and inside the window whatever the name's length.
+    expect(rect(menu.element()).left).toBeGreaterThan(rect(account.element()).right);
+    expect(rect(menu.element()).bottom).toBeLessThanOrEqual(innerHeight);
+    expect(await auditAccessibility(menu.element())).toEqual([]);
+    await page.getByRole('menuitem', { name: 'users.manageUsers' }).click();
+    await expect
+      .element(page.getByRole('link', { name: 'launchpad.sections.users' }))
+      .toHaveAttribute('aria-current', 'page');
+
+    // The icon rail names the avatar with a tooltip, which leaves once the menu opens.
+    await page.viewport(720, 450);
+    await expect.poll(() => rect(rail().element()).width).toBeLessThan(64);
+    expect(await auditAccessibility(rail().element())).toEqual([]);
+    await account.hover();
+    await expect.element(page.getByRole('tooltip')).toHaveTextContent(name);
+    await account.click();
+    await expect.element(page.getByRole('menuitem', { name: 'auth.signOut' })).toBeVisible();
+    await expect
+      .poll(() => [...document.querySelectorAll('[role="tooltip"]')].some((tip) => tip.checkVisibility()))
+      .toBe(false);
+    expect(rect(menu.element()).bottom).toBeLessThanOrEqual(innerHeight);
+    await userEvent.keyboard('{Escape}');
+    await expect.element(account).toHaveFocus();
+  });
+
+  it('keeps the rail free of an account row and its separator in single-user mode', async () => {
+    await page.viewport(1280, 900);
+    await render();
+
+    await expect.element(page.getByRole('button', { name: 'launchpad.help.label' })).toBeVisible();
+    expect(rail().element().querySelector('[data-scope="avatar"]')).toBeNull();
+    expect(rail().element().querySelectorAll('[role="separator"]')).toHaveLength(0);
   });
 
   it('squeezes the open projects list to one entry before the rail scrolls', async () => {

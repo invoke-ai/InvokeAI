@@ -1,8 +1,4 @@
-import type {
-  CanvasDocumentContractV3,
-  CanvasLayerContract,
-  CanvasLayerStackKind,
-} from '@workbench/canvas-engine/contracts';
+import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type {
   PreviewStateController,
   SamPreviewState,
@@ -10,6 +6,7 @@ import type {
 import type { RasterController } from '@workbench/canvas-engine/controllers/rasterController';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
+import type { OverlayStackKind } from '@workbench/canvas-engine/document/layerStacks';
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type { DerivedSurfaceCache } from '@workbench/canvas-engine/render/derivedSurfaceCache';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -56,39 +53,42 @@ export interface CreateCompositeFrameDeps {
   /** Starts (or joins) the rasterization of a layer whose cache is stale. */
   readonly rasterizeLayer: (layer: CanvasLayerContract, doc: CanvasDocumentContractV3) => void;
   /**
-   * Whether a pointer gesture in progress edits a mask or a region. Its stacks and the regenerate tint then draw
-   * above a shown preview, so the user never paints a mask blind; the frame after the gesture hides them again.
+   * Whether a pointer gesture, transform session or floating selection in progress edits a control layer, a mask or a
+   * region. Those stacks then draw above a shown preview, so the user never edits blind, and the regenerate tint draws
+   * again with its raster layer, under the preview. The frame after the edit ends hides them again.
    */
   readonly isEditingStagingHiddenStack: () => boolean;
 }
 
 /**
- * While a staged or progress preview shows, masks and regions stop tinting the screen, so the result reads as it
- * would be accepted; control layers stay.
+ * While a staged or progress preview shows, or the user toggled the staged result off to compare, the screen draws
+ * raster layers only: control layers, masks and regions stop covering and tinting it, so the result reads as it would
+ * be accepted and the canvas under it reads the same way. Generation still reads every stack.
  */
-const STAGING_OVERLAY_STACKS = { control: true, inpaint_mask: false, regional_guidance: false } as const;
-
-const isStagingHiddenStack = (stack: CanvasLayerStackKind): boolean =>
-  isOverlayStack(stack) && !STAGING_OVERLAY_STACKS[stack];
-
-/**
- * Whether the selection sits in a stack the staging view hides: a mask or a region, or a group in those stacks. A
- * gesture that edits it shows those stacks again ({@link CreateCompositeFrameDeps.isEditingStagingHiddenStack}).
- */
-export const isStagingHiddenStackSelected = (doc: CanvasDocumentContractV3): boolean => {
-  const stack = doc.selectedLayerId ? getDocumentIndex(doc).byId.get(doc.selectedLayerId)?.stack : undefined;
-  return stack !== undefined && isStagingHiddenStack(stack);
+const STAGING_OVERLAY_STACKS: Readonly<Record<OverlayStackKind, boolean>> = {
+  control: false,
+  inpaint_mask: false,
+  regional_guidance: false,
 };
 
 /**
- * The selected mask or region a shown preview hides, when the screen would draw it with the stack shown. A gesture
- * on it reveals the stack (and a brush refuses a mask whose pixels are not loaded yet), so the frame keeps it
- * resident while hidden and on screen. A selected group needs nothing up front: brush and shapes paint a new layer,
- * move drags whatever caches exist.
+ * Whether `nodeId` sits in a stack the staging view hides: a control layer, a mask or a region, or a group in those
+ * stacks. An edit of it shows those stacks again ({@link CreateCompositeFrameDeps.isEditingStagingHiddenStack}).
+ */
+export const isInStagingHiddenStack = (doc: CanvasDocumentContractV3, nodeId: string | null): boolean => {
+  const stack = nodeId ? getDocumentIndex(doc).byId.get(nodeId)?.stack : undefined;
+  return stack !== undefined && isOverlayStack(stack);
+};
+
+/**
+ * The selected control layer, mask or region a shown preview hides, when the screen would draw it with the stack
+ * shown. A gesture on it reveals the stack (and a brush refuses a layer whose pixels are not loaded yet), so the frame
+ * keeps it resident while hidden and on screen. A selected group needs nothing up front: brush and shapes paint a new
+ * layer, move drags whatever caches exist.
  */
 const stagingHiddenSelectedLeaf = (doc: CanvasDocumentContractV3): SemanticLeaf | null => {
   const leaf = doc.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
-  return leaf && isStagingHiddenStack(leaf.stack) && isLeafDrawableForScreen(leaf, false) ? leaf : null;
+  return leaf && isOverlayStack(leaf.stack) && isLeafDrawableForScreen(leaf, false) ? leaf : null;
 };
 
 export interface CompositeFrame {
@@ -234,8 +234,8 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
       const stagedPreview = previews.getStaged();
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
       const overrides = !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null;
-      // A shown preview hides masks, regions and the regenerate tint, unless a gesture is editing one of them.
-      const staging = stagedPreview !== null && !deps.isEditingStagingHiddenStack();
+      // A shown or toggled-off preview hides every overlay stack and the regenerate tint, unless one is being edited.
+      const staging = previews.hidesStagingOverlays() && !deps.isEditingStagingHiddenStack();
       const showOverlayStacks = staging ? STAGING_OVERLAY_STACKS : undefined;
       const frame = describeFrame(doc, isolatedGuard?.layerId ?? null, overrides, showOverlayStacks);
       // Snapshot filter previews only when active, avoiding an empty map allocation every frame.
@@ -251,7 +251,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         activeFrameLayerIds.add(layerId);
       }
       ensureLayerCaches(doc, frame, activeFrameLayerIds);
-      // The selected mask or region stays loaded and unevicted while hidden, ready for a gesture to reveal and edit,
+      // The selected overlay leaf stays loaded and unevicted while hidden, ready for a gesture to reveal and edit,
       // under the same on-screen rule as the leaves the frame draws. No transform override moves a hidden leaf.
       const hiddenSelected = staging && !isolatedGuard ? stagingHiddenSelectedLeaf(doc) : null;
       const hiddenBounds = hiddenSelected

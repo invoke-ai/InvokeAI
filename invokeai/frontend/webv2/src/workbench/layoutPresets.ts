@@ -193,7 +193,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
     defaultRoute: { destination: 'canvas', sourceId: 'canvas' },
     hotkeyId: 'selectEditPreset',
     id: 'edit',
-    iconId: 'layers',
+    iconId: 'pencil-ruler',
     label: BUILT_IN_LAYOUT_PRESET_LABELS.edit,
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
     widgetRegions: {

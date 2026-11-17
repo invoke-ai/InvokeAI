@@ -58,7 +58,7 @@ Modes
 - `math`: SDPA forced onto the math kernel at 1024px, next to the default kernel, in each of `--dtypes` (default
   bfloat16): what a materialized score matrix costs per element, against what the estimate charges for it.
 - `real`: the released model itself, a `--checkpoint` bf16 safetensors single file in BFL's layout (Klein or Klein
-  Base, read off its keys), loaded through the model loader's conversion (`flux3_transformer_from_native`) straight onto
+  Base, read off its keys), loaded through the model loader's conversion (`flux3_transformer_from_single_file`) straight onto
   the device and fully resident: 1024 and 2048 px with a `--text-tokens` caption, and 1024 px with one and with three
   `--reference-px` references. Each forward is set against the shipped 2-block point of the same features on this
   platform and card, and against the shipped estimate, both as the calibration script prices it (fully resident) and as
@@ -413,14 +413,16 @@ class _Shape:
 
 
 def _load_real(point: Point, device: "torch.device") -> "torch.nn.Module":
-    """The point's checkpoint, built as `Flux3CheckpointModel` builds it (`flux3_transformer_from_native`), except
+    """The point's checkpoint, built as `Flux3CheckpointModel` builds it (`flux3_transformer_from_single_file`), except
     straight onto `device` and outside the RAM cache."""
     import torch
     from safetensors.torch import load_file
 
-    from invokeai.backend.model_manager.load.model_loaders.flux3 import flux3_transformer_from_native
+    from invokeai.backend.model_manager.load.model_loaders.flux3 import flux3_transformer_from_single_file
 
-    model = flux3_transformer_from_native(load_file(point.checkpoint, device=str(device)), getattr(torch, point.dtype))
+    model = flux3_transformer_from_single_file(
+        load_file(point.checkpoint, device=str(device)), getattr(torch, point.dtype)
+    )
     return model.eval()
 
 
