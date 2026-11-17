@@ -173,8 +173,10 @@ import { getQueueSourceResultSelection, MAX_QUEUE_BATCH_ITEMS } from '@features/
 import {
   getAutoSwitchFollowedLive,
   getQueueItemSnapshotLabel,
+  isSameSubmissionRetry,
   pickAutoSwitch,
   selectsLandedResult,
+  withoutSubmissionRetry,
 } from '@features/queue/contracts';
 import {
   clearDeletedUpscaleInput,
@@ -3722,24 +3724,6 @@ const reopenQueueItemForRetry = (
       status: 'running',
     };
   });
-};
-
-const isSameSubmissionRetry = (left: QueueSubmissionRetry | undefined, right: QueueSubmissionRetry): boolean =>
-  left !== undefined &&
-  left.reason === right.reason &&
-  left.failureCount === right.failureCount &&
-  left.serverErrorCount === right.serverErrorCount &&
-  left.serverErrorSince === right.serverErrorSince &&
-  left.status === right.status &&
-  left.message === right.message &&
-  left.failedAt === right.failedAt;
-
-const withoutSubmissionRetry = (item: QueueItem): QueueItem => {
-  if (item.submissionRetry === undefined) {
-    return item;
-  }
-  const { submissionRetry: _, ...rest } = item;
-  return rest;
 };
 
 const mergeBackendItemId = (ids: number[] | undefined, backendItemId: number): number[] =>
