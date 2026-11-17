@@ -457,7 +457,9 @@ const buildMiniMaxH3VideoGraph = (settings: VideoSettings, catalogModel: MainMod
   // Hybrid loading overlays Ref2VA AdaLN blocks onto FL2VA; guard stale settings so unsupported mains cannot
   // silently load the wrong file.
   const hybridBase =
-    isSingleFileMain && model.variant === 'ref2va' && !settings.h3TaskOverride ? settings.h3HybridBaseModel : null;
+    isSingleFileMain && catalogModel.variant === 'ref2va' && model.variant === 'ref2va'
+      ? settings.h3HybridBaseModel
+      : null;
 
   const graph: BackendGraphContract = { edges: [], id: createId('minimax_h3_video_graph'), nodes: {} };
   const { positivePrompt, seed } = addPromptAndSeedNodes(graph);

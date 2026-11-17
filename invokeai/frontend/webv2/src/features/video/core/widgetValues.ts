@@ -243,7 +243,7 @@ export const getVideoWidgetValidationIssues = (
   const registered = models?.find((item) => item.key === values.model?.key);
   const source = registered && isSupportedVideoModel(registered) ? registered : values.model;
   const effectiveModel = getEffectiveVideoModel(source, values);
-  const issues = getVideoValidationIssues(effectiveModel, values);
+  const issues = getVideoValidationIssues(source, values);
 
   if (models) {
     issues.push(...getVideoModelAvailabilityIssues(effectiveModel, values, models));

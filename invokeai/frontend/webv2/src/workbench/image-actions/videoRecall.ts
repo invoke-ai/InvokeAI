@@ -775,16 +775,15 @@ export const buildVideoRecallSettings = ({
   // The existing generation_mode records the effective H3 task, including an override.
   // Restore an override only against the recorded, installed checkpoint.
   const recordedMode = isRecord(metadata) ? getString(metadata, 'generation_mode') : null;
-  const registeredModel = recalledModel;
   if (
     model?.base === 'minimax-h3' &&
     model.format === 'checkpoint' &&
-    registeredModel &&
+    recalledModel &&
     recordedMode?.startsWith('minimax_h3_')
   ) {
     const task = recordedMode === 'minimax_h3_ref2v' ? 'ref2va' : 'fl2va';
-    const h3TaskOverride = task !== getEffectiveVideoModel(registeredModel, {}).variant ? task : undefined;
-    values = { ...values, model: registeredModel, h3TaskOverride };
+    const h3TaskOverride = task !== getEffectiveVideoModel(recalledModel, {}).variant ? task : undefined;
+    values = { ...values, model: recalledModel, h3TaskOverride };
   }
 
   model = getEffectiveVideoModel(model, values);

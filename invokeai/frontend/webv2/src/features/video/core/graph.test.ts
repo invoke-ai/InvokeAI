@@ -545,62 +545,72 @@ describe('compileVideoGraph — MiniMax H3 Ref2VA', () => {
     ]);
   });
 
-  it('hybrid: loads the FL2VA base, overlays the Ref2VA main from the start block, and records both', () => {
-    const fl2vaBase: MainModelConfig = {
-      base: 'minimax-h3',
-      format: 'checkpoint',
-      key: 'h3-fl2va-ckpt',
-      name: 'MiniMax H3 FL2VA Transformer (int8, pruned)',
-      type: 'main',
-      variant: 'fl2va',
-    };
-    const turbo = {
-      base: 'minimax-h3',
-      key: 'ref2v-turbo',
-      name: 'MiniMax H3 Ref2V Turbo LoRA',
-      type: 'lora' as const,
-    };
-    const settings: VideoSettings = {
-      ...referenceSettings,
-      h3HybridBaseModel: fl2vaBase,
-      h3HybridStartBlock: 30,
-      loras: [{ isEnabled: true, model: turbo, weight: 1 }],
-    };
-    const { backendGraph } = compileVideoGraph(settings, model);
+  it.each([undefined, 'ref2va'] as const)(
+    'hybrid: loads, overlays and records a Ref2VA main with override %s',
+    (h3TaskOverride) => {
+      const fl2vaBase: MainModelConfig = {
+        base: 'minimax-h3',
+        format: 'checkpoint',
+        key: 'h3-fl2va-ckpt',
+        name: 'MiniMax H3 FL2VA Transformer (int8, pruned)',
+        type: 'main',
+        variant: 'fl2va',
+      };
+      const turbo = {
+        base: 'minimax-h3',
+        key: 'ref2v-turbo',
+        name: 'MiniMax H3 Ref2V Turbo LoRA',
+        type: 'lora' as const,
+      };
+      const settings: VideoSettings = {
+        ...referenceSettings,
+        h3TaskOverride,
+        h3HybridBaseModel: fl2vaBase,
+        h3HybridStartBlock: 30,
+        loras: [{ isEnabled: true, model: turbo, weight: 1 }],
+      };
+      const { backendGraph } = compileVideoGraph(settings, model);
 
-    // The loader loads the FL2VA base; the selected Ref2VA main becomes the overlay.
-    expect(nodeOfType(backendGraph, 'minimax_h3_model_loader')).toMatchObject({
-      model: { key: componentSource.key },
-      transformer_model: { key: fl2vaBase.key },
-    });
-    expect(nodeOfType(backendGraph, 'minimax_h3_hybrid_overlay')).toMatchObject({
-      end_block: 49,
-      id: 'hybrid_overlay',
-      include_final_layer: false,
-      overlay_model: { key: model.key },
-      start_block: 30,
-    });
-    expect(hasEdge(backendGraph, 'model_loader', 'transformer', 'hybrid_overlay', 'transformer')).toBe(true);
+      // The loader loads the FL2VA base; the selected Ref2VA main becomes the overlay.
+      expect(nodeOfType(backendGraph, 'minimax_h3_model_loader')).toMatchObject({
+        model: { key: componentSource.key },
+        transformer_model: { key: fl2vaBase.key },
+      });
+      expect(nodeOfType(backendGraph, 'minimax_h3_hybrid_overlay')).toMatchObject({
+        end_block: 49,
+        id: 'hybrid_overlay',
+        include_final_layer: false,
+        overlay_model: { key: model.key },
+        start_block: 30,
+      });
+      expect(hasEdge(backendGraph, 'model_loader', 'transformer', 'hybrid_overlay', 'transformer')).toBe(true);
 
-    // LoRAs apply on top of the hybrid, and the denoise reads the LoRA-patched hybrid.
-    const loraLoader = nodeOfType(backendGraph, 'minimax_h3_lora_collection_loader');
+      // LoRAs apply on top of the hybrid, and the denoise reads the LoRA-patched hybrid.
+      const loraLoader = nodeOfType(backendGraph, 'minimax_h3_lora_collection_loader');
 
-    expect(hasEdge(backendGraph, 'hybrid_overlay', 'transformer', loraLoader.id, 'transformer')).toBe(true);
-    expect(hasEdge(backendGraph, loraLoader.id, 'transformer', 'denoise_latents', 'transformer')).toBe(true);
-    expect(hasEdge(backendGraph, 'model_loader', 'transformer', 'denoise_latents', 'transformer')).toBe(false);
+      expect(hasEdge(backendGraph, 'hybrid_overlay', 'transformer', loraLoader.id, 'transformer')).toBe(true);
+      expect(hasEdge(backendGraph, loraLoader.id, 'transformer', 'denoise_latents', 'transformer')).toBe(true);
+      expect(hasEdge(backendGraph, 'model_loader', 'transformer', 'denoise_latents', 'transformer')).toBe(false);
 
-    // Metadata keeps the Ref2VA main as the model and records the hybrid for recall.
-    expect(nodeOfType(backendGraph, 'core_metadata')).toMatchObject({
-      minimax_h3_hybrid_base_model: { key: fl2vaBase.key },
-      minimax_h3_hybrid_start_block: 30,
-      model: { key: model.key },
-    });
-  });
+      // Metadata keeps the Ref2VA main as the model and records the hybrid for recall.
+      expect(nodeOfType(backendGraph, 'core_metadata')).toMatchObject({
+        minimax_h3_hybrid_base_model: { key: fl2vaBase.key },
+        minimax_h3_hybrid_start_block: 30,
+        model: { key: model.key },
+      });
+    }
+  );
 
-  it('hybrid: a stale quality base on an fl2va main is ignored', () => {
-    const fl2vaMain: MainModelConfig = { ...h3Model('h3-fl2va-main'), format: 'checkpoint' };
+  it.each([
+    ['fl2va', undefined],
+    ['fl2va', 'ref2va'],
+    ['ref2va', 'fl2va'],
+  ] as const)('hybrid: ignores a stale quality base for catalog %s with override %s', (variant, h3TaskOverride) => {
+    const fl2vaMain: MainModelConfig = { ...h3Model('h3-fl2va-main'), format: 'checkpoint', variant };
     const settings: VideoSettings = {
       ...settingsFor(fl2vaMain, { componentSourceModel: componentSource }),
+      h3TaskOverride,
+      references: h3TaskOverride === 'ref2va' ? referenceSettings.references : [],
       h3HybridBaseModel: { ...h3Model('h3-other-fl2va'), format: 'checkpoint' },
       h3HybridStartBlock: 10,
     };

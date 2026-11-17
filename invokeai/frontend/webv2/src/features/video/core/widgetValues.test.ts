@@ -4,7 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 import { compileVideoGraph } from './graph';
 import { normalizeVideoWidgetValues } from './settings';
-import { getAcceleratorToggleResult, getVideoModelPolicy, getVideoComponentSectionPolicy } from './videoPolicies';
+import {
+  getAcceleratorToggleResult,
+  getVideoModelPolicy,
+  getVideoComponentSectionPolicy,
+  getVideoModelSelectionResult,
+} from './videoPolicies';
 import {
   createDefaultVideoWidgetValues,
   getVideoWidgetValidationReasons,
@@ -63,6 +68,49 @@ describe('createDefaultVideoWidgetValues', () => {
 });
 
 describe('syncVideoWidgetValuesWithModels', () => {
+  it.each([
+    ['ref2va', undefined, true],
+    ['ref2va', 'ref2va', true],
+    ['fl2va', 'ref2va', false],
+    ['ref2va', 'fl2va', false],
+    ['fl2va', undefined, false],
+  ] as const)(
+    'hybrid eligibility survives restore, sync and selection: catalog %s, override %s',
+    (variant, h3TaskOverride, eligible) => {
+      const checkpoint = { ...h3Model('checkpoint', 'main'), variant };
+      const component = h3Model();
+      const hybrid = h3Model('checkpoint', 'quality-base');
+      const catalog = [checkpoint, component, hybrid];
+      const values = {
+        ...createDefaultVideoWidgetValues(catalog),
+        h3TaskOverride,
+        h3HybridBaseModel: hybrid,
+        h3HybridStartBlock: 30,
+      };
+      const restored = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(values)))!;
+      expect(restored.h3TaskOverride).toBe(h3TaskOverride);
+      expect(restored.h3HybridBaseModel).toEqual(hybrid);
+      expect(
+        getVideoComponentSectionPolicy(checkpoint, restored).slots.some((slot) => slot.key === 'h3HybridBaseModel')
+      ).toBe(eligible);
+      const synced = syncVideoWidgetValuesWithModels(restored, catalog);
+      expect(synced.h3HybridBaseModel).toBe(eligible ? hybrid : null);
+      expect(synced.h3HybridStartBlock).toBe(30);
+      expect(syncVideoWidgetValuesWithModels(synced, catalog)).toBe(synced);
+      const selected = getVideoModelSelectionResult({
+        currentSettings: restored,
+        model: checkpoint,
+        models: catalog,
+        h3TaskOverride,
+      });
+      expect(selected.settings.h3HybridBaseModel).toEqual(eligible ? hybrid : null);
+      expect(selected.losses.filter((loss) => loss.key === 'h3HybridBaseModel')).toEqual(
+        eligible ? [] : [{ count: 1, key: 'h3HybridBaseModel' }]
+      );
+      expect(selected.settings.h3TaskOverride).toBe(h3TaskOverride);
+    }
+  );
+
   it.each([
     ['fl2va', 'ref2va', true],
     ['fl2va', 'ref2va', false],

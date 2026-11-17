@@ -356,17 +356,16 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
   );
   const hasReferences = references.length > 0;
   const firstFrameImage = !hasReferences && isImageWithDims(values.firstFrameImage) ? values.firstFrameImage : null;
-  const effectiveFirstFrame = hasReferences ? null : firstFrameImage;
   // A first frame and a source video are mutually exclusive; if a stale
   // project somehow holds both, the first frame wins deterministically.
-  const sourceVideo = !effectiveFirstFrame && isVideoSourceClip(values.sourceVideo) ? values.sourceVideo : null;
+  const sourceVideo = !firstFrameImage && isVideoSourceClip(values.sourceVideo) ? values.sourceVideo : null;
   // One conditioning clip at a time, and never alongside an initial video. A first frame excludes it
   // only in the picture role, where both would hold the same frames; a soundtrack holds the other
   // stream, so a first frame can anchor the picture generated for it.
   const conditioningClip =
     !sourceVideo &&
     isVideoConditioningClip(values.conditioningClip) &&
-    (!effectiveFirstFrame || !isConditioningClipExcludingFrames(values.conditioningClip))
+    (!firstFrameImage || !isConditioningClipExcludingFrames(values.conditioningClip))
       ? values.conditioningClip
       : null;
   const loras = Array.isArray(values.loras) ? values.loras.filter(isVideoLora) : [];
@@ -538,11 +537,7 @@ export const normalizeVideoWidgetValues = (values: unknown): VideoWidgetValues |
     return null;
   }
 
-  const model = isMainModelConfig(values.model) ? values.model : null;
-  return {
-    ...settings,
-    model,
-  };
+  return { ...settings, model: isMainModelConfig(values.model) ? values.model : null };
 };
 
 export const isVideoWidgetValues = (values: unknown): values is VideoWidgetValues => {

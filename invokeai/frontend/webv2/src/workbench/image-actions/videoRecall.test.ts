@@ -1051,6 +1051,33 @@ describe('model-position recall shapes', () => {
     expect(result?.values).toMatchObject({ acceleratorEnabled: true, acceleratorLoraKeys: [ref2vTurbo.key] });
   });
 
+  it('preserves an explicitly matching Ref2VA hybrid through partial recall and catalog sync', () => {
+    const hybrid = { ...checkpoint, key: 'quality-base', variant: 'fl2va' };
+    const models = [...catalog, hybrid];
+    const holding: VideoWidgetValues = {
+      ...currentValues,
+      model: checkpoint,
+      modelKey: checkpoint.key,
+      h3TaskOverride: 'ref2va',
+      h3HybridBaseModel: hybrid,
+      h3HybridStartBlock: 30,
+    };
+    const result = buildVideoRecallSettings({
+      currentValues: holding,
+      kind: 'seed',
+      metadata: { generation_mode: 'minimax_h3_ref2v', seed: 123 },
+      models,
+    });
+    expect(result).not.toBeNull();
+    const synced = syncVideoWidgetValuesWithModels(result!.values, models);
+    expect(synced).toMatchObject({
+      seed: 123,
+      h3TaskOverride: 'ref2va',
+      h3HybridBaseModel: hybrid,
+      h3HybridStartBlock: 30,
+    });
+  });
+
   it('recalls the hybrid quality base together with its start block, never the block alone', () => {
     const fl2vaBase: MainModelConfig = {
       base: 'minimax-h3',

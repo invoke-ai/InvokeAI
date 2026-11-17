@@ -1546,7 +1546,6 @@ export const getVideoComponentSectionPolicy = (
   model: MainModelConfig | undefined,
   _settings: VideoSettings
 ): VideoComponentSectionPolicy => {
-  model = getEffectiveVideoModel(model, _settings);
   if (!model || !isSupportedVideoModel(model)) {
     return EMPTY_VIDEO_COMPONENT_POLICY;
   }
@@ -1698,7 +1697,7 @@ export const getVideoComponentSectionPolicy = (
     },
     // The hybrid replaces non-AdaLN weights with an FL2VA base while retaining Ref2VA task identity and
     // projections.
-    ...(model.variant === 'ref2va' && !_settings.h3TaskOverride
+    ...(model.variant === 'ref2va' && getEffectiveVideoModel(model, _settings).variant === 'ref2va'
       ? [
           {
             filter: isH3HybridBaseCandidate,
@@ -2013,6 +2012,7 @@ export const getVideoModelSelectionResult = ({
   /** Task override for the incoming H3 model, applied before the loss preview. */
   h3TaskOverride?: VideoSettings['h3TaskOverride'];
 }): VideoModelSelectionResult => {
+  const catalogModel = model;
   h3TaskOverride = model.base === 'minimax-h3' && model.format === 'checkpoint' ? h3TaskOverride : undefined;
   model = getEffectiveVideoModel(model, { h3TaskOverride });
   const config = getVideoConfig(model);
@@ -2234,7 +2234,7 @@ export const getVideoModelSelectionResult = ({
   // The user's concepts stay as they are, as in Generate: the graph loads only the ones the model can
   // (`getActiveCompatibleLoras`), the row badges the rest, and a compatible model runs them again.
 
-  const policy = getVideoComponentSectionPolicy(model, next);
+  const policy = getVideoComponentSectionPolicy(catalogModel, next);
   const slotsByKey = new Map(policy.slots.map((slotPolicy) => [slotPolicy.key, slotPolicy]));
   // A component the previous model seeds from the catalog is seeded again on the way back, so dropping it loses
   // nothing. Without a resolvable previous model every dropped component counts as the user's choice.
@@ -2472,6 +2472,7 @@ export const getVideoModelAvailabilityIssues = (
 
 /** Why Video cannot run with this model, each with the controls that fix it, in the order Invoke lists them. */
 export const getVideoValidationIssues = (model: MainModelConfig, settings: VideoSettings): VideoValidationIssue[] => {
+  const catalogModel = model;
   model = getEffectiveVideoModel(model, settings);
   // The model picker fixes these, and it sits in no section.
   if (!isSupportedVideoModel(model)) {
@@ -2814,7 +2815,7 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
     });
   }
 
-  const componentPolicy = getVideoComponentSectionPolicy(model, settings);
+  const componentPolicy = getVideoComponentSectionPolicy(catalogModel, settings);
   issues.push(
     ...componentPolicy
       .validate(getVideoComponentPolicyContext(model, settings))
