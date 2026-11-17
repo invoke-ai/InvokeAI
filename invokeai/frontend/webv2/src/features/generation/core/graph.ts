@@ -173,7 +173,8 @@ const addIPAdapterReferenceImages = (
   return collector;
 };
 
-const FLUX_REDUX_INFLUENCE = {
+/** FLUX Redux image influence as the backend's redux settings, for global and regional reference images alike. */
+export const FLUX_REDUX_INFLUENCE = {
   lowest: { downsampling_factor: 5, weight: 1 },
   low: { downsampling_factor: 4, weight: 1 },
   medium: { downsampling_factor: 3, weight: 1 },
