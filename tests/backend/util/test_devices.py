@@ -1172,8 +1172,8 @@ class _CountingObserver:
     def before_empty_cache(self) -> None:
         self.calls.append("before")
 
-    def after_empty_cache(self) -> None:
-        self.calls.append("after")
+    def after_empty_cache(self, released: bool) -> None:
+        self.calls.append(f"after:{released}")
 
 
 @pytest.fixture
@@ -1207,7 +1207,7 @@ def test_empty_cache_the_backend_refuses_is_reported_as_refused(refusing_backend
 
     assert outcome is EmptyCacheOutcome.REFUSED
     assert refusing_backend.calls == 1
-    assert refusing_backend.observer.calls == ["before", "after"]
+    assert refusing_backend.observer.calls == ["before", "after:False"]
     assert not TorchDevice._empty_cache_deferred.is_set()
     assert "CUDA out of memory while releasing" in caplog.text
     assert "second line of detail" not in caplog.text
@@ -1220,4 +1220,4 @@ def test_forced_empty_cache_the_backend_refuses_raises(refusing_backend):
         TorchDevice.empty_cache(force=True)
 
     assert refusing_backend.calls == 1
-    assert refusing_backend.observer.calls == ["before", "after"]
+    assert refusing_backend.observer.calls == ["before", "after:False"]

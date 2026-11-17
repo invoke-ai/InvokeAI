@@ -397,6 +397,10 @@ class DefaultSessionRunner(SessionRunnerBase):
                     self._services.logger.warning(
                         f"Could not record the outcome of calibration item {queue_item.item_id}", exc_info=True
                     )
+            # `raised` and the exception's traceback (through this frame) would otherwise reference each other, so the
+            # failed node's frames and tensors would wait for the cyclic GC instead of being freed when the worker
+            # drops the exception, before its VRAM release.
+            raised = None
 
     def _run_calibration_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem, run_id: str) -> bool:
         """Run one node of a calibration item inside a probe scope and persist its windows, whether the node completed,

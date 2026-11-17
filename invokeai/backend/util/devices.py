@@ -38,14 +38,15 @@ class EmptyCacheOutcome(Enum):
 class EmptyCacheObserver(Protocol):
     def before_empty_cache(self) -> None: ...
 
-    def after_empty_cache(self) -> None: ...
+    def after_empty_cache(self, released: bool) -> None: ...
 
 
 EMPTY_CACHE_OBSERVERS: list[EmptyCacheObserver] = []
-"""Told about every `TorchDevice.empty_cache` that releases memory, just before and just after the release, in
-registration order. The working-memory probe registers here while a calibration scope is open, so that a release inside
-a measured window ends a segment there (`invokeai.backend.working_memory.probe`); otherwise the list is empty and a
-release pays one truth test for it. Observers must not raise."""
+"""Told about every `TorchDevice.empty_cache` that attempts a release, just before and just after it, in
+registration order; `released` is False when the backend refused (raised). The working-memory probe registers here
+while a calibration scope is open, so that a release inside a measured window ends a segment there
+(`invokeai.backend.working_memory.probe`); otherwise the list is empty and a release pays one truth test for it.
+Observers must not raise."""
 
 
 def _xpu_is_available() -> bool:
@@ -506,6 +507,7 @@ class TorchDevice:
         observers = tuple(EMPTY_CACHE_OBSERVERS) if EMPTY_CACHE_OBSERVERS else ()
         for observer in observers:
             observer.before_empty_cache()
+        released = False
         try:
             if torch.backends.mps.is_available():
                 torch.mps.empty_cache()
@@ -515,6 +517,7 @@ class TorchDevice:
                 (getattr(cuda_empty_cache, "__wrapped__", cuda_empty_cache) if force else cuda_empty_cache)()
             if _xpu_is_available():
                 torch.xpu.empty_cache()
+            released = True
         except RuntimeError as e:
             if force:
                 raise
@@ -527,7 +530,7 @@ class TorchDevice:
             return EmptyCacheOutcome.REFUSED
         finally:
             for observer in observers:
-                observer.after_empty_cache()
+                observer.after_empty_cache(released)
         return EmptyCacheOutcome.RAN
 
     @classmethod

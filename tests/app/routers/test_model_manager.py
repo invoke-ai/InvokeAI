@@ -292,8 +292,8 @@ def test_empty_model_cache_aggregates_per_device_results(monkeypatch: Any, clien
             self.requested.append(bytes_needed)
             return self._result
 
-    cache_0 = _Cache(models_cleared=2, bytes_freed=100)
-    cache_1 = _Cache(models_cleared=3, bytes_freed=250, vram_release_refused=True)
+    cache_0 = _Cache(models_cleared=2, bytes_freed=100, vram_release_refused=True)
+    cache_1 = _Cache(models_cleared=3, bytes_freed=250)
     services = _make_stats_services({"cuda:0": cache_0, "cuda:1": cache_1})
     invoker = DummyInvoker(services)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))

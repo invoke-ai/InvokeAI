@@ -3,6 +3,7 @@ error out of the runner) asks for an empty_cache, its working set being orphaned
 release it; a completed one only flushes a release a peer deferred onto it; neither may fail the worker."""
 
 import asyncio
+import gc
 import threading
 import weakref
 from contextlib import contextmanager
@@ -225,6 +226,9 @@ def _run_one_session(
     The worker releases after the item's status is final, so the item is read back once the release was requested.
     Stopping the processor sets the worker's cancel event, so it waits for the release first or the session would
     look canceled."""
+    # One worker on the CPU, whatever GPUs the host has: `auto` would start a worker per GPU (rejecting `_RaisingRunner`,
+    # which cannot be cloned) and create CUDA contexts. The release under test does not depend on the worker's device.
+    invoker.services.configuration.generation_devices = ["cpu"]
     queue = SessionQueue(database)
     invoker.services.session_queue = queue
     invoker.services.performance_statistics = _Stats()
@@ -286,3 +290,31 @@ def test_release_after_an_error_out_of_the_runner_runs_once_the_failed_frames_ar
 
     assert runner.node_memory is not None
     assert device_requests.samples == [False]
+
+
+def test_a_failed_calibration_item_leaves_no_reference_cycle_through_the_exception() -> None:
+    """The worker releases VRAM once it dropped the exception; a cycle (the runner's frame holding the exception it
+    re-raises) would keep the failed node's tensors alive until the garbage collector ran."""
+    node_memory: list[weakref.ref[_NodeMemory]] = []
+
+    def run_session_loop(queue_item) -> None:
+        memory = _NodeMemory()
+        node_memory.append(weakref.ref(memory))
+        raise RuntimeError("out of memory")
+
+    runner = DefaultSessionRunner()
+    runner._services = SimpleNamespace(  # type: ignore[assignment]
+        working_memory_calibration=SimpleNamespace(admit=lambda item, run_id: None, observe=lambda *args: None),
+        logger=_Logger(),
+    )
+    runner._on_before_run_session = lambda queue_item: None  # type: ignore[method-assign]
+    runner._run_session_loop = run_session_loop  # type: ignore[method-assign]
+    item = SimpleNamespace(item_id=1)
+
+    gc.disable()
+    try:
+        with pytest.raises(RuntimeError, match="out of memory"):
+            runner._run_calibration_item(item, "run")  # type: ignore[arg-type]
+        assert node_memory[0]() is None
+    finally:
+        gc.enable()
