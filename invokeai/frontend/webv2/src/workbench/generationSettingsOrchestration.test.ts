@@ -5,8 +5,8 @@ import type {
   VaeModelConfig,
 } from '@features/generation/contracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it, vi } from 'vitest';
 
 import { recallProjectPromptHistoryItem, selectProjectGenerateModel } from './generationSettingsOrchestration';

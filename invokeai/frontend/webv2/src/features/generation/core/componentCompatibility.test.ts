@@ -1,8 +1,5 @@
-import { resetArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
-import {
-  seedArchitectureCapabilities,
-  architectureCapabilitiesFixture,
-} from '@features/generation/core/architectureCapabilities.testing';
+import { resetArchitectureCapabilities } from '@features/models/core/architectureCapabilities';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import type { ComponentModelConfig, GenerateModelConfig, VaeModelConfig } from './types';
@@ -195,16 +192,21 @@ describe('Generate component compatibility', () => {
     expect(isErnieImageMistralEncoder(candidate({ type: 'qwen3_encoder', variant: 'ministral3_3b' }))).toBe(false);
   });
 
-  it('allows only backend-supported Anima VAE families', () => {
-    const isAnimaVae = isVaeAcceptedByBase('anima');
-
-    expect(isAnimaVae(candidate({ base: 'anima', type: 'vae' }))).toBe(true);
-    expect(isAnimaVae(candidate({ base: 'qwen-image', type: 'vae' }))).toBe(true);
-    expect(isAnimaVae(candidate({ base: 'wan', latent_channels: 16, type: 'vae' }))).toBe(true);
-    expect(isAnimaVae(candidate({ base: 'wan', latent_channels: 48, type: 'vae' }))).toBe(false);
-    // A FLUX VAE decodes an Anima latent without raising and returns a magenta smear.
-    expect(isAnimaVae(candidate({ base: 'flux', type: 'vae' }))).toBe(false);
-    expect(isAnimaVae(candidate({ base: 'sdxl', type: 'vae' }))).toBe(false);
+  it('asks the served VAE rule only about VAEs, and never for an external model', () => {
+    // The rule itself is Models' (`architectureAcceptsVae`); these check what Generation hands it.
+    expect(isVaeAcceptedByBase('anima')(candidate({ base: 'anima', type: 'vae' }))).toBe(true);
+    expect(isVaeAcceptedByBase('anima')(candidate({ base: 'anima', type: 'lora' }))).toBe(false);
+    expect(
+      isVaeCompatibleWithGenerateModel(
+        {
+          base: 'external',
+          key: 'gpt-image',
+          name: 'GPT Image',
+          type: 'external_image_generator',
+        } as GenerateModelConfig,
+        { base: 'external', key: 'vae', name: 'VAE', type: 'vae' } as VaeModelConfig
+      )
+    ).toBe(false);
   });
 
   it('offers no VAE at all before the capability table has loaded', () => {
@@ -257,84 +259,5 @@ describe('Generate component compatibility', () => {
     expect(isVaeCompatibleWithGenerateModel(wanMain('i2v_a14b'), wanVae(48))).toBe(false);
     expect(isVaeCompatibleWithGenerateModel(wanMain('ti2v_5b'), wanVae(48))).toBe(true);
     expect(isVaeCompatibleWithGenerateModel(wanMain('ti2v_5b'), wanVae(16))).toBe(false);
-  });
-});
-
-describe('the VAE filters and the backend declarations', () => {
-  // Exercise each variant row with its own variant.
-  const mainOf = (base: string, variant: string | null = null) =>
-    ({
-      base,
-      key: `${base}-main`,
-      name: base,
-      type: 'main' as const,
-      ...(variant === null ? {} : { variant }),
-    }) as unknown as GenerateModelConfig;
-
-  const vaeOf = (base: string, latentChannels?: number) =>
-    ({
-      base,
-      key: `${base}-vae`,
-      name: `${base} vae`,
-      type: 'vae' as const,
-      ...(latentChannels === undefined ? {} : { latent_channels: latentChannels }),
-    }) as unknown as VaeModelConfig;
-
-  const ALL_BASES = [...new Set(architectureCapabilitiesFixture.map((row) => row.base))];
-
-  /** Check parity with served VAE policy instead of duplicating frontend rules. */
-  it('accepts every VAE base the backend declares for that architecture', () => {
-    const declared = architectureCapabilitiesFixture.filter((row) => row.vae);
-    expect(declared.length).toBeGreaterThan(0);
-
-    for (const row of declared) {
-      for (const accepted of row.vae!.accepted) {
-        expect(
-          // Only wan distinguishes VAEs by latent width; the others leave it null.
-          isVaeCompatibleWithGenerateModel(
-            mainOf(row.base, row.variant),
-            vaeOf(accepted.base, accepted.latent_channels ?? undefined)
-          ),
-          `${row.base} should accept a VAE registered under ${accepted.base}`
-        ).toBe(true);
-      }
-    }
-  });
-
-  /** Negative parity cases must reject an always-true filter. */
-  it('rejects every VAE base the backend does not declare for that architecture', () => {
-    for (const row of architectureCapabilitiesFixture) {
-      const accepted = row.vae?.accepted ?? [{ base: row.base, latent_channels: null }];
-      const acceptedBases = new Set(accepted.map((entry) => entry.base));
-
-      for (const base of ALL_BASES) {
-        if (acceptedBases.has(base)) {
-          continue;
-        }
-        expect(
-          isVaeCompatibleWithGenerateModel(mainOf(row.base, row.variant), vaeOf(base)),
-          `${row.base} should refuse a VAE registered under ${base}`
-        ).toBe(false);
-      }
-
-      // Same-base VAEs are still constrained by channel width.
-      for (const entry of accepted) {
-        if (entry.latent_channels === null) {
-          continue;
-        }
-        const otherWidth = entry.latent_channels === 16 ? 48 : 16;
-        if (accepted.some((other) => other.base === entry.base && other.latent_channels === otherWidth)) {
-          continue;
-        }
-        expect(
-          isVaeCompatibleWithGenerateModel(mainOf(row.base, row.variant), vaeOf(entry.base, otherWidth)),
-          `${row.base} should refuse a ${otherWidth}-channel ${entry.base} VAE`
-        ).toBe(false);
-      }
-    }
-  });
-
-  it('refuses an architecture the table says nothing about', () => {
-    expect(isVaeCompatibleWithGenerateModel(mainOf('not-an-architecture'), vaeOf('not-an-architecture'))).toBe(false);
   });
 });

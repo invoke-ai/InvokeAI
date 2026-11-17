@@ -2,12 +2,12 @@
 import type { GenerateModelConfig, GenerateSettings, MainModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
+} from '@features/models/core/architectureCapabilities';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';

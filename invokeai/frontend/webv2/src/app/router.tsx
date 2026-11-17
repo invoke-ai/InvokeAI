@@ -101,8 +101,8 @@ const publishSchedulerPolicy = (next: SchedulerPolicyState): void => {
 };
 
 /**
- * Generate's scheduler rules for the Model Manager's defaults. They and the architecture table they read live in
- * Generation, which the Launchpad does not load at startup, so they arrive with the first Default settings section.
+ * Generate's scheduler rules for the Model Manager's defaults. They live in Generation and read Models' architecture
+ * table, neither of which the Launchpad loads at startup, so they arrive with the first Default settings section.
  */
 const schedulerPolicySource: SchedulerPolicySource = {
   getSnapshot: () => schedulerPolicyState,

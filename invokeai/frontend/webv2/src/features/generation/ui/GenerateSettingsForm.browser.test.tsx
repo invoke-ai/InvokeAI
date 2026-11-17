@@ -5,13 +5,13 @@ import type { ComponentType } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
-import { ensureArchitectureCapabilitiesLoaded } from '@features/generation/data/architectureCapabilitiesStore';
 import { dynamicPromptsKeys } from '@features/generation/data/dynamicPromptsQueries';
 import { promptTemplatesQueryOptions } from '@features/generation/data/promptTemplates';
 import { wildcardsQueryOptions } from '@features/generation/data/wildcards';
 import { flushGenerateDrafts } from '@features/generation/react';
+import { ensureArchitectureCapabilitiesLoaded } from '@features/models/architecturesStore';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { createExternalStoreCore, type ExternalStoreCore } from '@platform/state/externalStoreCore';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
@@ -32,7 +32,7 @@ vi.mock('react-i18next', () => {
   return { useTranslation: () => ({ i18n: { resolvedLanguage: 'en' }, t }) };
 });
 
-vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
+vi.mock('@features/models/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => Promise.resolve(architectureCapabilitiesFixture),
 }));
 

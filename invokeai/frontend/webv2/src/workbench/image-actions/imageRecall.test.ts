@@ -8,20 +8,20 @@ import type {
 } from '@features/generation/contracts';
 
 import {
-  resetArchitectureCapabilities,
-  setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import {
-  architectureCapabilitiesFixture,
-  seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
-import {
   fullyFilledSettingsFor,
   generateGraphCases,
   satisfiedSettingsFor,
 } from '@features/generation/core/graphCoverage.testing';
 import { compileGenerateGraph } from '@features/generation/graph';
 import { normalizeReferenceImages } from '@features/generation/settings';
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities.testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {

@@ -1,7 +1,7 @@
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import type { AddRegionalGuidanceOptions, RegionalGuidanceInput, RegionalReferenceModel } from './addRegionalGuidance';

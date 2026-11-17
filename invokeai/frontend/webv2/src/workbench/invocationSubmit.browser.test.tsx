@@ -7,8 +7,8 @@ import {
   invalidateGallery,
   invalidateGalleryBoardDestinations,
 } from '@features/gallery/queries';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { queryClient } from '@platform/query/client';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { QueryObserver } from '@tanstack/react-query';

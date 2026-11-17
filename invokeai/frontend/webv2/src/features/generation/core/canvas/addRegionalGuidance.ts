@@ -2,13 +2,11 @@ import type { BackendGraphContract, BackendInvocationContract } from '@features/
 import type { FamilyConditioning } from '@features/generation/core/familyGraph';
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 
-import {
-  getArchitectureFeatures,
-  getArchitectureGenerationConfig,
-} from '@features/generation/core/architectureCapabilities';
+import { getArchitectureGenerationConfig } from '@features/generation/core/architectureGenerationConfig';
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
 import { COMPEL_PROMPT_NODE_TYPES } from '@features/generation/core/prompt/compel';
 import { getEffectivePositivePrompt, unwrapPromptFence } from '@features/generation/core/promptTemplates';
+import { getArchitectureFeatures } from '@features/models/architectures';
 
 import type { Rect } from './types';
 

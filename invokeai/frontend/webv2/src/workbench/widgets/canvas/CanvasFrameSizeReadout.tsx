@@ -9,8 +9,11 @@ import type { Project } from '@workbench/projectContracts';
 
 import { Box } from '@chakra-ui/react';
 import { resolveCanvasProcessingSize } from '@features/generation/canvasProcessingSize';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { isGenerateModelConfig } from '@features/generation/settings';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { roundBbox, type CanvasCoreStoreCapability } from '@workbench/canvas-engine/api';
 import { readCanvasScaling } from '@workbench/widgets/canvas/invoke/canvasScaling';

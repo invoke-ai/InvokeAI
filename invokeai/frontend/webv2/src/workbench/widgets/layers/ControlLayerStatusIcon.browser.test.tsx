@@ -1,9 +1,9 @@
-import type { ArchitectureCapabilitiesRow } from '@features/generation/core/architectureCapabilities';
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
 import type { CanvasControlLayerContract } from '@workbench/canvas-engine/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { ensureArchitectureCapabilitiesLoaded } from '@features/generation/data/architectureCapabilitiesStore';
+import { ensureArchitectureCapabilitiesLoaded } from '@features/models/architecturesStore';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
@@ -35,7 +35,7 @@ vi.mock('@features/models', async (importOriginal) => ({
 vi.mock('./useSelectedMainModel', () => ({ useSelectedMainModel: () => catalog.mainModel }));
 
 const getArchitectureCapabilities = vi.fn<() => Promise<ArchitectureCapabilitiesRow[]>>();
-vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
+vi.mock('@features/models/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => getArchitectureCapabilities(),
 }));
 

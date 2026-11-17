@@ -1,9 +1,9 @@
 import type { MainModelConfig } from '@features/generation/contracts';
 import type { InvocationRoute } from '@workbench/invocationContracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { dynamicPromptsKeys } from '@features/generation/prompts';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { queryClient } from '@platform/query/client';
 import { captureAccountScope } from '@platform/state/accountLifecycle';

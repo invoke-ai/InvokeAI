@@ -10,11 +10,11 @@ import type * as SettingsStoreModule from '@workbench/settings/store';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+} from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 import { parseOpenApiToTemplates } from '@features/workflow/react';
 import { clearLogs, getLogSnapshot } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';

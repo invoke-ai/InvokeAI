@@ -23,7 +23,6 @@ import {
   getGenerationUiPolicy,
   getReferenceImageLimit,
   getSettingsWithModelDefaults,
-  hasArchitectureCapabilities,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
@@ -41,6 +40,7 @@ import {
   resolveModelDefaultVae,
   withAddedReferenceImages,
 } from '@features/generation/settings';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 
 import {
   getBoolean,

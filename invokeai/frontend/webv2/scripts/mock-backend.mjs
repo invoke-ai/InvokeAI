@@ -68,7 +68,7 @@ const FIXTURE_VIDEO_POSTER = readFileSync(resolve(import.meta.dirname, 'mock-ass
 // Share the backend-pinned capabilities fixture to keep journey payloads aligned with the real API.
 const ARCHITECTURE_CAPABILITIES = JSON.parse(
   readFileSync(
-    resolve(import.meta.dirname, '../src/features/generation/core/__fixtures__/architectureCapabilities.json'),
+    resolve(import.meta.dirname, '../src/features/models/core/__fixtures__/architectureCapabilities.json'),
     'utf8'
   )
 );

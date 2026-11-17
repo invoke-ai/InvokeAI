@@ -16,7 +16,6 @@ import {
   getDefaultGenerateSettings,
   getGenerationUiPolicy,
   getSchedulerOptions,
-  hasArchitectureCapabilities,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isBundledFlux2Main,
@@ -38,6 +37,7 @@ import {
   MIN_POSITIVE_PROMPT_HEIGHT_PX,
   sanitizeBatchCount,
 } from '@features/generation/settings';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 import { isSeedMode, SEED_MAX } from '@platform/core/seed';
 
 import type { SpandrelModelConfig, TileControlNetModelConfig, UpscaleMode, UpscaleWidgetValues } from './types';

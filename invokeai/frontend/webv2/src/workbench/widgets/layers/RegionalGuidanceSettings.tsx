@@ -1,5 +1,5 @@
 import type { SelectValueChangeDetails } from '@chakra-ui/react';
-import type { ArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
+import type { ArchitectureCapabilitiesSnapshot } from '@features/models/architecturesStore';
 import type {
   CanvasMaskContract,
   CanvasMaskFillContract,
@@ -27,7 +27,10 @@ import {
   getRegionalGuidanceSupport,
   supportsPromptAttentionSyntax,
 } from '@features/generation/graph';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button, ColorPicker, Field, Select, Tooltip } from '@platform/ui';

@@ -5,7 +5,6 @@ import type { GenerateModelConfig, GenerateReferenceImage } from '@features/gene
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, MouseSensor, pointerWithin, useDraggable, useSensor, useSensors } from '@dnd-kit/core';
 import { getGalleryItemDragData } from '@features/gallery/utility';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import {
   getDefaultGenerateSettings,
   getGenerateInvocationIssues,
@@ -13,6 +12,7 @@ import {
 } from '@features/generation/core/baseGenerationPolicies';
 import { type GenerationUiAdapter, GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
 import { GenerateIssuesProvider } from '@features/generation/ui/shared/GenerateIssues';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
 import { system } from '@theme/system';
 import i18next from 'i18next';

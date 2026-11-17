@@ -5,7 +5,7 @@ import type {
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { createControlLayer } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { CircleDotIcon, CircleIcon } from 'lucide-react';

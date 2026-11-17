@@ -6,8 +6,8 @@ import { ChakraProvider } from '@chakra-ui/react';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';

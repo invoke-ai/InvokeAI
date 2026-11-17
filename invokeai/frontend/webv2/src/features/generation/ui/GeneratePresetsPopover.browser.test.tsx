@@ -2,9 +2,9 @@ import type { MainModelConfig } from '@features/generation/core/types';
 import type { GeneratePresetRecord, GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import i18next from 'i18next';

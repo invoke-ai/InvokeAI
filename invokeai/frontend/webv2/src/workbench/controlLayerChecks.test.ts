@@ -1,9 +1,9 @@
 import type { ModelConfig } from '@features/models';
 import type { CanvasControlLayerContract } from '@workbench/canvas-engine/api';
 
-import { resetArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { CONTROL_ADAPTER_KINDS, CONTROL_VALIDATION_REASONS } from '@features/generation/graph';
+import { resetArchitectureCapabilities } from '@features/models/core/architectureCapabilities';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { createInstance } from 'i18next';
 import { describe, expect, it } from 'vitest';
 

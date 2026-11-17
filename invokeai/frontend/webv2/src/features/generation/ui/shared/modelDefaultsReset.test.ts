@@ -1,8 +1,8 @@
 import type { GenerateSettings, MainModelConfig, VaeModelConfig } from '@features/generation/core/types';
 import type { TFunction } from 'i18next';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import i18n from 'i18next';
 import { beforeAll, describe, expect, it } from 'vitest';
 

@@ -1,4 +1,4 @@
-import { FEATURE_PUBLIC_INTERFACES } from './featureInterfaces';
+import { FEATURE_PUBLIC_INTERFACES, PURE_FEATURE_ENTRIES } from './featureInterfaces';
 import { analyzeSource, primeSourceAnalysis } from './tsSourceAnalysis';
 
 export type ModuleOwner = 'app' | 'platform' | 'workbench' | `feature:${string}`;
@@ -212,6 +212,19 @@ const DOCUMENT_MODEL_DEPENDENCY_MODULES = [
   'workbench/canvas-engine/document/selectionRepair',
 ];
 
+/** A registered pure entry reaching outside its own feature's `core/`. */
+const isPureEntryLeak = (sourcePath: string, target: string | null): boolean => {
+  const entry = sourcePath.replace(/\.[cm]?[jt]sx?$/, '');
+
+  if (!PURE_FEATURE_ENTRIES.includes(entry)) {
+    return false;
+  }
+
+  const featureRoot = entry.slice(0, entry.lastIndexOf('/'));
+
+  return target === null || !target.startsWith(`${featureRoot}/core/`);
+};
+
 /** Accept extensionless targets as well as source filenames. */
 const TEST_SUPPORT_SUFFIX = /\.(?:test|type-test|testing|stories)(?:\.[^.]+)?$/;
 
@@ -237,6 +250,10 @@ export const checkDependency = (source: string, specifier: string): DependencyVi
     sourcePath.includes('/core/') &&
     isFeatureCoreForbiddenDependency(specifier, target)
   ) {
+    add('feature-core-purity');
+  }
+
+  if (isPureEntryLeak(sourcePath, target)) {
     add('feature-core-purity');
   }
 

@@ -7,7 +7,7 @@ import {
   type ControlAdapterKind,
   type ControlValidationReason,
 } from '@features/generation/graph';
-import { hasArchitectureCapabilities } from '@features/generation/settings';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 import { getControlDetectionInput, isControlMapCurrent, needsControlDetection } from '@workbench/canvas-engine/api';
 import { hasControlLayerContent, isCompositableControlLayer } from '@workbench/canvasLayerContent';
 

@@ -1,5 +1,5 @@
-import type { ArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
 import type { ModelConfig } from '@features/models';
+import type { ArchitectureCapabilitiesSnapshot } from '@features/models/architecturesStore';
 import type {
   CanvasControlAdapterContract,
   CanvasControlLayerContract,
@@ -11,13 +11,13 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { HStack, Separator, Stack, Text } from '@chakra-ui/react';
 import { getControlModelUnusableReason } from '@features/generation/graph';
+import { useCapabilities } from '@features/identity';
+import { getModelBaseLabel, useModelsSelector, useStartersSelector } from '@features/models';
 import {
   ensureArchitectureCapabilitiesLoaded,
   getArchitectureCapabilitiesSnapshot,
   subscribeArchitectureCapabilities,
-} from '@features/generation/runtime';
-import { useCapabilities } from '@features/identity';
-import { getModelBaseLabel, useModelsSelector, useStartersSelector } from '@features/models';
+} from '@features/models/architecturesStore';
 import { focusFirstOperable } from '@platform/react/focusIfUnclaimed';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button } from '@platform/ui/Button';

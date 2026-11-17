@@ -7,14 +7,14 @@ import type {
   VaeModelConfig,
 } from '@features/generation/core/types';
 
-import {
-  architectureCapabilitiesFixture,
-  seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
 import { withAddedReferenceImages } from '@features/generation/core/baseGenerationPolicies';
 import { getPidDecoderBaseForMainBase } from '@features/generation/core/pid';
 import { isPidDecodeNodeType } from '@features/generation/core/pidGraph';
 import { syncGenerateWidgetValuesWithModels } from '@features/generation/core/settings';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ControlLayerGraphInput } from './addControlLayers';

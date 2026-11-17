@@ -22,12 +22,6 @@ import {
 } from '@features/generation/components';
 import { useDynamicPrompts } from '@features/generation/react';
 import {
-  type ArchitectureCapabilitiesSnapshot,
-  ensureArchitectureCapabilitiesLoaded,
-  getArchitectureCapabilitiesSnapshot,
-  subscribeArchitectureCapabilities,
-} from '@features/generation/runtime';
-import {
   getDynamicPromptsConfig,
   getEffectivePrompts,
   isLoraCompatibleWithModel,
@@ -45,6 +39,12 @@ import {
   useModelsSelector,
   useOpenModelInManager,
 } from '@features/models';
+import {
+  type ArchitectureCapabilitiesSnapshot,
+  ensureArchitectureCapabilitiesLoaded,
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { ModelSelect, useHasModelPickerCandidates } from '@features/models/react';
 import {
   coerceUpscaleScheduler,

@@ -1,13 +1,14 @@
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
+
+import capabilitiesFixture from '@features/models/core/__fixtures__/architectureCapabilities.json';
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { GenerateWidgetValues, MainModelConfig } from './types';
 
-import capabilitiesFixture from './__fixtures__/architectureCapabilities.json';
-import {
-  type ArchitectureCapabilitiesRow,
-  resetArchitectureCapabilities,
-  setArchitectureCapabilities,
-} from './architectureCapabilities';
 import { getDefaultGenerateSettings } from './baseGenerationPolicies';
 import { resolveGenerateWidgetValues } from './resolveGenerateWidgetValues';
 

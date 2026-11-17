@@ -1,4 +1,4 @@
-import { hasArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 
 import type { GenerationModelCatalogItem } from './contracts';

@@ -1,14 +1,14 @@
 import type { GenerationModelCatalogItem, GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
 import type { PromptTemplateRecord } from '@features/generation/data/promptTemplates';
 import type * as GenerationQueries from '@features/generation/queries';
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
 
-import capabilitiesFixture from '@features/generation/core/__fixtures__/architectureCapabilities.json';
+import { getDefaultGenerateSettings } from '@features/generation/settings';
+import capabilitiesFixture from '@features/models/core/__fixtures__/architectureCapabilities.json';
 import {
-  type ArchitectureCapabilitiesRow,
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import { getDefaultGenerateSettings } from '@features/generation/settings';
+} from '@features/models/core/architectureCapabilities';
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

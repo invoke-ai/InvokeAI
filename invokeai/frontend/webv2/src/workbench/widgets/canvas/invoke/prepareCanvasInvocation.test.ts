@@ -15,8 +15,8 @@ import type { WorkbenchState } from '@workbench/projectContracts';
 import type { WorkbenchAction } from '@workbench/workbenchState.testing';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';

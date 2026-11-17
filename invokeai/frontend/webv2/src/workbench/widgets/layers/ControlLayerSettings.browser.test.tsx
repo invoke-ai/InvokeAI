@@ -1,4 +1,4 @@
-import type { ArchitectureCapabilitiesRow } from '@features/generation/core/architectureCapabilities';
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
 import type {
   CanvasControlLayerContract,
   CanvasLayerContract,
@@ -8,8 +8,8 @@ import type { StructuralEngineStub } from '@workbench/canvas-engine/controllers/
 import type { ControlLayerIntent, ControlLayerIntentResult } from '@workbench/canvas-operations/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { ensureArchitectureCapabilitiesLoaded } from '@features/generation/data/architectureCapabilitiesStore';
+import { ensureArchitectureCapabilitiesLoaded } from '@features/models/architecturesStore';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { toaster } from '@platform/ui/toaster';
@@ -81,7 +81,7 @@ vi.mock('@workbench/settings/store', async (importOriginal) => ({
   },
 }));
 const getArchitectureCapabilities = vi.fn<() => Promise<ArchitectureCapabilitiesRow[]>>();
-vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
+vi.mock('@features/models/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => getArchitectureCapabilities(),
 }));
 

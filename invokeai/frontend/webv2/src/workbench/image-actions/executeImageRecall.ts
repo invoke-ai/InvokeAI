@@ -16,11 +16,11 @@ import {
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getEffectiveReferenceImage,
-  hasArchitectureCapabilities,
   isSupportedGenerateModel,
   isVaeModelConfig,
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 import {
   getInvocationTemplatesSnapshot,
   refreshInvocationTemplates,

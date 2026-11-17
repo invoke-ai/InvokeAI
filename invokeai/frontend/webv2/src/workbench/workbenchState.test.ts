@@ -23,8 +23,8 @@ import {
   registerImageCluster,
 } from '@features/gallery/contracts';
 import { galleryKeys } from '@features/gallery/queries';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { MAX_PROMPT_HISTORY } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { getWorkflowGeneratorKey } from '@features/workflow/utility';
 import { queryClient } from '@platform/query/client';

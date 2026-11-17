@@ -2,7 +2,7 @@
 
 import type { BackendGraphContract } from '@features/generation/core/contracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import type { GenerateComponentValueKey, SupportedGenerateBase } from './baseGenerationPolicies';

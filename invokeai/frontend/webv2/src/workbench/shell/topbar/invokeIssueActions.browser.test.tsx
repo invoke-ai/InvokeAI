@@ -6,13 +6,13 @@ import type * as ProjectsApiModule from '@workbench/projects/api';
 import type { RegisteredWidget } from '@workbench/widgetContracts';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
+import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { registerPositivePromptElement } from '@features/generation/ui/promptFields/promptFocus';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings } from '@features/generation/settings';
-import { registerPositivePromptElement } from '@features/generation/ui/promptFields/promptFocus';
+} from '@features/models/core/architectureCapabilities';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';

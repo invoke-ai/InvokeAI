@@ -17,7 +17,6 @@ import type {
 import type { CanvasCompileMode } from '@features/generation/core/canvas/types';
 import type { SpandrelModelConfig } from '@features/upscale/core/types';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { canvasModesFor, compile as compileCanvas } from '@features/generation/core/canvas/compileCanvasGraph.testing';
 import {
   externalRecallCases,
@@ -37,6 +36,7 @@ import {
   isSupportedGenerateModel,
   isVaeModelConfig,
 } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { compileModelOnlyUpscaleGraph, compileUpscaleGraph } from '@features/upscale/core/graph';
 import { CASES as UPSCALE_CASES, INSTALLED, valuesForCase } from '@features/upscale/core/upscaleGraphCoverage.testing';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';

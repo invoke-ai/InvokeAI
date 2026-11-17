@@ -24,7 +24,7 @@ FIXTURE_PATH = (
     / "webv2"
     / "src"
     / "features"
-    / "generation"
+    / "models"
     / "core"
     / "__fixtures__"
     / "architectureCapabilities.json"

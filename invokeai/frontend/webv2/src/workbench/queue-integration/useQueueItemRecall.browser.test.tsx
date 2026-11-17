@@ -6,15 +6,15 @@ import type { ImageRecallKind } from '@workbench/image-actions';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
 import { galleryDurability, galleryImages } from '@features/gallery';
+import { getDefaultGenerateSettings } from '@features/generation/settings';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+} from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings } from '@features/generation/settings';
+} from '@features/models/core/architectureCapabilities.testing';
 import { createDefaultVideoWidgetValues } from '@features/video';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { recordCanvasMetadata } from '@workbench/canvas-operations/saveCanvasToGallery';

@@ -195,8 +195,6 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
   '/features/generation/core/prompt/attention.ts',
-  '/features/generation/data/architectureCapabilitiesApi.ts',
-  '/features/generation/data/architectureCapabilitiesStore.ts',
   '/features/generation/data/dynamicPromptsQueries.ts',
   '/features/generation/data/promptTemplates.ts',
   '/features/generation/data/promptUtilities.ts',
@@ -262,6 +260,12 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/platform/react/draftRegistry.ts',
   '/features/generation/core/projectPromptDraft.ts',
   '/features/generation/core/prompt/compel.ts',
+  // The editor boot and the lazy Model Manager (both routes, which already loads this chunk) read the architecture
+  // table's store. `editor-boot-shared` would drag the editor shell into the manager; split out, the store and its
+  // entry cost the editor boot requests.
+  '/features/models/architecturesStore.ts',
+  '/features/models/data/architectureCapabilitiesApi.ts',
+  '/features/models/data/architectureCapabilitiesStore.ts',
   '/features/queue/core/deviceLabels.ts',
   // The shared device entry otherwise becomes an imports-only boot request beside its labels and hook.
   '/features/queue/devices.ts',
@@ -312,6 +316,11 @@ const WORKFLOW_CORE_MODULES = [
   '/features/workflow/ui/workflowUiStore.ts',
   '/features/workflow/utility.ts',
   '/workbench/projectWorkflows.ts',
+  // Workflow's model requirements and Generation's policies read Models' pure architecture entry, and Related Models
+  // (in the lazy Model Manager) the table registry behind it. The editor boot and the lazy Model and Node Managers all
+  // load this chunk already; split out, the two modules cost the editor boot and each manager requests.
+  '/features/models/architectures.ts',
+  '/features/models/core/architectureCapabilities.ts',
 ] as const;
 
 // The workflow queries entry and the library transport behind it are one chunk: the editor's boot hosts (publication,

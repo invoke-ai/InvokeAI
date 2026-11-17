@@ -5,16 +5,13 @@ import type {
 } from '@features/generation/core/contracts';
 import type { BaseGenerationConfig, GuidanceLabel } from '@features/generation/core/generationConfig';
 
-import {
-  getArchitectureFeatures,
-  getArchitectureGenerationConfig,
-  hasArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+import { getArchitectureGenerationConfig } from '@features/generation/core/architectureGenerationConfig';
 import {
   isSupportedGenerateBase,
   SUPPORTED_GENERATE_BASES,
   type SupportedGenerateBase,
 } from '@features/generation/core/supportedBases';
+import { getArchitectureFeatures, hasArchitectureCapabilities } from '@features/models/architectures';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { SEED_MAX } from '@platform/core/seed';
 

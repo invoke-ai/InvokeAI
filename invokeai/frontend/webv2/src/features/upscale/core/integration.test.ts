@@ -1,7 +1,7 @@
 import type { ModelConfig } from '@features/models';
 import type { WorkbenchState } from '@workbench/projectContracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { getDynamicPromptsExpansionSource } from '@workbench/invocation';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { describe, expect, it, vi } from 'vitest';
