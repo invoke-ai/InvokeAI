@@ -749,11 +749,12 @@ describe('StagingBar keys', () => {
     await expect.element(page.getByRole('menu')).toBeVisible();
     await act(() => userEvent.keyboard('{Delete}{ArrowRight}{Backspace}{ArrowLeft}'));
     await act(() => userEvent.keyboard('{Escape}'));
+    await expect.element(page.getByRole('menu')).not.toBeInTheDocument();
 
     await act(() => {
       thumbnails[0]!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     });
-    await expect.element(page.getByRole('menu')).toBeVisible();
+    await expect.element(page.getByTestId('staging-context-menu')).toBeVisible();
     await act(() => userEvent.keyboard('{Delete}{ArrowRight}{Backspace}{ArrowLeft}'));
 
     expect(onDiscardSelected).not.toHaveBeenCalled();
