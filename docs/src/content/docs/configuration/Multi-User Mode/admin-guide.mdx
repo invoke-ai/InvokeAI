@@ -28,7 +28,7 @@ Roles are read from the database on every request, so promoting or demoting some
 
 ## Set up multi-user mode
 
-Multi-user mode is on by default. An install that upgrades from a version where single-user mode was the default switches to multi-user mode unless its `invokeai.yaml` sets `multiuser: false`. See [Single-user mode](#single-user-mode).
+Multi-user mode is on by default. An install that upgrades from a version where single-user mode was the default switches to multi-user mode unless its `invokeai.yaml` sets `multiuser: false`. After that switch, the projects made in single-user mode are hidden from every account, including the new administrator, until you return to single-user mode; boards, images and workflows stay available to administrators. See [What happens to existing data](#what-happens-to-existing-data) and [Single-user mode](#single-user-mode). Browsers that had InvokeAI open before the switch need a hard refresh.
 
 <Steps>
 
@@ -64,7 +64,7 @@ InvokeAI cannot recover a password. If you lose the last administrator's passwor
 
 ### Single-user mode
 
-Set `multiuser: false` in `invokeai.yaml` and restart to run without accounts or sign-in. Browsers that had InvokeAI open may need a hard refresh. Every visitor then has full administrator control, so use it only on a server that listens on `127.0.0.1` (the default `host`), never on one other computers can reach.
+Set `multiuser: false` in `invokeai.yaml` and restart to run without accounts or sign-in. Browsers that had InvokeAI open may need a hard refresh. Every visitor then has full administrator control, so use it only on a server that only this computer can reach: `host: 127.0.0.1` (the default), or in Docker a port published as `127.0.0.1:9090:9090`. In Docker, set the environment variable `INVOKEAI_MULTIUSER=false` instead of editing `invokeai.yaml`.
 
 :::caution[Single-user mode is deprecated]
 Single-user mode will be removed in a future release.

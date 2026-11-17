@@ -17,6 +17,7 @@ Your working directory is mounted under the `/workspace` path inside the pod. Th
     - TIP: you know it's ready when the CPU usage goes idle
     - You can also check the logs for a line that says "_Point your browser at..._"
 1. Open the Invoke AI web UI: click the `Connect` => `connect over  HTTP` button.
+1. Create the administrator account right away: until it exists, anyone who can open the pod's HTTP address can claim it.
 1. Generate some art!
 
 ## Other things you can do

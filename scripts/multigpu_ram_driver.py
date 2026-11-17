@@ -23,6 +23,8 @@ it:
   3. Find the POST to `.../queue/default/enqueue_batch`, copy its JSON request body, save to a file
      (e.g. batch.json). It looks like {"prepend": false, "batch": {"graph": {...}, "runs": 1}}.
 
+The script sends no sign-in token, so run it against a server started with `multiuser: false`.
+
 The script bust the node cache by default (sets use_cache=false on every node and randomizes any
 "seed" fields) so every submission actually runs the model instead of returning a cached result.
 

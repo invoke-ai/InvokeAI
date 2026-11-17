@@ -26,7 +26,7 @@ docker run --device /dev/kfd --device /dev/dri \
 
 `RENDER_GROUP_ID` must match the host's `render` group. Without it, Invoke can't access the GPU.
 
-Open `http://localhost:9090` in your browser once the container finishes booting, install some models, and generate away!
+Open `http://localhost:9090` in your browser once the container finishes booting, create the administrator account, install some models, and generate away! Create the account right away: until it exists, anyone who can reach the published port can claim it.
 
 ### Data persistence
 
@@ -50,7 +50,7 @@ cp .env.sample .env
 ./run.sh
 ```
 
-It will take a few minutes to build the image the first time. Once the application starts up, open `http://localhost:9090` in your browser to invoke!
+It will take a few minutes to build the image the first time. Once the application starts up, open `http://localhost:9090` in your browser and create the administrator account right away: until it exists, anyone who can reach the published port can claim it.
 
 >[!TIP]
 >When using the `run.sh` script, the container will continue running after Ctrl+C. To shut it down, use the `docker compose down` command.
