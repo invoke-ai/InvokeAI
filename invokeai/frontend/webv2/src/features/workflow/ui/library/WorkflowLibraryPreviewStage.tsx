@@ -41,8 +41,8 @@ import { WORKFLOW_LIBRARY_NARROW, WORKFLOW_LIBRARY_WIDE } from './WorkflowLibrar
 /**
  * Preview mode's stage: it takes the places rail's and the collection's place in the dialog while the detail rail stays
  * where it is (and steps through the view's results). The bar leaves (back to the place), switches the view, finds a
- * node and exports the saved workflow; the body draws the selected workflow's document. The collection stays laid out underneath, hidden, so leaving
- * returns to it exactly as it was.
+ * node and exports the saved workflow; the body draws the selected workflow's document. The collection stays laid out
+ * underneath, hidden, so leaving returns to it exactly as it was.
  */
 
 export interface WorkflowLibraryPreviewStageHandle {

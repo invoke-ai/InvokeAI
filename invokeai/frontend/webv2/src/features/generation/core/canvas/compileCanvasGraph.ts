@@ -1,7 +1,7 @@
 /**
- * Pure canvas compiler over uploaded inputs. Resize through the processing grid and restore the bbox; hosted
- * providers are asked for one of their own sizes, take the bbox composite for edits, and have their result restored
- * to the bbox; reject unsupported modes.
+ * Pure canvas compiler over uploaded inputs. Resize through the processing grid and restore the bbox; hosted providers
+ * are asked for one of their own sizes, take the bbox composite for edits, and have their result restored to the bbox;
+ * reject unsupported modes.
  */
 
 import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
@@ -98,8 +98,8 @@ const hasAnimaInpaintAdapter = (model: GenerateModelConfig, settings: GenerateSe
 
 /**
  * The legacy PiD guards (`buildSDXLGraph.ts:192–205`, repeated in the other builders): only the txt2img and img2img
- * graphs decode through PiD, and Scale Before Processing must leave the bbox alone because PiD already decodes at
- * 4× the generation size.
+ * graphs decode through PiD, and Scale Before Processing must leave the bbox alone because PiD already decodes at 4×
+ * the generation size.
  */
 const getCanvasPidValidationReasons = (input: CompileCanvasGraphInput, processingSize: CanvasSize): string[] => {
   const { bbox, mode, model, settings } = input;
@@ -190,8 +190,8 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
     }
   }
 
-  // Inpaint always needs a mask (an active inpaint mask defines the region);
-  // outpaint derives its mask from the raster alpha, so its mask is optional.
+  // Inpaint always needs a mask (an active inpaint mask defines the region); outpaint derives its mask from the raster
+  // alpha, so its mask is optional.
   if (mode === 'inpaint' && !maskImageName) {
     reasons.push('Canvas inpainting requires an inpaint mask.');
   }
@@ -235,8 +235,8 @@ const resizeCanvasOutputToBbox = (
     return;
   }
 
-  // Retarget PiD Fit's resize so the output is resampled once, straight to the bbox (legacy parity), rather
-  // than through the processing size.
+  // Retarget PiD Fit's resize so the output is resampled once, straight to the bbox (legacy parity), rather than
+  // through the processing size.
   const terminalResize = graph.nodes.canvas_output;
   if (isPidFit && terminalResize?.type === 'img_resize') {
     terminalResize.width = bbox.width;
@@ -256,9 +256,9 @@ const resizeCanvasOutputToBbox = (
 
 /**
  * Hosted nodes return an image collection; restore each image to the bbox with its own provider metadata. A
- * text-to-image result at another aspect ratio is scaled to cover the bbox and center-cropped, never stretched.
- * Scaling before cropping keeps the crop centered when a provider answers at another scale of the requested shape
- * (named sizes such as Gemini's `2K`). An edit result is resized plainly, undoing its init image's resize.
+ * text-to-image result at another aspect ratio is scaled to cover the bbox and center-cropped, never stretched. Scaling
+ * before cropping keeps the crop centered when a provider answers at another scale of the requested shape (named sizes
+ * such as Gemini's `2K`). An edit result is resized plainly, undoing its init image's resize.
  */
 const restoreExternalCanvasOutputToBbox = (
   graph: BackendGraphContract,
@@ -448,8 +448,8 @@ const graftImageToImage = (
 ): void => {
   const { graph } = family;
   const latents = requireLatents(family, model);
-  // The source image is encoded at the size the graph denoises at. That is the processing size, except under
-  // native PiD, which denoises at a quarter of it and decodes straight back up (legacy `addPidImageToImageNative`).
+  // The source image is encoded at the size the graph denoises at. That is the processing size, except under native
+  // PiD, which denoises at a quarter of it and decodes straight back up (legacy `addPidImageToImageNative`).
   const encodeSize = family.denoiseSize;
   const needsResize = !sizesMatch(bbox, encodeSize);
   const encode = addEncodeNode(graph, latents, settings, needsResize ? null : compositeImageName);
@@ -497,10 +497,9 @@ const addInfillNode = (
 
 /**
  * Anima's 4-channel ControlNet-LLLite inpaint adapter: it conditions on the raster image and the region to inpaint
- * (legacy `addInpaint.ts` / `addOutpaint.ts`). The canvas mask is white = keep, the adapter expects white =
- * inpaint, so `img_lerp` with `min: 255, max: 0` inverts it first. The adapter joins the control layers' collector;
- * `anima_denoise` applies each LLLite model once, and control layers admit only 3-channel models, so they never
- * collide.
+ * (legacy `addInpaint.ts` / `addOutpaint.ts`). The canvas mask is white = keep, the adapter expects white = inpaint, so
+ * `img_lerp` with `min: 255, max: 0` inverts it first. The adapter joins the control layers' collector; `anima_denoise`
+ * applies each LLLite model once, and control layers admit only 3-channel models, so they never collide.
  */
 const addAnimaInpaintAdapter = (
   graph: BackendGraphContract,
@@ -787,8 +786,7 @@ const graftOutpaint = (
     infill.image = { image_name: initialImageName };
   }
 
-  // Derive the mask from image alpha (transparent means generate), combining an explicit inpaint mask when
-  // present.
+  // Derive the mask from image alpha (transparent means generate), combining an explicit inpaint mask when present.
   const alphaToMask = addNode(graph, {
     id: 'image_alpha_to_mask',
     image: { image_name: initialImageName },
@@ -1050,8 +1048,8 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
       throw new Error(`${model.name} does not support ${mode}ing on the canvas.`);
     }
 
-    // The provider is asked for the processing size, one of its own sizes, and the returned whole image is restored
-    // to the exact bbox footprint before staging or saving. No local denoising strength applies.
+    // The provider is asked for the processing size, one of its own sizes, and the returned whole image is restored to
+    // the exact bbox footprint before staging or saving. No local denoising strength applies.
     const backendGraph = buildExternalGraph(
       settings,
       model,

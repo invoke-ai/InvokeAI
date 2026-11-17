@@ -43,18 +43,16 @@ export interface LayerCacheEntry {
   /** Monotonic access tick, used to order LRU eviction. */
   lastUsed: number;
   /**
-   * Browser family alias used for the most recent text rasterization. The alias
-   * identifies the exact account-scoped face/variation in the Canvas font
-   * runtime, so output can reject pixels rendered with a fallback family after
-   * the real face becomes available.
+   * Browser family alias used for the most recent text rasterization. The alias identifies the exact account-scoped
+   * face/variation in the Canvas font runtime, so output can reject pixels rendered with a fallback family after the
+   * real face becomes available.
    */
   renderedFontFamily?: string;
 }
 
 /**
- * A fully-rasterized cache replacement that has not been published to the live
- * cache map yet. Preparation may allocate/draw and therefore may fail; install
- * performs only in-memory version/map bookkeeping.
+ * A fully-rasterized cache replacement that has not been published to the live cache map yet. Preparation may
+ * allocate/draw and therefore may fail; install performs only in-memory version/map bookkeeping.
  */
 export interface PreparedLayerCacheReplacement {
   readonly layerId: string;
@@ -87,8 +85,8 @@ export interface LayerCacheStore {
   /** Returns the existing cache entry for a layer, or `undefined`. Touches LRU order. */
   get(layerId: string): LayerCacheEntry | undefined;
   /**
-   * Create/resize origin-anchored caches with stable entry identity while size matches. Off-origin paint uses
-   * {@link getOrCreateRect} or {@link growToRect}.
+   * Create/resize origin-anchored caches with stable entry identity while size matches. Off-origin paint uses {@link
+   * getOrCreateRect} or {@link growToRect}.
    */
   getOrCreate(layerId: string, width: number, height: number): LayerCacheEntry;
   /**
@@ -97,13 +95,13 @@ export interface LayerCacheStore {
    */
   getOrCreateRect(layerId: string, rect: Rect): LayerCacheEntry;
   /**
-   * Grow to include a local rect while preserving pixels and offset; never shrink. Creates missing entries and
-   * reuses already-covering ones.
+   * Grow to include a local rect while preserving pixels and offset; never shrink. Creates missing entries and reuses
+   * already-covering ones.
    */
   growToRect(layerId: string, rect: Rect): LayerCacheEntry;
   /**
-   * Intersect-crop local bounds, retaining the entry even when empty so undo can grow it again. Changed bounds
-   * always bump version to fence stale raster jobs. Equal bounds are a no-op; missing caches return undefined.
+   * Intersect-crop local bounds, retaining the entry even when empty so undo can grow it again. Changed bounds always
+   * bump version to fence stale raster jobs. Equal bounds are a no-op; missing caches return undefined.
    */
   shrinkToRect(layerId: string, rect: Rect): LayerCacheEntry | undefined;
   /** Clones `pixels` into a detached replacement without mutating the live cache. */
@@ -120,8 +118,8 @@ export interface LayerCacheStore {
    */
   restoreState(layerId: string, state: LayerCacheEntryState | null): void;
   /**
-   * Publish direct writes as current, bump version and notify. Optional surface-local damage enables partial
-   * derived refresh; omission means the whole surface changed.
+   * Publish direct writes as current, bump version and notify. Optional surface-local damage enables partial derived
+   * refresh; omission means the whole surface changed.
    */
   publishPixels(layerId: string, damage?: Rect | null): LayerCacheEntry | undefined;
   /**
@@ -184,9 +182,8 @@ export const createLayerCacheStore = (
   const damageTrails = new Map<string, DamageStep[]>();
 
   /**
-   * Appends a write to a layer's damage trail. A `null` rect is recorded rather
-   * than dropped: it is what tells {@link damageSince} that a write of unknown
-   * extent happened, so a derived surface spanning it must rebuild in full.
+   * Appends a write to a layer's damage trail. A `null` rect is recorded rather than dropped: it is what tells {@link
+   * damageSince} that a write of unknown extent happened, so a derived surface spanning it must rebuild in full.
    */
   const recordDamage = (entry: LayerCacheEntry, rect: Rect | null): void => {
     const trail = damageTrails.get(entry.layerId) ?? [];
@@ -343,12 +340,11 @@ export const createLayerCacheStore = (
       touch(existing);
       return existing;
     }
-    // The surface origin moves with the grown rect, so every surface-local rect
-    // recorded so far is void. Dropping the trail makes derived surfaces rebuild
-    // wholesale for one frame rather than refresh the wrong pixels.
+    // The surface origin moves with the grown rect, so every surface-local rect recorded so far is void. Dropping the
+    // trail makes derived surfaces rebuild wholesale for one frame rather than refresh the wrong pixels.
     damageTrails.delete(layerId);
-    // Grow by adopting a fresh backing store and blitting old pixels at the new offset. Ordinary resize clears,
-    // and CPU readback/upload would add work on the stroke hot path.
+    // Grow by adopting a fresh backing store and blitting old pixels at the new offset. Ordinary resize clears, and CPU
+    // readback/upload would add work on the stroke hot path.
     const surface = existing.surface;
     if (!curEmpty && cur.width > 0 && cur.height > 0) {
       surface.resizePreserving(newRect.width, newRect.height, cur.x - newRect.x, cur.y - newRect.y);
@@ -390,8 +386,8 @@ export const createLayerCacheStore = (
     if (isEmpty(newRect)) {
       surface.resize(0, 0);
     } else {
-      // A negative offset IS the crop: `drawImage` clips what falls outside the
-      // smaller surface, so this is one GPU blit with no CPU round trip.
+      // A negative offset IS the crop: `drawImage` clips what falls outside the smaller surface, so this is one GPU
+      // blit with no CPU round trip.
       surface.resizePreserving(newRect.width, newRect.height, cur.x - newRect.x, cur.y - newRect.y);
     }
     existing.rect = newRect;
@@ -515,8 +511,8 @@ export const createLayerCacheStore = (
       return null;
     }
     const trail = damageTrails.get(layerId);
-    // The trail must reach back far enough to account for EVERY version since
-    // the caller's: a gap means an unrecorded write, so nothing can be assumed.
+    // The trail must reach back far enough to account for EVERY version since the caller's: a gap means an unrecorded
+    // write, so nothing can be assumed.
     if (!trail || trail.length === 0 || trail[0]!.version > version + 1) {
       return null;
     }

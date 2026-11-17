@@ -48,8 +48,8 @@ type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
 const THUMBNAIL_STRIP_HEIGHT = '5rem';
 const MENU_POSITIONING = { placement: 'top-end' } as const;
 /**
- * Below this bar width the "Generating" text and "Discard all" collapse to icons, so the accept split button (the
- * only pointer path to "Keep as hidden layer") stays inside the canvas. Measured on the staging slot itself.
+ * Below this bar width the "Generating" text and "Discard all" collapse to icons, so the accept split button (the only
+ * pointer path to "Keep as hidden layer") stays inside the canvas. Measured on the staging slot itself.
  */
 const COMPACT = '@container staging-bar (width < 56rem)';
 /**
@@ -149,9 +149,8 @@ export const StagingBar = ({
   const { t } = useTranslation();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [contextMenuTarget, setContextMenuTarget] = useState<StagingItemContextMenuTarget | null>(null);
-  // The menu's candidate actions act on the selection, so it only stays open
-  // while its slot is the selected one: an auto-switch to a newer result
-  // closes it rather than letting Discard hit the wrong candidate.
+  // The menu's candidate actions act on the selection, so it only stays open while its slot is the selected one: an
+  // auto-switch to a newer result closes it rather than letting Discard hit the wrong candidate.
   if (contextMenuTarget && selectedSlot?.id !== contextMenuTarget.slot.id) {
     setContextMenuTarget(null);
   }
@@ -174,8 +173,8 @@ export const StagingBar = ({
   /**
    * After a discard or a closed thumbnail menu, focus stays with the results instead of falling to the page: on
    * `preferred` (the thumbnail the menu opened from), else the result now selected when thumbnails show, else a step
-   * button that still works, else the bar itself. Once the last result is gone, and the bar with it, the canvas
-   * surface takes focus, so the canvas's keys keep working. Focus the user already moved elsewhere stays there.
+   * button that still works, else the bar itself. Once the last result is gone, and the bar with it, the canvas surface
+   * takes focus, so the canvas's keys keep working. Focus the user already moved elsewhere stays there.
    */
   const keepFocusWithResults = (preferred?: () => HTMLElement | null) => {
     const root = rootRef.current;
@@ -248,8 +247,8 @@ export const StagingBar = ({
       const direction = event.key === 'ArrowLeft' ? -1 : 1;
       const index = thumbnail ? Number(thumbnail.getAttribute(THUMBNAIL_ATTR)) : Number.NaN;
       if (Number.isInteger(index)) {
-        // Roving focus: an arrow is the pick (it steers Auto-switch), and focus goes with it. Tab only ever reaches
-        // the selected thumbnail, so passing through the strip picks nothing.
+        // Roving focus: an arrow is the pick (it steers Auto-switch), and focus goes with it. Tab only ever reaches the
+        // selected thumbnail, so passing through the strip picks nothing.
         const next = (index + direction + slots.length) % slots.length;
         onSelectImage(next);
         event.currentTarget.querySelector<HTMLElement>(`[${THUMBNAIL_ATTR}="${next}"]`)?.focus();
@@ -295,8 +294,7 @@ export const StagingBar = ({
         />
       ) : null}
       {hasSlots ? (
-        // Constrain thumbnail scrolling to canvas width so centered overflow cannot be clipped outside the
-        // surface.
+        // Constrain thumbnail scrolling to canvas width so centered overflow cannot be clipped outside the surface.
         <ScrollArea.Root
           h={areThumbnailsVisible ? THUMBNAIL_STRIP_HEIGHT : '0'}
           opacity={areThumbnailsVisible ? 1 : 0}
@@ -326,8 +324,8 @@ export const StagingBar = ({
                       if (slot.kind !== 'candidate') {
                         return;
                       }
-                      // The menu acts on the selected candidate, so a right-click selects first.
-                      // The keyboard's context-menu key reports no pointer; anchor to the thumbnail.
+                      // The menu acts on the selected candidate, so a right-click selects first. The keyboard's
+                      // context-menu key reports no pointer; anchor to the thumbnail.
                       event.preventDefault();
                       onSelectImage(index);
                       const rect = event.currentTarget.getBoundingClientRect();
@@ -383,7 +381,8 @@ export const StagingBar = ({
           <HStack
             color="fg.muted"
             // Once compact a running batch keeps its spinner; otherwise the status goes, since the counter shows the
-            // count, and it still reads the sentence. Once narrow, the stop button's icon says a run is going in its place.
+            // count, and it still reads the sentence. Once narrow, the stop button's icon says a run is going in its
+            // place.
             css={isGenerating ? (canStopGenerating ? NARROW_SR_ONLY_CSS : undefined) : COMPACT_SR_ONLY_CSS}
             flexShrink="0"
             gap="1.5"
@@ -592,9 +591,8 @@ const StagingThumbnail = ({
     [isSelected]
   );
   const preloadCandidate = useCallback(() => {
-    // Once a candidate's small thumbnail settles, warm its full bytes in the
-    // engine so cycling to it only pays the bitmap decode. The cache promotes a
-    // selected candidate out of the background queue when necessary.
+    // Once a candidate's small thumbnail settles, warm its full bytes in the engine so cycling to it only pays the
+    // bitmap decode. The cache promotes a selected candidate out of the background queue when necessary.
     if (slot.kind === 'candidate') {
       onPreloadCandidate(slot.candidate.imageName);
     }

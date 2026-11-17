@@ -1,8 +1,8 @@
 /**
  * Owns float geometry and extraction; the controller owns lifecycle/history/persistence. Document-space masks map
  * through the inverse layer transform into local space, resampling coverage rather than content. Pixels and live
- * transforms stay layer-local; whole-pixel translations preserve exact blits, and pointer deltas convert via
- * {@link documentDeltaToLocal}.
+ * transforms stay layer-local; whole-pixel translations preserve exact blits, and pointer deltas convert via {@link
+ * documentDeltaToLocal}.
  */
 
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -50,17 +50,15 @@ export interface LiftedPixels {
   /** The masked copy of the layer's content, sized to the cut region. */
   pixels: PlacedSurface;
   /**
-   * The selection mask projected into layer-local space over the same region —
-   * the stencil the caller punches the hole with, so the cut and the copy agree
-   * to the pixel.
+   * The selection mask projected into layer-local space over the same region — the stencil the caller punches the hole
+   * with, so the cut and the copy agree to the pixel.
    */
   localMask: PlacedSurface;
 }
 
 /**
- * Converts a DOCUMENT-space delta into the layer's LOCAL space. Only the linear
- * part of the layer matrix applies — a delta is a vector, not a point, so the
- * translation must not be added.
+ * Converts a DOCUMENT-space delta into the layer's LOCAL space. Only the linear part of the layer matrix applies — a
+ * delta is a vector, not a point, so the translation must not be added.
  */
 export const documentDeltaToLocal = (layerMatrix: Mat2d, delta: Vec2): Vec2 => {
   const inverse = invert(layerMatrix);
@@ -73,10 +71,9 @@ export const documentDeltaToLocal = (layerMatrix: Mat2d, delta: Vec2): Vec2 => {
 };
 
 /**
- * The float's transform expressed in DOCUMENT space: `L · F · L⁻¹`, where `L` is
- * the layer matrix and `F` the float's layer-local transform. Used to carry the
- * document-space selection mask along with the float on commit, so the marching
- * ants end up around the moved pixels.
+ * The float's transform expressed in DOCUMENT space: `L · F · L⁻¹`, where `L` is the layer matrix and `F` the float's
+ * layer-local transform. Used to carry the document-space selection mask along with the float on commit, so the
+ * marching ants end up around the moved pixels.
  */
 export const floatDocumentMatrix = (layerMatrix: Mat2d, floatMatrix: Mat2d): Mat2d | null => {
   const inverse = invert(layerMatrix);
@@ -115,8 +112,8 @@ export const liftRegion = (cacheRect: Rect, layerMatrix: Mat2d, maskRect: Rect):
 };
 
 /**
- * Copies selected layer content over {@link liftRegion} and returns its exact local stencil, or null without
- * overlap. Does not mutate cache; callers cut with the same stencil.
+ * Copies selected layer content over {@link liftRegion} and returns its exact local stencil, or null without overlap.
+ * Does not mutate cache; callers cut with the same stencil.
  */
 export const liftSelectedPixels = ({
   backend,

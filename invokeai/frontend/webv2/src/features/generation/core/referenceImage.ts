@@ -79,9 +79,9 @@ export const generatedImageToReferenceImage = (
 });
 
 /**
- * Accepts canonical legacy data, pre-crop `{ image_name, width, height }`, and
- * webv2's former flat `GeneratedImageContract`. Flat webv2 crops are necessarily
- * migrated as a new original because their previous original was not retained.
+ * Accepts canonical legacy data, pre-crop `{ image_name, width, height }`, and webv2's former flat
+ * `GeneratedImageContract`. Flat webv2 crops are necessarily migrated as a new original because their previous original
+ * was not retained.
  */
 export const normalizeCroppableImage = (value: unknown): CroppableImageWithDims | null => {
   const flat = normalizeFlatImage(value);
@@ -204,8 +204,8 @@ export const getEnabledReferenceImages = <T extends GenerateReferenceImageConfig
 const NO_PROMPT_TAGS: ReadonlyMap<string, string> = new Map();
 
 /**
- * Tags a FLUX.3 prompt uses to name each reference, keyed by reference id. The model numbers its references by
- * their 0-based position in the denoiser input, so disabled and empty cards take no number.
+ * Tags a FLUX.3 prompt uses to name each reference, keyed by reference id. The model numbers its references by their
+ * 0-based position in the denoiser input, so disabled and empty cards take no number.
  */
 export const getReferenceImagePromptTags = (
   base: string | undefined,
@@ -287,8 +287,8 @@ export const matchReferenceCropAspectRatio = (
 };
 
 /**
- * A box of `pctRatio` whose width is at most `width`, at least the minimum edge, and that fits the image: the larger
- * of the minimum edges wins, and overflow shrinks the box rather than breaking the ratio.
+ * A box of `pctRatio` whose width is at most `width`, at least the minimum edge, and that fits the image: the larger of
+ * the minimum edges wins, and overflow shrinks the box rather than breaking the ratio.
  */
 const fitRatioBox = (
   width: number,
@@ -310,8 +310,8 @@ const placeAround = (cx: number, cy: number, size: { height: number; width: numb
 });
 
 /**
- * Applies a preset to an existing box: the area and center are preserved where the image allows, as the legacy
- * cropper did, so switching presets reshapes rather than relocates the crop. A null ratio returns the box as is.
+ * Applies a preset to an existing box: the area and center are preserved where the image allows, as the legacy cropper
+ * did, so switching presets reshapes rather than relocates the crop. A null ratio returns the box as is.
  */
 export const constrainReferenceCropBox = (
   box: ReferenceImageCropBoxPct,

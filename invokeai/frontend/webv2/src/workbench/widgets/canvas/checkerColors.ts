@@ -16,8 +16,8 @@ const cssVarRef = (token: string): string | null => {
 };
 
 /**
- * Whether a computed color string is usable — a non-empty color that isn't fully
- * transparent (the browser's answer when a var failed to resolve).
+ * Whether a computed color string is usable — a non-empty color that isn't fully transparent (the browser's answer when
+ * a var failed to resolve).
  */
 export const isUsableColor = (value: string | null | undefined): value is string =>
   typeof value === 'string' && value.trim() !== '' && value !== 'transparent' && value !== 'rgba(0, 0, 0, 0)';

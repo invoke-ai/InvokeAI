@@ -91,8 +91,8 @@ export const GalleryPickerView = ({
   const currentKey = gallerySelectedItem ? toGalleryItemKey(gallerySelectedItem) : null;
   const seedKey = gallerySelectedItem && accept.includes(gallerySelectedItem.kind) ? currentKey : null;
 
-  // The highlight follows its item's key when an insert shifts it; only a placeholder is held by index. Each
-  // deliberate placement takes a new `placement`, so it reveals even where an earlier one rested.
+  // The highlight follows its item's key when an insert shifts it; only a placeholder is held by index. Each deliberate
+  // placement takes a new `placement`, so it reveals even where an earlier one rested.
   const [activeCursor, setActiveCursor] = useState<{
     filterIdentity: string;
     index: number;
@@ -289,8 +289,8 @@ export const GalleryPickerView = ({
   const visibleBoardCount = boardGroups.reduce((count, group) => count + group.boards.length, 0);
 
   const focusSearch = useCallback(() => searchInputRef.current?.focus(), [searchInputRef]);
-  // The view is lazy-loaded, so it arrives after the popover's own initial
-  // focus pass; the field takes focus itself as it mounts.
+  // The view is lazy-loaded, so it arrives after the popover's own initial focus pass; the field takes focus itself as
+  // it mounts.
   const attachSearchInput = useCallback(
     (node: HTMLInputElement | null) => {
       searchInputRef.current = node;
@@ -298,8 +298,8 @@ export const GalleryPickerView = ({
     },
     [searchInputRef]
   );
-  // The clicked row unmounts with the pane; without this, focus falls to the
-  // body and the next keystrokes reach the workbench hotkeys.
+  // The clicked row unmounts with the pane; without this, focus falls to the body and the next keystrokes reach the
+  // workbench hotkeys.
   const handleSelectBoard = useCallback(
     (boardId: string) => {
       selectBoard(boardId);

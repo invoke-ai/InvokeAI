@@ -37,12 +37,12 @@ export type ProjectDocumentV3 = Omit<
   /** Optional and additive, so schema 3 holds: a build that predates it ignores it and leaves it out of its next save. */
   presetWorkingLayouts?: Project['presetWorkingLayouts'];
   /**
-   * Present once the document's layerable settings were coerced to pins (see `migrateProjectDocument`); every save
-   * of this build writes `SETTINGS_LAYERING_VERSION`. Additive like `presetWorkingLayouts`. A build predating the
-   * marker drops it on save. The next load then coerces again: a pin equal to the built-in is dropped, and the
-   * project follows the user's default for that setting. Accepted: only a project edited in such a build, and only
-   * pins equal to the built-in. A higher marker from a newer build counts as layered here, but this build's saves
-   * write its own version, so the newer build re-runs its steps above that version.
+   * Present once the document's layerable settings were coerced to pins (see `migrateProjectDocument`); every save of
+   * this build writes `SETTINGS_LAYERING_VERSION`. Additive like `presetWorkingLayouts`. A build predating the marker
+   * drops it on save. The next load then coerces again: a pin equal to the built-in is dropped, and the project follows
+   * the user's default for that setting. Accepted: only a project edited in such a build, and only pins equal to the
+   * built-in. A higher marker from a newer build counts as layered here, but this build's saves write its own version,
+   * so the newer build re-runs its steps above that version.
    */
   settingsLayering?: number;
   workflows: ProjectWorkflowCollection;
@@ -117,8 +117,8 @@ export const serializeProjectDocumentV3Json = (
 };
 
 /**
- * The transfer shape export, import and duplication write: every field a loaded project carries except session
- * state, so a document authored with fields this client does not know keeps them, stamped with the current schema.
+ * The transfer shape export, import and duplication write: every field a loaded project carries except session state,
+ * so a document authored with fields this client does not know keeps them, stamped with the current schema.
  */
 export const serializeProjectDocument = (project: Project): Record<string, unknown> => {
   const {
@@ -199,9 +199,9 @@ const coerceProjectSettings = (settings: Record<string, unknown>): Record<string
 
 /**
  * Before settings layered over the user's defaults, a stored value equal to the built-in read the same as an absent
- * one, so a document without the marker drops those (widget values its owner's settings edit, and the generation
- * flags) and the retired per-project antialias flag: what is left is what the project chose. With the marker (this
- * version, or a newer build's higher one) the document's values are its pins and stay as they are.
+ * one, so a document without the marker drops those (widget values its owner's settings edit, and the generation flags)
+ * and the retired per-project antialias flag: what is left is what the project chose. With the marker (this version, or
+ * a newer build's higher one) the document's values are its pins and stay as they are.
  */
 const coerceSettingsLayering = (document: Record<string, unknown>): Record<string, unknown> => {
   if (typeof document.settingsLayering === 'number' && document.settingsLayering >= SETTINGS_LAYERING_VERSION) {
@@ -221,10 +221,10 @@ export type ProjectDocumentMigration =
   | { status: 'malformed'; reason: string };
 
 /**
- * The migration boundary: any supported older document comes out as schema 3. A document without a version is
- * schema 1; schema 2 owned one `projectGraph`, which becomes the first, active workflow. Collections that would
- * lose a workflow if repaired are refused instead. A document without `settingsLayering` has its stored built-in
- * settings values dropped once (see `coerceSettingsLayering`). Callers check for a future version before calling this.
+ * The migration boundary: any supported older document comes out as schema 3. A document without a version is schema 1;
+ * schema 2 owned one `projectGraph`, which becomes the first, active workflow. Collections that would lose a workflow
+ * if repaired are refused instead. A document without `settingsLayering` has its stored built-in settings values
+ * dropped once (see `coerceSettingsLayering`). Callers check for a future version before calling this.
  */
 export const migrateProjectDocument = (data: Record<string, unknown>): ProjectDocumentMigration => {
   const version = data.documentSchemaVersion;

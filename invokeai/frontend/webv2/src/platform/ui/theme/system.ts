@@ -29,8 +29,8 @@ import { CONTROL_HEIGHT_PX } from './scale';
 import { DEFAULT_THEME, DEFAULT_THEME_ID, type NeutralStep, THEMES, type ThemeDefinition } from './themes';
 
 /**
- * Emit theme-varying ramps as semantic tokens; map component tokens and Chakra gray onto them. Root data-theme
- * switches appearance; light elevations are not a reversed dark ramp.
+ * Emit theme-varying ramps as semantic tokens; map component tokens and Chakra gray onto them. Root data-theme switches
+ * appearance; light elevations are not a reversed dark ramp.
  */
 
 const NON_DEFAULT_THEMES = THEMES.filter((theme) => theme.id !== DEFAULT_THEME_ID);
@@ -57,8 +57,8 @@ const mix = (top: Compute, pct: number, bottom: Compute): TokenValue =>
 const LIGHT_FALLBACK_THEME = THEMES.find((theme) => theme.colorScheme === 'light') ?? DEFAULT_THEME;
 
 /**
- * Shadow default gray _light/_dark keys because nested palettes deep-merge; explicit root theme selectors must
- * still win.
+ * Shadow default gray _light/_dark keys because nested palettes deep-merge; explicit root theme selectors must still
+ * win.
  */
 const grayToken = (compute: Compute): TokenValue => {
   const token = colorToken(compute);
@@ -150,8 +150,7 @@ const categoricalPalettes = Object.fromEntries(
 );
 
 /**
- * Reuse Chakra token names so built-ins inherit themes; ramp references and explicit seeds form the semantic
- * contract.
+ * Reuse Chakra token names so built-ins inherit themes; ramp references and explicit seeds form the semantic contract.
  */
 const semanticColors = {
   ...categoricalPalettes,
@@ -165,9 +164,9 @@ const semanticColors = {
   'bg.emphasized': colorToken((theme) => theme.colors.control),
   'bg.inset': colorToken((theme) => theme.colors.inset),
   /**
-   * The pointed or highlighted fill for rows, tabs, and options: a faint foreground leaned toward the accent, translucent so it
-   * reads on any surface. Matches the ghost/outline button hover (`gray.hoverTint/10`), so an open trigger and its
-   * highlighted option share one fill.
+   * The pointed or highlighted fill for rows, tabs, and options: a faint foreground leaned toward the accent,
+   * translucent so it reads on any surface. Matches the ghost/outline button hover (`gray.hoverTint/10`), so an open
+   * trigger and its highlighted option share one fill.
    */
   'bg.hover': mix(hoverTint, 10, () => 'transparent'),
   // Soft status fills for alerts/banners, mixed into the panel surface.
@@ -274,9 +273,9 @@ const motionDurationToken = (base: string): TokenValue => ({ value: { base, _red
 const motionAnimationToken = (base: string): TokenValue => ({ value: { base, _reduceMotion: 'none' } });
 
 /**
- * Chakra's hover and active exclude only native and `data-disabled` controls. An `aria-disabled` one (kept focusable
- * so it can explain itself) must not respond to the pointer either. Nor may it look expanded: a tooltip marks its
- * trigger expanded while open, and buttons give expanded their hover fill, so showing the reason would tint it.
+ * Chakra's hover and active exclude only native and `data-disabled` controls. An `aria-disabled` one (kept focusable so
+ * it can explain itself) must not respond to the pointer either. Nor may it look expanded: a tooltip marks its trigger
+ * expanded while open, and buttons give expanded their hover fill, so showing the reason would tint it.
  */
 const interactionConditions = {
   hover: ['@media (hover: hover)', '&:is(:hover, [data-hover]):not(:disabled, [data-disabled], [aria-disabled=true])'],

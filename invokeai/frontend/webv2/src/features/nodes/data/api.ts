@@ -43,8 +43,8 @@ export const reloadCustomNodes = (signal?: AbortSignal): Promise<{ status: strin
   requestJson<{ status: string }>(`${CUSTOM_NODES_BASE}/reload`, { method: 'POST', signal });
 
 /**
- * Estimate imported workflows by pack tag for confirmation; uninstall uses manifest IDs, so retagging can change
- * the count.
+ * Estimate imported workflows by pack tag for confirmation; uninstall uses manifest IDs, so retagging can change the
+ * count.
  */
 export const getPackWorkflowCount = async (packName: string, signal?: AbortSignal): Promise<number> => {
   const tag = `node-pack:${packName}`;

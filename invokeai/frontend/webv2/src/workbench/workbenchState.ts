@@ -461,8 +461,8 @@ type WorkbenchReducerAction =
       image: ImageWithDims;
       upscaleModel: SpandrelModelConfig;
       /**
-       * `'native'` runs the upscaler once, which needs no recorded scale; any other of `getModelOnlyUpscaleFactors` runs
-       * the passes Model only plans and resizes to it. A recorded native scale is sized like any other factor.
+       * `'native'` runs the upscaler once, which needs no recorded scale; any other of `getModelOnlyUpscaleFactors`
+       * runs the passes Model only plans and resizes to it. A recorded native scale is sized like any other factor.
        */
       scale: number | 'native';
       /** The image's metadata, read before dispatch; null when it has none. */
@@ -539,8 +539,8 @@ type WorkbenchReducerAction =
       type: 'selectGalleryItem';
       item: GalleryItem;
       /**
-       * Navigate within the item's own board, unfiltered, instead of the listing the Gallery shows: for selections
-       * made outside the Gallery, such as a search result from any board.
+       * Navigate within the item's own board, unfiltered, instead of the listing the Gallery shows: for selections made
+       * outside the Gallery, such as a search result from any board.
        */
       navigateItemBoard?: boolean;
       preserveNavigationQuery?: boolean;
@@ -591,9 +591,9 @@ type WorkbenchReducerAction =
       type: 'removeGalleryItems';
       itemKeys: GalleryItemKey[];
       /**
-       * The caller selects a next image in `projectId` right after, as deleting the shown item does: that project's open
-       * comparison stays for it. Otherwise, and in every other project, a removal that leaves nothing selected ends the
-       * comparison.
+       * The caller selects a next image in `projectId` right after, as deleting the shown item does: that project's
+       * open comparison stays for it. Otherwise, and in every other project, a removal that leaves nothing selected
+       * ends the comparison.
        */
       keepComparisonForSuccessor?: boolean;
       /** The project deleting; the active one when omitted. */
@@ -778,8 +778,8 @@ const createNotification = ({
 const addNotification = (state: WorkbenchState, notification: WorkbenchNotification): WorkbenchState => {
   const [newest, ...rest] = state.notifications;
 
-  // Reuse the newest matching error's id to suppress repeated toasts. Routine success notifications must still
-  // toast independently.
+  // Reuse the newest matching error's id to suppress repeated toasts. Routine success notifications must still toast
+  // independently.
   if (
     newest &&
     newest.kind === 'error' &&
@@ -832,8 +832,8 @@ const withRunLabel = (
 type CodedRunFailure = Exclude<QueueRunErrorCode, 'removed' | 'unexplained'>;
 
 /**
- * Failures the queue runtime words itself, as translation keys with their English. `key` is the message for a run
- * with a prompt or workflow name, `${key}Unlabeled` the one without; `reason` is the server's or validator's text.
+ * Failures the queue runtime words itself, as translation keys with their English. `key` is the message for a run with
+ * a prompt or workflow name, `${key}Unlabeled` the one without; `reason` is the server's or validator's text.
  */
 const CODED_RUN_FAILURES: Record<
   CodedRunFailure,
@@ -919,8 +919,8 @@ const describeRunFailure = (
 
 /**
  * Says which run ended and where: its project, and its prompt or workflow name. A failure stays until dismissed and,
- * once the backend items that failed are known and still there, offers to show the first in the queue and to retry
- * them all at once. A run of several items says how many of them failed.
+ * once the backend items that failed are known and still there, offers to show the first in the queue and to retry them
+ * all at once. A run of several items says how many of them failed.
  */
 const createRunOutcomeNotification = (
   project: Project,
@@ -1516,8 +1516,8 @@ const pruneCanvasStagingFollow = (
 };
 
 /**
- * After every action: each project whose staging, queue or follow state changed shows what Auto-switch follows, and
- * the follow state keeps only placeholders that remain and projects that are open.
+ * After every action: each project whose staging, queue or follow state changed shows what Auto-switch follows, and the
+ * follow state keeps only placeholders that remain and projects that are open.
  */
 const reconcileCanvasStagingFollow = (previous: WorkbenchState, next: WorkbenchState): WorkbenchState => {
   if (next.projects === previous.projects && next.canvasStagingFollow === previous.canvasStagingFollow) {
@@ -1582,8 +1582,8 @@ const clampCanvasStagingSelection = (project: Project, previousSelectedSlot?: Ca
   const slots = getCanvasStagingSlots(project.canvas, project.queue.items);
   const slotCount = slots.length;
   const preservedSlotIndex = findPreservedCanvasStagingSlotIndex(slots, previousSelectedSlot);
-  // On 'progress', a followed slot that ends without a result (canceled, or finished with no image) hands the canvas
-  // to the newest result rather than to whatever placeholder takes its index, which has no frame yet.
+  // On 'progress', a followed slot that ends without a result (canceled, or finished with no image) hands the canvas to
+  // the newest result rather than to whatever placeholder takes its index, which has no frame yet.
   const fallbackIndex =
     project.canvas.stagingArea.autoSwitchMode === 'progress' && previousSelectedSlot?.kind === 'placeholder'
       ? getLatestCandidateSlotIndex(project, slots)
@@ -1654,8 +1654,9 @@ const getGalleryCompareState = (values: Record<string, unknown>): 'armed' | 'com
 };
 
 /**
- * What selecting `item` does to the comparison. A video cannot be compared. Picking the comparison image of an open pair
- * swaps the pair, as Swap does; any other selection landing on the comparison image ends it (`settleGalleryValues`).
+ * What selecting `item` does to the comparison. A video cannot be compared. Picking the comparison image of an open
+ * pair swaps the pair, as Swap does; any other selection landing on the comparison image ends it
+ * (`settleGalleryValues`).
  */
 const getSelectionComparePatch = (values: Record<string, unknown>, item: GalleryItem): Record<string, unknown> => {
   if (item.kind === 'video') {
@@ -1678,9 +1679,8 @@ const getSelectionComparePatch = (values: Record<string, unknown>, item: Gallery
 };
 
 /**
- * Deep-clones an already-v2 canvas state and normalizes staging candidate placements. Not a
- * migration boundary: callers with genuinely unknown/legacy input must run
- * `loadCanvasState` first (see `normalizeWorkbenchProject`).
+ * Deep-clones an already-v2 canvas state and normalizes staging candidate placements. Not a migration boundary: callers
+ * with genuinely unknown/legacy input must run `loadCanvasState` first (see `normalizeWorkbenchProject`).
  */
 const cloneCanvas = (canvas: CanvasStateContractV3): CanvasStateContractV3 => {
   const document = structuredClone(canvas.document);
@@ -1869,9 +1869,9 @@ const isPristineWidgetInstance = (instance: WidgetInstanceContract): boolean => 
  * step dropped returns with the values it had then, and one created since stays, unplaced, with its own, so adding it
  * again brings them back. One created since that the restored layout places nowhere and that holds nothing a fresh
  * instance would not is dropped, so opening a widget and undoing leaves no trace; the redo step's snapshot still
- * carries it. Preset working copies need no check: they are captured from the live project, so any instance one
- * places is in the snapshot, and applying a copy recreates a missing instance pristine anyway. Graphs fill in only
- * where the project has none now.
+ * carries it. Preset working copies need no check: they are captured from the live project, so any instance one places
+ * is in the snapshot, and applying a copy recreates a missing instance pristine anyway. Graphs fill in only where the
+ * project has none now.
  */
 const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): Project => {
   const restored = cloneWidgetInstances(snapshot.widgetInstances);
@@ -1916,8 +1916,8 @@ const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): P
 };
 
 /**
- * Capture the pre-edit state as one undo step; `notice` makes the step report itself with an Undo toast. Edits sharing a
- * `mergeKey` within the merge window fold into the step before them, which keeps its snapshot from before the burst.
+ * Capture the pre-edit state as one undo step; `notice` makes the step report itself with an Undo toast. Edits sharing
+ * a `mergeKey` within the merge window fold into the step before them, which keeps its snapshot from before the burst.
  */
 const pushUndo = (
   project: Project,
@@ -2151,11 +2151,11 @@ export const RETIRED_REGION_WIDGET_TYPE_IDS: Readonly<Partial<Record<WidgetRegio
 };
 
 /**
- * Stored placements with retired widgets removed: instances of retired types leave every region and the instance
- * map, and the region's first remaining widget comes to the front; an instance docked where its type is no longer
- * hosted leaves only that region (which collapses rather than expanding its next widget when it was in front), and
- * the instance map once nothing else places it. A docked id without an instance is read by its default type: its
- * id, or the part before `:` (`diagnostics:bottom`).
+ * Stored placements with retired widgets removed: instances of retired types leave every region and the instance map,
+ * and the region's first remaining widget comes to the front; an instance docked where its type is no longer hosted
+ * leaves only that region (which collapses rather than expanding its next widget when it was in front), and the
+ * instance map once nothing else places it. A docked id without an instance is read by its default type: its id, or the
+ * part before `:` (`diagnostics:bottom`).
  */
 const stripRetiredWidgets = <Instance extends { typeId: string }>(
   widgetRegions: Readonly<Record<WidgetRegion, WidgetRegionState>>,
@@ -2205,8 +2205,8 @@ const stripRetiredWidgets = <Instance extends { typeId: string }>(
   return { widgetInstances: instances, widgetRegions: regions };
 };
 
-// Adopt queue-status for the historical bottom default. Placement normalization removes any instance already
-// hosted in a window.
+// Adopt queue-status for the historical bottom default. Placement normalization removes any instance already hosted in
+// a window.
 const LEGACY_DEFAULT_BOTTOM_REGION_WIDGET_IDS: readonly WidgetInstanceId[] = [
   'server-status',
   'gallery:bottom',
@@ -2256,8 +2256,7 @@ const ensureCenterRegion = (
   // empty.
   const instanceIds = centerRegion ? centerRegion.instanceIds : defaultCenterRegion.instanceIds;
   const activeInstanceId = centerRegion?.activeInstanceId ?? getCenterWidgetIdFromViewId(fallbackCenterViewId);
-  // An empty center retains the floated instance pointer for boot preloading; nonempty centers clamp invalid
-  // pointers.
+  // An empty center retains the floated instance pointer for boot preloading; nonempty centers clamp invalid pointers.
   const normalizedActiveInstanceId = instanceIds.includes(activeInstanceId)
     ? activeInstanceId
     : (instanceIds[0] ?? activeInstanceId);
@@ -2306,8 +2305,7 @@ export const normalizeWorkbenchProject = (
   project: Project,
   options: {
     /**
-     * Drop session-only infinite-window anchors on imported/server documents; preserve them during live
-     * retargeting.
+     * Drop session-only infinite-window anchors on imported/server documents; preserve them during live retargeting.
      */
     isArriving?: boolean;
   } = {}
@@ -2486,9 +2484,9 @@ const assembleWorkbenchProject = (
 };
 
 /**
- * Documents reach here through `migrateProjectDocument`, which already refused malformed collections. Session
- * snapshots (`normalizeWorkbenchState`) are the one input that does not: a legacy single graph migrates, and a
- * snapshot without a usable collection gets one blank workflow rather than failing the whole session restore.
+ * Documents reach here through `migrateProjectDocument`, which already refused malformed collections. Session snapshots
+ * (`normalizeWorkbenchState`) are the one input that does not: a legacy single graph migrates, and a snapshot without a
+ * usable collection gets one blank workflow rather than failing the whole session restore.
  */
 const resolveProjectWorkflows = (
   candidate: ProjectWorkflowCollection | undefined,
@@ -2499,8 +2497,8 @@ const resolveProjectWorkflows = (
   createProjectWorkflowCollection(createBlankWorkflowDocument());
 
 /**
- * Assign the server board after normalization creates missing gallery instances. Projects with no gallery layout
- * remain unchanged.
+ * Assign the server board after normalization creates missing gallery instances. Projects with no gallery layout remain
+ * unchanged.
  */
 export const withAuthoritativeProjectBoard = (project: Project, boardId: string): Project =>
   updateProjectWidgetValues(project, 'gallery', (values) =>
@@ -2588,8 +2586,8 @@ export const resolvePanelToggle = (
 };
 
 /**
- * A region with nothing left names no active instance. The center keeps naming the view it lost: that pointer is
- * what lets a floated last view come back (see `isAwaitedCenterView`).
+ * A region with nothing left names no active instance. The center keeps naming the view it lost: that pointer is what
+ * lets a floated last view come back (see `isAwaitedCenterView`).
  */
 const emptiedActiveInstanceId = (regionId: WidgetRegion, region: WidgetRegionState): WidgetInstanceId =>
   regionId === 'center' ? region.activeInstanceId : '';
@@ -2603,10 +2601,10 @@ const getNextInstanceId = (region: WidgetRegionState, instanceId: WidgetInstance
 };
 
 /**
- * An instance opened in the center can stay a member of a side panel, but is not shown twice: a side panel fronting
- * it fronts its next member instead, or collapses when it has none. Only the pointer moves; no panel opens, so a
- * hidden panel stays hidden and later shows its neighbour. The bottom region is left alone: its members include
- * tooltip-only status items, and without the widget registry the reducer cannot tell which of them render a panel.
+ * An instance opened in the center can stay a member of a side panel, but is not shown twice: a side panel fronting it
+ * fronts its next member instead, or collapses when it has none. Only the pointer moves; no panel opens, so a hidden
+ * panel stays hidden and later shows its neighbour. The bottom region is left alone: its members include tooltip-only
+ * status items, and without the widget registry the reducer cannot tell which of them render a panel.
  */
 const SIDE_PANEL_REGIONS = ['left', 'right'] as const satisfies readonly WidgetRegion[];
 
@@ -2679,9 +2677,9 @@ const withoutFloatingWidget = (
 };
 
 /**
- * Edit one region's complete order — docked members and floating markers together — so the markers' return
- * indices stay in step with the members around them. A marker the edit docks or drops takes its window with it,
- * which keeps an instance from ending up both docked and floating.
+ * Edit one region's complete order — docked members and floating markers together — so the markers' return indices stay
+ * in step with the members around them. A marker the edit docks or drops takes its window with it, which keeps an
+ * instance from ending up both docked and floating.
  */
 const updateRegionOrder = (
   project: Project,
@@ -2719,8 +2717,8 @@ const updateRegionOrder = (
 };
 
 /**
- * Put a floating instance back where it came from: its return region, at its marker's position, and the center
- * too when the center has stayed empty since the instance left it. `reveal` also fronts it in the return region.
+ * Put a floating instance back where it came from: its return region, at its marker's position, and the center too when
+ * the center has stayed empty since the instance left it. `reveal` also fronts it in the return region.
  */
 const restoreFloatingInstance = (
   project: Project,
@@ -3000,8 +2998,8 @@ const withoutPresetWorkingLayouts = (
 
 /**
  * Drop copies that no longer hold anything: those of presets the account no longer has (they go with the preset and
- * never take one of the bounded places), and those equal to what their preset has saved. Run where the account is
- * the one the server holds (hydration, opening a project), so a copy whose save was lost still differs and stays.
+ * never take one of the bounded places), and those equal to what their preset has saved. Run where the account is the
+ * one the server holds (hydration, opening a project), so a copy whose save was lost still differs and stays.
  */
 const withoutRedundantWorkingCopies = (account: AccountState, project: Project): Project => {
   const presetWorkingLayouts = withoutPresetWorkingLayouts(
@@ -3018,9 +3016,9 @@ const withoutRedundantWorkingCopies = (account: AccountState, project: Project):
 };
 
 /**
- * The working copies after leaving the active preset for `incomingPresetId`: the outgoing arrangement is kept,
- * newest last, when it differs from what that preset has saved; the incoming copy leaves the list because it becomes
- * the live layout; copies of presets the account no longer has are dropped.
+ * The working copies after leaving the active preset for `incomingPresetId`: the outgoing arrangement is kept, newest
+ * last, when it differs from what that preset has saved; the incoming copy leaves the list because it becomes the live
+ * layout; copies of presets the account no longer has are dropped.
  */
 const captureOutgoingWorkingLayout = (
   account: AccountState,
@@ -3124,8 +3122,8 @@ export const normalizeWorkbenchAccount = (value: unknown): WorkbenchState['accou
 };
 
 const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => {
-  // Built explicitly: legacy snapshots carried preferences inside the account
-  // (they live in the settings store now) and must not resurface here.
+  // Built explicitly: legacy snapshots carried preferences inside the account (they live in the settings store now) and
+  // must not resurface here.
   const account = normalizeWorkbenchAccount(state.account);
   const restored = state.projects.map((project) =>
     withoutRedundantWorkingCopies(account, normalizeWorkbenchProject(project))
@@ -3351,8 +3349,8 @@ const applyAutoRouteForRevealedInstance = (
 ): Project => applyAutoRouteForWidgetReveal(project, project.widgetInstances[instanceId]?.typeId, context);
 
 /**
- * Consequential tab changes route only when a different widget becomes visible; background closes, collapsed
- * regions, and dangling pointers reveal nothing.
+ * Consequential tab changes route only when a different widget becomes visible; background closes, collapsed regions,
+ * and dangling pointers reveal nothing.
  */
 const applyAutoRouteForRegionFront = (
   project: Project,
@@ -3471,8 +3469,8 @@ const compileInvocationSnapshot = (
       return null;
     }
 
-    // Video's prompt is its own widget value, deliberately independent of the
-    // draft Generate and Upscale share: no draft is merged in here.
+    // Video's prompt is its own widget value, deliberately independent of the draft Generate and Upscale share: no
+    // draft is merged in here.
     const currentValues: VideoWidgetValues = models ? syncVideoWidgetValuesWithModels(values, models) : values;
 
     if (!currentValues.model || getVideoWidgetValidationReasons(currentValues, models).length > 0) {
@@ -3758,8 +3756,8 @@ const removeGalleryItemsFromAllProjects = (
       return { ...clearDeletedUpscaleInput(values, removedImageNames) };
     });
 
-    // Sweep raw slots before normalization so mutually excluded media references cannot survive deletion and
-    // reappear later.
+    // Sweep raw slots before normalization so mutually excluded media references cannot survive deletion and reappear
+    // later.
     const withoutVideoMedia = updateProjectWidgetValues(withoutUpscaleInput, 'video', (rawValues) =>
       clearDeletedVideoMedia(rawValues, removedImageNames, removedVideoNames)
     );
@@ -3853,8 +3851,8 @@ const reconcileDeletedGalleryBoard = (
 };
 
 /**
- * A deliberate selection settles the Preview on it: Auto-switch turns Off in the same step, so the control reads Off
- * at once and later results stay in the Gallery. With Auto-switch already Off only the selection changes.
+ * A deliberate selection settles the Preview on it: Auto-switch turns Off in the same step, so the control reads Off at
+ * once and later results stay in the Gallery. With Auto-switch already Off only the selection changes.
  */
 const updateGalleryValuesAndStopAutoSwitch = (
   state: WorkbenchState,
@@ -3937,8 +3935,8 @@ const reopenQueueItemForRetry = (
       ...reopened
     } = item;
 
-    // The run tracks only the reruns from here; it remembers the items it left so that retrying another of them
-    // later still returns its results here.
+    // The run tracks only the reruns from here; it remembers the items it left so that retrying another of them later
+    // still returns its results here.
     return {
       ...reopened,
       backendItemIds: itemIds,
@@ -4206,8 +4204,8 @@ const routeQueueItemResults = (
     );
   }
 
-  // Stage results only into the submitted documentRevision; wholesale canvas swaps invalidate staging while
-  // preserving completion status.
+  // Stage results only into the submitted documentRevision; wholesale canvas swaps invalidate staging while preserving
+  // completion status.
   if (queueItem && queueItem.snapshot.canvas.documentRevision !== nextProject.canvas.documentRevision) {
     return nextProject;
   }
@@ -4280,8 +4278,8 @@ const enqueueCompiledSnapshot = (
     : null;
   const effectivePrompts = submissionPlan?.effectivePrompts ?? null;
   const expandedPositivePrompts = submissionPlan?.submission.positivePrompts;
-  // The draw the expansion used. Generate expands before dispatch, so the project's sample seed may have rotated
-  // since; recall and rotation follow the expansion, not the project.
+  // The draw the expansion used. Generate expands before dispatch, so the project's sample seed may have rotated since;
+  // recall and rotation follow the expansion, not the project.
   const expansionSampleSeed = expandedPositivePrompts ? (compiled.positivePromptsSampleSeed ?? null) : null;
   // Compilation already reserved the starting seed; failures and cancellations do not roll the sequence back.
   const seedPlan = submissionPlan?.seedPlan ?? null;
@@ -4308,8 +4306,8 @@ const enqueueCompiledSnapshot = (
                 }
               : {}),
             ...(compiled.workflowJson ? { workflow: compiled.workflowJson } : {}),
-            // Capture the originating project workflow so results and seed advances return to it even after the
-            // active workflow changes.
+            // Capture the originating project workflow so results and seed advances return to it even after the active
+            // workflow changes.
             ...(compiled.projectWorkflowId ? { projectWorkflowId: compiled.projectWorkflowId } : {}),
           }
       : submissionPlan
@@ -4386,8 +4384,7 @@ const enqueueCompiledSnapshot = (
       galleryBoardId,
       graph: { id: graph.id, label: graph.label },
       presentation: {
-        // Placeholder sizing only: superseded by the backend's real item ids as
-        // soon as the batch is accepted.
+        // Placeholder sizing only: superseded by the backend's real item ids as soon as the batch is accepted.
         batchCount:
           backendSubmission.kind === 'invalid'
             ? 1
@@ -4491,9 +4488,9 @@ const hasUpscaleInputChanged = (project: Project, metadata: UpscaleSourceMetadat
 
 /**
  * The image menu's one-click upscale: the upscaler alone, results to the gallery, run and sized as the Upscale widget's
- * Model only mode runs that factor. An upscaler of unknown native scale runs once at it, unsized. The queue reads
- * the submission from the Upscale values it is handed, so these describe this run alone; the project's own Upscale
- * values, route and locks stay as they are.
+ * Model only mode runs that factor. An upscaler of unknown native scale runs once at it, unsized. The queue reads the
+ * submission from the Upscale values it is handed, so these describe this run alone; the project's own Upscale values,
+ * route and locks stay as they are.
  */
 const submitModelOnlyUpscale = (
   project: Project,
@@ -4614,8 +4611,8 @@ const getGallerySelectionPage = (values: Record<string, unknown>, selectionPage:
 
 /**
  * A host step keeps the selection's query but follows the Gallery's active ranking, except for a selection that
- * navigates its item's own board. Media kind follows the same rule as Preview's navigation: a ranked step navigated
- * the Gallery's live kind and stamps it; an ordinary step navigated the stamp's kind, which it keeps.
+ * navigates its item's own board. Media kind follows the same rule as Preview's navigation: a ranked step navigated the
+ * Gallery's live kind and stamps it; an ordinary step navigated the stamp's kind, which it keeps.
  */
 const getRankingStampFields = (
   values: Record<string, unknown>,
@@ -4649,8 +4646,8 @@ const getCurrentGallerySelectionQuery = (
     boardId: getGallerySelectionBoardId(values),
     galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
     imageOrderDir: settings.imageOrderDir,
-    // Absent reads as both kinds. Item-board stamps omit it, and result stamps omit it when the filter hides the result:
-    // both navigate a listing of both kinds.
+    // Absent reads as both kinds. Item-board stamps omit it, and result stamps omit it when the filter hides the
+    // result: both navigate a listing of both kinds.
     ...(mediaKind ? { mediaKind } : {}),
     page,
     paginationMode: settings.paginationMode,
@@ -4722,8 +4719,8 @@ export const __workbenchReducerInternal = (
       const previous = previousById.get(project.id);
 
       // A case that recorded its own step (a removal with its notice) already moved the history. A project built
-      // straight from a document, outside hydration, has none to record into. A request that left the placement as
-      // it was (opening the widget already in front) is no step: it would only clear redo.
+      // straight from a document, outside hydration, has none to record into. A request that left the placement as it
+      // was (opening the widget already in front) is no step: it would only clear redo.
       return !previous ||
         previous === project ||
         !previous.undoRedo ||
@@ -4851,8 +4848,8 @@ const reduceWorkbenchAction = (
         preset.id,
       ];
 
-      // The project moves onto the new preset, whose saved arrangement is the live one, so it opens clean; the
-      // preset it came from is left as saved, its changes having gone to the new preset rather than to a copy.
+      // The project moves onto the new preset, whose saved arrangement is the live one, so it opens clean; the preset
+      // it came from is left as saved, its changes having gone to the new preset rather than to a copy.
       return {
         ...state,
         account: { ...state.account, activeLayoutPresetId: preset.id, customLayoutPresets, layoutPresetOrder },
@@ -4868,9 +4865,9 @@ const reduceWorkbenchAction = (
         return state;
       }
 
-      // The active preset saves the live arrangement; another preset saves this project's working copy of it, and
-      // with no copy it has nothing unsaved to write. That copy stays (equal to the saved preset, it no longer reads
-      // as unsaved): saving writes only the account, so if the write is lost the copy still holds the arrangement and
+      // The active preset saves the live arrangement; another preset saves this project's working copy of it, and with
+      // no copy it has nothing unsaved to write. That copy stays (equal to the saved preset, it no longer reads as
+      // unsaved): saving writes only the account, so if the write is lost the copy still holds the arrangement and
       // shows as unsaved again. Hydration drops it once the account it loads proves it redundant.
       const workingArrangement =
         activeProject.layout.presetId === action.presetId
@@ -4904,8 +4901,8 @@ const reduceWorkbenchAction = (
         return presetWorkingLayouts === project.presetWorkingLayouts ? project : { ...project, presetWorkingLayouts };
       });
 
-      // Built-in preset bodies are code, so their saved form lives in an
-      // override map; custom presets own their snapshot outright.
+      // Built-in preset bodies are code, so their saved form lives in an override map; custom presets own their
+      // snapshot outright.
       if (isBuiltInLayoutPresetId(action.presetId)) {
         const layoutPresetOverrides: LayoutPresetOverrides = {
           ...state.account.layoutPresetOverrides,
@@ -5156,8 +5153,8 @@ const reduceWorkbenchAction = (
               ...project.widgetInstances,
               [instanceId]: createWidgetInstance(action.widgetId, instanceId, action.initialValues),
             };
-        // An explicit open docks a floating instance where it came from before placing it here, so it is never
-        // both a window and a region member.
+        // An explicit open docks a floating instance where it came from before placing it here, so it is never both a
+        // window and a region member.
         const docked = restoreFloatingInstance({ ...project, widgetInstances }, instanceId, { reveal: false });
         const placed = docked.widgetRegions[action.region].instanceIds.includes(instanceId)
           ? docked
@@ -5238,9 +5235,9 @@ const reduceWorkbenchAction = (
         const previousRegion = project.widgetRegions[action.region];
         const isEnabled = previousRegion.instanceIds.includes(action.widgetId);
 
-        // A refused toggle must stay a no-op down to object identity: the persistence layer treats any new
-        // `projects` reference as a change worth autosaving. The work surface keeps its last view, and a floating
-        // instance belongs to no region.
+        // A refused toggle must stay a no-op down to object identity: the persistence layer treats any new `projects`
+        // reference as a change worth autosaving. The work surface keeps its last view, and a floating instance belongs
+        // to no region.
         if (
           isEnabled
             ? action.region === 'center' && previousRegion.instanceIds.length === 1
@@ -5283,16 +5280,16 @@ const reduceWorkbenchAction = (
         const memberRegions = WIDGET_REGIONS.filter((regionId) =>
           project.widgetRegions[regionId].instanceIds.includes(action.instanceId)
         );
-        // The window returns to the chrome the float was asked from; without that hint, to its first member region.
-        // The reducer accepts a center origin; the UI float control only offers dockable panel origins.
+        // The window returns to the chrome the float was asked from; without that hint, to its first member region. The
+        // reducer accepts a center origin; the UI float control only offers dockable panel origins.
         const returnRegion = action.region && memberRegions.includes(action.region) ? action.region : memberRegions[0];
 
         if (!returnRegion) {
           return project;
         }
 
-        // The window reopens where it last floated, brought on screen if that was in a larger viewport; a first
-        // float takes the next cascade slot.
+        // The window reopens where it last floated, brought on screen if that was in a larger viewport; a first float
+        // takes the next cascade slot.
         const remembered = project.lastFloatingGeometry?.[action.instanceId];
         let floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined = {
           ...project.floatingWidgets,
@@ -5309,8 +5306,8 @@ const reduceWorkbenchAction = (
         };
         const widgetRegions = { ...project.widgetRegions };
 
-        // A floating instance belongs to no region: it leaves every one that held it, and only the return region
-        // keeps its slot, as a marker.
+        // A floating instance belongs to no region: it leaves every one that held it, and only the return region keeps
+        // its slot, as a marker.
         for (const regionId of memberRegions) {
           const region = project.widgetRegions[regionId];
           const slots = getRegionOrder(regionId, region.instanceIds, project.floatingWidgets);
@@ -5337,8 +5334,8 @@ const reduceWorkbenchAction = (
             ),
             widgetRegions,
           },
-          // The window lands on top of everything, so it is the revealed
-          // surface — not the tab the rail promotes behind it.
+          // The window lands on top of everything, so it is the revealed surface — not the tab the rail promotes behind
+          // it.
           action.instanceId,
           context
         );
@@ -5428,8 +5425,8 @@ const reduceWorkbenchAction = (
       return updateActiveProject(state, (project) => {
         const floatingWidgets = raiseFloatingWidget(project.floatingWidgets, action.instanceId);
 
-        // Every press and every focus arriving inside the window asks for this; only an actual raise should
-        // re-route or dirty the project.
+        // Every press and every focus arriving inside the window asks for this; only an actual raise should re-route or
+        // dirty the project.
         return floatingWidgets === project.floatingWidgets
           ? project
           : applyAutoRouteForRevealedInstance({ ...project, floatingWidgets }, action.instanceId, context);
@@ -5510,8 +5507,8 @@ const reduceWorkbenchAction = (
         const previousRegion = project.widgetRegions[action.region];
         const members = new Set(previousRegion.instanceIds);
 
-        // A reorder only permutes the docked members, which then fill the docked positions around stationary
-        // markers. Anything else is stale: it could re-add an instance that floated or left.
+        // A reorder only permutes the docked members, which then fill the docked positions around stationary markers.
+        // Anything else is stale: it could re-add an instance that floated or left.
         if (
           action.instanceIds.length !== members.size ||
           new Set(action.instanceIds).size !== members.size ||
@@ -5526,8 +5523,8 @@ const reduceWorkbenchAction = (
           instanceIds: action.instanceIds,
         }));
 
-        // A reorder that also changes which tab is selected reveals that tab;
-        // a pure reorder leaves the same panel in front and must not re-route.
+        // A reorder that also changes which tab is selected reveals that tab; a pure reorder leaves the same panel in
+        // front and must not re-route.
         return applyAutoRouteForRegionFront(nextProject, previousRegion, action.region, context);
       });
     }
@@ -6253,7 +6250,8 @@ const reduceWorkbenchAction = (
             selectedImageName: toGalleryItemKey(action.primaryItem),
             selectedImageNames: action.itemKeys,
             selectedImagePage,
-            // A Gallery range captures the current listing; only a host stepping within its own window keeps the old one.
+            // A Gallery range captures the current listing; only a host stepping within its own window keeps the old
+            // one.
             selectedImageQuery:
               action.preserveNavigationQuery && existingNavigationQuery
                 ? {
@@ -6282,8 +6280,8 @@ const reduceWorkbenchAction = (
           galleryPage: 0,
           selectedBoardId: action.boardId,
           selectedImageNames: [],
-          // A semantic search ranks within the board, so it follows the switch; a map cluster is a fixed member
-          // list and ends with an actual board change.
+          // A semantic search ranks within the board, so it follows the switch; a map cluster is a fixed member list
+          // and ends with an actual board change.
           ...(values.selectedBoardId !== action.boardId &&
           (values.semanticImageQuery as { kind?: unknown } | null | undefined)?.kind === 'cluster'
             ? { semanticImageQuery: null, semanticSearchText: null }
@@ -6354,8 +6352,7 @@ const reduceWorkbenchAction = (
             return values;
           }
 
-          // Retain text across mode changes; entering semantic mode applies immediately, leaving clears its
-          // ranking.
+          // Retain text across mode changes; entering semantic mode applies immediately, leaving clears its ranking.
           if (action.enabled) {
             const text = typeof values.searchTerm === 'string' ? values.searchTerm : '';
 
@@ -6481,8 +6478,8 @@ const reduceWorkbenchAction = (
         ...outcome.failedVideoNames.map((name) => toGalleryItemKey({ kind: 'video', name })),
       ]);
 
-      // Failed and otherwise unconfirmed local items survive. The reconciler
-      // moves every locally known key not confirmed deleted to Uncategorized.
+      // Failed and otherwise unconfirmed local items survive. The reconciler moves every locally known key not
+      // confirmed deleted to Uncategorized.
       return reconcileDeletedGalleryBoard(state, outcome.boardId, deletedItemKeys, confirmedMovedItemKeys);
     }
     case 'setGalleryProjectBoardId': {

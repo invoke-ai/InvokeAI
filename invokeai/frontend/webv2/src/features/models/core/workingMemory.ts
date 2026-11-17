@@ -1,8 +1,8 @@
 /**
  * Working-memory calibration as the Model Manager sees it: the order a plan's cases run in, the retry keys that make a
- * lost response safe to resend, which of a model's runs make up the latest attempt, and what the section shows for
- * a plan, a summary and the device status. The server owns every measurement and every state; this module only
- * orders, groups and reads them.
+ * lost response safe to resend, which of a model's runs make up the latest attempt, and what the section shows for a
+ * plan, a summary and the device status. The server owns every measurement and every state; this module only orders,
+ * groups and reads them.
  */
 
 import type { components } from '@api/schema';
@@ -94,8 +94,8 @@ const modelKeysOf = (graph: unknown): Set<string> => {
 };
 
 /**
- * The identity of every model `graph` names, from `records`, the records it was compiled over. Throws for a model
- * they lack, which a compiler over them cannot have named.
+ * The identity of every model `graph` names, from `records`, the records it was compiled over. Throws for a model they
+ * lack, which a compiler over them cannot have named.
  */
 export const compiledModelIdentities = (
   graph: unknown,
@@ -123,9 +123,9 @@ export const compiledModelIdentities = (
 
 /**
  * Builds every case's graph over `models`, or rejects naming the case that cannot compile, with the records' read
- * error, or once `signal` aborts. `models` are the records the server holds now, still being read when the compiler
- * is called, so it can fetch what else it needs meanwhile. Generation owns graph compilation and depends on Models,
- * so App supplies this; its implementation loads lazily on first call.
+ * error, or once `signal` aborts. `models` are the records the server holds now, still being read when the compiler is
+ * called, so it can fetch what else it needs meanwhile. Generation owns graph compilation and depends on Models, so App
+ * supplies this; its implementation loads lazily on first call.
  */
 export type CalibrationGraphCompiler = (
   cases: readonly WorkingMemoryCase[],
@@ -199,9 +199,9 @@ export const changesCalibration = (
 };
 
 /**
- * The retry key of one step. Resending a step after a lost response with the same key returns the run the first
- * request created. The key carries the attempt id: the server keys its retry receipts on the key alone, so a key
- * reused by a new attempt would be refused.
+ * The retry key of one step. Resending a step after a lost response with the same key returns the run the first request
+ * created. The key carries the attempt id: the server keys its retry receipts on the key alone, so a key reused by a
+ * new attempt would be refused.
  */
 export const calibrationIdempotencyKey = (attemptId: string, step: CalibrationStep): string =>
   `webv2:wm-calibration:${attemptId}:${String(step.index)}:${step.case.id}:${step.phase}-${String(step.repetition)}`;
@@ -214,8 +214,8 @@ export const newestRunId = (runs: readonly WorkingMemoryRun[]): string | null =>
   [...runs].sort(byCreation).at(-1)?.run_id ?? null;
 
 /**
- * The runs of one attempt, oldest first: those carrying `attemptId`, or by default those of the newest run's attempt.
- * A run without an attempt id (created before the server stored one) is an attempt of its own.
+ * The runs of one attempt, oldest first: those carrying `attemptId`, or by default those of the newest run's attempt. A
+ * run without an attempt id (created before the server stored one) is an attempt of its own.
  */
 export const selectAttemptRuns = (runs: readonly WorkingMemoryRun[], attemptId?: string): WorkingMemoryRun[] => {
   const ordered = [...runs].sort(byCreation);
@@ -230,10 +230,9 @@ export const selectAttemptRuns = (runs: readonly WorkingMemoryRun[], attemptId?:
 };
 
 /**
- * Why the server refused a calibration's step, where the section says it in its own words: another attempt is
- * running on this GPU, the model's record changed after the graphs were compiled over it, or another calibration ran
- * on this GPU between this attempt's steps (`interleaved`), whose later steps then no longer combine with its earlier
- * ones.
+ * Why the server refused a calibration's step, where the section says it in its own words: another attempt is running
+ * on this GPU, the model's record changed after the graphs were compiled over it, or another calibration ran on this
+ * GPU between this attempt's steps (`interleaved`), whose later steps then no longer combine with its earlier ones.
  */
 export type CalibrationRefusal = 'alreadyRunning' | 'interleaved' | 'modelChanged';
 
@@ -251,8 +250,8 @@ export interface LocalAttempt {
   /** The user stopped it. */
   stopped: boolean;
   /**
-   * The newest of the model's runs this tab knew when the attempt started. While the attempt has no runs of its own
-   * (it failed before queuing anything), it is the latest attempt only until a newer run appears.
+   * The newest of the model's runs this tab knew when the attempt started. While the attempt has no runs of its own (it
+   * failed before queuing anything), it is the latest attempt only until a newer run appears.
    */
   newestRunAtStart: string | null;
 }
@@ -271,9 +270,9 @@ export type CalibrationActivity =
     };
 
 /**
- * `discarded`: the attempt measured something, but the server aborted it (stopped, a run canceled, or its queuing
- * ended early), so none of its windows feeds a fit. A run that failed does not abort it: `kept` says that the other
- * steps measured something, which still counts.
+ * `discarded`: the attempt measured something, but the server aborted it (stopped, a run canceled, or its queuing ended
+ * early), so none of its windows feeds a fit. A run that failed does not abort it: `kept` says that the other steps
+ * measured something, which still counts.
  */
 export type CalibrationOutcome =
   | { kind: 'none' }
@@ -294,8 +293,8 @@ export type CalibrationOutcome =
   | { kind: 'failed'; discarded: boolean; error: string | null; kept: boolean; refusal?: CalibrationRefusal };
 
 /**
- * Progress and the latest attempt's outcome. A run counts as running while any of its items is pending or running
- * (the server derives that from the queue), so a pending item blocks a second start across reloads and tabs.
+ * Progress and the latest attempt's outcome. A run counts as running while any of its items is pending or running (the
+ * server derives that from the queue), so a pending item blocks a second start across reloads and tabs.
  */
 export const deriveCalibrationProgress = ({
   local,
@@ -343,10 +342,10 @@ export const deriveCalibrationProgress = ({
   const canceled =
     (current?.stopped ?? false) || attempt.some((run) => run.status === 'canceled' || run.status === 'partial');
   // Once the attempt settled, the server alone says whether it discards the attempt's windows: a Stop that came after
-  // the last step finished cancels nothing, and a step whose response was lost may still have been recorded. Before
-  // the summary lists the attempt's runs, nothing of it was measured, so nothing reads as discarded either. Measured
-  // means a run that completed, or partly did: `point_count` also counts the invalid windows of a decode that failed
-  // or was canceled.
+  // the last step finished cancels nothing, and a step whose response was lost may still have been recorded. Before the
+  // summary lists the attempt's runs, nothing of it was measured, so nothing reads as discarded either. Measured means
+  // a run that completed, or partly did: `point_count` also counts the invalid windows of a decode that failed or was
+  // canceled.
   const measured = attempt.some((run) => run.status === 'completed' || run.status === 'partial');
   const aborted = attempt.some((run) => run.held_back === 'aborted_attempt');
   const discarded = measured && aborted;
@@ -461,8 +460,8 @@ export const describeCoverage = (
   const current = lines.filter((line) => line.env_id === summary?.current_env_id);
   const hasOwnWindows = lines.some((line) => line.own_windows > 0);
   const applies = (line: (typeof lines)[number]) => line.state === 'in_use' || line.state === 'stale';
-  // An estimator update leaves the old version's windows as an unusable line; once the new version's line applies,
-  // the old one is superseded and does not head the section.
+  // An estimator update leaves the old version's windows as an unusable line; once the new version's line applies, the
+  // old one is superseded and does not head the section.
   const headline = current.filter(
     (line) =>
       line.state !== 'unusable' ||
@@ -499,8 +498,8 @@ export type CalibrationBlocker =
   | { kind: 'running' };
 
 /**
- * Why Calibrate is unavailable, in the order a user can act on: nothing helps an unsupported model; a missing or
- * second GPU and an unusable store are machine problems; a running attempt only needs to finish.
+ * Why Calibrate is unavailable, in the order a user can act on: nothing helps an unsupported model; a missing or second
+ * GPU and an unusable store are machine problems; a running attempt only needs to finish.
  */
 export const getCalibrationBlocker = ({
   isRunning,
@@ -530,10 +529,10 @@ export const getCalibrationBlocker = ({
 };
 
 /**
- * The model whose calibration attempt holds this GPU, as the status lists it, or null. The server takes one attempt
- * per device class at a time; a run without an attempt holds nothing. An attempt between its steps runs nothing and
- * reads as free here: the status cannot tell it from an abandoned one, which the server judges by its last activity.
- * The server's refusal covers that gap of seconds.
+ * The model whose calibration attempt holds this GPU, as the status lists it, or null. The server takes one attempt per
+ * device class at a time; a run without an attempt holds nothing. An attempt between its steps runs nothing and reads
+ * as free here: the status cannot tell it from an abandoned one, which the server judges by its last activity. The
+ * server's refusal covers that gap of seconds.
  */
 export const modelCalibratingOnGpu = (status: Pick<WorkingMemoryStatus, 'device_classes'>): string | null =>
   status.device_classes
@@ -541,8 +540,8 @@ export const modelCalibratingOnGpu = (status: Pick<WorkingMemoryStatus, 'device_
     ?.runs.find((run) => run.status === 'running' && run.attempt_id !== null)?.model_key ?? null;
 
 /**
- * Whether the server's way of measuring GPU memory was checked against real hardware on this GPU's backend: the
- * model summary's answer, else the current device class's; null while neither can tell.
+ * Whether the server's way of measuring GPU memory was checked against real hardware on this GPU's backend: the model
+ * summary's answer, else the current device class's; null while neither can tell.
  */
 export const isMeasurementMethodVerified = (
   summary: Pick<WorkingMemorySummary, 'measurement_verified'> | null,
@@ -585,8 +584,8 @@ const TRANSLATED_FACTS: Readonly<Record<string, TranslatedFact>> = {
 };
 
 /**
- * How the section names a changed environment fact (the server's fingerprint keys): a product name, a translated
- * label, or for environment variables and Invoke settings their own name. An unknown key shows as sent.
+ * How the section names a changed environment fact (the server's fingerprint keys): a product name, a translated label,
+ * or for environment variables and Invoke settings their own name. An unknown key shows as sent.
  */
 export const describeFact = (key: string): { name: string } | { translated: TranslatedFact } => {
   const translated = TRANSLATED_FACTS[key];

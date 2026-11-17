@@ -21,9 +21,8 @@ export const intersect = (a: Rect, b: Rect): Rect | null => {
 };
 
 /**
- * Union (bounding box) of two rects. An empty rect is treated as
- * contributing no area — the union of an empty rect and a non-empty rect is
- * the non-empty rect; the union of two empty rects is the first rect.
+ * Union (bounding box) of two rects. An empty rect is treated as contributing no area — the union of an empty rect and
+ * a non-empty rect is the non-empty rect; the union of two empty rects is the first rect.
  */
 export const union = (a: Rect, b: Rect): Rect => {
   if (isEmpty(a) && isEmpty(b)) {
@@ -86,8 +85,8 @@ export const transformBounds = (m: Mat2d, r: Rect): Rect => {
 const area = (r: Rect): number => (isEmpty(r) ? 0 : r.width * r.height);
 
 /**
- * True if two rects overlap or touch within `slack` pixels of each other
- * (i.e. their `slack`-expanded bounds intersect).
+ * True if two rects overlap or touch within `slack` pixels of each other (i.e. their `slack`-expanded bounds
+ * intersect).
  */
 const isNearby = (a: Rect, b: Rect, slack: number): boolean => {
   const expandedA = slack === 0 ? a : expand(a, slack);

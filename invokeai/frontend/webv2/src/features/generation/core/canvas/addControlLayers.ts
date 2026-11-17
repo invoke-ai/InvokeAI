@@ -54,8 +54,8 @@ export { isControlKindSupportedForBase } from './controlValidation';
 export type ImageSource = { node: BackendInvocationContract; field: string } | { image_name: string };
 
 /**
- * What the canvas inpaint and outpaint graphs regenerate: the image the denoise encodes, at processing size, and
- * the canvas mask as uploaded (white = keep). Adapters that condition on the region read both.
+ * What the canvas inpaint and outpaint graphs regenerate: the image the denoise encodes, at processing size, and the
+ * canvas mask as uploaded (white = keep). Adapters that condition on the region read both.
  */
 export interface CanvasInpaintSources {
   image: ImageSource;
@@ -91,8 +91,7 @@ export interface AddControlLayersOptions {
   layers: readonly ControlLayerGraphInput[];
   /**
    * Present when the canvas compiles in inpaint or outpaint mode. The Qwen-Image and FLUX.2 control nodes also
-   * condition on the inpainted region and take them, except an InstantX Qwen-Image union; the other kinds ignore
-   * them.
+   * condition on the inpainted region and take them, except an InstantX Qwen-Image union; the other kinds ignore them.
    */
   inpaint?: CanvasInpaintSources;
 }
@@ -100,8 +99,8 @@ export interface AddControlLayersOptions {
 /**
  * The Fun-ControlNet-Union nodes (`qwen_image_control`, `flux2_control`): the control image, plus the region being
  * regenerated when the canvas inpaints or outpaints (not for an InstantX Qwen-Image union, which conditions on the
- * control image alone), wired straight to the denoise's single `control` field.
- * Validation admits one per generation, so there is no collector.
+ * control image alone), wired straight to the denoise's single `control` field. Validation admits one per generation,
+ * so there is no collector.
  */
 const addFunUnionControl = (
   graph: BackendGraphContract,

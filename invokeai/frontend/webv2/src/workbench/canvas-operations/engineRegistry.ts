@@ -1,7 +1,7 @@
 /**
- * Share one engine per project through reference-counted leases. Delay disposal after the last release;
- * reacquisition cancels it so quick remounts reuse the warm engine. A disposed engine leaves its project's next engine
- * the tool the person was on, their quick-switch bookmark and how many undo steps went with it, for this session.
+ * Share one engine per project through reference-counted leases. Delay disposal after the last release; reacquisition
+ * cancels it so quick remounts reuse the warm engine. A disposed engine leaves its project's next engine the tool the
+ * person was on, their quick-switch bookmark and how many undo steps went with it, for this session.
  */
 
 import type {
@@ -22,8 +22,8 @@ import {
 /** Engine creation dependencies, minus what the registry supplies: the project id and its previous engine's carry. */
 export type EngineDeps = Omit<CanvasEngineOptions, 'droppedHistorySteps' | 'projectId'> & {
   /**
-   * The mounted Workbench's held-media registry. It also identifies that Workbench: an engine is bound to the one
-   * that created it, so a released engine is replaced rather than reused by the next Workbench.
+   * The mounted Workbench's held-media registry. It also identifies that Workbench: an engine is bound to the one that
+   * created it, so a released engine is replaced rather than reused by the next Workbench.
    */
   liveEngines?: LiveCanvasEngines;
 };
@@ -48,8 +48,8 @@ export const isBlankCanvasDocument = (document: CanvasDocumentContractV3 | null)
 
 /**
  * The tool a fresh engine starts on: the one its project's last engine was on, else Brush on a blank canvas with
- * nothing selected (a new project's), whose first stroke paints a new layer. A selected empty mask, as older
- * projects have, opens on View, so a first stroke never paints the mask by surprise.
+ * nothing selected (a new project's), whose first stroke paints a new layer. A selected empty mask, as older projects
+ * have, opens on View, so a first stroke never paints the mask by surprise.
  */
 const initialTool = (carry: EngineCarry | undefined, document: CanvasDocumentContractV3 | null): ToolId =>
   carry?.activeTool ?? (isBlankCanvasDocument(document) && !document?.selectedLayerId ? 'brush' : 'view');

@@ -45,8 +45,8 @@ export const createUnloadJournalServer = () => {
     server.offline ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(apply());
   const notFound = () => Object.assign(new Error('not found'), { status: 404 });
   const api: DurableProjectPersistenceApi = {
-    // As the settled create: a retry that finds its first attempt committed answers with that project, whichever
-    // halves it stored; an id another project holds is a conflict.
+    // As the settled create: a retry that finds its first attempt committed answers with that project, whichever halves
+    // it stored; an id another project holds is a conflict.
     createProject: (request) =>
       write(() => {
         server.creates += 1;
@@ -182,9 +182,9 @@ const emptyQueueRunJournal = (() =>
   })) as unknown as NonNullable<Parameters<typeof createDurableSyncedWorkbenchPersistence>[1]>['queueRunJournal'];
 
 /**
- * Unload journal journeys through the persistence service, against a draft store the caller provides (in memory or
- * real IndexedDB). A "reload" is a new service for the same editor session and store, which never ran the old page's
- * pending work; every write the old page could still make is made explicitly.
+ * Unload journal journeys through the persistence service, against a draft store the caller provides (in memory or real
+ * IndexedDB). A "reload" is a new service for the same editor session and store, which never ran the old page's pending
+ * work; every write the old page could still make is made explicitly.
  */
 export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDraftStore>): void => {
   let api: DurableProjectPersistenceApi;
@@ -1421,8 +1421,8 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
 
   describe('a new project whose first save reached the server unanswered', () => {
     /**
-     * The project is staged while the server is unreachable and recovered by a reload, as the editor would hold it;
-     * its first save then sends content and workspace in one create, which the server stores and never answers.
+     * The project is staged while the server is unreachable and recovered by a reload, as the editor would hold it; its
+     * first save then sends content and workspace in one create, which the server stores and never answers.
      */
     const createUnanswered = async (shape: (project: Project) => Project = (project) => project) => {
       const first = openTab();

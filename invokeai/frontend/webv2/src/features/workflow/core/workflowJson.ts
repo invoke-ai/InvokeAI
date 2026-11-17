@@ -16,8 +16,8 @@ import { createWorkflowForm, createWorkflowId } from './document';
 import { isInvocationNode } from './types';
 
 /**
- * Round-trip legacy WorkflowV3 files, metadata, and library records; recover unknown elements and dangling edges
- * as warnings.
+ * Round-trip legacy WorkflowV3 files, metadata, and library records; recover unknown elements and dangling edges as
+ * warnings.
  */
 
 const zXYPosition = z.object({ x: z.number().catch(0), y: z.number().catch(0) }).catch({ x: 0, y: 0 });
@@ -149,8 +149,8 @@ const zFormElement = z.discriminatedUnion('type', [
         fieldIdentifier: zFieldIdentifier,
         showDescription: z.boolean().catch(false),
         showShuffle: z.boolean().optional(),
-        // The legacy editor keeps its per-element settings (component, bounds, shuffle) here; they
-        // are carried through untouched so a workflow saved from webv2 still opens the same there.
+        // The legacy editor keeps its per-element settings (component, bounds, shuffle) here; they are carried through
+        // untouched so a workflow saved from webv2 still opens the same there.
         settings: z.looseObject({ showShuffle: z.boolean().optional() }).optional(),
       })
       .transform(({ settings, showShuffle, ...data }) => ({
@@ -187,8 +187,8 @@ const zWorkflowJson = z.looseObject({
   description: z.string().catch(''),
   edges: z.array(z.unknown()).catch([]),
   exposedFields: z.array(zFieldIdentifier).catch([]),
-  // Workflows that predate the form builder store `form: null`; a malformed
-  // form also degrades to "absent" rather than failing the whole parse.
+  // Workflows that predate the form builder store `form: null`; a malformed form also degrades to "absent" rather than
+  // failing the whole parse.
   form: z
     .object({
       elements: z.record(z.string(), z.unknown()),
@@ -520,8 +520,8 @@ export const hasMultipleWorkflowReturnNodes = (document: ProjectGraphState): boo
   document.nodes.filter((node) => node.type === 'invocation' && node.data.type === 'workflow_return').length > 1;
 
 /**
- * Exclude runtime templates and current-image decorations from submitted workflow metadata while preserving
- * recallable loop links.
+ * Exclude runtime templates and current-image decorations from submitted workflow metadata while preserving recallable
+ * loop links.
  */
 export const serializeWorkflowJsonForSubmission = (document: ProjectGraphState): Record<string, unknown> => {
   const serialized = serializeWorkflowJson(document);

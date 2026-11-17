@@ -37,8 +37,7 @@ export const createDefaultVideoWidgetValues = (models: readonly ModelConfig[] = 
 };
 
 /**
- * Resolve catalog references while preserving object identity when unchanged to avoid reconciliation write-back
- * loops.
+ * Resolve catalog references while preserving object identity when unchanged to avoid reconciliation write-back loops.
  */
 export const syncVideoWidgetValuesWithModels = (
   values: VideoWidgetValues,
@@ -67,15 +66,15 @@ export const syncVideoWidgetValuesWithModels = (
 
   const modelsByKey = new Map(models.map((model) => [model.key, model]));
   const storedMain = values.model ? modelsByKey.get(values.model.key) : undefined;
-  // Preserve supported legacy nonselectable mains for repair guidance; automatic choices use the stricter
-  // selectable filter.
+  // Preserve supported legacy nonselectable mains for repair guidance; automatic choices use the stricter selectable
+  // filter.
   const model: MainModelConfig | null =
     storedMain && isSupportedVideoModel(storedMain)
       ? storedMain
       : ((models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null);
 
-  // Run canonical selection transitions after model replacement so family-specific fps, frames, and resolution
-  // cannot remain stale.
+  // Run canonical selection transitions after model replacement so family-specific fps, frames, and resolution cannot
+  // remain stale.
   const base: VideoWidgetValues =
     model && model.key !== values.model?.key
       ? { ...getVideoModelSelectionResult({ currentSettings: values, model, models }).settings, model }
@@ -139,10 +138,10 @@ export const syncVideoWidgetValuesWithModels = (
       };
     }
   } else if (acceleratorSync && acceleratorSync.outcome !== 'unchanged') {
-    // Every field the change result rewrites, not a hand-picked five. An accelerator that removes
-    // guidance also restores it when it goes away, and naming fields here meant the Concepts-list
-    // route honoured that while this one -- the LoRA leaving the catalog entirely -- dropped it,
-    // leaving a guided run with its audio, STG and modality guidance silently pinned at identity.
+    // Every field the change result rewrites, not a hand-picked five. An accelerator that removes guidance also
+    // restores it when it goes away, and naming fields here meant the Concepts-list route honoured that while this one
+    // -- the LoRA leaving the catalog entirely -- dropped it, leaving a guided run with its audio, STG and modality
+    // guidance silently pinned at identity.
     accelerator = {
       acceleratorEnabled: acceleratorSync.settings.acceleratorEnabled,
       acceleratorLoraKeys: acceleratorSync.settings.acceleratorLoraKeys,
@@ -172,8 +171,8 @@ export const syncVideoWidgetValuesWithModels = (
     wanT5EncoderModel: syncComponent('wanT5EncoderModel', base.wanT5EncoderModel),
   };
 
-  // Auto duration belongs to the head it was turned on with: an uninstalled head takes it along, so
-  // reinstalling the head later does not silently switch it back on.
+  // Auto duration belongs to the head it was turned on with: an uninstalled head takes it along, so reinstalling the
+  // head later does not silently switch it back on.
   if (!next.ltx2DurationHeadModel) {
     next.autoDuration = false;
   }
@@ -226,10 +225,10 @@ export const getVideoWidgetValidationIssues = (
 };
 
 /**
- * The section of each issue Invoke lists for `validated` (the values Invoke checks), once for every section whose
- * shown control can fix it, so each section title counts what it can fix. `shown` is the controls the panel renders
- * (see `getVideoPanelFields`). An issue two sections can fix counts in both, so the counts can add up to more than
- * Invoke's total.
+ * The section of each issue Invoke lists for `validated` (the values Invoke checks), once for every section whose shown
+ * control can fix it, so each section title counts what it can fix. `shown` is the controls the panel renders (see
+ * `getVideoPanelFields`). An issue two sections can fix counts in both, so the counts can add up to more than Invoke's
+ * total.
  */
 export const getVideoPanelIssueSections = (
   validated: VideoWidgetValues | null,

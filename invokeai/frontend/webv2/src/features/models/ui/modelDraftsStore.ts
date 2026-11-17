@@ -10,9 +10,9 @@ import { useCallback } from 'react';
 
 /**
  * Unsaved model-detail edits, kept per model while the manager navigates between tabs and models so leaving a form
- * never loses work. Memory only, for the account's lifetime in this tab; a draft ends on its surface's save or
- * discard, the model's removal, eviction past the bound, or an account transition. A save in flight belongs here too,
- * so a form remounted mid-request still shows it and its outcome.
+ * never loses work. Memory only, for the account's lifetime in this tab; a draft ends on its surface's save or discard,
+ * the model's removal, eviction past the bound, or an account transition. A save in flight belongs here too, so a form
+ * remounted mid-request still shows it and its outcome.
  */
 
 type DraftValues = Readonly<Record<string, unknown>>;
@@ -102,8 +102,8 @@ export const hasUnsavedModelChanges = (draft: ModelDraft | undefined): boolean =
   FIELD_SURFACES.some((surface) => hasDraftFields(draft?.[surface]));
 
 /**
- * Whether a user value is still an edit: it differs from the server, or from a save in flight (a field typed back
- * to the old server value mid-save must survive that save landing).
+ * Whether a user value is still an edit: it differs from the server, or from a save in flight (a field typed back to
+ * the old server value mid-save must survive that save landing).
  */
 const isEdit = (value: unknown, key: string, server: object, submitted: DraftValues | undefined): boolean =>
   !isSameValue(value, readField(server, key)) || (submitted !== undefined && !isSameValue(value, submitted[key]));
@@ -196,8 +196,8 @@ registerAccountOwnedResource({
 });
 
 /**
- * Follow the loaded library: drop drafts of models that leave it (deleted here or found gone by a refresh), and when
- * a record changes, drop edits the server now agrees with so nothing reads as unsaved without a difference.
+ * Follow the loaded library: drop drafts of models that leave it (deleted here or found gone by a refresh), and when a
+ * record changes, drop edits the server now agrees with so nothing reads as unsaved without a difference.
  */
 const syncWithLibrary = (): void => {
   const { modelsByKey, status } = getModelsSnapshot();
@@ -304,8 +304,8 @@ export const beginModelDraftSave = (modelKey: string, surface: ModelDraftSurface
 };
 
 /**
- * A save landed: drop the fields it carried and keep anything edited since, as a draft against the saved record.
- * An identity editor left with nothing to save closes.
+ * A save landed: drop the fields it carried and keep anything edited since, as a draft against the saved record. An
+ * identity editor left with nothing to save closes.
  */
 export const finishModelDraftSave = (modelKey: string, surface: ModelDraftSurface, saved: object): void => {
   const draft = store.get(modelKey);

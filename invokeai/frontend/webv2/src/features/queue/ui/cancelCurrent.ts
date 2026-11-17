@@ -23,8 +23,8 @@ import { readQueueReadModel, readWholeQueueStatus } from './queueDataStore';
 
 /**
  * What runs anywhere in the queue, whatever the view's scope: a scoped reading counts only its scope, so another
- * project's or another user's item running would read as nothing. An unscoped reading's own count is the whole
- * queue's; a scoped one needs the whole-queue status read. Null while that is unknown.
+ * project's or another user's item running would read as nothing. An unscoped reading's own count is the whole queue's;
+ * a scoped one needs the whole-queue status read. Null while that is unknown.
  */
 export const getInProgressAnywhere = (
   scope: QueueQueryScope,
@@ -38,11 +38,11 @@ export const getInProgressAnywhere = (
  * the read window shows running beside someone else's), else, only in the gap between two items, the next one waiting.
  * The gap is the processor running (not paused) with nothing in progress anywhere in the queue (`inProgressAnywhere`,
  * unknown counting as something): the hand-off between items, a cached reading that is behind, or a canceled item's
- * worker still finishing. Stopping the next item is then what stops the run from the viewer's side. While the
- * processor is paused, or anything runs that it would not cancel, nothing waiting is stopped. The next item is the
- * server's; the read window stands in for it (the server's belonging to someone else) only when it holds exactly the
- * pending items the counts report, since the window is the newest items and the true next may be older.
- * `skippedItemId` leaves out an item a cancel just found already finished.
+ * worker still finishing. Stopping the next item is then what stops the run from the viewer's side. While the processor
+ * is paused, or anything runs that it would not cancel, nothing waiting is stopped. The next item is the server's; the
+ * read window stands in for it (the server's belonging to someone else) only when it holds exactly the pending items
+ * the counts report, since the window is the newest items and the true next may be older. `skippedItemId` leaves out an
+ * item a cancel just found already finished.
  */
 export const getCancelCurrentTarget = (
   model: Pick<QueueReadModel, 'current' | 'items' | 'next' | 'status'> | null | undefined,
@@ -108,8 +108,8 @@ export const CANCEL_CURRENT_SETTLE_MS = 400;
 const CANCEL_CURRENT_SETTLE_LIMIT_MS = 2_000;
 
 /**
- * The account whose cancel-current is in flight or settling; one at a time, so a held key, a double click or a
- * double tap stops one item.
+ * The account whose cancel-current is in flight or settling; one at a time, so a held key, a double click or a double
+ * tap stops one item.
  */
 let inFlightOwner: AccountScope | null = null;
 
@@ -149,12 +149,12 @@ const cancelItem = async (client: QueryClient, owner: AccountScope, item: QueueI
 };
 
 /**
- * Cancel-current, for every surface: the top bar, the queue widget, the shortcut and the palette. Picks its target
- * from the loaded read model when it runs, not when a control rendered. When the item it read as current had already
- * finished, it reads the queue afresh and stops what is current now, once. A call while another is in flight, or
- * within the settle window after one stopped an item (`CANCEL_CURRENT_SETTLE_MS`), returns `busy` at once: one
- * mechanism for every entry point, so a double click, a double tap of the shortcut or a double activation in the
- * palette stops one item.
+ * Cancel-current, for every surface: the top bar, the queue widget, the shortcut and the palette. Picks its target from
+ * the loaded read model when it runs, not when a control rendered. When the item it read as current had already
+ * finished, it reads the queue afresh and stops what is current now, once. A call while another is in flight, or within
+ * the settle window after one stopped an item (`CANCEL_CURRENT_SETTLE_MS`), returns `busy` at once: one mechanism for
+ * every entry point, so a double click, a double tap of the shortcut or a double activation in the palette stops one
+ * item.
  */
 export const cancelCurrentQueueItem = async ({
   canManageItem,

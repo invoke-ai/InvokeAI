@@ -30,8 +30,8 @@ import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workf
  * The selected workflow's detail rail, beside the grid in the wide layout and a bottom sheet in the narrow one
  * (`WORKFLOW_LIBRARY_NARROW`). The sheet is a one-row summary (thumbnail, name, facts, Open, More) pinned under the
  * grid; its "Details and requirements" disclosure lays the full rail over the grid, which keeps its scroll position.
- * The layout switch is CSS alone: in the narrow layout the rail's root stops generating a box (`display: contents`),
- * so its details and summary become items of the panes grid (`WORKFLOW_DETAIL_PANES_CSS`). Expanding never animates.
+ * The layout switch is CSS alone: in the narrow layout the rail's root stops generating a box (`display: contents`), so
+ * its details and summary become items of the panes grid (`WORKFLOW_DETAIL_PANES_CSS`). Expanding never animates.
  * Expanded, the sheet is compact: the pinned summary is its header (small thumbnail, the full name, Open), and the
  * details above it drop the rail's large preview and heading (`WORKFLOW_DETAIL_WIDE_ONLY_CSS`), leaving chips,
  * description, requirements and facts in one scrolling column.
@@ -70,8 +70,8 @@ const DETAILS_CSS: SystemStyleObject = {
     bg: 'bg.subtle',
     borderColor: 'border.subtle',
     borderWidth: '1px',
-    // Sized by the grid's row alone: in a flow layout the row is the grid's fixed viewport, which the details'
-    // content must not stretch.
+    // Sized by the grid's row alone: in a flow layout the row is the grid's fixed viewport, which the details' content
+    // must not stretch.
     contain: 'size',
     display: 'none',
     gridArea: '1 / 1',
@@ -96,16 +96,16 @@ const SUMMARY_CSS: SystemStyleObject = {
     position: 'sticky',
     rounded: 'md',
     zIndex: 2,
-    // The column's bottom scroll padding keeps focused controls clear of this summary; the summary's own controls
-    // are always in view, so focusing them must not scroll the column.
+    // The column's bottom scroll padding keeps focused controls clear of this summary; the summary's own controls are
+    // always in view, so focusing them must not scroll the column.
     '& button': { scrollMarginBottom: '-6rem' },
   },
 };
 const PLACEHOLDER_CSS: SystemStyleObject = { ...RAIL_CSS, [WORKFLOW_LIBRARY_NARROW]: { display: 'none' } };
 
 /**
- * The rail's Preview button: kept mounted in preview mode, which the stage already shows, so leaving can hand focus back
- * to it. The dialog body marks preview mode.
+ * The rail's Preview button: kept mounted in preview mode, which the stage already shows, so leaving can hand focus
+ * back to it. The dialog body marks preview mode.
  */
 export const WORKFLOW_PREVIEW_TRIGGER_CSS: SystemStyleObject = { '[data-previewing] &': { display: 'none' } };
 
@@ -262,8 +262,8 @@ export const WorkflowDetailSheet = ({
     scrollBeforeExpandRef.current = scrolled;
     flushSync(() => setExpandedWorkflowId(workflowId));
     // Into the details just shown, so Tab walks them before returning to the summary's actions below. The container
-    // takes focus, not its scroll region: Chromium only focuses scrollers that overflow, which the compact details
-    // may stop doing as they settle.
+    // takes focus, not its scroll region: Chromium only focuses scrollers that overflow, which the compact details may
+    // stop doing as they settle.
     const details = detailsRef.current;
 
     details?.focus();
@@ -273,8 +273,8 @@ export const WorkflowDetailSheet = ({
   }, [collapse, isExpanded, workflowId]);
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      // Captured: controls inside the details (tooltip triggers) stop Escape from bubbling. Portalled menus and
-      // dialogs reach here through React too, so only keys from the sheet's own DOM collapse it.
+      // Captured: controls inside the details (tooltip triggers) stop Escape from bubbling. Portalled menus and dialogs
+      // reach here through React too, so only keys from the sheet's own DOM collapse it.
       if (
         event.key === 'Escape' &&
         isExpanded &&
@@ -342,8 +342,8 @@ export const WorkflowDetailSheet = ({
               {name}
             </Text>
             {facts ? (
-              // One line keeps the summary short enough to stay pinned in a 320px-tall window; the details list
-              // every fact.
+              // One line keeps the summary short enough to stay pinned in a 320px-tall window; the details list every
+              // fact.
               <Text color="fg.muted" fontSize="xs" id={factsId} minW="0" truncate>
                 {facts}
               </Text>

@@ -1,11 +1,11 @@
 import { MouseSensor, type Activator, type SensorOptions, type SensorProps } from '@dnd-kit/core';
 
 /**
- * For touch on pannable surfaces, hold first, then require movement: early movement yields to scrolling and
- * motionless holds remain taps. Pen and touch-action:none surfaces activate by distance, unless the surface marks
- * itself with `data-drag-hold-on-touch` because it owns one-finger gestures of its own (the preview swipe); early
- * movement then yields to that gesture. Once armed, a non-passive touchmove listener prevents native pan from
- * stealing the gesture. Every exit, including pointercancel, calls onEnd/onCancel to clear dnd-kit's activation guard.
+ * For touch on pannable surfaces, hold first, then require movement: early movement yields to scrolling and motionless
+ * holds remain taps. Pen and touch-action:none surfaces activate by distance, unless the surface marks itself with
+ * `data-drag-hold-on-touch` because it owns one-finger gestures of its own (the preview swipe); early movement then
+ * yields to that gesture. Once armed, a non-passive touchmove listener prevents native pan from stealing the gesture.
+ * Every exit, including pointercancel, calls onEnd/onCancel to clear dnd-kit's activation guard.
  */
 
 export const TOUCH_DRAG_HOLD_DELAY_MS = 400;
@@ -20,9 +20,8 @@ const isScrollableOverflow = (overflow: string) =>
   overflow === 'auto' || overflow === 'scroll' || overflow === 'overlay';
 
 /**
- * Whether the browser may pan from a touch starting on `target`: true unless a
- * `touch-action: none` appears on the element itself or an ancestor below the
- * first scroll container. (`touch-action` intersects down the ancestor chain,
+ * Whether the browser may pan from a touch starting on `target`: true unless a `touch-action: none` appears on the
+ * element itself or an ancestor below the first scroll container. (`touch-action` intersects down the ancestor chain,
  * so a `none` anywhere below the scroller forbids the pan outright.)
  */
 const canSurfacePan = (target: EventTarget | null): boolean => {
@@ -85,9 +84,8 @@ export class HoldToDragSensor {
   ];
 
   /**
-   * Mirror of `TouchSensor.setup()`: a non-passive `touchmove` listener present
-   * from startup makes `preventDefault()` work in touchmove listeners added
-   * later (required for iOS Safari), which the active drag relies on.
+   * Mirror of `TouchSensor.setup()`: a non-passive `touchmove` listener present from startup makes `preventDefault()`
+   * work in touchmove listeners added later (required for iOS Safari), which the active drag relies on.
    */
   static setup(): () => void {
     const noop = () => {};
@@ -124,9 +122,8 @@ export class HoldToDragSensor {
     const { activationConstraint } = props.options ?? {};
     this.tolerance = activationConstraint?.tolerance ?? TOUCH_DRAG_MOVE_TOLERANCE_PX;
 
-    // Pointer listeners live on the document, not the touched element: the
-    // element may unmount mid-gesture (the virtualized grid under auto-scroll),
-    // and document-level listeners keep receiving the events.
+    // Pointer listeners live on the document, not the touched element: the element may unmount mid-gesture (the
+    // virtualized grid under auto-scroll), and document-level listeners keep receiving the events.
     const { signal } = this.abortController;
     this.document.addEventListener('pointermove', this.handlePointerMove, { signal });
     this.document.addEventListener('pointerup', this.handlePointerEnd, { signal });
@@ -212,8 +209,8 @@ export class HoldToDragSensor {
       return;
     }
 
-    // The browser claimed the gesture (a native pan). Its event stream ends
-    // here, so the sensor must too — a stuck gesture blocks all later drags.
+    // The browser claimed the gesture (a native pan). Its event stream ends here, so the sensor must too — a stuck
+    // gesture blocks all later drags.
     this.cancelGesture();
   };
 
@@ -230,8 +227,8 @@ export class HoldToDragSensor {
   };
 
   private readonly handleTouchMove = (event: TouchEvent) => {
-    // Prevent native touch pan after arming; pointer-event prevention cannot stop it and its threshold may precede
-    // drag tolerance.
+    // Prevent native touch pan after arming; pointer-event prevention cannot stop it and its threshold may precede drag
+    // tolerance.
     if ((this.gate === 'armed' || this.gate === 'active') && event.cancelable) {
       event.preventDefault();
     }
@@ -239,9 +236,8 @@ export class HoldToDragSensor {
 
   private readonly handleContextMenu = (event: MouseEvent) => {
     if (this.gate === 'armed') {
-      // Android's long-press menu (~500ms) outlasts the hold delay. Treat it as
-      // menu intent: disarm so a drag cannot start over the open menu, and let
-      // the menu through.
+      // Android's long-press menu (~500ms) outlasts the hold delay. Treat it as menu intent: disarm so a drag cannot
+      // start over the open menu, and let the menu through.
       this.cancelGesture();
       return;
     }
@@ -269,9 +265,8 @@ export class HoldToDragSensor {
     this.clearArmedCue();
     this.gate = 'active';
 
-    // A drag that ends where it started must not also click its own tile, so
-    // swallow the trailing click. Removed shortly after detach (not with the
-    // other listeners) so the click that follows the lift stays swallowed.
+    // A drag that ends where it started must not also click its own tile, so swallow the trailing click. Removed
+    // shortly after detach (not with the other listeners) so the click that follows the lift stays swallowed.
     this.document.addEventListener('click', stopClickPropagation, true);
     this.document.getSelection()?.removeAllRanges();
     // Keep the selection clear for the whole drag, as the stock sensors do.

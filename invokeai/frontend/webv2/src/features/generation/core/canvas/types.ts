@@ -65,8 +65,8 @@ export interface CompileCanvasGraphInput {
   /** The uploaded bbox composite (executor result). Required for image-referencing modes. */
   compositeImageName: string | null;
   /**
-   * Uploaded grayscale mask: white keeps, dark inpaints. Required for inpaint; outpaint can derive its mask from
-   * image alpha.
+   * Uploaded grayscale mask: white keeps, dark inpaints. Required for inpaint; outpaint can derive its mask from image
+   * alpha.
    */
   maskImageName?: string | null;
   /** An optional noise-level mask adds image noise before encoding. */

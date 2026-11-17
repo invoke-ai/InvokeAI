@@ -35,8 +35,8 @@ const loadReadyLibrary = async (
 
 /**
  * Library summaries plus the workbench's open projects, which the library may not list yet. The key follows the
- * summaries rather than the whole snapshot: a library that loads re-runs the search, a repeated failure does not.
- * The editor and Launchpad palettes both use it, so this module imports no editor runtime.
+ * summaries rather than the whole snapshot: a library that loads re-runs the search, a repeated failure does not. The
+ * editor and Launchpad palettes both use it, so this module imports no editor runtime.
  */
 export const createProjectsProvider = ({
   library,

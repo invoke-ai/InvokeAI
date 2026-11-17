@@ -16,8 +16,8 @@ import { refreshModels } from './modelsStore';
 import { refreshStartersIfLoaded } from './startersStore';
 
 /**
- * REST owns install jobs; lifecycle events refresh them. High-frequency progress bypasses the list and subscribes
- * per job to limit renders.
+ * REST owns install jobs; lifecycle events refresh them. High-frequency progress bypasses the list and subscribes per
+ * job to limit renders.
  */
 
 export interface InstallsSnapshot {
@@ -91,13 +91,13 @@ let nextOutcomeId = 1;
 const progressByJobId = createKeyedTransientStore<number, InstallDownloadProgress>();
 const rateSamplesByJobId = new Map<number, { bytes: number; at: number }>();
 /**
- * Latest locally known status per job, from a socket event or an action result, stamped with a sequence. A list
- * request that started before the stamp may predate that status, so it must not overwrite it; the first list request
- * started after it is authoritative and clears the fence. Starting earlier does not prove the backend served it
- * earlier, though, and some transitions emit no event (cancelling a download, pruning settled jobs). So a final list
- * status always wins, and a stale response may drop a job whose fence is settled, since pruning removes only those,
- * but only when this client knew the job before the request started; otherwise the backend may have served it before
- * the job existed.
+ * Latest locally known status per job, from a socket event or an action result, stamped with a sequence. A list request
+ * that started before the stamp may predate that status, so it must not overwrite it; the first list request started
+ * after it is authoritative and clears the fence. Starting earlier does not prove the backend served it earlier,
+ * though, and some transitions emit no event (cancelling a download, pruning settled jobs). So a final list status
+ * always wins, and a stale response may drop a job whose fence is settled, since pruning removes only those, but only
+ * when this client knew the job before the request started; otherwise the backend may have served it before the job
+ * existed.
  */
 const statusFenceByJobId = new Map<number, { sequence: number; status: ModelInstallStatus }>();
 /** Sequence at which this client first saw each job, from a list response, a socket event, or a creation result. */
@@ -163,8 +163,8 @@ export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Pr
           }
 
           if (fence.status === 'cancelled' && CANCELLATION_ACTIVE_STATUSES.has(job.status)) {
-            // DELETE can succeed before the worker observes cancellation. Keep the optimistic result until REST
-            // reports a terminal state; otherwise a successful refresh can revive the row if its socket was missed.
+            // DELETE can succeed before the worker observes cancellation. Keep the optimistic result until REST reports
+            // a terminal state; otherwise a successful refresh can revive the row if its socket was missed.
             const current = store.getSnapshot().jobs.find((candidate) => candidate.id === job.id) ?? job;
             return current.status === 'cancelled' ? current : { ...current, status: 'cancelled' };
           }
@@ -487,12 +487,12 @@ export const handleModelInstallSocketEvent = (
     }
 
     if (!job) {
-      // The first progress tick may arrive for a job created in another
-      // client; make sure the row exists without refetching on every tick.
+      // The first progress tick may arrive for a job created in another client; make sure the row exists without
+      // refetching on every tick.
       scheduleRefresh();
     } else if (job.status === 'waiting' && (fence === undefined || fence.status === 'waiting')) {
-      // Bytes are flowing, so the REST snapshot's `waiting` is stale. Patch
-      // locally so download controls (pause/cancel) appear immediately.
+      // Bytes are flowing, so the REST snapshot's `waiting` is stale. Patch locally so download controls (pause/cancel)
+      // appear immediately.
       patchJob({ ...job, status: 'downloading' });
     }
 

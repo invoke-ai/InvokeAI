@@ -182,8 +182,8 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
             assert.ok(!(await server.text()).includes(marker), 'Server must not explain A recovery');
             report.journalAttribution = recovery;
             await page.unroute('**/api/v1/projects/**', holdSaves);
-            // Wait for the recovered document's Gallery bodies, not just Preview's ready prompt, before Edit
-            // unmounts Gallery. Its lazy grid can otherwise begin and cancel both reads during the layout change.
+            // Wait for the recovered document's Gallery bodies, not just Preview's ready prompt, before Edit unmounts
+            // Gallery. Its lazy grid can otherwise begin and cancel both reads during the layout change.
             const initialGalleryReads = Promise.all(
               [
                 page.waitForResponse((response) => {

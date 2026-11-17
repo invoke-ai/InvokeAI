@@ -44,9 +44,9 @@ const DESTINATION_MAX_WIDTH = 'min(18rem, max(6.5rem, 50cqi - 3rem))';
 const DESTINATION_PREFIX_CSS = { '@container (width < 30rem)': { display: 'none' } } as const;
 /**
  * Rails shrink with the viewport, past the size a drag can set. Measured on the header's content box (its border box
- * less 20px of padding): below 20rem the label drops "Gallery /" so the board keeps room to name itself; below 15rem
- * (a 920px window's rail) the destination also drops its name, keeping its icon and the chevron that marks it as a
- * menu rather than a download button. Both accessible names stay whole.
+ * less 20px of padding): below 20rem the label drops "Gallery /" so the board keeps room to name itself; below 15rem (a
+ * 920px window's rail) the destination also drops its name, keeping its icon and the chevron that marks it as a menu
+ * rather than a download button. Both accessible names stay whole.
  */
 const NARROW_HEADER_HIDDEN_CSS = { '@container (width < 20rem)': { display: 'none' } } as const;
 const COMPACT_HEADER = '@container (width < 15rem)';
@@ -206,9 +206,9 @@ export const GalleryWidgetHeaderActions = () => {
       <Tooltip content={tooltip} disabled={isMenuOpen} ids={triggerIds}>
         <Menu.Trigger asChild>
           <Button
-            // Always starts with "Saving to" and the board, then the hint. The visible text ("Saving to" and the
-            // board, or the board alone on a narrow header) is contained in it, so label-in-name holds in every
-            // language and a speech user can say what the button shows.
+            // Always starts with "Saving to" and the board, then the hint. The visible text ("Saving to" and the board,
+            // or the board alone on a narrow header) is contained in it, so label-in-name holds in every language and a
+            // speech user can say what the button shows.
             aria-label={`${t('widgets.gallery.savingTo')} ${destinationName}. ${t('widgets.gallery.destinationTriggerHint')}`}
             css={DESTINATION_COMPACT_CSS}
             data-gallery-destination={destination.boardId}

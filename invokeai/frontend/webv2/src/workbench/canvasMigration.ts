@@ -279,8 +279,8 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   zLayerBase.extend({
     autoNegative: z.boolean(),
     isHidden: z.boolean().optional(),
-    // A structurally broken layout role drops (the region reads as an object). A role this build does not know
-    // refuses the canvas instead: rewriting it as an object would replace the user's choice on the next autosave.
+    // A structurally broken layout role drops (the region reads as an object). A role this build does not know refuses
+    // the canvas instead: rewriting it as an object would replace the user's choice on the next autosave.
     layout: z
       .object({ kind: z.string(), text: z.string().optional() })
       .optional()
@@ -678,8 +678,8 @@ const parseNode = (value: unknown, path: string, depth: number, context: ParseCo
   if (context.stack === 'raster' || shell.data.isHidden === false) {
     delete shell.data.isHidden;
   }
-  // Overlay groups carry coverage, not color. Drop raster-only properties silently because diagnostics reject the
-  // whole document.
+  // Overlay groups carry coverage, not color. Drop raster-only properties silently because diagnostics reject the whole
+  // document.
   if (context.stack !== 'raster') {
     delete shell.data.adjustments;
     delete shell.data.blendMode;
@@ -876,8 +876,8 @@ const loadCanvasStateStep = (canvas: unknown): LoadStep<CanvasStateContractV3> =
 };
 
 /**
- * Check versions before defaulting: absent state is fresh, current state is validated, and other versions retain
- * raw payloads for recovery.
+ * Check versions before defaulting: absent state is fresh, current state is validated, and other versions retain raw
+ * payloads for recovery.
  */
 export const loadCanvasState = (canvas: unknown): CanvasLoadResult<CanvasStateContractV3> => {
   const step = loadCanvasStateStep(canvas);

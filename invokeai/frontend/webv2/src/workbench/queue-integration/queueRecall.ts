@@ -7,8 +7,8 @@ import { extractGenerationMeta, extractNamedGenerationMeta, isWebv2QueueItemOrig
 import { cloneVideoWidgetValues } from '@features/video';
 
 /**
- * Partial recall merges current values; all/remix restores the submission snapshot. Foreign items expose only
- * session prompts and executed seed.
+ * Partial recall merges current values; all/remix restores the submission snapshot. Foreign items expose only session
+ * prompts and executed seed.
  */
 
 export const getQueueRecallCapabilities = (
@@ -72,9 +72,9 @@ export const getQueueRecallSource = (snapshotSourceId: string | null, isNonGener
         : 'unknown';
 
 /**
- * What a queue item's session tells recall. The server keeps a submitted workflow, named or not. webv2's own
- * Generate, Canvas, Video and Upscale submissions name their prompts and seed, so a webv2 item without them ran
- * something else, and its other values are never read by type and order; items from other clients still are.
+ * What a queue item's session tells recall. The server keeps a submitted workflow, named or not. webv2's own Generate,
+ * Canvas, Video and Upscale submissions name their prompts and seed, so a webv2 item without them ran something else,
+ * and its other values are never read by type and order; items from other clients still are.
  */
 export const readQueueItemRecallInput = (
   item: QueueItemReadModel
@@ -226,8 +226,8 @@ export const buildQueueRecallValues = (
     return {
       ...current,
       positivePrompt,
-      // Restore templates with authored snapshot prompts; clear templates for already-merged session prompts to
-      // avoid double wrapping. Older snapshots must not write undefined templates.
+      // Restore templates with authored snapshot prompts; clear templates for already-merged session prompts to avoid
+      // double wrapping. Older snapshots must not write undefined templates.
       promptTemplate: snapshot ? (snapshot.promptTemplate ?? null) : null,
       ...(negativePrompt !== undefined
         ? { negativePrompt, negativePromptEnabled: snapshot?.negativePromptEnabled ?? negativePrompt.length > 0 }
@@ -236,8 +236,7 @@ export const buildQueueRecallValues = (
   }
 
   if (kind === 'seed') {
-    // The session's seed is what actually ran (randomized submissions store a
-    // placeholder in the snapshot), so it wins.
+    // The session's seed is what actually ran (randomized submissions store a placeholder in the snapshot), so it wins.
     const seed = meta.seed ?? (snapshot && snapshot.seedMode !== 'random' ? snapshot.seed : undefined);
 
     return seed === undefined ? null : { ...current, seed, seedMode: 'fixed' };
@@ -285,8 +284,8 @@ export const buildVideoQueueRecallPatch = (
 
     return {
       positivePrompt: meta.positivePrompt,
-      // Absent/empty session negatives cannot identify disabled state, so preserve the toggle. H3 batch negatives
-      // may recall harmless hidden values absent from gallery metadata.
+      // Absent/empty session negatives cannot identify disabled state, so preserve the toggle. H3 batch negatives may
+      // recall harmless hidden values absent from gallery metadata.
       ...(meta.negativePrompt !== undefined && meta.negativePrompt.length > 0
         ? { negativePrompt: meta.negativePrompt, negativePromptEnabled: true }
         : {}),
@@ -301,10 +300,7 @@ export const buildVideoQueueRecallPatch = (
   return null;
 };
 
-/**
- * Discriminate Video patches from complete Generate values so callers must handle the correct destination
- * contract.
- */
+/** Discriminate Video patches from complete Generate values so callers must handle the correct destination contract. */
 export type QueueRecallPlan =
   | { target: 'generate'; values: GenerateWidgetValues }
   | { target: 'video'; patch: Partial<VideoWidgetValues> };
@@ -320,9 +316,8 @@ export const planQueueRecall = (
   }: {
     current: GenerateWidgetValues | null;
     /**
-     * Whether this item was submitted from Video BY THIS CLIENT. False also
-     * means "unknown" — a foreign item's `field_values` cannot distinguish a
-     * video batch from an image one, so the Generate-shaped default stands.
+     * Whether this item was submitted from Video BY THIS CLIENT. False also means "unknown" — a foreign item's
+     * `field_values` cannot distinguish a video batch from an image one, so the Generate-shaped default stands.
      */
     isVideoItem: boolean;
     meta: QueueGenerationMeta;

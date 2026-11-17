@@ -1,7 +1,7 @@
 /**
- * Draws cached content: clear/checkerboard across the viewport, bottom-first transformed layers with
- * opacity/blend, and the staged preview between the raster stack and the overlay stacks. Missing caches are skipped;
- * callers own rasterization. RasterSurface contexts make ordering testable.
+ * Draws cached content: clear/checkerboard across the viewport, bottom-first transformed layers with opacity/blend, and
+ * the staged preview between the raster stack and the overlay stacks. Missing caches are skipped; callers own
+ * rasterization. RasterSurface contexts make ordering testable.
  */
 
 import type {
@@ -38,8 +38,8 @@ export const CHECKERBOARD_SQUARE_PX = 8;
 export const SMOOTHING_MAX_ZOOM = 1;
 
 /**
- * Smooth only below 1x for clean downscaling. Magnification uses nearest-neighbor for crisp pixels without
- * per-frame bilinear upscaling.
+ * Smooth only below 1x for clean downscaling. Magnification uses nearest-neighbor for crisp pixels without per-frame
+ * bilinear upscaling.
  */
 export const shouldSmoothAtZoom = (zoom: number): boolean => zoom < SMOOTHING_MAX_ZOOM;
 
@@ -72,8 +72,8 @@ export interface CompositeOptions {
    */
   stagedPreview?: { surface: RasterSurface; rect: Rect; opacity?: number } | null;
   /**
-   * Checker tile fills the unbounded viewport. Null/absence disables it, revealing themed widget background
-   * through the cleared surface.
+   * Checker tile fills the unbounded viewport. Null/absence disables it, revealing themed widget background through the
+   * cleared surface.
    */
   checkerboardTile?: RasterSurface | null;
   /**
@@ -82,13 +82,13 @@ export interface CompositeOptions {
    */
   imageSmoothing?: boolean;
   /**
-   * Bounded damage clips clear, checkerboard and every draw to the screen union of its regions and culls
-   * contributors outside it; damage resolving offscreen draws nothing. Absence repaints the whole target.
+   * Bounded damage clips clear, checkerboard and every draw to the screen union of its regions and culls contributors
+   * outside it; damage resolving offscreen draws nothing. Absence repaints the whole target.
    */
   damage?: FrameDamage;
   /**
-   * Transient transforms override committed values without changing the mirror. Missing scale/rotation retain
-   * committed values, supporting position-only move previews.
+   * Transient transforms override committed values without changing the mirror. Missing scale/rotation retain committed
+   * values, supporting position-only move previews.
    */
   transformOverrides?: ReadonlyMap<
     string,
@@ -104,8 +104,8 @@ export interface CompositeOptions {
    */
   regionOverlays?: boolean;
   /**
-   * Filter previews replace committed pixels at layer-local output bounds through the layer transform without
-   * document mutation. Null/absence means none.
+   * Filter previews replace committed pixels at layer-local output bounds through the layer transform without document
+   * mutation. Null/absence means none.
    */
   layerPreviews?: ReadonlyMap<string, { surface: RasterSurface; rect: Rect }> | null;
   /** Isolate one leaf and suppress staged/filter previews; disabled or hidden leaves remain undrawn. */
@@ -113,8 +113,8 @@ export interface CompositeOptions {
   /** Overlay stacks the screen draws; absence draws all. An isolated target draws whatever its stack. */
   showOverlayStacks?: Readonly<Record<OverlayStackKind, boolean>>;
   /**
-   * Memoized adjusted raster surface, or null for raw pixels. Optional provider; without it adjustments are
-   * ignored. Cache versions prevent per-frame recomputation.
+   * Memoized adjusted raster surface, or null for raw pixels. Optional provider; without it adjustments are ignored.
+   * Cache versions prevent per-frame recomputation.
    */
   adjustedSurface?: ((layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null) | null;
   /** Shared memoized surfaces for mask and control display effects. */
@@ -125,8 +125,8 @@ export interface CompositeOptions {
    */
   floatingSelection?: { layerId: string; surface: RasterSurface; rect: Rect; matrix: Mat2d } | null;
   /**
-   * Display-only control layer view: the kept original (layer-local through `matrix`, at the layer's opacity and
-   * blend) in place of the map, or under the map at {@link CONTROL_OVERLAY_MAP_ALPHA}. Suppressed under isolation.
+   * Display-only control layer view: the kept original (layer-local through `matrix`, at the layer's opacity and blend)
+   * in place of the map, or under the map at {@link CONTROL_OVERLAY_MAP_ALPHA}. Suppressed under isolation.
    */
   controlView?: {
     layerId: string;
@@ -186,9 +186,9 @@ const overlayStacksKey = (shown: CompositeOptions['showOverlayStacks']): string 
 };
 
 /**
- * One frame description: the leaves drawn (bottom first), their effective matrices with overrides applied, the
- * isolated group scopes, and optionally each leaf's document-space bounds this frame. Stable while the document,
- * isolation, overlay stacks, grouping and override contents are, so frame demand, compositing and sampling share it.
+ * One frame description: the leaves drawn (bottom first), their effective matrices with overrides applied, the isolated
+ * group scopes, and optionally each leaf's document-space bounds this frame. Stable while the document, isolation,
+ * overlay stacks, grouping and override contents are, so frame demand, compositing and sampling share it.
  */
 export interface CompositePreparation {
   readonly document: CanvasDocumentContractV3;
@@ -311,9 +311,8 @@ const drawBackground = (ctx: Ctx, tile: RasterSurface | null, bounds: Rect): voi
 type ScreenDamage = { kind: 'full' } | { kind: 'none' } | { kind: 'rect'; rect: Rect };
 
 /**
- * Transform local damage by view*layerMatrix into screen bounds, rounded outward with a one-pixel pad for
- * antialiased seams. Unknown layers or non-finite geometry repaint everything; regions off the target repaint
- * nothing.
+ * Transform local damage by view*layerMatrix into screen bounds, rounded outward with a one-pixel pad for antialiased
+ * seams. Unknown layers or non-finite geometry repaint everything; regions off the target repaint nothing.
  */
 const resolveDamage = (
   plan: CompositePreparation,
@@ -400,8 +399,8 @@ const drawCachedLayer = (
   ctx.globalCompositeOperation = blendToComposite(layer.blendMode);
   setTransformFromMat(ctx, multiply(view, matrix));
 
-  // The cache surface holds pixels for `entry.rect` in layer-local space; draw
-  // it at that local origin (offset paint/mask layers place their content off-zero).
+  // The cache surface holds pixels for `entry.rect` in layer-local space; draw it at that local origin (offset
+  // paint/mask layers place their content off-zero).
   const origin = { x: entry.rect.x, y: entry.rect.y };
   const preview = isIsolated(opts) ? null : (opts.layerPreviews?.get(layer.id) ?? null);
   if (preview) {
@@ -494,9 +493,9 @@ const drawRegionCoverage = (
 };
 
 /**
- * Draws layer-local pixels that are not the layer's cache (a floating selection, a control layer's original) with
- * the layer's opacity and blend. They go through the layer's (possibly overridden) matrix and then their own,
- * never resampled into document space and back.
+ * Draws layer-local pixels that are not the layer's cache (a floating selection, a control layer's original) with the
+ * layer's opacity and blend. They go through the layer's (possibly overridden) matrix and then their own, never
+ * resampled into document space and back.
  */
 const drawLayerLocalSurface = (
   ctx: Ctx,
@@ -531,8 +530,8 @@ const controlViewOf = (leaf: SemanticLeaf, opts: CompositeOptions): CompositeOpt
   !isIsolated(opts) && leaf.layer.type === 'control' && opts.controlView?.layerId === leaf.id ? opts.controlView : null;
 
 /**
- * Document-space bounds a leaf can cover this frame: committed pixels joined with its preview, float and shown
- * control original.
+ * Document-space bounds a leaf can cover this frame: committed pixels joined with its preview, float and shown control
+ * original.
  */
 const leafBounds = (leaf: SemanticLeaf, matrix: Mat2d, committed: Rect | null, opts: CompositeOptions): Rect | null => {
   const preview = isIsolated(opts) ? null : (opts.layerPreviews?.get(leaf.id) ?? null);
@@ -696,8 +695,8 @@ export const compositeDocument = (
         ctx.restore();
         opts.diagnostics?.increment('layersDrawn');
       }
-      // Region overlays are display-only, so they ride ABOVE the group
-      // composite rather than being baked into (and staled with) its memo.
+      // Region overlays are display-only, so they ride ABOVE the group composite rather than being baked into (and
+      // staled with) its memo.
       for (let member = scope.start; opts.regionOverlays && member < scope.end; member += 1) {
         const { layer } = leaves[member]!;
         if (

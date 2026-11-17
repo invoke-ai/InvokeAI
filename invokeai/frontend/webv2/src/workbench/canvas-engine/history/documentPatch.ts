@@ -1,6 +1,6 @@
 /**
- * Structural history stores forward/inverse reducer actions without bitmaps, sharing the pixel undo stack at
- * nominal byte cost.
+ * Structural history stores forward/inverse reducer actions without bitmaps, sharing the pixel undo stack at nominal
+ * byte cost.
  */
 
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';

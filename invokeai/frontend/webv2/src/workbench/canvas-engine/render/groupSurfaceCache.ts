@@ -1,10 +1,10 @@
 /**
- * Document-space group composites keyed by scope shape, member appearance, effective matrices and in-scope
- * previews. Own opacity/blend apply at draw time. A stable slot refreshes in place: only the region its members
- * damaged since the last draw is cleared and redrawn, and geometry changes redraw without reallocating when the
- * size holds. Document-resolution buffers resample transformed members twice and upscale above 100% zoom. A scope
- * whose own stack is spatial keeps its raw composite and shows a separate adjusted surface, evaluated
- * asynchronously by the shared spatial display rules (`spatialDisplay.ts`).
+ * Document-space group composites keyed by scope shape, member appearance, effective matrices and in-scope previews.
+ * Own opacity/blend apply at draw time. A stable slot refreshes in place: only the region its members damaged since the
+ * last draw is cleared and redrawn, and geometry changes redraw without reallocating when the size holds.
+ * Document-resolution buffers resample transformed members twice and upscale above 100% zoom. A scope whose own stack
+ * is spatial keeps its raw composite and shows a separate adjusted surface, evaluated asynchronously by the shared
+ * spatial display rules (`spatialDisplay.ts`).
  */
 
 import type { CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
@@ -60,8 +60,8 @@ export interface GroupSurfaceDeps {
   getAdjustedSurface(layer: CanvasRasterLayerContractV2, entry: LayerCacheEntry): MemberDisplayedPixels;
   diagnostics?: CanvasDiagnostics;
   /**
-   * Evaluates group stacks with spatial entries, reporting by group id. Without it those scopes show the per-pixel
-   * part only.
+   * Evaluates group stacks with spatial entries, reporting by group id. Without it those scopes show the per-pixel part
+   * only.
    */
   spatial?: SpatialDisplayOptions;
 }
@@ -70,9 +70,9 @@ export interface GroupSurfaceCache {
   /** Total RGBA bytes the cached group surfaces hold, for the memory budget. */
   byteSize(): number;
   /**
-   * `frame` marks the canvas frame's reads: a group reports, under its id in `adjustmentStatus`, the status of the
-   * slot the frame read last (else of its most recently read slot), so reads by other consumers with other keys
-   * (the overview, picking) never flip it.
+   * `frame` marks the canvas frame's reads: a group reports, under its id in `adjustmentStatus`, the status of the slot
+   * the frame read last (else of its most recently read slot), so reads by other consumers with other keys (the
+   * overview, picking) never flip it.
    */
   get(
     scope: GroupCompositeScope,
@@ -85,8 +85,8 @@ export interface GroupSurfaceCache {
   prune(liveGroupIds: ReadonlySet<string>): void;
   /**
    * Makes the named groups redraw in full on their next read, keeping their surfaces: a member's displayed pixels
-   * changed without a cache version (a spatial adjustment landed). A spatial group's adjusted surface keeps its
-   * pixels outside member content damage until its own job lands.
+   * changed without a cache version (a spatial adjustment landed). A spatial group's adjusted surface keeps its pixels
+   * outside member content damage until its own job lands.
    */
   invalidate(groupIds: Iterable<string>): void;
   /** Drops the spatial slots of every group `keep` rejects, e.g. a group whose stack lost its spatial entries. */
@@ -108,14 +108,13 @@ const rectKey = (r: Rect): string => `${r.x},${r.y},${r.width},${r.height}`;
 const sameRect = (a: Rect, b: Rect): boolean =>
   a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 
-// A changed source pixel reaches one source pixel further through bilinear sampling, whatever the member's scale,
-// plus one destination pixel of edge antialiasing.
+// A changed source pixel reaches one source pixel further through bilinear sampling, whatever the member's scale, plus
+// one destination pixel of edge antialiasing.
 const SOURCE_FILTER_RADIUS = 1;
 const ANTIALIAS_MARGIN = 1;
 
-// The frame composites with live session matrices while the overview composites
-// the settled contract, so one group legitimately holds two keys at once; two
-// slots stop those consumers evicting each other every tick.
+// The frame composites with live session matrices while the overview composites the settled contract, so one group
+// legitimately holds two keys at once; two slots stop those consumers evicting each other every tick.
 const SLOTS_PER_GROUP = 2;
 
 /** Raw repaints a spatial slot records apart; older ones fold into the oldest entry, coarser but still known. */
@@ -135,8 +134,8 @@ interface SpatialGroupState {
 }
 
 /**
- * How a spatial scope's member or nested group draws into the raw composite. A change repaints only its bounds,
- * instead of moving the scope to another slot whose adjusted copy would restart from a whole per-pixel interim.
+ * How a spatial scope's member or nested group draws into the raw composite. A change repaints only its bounds, instead
+ * of moving the scope to another slot whose adjusted copy would restart from a whole per-pixel interim.
  */
 interface DrawnAppearance {
   /** Opacity and blend, plus the matrix for a member. */
@@ -308,13 +307,11 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
     }
   };
 
-  // A scope's OWN opacity/blend are applied by the consumer when the surface
-  // lands, so they stay out of its shape key (an opacity scrub reuses the
-  // surface); a CHILD scope's opacity/blend are baked in here, so children key
-  // with them.
+  // A scope's OWN opacity/blend are applied by the consumer when the surface lands, so they stay out of its shape key
+  // (an opacity scrub reuses the surface); a CHILD scope's opacity/blend are baked in here, so children key with them.
   //
-  // A spatial scope's own stack applies to a separate adjusted surface, so its own key stays out too and a
-  // parameter edit reuses the raw composite; a parent still keys a spatial child with it.
+  // A spatial scope's own stack applies to a separate adjusted surface, so its own key stays out too and a parameter
+  // edit reuses the raw composite; a parent still keys a spatial child with it.
   const childScopeKey = (scope: GroupCompositeScope): string =>
     `${scopeShapeKey(scope, adjustmentsKey(scope.adjustments))}:${scope.opacity}:${scope.blendMode}`;
   const scopeShapeKey = (scope: GroupCompositeScope, ownKey: string): string =>
@@ -447,8 +444,8 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
   };
 
   /**
-   * Draws `[from, to)` (absolute plan indices, bottom first); `baseIndex` = absolute index of `members[0]`. Returns
-   * how final the drawn members and nested groups are.
+   * Draws `[from, to)` (absolute plan indices, bottom first); `baseIndex` = absolute index of `members[0]`. Returns how
+   * final the drawn members and nested groups are.
    */
   const drawRange = (
     ctx: RasterSurface['ctx'],
@@ -548,8 +545,8 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       frame
     );
     ctx.restore();
-    // Per-pixel adjustments are region independent and group stacks work in document pixels, so a region-limited
-    // pass at the region's document origin equals a whole-surface one there.
+    // Per-pixel adjustments are region independent and group stacks work in document pixels, so a region-limited pass
+    // at the region's document origin equals a whole-surface one there.
     if (!spatial && !isIdentityAdjustments(scope.adjustments)) {
       const pixels = ctx.getImageData(region.x, region.y, region.width, region.height);
       applyAdjustments(pixels, scope.adjustments, { x: slot.rect.x + region.x, y: slot.rect.y + region.y });
@@ -560,8 +557,8 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
   /**
    * Document-space region the members changed since the slot was drawn; null when only a full redraw is safe. With
    * `appearances` (a spatial scope), changed looks add their old and new bounds. A spatial stack edited into another
-   * spatial stack keeps its shown pixels until its result lands, so its bounds go to `reread` instead: redrawn so
-   * the edit reaches its owner and its pending state is seen, but not damage for the adjusted copy.
+   * spatial stack keeps its shown pixels until its result lands, so its bounds go to `reread` instead: redrawn so the
+   * edit reaches its owner and its pending state is seen, but not damage for the adjusted copy.
    */
   const damagedRegion = (
     slot: GroupSlot,
@@ -635,9 +632,9 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
     new Map(drawn.flatMap(({ entry, leaf }) => (entry ? [[leaf.id, entry.version] as const] : [])));
 
   /**
-   * Shows a spatial scope's adjusted surface for the slot's raw composite: an interim now (`painted` is the raw
-   * damage this read drew, `undefined` when none), the evaluated stack when its job lands. Jobs wait while an input
-   * is still pending.
+   * Shows a spatial scope's adjusted surface for the slot's raw composite: an interim now (`painted` is the raw damage
+   * this read drew, `undefined` when none), the evaluated stack when its job lands. Jobs wait while an input is still
+   * pending.
    */
   const showSpatial = (
     display: SpatialDisplay,
@@ -736,8 +733,8 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
     let damage: Damage | null | undefined;
     if (structureKey !== null && !(matching && sameRect(matching.rect, rect))) {
       // Only looks changed (a member's stack, opacity, blend or matrix, a nested group's stack, opacity or blend):
-      // refresh the same-shaped slot needing the least repaint in place, so its adjusted copy keeps its pixels
-      // outside the changed bounds. Frame and overview keys still settle into one slot each.
+      // refresh the same-shaped slot needing the least repaint in place, so its adjusted copy keeps its pixels outside
+      // the changed bounds. Frame and overview keys still settle into one slot each.
       let bestArea = Infinity;
       for (const candidate of slots) {
         if (candidate.structureKey !== structureKey || !sameRect(candidate.rect, rect)) {
@@ -768,8 +765,8 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       slot = matching;
       damage = damage === undefined ? damagedRegion(slot, drawn, appearances) : damage;
       if (slot.stale) {
-        // A member's displayed pixels changed without a version: redraw everything, but report only the content
-        // damage, so a spatial scope keeps its adjusted pixels elsewhere until its own job lands.
+        // A member's displayed pixels changed without a version: redraw everything, but report only the content damage,
+        // so a spatial scope keeps its adjusted pixels elsewhere until its own job lands.
         paint(slot, whole, scope, members, memberMatrices, content, baseIndex, spatial, frame);
         painted = damage ? (toLocal(damage.region) ?? NO_AREA) : null;
         deps.diagnostics?.increment('groupSurfaceRebuilds');

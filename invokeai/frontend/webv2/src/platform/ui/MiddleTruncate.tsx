@@ -130,8 +130,8 @@ export interface MiddleTruncateProps extends Omit<TextProps, 'children' | 'ref'>
 }
 
 /**
- * The split's flex items read as separate words to assistive technology ("S DXL Main"), so a split label hides
- * them and exposes the whole string once through generated content, which stays out of text selection and copy.
+ * The split's flex items read as separate words to assistive technology ("S DXL Main"), so a split label hides them and
+ * exposes the whole string once through generated content, which stays out of text selection and copy.
  */
 const SPLIT_LABEL_CSS = {
   '&::before': {
@@ -148,9 +148,9 @@ const SPLIT_LABEL_CSS = {
 /**
  * For identifiers whose suffix matters. Keep white-space: pre across the head/tail boundary so the space there
  * survives; a head with no tail collapses newlines like any single-line label. Preserve full DOM text for copy and
- * accessibility. Where the width cannot hold the tail and a few head graphemes, the head span takes the whole text
- * and ends it in an ellipsis instead of showing a clipped tail fragment; it keeps the split's white-space, so both
- * forms measure the same.
+ * accessibility. Where the width cannot hold the tail and a few head graphemes, the head span takes the whole text and
+ * ends it in an ellipsis instead of showing a clipped tail fragment; it keeps the split's white-space, so both forms
+ * measure the same.
  */
 export const MiddleTruncate = ({
   css,

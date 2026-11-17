@@ -152,11 +152,11 @@ export type RestoreOutcome =
   | { status: 'gone' };
 
 /**
- * Restores a point. A canvas point waits while an operation, a generation or a review holds the canvas, both before
- * and after saving the strokes still uploading, then takes the replaced canvas's place among the points
- * (`undoPointId`) unless that canvas was blank. A Discard all point only re-stages its results, so it neither waits
- * nor keeps the canvas. `isEditedSince`, for an Undo, refuses once the canvas was edited, asked again after the
- * barrier since the strokes it saves land in the document only then.
+ * Restores a point. A canvas point waits while an operation, a generation or a review holds the canvas, both before and
+ * after saving the strokes still uploading, then takes the replaced canvas's place among the points (`undoPointId`)
+ * unless that canvas was blank. A Discard all point only re-stages its results, so it neither waits nor keeps the
+ * canvas. `isEditedSince`, for an Undo, refuses once the canvas was edited, asked again after the barrier since the
+ * strokes it saves land in the document only then.
  */
 export const restoreFromPoint = async (
   ports: RestorePointPorts,

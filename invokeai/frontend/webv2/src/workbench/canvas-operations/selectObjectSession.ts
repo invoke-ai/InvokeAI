@@ -103,8 +103,8 @@ export type SelectObjectSessionChanges<T> = Partial<
   >
 > & {
   /**
-   * Switches between visual and prompt input: the current input is kept aside and the requested type's last input
-   * (or an empty one) comes back. An explicit `input` in the same update wins; one of the other type is a switch too.
+   * Switches between visual and prompt input: the current input is kept aside and the requested type's last input (or
+   * an empty one) comes back. An explicit `input` in the same update wins; one of the other type is a switch too.
    */
   inputType?: SamInput['type'];
 };

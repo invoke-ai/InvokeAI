@@ -48,8 +48,8 @@ export const isOnFirstVertex = (ctx: ToolContext, session: PolylineSession, scre
   if (!first || session.points.length < MIN_POLYLINE_POINTS) {
     return false;
   }
-  // Project through the viewport rather than caching the vertex's screen
-  // position: the user may pan (space-hold) between vertices.
+  // Project through the viewport rather than caching the vertex's screen position: the user may pan (space-hold)
+  // between vertices.
   return distance(ctx.viewport.documentToScreen(first), screenPoint) <= POLYLINE_CLOSE_HIT_PX;
 };
 

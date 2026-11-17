@@ -68,9 +68,8 @@ export type ImageContextMenuTarget = LegacyImageContextMenuTarget | GalleryItemC
 export type ImageContextMenuVariant = 'full' | 'housekeeping';
 
 /**
- * Extra actions owned by Preview's selected native video. Other hosts omit
- * this port, so gallery/grid video menus retain their common-action-only
- * contract and never gain a frame-copy item.
+ * Extra actions owned by Preview's selected native video. Other hosts omit this port, so gallery/grid video menus
+ * retain their common-action-only contract and never gain a frame-copy item.
  */
 export interface PreviewVideoContextActions {
   isCopyCurrentFrameAvailable: boolean;

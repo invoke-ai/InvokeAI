@@ -1,8 +1,8 @@
 /**
  * Own snapshot, planning, capture, and all generation composites; always release captured rasters. No bbox overlap
- * means txt2img without base upload or mode detection. detectMode runs at most once; control/regional predicates
- * skip rejected layers, while thrown errors abort without committing dedupe. Return an idempotent dedupe commit
- * for publication only after graph compilation and synchronous queue dispatch succeed.
+ * means txt2img without base upload or mode detection. detectMode runs at most once; control/regional predicates skip
+ * rejected layers, while thrown errors abort without committing dedupe. Return an idempotent dedupe commit for
+ * publication only after graph compilation and synchronous queue dispatch succeed.
  */
 
 import type {
@@ -39,10 +39,7 @@ import {
   planRegionalMaskComposites,
 } from '@workbench/canvas-operations/generationCompositePlan';
 
-/**
- * Mirror CanvasGenerationMode without importing the feature; caller wiring checks compatibility in both
- * directions.
- */
+/** Mirror CanvasGenerationMode without importing the feature; caller wiring checks compatibility in both directions. */
 export type GenerationCompositeMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
 /** The composite facts the caller's `detectMode` strategy decides from. */
@@ -64,13 +61,13 @@ export interface ComposeForGenerationOptions {
   /** Cancels raster capture; a capture abort resolves as `{ status: 'aborted' }`. */
   signal: AbortSignal;
   /**
-   * Maps composite facts to the generation mode. Called at most once, and only
-   * when raster content overlaps the bbox (otherwise the mode is txt2img).
+   * Maps composite facts to the generation mode. Called at most once, and only when raster content overlaps the bbox
+   * (otherwise the mode is txt2img).
    */
   detectMode(facts: GenerationModeFacts): GenerationCompositeMode;
   /**
-   * Vets one planned control layer (called in z-order). `false` skips it with
-   * no upload; a throw aborts the whole operation (snapshot released, dedupe
+   * Vets one planned control layer (called in z-order). `false` skips it with no upload; a throw aborts the whole
+   * operation (snapshot released, dedupe
    * uncommitted, error rethrown). Omitted → every planned layer composites.
    */
   shouldCompositeControlLayer?(layer: CanvasControlLayerContract): boolean;
@@ -124,8 +121,8 @@ export interface GenerationComposites {
   /** One uploaded image per accepted control layer, in z-order. */
   controlImages: { layerId: string; imageName: string }[];
   /**
-   * One uploaded alpha-mask image per accepted regional-guidance layer, in z-order, with the alpha bounds of its
-   * pixels in bbox space (origin at the bbox corner; empty when the mask misses the bbox).
+   * One uploaded alpha-mask image per accepted regional-guidance layer, in z-order, with the alpha bounds of its pixels
+   * in bbox space (origin at the bbox corner; empty when the mask misses the bbox).
    */
   regionalMaskImages: { layerId: string; imageName: string; bounds: Rect }[];
 }
@@ -138,8 +135,8 @@ export type ComposeForGenerationResult =
 
 /**
  * Runs the complete canvas → generation composite pipeline against `host`.
- * Capture failures resolve as a status; execution failures (including a
- * control-predicate throw) release the raster snapshot and rethrow.
+ * Capture failures resolve as a status; execution failures (including a control-predicate throw) release the raster
+ * snapshot and rethrow.
  */
 export const composeForGeneration = async (
   host: GenerationCompositeHost,
@@ -188,8 +185,8 @@ export const composeForGeneration = async (
     return { status: 'aborted' };
   }
 
-  // Operation-scoped dedupe: composites read/write a copy. Publication remains
-  // provisional until the caller successfully compiles and dispatches.
+  // Operation-scoped dedupe: composites read/write a copy. Publication remains provisional until the caller
+  // successfully compiles and dispatches.
   const operationDedupe: CompositeDedupeCache = {
     byHash: new Map(host.dedupe.byHash),
     byKey: new Map(host.dedupe.byKey),
@@ -207,8 +204,8 @@ export const composeForGeneration = async (
         : Promise.reject(new Error(`Canvas raster snapshot is missing layer ${layerId}.`));
     },
     uploadImage: async (blob) => {
-      // Encoding and hashing yield before upload. Re-check at the transport
-      // boundary so Account A work cannot start with Account B credentials.
+      // Encoding and hashing yield before upload. Re-check at the transport boundary so Account A work cannot start
+      // with Account B credentials.
       options.signal.throwIfAborted();
       const uploaded = await executorDeps.uploadImage(blob);
       options.signal.throwIfAborted();
@@ -218,8 +215,8 @@ export const composeForGeneration = async (
   };
 
   try {
-    // Use captured rects, including measured text, for the bounds-only overlap check. Empty boxes and touching
-    // edges do not overlap and need no base upload.
+    // Use captured rects, including measured text, for the bounds-only overlap check. Empty boxes and touching edges do
+    // not overlap and need no base upload.
     const actualLayerRects = new Map<string, Rect>();
     for (const [layerId, detached] of rasterSnapshot.layerSurfaces) {
       actualLayerRects.set(layerId, detached.sourceRect ?? detached.rect);
@@ -234,8 +231,8 @@ export const composeForGeneration = async (
     if (contentBounds && intersect(contentBounds, bbox) !== null) {
       const result = await executeCompositePlan(plan, deps);
 
-      // Composite the denoise-limit mask before mode detection: even opaque raster content becomes inpaint when
-      // the mask has coverage.
+      // Composite the denoise-limit mask before mode detection: even opaque raster content becomes inpaint when the
+      // mask has coverage.
       const maskEntry = plan.entries.find((entry) => entry.kind === 'inpaint-mask');
       const maskResult = maskEntry ? await executeMaskComposite(maskEntry, deps) : null;
 
@@ -250,8 +247,8 @@ export const composeForGeneration = async (
       baseImageName = mode === 'txt2img' ? null : result.base.imageName;
 
       if (mode === 'inpaint' || mode === 'outpaint') {
-        // A real (non-white) mask feeds create_gradient_mask; outpaint without one
-        // derives its mask from the raster alpha (maskImageName stays null).
+        // A real (non-white) mask feeds create_gradient_mask; outpaint without one derives its mask from the raster
+        // alpha (maskImageName stays null).
         maskImageName = maskResult?.hasContent ? maskResult.imageName : null;
         const noiseEntry = plan.entries.find((entry) => entry.kind === 'noise-mask');
         if (noiseEntry) {

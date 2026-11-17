@@ -14,29 +14,29 @@ import { useId, useMemo, type ComponentProps } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Hide editor re-entry only for a known-empty saved session. Unknown sessions retain entry so the editor can
- * resolve them.
+ * Hide editor re-entry only for a known-empty saved session. Unknown sessions retain entry so the editor can resolve
+ * them.
  */
 
 /**
- * Many open projects scroll inside the section instead of pushing Manage out of the rail: up to 12rem of entries,
- * plus the list's focus-ring inset.
+ * Many open projects scroll inside the section instead of pushing Manage out of the rail: up to 12rem of entries, plus
+ * the list's focus-ring inset.
  */
 const LIST_MAX_H = 'calc({sizes.48} + {spacing.2})';
 
 /**
  * The list's viewport clips: an inset as wide as the entries' outside focus ring keeps rings visible, and negative
- * margins of the same size keep the entries aligned with the rest of the rail. Scroll padding keeps a ring visible
- * when focus scrolls an entry to the viewport's edge.
+ * margins of the same size keep the entries aligned with the rest of the rail. Scroll padding keeps a ring visible when
+ * focus scrolls an entry to the viewport's edge.
  */
 const LIST_CONTENT_PROPS = { p: '1' } as const;
 const LIST_VIEWPORT_PROPS = { scrollPaddingY: '1' } as const;
 
 /**
  * A short rail squeezes the list before the rail scrolls, down to one lg (sizes.8) entry. The full rail's floor adds
- * the heading (xs text at the inherited 1.5 line height, `py` 1 from the rail's heading style) and the 0.5 gap.
- * The section grows from the floor up to its content, so the rail's free space still falls below Manage. Content-box
- * sizing keeps the rail's group spacing (padding, border) out of these heights.
+ * the heading (xs text at the inherited 1.5 line height, `py` 1 from the rail's heading style) and the 0.5 gap. The
+ * section grows from the floor up to its content, so the rail's free space still falls below Manage. Content-box sizing
+ * keeps the rail's group spacing (padding, border) out of these heights.
  */
 const SECTION_CSS: SystemStyleObject = {
   boxSizing: 'content-box',
@@ -164,8 +164,8 @@ export const OpenProjectsNavSection = ({
 };
 
 /**
- * An icon-rail entry into the editor: an app window rather than the Projects folder, so the two read apart. The
- * current project takes the rail's selected tone; its tooltip and name say "Current" too.
+ * An icon-rail entry into the editor: an app window rather than the Projects folder, so the two read apart. The current
+ * project takes the rail's selected tone; its tooltip and name say "Current" too.
  */
 const CompactEntry = ({
   isCurrent = false,

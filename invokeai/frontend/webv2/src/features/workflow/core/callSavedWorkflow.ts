@@ -141,8 +141,8 @@ export const shouldSyncSavedWorkflowDynamicFields = ({
 
 /**
  * Returns the dynamic inbound edges the next signature cannot take: every edge into an input it does not have, and
- * every resolvable edge whose source type it does not accept. An edge from a connector with nothing upstream yet has
- * no type to check, so it stays while its input does.
+ * every resolvable edge whose source type it does not accept. An edge from a connector with nothing upstream yet has no
+ * type to check, so it stays while its input does.
  */
 export const getSavedWorkflowDynamicEdgeIdsToRemove = (
   document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
@@ -211,11 +211,11 @@ const removeFormElement = (form: WorkflowForm, elementId: string): WorkflowForm 
 };
 
 /**
- * Applies the selected child workflow's field signature to a call node. A refresh of the same workflow keeps
- * compatible values and the user's label and description overrides; incompatible or new fields use the child
- * workflow's initial values. After another workflow was selected every field starts from that workflow's own values,
- * even where the two share field identities (copies of one template): only connections carry over, which the caller
- * filters through `edgeIdsToRemove`.
+ * Applies the selected child workflow's field signature to a call node. A refresh of the same workflow keeps compatible
+ * values and the user's label and description overrides; incompatible or new fields use the child workflow's initial
+ * values. After another workflow was selected every field starts from that workflow's own values, even where the two
+ * share field identities (copies of one template): only connections carry over, which the caller filters through
+ * `edgeIdsToRemove`.
  */
 export const syncCallSavedWorkflowFields = (
   document: ProjectGraphState,
@@ -304,8 +304,8 @@ export const syncCallSavedWorkflowFields = (
 };
 
 /**
- * Removes a call node's dynamic inputs and every connection into them: its selection was cleared, or the newly
- * selected workflow could not be loaded and the inputs left describe the previous one.
+ * Removes a call node's dynamic inputs and every connection into them: its selection was cleared, or the newly selected
+ * workflow could not be loaded and the inputs left describe the previous one.
  */
 export const clearSavedWorkflowDynamicFields = (
   document: ProjectGraphState,

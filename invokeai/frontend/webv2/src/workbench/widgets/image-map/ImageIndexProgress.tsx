@@ -23,8 +23,8 @@ const useCountsAge = (updatedAt: number | null): number => {
     return () => clearInterval(timer);
   }, [updatedAt]);
 
-  // Clamped rather than reset on a new report: until the next tick `now` still
-  // predates it, and a negative age would read as the future.
+  // Clamped rather than reset on a new report: until the next tick `now` still predates it, and a negative age would
+  // read as the future.
   return updatedAt === null ? 0 : Math.max(0, now - updatedAt);
 };
 
@@ -35,8 +35,8 @@ interface ImageIndexProgressProps {
 }
 
 /**
- * Show server-wide embedding progress only to admins receiving status events; non-admins see the empty state
- * instead of a frozen bar.
+ * Show server-wide embedding progress only to admins receiving status events; non-admins see the empty state instead of
+ * a frozen bar.
  */
 export const ImageIndexProgressPanel = ({
   counts,
@@ -108,8 +108,8 @@ export const ImageIndexActivityBadge = ({ counts, updatedAt }: ImageIndexProgres
     : t('widgets.imageMap.progress.badge', { counts: progress.counts });
 
   return (
-    // Positioned by the map's overlay column, which passes pointer events
-    // through to the plot; the badge takes its own back so the tooltip opens.
+    // Positioned by the map's overlay column, which passes pointer events through to the plot; the badge takes its own
+    // back so the tooltip opens.
     <Tooltip content={label}>
       <HStack
         bg="bg.subtle"

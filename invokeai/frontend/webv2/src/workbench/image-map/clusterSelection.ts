@@ -29,8 +29,8 @@ export const collectClusterSelection = (
     .map((entry) => entry.key);
 };
 
-// The map widget is English-only, so its numbers are grouped to match its words
-// rather than by whatever locale the browser reports.
+// The map widget is English-only, so its numbers are grouped to match its words rather than by whatever locale the
+// browser reports.
 const CLUSTER_SIZE_FORMAT = new Intl.NumberFormat('en-US');
 
 /** A cluster's size as the map words it; also the selection's name while the cluster has no label. */

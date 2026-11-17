@@ -1,6 +1,6 @@
 /**
- * Shows a loupe of the composited pixels under the pointer, previews samples while pressed and commits the last one
- * on release (or cancels it when the press ends any other way) through the active color target. Alt-hold restoration
+ * Shows a loupe of the composited pixels under the pointer, previews samples while pressed and commits the last one on
+ * release (or cancels it when the press ends any other way) through the active color target. Alt-hold restoration
  * returns to the prior tool; the picker neither dispatches nor edits pixels. State is per engine.
  */
 

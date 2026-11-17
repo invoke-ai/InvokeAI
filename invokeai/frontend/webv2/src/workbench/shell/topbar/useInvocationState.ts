@@ -48,8 +48,8 @@ export type { InvocationIssue, InvocationIssueTarget } from './invokeIssueTarget
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
 /**
- * Include capability, template and remembered control-model snapshots in route selection so each change
- * independently re-evaluates its readiness gate.
+ * Include capability, template and remembered control-model snapshots in route selection so each change independently
+ * re-evaluates its readiness gate.
  */
 const subscribeRouteSources = (listener: () => void): (() => void) => {
   const unsubscribeCapabilities = subscribeArchitectureCapabilities(listener);
@@ -188,8 +188,8 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
           ? routeInput.workflowValues
           : routeInput.generateValues;
 
-  // Video reads its own normalized values, so the count follows what its submission expands. Upscale's Refine reads
-  // the draft it shares with Generate, as its submission does.
+  // Video reads its own normalized values, so the count follows what its submission expands. Upscale's Refine reads the
+  // draft it shares with Generate, as its submission does.
   const videoValues = invocation.sourceId === 'video' ? normalizeVideoWidgetValues(routeInput.videoValues) : null;
   const upscalePromptDraft =
     invocation.sourceId === 'upscale' && readsUpscalePrompt(routeInput.upscaleValues)
@@ -209,8 +209,8 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
           ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
           : null
   );
-  // Block unexpandable prompts rather than submitting literal dynamic syntax; hotkey submission enforces the same
-  // rule. The prompt field offers the way out: retry, or turn dynamic prompts off and run the prompt as typed.
+  // Block unexpandable prompts rather than submitting literal dynamic syntax; hotkey submission enforces the same rule.
+  // The prompt field offers the way out: retry, or turn dynamic prompts off and run the prompt as typed.
   const expansionFailure = describeDynamicPromptsFailure(promptExpansion);
   const expansionReason = expansionFailure ? describeGenerationIssue(t, expansionFailure) : null;
 

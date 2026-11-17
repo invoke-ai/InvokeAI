@@ -234,8 +234,8 @@ const areQueueWorkflowSeedsValid = (seeds: unknown, graph: { nodes?: Record<stri
 };
 
 /**
- * Every group zips datums of one length onto fields of nodes the graph still has, no field is fed twice (by
- * another group or by a seed), and the product stays within what the queue accepts.
+ * Every group zips datums of one length onto fields of nodes the graph still has, no field is fed twice (by another
+ * group or by a seed), and the product stays within what the queue accepts.
  */
 const areQueueWorkflowBatchGroupsValid = (
   batchData: unknown,
@@ -356,8 +356,8 @@ export const createQueueItemBackendSubmission = (
     return { error: 'Queue item has malformed workflow batch metadata.', kind: 'invalid' };
   }
 
-  // Workflow provenance stays on the snapshot: the backend enqueue accepts neither the originating project
-  // workflow nor the library binding older records still carry.
+  // Workflow provenance stays on the snapshot: the backend enqueue accepts neither the originating project workflow nor
+  // the library binding older records still carry.
   const {
     kind: _,
     projectWorkflowId: _projectWorkflowId,
@@ -437,13 +437,12 @@ const getJournalSignature = (item: QueueItem): string =>
   ]);
 
 /**
- * A 5xx answer to an enqueue is usually caused by the request itself (e.g. a graph that
- * crashes server-side validation), so retrying the same submission forever never succeeds.
- * Gateway and availability errors (502/503/504, and 408/429) stay transient and keep retrying.
- * A run only gives up after at least MAX_SERVER_ERROR_SUBMISSIONS consecutive 500s spread over at least
- * MIN_SERVER_ERROR_WINDOW_MS, so a short-lived internal error can still recover.
- * After the last allowed 500 the run is reconciled once more, and only fails if the
- * backend queue really has nothing for it. The count lives on the run (`submissionRetry`), so a reload continues it.
+ * A 5xx answer to an enqueue is usually caused by the request itself (e.g. a graph that crashes server-side
+ * validation), so retrying the same submission forever never succeeds. Gateway and availability errors (502/503/504,
+ * and 408/429) stay transient and keep retrying. A run only gives up after at least MAX_SERVER_ERROR_SUBMISSIONS
+ * consecutive 500s spread over at least MIN_SERVER_ERROR_WINDOW_MS, so a short-lived internal error can still recover.
+ * After the last allowed 500 the run is reconciled once more, and only fails if the backend queue really has nothing
+ * for it. The count lives on the run (`submissionRetry`), so a reload continues it.
  */
 const MAX_SERVER_ERROR_SUBMISSIONS = 3;
 const MIN_SERVER_ERROR_WINDOW_MS = 10_000;
@@ -495,9 +494,9 @@ const getRetryReason = (error: unknown): Exclude<QueueSubmissionRetry['reason'],
 };
 
 /**
- * The retry a failed submission leaves, continuing the run's consecutive server errors unless the attempt started
- * more than SERVER_ERROR_STREAK_GAP_MS after the previous failure. The gap is measured from the attempt's start, so
- * a slow answer cannot reset its own streak.
+ * The retry a failed submission leaves, continuing the run's consecutive server errors unless the attempt started more
+ * than SERVER_ERROR_STREAK_GAP_MS after the previous failure. The gap is measured from the attempt's start, so a slow
+ * answer cannot reset its own streak.
  */
 const getSubmissionRetry = (
   error: unknown,
@@ -567,8 +566,8 @@ export const createQueueRuntime = ({
     setStatus: (payload) => {
       history.commands.setStatus(payload);
       // A run bound for the gallery, or a workflow run, whose nodes name boards whatever its destination, may have
-      // failed on a board: deleted, archived, or no longer the caller's to add to. The listing is read again at once;
-      // a run submitted after that read lands is routed by it, one submitted before still goes by the old listing.
+      // failed on a board: deleted, archived, or no longer the caller's to add to. The listing is read again at once; a
+      // run submitted after that read lands is routed by it, one submitted before still goes by the old listing.
       const failedSnapshot =
         payload.status === 'failed' ? getRouteTarget(history, payload.queueItemId)?.queueItem?.snapshot : undefined;
       if (failedSnapshot && (failedSnapshot.destination === 'gallery' || failedSnapshot.sourceId === 'workflow')) {
@@ -1084,8 +1083,8 @@ export const createQueueRuntime = ({
     return queueItem.snapshot.destination === 'gallery' && boardId && boardId !== 'none' ? boardId : null;
   };
 
-  // Submissions are immutable once enqueued, so a batch's input media is collected once and reused by every partial
-  // and final result route; scanning batch data per route would repeat a walk over every batch item.
+  // Submissions are immutable once enqueued, so a batch's input media is collected once and reused by every partial and
+  // final result route; scanning batch data per route would repeat a walk over every batch item.
   const submissionInputMedia = new WeakMap<object, SubmissionInputMediaNames>();
   const getSubmissionInputMediaNames = (queueItem: QueueItem): SubmissionInputMediaNames => {
     const submission: unknown = queueItem.snapshot.backendSubmission;
@@ -1111,16 +1110,16 @@ export const createQueueRuntime = ({
   };
 
   /**
-   * Hydrate generated videos for display and attach the unassigned ones to the destination board. Failures are
-   * recorded but never turn successful generation into failure.
+   * Hydrate generated videos for display and attach the unassigned ones to the destination board. Failures are recorded
+   * but never turn successful generation into failure.
    */
   const deliverResultVideos = async (
     projectId: string,
     queueItem: QueueItem,
     backendItemIds: number[]
   ): Promise<QueueResultVideo[]> => {
-    // Skip known cancelled backend items. Resumed cancellation records can be incomplete, so remaining attachments
-    // are best-effort.
+    // Skip known cancelled backend items. Resumed cancellation records can be incomplete, so remaining attachments are
+    // best-effort.
     const deliverableItemIds = backendItemIds.filter(
       (backendItemId) => !queueItem.cancelledBackendItemIds?.includes(backendItemId)
     );
@@ -1239,8 +1238,7 @@ export const createQueueRuntime = ({
     coordinator: QueueCoordinator,
     projectId: string,
     queueItem: QueueItem,
-    // Pass actual backend IDs explicitly; the immutable pre-submit queueItem closure cannot contain newly assigned
-    // IDs.
+    // Pass actual backend IDs explicitly; the immutable pre-submit queueItem closure cannot contain newly assigned IDs.
     backendItemIds: number[],
     attempt: RunAttempt
   ): Promise<void> => {
@@ -1392,8 +1390,8 @@ export const createQueueRuntime = ({
         return;
       }
 
-      // The held denoise frame may be painted over exactly these images while
-      // they decode — not over an earlier image of the same batch.
+      // The held denoise frame may be painted over exactly these images while they decode — not over an earlier image
+      // of the same batch.
       progressImageStore.bindSwapImages(
         queueItem.id,
         visibleImages.map((image) => image.imageName)
@@ -1489,8 +1487,8 @@ export const createQueueRuntime = ({
             )
           );
         }
-        // Inactive: whatever is left will never run. Release its awaiters — a
-        // followed slot must not hang on a route that is never coming.
+        // Inactive: whatever is left will never run. Release its awaiters — a followed slot must not hang on a route
+        // that is never coming.
         for (const route of pendingResultRoutes.values()) {
           route.settle();
         }
@@ -1815,8 +1813,8 @@ export const createQueueRuntime = ({
     (!deliveryConfirmations.isStaged(backendItemId) &&
       adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId))?.isClaimed === true);
   /**
-   * Protect claims during synchronous routing, which may finish the run and release its unstaged claims.
-   * Actual candidates decide confirmation; a routing failure releases only work it did not stage.
+   * Protect claims during synchronous routing, which may finish the run and release its unstaged claims. Actual
+   * candidates decide confirmation; a routing failure releases only work it did not stage.
    */
   const markAdoptedRerunsStaged = (projectId: string, queueItem: QueueItem, backendItemIds: number[]): void => {
     for (const backendItemId of backendItemIds) {
@@ -1875,9 +1873,9 @@ export const createQueueRuntime = ({
   };
 
   /**
-   * A retry, from any tab or client, re-runs failed or canceled backend items under new ids. The open run that owns
-   * the retried items, or once owned them before an earlier retry, reopens around the reruns, so its captured
-   * destination receives their results; reconciliation then tracks them like any resumed run.
+   * A retry, from any tab or client, re-runs failed or canceled backend items under new ids. The open run that owns the
+   * retried items, or once owned them before an earlier retry, reopens around the reruns, so its captured destination
+   * receives their results; reconciliation then tracks them like any resumed run.
    */
   const handleItemsRetried = (event: QueueItemsRetriedEvent): void => {
     if (!isActive() || !event.retried_items?.length) {
@@ -2048,8 +2046,8 @@ export const createQueueRuntime = ({
     const canStage = (): boolean =>
       isActive() && history.getSnapshot().projects.some((project) => project.id === projectId);
     const stage = async (): Promise<void> => {
-      // A tab that tracks the run knows its result nodes and stages the rerun itself; this one waits until that tab lets
-      // the run go, and then stages only a rerun it left.
+      // A tab that tracks the run knows its result nodes and stages the rerun itself; this one waits until that tab
+      // lets the run go, and then stages only a rerun it left.
       if (await isRunTrackedElsewhere(projectId, queueItemId)) {
         await locks?.waitForRunRelease(projectId, queueItemId, rerunWaits.signal);
       }

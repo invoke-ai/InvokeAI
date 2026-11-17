@@ -103,8 +103,7 @@ const TextEditable = ({ engine, session }: TextEditableProps) => {
       el.focus();
       placeCaretAtEnd(el);
     },
-    // `session` is stable for this element's life (parent keys by session.id);
-    // seed from the source captured at mount.
+    // `session` is stable for this element's life (parent keys by session.id); seed from the source captured at mount.
     [engine, source.content]
   );
 

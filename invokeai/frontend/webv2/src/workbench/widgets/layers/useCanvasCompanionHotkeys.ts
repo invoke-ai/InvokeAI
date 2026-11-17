@@ -26,8 +26,8 @@ export type CanvasCompanionEngine = Pick<
 >;
 
 /**
- * Registers the canvas keys that stay live while a companion widget (Layers and its Color pane) holds focus:
- * undo/redo, merge down, and the shared tool, brush-size and color table. Rows keep arrows, Delete and selection.
+ * Registers the canvas keys that stay live while a companion widget (Layers and its Color pane) holds focus: undo/redo,
+ * merge down, and the shared tool, brush-size and color table. Rows keep arrows, Delete and selection.
  */
 export const useCanvasCompanionHotkeys = (
   runtime: { commands: Pick<WidgetCommandApi, 'register'>; hotkeys: WidgetHotkeyApi },

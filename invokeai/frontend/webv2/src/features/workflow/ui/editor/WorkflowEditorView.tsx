@@ -537,8 +537,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const renderedFlowNodes = renderedFlowModel?.nodes ?? EMPTY_FLOW_NODES;
   const renderedFlowEdges = renderedFlowModel?.edges ?? EMPTY_FLOW_EDGES;
 
-  // Measured before paint, so the flow mounts once, at the viewport its nodes first render for.
-  // An unmeasurable container opens at the default viewport.
+  // Measured before paint, so the flow mounts once, at the viewport its nodes first render for. An unmeasurable
+  // container opens at the default viewport.
   useLayoutEffect(() => {
     if (mountViewport !== undefined || !fitOnMount) {
       return;
@@ -1010,8 +1010,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         return;
       }
 
-      // Dragging an end away and dropping it on empty canvas disconnects; a plain click, or a
-      // drop on a handle that rejected the connection, leaves the edge alone.
+      // Dragging an end away and dropping it on empty canvas disconnects; a plain click, or a drop on a handle that
+      // rejected the connection, leaves the edge alone.
       const position = getEventClientPosition(event);
       const didMove =
         position !== null &&
@@ -1262,16 +1262,16 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         {
           opacity: 1,
         },
-      // With a node selected, every edge it does not touch drops to a quarter so its own connections stand out.
-      // Only the live flow, a direct child: the image export's offscreen flow sits in this box too.
+      // With a node selected, every edge it does not touch drops to a quarter so its own connections stand out. Only
+      // the live flow, a direct child: the image export's offscreen flow sits in this box too.
       '&[data-node-selected] > .react-flow .react-flow__edge:not(.selected, .workflow-selected-node-edge, :hover) .react-flow__edge-path':
         { opacity: 0.25 },
       '& .react-flow__edge.workflow-selected-node-edge .react-flow__edge-path': {
         animation: 'dashdraw var(--wb-motion-duration-slow) linear var(--wb-motion-animation-iteration-count)',
         strokeDasharray: '5',
       },
-      // The edge layer is a stacking context of its own, so sinking it keeps
-      // every edge (including ones xyflow elevates for a selection) under nodes.
+      // The edge layer is a stacking context of its own, so sinking it keeps every edge (including ones xyflow elevates
+      // for a selection) under nodes.
       ...(workflowEdgesBehindNodes ? { '& .react-flow__edges': { zIndex: -1 } } : {}),
       ...(tool === 'eraser'
         ? { '& .react-flow__edge, & .react-flow__node, & .react-flow__pane': { cursor: 'crosshair' } }

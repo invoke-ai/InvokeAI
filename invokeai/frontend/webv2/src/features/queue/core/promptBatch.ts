@@ -1,6 +1,6 @@
 /**
- * Prompts arrive pre-expanded. Backend outer groups form a Cartesian product; entries within each group zip and
- * require equal lengths.
+ * Prompts arrive pre-expanded. Backend outer groups form a Cartesian product; entries within each group zip and require
+ * equal lengths.
  */
 
 import { SEED_MAX } from '@platform/core/seed';
@@ -121,8 +121,8 @@ const toBackendDatum = (datum: QueueWorkflowBatchDatum): QueueBatchDatum => ({
 });
 
 /**
- * Every combination the backend would produce from `groups`, in its order: the first group varies slowest, and
- * each group's datums are read in step. Each entry maps a datum to the index of the item that combination uses.
+ * Every combination the backend would produce from `groups`, in its order: the first group varies slowest, and each
+ * group's datums are read in step. Each entry maps a datum to the index of the item that combination uses.
  */
 const expandCombinations = (groups: readonly (readonly QueueWorkflowBatchDatum[])[]): number[][] => {
   let combinations: number[][] = [[]];
@@ -144,9 +144,9 @@ const expandCombinations = (groups: readonly (readonly QueueWorkflowBatchDatum[]
 };
 
 /**
- * Without varying seeds the backend multiplies the batch groups itself and repeats the product `batchCount` times.
- * Once a seed steps, every session must get its own seed, so the product is expanded here into one zipped group,
- * run-major, with each seed walking straight through it.
+ * Without varying seeds the backend multiplies the batch groups itself and repeats the product `batchCount` times. Once
+ * a seed steps, every session must get its own seed, so the product is expanded here into one zipped group, run-major,
+ * with each seed walking straight through it.
  */
 export const buildQueueWorkflowBatchPlan = ({
   batchCount,
@@ -228,8 +228,8 @@ const generateLegacySeedSequence = (start: number, count: number): number[] =>
   Array.from({ length: sanitizeBatchCount(count) }, (_, index) => (start + index) % SEED_MAX);
 
 /**
- * Recovery preserves legacy random-toggle seed rules, including exclusive SEED_MAX wrapping; new submissions never
- * use this path.
+ * Recovery preserves legacy random-toggle seed rules, including exclusive SEED_MAX wrapping; new submissions never use
+ * this path.
  */
 export const buildLegacyGeneratePromptBatchPlan = ({
   batchCount,
@@ -328,9 +328,8 @@ export const buildGeneratePromptBatchPlan = ({
     };
   }
 
-  // per-iteration: the seed list is its own dimension, so each iteration's seed
-  // is applied across the whole prompt set. Seeds first so results group by
-  // iteration rather than interleaving prompts.
+  // per-iteration: the seed list is its own dimension, so each iteration's seed is applied across the whole prompt set.
+  // Seeds first so results group by iteration rather than interleaving prompts.
   const seeds = isHeld ? [seed] : generateSeedSequence(seed, iterations, seedStep);
 
   return {
@@ -348,8 +347,8 @@ export interface GeneratePromptSubmission {
   positivePrompt: string;
   positivePromptNodeId: string;
   /**
-   * Prompts to submit as a batch dimension, already expanded by the caller.
-   * Absent or empty submits `positivePrompt` verbatim.
+   * Prompts to submit as a batch dimension, already expanded by the caller. Absent or empty submits `positivePrompt`
+   * verbatim.
    */
   positivePrompts?: string[];
   seed: number;

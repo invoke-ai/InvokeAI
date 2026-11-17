@@ -29,8 +29,8 @@ import { getObjectIdentity } from './objectIdentity';
 const PROVIDER_PAGE_SIZE = 8;
 
 /**
- * Boards back two providers on every debounced keystroke; read them through the
- * query cache (60s staleTime) instead of refetching per search.
+ * Boards back two providers on every debounced keystroke; read them through the query cache (60s staleTime) instead of
+ * refetching per search.
  */
 const loadActiveBoards = (): Promise<GalleryBoard[]> =>
   queryClient.fetchQuery(galleryBoardsOptions({ includeArchived: false }));
@@ -93,8 +93,8 @@ export const createBoardsProvider = ({
       .filter(
         (board: GalleryBoard) =>
           matchesQuery(getGalleryBoardLabel(board, t)) &&
-          // Boards without a creation date (uncategorized, date virtual
-          // boards) are excluded only while a date range is active.
+          // Boards without a creation date (uncategorized, date virtual boards) are excluded only while a date range is
+          // active.
           (query.range === undefined || isTimestampInRange(board.createdAt ?? '', query.range))
       )
       .map<PaletteEntry>((board) => ({
@@ -137,8 +137,8 @@ export const createPromptHistoryProvider = ({
     for (const [index, item] of promptHistory.entries()) {
       const dedupeKey = `${item.positivePrompt}\n${item.negativePrompt ?? ''}`;
 
-      // Prompt history items carry no timestamp, so this provider is text-only
-      // (not range-capable); it never sees pure-date queries.
+      // Prompt history items carry no timestamp, so this provider is text-only (not range-capable); it never sees
+      // pure-date queries.
       if (seen.has(dedupeKey) || !matchesQuery(`${item.positivePrompt} ${item.negativePrompt ?? ''}`)) {
         continue;
       }
@@ -225,9 +225,8 @@ export const createQueueItemsProvider = ({
   providerKey: getPaletteContributionKey('provider', 'queue-items'),
   supportsCreatedAtRange: true,
   search: async (query, { signal }) => {
-    // The queue read model is a recent window with no server-side text search;
-    // filter the fetched window client-side. Items without a timestamp fail
-    // closed while a date range is active.
+    // The queue read model is a recent window with no server-side text search; filter the fetched window client-side.
+    // Items without a timestamp fail closed while a date range is active.
     signal.throwIfAborted();
     const model = await loadQueue();
     const matchesQuery = createTermsMatcher(query.text);
@@ -319,8 +318,8 @@ export const createImagesProvider = (deps: ImageEntryDeps): PaletteSearchProvide
     providerKey: getPaletteContributionKey('provider', 'images'),
     supportsCreatedAtRange: true,
     search: async (query, { signal }) => {
-      // Search the explicit all-readable scope. The endpoint excludes archived
-      // and inaccessible boards; the active board list supplies display labels.
+      // Search the explicit all-readable scope. The endpoint excludes archived and inaccessible boards; the active
+      // board list supplies display labels.
       const [page, boards] = await Promise.all([
         listPaletteImages({
           boardId: ALL_READABLE_BOARDS_ID,
@@ -340,8 +339,8 @@ export const createImagesProvider = (deps: ImageEntryDeps): PaletteSearchProvide
 };
 
 /**
- * Ranks every accessible image by meaning, unlike the gallery's search, which stays within its board. Scoped-only:
- * each search runs the server's text encoder, and cosine ranking matches any query, so root typing never triggers it.
+ * Ranks every accessible image by meaning, unlike the gallery's search, which stays within its board. Scoped-only: each
+ * search runs the server's text encoder, and cosine ranking matches any query, so root typing never triggers it.
  */
 export const createSemanticImagesProvider = (deps: ImageEntryDeps): PaletteSearchProvider => {
   const toEntries = createImageEntryMapper(deps);

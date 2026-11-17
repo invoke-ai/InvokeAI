@@ -34,12 +34,12 @@ const controlSizes = <T>(
   );
 
 /**
- * Arrowed surfaces (menus, popovers, hover cards) keep the tip clear of the content's rounded corners: the arrow box gets
- * a transparent border of the corner radius plus a margin. Floating UI keeps the whole box within the content's edge,
- * so the tip never lands on a corner curve; a small trigger at the end of a bar shifts the panel instead. Zag's gutter
- * reads the box's inner height, which the border leaves at the visible size. An arrow of no size gets no border either,
- * so Floating UI has nothing to centre on the anchor and leaves the panel where its placement puts it. The box overlaps
- * the content and is transparent, so it lets the pointer through.
+ * Arrowed surfaces (menus, popovers, hover cards) keep the tip clear of the content's rounded corners: the arrow box
+ * gets a transparent border of the corner radius plus a margin. Floating UI keeps the whole box within the content's
+ * edge, so the tip never lands on a corner curve; a small trigger at the end of a bar shifts the panel instead. Zag's
+ * gutter reads the box's inner height, which the border leaves at the visible size. An arrow of no size gets no border
+ * either, so Floating UI has nothing to centre on the anchor and leaves the panel where its placement puts it. The box
+ * overlaps the content and is transparent, so it lets the pointer through.
  */
 const arrowClearOfCorners = (visibleSize: string) => ({
   '--arrow-visible-size': visibleSize,
@@ -68,16 +68,16 @@ const arrowInsideContent = {
 };
 
 /**
- * Zag rotates the tip so its bordered top-left corner points out of the content. Clipped to that outer half plus a
- * band into the content, it covers the content's edge across its base, so tip and panel share one outline. The band
- * spans the 1px border and the 1px inset highlight the dark `lg` shadow paints inside it, with room to spare: a
- * rotated element loses its sub-pixel offset, so at a fractional device pixel ratio (125%) the tip lands up to half a
- * device pixel off its layout position, and the arrow's 1px move outward overshoots a border the browser snapped to
- * one device pixel (0.8px). A band of about 3px (4.5px along each side) absorbs both; one of 1px left part of the
- * border or the highlight as a line across the base. A menu's tip, on top of its content, covers only padding with it.
- * A tip of no size draws no border either. The clip bounds hit testing as well: unlike its click-through arrow box,
- * the visible tip takes the pointer as part of the surface, so resting on it keeps a hover card open and a click on
- * it never reaches whatever lies beneath.
+ * Zag rotates the tip so its bordered top-left corner points out of the content. Clipped to that outer half plus a band
+ * into the content, it covers the content's edge across its base, so tip and panel share one outline. The band spans
+ * the 1px border and the 1px inset highlight the dark `lg` shadow paints inside it, with room to spare: a rotated
+ * element loses its sub-pixel offset, so at a fractional device pixel ratio (125%) the tip lands up to half a device
+ * pixel off its layout position, and the arrow's 1px move outward overshoots a border the browser snapped to one device
+ * pixel (0.8px). A band of about 3px (4.5px along each side) absorbs both; one of 1px left part of the border or the
+ * highlight as a line across the base. A menu's tip, on top of its content, covers only padding with it. A tip of no
+ * size draws no border either. The clip bounds hit testing as well: unlike its click-through arrow box, the visible tip
+ * takes the pointer as part of the surface, so resting on it keeps a hover card open and a click on it never reaches
+ * whatever lies beneath.
  */
 const arrowTipOutsideContent = {
   borderLeftWidth: 'min(1px, var(--arrow-visible-size))',
@@ -183,8 +183,8 @@ export const popoverSlotRecipe = defineSlotRecipe({
 });
 
 /**
- * Keep white status text at AA: Chakra dims descriptions to 80%, and its green/orange 600 fills are too light
- * for white at any opacity, so success and warning use the 700 step.
+ * Keep white status text at AA: Chakra dims descriptions to 80%, and its green/orange 600 fills are too light for white
+ * at any opacity, so success and warning use the 700 step.
  */
 export const toastSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.toast,
@@ -397,8 +397,7 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
     item: {
       ...chakraSlotRecipes.segmentGroup.base?.item,
       color: 'fg.muted',
-      // Use positive z-order; axe can treat negative indicators as beneath the page and measure the wrong
-      // contrast.
+      // Use positive z-order; axe can treat negative indicators as beneath the page and measure the wrong contrast.
       zIndex: 1,
       fontWeight: '500',
       transitionDuration: 'faster',
@@ -633,12 +632,12 @@ export const dropdownGroupLabel = {
 
 /**
  * A menu's arrow points at its anchor when the anchor is a box: a trigger, or a measured one. A context menu is
- * anchored to the pointer, a point of at most 1px with nothing to point at, so its arrow's visible size is nothing. Zag sets
- * the anchor's size on the positioner as it places the menu; until then, a box is assumed. The placement after that,
- * which Floating UI's auto-update makes as soon as its resize observer reports the content, drops the shrunken arrow's
- * height from the gutter. Zag's one-shot repositions (`listeners: false`: `Menu.ContextTrigger`, an `anchorPoint`
- * prop, `TRIGGER_VALUE.SET`) get no such second placement and would keep a point-anchored menu 6px further out; the app
- * uses none of them.
+ * anchored to the pointer, a point of at most 1px with nothing to point at, so its arrow's visible size is nothing. Zag
+ * sets the anchor's size on the positioner as it places the menu; until then, a box is assumed. The placement after
+ * that, which Floating UI's auto-update makes as soon as its resize observer reports the content, drops the shrunken
+ * arrow's height from the gutter. Zag's one-shot repositions (`listeners: false`: `Menu.ContextTrigger`, an
+ * `anchorPoint` prop, `TRIGGER_VALUE.SET`) get no such second placement and would keep a point-anchored menu 6px
+ * further out; the app uses none of them.
  */
 const MENU_ARROW_SIZE =
   'min({sizes.3}, max(0px, calc((min(var(--reference-width, 2px), var(--reference-height, 2px)) - 1px) * 1000)))';
@@ -688,8 +687,8 @@ export const menuSlotRecipe = defineSlotRecipe({
 
 export const selectSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.select,
-  // Override outline _expanded at variant level; base styles lose to it. Preserve Chakra's variant-map inference
-  // in the cast.
+  // Override outline _expanded at variant level; base styles lose to it. Preserve Chakra's variant-map inference in the
+  // cast.
   variants: {
     ...chakraSlotRecipes.select.variants,
     size: controlSizes<SlotStyles>(chakraSlotRecipes.select.variants?.size, (styles, height) => ({
@@ -786,8 +785,9 @@ export const comboboxSlotRecipe = defineSlotRecipe({
 });
 
 /**
- * Dialogs stack from the modal token, below the popover token menus and popovers use. zag copies a menu's z-index to its
- * positioner once, before the layer index lands, so a menu opened in a second, stacked dialog sat under that dialog.
+ * Dialogs stack from the modal token, below the popover token menus and popovers use. zag copies a menu's z-index to
+ * its positioner once, before the layer index lands, so a menu opened in a second, stacked dialog sat under that
+ * dialog.
  */
 const DIALOG_LAYER = { '--dialog-z-index': 'zIndex.modal' } as const;
 
@@ -864,8 +864,8 @@ export const scrollAreaSlotRecipe = defineSlotRecipe({
 /**
  * Extend the control's hit area past its box with an invisible outset; the root is a label, so a press there toggles
  * the input. 6px gives the smallest (sm, 12px) control a 24px target and stays under the 8px minimum spacing between
- * neighbouring controls, so it never reaches a neighbour's box. Insets resolve from the padding box, so the outset
- * also clears the control's 1px border.
+ * neighbouring controls, so it never reaches a neighbour's box. Insets resolve from the padding box, so the outset also
+ * clears the control's 1px border.
  *
  * Ark marks the control hovered while any part of the root is, so the label and the outset show the hover too. The
  * hover is defined for the `solid` variant only, the default every checkbox uses.
@@ -890,8 +890,8 @@ export const checkboxSlotRecipe = defineSlotRecipe({
         control: {
           ...chakraSlotRecipes.checkbox.variants?.variant?.solid?.control,
           _hover: {
-            // Halfway to the foreground is stronger than the rest border in every theme, high contrast included,
-            // where the rest border already matches the muted foreground. An invalid control keeps its error border.
+            // Halfway to the foreground is stronger than the rest border in every theme, high contrast included, where
+            // the rest border already matches the muted foreground. An invalid control keeps its error border.
             '&[data-state=unchecked]:not([data-invalid])': {
               borderColor: 'color-mix(in oklab, {colors.border.emphasized}, {colors.fg})',
             },
@@ -1069,8 +1069,7 @@ export const kbdRecipe = defineRecipe({
 });
 
 /**
- * Use a linear sweep to avoid endpoint pauses; system.ts disables skeleton motion and gradients under reduced
- * motion.
+ * Use a linear sweep to avoid endpoint pauses; system.ts disables skeleton motion and gradients under reduced motion.
  */
 export const skeletonRecipe = defineRecipe({
   ...chakraRecipes.skeleton,
@@ -1178,8 +1177,8 @@ export const rowRecipe = defineRecipe({
 });
 
 /**
- * A list row: an optional checkbox beside one primary button, never inside it. The ring wraps the whole row when
- * the button has focus; the accent tone recolors muted text so it stays legible on the solid fill.
+ * A list row: an optional checkbox beside one primary button, never inside it. The ring wraps the whole row when the
+ * button has focus; the accent tone recolors muted text so it stays legible on the solid fill.
  */
 export const listItemSlotRecipe = defineSlotRecipe({
   slots: [
@@ -1538,8 +1537,8 @@ export const resizeHandleSlotRecipe = defineSlotRecipe({
       position: 'relative',
       // Above region outlines (zIndex 4) so the capsule masks an outline passing through it.
       zIndex: 5,
-      // The line is a border, not a 1px background: at fractional display scales a background can round to two
-      // device pixels while every other border draws one. A pseudo-element keeps the hit strip's offsets unshifted.
+      // The line is a border, not a 1px background: at fractional display scales a background can round to two device
+      // pixels while every other border draws one. A pseudo-element keeps the hit strip's offsets unshifted.
       _before: { borderColor: 'border.subtle', content: '""', inset: '0', position: 'absolute' },
       '&[data-line-hidden]::before, &:has([data-collapse-armed])::before': { borderColor: 'transparent' },
     },

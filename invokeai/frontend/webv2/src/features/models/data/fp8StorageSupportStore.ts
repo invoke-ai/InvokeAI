@@ -13,11 +13,10 @@ import { getFp8StorageSupport, type Fp8StorageSupportRow } from './api';
 /**
  * Which models may be offered the FP8 Storage default, answered by the backend.
  *
- * The client used to answer it from the model type alone — `main`, `controlnet` or `t2i_adapter` — and
- * so offered the control for 19 of the 52 loader keys that ignore it: a GGUF main model whose packed
- * weights must never be re-encoded, a FLUX ControlNet whose loader never casts. Type is not enough,
- * and neither is base: FLUX main casts and FLUX ControlNet does not. The server composes the whole
- * answer per `(base, type, format)` and ships the finished boolean.
+ * The client used to answer it from the model type alone — `main`, `controlnet` or `t2i_adapter` — and so offered the
+ * control for 19 of the 52 loader keys that ignore it: a GGUF main model whose packed weights must never be re-encoded,
+ * a FLUX ControlNet whose loader never casts. Type is not enough, and neither is base: FLUX main casts and FLUX
+ * ControlNet does not. The server composes the whole answer per `(base, type, format)` and ships the finished boolean.
  *
  * Static per backend build, so it is fetched once on first use rather than kept fresh.
  */
@@ -59,8 +58,8 @@ const refresh = (): Promise<void> =>
       })
       .catch(() => {
         if (isAccountScopeCurrent(owner)) {
-          // No error copy: the only consumer hides a control it cannot vouch for, which needs no
-          // message. Recorded as `error` so a later mount retries rather than waiting forever.
+          // No error copy: the only consumer hides a control it cannot vouch for, which needs no message. Recorded as
+          // `error` so a later mount retries rather than waiting forever.
           store.patchSnapshot({ status: store.getSnapshot().byKey ? 'loaded' : 'error' });
         }
       });
@@ -80,13 +79,13 @@ export const ensureFp8StorageSupportLoaded = (): Promise<void> => {
 /**
  * Whether FP8 Storage does anything for this model. `false` until the table has arrived.
  *
- * Unknown reads as unsupported in both directions — before the table loads, and for a key the table
- * does not contain. Offering a control that turns out to be inert is the defect this replaces; a
- * control that appears a moment late is not.
+ * Unknown reads as unsupported in both directions — before the table loads, and for a key the table does not contain.
+ * Offering a control that turns out to be inert is the defect this replaces; a control that appears a moment late is
+ * not.
  *
- * A row with base `any` is a wildcard loader registration, resolved after the exact key and in the same
- * order the backend registry resolves a loader. T2I adapters are served entirely that way, so without
- * the fallback they would all lose the control.
+ * A row with base `any` is a wildcard loader registration, resolved after the exact key and in the same order the
+ * backend registry resolves a loader. T2I adapters are served entirely that way, so without the fallback they would all
+ * lose the control.
  */
 export const isFp8StorageSupported = (
   snapshot: Fp8StorageSupportSnapshot,

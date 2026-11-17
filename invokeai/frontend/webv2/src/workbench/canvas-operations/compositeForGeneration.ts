@@ -1,8 +1,8 @@
 /**
- * Execute a {@link CompositePlan} with injected raster, encoding, hashing, and upload dependencies. Composite
- * enabled layers in z-order through their transforms, opacity, and blend modes into the bbox, then compute
- * document-space bounds and alpha coverage. The caller-owned {@link CompositeDedupeCache} skips unchanged plans
- * and reuses uploads with identical pixel hashes.
+ * Execute a {@link CompositePlan} with injected raster, encoding, hashing, and upload dependencies. Composite enabled
+ * layers in z-order through their transforms, opacity, and blend modes into the bbox, then compute document-space
+ * bounds and alpha coverage. The caller-owned {@link CompositeDedupeCache} skips unchanged plans and reuses uploads
+ * with identical pixel hashes.
  */
 
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
@@ -139,9 +139,8 @@ const reserveComposite = (
   scratchPixels: number
 ): { release(): void } => {
   const pixels = Math.max(0, entry.bbox.width) * Math.max(0, entry.bbox.height);
-  // Final/accumulator surface plus a final scan ImageData (except for control
-  // layers, which are made opaque by construction), plus a temporary surface
-  // and an ImageData buffer for every scratch pixel.
+  // Final/accumulator surface plus a final scan ImageData (except for control layers, which are made opaque by
+  // construction), plus a temporary surface and an ImageData buffer for every scratch pixel.
   const finalBuffers = entry.kind === 'control-layer' ? 1 : 2;
   const reservation = deps.reserve?.((pixels * finalBuffers + scratchPixels * 2) * 4);
   if (reservation?.status === 'over-budget') {
@@ -250,8 +249,8 @@ type RasterEntryResult = CompositeEntryResult & {
 };
 
 /**
- * Share raster composition, coverage scanning, encoding, and plan-key/content-hash upload deduplication between
- * {@link executeCompositePlan}, {@link executeControlComposite} and {@link executeRegionalMaskComposite}.
+ * Share raster composition, coverage scanning, encoding, and plan-key/content-hash upload deduplication between {@link
+ * executeCompositePlan}, {@link executeControlComposite} and {@link executeRegionalMaskComposite}.
  */
 const executeRasterEntry = async (
   entry: CompositeEntry,
@@ -492,8 +491,8 @@ const compositeMaskEntry = async (
 };
 
 /**
- * Composite inpaint/noise masks over white, scan mask coverage, and reuse the caller-owned plan-key/content-hash
- * upload cache.
+ * Composite inpaint/noise masks over white, scan mask coverage, and reuse the caller-owned plan-key/content-hash upload
+ * cache.
  */
 export const executeMaskComposite = async (
   entry: CompositeEntry,

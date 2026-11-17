@@ -44,18 +44,16 @@ interface WidgetRendererByIdProps extends Omit<WidgetViewProps, 'instance' | 'ma
 }
 
 /**
- * The chrome slots a region can hoist out of the widget frame. `actions` is the
- * full trailing cluster (widget actions, settings, float, overflow menu);
- * `viewActions` contains widget actions and settings, for chrome that already
- * carries its own layout controls.
+ * The chrome slots a region can hoist out of the widget frame. `actions` is the full trailing cluster (widget actions,
+ * settings, float, overflow menu); `viewActions` contains widget actions and settings, for chrome that already carries
+ * its own layout controls.
  */
 type WidgetChromeSlotName = 'actions' | 'label' | 'viewActions' | 'icon';
 
 interface WidgetChromeSlotByIdProps {
   instanceId: string;
   /**
-   * Specify the runtime region for hoisted chrome outside center so close/reveal commands target the correct
-   * placement.
+   * Specify the runtime region for hoisted chrome outside center so close/reveal commands target the correct placement.
    */
   region?: WorkbenchRegion;
   slot: WidgetChromeSlotName;
@@ -72,8 +70,8 @@ export const WidgetRendererById = ({ instanceId, widget, ...props }: WidgetRende
 };
 
 /**
- * Resolve widget chrome with the view's implementation/runtime for center and floating hosts. Callers supply
- * Suspense so other chrome paints during chunk loading.
+ * Resolve widget chrome with the view's implementation/runtime for center and floating hosts. Callers supply Suspense
+ * so other chrome paints during chunk loading.
  */
 export const WidgetChromeSlotById = ({ instanceId, region = 'center', slot, widget }: WidgetChromeSlotByIdProps) => {
   const selection = useActiveProjectSelector(
@@ -401,8 +399,8 @@ const WidgetShellFrame = ({
     return <WidgetTooltipFrame icon={widget.manifest.icon}>{children}</WidgetTooltipFrame>;
   }
 
-  // Floating windows provide their own chrome (FloatingWidgetWindow), so the
-  // view renders bare, like popovers and dialogs.
+  // Floating windows provide their own chrome (FloatingWidgetWindow), so the view renders bare, like popovers and
+  // dialogs.
   if (region === 'popover' || region === 'dialog' || region === 'floating' || presentation === 'compact') {
     return children;
   }
@@ -549,9 +547,9 @@ const HeaderSlot = memo(function HeaderSlot({
   );
 }, areSlotPropsEqual);
 
-// minmax(0,1fr) prevents long content from widening and clipping panels.
-// Never shrunk: the viewport is a flex column, and `minH: full` would let it squeeze the content to its own height.
-// The scroll area sizes its thumb from this element, so a squeezed one leaves a stale or missing scrollbar.
+// minmax(0,1fr) prevents long content from widening and clipping panels. Never shrunk: the viewport is a flex column,
+// and `minH: full` would let it squeeze the content to its own height. The scroll area sizes its thumb from this
+// element, so a squeezed one leaves a stale or missing scrollbar.
 const panelBodyContentProps = {
   display: 'grid',
   flexShrink: 0,

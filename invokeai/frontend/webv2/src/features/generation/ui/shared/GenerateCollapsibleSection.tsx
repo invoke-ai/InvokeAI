@@ -44,14 +44,14 @@ type Props = {
 /**
  * An open section reads as one card: a title bar, dimmer than the panel, over a lighter tray holding the fields, the
  * two a hair apart. A folded section is its title row alone, and hairlines separate the folded rows; the hairlines
- * either side of an open or pointed section hide, since its card or hover fill already bounds it. The title bar
- * spans the row, so its summary and badges sit inside it.
+ * either side of an open or pointed section hide, since its card or hover fill already bounds it. The title bar spans
+ * the row, so its summary and badges sit inside it.
  */
 const POINTED = ':has(> [data-part="trigger"]:hover)';
 const SECTION_STYLES = {
   '&:last-child': { borderBottomWidth: '1px' },
-  // An open section is a card of its own (title bar over tray), and a pointed title fills its row as a list row
-  // does, so the hairlines either side of either go.
+  // An open section is a card of its own (title bar over tray), and a pointed title fills its row as a list row does,
+  // so the hairlines either side of either go.
   [`&:is([data-state="open"], ${POINTED}), .generate-section:is([data-state="open"], ${POINTED}) + &`]: {
     borderTopColor: 'transparent',
   },
@@ -66,13 +66,13 @@ const SEAM_RADIUS = '2px';
 const TRAY_BG = 'bg.muted';
 const COLLAPSIBLE_INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' };
 /**
- * The fields grow in by a fixed few pixels while the content opens, and back as it folds, on the recipe's duration
- * (1ms under Reduce motion). On the fields, not the content: the content clips its animating height, and Chromium
- * leaves fields unpainted when one element does both that and a composited transform animation.
+ * The fields grow in by a fixed few pixels while the content opens, and back as it folds, on the recipe's duration (1ms
+ * under Reduce motion). On the fields, not the content: the content clips its animating height, and Chromium leaves
+ * fields unpainted when one element does both that and a composited transform animation.
  */
 const FIELDS_STYLES = {
-  // Controls that back themselves with the surface they sit on (a row's weight, a reference image's fields) take
-  // the tray's here, not the widget's.
+  // Controls that back themselves with the surface they sit on (a row's weight, a reference image's fields) take the
+  // tray's here, not the widget's.
   '--wb-field-surface': '{colors.bg.muted}',
   transformOrigin: 'top',
   '[data-part="content"][data-state="open"] > &': {
@@ -102,8 +102,8 @@ const TRIGGER_STYLES = {
     outlineColor: 'accent.solid',
     outlineOffset: '-2px',
   },
-  // Summaries say what a folded section holds; an open one shows its fields instead.
-  // They leave downward, toward the fields that open in their place.
+  // Summaries say what a folded section holds; an open one shows its fields instead. They leave downward, toward the
+  // fields that open in their place.
   '&[data-state="open"] [data-section-summary]': {
     opacity: 0,
     transform: 'translateY(4px)',
@@ -255,8 +255,8 @@ export const GenerateCollapsibleSection = ({
       root,
     });
     open({
-      // A frame late: Zag focuses the menu a frame after a highlight, and a pick within that frame would otherwise
-      // land focus back in the closing menu.
+      // A frame late: Zag focuses the menu a frame after a highlight, and a pick within that frame would otherwise land
+      // focus back in the closing menu.
       restoreFocus: () => requestAnimationFrame(() => trigger.focus()),
       x: fromKeyboard ? rect.left : event.clientX,
       y: fromKeyboard ? rect.bottom : event.clientY,

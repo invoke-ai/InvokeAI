@@ -17,10 +17,9 @@ export interface ToolFormProps {
 export type ToolFormComponent = ComponentType<ToolFormProps>;
 
 /**
- * One named group of a tool's property form. Group ids are GLOBAL keys: shared
- * across tools when (and only when) the tools share the group's component, so
- * React keeps the DOM alive across the tool switch and collapse state follows
- * the group rather than the tool.
+ * One named group of a tool's property form. Group ids are GLOBAL keys: shared across tools when (and only when) the
+ * tools share the group's component, so React keeps the DOM alive across the tool switch and collapse state follows the
+ * group rather than the tool.
  */
 export interface ToolPropertyGroup {
   id: string;

@@ -126,8 +126,8 @@ const VideoModelReconciler = ({
     const normalized = normalizeVideoWidgetValues(rawValues);
 
     if (normalized && areVideoValuesEqual(normalized, values)) {
-      // Pin whether this panel expands prompts while the record still says which kind it is: a later partial edit
-      // (a prompt resize) would make an unseeded panel read as one saved before Video expanded prompts.
+      // Pin whether this panel expands prompts while the record still says which kind it is: a later partial edit (a
+      // prompt resize) would make an unseeded panel read as one saved before Video expanded prompts.
       if (typeof rawValues.dynamicPromptsEnabled !== 'boolean') {
         patchValues(normalizeDynamicPromptsSettings(values), 'system');
       }
@@ -182,8 +182,8 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
     [models, modelsStatus, panelFields, rawValues]
   );
   const dimensions = useMemo(() => getVideoDimensions(values.model ?? undefined, values), [values]);
-  // What the run will actually use: a conditioning clip decides the length, and in the video role
-  // the frame rate too. The stored values stay put underneath, so clearing the clip restores them.
+  // What the run will actually use: a conditioning clip decides the length, and in the video role the frame rate too.
+  // The stored values stay put underneath, so clearing the clip restores them.
   const timing = useMemo(() => getEffectiveVideoTiming(values.model ?? undefined, values), [values]);
   const autoDurationActive = useMemo(() => isAutoDurationActive(values), [values]);
   const autoDurationBounds = useMemo(() => getAutoDurationBounds(values.model ?? undefined, values), [values]);
@@ -207,10 +207,9 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
 
   const patch = useCallback((next: Partial<VideoWidgetValues>) => patchValues(next), [patchValues]);
 
-  // Async writes must use the latest committed list for this project while the sync effect is live. Hidden
-  // Activity panels stop syncing, and old callbacks still target their original project; drop writes in either
-  // case to avoid restoring stale references. Two resolves in one microtask drain may still see the same
-  // pre-commit list.
+  // Async writes must use the latest committed list for this project while the sync effect is live. Hidden Activity
+  // panels stop syncing, and old callbacks still target their original project; drop writes in either case to avoid
+  // restoring stale references. Two resolves in one microtask drain may still see the same pre-commit list.
   const referencesRef = useRef({ live: true, projectId, references: values.references });
 
   useEffect(() => {
@@ -268,9 +267,9 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
       fps: (fps: number) => patch({ fps }),
       autoDuration: ({ checked }: { checked: boolean }) => patch({ autoDuration: checked }),
       steps: (steps: number) => patch({ steps }),
-      // Snapped on the way out: the VAE encodes 8k + 1 frames and the node snaps a ragged request
-      // down silently, so an unsnapped value would leave the panel showing a number the run did
-      // not use. The scrubber's own step keeps dragging on-grid; this covers typed input.
+      // Snapped on the way out: the VAE encodes 8k + 1 frames and the node snaps a ragged request down silently, so an
+      // unsnapped value would leave the panel showing a number the run did not use. The scrubber's own step keeps
+      // dragging on-grid; this covers typed input.
       ltx2ExtendContextFrames: (frames: number) =>
         patch({ ltx2ExtendContextFrames: Math.max(1 + LTX2_NUM_FRAMES_STEP, snapLtx2FramesDown(frames)) }),
       targetResolution: ({ value }: { value: string[] }) => {
@@ -289,8 +288,8 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
     [patch, values.aspectRatioId]
   );
 
-  // First frame and initial video share one conditioning slot; last frame can accompany either. Reference
-  // extension also keeps the linked tail reference synchronized.
+  // First frame and initial video share one conditioning slot; last frame can accompany either. Reference extension
+  // also keeps the linked tail reference synchronized.
   const referenceExtend = Boolean(policy.references?.extend);
   const maxVideoReferences = policy.references?.maxVideos ?? 3;
   const conditioningClip = values.conditioningClip;
@@ -311,8 +310,8 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
     (conditioningClip: VideoConditioningClip | null) => patch(getConditioningClipPatch(conditioningClip)),
     [patch]
   );
-  // This setter tracks references separately from patch-only field setters. Rebudget the linked tail with frame
-  // count so backend truncation cannot discard its seam end; derivation must tolerate intermediate input values.
+  // This setter tracks references separately from patch-only field setters. Rebudget the linked tail with frame count
+  // so backend truncation cannot discard its seam end; derivation must tolerate intermediate input values.
   const setNumFrames = useCallback(
     (numFrames: number) =>
       patch(
@@ -320,8 +319,7 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
           ? { numFrames, references: applyReferenceExtendNumFrames(referencesRef.current.references, numFrames) }
           : { numFrames }
       ),
-    // Read committed references through the guarded ref to keep the Frames callback stable; rebudgeting is
-    // idempotent.
+    // Read committed references through the guarded ref to keep the Frames callback stable; rebudgeting is idempotent.
     [patch, projectId, referenceExtend]
   );
   const setSourceVideo = useCallback(
@@ -337,8 +335,8 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
         sourceVideo,
       });
 
-      // No tail-reference slot is available: refuse the whole drop so the clip cannot be set without its
-      // continuity anchor.
+      // No tail-reference slot is available: refuse the whole drop so the clip cannot be set without its continuity
+      // anchor.
       if (!placement) {
         toaster.create({
           description: t('widgets.video.referenceExtendCapFullDescription'),
@@ -423,9 +421,9 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
     () => createListCollection({ items: policy.targetResolutions.map((option) => ({ ...option, value: option.id })) }),
     [policy.targetResolutions]
   );
-  // A two-stage preset generates at half the canvas it names, which the size line below does not
-  // say -- it reports the output size, which is the final one. Without this the whole signal that a
-  // preset costs two passes is the three words in its own label.
+  // A two-stage preset generates at half the canvas it names, which the size line below does not say -- it reports the
+  // output size, which is the final one. Without this the whole signal that a preset costs two passes is the three
+  // words in its own label.
   const twoStageHelpText = useMemo(() => {
     const option = policy.targetResolutions.find((entry) => entry.id === values.targetResolution);
 
@@ -503,13 +501,13 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
   const supportsReferences = panelFields.has('references');
   const supportsConditioningClip = panelFields.has('conditioningClip');
   const supportsInitialVideo = panelFields.has('initialVideo');
-  // Use the setter's capacity predicate: recalled unflagged references can be adopted without consuming a slot,
-  // and must not disable clip trimming.
+  // Use the setter's capacity predicate: recalled unflagged references can be adopted without consuming a slot, and
+  // must not disable clip trimming.
   const initialVideoCapBlocked =
     referenceExtend &&
     !canPlaceReferenceExtendAnchor(values.references, values.sourceVideo?.video_name, maxVideoReferences);
-  // The aspect-ratio control is locked by media that pins the frame. A clip in the `audio` role
-  // does not: its picture is what gets generated, so the ratio is still the user's to choose.
+  // The aspect-ratio control is locked by media that pins the frame. A clip in the `audio` role does not: its picture
+  // is what gets generated, so the ratio is still the user's to choose.
   const hasConditioningMedia = Boolean(
     values.firstFrameImage || values.lastFrameImage || values.sourceVideo || values.conditioningClip?.role === 'video'
   );
@@ -525,8 +523,8 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
       )
     : undefined;
   const derivedSourceText = dimensions ? t(`widgets.video.dimensionSource.${dimensions.source}`) : undefined;
-  // Media determines output proportions. Show its ratio source while disabled, preserving the saved preset for
-  // when media is removed.
+  // Media determines output proportions. Show its ratio source while disabled, preserving the saved preset for when
+  // media is removed.
   const dimensionSource = dimensions?.source;
   const derivedSourceValueText = useMemo(
     () =>
@@ -696,9 +694,9 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
                 {policy.ui.extendContext ? (
                   <ScrubberField
                     defaultValue={LTX2_EXTEND_CONTEXT_FRAMES}
-                    // The trade this control makes, which Frames alone does not show: the join consumes
-                    // the context from both halves, so every frame held is a frame of new video given up.
-                    // Under auto duration Frames is only a ceiling, so the new material is too.
+                    // The trade this control makes, which Frames alone does not show: the join consumes the context
+                    // from both halves, so every frame held is a frame of new video given up. Under auto duration
+                    // Frames is only a ceiling, so the new material is too.
                     helpText={t(
                       autoDurationBounds ? 'widgets.video.extendContextHelpAuto' : 'widgets.video.extendContextHelp',
                       {

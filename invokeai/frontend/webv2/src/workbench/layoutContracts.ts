@@ -33,8 +33,8 @@ export interface FloatingWidgetState {
   /** The dockable region this window returns to when docked. */
   returnRegion: WidgetRegion;
   /**
-   * Position in the return region's complete order: its docked members plus one marker per floating window.
-   * Placement normalization makes it canonical; only data stored by an older build lacks it or disagrees.
+   * Position in the return region's complete order: its docked members plus one marker per floating window. Placement
+   * normalization makes it canonical; only data stored by an older build lacks it or disagrees.
    */
   returnIndex?: number;
   /** Z-order within the floating layer; higher renders on top. */
@@ -81,8 +81,8 @@ export interface LayoutPresetWorkingCopy {
 }
 
 /**
- * The route a preset establishes when it is activated. Locks belong to the
- * live project controller and are intentionally never persisted on a preset.
+ * The route a preset establishes when it is activated. Locks belong to the live project controller and are
+ * intentionally never persisted on a preset.
  */
 export interface LayoutPresetRoute {
   sourceId: InvocationSourceId;

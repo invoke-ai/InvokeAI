@@ -29,11 +29,9 @@ interface SelectedNode {
 }
 
 /**
- * The selected layer's transform, editable without picking a tool: each field
- * commits one undoable document patch. While the Transform tool holds a
- * session, the same fields drive its preview and Apply / Cancel land or drop
- * it; a floating selection offers Apply / Cancel alone, since its transform is
- * layer-local rather than document space.
+ * The selected layer's transform, editable without picking a tool: each field commits one undoable document patch.
+ * While the Transform tool holds a session, the same fields drive its preview and Apply / Cancel land or drop it; a
+ * floating selection offers Apply / Cancel alone, since its transform is layer-local rather than document space.
  */
 export const TransformPane = () => {
   const { t } = useTranslation();

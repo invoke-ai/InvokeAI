@@ -1,7 +1,7 @@
 /**
- * The project's workflow collection and its session edit histories. Documents are edited through structural
- * sharing so an inactive workflow keeps its identity while another is edited, and histories keep previous document
- * references rather than deep copies.
+ * The project's workflow collection and its session edit histories. Documents are edited through structural sharing so
+ * an inactive workflow keeps its identity while another is edited, and histories keep previous document references
+ * rather than deep copies.
  */
 
 import type {
@@ -39,8 +39,8 @@ export interface WorkflowHistoryEntry {
   /** Global order across the project's histories; the aggregate cap evicts the lowest first. */
   sequence: number;
   /**
-   * The library source the copy had before the step, for steps that move it (a library replace); null means none.
-   * Undo restores it with the document, so the copy never claims a revision its graph is not based on.
+   * The library source the copy had before the step, for steps that move it (a library replace); null means none. Undo
+   * restores it with the document, so the copy never claims a revision its graph is not based on.
    */
   source?: ProjectWorkflowSource | null;
 }
@@ -138,8 +138,8 @@ const normalizeRunPreview = (candidate: unknown): ProjectWorkflowRunPreview | un
 };
 
 /**
- * Validates a persisted collection. Anything that would silently lose a workflow (a malformed entry, a repeated id,
- * an active id naming nothing) is refused rather than repaired.
+ * Validates a persisted collection. Anything that would silently lose a workflow (a malformed entry, a repeated id, an
+ * active id naming nothing) is refused rather than repaired.
  */
 export const normalizeProjectWorkflowCollection = (candidate: unknown): ProjectWorkflowCollection | null => {
   if (!isRecord(candidate) || typeof candidate.activeWorkflowId !== 'string' || !Array.isArray(candidate.entries)) {
@@ -185,8 +185,8 @@ export const normalizeProjectWorkflowCollection = (candidate: unknown): ProjectW
 };
 
 /**
- * A schema-2 document owned one graph. It becomes the first, active workflow; a library binding becomes source
- * metadata with an unknown revision, because nothing proves the old graph still matches the library's contents.
+ * A schema-2 document owned one graph. It becomes the first, active workflow; a library binding becomes source metadata
+ * with an unknown revision, because nothing proves the old graph still matches the library's contents.
  */
 /**
  * A legacy single graph becomes the first, active workflow. Only the Phase-1 placeholder (no authored content) is
@@ -352,8 +352,8 @@ export const duplicateProjectWorkflow = <Session extends ProjectWorkflowSession>
 };
 
 /**
- * Removes a workflow and releases its history. Selection moves to the next neighbour, or the previous one for the
- * last entry; removing the only workflow leaves a fresh blank in its place.
+ * Removes a workflow and releases its history. Selection moves to the next neighbour, or the previous one for the last
+ * entry; removing the only workflow leaves a fresh blank in its place.
  */
 export const removeProjectWorkflow = <Session extends ProjectWorkflowSession>(
   project: Session,
@@ -402,8 +402,8 @@ export const setProjectWorkflowSource = <Session extends ProjectWorkflowSession>
   });
 
 /**
- * Puts a freshly loaded document in a copy's place as one undoable step. The copy keeps its id and name, and its
- * source moves to the revision it now holds.
+ * Puts a freshly loaded document in a copy's place as one undoable step. The copy keeps its id and name, and its source
+ * moves to the revision it now holds.
  */
 export const replaceProjectWorkflowDocument = <Session extends ProjectWorkflowSession>(
   project: Session,
@@ -518,8 +518,8 @@ const pushHistory = <Session extends ProjectWorkflowSession>(
   const history = getProjectWorkflowHistory(project, workflowId);
   const last = history.past.at(-1);
 
-  // An undo in between (`future` non-empty) ends the burst: the state the user just stood on must stay reachable as
-  // its own step.
+  // An undo in between (`future` non-empty) ends the burst: the state the user just stood on must stay reachable as its
+  // own step.
   if (
     mergeKey &&
     last?.mergeKey === mergeKey &&

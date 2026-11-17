@@ -3,8 +3,8 @@ import { FolderIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 /**
- * Reserve cover geometry to prevent reflow. Missing or deleted covers use the permanent glyph; images are
- * decorative beside the project name.
+ * Reserve cover geometry to prevent reflow. Missing or deleted covers use the permanent glyph; images are decorative
+ * beside the project name.
  */
 
 export const PROJECT_COVER_ASPECT_RATIO = 16 / 10;

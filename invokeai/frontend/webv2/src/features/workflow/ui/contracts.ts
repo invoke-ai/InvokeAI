@@ -122,8 +122,8 @@ export interface GraphPreviewProvenance {
 }
 
 /**
- * isLive distinguishes recompilation from current project state from replaying a saved compiled graph and controls
- * the dialog subtitle.
+ * isLive distinguishes recompilation from current project state from replaying a saved compiled graph and controls the
+ * dialog subtitle.
  */
 /** The host's Invoke for a graph preview's source, rendered by the host (the preview owns no route). */
 export interface GraphPreviewInvoke {

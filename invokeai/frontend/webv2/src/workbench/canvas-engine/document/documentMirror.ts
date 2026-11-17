@@ -25,14 +25,13 @@ export interface DocumentMirrorStore {
 export interface DocumentMirrorCallbacks {
   /**
    * Reports leaf or ancestor-effective changes in document order. `sourceChanged` contains added leaves and changed
-   * raster/control sources or mask bitmaps whose caches are stale. Property, transform and ancestor-flag changes
-   * retain cached pixels. `restructured` is false for value edits, which add, remove and move nothing.
+   * raster/control sources or mask bitmaps whose caches are stale. Property, transform and ancestor-flag changes retain
+   * cached pixels. `restructured` is false for value edits, which add, remove and move nothing.
    */
   onLayersChanged(changed: string[], sourceChanged: string[], restructured: boolean): void;
   /**
-   * Leaves changed ONLY by an ancestor group's adjustment stack: recomposite
-   * without `onLayersChanged`'s destructive reactions (float and pixel-edit
-   * cancellation).
+   * Leaves changed ONLY by an ancestor group's adjustment stack: recomposite without `onLayersChanged`'s destructive
+   * reactions (float and pixel-edit cancellation).
    */
   onLayersRecomposite?(ids: string[]): void;
   /** The forests were restructured without any leaf changing: recomposite with the new order. */
@@ -93,8 +92,8 @@ interface ForestDiff {
 }
 
 /**
- * Diffs leaf identity and ancestor-effective enabled, locked and hidden state, including unchanged leaves affected
- * by ancestors.
+ * Diffs leaf identity and ancestor-effective enabled, locked and hidden state, including unchanged leaves affected by
+ * ancestors.
  */
 const diffForests = (prev: CanvasDocumentIndex, next: CanvasDocumentIndex): ForestDiff => {
   diagnostics.forestDiffs += 1;
@@ -162,8 +161,8 @@ const groupFlagsChanged = (before: CanvasGroupContract, after: CanvasGroupContra
   (before.isHidden === true) !== (after.isHidden === true);
 
 /**
- * Diffs a value edit from its recorded node changes: changed leaves, the subtree leaves whose inherited flags
- * moved, and the subtree leaves of groups whose adjustments, opacity or blend changed. Structure is unchanged.
+ * Diffs a value edit from its recorded node changes: changed leaves, the subtree leaves whose inherited flags moved,
+ * and the subtree leaves of groups whose adjustments, opacity or blend changed. Structure is unchanged.
  */
 const diffValueEdit = (prev: CanvasDocumentIndex, next: CanvasDocumentIndex, edit: CanvasValueEdit): ForestDiff => {
   const changed = new Set<string>();
@@ -219,8 +218,8 @@ const diffValueEdit = (prev: CanvasDocumentIndex, next: CanvasDocumentIndex, edi
 };
 
 /**
- * Creates a document mirror bound to `projectId`. Subscribes immediately and seeds the last-seen
- * references from the current state, so no spurious callback fires on creation.
+ * Creates a document mirror bound to `projectId`. Subscribes immediately and seeds the last-seen references from the
+ * current state, so no spurious callback fires on creation.
  */
 export const createDocumentMirror = (
   store: DocumentMirrorStore,

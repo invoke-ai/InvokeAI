@@ -28,8 +28,8 @@ export const ProjectsPage = () => {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
-  // Captured once per visit: the date buckets should reflect when the library
-  // was opened, and reading the clock each render would rebucket unstably.
+  // Captured once per visit: the date buckets should reflect when the library was opened, and reading the clock each
+  // render would rebucket unstably.
   const [now] = useState(() => Date.now());
 
   const view = useWorkbenchPreferenceSelector((preferences) => preferences.launchpadProjectsView);

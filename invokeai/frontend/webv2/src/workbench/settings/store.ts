@@ -203,8 +203,7 @@ const normalizeGenerateSectionsOpen = (values: unknown): Record<string, boolean>
 };
 
 /**
- * Validate record shape here; generation validates weight grammar when reading, preserving Launchpad's bundle
- * boundary.
+ * Validate record shape here; generation validates weight grammar when reading, preserving Launchpad's bundle boundary.
  */
 const normalizeRebalancePresets = (values: unknown): StoredRebalancePreset[] => {
   if (!Array.isArray(values)) {
@@ -278,8 +277,8 @@ const normalizeGeneratePresets = (values: unknown): StoredGeneratePreset[] => {
 };
 
 /**
- * `${base}:${controlType}`. The control types are spelled out because importing them from the canvas engine would
- * pull it into Launchpad's bundle; a store test keeps the list in step with `CONTROL_TYPES`.
+ * `${base}:${controlType}`. The control types are spelled out because importing them from the canvas engine would pull
+ * it into Launchpad's bundle; a store test keeps the list in step with `CONTROL_TYPES`.
  */
 const CONTROL_MODEL_MEMORY_KEY = /^[^:]+:(?:pose|depth|edges|softedge|lineart|sketch|color|tile)$/;
 const CONTROL_MODEL_MEMORY_MAX_ENTRIES = 256;
@@ -351,9 +350,9 @@ const normalizeCanvasToolMemoryRecord = (value: unknown): Readonly<Record<string
 };
 
 /**
- * Keeps each owner's layerable keys (`getLayeredKeys`): a key no owner layers, or an owner nobody knows, is dropped,
- * so nothing stray reaches resolution. Owners normalize their values on read. An already-clean record comes back as
- * is, so resolved widget values keep their identity across unrelated preference patches.
+ * Keeps each owner's layerable keys (`getLayeredKeys`): a key no owner layers, or an owner nobody knows, is dropped, so
+ * nothing stray reaches resolution. Owners normalize their values on read. An already-clean record comes back as is, so
+ * resolved widget values keep their identity across unrelated preference patches.
  */
 const normalizeScopedDefaults = (value: unknown): ScopedDefaults => {
   if (!isPlainRecord(value)) {
@@ -594,9 +593,8 @@ const parsePreferences = (raw: string | null): WorkbenchPreferences | null => {
 };
 
 /**
- * The localStorage payload: preferences plus a dirty marker for edits that
- * never reached the backend. A pending local copy outranks the server at the
- * next load, so going offline cannot silently revert a change.
+ * The localStorage payload: preferences plus a dirty marker for edits that never reached the backend. A pending local
+ * copy outranks the server at the next load, so going offline cannot silently revert a change.
  */
 interface StoredSettings {
   preferences: WorkbenchPreferences;
@@ -744,9 +742,8 @@ const resolveSettings = async (
 const settingsLoad = createSingleFlight<WorkbenchPreferences>();
 
 /**
- * Resolve settings once per account scope (a sign-in/out switches scope and
- * reloads); later calls return the snapshot. Offline, the local copy serves
- * and the next load retries the backend.
+ * Resolve settings once per account scope (a sign-in/out switches scope and reloads); later calls return the snapshot.
+ * Offline, the local copy serves and the next load retries the backend.
  */
 export const loadWorkbenchSettings = (): Promise<WorkbenchPreferences> => {
   const owner = captureAccountScope();

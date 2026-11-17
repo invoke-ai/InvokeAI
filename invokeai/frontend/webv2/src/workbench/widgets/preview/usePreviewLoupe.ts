@@ -67,9 +67,8 @@ interface PinchGesture {
 }
 
 /**
- * Clamp one axis of the translation: content smaller than the stage is
- * centered; content larger may pan but never leaves a gap at either edge.
- * `base` is the content's untransformed layout offset within the stage.
+ * Clamp one axis of the translation: content smaller than the stage is centered; content larger may pan but never
+ * leaves a gap at either edge. `base` is the content's untransformed layout offset within the stage.
  */
 const clampAxis = (t: number, stageLen: number, base: number, scaledLen: number): number =>
   scaledLen <= stageLen ? (stageLen - scaledLen) / 2 - base : Math.min(-base, Math.max(stageLen - scaledLen - base, t));
@@ -175,9 +174,8 @@ export const usePreviewLoupe = ({
 
       const actualZoom = getActualZoom(transform.scale);
 
-      // `image-rendering` is inherited, so setting it on the content box
-      // reaches the img (whose own style leaves it unset while the loupe is
-      // enabled).
+      // `image-rendering` is inherited, so setting it on the content box reaches the img (whose own style leaves it
+      // unset while the loupe is enabled).
       content.style.imageRendering = !isFit && actualZoom >= PIXELATED_ACTUAL_ZOOM ? 'pixelated' : '';
       setIsPannable(transform.scale > 1);
       publish(transform.scale);
@@ -185,8 +183,7 @@ export const usePreviewLoupe = ({
   }, [getActualZoom, publish]);
 
   /**
-   * Reset transforms when the displayed-image token changes without remounting decoded media; null disables the
-   * loupe.
+   * Reset transforms when the displayed-image token changes without remounting decoded media; null disables the loupe.
    */
   const syncDisplayedSource = (token: string | null): void => {
     if (lastSourceTokenRef.current === token) {
@@ -268,8 +265,8 @@ export const usePreviewLoupe = ({
     [constrainScale, setTransform]
   );
 
-  // Both commands drop a gesture in flight: a live pinch resolves every move
-  // from the transform it started on, so its next move would undo the command.
+  // Both commands drop a gesture in flight: a live pinch resolves every move from the transform it started on, so its
+  // next move would undo the command.
   const reset = useCallback(() => {
     pinchRef.current = null;
     wheelSnapRef.current = null;
@@ -372,9 +369,8 @@ export const usePreviewLoupe = ({
   }, []);
 
   /**
-   * Ends one pointer, wherever it lifted. Lifting one finger of a three-finger
-   * gesture re-pinches on what is left; lifting to a single finger hands the
-   * gesture over to a pan, so the image keeps following that finger without a
+   * Ends one pointer, wherever it lifted. Lifting one finger of a three-finger gesture re-pinches on what is left;
+   * lifting to a single finger hands the gesture over to a pan, so the image keeps following that finger without a
    * release and re-touch.
    */
   const endPointer = useCallback(
@@ -456,8 +452,8 @@ export const usePreviewLoupe = ({
         zoomAroundPoint(stageX, stageY, snap.zoom / fitRatio);
       };
 
-      // Track pointer positions/releases document-wide so off-stage movement cannot leave phantom pinch origins;
-      // stage handlers still drive gestures.
+      // Track pointer positions/releases document-wide so off-stage movement cannot leave phantom pinch origins; stage
+      // handlers still drive gestures.
       const handleDocumentPointerMove = (event: PointerEvent): void => {
         const pointers = pointersRef.current;
 
@@ -489,8 +485,8 @@ export const usePreviewLoupe = ({
   );
 
   /**
-   * Cancel dnd's pending/active image drag when pinch takes over using a document-targeted non-bubbling
-   * pointercancel. Only do so when a finger began on the image, leaving stage handlers untouched.
+   * Cancel dnd's pending/active image drag when pinch takes over using a document-targeted non-bubbling pointercancel.
+   * Only do so when a finger began on the image, leaving stage handlers untouched.
    */
   const cancelPointerDrag = (): void => {
     const stage = stageRef.current;

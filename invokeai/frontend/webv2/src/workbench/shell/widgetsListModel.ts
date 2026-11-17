@@ -104,8 +104,8 @@ const findRegion = (project: WidgetPlacementProject, instanceId: WidgetInstanceI
   REGION_ORDER.find((region) => project.widgetRegions[region].instanceIds.includes(instanceId));
 
 /**
- * One row per placed instance, then one per widget type the layout holds none of (or that allows more), so every
- * widget can be found and brought back from one list. Placed rows come first, each group by label.
+ * One row per placed instance, then one per widget type the layout holds none of (or that allows more), so every widget
+ * can be found and brought back from one list. Placed rows come first, each group by label.
  */
 export const getWidgetsListRows = ({
   getLabel,

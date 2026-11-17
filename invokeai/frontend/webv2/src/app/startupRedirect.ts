@@ -53,14 +53,14 @@ const findRecentProjectId = (library: ProjectLibrarySnapshot): string | null =>
   library.status === 'ready' ? (library.summaries.find(isProjectSummaryCompatible)?.id ?? null) : null;
 
 /**
- * Decides, once per page load, whether the app's launch skips the Launchpad. Only opening the bare URL (a bookmark,
- * the installed app's start URL) is a launch: deep links keep their destination, including `#/` from reloading Home.
- * The router leaves a bare URL bare on Home, so reloading or returning to it there is not a launch either. The first
+ * Decides, once per page load, whether the app's launch skips the Launchpad. Only opening the bare URL (a bookmark, the
+ * installed app's start URL) is a launch: deep links keep their destination, including `#/` from reloading Home. The
+ * router leaves a bare URL bare on Home, so reloading or returning to it there is not a launch either. The first
  * authenticated arrival (not a preload) consumes the launch, so it survives sign-in (which lands on Home) while later
  * visits to Home (app menu, the editor's empty-session guard, the not-found fallback) never redirect again. A session
- * with open projects reopens them; otherwise the launch opens the most recently edited compatible project, if any.
- * The splash can call the launch off while it decides or opens, and a launch whose editor never rendered makes the
- * next one stay on the Launchpad, with a notice.
+ * with open projects reopens them; otherwise the launch opens the most recently edited compatible project, if any. The
+ * splash can call the launch off while it decides or opens, and a launch whose editor never rendered makes the next one
+ * stay on the Launchpad, with a notice.
  */
 export const createStartupRedirects = (
   { hash, navigationType }: InitialPageLoad,

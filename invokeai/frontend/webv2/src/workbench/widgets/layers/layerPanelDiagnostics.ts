@@ -1,6 +1,6 @@
 /**
- * Deterministic counters for the panel's performance contract: how many times each row committed
- * and how many thumbnails were requested. Read by budget tests only; production never reads them.
+ * Deterministic counters for the panel's performance contract: how many times each row committed and how many
+ * thumbnails were requested. Read by budget tests only; production never reads them.
  */
 const rowCommits = new Map<string, number>();
 

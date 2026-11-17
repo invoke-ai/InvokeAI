@@ -53,9 +53,9 @@ export interface PixelEditPatch {
 }
 
 /**
- * An admitted live pixel edit. Its undo footprint is admitted before pixels change: `grow` admits more before the
- * edit expands, and a refusal means the caller must restore its pixels and cancel. `commit` records the
- * already-applied pixels as one undo step and reports whether it did; `cancel` ends it unrecorded.
+ * An admitted live pixel edit. Its undo footprint is admitted before pixels change: `grow` admits more before the edit
+ * expands, and a refusal means the caller must restore its pixels and cancel. `commit` records the already-applied
+ * pixels as one undo step and reports whether it did; `cancel` ends it unrecorded.
  */
 export interface StrokeEdit {
   grow(bytes: number): boolean;
@@ -64,8 +64,8 @@ export interface StrokeEdit {
 }
 
 /**
- * A pixel edit that may first materialize its layer (control layers, raster images) in place. A `false` commit
- * leaves it open: the caller restores the pixels it touched, then cancels, which undoes the materialization.
+ * A pixel edit that may first materialize its layer (control layers, raster images) in place. A `false` commit leaves
+ * it open: the caller restores the pixels it touched, then cancels, which undoes the materialization.
  */
 export interface PixelEditTransaction extends StrokeEdit {
   readonly layerId: string;
@@ -73,8 +73,7 @@ export interface PixelEditTransaction extends StrokeEdit {
 }
 
 /**
- * Transient render-time transforms leave the mirror unchanged. Move sets position only; transform supplies full
- * values.
+ * Transient render-time transforms leave the mirror unchanged. Move sets position only; transform supplies full values.
  */
 export interface LayerTransformOverride {
   x: number;
@@ -149,10 +148,10 @@ export interface ToolContext {
   /** Shows or hides the color picker's loupe, which follows the pointer while shown; optional in test harnesses. */
   showColorLoupe?(shown: boolean): void;
   /**
-   * Routes a pick's samples to the one-shot claim, else the persistent workbench target: `preview` per sample, then
-   * one `commit` (pointer up only, so a structural commit in the requester's continuation is not refused as
-   * `gesture-active`) or `cancel`. Returns whether consumed; a declined preview falls back to brush color. Optional
-   * in test harnesses.
+   * Routes a pick's samples to the one-shot claim, else the persistent workbench target: `preview` per sample, then one
+   * `commit` (pointer up only, so a structural commit in the requester's continuation is not refused as
+   * `gesture-active`) or `cancel`. Returns whether consumed; a declined preview falls back to brush color. Optional in
+   * test harnesses.
    */
   resolveColorSample?(hex: string, phase: ColorSamplePhase): boolean;
   /** Compositor providers that make sampling WYSIWYG; absent ⇒ raw cached pixels. */
@@ -164,8 +163,8 @@ export interface ToolContext {
    */
   paintLineEnds?: PaintLineEnds;
   /**
-   * Refresh the input element cursor when tool state changes; ordinary pointermove does not automatically
-   * reevaluate it.
+   * Refresh the input element cursor when tool state changes; ordinary pointermove does not automatically reevaluate
+   * it.
    */
   updateCursor(): void;
   /** Admits a live pixel edit on a paint layer; null when refused (the engine reports why). */
@@ -195,17 +194,17 @@ export interface ToolContext {
   /** Puts the float's pixels back untouched, pushing no history. */
   cancelFloatingSelection?(): void;
   /**
-   * Converts a DOCUMENT-space delta into `layerId`'s LOCAL space, so a pointer
-   * drag moves a float correctly under a rotated/scaled layer.
+   * Converts a DOCUMENT-space delta into `layerId`'s LOCAL space, so a pointer drag moves a float correctly under a
+   * rotated/scaled layer.
    */
   documentDeltaToLayerLocal?(layerId: string, delta: Vec2): Vec2;
   /** True if `point` (document space) falls inside the live selection. */
   isPointInSelection?(point: Vec2): boolean;
   /**
-   * The gesture in progress has started editing the selected layer in place: once its press reaches the tool (a
-   * shape whose modifiers make it a cutout), or later (a move crossing its drag threshold). Answers what
-   * {@link Tool.editsSelectedLayer} would have, for a tool that only knows after it was asked; outside a pointer
-   * gesture it does nothing.
+   * The gesture in progress has started editing the selected layer in place: once its press reaches the tool (a shape
+   * whose modifiers make it a cutout), or later (a move crossing its drag threshold). Answers what {@link
+   * Tool.editsSelectedLayer} would have, for a tool that only knows after it was asked; outside a pointer gesture it
+   * does nothing.
    */
   beginSelectedLayerEdit?(): void;
 }
@@ -225,19 +224,18 @@ export interface Tool {
   onDeactivate?(ctx: ToolContext, opts?: ToolActivationOptions): void;
   onPointerDown?(ctx: ToolContext, input: PointerInput): void;
   /**
-   * A pointer move. `batch` carries the coalesced samples for this move event
-   * (always at least one; its last element equals `input`); tools that paint
-   * consume the whole batch, navigation tools use only `input`.
+   * A pointer move. `batch` carries the coalesced samples for this move event (always at least one; its last element
+   * equals `input`); tools that paint consume the whole batch, navigation tools use only `input`.
    */
   onPointerMove?(ctx: ToolContext, input: PointerInput, batch: readonly PointerInput[]): void;
   onPointerUp?(ctx: ToolContext, input: PointerInput): void;
   /** The active gesture was cancelled (Esc, pointercancel, focus loss). */
   onPointerCancel?(ctx: ToolContext): void;
   /**
-   * Session commands: `apply` from Enter on the surface, `cancel` from the engine's Escape ladder once no
-   * engine-owned session (text edit, transform, float) took it. Returns whether the tool had an open session the
-   * command applied or dropped: a handled cancel ends the ladder, so that Escape never also clears the selection.
-   * Gesture cancellation stays separate (`onPointerCancel`) and runs first when Escape lands mid-press.
+   * Session commands: `apply` from Enter on the surface, `cancel` from the engine's Escape ladder once no engine-owned
+   * session (text edit, transform, float) took it. Returns whether the tool had an open session the command applied or
+   * dropped: a handled cancel ends the ladder, so that Escape never also clears the selection. Gesture cancellation
+   * stays separate (`onPointerCancel`) and runs first when Escape lands mid-press.
    */
   onKeyCommand?(ctx: ToolContext, command: 'apply' | 'cancel'): boolean;
   /** Wheel over the canvas; `screenAnchor` is the CSS-pixel cursor position. */
@@ -251,10 +249,10 @@ export interface Tool {
   readonly usesAltKey?: boolean;
   /**
    * Whether a primary gesture starting now edits the selected layer in place, writing its pixels or its placement:
-   * false when the press would be refused up front or would add a new layer instead. Asked once as each gesture
-   * starts, before the press reaches the tool; absent means not known then (a tool that decides from the press's
-   * modifiers or later calls {@link ToolContext.beginSelectedLayerEdit}). While such a gesture targets a control
-   * layer, a mask or a region, the screen shows their stacks above a staged preview that otherwise hides them.
+   * false when the press would be refused up front or would add a new layer instead. Asked once as each gesture starts,
+   * before the press reaches the tool; absent means not known then (a tool that decides from the press's modifiers or
+   * later calls {@link ToolContext.beginSelectedLayerEdit}). While such a gesture targets a control layer, a mask or a
+   * region, the screen shows their stacks above a staged preview that otherwise hides them.
    */
   editsSelectedLayer?(ctx: ToolContext): boolean;
 }

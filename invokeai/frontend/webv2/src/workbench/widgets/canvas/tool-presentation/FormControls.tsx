@@ -38,8 +38,8 @@ const START_ELEMENT_PROPS = { ...AFFIX_PROPS, fontWeight: 'medium', pointerEvent
 const END_ELEMENT_PROPS = { ...AFFIX_PROPS, pe: '1.5', pointerEvents: 'none' } as const;
 
 /**
- * Keep drafts through typing/scrubbing and commit once on blur, Enter, or release only after edits. Do not
- * overwrite precise values by tabbing through rounded displays; show the accepted clamped result.
+ * Keep drafts through typing/scrubbing and commit once on blur, Enter, or release only after edits. Do not overwrite
+ * precise values by tabbing through rounded displays; show the accepted clamped result.
  */
 export const FormNumberField = ({
   'aria-label': ariaLabel,
@@ -71,10 +71,9 @@ export const FormNumberField = ({
     },
     [onValueCommit, value]
   );
-  // The number input commits on blur and Enter only; a scrub ends with the
-  // mouse button, so the draft it produced is committed when the button lifts.
-  // The listener reads the ref: a release in the same frame as the last move
-  // must not commit a draft one step behind.
+  // The number input commits on blur and Enter only; a scrub ends with the mouse button, so the draft it produced is
+  // committed when the button lifts. The listener reads the ref: a release in the same frame as the last move must not
+  // commit a draft one step behind.
   const onScrubStart = useCallback(() => {
     scrubEnd.current?.();
     const scrub = new AbortController();
@@ -136,9 +135,9 @@ export const useNumberCommit = (apply: (value: number) => void) =>
   );
 
 /**
- * Gesture state for a slider or scrubber whose settled value lives in the document: the
- * draft follows the thumb, `settle` runs ONCE on release (one history entry per
- * gesture), and optional `preview` mirrors ticks into a non-committing store.
+ * Gesture state for a slider or scrubber whose settled value lives in the document: the draft follows the thumb,
+ * `settle` runs ONCE on release (one history entry per gesture), and optional `preview` mirrors ticks into a
+ * non-committing store.
  */
 export const useSliderGesture = (
   committed: number,
@@ -146,9 +145,8 @@ export const useSliderGesture = (
   preview?: (value: number) => void
 ) => {
   const [draft, setDraft] = useState<number | null>(null);
-  // The end event also fires for gestures that changed nothing (a thumb click,
-  // an arrow key at the boundary); settling those would record empty history
-  // entries, so a gesture only settles a genuinely different value.
+  // The end event also fires for gestures that changed nothing (a thumb click, an arrow key at the boundary); settling
+  // those would record empty history entries, so a gesture only settles a genuinely different value.
   const committedRef = useRef(committed);
   useEffect(() => {
     committedRef.current = committed;

@@ -215,8 +215,8 @@ const mutateGalleryItems = async (
 };
 
 /**
- * Mixed-media organization transport. Results contain only backend-confirmed
- * refs and do not patch caches, invalidate queries, or notify.
+ * Mixed-media organization transport. Results contain only backend-confirmed refs and do not patch caches, invalidate
+ * queries, or notify.
  */
 export const galleryItemOrganization = {
   delete: (refs: readonly ItemRef[], signal?: AbortSignal): Promise<ConfirmedGalleryItemMutationResult> =>

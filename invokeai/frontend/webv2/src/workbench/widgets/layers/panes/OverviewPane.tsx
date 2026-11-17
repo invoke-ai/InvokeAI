@@ -40,8 +40,8 @@ const VIEW_RECT_INNER_CSS = {
 const VIEW_RECT_TRANSITION = `left ${VIEW_RECT_INTERVAL_MS}ms linear, top ${VIEW_RECT_INTERVAL_MS}ms linear, width ${VIEW_RECT_INTERVAL_MS}ms linear, height ${VIEW_RECT_INTERVAL_MS}ms linear`;
 
 /**
- * Show a fitted composite with viewport outline; click/drag centers, wheel zooms, and arrows pan. Throttle
- * painting and update the outline imperatively.
+ * Show a fitted composite with viewport outline; click/drag centers, wheel zooms, and arrows pan. Throttle painting and
+ * update the outline imperatively.
  */
 export const OverviewPane = () => {
   const { t } = useTranslation();
@@ -143,8 +143,8 @@ const ConnectedOverview = ({ engine }: { engine: CanvasEngineHandle }) => {
         }, VIEW_RECT_INTERVAL_MS - elapsed);
       };
 
-      // Only a real composite consumes throttle budget, so the pre-measure clearing draw never defers the first
-      // paint. The outline follows every draw at once, so it never disagrees with the bitmap.
+      // Only a real composite consumes throttle budget, so the pre-measure clearing draw never defers the first paint.
+      // The outline follows every draw at once, so it never disagrees with the bitmap.
       const drawComposite = (): boolean => {
         const rect = maxSizePx < 16 ? null : engine.previews.drawDocumentOverview(canvas, maxSizePx);
         if (!rect) {

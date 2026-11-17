@@ -10,8 +10,8 @@ import { useCallback, useState, useSyncExternalStore } from 'react';
 
 /**
  * A row of top or center chrome that scrolls sideways without a scrollbar, and the cues at the ends that hide content:
- * a fade into the chrome's background with a button that scrolls to that end. Shared by the center's chrome islands
- * and the layout preset strip.
+ * a fade into the chrome's background with a button that scrolls to that end. Shared by the center's chrome islands and
+ * the layout preset strip.
  */
 
 export type OverflowEdge = 'end' | 'start';
@@ -55,8 +55,8 @@ const keepFocus = (event: MouseEvent) => event.preventDefault();
 
 /**
  * Which ends of the island's row hide content. Re-measured on scroll, whenever the scrollport or a control changes
- * size, and on any change inside the row: nested text can grow past a control that keeps its size (a counter gaining
- * a digit, a label overflowing its box). A measurement reads three layout values; subscribers hear only a change of
+ * size, and on any change inside the row: nested text can grow past a control that keeps its size (a counter gaining a
+ * digit, a label overflowing its box). A measurement reads three layout values; subscribers hear only a change of
  * either edge.
  */
 const createHiddenEdgesStore = ({ itemSelector, keepInViewSelector }: OverflowEdgesOptions) => {
@@ -110,8 +110,8 @@ const createHiddenEdgesStore = ({ itemSelector, keepInViewSelector }: OverflowEd
   return {
     /**
      * Ref callback for the scroller. Controls that cannot shrink further overflow the scroller's box without resizing
-     * it, so each control is observed too, including ones that mount later (a label whose chunk was still loading).
-     * The cues take the pointer over the row's ends, so a wheel over them is forwarded to the row from its parent, which
+     * it, so each control is observed too, including ones that mount later (a label whose chunk was still loading). The
+     * cues take the pointer over the row's ends, so a wheel over them is forwarded to the row from its parent, which
      * holds the cues.
      */
     attach: (element: HTMLElement | null) => {
@@ -268,7 +268,8 @@ export const OverflowCue = ({
             aria-label={ariaLabel ?? label}
             color="fg.muted"
             size="sm"
-            // Out of the tab order like other pointer shortcuts: focus already brings every control in the row into view.
+            // Out of the tab order like other pointer shortcuts: focus already brings every control in the row into
+            // view.
             tabIndex={-1}
             variant="ghost"
             onClick={scrollToEdge}

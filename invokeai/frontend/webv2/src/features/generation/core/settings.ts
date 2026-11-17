@@ -338,8 +338,8 @@ const toUniqueAscending = (values: readonly number[]): number[] =>
   [...new Set(values)].sort((left, right) => left - right);
 
 /**
- * Comma-separated block indices to the stored form, unique and ascending; empty entries are ignored, so an empty
- * field skips none. Null when an entry is not a whole number. The range is checked separately, by
+ * Comma-separated block indices to the stored form, unique and ascending; empty entries are ignored, so an empty field
+ * skips none. Null when an entry is not a whole number. The range is checked separately, by
  * `isValidMossImageSkipLayers`.
  */
 export const parseMossImageSkipLayers = (text: string): number[] | null => {
@@ -510,8 +510,8 @@ export const normalizeReferenceImageName = (value: unknown): string | undefined 
 };
 
 /**
- * Names one reference. A name that normalizes to nothing, or reads as a positional default (`isDefaultName`: its own
- * or another position's, "Reference image 2" on the first row), stores no name: the default keeps following the
+ * Names one reference. A name that normalizes to nothing, or reads as a positional default (`isDefaultName`: its own or
+ * another position's, "Reference image 2" on the first row), stores no name: the default keeps following the
  * reference's position, and no row can borrow another's default. No change returns the same array.
  */
 export const renameReferenceImage = (
@@ -645,9 +645,9 @@ const hasSameModelKind = (candidate: ModelIdentifierConfig, saved: ModelIdentifi
   (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
 
 /**
- * Whether an installed model is the same file as a saved choice that is no longer installed: a reinstall gives the
- * file a new key but keeps its hash. Type, base and (where the saved choice names one) variant must agree as well, so
- * a file registered differently is not taken for it.
+ * Whether an installed model is the same file as a saved choice that is no longer installed: a reinstall gives the file
+ * a new key but keeps its hash. Type, base and (where the saved choice names one) variant must agree as well, so a file
+ * registered differently is not taken for it.
  */
 export const isSameModelFile = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
   Boolean(saved.hash) && candidate.hash === saved.hash && hasSameModelKind(candidate, saved);

@@ -68,8 +68,8 @@ const ROW_PITCH = getListContentHeight([{ kind: 'item' }], 'comfortable');
 const DEMAND_OVERSCAN_ROWS = 8;
 const NO_MISSING_COUNTS: ReadonlyMap<string, number> = new Map();
 /**
- * Row controls take the row's text colour and a border and hover tint mixed from it, so they read on the selected
- * row's accent fill as on the panel, without a fill of their own.
+ * Row controls take the row's text colour and a border and hover tint mixed from it, so they read on the selected row's
+ * accent fill as on the panel, without a fill of their own.
  */
 const ROW_ACTION_CSS: SystemStyleObject = {
   borderColor: 'color-mix(in oklab, currentColor 35%, transparent)',
@@ -184,8 +184,8 @@ export const WorkflowLibraryList = ({
 
   /**
    * Rows kept while their page is not resident, with their positions: the one last focused or given a menu, and the
-   * selected one. Each stays rendered with its name, so focus and the List's tab stop never land on a placeholder.
-   * The copies drop their parsed documents, like the grid's pinned card, so memory stays within the window.
+   * selected one. Each stays rendered with its name, so focus and the List's tab stop never land on a placeholder. The
+   * copies drop their parsed documents, like the grid's pinned card, so memory stays within the window.
    */
   const [focusedRow, setFocusedRow] = useState<KeptRow | null>(null);
   const [selectedRow, setSelectedRow] = useState<KeptRow | null>(null);
@@ -518,8 +518,8 @@ const PLACEHOLDER_LEADING = <Box {...PLACEHOLDER_THUMBNAIL_PROPS} data-workflow-
 const PLACEHOLDER_DESCRIPTION = <Box as="span" {...PLACEHOLDER_LINE_PROPS} />;
 
 /**
- * One component for a position whether or not its page is resident, so the ListItem and its primary button persist
- * when the page arrives. Memoised: range loads, enrichment and scrolling re-render the list, but rarely a given row.
+ * One component for a position whether or not its page is resident, so the ListItem and its primary button persist when
+ * the page arrives. Memoised: range loads, enrichment and scrolling re-render the list, but rarely a given row.
  */
 const WorkflowLibraryListRow = memo(function WorkflowLibraryListRow({
   actions,

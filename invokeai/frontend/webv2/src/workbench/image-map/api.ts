@@ -107,8 +107,8 @@ export const fetchImageMapPoints = async (options?: ImageMapClusteringOptions): 
     query.set('min_samples', String(options.minSamples));
   }
 
-  // Not URLSearchParams.size: it is newer than the build's browser baseline
-  // (undefined on Safari 16, which would silently drop the params).
+  // Not URLSearchParams.size: it is newer than the build's browser baseline (undefined on Safari 16, which would
+  // silently drop the params).
   const queryString = query.toString();
   const body = await apiFetchJson<BackendImageMapPointsResponse>(
     `/api/v1/image_map/points${queryString ? `?${queryString}` : ''}`
@@ -142,9 +142,8 @@ export const fetchImageMapStatus = async (mediaKind?: GalleryItemKind): Promise<
   const { embedded = 0, failed = 0, total = 0 } = body.index ?? {};
 
   return {
-    // `pending` is a computed property on the backend model and so is absent
-    // from the serialized response; it is derived the same way here (failures
-    // are excluded so it can still drain to zero).
+    // `pending` is a computed property on the backend model and so is absent from the serialized response; it is
+    // derived the same way here (failures are excluded so it can still drain to zero).
     index: body.index ? { embedded, failed, pending: Math.max(0, total - embedded - failed), total } : null,
     modelId: body.model_id ?? null,
     modelName: body.model_name ?? null,
@@ -176,8 +175,8 @@ export interface ImageMapClusterLabels {
 export const fetchImageMapClusterLabels = async (
   options?: ImageMapClusteringOptions
 ): Promise<ImageMapClusterLabels> => {
-  // Must match /points exactly: the two responses' visible hashes are compared
-  // before the labels are used, and a set difference discards every label.
+  // Must match /points exactly: the two responses' visible hashes are compared before the labels are used, and a set
+  // difference discards every label.
   const query = toServedKindsParams(options?.mediaKind);
 
   if (options?.eps !== undefined) {

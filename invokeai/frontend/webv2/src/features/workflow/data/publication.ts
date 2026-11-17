@@ -17,9 +17,9 @@ import {
 import { invalidateWorkflowLibraryCache } from './libraryCache';
 
 /**
- * The one way a project workflow reaches the library. A publication captures everything it needs up front, refuses
- * to overlap another for the same workflow, keeps its captured request and reserved id across retryable failures,
- * and reconciles an ambiguous answer against the destination record before sending again.
+ * The one way a project workflow reaches the library. A publication captures everything it needs up front, refuses to
+ * overlap another for the same workflow, keeps its captured request and reserved id across retryable failures, and
+ * reconciles an ambiguous answer against the destination record before sending again.
  */
 
 export type WorkflowPublicationDestination =
@@ -258,8 +258,8 @@ export const createWorkflowPublicationController = (
     const attempt = (): Promise<WorkflowPublicationResult> =>
       settle(request, async () => {
         try {
-          // The server matches a resend against the record the first send made, so a lost response never
-          // creates a second template.
+          // The server matches a resend against the record the first send made, so a lost response never creates a
+          // second template.
           const record = await deps.createRecord(
             { ...request.workflow, name },
             { reservedId, signal: request.owner.signal }
@@ -298,8 +298,8 @@ export const createWorkflowPublicationController = (
   };
 
   const update = (request: WorkflowPublicationRequest, libraryWorkflowId: string, expectedRevision: number) => {
-    // The template keeps its own name: an update replaces its content, and the project workflow's name stays
-    // with the project. The content is fixed by the first read so a resend carries exactly what was sent before.
+    // The template keeps its own name: an update replaces its content, and the project workflow's name stays with the
+    // project. The content is fixed by the first read so a resend carries exactly what was sent before.
     let content: Record<string, unknown> | null = null;
 
     const send = async (record: WorkflowRecordDTO): Promise<WorkflowPublicationResult> => {
@@ -320,9 +320,9 @@ export const createWorkflowPublicationController = (
     };
 
     /**
-     * Every attempt starts from the live record. The first read supplies the template's name; a read before a
-     * resend tells whether the lost answer applied the write (the revision advanced by exactly one to this
-     * content), left it untouched, or whether someone else moved the template.
+     * Every attempt starts from the live record. The first read supplies the template's name; a read before a resend
+     * tells whether the lost answer applied the write (the revision advanced by exactly one to this content), left it
+     * untouched, or whether someone else moved the template.
      */
     const attempt = (): Promise<WorkflowPublicationResult> =>
       settle(request, async () => {

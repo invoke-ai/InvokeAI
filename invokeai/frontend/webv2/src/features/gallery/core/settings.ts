@@ -39,8 +39,8 @@ export const GALLERY_BOARD_SECTION_IDS = [
 export type GalleryBoardSectionId = (typeof GALLERY_BOARD_SECTION_IDS)[number];
 
 /**
- * Groups that start collapsed, which the panel records as opened rather than collapsed: an admin's view of other
- * users' boards stays out of the way of their own on a busy install.
+ * Groups that start collapsed, which the panel records as opened rather than collapsed: an admin's view of other users'
+ * boards stays out of the way of their own on a busy install.
  */
 const GALLERY_BOARD_SECTIONS_COLLAPSED_BY_DEFAULT: readonly GalleryBoardSectionId[] = ['other-users'];
 
@@ -148,8 +148,8 @@ const getBoardSections = (value: unknown, candidates: readonly GalleryBoardSecti
     : [];
 
 /**
- * Distinct strings, each at its last occurrence, at most the limit's newest. One pass from the end stops at the
- * limit, so an imported workspace with a huge list costs no more than the ids it keeps.
+ * Distinct strings, each at its last occurrence, at most the limit's newest. One pass from the end stops at the limit,
+ * so an imported workspace with a huge list costs no more than the ids it keeps.
  */
 const getCollapsedProjectGroupIds = (value: unknown): string[] => {
   if (!Array.isArray(value)) {

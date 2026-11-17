@@ -1,8 +1,8 @@
 /** Twelve elementwise gains, ordered from shallow to deep encoder taps. */
 
 /**
- * The encoder layers tapped into the conditioning, shallow to deep.
- * Source of truth: `KREA2_SELECT_LAYERS` in `invokeai/backend/krea2/sampling_utils.py`.
+ * The encoder layers tapped into the conditioning, shallow to deep. Source of truth: `KREA2_SELECT_LAYERS` in
+ * `invokeai/backend/krea2/sampling_utils.py`.
  */
 export const KREA2_TAP_LAYERS: readonly number[] = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35];
 

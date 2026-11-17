@@ -98,14 +98,14 @@ import {
 } from './workflowUiStore';
 
 /**
- * Keep dialogs mounted here and drive them through workflowUiStore; manifest slots contribute label, quick
- * actions, and shared menu actions.
+ * Keep dialogs mounted here and drive them through workflowUiStore; manifest slots contribute label, quick actions, and
+ * shared menu actions.
  */
 
 /**
  * The library dialog's chunk (cards, rails, toolbar, detail sheet) stays out of the editor's startup bundle until the
- * library first opens; its entry points preload it on hover or focus so that opening feels immediate. A failed load
- * (an offline moment, a redeploy) retries on the next attempt.
+ * library first opens; its entry points preload it on hover or focus so that opening feels immediate. A failed load (an
+ * offline moment, a redeploy) retries on the next attempt.
  */
 const workflowLibraryDialog = createDeferredModule(() => import('./library/WorkflowLibraryDialog'));
 const preloadWorkflowLibraryDialog = workflowLibraryDialog.preload;
@@ -181,8 +181,8 @@ const areWorkflowChoicesEqual = (left: readonly WorkflowChoice[], right: readonl
   left.every((choice, index) => choice.id === right[index]?.id && choice.name === right[index].name);
 
 /**
- * A long list opens with the active workflow in view. A frame later, once the positioner has capped the menu to the room
- * beside its trigger; the list's own viewport is the nearest scroller, so only the list moves.
+ * A long list opens with the active workflow in view. A frame later, once the positioner has capped the menu to the
+ * room beside its trigger; the list's own viewport is the nearest scroller, so only the list moves.
  */
 const revealActiveChoice = (item: HTMLElement | null) => {
   if (item) {
@@ -191,10 +191,11 @@ const revealActiveChoice = (item: HTMLElement | null) => {
 };
 
 /**
- * The list's scroller is the shared scrolling menu list, which lives with the editor's boot code: imported here, it would
- * make this chunk, which a Launchpad manager reaches, reach the editor. It loads on first use instead, already loaded
- * wherever the editor has booted; until then, or if it fails to load, the same rows scroll natively. The rows and the
- * actions are this component's either way, so the menu opens whole and nothing moves under a click when it arrives.
+ * The list's scroller is the shared scrolling menu list, which lives with the editor's boot code: imported here, it
+ * would make this chunk, which a Launchpad manager reaches, reach the editor. It loads on first use instead, already
+ * loaded wherever the editor has booted; until then, or if it fails to load, the same rows scroll natively. The rows
+ * and the actions are this component's either way, so the menu opens whole and nothing moves under a click when it
+ * arrives.
  */
 const scrollableMenu = createDeferredModule(() => import('@platform/ui/ScrollableMenuContent'));
 const NATIVE_SCROLL_LIST_PROPS = { minH: '0', overflowY: 'auto' } as const;
@@ -300,8 +301,8 @@ const PERSISTENCE_VIEW: Record<
 };
 
 /**
- * What the workflow's library link says: the template it updates, a bundled template, another linked template, or
- * none. The template's name is not part of the project; it is read only once asked for, through the query the update
+ * What the workflow's library link says: the template it updates, a bundled template, another linked template, or none.
+ * The template's name is not part of the project; it is read only once asked for, through the query the update
  * confirmation uses.
  */
 const useTemplateLinkDescription = (
@@ -387,8 +388,8 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
       : 'none';
 
   return (
-    // Sized by its content, so a narrow center shrinks it and the view menu beside it in proportion; a zero basis
-    // would leave the name only what the view menu does not take.
+    // Sized by its content, so a narrow center shrinks it and the view menu beside it in proportion; a zero basis would
+    // leave the name only what the view menu does not take.
     <HStack css={LABEL_CLIP_CSS} flex="1 1 auto" gap="1" minW="0">
       <Text color="fg.subtle" flexShrink={1} minW="0" overflow="hidden">
         /
@@ -452,16 +453,16 @@ const LABEL_CLIP_CSS = { overflow: 'clip', overflowClipMargin: '4px' } as const;
 
 /**
  * Below the width where every header action fits, Undo and Redo give way rather than the library actions: in the
- * default Workflow layout of a 1280px window the center chrome row is 304px, which held the header before they
- * arrived and no more. Their shortcuts keep working, and the ⋯ menu offers them while the header hides them. Queried
- * on the nearest container: the center chrome row, or a panel header.
+ * default Workflow layout of a 1280px window the center chrome row is 304px, which held the header before they arrived
+ * and no more. Their shortcuts keep working, and the ⋯ menu offers them while the header hides them. Queried on the
+ * nearest container: the center chrome row, or a panel header.
  */
 const HEADER_HISTORY_CSS = { '@container (width < 24rem)': { display: 'none' } } as const;
 
 /**
  * The headers that have hidden their history steps for want of room, by widget instance and region: the widget can show
- * in several regions at once, each header at its own width, and each ⋯ menu (outside that container) asks after its
- * own header only.
+ * in several regions at once, each header at its own width, and each ⋯ menu (outside that container) asks after its own
+ * header only.
  */
 const headerHistoryStore = createExternalStore<{ hiddenIn: Readonly<Record<string, true>> }>({ hiddenIn: {} });
 
@@ -852,8 +853,8 @@ export const WorkflowDialogHost = () => {
     setHasOpenedLibrary(true);
   }
   const lastImportRequestRef = useRef(importRequestCount);
-  // A rename request opens the dialog once, for the workflow it named, and only while that workflow is the active
-  // one; closing records the request as handled.
+  // A rename request opens the dialog once, for the workflow it named, and only while that workflow is the active one;
+  // closing records the request as handled.
   const renameRequest = workflowUiStore.useSelector((snapshot) => snapshot.renameRequest);
   const [handledRenameRequestId, setHandledRenameRequestId] = useState(0);
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);

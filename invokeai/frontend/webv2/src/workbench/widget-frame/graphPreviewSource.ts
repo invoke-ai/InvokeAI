@@ -20,8 +20,7 @@ import { getActiveProjectGraph } from '@workbench/projectWorkflows';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
 /**
- * Translate project/surface to preview data without effects; callers load models/templates before per-edit
- * compilation.
+ * Translate project/surface to preview data without effects; callers load models/templates before per-edit compilation.
  */
 export interface GraphPreviewSourceDeps {
   models: readonly ModelConfig[] | undefined;

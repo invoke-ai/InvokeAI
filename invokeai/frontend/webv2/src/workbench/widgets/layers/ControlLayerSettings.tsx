@@ -64,10 +64,10 @@ const selectStarterModels = (snapshot: {
 }) => (snapshot.status === 'loaded' ? (snapshot.response?.starter_models ?? null) : null);
 
 /**
- * The checks' context for one revision of the capability table, which the checks read when they run. The revision is
- * an argument, not only a dependency: the React Compiler infers a memo's dependencies from what its callback reads,
- * and prunes a side-effect-free `void revision`, so a context made from `base` and `remembered` alone would outlive
- * the table's arrival, and every check memoized on it with it.
+ * The checks' context for one revision of the capability table, which the checks read when they run. The revision is an
+ * argument, not only a dependency: the React Compiler infers a memo's dependencies from what its callback reads, and
+ * prunes a side-effect-free `void revision`, so a context made from `base` and `remembered` alone would outlive the
+ * table's arrival, and every check memoized on it with it.
  */
 const getCheckContext = (base: string | null, remembered: Record<string, string>, _capabilitiesRevision: number) =>
   createControlLayerCheckContext(base, remembered);
@@ -88,8 +88,8 @@ interface ControlLayerSettingsProps {
 
 /**
  * The control layer Properties panel: Image · Type · Detection · Model, then Weight · Steps · Priority. The rows stay
- * put; only their values change. Type, detector and image edits go through the canvas operations, which detect the
- * map in the background; adapter values commit through canvas undo like any layer property.
+ * put; only their values change. Type, detector and image edits go through the canvas operations, which detect the map
+ * in the background; adapter values commit through canvas undo like any layer property.
  */
 export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
@@ -322,8 +322,8 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
     };
   }, []);
   const capabilitiesUnavailable = reason === 'capabilities_unavailable';
-  // The click flips the status to `loading` synchronously; keeping the failure surface mounted for the
-  // retry it started keeps the button, and the user's focus, in place.
+  // The click flips the status to `loading` synchronously; keeping the failure surface mounted for the retry it started
+  // keeps the button, and the user's focus, in place.
   const isRetryingCapabilities = hasRequestedCapabilitiesRetry && capabilitiesStatus === 'loading';
   const showCapabilitiesFailure = capabilitiesUnavailable && (capabilitiesStatus === 'error' || isRetryingCapabilities);
 

@@ -35,8 +35,8 @@ const TRACKED_GALLERY_REMOVAL_FIELDS: ReadonlyArray<{ key: string; widgetId: Wid
 ];
 
 /**
- * Skip restoration when a mutually exclusive rival slot was filled after optimistic removal; bypassing setters
- * must not recreate an invalid pair.
+ * Skip restoration when a mutually exclusive rival slot was filled after optimistic removal; bypassing setters must not
+ * recreate an invalid pair.
  */
 const EXCLUSIVE_RIVAL_FIELDS: ReadonlyArray<{ key: string; rivalKey: string; widgetId: WidgetTypeId }> = [
   { key: 'firstFrameImage', rivalKey: 'sourceVideo', widgetId: 'video' },
@@ -45,8 +45,8 @@ const EXCLUSIVE_RIVAL_FIELDS: ReadonlyArray<{ key: string; rivalKey: string; wid
   { key: 'sourceVideo', rivalKey: 'firstFrameImage', widgetId: 'video' },
   { key: 'references', rivalKey: 'firstFrameImage', widgetId: 'video' },
   { key: 'references', rivalKey: 'lastFrameImage', widgetId: 'video' },
-  // sourceVideo and references coexist for Ref2VA reference-extend; treating them as rivals would lose valid data
-  // on rollback.
+  // sourceVideo and references coexist for Ref2VA reference-extend; treating them as rivals would lose valid data on
+  // rollback.
 ];
 
 const trackedFieldKey = (projectId: string, widgetId: WidgetTypeId, key: string): string =>
@@ -80,8 +80,8 @@ export interface GalleryWidgetKeySnapshotEntry {
 }
 
 /**
- * Immediately after optimistic mutation, capture only changed fields with before/after values so rollback can
- * detect subsequent writes.
+ * Immediately after optimistic mutation, capture only changed fields with before/after values so rollback can detect
+ * subsequent writes.
  */
 export const diffGalleryWidgetKeyValues = (
   before: GalleryWidgetKeyValueMap,
@@ -142,8 +142,7 @@ export const selectRestorableGalleryWidgetPatches = (
     const rivals = EXCLUSIVE_RIVAL_FIELDS.filter(
       (field) => field.widgetId === entry.widgetId && field.key === entry.key
     );
-    // An ordered-list slot (the video references) is "occupied" only when non-empty; a
-    // nullable slot when non-null.
+    // An ordered-list slot (the video references) is "occupied" only when non-empty; a nullable slot when non-null.
     const isOccupied = (value: unknown): boolean =>
       Array.isArray(value) ? value.length > 0 : value !== null && value !== undefined;
 
@@ -173,8 +172,8 @@ export interface GalleryStoreKnownItemFields {
 }
 
 /**
- * Read board/star state from project selection, comparison, or recent generations; newly generated items may not
- * exist in list caches yet.
+ * Read board/star state from project selection, comparison, or recent generations; newly generated items may not exist
+ * in list caches yet.
  */
 export const collectGalleryStoreKnownItemFields = (
   projects: readonly Project[],
@@ -218,14 +217,12 @@ export const collectGalleryStoreKnownItemFields = (
 };
 
 /**
- * The per-item form of the shared compare-and-swap rule: a key rolls back only
- * if its current value is still what *this* mutation painted it to. A key a
- * second, later mutation already moved on from (a subsequent drag to a
- * different board, another star toggle) is excluded.
+ * The per-item form of the shared compare-and-swap rule: a key rolls back only if its current value is still what
+ * *this* mutation painted it to. A key a second, later mutation already moved on from (a subsequent drag to a different
+ * board, another star toggle) is excluded.
  *
- * Unknown counts as unclaimed here, unlike the widget-value case: `readCurrent`
- * looks the item up in local state that may simply not hold it, so `undefined`
- * means "nothing here to protect" rather than "someone cleared it".
+ * Unknown counts as unclaimed here, unlike the widget-value case: `readCurrent` looks the item up in local state that
+ * may simply not hold it, so `undefined` means "nothing here to protect" rather than "someone cleared it".
  */
 export const selectItemKeysUnchangedSince = <Value>(
   keys: readonly GalleryItemKey[],

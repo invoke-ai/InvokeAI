@@ -1,9 +1,8 @@
 import type { GradientStop } from '@workbench/canvas-engine/api';
 
 /**
- * Pure stop-list math for the gradient stop strip. Stops are `#rrggbb` or
- * `#rrggbbaa` colors with offsets in [0, 1]; every operation returns a new
- * sorted list and never drops below two stops.
+ * Pure stop-list math for the gradient stop strip. Stops are `#rrggbb` or `#rrggbbaa` colors with offsets in [0, 1];
+ * every operation returns a new sorted list and never drops below two stops.
  */
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));

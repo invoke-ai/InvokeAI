@@ -46,8 +46,8 @@ const OPACITY_INPUT_PROPS = { fontSize: 'md', h: 'control.md' } as const;
 const OPACITY_ICON_SLOT_PROPS = { color: 'fg.muted', ps: '2' } as const;
 const SLIDER_TRIGGER_SLOT_PROPS = { pe: '0.5', pointerEvents: 'auto' } as const;
 const SLIDER_POPOVER_POSITIONING = { placement: 'bottom-end' } as const;
-// Lucide has no dedicated opacity glyph; two overlapping translucent circles read as opacity, and the Workflow
-// editor's node-opacity control uses the same one.
+// Lucide has no dedicated opacity glyph; two overlapping translucent circles read as opacity, and the Workflow editor's
+// node-opacity control uses the same one.
 const OPACITY_ICON = <Icon aria-hidden as={OpacityIcon} boxSize="3.5" />;
 // Keys that step the slider; their release ends the gesture.
 const SLIDER_STEP_KEYS = new Set([
@@ -73,9 +73,8 @@ const getPercentValueText = ({ value }: { value: number }): string => `${value}%
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 
-// Reference equality is exact: the document index hands back the same node
-// object until the node itself changes. A raster-stack GROUP is a valid target
-// (opacity/blend on its isolated composite); overlay-stack groups are not.
+// Reference equality is exact: the document index hands back the same node object until the node itself changes. A
+// raster-stack GROUP is a valid target (opacity/blend on its isolated composite); overlay-stack groups are not.
 export const selectBlendTarget = (project: {
   canvas: { document: Pick<CanvasDocumentContractV3, 'stacks' | 'selectedLayerId'> };
 }): CanvasNodeContract | null => {
@@ -127,9 +126,8 @@ const pinnedBlendMode = (
 
 /**
  * Highlighting an option (hover or arrow keys) previews its mode unrecorded. Choosing one records a single step from
- * the mode the preview started on; closing without a choice or unmounting restores that mode. An undo or an edit
- * from elsewhere while the menu is open ends the preview in the engine, and a choice then records from the live
- * mode.
+ * the mode the preview started on; closing without a choice or unmounting restores that mode. An undo or an edit from
+ * elsewhere while the menu is open ends the preview in the engine, and a choice then records from the live mode.
  */
 const BlendModeControl = ({
   editingLocked,
@@ -152,8 +150,8 @@ const BlendModeControl = ({
   const [isOpen, setIsOpen] = useState(false);
   const disabled = isLayerEditingDisabled(layer, editingLocked);
   // While the menu is open the document carries the previewed mode and the control keeps naming the one the preview
-  // replaced; every preview re-renders through the layer. Once the engine ended the preview (an undo landed under
-  // the menu) the document's mode is the committed one again, and a choice records from it.
+  // replaced; every preview re-renders through the layer. Once the engine ended the preview (an undo landed under the
+  // menu) the document's mode is the committed one again, and a choice records from it.
   const shownMode = (isOpen ? pinnedBlendMode(previewBaseline(), layer) : undefined) ?? blendModeOf(layer);
   const blendCollection = useMemo(
     () =>
@@ -256,8 +254,8 @@ const BlendModeControl = ({
 
 /**
  * Typed entry, arrow keys, and a slider in a popover at the field's end. Every change previews on the layer; each
- * completed gesture records one history entry: a typed value on Enter or blur, a held key on its release, a slider
- * drag when the pointer lifts. The field shows the slider's live value, so the thumb carries no tooltip to cover the
+ * completed gesture records one history entry: a typed value on Enter or blur, a held key on its release, a slider drag
+ * when the pointer lifts. The field shows the slider's live value, so the thumb carries no tooltip to cover the
  * trigger.
  */
 const OpacityRow = ({
@@ -303,8 +301,8 @@ const OpacityRow = ({
       if (!layer || !Number.isFinite(nextPercent)) {
         return;
       }
-      // If a pending edit belongs to a previously selected layer, flush it first
-      // so its history entry is never attributed to the new layer.
+      // If a pending edit belongs to a previously selected layer, flush it first so its history entry is never
+      // attributed to the new layer.
       if (pendingRef.current && pendingRef.current.id !== layer.id) {
         commitPending();
       }
@@ -374,8 +372,8 @@ const OpacityRow = ({
     [commitPending]
   );
 
-  // Flush a still-pending edit if the row unmounts mid-gesture (e.g. the panel
-  // closes mid-drag or right after an arrow key) so the edit is never lost to history.
+  // Flush a still-pending edit if the row unmounts mid-gesture (e.g. the panel closes mid-drag or right after an arrow
+  // key) so the edit is never lost to history.
   const flushOnUnmountRef = useCallback(
     (node: HTMLDivElement | null) => (node ? commitPending : undefined),
     [commitPending]

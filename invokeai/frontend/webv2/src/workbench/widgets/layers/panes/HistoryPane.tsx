@@ -25,8 +25,8 @@ const EMPTY_SNAPSHOTS: readonly CanvasSnapshotContract[] = [];
 
 /**
  * Mirror bounded engine history oldest-first, from the canvas's starting point; selecting a step replays undo/redo,
- * with future steps below the current position. Below the steps, the restore points Clear canvas and Discard all
- * keep. Steps and restores wait while an operation holds the document.
+ * with future steps below the current position. Below the steps, the restore points Clear canvas and Discard all keep.
+ * Steps and restores wait while an operation holds the document.
  */
 export const HistoryPane = () => {
   const { t } = useTranslation();
@@ -280,8 +280,8 @@ const HistoryStep = ({
         aria-current={isCurrent ? 'step' : undefined}
         aria-disabled={isLocked || undefined}
         bg={isCurrent ? 'bg.emphasized' : 'transparent'}
-        // Future (redoable) steps read as dimmed via italics; fg.subtle fails
-        // WCAG contrast at this size, so color stays at fg.muted for both.
+        // Future (redoable) steps read as dimmed via italics; fg.subtle fails WCAG contrast at this size, so color
+        // stays at fg.muted for both.
         color={isCurrent ? 'fg' : 'fg.muted'}
         cursor={isLocked ? 'not-allowed' : undefined}
         display="flex"

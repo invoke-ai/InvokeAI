@@ -75,8 +75,8 @@ const ConnectedProperties = ({ engine }: { engine: CanvasEngineHandle }) => {
           {tool.paintsLeaf && !running ? <GroupSelectedNotice /> : null}
           {Preview ? <Preview engine={engine} /> : null}
           {tool.groups.map((group) => (
-            // Keyed by GROUP id, not tool id: tools sharing a group keep its
-            // DOM (and collapse state) alive across the tool switch.
+            // Keyed by GROUP id, not tool id: tools sharing a group keep its DOM (and collapse state) alive across the
+            // tool switch.
             <PropertyGroup key={group.id} collapsible={group.collapsible} id={group.id} label={t(group.labelKey)}>
               <group.body {...regionProps} />
             </PropertyGroup>

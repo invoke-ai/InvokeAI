@@ -1,6 +1,6 @@
 /**
- * Pure policy for hosted image providers: which provider-specific options a selected external model exposes, the
- * named sizes and fixed-size ratios it advertises, and the invocation fields those settings compile to.
+ * Pure policy for hosted image providers: which provider-specific options a selected external model exposes, the named
+ * sizes and fixed-size ratios it advertises, and the invocation fields those settings compile to.
  */
 
 import type {
@@ -90,9 +90,9 @@ const acceptsImageInputs = (capabilities: ExternalModelCapabilities | null): boo
   (capabilities?.modes ?? []).some((mode) => mode === 'img2img' || mode === 'inpaint');
 
 /**
- * The provider options the selected model's invocation accepts, in display order. Each provider's node declares its
- * own fields, so the provider decides. OpenAI sends them only for GPT Image models (DALL·E takes none), and input
- * fidelity only with image inputs, so a model that takes none does not offer it.
+ * The provider options the selected model's invocation accepts, in display order. Each provider's node declares its own
+ * fields, so the provider decides. OpenAI sends them only for GPT Image models (DALL·E takes none), and input fidelity
+ * only with image inputs, so a model that takes none does not offer it.
  */
 export const getExternalProviderOptionKeys = (model: GenerateModelConfig | undefined): ExternalProviderOptionKey[] => {
   const capabilities = getCapabilities(model);

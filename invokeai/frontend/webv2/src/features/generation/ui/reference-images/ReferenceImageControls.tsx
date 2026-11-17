@@ -78,8 +78,8 @@ export const DEFAULT_REFERENCE_WEIGHT = 1;
 const STEPS_FIELD_DISABLED_CSS = { opacity: 0.5 } as const;
 
 /**
- * Controls on a list row are backed with the widget's surface, as a concept row backs its weight: the row's
- * hover tint would otherwise wash out their transparent fills and faint borders, and their own hover fills with it.
+ * Controls on a list row are backed with the widget's surface, as a concept row backs its weight: the row's hover tint
+ * would otherwise wash out their transparent fills and faint borders, and their own hover fills with it.
  */
 export const ControlSurface = ({ children, ...props }: { children: ReactNode } & Record<`data-${string}`, string>) => (
   <Box
@@ -111,8 +111,8 @@ const FieldHeader = ({ children, hint, label }: { children?: ReactNode; hint?: F
 };
 
 /**
- * The adapter's weight, its one control on the row. `strengthOnly` adapters (Anima) take a strength alone, which
- * cannot go negative.
+ * The adapter's weight, its one control on the row. `strengthOnly` adapters (Anima) take a strength alone, which cannot
+ * go negative.
  */
 export const IPAdapterWeightField = ({
   config,
@@ -260,8 +260,8 @@ export const IPAdapterSettings = ({
 };
 
 /**
- * The step window as one control: its label, a range slider and the window it covers on a single line, the same
- * height and frame as the weight scrubber above it. Every step of a drag commits, so the row's summary follows it.
+ * The step window as one control: its label, a range slider and the window it covers on a single line, the same height
+ * and frame as the weight scrubber above it. Every step of a drag commits, so the row's summary follows it.
  */
 const ActiveStepsField = ({
   disabled,
@@ -441,7 +441,8 @@ const KREA2_MODE_SEGMENTS = [
 
 /**
  * Switches a Krea-2 reference between Style and Edit; the image stays and Style restarts at its default strength. It
- * stays live while the row is off, so switched-off references can be turned into the set they will join before they run.
+ * stays live while the row is off, so switched-off references can be turned into the set they will join before they
+ * run.
  */
 export const Krea2ReferenceModeControl = ({
   config,

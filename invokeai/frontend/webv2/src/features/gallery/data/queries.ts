@@ -84,9 +84,8 @@ export interface GalleryItemsFilter {
   orderDir?: GalleryOrderDir;
   searchTerm: string;
   /**
-   * When set, items come from semantic image-similarity search over the board
-   * (relevance order) instead of the board listing; order/starred controls do
-   * not apply to a ranked result set.
+   * When set, items come from semantic image-similarity search over the board (relevance order) instead of the board
+   * listing; order/starred controls do not apply to a ranked result set.
    */
   semanticQuery?: GallerySemanticReference | null;
   /** true = only starred items, false = only unstarred; absent = all. */
@@ -108,8 +107,8 @@ export interface CanonicalGalleryItemsFilter {
 }
 
 /**
- * Offset anchors a page-aligned infinite window with GALLERY_MAX_ROWS reach. Board, search, and view changes reset
- * it to zero.
+ * Offset anchors a page-aligned infinite window with GALLERY_MAX_ROWS reach. Board, search, and view changes reset it
+ * to zero.
  */
 export type GalleryItemsWindow = { kind: 'anchor'; offset: number } | { kind: 'infinite'; offset?: number };
 
@@ -150,8 +149,8 @@ export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): Cano
   const semantic = filter.semanticQuery ? toGallerySemanticQuery(filter.semanticQuery) : undefined;
 
   if (semantic) {
-    // Pin irrelevant filter fields to canonical values: rankings depend only on the query and its board (a cluster is
-    // a fixed member list with no board), and distinct keys would repeat uploads or downloads.
+    // Pin irrelevant filter fields to canonical values: rankings depend only on the query and its board (a cluster is a
+    // fixed member list with no board), and distinct keys would repeat uploads or downloads.
     return {
       boardId: semantic.kind === 'cluster' ? '' : filter.boardId,
       galleryView: 'images',
@@ -365,8 +364,8 @@ const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalG
   });
 
 /**
- * Lazy item-name query options. Constructing these does not subscribe or
- * request; range selection fetches them explicitly on first Shift-click.
+ * Lazy item-name query options. Constructing these does not subscribe or request; range selection fetches them
+ * explicitly on first Shift-click.
  */
 export const galleryItemNamesOptions = (inputFilter: GalleryItemsFilter) => {
   const owner = captureAccountScope();
@@ -500,8 +499,8 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
       return;
     }
 
-    // Local cache patches and rollbacks are manual successes in Query. They must not certify an invalidated
-    // page as fresh, including when cancellation restores the state captured by one of those manual writes.
+    // Local cache patches and rollbacks are manual successes in Query. They must not certify an invalidated page as
+    // fresh, including when cancellation restores the state captured by one of those manual writes.
     if (event.type === 'updated') {
       if (event.query.state.isInvalidated || event.action.type === 'error') {
         lifecycle.pageReadFreshness.set(event.query, false);
@@ -511,8 +510,8 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
     }
 
     // A failed page waits for its own Retry only while it stays in view. Once nothing observes it, forget the failure
-    // so returning to the page reads it again, whether its last observer left or it failed with none left to see it.
-    // (A read its last observer leaves mid-flight is cancelled back to its prior state before `observerRemoved`.)
+    // so returning to the page reads it again, whether its last observer left or it failed with none left to see it. (A
+    // read its last observer leaves mid-flight is cancelled back to its prior state before `observerRemoved`.)
     if (
       (event.type === 'observerRemoved' || (event.type === 'updated' && event.action.type === 'error')) &&
       event.query.state.status === 'error' &&
@@ -720,8 +719,8 @@ const fetchSharedQuery = <T, TQueryKey extends QueryKey>(
   let sharedState = consumers.get(queryHash);
 
   if (!sharedState) {
-    // The explicit Query observer keeps TanStack from aborting a signal-aware read when its last UI observer leaves
-    // but an imperative reveal/location caller still awaits the shared request.
+    // The explicit Query observer keeps TanStack from aborting a signal-aware read when its last UI observer leaves but
+    // an imperative reveal/location caller still awaits the shared request.
     const observer = new QueryObserver(client, { ...options, enabled: false });
 
     sharedState = { count: 0, unsubscribeObserver: observer.subscribe(() => undefined) };
@@ -893,8 +892,8 @@ const isValidLocation = (location: GalleryItemLocation, ref: GalleryItemRef): bo
 const MAX_CANCELLED_LOCATOR_READS = 2;
 
 /**
- * Resolve the target's current rank and fetch only its aligned page. A mismatch means the listing shifted between
- * the rank and page reads; refresh both once, then leave failure to the caller without changing Gallery state.
+ * Resolve the target's current rank and fetch only its aligned page. A mismatch means the listing shifted between the
+ * rank and page reads; refresh both once, then leave failure to the caller without changing Gallery state.
  */
 export const fetchVerifiedGalleryItemPage = async (
   queryClient: QueryClient,
@@ -947,8 +946,8 @@ export const fetchVerifiedGalleryItemPage = async (
       throw new Error('Gallery account changed before the target page could be fetched.');
     }
 
-    // A cached page can have a fresh staleTime while an external insert/delete has shifted its offsets. Always read
-    // the one resolved page from the backend before treating a locator result as verified.
+    // A cached page can have a fresh staleTime while an external insert/delete has shifted its offsets. Always read the
+    // one resolved page from the backend before treating a locator result as verified.
     let page: GalleryItemsPage;
 
     try {
@@ -959,8 +958,8 @@ export const fetchVerifiedGalleryItemPage = async (
         })
       );
     } catch (error: unknown) {
-      // An invalidation cancelled the read because the listing changed; its rank may have moved too, so both are
-      // read again. Account and navigation aborts were already rethrown by the fence.
+      // An invalidation cancelled the read because the listing changed; its rank may have moved too, so both are read
+      // again. Account and navigation aborts were already rethrown by the fence.
       if (isCancelledError(error) && cancelledReads < MAX_CANCELLED_LOCATOR_READS) {
         cancelledReads += 1;
         continue;
@@ -988,10 +987,9 @@ export const fetchVerifiedGalleryItemPage = async (
 const dateBoardNamesConsumers = new WeakMap<QueryClient, Map<string, number>>();
 
 /**
- * A name-list request (date boards and semantic searches) is shared by
- * infinite and paginated consumers. One consumer may stop waiting immediately
- * without cancelling work still needed by another; the final departing
- * consumer owns cancellation.
+ * A name-list request (date boards and semantic searches) is shared by infinite and paginated consumers. One consumer
+ * may stop waiting immediately without cancelling work still needed by another; the final departing consumer owns
+ * cancellation.
  */
 const fetchSharedDateBoardNames = (
   client: QueryClient,
@@ -1116,8 +1114,8 @@ export const fetchGalleryItemsRange = async (
 };
 
 /**
- * Poll missing-model and failed statuses only. Settled status refreshes on a new stale consumer, including after
- * layout changes.
+ * Poll missing-model and failed statuses only. Settled status refreshes on a new stale consumer, including after layout
+ * changes.
  */
 export const IMAGE_INDEX_UNAVAILABLE_POLL_MS = 30_000;
 const IMAGE_INDEX_STALE_MS = 5 * 60_000;
@@ -1206,16 +1204,16 @@ export const galleryItemsInfiniteOptions = (
     GalleryItemsListQueryKey,
     number
   >({
-    // Anchored windows (paginated pages and deep infinite reveals) are
-    // transient views; only the base window's cache is worth keeping around.
+    // Anchored windows (paginated pages and deep infinite reveals) are transient views; only the base window's cache is
+    // worth keeping around.
     ...(isBaseInfiniteWindow ? {} : { gcTime: 0 }),
     getNextPageParam: (lastPage, allPages, lastPageParam) =>
       allPages.length >= GALLERY_MAX_INFINITE_PAGES
         ? undefined
         : getNextPageParam(normalizedWindow, lastPage, lastPageParam),
     getPreviousPageParam: (_firstPage, allPages, firstPageParam) => {
-      // Infinite windows cannot prepend above their anchor without shifting the viewport. Paginated windows may
-      // prepend because consumers select by pageParam.
+      // Infinite windows cannot prepend above their anchor without shifting the viewport. Paginated windows may prepend
+      // because consumers select by pageParam.
       const lowestPageParam = normalizedWindow.kind === 'infinite' ? normalizedWindow.offset : 0;
 
       return allPages.length < GALLERY_MAX_INFINITE_PAGES && firstPageParam - GALLERY_PAGE_SIZE >= lowestPageParam
@@ -1236,9 +1234,8 @@ export const galleryItemsInfiniteOptions = (
 };
 
 /**
- * The starred strip shares the list key family (and so the account-wide
- * invalidation and mutation patching) with the listing it sits above, keyed
- * on that listing's filter plus `starred: true`.
+ * The starred strip shares the list key family (and so the account-wide invalidation and mutation patching) with the
+ * listing it sits above, keyed on that listing's filter plus `starred: true`.
  */
 export const galleryStarredStripOptions = (inputFilter: GalleryItemsFilter) => {
   const owner = captureAccountScope();

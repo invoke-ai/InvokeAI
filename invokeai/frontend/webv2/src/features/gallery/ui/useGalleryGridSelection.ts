@@ -36,8 +36,8 @@ const getGalleryItemRange = (
 };
 
 /**
- * Async range selection fetches beyond the loaded window; apply only if account, filter, and anchor still match
- * the captured context.
+ * Async range selection fetches beyond the loaded window; apply only if account, filter, and anchor still match the
+ * captured context.
  */
 export const useGalleryGridSelection = ({
   getItemReturnFocus,
@@ -48,8 +48,8 @@ export const useGalleryGridSelection = ({
   /** The sparse page stamp for a loaded listing item; selections without one stamp the grid's page. */
   getSelectionPage?: (item: GalleryItem) => number | undefined;
 } = {}) => {
-  // `loadedItems` includes the strip, whose starred items the listing window
-  // may not hold; the context menu and ctrl-toggle must resolve those too.
+  // `loadedItems` includes the strip, whose starred items the listing window may not hold; the context menu and
+  // ctrl-toggle must resolve those too.
   const { actions, filter, gallery, loadedItems, starredStrip } = useGalleryWidget();
   const queryClient = useQueryClient();
   const [contextMenuTarget, setContextMenuTarget] = useState<GalleryItemContextMenuTarget | null>(null);
@@ -183,8 +183,7 @@ export const useGalleryGridSelection = ({
         }
       }
 
-      // The names list describes the listing only; a range inside the strip
-      // resolves against the strip's own order.
+      // The names list describes the listing only; a range inside the strip resolves against the strip's own order.
       if (!isInteractionCurrent(hasAwaitedNames)) {
         return;
       }

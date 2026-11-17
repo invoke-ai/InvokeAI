@@ -35,8 +35,8 @@ export interface GalleryMediaUsageDocument extends GalleryMediaUsageNames {
    */
   workspaceRevision: number | null;
   /**
-   * A check sent in several requests could not list this document in all of them: its names and counts are only
-   * some of what it uses.
+   * A check sent in several requests could not list this document in all of them: its names and counts are only some of
+   * what it uses.
    */
   namesIncomplete?: true;
 }

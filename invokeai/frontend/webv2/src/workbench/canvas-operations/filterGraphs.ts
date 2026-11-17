@@ -326,8 +326,8 @@ export interface FilterGraphResult {
 }
 
 /**
- * Reject unknown filter types; invalid settings use legacy defaults. Preview outputs are intermediate and
- * collectible; Apply promotes the selected image to durable layer content.
+ * Reject unknown filter types; invalid settings use legacy defaults. Preview outputs are intermediate and collectible;
+ * Apply promotes the selected image to durable layer content.
  */
 export const buildFilterGraph = (
   filterType: string,

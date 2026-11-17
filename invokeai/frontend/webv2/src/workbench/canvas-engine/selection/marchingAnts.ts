@@ -1,7 +1,6 @@
 /**
- * Draws black/white selection paths with zoom-compensated widths and dashes. A throttled injected frame loop
- * advances phase through overlay-only invalidation; run only while selected and attached, and cancel pending
- * frames on stop.
+ * Draws black/white selection paths with zoom-compensated widths and dashes. A throttled injected frame loop advances
+ * phase through overlay-only invalidation; run only while selected and attached, and cancel pending frames on stop.
  */
 
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -28,8 +27,8 @@ export interface MarchingAntsRender {
   /** Animated dash offset in screen pixels. */
   phase: number;
   /**
-   * Optional document transform moves ants with live float pixels without rebuilding paths. Commit replaces
-   * selection geometry and removes the override.
+   * Optional document transform moves ants with live float pixels without rebuilding paths. Commit replaces selection
+   * geometry and removes the override.
    */
   matrix?: Mat2d | null;
 }
@@ -48,8 +47,8 @@ export const drawMarchingAnts = (
     return;
   }
   const transform = multiply(base, render.matrix ? multiply(view, render.matrix) : view);
-  // Line width and dash stay screen-constant, so they follow the VIEW scale
-  // only — a float scaled up must not thicken its own outline.
+  // Line width and dash stay screen-constant, so they follow the VIEW scale only — a float scaled up must not thicken
+  // its own outline.
   const scale = getScale(view) || 1;
   const dash = ANTS_DASH_PX / scale;
   const lineWidth = ANTS_LINE_WIDTH_PX / scale;

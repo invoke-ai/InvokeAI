@@ -56,8 +56,9 @@ export const describeAdjustmentRefusal = (refusal: AdjustmentRefusal, t: TFuncti
   t(ADJUSTMENT_REFUSAL_KEYS[refusal.reason], { name: refusal.ownerName });
 
 /**
- * Each status's title and message for a layer the Canvas refused to edit, and the message that goes with an offer to paint on a new layer instead: only a
- * hidden or locked layer makes that offer, since a new layer above it escapes the cause.
+ * Each status's title and message for a layer the Canvas refused to edit, and the message that goes with an offer to
+ * paint on a new layer instead: only a hidden or locked layer makes that offer, since a new layer above it escapes the
+ * cause.
  */
 const LAYER_REFUSAL_KEYS: Record<
   CanvasLayerEditRefusal['status'],
@@ -173,8 +174,8 @@ export const reportMaskEdit = (
 };
 
 /**
- * Explains a refused structural edit. `busy` stays silent because an in-flight operation already
- * disables the controls that could reach here; every other refusal drops the edit and says so.
+ * Explains a refused structural edit. `busy` stays silent because an in-flight operation already disables the controls
+ * that could reach here; every other refusal drops the edit and says so.
  */
 export const reportStructuralCommit = (
   result: StructuralCommitResult,
@@ -311,9 +312,9 @@ export interface CanvasPreviewEngine extends CanvasPreparedEngine {
 }
 
 /**
- * Prepares the gesture's edit. `baseline` restores what the gesture previewed, for the edit's `before`; it is null
- * when nothing was previewed or the engine ended the gesture (a replay or an edit from elsewhere landed), and the
- * edit then records from the live document.
+ * Prepares the gesture's edit. `baseline` restores what the gesture previewed, for the edit's `before`; it is null when
+ * nothing was previewed or the engine ended the gesture (a replay or an edit from elsewhere landed), and the edit then
+ * records from the live document.
  */
 export type PreviewCommit = (
   label: string,
@@ -396,9 +397,9 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
       if (session?.apply(action)) {
         return true;
       }
-      // No session yet, or the engine ended it: the next session starts from the document as it is now. A session
-      // that only refused this preview (edits locked mid-gesture) stays the gesture's, holding its previews and
-      // baseline for the commit or cancel to come.
+      // No session yet, or the engine ended it: the next session starts from the document as it is now. A session that
+      // only refused this preview (edits locked mid-gesture) stays the gesture's, holding its previews and baseline for
+      // the commit or cancel to come.
       sessionRef.current = engine.layers.beginStructuralPreview() ?? (session?.isActive() ? session : null);
       return sessionRef.current?.apply(action) ?? false;
     },
@@ -413,12 +414,12 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
       // (a stroke, a selection edit, a staged result) restored its baseline. Its edit then commits like any prepared
       // edit, and any refusal to prepare it stays silent. Often that refusal is the interrupting change's own
       // consequence (an undone conversion, lock or removal); when it is a genuine one, the interrupted gesture's
-      // previews have already reverted on screen, so the control shows the document as it is and the value was
-      // never applied.
+      // previews have already reverted on screen, so the control shows the document as it is and the value was never
+      // applied.
       const sessionEnded = session !== null && !session.isActive();
-      // Without a live session of its own, the edit is prepared from the committed document: a preview another
-      // gesture holds ends first, as for any one-shot commit, or its values would leak into the edit and its
-      // revision would turn stale when the commit ends it.
+      // Without a live session of its own, the edit is prepared from the committed document: a preview another gesture
+      // holds ends first, as for any one-shot commit, or its values would leak into the edit and its revision would
+      // turn stale when the commit ends it.
       if (engine && !session?.isActive()) {
         engine.layers.endStructuralPreview();
       }

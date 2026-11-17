@@ -81,14 +81,14 @@ const paintOnNewLayer = (
   );
 
 /**
- * Explains edits the engine refused without a caller to report to: a stroke too large to undo, a press on a layer
- * the tool cannot edit (hidden, hidden on the canvas, locked, still loading, one the eraser cannot erase, or a mask
- * the gradient cannot go on), or an erase or shape cutout with no layer selected. A brush press on a locked or hidden
- * image offers a new paint layer above it rather than making one unasked; that offer holds a closure, so it is a
- * toast only, closed with this canvas or the account. Layer refusals are toasts only, one per layer and reason: a
- * repeated press (every eraser press on a transparency-locked layer, say) replaces its toast instead of stacking
- * another, and taking one offer closes the other offers. An erase or cutout with nothing to act on keeps a single
- * toast the same way. Keyed by engine.
+ * Explains edits the engine refused without a caller to report to: a stroke too large to undo, a press on a layer the
+ * tool cannot edit (hidden, hidden on the canvas, locked, still loading, one the eraser cannot erase, or a mask the
+ * gradient cannot go on), or an erase or shape cutout with no layer selected. A brush press on a locked or hidden image
+ * offers a new paint layer above it rather than making one unasked; that offer holds a closure, so it is a toast only,
+ * closed with this canvas or the account. Layer refusals are toasts only, one per layer and reason: a repeated press
+ * (every eraser press on a transparency-locked layer, say) replaces its toast instead of stacking another, and taking
+ * one offer closes the other offers. An erase or cutout with nothing to act on keeps a single toast the same way. Keyed
+ * by engine.
  */
 export const CanvasEditRefusalNotices = ({
   engine,

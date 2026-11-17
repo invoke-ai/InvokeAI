@@ -24,9 +24,8 @@ export interface GalleryRevealContext {
 }
 
 /**
- * What the gesture was, at the moment it was made. The caller captures the
- * account, project, and sequence before lazy loading; the reveal must not take
- * any of them from whatever state exists when the chunk lands.
+ * What the gesture was, at the moment it was made. The caller captures the account, project, and sequence before lazy
+ * loading; the reveal must not take any of them from whatever state exists when the chunk lands.
  */
 export interface GalleryRevealTicket {
   /** Account identity lifetime at the original gesture, before any lazy import or media fetch. */
@@ -36,8 +35,8 @@ export interface GalleryRevealTicket {
   /** Canceled when a later Gallery navigation supersedes this locator. */
   locatorSignal?: AbortSignal;
   /**
-   * A further condition checked wherever the ticket is, last immediately before the first Gallery change; false
-   * stands the reveal down. For reveals nobody on screen asked for.
+   * A further condition checked wherever the ticket is, last immediately before the first Gallery change; false stands
+   * the reveal down. For reveals nobody on screen asked for.
    */
   mayApply?: () => boolean;
   /** The project the press belongs to; its writes may not land in another. */
@@ -47,9 +46,9 @@ export interface GalleryRevealTicket {
 }
 
 /**
- * Reveal a freshly resolved item in its board/view after its exact filtered-list position and page agree. Do not
- * change Gallery state until the page verifies the locator result. Caller-minted gesture tickets fence project
- * changes and later selections even across lazy loading.
+ * Reveal a freshly resolved item in its board/view after its exact filtered-list position and page agree. Do not change
+ * Gallery state until the page verifies the locator result. Caller-minted gesture tickets fence project changes and
+ * later selections even across lazy loading.
  */
 export const revealGalleryItem = (
   { commands, queries, queryClient }: GalleryRevealContext,
@@ -99,8 +98,8 @@ export const revealGalleryItem = (
       searchTerm: '',
       starred: wantsStarredOnly,
     };
-    // The board list determines whether the destination can present an archived board. The locator itself uses
-    // the same filters as the destination's 60-item page and avoids downloading every item name.
+    // The board list determines whether the destination can present an archived board. The locator itself uses the same
+    // filters as the destination's 60-item page and avoids downloading every item name.
     const boardsPromise = queryClient
       .fetchQuery(
         galleryBoardsOptions({

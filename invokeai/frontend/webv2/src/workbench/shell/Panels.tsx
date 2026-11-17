@@ -29,8 +29,8 @@ export const RightPanel = ({ instanceId }: { instanceId: WidgetInstanceId }) => 
 );
 
 /**
- * Keep previously shown panels mounted to preserve scroll, selection, and virtualization across presets that
- * replace region membership.
+ * Keep previously shown panels mounted to preserve scroll, selection, and virtualization across presets that replace
+ * region membership.
  */
 export const WidgetPanelSlot = ({ instanceId, region }: { instanceId: WidgetInstanceId; region: PanelRegion }) => {
   const projectId = useActiveProjectId();

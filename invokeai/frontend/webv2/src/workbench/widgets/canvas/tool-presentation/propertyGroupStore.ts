@@ -3,9 +3,8 @@ import { createExternalStore } from '@platform/state/externalStore';
 const STORAGE_KEY = 'invokeai:v7:webv2:tool-property-collapsed';
 
 /**
- * Per-user collapsed-state overrides for tool property groups, keyed by group
- * id. Only overrides are stored: a group absent here uses its declared
- * default, so new groups can ship collapsed without migration.
+ * Per-user collapsed-state overrides for tool property groups, keyed by group id. Only overrides are stored: a group
+ * absent here uses its declared default, so new groups can ship collapsed without migration.
  */
 const readStored = (): Record<string, boolean> => {
   if (typeof window === 'undefined') {

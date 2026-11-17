@@ -37,8 +37,8 @@ import { getInvocationTemplatesSnapshot, refreshInvocationTemplates } from './te
 const libraryLogger = createLogger({ area: 'library', namespace: 'workflows' });
 
 /**
- * Filter and paginate server-side; asynchronously enrich cached payloads per row so node/model details cannot
- * block the grid.
+ * Filter and paginate server-side; asynchronously enrich cached payloads per row so node/model details cannot block the
+ * grid.
  */
 
 export type { WorkflowTagCount } from '@features/workflow/core/libraryTags';
@@ -220,8 +220,9 @@ const withPlaceTotal = (filter: WorkflowLibraryBrowseFilter, total: number) =>
 // #region View cache
 
 /**
- * Views already browsed (a place, a tag selection or a search), kept so switching back shows their metadata at once instead of refetching every row. A view older than `VIEW_FRESH_MS` is revalidated in the
- * background and merged in place; library mutations drop the other views.
+ * Views already browsed (a place, a tag selection or a search), kept so switching back shows their metadata at once
+ * instead of refetching every row. A view older than `VIEW_FRESH_MS` is revalidated in the background and merged in
+ * place; library mutations drop the other views.
  */
 interface CachedBrowseView {
   entries: readonly WorkflowLibraryEntry[];
@@ -294,8 +295,8 @@ let initialLoadGeneration = -1;
 let refreshGeneration = -1;
 
 /**
- * Fences page responses by generation, not request order. A filter change, an account change, or a revalidation of
- * the current view starts a new generation, so a page requested before it cannot publish over what it read.
+ * Fences page responses by generation, not request order. A filter change, an account change, or a revalidation of the
+ * current view starts a new generation, so a page requested before it cannot publish over what it read.
  */
 let listGeneration = 0;
 /** Only metadata published in this list generation can satisfy overlapping range reads. */
@@ -415,10 +416,10 @@ const demandedIds = (): Set<string> =>
   new Set([...(selectedDemand ? [selectedDemand] : []), ...visibleDemand.slice(0, WORKFLOW_LIBRARY_ENRICHMENT_DEMAND)]);
 
 /**
- * Drops documents nobody demands, and gives a pending list copy of the selected workflow the selected copy's
- * enrichment at the same revision. Every list publication (first page, range, revalidation, cached view) runs this
- * through `pumpEnrichment`, so a card, its missing-model count and its preview never stay pending beside a rail that
- * already shows the same revision (the enrichment loop skips the id: `findEntry` answers with the selected copy).
+ * Drops documents nobody demands, and gives a pending list copy of the selected workflow the selected copy's enrichment
+ * at the same revision. Every list publication (first page, range, revalidation, cached view) runs this through
+ * `pumpEnrichment`, so a card, its missing-model count and its preview never stay pending beside a rail that already
+ * shows the same revision (the enrichment loop skips the id: `findEntry` answers with the selected copy).
  */
 const trimDocuments = (): void => {
   const demand = demandedIds();
@@ -925,10 +926,9 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
 };
 
 /**
- * Every open of a template place applies the opening filter, a patch over the current one; the dialog passes its
- * place, the account's stored order, and the session's search and tags. The first open loads page 0 and the place's
- * tag counts in that filter, so the first request already comes back in order; a later open applies it as a filter
- * change.
+ * Every open of a template place applies the opening filter, a patch over the current one; the dialog passes its place,
+ * the account's stored order, and the session's search and tags. The first open loads page 0 and the place's tag counts
+ * in that filter, so the first request already comes back in order; a later open applies it as a filter change.
  */
 export const ensureWorkflowLibraryBrowseLoaded = (opening: Partial<WorkflowLibraryBrowseFilter>): Promise<void> => {
   const snapshot = store.getSnapshot();
@@ -1024,9 +1024,7 @@ const revalidateSelected = async (generation: number, owner: AccountScope): Prom
   }
 };
 
-/**
- * Revalidate resident positions and tag counts. A later range owns the window and fences this list publication.
- */
+/** Revalidate resident positions and tag counts. A later range owns the window and fences this list publication. */
 export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
   refreshFlight.run(async () => {
     const { filter, status } = store.getSnapshot();

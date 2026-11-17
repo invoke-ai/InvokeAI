@@ -203,9 +203,8 @@ interface LayerMenuProps {
   lazyMount?: boolean;
   unmountOnExit?: boolean;
   /**
-   * Controlled sibling-dialog state. When provided (canvas right-click), the
-   * parent owns it so dialogs survive the menu closing. Undefined means the menu
-   * keeps this state internally (panel).
+   * Controlled sibling-dialog state. When provided (canvas right-click), the parent owns it so dialogs survive the menu
+   * closing. Undefined means the menu keeps this state internally (panel).
    */
   dialogKind?: LayerMenuDialogKind | null;
   onDialogKindChange?: (kind: LayerMenuDialogKind | null) => void;
@@ -218,8 +217,8 @@ interface LayerMenuProps {
 }
 
 /**
- * Share per-layer actions across panel and canvas menus. Arrange within type groups; merge uses global adjacency.
- * Keep dialogs outside the closing menu portal.
+ * Share per-layer actions across panel and canvas menus. Arrange within type groups; merge uses global adjacency. Keep
+ * dialogs outside the closing menu portal.
  */
 const LayerMenu = ({
   engine,
@@ -526,8 +525,8 @@ const LayerMenu = ({
       if (!converted) {
         throw makeStatusError('unsupported');
       }
-      // Pass the immutable live object: the engine rejects stale menu actions
-      // by identity and clones the inverse contract internally.
+      // Pass the immutable live object: the engine rejects stale menu actions by identity and clones the inverse
+      // contract internally.
       if (!engine?.layers.commitLayerConversion(label, layer, converted)) {
         throw makeStatusError('not-ready');
       }
@@ -588,8 +587,8 @@ const LayerMenu = ({
 
   const handleSetColorLabel = useCallback(
     (label: CanvasColorLabel | null) => {
-      // `undefined` clears: the reducer writes the key as undefined and
-      // serialization drops it, so "no label" round-trips as absence.
+      // `undefined` clears: the reducer writes the key as undefined and serialization drops it, so "no label"
+      // round-trips as absence.
       patchBase(t('widgets.layers.menu.colorLabel'), { colorLabel: label ?? undefined });
     },
     [patchBase, t]
@@ -1136,8 +1135,8 @@ export interface CanvasLayerContextMenuTarget {
 }
 
 /**
- * Anchor {@link LayerMenu} at the cursor for the supplied layer id, resolved against the live document. Keep a
- * sticky dialog target after menu closure so sibling dialogs survive; changing layer resets their state.
+ * Anchor {@link LayerMenu} at the cursor for the supplied layer id, resolved against the live document. Keep a sticky
+ * dialog target after menu closure so sibling dialogs survive; changing layer resets their state.
  */
 export const CanvasLayerContextMenu = ({
   beforeDangerItems,
@@ -1152,11 +1151,11 @@ export const CanvasLayerContextMenu = ({
   showGroupLabels?: boolean;
   onClose: () => void;
 }) => {
-  // The layer a sibling dialog is anchored to. Captured while the live target
-  // still exists, then retained until the dialog has animated out.
+  // The layer a sibling dialog is anchored to. Captured while the live target still exists, then retained until the
+  // dialog has animated out.
   const [dialogState, setDialogState] = useState<(LayerMenuDialogState & { isOpen: boolean }) | null>(null);
-  // A menu for another layer remounts LayerMenu, cutting the retained dialog short before it reports its exit.
-  // Drop that dialog, or it would resurface as a hidden menu for its layer once this one closes.
+  // A menu for another layer remounts LayerMenu, cutting the retained dialog short before it reports its exit. Drop
+  // that dialog, or it would resurface as a hidden menu for its layer once this one closes.
   if (target && dialogState && target.layerId !== dialogState.target.layerId) {
     setDialogState(null);
   }

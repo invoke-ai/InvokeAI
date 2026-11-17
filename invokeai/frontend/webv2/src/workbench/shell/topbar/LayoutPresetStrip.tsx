@@ -196,8 +196,8 @@ export const LayoutPresetStrip = () => {
   /** Acknowledge the tab press before rearranging the workspace so a blocking layout commit cannot delay feedback. */
   const requestPreset = useCallback(
     (presetId: LayoutPresetId) => {
-      // Pressing the preset the workbench is still on, while another is pending, means stay: cancel the pending
-      // switch. Applying it would reapply its saved arrangement and discard its unsaved changes.
+      // Pressing the preset the workbench is still on, while another is pending, means stay: cancel the pending switch.
+      // Applying it would reapply its saved arrangement and discard its unsaved changes.
       if (presetId === activePresetId) {
         requestedPresetIdRef.current = null;
         layout.cancelPresetActivation();
@@ -213,8 +213,7 @@ export const LayoutPresetStrip = () => {
         }
 
         void layout.activatePreset(presetId).then((appliedPresetId) => {
-          // Return dropped activations to store selection without overwriting a newer request's optimistic
-          // selection.
+          // Return dropped activations to store selection without overwriting a newer request's optimistic selection.
           if (appliedPresetId !== presetId) {
             setPendingPresetId((pending) => (pending === presetId ? null : pending));
           }
@@ -434,8 +433,7 @@ const PresetTab = ({
       opacity: isDragging ? 0.5 : undefined,
       position: 'relative' as const,
       transform: CSS.Translate.toString(transform),
-      // Compose fill transitions with dnd-kit's inline transform transition so hover/selection fades remain
-      // active.
+      // Compose fill transitions with dnd-kit's inline transform transition so hover/selection fades remain active.
       transition: [transition, TAB_FILL_TRANSITION].filter(Boolean).join(', '),
       zIndex: isDragging ? 1 : undefined,
     }),
@@ -461,8 +459,7 @@ const PresetTab = ({
     [onOpenMenu, preset]
   );
 
-  // Activate on primary press for immediate feedback; right-click must preserve the inactive preset's menu
-  // actions.
+  // Activate on primary press for immediate feedback; right-click must preserve the inactive preset's menu actions.
   const handlePointerDown = useCallback(
     (event: PointerEvent<HTMLButtonElement>) => {
       // Chain dnd-kit's activator so a sensor change cannot silently lose drag initiation.
@@ -706,9 +703,8 @@ const PresetMenu = ({
     [onClose]
   );
 
-  // Anchored to a measured rect rather than a trigger element: the chevron lives
-  // inside the tab button and cannot be a `Menu.Trigger` of its own without
-  // nesting buttons, and a right-click anchors at the pointer.
+  // Anchored to a measured rect rather than a trigger element: the chevron lives inside the tab button and cannot be a
+  // `Menu.Trigger` of its own without nesting buttons, and a right-click anchors at the pointer.
   const { anchor } = target;
   const positioning = useMemo(
     () => ({

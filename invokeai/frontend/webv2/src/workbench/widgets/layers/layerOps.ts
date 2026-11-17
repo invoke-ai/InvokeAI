@@ -39,10 +39,7 @@ type RegionalGuidanceConfigPatch = {
   autoNegative?: boolean;
   referenceImages?: CanvasRegionalGuidanceLayerContract['referenceImages'];
 };
-/**
- * Re-export the engine's canonical mergeability predicate so UI and engine exclude unsafe mask merges
- * consistently.
- */
+/** Re-export the engine's canonical mergeability predicate so UI and engine exclude unsafe mask merges consistently. */
 export { isMergeableRasterLayer };
 
 /** All 16 document blend modes, in the contract's declared order. */
@@ -256,8 +253,8 @@ export const createReferenceImageId = (): string => createItemId('rgref');
 export const createAdjustmentId = (): string => createItemId('adj');
 
 /**
- * A new noise entry's amount: σ ≈ 13 of 255, grain clearly visible at 100% zoom without swamping detail. Lower
- * values suit subtle grain or dither; the slider covers both.
+ * A new noise entry's amount: σ ≈ 13 of 255, grain clearly visible at 100% zoom without swamping detail. Lower values
+ * suit subtle grain or dither; the slider covers both.
  */
 export const DEFAULT_NOISE_AMOUNT = 0.1;
 
@@ -318,8 +315,8 @@ export const createAdjustmentEntry = (type: CanvasAdjustmentEntry['type']): Canv
 export const DEFAULT_REGIONAL_REFERENCE_WEIGHT = 1;
 
 /**
- * Create shared regional-reference defaults: FLUX uses Redux, other bases IP-Adapter. Users choose models and
- * assign images via drop/upload.
+ * Create shared regional-reference defaults: FLUX uses Redux, other bases IP-Adapter. Users choose models and assign
+ * images via drop/upload.
  */
 export const createRegionalReferenceImage = (
   base: string | null,
@@ -473,8 +470,8 @@ const destinationBase = (layer: CanvasLayerContract, id: string, isCopy: boolean
 });
 
 /**
- * An untyped, model-less control layer over the same pixels; generation resolves its model. Null for a layer
- * {@link needsBakedControlPixels}, which no clone represents.
+ * An untyped, model-less control layer over the same pixels; generation resolves its model. Null for a layer {@link
+ * needsBakedControlPixels}, which no clone represents.
  */
 const pixelLayerToControl = (
   layer: PixelLayer,
@@ -587,8 +584,8 @@ export const copyRegionalGuidanceToInpaintMask = (
 });
 
 /**
- * Convert raster/control types while preserving source, identity, transform, and base properties; reject
- * unsupported or unchanged targets.
+ * Convert raster/control types while preserving source, identity, transform, and base properties; reject unsupported or
+ * unchanged targets.
  */
 export const convertRasterControlLayer = (
   layer: CanvasLayerContract,

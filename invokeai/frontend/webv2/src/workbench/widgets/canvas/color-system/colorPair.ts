@@ -36,8 +36,8 @@ const toOpaqueHex = (value: unknown): string | null => {
 const readColor = (value: unknown, fallback: string): string => toOpaqueHex(value) ?? fallback;
 
 /**
- * The persisted widget values are untyped; anything malformed falls back per
- * field, and an existing pair is preserved verbatim (idempotent migration).
+ * The persisted widget values are untyped; anything malformed falls back per field, and an existing pair is preserved
+ * verbatim (idempotent migration).
  */
 export const readActiveColorPair = (values: Record<string, unknown> | undefined): ActiveColorPair => {
   const raw = values?.[CANVAS_ACTIVE_COLORS_KEY];

@@ -34,8 +34,8 @@ import { DEFAULT_REGIONAL_REFERENCE_WEIGHT } from './layerOps';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
 /**
- * Edit regional references through whole-array patch-config; tree rows remain the sole inventory, enable, and
- * removal controls.
+ * Edit regional references through whole-array patch-config; tree rows remain the sole inventory, enable, and removal
+ * controls.
  */
 
 const IP_ADAPTER_METHODS: readonly RegionalGuidanceIPAdapterMethod[] = [
@@ -75,8 +75,8 @@ const useReferenceImageEditing = (
   const { notifications } = useWorkbenchCommands();
   const queryClient = useQueryClient();
 
-  // Reads the references at commit time, so an edit that finishes later than it began (an upload, a weight drag)
-  // never reverts one that landed in between, and undo restores only this reference.
+  // Reads the references at commit time, so an edit that finishes later than it began (an upload, a weight drag) never
+  // reverts one that landed in between, and undo restores only this reference.
   const updateReferenceImage = useCallback(
     (refId: string, update: (ref: RegionalGuidanceReferenceImage) => RegionalGuidanceReferenceImage) => {
       commitPrepared(t('widgets.layers.regionalGuidance.referenceImages'), (model) => {
@@ -203,8 +203,8 @@ const useReferenceImageCollections = (): ReferenceImageCollections => {
 };
 
 /**
- * Resolves the sub-selected reference image; renders nothing once the item is
- * gone — the sub-selection reconciler hands the pane back to the layer.
+ * Resolves the sub-selected reference image; renders nothing once the item is gone — the sub-selection reconciler hands
+ * the pane back to the layer.
  */
 export const ReferenceImageSettings = ({
   engine,
@@ -300,8 +300,8 @@ const ReferenceImageEditor = ({
     [config, referenceImage, replaceRef]
   );
 
-  // The weight is not previewed on the canvas, so a gesture shows locally and records once when it ends. A drag
-  // keeps the handlers it started with, so the commit patches only the weight onto the references as they are then.
+  // The weight is not previewed on the canvas, so a gesture shows locally and records once when it ends. A drag keeps
+  // the handlers it started with, so the commit patches only the weight onto the references as they are then.
   const [liveWeight, setLiveWeight] = useState<number | null>(null);
 
   const handleWeightEnd = useCallback(

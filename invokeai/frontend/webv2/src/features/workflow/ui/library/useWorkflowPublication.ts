@@ -9,8 +9,8 @@ import { useCallback, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * One publication controller per account: every editor save and preview save goes through it, so a workflow is
- * never published twice at once and a lost answer is reconciled before it is sent again.
+ * One publication controller per account: every editor save and preview save goes through it, so a workflow is never
+ * published twice at once and a lost answer is reconciled before it is sent again.
  */
 
 let controller: WorkflowPublicationController | null = null;
@@ -21,10 +21,10 @@ export const getWorkflowPublicationController = (): WorkflowPublicationControlle
 };
 
 /**
- * Publications that got no definitive answer, by project workflow. Each keeps its captured request and reserved id
- * so a resend after a lost response cannot create a second template. They outlive the dialog that reported them:
- * a new save for that workflow meets the unanswered one first, and returning to the workflow offers it once more.
- * An entry ends when the publication settles, when the user discards it, or with the account.
+ * Publications that got no definitive answer, by project workflow. Each keeps its captured request and reserved id so a
+ * resend after a lost response cannot create a second template. They outlive the dialog that reported them: a new save
+ * for that workflow meets the unanswered one first, and returning to the workflow offers it once more. An entry ends
+ * when the publication settles, when the user discards it, or with the account.
  */
 const unresolvedPublications = new Map<string, { failure: WorkflowPublicationFailure; offered: boolean }>();
 
@@ -154,9 +154,9 @@ export const useWorkflowPublication = (): WorkflowPublication => {
           );
         }
 
-        // A save as new turns the workflow into the template it created, so it takes that template's name; the
-        // header and a later update confirmation then name the template the workflow is linked to. A name the user
-        // chose meanwhile stands, and so does one that cannot be checked because another project is active now.
+        // A save as new turns the workflow into the template it created, so it takes that template's name; the header
+        // and a later update confirmation then name the template the workflow is linked to. A name the user chose
+        // meanwhile stands, and so does one that cannot be checked because another project is active now.
         if (target.adoptNameFrom !== undefined && result.kind === 'created') {
           const snapshot = project.getSnapshot();
           const current =

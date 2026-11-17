@@ -2,8 +2,8 @@ import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
- * Open state for the project switcher menu, so `⌘P` can reach it without the
- * hotkey runtime holding a ref to the trigger.
+ * Open state for the project switcher menu, so `⌘P` can reach it without the hotkey runtime holding a ref to the
+ * trigger.
  */
 const INITIAL_SNAPSHOT = { isOpen: false };
 

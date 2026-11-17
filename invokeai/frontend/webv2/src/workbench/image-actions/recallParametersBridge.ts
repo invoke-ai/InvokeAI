@@ -18,8 +18,8 @@ import type { createVideoRecallRuntime } from './videoRecallRuntime';
 
 /**
  * Lazy-load a recall runtime on its first event; buffer events in arrival order with their original project. Report
- * load failures and retry on the next event. This module stays in the editor boot graph, so it imports the runtimes
- * by type only.
+ * load failures and retry on the next event. This module stays in the editor boot graph, so it imports the runtimes by
+ * type only.
  */
 const attachLazyRecallRuntime = <Module>({
   area,
@@ -51,8 +51,8 @@ const attachLazyRecallRuntime = <Module>({
           return;
         }
 
-        // Hand-over and live subscription share one tick, so no event can
-        // slip between the buffered ones and the runtime's own listener.
+        // Hand-over and live subscription share one tick, so no event can slip between the buffered ones and the
+        // runtime's own listener.
         detachBuffer?.();
         detachBuffer = null;
         runtime = create(module, pending.splice(0));

@@ -338,11 +338,11 @@ export const AddModelsView = () => {
     );
   };
 
-  // Stop aborts the request; the server watches for the disconnect and
-  // abandons its directory walk, so a wrong folder does not keep crawling.
+  // Stop aborts the request; the server watches for the disconnect and abandons its directory walk, so a wrong folder
+  // does not keep crawling.
   const handleScan = async (path: string, origin: 'field' | 'models-folder') => {
-    // Enter in the field reaches here while the button reads Stop; a second
-    // scan must not replace the controller the running one is wired to.
+    // Enter in the field reaches here while the button reads Stop; a second scan must not replace the controller the
+    // running one is wired to.
     if (scanAbortRef.current) {
       return;
     }

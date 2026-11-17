@@ -20,9 +20,8 @@ export const getFittedFrameCss = (width: number, height: number): SystemStyleObj
 });
 
 /**
- * Room for the centre region's floating chrome islands. `CenterArea` publishes
- * the variable and nothing else does, so the `0px` fallback keeps the right
- * panel — which reserves a real header row instead — unpadded.
+ * Room for the centre region's floating chrome islands. `CenterArea` publishes the variable and nothing else does, so
+ * the `0px` fallback keeps the right panel — which reserves a real header row instead — unpadded.
  */
 const CENTER_CHROME_INSET = 'var(--wb-center-chrome-inset, 0px)';
 

@@ -44,9 +44,9 @@ import {
 
 /**
  * The calibration attempts this tab started, by model key: what only this tab knows (that it is still posting steps,
- * how many it meant to post, why it stopped). Every step's run carries the attempt id, so the server's
- * runs say which runs belong together, after a reload too. Kept outside the section so leaving a model's details
- * while an attempt queues, and coming back, shows the same attempt.
+ * how many it meant to post, why it stopped). Every step's run carries the attempt id, so the server's runs say which
+ * runs belong together, after a reload too. Kept outside the section so leaving a model's details while an attempt
+ * queues, and coming back, shows the same attempt.
  */
 const attemptsStore = createExternalStore<{ byModel: ReadonlyMap<string, LocalAttempt> }>({ byModel: new Map() });
 
@@ -115,9 +115,9 @@ const refusalOf = (error: unknown): CalibrationRefusal | undefined =>
   error instanceof ApiError && error.status === 409 ? REFUSAL_CODES[getApiErrorCode(error) ?? ''] : undefined;
 
 /**
- * A lost response is resent with the same key, which returns the run the first request created. So is a 503: the
- * store failed for a passing reason (an unwritable root, a lock timeout), possibly after the items were queued, and a
- * repeat with the key records them without queuing anything new.
+ * A lost response is resent with the same key, which returns the run the first request created. So is a 503: the store
+ * failed for a passing reason (an unwritable root, a lock timeout), possibly after the items were queued, and a repeat
+ * with the key records them without queuing anything new.
  */
 const POST_ATTEMPTS = 3;
 const POST_RETRY_DELAY_MS = 1_000;
@@ -142,10 +142,10 @@ const postStep = async (
 
 /**
  * Every model's summary moves: lines are shared across models, and a reset or new points change their fits. So does
- * every model's plan, which prices on those fits and sizes for the memory the stored measurements found. Plans are
- * only marked stale, not read now: a read measures the GPU's free memory, which a calibration that is running or just
- * ended does not leave as a generation finds it, and a running attempt's progress names its cases from the shown plan.
- * The next open of a section and the next start read them (`refreshWorkingMemoryPlan`, `fetchCurrentWorkingMemoryPlan`).
+ * every model's plan, which prices on those fits and sizes for the memory the stored measurements found. Plans are only
+ * marked stale, not read now: a read measures the GPU's free memory, which a calibration that is running or just ended
+ * does not leave as a generation finds it, and a running attempt's progress names its cases from the shown plan. The
+ * next open of a section and the next start read them (`refreshWorkingMemoryPlan`, `fetchCurrentWorkingMemoryPlan`).
  */
 const invalidateAfterChange = async (queryClient: QueryClient, owner: AccountScope) => {
   await Promise.all([
@@ -161,9 +161,9 @@ export const refreshWorkingMemoryPlan = (queryClient: QueryClient, modelKey: str
 
 /**
  * The model whose calibration holds this GPU as the server sees it now, from any tab, or null when none does
- * (`modelCalibratingOnGpu`). Read right before an attempt starts, after its graphs compiled; the status query keeps
- * the read, so the section names that model, or holds a failed read's error, which the section shows. A running
- * attempt marks every model's summary stale, so an attempt of the shown model appears with its progress.
+ * (`modelCalibratingOnGpu`). Read right before an attempt starts, after its graphs compiled; the status query keeps the
+ * read, so the section names that model, or holds a failed read's error, which the section shows. A running attempt
+ * marks every model's summary stale, so an attempt of the shown model appears with its progress.
  */
 export const calibrationOnGpuNow = async (queryClient: QueryClient): Promise<string | null> => {
   const owner = captureAccountScope();
@@ -188,12 +188,12 @@ export const fetchCurrentWorkingMemoryPlan = (queryClient: QueryClient, modelKey
   queryClient.fetchQuery({ ...workingMemoryPlanQueryOptions(modelKey), staleTime: 0 });
 
 /**
- * The graphs of the plan's cases, as Generate would compile them over the model records the server holds now, each
- * with the identity of every model it names from those same records; loads the compiler on first use. Each step posts
- * those identities, never a later read, so the server refuses a step whose models changed since they compiled. Rejects
- * with the compiler's error, naming the first case that cannot compile, such as one whose model needs a text encoder
- * that is not installed, or with the error of reading the records. A start needs them, so compiling first is how a
- * plan the server supports turns out to be one this machine cannot run.
+ * The graphs of the plan's cases, as Generate would compile them over the model records the server holds now, each with
+ * the identity of every model it names from those same records; loads the compiler on first use. Each step posts those
+ * identities, never a later read, so the server refuses a step whose models changed since they compiled. Rejects with
+ * the compiler's error, naming the first case that cannot compile, such as one whose model needs a text encoder that is
+ * not installed, or with the error of reading the records. A start needs them, so compiling first is how a plan the
+ * server supports turns out to be one this machine cannot run.
  */
 export const compileWorkingMemoryPlan = async (
   compile: CalibrationGraphCompiler,
@@ -204,9 +204,9 @@ export const compileWorkingMemoryPlan = async (
   const compileSignal = signal ? AbortSignal.any([owner.signal, signal]) : owner.signal;
 
   compileSignal.throwIfAborted();
-  // Not this tab's models store: another tab or a script may have changed a record since it loaded, and a model's
-  // base edited under the same key can plan the same SD cases while the run executes as the record the server holds.
-  // Only the records, not the library's missing-file check, which stats every model's files on the server.
+  // Not this tab's models store: another tab or a script may have changed a record since it loaded, and a model's base
+  // edited under the same key can plan the same SD cases while the run executes as the record the server holds. Only
+  // the records, not the library's missing-file check, which stats every model's files on the server.
   const records = listModels(compileSignal);
   // The compiler awaits the records only once it has loaded; until then a failed read must not count as unhandled.
   void records.catch(() => undefined);
@@ -222,9 +222,9 @@ export const compileWorkingMemoryPlan = async (
  * Posts every step of the plan with its compiled graph (`compileWorkingMemoryPlan`), in order and each after the last
  * one's response, so the queue runs them in step order. Every step names the attempt and its step count, so the server
  * fits the attempt's windows only once all of its steps have run. Stops at the first step that still fails once its
- * retries are spent: the runs already queued still run, but the server discards the attempt as aborted, and the
- * section reports it as partial. A first step the server refuses because another attempt runs on this GPU leaves
- * no record of this one: the section follows what the server lists instead.
+ * retries are spent: the runs already queued still run, but the server discards the attempt as aborted, and the section
+ * reports it as partial. A first step the server refuses because another attempt runs on this GPU leaves no record of
+ * this one: the section follows what the server lists instead.
  */
 export const startCalibration = ({
   graphs,
@@ -334,8 +334,8 @@ export const startCalibration = ({
 };
 
 /**
- * Stops queuing, then cancels every run of the model the queue still holds, newest first so no later item starts
- * while an earlier one is cancelled. Waits for the step in flight: its run exists once the response arrives.
+ * Stops queuing, then cancels every run of the model the queue still holds, newest first so no later item starts while
+ * an earlier one is cancelled. Waits for the step in flight: its run exists once the response arrives.
  */
 export const stopCalibration = async ({
   modelKey,
@@ -392,8 +392,8 @@ export const resetCalibration = async ({
 };
 
 /**
- * Keeps an open section current: a calibration item changing status refreshes the summaries, and a reconnect
- * refreshes everything, since events during the gap were lost. Polling covers the time without a socket.
+ * Keeps an open section current: a calibration item changing status refreshes the summaries, and a reconnect refreshes
+ * everything, since events during the gap were lost. Polling covers the time without a socket.
  */
 export const attachWorkingMemoryRealtime = (queryClient: QueryClient): (() => void) => {
   const owner = captureAccountScope();

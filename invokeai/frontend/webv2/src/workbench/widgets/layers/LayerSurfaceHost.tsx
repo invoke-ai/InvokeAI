@@ -32,9 +32,8 @@ interface LayerSurfaceHostProps {
 }
 
 /**
- * The one menu and one properties popover the whole panel shares. A row asks for a surface by id
- * and anchor; nothing heavier than a button lives in the row. A surface whose node has gone
- * closes itself.
+ * The one menu and one properties popover the whole panel shares. A row asks for a surface by id and anchor; nothing
+ * heavier than a button lives in the row. A surface whose node has gone closes itself.
  */
 export const LayerSurfaceHost = ({
   commands,

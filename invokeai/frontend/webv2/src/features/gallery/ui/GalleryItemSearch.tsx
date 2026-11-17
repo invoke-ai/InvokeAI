@@ -70,14 +70,13 @@ export const GalleryItemSearch = () => {
   const { data: indexAvailability } = useQuery(imageIndexAvailabilityOptions());
   const isSemanticMode = gallery.semanticSearchText !== null;
   const semanticText = gallery.semanticSearchText ?? '';
-  // Offer semantic mode whenever indexing is configured; keep the toggle reachable for persisted mode so users can
-  // exit it.
+  // Offer semantic mode whenever indexing is configured; keep the toggle reachable for persisted mode so users can exit
+  // it.
   const isIndexConfigured = indexAvailability !== undefined && indexAvailability.state !== 'disabled';
   const showSemanticToggle = isIndexConfigured || isSemanticMode;
 
-  // The commit trails typing on a timer that belongs to this render tree; a
-  // timer that outlives the field is cleared, and one that outlives its text
-  // is refused by the reducer.
+  // The commit trails typing on a timer that belongs to this render tree; a timer that outlives the field is cleared,
+  // and one that outlives its text is refused by the reducer.
   const inputRef = useRef<HTMLInputElement>(null);
   const commitTimerRef = useRef<number | null>(null);
   const cancelPendingCommit = useCallback(() => {
@@ -98,8 +97,8 @@ export const GalleryItemSearch = () => {
 
       actions.setSemanticSearchText(value);
       cancelPendingCommit();
-      // Commit text even without the model; listing errors explain unavailable search without leaving deferred
-      // text to reconcile.
+      // Commit text even without the model; listing errors explain unavailable search without leaving deferred text to
+      // reconcile.
       commitTimerRef.current = window.setTimeout(() => {
         commitTimerRef.current = null;
         actions.commitSemanticSearch(value);
@@ -125,9 +124,8 @@ export const GalleryItemSearch = () => {
   const handleToggleSemanticMode = useCallback(
     (enabled: boolean) => {
       cancelPendingCommit();
-      // Rendered before focus moves, so the field is announced under its
-      // semantic name — a name that changes on an already-focused element is
-      // not read out again.
+      // Rendered before focus moves, so the field is announced under its semantic name — a name that changes on an
+      // already-focused element is not read out again.
       flushSync(() => actions.setSemanticSearchMode(enabled));
 
       if (!enabled) {
@@ -180,8 +178,8 @@ export const GalleryItemSearch = () => {
     [gallery.isSearchActive, handleSearchScopeChange, isSearchingAllBoards, t]
   );
 
-  // In-app drags (dnd-kit) resolve through GalleryBoardDragMonitor; this hook
-  // only registers the drop target and reports hover for the highlight.
+  // In-app drags (dnd-kit) resolve through GalleryBoardDragMonitor; this hook only registers the drop target and
+  // reports hover for the highlight.
   const { isOver: isItemDragOver, setNodeRef: setSemanticDropRef } = useGalleryImageDroppable({
     id: GALLERY_SEMANTIC_SEARCH_DROP_ID,
   });
@@ -208,8 +206,8 @@ export const GalleryItemSearch = () => {
     (event: React.DragEvent<HTMLDivElement>) => {
       const types = event.dataTransfer.types;
 
-      // Only claim drops this feature understands; a plain-text drop must
-      // fall through to the browser's default insertion into the input.
+      // Only claim drops this feature understands; a plain-text drop must fall through to the browser's default
+      // insertion into the input.
       if (!types.includes('Files') && !types.includes('text/uri-list')) {
         setIsNativeDropOver(false);
         return;
@@ -258,8 +256,8 @@ export const GalleryItemSearch = () => {
 
   const hint = invalidHint ?? semanticHint;
 
-  // The chips show which text is a filter, not what it resolved to, so the
-  // resolved range stays available to assistive tech.
+  // The chips show which text is a filter, not what it resolved to, so the resolved range stays available to assistive
+  // tech.
   const appliedRange = useMemo(() => {
     const parse = parseDateTokens(gallery.searchTerm);
     const shape = parse.range ? describeDateRange(parse.range) : null;
@@ -285,8 +283,7 @@ export const GalleryItemSearch = () => {
     }
   }, [gallery.searchTerm, i18n.language, t]);
 
-  // One name in both states — the pressed state says which — and the tooltip
-  // names the action a click takes.
+  // One name in both states — the pressed state says which — and the tooltip names the action a click takes.
   const semanticToggle = useMemo(
     () =>
       showSemanticToggle ? (
@@ -383,8 +380,8 @@ export const GalleryItemSearch = () => {
           fontSize="xs"
           id={SEARCH_HINT_ID}
           insetInlineStart="0"
-          // Out of flow and inert: it must never shift the header row, nor
-          // swallow clicks meant for the grid it now floats over.
+          // Out of flow and inert: it must never shift the header row, nor swallow clicks meant for the grid it now
+          // floats over.
           pointerEvents="none"
           position="absolute"
           role="status"

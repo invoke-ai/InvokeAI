@@ -14,8 +14,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 /**
- * Share action order between right-click and overflow menus; ProjectActionsMenuHost owns the single menu and
- * dialogs.
+ * Share action order between right-click and overflow menus; ProjectActionsMenuHost owns the single menu and dialogs.
  */
 export const ProjectActionsMenuBody = ({
   isCompatible,

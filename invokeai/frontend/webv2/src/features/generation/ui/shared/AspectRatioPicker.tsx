@@ -430,9 +430,9 @@ const GroupLabel = ({ children, id }: { children: ReactNode; id: string }) => (
 );
 
 /**
- * The aspect ratio control: built-in ratios as a grid of shapes, the account's saved ratios as rows, and an inline
- * form to add or edit one. Choosing applies at once and closes; callers own what a ratio does to the size.
- * Without `presets` it offers the built-in grid alone.
+ * The aspect ratio control: built-in ratios as a grid of shapes, the account's saved ratios as rows, and an inline form
+ * to add or edit one. Choosing applies at once and closes; callers own what a ratio does to the size. Without `presets`
+ * it offers the built-in grid alone.
  */
 export const AspectRatioPicker = (props: AspectRatioPickerProps) => {
   const { disabled, lockedRatio, valueText: valueTextOverride } = props;
@@ -552,8 +552,8 @@ export const AspectRatioPicker = (props: AspectRatioPickerProps) => {
     focusKey(saved ? `choose:${saved.id}` : last ? `choose:${last.id}` : 'add');
   };
 
-  // Deleting is undoable (the port reports it with Undo), so it asks nothing. Focus moves to the next row's delete,
-  // the previous one's after the last row, or Add ratio once none are left.
+  // Deleting is undoable (the port reports it with Undo), so it asks nothing. Focus moves to the next row's delete, the
+  // previous one's after the last row, or Add ratio once none are left.
   const deletePreset = (preset: AspectRatioPreset) => {
     if (!full) {
       return;

@@ -287,8 +287,8 @@ const NumberFieldInput = (props: ScalarInputProps) => {
 };
 
 /**
- * Plan stepping previews from workflow iterations and template defaults; nokey prevents node shortcuts inside the
- * row and portalled menu.
+ * Plan stepping previews from workflow iterations and template defaults; nokey prevents node shortcuts inside the row
+ * and portalled menu.
  */
 const WorkflowSeedInput = ({
   id,
@@ -346,8 +346,8 @@ const SWITCH_CHECKED_PROPS = { bg: 'accent.solid' };
 
 const BooleanInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   const onCheckedChange = useCallback((event: { checked: boolean }) => onChange(event.checked), [onChange]);
-  // The host id goes through zag's id map: the root is a `<label for>` pointing at zag's hidden-input
-  // id, so an `id` set on the element itself would leave the label pointing at nothing (an inert switch).
+  // The host id goes through zag's id map: the root is a `<label for>` pointing at zag's hidden-input id, so an `id`
+  // set on the element itself would leave the label pointing at nothing (an inert switch).
   const switchIds = useMemo(() => (id ? { hiddenInput: `${id}-switch-input` } : undefined), [id]);
 
   return (
@@ -471,8 +471,8 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
   const filter = useCallback(
     (model: ModelConfig) =>
       (allowedBases ? allowedBases.includes(model.base) : true) &&
-      // A components-only folder carries no transformer, so it can only fill a field that asks for
-      // folders explicitly (e.g. a loader's Components field), never a format-agnostic model field.
+      // A components-only folder carries no transformer, so it can only fill a field that asks for folders explicitly
+      // (e.g. a loader's Components field), never a format-agnostic model field.
       (allowedFormats ? allowedFormats.includes(model.format) : model.components_only !== true),
     [allowedBases, allowedFormats]
   );
@@ -527,8 +527,8 @@ const BoardInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInp
   const { data } = useQuery(galleryBoardsOptions());
   const listedBoards = useHostGalleryBoards(data);
   const host = useOptionalGalleryHostProjectContext();
-  // Only boards a node's results may land on: someone else's board the caller can only view would refuse them after
-  // the run.
+  // Only boards a node's results may land on: someone else's board the caller can only view would refuse them after the
+  // run.
   const boards = useMemo(
     () => listedBoards.filter((board) => board.kind === 'board' && canOnBoard(board, 'add_media')),
     [listedBoards]
@@ -658,8 +658,8 @@ const VIDEO_ONLY = ['video'] as const;
 const MEDIA_INPUT_FOCUS_PROPS = { outline: '2px solid {colors.accent.focusRing}', outlineOffset: '2px' } as const;
 
 /**
- * Apply uploads only to their originating mounted widget/project. Late successes still refresh Gallery and direct
- * users there instead of mutating another project.
+ * Apply uploads only to their originating mounted widget/project. Late successes still refresh Gallery and direct users
+ * there instead of mutating another project.
  */
 const useMediaUpload = ({
   kind,
@@ -699,8 +699,8 @@ const useMediaUpload = ({
         return;
       }
 
-      // `accept` on the input is advisory only ("All Files" bypasses it); an
-      // unknown type (empty string) is left for the server to judge.
+      // `accept` on the input is advisory only ("All Files" bypasses it); an unknown type (empty string) is left for
+      // the server to judge.
       if (files.some((file) => file.type && !file.type.startsWith(`${kind}/`))) {
         toaster.create({
           title: `Please choose ${multiple ? `${config.noun} files` : `a ${config.noun} file`}`,
@@ -718,9 +718,9 @@ const useMediaUpload = ({
         const names: string[] = [];
         const failedFiles: string[] = [];
 
-        // Uploads follow the gallery's selected board, unless it takes none: a date board, or someone else's board
-        // the caller can only view or no longer read. Then they go to the project's inbox, where results go in the
-        // same case. The listing is ensured first, so the board is judged from one and never trusted unseen.
+        // Uploads follow the gallery's selected board, unless it takes none: a date board, or someone else's board the
+        // caller can only view or no longer read. Then they go to the project's inbox, where results go in the same
+        // case. The listing is ensured first, so the board is judged from one and never trusted unseen.
         if (selectedBoardId !== 'none') {
           await ensureGalleryBoardDestinations(queryClient);
         }
@@ -906,8 +906,8 @@ const ImageCollectionInput = ({
   const { project } = useWorkflowUi();
   const names = useMemo(() => getImageCollectionNames(value), [value]);
   const invalidAriaProps = useMemo(() => (invalid ? { 'aria-invalid': true } : {}), [invalid]);
-  // An upload finishing later appends to the field as it stands then, read from the document, not
-  // to the list this render saw.
+  // An upload finishing later appends to the field as it stands then, read from the document, not to the list this
+  // render saw.
   const appendNames = useCallback(
     (added: string[]) => {
       const snapshot = project.getSnapshot();
@@ -1245,8 +1245,8 @@ const VideoFramePickerFallback = ({ posterUrl }: { posterUrl: string }) => {
 };
 
 /**
- * Convention shared with the legacy editor: a `video-frame-index` field's
- * source video lives on a sibling field named `video` on the same node.
+ * Convention shared with the legacy editor: a `video-frame-index` field's source video lives on a sibling field named
+ * `video` on the same node.
  */
 const COMPANION_VIDEO_FIELD_NAME = 'video';
 
@@ -1258,10 +1258,9 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
   const { t } = useTranslation();
   const { nodeId, onChange, value } = props;
 
-  // A connected `video` field keeps its stored value in the document, so the
-  // sibling value alone would preview a stale video while invoke uses the
-  // upstream one. Resolved edges are the same "connected" signal the editor
-  // and Linear panel use to hide the video widget itself.
+  // A connected `video` field keeps its stored value in the document, so the sibling value alone would preview a stale
+  // video while invoke uses the upstream one. Resolved edges are the same "connected" signal the editor and Linear
+  // panel use to hide the video widget itself.
   const isVideoConnected = useWorkflowProjectSelector(
     (project) =>
       nodeId !== undefined &&
@@ -1282,8 +1281,8 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
   });
   const videoName = isVideoConnected ? null : siblingVideoName;
 
-  // Same query key as the media widget's badge lookup, so the two share a cache
-  // entry when a frame field sits next to a populated video field (the common case).
+  // Same query key as the media widget's badge lookup, so the two share a cache entry when a frame field sits next to a
+  // populated video field (the common case).
   const { data, isError } = useQuery({
     enabled: videoName !== null,
     queryFn: ({ signal }) => galleryItems.resolve({ kind: 'video', name: videoName ?? '' }, signal),
@@ -1300,9 +1299,8 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
   const frameCount =
     video && fps && video.durationSeconds > 0 ? Math.max(1, Math.round(video.durationSeconds * fps)) : null;
 
-  // Resolve negative indices (-1 = last frame) for display only — the field
-  // value is preserved verbatim so users can still type "-1" and have the
-  // backend resolve it against the actual frame count.
+  // Resolve negative indices (-1 = last frame) for display only — the field value is preserved verbatim so users can
+  // still type "-1" and have the backend resolve it against the actual frame count.
   const numericValue = typeof value === 'number' && Number.isFinite(value) ? value : 0;
   const resolvedIndex =
     frameCount === null
@@ -1386,8 +1384,7 @@ const ColorInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
 const LORA_MODEL_TYPES: ModelTaxonomyType[] = ['lora'];
 
 /**
- * Edit LoRA collections by index so imported duplicate keys and unreadable entries remain independent and
- * preserved.
+ * Edit LoRA collections by index so imported duplicate keys and unreadable entries remain independent and preserved.
  */
 const LoRACollectionInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
   // The raw list, unreadable items included — see `toLoraFieldCollectionList`.
@@ -1513,8 +1510,8 @@ const LoRACollectionRow = ({
   const label = entry ? entry.lora.name : t('nodes.loraEntryUnreadable');
   const removeLabel = t('nodes.loraEntryRemove', { name: label });
   const onRemoveClick = useCallback(() => onRemove(index), [index, onRemove]);
-  // The shared numeric control commits as typed; a cleared or out-of-range weight stays on screen and blocks
-  // invoking through the field's own reason instead of being clamped.
+  // The shared numeric control commits as typed; a cleared or out-of-range weight stays on screen and blocks invoking
+  // through the field's own reason instead of being clamped.
   const onValueChange = useCallback(
     (weight: unknown) => onWeightChange(index, typeof weight === 'number' ? weight : null),
     [index, onWeightChange]
@@ -1575,8 +1572,8 @@ const ScalarCollectionInput = ({ id, invalid, onChange, template, value }: Workf
   );
   const addButtonRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  // Rows are keyed by position, so a removal only unmounts the last row's controls. Move keyboard focus off
-  // anything about to unmount before the commit lands, or it falls to the canvas and its delete shortcut.
+  // Rows are keyed by position, so a removal only unmounts the last row's controls. Move keyboard focus off anything
+  // about to unmount before the commit lands, or it falls to the canvas and its delete shortcut.
   const onClear = useCallback(() => {
     addButtonRef.current?.focus();
     commit([]);
@@ -1856,9 +1853,9 @@ const SavedWorkflowInput = ({ nodeId, onChange, template, value }: WorkflowField
 };
 
 export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
-  // COLLECTION fields hold arrays; only image and scalar lists have a list widget. Other
-  // collections stay connection-only even when a migrated linear-form element
-  // points at them, since the single-value widget would write a bare value.
+  // COLLECTION fields hold arrays; only image and scalar lists have a list widget. Other collections stay
+  // connection-only even when a migrated linear-form element points at them, since the single-value widget would write
+  // a bare value.
   if (props.template.type.cardinality === 'COLLECTION') {
     switch (props.template.type.name) {
       case 'ImageField':

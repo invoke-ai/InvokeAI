@@ -1,6 +1,6 @@
 /**
- * Admin-maintained server-wide supplementary terms augment bundled label vocabulary. All users can read;
- * admin-only saves replace the full list idempotently.
+ * Admin-maintained server-wide supplementary terms augment bundled label vocabulary. All users can read; admin-only
+ * saves replace the full list idempotently.
  */
 
 import {
@@ -97,8 +97,7 @@ const delay = (ms: number): Promise<void> =>
   });
 
 const watchRebuild = (): void => {
-  // One watcher covers every save it overlaps: it acts on the final state,
-  // not on which save produced it.
+  // One watcher covers every save it overlaps: it acts on the final state, not on which save produced it.
   if (rebuildWatchActive) {
     return;
   }

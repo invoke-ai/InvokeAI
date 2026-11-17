@@ -97,8 +97,8 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     [queryClient]
   );
   const openWorkbenchWidget = useOpenWorkbenchWidget();
-  // Raise Preview before changing selection; refusal must leave selection untouched. Request the span last and do
-  // not reveal/scroll the gallery.
+  // Raise Preview before changing selection; refusal must leave selection untouched. Request the span last and do not
+  // reveal/scroll the gallery.
   const playVideoSpanInPreview = useCallback<VideoUiAdapter['playVideoSpanInPreview']>(
     ({ endSeconds, item, startSeconds }) => {
       // Discard a resolved clip if its originating project is no longer active.
@@ -117,8 +117,8 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     [commands, openWorkbenchWidget, projectId]
   );
   // Judged from the listing of every readable board, ensured as the upload starts: an archived or revoked board is
-  // decided from a listing, not for want of one, and no listing is read while nothing uploads. The board is read
-  // before anything is awaited, so a later change to the panel cannot redirect an upload already under way.
+  // decided from a listing, not for want of one, and no listing is read while nothing uploads. The board is read before
+  // anything is awaited, so a later change to the panel cannot redirect an upload already under way.
   const getUploadBoardId = useCallback<VideoUiAdapter['getUploadBoardId']>(async () => {
     const galleryValues = galleryValuesRef.current;
     const pendingListing = ensureGalleryBoardDestinations(queryClient);

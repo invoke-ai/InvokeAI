@@ -388,8 +388,8 @@ const insertAt = <T extends { id: string }>(items: readonly T[], item: T, before
 
 /**
  * An adjustment entry's landing: a reorder within its owner, or ONE atomic batch removing it from its owner and
- * inserting it into another raster layer or group. The document model still refuses locked and overlay-stack
- * owners when the command is prepared.
+ * inserting it into another raster layer or group. The document model still refuses locked and overlay-stack owners
+ * when the command is prepared.
  */
 const adjustmentDropCommand = (
   document: CanvasDocumentContractV3,
@@ -439,11 +439,9 @@ const adjustmentDropCommand = (
 };
 
 /**
- * The document command a child-row drag resolves to, or `null` when it is a
- * no-op or the landing is invalid. Adjustment entries and reference images
- * reorder within their layer, or move to another layer that holds their kind
- * (raster layers and raster groups; regional layers) as ONE atomic cross-layer
- * edit.
+ * The document command a child-row drag resolves to, or `null` when it is a no-op or the landing is invalid. Adjustment
+ * entries and reference images reorder within their layer, or move to another layer that holds their kind (raster
+ * layers and raster groups; regional layers) as ONE atomic cross-layer edit.
  */
 export const layerChildDropCommand = (
   document: CanvasDocumentContractV3,
@@ -485,8 +483,8 @@ export const layerChildDropCommand = (
   if (destination?.type !== 'regional_guidance') {
     return null;
   }
-  // A duplicated layer can carry the same item id (cloneSubtree re-mints only
-  // node ids); landing there would alias two rows onto one key. Refuse.
+  // A duplicated layer can carry the same item id (cloneSubtree re-mints only node ids); landing there would alias two
+  // rows onto one key. Refuse.
   if (destination.referenceImages.some((candidate) => candidate.id === child.itemId)) {
     return null;
   }

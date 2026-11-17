@@ -50,9 +50,9 @@ import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowLibraryCardSizeContext } from 
 
 /**
  * What the grid renders from: the mounted rows and the visible range, never the scroll offset, so scrolling within a
- * row re-renders nothing and only crossing a row boundary or a measurement does. Scroll start and stop count only
- * while a restoration waits for scrolling to settle. The methods, the element cache and the instance are stable
- * across snapshots.
+ * row re-renders nothing and only crossing a row boundary or a measurement does. Scroll start and stop count only while
+ * a restoration waits for scrolling to settle. The methods, the element cache and the instance are stable across
+ * snapshots.
  */
 type GridVirtualizer = Virtualizer<HTMLDivElement, Element>;
 
@@ -89,9 +89,9 @@ const selectVirtualizerView = (
 });
 
 /**
- * A card's height below its image at the default 16px root size: borders, body padding, title and facts rows, and
- * the row's bottom gap come to 78px; the 3:2 image is 2px narrower than the card. Rounding down keeps the estimate
- * a lower bound, so a viewport capped at N estimated rows never spans more than N + 1 real ones.
+ * A card's height below its image at the default 16px root size: borders, body padding, title and facts rows, and the
+ * row's bottom gap come to 78px; the 3:2 image is 2px narrower than the card. Rounding down keeps the estimate a lower
+ * bound, so a viewport capped at N estimated rows never spans more than N + 1 real ones.
  */
 const ROW_CHROME_PX = 76;
 const NO_MISSING_COUNTS: ReadonlyMap<string, number> = new Map();
@@ -370,8 +370,8 @@ export const WorkflowLibraryGrid = ({
     }
   }, [measureElement, elementsCache, instance, rowHeight]);
   // Measure the mounted width before the first paint rather than waiting for the observer's first report: Chromium can
-  // hold back a report that misses its frame's resize-observer depth limit until some later rendering update, and
-  // until the width is known the grid demands nothing (a returning grid would sit on placeholders).
+  // hold back a report that misses its frame's resize-observer depth limit until some later rendering update, and until
+  // the width is known the grid demands nothing (a returning grid would sit on placeholders).
   useLayoutEffect(() => {
     setWidth(viewportRef.current?.clientWidth ?? 0);
   }, []);
@@ -403,8 +403,8 @@ export const WorkflowLibraryGrid = ({
     ) {
       return;
     }
-    // Wait for resident metadata and the committed sizer before starting an index command.
-    // A command against an empty sizer can otherwise outlive cancellation through its pending clamp retry.
+    // Wait for resident metadata and the committed sizer before starting an index command. A command against an empty
+    // sizer can otherwise outlive cancellation through its pending clamp retry.
     if (positionedAt.current?.row !== restoreRow || positionedAt.current.width !== width) {
       positionedAt.current = { row: restoreRow, width };
       virtualizer.scrollToIndex(restoreRow, { align: 'start' });

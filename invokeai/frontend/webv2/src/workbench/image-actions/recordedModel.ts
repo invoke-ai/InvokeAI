@@ -33,9 +33,8 @@ interface ResolvableModel {
  * - `ambiguous`: `'refuse'` reports a portable identifier several installed models match as `'ambiguous'`;
  *   `'first'` takes the first match in catalog order.
  *
- * Image recall refuses both for the main model, VAE, components, refiner and concepts, and uses
- * `hashMiss: 'matchName'` for reference-image adapters, as legacy web does. Video recall uses
- * `{ hashMiss: 'matchName', ambiguous: 'first' }`.
+ * Image recall refuses both for the main model, VAE, components, refiner and concepts, and uses `hashMiss: 'matchName'`
+ * for reference-image adapters, as legacy web does. Video recall uses `{ hashMiss: 'matchName', ambiguous: 'first' }`.
  */
 export interface RecordedModelPolicy {
   ambiguous: 'first' | 'refuse';

@@ -23,8 +23,8 @@ const toErrorMessage = (error: unknown): string => (error instanceof Error ? err
 
 /**
  * Apply one kind of external recall event to its arrival-time project, strictly in arrival order so a later event
- * observes an earlier one's changes (an append after a replace). Buffered replay events run first. Each event waits
- * for the model catalog and is dropped when it belongs to another user or outlives the account it arrived under.
+ * observes an earlier one's changes (an append after a replace). Buffered replay events run first. Each event waits for
+ * the model catalog and is dropped when it belongs to another user or outlives the account it arrived under.
  */
 export const createRecallEventRuntime = <Event extends { user_id: string }>({
   apply,
@@ -83,8 +83,8 @@ export const createRecallEventRuntime = <Event extends { user_id: string }>({
           return;
         }
 
-        // The models store never rejects; a failed catalog fetch is recorded as
-        // its error status, which would otherwise read as "no model selected".
+        // The models store never rejects; a failed catalog fetch is recorded as its error status, which would otherwise
+        // read as "no model selected".
         await ensureModelsLoaded();
         if (disposed || !isAccountScopeCurrent(owner)) {
           return;
@@ -130,9 +130,9 @@ export interface RecallRevealContext {
 
 /**
  * Bring the widget a recall just changed to the front of its project, so the caller sees the result: reveal it where
- * the layout has it (see `revealPlacedWidget`), or open it when the layout has none. A floating window stays
- * floating. Nothing moves while the user is typing, or when the project is no longer the one on screen; the
- * notification reports the change either way.
+ * the layout has it (see `revealPlacedWidget`), or open it when the layout has none. A floating window stays floating.
+ * Nothing moves while the user is typing, or when the project is no longer the one on screen; the notification reports
+ * the change either way.
  */
 export const bringRecallWidgetToFront = ({
   commands,

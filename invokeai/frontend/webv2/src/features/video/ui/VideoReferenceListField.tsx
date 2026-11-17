@@ -95,8 +95,8 @@ const ReferenceCard = memo(function ReferenceCard({
   videoLabel,
 }: {
   /**
-   * Pass scalar labels: labels depend on the whole list, but fresh per-card objects would rerender every card on
-   * each trim step.
+   * Pass scalar labels: labels depend on the whole list, but fresh per-card objects would rerender every card on each
+   * trim step.
    */
   audioLabel: number | null;
   collections: ReferenceCollections;
@@ -152,8 +152,8 @@ const ReferenceCard = memo(function ReferenceCard({
     },
     [index, onUpdate, reference]
   );
-  // Present start plus length while storing request bounds. Editing either control marks the anchor window
-  // overridden; derivation from the initial-video cutpoint is only a default.
+  // Present start plus length while storing request bounds. Editing either control marks the anchor window overridden;
+  // derivation from the initial-video cutpoint is only a default.
   const handleStartFrame = useCallback(
     (rawStart: number) => {
       if (reference.kind === 'video') {
@@ -197,8 +197,8 @@ const ReferenceCard = memo(function ReferenceCard({
       ? (sampleFrames / reference.clip.fps).toFixed(1)
       : null;
   // Arm focus repair only if the arrow owns focus. Reordering can disable it; inspect the committed disabled state
-  // because the anchor rule determines the endpoint. Some browsers click without focusing, so never steal focus
-  // from the prompt.
+  // because the anchor rule determines the endpoint. Some browsers click without focusing, so never steal focus from
+  // the prompt.
   const pendingFocusRef = useRef<'down' | 'up' | null>(null);
   const handleMoveUp = useCallback(() => {
     const arrow = moveUpRef.current;
@@ -223,8 +223,8 @@ const ReferenceCard = memo(function ReferenceCard({
 
     const pressed = pending === 'up' ? moveUpRef.current : moveDownRef.current;
     const sibling = pending === 'up' ? moveDownRef.current : moveUpRef.current;
-    // Repair only arrow/body focus: a dropped write can leave this arm until an unrelated render, after the user
-    // has focused elsewhere.
+    // Repair only arrow/body focus: a dropped write can leave this arm until an unrelated render, after the user has
+    // focused elsewhere.
     const isOursToRestore = document.activeElement === document.body || document.activeElement === pressed;
 
     if (isOursToRestore && pressed?.disabled === true && sibling !== null && !sibling.disabled) {
@@ -438,8 +438,8 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
     (image: { height: number; name: string; width: number }) => {
       setErrorMessage(null);
 
-      // Recheck live capacity after async resolution; normalization would otherwise discard an existing reference
-      // on overflow.
+      // Recheck live capacity after async resolution; normalization would otherwise discard an existing reference on
+      // overflow.
       let declined = false;
 
       onChange((current) => {
@@ -580,8 +580,8 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
           return;
         }
 
-        // The board refused the upload (403) or is gone (404): the listing it was chosen from is read again at once,
-        // so an upload that follows the read is routed by it.
+        // The board refused the upload (403) or is gone (404): the listing it was chosen from is read again at once, so
+        // an upload that follows the read is routed by it.
         if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
           refreshBoardDestinations();
         }
@@ -634,8 +634,8 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
   );
   const addPickedVideo = useCallback(
     (item: GalleryVideoItem) => {
-      // Apply picks synchronously so subsequent clicks see current capacity and cannot duplicate or reorder
-      // pending selections.
+      // Apply picks synchronously so subsequent clicks see current capacity and cannot duplicate or reorder pending
+      // selections.
       addVideoItem(item);
     },
     [addVideoItem]
@@ -663,8 +663,8 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
     },
     [onChange]
   );
-  // Key by kind/name occurrence, not index, to preserve focus and video elements across moves. Identical twins
-  // reuse instances with swapped props; independent twin identity would require persisted per-entry IDs.
+  // Key by kind/name occurrence, not index, to preserve focus and video elements across moves. Identical twins reuse
+  // instances with swapped props; independent twin identity would require persisted per-entry IDs.
   const referenceKeys = useMemo(() => {
     const seen = new Map<string, number>();
 

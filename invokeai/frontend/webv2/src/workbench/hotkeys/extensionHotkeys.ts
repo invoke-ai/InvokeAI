@@ -44,8 +44,8 @@ export const toExtensionHotkeyDefinition = (hotkey: WidgetHotkeyContribution): H
     return { ...hotkey, category, scope: { kind: 'focused-region', region: source.region } };
   }
 
-  // A floating window is not a region other widgets share: "while my region is focused" means "while my window is".
-  // It stays a focused-region shortcut, so floating a widget does not change which binding wins a shared key.
+  // A floating window is not a region other widgets share: "while my region is focused" means "while my window is". It
+  // stays a focused-region shortcut, so floating a widget does not change which binding wins a shared key.
   if (scope === 'focused-region' && source?.region === 'floating') {
     return {
       ...hotkey,

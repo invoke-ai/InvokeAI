@@ -10,9 +10,9 @@ export const LAYER_ROW_HEIGHT_PX = 40;
 export const LAYER_CHILD_ROW_HEIGHT_PX = 32;
 export const LAYER_HEADER_HEIGHT_PX = 28;
 /**
- * Horizontal offset per nesting level, in CSS pixels; the drag projection uses the same step. A level's guide line
- * runs under the centre of its rows' 32px leading box, 22px past their edge, so this step leaves the branch into the
- * next level a short straight run after its rounded corner.
+ * Horizontal offset per nesting level, in CSS pixels; the drag projection uses the same step. A level's guide line runs
+ * under the centre of its rows' 32px leading box, 22px past their edge, so this step leaves the branch into the next
+ * level a short straight run after its rounded corner.
  */
 export const LAYER_TREE_INDENT_PX = 28;
 /** Above this many nodes the panel drops thumbnails and drag reordering to stay deterministic. */
@@ -55,10 +55,10 @@ export type PanelRow =
 
 /**
  * Tree guide glyphs, one per nesting column from the outermost in. A row at depth `d` fills columns `0..d-1`:
- * `TREE_GUIDE.pass` where an ancestor's line runs on past it, a space where that ancestor's visible children
- * already ended, then `tee` or `elbow` for the branch from its parent (more visible siblings follow, or none do).
- * Column `d` holds `stem` when the row's own visible children follow it. Stack headers are headings, not
- * parents: top-level rows get no branch.
+ * `TREE_GUIDE.pass` where an ancestor's line runs on past it, a space where that ancestor's visible children already
+ * ended, then `tee` or `elbow` for the branch from its parent (more visible siblings follow, or none do). Column `d`
+ * holds `stem` when the row's own visible children follow it. Stack headers are headings, not parents: top-level rows
+ * get no branch.
  */
 export const TREE_GUIDE = { elbow: '└', pass: '│', stem: '╷', tee: '├' } as const;
 
@@ -105,8 +105,8 @@ export const isHeaderKey = (key: string): boolean => key.startsWith('header:');
 export const stackOfHeaderKey = (key: string): LayerStackKind => key.slice('header:'.length) as LayerStackKind;
 
 /**
- * Flatten stack headers and visible rows for virtualization; forceOpen keeps pending targets reachable inside
- * collapsed stacks.
+ * Flatten stack headers and visible rows for virtualization; forceOpen keeps pending targets reachable inside collapsed
+ * stacks.
  */
 export const flattenPanelRows = (
   stacks: LayerStackRowsByKind,
@@ -196,8 +196,7 @@ const positionsOf = (rows: readonly PanelRow[]): Map<string, number> => {
 };
 
 /**
- * Apply tree keyboard navigation across headers/rows: vertical/Home/End traversal, Right open/enter, Left
- * close/parent.
+ * Apply tree keyboard navigation across headers/rows: vertical/Home/End traversal, Right open/enter, Left close/parent.
  */
 export const navigateTree = (
   rows: readonly PanelRow[],

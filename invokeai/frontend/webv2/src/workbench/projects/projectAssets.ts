@@ -1,6 +1,6 @@
 /**
- * Discover references by name key with separate image/video namespaces. Collection excludes history; remapping
- * includes it.
+ * Discover references by name key with separate image/video namespaces. Collection excludes history; remapping includes
+ * it.
  */
 
 import {
@@ -26,8 +26,8 @@ export const GALLERY_SELECTION_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Strip gallery board IDs while preserving authored workflow board inputs. A dropped auto-add board falls back to
- * the default destination, the project's inbox.
+ * Strip gallery board IDs while preserving authored workflow board inputs. A dropped auto-add board falls back to the
+ * default destination, the project's inbox.
  */
 export const GALLERY_INSTALLATION_KEYS: ReadonlySet<string> = new Set([
   'autoAddBoardId',

@@ -159,9 +159,8 @@ const toSearchParams = (entries: Record<string, boolean | number | string | stri
 };
 
 /**
- * The backend sets exactly one of `cover_image_name` / `cover_video_name`, depending on which
- * kind the board's most recent item is. Both resolve to a static WebP thumbnail, so the cover
- * renders identically either way.
+ * The backend sets exactly one of `cover_image_name` / `cover_video_name`, depending on which kind the board's most
+ * recent item is. Both resolve to a static WebP thumbnail, so the cover renders identically either way.
  */
 const getBoardCoverThumbnailUrl = (board: {
   cover_image_name?: string | null;
@@ -367,8 +366,8 @@ export const listGalleryBoards = async ({
     boardsBodyPromise,
     getGalleryTotal({ boardId: 'none', categories: imageCategories, signal }),
     getGalleryTotal({ boardId: 'none', categories: assetCategories, signal }),
-    // Real boards carry `video_count` in their DTO, but the uncategorized pseudo-board is assembled here, so its
-    // video totals need their own requests. Like a board's, they count only what the Media and Uploads views list.
+    // Real boards carry `video_count` in their DTO, but the uncategorized pseudo-board is assembled here, so its video
+    // totals need their own requests. Like a board's, they count only what the Media and Uploads views list.
     getGalleryVideoTotal({ boardId: 'none', categories: [...imageCategories, ...assetCategories], signal }),
     getGalleryVideoTotal({ boardId: 'none', categories: assetCategories, signal }),
   ]);
@@ -383,8 +382,8 @@ export const listGalleryBoards = async ({
       imageCount: uncategorizedImageCount,
       isInbox: false,
       kind: 'uncategorized',
-      // Synthesized, not stored: `kind` is the durable fact and the UI resolves
-      // the label from it, so no untranslatable name crosses the transport.
+      // Synthesized, not stored: `kind` is the durable fact and the UI resolves the label from it, so no untranslatable
+      // name crosses the transport.
       name: '',
       // A virtual board is nobody's project board.
       projectId: null,
@@ -532,9 +531,8 @@ interface PaletteDateBoardImageNames {
 }
 
 /**
- * Date virtual boards have no offset-paginated DTO endpoint. The query module
- * caches this ordered name list once per semantic filter, then each infinite
- * page hydrates only its own fixed-size slice.
+ * Date virtual boards have no offset-paginated DTO endpoint. The query module caches this ordered name list once per
+ * semantic filter, then each infinite page hydrates only its own fixed-size slice.
  */
 const listPaletteDateBoardImageNames = async ({
   boardId,
@@ -619,8 +617,8 @@ export const listGalleryItemNames = async ({
     order_dir: orderDir,
     search_term: searchTerm.trim() || undefined,
     starred,
-    // The backend defaults to starred-first; the grid orders chronologically
-    // and carries starred items in its own strip.
+    // The backend defaults to starred-first; the grid orders chronologically and carries starred items in its own
+    // strip.
     starred_first: false,
   });
   const body = await apiFetchJson<{ items: GalleryItemRef[]; total_count: number }>(
@@ -851,8 +849,7 @@ export interface GallerySemanticResult {
 type SemanticSearchBody = { results: { image_name: string; kind?: string; score: number }[] };
 
 const toSemanticResults = (body: SemanticSearchBody): GallerySemanticResult[] =>
-  // `image_name` serves both namespaces; only kind `video` selects videos, preserving image fallback for other
-  // values.
+  // `image_name` serves both namespaces; only kind `video` selects videos, preserving image fallback for other values.
   body.results.map((result) => ({
     ref: { kind: result.kind === 'video' ? 'video' : 'image', name: result.image_name },
     score: result.score,
@@ -942,8 +939,8 @@ interface ImageIndexStatusBody {
 }
 
 /**
- * Search requires indexed embeddings and their model, not map projection. model_name distinguishes a missing
- * configured model from a disabled index; an inactive index whose projection is computing is switching models.
+ * Search requires indexed embeddings and their model, not map projection. model_name distinguishes a missing configured
+ * model from a disabled index; an inactive index whose projection is computing is switching models.
  */
 export const fetchImageIndexAvailability = async (signal: AbortSignal): Promise<ImageIndexAvailability> => {
   const body = await apiFetchJson<ImageIndexStatusBody>('/api/v1/image_map/status', { signal });
@@ -970,8 +967,8 @@ export const listSemanticGalleryItemNames = async ({
   query: GallerySemanticQuery;
   signal?: AbortSignal;
 }): Promise<GalleryItemNames> => {
-  // A cluster query is an explicit member list held client-side (in proximity
-  // order from the clicked map point); there is nothing to ask the server.
+  // A cluster query is an explicit member list held client-side (in proximity order from the clicked map point); there
+  // is nothing to ask the server.
   if (query.kind === 'cluster') {
     const items = (getImageCluster(query.clusterId)?.itemKeys ?? [])
       .map(parseGalleryItemKey)
@@ -1073,8 +1070,8 @@ export const imageMakeDurableChanges = (): { is_intermediate: false } => ({
 });
 
 /**
- * Adopt utility results as durable `other` pixels, excluded from both gallery views; durability alone leaves
- * general outputs visible.
+ * Adopt utility results as durable `other` pixels, excluded from both gallery views; durability alone leaves general
+ * outputs visible.
  */
 export const imageMakeCanvasAssetChanges = (): { is_intermediate: false; image_category: 'other' } => ({
   image_category: 'other',
@@ -1082,8 +1079,8 @@ export const imageMakeCanvasAssetChanges = (): { is_intermediate: false; image_c
 });
 
 /**
- * Await the durability PATCH before committing a layer-source swap; failed promotion must not leave a layer
- * referencing collectible pixels.
+ * Await the durability PATCH before committing a layer-source swap; failed promotion must not leave a layer referencing
+ * collectible pixels.
  */
 export const makeImageDurable = async (imageName: string): Promise<void> => {
   await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, {
@@ -1093,8 +1090,8 @@ export const makeImageDurable = async (imageName: string): Promise<void> => {
 };
 
 /**
- * Adopt graph results as durable canvas pixels outside Images; {@link makeImageDurable} instead preserves the
- * current category.
+ * Adopt graph results as durable canvas pixels outside Images; {@link makeImageDurable} instead preserves the current
+ * category.
  */
 export const makeImageCanvasAsset = async (imageName: string): Promise<void> => {
   await apiFetchJson<BackendImageDTO>(`/api/v1/images/i/${encodeURIComponent(imageName)}`, {
@@ -1123,10 +1120,10 @@ export const getGalleryImageMetadata = async (
 };
 
 /**
- * Whether a board a project names still exists: false only when the server answers 404, that there is no such board.
- * A board the caller may no longer read answers 403: it exists, so the project keeps naming it, and access granted
- * again brings it back. A virtual board (Uncategorized, a date, every board) always exists; any other failure is
- * thrown, unanswered.
+ * Whether a board a project names still exists: false only when the server answers 404, that there is no such board. A
+ * board the caller may no longer read answers 403: it exists, so the project keeps naming it, and access granted again
+ * brings it back. A virtual board (Uncategorized, a date, every board) always exists; any other failure is thrown,
+ * unanswered.
  */
 export const galleryBoardExists = async (boardId: string, signal?: AbortSignal): Promise<boolean> => {
   if (getUploadBoardId(boardId) === undefined) {
@@ -1274,8 +1271,8 @@ const emptyGalleryItemOrganizationTransportResult = (): GalleryItemOrganizationT
 /**
  * Sends a name-list mutation in batches the server accepts, one at a time (each name costs the server database work),
  * and merges their answers. A batch failing or the caller aborting after earlier batches succeeded ends the run: those
- * earlier items did change, so they are reported, and this batch's and the unsent batches' names are reported failed.
- * A failure or abort before anything succeeded rejects as a single request would. An account change rejects whatever
+ * earlier items did change, so they are reported, and this batch's and the unsent batches' names are reported failed. A
+ * failure or abort before anything succeeded rejects as a single request would. An account change rejects whatever
  * succeeded: the answers belong to an account no longer signed in.
  */
 const mutateInNameBatches = async (
@@ -1533,8 +1530,7 @@ export const moveGalleryVideoItemsToBoard = async (
           }
           return;
         }
-        // A rejected single-video request is unconfirmed. Other videos may still
-        // return authoritative successes.
+        // A rejected single-video request is unconfirmed. Other videos may still return authoritative successes.
       }
     }
   };
@@ -1652,8 +1648,8 @@ export const uploadGalleryVideo = async (
   const query = toSearchParams({
     board_id: getUploadBoardId(boardId),
     is_intermediate: false,
-    // Uploads are user assets (the Assets view), mirroring `image_category: 'user'` on
-    // image uploads; generated videos save as 'general' (the Media view).
+    // Uploads are user assets (the Assets view), mirroring `image_category: 'user'` on image uploads; generated videos
+    // save as 'general' (the Media view).
     video_category: 'user',
   });
   const body = new FormData();

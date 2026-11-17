@@ -145,8 +145,8 @@ export const useCompareLoupe = ({
   );
 
   /**
-   * Never below fit, never past `MAX_ACTUAL_ZOOM` of the sharper image's own pixels, so a pair of different
-   * resolutions can still be inspected down to the larger one's detail; the other pane goes pixelated first.
+   * Never below fit, never past `MAX_ACTUAL_ZOOM` of the sharper image's own pixels, so a pair of different resolutions
+   * can still be inspected down to the larger one's detail; the other pane goes pixelated first.
    */
   const constrainScale = useCallback((scale: number): number => {
     let maxScale = 0;
@@ -201,8 +201,8 @@ export const useCompareLoupe = ({
     [zoomAroundFraction]
   );
 
-  // One stable set of callbacks per pane index; wheel listeners need manual
-  // attachment (`passive: false`) so ref callbacks with cleanup own them.
+  // One stable set of callbacks per pane index; wheel listeners need manual attachment (`passive: false`) so ref
+  // callbacks with cleanup own them.
   /** Choose the pane containing the pinch midpoint, independent of finger arrival order. */
   const getGesturePane = useCallback((center: PanZoomPoint, fallback: 0 | 1): 0 | 1 => {
     for (const index of [0, 1] as const) {
@@ -468,9 +468,8 @@ export const useCompareLoupe = ({
         pinchRef.current = null;
         const remaining = [...pointers.keys()];
 
-        // Lifting one finger of a three-finger gesture re-pinches on what is
-        // left; lifting to a single finger hands the gesture over to a pan, so
-        // the images keep following that finger without a release and retouch.
+        // Lifting one finger of a three-finger gesture re-pinches on what is left; lifting to a single finger hands the
+        // gesture over to a pan, so the images keep following that finger without a release and retouch.
         if (remaining.length >= 2) {
           beginPinch(pinch.paneIndex, [remaining[0]!, remaining[1]!]);
           return;

@@ -148,8 +148,8 @@ export const getLayoutRegionIssue = (
 
 /**
  * Why a layout base cannot lay these regions out, or null: the layout is built around the global prompt (as submitted,
- * template applied), so regions it can place need one. Readiness asks before anything uploads; the canvas compiler
- * asks again for the regions it actually places.
+ * template applied), so regions it can place need one. Readiness asks before anything uploads; the canvas compiler asks
+ * again for the regions it actually places.
  */
 export const getLayoutPromptRejectionReason = (params: {
   base: string;
@@ -492,9 +492,9 @@ export const addRegionalGuidance = (graph: BackendGraphContract, options: AddReg
 };
 
 /**
- * Omit unsupported content without erasing stored values. Count resolved references; auto-negative requires
- * positive text, and negatives count only at a CFG Scale the base reads them at. Layout bases need a caption, and a
- * text region its visible text.
+ * Omit unsupported content without erasing stored values. Count resolved references; auto-negative requires positive
+ * text, and negatives count only at a CFG Scale the base reads them at. Layout bases need a caption, and a text region
+ * its visible text.
  */
 export const getRegionalGuidanceRejectionReason = (params: {
   layerName: string;

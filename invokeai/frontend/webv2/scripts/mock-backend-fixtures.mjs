@@ -47,8 +47,8 @@ export const assertMockBackendProfileName = (value) => {
 };
 
 /**
- * Cover board-only/shared references, visible/excluded categories, and external references. Reassign existing
- * images without changing the pinned image count.
+ * Cover board-only/shared references, visible/excluded categories, and external references. Reassign existing images
+ * without changing the pinned image count.
  */
 export const PROJECT_FILE_BOARD = Object.freeze({
   /** Generated, on the board, and drawn by the canvas: the overlap case. */
@@ -117,9 +117,9 @@ const createImages = (count) =>
   });
 
 /**
- * Wan text-to-video metadata in the shape the video graph builders record (`core_metadata`), so Preview Details
- * parses rows and the media menu offers recall. The mock catalog serves no Wan main, so the model is a plausible
- * identifier that recall reports as not installed.
+ * Wan text-to-video metadata in the shape the video graph builders record (`core_metadata`), so Preview Details parses
+ * rows and the media menu offers recall. The mock catalog serves no Wan main, so the model is a plausible identifier
+ * that recall reports as not installed.
  */
 const wanT2vMetadata = (positivePrompt, seed) => ({
   cfg_scale: 5,
@@ -500,8 +500,8 @@ const EXTERNAL_MODEL_FIXTURES = [
     name: 'Fixture GPT Image',
     path: 'external://openai/fixture-gpt-image',
     provider_id: 'openai',
-    // A GPT Image model id, so Generate offers OpenAI's quality, background, and input-fidelity options; the
-    // fixture source keeps the record out of the starter catalog and editable in the Model Manager.
+    // A GPT Image model id, so Generate offers OpenAI's quality, background, and input-fidelity options; the fixture
+    // source keeps the record out of the starter catalog and editable in the Model Manager.
     provider_model_id: 'gpt-image-1',
     source: 'external://openai/fixture-gpt-image',
     source_type: 'external',
@@ -600,8 +600,8 @@ const createLocalModels = (count) =>
   });
 
 /**
- * A model record in the shape the list endpoint serves; the seed sets below override only what they need. Main,
- * LoRA and Control LoRA seeds add `trigger_phrases`, which only those configs store.
+ * A model record in the shape the list endpoint serves; the seed sets below override only what they need. Main, LoRA
+ * and Control LoRA seeds add `trigger_phrases`, which only those configs store.
  */
 const seedModel = ({ key, name, ...fields }) => ({
   base: 'any',
@@ -635,8 +635,8 @@ const controlSeed = (name, base, preprocessor, fields = {}) => ({
 
 /**
  * Opt-in model sets for browser checks, added by `POST /__models` so the profiles' fixture counts stay fixed. Each
- * entry is the record as installed plus `probe`: the fields `POST /api/v2/models/i/{key}/reidentify` fills in, as
- * the backend's probe would for a record installed before it recorded them.
+ * entry is the record as installed plus `probe`: the fields `POST /api/v2/models/i/{key}/reidentify` fills in, as the
+ * backend's probe would for a record installed before it recorded them.
  */
 export const MODEL_SEED_SETS = Object.freeze({
   // Anima ControlNet-LLLite adapters: one usable, two from before `cond_in_channels` was recorded.
@@ -699,8 +699,8 @@ export const MODEL_SEED_SETS = Object.freeze({
       }),
     },
   ],
-  // SDXL control models for the control-layer panel: two depth models naming their preprocessor in the legacy and
-  // the node form, a pose model, a Union model, one whose purpose nothing names, and a T2I-Adapter.
+  // SDXL control models for the control-layer panel: two depth models naming their preprocessor in the legacy and the
+  // node form, a pose model, a Union model, one whose purpose nothing names, and a T2I-Adapter.
   'control-sdxl': [
     controlSeed('controlnet-depth-sdxl-1.0', 'sdxl', 'depth_anything_image_processor'),
     controlSeed('controlnet-zoe-depth-sdxl', 'sdxl', 'depth_anything_depth_estimation'),

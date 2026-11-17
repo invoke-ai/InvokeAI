@@ -66,8 +66,8 @@ export interface OverlayFrame {
 export type OverlayScreen = Pick<OverlayState, 'dpr' | 'view' | 'viewportSize'>;
 
 /**
- * Pure projection of engine state into overlay descriptors. Live previews replace committed geometry; stale frames
- * are suppressed. The overlay owns no interaction state.
+ * Pure projection of engine state into overlay descriptors. Live previews replace committed geometry; stale frames are
+ * suppressed. The overlay owns no interaction state.
  */
 export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame => {
   const { getActiveToolId, selection, stores, transformOverrides } = deps;
@@ -86,9 +86,8 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
   };
 
   /**
-   * The selected layer's bounds outline for the move tool. A layer mid-drag
-   * (carrying a live override) wins over the committed selection so the marquee
-   * tracks the preview rather than lagging a frame behind it.
+   * The selected layer's bounds outline for the move tool. A layer mid-drag (carrying a live override) wins over the
+   * committed selection so the marquee tracks the preview rather than lagging a frame behind it.
    */
   const moveOutlineCorners = (doc: CanvasDocumentContractV3): readonly Vec2[] | null => {
     if (getActiveToolId() !== 'move') {
@@ -109,9 +108,8 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
     }
     const float = deps.getFloatingSelection();
     if (float) {
-      // The float frames its own pixels. Its rect and transform are LAYER-LOCAL,
-      // so the resulting geometry is projected out through the layer's matrix to
-      // reach the document space the overlay draws in.
+      // The float frames its own pixels. Its rect and transform are LAYER-LOCAL, so the resulting geometry is projected
+      // out through the layer's matrix to reach the document space the overlay draws in.
       const floatLeaf = lookupDocumentLeaf(doc, float.layerId);
       if (!floatLeaf) {
         return null;
@@ -174,8 +172,8 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
           : null,
         shapePreview: stores.shapePreview.get(),
         stagedRegions: deps.getStagedRegions(),
-        // The passive bbox frame follows the setting, but always renders while
-        // the bbox tool is active so its handles have a frame to attach to.
+        // The passive bbox frame follows the setting, but always renders while the bbox tool is active so its handles
+        // have a frame to attach to.
         showBbox: stores.showBbox.get() || activeTool === 'bbox',
         showGrid: stores.showGrid.get(),
         transformFrame: transformFrame(doc),

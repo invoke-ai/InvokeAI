@@ -12,10 +12,10 @@ const ZOOM_PRESETS = [100, 200, 400] as const;
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 
 /**
- * Expose fitted/actual zoom and keyboard presets in the header; the stage owns wheel, pinch, and double-click
- * gestures. A `full` header shows the magnifier and, only while zoomed, the percent, so the fit readout does not cost
- * the widget title its width; the tooltip and accessible name always carry the percent. A `compact` header (a narrow
- * view, down to 280px) keeps only the readout and chevron.
+ * Expose fitted/actual zoom and keyboard presets in the header; the stage owns wheel, pinch, and double-click gestures.
+ * A `full` header shows the magnifier and, only while zoomed, the percent, so the fit readout does not cost the widget
+ * title its width; the tooltip and accessible name always carry the percent. A `compact` header (a narrow view, down to
+ * 280px) keeps only the readout and chevron.
  */
 export const PreviewZoomMenu = ({
   density = 'full',

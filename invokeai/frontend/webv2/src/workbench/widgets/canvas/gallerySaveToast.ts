@@ -1,6 +1,6 @@
 /**
- * Feedback for a canvas save to the Gallery, shared by the canvas header save and the staged-result save: the board
- * the image went to, named as the Gallery names it, in a toast fenced to the account that saved.
+ * Feedback for a canvas save to the Gallery, shared by the canvas header save and the staged-result save: the board the
+ * image went to, named as the Gallery names it, in a toast fenced to the account that saved.
  */
 import type { QueryClient } from '@tanstack/react-query';
 import type { Project } from '@workbench/projectContracts';

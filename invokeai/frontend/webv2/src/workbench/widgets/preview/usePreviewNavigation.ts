@@ -49,8 +49,8 @@ const EMPTY_PREVIEW_ITEMS: GalleryItem[] = [];
 
 /**
  * The page Preview opens on. An ordinary listing is the stamp's own, so its page holds. A ranked filmstrip follows the
- * Gallery's live ranking, board and media kind; the stamped page is reused only while all three still match what it
- * was stamped in, and otherwise Preview mirrors the Gallery's page.
+ * Gallery's live ranking, board and media kind; the stamped page is reused only while all three still match what it was
+ * stamped in, and otherwise Preview mirrors the Gallery's page.
  */
 export const getPreviewSelectedPage = ({
   galleryPage,
@@ -127,8 +127,8 @@ export const mergePreviewBoardItems = (
 ): GalleryItem[] => {
   const backendKeys = new Set(backendItems.map(toGalleryItemKey));
 
-  // Preserve ranking order and exclude local generations; retain out-of-ranking selection as a cursor anchor so
-  // arrows remain usable.
+  // Preserve ranking order and exclude local generations; retain out-of-ranking selection as a cursor anchor so arrows
+  // remain usable.
   if (isRanked) {
     const anchors = localItems.filter((item) => !backendKeys.has(toGalleryItemKey(item)));
 
@@ -150,9 +150,7 @@ export const mergePreviewBoardItems = (
 const toItemEntries = (items: readonly GalleryItem[]): GalleryNavigationEntry[] =>
   items.map((item) => ({ item, kind: 'item' }));
 
-/**
- * A step's destination: a saved item, a running session, a page not loaded yet (`more`), or nothing (null).
- */
+/** A step's destination: a saved item, a running session, a page not loaded yet (`more`), or nothing (null). */
 export type PreviewNeighbor =
   | { kind: 'item'; item: GalleryItem }
   | { kind: 'more' }
@@ -257,8 +255,8 @@ export const usePreviewNavigation = ({
   // Media kind follows the same rule as the ranking: a ranked filmstrip navigates the Gallery's live kind, a listing
   // the stamp's. Host steps stamp exactly what was navigated (see the reducer's getRankingStampFields).
   const navigationMediaKind = navigationSemanticQuery ? galleryMediaKind : selectedImageQuery.mediaKind;
-  // The grid partitions: its listing is unstarred-only, with the starred
-  // items in the strip above it, unless the starred filter is on.
+  // The grid partitions: its listing is unstarred-only, with the starred items in the strip above it, unless the
+  // starred filter is on.
   const navigationStarredOnly = selectedImageQuery.starredOnly;
   const navigationSemanticKey = gallerySemanticReferenceKey(navigationSemanticQuery);
   const navigationPaginationMode =
@@ -381,9 +379,8 @@ export const usePreviewNavigation = ({
 
     const items = stripData?.items ?? EMPTY_PREVIEW_ITEMS;
 
-    // A starred selection beyond the strip's bound (the grid hides it behind
-    // "Show all") still belongs to the starred partition: it joins the strip
-    // section so the arrows have somewhere to step from.
+    // A starred selection beyond the strip's bound (the grid hides it behind "Show all") still belongs to the starred
+    // partition: it joins the strip section so the arrows have somewhere to step from.
     return selectedItem?.starred && !items.some((item) => toGalleryItemKey(item) === selectedItemKey)
       ? [...items, selectedItem]
       : items;
@@ -462,8 +459,8 @@ export const usePreviewNavigation = ({
     [queueItems]
   );
   const navigationLocalItems = useMemo(() => {
-    // Keep recent results until listings catch up, except in filtered or deep windows where they do not
-    // belong. Those windows merge only in-flight work and selection.
+    // Keep recent results until listings catch up, except in filtered or deep windows where they do not belong. Those
+    // windows merge only in-flight work and selection.
     const hasActiveSearch =
       navigationStarredOnly || selectedImageSearch.text.trim() !== '' || selectedImageSearch.range !== undefined;
 
@@ -520,8 +517,8 @@ export const usePreviewNavigation = ({
       navigationSemanticQuery === null ? previewLocalBoardItems : selectedItem ? [selectedItem] : EMPTY_PREVIEW_ITEMS,
     [navigationSemanticQuery, previewLocalBoardItems, selectedItem]
   );
-  // The listing and the strip refetch independently, so an item just starred
-  // can sit on both sides for a moment; the strip keeps it.
+  // The listing and the strip refetch independently, so an item just starred can sit on both sides for a moment; the
+  // strip keeps it.
   const stripKeys = useMemo(() => new Set(stripItems.map(toGalleryItemKey)), [stripItems]);
   const mergeListingItems = useCallback(
     (backendItems: GalleryItem[]) =>
@@ -648,8 +645,8 @@ export const usePreviewNavigation = ({
       ?.data.items.some((item) => toGalleryItemKey(item) === selectedItemKey);
   const selectedItemNeedsLocation = selectedItemIsMissingFromStampedPage;
   // `boardItems` holds only the pages around the selection; the listing part of the cursor is offset by where that
-  // window starts, and the total adds the listing items outside it. A selection not yet located in its listing sits
-  // in the window only as an anchor, so it has no position until a step locates it.
+  // window starts, and the total adds the listing items outside it. A selection not yet located in its listing sits in
+  // the window only as an anchor, so it has no position until a step locates it.
   const windowStartIndex = boardPageResults[0]?.offset ?? 0;
   const isSelectionInLoadedPage = boardPageResults.some(({ data }) =>
     data.items.some((item) => toGalleryItemKey(item) === selectedItemKey)
@@ -805,8 +802,8 @@ export const usePreviewNavigation = ({
               pageOffset = located.offset;
               total = located.total;
 
-              // At the located page's edge, its neighbor page comes first: a recent or another section could
-              // otherwise sit just past the edge and take the step.
+              // At the located page's edge, its neighbor page comes first: a recent or another section could otherwise
+              // sit just past the edge and take the step.
               const adjacentOffset =
                 direction === 'left'
                   ? located.index === located.offset && located.offset > 0

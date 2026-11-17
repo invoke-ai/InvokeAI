@@ -281,8 +281,8 @@ export interface WidgetManifest {
     body?: WidgetBodySizing;
   };
   /**
-   * Literal dynamic loader for all render slots. The registry owns caching,
-   * failure state, and retry; callers never invoke this directly.
+   * Literal dynamic loader for all render slots. The registry owns caching, failure state, and retry; callers never
+   * invoke this directly.
    */
   load: () => Promise<WidgetImplementation>;
   /** Load always-on runtimes and dialog shells separately so boot does not download their widget views. */

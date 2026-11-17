@@ -1,6 +1,6 @@
 /**
- * Viewport owns pan, zoom, CSS size and device-pixel ratio. CSS mapping is screen=zoom*document+pan; device
- * mapping multiplies by DPR. Shared transforms keep renderer device pixels and pointer CSS coordinates aligned.
+ * Viewport owns pan, zoom, CSS size and device-pixel ratio. CSS mapping is screen=zoom*document+pan; device mapping
+ * multiplies by DPR. Shared transforms keep renderer device pixels and pointer CSS coordinates aligned.
  */
 
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';

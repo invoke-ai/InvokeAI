@@ -543,8 +543,8 @@ export const createWorkbenchPersistenceRuntime = ({
         return;
       }
 
-      // A persisted edit made while loading is newer than the loaded snapshot.
-      // Preserve it and let the first autosave reconcile it with remote storage.
+      // A persisted edit made while loading is newer than the loaded snapshot. Preserve it and let the first autosave
+      // reconcile it with remote storage.
       const wasEditedDuringLoad = aggregate.getPersistedRevision() !== revisionBeforeLoad;
       if (loadedSnapshot && !wasEditedDuringLoad) {
         const isPendingSnapshot = persistence.hasPendingChanges();
@@ -710,8 +710,8 @@ export const createWorkbenchPersistenceRuntime = ({
       await previousExitWait;
       return 'nothing-to-save';
     }
-    // Stage what is already committed at once (behind any save in flight) instead of after the capture, which can
-    // take network round trips; the descendants' unmount flushes land before this first await resumes.
+    // Stage what is already committed at once (behind any save in flight) instead of after the capture, which can take
+    // network round trips; the descendants' unmount flushes land before this first await resumes.
     const [first] = await Promise.all([
       writeLatest(isSuperseded, null),
       beforeCapture ? captureBeforeExit(beforeCapture) : undefined,

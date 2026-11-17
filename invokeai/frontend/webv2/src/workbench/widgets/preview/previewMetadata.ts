@@ -6,8 +6,8 @@ import { getLegacyCanvasReferenceEntries } from '@workbench/image-actions/imageR
 
 /**
  * Parse variable untyped generation metadata tolerantly into display rows; skip unknown or malformed fields while the
- * complete raw record stays available for JSON display. Rows show what was recorded, whether or not recall could
- * apply it to the current panel.
+ * complete raw record stays available for JSON display. Rows show what was recorded, whether or not recall could apply
+ * it to the current panel.
  */
 
 export interface PreviewMetadataEntry {

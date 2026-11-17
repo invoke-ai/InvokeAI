@@ -104,8 +104,8 @@ export interface ImageWithDims {
 }
 
 /**
- * What a widget suggests to Expand Prompt for its model family. Each part applies only until the
- * user picks a model or system prompt themselves.
+ * What a widget suggests to Expand Prompt for its model family. Each part applies only until the user picks a model or
+ * system prompt themselves.
  */
 export interface ExpandPromptSuggestion {
   /** Source of the family's released enhancer, preselected when an installed text LLM has it. */
@@ -180,8 +180,8 @@ export type GenerateReferenceImageConfig =
 export interface GenerateReferenceImage {
   id: string;
   /**
-   * The user's name for the reference: trimmed, at most MAX_REFERENCE_IMAGE_NAME_LENGTH characters, never empty.
-   * Absent shows the positional default ("Reference image 2"). A label only: prompt tags stay positional.
+   * The user's name for the reference: trimmed, at most MAX_REFERENCE_IMAGE_NAME_LENGTH characters, never empty. Absent
+   * shows the positional default ("Reference image 2"). A label only: prompt tags stay positional.
    */
   name?: string;
   isEnabled: boolean;
@@ -291,8 +291,8 @@ export interface GenerateSettings {
   animaInpaintAdapterEnabled: boolean;
   animaInpaintAdapterWeight: number;
   /**
-   * FLUX.3: rewrite the prompt into the detailed caption the model is trained on before every generation. Off skips
-   * the upsampler and keeps the selected model; other families never run it.
+   * FLUX.3: rewrite the prompt into the detailed caption the model is trained on before every generation. Off skips the
+   * upsampler and keeps the selected model; other families never run it.
    */
   flux3PromptUpsamplerEnabled: boolean;
   /** A Text LLM that can read images; required while `flux3PromptUpsamplerEnabled` is on. */
@@ -302,8 +302,8 @@ export interface GenerateSettings {
   /** The low-noise expert is optional; the selected expert can span the full schedule. */
   wanLowNoiseModel: MainModelConfig | null;
   /**
-   * Ideogram 4's unconditional transformer branch. Required with a single-file main, which holds
-   * only the conditional branch; null for a diffusers pipeline, which bundles both.
+   * Ideogram 4's unconditional transformer branch. Required with a single-file main, which holds only the conditional
+   * branch; null for a diffusers pipeline, which bundles both.
    */
   ideogram4UnconditionalModel: MainModelConfig | null;
   /** Optional Diffusers main model used as a component source for split/quantized model families. */

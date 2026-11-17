@@ -1,7 +1,7 @@
 /**
- * Resolve the active engine, flush paint uploads, compose the fresh snapshot, compile, and enqueue. Invalid
- * controls and unsupported hosted-provider regions block. Publish dedupe only after dispatch succeeds and report
- * failures as notices. A per-project in-flight guard prevents overlapping preparation.
+ * Resolve the active engine, flush paint uploads, compose the fresh snapshot, compile, and enqueue. Invalid controls
+ * and unsupported hosted-provider regions block. Publish dedupe only after dispatch succeeds and report failures as
+ * notices. A per-project in-flight guard prevents overlapping preparation.
  */
 
 import type {
@@ -79,9 +79,8 @@ export interface RunCanvasInvocationDeps {
   /** The active project id (also the in-flight guard key). */
   projectId: string;
   /**
-   * The resolved result destination. Drives the compiled output node's
-   * `is_intermediate` flag (`destination === 'canvas'`) and the enqueued
-   * snapshot's destination, so a Canvas source can target the Gallery.
+   * The resolved result destination. Drives the compiled output node's `is_intermediate` flag (`destination ===
+   * 'canvas'`) and the enqueued snapshot's destination, so a Canvas source can target the Gallery.
    */
   destination: ResultDestination;
   /** Capture and upload generation composites, releasing pixel resources on success or failure. */
@@ -318,9 +317,8 @@ const ADJUSTMENT_REFUSAL_NOTICES: Record<'too-large' | 'over-budget' | 'error', 
 };
 
 /**
- * Runs the canvas-invoke pipeline with injected dependencies. Never throws:
- * every failure is turned into a notice, and the in-flight guard is always
- * cleared. Returns when the graph has been dispatched (or the invoke aborted).
+ * Runs the canvas-invoke pipeline with injected dependencies. Never throws: every failure is turned into a notice, and
+ * the in-flight guard is always cleared. Returns when the graph has been dispatched (or the invoke aborted).
  */
 export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promise<void> => {
   const { commands, inFlight, projectId } = deps;
@@ -350,11 +348,10 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
     const controls = createControlLayerCollector(model, deps.models, deps.controlModelMemory);
     const regions = createRegionalGuidanceCollector(model, settings.cfgScale);
     const composed = await deps.composeForGeneration({
-      // Mode-union drift guard: `detectCanvasMode`'s facts/mode types must stay
-      // structurally identical to canvas-operations' `GenerationModeFacts` /
-      // `GenerationCompositeMode` — tsc fails here on drift in either direction.
-      // A hosted model takes the frame's pixels as they are, with no masked tail: bounds that overlap the frame with
-      // nothing visible inside it leave an empty frame, which it generates from text.
+      // Mode-union drift guard: `detectCanvasMode`'s facts/mode types must stay structurally identical to
+      // canvas-operations' `GenerationModeFacts` / `GenerationCompositeMode` — tsc fails here on drift in either
+      // direction. A hosted model takes the frame's pixels as they are, with no masked tail: bounds that overlap the
+      // frame with nothing visible inside it leave an empty frame, which it generates from text.
       detectMode: (facts) =>
         model.type === 'external_image_generator' && !facts.bboxHasContent ? 'txt2img' : detectCanvasMode(facts),
       shouldCompositeControlLayer: controls.shouldComposite,
@@ -468,15 +465,15 @@ export interface PrepareCanvasInvocationArgs {
   prepend?: boolean;
   projectSettings: GenerationProjectSettings;
   /**
-   * The canvas widget's persisted values. The scaling policy is read here, in
-   * the lazily loaded orchestrator, so its reader stays out of the eager submit path.
+   * The canvas widget's persisted values. The scaling policy is read here, in the lazily loaded orchestrator, so its
+   * reader stays out of the eager submit path.
    */
   canvasValues?: Record<string, unknown>;
   strength: number;
   signal?: AbortSignal;
   /**
-   * Persisted compositing settings, already defaulted + clamped by the caller
-   * (`readCanvasCompositingSettings`). Falls back to legacy defaults when omitted.
+   * Persisted compositing settings, already defaulted + clamped by the caller (`readCanvasCompositingSettings`). Falls
+   * back to legacy defaults when omitted.
    */
   compositing?: CanvasCompositingSettings;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;

@@ -38,9 +38,9 @@ const GALLERY_MEDIA_FILTER_OPTIONS = [
 ] as const;
 
 /**
- * The media-type menu's content for `IconRadioMenu`, for surfaces outside the Gallery that edit its per-project
- * media filter (the Image Map header). It lives in this boot-loaded view module, exported through `contracts`, so
- * those lazily loaded widgets add no module of their own.
+ * The media-type menu's content for `IconRadioMenu`, for surfaces outside the Gallery that edit its per-project media
+ * filter (the Image Map header). It lives in this boot-loaded view module, exported through `contracts`, so those
+ * lazily loaded widgets add no module of their own.
  */
 export const getGalleryMediaFilterMenuProps = (
   t: TFunction,
@@ -82,8 +82,8 @@ const UNCATEGORIZED_BOARD: GalleryBoard = {
 
 export interface GalleryStateView {
   /**
-   * A nonzero infinite anchor prevents scrolling to earlier rows; the surface must explain it and provide a return
-   * to the top.
+   * A nonzero infinite anchor prevents scrolling to earlier rows; the surface must explain it and provide a return to
+   * the top.
    */
   anchoredWindowPage: number;
   boards: GalleryBoard[];
@@ -106,8 +106,8 @@ export interface GalleryStateView {
   page: number;
   projectBoardId: string | null;
   /**
-   * The selection's stamped paginated page, when the stamp names the listing
-   * the grid is showing; null otherwise. Reveals follow it across pages.
+   * The selection's stamped paginated page, when the stamp names the listing the grid is showing; null otherwise.
+   * Reveals follow it across pages.
    */
   revealTargetPage: number | null;
   /** Where the current search looks; `board` whenever no search is active. */
@@ -120,8 +120,8 @@ export interface GalleryStateView {
   selectedItemKey: GalleryItemKey | null;
   selectedItemKeys: GalleryItemKey[];
   /**
-   * The selection was made in a starred-only listing, so its members were starred when selected. A selection carried
-   * in from another listing says nothing about the star flags of members no page has loaded.
+   * The selection was made in a starred-only listing, so its members were starred when selected. A selection carried in
+   * from another listing says nothing about the star flags of members no page has loaded.
    */
   selectionStarredOnly: boolean;
   /** Active image-similarity query, rendered as a chip in place of the search text. */
@@ -156,9 +156,9 @@ export const isGallerySearchActive = (values: Record<string, unknown>): boolean 
   (getGallerySemanticSearchText(values) ?? '').trim() !== '';
 
 /**
- * Gallery values with the search scope settled: with no active search the scope returns to 'board', so the next
- * search starts on the selected board whatever cleared the last one (the field, a reveal, a load-time strip). The
- * values themselves when nothing changes. Every write of gallery values goes through it.
+ * Gallery values with the search scope settled: with no active search the scope returns to 'board', so the next search
+ * starts on the selected board whatever cleared the last one (the field, a reveal, a load-time strip). The values
+ * themselves when nothing changes. Every write of gallery values goes through it.
  */
 export const settleGallerySearchScope = (values: Record<string, unknown>): Record<string, unknown> =>
   values.searchScope === 'all' && !isGallerySearchActive(values) ? { ...values, searchScope: 'board' } : values;
@@ -242,9 +242,9 @@ export const getGalleryRawSelectedBoardId = (values: Record<string, unknown>): s
   typeof values.selectedBoardId === 'string' ? values.selectedBoardId : null;
 
 /**
- * The board a selection made in the grid is stamped with: the scope of every board while a search looks there, else
- * the saved choice, else the project board the grid falls back to showing. Stamping Uncategorized instead points
- * Preview at a listing the selection is not in.
+ * The board a selection made in the grid is stamped with: the scope of every board while a search looks there, else the
+ * saved choice, else the project board the grid falls back to showing. Stamping Uncategorized instead points Preview at
+ * a listing the selection is not in.
  */
 export const getGallerySelectionBoardId = (values: Record<string, unknown>): string =>
   getGallerySearchScope(values) === 'all'
@@ -303,8 +303,7 @@ export const getGalleryIntendedDestinationId = (
 };
 
 /**
- * Preserve valid destinations, otherwise use the project board. An empty board list means loading, so defer
- * resolution.
+ * Preserve valid destinations, otherwise use the project board. An empty board list means loading, so defer resolution.
  */
 export const resolveGallerySelectedBoardId = (
   { projectBoardId, selectedBoardId }: { projectBoardId: string | null; selectedBoardId: string | null },
@@ -439,8 +438,8 @@ export const getGalleryAnchoredWindowPage = (values: Record<string, unknown>): n
 };
 
 /**
- * How one Gallery read model stands for the scope its query is keyed on (board, search, view, page). Derived from
- * Query state on every render, never stored.
+ * How one Gallery read model stands for the scope its query is keyed on (board, search, view, page). Derived from Query
+ * state on every render, never stored.
  *
  * - `loading`: nothing for this scope yet, and no failure on record.
  * - `ready` / `empty`: this scope's latest request succeeded, with or without items.
@@ -491,9 +490,9 @@ export const getGalleryReadStatus = (facts: GalleryQueryFacts, itemCount: number
 };
 
 /**
- * The listing for the current scope. `scopedItems` is the backend window merged with recents already filtered to
- * this scope (only the recents while nothing has loaded); they may ride along while the scope loads or has data,
- * but never stand in for a failed load.
+ * The listing for the current scope. `scopedItems` is the backend window merged with recents already filtered to this
+ * scope (only the recents while nothing has loaded); they may ride along while the scope loads or has data, but never
+ * stand in for a failed load.
  */
 export const getGalleryListing = (
   facts: GalleryQueryFacts,
@@ -569,8 +568,8 @@ export const getGalleryStateView = (
       settings,
       starredOnly,
     }) &&
-    // A starred item lives in the strip, never on a page of the unstarred
-    // listing; Preview stamps its starred-list page, which the grid must not follow.
+    // A starred item lives in the strip, never on a page of the unstarred listing; Preview stamps its starred-list
+    // page, which the grid must not follow.
     (starredOnly || selectedItem?.starred !== true)
       ? selectedImageQuery.page
       : null;

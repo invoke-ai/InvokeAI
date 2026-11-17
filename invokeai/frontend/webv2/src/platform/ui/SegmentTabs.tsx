@@ -13,8 +13,9 @@ const TAB_DISABLED_PROPS = { layerStyle: 'disabled' } as const;
 // Inset: the tablist clips at the tabs' own height, so an outside ring would be cut off.
 const TAB_FOCUS_VISIBLE_PROPS = { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' } as const;
 const ENABLED_TAB = '[role="tab"]:not([aria-disabled="true"])';
-// A hovered tab's background replaces its neighbouring dividers, as the shown tab's does. The theme's `_hover` condition
-// already skips `aria-disabled` controls, so a disabled tab gets no hover fill; this raw selector must skip it too.
+// A hovered tab's background replaces its neighbouring dividers, as the shown tab's does. The theme's `_hover`
+// condition already skips `aria-disabled` controls, so a disabled tab gets no hover fill; this raw selector must skip
+// it too.
 const TABLIST_CSS = {
   [`& > ${ENABLED_TAB}:hover + [data-segment-divider], & > [data-segment-divider]:has(+ ${ENABLED_TAB}:hover)`]: {
     opacity: 0,
@@ -55,9 +56,9 @@ export interface SegmentTab<T extends string = string> {
 const isTabEnabled = (tab: HTMLElement): boolean => tab.getAttribute('aria-disabled') !== 'true';
 
 /**
- * Scroll only a scrolling strip, never its ancestors, until `tab` lies wholly inside it and clear of the edge fades. The
- * scroll clamps at either end, where no fade shows. Focus scrolling cannot be relied on: a pointer press does not focus
- * a button in every browser. Physical offsets suit either direction. A strip whose tabs fit is left alone.
+ * Scroll only a scrolling strip, never its ancestors, until `tab` lies wholly inside it and clear of the edge fades.
+ * The scroll clamps at either end, where no fade shows. Focus scrolling cannot be relied on: a pointer press does not
+ * focus a button in every browser. Physical offsets suit either direction. A strip whose tabs fit is left alone.
  */
 const revealInStrip = (tab: HTMLElement): void => {
   const strip = tab.closest<HTMLElement>('[role="tablist"]');
@@ -83,9 +84,9 @@ const revealSelectedTab = (tab: HTMLElement | null): void => {
 };
 
 /**
- * Roving focus for a horizontal tablist: arrows cycle, Home/End jump, all over enabled tabs. A focused disabled tab (the
- * selected one, when it has nothing to show) still steps to its enabled neighbours. A scrolling strip brings the focused
- * tab into view itself, so focus never scrolls the strip's ancestors.
+ * Roving focus for a horizontal tablist: arrows cycle, Home/End jump, all over enabled tabs. A focused disabled tab
+ * (the selected one, when it has nothing to show) still steps to its enabled neighbours. A scrolling strip brings the
+ * focused tab into view itself, so focus never scrolls the strip's ancestors.
  */
 const focusSibling = (event: ReactKeyboardEvent<HTMLElement>, isScrollable: boolean) => {
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') {

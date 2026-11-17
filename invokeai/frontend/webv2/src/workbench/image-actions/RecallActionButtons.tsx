@@ -13,8 +13,8 @@ import {
 import type { ImageRecallCapabilities, ImageRecallKind } from './imageRecall';
 
 /**
- * Share recall labels/icons across metadata and queue details. Unavailable actions stay visible but disabled with
- * the host's reason.
+ * Share recall labels/icons across metadata and queue details. Unavailable actions stay visible but disabled with the
+ * host's reason.
  */
 
 const RECALL_ACTION_ITEMS: {

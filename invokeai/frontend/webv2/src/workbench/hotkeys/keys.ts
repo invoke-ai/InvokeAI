@@ -92,8 +92,8 @@ export const eventToHotkeyString = (event: KeyboardEvent, isMacOs = IS_MAC_OS): 
     modifiers.push('alt');
   }
 
-  // A key is recorded as typed, so the binding keeps its meaning on any layout. Only a chord the matching falls back
-  // to position for (Alt with Cmd, Ctrl or Meta) records a dead key or symbol by its position: there macOS's Option
+  // A key is recorded as typed, so the binding keeps its meaning on any layout. Only a chord the matching falls back to
+  // position for (Alt with Cmd, Ctrl or Meta) records a dead key or symbol by its position: there macOS's Option
   // reports `Dead` or `˜` for N. Option alone keeps the typed character (`alt+å`), as it matches only by character.
   // AltGr typed a character of the layout (`ń`): that character is the binding, as matching refuses position under it.
   const fallsBackToPosition =
@@ -108,9 +108,9 @@ export const eventToHotkeyString = (event: KeyboardEvent, isMacOs = IS_MAC_OS): 
 };
 
 /**
- * Whether a binding may also match its letter or digit by position: an Alt chord with Cmd, Ctrl or Meta, which types
- * no character. macOS's Option still changes the key such a chord reports (`Dead`, `˜`), so `mod+alt+n` would never
- * fire by character. An Alt chord alone keeps to the character, so Option+A still types `å` in a text field.
+ * Whether a binding may also match its letter or digit by position: an Alt chord with Cmd, Ctrl or Meta, which types no
+ * character. macOS's Option still changes the key such a chord reports (`Dead`, `˜`), so `mod+alt+n` would never fire
+ * by character. An Alt chord alone keeps to the character, so Option+A still types `å` in a text field.
  */
 const hasPositionFallback = (parts: readonly string[]): boolean => {
   const key = parts.at(-1) ?? '';
@@ -143,8 +143,8 @@ export const toTinykeysBinding = (hotkey: string): string => {
 /**
  * The checks a press must pass beyond the tinykeys match, for a binding matched by its key's position: the press must
  * have typed no Latin character, so a non-QWERTY layout's letters keep their meaning; and it must not hold AltGr, which
- * some layouts need to type a character at that position (`ń`). Every other match stands as tinykeys made it,
- * including its reading of AltGr as Alt (browsers report AltGr for Ctrl+Alt on those layouts).
+ * some layouts need to type a character at that position (`ń`). Every other match stands as tinykeys made it, including
+ * its reading of AltGr as Alt (browsers report AltGr for Ctrl+Alt on those layouts).
  */
 export const acceptsHotkeyPress = (event: KeyboardEvent, hotkey: string): boolean => {
   const parts = normalizeHotkeyString(hotkey).split('+').filter(Boolean);
@@ -284,9 +284,9 @@ const ACTIVATABLE_CONTROL_SELECTOR = [
 /**
  * Whether a press is the focused control's own: a radio group's or slider's navigation (arrows, Home, End), or the
  * Space or Enter that activates a focused button, link, toggle or tab, all without Ctrl, Meta or Alt. These controls
- * take no typed text, so {@link isEditableHotkeyTarget} lets chords through from them, but a plain shortcut on the
- * same key (Gallery's arrow navigation, the workflow editor's Space for Add node) would prevent the default and freeze
- * or skip the control.
+ * take no typed text, so {@link isEditableHotkeyTarget} lets chords through from them, but a plain shortcut on the same
+ * key (Gallery's arrow navigation, the workflow editor's Space for Add node) would prevent the default and freeze or
+ * skip the control.
  */
 export const isNativeControlKeyPress = (event: KeyboardEvent): boolean =>
   !event.ctrlKey &&

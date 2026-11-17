@@ -267,8 +267,8 @@ export const exportOpenProject = async (
 };
 
 /**
- * An imported project is new to this library, so it starts on a new project's Auto-switch (In progress) unless the
- * file names a mode of its own; a file from before the mode existed would otherwise read as a stored project's Off.
+ * An imported project is new to this library, so it starts on a new project's Auto-switch (In progress) unless the file
+ * names a mode of its own; a file from before the mode existed would otherwise read as a stored project's Off.
  */
 const withImportedViewerAutoSwitch = (settings: unknown): Record<string, unknown> => {
   const record = settings !== null && typeof settings === 'object' ? (settings as Record<string, unknown>) : {};
@@ -324,9 +324,8 @@ export const importProjectFile = async (
     throw new InvkFormatError('damaged', 'The project document will not rehydrate.');
   }
 
-  // An imported archive never inherits library write targets from the ids its workflows carry.
-  // Lazy like the other document modules here: this file is shared with the Launchpad, which never loads the
-  // workflow core eagerly.
+  // An imported archive never inherits library write targets from the ids its workflows carry. Lazy like the other
+  // document modules here: this file is shared with the Launchpad, which never loads the workflow core eagerly.
   const { stripProjectWorkflowSources } = await import('@workbench/projectWorkflows');
   const project = { ...loaded.project, workflows: stripProjectWorkflowSources(loaded.project.workflows) };
 
@@ -350,8 +349,8 @@ export const importProjectFile = async (
   assertAccountScopeCurrent(owner);
 
   const archiveBoards = archive?.boardSnapshot?.boards ?? [];
-  // Made before anything is staged: every staging board joins it as it is created, so a restore abandoned at any
-  // point can delete them all.
+  // Made before anything is staged: every staging board joins it as it is created, so a restore abandoned at any point
+  // can delete them all.
   const ledger = restoreMedia.createRestoredMediaLedger([]);
   let didCreateProject = false;
   let didAttemptProjectCreate = false;

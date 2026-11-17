@@ -25,8 +25,7 @@ export interface HoverPreview {
 }
 
 /**
- * Resolve hovered cluster identity from current points; live reclustering may renumber ids under a stationary
- * pointer.
+ * Resolve hovered cluster identity from current points; live reclustering may renumber ids under a stationary pointer.
  */
 export interface HoverCluster {
   /** DBSCAN cluster of the hovered point; -1 means unclustered noise. */
@@ -49,8 +48,8 @@ const HoverTagsRow = ({ prefix, tags }: { prefix: string; tags: string[] }) => (
 );
 
 /**
- * Measure asynchronous hover-card content invisibly before cursor-relative placement and viewport flipping. Key by
- * item for clean state and label video thumbnails explicitly.
+ * Measure asynchronous hover-card content invisibly before cursor-relative placement and viewport flipping. Key by item
+ * for clean state and label video thumbnails explicitly.
  */
 export const MapHoverCard = ({
   preview,
@@ -67,8 +66,7 @@ export const MapHoverCard = ({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
-  // Fetch tags lazily by stable item key and use session caching; DTO refresh identity must not retrigger
-  // requests.
+  // Fetch tags lazily by stable item key and use session caching; DTO refresh identity must not retrigger requests.
   const item = parseGalleryItemKey(preview.key);
 
   useEffect(() => {

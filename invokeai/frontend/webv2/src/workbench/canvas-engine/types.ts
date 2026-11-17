@@ -15,9 +15,8 @@ export interface Rect {
 }
 
 /**
- * A raster surface placed in some coordinate space: the surface holds pixels for
- * `rect` (its bounds in that space), so surface pixel `(sx, sy)` maps to
- * `(rect.x + sx, rect.y + sy)`. Used for content-sized layer caches (layer-local
+ * A raster surface placed in some coordinate space: the surface holds pixels for `rect` (its bounds in that space), so
+ * surface pixel `(sx, sy)` maps to `(rect.x + sx, rect.y + sy)`. Used for content-sized layer caches (layer-local
  * space) and the bounded selection mask (document space).
  */
 export interface PlacedSurface {

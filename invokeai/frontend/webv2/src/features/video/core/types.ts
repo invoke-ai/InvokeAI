@@ -39,8 +39,8 @@ export interface VideoSourceClip extends VideoClipRef {
 export type VideoConditioningRole = 'audio' | 'video';
 
 /**
- * A clip conditioning the opposite modality. One slot, because LTX-2 holds one modality clean and samples the
- * other, so a clip can only be given in one role at a time.
+ * A clip conditioning the opposite modality. One slot, because LTX-2 holds one modality clean and samples the other, so
+ * a clip can only be given in one role at a time.
  */
 export interface VideoConditioningClip {
   /** Whole-clip and untrimmed: the conditioning nodes consume the whole recording. */
@@ -68,8 +68,8 @@ export type VideoReferenceItem =
        */
       fromSourceVideo?: boolean;
       /**
-       * Panel-only anchor override disables cutpoint/frame-count re-derivation after manual trim edits.
-       * Clear/reset source removes it; meaningful only with fromSourceVideo.
+       * Panel-only anchor override disables cutpoint/frame-count re-derivation after manual trim edits. Clear/reset
+       * source removes it; meaningful only with fromSourceVideo.
        */
       trimOverridden?: boolean;
       /**
@@ -101,8 +101,7 @@ export interface VideoSettings extends DynamicPromptsSettings {
   /** Image-to-video conditioning. Mutually exclusive with `sourceVideo`. */
   firstFrameImage: ImageWithDims | null;
   /**
-   * Last frame supplies interpolation's endpoint or an extension destination, paired with first frame or source
-   * video.
+   * Last frame supplies interpolation's endpoint or an extension destination, paired with first frame or source video.
    */
   lastFrameImage: ImageWithDims | null;
   /** Source excludes first frame; FL2VA uses extend mode while Ref2VA appends using a linked tail reference. */
@@ -120,8 +119,8 @@ export interface VideoSettings extends DynamicPromptsSettings {
   /** Guidance for the low-noise half of a Wan A14B schedule; null reuses `cfgScale`. */
   cfgScaleLowNoise: number | null;
   /**
-   * LTX-2 guides audio separately from video and far harder (7 against 3). Null on a family with one guidance
-   * scale, like `cfgScaleLowNoise` outside Wan A14B.
+   * LTX-2 guides audio separately from video and far harder (7 against 3). Null on a family with one guidance scale,
+   * like `cfgScaleLowNoise` outside Wan A14B.
    */
   audioCfgScale: number | null;
   /** LTX-2 spatio-temporal guidance; 0 turns it off and saves a forward per step. Null on families without it. */
@@ -129,20 +128,19 @@ export interface VideoSettings extends DynamicPromptsSettings {
   /** LTX-2 modality-isolation guidance; 1 turns it off. Null on families without it. */
   modalityScale: number | null;
   /**
-   * Acceleration patches visible sampling settings and LoRAs; this flag records intent rather than hidden graph
-   * state.
+   * Acceleration patches visible sampling settings and LoRAs; this flag records intent rather than hidden graph state.
    */
   /**
-   * Frames of the source an LTX-2 continuation opens with, held clean so the model reads the clip's
-   * motion rather than just its last still. On the VAE's 8k + 1 grid, and it is spent twice over:
-   * the generation reproduces these frames, and the join then crossfades exactly them out of both
-   * halves — so raising it costs new material one frame for one against a fixed Frames budget.
+   * Frames of the source an LTX-2 continuation opens with, held clean so the model reads the clip's motion rather than
+   * just its last still. On the VAE's 8k + 1 grid, and it is spent twice over: the generation reproduces these frames,
+   * and the join then crossfades exactly them out of both halves — so raising it costs new material one frame for one
+   * against a fixed Frames budget.
    */
   ltx2ExtendContextFrames: number;
   acceleratorEnabled: boolean;
   /**
-   * Track exactly the toggle-added LoRA keys for removal; never remove matching user-owned entries, and clear
-   * enabled intent if they disappear.
+   * Track exactly the toggle-added LoRA keys for removal; never remove matching user-owned entries, and clear enabled
+   * intent if they disappear.
    */
   acceleratorLoraKeys: string[];
   seed: number;
@@ -163,26 +161,21 @@ export interface VideoSettings extends DynamicPromptsSettings {
   h3TransformerModel: MainModelConfig | null;
   /** Optional single-file MiniMax H3 Qwen3-VL text-encoder override. */
   h3TextEncoderModel: ModelIdentifierConfig | null;
-  /**
-   * LTX-2's Gemma-4 text encoder. Required, not an override: no LTX-2 main carries text-encoder weights.
-   */
+  /** LTX-2's Gemma-4 text encoder. Required, not an override: no LTX-2 main carries text-encoder weights. */
   ltx2TextEncoderModel: ModelIdentifierConfig | null;
-  /**
-   * LTX-2's duration head. Optional: without it the run uses the frame count the panel holds.
-   */
+  /** LTX-2's duration head. Optional: without it the run uses the frame count the panel holds. */
   ltx2DurationHeadModel: ModelIdentifierConfig | null;
   /**
    * Let the duration head choose the clip's length instead of the Frames control.
    *
-   * Healed against the head only: a stored `true` whose model is gone becomes `false`. It is
-   * deliberately NOT healed against the mode, which is transient -- dropping in a source clip and
-   * taking it out again would otherwise silently lose the setting. `isAutoDurationActive` is what
-   * decides whether it applies to a given run.
+   * Healed against the head only: a stored `true` whose model is gone becomes `false`. It is deliberately NOT healed
+   * against the mode, which is transient -- dropping in a source clip and taking it out again would otherwise silently
+   * lose the setting. `isAutoDurationActive` is what decides whether it applies to a given run.
    */
   autoDuration: boolean;
   /**
-   * Hybrid loads FL2VA base weights and overlays selected Ref2VA AdaLN from h3HybridStartBlock onward while
-   * retaining reference conditioning.
+   * Hybrid loads FL2VA base weights and overlays selected Ref2VA AdaLN from h3HybridStartBlock onward while retaining
+   * reference conditioning.
    */
   h3HybridBaseModel: MainModelConfig | null;
   /** First transformer block (0-49) whose AdaLN projection stays Ref2VA's under the hybrid. */

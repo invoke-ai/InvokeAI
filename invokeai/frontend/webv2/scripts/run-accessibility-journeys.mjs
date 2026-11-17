@@ -156,8 +156,8 @@ const centerViewTrigger = (page, label) => page.getByRole('button', { exact: tru
 
 /** Preset names need not match their center views; pass the expected view explicitly. */
 const selectLayoutPreset = async (page, preset, centerView) => {
-  // Match the full preset name plus optional drift marker within the strip; custom presets and Workflow tabs can
-  // share prefixes.
+  // Match the full preset name plus optional drift marker within the strip; custom presets and Workflow tabs can share
+  // prefixes.
   const name = new RegExp(`^${preset}(, unsaved changes)?$`);
   const strip = presetStrip(page);
   const selected = strip.getByRole('tab', { name, selected: true });
@@ -261,8 +261,8 @@ const surfaces = [
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Edit', 'Canvas');
       await waitForRenderedMedia(page, { canvas: true });
-      // The representative main model is SD 1.x; the seeded control models are SDXL, so switch to an SDXL main
-      // (Fixture Model 006) through the Generate panel's model picker.
+      // The representative main model is SD 1.x; the seeded control models are SDXL, so switch to an SDXL main (Fixture
+      // Model 006) through the Generate panel's model picker.
       await page.getByText('Fixture Model 001', { exact: true }).click();
       const search = page.getByRole('combobox', { name: /^Search / });
       await search.fill('Fixture Model 006');
@@ -1092,16 +1092,15 @@ const runVideoPreviewJourney = async (browser) => {
 };
 
 /**
- * Verify retained scroll and canvas state across layout switches; mounted-node identity alone cannot detect state
- * loss.
+ * Verify retained scroll and canvas state across layout switches; mounted-node identity alone cannot detect state loss.
  */
 const runKeepAliveStateJourney = async (browser) => {
   const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
   const id = 'workbench-keep-alive-state';
 
   /**
-   * Capture both axes of actual scroll containers; clipped text is not scroll state, and filmstrips may overflow
-   * only horizontally.
+   * Capture both axes of actual scroll containers; clipped text is not scroll state, and filmstrips may overflow only
+   * horizontally.
    */
   const SCROLLER_QUERY = `(element) => [...element.querySelectorAll('*')].filter((node) => {
     const style = getComputedStyle(node);
@@ -1238,8 +1237,7 @@ const runKeepAliveStateJourney = async (browser) => {
 };
 
 /**
- * Exercise pane switching by pointer and keyboard, tool-dependent Properties, and accessibility of non-default
- * panes.
+ * Exercise pane switching by pointer and keyboard, tool-dependent Properties, and accessibility of non-default panes.
  */
 const LAYERS_PANEL_SCOPE = { include: ['[data-hotkey-widget-type-id="layers"]'] };
 
@@ -1299,8 +1297,8 @@ const runLayersPanesJourney = async (browser) => {
 };
 
 /**
- * Floating a rail panel that is also the center's only view: the rail keeps a marker, the center says where the
- * view went, and removing or docking the window gives the center its view — and keyboard focus — back.
+ * Floating a rail panel that is also the center's only view: the rail keeps a marker, the center says where the view
+ * went, and removing or docking the window gives the center its view — and keyboard focus — back.
  */
 const runFloatingWindowJourney = async (browser) => {
   const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
@@ -1399,8 +1397,8 @@ const runFloatingWindowJourney = async (browser) => {
     await waitForFocusedRegion('center');
     assert.equal(await focusedRegion(), 'center');
 
-    // Docking brought Preview to the front of the right panel. Float it again: docking from the window's own
-    // control returns focus to that panel.
+    // Docking brought Preview to the front of the right panel. Float it again: docking from the window's own control
+    // returns focus to that panel.
     await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
     await floatingWindow.waitFor();
     await waitForActiveWindow();

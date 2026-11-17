@@ -40,8 +40,8 @@ import { isInvocationNode } from './types';
 import { hasAnyCycle } from './validation';
 
 /**
- * Compile documents to immutable queue GraphContract with connector resolution. Batch and generator nodes never
- * reach the backend graph: the batch planner turns them into queue batch groups instead.
+ * Compile documents to immutable queue GraphContract with connector resolution. Batch and generator nodes never reach
+ * the backend graph: the batch planner turns them into queue batch groups instead.
  */
 
 export const isExecutableInvocationType = (type: string): boolean =>
@@ -67,8 +67,8 @@ const getNodeInputTemplates = (
 
 export interface CompileProjectGraphOptions {
   /**
-   * The board Auto (and an unset board field) resolves to; `none` or null leaves the node unboarded, which the
-   * backend saves as Uncategorized.
+   * The board Auto (and an unset board field) resolves to; `none` or null leaves the node unboarded, which the backend
+   * saves as Uncategorized.
    */
   autoBoardId?: string | null;
   /**
@@ -423,8 +423,8 @@ export const compileProjectGraph = (
       type: edge.type,
     });
 
-    // A connected input always wins over a stale direct value; sending both
-    // would let pydantic reject the node on the ignored direct value.
+    // A connected input always wins over a stale direct value; sending both would let pydantic reject the node on the
+    // ignored direct value.
     const targetNode = backendGraph.nodes[edge.destination.node_id];
 
     if (targetNode) {
@@ -468,15 +468,15 @@ export const compileProjectGraph = (
 };
 
 /**
- * Seed modes require a template-declared scalar seed with the full range. Keep seed arithmetic here so shared
- * field utilities remain lightweight.
+ * Seed modes require a template-declared scalar seed with the full range. Keep seed arithmetic here so shared field
+ * utilities remain lightweight.
  */
 export const isSeedInputField = (template: FieldInputTemplate): boolean =>
   template.name === 'seed' &&
   template.type.name === 'IntegerField' &&
   template.type.cardinality === 'SINGLE' &&
-  // The modes walk and wrap over 0…SEED_MAX in steps of one, so the template has to
-  // accept every value on that walk; a tighter range or step keeps its plain control.
+  // The modes walk and wrap over 0…SEED_MAX in steps of one, so the template has to accept every value on that walk; a
+  // tighter range or step keeps its plain control.
   template.maximum === SEED_MAX &&
   ((template.minimum ?? null) === null || (template.minimum ?? 0) <= 0) &&
   (template.exclusiveMinimum ?? null) === null &&
@@ -503,8 +503,8 @@ export interface WorkflowSeedPlan {
 }
 
 /**
- * Choose seed starts once per submission and expand runs deterministically at send time. Random preserves the
- * entered seed; stepping reports the next authored value.
+ * Choose seed starts once per submission and expand runs deterministically at send time. Random preserves the entered
+ * seed; stepping reports the next authored value.
  */
 export const planWorkflowSeeds = (
   document: ProjectGraphState,
@@ -615,8 +615,8 @@ export interface WorkflowSubmissionPlanOptions extends CompileProjectGraphOption
 }
 
 /**
- * Compiles the document with every planned first seed in place and reports the seeds that vary. Returns null when
- * the batch plan is not ready: an unresolved generator, a batch reason, or more sessions than the queue accepts.
+ * Compiles the document with every planned first seed in place and reports the seeds that vary. Returns null when the
+ * batch plan is not ready: an unresolved generator, a batch reason, or more sessions than the queue accepts.
  */
 export const planWorkflowSubmission = (
   document: ProjectGraphState,

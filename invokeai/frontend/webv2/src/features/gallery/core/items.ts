@@ -124,10 +124,7 @@ export const assertNeverGalleryItem = (item: never): never => {
 
 const compareSqliteBinaryText = (a: string, b: string): number => (a === b ? 0 : a < b ? -1 : 1);
 
-/**
- * Normalize SQLite and ISO timestamps before comparing; their space/T separators otherwise misorder same-day
- * items.
- */
+/** Normalize SQLite and ISO timestamps before comparing; their space/T separators otherwise misorder same-day items. */
 export const compareCreatedAt = (a: string, b: string): number =>
   compareSqliteBinaryText(normalizeServerTimestamp(a), normalizeServerTimestamp(b));
 
@@ -222,8 +219,8 @@ export const formatGalleryVideoDuration = (durationSeconds: number): string => {
 /** Share upload acceptance and classification here to prevent drift without adding an initial bundle request. */
 
 /**
- * Audio uploads become waveform videos. Video/audio MIME wildcards mirror server checks; extensions cover unknown
- * MIME types. Images deliberately offer only round-trippable formats.
+ * Audio uploads become waveform videos. Video/audio MIME wildcards mirror server checks; extensions cover unknown MIME
+ * types. Images deliberately offer only round-trippable formats.
  */
 const GALLERY_UPLOAD_FORMATS: Record<GalleryItemKind, { extensions: readonly string[]; mimes: readonly string[] }> = {
   image: {
@@ -260,14 +257,13 @@ const GALLERY_UPLOAD_FORMATS: Record<GalleryItemKind, { extensions: readonly str
 };
 
 /**
- * Keep top-level declarations tree-shakeable; scanning the small format table avoids retaining this module's
- * barrels.
+ * Keep top-level declarations tree-shakeable; scanning the small format table avoids retaining this module's barrels.
  */
 const GALLERY_UPLOAD_KINDS = ['image', 'video'] as const;
 
 /**
- * The file input `accept` list for the given kinds. Advisory only — every browser offers an
- * "All files" escape hatch, so callers still classify what comes back.
+ * The file input `accept` list for the given kinds. Advisory only — every browser offers an "All files" escape hatch,
+ * so callers still classify what comes back.
  */
 export const getGalleryUploadAccept = (kinds: readonly GalleryItemKind[]): string =>
   kinds
@@ -275,15 +271,14 @@ export const getGalleryUploadAccept = (kinds: readonly GalleryItemKind[]): strin
     .join(',');
 
 /**
- * Which upload route a picked file belongs to, or null when no route takes it. An exact MIME
- * match wins over a wildcard, and both win over the filename, so a file the OS typed is never
- * routed by its extension.
+ * Which upload route a picked file belongs to, or null when no route takes it. An exact MIME match wins over a
+ * wildcard, and both win over the filename, so a file the OS typed is never routed by its extension.
  */
 export const classifyGalleryUpload = (file: Pick<File, 'name' | 'type'>): { kind: GalleryItemKind } | null => {
   const mimeType = file.type.toLowerCase();
 
-  // The legacy alias some Windows tools emit; the image route accepts it, but no picker
-  // needs to advertise it, so it is classified without being offered.
+  // The legacy alias some Windows tools emit; the image route accepts it, but no picker needs to advertise it, so it is
+  // classified without being offered.
   if (mimeType === 'image/jpg') {
     return { kind: 'image' };
   }
@@ -316,8 +311,8 @@ export const classifyGalleryUpload = (file: Pick<File, 'name' | 'type'>): { kind
 export const DATE_BOARD_ID_PREFIX = 'by_date:';
 
 /**
- * The listing scope of every board the caller may read plus their Uncategorized items, as the gallery endpoints take
- * it for `board_id`. A scope, not a board: nothing is ever stored on it.
+ * The listing scope of every board the caller may read plus their Uncategorized items, as the gallery endpoints take it
+ * for `board_id`. A scope, not a board: nothing is ever stored on it.
  */
 export const ALL_READABLE_BOARDS_ID = 'all';
 

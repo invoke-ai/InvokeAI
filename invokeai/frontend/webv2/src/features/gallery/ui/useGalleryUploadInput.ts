@@ -7,8 +7,8 @@ const UPLOAD_INPUT_STYLE = { display: 'none' } as const;
 /**
  * The hidden-input picker every gallery upload trigger shares: change extracts files, resets the input (so re-picking
  * the same file fires), and forwards. The default `accept` is computed per call, not at module scope: this module is
- * bundled in a lazy chunk, and a module-scope call into a core bundled elsewhere runs before that core has
- * initialised whenever the chunks come to import each other.
+ * bundled in a lazy chunk, and a module-scope call into a core bundled elsewhere runs before that core has initialised
+ * whenever the chunks come to import each other.
  */
 export const useGalleryUploadInput = (
   onUploadFiles: (files: File[]) => Promise<unknown> | void,

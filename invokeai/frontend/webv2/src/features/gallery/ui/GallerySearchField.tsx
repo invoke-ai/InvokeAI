@@ -17,9 +17,8 @@ export interface GallerySearchSegment {
 }
 
 /**
- * Splits the value into plain runs and token chips. Concatenating the segments
- * must reproduce the value exactly — a dropped character shifts every glyph
- * after it out of register with the input behind.
+ * Splits the value into plain runs and token chips. Concatenating the segments must reproduce the value exactly — a
+ * dropped character shifts every glyph after it out of register with the input behind.
  */
 export const getGallerySearchSegments = (value: string, parse: DateTokenParse): GallerySearchSegment[] => {
   const invalidRaw = new Set(parse.invalidTokens.map((token) => `${token.key}:${token.raw}`.toLowerCase()));
@@ -64,8 +63,8 @@ const MIRROR_CHIP_CSS = {
 } as const;
 
 /**
- * Share a zero-padded cell to align date chips with transparent input text. Semantic descriptions remain plain
- * text with persistent mode tint.
+ * Share a zero-padded cell to align date chips with transparent input text. Semantic descriptions remain plain text
+ * with persistent mode tint.
  */
 export const GallerySearchField = ({
   ariaLabel,

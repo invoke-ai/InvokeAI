@@ -20,9 +20,9 @@ import { useTranslation } from 'react-i18next';
 import { findProjectCopiesOf } from './projectWorkflowEntries';
 
 /**
- * Opening a template always lands in the project's own collection. The first copy is added directly; once the
- * project holds one, the caller asks whether to open a copy, add another, or replace one with the library version.
- * Overlapping loads are dropped; a queued second load would add a second copy.
+ * Opening a template always lands in the project's own collection. The first copy is added directly; once the project
+ * holds one, the caller asks whether to open a copy, add another, or replace one with the library version. Overlapping
+ * loads are dropped; a queued second load would add a second copy.
  */
 
 export type WorkflowLoadPhase = 'applying' | 'fetching' | 'idle';

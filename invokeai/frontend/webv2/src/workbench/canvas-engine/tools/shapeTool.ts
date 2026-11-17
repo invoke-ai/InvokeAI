@@ -1,19 +1,19 @@
 /**
  * Shapes use box drags, polygon clicks or closed freehand. Place on = selected layer draws into a selected paint layer
- * or mask (as opaque mask coverage); any other selection, or Place on = new layer, adds a parametric shape layer.
- * Shift squares a box and Alt grows it from the press point, both read live on every move and the release, as the
- * marquee does; polygon and freehand ignore them. The platform's mod key (⌘ on macOS, where Ctrl-click opens the
- * context menu; Ctrl elsewhere) cuts the shape's opaque footprint out of the selected paint layer or mask instead,
- * whatever Place on says, and never adds a layer: the release decides for drags and traces, the closing press for a
- * click-closed polygon; Enter always draws. Pixel commits clip to the selection and bbox. Hidden, locked or loading
- * targets refuse with a notice (a cutout also refuses a transparency lock or a selection it cannot cut), at the
- * press when the press already knows, so nothing is drawn in vain; a refused polygon close, by click or Enter, keeps
- * its vertices. A new layer the document refuses (busy, not ready, over budget) is reported too.
- * Commits wait for the gesture to end, so a new layer is never refused mid-gesture: a drag or trace commits on
- * release, a polygon on Enter or on the release of the press that closes it. Escape (through the engine ladder) or a
- * cancelled press drops the session. A box or freehand gesture bound for the selected layer's pixels tells the engine
- * so as soon as its modifiers decide it, so a mask it edits shows above a staged preview; polygons never do. Previews
- * and cancellation do not dispatch, and a nonzero shape produces one structural or stroke commit.
+ * or mask (as opaque mask coverage); any other selection, or Place on = new layer, adds a parametric shape layer. Shift
+ * squares a box and Alt grows it from the press point, both read live on every move and the release, as the marquee
+ * does; polygon and freehand ignore them. The platform's mod key (⌘ on macOS, where Ctrl-click opens the context menu;
+ * Ctrl elsewhere) cuts the shape's opaque footprint out of the selected paint layer or mask instead, whatever Place on
+ * says, and never adds a layer: the release decides for drags and traces, the closing press for a click-closed polygon;
+ * Enter always draws. Pixel commits clip to the selection and bbox. Hidden, locked or loading targets refuse with a
+ * notice (a cutout also refuses a transparency lock or a selection it cannot cut), at the press when the press already
+ * knows, so nothing is drawn in vain; a refused polygon close, by click or Enter, keeps its vertices. A new layer the
+ * document refuses (busy, not ready, over budget) is reported too. Commits wait for the gesture to end, so a new layer
+ * is never refused mid-gesture: a drag or trace commits on release, a polygon on Enter or on the release of the press
+ * that closes it. Escape (through the engine ladder) or a cancelled press drops the session. A box or freehand gesture
+ * bound for the selected layer's pixels tells the engine so as soon as its modifiers decide it, so a mask it edits
+ * shows above a staged preview; polygons never do. Previews and cancellation do not dispatch, and a nonzero shape
+ * produces one structural or stroke commit.
  */
 
 import type { CanvasLayerEditRefusal, CanvasNoTargetRefusal } from '@workbench/canvas-engine/capabilities';
@@ -105,8 +105,8 @@ interface PlacedShape {
 }
 
 /**
- * A polygon source for document-space vertices: the extent is the vertex
- * bounds, and the stored points are relative to that box's origin.
+ * A polygon source for document-space vertices: the extent is the vertex bounds, and the stored points are relative to
+ * that box's origin.
  */
 export const polygonShapeFrom = (
   vertices: readonly Vec2[],
@@ -157,9 +157,9 @@ const sessionFitsKind = (session: Session, kind: ShapeToolOptions['kind']): bool
       : session.kind === 'drag';
 
 /**
- * Where a shape finished in `mode` would go now. A cutout needs a selected paint layer or mask; a drawn shape takes
- * one only when Place on asks for it. `loading: 'request'` also refuses a target whose durable pixels are not cached
- * yet (drawing then would lose them) and asks for them; `'skip'` predicts without side effects, for the cursor.
+ * Where a shape finished in `mode` would go now. A cutout needs a selected paint layer or mask; a drawn shape takes one
+ * only when Place on asks for it. `loading: 'request'` also refuses a target whose durable pixels are not cached yet
+ * (drawing then would lose them) and asks for them; `'skip'` predicts without side effects, for the cursor.
  */
 const resolveTarget = (ctx: ToolContext, mode: ShapeMode, loading: 'request' | 'skip'): ShapeTarget => {
   const doc = ctx.getDocument();
@@ -314,8 +314,8 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
       sy = dirtyRect.y - entry.rect.y;
       beforeImageData = surfaceCtx.getImageData(sx, sy, dirtyRect.width, dirtyRect.height);
 
-      // Draw into dirty-rect-local scratch so clipping and transparency lock apply in one composite; map through
-      // layer inverse then scratch offset.
+      // Draw into dirty-rect-local scratch so clipping and transparency lock apply in one composite; map through layer
+      // inverse then scratch offset.
       const scratch = ctx.backend.createSurface(dirtyRect.width, dirtyRect.height);
       const draw = scratch.ctx;
       const { rect } = placed;
@@ -329,8 +329,8 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
         draw.drawImage(clipMask.surface.canvas, clipMask.rect.x, clipMask.rect.y);
       }
       if (clipRect && (toLocal.b !== 0 || toLocal.c !== 0)) {
-        // The dirty-rect clamp only bounds the AABB on a rotated/sheared layer;
-        // keep exactly the pixels inside the document-space rect.
+        // The dirty-rect clamp only bounds the AABB on a rotated/sheared layer; keep exactly the pixels inside the
+        // document-space rect.
         draw.fillStyle = '#000';
         draw.beginPath();
         draw.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);

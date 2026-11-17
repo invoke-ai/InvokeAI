@@ -105,8 +105,8 @@ const getFirstModelByName = (models: readonly ModelConfig[]): ModelConfig | null
   );
 
 /**
- * The picked model when it is still installed, else the suggested one, else the first listed. A pick is saved
- * to the surface when it keeps one, and only when it differs from what is saved.
+ * The picked model when it is still installed, else the suggested one, else the first listed. A pick is saved to the
+ * surface when it keeps one, and only when it differs from what is saved.
  */
 const usePromptModelPick = ({
   candidates,
@@ -469,10 +469,10 @@ const HELD_RESULT_PREVIEW_LENGTH = 280;
 
 /**
  * One Expand or Image to Prompt request at a time; it keeps running when its popover closes. Its result replaces the
- * prompt only while the prompt reads as it did when the request started: as an edit (Ctrl+Z) while the popover is
- * still open, else without taking focus from wherever the user went; an Undo toast covers both. A prompt changed
- * meanwhile is never overwritten: the result is offered in a toast instead. A field that unmounts or moves to another
- * project drops the request, so a late result never lands in the wrong prompt.
+ * prompt only while the prompt reads as it did when the request started: as an edit (Ctrl+Z) while the popover is still
+ * open, else without taking focus from wherever the user went; an Undo toast covers both. A prompt changed meanwhile is
+ * never overwritten: the result is offered in a toast instead. A field that unmounts or moves to another project drops
+ * the request, so a late result never lands in the wrong prompt.
  */
 const usePromptRewrite = ({
   editor,

@@ -43,9 +43,9 @@ import {
 type FailedResult = WorkflowPublicationFailure;
 
 /**
- * The publication dialogs, always mounted beside the editor so any surface (header, menu, the project view) can
- * start one for any project workflow. One stage at a time; every stage names the workflow it works on, and a
- * workflow that leaves the project ends its stage.
+ * The publication dialogs, always mounted beside the editor so any surface (header, menu, the project view) can start
+ * one for any project workflow. One stage at a time; every stage names the workflow it works on, and a workflow that
+ * leaves the project ends its stage.
  */
 /** Every stage names the project and workflow it belongs to and the operation that started it. */
 interface StageContext {
@@ -105,11 +105,11 @@ export const WorkflowPublicationHost = () => {
     [workflows]
   );
 
-  // An intent is consumed as it is posted: the stage it opens is read from the project as it stands then. Each
-  // intent starts a new operation, and a project switch ends whatever stage was open, so a late answer from an
-  // earlier operation can never land on a stage it did not start. A publication that never got an answer is
-  // offered once more, under its own reserved id, when the user comes back to that workflow, and always meets a
-  // new save for that workflow first.
+  // An intent is consumed as it is posted: the stage it opens is read from the project as it stands then. Each intent
+  // starts a new operation, and a project switch ends whatever stage was open, so a late answer from an earlier
+  // operation can never land on a stage it did not start. A publication that never got an answer is offered once more,
+  // under its own reserved id, when the user comes back to that workflow, and always meets a new save for that workflow
+  // first.
   useMountEffect(() => {
     const retryStage = (failed: FailedResult, projectId: string, workflowId: string): Stage => {
       operationRef.current += 1;
@@ -354,12 +354,12 @@ export const WorkflowPublicationHost = () => {
       }));
     }
   }, [activeStage, advance]);
-  // The confirm dialog closes itself once its confirmation settles; that close belongs to the operation the dialog
-  // was shown for, so it neither ends the update it started nor a confirmation another operation opened since.
+  // The confirm dialog closes itself once its confirmation settles; that close belongs to the operation the dialog was
+  // shown for, so it neither ends the update it started nor a confirmation another operation opened since.
   const confirmOperation = activeStage.kind === 'confirm-update' ? activeStage.operation : null;
-  // The confirm dialog is one instance per operation: an in-flight confirmation of one operation never leaves
-  // another operation's confirmation disabled. The key follows the operation from the stage's first step, so the
-  // instance is already mounted when a review turns into a confirmation, and it stays put through an ordinary close.
+  // The confirm dialog is one instance per operation: an in-flight confirmation of one operation never leaves another
+  // operation's confirmation disabled. The key follows the operation from the stage's first step, so the instance is
+  // already mounted when a review turns into a confirmation, and it stays put through an ordinary close.
   const stageOperation = activeStage.kind === 'idle' ? null : activeStage.operation;
   const [confirmKey, setConfirmKey] = useState(0);
 
@@ -392,8 +392,8 @@ export const WorkflowPublicationHost = () => {
     close();
   }, [activeStage, close]);
 
-  // The template an update replaces is the one the workflow is linked to now (a save as new re-links it), which
-  // need not share the workflow's name; the confirmation names only that template, once its record is read.
+  // The template an update replaces is the one the workflow is linked to now (a save as new re-links it), which need
+  // not share the workflow's name; the confirmation names only that template, once its record is read.
   const confirmTemplateId = activeStage.kind === 'confirm-update' ? activeStage.libraryWorkflowId : '';
   const confirmTemplateName = useQuery({
     ...savedWorkflowDetailQueryOptions(confirmTemplateId),
@@ -718,8 +718,8 @@ const ChoiceButton = ({
 );
 
 /**
- * Names the new template. The explanation is the contract: current input values become the template's defaults, and
- * the workflow then links to the new template under its name.
+ * Names the new template. The explanation is the contract: current input values become the template's defaults, and the
+ * workflow then links to the new template under its name.
  */
 export const SaveToLibraryDialog = ({
   initialName,

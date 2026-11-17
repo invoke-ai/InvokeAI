@@ -31,10 +31,10 @@ export const PreviewSwipeNeighbors = ({
 );
 
 /**
- * One stage-width beside the preview, the item a swipe slides in. It shares the stage's padding and container
- * queries, so it fits exactly as the item will once selected; images use the full URL that navigation prefetches,
- * making the post-commit swap pixel-identical. An unloaded page shows a spinner while the step fetches it; a live
- * session shows the bare stage.
+ * One stage-width beside the preview, the item a swipe slides in. It shares the stage's padding and container queries,
+ * so it fits exactly as the item will once selected; images use the full URL that navigation prefetches, making the
+ * post-commit swap pixel-identical. An unloaded page shows a spinner while the step fetches it; a live session shows
+ * the bare stage.
  */
 const PreviewSwipeNeighbor = ({
   neighbor,
@@ -73,8 +73,8 @@ const PreviewSwipeNeighbor = ({
 
 /**
  * The thumbnail (usually cached already) lies under the full image until that loads, so a swipe faster than the
- * download still reveals the right picture; it is removed once the full image arrives, leaving exactly what the
- * frame will show. No shadow: the neighbor sits just beyond the stage edge, where the frame shadow would bleed in.
+ * download still reveals the right picture; it is removed once the full image arrives, leaving exactly what the frame
+ * will show. No shadow: the neighbor sits just beyond the stage edge, where the frame shadow would bleed in.
  */
 const NeighborMedia = ({ item }: { item: GalleryItem }) => {
   const [isLoaded, setIsLoaded] = useState(false);

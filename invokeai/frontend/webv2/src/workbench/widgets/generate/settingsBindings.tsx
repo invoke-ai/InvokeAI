@@ -15,8 +15,8 @@ const readProjectSetting = (key: LayeredProjectSettingKey) => (values: Readonly<
 };
 
 /**
- * The project's generation flags behind the Generate widget's settings: this project's pin inside a project, the
- * user's default outside one. They live in the project settings, not the Generate widget's values.
+ * The project's generation flags behind the Generate widget's settings: this project's pin inside a project, the user's
+ * default outside one. They live in the project settings, not the Generate widget's values.
  */
 export const Field = ({ field, surface, target }: SettingFieldProps) => {
   const key = field.id as LayeredProjectSettingKey;

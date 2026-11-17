@@ -1,6 +1,5 @@
 /**
- * Persist decayed-use rankings per browser across projects; filter stale ids against current entries when
- * rendering.
+ * Persist decayed-use rankings per browser across projects; filter stale ids against current entries when rendering.
  */
 
 import type { PaletteEntry } from './entries';
@@ -59,8 +58,8 @@ const readRawRecords = (): string | null => {
   }
 
   try {
-    // Accessing localStorage itself can throw (SecurityError) when storage is
-    // disabled or blocked, not just getItem — keep both inside the guard.
+    // Accessing localStorage itself can throw (SecurityError) when storage is disabled or blocked, not just getItem —
+    // keep both inside the guard.
     return window.localStorage.getItem(STORAGE_KEY);
   } catch {
     return null;

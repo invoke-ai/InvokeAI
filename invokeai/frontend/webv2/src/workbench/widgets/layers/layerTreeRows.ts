@@ -40,9 +40,9 @@ const rowFor = (vm: SemanticNode, expanded: boolean, posInSet: number, setSize: 
 const normalizeFilter = (filter: string | undefined): string => (filter ?? '').trim().toLocaleLowerCase();
 
 /**
- * The nodes a filter keeps: every node whose name matches, plus the groups above a match so the
- * match stays reachable. A kept group shows expanded when something kept sits beneath it; a
- * matching group with no kept descendant shows collapsed, since its children are not matches.
+ * The nodes a filter keeps: every node whose name matches, plus the groups above a match so the match stays reachable.
+ * A kept group shows expanded when something kept sits beneath it; a matching group with no kept descendant shows
+ * collapsed, since its children are not matches.
  */
 const filteredIds = (
   nodes: readonly SemanticNode[],

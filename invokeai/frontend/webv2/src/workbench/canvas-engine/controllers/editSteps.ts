@@ -1,7 +1,6 @@
 /**
- * Edit-step building blocks shared by the layer controllers: byte accounting, replay reservations, the steps that
- * add, replace and remove layers with their pixels, and how a publication's outcome is reported to each kind of
- * caller.
+ * Edit-step building blocks shared by the layer controllers: byte accounting, replay reservations, the steps that add,
+ * replace and remove layers with their pixels, and how a publication's outcome is reported to each kind of caller.
  */
 
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
@@ -73,8 +72,8 @@ export const layerOperationStatus = (result: EditPublishResult): LayerOperationS
 export type GuardedResultRefusal = LayerEditRefusal | SubsetOf<CanvasTransactionOutcome, 'stale'>;
 
 /**
- * Guarded result operations (generated, filter, mask and staged results, mask edits, duplicate) were prepared
- * against a guard, so a step that did not land means the target moved on: `stale`.
+ * Guarded result operations (generated, filter, mask and staged results, mask edits, duplicate) were prepared against a
+ * guard, so a step that did not land means the target moved on: `stale`.
  */
 export const guardedResultRefusal = (
   result: Exclude<EditPublishResult, { status: 'committed' }>
@@ -279,8 +278,8 @@ export interface AddedRasterLayerEdit {
 export const addedLayerHistoryBytes = (rect: Rect): number => rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES;
 
 /**
- * Inserts the layer with its prepared pixels as one undo step. The cache replacement is reserved and prepared
- * before the document changes; replays prepare again under their own reservation.
+ * Inserts the layer with its prepared pixels as one undo step. The cache replacement is reserved and prepared before
+ * the document changes; replays prepare again under their own reservation.
  */
 export const publishAddedRasterLayer = (
   ctx: LayerStepContext,

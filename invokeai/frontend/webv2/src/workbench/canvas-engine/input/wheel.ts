@@ -1,6 +1,6 @@
 /**
- * Plain wheel routes to the tool or cursor-centered zoom. Ctrl+wheel sizes brush/eraser and is otherwise
- * swallowed. Injected dependencies keep routing testable without DOM setup.
+ * Plain wheel routes to the tool or cursor-centered zoom. Ctrl+wheel sizes brush/eraser and is otherwise swallowed.
+ * Injected dependencies keep routing testable without DOM setup.
  */
 
 import type { InvalidatePayload } from '@workbench/canvas-engine/render/scheduler';
@@ -18,8 +18,8 @@ export interface WheelHandlerDeps {
   /** Steps the active brush/eraser diameter by one notch (`+1` grow, `-1` shrink). */
   stepActiveBrushSize(direction: 1 | -1): void;
   /**
-   * Whether ctrl+wheel brush sizing is inverted. `false` (default): wheel-up
-   * grows. `true`: wheel-up shrinks. A user preference read fresh per event.
+   * Whether ctrl+wheel brush sizing is inverted. `false` (default): wheel-up grows. `true`: wheel-up shrinks. A user
+   * preference read fresh per event.
    */
   getInvertBrushSizeScroll(): boolean;
 }

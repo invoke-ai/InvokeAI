@@ -21,8 +21,8 @@ export interface MediaElementSnapshot {
 
 export interface MediaElementStore {
   /**
-   * A React 19 ref callback: binds the store to `video` and returns the unbinding. Unbinding removes every listener
-   * and frame callback and resets the snapshot; it leaves playback alone.
+   * A React 19 ref callback: binds the store to `video` and returns the unbinding. Unbinding removes every listener and
+   * frame callback and resets the snapshot; it leaves playback alone.
    */
   attach: (video: HTMLVideoElement) => () => void;
   getSnapshot: () => MediaElementSnapshot;
@@ -111,9 +111,9 @@ const ignoreRefusal = (): void => {};
 const REST_TOLERANCE_SECONDS = 0.001;
 
 /**
- * One media element's state as an external store, for `useSyncExternalStore` with narrow selectors. Every media
- * event re-reads the element, so the snapshot cannot drift from it. The playhead follows animation frames only while
- * playing, for a smooth scrubber; `timeupdate` covers paused seeks and background tabs, where frames stop.
+ * One media element's state as an external store, for `useSyncExternalStore` with narrow selectors. Every media event
+ * re-reads the element, so the snapshot cannot drift from it. The playhead follows animation frames only while playing,
+ * for a smooth scrubber; `timeupdate` covers paused seeks and background tabs, where frames stop.
  */
 export const createMediaElementStore = (): MediaElementStore => {
   const core = createExternalStoreCore<MediaElementSnapshot>(DETACHED_SNAPSHOT);

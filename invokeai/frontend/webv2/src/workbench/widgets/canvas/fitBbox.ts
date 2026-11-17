@@ -1,7 +1,7 @@
 /**
- * Union enabled, renderable, nonempty layer bounds in document space. Fitting to layers snaps inward with
- * {@link fitRectToGrid}. Mask fitting includes only inpaint masks, pads by the mask blur plus {@link MASK_FIT_MARGIN}
- * and snaps outward, so no grid cuts the feathered edge. Return null for no content or a collapsed result.
+ * Union enabled, renderable, nonempty layer bounds in document space. Fitting to layers snaps inward with {@link
+ * fitRectToGrid}. Mask fitting includes only inpaint masks, pads by the mask blur plus {@link MASK_FIT_MARGIN} and
+ * snaps outward, so no grid cuts the feathered edge. Return null for no content or a collapsed result.
  */
 
 import {
@@ -16,15 +16,12 @@ import {
 } from '@workbench/canvas-engine/api';
 
 /**
- * Outward margin (document px) beyond the mask blur. The blur feathers the mask past its painted edge, so the frame
- * has to clear the blur radius for the soft edge to land inside the generated region.
+ * Outward margin (document px) beyond the mask blur. The blur feathers the mask past its painted edge, so the frame has
+ * to clear the blur radius for the soft edge to land inside the generated region.
  */
 const MASK_FIT_MARGIN = 8;
 
-/**
- * Snap inward: round origins up and sizes down. gridSize <= 1 uses integer rounding, matching legacy
- * fitRectToGrid.
- */
+/** Snap inward: round origins up and sizes down. gridSize <= 1 uses integer rounding, matching legacy fitRectToGrid. */
 export const fitRectToGrid = (rect: Rect, gridSize: number): Rect => {
   const g = gridSize > 1 ? gridSize : 1;
   const x = Math.ceil(rect.x / g) * g;
@@ -75,9 +72,9 @@ export const computeFitBboxToLayers = (doc: CanvasDocumentContractV3, gridSize: 
 };
 
 /**
- * The grid-aligned frame that contains the visible INPAINT masks padded by `maskBlur` plus {@link MASK_FIT_MARGIN},
- * or `null` when there are none. `maskBlur` is the project's clamped compositing mask blur. Snapping inward would cut
- * up to a grid step less one pixel from each side, more than the margin on 16 and 32 px grids.
+ * The grid-aligned frame that contains the visible INPAINT masks padded by `maskBlur` plus {@link MASK_FIT_MARGIN}, or
+ * `null` when there are none. `maskBlur` is the project's clamped compositing mask blur. Snapping inward would cut up
+ * to a grid step less one pixel from each side, more than the margin on 16 and 32 px grids.
  */
 export const computeFitBboxToMasks = (
   doc: CanvasDocumentContractV3,

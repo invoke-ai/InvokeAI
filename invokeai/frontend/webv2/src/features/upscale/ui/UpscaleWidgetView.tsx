@@ -421,9 +421,9 @@ const UpscaleModelReconciler = ({
 };
 
 /**
- * Each range field's error. CFG and Steps take their bounds from the served table, read when this runs, so its
- * revision is an argument: the React Compiler infers a memo's dependencies from what the callback reads, and a table
- * read through a function call is not one of them, so the bounds would stay those of the table before it loaded.
+ * Each range field's error. CFG and Steps take their bounds from the served table, read when this runs, so its revision
+ * is an argument: the React Compiler infers a memo's dependencies from what the callback reads, and a table read
+ * through a function call is not one of them, so the bounds would stay those of the table before it loaded.
  */
 const getFieldErrors = (t: (key: string) => string, values: UpscaleWidgetValues, _capabilitiesRevision: number) => ({
   cfgScale: getRangeError(t('widgets.upscale.cfgScale'), values.cfgScale, 1, upscaleMaxCfgScale(values.model)),
@@ -452,8 +452,8 @@ const getFieldErrors = (t: (key: string) => string, values: UpscaleWidgetValues,
 });
 
 /**
- * The scheduler choices, the scheduler the pass runs, and the highest CFG it takes, all read from the served table
- * when this runs; the revision is an argument for the reason `getFieldErrors` gives.
+ * The scheduler choices, the scheduler the pass runs, and the highest CFG it takes, all read from the served table when
+ * this runs; the revision is an argument for the reason `getFieldErrors` gives.
  */
 const getServedSamplingFields = (model: MainModelConfig | null, scheduler: string, _capabilitiesRevision: number) => ({
   cfgScaleMax: upscaleMaxCfgScale(model),
@@ -500,9 +500,9 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
     getArchitectureCapabilitiesSnapshot,
     selectCapabilitiesRevision
   );
-  // The sync picks VAEs and a new model's CFG from the served table, and a default applied without it
-  // would stick: nothing re-applies one to a model already selected. So the sync waits for the table,
-  // and until then the gate holds back the form, its model picker included.
+  // The sync picks VAEs and a new model's CFG from the served table, and a default applied without it would stick:
+  // nothing re-applies one to a model already selected. So the sync waits for the table, and until then the gate holds
+  // back the form, its model picker included.
   const hasCapabilities = capabilitiesRevision > 0;
   const canSync = modelsStatus === 'loaded' && hasCapabilities;
   const { patchPromptDraft: patchDraft, patchValues, projectId, promptDraft, rawValues } = selection;
@@ -602,8 +602,8 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
   );
   const selectedLoraKeys = useMemo(() => new Set(values.loras.map((lora) => lora.model.key)), [values.loras]);
 
-  // A control with nothing to steer is worse than no control, so the widget follows the table
-  // rather than showing every field for every architecture.
+  // A control with nothing to steer is worse than no control, so the widget follows the table rather than showing every
+  // field for every architecture.
   const architecture = upscaleArchitectureFor(values.model);
   const tileControlNet = architecture?.tileControlNet ?? null;
   // Structure scales the ControlNet's weights, so with an optional one left out it steers nothing.
@@ -615,8 +615,8 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
       PRESET_ENTRIES.find(
         ([, preset]) =>
           values.creativity === preset.creativity &&
-          // Structure is hidden where nothing consumes it, so a stale value must not keep every
-          // preset unhighlighted with nothing on screen to explain why.
+          // Structure is hidden where nothing consumes it, so a stale value must not keep every preset unhighlighted
+          // with nothing on screen to explain why.
           (!showStructure || values.structure === preset.structure)
       )?.[0] ?? null,
     [showStructure, values.creativity, values.structure]
@@ -692,8 +692,8 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
   );
 
   const vaePrecisionValue = useMemo(() => [values.vaePrecision], [values.vaePrecision]);
-  // The architecture's own list, less the schedulers that would ignore Creativity, showing the one the
-  // graph will really run. Where one is left there is nothing to choose, and the field goes.
+  // The architecture's own list, less the schedulers that would ignore Creativity, showing the one the graph will
+  // really run. Where one is left there is nothing to choose, and the field goes.
   const { cfgScaleMax, scheduler, schedulerOptions } = useMemo(
     () => getServedSamplingFields(values.model, values.scheduler, capabilitiesRevision),
     [capabilitiesRevision, values.model, values.scheduler]
@@ -730,8 +730,8 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
     () => [templateName, promptCount > 1 ? t('topbar.invoke.summary.promptCount', { count: promptCount }) : null],
     [promptCount, t, templateName]
   );
-  // Model only can neither show nor plan the passes of an upscaler installed before Invoke recorded native scales;
-  // the field's description says so, and re-identifying it in the Model Manager records it.
+  // Model only can neither show nor plan the passes of an upscaler installed before Invoke recorded native scales; the
+  // field's description says so, and re-identifying it in the Model Manager records it.
   const isNativeScaleUnknown =
     values.mode === 'model-only' &&
     values.upscaleModel !== null &&
@@ -817,9 +817,8 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
                 )}`;
 
                 return (
-                  // The tooltip trigger merges onto the text, not the item: both
-                  // tooltip and segment item write `data-state`, and the tooltip's
-                  // open/closed would clobber the item's checked state.
+                  // The tooltip trigger merges onto the text, not the item: both tooltip and segment item write
+                  // `data-state`, and the tooltip's open/closed would clobber the item's checked state.
                   <SegmentGroup.Item key={id} flex="1" minW="0" value={id}>
                     <SegmentGroup.ItemHiddenInput />
                     <Tooltip content={tooltipContent}>

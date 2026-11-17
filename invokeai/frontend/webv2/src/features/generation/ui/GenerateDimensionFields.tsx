@@ -120,8 +120,8 @@ interface ResetSizeChoice {
 
 /**
  * The ratio row's Reset size menu; each choice shows the size it sets. The choices are radio items, so the applied one
- * stays reachable and reads as checked, and an open menu always has an item to land on. Two choices can set the
- * same size; the first of them is the checked one.
+ * stays reachable and reads as checked, and an open menu always has an item to land on. Two choices can set the same
+ * size; the first of them is the checked one.
  */
 const ResetSizeMenu = ({ choices }: { choices: readonly ResetSizeChoice[] }) => {
   const { t } = useTranslation();
@@ -555,8 +555,8 @@ export const GenerateDimensionFields = ({
     modelDefaults && modelSetsSize ? { height: modelDefaults.height, width: modelDefaults.width } : null;
   const baseLabel = selectedModel?.type === 'main' ? models.getBaseLabel(selectedModel.base) : null;
   const sizeSource = selectedModel ? getDefaultSource(selectedModel, ['size']) : 'base';
-  // An external model's fallback size belongs to no base, so it is a plain default. One side set by the model takes
-  // the other from the base.
+  // An external model's fallback size belongs to no base, so it is a plain default. One side set by the model takes the
+  // other from the base.
   const sizeSectionResetLabel =
     sizeSource === 'model'
       ? t('widgets.generate.sectionMenu.resetSize')
@@ -567,8 +567,8 @@ export const GenerateDimensionFields = ({
           : t('widgets.generate.sectionMenu.resetSizeBase', { base: baseLabel });
 
   const resetSizeChoices: readonly ResetSizeChoice[] = [
-    // First, as the choice most reached for. A square ratio's optimal size is the native square, which the square choice
-    // below sets, so it is left out there.
+    // First, as the choice most reached for. A square ratio's optimal size is the native square, which the square
+    // choice below sets, so it is left out there.
     ...(optimalSize.width === nativeSide && optimalSize.height === nativeSide
       ? []
       : [
@@ -786,8 +786,8 @@ export const GenerateDimensionFields = ({
     );
   };
 
-  // Switching source remounts the section's subtree; that is deliberate, as its state lives in this component.
-  // A hosted provider is asked for the frame itself (it buckets to its own size table), so there is no render size.
+  // Switching source remounts the section's subtree; that is deliberate, as its state lives in this component. A hosted
+  // provider is asked for the frame itself (it buckets to its own size table), so there is no render size.
   return project.invocationSourceId === 'canvas' && selectedModel?.type !== 'external_image_generator' ? (
     <CanvasRenderSizeSlot frame={displayDimensions}>{renderSection}</CanvasRenderSizeSlot>
   ) : (

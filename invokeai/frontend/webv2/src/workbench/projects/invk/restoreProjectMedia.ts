@@ -72,8 +72,8 @@ export type MediaMaterializer = (
 ) => Promise<MaterializeResult>;
 
 /**
- * Every identity a restore created, so a failure can undo exactly what it did. Filled in as it
- * runs, not returned at the end: a restore that throws part way has still created things.
+ * Every identity a restore created, so a failure can undo exactly what it did. Filled in as it runs, not returned at
+ * the end: a restore that throws part way has still created things.
  */
 export interface RestoredMediaLedger {
   /** The staging boards these were created on: one per archive board that carried media. */

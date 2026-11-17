@@ -39,14 +39,13 @@ export const getUpscaleDenoisingStart = (creativity: number): number => ((creati
 /**
  * The start an index-clipping node needs to enter where a value-clipping one would.
  *
- * Creativity is defined by where FLUX enters: `flux_denoise` clips the schedule by *value*, so a start
- * of 0.499 enters at sigma 0.501 whatever the shift or step count. Z-Image, Anima, Krea-2 and Qwen Image
- * clip by *index* instead, so the same number enters far noisier there -- 0.499 starts Z-Image at sigma
- * 0.78. Given the node's own `sigmas` (`indexClipping.sigmas`), this picks the step `i` whose sigma is
- * nearest `1 - valueStart`. Z-Image and Anima begin at `i = int(start * steps)`, so the start aims at the
- * middle of that step, where float error in the node's product cannot floor it one step short. Krea-2 and
- * Qwen Image round instead, half to even, so their start is the step itself. This goes away when those
- * nodes clip by value; `test_upscale_index_clipped_starts.py` fails when they do.
+ * Creativity is defined by where FLUX enters: `flux_denoise` clips the schedule by *value*, so a start of 0.499 enters
+ * at sigma 0.501 whatever the shift or step count. Z-Image, Anima, Krea-2 and Qwen Image clip by *index* instead, so
+ * the same number enters far noisier there -- 0.499 starts Z-Image at sigma 0.78. Given the node's own `sigmas`
+ * (`indexClipping.sigmas`), this picks the step `i` whose sigma is nearest `1 - valueStart`. Z-Image and Anima begin at
+ * `i = int(start * steps)`, so the start aims at the middle of that step, where float error in the node's product
+ * cannot floor it one step short. Krea-2 and Qwen Image round instead, half to even, so their start is the step itself.
+ * This goes away when those nodes clip by value; `test_upscale_index_clipped_starts.py` fails when they do.
  */
 export const getIndexClippedDenoisingStart = (
   valueStart: number,
@@ -91,9 +90,9 @@ export const getUpscaleControlNetValues = (structure: number) => {
 };
 
 /**
- * Z-Image takes one control, not SD's pair. At Structure 0 it sits at the bottom of the adapter's
- * recommended 0.65-0.80 and lets go for the last quarter of the pass, where the detail is drawn;
- * the slider runs it from a light early nudge (0.3, first half) to holding the whole pass at 1.0.
+ * Z-Image takes one control, not SD's pair. At Structure 0 it sits at the bottom of the adapter's recommended 0.65-0.80
+ * and lets go for the last quarter of the pass, where the detail is drawn; the slider runs it from a light early nudge
+ * (0.3, first half) to holding the whole pass at 1.0.
  */
 export const getZImageTileControlValues = (structure: number) => ({
   beginStepPercent: 0,
@@ -167,9 +166,9 @@ const addUpscaleMetadata = (
 /**
  * Everything the second pass needs, once the frame has been enlarged.
  *
- * The prefix — prompts, seed, Spandrel, unsharp — is identical for every architecture, so it is
- * built once and handed over. What differs is the model loader, the conditioning, the VAE ends and
- * whether anything anchors the pass to the enlarged frame.
+ * The prefix — prompts, seed, Spandrel, unsharp — is identical for every architecture, so it is built once and handed
+ * over. What differs is the model loader, the conditioning, the VAE ends and whether anything anchors the pass to the
+ * enlarged frame.
  */
 interface UpscalePathContext {
   graph: BackendGraphContract;
@@ -183,8 +182,8 @@ interface UpscalePathContext {
   negativePrompt: BackendInvocationContract;
   seed: BackendInvocationContract;
   /**
-   * The enlarged image, at whatever size Spandrel produced. That is not always `denoiseSize`: a
-   * model that does not enlarge makes Spandrel ignore the scale. See `fitFrameToDenoiseSize`.
+   * The enlarged image, at whatever size Spandrel produced. That is not always `denoiseSize`: a model that does not
+   * enlarge makes Spandrel ignore the scale. See `fitFrameToDenoiseSize`.
    */
   frame: BackendInvocationContract;
   /** The frame size the second pass will run at, already floored to the architecture's grid. */
@@ -197,8 +196,8 @@ interface UpscalePathResult {
   /** The node whose image is the result; the caller hangs metadata off it. */
   output: BackendInvocationContract;
   /**
-   * The image the pass encoded, which the result matches in size: Spandrel's frame, or the one
-   * resized to the denoise size. The metadata records its size, so Recall restores the real one.
+   * The image the pass encoded, which the result matches in size: Spandrel's frame, or the one resized to the denoise
+   * size. The metadata records its size, so Recall restores the real one.
    */
   frame: BackendInvocationContract;
   /** Names the pass in the queue, so "multi-diffusion" is not claimed where none runs. */
@@ -210,11 +209,10 @@ type UpscalePathBuilder = (context: UpscalePathContext) => UpscalePathResult;
 /**
  * Resize the frame to the size a builder states as a literal on its denoise node.
  *
- * The literal is computed from the scale, but Spandrel ignores the scale for a model that does not
- * enlarge (a 1x restoration model), and it rounds to a multiple of 8 where `flux_denoise` and
- * `z_image_denoise` take multiples of 16. Either way the latents would disagree with the node's size,
- * and the pass would fail -- after the upscale has run. SD needs none of this: its sizes follow the
- * frame through edges.
+ * The literal is computed from the scale, but Spandrel ignores the scale for a model that does not enlarge (a 1x
+ * restoration model), and it rounds to a multiple of 8 where `flux_denoise` and `z_image_denoise` take multiples of 16.
+ * Either way the latents would disagree with the node's size, and the pass would fail -- after the upscale has run. SD
+ * needs none of this: its sizes follow the frame through edges.
  */
 const fitFrameToDenoiseSize = (
   graph: BackendGraphContract,
@@ -383,9 +381,9 @@ const buildSdUpscalePath: UpscalePathBuilder = ({
 };
 
 /**
- * FLUX.1 has no tile ControlNet, so the second pass is anchored only by where it starts on the
- * schedule. Both VAE ends tile: the frame handed to `i2l` is the largest in the graph, and an
- * untiled encode of it does not fit on consumer hardware.
+ * FLUX.1 has no tile ControlNet, so the second pass is anchored only by where it starts on the schedule. Both VAE ends
+ * tile: the frame handed to `i2l` is the largest in the graph, and an untiled encode of it does not fit on consumer
+ * hardware.
  */
 const buildFluxUpscalePath: UpscalePathBuilder = ({
   graph,
@@ -464,9 +462,9 @@ const buildFluxUpscalePath: UpscalePathBuilder = ({
 };
 
 /**
- * FLUX.2 runs the pass whole like FLUX.1, both VAE ends tiled. Klein and [dev] differ in their loader, text
- * encoder and LoRA loader. As in Generate, CFG stays off and the slider drives the guidance [dev] is distilled
- * on; Klein ignores it.
+ * FLUX.2 runs the pass whole like FLUX.1, both VAE ends tiled. Klein and [dev] differ in their loader, text encoder and
+ * LoRA loader. As in Generate, CFG stays off and the slider drives the guidance [dev] is distilled on; Klein ignores
+ * it.
  */
 const buildFlux2UpscalePath: UpscalePathBuilder = ({
   graph,
@@ -568,10 +566,10 @@ const buildFlux2UpscalePath: UpscalePathBuilder = ({
 };
 
 /**
- * Z-Image runs the pass whole like FLUX.1, both VAE ends tiled. Its tile ControlNet is optional: a
- * pass that does not tile has no seams to hold together, so the ControlNet only lets Structure pull
- * the result back toward the enlarged frame. The ControlNet encodes that frame inside the denoise,
- * at the same size as `i2l` does, so it is tiled the same way.
+ * Z-Image runs the pass whole like FLUX.1, both VAE ends tiled. Its tile ControlNet is optional: a pass that does not
+ * tile has no seams to hold together, so the ControlNet only lets Structure pull the result back toward the enlarged
+ * frame. The ControlNet encodes that frame inside the denoise, at the same size as `i2l` does, so it is tiled the same
+ * way.
  */
 const buildZImageUpscalePath: UpscalePathBuilder = ({
   graph,
@@ -667,9 +665,8 @@ const buildZImageUpscalePath: UpscalePathBuilder = ({
 };
 
 /**
- * Anima has no tile ControlNet (only LLLite adapters), so like FLUX.1 the pass is anchored by where
- * it starts. Its decode has no tiling switch: `anima_l2i` tiles on its own once an untiled decode
- * would take most of the card.
+ * Anima has no tile ControlNet (only LLLite adapters), so like FLUX.1 the pass is anchored by where it starts. Its
+ * decode has no tiling switch: `anima_l2i` tiles on its own once an untiled decode would take most of the card.
  */
 const buildAnimaUpscalePath: UpscalePathBuilder = ({
   graph,
@@ -748,9 +745,9 @@ const buildAnimaUpscalePath: UpscalePathBuilder = ({
 };
 
 /**
- * Krea-2 runs the pass whole like FLUX.1, both VAE ends tiled. It encodes and decodes with the
- * Qwen-Image VAE through that family's nodes, as Generate and Canvas do. `krea2_denoise` picks its own
- * shift, fixed for Turbo and by size for Raw, so the graph sends none.
+ * Krea-2 runs the pass whole like FLUX.1, both VAE ends tiled. It encodes and decodes with the Qwen-Image VAE through
+ * that family's nodes, as Generate and Canvas do. `krea2_denoise` picks its own shift, fixed for Turbo and by size for
+ * Raw, so the graph sends none.
  */
 const buildKrea2UpscalePath: UpscalePathBuilder = ({
   graph,
@@ -828,9 +825,9 @@ const buildKrea2UpscalePath: UpscalePathBuilder = ({
 };
 
 /**
- * Qwen Image runs the pass whole like FLUX.1, through the VAE nodes Krea-2 uses, tiled at both ends. The graph
- * sends no shift, so `qwen_image_denoise` keeps its dynamic one, held past 8192 tokens, which is the schedule
- * Creativity is translated against. Validation refuses Edit models, which would run against a blank reference.
+ * Qwen Image runs the pass whole like FLUX.1, through the VAE nodes Krea-2 uses, tiled at both ends. The graph sends no
+ * shift, so `qwen_image_denoise` keeps its dynamic one, held past 8192 tokens, which is the schedule Creativity is
+ * translated against. Validation refuses Edit models, which would run against a blank reference.
  */
 const buildQwenImageUpscalePath: UpscalePathBuilder = ({
   graph,
@@ -907,9 +904,9 @@ const buildQwenImageUpscalePath: UpscalePathBuilder = ({
 };
 
 /**
- * Z-Image's, Anima's, Krea-2's, Qwen Image's and MOSS-Image's text encoders take their encoders on named fields.
- * All but Qwen Image's and MOSS-Image's hand the denoise a collected list; theirs take the one conditioning. The
- * negative branch exists only where the caller decided it is read.
+ * Z-Image's, Anima's, Krea-2's, Qwen Image's and MOSS-Image's text encoders take their encoders on named fields. All
+ * but Qwen Image's and MOSS-Image's hand the denoise a collected list; theirs take the one conditioning. The negative
+ * branch exists only where the caller decided it is read.
  */
 const addPromptConditioning = (
   graph: BackendGraphContract,
@@ -1029,8 +1026,8 @@ const buildMossImageUpscalePath: UpscalePathBuilder = ({
 };
 
 /**
- * Keyed by the same bases as `UPSCALE_ARCHITECTURES`, and `satisfies` makes that a compile error to
- * break: declaring an architecture supported without giving it a builder will not type-check.
+ * Keyed by the same bases as `UPSCALE_ARCHITECTURES`, and `satisfies` makes that a compile error to break: declaring an
+ * architecture supported without giving it a builder will not type-check.
  */
 const UPSCALE_PATH_BUILDERS = {
   anima: buildAnimaUpscalePath,
@@ -1048,8 +1045,8 @@ export interface ModelOnlyUpscaleRequest {
   image: ImageWithDims;
   upscaleModel: SpandrelModelConfig;
   /**
-   * A Scale runs the upscaler until it reaches it; `'native'` runs the model once, at its own scale, sized as that Scale
-   * would be when it is recorded and left unsized when it is not.
+   * A Scale runs the upscaler until it reaches it; `'native'` runs the model once, at its own scale, sized as that
+   * Scale would be when it is recorded and left unsized when it is not.
    */
   scale: number | 'native';
   destination: ResultDestination;

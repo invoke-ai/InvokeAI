@@ -39,8 +39,8 @@ type CreateFromBboxEngine = CanvasCompositeExportEngine & {
 };
 
 /**
- * Upload visible raster content inside the bbox for a global reference or layer at the bbox origin. The shared
- * import pipeline rechecks document identity after export/upload.
+ * Upload visible raster content inside the bbox for a global reference or layer at the bbox origin. The shared import
+ * pipeline rechecks document identity after export/upload.
  */
 export const createFromBbox = async (options: {
   applyCanvasMutation: (projectId: string, mutation: CanvasProjectMutation) => boolean | void;
@@ -114,8 +114,8 @@ export const createFromBbox = async (options: {
         // Unreachable: exactly one image is always passed. Kept for exhaustiveness.
         return { status: 'blocked' };
       case 'capabilities-unavailable':
-        // Unreachable: only 'control-resized' consults the capability table, and this flow never
-        // asks for it -- CreateFromBboxLayerDestination excludes that destination.
+        // Unreachable: only 'control-resized' consults the capability table, and this flow never asks for it --
+        // CreateFromBboxLayerDestination excludes that destination.
         return { status: 'blocked' };
     }
   } catch (error) {

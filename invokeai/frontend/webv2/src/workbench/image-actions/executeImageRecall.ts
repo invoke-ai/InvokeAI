@@ -93,8 +93,8 @@ const fetchEmbeddedWorkflow = (media: WorkflowMediaRef, signal: AbortSignal) =>
   media.kind === 'image' ? galleryImages.workflow(media.name, signal) : galleryVideos.workflow(media.name, signal);
 
 /**
- * Load the media's authored workflow, or reconstruct its generation graph, then open the workflow editor. False
- * from `openWorkflowEditor` means no editor can consume the load request.
+ * Load the media's authored workflow, or reconstruct its generation graph, then open the workflow editor. False from
+ * `openWorkflowEditor` means no editor can consume the load request.
  */
 export const executeLoadMediaWorkflow = async ({
   isProjectActive,
@@ -296,13 +296,12 @@ export const getCurrentGenerateValues = ({
 let canvasRecallHolder: { owner: AccountScope } | null = null;
 
 /**
- * Claims the one Canvas recall that may run at a time, or returns null while another reads or commits (a double
- * click, a second key press): a Canvas recall that started before another commits finds the document changed and
- * recalls only in part. Recalls that leave the Canvas alone need no claim: they re-read Generate values after every
- * await. A claim left over from an account that has since ended holds nothing back. Release once the recall has
- * committed, before saving its Canvas images, so a slow save holds no later recall back. Releasing again, or after
- * another claim took over, does nothing. API-driven recalls (`recall_parameters_updated`) queue among themselves
- * and do not claim.
+ * Claims the one Canvas recall that may run at a time, or returns null while another reads or commits (a double click,
+ * a second key press): a Canvas recall that started before another commits finds the document changed and recalls only
+ * in part. Recalls that leave the Canvas alone need no claim: they re-read Generate values after every await. A claim
+ * left over from an account that has since ended holds nothing back. Release once the recall has committed, before
+ * saving its Canvas images, so a slow save holds no later recall back. Releasing again, or after another claim took
+ * over, does nothing. API-driven recalls (`recall_parameters_updated`) queue among themselves and do not claim.
  */
 export const claimCanvasRecall = (owner: AccountScope): (() => void) | null => {
   if (canvasRecallHolder && isAccountScopeCurrent(canvasRecallHolder.owner)) {
@@ -381,8 +380,8 @@ export const executeImageRecall = async ({
         title: t('widgets.gallery.itemActions.recall.cannotRecallImage'),
       });
 
-    // No reads without values to apply them to: the answer only depends on the model catalog and capabilities,
-    // which reading the record does not change.
+    // No reads without values to apply them to: the answer only depends on the model catalog and capabilities, which
+    // reading the record does not change.
     if (!readGenerateValues()) {
       missingValuesNotice();
       return false;
@@ -390,8 +389,8 @@ export const executeImageRecall = async ({
 
     const metadata =
       kind === 'dimensions' ? null : await fetchGalleryImageMetadata(queryClient, owner, image.imageName);
-    // Only all/remix recall references. Checked against the record, not the built list, so the check happens before
-    // the snapshot below.
+    // Only all/remix recall references. Checked against the record, not the built list, so the check happens before the
+    // snapshot below.
     const referenceRecord = kind === 'all' || kind === 'remix' ? readMetadataReferenceImages(metadata) : null;
     let referenceAssets = new Map<string, GalleryImage>();
     let referenceLookupFailed = false;
@@ -480,8 +479,8 @@ export const executeImageRecall = async ({
     if (canvasTarget && !canvasTarget.getProject()) {
       return false;
     }
-    // Every read is above: nothing yields between this snapshot and the commit, so an edit made while the record
-    // or its references loaded stays in the values the recall writes.
+    // Every read is above: nothing yields between this snapshot and the commit, so an edit made while the record or its
+    // references loaded stays in the values the recall writes.
     const currentGenerateValues = readGenerateValues();
 
     if (!currentGenerateValues) {

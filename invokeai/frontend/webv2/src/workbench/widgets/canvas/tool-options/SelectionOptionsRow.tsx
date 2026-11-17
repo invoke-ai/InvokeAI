@@ -82,9 +82,8 @@ export const SelectionOpModeButtons = ({
 };
 
 /**
- * A selection command; while unavailable, its tooltip says what is missing
- * instead of going quiet. The button is aria-disabled rather than natively
- * disabled so it still emits the pointer events the tooltip needs and stays
+ * A selection command; while unavailable, its tooltip says what is missing instead of going quiet. The button is
+ * aria-disabled rather than natively disabled so it still emits the pointer events the tooltip needs and stays
  * reachable by keyboard, where the reason reads as its description.
  */
 const SelectionAction = ({
@@ -134,9 +133,8 @@ const describePixelRefusal = (
 };
 
 /**
- * Commands over the live selection. Select all always works; fill and erase
- * need a layer the brush and eraser would edit in place, refused the way they
- * are (the engine's own rule); lift needs an eligible paint or control layer;
+ * Commands over the live selection. Select all always works; fill and erase need a layer the brush and eraser would
+ * edit in place, refused the way they are (the engine's own rule); lift needs an eligible paint or control layer;
  * invert and deselect need only a selection.
  */
 export const SelectionActions = ({ engine }: ToolFormProps) => {

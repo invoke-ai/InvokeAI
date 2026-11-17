@@ -21,9 +21,9 @@ import { useTranslation } from 'react-i18next';
 import { usePreviewHeaderContext } from './previewHeaderStore';
 
 /**
- * Show board/image context from previewHeaderStore, falling back to Preview except where the center trigger
- * already names it. The named item opens a mini gallery at that item's board to select another item, and carries a
- * control that clears the gallery selection it shows.
+ * Show board/image context from previewHeaderStore, falling back to Preview except where the center trigger already
+ * names it. The named item opens a mini gallery at that item's board to select another item, and carries a control that
+ * clears the gallery selection it shows.
  */
 export const PreviewWidgetLabel = ({ region }: WidgetLabelProps) => {
   const { t } = useTranslation();
@@ -76,8 +76,8 @@ const NAME_ROW_CSS = {
   overflow: 'hidden',
 } as const;
 // The floors decide when the board drops: room for a few head characters plus the name's kept tail, and a few
-// characters of board. The lopsided grow weights hand the name all free space until its max-content clamp freezes it;
-// a modest ratio would leave it a fraction of a pixel short, and ellipsized, while the board still grows.
+// characters of board. The lopsided grow weights hand the name all free space until its max-content clamp freezes it; a
+// modest ratio would leave it a fraction of a pixel short, and ellipsized, while the board still grows.
 const ITEM_NAME_CSS = { flex: '1000000 1 16ch', maxW: 'max-content', minW: '0' } as const;
 const BOARD_GROUP_CSS = { columnGap: '1', display: 'flex', flex: '1 1 8ch', maxW: 'max-content', minW: '0' } as const;
 

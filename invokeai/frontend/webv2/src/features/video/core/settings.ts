@@ -107,8 +107,8 @@ export const VIDEO_REFERENCE_MAX_VIDEOS = 3;
 export const VIDEO_REFERENCE_MAX_IMAGES = 9;
 
 /**
- * Default to a short reference sample to limit rows attended at every denoise step; 200 frames is about eight
- * seconds at 24 fps.
+ * Default to a short reference sample to limit rows attended at every denoise step; 200 frames is about eight seconds
+ * at 24 fps.
  */
 export const DEFAULT_REFERENCE_SAMPLE_FRAMES = 200;
 
@@ -143,8 +143,8 @@ export const slideReferenceSampleWindow = (
 };
 
 /**
- * Grow from the current start and clamp to the clip; callers persist requested sampleFrames separately from
- * effective bounds.
+ * Grow from the current start and clamp to the clip; callers persist requested sampleFrames separately from effective
+ * bounds.
  */
 export const resizeReferenceSampleWindow = (clip: VideoSourceClip, rawSampleFrames: number): VideoSourceClip => {
   const maxFrame = Math.max(0, clip.numFrames - 1);
@@ -157,8 +157,7 @@ export const resizeReferenceSampleWindow = (clip: VideoSourceClip, rawSampleFram
 const VIDEO_REFERENCE_CONDITIONINGS = ['video_audio', 'video', 'audio'] as const;
 
 /**
- * Share conditioning recognition with recall so valid recorded choices remain distinct from missing or unusable
- * values.
+ * Share conditioning recognition with recall so valid recorded choices remain distinct from missing or unusable values.
  */
 export const isVideoReferenceConditioning = (value: unknown): value is VideoReferenceConditioning =>
   VIDEO_REFERENCE_CONDITIONINGS.includes(value as (typeof VIDEO_REFERENCE_CONDITIONINGS)[number]);
@@ -184,8 +183,8 @@ export const isVideoReferenceItem = (value: unknown): value is VideoReferenceIte
 };
 
 /**
- * Drop invalid/over-cap entries while preserving order. Keep the anchor and oldest video references; discard
- * newest non-anchor overflow. Images retain the front.
+ * Drop invalid/over-cap entries while preserving order. Keep the anchor and oldest video references; discard newest
+ * non-anchor overflow. Images retain the front.
  */
 const sanitizeVideoReferences = (value: unknown, sourceVideoName?: string): VideoReferenceItem[] => {
   if (!Array.isArray(value)) {
@@ -229,10 +228,9 @@ const sanitizeVideoReferences = (value: unknown, sourceVideoName?: string): Vide
   // Pin before trimming overflow so older records with prepended anchors cannot lose their continuity reference.
   valid = pinReferenceExtendAnchor(valid);
 
-  // Keyed by INDEX, not object identity: a hand-edited record can alias the
-  // same entry object twice, and an identity Set would drop both copies.
-  // With the flag canonicalized to at most one entry above, the flag
-  // exemption can never leave the surplus undroppable.
+  // Keyed by INDEX, not object identity: a hand-edited record can alias the same entry object twice, and an identity
+  // Set would drop both copies. With the flag canonicalized to at most one entry above, the flag exemption can never
+  // leave the surplus undroppable.
   let videosToDrop = Math.max(0, valid.filter((entry) => entry.kind === 'video').length - VIDEO_REFERENCE_MAX_VIDEOS);
   const dropped = new Set<number>();
   for (let index = valid.length - 1; index >= 0 && videosToDrop > 0; index -= 1) {
@@ -287,9 +285,9 @@ export const resolveVideoMode = (
     return 'reference';
   }
 
-  // Ahead of the frame and clip slots because a conditioning clip decides the mode: it holds one
-  // whole modality clean. A soundtrack leaves the picture to be generated, so first and last frames
-  // ride along inside audio-to-video rather than naming a mode of their own.
+  // Ahead of the frame and clip slots because a conditioning clip decides the mode: it holds one whole modality clean.
+  // A soundtrack leaves the picture to be generated, so first and last frames ride along inside audio-to-video rather
+  // than naming a mode of their own.
   if (settings.conditioningClip) {
     return settings.conditioningClip.role === 'audio' ? 'audio-to-video' : 'video-to-audio';
   }
@@ -313,8 +311,8 @@ export const VIDEO_DYNAMIC_PROMPTS_DEFAULTS: Readonly<DynamicPromptsSettings> = 
 
 /**
  * A panel saved before Video expanded prompts keeps running its prompt as typed until the user turns expansion on.
- * Every seeded panel stores `positivePromptHeightPx`; an unseeded record (a new panel, a partial Send to Video
- * payload) lacks it and takes the new-panel defaults.
+ * Every seeded panel stores `positivePromptHeightPx`; an unseeded record (a new panel, a partial Send to Video payload)
+ * lacks it and takes the new-panel defaults.
  */
 const SAVED_VIDEO_DYNAMIC_PROMPTS_DEFAULTS: Readonly<DynamicPromptsSettings> = {
   ...VIDEO_DYNAMIC_PROMPTS_DEFAULTS,
@@ -341,8 +339,8 @@ const SETTINGS_FALLBACKS = {
 } as const;
 
 /**
- * Normalize partial records field by field without clamping invalid user values; preserve seeded payloads and
- * report range errors through validation.
+ * Normalize partial records field by field without clamping invalid user values; preserve seeded payloads and report
+ * range errors through validation.
  */
 export const normalizeVideoSettings = (values: unknown): VideoSettings | null => {
   if (!isRecord(values)) {
@@ -356,12 +354,12 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
   );
   const hasReferences = references.length > 0;
   const firstFrameImage = !hasReferences && isImageWithDims(values.firstFrameImage) ? values.firstFrameImage : null;
-  // A first frame and a source video are mutually exclusive; if a stale
-  // project somehow holds both, the first frame wins deterministically.
+  // A first frame and a source video are mutually exclusive; if a stale project somehow holds both, the first frame
+  // wins deterministically.
   const sourceVideo = !firstFrameImage && isVideoSourceClip(values.sourceVideo) ? values.sourceVideo : null;
-  // One conditioning clip at a time, and never alongside an initial video. A first frame excludes it
-  // only in the picture role, where both would hold the same frames; a soundtrack holds the other
-  // stream, so a first frame can anchor the picture generated for it.
+  // One conditioning clip at a time, and never alongside an initial video. A first frame excludes it only in the
+  // picture role, where both would hold the same frames; a soundtrack holds the other stream, so a first frame can
+  // anchor the picture generated for it.
   const conditioningClip =
     !sourceVideo &&
     isVideoConditioningClip(values.conditioningClip) &&
@@ -373,8 +371,8 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
   // Clear acceleration when any required accelerator LoRA disappears instead of claiming an inactive fast path.
   const acceleratorEnabled =
     values.acceleratorEnabled === true && areAcceleratorLorasPresent(acceleratorLoraKeys, loras);
-  // Same healing as the accelerator: a stored `true` whose model has since been uninstalled would
-  // otherwise leave the Frames control disabled with nothing able to fill in a length.
+  // Same healing as the accelerator: a stored `true` whose model has since been uninstalled would otherwise leave the
+  // Frames control disabled with nothing able to fill in a length.
   const ltx2DurationHeadModel = isModelIdentifierConfig(values.ltx2DurationHeadModel)
     ? values.ltx2DurationHeadModel
     : null;
@@ -424,10 +422,9 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
       MAX_NEGATIVE_PROMPT_HEIGHT_PX,
       DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX
     ),
-    // Snapped on the way in: a stored or hand-edited value off the 8k + 1 grid would otherwise
-    // reach the node, which snaps it down silently and then reports a different count than the
-    // panel shows. Bounds against the source are the validator's job, not this one's -- it has no
-    // model or clip to check against.
+    // Snapped on the way in: a stored or hand-edited value off the 8k + 1 grid would otherwise reach the node, which
+    // snaps it down silently and then reports a different count than the panel shows. Bounds against the source are the
+    // validator's job, not this one's -- it has no model or clip to check against.
     ltx2ExtendContextFrames: hasFiniteNumber(values, 'ltx2ExtendContextFrames')
       ? Math.max(1 + LTX2_NUM_FRAMES_STEP, snapLtx2FramesDown(values.ltx2ExtendContextFrames as number))
       : SETTINGS_FALLBACKS.ltx2ExtendContextFrames,
@@ -579,8 +576,8 @@ export const cloneVideoWidgetValues = (values: VideoWidgetValues): VideoWidgetVa
 export const VIDEO_SOURCE_FALLBACK_FPS = 16;
 
 /**
- * Estimate frames from duration/fps; backend extraction resolves exact indices. Default trim omits the final frame
- * to avoid duplicating it at the extension seam.
+ * Estimate frames from duration/fps; backend extraction resolves exact indices. Default trim omits the final frame to
+ * avoid duplicating it at the extension seam.
  */
 // Never below 1: the crossfade join needs at least a two-frame trim.
 const getDefaultSourceEndFrame = (numFrames: number): number => Math.max(1, numFrames - 2);
@@ -612,22 +609,21 @@ export const createVideoSourceClip = (item: {
 
 /**
  * Audio uploads default to soundtrack-only conditioning. Extension anchors require visual conditioning and use
- * anchorReferenceConditioning instead. Read mediaOrigin from the gallery item; it is not persisted on
- * VideoSourceClip.
+ * anchorReferenceConditioning instead. Read mediaOrigin from the gallery item; it is not persisted on VideoSourceClip.
  */
 export const getDefaultReferenceConditioning = (mediaOrigin: string | null | undefined): VideoReferenceConditioning =>
   mediaOrigin === 'audio_upload' ? 'audio' : 'video_audio';
 
 /**
- * An audio_upload record is a bare soundtrack, so it can only condition the audio side; every other clip
- * defaults to video.
+ * An audio_upload record is a bare soundtrack, so it can only condition the audio side; every other clip defaults to
+ * video.
  */
 export const getDefaultConditioningRole = (mediaOrigin: string | null | undefined): VideoConditioningRole =>
   mediaOrigin === 'audio_upload' ? 'audio' : 'video';
 
 /**
- * A clip in its default role. `framesHeld` puts it in the soundtrack role instead, the only one that can join start
- * and end images already set: the picture role would clear them.
+ * A clip in its default role. `framesHeld` puts it in the soundtrack role instead, the only one that can join start and
+ * end images already set: the picture role would clear them.
  */
 export const createVideoConditioningClip = (
   item: {
@@ -650,22 +646,22 @@ export const createVideoConditioningClip = (
 };
 
 /**
- * Audio-only references cannot anchor visual continuity. Preserve them as user references and select or append a
- * visual anchor instead.
+ * Audio-only references cannot anchor visual continuity. Preserve them as user references and select or append a visual
+ * anchor instead.
  */
 const canAnchorReferenceExtend = (entry: VideoReferenceItem): boolean =>
   entry.kind === 'video' && entry.conditioning !== 'audio';
 
 /**
- * Promote flagged audio anchors only while deriving their tail window or preserving an explicit override;
- * normalization alone could activate unrelated opening frames.
+ * Promote flagged audio anchors only while deriving their tail window or preserving an explicit override; normalization
+ * alone could activate unrelated opening frames.
  */
 export const anchorReferenceConditioning = (conditioning: VideoReferenceConditioning): VideoReferenceConditioning =>
   conditioning === 'audio' ? 'video_audio' : conditioning;
 
 /**
- * Mirror build_ref2va_presentation with independent Picture, Video, and Audio counters in attachment order;
- * video_audio advances both relevant counters.
+ * Mirror build_ref2va_presentation with independent Picture, Video, and Audio counters in attachment order; video_audio
+ * advances both relevant counters.
  */
 export type VideoReferencePromptLabels = {
   audio: number | null;
@@ -673,10 +669,7 @@ export type VideoReferencePromptLabels = {
   video: number | null;
 };
 
-/**
- * Display encoder tokens literally, untranslated, with visual labels first for references carrying both
- * modalities.
- */
+/** Display encoder tokens literally, untranslated, with visual labels first for references carrying both modalities. */
 export const formatReferencePromptLabels = (labels: VideoReferencePromptLabels): string[] => {
   const formatted: string[] = [];
 
@@ -753,8 +746,8 @@ export const createVideoReferenceEntry = (item: {
 };
 
 /**
- * New image references match the generation size, which limits the reference rows the model attends to; users may
- * raise each to max. Stored references keep their own detail, and recall restores the recorded one.
+ * New image references match the generation size, which limits the reference rows the model attends to; users may raise
+ * each to max. Stored references keep their own detail, and recall restores the recorded one.
  */
 export const DEFAULT_REFERENCE_IMAGE_DETAIL: VideoReferenceImageDetail = 'match';
 
@@ -774,21 +767,20 @@ export const videoClipSpanSeconds = (clip: VideoSourceClip): { endSeconds: numbe
 export const VIDEO_REFERENCE_EXTEND_TAIL_FRAMES = 141;
 
 /**
- * Default to grid-aligned tail context ending at the cutpoint. Account for resampling, generated-length
- * truncation, and 17n+5 snap-down; user trim overrides remain editorial choices.
+ * Default to grid-aligned tail context ending at the cutpoint. Account for resampling, generated-length truncation, and
+ * 17n+5 snap-down; user trim overrides remain editorial choices.
  */
 export const deriveReferenceExtendClip = (sourceVideo: VideoSourceClip, numFrames: number): VideoSourceClip => ({
   ...sourceVideo,
   endFrame: sourceVideo.endFrame,
-  // Deliberately unclamped by the Initial Video's START cutpoint: the
-  // reference samples the original clip for continuity, independent of which
-  // portion the extension keeps.
+  // Deliberately unclamped by the Initial Video's START cutpoint: the reference samples the original clip for
+  // continuity, independent of which portion the extension keeps.
   startFrame: referenceExtendStartFrame(sourceVideo, numFrames),
 });
 
 /**
- * Allow real high-rate containers while bounding fps far below floating-point plateaus that would stop adjustment
- * loops advancing.
+ * Allow real high-rate containers while bounding fps far below floating-point plateaus that would stop adjustment loops
+ * advancing.
  */
 const MAX_REFERENCE_SOURCE_FPS = 1e6;
 
@@ -807,8 +799,8 @@ const referenceExtendStartFrame = (clip: VideoSourceClip, numFrames: number): nu
   const requested = Number.isFinite(numFrames)
     ? Math.min(VIDEO_REFERENCE_EXTEND_TAIL_FRAMES, Math.trunc(numFrames))
     : VIDEO_REFERENCE_EXTEND_TAIL_FRAMES;
-  // For short clips choose the largest available on-grid budget ending at the cutpoint so snap-down cannot discard
-  // seam context.
+  // For short clips choose the largest available on-grid budget ending at the cutpoint so snap-down cannot discard seam
+  // context.
   const budget = Math.min(
     requested,
     snapReferenceFrames(Math.min(resampledFrameCount(clip.endFrame + 1, fps), requested))
@@ -862,8 +854,8 @@ export const applyReferenceExtendNumFrames = (
 };
 
 /**
- * Pin the continuity anchor last because generated rotary positions follow the final reference block; preserve
- * identity when already pinned.
+ * Pin the continuity anchor last because generated rotary positions follow the final reference block; preserve identity
+ * when already pinned.
  */
 export const pinReferenceExtendAnchor = (references: VideoReferenceItem[]): VideoReferenceItem[] => {
   const index = references.findIndex((entry) => entry.kind === 'video' && entry.fromSourceVideo === true);
@@ -877,8 +869,8 @@ export const pinReferenceExtendAnchor = (references: VideoReferenceItem[]): Vide
 };
 
 /**
- * Mirror setter capacity checks. Existing anchors or adoptable same-clip refs need no new slot; unknown incoming
- * clips conservatively require one.
+ * Mirror setter capacity checks. Existing anchors or adoptable same-clip refs need no new slot; unknown incoming clips
+ * conservatively require one.
  */
 export const canPlaceReferenceExtendAnchor = (
   references: VideoReferenceItem[],
@@ -922,8 +914,8 @@ export const applyReferenceExtendSourceVideo = (
     fromSourceVideo: true,
     kind: 'video',
   };
-  // Prefer the flagged anchor; same-name fallback is only for unflagged recall, preserving the user's other
-  // same-clip trims.
+  // Prefer the flagged anchor; same-name fallback is only for unflagged recall, preserving the user's other same-clip
+  // trims.
   const flaggedIndex = references.findIndex((entry) => entry.kind === 'video' && entry.fromSourceVideo === true);
   const linkedIndex =
     flaggedIndex >= 0
@@ -932,8 +924,7 @@ export const applyReferenceExtendSourceVideo = (
           (entry) =>
             entry.kind === 'video' &&
             entry.clip.video_name === sourceVideo.video_name &&
-            // Preserve audio-only same-clip references as soundtracks and append a visual continuity anchor
-            // instead.
+            // Preserve audio-only same-clip references as soundtracks and append a visual continuity anchor instead.
             canAnchorReferenceExtend(entry)
         );
 
@@ -945,8 +936,7 @@ export const applyReferenceExtendSourceVideo = (
         }
         const conditioning = anchorReferenceConditioning(entry.conditioning);
 
-        // Only flagged entries can retain anchor overrides; same-name adoption must derive its first anchor
-        // window.
+        // Only flagged entries can retain anchor overrides; same-name adoption must derive its first anchor window.
         if (
           entry.fromSourceVideo !== true ||
           entry.trimOverridden !== true ||
@@ -976,10 +966,9 @@ export const applyReferenceExtendSourceVideo = (
 };
 
 /**
- * The panel patch that makes `sourceVideo` the Initial Video, or clears it. An initial video displaces the first
- * frame and a conditioning clip; on a reference-extend panel it also links its continuity anchor into the
- * references. Returns null when that panel has no reference slot left for the anchor: the clip must not be set
- * without it.
+ * The panel patch that makes `sourceVideo` the Initial Video, or clears it. An initial video displaces the first frame
+ * and a conditioning clip; on a reference-extend panel it also links its continuity anchor into the references. Returns
+ * null when that panel has no reference slot left for the anchor: the clip must not be set without it.
  */
 export const getInitialVideoPatch = ({
   maxVideos,
@@ -1135,8 +1124,8 @@ export const clearDeletedVideoMedia = <T extends object>(
     return values;
   }
 
-  // The spread widens the cleared keys to `null`; T itself declares them
-  // nullable in every real shape (VideoSettings, raw widget values).
+  // The spread widens the cleared keys to `null`; T itself declares them nullable in every real shape (VideoSettings,
+  // raw widget values).
   return {
     ...values,
     ...(clearFirst ? { firstFrameImage: null } : {}),

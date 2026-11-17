@@ -114,9 +114,9 @@ const ROUTE_VALUE_PROPS = {
 } as const;
 
 /**
- * Where Invoke runs from and where its results go, each switchable in place, plus the lock that keeps the route
- * through edits. Sources are those this layout holds, plus the current one when it is missing, so the choice is never
- * between things the user cannot see. Video only lands in the Gallery, so it offers no destination to choose.
+ * Where Invoke runs from and where its results go, each switchable in place, plus the lock that keeps the route through
+ * edits. Sources are those this layout holds, plus the current one when it is missing, so the choice is never between
+ * things the user cannot see. Video only lands in the Gallery, so it offers no destination to choose.
  */
 const InvokeRoute = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();

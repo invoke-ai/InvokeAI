@@ -1,7 +1,7 @@
 /**
- * Batch and generator nodes never run on the backend: the editor resolves them into queue batch groups at submit
- * time. Value shapes and resolution rules mirror the legacy editor so saved workflows keep their meaning, with one
- * exception: seeded random draws use a different generator, so a legacy seed yields different values here.
+ * Batch and generator nodes never run on the backend: the editor resolves them into queue batch groups at submit time.
+ * Value shapes and resolution rules mirror the legacy editor so saved workflows keep their meaning, with one exception:
+ * seeded random draws use a different generator, so a legacy seed yields different values here.
  */
 
 import type { InvocationTemplates, ProjectGraphState, WorkflowInvocationNode } from './types';
@@ -324,8 +324,8 @@ const readProperty = (spec: PropertySpec, raw: unknown, fallback: unknown): unkn
 
 /**
  * Reads a stored generator value the way the legacy schemas did: missing properties take their defaults, a missing
- * variant is the field's first one, and a wrong-typed property makes the whole value unusable (null). Numbers are
- * kept as entered; `getWorkflowGeneratorInvalidReason` says whether they can run.
+ * variant is the field's first one, and a wrong-typed property makes the whole value unusable (null). Numbers are kept
+ * as entered; `getWorkflowGeneratorInvalidReason` says whether they can run.
  */
 export const parseWorkflowGeneratorValue = (fieldTypeName: string, raw: unknown): WorkflowGeneratorValue | null => {
   if (!isWorkflowGeneratorFieldTypeName(fieldTypeName) || typeof raw !== 'object' || raw === null) {
@@ -470,8 +470,8 @@ type Runnable<T> = T extends unknown ? { [K in keyof T]: K extends 'seed' ? T[K]
 export type RunnableWorkflowGeneratorValue = Runnable<WorkflowGeneratorValue>;
 
 /**
- * How many items a generator asks for, before any are built: a stored count can be arbitrarily large, and the
- * queue accepts at most `WORKFLOW_BATCH_MAX_ITEMS`, so callers refuse oversized requests without materializing them.
+ * How many items a generator asks for, before any are built: a stored count can be arbitrarily large, and the queue
+ * accepts at most `WORKFLOW_BATCH_MAX_ITEMS`, so callers refuse oversized requests without materializing them.
  */
 export const getWorkflowGeneratorRequestedCount = (value: WorkflowGeneratorValue): number | null =>
   'values' in value && value.values

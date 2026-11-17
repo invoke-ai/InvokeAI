@@ -1,6 +1,6 @@
 /**
- * Per-engine view tool pans and zooms through viewport state without document dispatch; also used for temporary
- * Space navigation.
+ * Per-engine view tool pans and zooms through viewport state without document dispatch; also used for temporary Space
+ * navigation.
  */
 
 import type { PointerInput, PointerModifiers, Vec2 } from '@workbench/canvas-engine/types';

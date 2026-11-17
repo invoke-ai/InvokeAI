@@ -2,10 +2,10 @@ import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createListenerChannel } from '@platform/state/externalStoreCore';
 
 /**
- * The closures behind `{ kind: 'undo' }` notification actions. Notifications are plain workbench state, so they name
- * an undo by id and the closure stays here, for this tab and account only. The record owns the entry and a toast
- * only borrows it: an entry lives while a listed notification names it (`retainNotificationUndos`) or a toast holds
- * it, until it runs, is withdrawn, or the account changes. Entries neither referenced nor held (say, recorded while the
+ * The closures behind `{ kind: 'undo' }` notification actions. Notifications are plain workbench state, so they name an
+ * undo by id and the closure stays here, for this tab and account only. The record owns the entry and a toast only
+ * borrows it: an entry lives while a listed notification names it (`retainNotificationUndos`) or a toast holds it,
+ * until it runs, is withdrawn, or the account changes. Entries neither referenced nor held (say, recorded while the
  * editor shell was not mounted) are capped, oldest dropped first. With the list capped at 100, a tab keeps at most 100
  * listed and 20 idle closures, plus what open toasts hold (Clear's toast can hold up to 100 cleared notices'). Most
  * capture ids or small records; Canvas's restore undo keeps a document (metadata only, pixels stay engine-owned), one

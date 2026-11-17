@@ -66,8 +66,8 @@ export interface GalleryBoard {
   createdAt?: string | null;
   ownerName?: string | null;
   /**
-   * The project this board belongs to; null is the Library. Members are ordinary boards; only the inbox is
-   * managed through its project.
+   * The project this board belongs to; null is the Library. Members are ordinary boards; only the inbox is managed
+   * through its project.
    */
   projectId: string | null;
   /** Its project's inbox: named after the project and only renamed, archived, moved or deleted through it. */
@@ -118,8 +118,8 @@ export type GalleryMediaMetadata = Record<string, unknown>;
 export type GalleryImageMetadata = GalleryMediaMetadata;
 
 /**
- * Per-name outcome of a bulk delete. The backend deletes each name independently, so a
- * request can partly succeed and callers must evict only what actually went away.
+ * Per-name outcome of a bulk delete. The backend deletes each name independently, so a request can partly succeed and
+ * callers must evict only what actually went away.
  */
 export interface GalleryDeletionResult {
   deletedImageNames: string[];
@@ -127,9 +127,8 @@ export interface GalleryDeletionResult {
 }
 
 /**
- * Authoritative outcome of deleting a board. Deleting the board with its
- * contents reports deleted/failed media; retaining its contents reports the
- * removed board relationships instead.
+ * Authoritative outcome of deleting a board. Deleting the board with its contents reports deleted/failed media;
+ * retaining its contents reports the removed board relationships instead.
  */
 export interface GalleryBoardDeletionResult {
   boardId: string;

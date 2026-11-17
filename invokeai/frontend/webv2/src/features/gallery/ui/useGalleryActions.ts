@@ -144,9 +144,9 @@ export const useGalleryActions = ({
           if (!(await setBoardArchived(boardId, false))) {
             return;
           }
-          // Back to what the archive changed, in the project it changed them in (the toast outlives a project
-          // switch), and each only while that project still has what the archive left: no destination, and
-          // Uncategorized on screen.
+          // Back to what the archive changed, in the project it changed them in (the toast outlives a project switch),
+          // and each only while that project still has what the archive left: no destination, and Uncategorized on
+          // screen.
           const values = movedSelectionAway || stoppedAutoAdding ? getProjectGalleryValues?.(projectId) : null;
 
           if (!values) {
@@ -320,8 +320,8 @@ export const useGalleryActions = ({
       moveBoard: async (boardId, destinationProjectId, destinationLabel) => {
         const owner = captureAccountScope();
         const rollback = patchGalleryBoardCaches(queryClient, boardId, { projectId: destinationProjectId });
-        // Into another project while other projects are hidden, the board leaves the panel as an archived one does:
-        // it stops being the selection and the auto-add target rather than take results nothing on screen shows.
+        // Into another project while other projects are hidden, the board leaves the panel as an archived one does: it
+        // stops being the selection and the auto-add target rather than take results nothing on screen shows.
         const leavesView =
           destinationProjectId !== null && destinationProjectId !== projectId && !showOtherProjectBoards;
         const movedSelectionAway = leavesView && boardId === selectedBoardId;

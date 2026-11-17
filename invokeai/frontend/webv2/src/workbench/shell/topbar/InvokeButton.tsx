@@ -40,8 +40,8 @@ const loadPopoverBody = (): Promise<InvokePopoverBodyComponent> =>
 
 /**
  * Invoke ends its attached group and sits on top of the iterations field with full control corners; the field's frame
- * runs on under Invoke's leading corners so it reads as a continuing border, not a notch.
- * Doubled specificity outranks the attached Group's `!important` corner reset.
+ * runs on under Invoke's leading corners so it reads as a continuing border, not a notch. Doubled specificity outranks
+ * the attached Group's `!important` corner reset.
  */
 const INVOKE_BUTTON_CSS = { '&&': { borderRadius: 'control !important' } } as const;
 /** The hint inherits the button's text color; its frame is that color, faded. */
@@ -55,8 +55,8 @@ export const PREVIEW_CLOSE_DELAY_MS = 200;
 
 /**
  * `preview` follows hover and keyboard focus and leaves focus where it is; `pinned` stays until dismissed. The blocked
- * button's click, ArrowDown and a right-click pin it; any press inside a preview pins it too, so an edit there
- * survives a short pointer excursion.
+ * button's click, ArrowDown and a right-click pin it; any press inside a preview pins it too, so an edit there survives
+ * a short pointer excursion.
  */
 type IssuesPopoverMode = 'closed' | 'pinned' | 'preview';
 /** An open waiting on the card's chunk. Compared by identity: a later request, even of the same mode, replaces it. */
@@ -65,9 +65,9 @@ interface PendingOpen {
 }
 
 /**
- * Keep Invoke geometry and availability stable while work runs. Only the icon changes to progress; hover or
- * keyboard focus-visible restores play to signal that more work can queue. While issues block it, the button turns
- * secondary and opens the list of them, each with the way to its fix.
+ * Keep Invoke geometry and availability stable while work runs. Only the icon changes to progress; hover or keyboard
+ * focus-visible restores play to signal that more work can queue. While issues block it, the button turns secondary and
+ * opens the list of them, each with the way to its fix.
  */
 export const InvokeButton = ({
   isRouteFixed = false,
@@ -361,7 +361,8 @@ export const InvokeButton = ({
     onJump?.();
   }, [clearTimers, onJump]);
   const getButton = useCallback(() => buttonRef.current, []);
-  // The button is the popover's anchor, not its trigger: pressing it while open is its own toggle, not an outside press.
+  // The button is the popover's anchor, not its trigger: pressing it while open is its own toggle, not an outside
+  // press.
   const persistentElements = useMemo(() => [getButton], [getButton]);
   const popoverIds = useMemo(() => ({ content: contentId, title: titleId }), [contentId, titleId]);
 
@@ -418,8 +419,8 @@ export const InvokeButton = ({
           data-blocked={showsIssues ? '' : undefined}
           flexShrink={0}
           size={size}
-          // Blocked is not disabled: the button opens what is in the way. It steps back from the primary color so it
-          // no longer reads as ready.
+          // Blocked is not disabled: the button opens what is in the way. It steps back from the primary color so it no
+          // longer reads as ready.
           variant={showsIssues ? 'outline' : 'solid'}
           onBlur={handleBlur}
           onClick={handleClick}

@@ -70,9 +70,9 @@ export interface LayerExportGuard {
 }
 
 /**
- * Guarded mutations can decline as busy (another edit or gesture), stale (pixels changed), aborted (caller
- * signal), not-ready (pixels still loading), over-budget (too large to undo or prepare), or command-specific
- * refusals. Structural commits use {@link StructuralCommitResult}.
+ * Guarded mutations can decline as busy (another edit or gesture), stale (pixels changed), aborted (caller signal),
+ * not-ready (pixels still loading), over-budget (too large to undo or prepare), or command-specific refusals.
+ * Structural commits use {@link StructuralCommitResult}.
  */
 export type GuardedMutationRefusal =
   | SubsetOf<CanvasTransactionOutcome, 'aborted' | 'busy' | 'stale' | 'not-ready' | 'over-budget'>
@@ -101,8 +101,8 @@ export interface CommitRasterFilterOptions {
   filter?: RasterFilterSettings;
   target?: RasterFilterCommitTarget;
   /**
-   * For `target: 'control'` copies: the control type the filter implies, or null for an untyped copy. A typed copy
-   * uses its pixels as-is (`detection: null`); either way the copy keeps no derivation of its source layer.
+   * For `target: 'control'` copies: the control type the filter implies, or null for an untyped copy. A typed copy uses
+   * its pixels as-is (`detection: null`); either way the copy keeps no derivation of its source layer.
    */
   controlCopy?: { controlType: ControlType | null };
   requireExactImageDimensions?: boolean;
@@ -142,14 +142,14 @@ export type ControlMapCommitResult =
     };
 
 /**
- * Edits that keep a control layer's derived map in step with its type, detector and original. Neither commit takes
- * the operation edit lease: both refuse `busy` while a modal operation, gesture, replay or layer session is running,
- * and the caller retries later.
+ * Edits that keep a control layer's derived map in step with its type, detector and original. Neither commit takes the
+ * operation edit lease: both refuse `busy` while a modal operation, gesture, replay or layer session is running, and
+ * the caller retries later.
  */
 export interface CanvasControlDerivationCapability {
   /**
-   * Replaces one control layer's contract as one user-origin history entry; refused `stale` unless the live layer
-   * still equals `expected`. Consecutive patches of the same layer with the same `coalesceKey` replace the top entry.
+   * Replaces one control layer's contract as one user-origin history entry; refused `stale` unless the live layer still
+   * equals `expected`. Consecutive patches of the same layer with the same `coalesceKey` replace the top entry.
    */
   commitControlLayerPatch(options: {
     label: string;
@@ -169,8 +169,8 @@ export interface CanvasControlDerivationCapability {
     rect: Rect;
     detection: CanvasControlDetectionContract;
     /**
-     * Makes `image` durable. Awaited only once the guard holds and nothing holds the document, just before decoding,
-     * so a refused or stale result is never promoted; a rejection refuses the commit `failed`.
+     * Makes `image` durable. Awaited only once the guard holds and nothing holds the document, just before decoding, so
+     * a refused or stale result is never promoted; a rejection refuses the commit `failed`.
      */
     makeDurable(): Promise<void>;
     signal?: AbortSignal;
@@ -283,9 +283,8 @@ export interface CanvasInteractionStateCapability {
 }
 
 /**
- * Font resolution shared by Canvas rasterization and the editing portal.
- * Implementations may return a browser-only family alias, but that alias must
- * never be written into a persisted text source.
+ * Font resolution shared by Canvas rasterization and the editing portal. Implementations may return a browser-only
+ * family alias, but that alias must never be written into a persisted text source.
  */
 export interface CanvasFontCapability {
   resolveFamily(source: Extract<CanvasLayerSourceContract, { type: 'text' }>): string;
@@ -304,8 +303,8 @@ export interface CanvasCoreStoreCapability {
 }
 
 /**
- * Which workbench region a key belongs to, as the host's focus judge decides: this canvas (`surface`), a widget
- * that acts on this canvas's layers (`companion`), or anything else (`elsewhere`).
+ * Which workbench region a key belongs to, as the host's focus judge decides: this canvas (`surface`), a widget that
+ * acts on this canvas's layers (`companion`), or anything else (`elsewhere`).
  */
 export type CanvasKeyOwner = 'surface' | 'companion' | 'elsewhere';
 
@@ -333,9 +332,8 @@ export interface CanvasDocumentCapability {
   captureSnapshot(): CanvasDocumentSnapshot | null;
   getDocument(): CanvasDocumentContractV3 | null;
   /**
-   * Counts every reducer document identity change, including previews, selection and syncs, to reject stale
-   * prepared edits. Unlike raster `documentGeneration` or wholesale-swap `documentRevision`, it advances on each
-   * edit.
+   * Counts every reducer document identity change, including previews, selection and syncs, to reject stale prepared
+   * edits. Unlike raster `documentGeneration` or wholesale-swap `documentRevision`, it advances on each edit.
    */
   getEditRevision(): number;
   /** Where a new `stack` layer lands: above `aboveId` when it belongs to the stack, else the stack top. */
@@ -397,15 +395,15 @@ export interface CanvasHistoryEntries {
   /** The oldest steps dropped to stay within the history's entry cap or memory budget since it was last cleared. */
   evicted: number;
   /**
-   * Present while nonzero: the steps this canvas's previous engine held when it was disposed, which this one could
-   * not take over. Cleared with the history (Clear history, a document swap).
+   * Present while nonzero: the steps this canvas's previous engine held when it was disposed, which this one could not
+   * take over. Cleared with the history (Clear history, a document swap).
    */
   dropped?: number;
 }
 
 /**
- * How a replay ended: `applied`, nothing to replay (`empty`), another replay or edit in progress (`busy`/`refused`),
- * or `failed`, in which case the step stayed where it was and the engine reported why.
+ * How a replay ended: `applied`, nothing to replay (`empty`), another replay or edit in progress (`busy`/`refused`), or
+ * `failed`, in which case the step stayed where it was and the engine reported why.
  */
 export type CanvasHistoryReplayStatus = 'applied' | 'empty' | 'busy' | 'refused' | 'failed';
 
@@ -421,8 +419,8 @@ export interface CanvasHistoryCapability {
 
 /**
  * Where an eyedropper sample is in its pick: `preview` on every sampled move while the pick is held, `commit` once on
- * release, `cancel` once when the pick ends without a release over the canvas (Escape, a tool change, an aborted
- * hold), carrying the last previewed color.
+ * release, `cancel` once when the pick ends without a release over the canvas (Escape, a tool change, an aborted hold),
+ * carrying the last previewed color.
  */
 export type ColorSamplePhase = 'preview' | 'commit' | 'cancel';
 
@@ -430,11 +428,11 @@ export type ColorSamplePhase = 'preview' | 'commit' | 'cancel';
  * An edit the selected layer cannot take, named so the notice can say which layer and why: it is hidden (disabled,
  * itself or through a group), hidden on the canvas only (refused by edits that write pixels), locked, has its
  * transparency locked against erasing, its pixels have not loaded yet (the engine has started loading them; the next
- * press can edit), or it is a control layer whose empty shape has no pixels (`layer-unpaintable`).
- * `erase-unsupported` names a selection the eraser cannot erase in place (a group, text, shape or gradient), where the
- * brush would paint a new layer instead; `selection-erase-unsupported` the same for removing the selection's pixels
- * (Erase, Delete, Cut); `gradient-unsupported` a mask or region, which the Gradient tool never adds a raster layer
- * for; `transform-session` the layer whose open transform session selection Fill and Erase wait for.
+ * press can edit), or it is a control layer whose empty shape has no pixels (`layer-unpaintable`). `erase-unsupported`
+ * names a selection the eraser cannot erase in place (a group, text, shape or gradient), where the brush would paint a
+ * new layer instead; `selection-erase-unsupported` the same for removing the selection's pixels (Erase, Delete, Cut);
+ * `gradient-unsupported` a mask or region, which the Gradient tool never adds a raster layer for; `transform-session`
+ * the layer whose open transform session selection Fill and Erase wait for.
  */
 export interface CanvasLayerEditRefusal {
   readonly status:
@@ -464,9 +462,8 @@ export interface CanvasNoTargetRefusal {
 
 /**
  * Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). An
- * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting;
- * a `CanvasLayerEditRefusal` names a layer the active tool cannot edit; a `CanvasNoTargetRefusal` has no layer to
- * name.
+ * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting; a
+ * `CanvasLayerEditRefusal` names a layer the active tool cannot edit; a `CanvasNoTargetRefusal` has no layer to name.
  */
 export type CanvasEditRefusal =
   | SubsetOf<CanvasTransactionOutcome, 'busy' | 'gesture-active' | 'not-ready' | 'over-budget'>
@@ -563,12 +560,11 @@ export type ReplaceSelectionFromImageResult =
   | { status: 'failed'; message: string };
 
 /**
- * The runtime outcome of a structural document commit. `busy`, `gesture-active`, `not-ready`, and
- * `stale` refuse before dispatch. `dispatch-rejected` means the reducer left the document unchanged,
- * which includes a forward that would not change anything. `postcondition-failed` means the reducer
- * accepted but the result could not be verified; `recovered` says how far the inverse got, and any
- * outcome short of `reverted` was reported. Exactly one history entry is recorded, and only for
- * `committed`.
+ * The runtime outcome of a structural document commit. `busy`, `gesture-active`, `not-ready`, and `stale` refuse before
+ * dispatch. `dispatch-rejected` means the reducer left the document unchanged, which includes a forward that would not
+ * change anything. `postcondition-failed` means the reducer accepted but the result could not be verified; `recovered`
+ * says how far the inverse got, and any outcome short of `reverted` was reported. Exactly one history entry is
+ * recorded, and only for `committed`.
  */
 export type StructuralCommitResult =
   | { status: 'committed' }
@@ -602,12 +598,12 @@ export interface CanvasStructuralEngine {
  * An owned live preview of a structural edit. `apply` publishes previews at most once per frame and captures, before
  * the first one lands, the values it replaces: the session's baseline. `commit` records the gesture as one undo step
  * from its prepared baseline, without dispatching again when the preview already reached it, and returns to the
- * baseline when it is refused; `cancel` drops pending previews and restores the baseline, unrecorded. A newer
- * session, a commit from elsewhere, a history replay or disposal ends the session first, restoring its baseline and
- * dropping pending previews, so the previewed values never land over a replayed document or inside another step;
- * later calls on an ended session are refused (`commit` reports `busy`). While edits are locked, `apply` and
- * `commit` refuse. A session previews one mutation kind on one node; its baseline holds every field it previewed, and
- * a commit records from that baseline narrowed to the fields its edit names.
+ * baseline when it is refused; `cancel` drops pending previews and restores the baseline, unrecorded. A newer session,
+ * a commit from elsewhere, a history replay or disposal ends the session first, restoring its baseline and dropping
+ * pending previews, so the previewed values never land over a replayed document or inside another step; later calls on
+ * an ended session are refused (`commit` reports `busy`). While edits are locked, `apply` and `commit` refuse. A
+ * session previews one mutation kind on one node; its baseline holds every field it previewed, and a commit records
+ * from that baseline narrowed to the fields its edit names.
  */
 export interface StructuralPreviewSession {
   apply(action: CanvasLayerPreviewMutation): boolean;
@@ -682,8 +678,8 @@ export interface CanvasLifecycleCapability {
   dispose(): void;
   getLifecycleState(): CanvasLifecycleState;
   /**
-   * Persists unsaved pixels. With `waitForHeldPixels: false` it rejects instead of waiting while an open edit
-   * holds dirty pixels.
+   * Persists unsaved pixels. With `waitForHeldPixels: false` it rejects instead of waiting while an open edit holds
+   * dirty pixels.
    */
   flushPendingUploads(options?: { readonly waitForHeldPixels?: boolean }): Promise<void>;
 }
@@ -707,8 +703,8 @@ export type DuplicateLayersResult =
     }
   | LayerUnreadable;
 /**
- * Layer pixel operations report a distinct outcome: refused before anything changed (`busy`, `not-ready`,
- * `over-budget` when the edit could never be undone), nothing to do, or `failed` when the document refused it.
+ * Layer pixel operations report a distinct outcome: refused before anything changed (`busy`, `not-ready`, `over-budget`
+ * when the edit could never be undone), nothing to do, or `failed` when the document refused it.
  */
 export type {
   BooleanRasterResult,
@@ -754,9 +750,8 @@ export interface CanvasDiagnosticsSnapshot {
 
 export interface CanvasEngineToolCapability extends CanvasToolCapability {
   /**
-   * Whether the canvas context menu may act on a layer. The menu targets the
-   * document's SELECTED layer (never the layer under the pointer); this reports
-   * only whether an in-progress gesture/session should suppress it.
+   * Whether the canvas context menu may act on a layer. The menu targets the document's SELECTED layer (never the layer
+   * under the pointer); this reports only whether an in-progress gesture/session should suppress it.
    */
   canTargetLayerFromContextMenu(): boolean;
   handleEscapePriority(options: { gestureWasActive: boolean }): void;
@@ -764,14 +759,14 @@ export interface CanvasEngineToolCapability extends CanvasToolCapability {
   /** Refusals of edits that have no caller to report to, such as a stroke too large to undo. */
   onEditRefused(listener: (refusal: CanvasEditRefusal) => void): () => void;
   /**
-   * Samples the composite once as `#rrggbb`, or null on Escape, tool change or disposal. Restores the previous
-   * tool on either outcome.
+   * Samples the composite once as `#rrggbb`, or null on Escape, tool change or disposal. Restores the previous tool on
+   * either outcome.
    */
   requestColorSample(): Promise<string | null>;
   /**
-   * Routes unclaimed eyedropper samples to the active color target by phase. A pick previews each sample, then
-   * commits or cancels exactly once; a declined `preview` falls back to the brush color. Disposal removes only this
-   * router, preserving newer registrations.
+   * Routes unclaimed eyedropper samples to the active color target by phase. A pick previews each sample, then commits
+   * or cancels exactly once; a declined `preview` falls back to the brush color. Disposal removes only this router,
+   * preserving newer registrations.
    */
   setColorSampleRouter(router: (hex: string, phase: ColorSamplePhase) => boolean): () => void;
 }
@@ -786,8 +781,8 @@ export type BeginTransformResult =
 export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   applyTransform(): void;
   /**
-   * Selects `layerId`, switches to the transform tool and opens its session, even when transform is already active.
-   * An open session on another layer is cancelled first.
+   * Selects `layerId`, switches to the transform tool and opens its session, even when transform is already active. An
+   * open session on another layer is cancelled first.
    */
   beginTransform(layerId: string): BeginTransformResult;
   booleanMergeRasterLayers(upperLayerId: string, operation: BooleanRasterOperation): Promise<BooleanRasterResult>;
@@ -849,18 +844,18 @@ export interface CanvasEngineExportCapability extends CanvasExportCapability, Ca
 export type ControlLayerViewMode = 'original' | 'map' | 'overlay';
 
 /**
- * `missing`: no control layer with a kept original; `locked`: an operation holds the document;
- * `stale`: a newer request or an edit of the layer superseded it; `over-budget`: the original's pixels do not fit the
- * raster budget; `failed`: the original could not be decoded.
+ * `missing`: no control layer with a kept original; `locked`: an operation holds the document; `stale`: a newer request
+ * or an edit of the layer superseded it; `over-budget`: the original's pixels do not fit the raster budget; `failed`:
+ * the original could not be decoded.
  */
 export type ControlLayerViewOutcome = 'shown' | 'missing' | 'locked' | 'stale' | 'over-budget' | 'failed';
 
 export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
   /**
    * Sizes `target` to fit `maxSizePx` (never above 1:1) and draws the committed document's extent into it: the frame
-   * joined with every enabled renderable layer's bounds, the same extent `fitToView` fits. Returns that
-   * document-space rect, which the caller maps between target pixels and document space with (target pixel =
-   * (document point - rect origin) * target.width / rect.width); null without a document or 2D context.
+   * joined with every enabled renderable layer's bounds, the same extent `fitToView` fits. Returns that document-space
+   * rect, which the caller maps between target pixels and document space with (target pixel = (document point - rect
+   * origin) * target.width / rect.width); null without a document or 2D context.
    */
   drawDocumentOverview(target: HTMLCanvasElement, maxSizePx: number): Rect | null;
   preloadStagedPreview(imageName: string): void;
@@ -876,10 +871,10 @@ export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
    */
   setStagedRegions(regions: readonly StagedRegion[]): void;
   /**
-   * Display-only: shows a control layer as its kept original, the original under its map at half strength, or
-   * (`map`) as usual. One layer holds a view at a time; refused while an operation holds the document. Any edit or
-   * stroke on the layer, a selection change, an operation taking the document, a document replacement and the other
-   * resets in ARCHITECTURE.md return it to the map. Never recorded in history, persisted or exported.
+   * Display-only: shows a control layer as its kept original, the original under its map at half strength, or (`map`)
+   * as usual. One layer holds a view at a time; refused while an operation holds the document. Any edit or stroke on
+   * the layer, a selection change, an operation taking the document, a document replacement and the other resets in
+   * ARCHITECTURE.md return it to the map. Never recorded in history, persisted or exported.
    */
   setControlLayerView(layerId: string, view: ControlLayerViewMode): Promise<ControlLayerViewOutcome>;
 }
@@ -915,11 +910,11 @@ export interface StagedPreviewPlacement extends Rect {
   opacity: number;
 }
 /**
- * A staged preview always lands at absolute document coordinates pinned at submission: a candidate at its placement,
- * a progress frame (scaled to fill) at the rect its run was submitted with. Later bbox edits never move either.
- * `hidden`: the user toggled the candidate off to compare it with the canvas under it. Nothing decodes or draws, but
- * the screen keeps hiding control layers, masks, regions and the regenerate tint as the shown candidate does, so both
- * sides of the comparison read alike.
+ * A staged preview always lands at absolute document coordinates pinned at submission: a candidate at its placement, a
+ * progress frame (scaled to fill) at the rect its run was submitted with. Later bbox edits never move either. `hidden`:
+ * the user toggled the candidate off to compare it with the canvas under it. Nothing decodes or draws, but the screen
+ * keeps hiding control layers, masks, regions and the regenerate tint as the shown candidate does, so both sides of the
+ * comparison read alike.
  */
 export type StagedPreviewInput =
   | { imageName: string; placement: StagedPreviewPlacement; hidden?: boolean }

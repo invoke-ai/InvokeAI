@@ -1,7 +1,7 @@
 /**
- * Transform document points into layer-local content bounds for exact rotation/scale hit tests. All renderable
- * source types and mask alpha use the same bounds; empty content returns null/false. Helpers locate a specified
- * layer, never choose a stack target instead of panel selection.
+ * Transform document points into layer-local content bounds for exact rotation/scale hit tests. All renderable source
+ * types and mask alpha use the same bounds; empty content returns null/false. Helpers locate a specified layer, never
+ * choose a stack target instead of panel selection.
  */
 
 import type {
@@ -73,8 +73,8 @@ export const hitTestLayer = (
 };
 
 /**
- * Returns transformed content corners or null. Partial overrides preview move/scale/rotation without mutation;
- * omitted fields retain committed values.
+ * Returns transformed content corners or null. Partial overrides preview move/scale/rotation without mutation; omitted
+ * fields retain committed values.
  */
 export const layerOutlineCorners = (
   layer: CanvasLayerContract,

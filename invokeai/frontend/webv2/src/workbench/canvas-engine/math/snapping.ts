@@ -21,8 +21,8 @@ export const snapToGrid = (value: number, grid: number): number => {
 };
 
 /**
- * Snap the resulting absolute position so off-grid origins align. Preserve axes with zero delta, avoiding
- * unintended movement on locked axes.
+ * Snap the resulting absolute position so off-grid origins align. Preserve axes with zero delta, avoiding unintended
+ * movement on locked axes.
  */
 export const snapMovedPoint = (origin: Vec2, delta: Vec2, grid: number): Vec2 => ({
   x: delta.x === 0 ? origin.x : snapToGrid(origin.x + delta.x, grid),

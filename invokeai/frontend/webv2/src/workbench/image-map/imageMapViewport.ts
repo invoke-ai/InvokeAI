@@ -63,8 +63,8 @@ export const expandRangesToInclude = (
 };
 
 /**
- * Expand ranges for equal-scale axes before handing them to Plotly; otherwise its aspect correction may crop one
- * axis. Never shrink the requested box.
+ * Expand ranges for equal-scale axes before handing them to Plotly; otherwise its aspect correction may crop one axis.
+ * Never shrink the requested box.
  */
 export const fitRangesToAspect = (ranges: AxisRanges, aspectRatio: number): AxisRanges => {
   if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
@@ -106,8 +106,8 @@ const PINCH_DELTA_LIMIT_PX = 40;
 const MAX_WHEEL_ZOOM_STEP = 1.25;
 
 /**
- * Normalize delta units: Firefox mouse wheels report lines, whose raw values would otherwise produce imperceptible
- * zoom while native scrolling is prevented.
+ * Normalize delta units: Firefox mouse wheels report lines, whose raw values would otherwise produce imperceptible zoom
+ * while native scrolling is prevented.
  */
 export const normalizeWheelDeltaY = (deltaY: number, deltaMode: number): number => {
   if (deltaMode === 1) {
@@ -132,8 +132,8 @@ export const zoomFactorFromWheel = (deltaY: number, deltaMode: number, isCtrlHel
 };
 
 /**
- * Scale both ranges by `factor` while keeping the point at the given
- * fractional position (0..1 from each range's start) fixed on screen.
+ * Scale both ranges by `factor` while keeping the point at the given fractional position (0..1 from each range's start)
+ * fixed on screen.
  */
 export const zoomRangesAroundFraction = (
   ranges: AxisRanges,
@@ -156,9 +156,8 @@ export const zoomRangesAroundFraction = (
 };
 
 /**
- * If the point sits within `padFraction` of (or beyond) a viewport edge,
- * translate the ranges to center it — preserving the zoom width. Returns
- * null when the point is comfortably in view.
+ * If the point sits within `padFraction` of (or beyond) a viewport edge, translate the ranges to center it — preserving
+ * the zoom width. Returns null when the point is comfortably in view.
  */
 export const rangesToKeepMarkerInView = (
   ranges: AxisRanges,

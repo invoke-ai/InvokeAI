@@ -28,8 +28,8 @@ import {
 } from './projectsMetrics';
 
 /**
- * Virtualize derived-height rows in both layouts: grid rows hold multiple cards, list rows one. Headings share the
- * same flat index space.
+ * Virtualize derived-height rows in both layouts: grid rows hold multiple cards, list rows one. Headings share the same
+ * flat index space.
  */
 
 const MEASURE_SX: SystemStyleObject = {
@@ -55,9 +55,8 @@ const NO_PROJECTS_ICON = <Icon as={FolderIcon} />;
 
 export interface ProjectsBrowserProps {
   /**
-   * When "today" starts, captured once by the page rather than read here —
-   * reading the clock during render is impure and would rebucket unstably
-   * across re-renders.
+   * When "today" starts, captured once by the page rather than read here — reading the clock during render is impure
+   * and would rebucket unstably across re-renders.
    */
   now: number;
   pinnedIds: readonly string[];
@@ -133,14 +132,13 @@ export const ProjectsBrowser = ({
     getItemKey,
     getScrollElement,
     overscan: 4,
-    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error
-    // for any scroll event dispatched while React is rendering or flushing effects.
+    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error for
+    // any scroll event dispatched while React is rendering or flushing effects.
     useFlushSync: false,
   });
 
-  // The virtualizer caches measurements and will not re-read `estimateSize` on
-  // its own, so switching layouts or resizing the panel has to invalidate it —
-  // otherwise list rows keep the taller grid row's spacing.
+  // The virtualizer caches measurements and will not re-read `estimateSize` on its own, so switching layouts or
+  // resizing the panel has to invalidate it — otherwise list rows keep the taller grid row's spacing.
   const measureVirtualizer = useEffectEvent(() => {
     virtualizer.measure();
   });

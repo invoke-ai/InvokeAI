@@ -120,8 +120,8 @@ export const NumericInput = ({
     },
     [clearDraft]
   );
-  // Chromium steps a focused number input on wheel and swallows the scroll. Dropping focus for the event lets the
-  // panel scroll instead; focus returns, with the draft and caret, once the scroll has been dispatched.
+  // Chromium steps a focused number input on wheel and swallows the scroll. Dropping focus for the event lets the panel
+  // scroll instead; focus returns, with the draft and caret, once the scroll has been dispatched.
   const onWheel = useCallback(
     (event: WheelEvent<HTMLInputElement>) => {
       const input = event.currentTarget;
@@ -147,8 +147,8 @@ export const NumericInput = ({
     [clearDraft]
   );
 
-  // Any non-empty text React writes replaces the bad entry on screen (a reset or undo landing a number), so the
-  // flag cannot outlive it; while the entry is held the text is empty, so a lagging Canvas echo leaves it alone.
+  // Any non-empty text React writes replaces the bad entry on screen (a reset or undo landing a number), so the flag
+  // cannot outlive it; while the entry is held the text is empty, so a lagging Canvas echo leaves it alone.
   if (hasBadInput && text !== '') {
     setHasBadInput(false);
   }

@@ -61,9 +61,8 @@ export const useLayerThumbnailVersion = (
 
 /**
  * A primitive read of live engine state (document model, cached pixels), taken on every render and whenever the
- * engine's document changes or a layer publishes pixels. The React Compiler memoizes a plain render-time engine call
- * on its arguments, so it would keep a stale answer after a paint or another layer's edit; route such reads through
- * here.
+ * engine's document changes or a layer publishes pixels. The React Compiler memoizes a plain render-time engine call on
+ * its arguments, so it would keep a stale answer after a paint or another layer's edit; route such reads through here.
  */
 export const useCanvasEngineRead = <T extends boolean | number | string | null>(
   engine: CanvasCoreStoreCapability | null,

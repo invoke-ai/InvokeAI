@@ -118,8 +118,7 @@ export const PreviewFilmstrip = ({
 };
 
 /**
- * Show live/settling/queued slots with progress, device, and selected/pinned state; only running slots can be
- * followed.
+ * Show live/settling/queued slots with progress, device, and selected/pinned state; only running slots can be followed.
  */
 const FilmstripLiveThumb = ({
   isFollowed,
@@ -333,8 +332,8 @@ const FILMSTRIP_THUMB_DRAG_CSS = { filter: 'saturate(0)' } as const;
 /** Match Gallery's desaturated data-drag-armed cue before held-touch movement starts dragging. */
 const FILMSTRIP_THUMB_ARMED_CSS = { '&[data-drag-armed=true]': { filter: 'saturate(0)' } } as const;
 
-// The thumb row centers itself with `h="full"`, which needs the content
-// wrapper to actually span the viewport height rather than shrink to it.
+// The thumb row centers itself with `h="full"`, which needs the content wrapper to actually span the viewport height
+// rather than shrink to it.
 const FILMSTRIP_CONTENT_PROPS = { h: 'full' } as const;
 
 const FILMSTRIP_IMG_STYLE = {

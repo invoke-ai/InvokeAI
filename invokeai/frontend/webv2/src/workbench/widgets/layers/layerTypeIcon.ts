@@ -17,8 +17,8 @@ import {
 import type { AddLayerItemId } from './addLayerMenu';
 
 /**
- * One glyph per kind of layer a person can create, wherever a menu offers one: the add-layer menus and the image
- * menus' canvas destinations.
+ * One glyph per kind of layer a person can create, wherever a menu offers one: the add-layer menus and the image menus'
+ * canvas destinations.
  */
 export const LAYER_KIND_ICONS: Readonly<Record<AddLayerItemId, LucideIcon>> = {
   control: SlidersHorizontalIcon,

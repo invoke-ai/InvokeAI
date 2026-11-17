@@ -5,8 +5,8 @@ import { Box } from '@chakra-ui/react';
 import { Panel } from '@platform/ui';
 
 /**
- * Share floating canvas chrome and re-enable pointer events; parents own positioning and consumers compose their
- * own sections with {@link CanvasFloatingBarDivider}.
+ * Share floating canvas chrome and re-enable pointer events; parents own positioning and consumers compose their own
+ * sections with {@link CanvasFloatingBarDivider}.
  */
 export const CanvasFloatingBar = ({ children, ...rest }: PanelProps) => (
   <Panel density="sm" pointerEvents="auto" rounded="lg" shadow="lg" p="1" tone="surface" {...rest}>

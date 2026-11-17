@@ -31,8 +31,8 @@ import {
 } from '@features/workflow/utility';
 
 /**
- * Rebuild from document truth while preserving unchanged identities and selection. Precompute connection/exposure
- * facts so nodes need no workbench subscriptions.
+ * Rebuild from document truth while preserving unchanged identities and selection. Precompute connection/exposure facts
+ * so nodes need no workbench subscriptions.
  */
 
 /**
@@ -519,9 +519,9 @@ export const withCollapsedEdgeSiblings = (
 /**
  * Edge changes with each collapsed group selected as one. A group follows its drawn edge: its state after this batch
  * (its current state, or the change addressed to it) goes to every member. Changes addressed to hidden members are
- * dropped: xyflow reports them only because their state differs, as when a click re-selects the drawn edge and
- * xyflow deselects everything else, so they would otherwise overturn the drawn edge. One lookup per call; the changes
- * pass through untouched when nothing is collapsed.
+ * dropped: xyflow reports them only because their state differs, as when a click re-selects the drawn edge and xyflow
+ * deselects everything else, so they would otherwise overturn the drawn edge. One lookup per call; the changes pass
+ * through untouched when nothing is collapsed.
  */
 export const withCollapsedGroupSelection = <Change extends { id?: string; type: string }>(
   document: Pick<ProjectGraphState, 'edges' | 'nodes'>,

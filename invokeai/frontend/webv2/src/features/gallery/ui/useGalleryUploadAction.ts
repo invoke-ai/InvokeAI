@@ -52,8 +52,8 @@ export interface GalleryUploadOptions {
   /** Selects the newest upload where the Gallery shows it; absent hosts leave the selection alone. */
   gallery?: Pick<GalleryCommandsPort, 'selectItem' | 'setView'>;
   /**
-   * Where the Gallery widget is showing on completion; the newest upload visible there gets selected. Omit to leave
-   * the selection alone, as hosts without a workbench must.
+   * Where the Gallery widget is showing on completion; the newest upload visible there gets selected. Omit to leave the
+   * selection alone, as hosts without a workbench must.
    */
   getCurrentGalleryLocation?: () => { galleryView: GalleryView; selectedBoardId: string };
   notifications: GalleryNotificationsPort;
@@ -65,8 +65,8 @@ export interface GalleryUploadOptions {
   revealInReceivingTab?: boolean;
   /**
    * A getter is read when the upload starts and, when it names a real board, once more after the listing of every
-   * readable board is ensured, the second reading deciding: for hosts that resolve the board from that listing or
-   * must not re-render on board changes.
+   * readable board is ensured, the second reading deciding: for hosts that resolve the board from that listing or must
+   * not re-render on board changes.
    */
   selectedBoardId: string | (() => string);
   t: TFunction;
@@ -107,9 +107,9 @@ export const uploadGalleryFiles = async (
     return [];
   }
 
-  // A board is judged from the listing of every readable board, never trusted as given: an upload to a board
-  // that was deleted, archived out of reach or shared read-only since the panel listed it would only fail.
-  // Uncategorized and virtual boards need no listing.
+  // A board is judged from the listing of every readable board, never trusted as given: an upload to a board that was
+  // deleted, archived out of reach or shared read-only since the panel listed it would only fail. Uncategorized and
+  // virtual boards need no listing.
   if (isGalleryBoardId(selectedBoardId)) {
     await ensureGalleryBoardDestinations(queryClient);
     if (!isAccountScopeCurrent(owner)) {
@@ -147,9 +147,9 @@ export const uploadGalleryFiles = async (
     boards.find((board) => board.id === selectedBoardId) ?? getCachedGalleryBoard(selectedBoardId, queryClient);
   const targetBoardName = selectedBoard ? getGalleryBoardLabel(selectedBoard, t) : t('widgets.gallery.uncategorized');
 
-  // Refused before any upload: the server would refuse each file, leaving nothing but errors. The reason comes
-  // from the listing that decided, not the panel's older view of the board. The listing is read again at once,
-  // so the panel stops offering the board and the next upload is judged afresh.
+  // Refused before any upload: the server would refuse each file, leaving nothing but errors. The reason comes from the
+  // listing that decided, not the panel's older view of the board. The listing is read again at once, so the panel
+  // stops offering the board and the next upload is judged afresh.
   if (isGalleryBoardId(selectedBoardId) && !canAddToCachedGalleryBoard(selectedBoardId, queryClient)) {
     const cachedBoard = getCachedGalleryBoard(selectedBoardId, queryClient);
     const cachedBoardName = cachedBoard ? getGalleryBoardLabel(cachedBoard, t) : targetBoardName;
@@ -230,8 +230,8 @@ export const uploadGalleryFiles = async (
       });
     }
 
-    // What landed is listed; a board that refused a file leaves the listing's view of it stale. Either way the
-    // gallery, boards included, reads again.
+    // What landed is listed; a board that refused a file leaves the listing's view of it stale. Either way the gallery,
+    // boards included, reads again.
     void invalidateGallery(queryClient);
 
     if (uploadedItems.length === 0) {
@@ -252,9 +252,9 @@ export const uploadGalleryFiles = async (
     const visibleUploads = uploadsOnBoard.filter(
       (item) => getGalleryItemView(item) === currentGalleryLocation?.galleryView
     );
-    // Uploaded images and videos land on different tabs; when nothing landed on the one showing, switch to the
-    // one that received them, so the upload is seen. A mixed upload always has some on the tab showing. A Gallery
-    // the user moved while the upload ran keeps where they took it.
+    // Uploaded images and videos land on different tabs; when nothing landed on the one showing, switch to the one that
+    // received them, so the upload is seen. A mixed upload always has some on the tab showing. A Gallery the user moved
+    // while the upload ran keeps where they took it.
     const isGalleryWhereLaunched =
       revealInReceivingTab &&
       launchLocation !== undefined &&

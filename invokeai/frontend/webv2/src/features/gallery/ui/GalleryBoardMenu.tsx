@@ -69,9 +69,9 @@ export const GalleryBoardMenu = ({
   // Other than an inbox, a real board is managed as far as the server allows the caller.
   const isManagedBoard = board !== null && isManagedGalleryBoard(board, gallery.projectBoardId);
   const can = (action: GalleryBoardAction) => board !== null && isManagedBoard && canOnBoard(board, action);
-  // A dialog stays open only while the board is listed and still allows its action: a refetch after a revocation
-  // or a deletion elsewhere closes it, for good, rather than leaving a change that would only be refused or reopening
-  // it with what was typed when access returns.
+  // A dialog stays open only while the board is listed and still allows its action: a refetch after a revocation or a
+  // deletion elsewhere closes it, for good, rather than leaving a change that would only be refused or reopening it
+  // with what was typed when access returns.
   const isStillAllowed = (dialogBoard: GalleryBoard, action: GalleryBoardAction) => {
     const listed = gallery.boards.find((candidate) => candidate.id === dialogBoard.id);
     return Boolean(listed && canOnBoard(listed, action));
@@ -167,8 +167,8 @@ export const GalleryBoardMenu = ({
           <Menu.Positioner>
             {board && (
               <MenuContent
-                // Focus moves to the items, outside the header's group: the menu itself is described by it, so
-                // whose board it is and what the caller may do is announced as the menu opens.
+                // Focus moves to the items, outside the header's group: the menu itself is described by it, so whose
+                // board it is and what the caller may do is announced as the menu opens.
                 aria-describedby={hasAccessHeader(board) ? accessHeaderId : undefined}
                 minW="12rem"
               >
@@ -331,7 +331,8 @@ const BoardDeleteDialog = ({
   ) {
     setKeptAnswer({ check: answer, opening });
   }
-  // Unticking stops a check still running too; it reverts, so ticking again asks again. An answer stays for the opening.
+  // Unticking stops a check still running too; it reverts, so ticking again asks again. An answer stays for the
+  // opening.
   const cancelUsageCheck = useCallback(
     () => void queryClient.cancelQueries({ exact: true, queryKey: usageQueryKey }),
     [queryClient, usageQueryKey]
@@ -519,8 +520,8 @@ const BoardExportProjectMenuItem = ({ board }: { board: GalleryBoard }) => {
 const SUBMENU_POSITIONING = { gutter: 2, placement: 'right-start' } as const;
 
 /**
- * Where a board can go: the Library, then under a Projects heading the open project and the account's other projects
- * by name — every tier but the one it is in. Nested so the board menu keeps its one-level shape for the common actions.
+ * Where a board can go: the Library, then under a Projects heading the open project and the account's other projects by
+ * name — every tier but the one it is in. Nested so the board menu keeps its one-level shape for the common actions.
  */
 const BoardMoveSubMenu = ({
   board,
@@ -746,8 +747,8 @@ const BoardMenuItem = ({
 );
 
 /**
- * Whose board someone else's board is and what the caller may do with it, above its actions: the menu offers only
- * what is allowed, so this says why the rest is missing and whom to ask. Nothing on the caller's own boards.
+ * Whose board someone else's board is and what the caller may do with it, above its actions: the menu offers only what
+ * is allowed, so this says why the rest is missing and whom to ask. Nothing on the caller's own boards.
  */
 const hasAccessHeader = (board: GalleryBoard) => board.access !== undefined && board.access.role !== 'owner';
 

@@ -112,8 +112,8 @@ export const releaseNotificationActions = (actions: readonly WorkbenchNotificati
 };
 
 /**
- * Keeps the undo entries the listed notifications still offer and frees the rest no toast holds: after the list
- * changed (a dismiss, Clear, a record pushed past the limit) or a project closed, whose undos are no longer offered.
+ * Keeps the undo entries the listed notifications still offer and frees the rest no toast holds: after the list changed
+ * (a dismiss, Clear, a record pushed past the limit) or a project closed, whose undos are no longer offered.
  */
 export const retainNotificationActions = (
   notifications: readonly WorkbenchNotification[],

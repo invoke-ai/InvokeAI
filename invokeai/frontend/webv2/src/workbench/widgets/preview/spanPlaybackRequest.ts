@@ -1,8 +1,8 @@
 import type { GalleryItemKey } from '@features/gallery';
 
 /**
- * Publish ephemeral tokenized trim-playback intents after selecting media and raising Preview. Expire stale requests
- * to prevent unexpected delayed audio; the player reports running state and stop control under the same token.
+ * Publish ephemeral tokenized trim-playback intents after selecting media and raising Preview. Expire stale requests to
+ * prevent unexpected delayed audio; the player reports running state and stop control under the same token.
  */
 
 export interface VideoSpanPlaybackRequest {
@@ -65,8 +65,8 @@ export const subscribeVideoSpanPlaybackRequests = (listener: () => void): (() =>
 };
 
 /**
- * Report actual element playback for the current span, null before use, after leaving it, or while hidden.
- * Pausing keeps the span armed for the player's resume.
+ * Report actual element playback for the current span, null before use, after leaving it, or while hidden. Pausing
+ * keeps the span armed for the player's resume.
  */
 export interface VideoSpanPlaybackState {
   isPlaying: boolean;

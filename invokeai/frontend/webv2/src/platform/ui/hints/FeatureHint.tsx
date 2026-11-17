@@ -123,8 +123,8 @@ const ExclusionProvider = ({ children }: { children: ReactNode }) => {
 };
 
 /**
- * Suppress pointer hints over nested tooltip controls by treating entry/exit as trigger leave/enter; keyboard
- * focus is unaffected.
+ * Suppress pointer hints over nested tooltip controls by treating entry/exit as trigger leave/enter; keyboard focus is
+ * unaffected.
  */
 export const FeatureHintExclusion = ({ children }: { children: ReactElement<HTMLAttributes<HTMLElement>> }) => {
   const handlers = useContext(ExclusionContext);
@@ -134,8 +134,8 @@ export const FeatureHintExclusion = ({ children }: { children: ReactElement<HTML
 type Point = { x: number; y: number };
 
 /**
- * What one hint's hover-card callbacks share outside render: the card element, the panel found once per opening,
- * and the grace corridor in progress.
+ * What one hint's hover-card callbacks share outside render: the card element, the panel found once per opening, and
+ * the grace corridor in progress.
  */
 const createHintSession = () => {
   let card: HTMLElement | null = null;
@@ -165,8 +165,8 @@ const createHintSession = () => {
     },
     /**
      * Leaving the label toward an open card keeps it open while the pointer travels the corridor to it, as long as it
-     * gets closer within each `CORRIDOR_GRACE_MS`. Leaving the corridor, another hint's label, a scroll, or the pointer leaving the
-     * page calls `close`, as leaving the label would have. Returns false when no corridor applies.
+     * gets closer within each `CORRIDOR_GRACE_MS`. Leaving the corridor, another hint's label, a scroll, or the pointer
+     * leaving the page calls `close`, as leaving the label would have. Returns false when no corridor applies.
      */
     startCorridor: (exit: Point, trigger: HTMLElement, close: () => void): boolean => {
       cancelCorridor();
@@ -240,8 +240,8 @@ type HintCorridor = Pick<ReturnType<typeof createHintSession>, 'cancelCorridor' 
 
 /**
  * The label as the card's trigger. The card opens beside the panel, out of reach of the close delay, so the trigger
- * hands an open card's pointer leave to the session's grace corridor. Escape and blur still close it through the
- * hover card.
+ * hands an open card's pointer leave to the session's grace corridor. Escape and blur still close it through the hover
+ * card.
  */
 const HintTrigger = ({ cancelCorridor, children, startCorridor }: HintCorridor & { children: ReactElement }) => {
   const hoverCard = useHoverCardContext();
@@ -297,8 +297,8 @@ export const FeatureHint = ({ children, hint }: FeatureHintProps) => {
     }),
     [getAnchorRect, hint]
   );
-  // The panel around a label can change between openings, never during one. A press outside the card closes it
-  // through the hover card's dismissal, which ends any corridor with it.
+  // The panel around a label can change between openings, never during one. A press outside the card closes it through
+  // the hover card's dismissal, which ends any corridor with it.
   const handleOpenChange = useCallback(
     ({ open }: { open: boolean }) => {
       if (open) {

@@ -25,8 +25,8 @@ const usePaintOptions = (engine: ToolFormProps['engine']) => {
   const eraser = useEraserOptions(engine);
   const isEraser = activeTool === 'eraser';
   const options = isEraser ? eraser : brush;
-  // Patch the store's current options: a scrubber drag keeps the handler it started with, so options captured at
-  // its start would undo a size hotkey pressed mid-drag.
+  // Patch the store's current options: a scrubber drag keeps the handler it started with, so options captured at its
+  // start would undo a size hotkey pressed mid-drag.
   const set = useCallback(
     (changes: Partial<typeof options>) => {
       if (isEraser) {
@@ -103,8 +103,8 @@ const PaintColorSettings = ({ engine }: ToolFormProps) => {
 };
 
 /**
- * Width and opacity are separate pressure responses (opacity also costs a scratch refill per frame). The eraser
- * exposes width only: pressure never modulates erase strength.
+ * Width and opacity are separate pressure responses (opacity also costs a scratch refill per frame). The eraser exposes
+ * width only: pressure never modulates erase strength.
  */
 const PaintDynamicsSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();

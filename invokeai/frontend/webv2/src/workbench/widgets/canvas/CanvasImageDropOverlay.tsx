@@ -44,8 +44,8 @@ const CANVAS_IMAGE_DROP_ZONES = CANVAS_IMAGE_DROP_LAYOUT.map((zone) => ({
 })) satisfies readonly CanvasImageDropZoneProps[];
 
 /**
- * The drop zones over the canvas while a gallery image is dragged with dnd-kit, or files from the desktop
- * (`fileDrag`); both land the same way. A canvas held by a running operation takes neither and says so instead.
+ * The drop zones over the canvas while a gallery image is dragged with dnd-kit, or files from the desktop (`fileDrag`);
+ * both land the same way. A canvas held by a running operation takes neither and says so instead.
  */
 export const CanvasImageDropOverlay = ({
   fileDrag,

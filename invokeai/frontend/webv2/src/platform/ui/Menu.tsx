@@ -26,9 +26,10 @@ import { useRegisterWidgetOverlay } from './widgetOverlays';
 type MenuContentProps = Omit<ComponentProps<typeof Menu.Content>, 'ref'>;
 
 /**
- * The layout of menu content whose list scrolls (`ScrollableMenuContent`, or `ScrollableMenuList` inside it): it grows to
- * the context menus' cap or the room the positioner measured beside its anchor, then the list scrolls. The column gives
- * the list the content's padded box, so its last row is never cut off by the padding, and rows after it stay in view.
+ * The layout of menu content whose list scrolls (`ScrollableMenuContent`, or `ScrollableMenuList` inside it): it grows
+ * to the context menus' cap or the room the positioner measured beside its anchor, then the list scrolls. The column
+ * gives the list the content's padded box, so its last row is never cut off by the padding, and rows after it stay in
+ * view.
  */
 export const SCROLLABLE_MENU_CONTENT_PROPS = {
   display: 'flex',
@@ -109,8 +110,8 @@ export interface MenuHeadingGroupProps {
 }
 
 /**
- * A menu's title over the items it names. It keeps the group label's size, weight, padding and height so a titled
- * menu reads like every other one, and labels the group, so assistive technology hears it without a focusable row.
+ * A menu's title over the items it names. It keeps the group label's size, weight, padding and height so a titled menu
+ * reads like every other one, and labels the group, so assistive technology hears it without a focusable row.
  */
 export const MenuHeadingGroup = ({ children, label, trailing }: MenuHeadingGroupProps) => (
   <Menu.ItemGroup>
@@ -311,8 +312,8 @@ const ignoreSelect = () => undefined;
 
 /**
  * An unavailable item in the place of a part still loading or that failed to, so the menu holds only menu items. Not
- * `disabled`: Zag skips disabled items in keyboard navigation, so a menu holding only this one would leave the
- * keyboard nothing to reach and the state unannounced.
+ * `disabled`: Zag skips disabled items in keyboard navigation, so a menu holding only this one would leave the keyboard
+ * nothing to reach and the state unannounced.
  */
 export const MenuPartPlaceholder = ({ status }: { status: MenuPartSnapshot<unknown>['status'] }) => {
   const { t } = useTranslation();
@@ -500,9 +501,9 @@ const activeMenu = createExternalStore<{ owner: string | null; anchor: ContextMe
 });
 
 /**
- * Menus sharing this ownership replace one another; none is a parent of the next. The layer stack dismisses every
- * layer registered after one being torn down, so a menu that registers before its predecessor is gone (its content
- * still mounted from an exit animation) would be closed as if nested. Pass this as the menu root's `onRequestDismiss`.
+ * Menus sharing this ownership replace one another; none is a parent of the next. The layer stack dismisses every layer
+ * registered after one being torn down, so a menu that registers before its predecessor is gone (its content still
+ * mounted from an exit animation) would be closed as if nested. Pass this as the menu root's `onRequestDismiss`.
  */
 const keepOpenThroughSiblingTeardown = (event: Event) => event.preventDefault();
 

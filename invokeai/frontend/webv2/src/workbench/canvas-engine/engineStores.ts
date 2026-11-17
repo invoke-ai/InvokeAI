@@ -1,6 +1,6 @@
 /**
- * Per-engine React-free external stores expose narrow interaction snapshots and subscriptions. Widget hooks adapt
- * them to React without coupling the engine to UI.
+ * Per-engine React-free external stores expose narrow interaction snapshots and subscriptions. Widget hooks adapt them
+ * to React without coupling the engine to UI.
  */
 
 import type { PsdExportStatus } from '@workbench/canvas-engine/capabilities';
@@ -36,8 +36,8 @@ export interface BrushOptions {
   /** Whether pen pressure modulates the stroke width. */
   pressureAffectsWidth: boolean;
   /**
-   * Pressure-alpha is off by default: unlike width modulation it refills the full scratch region each frame and
-   * changes stroke appearance.
+   * Pressure-alpha is off by default: unlike width modulation it refills the full scratch region each frame and changes
+   * stroke appearance.
    */
   pressureAffectsOpacity: boolean;
 }
@@ -55,8 +55,8 @@ export interface EraserOptions {
 }
 
 /**
- * Quick-switch memory (Q): the layer a user bookmarked from its menu, and the layer selected before the current
- * one. Transient like tool options: it lives with the engine, never in the project.
+ * Quick-switch memory (Q): the layer a user bookmarked from its menu, and the layer selected before the current one.
+ * Transient like tool options: it lives with the engine, never in the project.
  */
 export interface LayerQuickSwitchState {
   /** Set from the layer menu; a stale id (the layer was removed) is ignored by readers. */
@@ -173,8 +173,8 @@ export const DEFAULT_GRADIENT_OPTIONS: Readonly<Omit<GradientToolOptions, 'stops
 };
 
 /**
- * New-text defaults and live style. Initial color comes from foreground; active session and selected-layer colors
- * are independently stored.
+ * New-text defaults and live style. Initial color comes from foreground; active session and selected-layer colors are
+ * independently stored.
  */
 export interface TextToolOptions {
   fontFamily: string;
@@ -488,8 +488,8 @@ export interface EngineStores {
   /** Text tool options (font family / size / weight / line-height / align). */
   textOptions: ScalarStore<TextToolOptions>;
   /**
-   * Text session drives the portal, live style controls and composite suppression. Commit, cancel, real tool
-   * switch, deletion or replacement clears it.
+   * Text session drives the portal, live style controls and composite suppression. Commit, cancel, real tool switch,
+   * deletion or replacement clears it.
    */
   textEditSession: ScalarStore<TextEditSession | null>;
   /** Document-space shape preview replaces dispatch during drag; null when idle, cleared on commit/cancel. */

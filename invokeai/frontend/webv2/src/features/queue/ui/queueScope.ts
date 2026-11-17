@@ -106,9 +106,9 @@ const getRevealAt = (run: QueueLocalRun, isConnected: boolean): number =>
   run.retry !== null || !isConnected ? Number.NEGATIVE_INFINITY : run.submittedAt + LOCAL_RUN_REVEAL_DELAY_MS;
 
 /**
- * The scoped runs the queue widget lists and counts: those `getRevealAt` has reached. A run restored from storage is old,
- * so it shows at once; a hung first request shows after the delay. Its caller re-renders as each one comes due, on one
- * timer at a time, cleared when it unmounts.
+ * The scoped runs the queue widget lists and counts: those `getRevealAt` has reached. A run restored from storage is
+ * old, so it shows at once; a hung first request shows after the delay. Its caller re-renders as each one comes due, on
+ * one timer at a time, cleared when it unmounts.
  */
 export const useShownLocalRuns = (): readonly QueueLocalRun[] => {
   const { isConnected } = useQueueUi();

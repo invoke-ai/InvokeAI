@@ -2,8 +2,8 @@ import type { ModelConfig } from '@features/models';
 import type { ControlType } from '@workbench/canvas-engine/api';
 
 /**
- * What a control map encodes. A control type groups the families its detectors produce; a control model is trained
- * on one family (or, for union models, several).
+ * What a control map encodes. A control type groups the families its detectors produce; a control model is trained on
+ * one family (or, for union models, several).
  */
 export type ControlFamily =
   | 'openpose'
@@ -130,8 +130,8 @@ export const getDetectorFamily = (type: ControlType, detectorType: string | null
 };
 
 /**
- * The control type a detector run belongs to, for maps made outside a control layer (a raster filter saved as
- * control). An entry that fixes settings beats a generic one, so PiDi with `scribble` is a sketch.
+ * The control type a detector run belongs to, for maps made outside a control layer (a raster filter saved as control).
+ * An entry that fixes settings beats a generic one, so PiDi with `scribble` is a sketch.
  */
 export const controlTypeForDetector = (detector: {
   type: string;
@@ -156,8 +156,8 @@ export const controlTypeForDetector = (detector: {
 };
 
 /**
- * Model `default_settings.preprocessor` values mapped to the family they produce: the legacy `*_image_processor`
- * ids older installs carry, the filter node ids the model manager saves today, and `tile`.
+ * Model `default_settings.preprocessor` values mapped to the family they produce: the legacy `*_image_processor` ids
+ * older installs carry, the filter node ids the model manager saves today, and `tile`.
  */
 export const PREPROCESSOR_FAMILY: Readonly<Record<string, ControlFamily>> = {
   canny_edge_detection: 'canny',

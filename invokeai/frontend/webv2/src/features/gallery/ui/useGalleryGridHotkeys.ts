@@ -10,8 +10,8 @@ import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 /**
- * How an arrow moves: `select` replaces the selection with the next tile, `extend` selects the range from the anchor
- * to it, and `focus` moves keyboard focus alone, so a toggle can then build a discontiguous selection.
+ * How an arrow moves: `select` replaces the selection with the next tile, `extend` selects the range from the anchor to
+ * it, and `focus` moves keyboard focus alone, so a toggle can then build a discontiguous selection.
  */
 export type GalleryNavigationMode = 'extend' | 'focus' | 'select';
 
@@ -67,8 +67,7 @@ const GALLERY_HOTKEYS = [
 ])[];
 
 /**
- * Read current handler state without re-registering commands on selection changes, avoiding palette and hotkey
- * churn.
+ * Read current handler state without re-registering commands on selection changes, avoiding palette and hotkey churn.
  */
 export const useGalleryGridHotkeys = ({
   actionSelectionRefs,
@@ -126,8 +125,8 @@ export const useGalleryGridHotkeys = ({
   // A run of Shift+arrows keeps the anchor it started from; the range it last reached says whether it is still running.
   const keyboardRangeRef = useRef<{ anchorKey: GalleryItemKey | null; reachedKey: GalleryItemKey } | null>(null);
 
-  // A run continues from its own anchor. A new one starts from the persisted primary, which outlives its tile when
-  // a sparse page leaves the viewport; a stored null would let the next step re-anchor on the moved primary.
+  // A run continues from its own anchor. A new one starts from the persisted primary, which outlives its tile when a
+  // sparse page leaves the viewport; a stored null would let the next step re-anchor on the moved primary.
   const getRangeAnchorKey = (cursorKey: string | null): GalleryItemKey | null => {
     const range = keyboardRangeRef.current;
 

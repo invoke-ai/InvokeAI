@@ -101,8 +101,8 @@ export const nodeExecutionStore = {
     });
   },
   /**
-   * The queue item running these nodes reached a terminal state: a node still marked running
-   * finished with it, or never will (its failure/cancel event was lost or never sent).
+   * The queue item running these nodes reached a terminal state: a node still marked running finished with it, or never
+   * will (its failure/cancel event was lost or never sent).
    */
   settleRunning(nodeIds: Iterable<string>, outcome: NodeExecutionOutcome, error?: string): void {
     for (const nodeId of nodeIds) {

@@ -10,8 +10,8 @@ import type { WidgetInstanceId } from '@workbench/widgetContracts';
 import { isWidgetRegion, WIDGET_REGIONS } from '@workbench/layoutContracts';
 
 /**
- * Pure geometry, stacking, and placement rules for floating widget windows. The reducer owns the state;
- * components clamp against the live viewport (the reducer never reads window dimensions).
+ * Pure geometry, stacking, and placement rules for floating widget windows. The reducer owns the state; components
+ * clamp against the live viewport (the reducer never reads window dimensions).
  */
 
 export const FLOATING_DEFAULT_WIDTH_PX = 520;
@@ -49,9 +49,9 @@ export const clampSizeToMinimum = (geometry: FloatingGeometry): FloatingGeometry
 });
 
 /**
- * Keep at least a grabbable corner of the window inside the viewport so a
- * drag (or a shrunk browser window) can never strand it off-screen. The window is never shown wider than the
- * viewport, so that displayed width — not a larger stored one — is what has to stay reachable.
+ * Keep at least a grabbable corner of the window inside the viewport so a drag (or a shrunk browser window) can never
+ * strand it off-screen. The window is never shown wider than the viewport, so that displayed width — not a larger
+ * stored one — is what has to stay reachable.
  */
 export const clampWindowToViewport = (
   geometry: FloatingGeometry,
@@ -66,15 +66,15 @@ export const clampWindowToViewport = (
 });
 
 /**
- * What a move or resize commits: on each axis the gesture actually changed, the result from the rectangle on
- * screen, held in the viewport by {@link clampWindowToViewport}; on an axis it left alone, what was stored. An
- * untouched axis may be showing the viewport's clamp or cap, which is not the user's choice to persist. An axis
- * counts as changed only when the clamp lets the change show: a push against the viewport's edge, which the clamp
- * holds where it was, keeps what was stored too. Null when the gesture changed nothing on screen — a press that
- * never moves, or a drag against the minimum, the cap, or the edge.
+ * What a move or resize commits: on each axis the gesture actually changed, the result from the rectangle on screen,
+ * held in the viewport by {@link clampWindowToViewport}; on an axis it left alone, what was stored. An untouched axis
+ * may be showing the viewport's clamp or cap, which is not the user's choice to persist. An axis counts as changed only
+ * when the clamp lets the change show: a push against the viewport's edge, which the clamp holds where it was, keeps
+ * what was stored too. Null when the gesture changed nothing on screen — a press that never moves, or a drag against
+ * the minimum, the cap, or the edge.
  *
- * `viewport` is the one CSS holds `start` in, in the same fractional pixels: one rounded to whole pixels puts the
- * edge up to a pixel away from where the window sits, and a push into it would read as a move.
+ * `viewport` is the one CSS holds `start` in, in the same fractional pixels: one rounded to whole pixels puts the edge
+ * up to a pixel away from where the window sits, and a push into it would read as a move.
  */
 export const commitChangedAxes = (
   stored: FloatingGeometry,
@@ -82,9 +82,9 @@ export const commitChangedAxes = (
   changedTo: FloatingGeometry,
   viewport: { width: number; height: number }
 ): FloatingGeometry | null => {
-  // The rectangle on screen can sit on fractional pixels, and what is committed is whole ones: a difference under
-  // half a pixel is arithmetic, not the user. Changes are read before the clamp too, so the clamp never moves an
-  // axis the gesture did not touch.
+  // The rectangle on screen can sit on fractional pixels, and what is committed is whole ones: a difference under half
+  // a pixel is arithmetic, not the user. Changes are read before the clamp too, so the clamp never moves an axis the
+  // gesture did not touch.
   const changed = (from: number, to: number) => Math.abs(to - from) >= 0.5;
   const placed = clampWindowToViewport(changedTo, viewport);
   const horizontal =
@@ -108,10 +108,10 @@ export const commitChangedAxes = (
 export type FloatingResizeEdge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
 /**
- * Resize from one edge or corner by a pointer offset. The opposite side stays where it is, the size stays between
- * the minimum and `max` (the viewport, which is as large as a window is ever shown), and the top edge stops at the
- * viewport's top so the title bar stays reachable. A viewport smaller than the minimum lowers the minimum to it:
- * the window is shown at the viewport's size there, and raising it to the minimum would read as a resize.
+ * Resize from one edge or corner by a pointer offset. The opposite side stays where it is, the size stays between the
+ * minimum and `max` (the viewport, which is as large as a window is ever shown), and the top edge stops at the
+ * viewport's top so the title bar stays reachable. A viewport smaller than the minimum lowers the minimum to it: the
+ * window is shown at the viewport's size there, and raising it to the minimum would read as a resize.
  */
 export const resizeFloatingGeometry = (
   start: FloatingGeometry,
@@ -146,9 +146,8 @@ export const resizeFloatingGeometry = (
   return geometry;
 };
 
-// Placement: where a floating window returns to. A floating instance belongs to no region's `instanceIds`; its
-// return region keeps a marker for it instead, and reducers, normalization, and rails all read that marker's
-// position here.
+// Placement: where a floating window returns to. A floating instance belongs to no region's `instanceIds`; its return
+// region keeps a marker for it instead, and reducers, normalization, and rails all read that marker's position here.
 
 /** The placement half of a window: the slot its return region keeps for it. */
 export type FloatingWidgetPlacement = Pick<FloatingWidgetState, 'returnIndex' | 'returnRegion'>;
@@ -168,9 +167,9 @@ const compareInstanceIds = (left: WidgetInstanceId, right: WidgetInstanceId): nu
  * One region's complete order: its docked instances plus a marker for each window that returns to it. A marker's
  * `returnIndex` is its position in this order, so docking never moves anything the rail shows.
  *
- * Indices persisted before markers were counted, and missing or colliding ones, are read best-effort: ascending,
- * ties broken by instance id, absent ones appended. That is deterministic, but it does not reconstruct the
- * arrangement those windows were floated from.
+ * Indices persisted before markers were counted, and missing or colliding ones, are read best-effort: ascending, ties
+ * broken by instance id, absent ones appended. That is deterministic, but it does not reconstruct the arrangement those
+ * windows were floated from.
  */
 export const getRegionOrder = (
   region: WidgetRegion,
@@ -204,8 +203,8 @@ export const getRegionOrder = (
 };
 
 /**
- * The one shape a window's state is written in. Persistence compares documents as JSON, key order included, so a
- * window built by a reducer has to serialize exactly as the same window read back by a reload.
+ * The one shape a window's state is written in. Persistence compares documents as JSON, key order included, so a window
+ * built by a reducer has to serialize exactly as the same window read back by a reload.
  */
 export const toFloatingWidgetState = ({
   heightPx,
@@ -252,9 +251,9 @@ export const writeRegionOrder = (
 };
 
 /**
- * Whether the center is still waiting for this instance: it emptied when the instance floated and nothing has
- * taken its place since. Docking or removing the window then gives the center its view back. Emptiness is by
- * membership, not by what can render — state has no widget registry to ask.
+ * Whether the center is still waiting for this instance: it emptied when the instance floated and nothing has taken its
+ * place since. Docking or removing the window then gives the center its view back. Emptiness is by membership, not by
+ * what can render — state has no widget registry to ask.
  */
 export const isAwaitedCenterView = (
   center: Pick<WidgetRegionState, 'activeInstanceId' | 'instanceIds'>,
@@ -311,9 +310,9 @@ const validateFloatingWidgets = (
 
 /**
  * The one normalization for stored placements — hydrated projects, stored presets, applied presets, and preset
- * comparison all pass through it, so the same arrangement always reads the same way. Malformed windows are
- * dropped, a floating instance leaves every region (an emptied center keeps naming it, so it can come back), and
- * every marker's return index becomes its position in {@link getRegionOrder}. Running it twice changes nothing.
+ * comparison all pass through it, so the same arrangement always reads the same way. Malformed windows are dropped, a
+ * floating instance leaves every region (an emptied center keeps naming it, so it can come back), and every marker's
+ * return index becomes its position in {@link getRegionOrder}. Running it twice changes nothing.
  */
 export const normalizeFloatingPlacement = (
   widgetRegions: Record<WidgetRegion, WidgetRegionState>,
@@ -350,8 +349,8 @@ export const normalizeFloatingPlacement = (
 };
 
 /**
- * A region after some of its instances floated away. The center never collapses and, once empty, keeps naming the
- * view it lost; an emptied rail collapses and names nothing.
+ * A region after some of its instances floated away. The center never collapses and, once empty, keeps naming the view
+ * it lost; an emptied rail collapses and names nothing.
  */
 export const withoutFloatedInstances = (
   regionId: WidgetRegion,
@@ -375,10 +374,10 @@ const toRememberedGeometry = ({ heightPx, widthPx, x, y }: FloatingWidgetGeometr
 });
 
 /**
- * Keep the memory of closed windows in step with a change to the open ones, so it always reads the way
- * {@link normalizeLastFloatingGeometry} would leave it: a window that was open and no longer is leaves its
- * geometry behind, one that is open now has none (its geometry is its own state), and an instance that no longer
- * exists is forgotten. Returns the same memory when nothing changed, and undefined when nothing is remembered.
+ * Keep the memory of closed windows in step with a change to the open ones, so it always reads the way {@link
+ * normalizeLastFloatingGeometry} would leave it: a window that was open and no longer is leaves its geometry behind,
+ * one that is open now has none (its geometry is its own state), and an instance that no longer exists is forgotten.
+ * Returns the same memory when nothing changed, and undefined when nothing is remembered.
  */
 export const rememberClosedWindows = (
   remembered: Record<WidgetInstanceId, FloatingWidgetGeometry> | undefined,
@@ -408,9 +407,9 @@ export const rememberClosedWindows = (
 };
 
 /**
- * Bring a remembered rectangle wholly into the viewport. The sliver policy suits a window that was already open
- * when the viewport shrank; a window the user has just asked to float should arrive where they can use it. The
- * size is left alone: CSS caps what is shown, and the stored size returns when there is room.
+ * Bring a remembered rectangle wholly into the viewport. The sliver policy suits a window that was already open when
+ * the viewport shrank; a window the user has just asked to float should arrive where they can use it. The size is left
+ * alone: CSS caps what is shown, and the stored size returns when there is room.
  */
 export const fitWindowIntoViewport = (
   geometry: FloatingGeometry,
@@ -422,8 +421,8 @@ export const fitWindowIntoViewport = (
 });
 
 /**
- * Stored memory of where docked or closed windows last floated. Keeps well-formed geometry for instances that
- * exist and are not floating now — a floating window's geometry is its own state — and reports none as undefined.
+ * Stored memory of where docked or closed windows last floated. Keeps well-formed geometry for instances that exist and
+ * are not floating now — a floating window's geometry is its own state — and reports none as undefined.
  */
 export const normalizeLastFloatingGeometry = (
   stored: unknown,

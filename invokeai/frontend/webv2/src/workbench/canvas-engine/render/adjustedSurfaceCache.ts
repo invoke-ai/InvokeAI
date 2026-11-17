@@ -26,9 +26,9 @@ export interface AdjustedSurfaceCacheOptions {
 export interface AdjustedSurfaceCache {
   /**
    * Returns the surface the display shows for `entry`'s pixels with `adjustments`, or `null` when the adjustments are
-   * identity (the caller should draw the original cache surface). Memoized: an unchanged
-   * `(entry.version, adjustmentsKey)` reuses it with zero pixel work. A stack with spatial entries shows an interim
-   * until its asynchronous evaluation lands (see `SpatialDisplayOptions.onSettle`).
+   * identity (the caller should draw the original cache surface). Memoized: an unchanged `(entry.version,
+   * adjustmentsKey)` reuses it with zero pixel work. A stack with spatial entries shows an interim until its
+   * asynchronous evaluation lands (see `SpatialDisplayOptions.onSettle`).
    */
   get(
     layerId: string,
@@ -61,8 +61,8 @@ export interface AdjustedSurfaceCache {
    */
   cancelSpatial(): void;
   /**
-   * Drops the spatial state and surface of every layer `keep` rejects, e.g. one whose stack lost its spatial entries
-   * or that was removed while not drawn, so no stale status outlives its stack.
+   * Drops the spatial state and surface of every layer `keep` rejects, e.g. one whose stack lost its spatial entries or
+   * that was removed while not drawn, so no stale status outlives its stack.
    */
   retainSpatial(keep: (layerId: string) => boolean): void;
   /** Number of memoized adjusted surfaces (for tests / accounting). */
@@ -94,8 +94,8 @@ export const createAdjustedSurfaceCache = (
         if (resized) {
           surface.resize(width, height);
         }
-        // Source versions change every stroke tick. Refresh only reported damage to avoid full-surface readback
-        // and adjustment work; resized surfaces always rebuild.
+        // Source versions change every stroke tick. Refresh only reported damage to avoid full-surface readback and
+        // adjustment work; resized surfaces always rebuild.
         const refresh =
           resized || reusableFromVersion === null
             ? null

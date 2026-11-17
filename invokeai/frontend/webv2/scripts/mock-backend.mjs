@@ -74,20 +74,19 @@ const ARCHITECTURE_CAPABILITIES = JSON.parse(
 );
 
 /**
- * POST /__faults sets capabilities to error, empty, or ok, and `intermediatesCaller` to admin, user or
- * multiuser-admin, until POST /__reset; independent of workload profile. `user` and `multiuser-admin` also turn on
- * multi-user auth, with a non-admin or an admin session: sign in with any email and password (or reload a page that
- * already holds the token). `sharedBoards: true` adds boards other accounts own (`SHARED_BOARD_FIXTURES`), which the
- * caller sees through general access, a membership, or admin rights. `user` also makes the admin-only image storage
- * routes answer 403. `imageMoves` seeds the image move journal: `idle` (the
- * default), `needs-recovery` (an interrupted job that only Recover can finish), `failed` (a job that ended in error,
- * which counts as finished) or `instant` (a move so small it commits before the POST answers, so `is_running` is
- * already false). Like the real service, Start Move is refused while any queue item is pending or in progress (the
- * representative profile seeds some; clear the queue first). While a move runs or a job awaits recovery, image files,
- * media mutations and enqueueing answer 409 like the real maintenance guard; listings stay readable.
- * `workingMemory` selects a calibration device scenario, and `stoppedCalibration: <main model key>` gives that model an
- * attempt Stop aborted, `runningCalibration: <main model key>` one still running, which holds the GPU,
- * `modelChangedCalibration: <main model key>` one whose steps failed for a changed model (see
+ * POST /__faults sets capabilities to error, empty, or ok, and `intermediatesCaller` to admin, user or multiuser-admin,
+ * until POST /__reset; independent of workload profile. `user` and `multiuser-admin` also turn on multi-user auth, with
+ * a non-admin or an admin session: sign in with any email and password (or reload a page that already holds the token).
+ * `sharedBoards: true` adds boards other accounts own (`SHARED_BOARD_FIXTURES`), which the caller sees through general
+ * access, a membership, or admin rights. `user` also makes the admin-only image storage routes answer 403. `imageMoves`
+ * seeds the image move journal: `idle` (the default), `needs-recovery` (an interrupted job that only Recover can
+ * finish), `failed` (a job that ended in error, which counts as finished) or `instant` (a move so small it commits
+ * before the POST answers, so `is_running` is already false). Like the real service, Start Move is refused while any
+ * queue item is pending or in progress (the representative profile seeds some; clear the queue first). While a move
+ * runs or a job awaits recovery, image files, media mutations and enqueueing answer 409 like the real maintenance
+ * guard; listings stay readable. `workingMemory` selects a calibration device scenario, and `stoppedCalibration: <main
+ * model key>` gives that model an attempt Stop aborted, `runningCalibration: <main model key>` one still running, which
+ * holds the GPU, `modelChangedCalibration: <main model key>` one whose steps failed for a changed model (see
  * mock-working-memory.mjs).
  */
 const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
@@ -108,8 +107,8 @@ const createFaults = () => ({
 });
 
 /**
- * Every fixture image is stored flat, so the move count is the whole library whenever the configured layout
- * differs from the one the last committed move left the files in.
+ * Every fixture image is stored flat, so the move count is the whole library whenever the configured layout differs
+ * from the one the last committed move left the files in.
  */
 const createImageStorage = () => ({
   layout: 'flat',
@@ -199,8 +198,8 @@ const hasActiveQueueWork = (state) =>
   [...state.queueItems.values()].some((item) => item.status === 'pending' || item.status === 'in_progress');
 
 /**
- * The real maintenance guard covers image uploads, deletions, edits, star changes, copies, downloads, image files
- * and board-image membership, plus deleting a board with its images; listings and DTO reads stay open.
+ * The real maintenance guard covers image uploads, deletions, edits, star changes, copies, downloads, image files and
+ * board-image membership, plus deleting a board with its images; listings and DTO reads stay open.
  */
 const isImageMoveMaintenanceRoute = (method, path, url) => {
   if (path.startsWith('/api/v1/board_images')) {
@@ -718,8 +717,8 @@ const galleryMediaUsage = (state, faults, body) => {
     return [422, { detail: 'board_id cannot be combined with image_names or video_names' }];
   }
 
-  // As the server: only media the caller may delete is checked, images and videos alike (fixture images carry no
-  // owner and are the caller's).
+  // As the server: only media the caller may delete is checked, images and videos alike (fixture images carry no owner
+  // and are the caller's).
   const isCallers = (item) => (item.owner_user_id ?? MOCK_USER_ID) === MOCK_USER_ID;
   let checked;
 
@@ -1185,8 +1184,8 @@ const boardDto = (state, board, faults) => {
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     image_count: images.filter((image) => image.image_category === 'general').length,
     is_inbox: inboxProjectIdForBoard(state, board.board_id) !== null,
-    // Membership is stored on the board; the backend sends null for a Library board, and to anyone but the owner
-    // and admins.
+    // Membership is stored on the board; the backend sends null for a Library board, and to anyone but the owner and
+    // admins.
     project_id: access.role === 'owner' || isAdminCaller(faults) ? projectId : null,
     video_count: videos.length,
   };
@@ -1764,8 +1763,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           const name = requested.name ?? `Project Name #${projectNumber}`;
           const projectId = requested.project_id ?? `mock-project-${projectNumber}`;
 
-          // Refusals come before anything is written: a refused create claims no board, as the server's one
-          // transaction would not.
+          // Refusals come before anything is written: a refused create claims no board, as the server's one transaction
+          // would not.
           const minimum = requested.minimum_canvas_schema_version ?? DEFAULT_CANVAS_SCHEMA_VERSION;
           const maximum = clientMaximum(requested.max_canvas_schema_version);
           if (minimum > maximum) {
@@ -1972,8 +1971,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
               return json(422, { detail: 'boards must be release or delete' });
             }
             state.projects.delete(projectId);
-            // The inbox goes with the project; the other boards are released or go too. Media survives as
-            // uncategorized either way.
+            // The inbox goes with the project; the other boards are released or go too. Media survives as uncategorized
+            // either way.
             const removedBoardIds = new Set([project.board_id]);
             for (const board of state.boards.values()) {
               if ((board.project_id ?? null) === projectId && board.board_id !== project.board_id) {
@@ -2259,8 +2258,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         if (action === 'item_ids' || action === 'list') {
           const descending = url.searchParams.get('order_dir')?.toUpperCase() !== 'ASC';
           const itemIds = scopedItems.map((item) => item.item_id).sort((left, right) => left - right);
-          // Like the backend: an optional limit from 1 to MAX_QUEUE_ITEM_IDS_PER_REQUEST returns the head of the
-          // order, and total_count is then the number of ids returned.
+          // Like the backend: an optional limit from 1 to MAX_QUEUE_ITEM_IDS_PER_REQUEST returns the head of the order,
+          // and total_count is then the number of ids returned.
           const limit = action === 'item_ids' ? url.searchParams.get('limit') : null;
 
           if (limit !== null && !(/^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= 1000)) {

@@ -51,8 +51,7 @@ const BACKEND_READ_CONCURRENCY = 16;
 const FRAME_GATES_PER_WAIT_LIMIT = 64;
 
 /**
- * App injects Models' model-load activity sink so Queue can report socket-derived activity without importing its
- * owner.
+ * App injects Models' model-load activity sink so Queue can report socket-derived activity without importing its owner.
  */
 export interface QueueModelLoadPort {
   completed(payload: unknown): void;
@@ -103,8 +102,8 @@ export interface QueueCoordinatorCallbacks {
   /** Fired when one backend item in a local batch is canceled. */
   onBackendItemCancelled?(localQueueItemId: string, backendItemId: number): void;
   /**
-   * Fired once per slot when its first progress frame of its own arrives: what live surfaces wait for before they
-   * leave the previous slot's result.
+   * Fired once per slot when its first progress frame of its own arrives: what live surfaces wait for before they leave
+   * the previous slot's result.
    */
   onFirstProgressFrame?(target: QueueItemProgressTarget): void;
   /** Coalesced signal that completed generations may have added gallery images. */
@@ -132,8 +131,8 @@ export class QueueItemCancelledError extends Error {
 
 /**
  * Thrown by `waitForResults` when backend items of the run failed. `message` and `failure` describe a representative
- * failure; `failedBackendItemIds` names every item that genuinely failed, so the failure notice can show and retry
- * them all. Empty when the run's items only vanished (`failure: 'removed'`).
+ * failure; `failedBackendItemIds` names every item that genuinely failed, so the failure notice can show and retry them
+ * all. Empty when the run's items only vanished (`failure: 'removed'`).
  */
 export class QueueItemFailedError extends Error {
   readonly failedBackendItemIds: readonly number[];
@@ -307,15 +306,13 @@ export const createQueueCoordinator = (
     }
   };
   /**
-   * Terminal events that arrived for items nobody tracks yet. Closes the race
-   * where a very fast generation finishes between `enqueue_batch` resolving
-   * and the run being registered.
+   * Terminal events that arrived for items nobody tracks yet. Closes the race where a very fast generation finishes
+   * between `enqueue_batch` resolving and the run being registered.
    */
   const recentTerminalOutcomes = new Map<number, TerminalOutcome>();
   /**
-   * Node lifecycle events for items nobody tracks yet, replayed once the item
-   * is registered: a fast run's nodes start and finish while `enqueue_batch`
-   * is still resolving.
+   * Node lifecycle events for items nobody tracks yet, replayed once the item is registered: a fast run's nodes start
+   * and finish while `enqueue_batch` is still resolving.
    */
   const pendingNodeEvents = new Map<number, NodeEvent[]>();
   /** Latest preview for items whose enqueue response has not registered them yet. */
@@ -405,8 +402,8 @@ export const createQueueCoordinator = (
       state.activeBackendItemId !== undefined && !terminalBackendItemIds.has(state.activeBackendItemId)
         ? state.activeBackendItemId
         : undefined;
-    // activeItemIndex means "slot currently executing" — omitted while the
-    // item merely waits in the queue, so idle slots never present as live.
+    // activeItemIndex means "slot currently executing" — omitted while the item merely waits in the queue, so idle
+    // slots never present as live.
     const activeItemIndex =
       activeBackendItemId !== undefined
         ? Math.max(1, state.backendItemIds.indexOf(activeBackendItemId) + 1)
@@ -488,9 +485,8 @@ export const createQueueCoordinator = (
         return;
       }
       case 'completed':
-        // A called workflow's child lifecycle is represented by the visible
-        // Call Saved Workflow node. Only the root invocation may settle that
-        // node or replace its latest output.
+        // A called workflow's child lifecycle is represented by the visible Call Saved Workflow node. Only the root
+        // invocation may settle that node or replace its latest output.
         waits.get(backendItemId)?.frameGates.delete(nodeEvent.event.item_id);
         if (backendItemId !== nodeEvent.event.item_id) {
           return;
@@ -636,8 +632,7 @@ export const createQueueCoordinator = (
       const routingPromise = callbacks.onBackendItemComplete?.(wait.localQueueItemId, backendItemId);
 
       if (routingPromise) {
-        // Keep following until routing lands; terminal events precede finished-image selection by network round
-        // trips.
+        // Keep following until routing lands; terminal events precede finished-image selection by network round trips.
         activeProgressTarget.settle(progressTarget);
         const routing = Promise.resolve(routingPromise)
           .finally(releaseProgressSlot)
@@ -787,8 +782,8 @@ export const createQueueCoordinator = (
   };
 
   /**
-   * Fetch current previews through the revision-gated live handler. Snapshot failure is nonfatal; replay or the
-   * next step can recover.
+   * Fetch current previews through the revision-gated live handler. Snapshot failure is nonfatal; replay or the next
+   * step can recover.
    */
   const refreshProgressPreviews = async (): Promise<void> => {
     if (!isActive() || waits.size === 0 || !backend.readProgressPreviews) {
@@ -832,9 +827,8 @@ export const createQueueCoordinator = (
       if (wait && event.status === 'in_progress') {
         activeProgressTarget.set(getProgressImageTarget(wait.localQueueItemId, event.item_id));
       }
-      // Back to the queue (a workflow-call parent waiting on its child, a retry):
-      // whatever frames follow belong to a new leg, and after a backend restart
-      // their revisions start over.
+      // Back to the queue (a workflow-call parent waiting on its child, a retry): whatever frames follow belong to a
+      // new leg, and after a backend restart their revisions start over.
       if (event.status === 'pending' || event.status === 'waiting') {
         if (wait && !wait.hasWorkflowCall) {
           wait.hasOwnFrame = false;
@@ -846,8 +840,8 @@ export const createQueueCoordinator = (
       return;
     }
 
-    // Root settlement clears its own wait's gates. Only child item statuses
-    // need the cross-wait lookup to remove their per-child preview gate.
+    // Root settlement clears its own wait's gates. Only child item statuses need the cross-wait lookup to remove their
+    // per-child preview gate.
     if (!waits.has(event.item_id)) {
       clearFrameGate(event.item_id);
     }
@@ -875,9 +869,8 @@ export const createQueueCoordinator = (
   };
 
   /**
-   * Whether a frame is older than one already shown for its backend item;
-   * records it as the newest when it is not. A new session on the same item
-   * starts over.
+   * Whether a frame is older than one already shown for its backend item; records it as the newest when it is not. A
+   * new session on the same item starts over.
    */
   const isStaleFrame = (event: InvocationProgressEvent): boolean => {
     const wait = waits.get(getTrackedBackendItemId(event));
@@ -1028,8 +1021,8 @@ export const createQueueCoordinator = (
       })
     );
 
-    // Fires synchronously with the current status, so attaching after the hub
-    // has already connected still triggers the initial clear + sweep.
+    // Fires synchronously with the current status, so attaching after the hub has already connected still triggers the
+    // initial clear + sweep.
     detachers.push(backend.onConnectionChange(handleConnectionChange));
 
     // Sweep when the tab becomes visible instead of waiting for socket reconnect backoff.
@@ -1147,9 +1140,8 @@ export const createQueueCoordinator = (
       );
 
       if (foundBackendItems.length === 0) {
-        // A pending item with no backend trace was never accepted and is safe
-        // to submit; a running item with (partially) vanished backend items is
-        // unrecoverable.
+        // A pending item with no backend trace was never accepted and is safe to submit; a running item with
+        // (partially) vanished backend items is unrecoverable.
         outcomes.set(
           item.id,
           item.status === 'pending' && !item.backendItemIds?.length
@@ -1270,8 +1262,8 @@ export const createQueueCoordinator = (
 
       if (failure?.status === 'failed') {
         // The failed status ends routing; let completed siblings' results land first. No timeout bounds this: it waits
-        // on the same result reads the success path awaits, and a route started before dispose still finishes or
-        // fails with its request (unstarted routes are released when the runtime goes inactive).
+        // on the same result reads the success path awaits, and a route started before dispose still finishes or fails
+        // with its request (unstarted routes are released when the runtime goes inactive).
         await Promise.all(run.pendingRouting);
         throw new QueueItemFailedError(failedBackendItemIds, failure.error, failure.cause);
       }

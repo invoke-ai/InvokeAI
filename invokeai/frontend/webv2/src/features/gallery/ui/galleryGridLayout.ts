@@ -106,8 +106,8 @@ export const getGalleryStarredStripItems = (starredItems: readonly GalleryItem[]
   starredItems.slice(0, GALLERY_STARRED_STRIP_MAX_ROWS * columnCount);
 
 /**
- * Every item the grid has on hand — strip first, then the listing. The two
- * refetch independently, so an item can sit on both sides for a moment.
+ * Every item the grid has on hand — strip first, then the listing. The two refetch independently, so an item can sit on
+ * both sides for a moment.
  */
 export const mergeGalleryLoadedItems = (
   starredItems: readonly GalleryItem[],
@@ -197,9 +197,9 @@ export const getGallerySparseRowKey = (rowIndex: number): string => `listing-row
 export const getGallerySparseSlotKey = (itemIndex: number): string => `listing-slot:${itemIndex}`;
 
 /**
- * Include empty positions from active pages so arrow navigation retains real row and column geometry across
- * hydration gaps. Entries cover each contiguous run of subscribed pages plus a boundary row, so a page retained far
- * from the viewport (a reveal) adds its own run rather than every position between them.
+ * Include empty positions from active pages so arrow navigation retains real row and column geometry across hydration
+ * gaps. Entries cover each contiguous run of subscribed pages plus a boundary row, so a page retained far from the
+ * viewport (a reveal) adds its own run rather than every position between them.
  */
 export const buildSparseGalleryNavigationEntries = ({
   columnCount = 1,
@@ -303,8 +303,8 @@ export const getGalleryProgressLayout = ({
 export type GalleryProgressLayout = ReturnType<typeof getGalleryProgressLayout>;
 
 /**
- * The pinned starred strip: its disclosure row plus, while open, its bounded rows. A strip that failed with
- * nothing to show keeps the header row alone, to report the failure in place of the cells.
+ * The pinned starred strip: its disclosure row plus, while open, its bounded rows. A strip that failed with nothing to
+ * show keeps the header row alone, to report the failure in place of the cells.
  */
 export const getGalleryStarredLayout = ({
   columns,

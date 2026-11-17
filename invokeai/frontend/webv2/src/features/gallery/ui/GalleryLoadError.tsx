@@ -9,9 +9,9 @@ const OPERABLE = ['button', '[href]', 'input', 'select', 'textarea', '[tabindex]
   .join(', ');
 
 /**
- * Focuses the first (or last) element matching `selector` (any operable element by default) that `viewport`
- * currently shows, without scrolling it: a focus handoff must never move the content the user is looking at.
- * Reports whether anything took focus.
+ * Focuses the first (or last) element matching `selector` (any operable element by default) that `viewport` currently
+ * shows, without scrolling it: a focus handoff must never move the content the user is looking at. Reports whether
+ * anything took focus.
  */
 export const focusVisibleOperable = (
   viewport: HTMLElement | null,
@@ -40,8 +40,8 @@ export const focusVisibleOperable = (
 };
 
 /**
- * The owner's persistent polite live region. Screen readers announce changes inside a region that already exists,
- * not one inserted with its text, so non-blocking failures report here rather than through the notices showing them.
+ * The owner's persistent polite live region. Screen readers announce changes inside a region that already exists, not
+ * one inserted with its text, so non-blocking failures report here rather than through the notices showing them.
  */
 export const GalleryAnnouncer = ({ message }: { message: string }) => (
   <VisuallyHidden aria-atomic="true" aria-live="polite" role="status">

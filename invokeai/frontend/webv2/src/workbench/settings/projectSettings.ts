@@ -52,10 +52,10 @@ let layeredSettingsV1: LayeredSettingsTable | undefined;
 
 /**
  * Every layerable key, per owner, as of `settingsLayering: 1`. The one list of what layers: resolution merges only
- * these keys from the user's defaults, the settings store keeps only these, and the document codec drops a stored
- * value the owner read as the built-in from a document without the marker. The codec's meaning is frozen: a later
- * change to an owner's built-in or normalizer does not edit an entry here (it would change what old documents lose);
- * a new layerable key is added, and tests keep the keys equal to the settings contributions'. Built on first use: a
+ * these keys from the user's defaults, the settings store keeps only these, and the document codec drops a stored value
+ * the owner read as the built-in from a document without the marker. The codec's meaning is frozen: a later change to
+ * an owner's built-in or normalizer does not edit an entry here (it would change what old documents lose); a new
+ * layerable key is added, and tests keep the keys equal to the settings contributions'. Built on first use: a
  * module-scope table of calls would make this boot module side-effectful to the bundler.
  */
 export const getLayeredSettings = (): LayeredSettingsTable =>
@@ -123,8 +123,8 @@ export const getLayeredKeys = (ownerId: string): Readonly<Record<string, Layered
 /**
  * Every Auto-switch mode, keyed by the shared policy's union (`ViewerAutoSwitchMode` is `AutoSwitchMode`): a mode added
  * there fails to compile here until it is listed, so a stored value is never reset to `off` for being unknown. A record
- * rather than the policy's own list: importing it would bring the Queue contracts into the boot graph with the
- * settings store.
+ * rather than the policy's own list: importing it would bring the Queue contracts into the boot graph with the settings
+ * store.
  */
 const VIEWER_AUTO_SWITCH_MODES: Readonly<Record<ViewerAutoSwitchMode, true>> = {
   latest: true,
@@ -160,8 +160,8 @@ let effectiveProjectSettingsCache:
   | undefined;
 
 /**
- * Resolves each layered flag as project pin, then the user's default, then built-in. Memoized on the settings
- * object, so repeated reads of an unchanged project and defaults return the same object.
+ * Resolves each layered flag as project pin, then the user's default, then built-in. Memoized on the settings object,
+ * so repeated reads of an unchanged project and defaults return the same object.
  */
 export const getEffectiveProjectSettings = (
   settings: ProjectSettings,

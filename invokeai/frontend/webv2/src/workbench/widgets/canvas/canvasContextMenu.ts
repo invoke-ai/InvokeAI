@@ -55,8 +55,8 @@ export const resolveCanvasContextMenu = ({
 };
 
 /**
- * Why Crop all layers to frame cannot run on `document`, or null when it has a leaf to act on: one not locked by
- * itself or a group above it.
+ * Why Crop all layers to frame cannot run on `document`, or null when it has a leaf to act on: one not locked by itself
+ * or a group above it.
  */
 export const getCropAllUnavailableReasonKey = (document: CanvasDocumentContractV3): string | null => {
   const { byId, leaves } = getDocumentIndex(document);
@@ -69,9 +69,9 @@ export const getCropAllUnavailableReasonKey = (document: CanvasDocumentContractV
 };
 
 /**
- * Crops every unlocked layer to the frame as one undo step and says what happened: how many layers it cropped, how
- * many locked ones it skipped, which layer could not be read (named, with a count of any others), or that nothing
- * needed cropping. The canvas menu and the command share it.
+ * Crops every unlocked layer to the frame as one undo step and says what happened: how many layers it cropped, how many
+ * locked ones it skipped, which layer could not be read (named, with a count of any others), or that nothing needed
+ * cropping. The canvas menu and the command share it.
  */
 export const cropAllLayersToFrame = async (
   layers: Pick<CanvasEngineLayerCapability, 'cropAllLayersToBbox'>,

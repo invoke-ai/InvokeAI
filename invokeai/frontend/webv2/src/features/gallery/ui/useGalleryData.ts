@@ -66,8 +66,8 @@ export interface GalleryData {
   listing: GalleryListingState;
   loadMore: () => void;
   /**
-   * The previous scope's items while the current one loads, for consumers that keep them on screen (dimmed and
-   * busy) across a scope change. Never set once the current scope has data or has failed.
+   * The previous scope's items while the current one loads, for consumers that keep them on screen (dimmed and busy)
+   * across a scope change. Never set once the current scope has data or has failed.
    */
   previousScopeItems: GalleryItem[] | null;
   total: number | null;
@@ -203,9 +203,8 @@ const mergeRecentItemsIntoWindow = ({
     return true;
   });
 
-  // Semantic results arrive in relevance order, which a date re-sort would
-  // destroy; the backend order is the meaning of the list. (No recent items
-  // are overlaid in that mode, so the merge is the backend window itself.)
+  // Semantic results arrive in relevance order, which a date re-sort would destroy; the backend order is the meaning of
+  // the list. (No recent items are overlaid in that mode, so the merge is the backend window itself.)
   if (!filter.semanticQuery) {
     mergedItems.sort((a, b) => compareGalleryItems(a, b, { orderDir: filter.orderDir }));
   }
@@ -250,8 +249,8 @@ export const getGalleryRecentItems = ({
   knownBackendItemKeys?: ReadonlySet<ReturnType<typeof toGalleryItemKey>>;
   filter: GalleryItemsFilter;
   /**
-   * Also drop recents created no later than this instant, the listing's newest item. Sparse viewports render recents
-   * as rows beside the listing's newest end and cannot interleave them, so an older recent belongs inside the listing
+   * Also drop recents created no later than this instant, the listing's newest item. Sparse viewports render recents as
+   * rows beside the listing's newest end and cannot interleave them, so an older recent belongs inside the listing
    * range: the listing places it, or the post-run gallery refresh does once its board attach lands. The dense window
    * interleaves instead.
    */
@@ -296,8 +295,8 @@ export const useGalleryData = ({
   /** Hold the previous scope's items as `previousScopeItems` while a new scope loads. */
   keepPreviousScope?: boolean;
   /**
-   * Only this media kind; absent lists both. Passed explicitly rather than read from `settings` because consumers
-   * like the picker list both kinds whatever the Gallery widget shows.
+   * Only this media kind; absent lists both. Passed explicitly rather than read from `settings` because consumers like
+   * the picker list both kinds whatever the Gallery widget shows.
    */
   mediaKind?: GalleryItemKind;
   page: number;
@@ -311,9 +310,8 @@ export const useGalleryData = ({
   semanticQuery?: GallerySemanticReference | null;
   settings: GallerySettings;
   /**
-   * Partition to list: the grid asks for unstarred (`false`) or, under its
-   * starred filter, starred (`true`); consumers like the picker omit it and
-   * see everything.
+   * Partition to list: the grid asks for unstarred (`false`) or, under its starred filter, starred (`true`); consumers
+   * like the picker omit it and see everything.
    */
   starred?: boolean;
   /** Main Gallery and picker opt into page-sized viewport subscriptions; other consumers may keep the bounded window. */
@@ -414,8 +412,8 @@ export const useGalleryData = ({
   const requestedPageOffset = Math.max(0, page) * GALLERY_PAGE_SIZE;
   const getCachedPageTotal = (offset: number) =>
     queryClient.getQueryData<{ total: number }>(galleryItemsPageOptions(filter, offset).queryKey)?.total;
-  // A cached requested page's own total says whether that page exists, and is fresher than the retained total when
-  // Find in Gallery has just verified it. Clamping by it also keeps the selection independent of observed totals.
+  // A cached requested page's own total says whether that page exists, and is fresher than the retained total when Find
+  // in Gallery has just verified it. Clamping by it also keeps the selection independent of observed totals.
   const requestedPageTotal = sparseViewport && isPaginated ? getCachedPageTotal(requestedPageOffset) : undefined;
   const paginatedTotal = requestedPageTotal ?? knownTotal;
   const clampPaginatedOffset = (total: number | null) =>
@@ -444,8 +442,8 @@ export const useGalleryData = ({
       return [selectedPageOffset];
     }
 
-    // Infinite listings learn their total from page zero. Once known, subscriptions follow only the virtual range
-    // and its virtualizer overscan, even when it is far from the start of the listing.
+    // Infinite listings learn their total from page zero. Once known, subscriptions follow only the virtual range and
+    // its virtualizer overscan, even when it is far from the start of the listing.
     const plannedOffsets =
       knownTotal === 0 || (knownTotal === null && !hasRequestedRange)
         ? [0]
@@ -529,8 +527,8 @@ export const useGalleryData = ({
     return {
       ...options,
       enabled: queryClient.getQueryState(options.queryKey)?.status !== 'error',
-      // Manual patches reset Query's freshness clock. Refresh a suspended page on return, without retrying a
-      // mounted failed page merely because a patch changed its status back to success.
+      // Manual patches reset Query's freshness clock. Refresh a suspended page on return, without retrying a mounted
+      // failed page merely because a patch changed its status back to success.
       refetchOnMount:
         shouldOverlayRecentItems &&
         offset === newestPageOffset &&
@@ -639,9 +637,9 @@ export const useGalleryData = ({
     [pageOffsets, pageResults]
   );
   // Query forgets which fetch failed as soon as any other starts, so an unrelated refetch (an invalidation after a
-  // generation) would turn a failed next page into a "refresh" failure and let scrolling silently retry it. Keep
-  // the page count the failure left this scope at: the next page stays failed until a Retry, a page beyond it, or
-  // another scope. Recorded from the fetch's own result, in the handler that started it.
+  // generation) would turn a failed next page into a "refresh" failure and let scrolling silently retry it. Keep the
+  // page count the failure left this scope at: the next page stays failed until a Retry, a page beyond it, or another
+  // scope. Recorded from the fetch's own result, in the handler that started it.
   const [failedNextPage, setFailedNextPage] = useState<{ pageCount: number; scopeHash: string } | null>(null);
   // Everything below describes this scope; another scope's placeholder is only ever `previousScopeItems`.
   const queryData = sparseViewport || isPlaceholderData ? undefined : data;
@@ -706,8 +704,8 @@ export const useGalleryData = ({
     [isPaginated, pageOffsets, pageResults, selectedPageOffset, sparseViewport]
   );
   const maxRows = isPaginated ? GALLERY_PAGE_SIZE : GALLERY_MAX_ROWS;
-  // Read the newest-end page without observing it: scrolling may release or evict it normally. Its cached state
-  // remains the authority for the cutoff, so invalidation/removal suspends the overlay until that page is fresh.
+  // Read the newest-end page without observing it: scrolling may release or evict it normally. Its cached state remains
+  // the authority for the cutoff, so invalidation/removal suspends the overlay until that page is fresh.
   const newestPageHash =
     sparseViewport && shouldOverlayRecentItems
       ? hashKey(galleryItemsPageOptions(filter, newestPageOffset).queryKey)

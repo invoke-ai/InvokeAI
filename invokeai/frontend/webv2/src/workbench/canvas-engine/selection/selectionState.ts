@@ -3,8 +3,8 @@
  * authoritative for clipping and boolean operations; paths serve only ants rendering.
  *
  * Replace uses its path; boolean operations retrace actual mask edges. Add may fall back to source paths when stub
- * pixels cannot be read; empty subtract/intersect results clear selection. Replace/add emptiness is structural,
- * while subtract/intersect inspect alpha.
+ * pixels cannot be read; empty subtract/intersect results clear selection. Replace/add emptiness is structural, while
+ * subtract/intersect inspect alpha.
  */
 
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
@@ -24,9 +24,8 @@ export interface SelectionCommit {
 }
 
 /**
- * A restorable capture of the selection: the mask's alpha plane over `rect`
- * plus the bookkeeping the mask alone cannot recover. Alpha-only keeps a
- * full-document capture at one byte per pixel; the mask is white by contract.
+ * A restorable capture of the selection: the mask's alpha plane over `rect` plus the bookkeeping the mask alone cannot
+ * recover. Alpha-only keeps a full-document capture at one byte per pixel; the mask is white by contract.
  */
 export interface SelectionSnapshot {
   readonly alpha: Uint8ClampedArray<ArrayBuffer> | null;
@@ -122,15 +121,14 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
   const { backend, createPath2D, getDocumentSize, onChange } = deps;
 
   let mask: RasterSurface | null = null;
-  // The mask surface's document-space bounds (its origin/extent). The mask is
-  // bounded to the selection, not the document — surface pixel (sx,sy) maps to
-  // document (maskRect.x+sx, maskRect.y+sy).
+  // The mask surface's document-space bounds (its origin/extent). The mask is bounded to the selection, not the
+  // document — surface pixel (sx,sy) maps to document (maskRect.x+sx, maskRect.y+sy).
   let maskRect: Rect | null = null;
   let commits: SelectionCommit[] = [];
   let selectionBounds: Rect | null = null;
   let selected = false;
-  // The last capture stays valid until the next mutation, so a change recorded
-  // as before/after reads the mask back once, not twice.
+  // The last capture stays valid until the next mutation, so a change recorded as before/after reads the mask back
+  // once, not twice.
   let cachedSnapshot: SelectionSnapshot | null = null;
 
   const changed = (): void => {
@@ -215,8 +213,8 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
   const replaceMask = (next: PlacedSurface): void => {
     const rect = roundOut(next.rect);
     const publishEmptyReplacement = (): void => {
-      // Publish empty selection by detaching the old surface; a fallible in-place clear after changing logical
-      // flags would break atomicity.
+      // Publish empty selection by detaching the old surface; a fallible in-place clear after changing logical flags
+      // would break atomicity.
       mask = null;
       maskRect = null;
       commits = [];
@@ -242,14 +240,12 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
       return;
     }
 
-    // Prepare every fallible replacement artifact before publishing any state.
-    // If allocation, the blit, or Path2D construction fails, the exact prior
-    // selection remains authoritative and the engine may safely report failure.
+    // Prepare every fallible replacement artifact before publishing any state. If allocation, the blit, or Path2D
+    // construction fails, the exact prior selection remains authoritative and the engine may safely report failure.
     const nextMask = backend.createSurface(rect.width, rect.height);
     nextMask.ctx.drawImage(next.surface.canvas, 0, 0);
-    // Trace the mask's true edge for the ants; a mask whose alpha never reaches
-    // the solid threshold still selected something (hasAlpha above), so fall
-    // back to tracing any non-zero coverage rather than showing no outline.
+    // Trace the mask's true edge for the ants; a mask whose alpha never reaches the solid threshold still selected
+    // something (hasAlpha above), so fall back to tracing any non-zero coverage rather than showing no outline.
     const outline = traceMaskOutlinePath(source, rect) || traceMaskOutlinePath(source, rect, 1) || rectPathData(rect);
     const nextPath = createPath2D(outline);
 
@@ -288,8 +284,8 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
       return;
     }
 
-    // For `add` the mask may need to grow to include the new path; `subtract` /
-    // `intersect` never grow the covered region (they only remove).
+    // For `add` the mask may need to grow to include the new path; `subtract` / `intersect` never grow the covered
+    // region (they only remove).
     const surface =
       next.op === 'add' && bounds
         ? ensureMask(bounds)

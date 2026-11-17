@@ -136,8 +136,8 @@ export const previewGraphToDocument = (
     });
   }
 
-  // Clear literal values on connected inputs after wiring, so a stale direct
-  // value can't shadow the edge during compilation.
+  // Clear literal values on connected inputs after wiring, so a stale direct value can't shadow the edge during
+  // compilation.
   for (const edge of edges) {
     const targetNode = nodes.find((node) => node.id === edge.target);
     const instance =
@@ -188,8 +188,8 @@ export const storedGraphToDocument = (raw: unknown, templates: InvocationTemplat
     templates
   );
 
-  // Graphs carry no source versions. Recognize legacy values before labeling the recalled nodes current.
-  // Preview conversion has already cleared connected input literals, so they cannot be mistaken for old lists.
+  // Graphs carry no source versions. Recognize legacy values before labeling the recalled nodes current. Preview
+  // conversion has already cleared connected input literals, so they cannot be mistaken for old lists.
   for (const node of result.document.nodes) {
     if (!isInvocationNode(node)) {
       continue;

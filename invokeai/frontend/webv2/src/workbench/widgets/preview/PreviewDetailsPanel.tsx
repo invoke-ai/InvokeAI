@@ -53,8 +53,8 @@ const PreviewImageTags = ({ accountEpoch, item }: { accountEpoch: number; item: 
     return null;
   }
 
-  // A zero basis gives the tags only the width the header leaves over, so they truncate before anything else and,
-  // with the separator inside them, vanish whole rather than leave a dangling one.
+  // A zero basis gives the tags only the width the header leaves over, so they truncate before anything else and, with
+  // the separator inside them, vanish whole rather than leave a dangling one.
   return (
     <Text color="fg.muted" data-preview-image-tags flex="1 1 0" fontSize="xs" minW="0" truncate>
       <chakra.span aria-hidden="true" color="fg.subtle" marginInlineEnd="1">
@@ -128,9 +128,9 @@ export const PreviewDetailsPanel = ({
   );
   const focusMoves = useWorkbenchFocus();
   // However Details leaves (its trigger, Escape, the I hotkey, a selection that takes the header item, a stage that
-  // remounts), focus inside it would fall to the body. It goes to the trigger instead, or, when the trigger left too, to
-  // the Preview's own window or region. Read once removal is committed: a cleanup alone cannot tell removal apart from a
-  // re-attached ref, and focus that already moved elsewhere stays put.
+  // remounts), focus inside it would fall to the body. It goes to the trigger instead, or, when the trigger left too,
+  // to the Preview's own window or region. Read once removal is committed: a cleanup alone cannot tell removal apart
+  // from a re-attached ref, and focus that already moved elsewhere stays put.
   const restoreFocusOnRemoval = useCallback(
     (element: HTMLDivElement | null) => {
       if (!element) {
@@ -183,8 +183,8 @@ export const PreviewDetailsPanel = ({
   const panel =
     isOpen && stageElement
       ? createPortal(
-          // A named region rather than a group: a pinned panel is a place to return to, so it is a landmark. It
-          // follows the stage's media in DOM order, so Tab reaches it from the Preview without moving focus on open.
+          // A named region rather than a group: a pinned panel is a place to return to, so it is a landmark. It follows
+          // the stage's media in DOM order, so Tab reaches it from the Preview without moving focus on open.
           <Box
             ref={restoreFocusOnRemoval}
             aria-label={label}

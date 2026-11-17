@@ -1,12 +1,12 @@
 /**
- * Sync only for Canvas sources: then the canvas frame and Generate's size are one frame-size model. Bbox edits keep
- * the exact footprint and derive model-grid processing dimensions; Generate edits resize the frame around its centre,
- * the anchor every size path uses. The aspect lock is Generate's own (`aspectRatioIsLocked`), and the Frame tool
- * follows it: a frame edit under the lock keeps the locked ratio, one that changes the ratio carries the lock to the
- * new ratio, and a free edit leaves the ratio free (it never reads as a preset the person did not pick).
- * A frame resize this sync makes goes through the canvas's undo history when a canvas engine is open, so undoing it
- * restores both sides; otherwise it is a `system` write. The Custom render size follows the locked ratio. Capability
- * changes retrigger reconciliation; update the expected snapshot before dispatch and guard re-entry.
+ * Sync only for Canvas sources: then the canvas frame and Generate's size are one frame-size model. Bbox edits keep the
+ * exact footprint and derive model-grid processing dimensions; Generate edits resize the frame around its centre, the
+ * anchor every size path uses. The aspect lock is Generate's own (`aspectRatioIsLocked`), and the Frame tool follows
+ * it: a frame edit under the lock keeps the locked ratio, one that changes the ratio carries the lock to the new ratio,
+ * and a free edit leaves the ratio free (it never reads as a preset the person did not pick). A frame resize this sync
+ * makes goes through the canvas's undo history when a canvas engine is open, so undoing it restores both sides;
+ * otherwise it is a `system` write. The Custom render size follows the locked ratio. Capability changes retrigger
+ * reconciliation; update the expected snapshot before dispatch and guard re-entry.
  */
 
 import type { AspectRatioId, CanvasScaleMethod, GenerateModelConfig, PidMode } from '@features/generation/contracts';
@@ -107,8 +107,8 @@ const createSnapshot = (
 });
 
 /**
- * The changed side wins; bbox wins on first run or simultaneous changes. Write model-grid dimensions without
- * changing its exact footprint, and skip already-consistent state.
+ * The changed side wins; bbox wins on first run or simultaneous changes. Write model-grid dimensions without changing
+ * its exact footprint, and skip already-consistent state.
  */
 export const reconcileCanvasDims = ({
   aspect = FREE_ASPECT,
@@ -250,8 +250,7 @@ export const createCanvasDimsSync = (
     const bbox = project.canvas.document.bbox;
     const grid = resolveModelGrid(readModelBase(generateValues), readModelVariant(generateValues));
 
-    // Wait for backend capabilities before persisting dimensions; a fallback grid may be invalid for this
-    // architecture.
+    // Wait for backend capabilities before persisting dimensions; a fallback grid may be invalid for this architecture.
     if (grid === null) {
       prev = null;
       return;

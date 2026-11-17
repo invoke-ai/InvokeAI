@@ -1,7 +1,7 @@
 /**
- * Persist paint as imageName references. Category other hides pixels from gallery views; is_intermediate=false
- * makes referenced pixels durable. Only unreferenced generation composites are intermediate. Uploads use the
- * shared authentication and base-URL policy.
+ * Persist paint as imageName references. Category other hides pixels from gallery views; is_intermediate=false makes
+ * referenced pixels durable. Only unreferenced generation composites are intermediate. Uploads use the shared
+ * authentication and base-URL policy.
  */
 
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';

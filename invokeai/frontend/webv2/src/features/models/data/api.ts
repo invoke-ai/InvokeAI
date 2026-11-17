@@ -49,9 +49,9 @@ export interface Fp8StorageSupportRow {
 /**
  * Which kinds of model FP8 Storage actually does something for. Static per backend build.
  *
- * Keyed by the loader key rather than the model type, because the answer differs along all three
- * parts: FLUX main implements the cast, FLUX ControlNet does not, and a GGUF main model must never be
- * re-encoded. A key the backend does not serve is not supported.
+ * Keyed by the loader key rather than the model type, because the answer differs along all three parts: FLUX main
+ * implements the cast, FLUX ControlNet does not, and a GGUF main model must never be re-encoded. A key the backend does
+ * not serve is not supported.
  */
 export const getFp8StorageSupport = (signal?: AbortSignal): Promise<Fp8StorageSupportRow[]> =>
   requestJson<Fp8StorageSupportRow[]>(`${MODELS_BASE}/fp8_storage_support`, { signal });

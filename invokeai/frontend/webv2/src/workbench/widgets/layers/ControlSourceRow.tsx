@@ -38,8 +38,8 @@ export interface ControlSourceRowProps {
 }
 
 /**
- * The Image row: Upload / Frame / Draw while the layer is empty, else a thumbnail, its name and a Replace menu with
- * the same three actions. Focus that sat on the part that went away moves to the part that replaced it.
+ * The Image row: Upload / Frame / Draw while the layer is empty, else a thumbnail, its name and a Replace menu with the
+ * same three actions. Focus that sat on the part that went away moves to the part that replaced it.
  */
 export const ControlSourceRow = ({
   busy,

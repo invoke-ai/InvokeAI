@@ -143,10 +143,10 @@ const getQueueInsights = (
  * The project's queue read model is observed only while a Generate control subscribes, so a workbench without one
  * neither fetches it nor refetches it on every queue invalidation. Unsubscribed reads use whatever is cached.
  *
- * Insights derive from the read model's items and the local queue alone, keyed on their identities: structural
- * sharing keeps `items` stable across status-only refetches, so those leave the snapshot untouched. Every source
- * change notifies every subscriber; the subscribers' selectors drop the ones that change nothing they read. Comparing
- * against the cached snapshot here instead would miss a change that a render had already pulled into the cache.
+ * Insights derive from the read model's items and the local queue alone, keyed on their identities: structural sharing
+ * keeps `items` stable across status-only refetches, so those leave the snapshot untouched. Every source change
+ * notifies every subscriber; the subscribers' selectors drop the ones that change nothing they read. Comparing against
+ * the cached snapshot here instead would miss a change that a render had already pulled into the cache.
  */
 const createQueueInsightsStore = (
   queryClient: QueryClient,
@@ -272,11 +272,10 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     (imageName) => findGalleryItem({ kind: 'image', name: imageName }),
     [findGalleryItem]
   );
-  // Save to Uploads lands where new results do: the auto-add board, judged against the listing of every readable
-  // board, ensured as the upload starts so an archived or revoked board is decided from a listing, not for want of
-  // one, and no listing is read while nothing uploads; a board the listing refuses falls back to the project's inbox.
-  // The board is read from the project before anything is awaited, so a later change cannot redirect an upload
-  // already under way.
+  // Save to Uploads lands where new results do: the auto-add board, judged against the listing of every readable board,
+  // ensured as the upload starts so an archived or revoked board is decided from a listing, not for want of one, and no
+  // listing is read while nothing uploads; a board the listing refuses falls back to the project's inbox. The board is
+  // read from the project before anything is awaited, so a later change cannot redirect an upload already under way.
   const getUploadBoardId = useCallback<GenerationUiAdapter['gallery']['getUploadBoardId']>(async () => {
     const { activeProject, scopedDefaults } = store.getSnapshot();
     const galleryValues = getResolvedProjectWidgetValues(activeProject, 'gallery', scopedDefaults);

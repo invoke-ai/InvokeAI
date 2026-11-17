@@ -1,7 +1,7 @@
 /**
- * Normalizes DOM events into tool input with capture, coalesced samples and default mouse pressure 0.5. Middle
- * mouse pans independently. Space, Alt and held C temporarily select view, picker and bbox; release restores the
- * tool, while quick C selects bbox persistently. Temporary switches preserve sessions and are blocked mid-gesture.
+ * Normalizes DOM events into tool input with capture, coalesced samples and default mouse pressure 0.5. Middle mouse
+ * pans independently. Space, Alt and held C temporarily select view, picker and bbox; release restores the tool, while
+ * quick C selects bbox persistently. Temporary switches preserve sessions and are blocked mid-gesture.
  * Escape/pointercancel cancel; extra buttons are ignored mid-gesture. No key acts over an editable field, a
  * keyboard-navigated control, an open overlay or beneath a modal dialog; past that, the host's key-owner judge decides:
  * Enter needs the surface itself, the Escape ladder and C also accept a companion widget, and Space and Alt act over
@@ -42,15 +42,14 @@ export interface PointerPipelineDeps {
   getActiveToolId(): ToolId;
   getToolContext(): ToolContext;
   /**
-   * Temporary modifier switches and restores preserve tool sessions; see {@link beginTempTool} and {@link
-   * endTempTool}.
+   * Temporary modifier switches and restores preserve tool sessions; see {@link beginTempTool} and {@link endTempTool}.
    */
   setTool(id: ToolId, opts?: { temporary?: boolean }): void;
   hasTool(id: ToolId): boolean;
   updateCursor(): void;
   /**
-   * Optional Escape handler after gesture cancellation, skipped in editable fields. `gestureWasActive` allows
-   * session teardown while preserving committed selection.
+   * Optional Escape handler after gesture cancellation, skipped in editable fields. `gestureWasActive` allows session
+   * teardown while preserving committed selection.
    */
   handleEscape?(opts: { gestureWasActive: boolean }): void;
   /**
@@ -88,8 +87,8 @@ export interface PointerPipeline {
    */
   hoverPoint(): Vec2 | null;
   /**
-   * Cancels capture/tool state and refreshes the cursor. Used on document replacement so a later release cannot
-   * commit stale drag state; idle calls do nothing.
+   * Cancels capture/tool state and refreshes the cursor. Used on document replacement so a later release cannot commit
+   * stale drag state; idle calls do nothing.
    */
   cancelActiveGesture(): void;
   /**
@@ -199,20 +198,19 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
   let bboxTapTimer: ReturnType<typeof setTimeout> | null = null;
   // A cancelled gesture's pointer keeps reporting pressed moves; they reach a tool only as hover until release.
   let cancelledPointerId: number | null = null;
-  // The control focus last landed on by pointer; keyboard navigation (`:focus-visible` on arrival) clears it.
-  // Held weakly: a focused row may be removed (virtualized) without another focusin.
+  // The control focus last landed on by pointer; keyboard navigation (`:focus-visible` on arrival) clears it. Held
+  // weakly: a focused row may be removed (virtualized) without another focusin.
   let pointerFocused: WeakRef<EventTarget> | null = null;
-  // Alt went down while the surface owned it but the pointer was elsewhere: the next hover or press with Alt still
-  // held begins the picker hold, so a pen that lands without hovering samples on contact.
+  // Alt went down while the surface owned it but the pointer was elsewhere: the next hover or press with Alt still held
+  // begins the picker hold, so a pen that lands without hovering samples on contact.
   let altPending = false;
   // This pipeline began or armed a hold for the Alt now down; its release is prevented too.
   let altClaimed = false;
 
   /**
-   * Reads the input element's viewport offset. Hoisted out of
-   * {@link buildPointerInput} so a coalesced batch pays for one layout read
-   * instead of one per sample — the whole batch comes from a single event, so
-   * the element cannot have moved between its samples.
+   * Reads the input element's viewport offset. Hoisted out of {@link buildPointerInput} so a coalesced batch pays for
+   * one layout read instead of one per sample — the whole batch comes from a single event, so the element cannot have
+   * moved between its samples.
    */
   const inputOrigin = (): { left: number; top: number } =>
     deps.getInputElement()?.getBoundingClientRect() ?? { left: 0, top: 0 };
@@ -245,8 +243,8 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
 
   /**
    * Who owns a keydown the canvas might act on, or null when it is refused outright: already handled, under a modal
-   * dialog (focus can rest on the body beneath one), over an editable field or an open overlay, or on a control
-   * reached by keyboard, whose own activation must win.
+   * dialog (focus can rest on the body beneath one), over an editable field or an open overlay, or on a control reached
+   * by keyboard, whose own activation must win.
    */
   const keyOwner = (event: KeyboardEvent): CanvasKeyOwner | null => {
     const target = event.target as KeyTarget;
@@ -424,8 +422,8 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     },
     onKeyDown: (event) => {
       if (event.key === 'Escape') {
-        // Cancel the gesture before the engine Escape ladder. Editable fields keep Escape; gesture-consuming
-        // Escape may cancel a session but must preserve committed selection.
+        // Cancel the gesture before the engine Escape ladder. Editable fields keep Escape; gesture-consuming Escape may
+        // cancel a session but must preserve committed selection.
         const gestureWasActive = gestureActive;
         cancelGesture();
         if (ownsSessionKey(event)) {
@@ -499,8 +497,8 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       }
     },
     onPointerCancel: (event) => {
-      // Ignore cancel events from a pointer other than the one driving the active gesture/pan
-      // (pointer capture on the active pointer does not suppress other pointers' events).
+      // Ignore cancel events from a pointer other than the one driving the active gesture/pan (pointer capture on the
+      // active pointer does not suppress other pointers' events).
       if (activePointerId !== null && event.pointerId !== activePointerId) {
         return;
       }
@@ -543,8 +541,8 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
           beginTempTool('alt', ALT_TEMP_TOOL);
         }
       }
-      // Commit and consume modal text presses before gesture activation; prevent default focus/selection after
-      // closing the session.
+      // Commit and consume modal text presses before gesture activation; prevent default focus/selection after closing
+      // the session.
       if (deps.maybeCommitModalSession?.()) {
         event.preventDefault();
         return;

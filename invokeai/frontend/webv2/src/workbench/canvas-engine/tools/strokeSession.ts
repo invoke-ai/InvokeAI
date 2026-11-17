@@ -1,12 +1,12 @@
 /**
- * Per-gesture brush/eraser sessions accumulate samples and draw one scratch silhouette, compositing at stroke
- * opacity without overlap darkening. Samples append immediately; the accumulated stroke renders at most once per
- * frame and commit renders the final stroke synchronously. Brush uses source-over or transparency-locked source-atop; erase uses
+ * Per-gesture brush/eraser sessions accumulate samples and draw one scratch silhouette, compositing at stroke opacity
+ * without overlap darkening. Samples append immediately; the accumulated stroke renders at most once per frame and
+ * commit renders the final stroke synchronously. Brush uses source-over or transparency-locked source-atop; erase uses
  * destination-out and is refused under transparency lock.
  *
- * Each preview restores affected pristine pixels before compositing the accumulated stroke. Extend
- * before-snapshots only with newly covered strips, keeping readback proportional to added area. Commit records
- * exact before/after pixels; cancel restores before. Move processing never dispatches.
+ * Each preview restores affected pristine pixels before compositing the accumulated stroke. Extend before-snapshots
+ * only with newly covered strips, keeping readback proportional to added area. Commit records exact before/after
+ * pixels; cancel restores before. Move processing never dispatches.
  */
 
 import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
@@ -41,8 +41,8 @@ export interface StrokeSessionConfig {
   /** Freehand thinning; 0 disables pressure sensitivity. */
   thinning: number;
   /**
-   * Whether pen pressure modulates alpha along the stroke. Costs a full-region scratch
-   * refill per frame (see the band fill below), so it is opt-in.
+   * Whether pen pressure modulates alpha along the stroke. Costs a full-region scratch refill per frame (see the band
+   * fill below), so it is opt-in.
    */
   pressureOpacity: boolean;
   /** Fill color (brush only; ignored for the eraser). */
@@ -68,8 +68,8 @@ export interface StrokeSessionConfig {
    */
   clipRect?: Rect | null;
   /**
-   * Local-to-document layer transform; inverse-map document input/clips because cache, damage and history are
-   * local. Absence uses identity.
+   * Local-to-document layer transform; inverse-map document input/clips because cache, damage and history are local.
+   * Absence uses identity.
    */
   layerTransform?: Mat2d | null;
   /** The admitted edit; its undo footprint grows before the stroke's before/after pixels do. */
@@ -103,8 +103,8 @@ const GROWTH_CHUNK = 64;
 const MAX_GROWTH_CHUNK = 512;
 
 /**
- * Scale growth chunks with brush diameter above {@link GROWTH_CHUNK}; wide brushes cross fewer boundaries while
- * small brushes retain compact history patches.
+ * Scale growth chunks with brush diameter above {@link GROWTH_CHUNK}; wide brushes cross fewer boundaries while small
+ * brushes retain compact history patches.
  */
 const GROWTH_CHUNK_RATIO = 0.25;
 
@@ -128,9 +128,8 @@ const padToChunk = (r: Rect, chunk: number): Rect => {
 type SurfaceContext = RasterSurface['ctx'];
 
 /**
- * Extra slack (layer-local units, the space the stroke rasterizes in) around
- * the changed geometry, covering the antialiased edge and the outward rounding
- * of the bounds themselves.
+ * Extra slack (layer-local units, the space the stroke rasterizes in) around the changed geometry, covering the
+ * antialiased edge and the outward rounding of the bounds themselves.
  */
 const CHANGE_MARGIN = 2;
 
@@ -180,8 +179,7 @@ const sameRect = (a: Rect, b: Rect): boolean =>
   a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 
 /**
- * Extend pristine snapshots by copying retained data and reading only new strips, where no stroke has yet
- * composited.
+ * Extend pristine snapshots by copying retained data and reading only new strips, where no stroke has yet composited.
  */
 const extendBefore = (
   surfaceCtx: SurfaceContext,
@@ -216,8 +214,8 @@ const extendBefore = (
 };
 
 /**
- * Decomposes `outer` minus `inner` into up to four disjoint rects (top, bottom,
- * left, right), assuming `inner` is contained in `outer`.
+ * Decomposes `outer` minus `inner` into up to four disjoint rects (top, bottom, left, right), assuming `inner` is
+ * contained in `outer`.
  */
 const surroundingStrips = (inner: Rect, outer: Rect): Rect[] => {
   const innerBottom = inner.y + inner.height;
@@ -255,23 +253,19 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
 
   const layers: LayerCacheStore = ctx.layers;
   // The document→layer-local boundary. The owning tool refuses degenerate
-  // (zero-scale) transforms before opening a session; the identity fallback
-  // keeps this total for direct callers.
+  // (zero-scale) transforms before opening a session; the identity fallback keeps this total for direct callers.
   const toLocal = (config.layerTransform && invert(config.layerTransform)) ?? identity();
-  // Brush geometry is authored in document units; in layer space it scales by
-  // the inverse (exact under rotation and uniform scale, the geometric mean
-  // under non-uniform — the stroke then stretches with the layer's own pixels).
+  // Brush geometry is authored in document units; in layer space it scales by the inverse (exact under rotation and
+  // uniform scale, the geometric mean under non-uniform — the stroke then stretches with the layer's own pixels).
   const localSize = size * getScale(toLocal);
-  // Blur the whole silhouette for uniform, noncompounding softness; sub-quarter-pixel sigma uses the crisp banded
-  // path.
+  // Blur the whole silhouette for uniform, noncompounding softness; sub-quarter-pixel sigma uses the crisp banded path.
   const rawSigma = ((1 - Math.min(1, Math.max(0, config.hardness))) * localSize) / 4;
   const featherSigma = rawSigma < 0.25 ? 0 : rawSigma;
   const featherBleed = Math.ceil(featherSigma * 3);
   const clipMaskLocalRect = clipMask ? roundOut(transformBounds(toLocal, clipMask.rect)) : null;
   const clipRectLocal = clipRect ? roundOut(transformBounds(toLocal, clipRect)) : null;
-  // Axis-aligned layers get the rect clip for free from the region clamp; a
-  // rotated/sheared layer's clamp is only the AABB, so the exact rect must also
-  // be cut out of the scratch like the selection mask is.
+  // Axis-aligned layers get the rect clip for free from the region clamp; a rotated/sheared layer's clamp is only the
+  // AABB, so the exact rect must also be cut out of the scratch like the selection mask is.
   const clipRectNeedsMask = !!clipRect && (toLocal.b !== 0 || toLocal.c !== 0);
   const toSample = (input: PointerInput): StrokeSamplePoint => {
     const local = applyToPoint(toLocal, input.documentPoint);
@@ -341,8 +335,8 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     if (!dirty || isEmpty(dirty)) {
       return true;
     }
-    // Outward chunk-padding amortizes growth; dirty regions and history use the same padded extent. Clamp padding
-    // to selection bounds, and trim visible content during persistence.
+    // Outward chunk-padding amortizes growth; dirty regions and history use the same padded extent. Clamp padding to
+    // selection bounds, and trim visible content during persistence.
     let region = padToChunk(accumRect ? roundOut(union(accumRect, dirty)) : dirty, chunk);
     if (clipMaskLocalRect) {
       const clamped = intersect(region, clipMaskLocalRect);
@@ -387,13 +381,13 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     const moved = previousPolygon ? changedVertexBounds(previousPolygon, polygon) : null;
     const touched =
       previousRect && moved ? intersect(roundOut(expand(moved, CHANGE_MARGIN + featherBleed)), region) : region;
-    // No intersection means the change fell outside the paintable region (a clip
-    // can do that); fall back to the whole region rather than skip the frame.
+    // No intersection means the change fell outside the paintable region (a clip can do that); fall back to the whole
+    // region rather than skip the frame.
     const changed = touched && !isEmpty(touched) ? touched : region;
     previousPolygon = polygon;
 
-    // Restore the changed band from pristine pixels before compositing to avoid compounded opacity. The first
-    // frame has nothing to restore.
+    // Restore the changed band from pristine pixels before compositing to avoid compounded opacity. The first frame has
+    // nothing to restore.
     if (previousRect) {
       targetCtx.putImageData(
         beforeImageData,
@@ -406,9 +400,9 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
       );
     }
 
-    // Fill the accumulated outline once in region-local scratch, refreshing only changed bounds to avoid overlap
-    // seams. Resizing clears scratch and requires a full fill. Pressure-alpha also refreshes fully because partial
-    // replacement could split a band and lose earlier coverage.
+    // Fill the accumulated outline once in region-local scratch, refreshing only changed bounds to avoid overlap seams.
+    // Resizing clears scratch and requires a full fill. Pressure-alpha also refreshes fully because partial replacement
+    // could split a band and lose earlier coverage.
     const scratchCleared = !previousRect || !sameRect(previousRect, region);
     // The blur reads the whole silhouette; a band-only refill would seam.
     const refresh = scratchCleared || pressureOpacity || featherSigma > 0 ? region : changed;
@@ -427,8 +421,8 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
       tapPoint !== undefined && bounds.width > 0 && bounds.width < 1 && bounds.height > 0 && bounds.height < 1;
 
     if (isSubpixelTap) {
-      // Subpixel paths may quantize to zero in Skia. Represent a tiny dab in its containing pixel with
-      // ellipse-area alpha, preserving subpixel coverage rather than inflating brush size.
+      // Subpixel paths may quantize to zero in Skia. Represent a tiny dab in its containing pixel with ellipse-area
+      // alpha, preserving subpixel coverage rather than inflating brush size.
       strokeCtx.globalCompositeOperation = 'source-over';
       const pressureAlpha = pressureOpacity ? (getPressureBands([tapPoint])[0]?.alpha ?? 1) : 1;
       strokeCtx.globalAlpha = Math.min(1, ((Math.PI * bounds.width * bounds.height) / 4) * pressureAlpha);
@@ -469,8 +463,8 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     }
     const paintCtx = paintSurface.ctx;
 
-    // Mask only the changed scratch band at maskOrigin-regionOrigin; masking retained pixels again would multiply
-    // alpha twice.
+    // Mask only the changed scratch band at maskOrigin-regionOrigin; masking retained pixels again would multiply alpha
+    // twice.
     if (clipMask) {
       paintCtx.setTransform(1, 0, 0, 1, 0, 0);
       paintCtx.save();
@@ -479,8 +473,8 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
       paintCtx.clip();
       paintCtx.globalCompositeOperation = 'destination-in';
       paintCtx.globalAlpha = 1;
-      // The mask is document-space; drawing it through the layer inverse keeps
-      // its exact shape clipping even on a rotated or scaled layer.
+      // The mask is document-space; drawing it through the layer inverse keeps its exact shape clipping even on a
+      // rotated or scaled layer.
       const maskMatrix = multiply({ a: 1, b: 0, c: 0, d: 1, e: -region.x, f: -region.y }, toLocal);
       paintCtx.setTransform(maskMatrix.a, maskMatrix.b, maskMatrix.c, maskMatrix.d, maskMatrix.e, maskMatrix.f);
       paintCtx.drawImage(clipMask.surface.canvas, clipMask.rect.x, clipMask.rect.y);
@@ -516,8 +510,8 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     targetCtx.drawImage(paintSurface.canvas, region.x - ox, region.y - oy);
     targetCtx.restore();
 
-    // Bump cache version with surface-local changed bounds so adjusted surfaces refresh live strokes partially.
-    // Keep thumbnail versions unchanged until committed paint/rasterization notifications.
+    // Bump cache version with surface-local changed bounds so adjusted surfaces refresh live strokes partially. Keep
+    // thumbnail versions unchanged until committed paint/rasterization notifications.
     layers.publishPixels(layerId, {
       height: changed.height,
       width: changed.width,

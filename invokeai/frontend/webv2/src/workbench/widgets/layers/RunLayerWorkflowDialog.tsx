@@ -59,9 +59,8 @@ export interface LayerWorkflowAvailability {
 }
 
 /**
- * Every layer row observes the same immutable graph/template objects. Cache the
- * expensive injected-graph readiness probes by those identities so a long
- * layer list does the work once, while each row still gets live eligibility.
+ * Every layer row observes the same immutable graph/template objects. Cache the expensive injected-graph readiness
+ * probes by those identities so a long layer list does the work once, while each row still gets live eligibility.
  */
 const availabilityCache = new WeakMap<
   ProjectGraphState,

@@ -28,8 +28,8 @@ export interface CanvasFontRuntime {
   /** Ensures the exact static face/instance is loaded and returns its browser family alias. */
   ensure(reference: CanvasFontReference, signal?: AbortSignal): Promise<string>;
   /**
-   * Revalidate exact faces against current account/catalog state for outputs; cached preview aliases must not
-   * allow deleted or changed resources.
+   * Revalidate exact faces against current account/catalog state for outputs; cached preview aliases must not allow
+   * deleted or changed resources.
    */
   ensureForOutput(reference: CanvasFontReference, signal?: AbortSignal): Promise<string>;
   /** Keeps the loaded face registered while this engine has a live text consumer. */
@@ -274,9 +274,8 @@ export const createFontLoader = (api: FontLoadApi | CanvasFontRuntime | null): F
     if (resolved !== undefined && !bypassReady) {
       return { pending: false, promise: Promise.resolve(resolved) };
     }
-    // An output check must not inherit a preview request that started before
-    // the operation. That request may have used a cached alias without the
-    // fresh metadata/authentication validation required at the output boundary.
+    // An output check must not inherit a preview request that started before the operation. That request may have used
+    // a cached alias without the fresh metadata/authentication validation required at the output boundary.
     const existing = bypassReady ? undefined : pending.get(key);
     if (existing) {
       return { pending: true, promise: existing };
@@ -287,9 +286,8 @@ export const createFontLoader = (api: FontLoadApi | CanvasFontRuntime | null): F
     } catch (error) {
       loaded = Promise.reject(error);
     }
-    // A runtime may publish its ordinary `loading` state synchronously from
-    // inside ensure(). Capture the fence after that call; a later lifecycle
-    // notification still invalidates this request before it can be retained.
+    // A runtime may publish its ordinary `loading` state synchronously from inside ensure(). Capture the fence after
+    // that call; a later lifecycle notification still invalidates this request before it can be retained.
     const requestGeneration = generation;
     let promise!: Promise<string>;
     promise = loaded
@@ -387,9 +385,8 @@ export const createFontLoader = (api: FontLoadApi | CanvasFontRuntime | null): F
       return { ...result, promise: withAbortSignal(shared, signal) };
     }
     if (reference) {
-      // A custom reference cannot be made trustworthy by loading the readable
-      // family name through document.fonts. Failing closed keeps export and
-      // generation output from silently baking fallback glyphs.
+      // A custom reference cannot be made trustworthy by loading the readable family name through document.fonts.
+      // Failing closed keeps export and generation output from silently baking fallback glyphs.
       return {
         pending: true,
         promise: Promise.reject(new Error('A custom Canvas font runtime is required for this text source.')),
@@ -466,8 +463,8 @@ export const createFontLoader = (api: FontLoadApi | CanvasFontRuntime | null): F
       const key = `runtime:${sourceKey(source)}`;
       const result = track(key, () => api.ensureForOutput(reference, signal), !api.subscribe, reference, true);
       return result.promise.catch((error: unknown) => {
-        // A readiness operation is allowed to discover that an account-scoped
-        // face disappeared after rasterization cached its previous alias.
+        // A readiness operation is allowed to discover that an account-scoped face disappeared after rasterization
+        // cached its previous alias.
         ready.delete(key);
         releaseLease(key);
         throw error;

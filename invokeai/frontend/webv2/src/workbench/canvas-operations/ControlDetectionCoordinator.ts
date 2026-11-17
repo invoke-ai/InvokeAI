@@ -1,10 +1,10 @@
 /**
  * Background detection for control layers. Commands start it (a Properties intent, Retry, resuming after cooldown);
- * document changes never do, so undo and redo cannot re-run detection. One job per layer, at most
- * {@link CONTROL_DETECTION_MAX_CONCURRENT} graphs per engine; results land through the engine's guarded map commit,
- * which refuses while a modal operation, gesture or layer session holds the document, so a finished result waits
- * and retries instead of blocking them. The commit promotes a result to durable pixels only once it is about to
- * land, so a dropped result stays an intermediate the server collects.
+ * document changes never do, so undo and redo cannot re-run detection. One job per layer, at most {@link
+ * CONTROL_DETECTION_MAX_CONCURRENT} graphs per engine; results land through the engine's guarded map commit, which
+ * refuses while a modal operation, gesture or layer session holds the document, so a finished result waits and retries
+ * instead of blocking them. The commit promotes a result to durable pixels only once it is about to land, so a dropped
+ * result stays an intermediate the server collects.
  */
 
 import type { AccountOwnedResource, AccountScope } from '@platform/state/accountLifecycle';
@@ -156,8 +156,8 @@ const isOwnPaintInput = (layer: CanvasControlLayerContract): boolean =>
   layer.original === undefined && !layer.filter && layer.source.type === 'paint';
 
 /**
- * Whether a run could produce a map: the document says the map is stale, or the input is the layer's own paint
- * whose pixels may still be in flight (a flush settles which).
+ * Whether a run could produce a map: the document says the map is stale, or the input is the layer's own paint whose
+ * pixels may still be in flight (a flush settles which).
  */
 const wantsDetection = (layer: CanvasControlLayerContract): boolean =>
   needsControlDetection(layer) ||
@@ -272,8 +272,8 @@ export const createControlDetectionCoordinator = (
 
   /**
    * Whether `guard` still describes the layer. The layer's own paint landing under the job (an upload, more strokes)
-   * runs again; anything else (removal, a document swap, an image swapped by undo or redo, another command) drops
-   * the result, so history never re-runs detection.
+   * runs again; anything else (removal, a document swap, an image swapped by undo or redo, another command) drops the
+   * result, so history never re-runs detection.
    */
   const checkGuard = (
     guard: ControlDetectionGuard,
@@ -565,8 +565,8 @@ export const createControlDetectionCoordinator = (
           continue;
         }
         if (job) {
-          // History moved the layer away from what the job detects: its result would be dropped, so stop the graph
-          // now. The layer's own paint landing keeps it, to restart once it finishes.
+          // History moved the layer away from what the job detects: its result would be dropped, so stop the graph now.
+          // The layer's own paint landing keeps it, to restart once it finishes.
           const inputChanged =
             controlDetectionInputKey(layer) !== job.inputKey && !onlyOwnPaintChanged(job.recipe, layer);
           if (!wantsDetection(layer) || inputChanged) {

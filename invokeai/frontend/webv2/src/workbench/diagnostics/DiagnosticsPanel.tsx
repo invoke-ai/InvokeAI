@@ -122,8 +122,8 @@ const formatSource = (entry: LogEntry, showProject: boolean): string => {
 };
 
 /**
- * Lists recorded events for one scope with display-only filters, paging and export. Callers supply the project
- * the viewer belongs to; Launchpad-style hosts pass null and see account-wide events only.
+ * Lists recorded events for one scope with display-only filters, paging and export. Callers supply the project the
+ * viewer belongs to; Launchpad-style hosts pass null and see account-wide events only.
  */
 export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) => {
   const { t } = useTranslation();

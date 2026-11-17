@@ -512,11 +512,11 @@ export class ProjectCreateAbsentError extends Error {
 }
 
 /**
- * Settle ambiguous creates with a second POST: SQLite serializes writers, while GET 404 can race the initial
- * commit. A 201 succeeds; after 409, GET distinguishes an existing project from a board conflict or an id another
- * account holds. Other deterministic rejections prove absence. When the retry settles nothing either, a GET that finds
- * this create's project still proves it committed. Transport failure remains unknown and must never authorize deletion.
- * A read that settles the create carries the workspace the committed attempt stored, as the create's own answer would.
+ * Settle ambiguous creates with a second POST: SQLite serializes writers, while GET 404 can race the initial commit. A
+ * 201 succeeds; after 409, GET distinguishes an existing project from a board conflict or an id another account holds.
+ * Other deterministic rejections prove absence. When the retry settles nothing either, a GET that finds this create's
+ * project still proves it committed. Transport failure remains unknown and must never authorize deletion. A read that
+ * settles the create carries the workspace the committed attempt stored, as the create's own answer would.
  */
 const settleProjectCreate = async (
   request: ProjectCreateRequest,
@@ -639,7 +639,8 @@ export const getClientStateValue = (key: string, signal?: AbortSignal): Promise<
 
 /** The endpoint takes a JSON-encoded string body, hence the stringify of a string. */
 export const setClientStateValue = async (key: string, value: string, signal?: AbortSignal): Promise<void> => {
-  // Unconditional writes must settle before callers release their ordering queues; a timeout cannot fence a late commit.
+  // Unconditional writes must settle before callers release their ordering queues; a timeout cannot fence a late
+  // commit.
   await apiFetchJson<string>(`${CLIENT_STATE_BASE}/set_by_key?key=${encodeURIComponent(key)}`, {
     body: JSON.stringify(value),
     method: 'POST',

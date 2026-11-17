@@ -1,6 +1,6 @@
 /**
- * Media cookies authenticate video routes because elements cannot set bearer headers. The full route supports
- * native Range requests for seeking.
+ * Media cookies authenticate video routes because elements cannot set bearer headers. The full route supports native
+ * Range requests for seeking.
  */
 
 export const getGalleryVideoThumbnailPath = (videoName: string): string =>

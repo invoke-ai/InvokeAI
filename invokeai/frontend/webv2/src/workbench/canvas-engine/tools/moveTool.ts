@@ -1,11 +1,11 @@
 /**
- * Move targets panel selection, never stack hit tests. Dragging inside selection, or an existing float, moves
- * pixels across multiple drags until commit/cancel; the pixels are cut only once a press becomes a drag, so a click
- * leaves the layer whole. Otherwise move eligible selected layers with a primary-layer fallback.
+ * Move targets panel selection, never stack hit tests. Dragging inside selection, or an existing float, moves pixels
+ * across multiple drags until commit/cancel; the pixels are cut only once a press becomes a drag, so a click leaves the
+ * layer whole. Otherwise move eligible selected layers with a primary-layer fallback.
  *
- * Shift locks the dominant axis. Layer movement uses the visible model grid unless Alt bypasses; local-space
- * floats never snap. Preview only during drag; changed layer moves commit once, float history waits for its later
- * bake. Cancel restores the drag start; clicks/zero movement do nothing.
+ * Shift locks the dominant axis. Layer movement uses the visible model grid unless Alt bypasses; local-space floats
+ * never snap. Preview only during drag; changed layer moves commit once, float history waits for its later bake. Cancel
+ * restores the drag start; clicks/zero movement do nothing.
  */
 
 import type { CanvasLayerEditRefusal } from '@workbench/canvas-engine/capabilities';
@@ -30,9 +30,9 @@ const PRIMARY_BUTTON = 1;
 export const MOVE_DRAG_THRESHOLD_PX = 3;
 
 /**
- * What a press drags from the panel selection: every selected leaf, and every leaf beneath a selected group, with
- * the primary one under the document selection; refused, naming the first leaf in the way, when any is locked or
- * hidden. Pure, so a press can ask before it reports.
+ * What a press drags from the panel selection: every selected leaf, and every leaf beneath a selected group, with the
+ * primary one under the document selection; refused, naming the first leaf in the way, when any is locked or hidden.
+ * Pure, so a press can ask before it reports.
  */
 type SelectedLayerDrag =
   | { kind: 'drag'; layers: readonly CanvasLayerContract[]; primary: CanvasLayerContract }
@@ -112,8 +112,8 @@ export const createMoveTool = (): Tool => {
   };
 
   /**
-   * Resolves what a press at `point` drags. Pixels win over the layer when a
-   * float is already in flight, or when a live selection contains the press.
+   * Resolves what a press at `point` drags. Pixels win over the layer when a float is already in flight, or when a live
+   * selection contains the press.
    */
   const resolveMode = (ctx: ToolContext, point: Vec2): DragMode => {
     const existing = ctx.getFloatingSelection?.() ?? null;
@@ -143,8 +143,8 @@ export const createMoveTool = (): Tool => {
   };
 
   /**
-   * A click must leave the layer whole, so the pixels are cut only when the drag starts. Only a selection with
-   * nothing to lift falls back to moving the layer; a refused lift moves nothing.
+   * A click must leave the layer whole, so the pixels are cut only when the drag starts. Only a selection with nothing
+   * to lift falls back to moving the layer; a refused lift moves nothing.
    */
   const liftOnDrag = (ctx: ToolContext, mode: Extract<DragMode, { kind: 'lift' }>): DragMode => {
     const result = ctx.liftFloatingSelection?.(mode.layerId) ?? 'unavailable';
@@ -186,9 +186,8 @@ export const createMoveTool = (): Tool => {
       return;
     }
     if (current.mode.kind === 'float') {
-      // The float's transform is LAYER-LOCAL, so a document-space pointer delta
-      // has to be mapped through the layer's inverse matrix first — otherwise a
-      // rotated or scaled layer would drag the pixels off at an angle.
+      // The float's transform is LAYER-LOCAL, so a document-space pointer delta has to be mapped through the layer's
+      // inverse matrix first — otherwise a rotated or scaled layer would drag the pixels off at an angle.
       const local = ctx.documentDeltaToLayerLocal?.(current.mode.layerId, delta) ?? delta;
       ctx.setFloatingTransform?.({
         ...current.mode.origin,
@@ -222,8 +221,8 @@ export const createMoveTool = (): Tool => {
     },
     onPointerCancel: (ctx) => {
       if (state?.mode.kind === 'float') {
-        // Revert just this drag; the float itself survives (Escape's own
-        // float-cancel is a separate, engine-level step).
+        // Revert just this drag; the float itself survives (Escape's own float-cancel is a separate, engine-level
+        // step).
         ctx.setFloatingTransform?.(state.mode.origin);
       }
       clearOverride(ctx);

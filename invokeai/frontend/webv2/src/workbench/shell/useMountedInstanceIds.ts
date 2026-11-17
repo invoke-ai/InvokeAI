@@ -4,9 +4,9 @@ import { useState } from 'react';
 export const MOUNTED_INSTANCE_LIMIT = 3;
 
 /**
- * Remember recently shown instances independently of replaced region membership. Reset on project id because
- * instance ids repeat across projects. State is ephemeral; closing hides rather than destroys retained instances,
- * bounded by limit.
+ * Remember recently shown instances independently of replaced region membership. Reset on project id because instance
+ * ids repeat across projects. State is ephemeral; closing hides rather than destroys retained instances, bounded by
+ * limit.
  */
 export const useMountedInstanceIds = (
   activeId: string | undefined,

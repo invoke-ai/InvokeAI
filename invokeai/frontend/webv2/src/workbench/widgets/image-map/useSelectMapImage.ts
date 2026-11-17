@@ -24,8 +24,8 @@ export interface MapSelectionActions {
 }
 
 /**
- * Single clicks use shared gallery reveal without raising widgets. Cluster clicks populate a proximity-ordered
- * semantic list. Both share gesture ordering so the latest click wins.
+ * Single clicks use shared gallery reveal without raising widgets. Cluster clicks populate a proximity-ordered semantic
+ * list. Both share gesture ordering so the latest click wins.
  */
 export const useMapSelection = (): MapSelectionActions => {
   const commands = useWorkbenchCommands();
@@ -45,9 +45,8 @@ export const useMapSelection = (): MapSelectionActions => {
 
       void revealGalleryItem({ commands, queries, queryClient }, ref, ticket)
         .catch(() => {
-          // A click on a just-deleted point, or a blip mid-backend-restart, simply
-          // leaves the selection unchanged. The map sits beside the grid and has
-          // moved nothing, so there is nothing to explain.
+          // A click on a just-deleted point, or a blip mid-backend-restart, simply leaves the selection unchanged. The
+          // map sits beside the grid and has moved nothing, so there is nothing to explain.
         })
         .finally(locatorRequest.release);
     },
@@ -74,9 +73,8 @@ export const useMapSelection = (): MapSelectionActions => {
             return;
           }
 
-          // Same reason as a single-item reveal: the selection stamps the
-          // navigation query from the board the gallery is showing, so land
-          // on the primary item's board first to keep that query coherent.
+          // Same reason as a single-item reveal: the selection stamps the navigation query from the board the gallery
+          // is showing, so land on the primary item's board first to keep that query coherent.
           commands.gallery.selectBoard(image.boardId);
           // Keep large member lists in memory and persist only their key; reset page/search like gallery semantic
           // queries.
@@ -109,8 +107,8 @@ export const useMapSelection = (): MapSelectionActions => {
  * its colours, since both draw from the same reference. Claiming a navigation ticket retires a cluster click still
  * hydrating, which would otherwise re-apply the selection just cleared.
  *
- * Checks at call time that a cluster is what the gallery shows: Esc reaches this whenever the map has focus, and
- * the same reset applied to an ordinary search would wipe the user's search text.
+ * Checks at call time that a cluster is what the gallery shows: Esc reaches this whenever the map has focus, and the
+ * same reset applied to an ordinary search would wipe the user's search text.
  */
 export const useClearClusterSelection = (): (() => void) => {
   const { widgets } = useWorkbenchCommands();

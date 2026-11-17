@@ -37,9 +37,8 @@ const PropertyRowLabel = ({ label, labelId }: { label: string; labelId?: string 
 };
 
 /**
- * Use fixed label/trailing columns around a flexible control so sliders and numbers never wrap; blank labels
- * preserve continuation alignment. `labelId` names the label so a control in the row can point
- * `aria-labelledby` at it.
+ * Use fixed label/trailing columns around a flexible control so sliders and numbers never wrap; blank labels preserve
+ * continuation alignment. `labelId` names the label so a control in the row can point `aria-labelledby` at it.
  */
 export const PropertyControlRow = ({
   children,
@@ -93,9 +92,8 @@ export const PropertySwitchRow = ({
 };
 
 /**
- * A named group of form rows. A collapsible group renders its label as a
- * disclosure button and remembers the user's choice per group id (an override
- * store; the declared default applies until the user touches it).
+ * A named group of form rows. A collapsible group renders its label as a disclosure button and remembers the user's
+ * choice per group id (an override store; the declared default applies until the user touches it).
  */
 export const PropertyGroup = ({
   children,

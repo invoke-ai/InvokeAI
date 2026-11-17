@@ -17,9 +17,8 @@ import {
 } from './entries';
 
 /**
- * Single source for stage row construction. `t` is optional so the synchronous
- * stage-preview path can build rows without translation-dependent labels;
- * rendered rows always pass it.
+ * Single source for stage row construction. `t` is optional so the synchronous stage-preview path can build rows
+ * without translation-dependent labels; rendered rows always pass it.
  */
 export const buildStageRows = (
   stage: PaletteStage,

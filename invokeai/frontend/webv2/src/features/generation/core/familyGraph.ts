@@ -49,8 +49,8 @@ export interface FamilyConditioning {
    */
   ipAdapterCollector: BackendInvocationContract | null;
   /**
-   * The collector the builder already feeds `denoise.redux_conditioning` from, when it wired FLUX Redux. Only read where
-   * regional references are FLUX Redux (FLUX).
+   * The collector the builder already feeds `denoise.redux_conditioning` from, when it wired FLUX Redux. Only read
+   * where regional references are FLUX Redux (FLUX).
    */
   fluxReduxCollector: BackendInvocationContract | null;
 }

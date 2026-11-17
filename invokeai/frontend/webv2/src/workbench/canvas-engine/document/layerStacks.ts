@@ -9,9 +9,9 @@ import { childrenAt, indexStacks, type CanvasDocumentIndex } from './documentInd
 import { childrenOf, isGroupNode, replaceChildren } from './documentTree';
 
 /**
- * The four stack forests of a v3 document. The compositor draws the stacks bottom to top in
- * {@link LAYER_STACK_ORDER} and the Layers panel lists them top first; within a stack, nodes are
- * ordered by their depth-first preorder position, top first.
+ * The four stack forests of a v3 document. The compositor draws the stacks bottom to top in {@link LAYER_STACK_ORDER}
+ * and the Layers panel lists them top first; within a stack, nodes are ordered by their depth-first preorder position,
+ * top first.
  */
 export type LayerStackKind = CanvasLayerStackKind;
 
@@ -116,9 +116,9 @@ const moveSelectedIds = (
 };
 
 /**
- * Moves every selected node among its own siblings, selected members keeping their relative order.
- * A selected node whose ancestor is also selected moves with the ancestor. Returns one command per
- * sibling list whose order changes, in document order.
+ * Moves every selected node among its own siblings, selected members keeping their relative order. A selected node
+ * whose ancestor is also selected moves with the ancestor. Returns one command per sibling list whose order changes, in
+ * document order.
  */
 export const moveNodesWithinSiblings = (
   index: CanvasDocumentIndex,

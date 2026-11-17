@@ -132,8 +132,8 @@ export const GenerateCanvasCompositingSection = () => {
     [patch]
   );
 
-  // The generate form outlives the canvas widget's engine lease, so the sampler
-  // peeks non-owningly at click time instead of holding an engine alive.
+  // The generate form outlives the canvas widget's engine lease, so the sampler peeks non-owningly at click time
+  // instead of holding an engine alive.
   const handleSampleInfillColor = useCallback(
     () => getCanvasEngine(projectId)?.tools.requestColorSample() ?? Promise.resolve(null),
     [projectId]

@@ -674,8 +674,8 @@ const buildSD3Graph = (
 };
 
 /**
- * The node's own default is `off`, so that preset sends nothing and the graph stays as it was. Scale and exponent
- * only mean anything under `manual`; the other presets derive theirs from the image size.
+ * The node's own default is `off`, so that preset sends nothing and the graph stays as it was. Scale and exponent only
+ * mean anything under `manual`; the other presets derive theirs from the image size.
  */
 const getFluxDypeFields = (
   settings: GenerateSettings
@@ -1365,7 +1365,8 @@ const buildAnimaGraph = (
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, loraSource, 'qwen3_encoder', posCond, 'qwen3_encoder');
   if (qwen35EncoderModel) {
-    // Straight from the loader: the LoRA collection loader passes Qwen3.5 through untouched, so it has no output for it.
+    // Straight from the loader: the LoRA collection loader passes Qwen3.5 through untouched, so it has no output for
+    // it.
     addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
   }
   addEdge(graph, modelLoader, 'vae', output, 'vae');
@@ -1556,8 +1557,8 @@ const buildKrea2Graph = (
         );
 
   // The cache changes how edit references run, and only an edit LoRA trained with it (ai-toolkit's `kv_cache`) reads
-  // them that way; the base model alone sees them through attention it never learned. Without a LoRA the stored
-  // switch is kept but not sent, so the denoise runs its default and the record says nothing about it.
+  // them that way; the base model alone sees them through attention it never learned. Without a LoRA the stored switch
+  // is kept but not sent, so the denoise runs its default and the record says nothing about it.
   const referenceKvCache =
     editReferenceImages.length > 0 && activeLoras.length > 0 ? settings.krea2ReferenceKvCache : undefined;
 
@@ -1698,9 +1699,9 @@ const buildQwenImage21Graph = (
 };
 
 /**
- * Qwen-Image-2.1 reads each reference twice, at one size: the prompt encoder sees it through the vision tower, and
- * the denoise node places its clean latents in the prompt's image slots. Both prompts are encoded with the
- * references, and the latents follow in the same order.
+ * Qwen-Image-2.1 reads each reference twice, at one size: the prompt encoder sees it through the vision tower, and the
+ * denoise node places its clean latents in the prompt's image slots. Both prompts are encoded with the references, and
+ * the latents follow in the same order.
  */
 const addQwenImage21ReferenceImages = (
   graph: BackendGraphContract,
@@ -1823,9 +1824,9 @@ const buildMossImageGraph = (
   // The denoise node reads the VAE's BatchNorm statistics, which define the latent space it works in.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
-  // The layout node compiles a layout draft (e.g. from Expand Prompt) and canvas regions into the model's layout
-  // prompt at run time, and passes plain text through. Canvas fills `regions`; batch prompt variation still flows
-  // through `positive_prompt`.
+  // The layout node compiles a layout draft (e.g. from Expand Prompt) and canvas regions into the model's layout prompt
+  // at run time, and passes plain text through. Canvas fills `regions`; batch prompt variation still flows through
+  // `positive_prompt`.
   const layoutPrompt = addNode(graph, {
     height: denoiseSize.height,
     id: 'layout_prompt',
@@ -1899,9 +1900,9 @@ const buildFlux3Graph = (
         'transformer',
       ])
     : modelLoader;
-  // Canvas regions become a box table at the end of the prompt here, at run time, so batch prompt variation still
-  // flows through `positive_prompt`. Without regions the prompt passes through unchanged. The prompt upsampler takes
-  // this place when it is on: it takes the regions itself and also reads the reference images.
+  // Canvas regions become a box table at the end of the prompt here, at run time, so batch prompt variation still flows
+  // through `positive_prompt`. Without regions the prompt passes through unchanged. The prompt upsampler takes this
+  // place when it is on: it takes the regions itself and also reads the reference images.
   const upsamplerModel = settings.flux3PromptUpsamplerEnabled
     ? requireComponent(
         getCompatibleComponent(settings.flux3PromptUpsamplerModel, isVisionTextLlm),

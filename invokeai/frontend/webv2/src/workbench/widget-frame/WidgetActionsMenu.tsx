@@ -149,8 +149,8 @@ export const WidgetActionsMenu = ({
     setIsPreviewMounted(true);
     setIsPreviewOpen(true);
   }, []);
-  // Guarded on `isPreviewOpen`: re-opening the preview while it is still
-  // animating out must not have the late exit report drop its mount.
+  // Guarded on `isPreviewOpen`: re-opening the preview while it is still animating out must not have the late exit
+  // report drop its mount.
   const handlePreviewExitComplete = useCallback(() => {
     if (!isPreviewOpen) {
       setIsPreviewMounted(false);

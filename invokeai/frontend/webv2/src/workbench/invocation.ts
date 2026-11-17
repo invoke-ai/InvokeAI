@@ -186,9 +186,9 @@ export interface InvocationRouteInput {
    */
   canvasRasterInFrame: boolean;
   /**
-   * The enabled, painted regional guidance layers whose mask bounds overlap the frame (identity-stable), which a
-   * layout base places around the global prompt. Measured whatever the model: which bases read them is capability
-   * data that can arrive after the project, so readiness decides that when it runs.
+   * The enabled, painted regional guidance layers whose mask bounds overlap the frame (identity-stable), which a layout
+   * base places around the global prompt. Measured whatever the model: which bases read them is capability data that
+   * can arrive after the project, so readiness decides that when it runs.
    */
   canvasRegionalLayersInFrame: readonly CanvasRegionalGuidanceLayerContract[];
 }
@@ -262,9 +262,9 @@ const NO_REGIONAL_LAYERS: readonly CanvasRegionalGuidanceLayerContract[] = [];
 
 /**
  * The compositable regional guidance layers whose mask bounds, offset and transform included, overlap the frame's
- * interior: the regions a layout base can place. The one remaining approximation is a mask bitmap that reaches into
- * the frame with transparent pixels only (a legacy document-sized mask, say), which still counts here although the
- * canvas compiler, reading the uploaded mask's pixels, leaves it out.
+ * interior: the regions a layout base can place. The one remaining approximation is a mask bitmap that reaches into the
+ * frame with transparent pixels only (a legacy document-sized mask, say), which still counts here although the canvas
+ * compiler, reading the uploaded mask's pixels, leaves it out.
  */
 const getRegionalLayersInFrame = (
   document: Project['canvas']['document'],

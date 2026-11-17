@@ -10,9 +10,9 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import type { PlaceableVideo } from './index';
 import type { PendingRecallEvent, RecallRevealContext, RecallRuntime } from './recallEventRuntime';
 
-// Through the package entry, not the modules themselves: the gallery's actions share these modules, and importing
-// them from this lazy runtime directly would split them out of the image-actions chunk into one more request on
-// every editor route.
+// Through the package entry, not the modules themselves: the gallery's actions share these modules, and importing them
+// from this lazy runtime directly would split them out of the image-actions chunk into one more request on every editor
+// route.
 import {
   appendReferenceVideo,
   applyVideoRecallMetadata,
@@ -118,11 +118,10 @@ const IMAGE_PLACED_TITLES = {
 } as const;
 
 /**
- * Apply `video_recall_requested` events to their arrival-time project's Video panel: recall or remix parameters,
- * set the Initial Video, append a reference video, set the conditioning clip, or place an image as a reference or
- * frame. The panel's model is never switched to make a video fit; a
- * placement it cannot take is declined with a notice. The Video widget is revealed when the project is still the
- * one on screen.
+ * Apply `video_recall_requested` events to their arrival-time project's Video panel: recall or remix parameters, set
+ * the Initial Video, append a reference video, set the conditioning clip, or place an image as a reference or frame.
+ * The panel's model is never switched to make a video fit; a placement it cannot take is declined with a notice. The
+ * Video widget is revealed when the project is still the one on screen.
  */
 export const createVideoRecallRuntime = ({
   commands,

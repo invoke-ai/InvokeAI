@@ -95,8 +95,8 @@ export const queueItemDetailOptions = (backend: QueueBackendPort, itemId: number
 
 /**
  * Refresh queue reads after queue activity; coalesced by QueryClient, and only active observers refetch. A finished
- * item's execution data no longer changes, so its open details are not read again on every queue event; a details
- * view opened again reads them afresh.
+ * item's execution data no longer changes, so its open details are not read again on every queue event; a details view
+ * opened again reads them afresh.
  */
 export const invalidateQueueQueries = async (queryClient: QueryClient): Promise<void> => {
   await queryClient.invalidateQueries({
@@ -111,8 +111,8 @@ export const invalidateQueueQueries = async (queryClient: QueryClient): Promise<
 export interface QueueItemStatusChange {
   item: QueueItemReadModel;
   /**
-   * The whole queue's counts after the change, as a status event carries them; null when unknown. Their own-item
-   * fields belong to the item's owner, whoever receives the event (an administrator receives every user's).
+   * The whole queue's counts after the change, as a status event carries them; null when unknown. Their own-item fields
+   * belong to the item's owner, whoever receives the event (an administrator receives every user's).
    */
   queueCounts: QueueCounts | null;
 }
@@ -125,8 +125,8 @@ export const compareQueuedItems = (left: QueueItemReadModel, right: QueueItemRea
   (right.priority ?? 0) - (left.priority ?? 0) || left.id - right.id;
 
 /**
- * Whether `change` is newer than the reading the model holds. Both carry a status sequence: the higher one wins, so
- * a late event never undoes a read, and a server that started over (a reset queue reuses item ids) is followed once a
+ * Whether `change` is newer than the reading the model holds. Both carry a status sequence: the higher one wins, so a
+ * late event never undoes a read, and a server that started over (a reset queue reuses item ids) is followed once a
  * read has brought its own sequences in. Without both: a finished item never runs again.
  */
 const isNewerReading = (known: QueueItemReadModel, change: QueueItemReadModel): boolean =>
@@ -176,11 +176,11 @@ const shiftCounts = (
       };
 
 /**
- * The read model with one item's status change applied at once, so the current and next items and the counts are
- * right before the read that reconciles them lands. A change outside the model's scope, or not newer than what the
- * model holds, changes no item. Counts: an unscoped model takes an event's whole-queue counts, even when it already
- * shows the item so (as after the viewer's own cancel); otherwise a change to an item the model knows moves it between
- * buckets. The viewer's own counts wait for the read: an event's are the item owner's.
+ * The read model with one item's status change applied at once, so the current and next items and the counts are right
+ * before the read that reconciles them lands. A change outside the model's scope, or not newer than what the model
+ * holds, changes no item. Counts: an unscoped model takes an event's whole-queue counts, even when it already shows the
+ * item so (as after the viewer's own cancel); otherwise a change to an item the model knows moves it between buckets.
+ * The viewer's own counts wait for the read: an event's are the item owner's.
  */
 export const applyQueueItemStatusChange = (
   model: QueueReadModel,
@@ -223,10 +223,10 @@ export const applyQueueItemStatusChange = (
         : model.current;
   const counts =
     eventCounts ?? (known ? shiftCounts(model.status.queue, known.status, item.status) : model.status.queue);
-  // Until the read names the server's next item, the window's first pending item in run order stands in, but only
-  // when the window holds exactly the pending items the counts report: the window is the newest items, and the true
-  // next may be older than all of them (a long batch, or a member's own items among everyone's). An item the window
-  // does not list turning pending, or counts that disagree with the window, leave the next item unknown until then.
+  // Until the read names the server's next item, the window's first pending item in run order stands in, but only when
+  // the window holds exactly the pending items the counts report: the window is the newest items, and the true next may
+  // be older than all of them (a long batch, or a member's own items among everyone's). An item the window does not
+  // list turning pending, or counts that disagree with the window, leave the next item unknown until then.
   const pendingInWindow = items.filter((candidate) => candidate.status === 'pending');
   const standIn =
     (known || item.status !== 'pending') && pendingInWindow.length === counts.pending
@@ -305,8 +305,8 @@ export interface QueueItemStatusGuess {
 }
 
 /**
- * Applies the viewer's own change at once, ahead of the server (a cancel assumes the item canceled), and returns how
- * to settle it. The caller settles or reverts it once its request ends, whichever way.
+ * Applies the viewer's own change at once, ahead of the server (a cancel assumes the item canceled), and returns how to
+ * settle it. The caller settles or reverts it once its request ends, whichever way.
  */
 export const applyQueueItemStatusGuess = (
   queryClient: QueryClient,

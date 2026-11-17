@@ -58,19 +58,19 @@ const listOnce = (owner: AccountScope): Promise<IntermediatesOperation[]> => {
 };
 
 /**
- * Asks the server for the account's operations and follows the newest unsettled one, unless the followed operation
- * or the account changed meanwhile: a Confirm that lands while the listing is in flight is never overwritten by an
- * older run. Returns what it adopted, or null when the server listed nothing running; rejects when it could not ask.
+ * Asks the server for the account's operations and follows the newest unsettled one, unless the followed operation or
+ * the account changed meanwhile: a Confirm that lands while the listing is in flight is never overwritten by an older
+ * run. Returns what it adopted, or null when the server listed nothing running; rejects when it could not ask.
  */
 export const reconcileIntermediatesOperations = async (
   queryClient: QueryClient,
   owner: AccountScope = captureAccountScope(),
   options: {
     /**
-     * Ask again rather than join a listing already in flight: a listing begun before a Confirm cannot contain the
-     * run it started, and one that hangs must not hold the confirmation open. Bounded by its own timeout. The
-     * server's `created_at` of the confirmed preview: only a run created after it can be the one that Confirm
-     * started, since the server also lists earlier finished runs.
+     * Ask again rather than join a listing already in flight: a listing begun before a Confirm cannot contain the run
+     * it started, and one that hangs must not hold the confirmation open. Bounded by its own timeout. The server's
+     * `created_at` of the confirmed preview: only a run created after it can be the one that Confirm started, since the
+     * server also lists earlier finished runs.
      */
     startedAfter?: string;
   } = {}

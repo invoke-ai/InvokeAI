@@ -25,9 +25,9 @@ const RenderedLabelIdProvider = ({ children }: { children: ReactNode }) => {
 };
 
 /**
- * The id of the label naming the nearest field's control, or null when that field renders none. For custom
- * controls that reference the label themselves; Chakra controls read Field context directly. An inside Field renders
- * no label of its own: a control that shows it takes the id from `useInsideFieldLabel` along with the label.
+ * The id of the label naming the nearest field's control, or null when that field renders none. For custom controls
+ * that reference the label themselves; Chakra controls read Field context directly. An inside Field renders no label of
+ * its own: a control that shows it takes the id from `useInsideFieldLabel` along with the label.
  */
 export const useFieldLabelId = (): string | null => {
   const field = useFieldContext();
@@ -98,8 +98,8 @@ const INSIDE_LABEL_CSS = {
 
 /**
  * The inside label at the start of a control's box. In a trigger button it is a span the trigger's aria-labelledby
- * points at (a `<label>` may not sit in a button); beside an input, `htmlFor` makes it a native label, so a click on
- * it focuses and opens the input like the rest of the box.
+ * points at (a `<label>` may not sit in a button); beside an input, `htmlFor` makes it a native label, so a click on it
+ * focuses and opens the input like the rest of the box.
  */
 export const FieldInsideLabel = ({ htmlFor, label }: { htmlFor?: string; label: InsideFieldLabel }) => {
   const text = renderLabelText(label.text, label.hint);

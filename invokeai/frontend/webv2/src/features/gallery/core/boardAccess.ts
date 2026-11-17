@@ -18,9 +18,9 @@ export const isSharedGalleryBoard = (board: GalleryBoard): boolean =>
   board.access !== undefined && board.access.role !== null && board.access.role !== 'owner';
 
 /**
- * The boards as a server with one account sees them: every board is the caller's own. Boards other accounts made
- * while the server ran with several come back as an admin's view of someone else's; there is no one else to share
- * with or to name, so they read as the caller's, as they did before sharing.
+ * The boards as a server with one account sees them: every board is the caller's own. Boards other accounts made while
+ * the server ran with several come back as an admin's view of someone else's; there is no one else to share with or to
+ * name, so they read as the caller's, as they did before sharing.
  */
 export const asSingleAccountBoards = (boards: readonly GalleryBoard[]): GalleryBoard[] =>
   boards.map((board) =>

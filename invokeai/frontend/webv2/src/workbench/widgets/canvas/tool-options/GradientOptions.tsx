@@ -72,8 +72,8 @@ const useGradientEditor = (engine: ToolFormProps['engine']) => {
   const stops = selected ? selected.source.stops : options.preset === 'pair' ? pairStops : options.stops;
 
   const selectedId = selected?.id ?? null;
-  // Scrubbers keep the handler a gesture started with, so writes patch the live options and source: an undo or
-  // edit landing mid-drag survives the release.
+  // Scrubbers keep the handler a gesture started with, so writes patch the live options and source: an undo or edit
+  // landing mid-drag survives the release.
   const apply = useCallback(
     (patch: GradientPatch, commit: boolean) => {
       const layer = selectedId ? engine.document.model()?.getLayer(selectedId) : null;
@@ -219,8 +219,8 @@ const GradientStopStrip = ({
   const rampStyle = useMemo(() => ({ background: `${stopsToCssGradient(shown)}, ${STRIP_CHECKER}` }), [shown]);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const pendingFocus = useRef<number>(-1);
-  // A key-move can reorder past a neighbour, so the handle at the OLD index now
-  // renders a different stop; refocus the moved stop at its new index.
+  // A key-move can reorder past a neighbour, so the handle at the OLD index now renders a different stop; refocus the
+  // moved stop at its new index.
   useEffect(() => {
     if (pendingFocus.current < 0) {
       return;
@@ -418,8 +418,8 @@ const GradientStopsSettings = ({ engine }: ToolFormProps) => {
     (hex: string) => editor.commitStops(recolorStop(editor.stops, stopIndex, hex)),
     [editor, stopIndex]
   );
-  // Moves the stop the gesture started on — found by identity, else by position — within the stops as they are
-  // on release, so another stop's edit landing mid-drag is kept.
+  // Moves the stop the gesture started on — found by identity, else by position — within the stops as they are on
+  // release, so another stop's edit landing mid-drag is kept.
   const setOffset = useCallback(
     (value: number) => {
       editor.updateStops((current) => {
@@ -441,8 +441,8 @@ const GradientStopsSettings = ({ engine }: ToolFormProps) => {
     editor.commitStops(removeStop(editor.stops, stopIndex));
     setSelectedIndex(Math.max(0, stopIndex - 1));
   }, [editor, stopIndex]);
-  // The keyboard path to what a ramp click does: a new stop halfway to the
-  // next one (or back toward the previous from the last stop).
+  // The keyboard path to what a ramp click does: a new stop halfway to the next one (or back toward the previous from
+  // the last stop).
   const onAdd = useCallback(() => {
     const current = editor.stops[stopIndex];
     if (!current) {

@@ -66,8 +66,8 @@ import { SocketHubRuntime } from './SocketHubRuntime';
 import { createStartupRedirects } from './startupRedirect';
 
 /**
- * The authenticated layout owns setup/login guards; lazy /app keeps editor code out of Launchpad. Hash history
- * supports the relative base without server deep-path fallback.
+ * The authenticated layout owns setup/login guards; lazy /app keeps editor code out of Launchpad. Hash history supports
+ * the relative base without server deep-path fallback.
  */
 
 /** Route render and loader failures reach the router's catch boundary; record them once there. */
@@ -402,9 +402,9 @@ const workbenchRoute = createRoute({
     // Preload the editor during the session peek; the module loader deduplicates the lazy-route import.
     void import('./WorkbenchApp');
 
-    // Redirect a definitively empty session to Home unless ?project/?new is supplied. Unknown sessions fall
-    // through. Check only entries: search changes can precede autosave, and hover preloads must not fetch the
-    // session. A launch redirect that just found open projects hands over its proof instead of a second peek.
+    // Redirect a definitively empty session to Home unless ?project/?new is supplied. Unknown sessions fall through.
+    // Check only entries: search changes can precede autosave, and hover preloads must not fetch the session. A launch
+    // redirect that just found open projects hands over its proof instead of a second peek.
     if (cause !== 'enter' || search.project || search.new || startupRedirects.takeOpenSessionProof()) {
       return;
     }

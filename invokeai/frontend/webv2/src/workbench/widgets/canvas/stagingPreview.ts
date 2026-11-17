@@ -1,8 +1,7 @@
 /**
- * Prefer the selected finished candidate, then the selected placeholder's live progress frame, otherwise no
- * preview. Both land at the rect pinned at submission, so moving the bbox mid-run never moves them. A candidate the
- * eye toggled off stays selected as a hidden preview: the canvas under it compares without the masks the shown
- * candidate hides.
+ * Prefer the selected finished candidate, then the selected placeholder's live progress frame, otherwise no preview.
+ * Both land at the rect pinned at submission, so moving the bbox mid-run never moves them. A candidate the eye toggled
+ * off stays selected as a hidden preview: the canvas under it compares without the masks the shown candidate hides.
  */
 
 import type { CanvasPlacementContract, Rect, StagedPreviewInput } from '@workbench/canvas-engine/api';

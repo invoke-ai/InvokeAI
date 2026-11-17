@@ -31,8 +31,8 @@ export const GalleryViewSegmentTabs = ({
 }) => {
   const { t } = useTranslation();
 
-  // SegmentTabs re-fires selecting the active tab (its collapsible-toggle
-  // affordance); a same-view write would only dirty the widget values.
+  // SegmentTabs re-fires selecting the active tab (its collapsible-toggle affordance); a same-view write would only
+  // dirty the widget values.
   const handleViewChange = useCallback(
     (value: GalleryView) => {
       if (value !== activeView) {

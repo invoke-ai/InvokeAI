@@ -189,8 +189,8 @@ const prefersReducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-mot
 const motion = (duration: number) => (prefersReducedMotion() ? 0 : duration);
 
 /**
- * A node's flow box: its chip. Edges meet the chip's middle, so the pills it stacks above it sit outside the box
- * xyflow measures and draws to.
+ * A node's flow box: its chip. Edges meet the chip's middle, so the pills it stacks above it sit outside the box xyflow
+ * measures and draws to.
  */
 const getChipBox = (layout: WorkflowPreviewLayout, id: string) => {
   const { x, y } = layout.positions[id] ?? { x: 0, y: 0 };
@@ -1237,8 +1237,8 @@ const GraphView = ({
     []
   );
   /**
-   * The chip width for this drawing: wide enough for its longest title where the stage leaves the room (the graph
-   * still fitted at a legible zoom), one width for every chip so columns stay aligned.
+   * The chip width for this drawing: wide enough for its longest title where the stage leaves the room (the graph still
+   * fitted at a legible zoom), one width for every chip so columns stay aligned.
    */
   const chooseChipWidth = useCallback(
     (stage: HTMLElement) => {

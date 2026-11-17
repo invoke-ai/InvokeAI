@@ -1,7 +1,7 @@
 /**
- * Interaction overlays render in CSS pixels through `view` under a device-pixel-ratio base transform, keeping
- * strokes and handles constant in CSS pixels at any zoom and DPR, where pointer hit testing measures them. The
- * unbounded plane has no document outline; all drawing uses {@link RasterSurface} contexts.
+ * Interaction overlays render in CSS pixels through `view` under a device-pixel-ratio base transform, keeping strokes
+ * and handles constant in CSS pixels at any zoom and DPR, where pointer hit testing measures them. The unbounded plane
+ * has no document outline; all drawing uses {@link RasterSurface} contexts.
  */
 
 import type { ParametricShapeKind } from '@workbench/canvas-engine/contracts';
@@ -136,10 +136,7 @@ export interface OverlayState {
   colorLoupe?: ColorLoupeOverlay | null;
   /** Move outline uses four document-space content corners projected through view; null/absence hides it. */
   layerOutline?: readonly Vec2[] | null;
-  /**
-   * Document-space rotated transform bounds, eight handles and rotation-nub anchors; null/absence means no
-   * session.
-   */
+  /** Document-space rotated transform bounds, eight handles and rotation-nub anchors; null/absence means no session. */
   transformFrame?: TransformFrameOverlay | null;
   /** Document-space freehand/polygon lasso preview with vertices and close cue; null/absence means idle. */
   lassoPreview?:
@@ -192,8 +189,8 @@ const strokeRectScreen = (ctx: Ctx, screenRect: Rect): void => {
 };
 
 /**
- * Project viewport bounds into document space and snap outward to grid cells for seamless pan/zoom. Skip overly
- * dense grids; never clip to document bounds.
+ * Project viewport bounds into document space and snap outward to grid cells for seamless pan/zoom. Skip overly dense
+ * grids; never clip to document bounds.
  */
 const drawGrid = (ctx: Ctx, state: OverlayState): void => {
   const gridSize = state.gridSize ?? 0;
@@ -258,8 +255,8 @@ const drawCursor = (ctx: Ctx, state: OverlayState): void => {
   ctx.setLineDash([]);
   ctx.beginPath();
   ctx.arc(center.x, center.y, Math.max(0, radius), 0, Math.PI * 2);
-  // A dark outer ring plus a light inner ring stays legible over either end of
-  // the value range without sampling pixels or relying on blend-mode support.
+  // A dark outer ring plus a light inner ring stays legible over either end of the value range without sampling pixels
+  // or relying on blend-mode support.
   ctx.strokeStyle = CURSOR_DARK;
   ctx.lineWidth = CURSOR_OUTER_WIDTH_PX;
   ctx.stroke();
@@ -280,8 +277,8 @@ const strokeOutlined = (ctx: Ctx, light: string, lightWidth: number): void => {
 };
 
 /**
- * Draws the picker's loupe: the pixels around the pointer magnified without smoothing inside a ring, the sampled
- * center pixel boxed as the target (the picker hides the system cursor), and its RGB values below.
+ * Draws the picker's loupe: the pixels around the pointer magnified without smoothing inside a ring, the sampled center
+ * pixel boxed as the target (the picker hides the system cursor), and its RGB values below.
  */
 const drawColorLoupe = (ctx: Ctx, state: OverlayState): void => {
   const loupe = state.colorLoupe;
@@ -583,8 +580,8 @@ const drawSamGeometry = (ctx: Ctx, state: OverlayState): void => {
 };
 
 /**
- * Even-odd viewport/bbox fill shades outside the generation frame; globalAlpha controls opacity independently of
- * theme color.
+ * Even-odd viewport/bbox fill shades outside the generation frame; globalAlpha controls opacity independently of theme
+ * color.
  */
 const drawBboxOverlayShade = (ctx: Ctx, target: RasterSurface, state: OverlayState): void => {
   if (!state.bboxOverlay) {
@@ -743,8 +740,8 @@ const frameBandRect = (
 /**
  * Traces one band of the dashed frame in device space as axis-aligned rects on whole device pixels, so every edge is
  * crisp. Each edge fits its dashes between its corners, and a dash at a corner extends past it by the band's outer
- * offset: the bands of the two edges meeting there tile one whole L, with no seam, cap or join to notch it. Dash and gap
- * lengths vary by at most a device pixel along an edge.
+ * offset: the bands of the two edges meeting there tile one whole L, with no seam, cap or join to notch it. Dash and
+ * gap lengths vary by at most a device pixel along an edge.
  */
 const traceBboxFrameBand = (ctx: Ctx, frame: BboxFrameGeometry, dash: number, inner: number, outer: number): void => {
   const { rect } = frame;

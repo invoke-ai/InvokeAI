@@ -29,9 +29,9 @@ export const isPidDecodeNodeType = (type: string | undefined): type is PidDecode
   type !== undefined && PID_DECODE_NODE_TYPE_SET.has(type);
 
 /**
- * The decode node types that take a `vae` input. PiD takes the latent in the VAE's normalized space, and only
- * FLUX.2 stores it denormalized, so only its decode reads the VAE (BatchNorm statistics to normalize its latent).
- * The others take the stored latent as is, but the edge still records in the emitted graph which VAE it decodes with.
+ * The decode node types that take a `vae` input. PiD takes the latent in the VAE's normalized space, and only FLUX.2
+ * stores it denormalized, so only its decode reads the VAE (BatchNorm statistics to normalize its latent). The others
+ * take the stored latent as is, but the edge still records in the emitted graph which VAE it decodes with.
  */
 const PID_DECODE_NODES_WITH_VAE_INPUT: ReadonlySet<string> = new Set([
   'flux2_pid_decode',

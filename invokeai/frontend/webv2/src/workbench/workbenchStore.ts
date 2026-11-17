@@ -684,8 +684,8 @@ const createPersistenceAdapter = (dispatch: WorkbenchDispatch, getState: () => W
 
   return {
     /**
-     * Record the server-assigned board without selecting it: the user may have changed selection during creation,
-     * and unresolved selections already fall back to the project board.
+     * Record the server-assigned board without selecting it: the user may have changed selection during creation, and
+     * unresolved selections already fall back to the project board.
      */
     assignProjectBoard: ({ boardId, projectId }: { boardId: string; projectId: string }) => {
       dispatch({ boardId, projectId, type: 'setGalleryProjectBoardId' });
@@ -1030,9 +1030,8 @@ export const createWorkbenchStore = (
     if (action.type === 'hydrateWorkbench') {
       clearLayerPanelStates();
     } else if (nextState !== previousState) {
-      // The always-live store boundary collapses stale secondaries after an
-      // external primary change or layer removal, even while the Layers widget
-      // is unmounted.
+      // The always-live store boundary collapses stale secondaries after an external primary change or layer removal,
+      // even while the Layers widget is unmounted.
       reconcileLayerPanelStates(nextState.projects);
     }
 

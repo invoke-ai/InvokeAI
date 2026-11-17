@@ -79,8 +79,8 @@ interface RegionalGuidanceSettingsProps {
 }
 
 /**
- * Edit regional prompts/toggles/fill through undoable config patches and invert through engine pixels. Reference
- * images have dedicated tree-child editors.
+ * Edit regional prompts/toggles/fill through undoable config patches and invert through engine pixels. Reference images
+ * have dedicated tree-child editors.
  */
 export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSettingsProps) => {
   const { t } = useTranslation();
@@ -95,8 +95,8 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const [positiveDraft, setPositiveDraft] = useState<string | null>(null);
   const [negativeDraft, setNegativeDraft] = useState<string | null>(null);
   const positivePrompt = positiveDraft ?? layer.positivePrompt ?? '';
-  // A region has a negative prompt once one is added, even while it is empty; null means none, and generation reads
-  // an empty one as none too.
+  // A region has a negative prompt once one is added, even while it is empty; null means none, and generation reads an
+  // empty one as none too.
   const hasNegativePrompt = layer.negativePrompt !== null;
   const negativePrompt = negativeDraft ?? layer.negativePrompt ?? '';
 
@@ -115,8 +115,8 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       [base]
     )
   );
-  // Hide negatives only when backend policy rejects them, retaining values for other models; offer controls while
-  // no model/policy is known.
+  // Hide negatives only when backend policy rejects them, retaining values for other models; offer controls while no
+  // model/policy is known.
   const showNegativeControls = !hasCapabilities || support?.negativePrompt !== false;
   const unsupportedModel = hasCapabilities && base !== null && support === null;
   // Controls stay editable so values carry over; the hint says why they do nothing at this CFG Scale.
@@ -142,8 +142,8 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       return;
     }
     const positive = positiveDraft === null ? layer.positivePrompt : positiveDraft || null;
-    // Clearing the text keeps the negative prompt; only its remove control takes it out. A draft left behind after
-    // the prompt was removed elsewhere (undo) does not bring it back.
+    // Clearing the text keeps the negative prompt; only its remove control takes it out. A draft left behind after the
+    // prompt was removed elsewhere (undo) does not bring it back.
     const negative = negativeDraft === null || layer.negativePrompt === null ? layer.negativePrompt : negativeDraft;
     const patch: RegionalConfigPatch = {
       ...(positive === layer.positivePrompt ? {} : { positivePrompt: positive }),

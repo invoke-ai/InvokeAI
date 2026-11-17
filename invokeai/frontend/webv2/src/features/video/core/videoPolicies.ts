@@ -86,16 +86,16 @@ export interface VideoTargetResolutionOption {
   id: VideoTargetResolution;
   label: string;
   /**
-   * How many denoise passes the preset runs. Absent means one. A two-stage preset generates at half
-   * this canvas, upscales the latent x2 and refines it, which is what buys detail no single pass at
-   * this size would reach -- and it costs two passes, the second at four times the token count.
+   * How many denoise passes the preset runs. Absent means one. A two-stage preset generates at half this canvas,
+   * upscales the latent x2 and refines it, which is what buys detail no single pass at this size would reach -- and it
+   * costs two passes, the second at four times the token count.
    */
   stages?: 2;
 }
 
 /**
- * Extends the shape `snapNumFramesToGrid` takes, so the two cannot drift: the snapper is the
- * production consumer of this policy, and a field added here has to remain assignable to it.
+ * Extends the shape `snapNumFramesToGrid` takes, so the two cannot drift: the snapper is the production consumer of
+ * this policy, and a field added here has to remain assignable to it.
  */
 export interface VideoFramesGridPolicy extends VideoFramesGrid {
   kind: 'grid';
@@ -115,25 +115,24 @@ export interface VideoFpsPolicy {
 }
 
 /**
- * Family accelerator LoRAs and sampling defaults. steps describes the reference release; getAcceleratorSteps
- * resolves release-specific schedules.
+ * Family accelerator LoRAs and sampling defaults. steps describes the reference release; getAcceleratorSteps resolves
+ * release-specific schedules.
  */
 export interface VideoAcceleratorConfig {
   label: 'Lightning' | 'Turbo' | 'Distilled';
   steps: number;
   /**
-   * Step counts for releases whose names carry no "N-step" token. First match
-   * wins; consulted only when the name does not state the count itself.
+   * Step counts for releases whose names carry no "N-step" token. First match wins; consulted only when the name does
+   * not state the count itself.
    */
   stepOverrides?: readonly { pattern: RegExp; steps: number }[];
   cfgScale: number;
   cfgScaleLowNoise: number | null;
   /**
-   * Guidance values the accelerator requires, for families that expose more than the primary CFG
-   * scale. A step-distilled model is trained to predict without guidance at all, so leaving the
-   * extra scales at their guided defaults does not merely waste compute — it pushes the sample off
-   * the distribution the distillation was fitted to. Absent for accelerators whose family has no
-   * extra guidance, in which case the toggle leaves those settings alone.
+   * Guidance values the accelerator requires, for families that expose more than the primary CFG scale. A
+   * step-distilled model is trained to predict without guidance at all, so leaving the extra scales at their guided
+   * defaults does not merely waste compute — it pushes the sample off the distribution the distillation was fitted to.
+   * Absent for accelerators whose family has no extra guidance, in which case the toggle leaves those settings alone.
    */
   guidance?: { audioCfgScale: number; modalityScale: number; stgScale: number };
 }
@@ -143,12 +142,11 @@ interface VideoVariantConfig {
   pixelMultiple: number;
   targetResolutions: readonly VideoTargetResolutionOption[];
   /**
-   * The step budget the refine pass of a two-stage preset runs at, when this variant needs one of
-   * its own. The schedule is entered partway down and truncated, so a budget here buys fewer refine
-   * steps than the same number would in a base pass: measured on a W7900, a guided dev step at the
-   * 1024p canvas is 262 s, so inheriting `defaults.steps` (30 -> 17 refine steps) would be 74
-   * minutes there and over eight hours at 1536p. Absent leaves the base pass's budget alone, which
-   * is right for the distilled checkpoint: its schedule is fixed and a budget is ignored.
+   * The step budget the refine pass of a two-stage preset runs at, when this variant needs one of its own. The schedule
+   * is entered partway down and truncated, so a budget here buys fewer refine steps than the same number would in a
+   * base pass: measured on a W7900, a guided dev step at the 1024p canvas is 262 s, so inheriting `defaults.steps` (30
+   * -> 17 refine steps) would be 74 minutes there and over eight hours at 1536p. Absent leaves the base pass's budget
+   * alone, which is right for the distilled checkpoint: its schedule is fixed and a budget is ignored.
    */
   refineSteps?: number;
   defaults: {
@@ -213,8 +211,8 @@ export const MINIMAX_H3_TURBO_ACCELERATOR: VideoAcceleratorConfig = {
 };
 
 /**
- * The LTX-2.5 step-distillation LoRA: 8 guidance-free steps against Dev's ~30 guided ones, so every guidance
- * scale goes to its identity. `steps: 8` is stated because the release name only carries the rank (450).
+ * The LTX-2.5 step-distillation LoRA: 8 guidance-free steps against Dev's ~30 guided ones, so every guidance scale goes
+ * to its identity. `steps: 8` is stated because the release name only carries the rank (450).
  */
 export const LTX2_DISTILLED_ACCELERATOR: VideoAcceleratorConfig = {
   cfgScale: 1,
@@ -298,8 +296,8 @@ const WAN_VARIANTS: Record<string, VideoVariantConfig> = {
   },
 };
 
-// An unknown Wan variant (new backend release) gets the most permissive A14B
-// capabilities rather than being blocked: the backend probe is the authority.
+// An unknown Wan variant (new backend release) gets the most permissive A14B capabilities rather than being blocked:
+// the backend probe is the authority.
 const WAN_FALLBACK_VARIANT: VideoVariantConfig = {
   ...WAN_A14B_COMMON,
   modes: ['txt2vid', 'first-frame', 'first-last', 'extend'],
@@ -369,28 +367,25 @@ const LTX2_COMMON = {
   fps: { defaultValue: LTX2_FPS_DEFAULT, editable: true, max: LTX2_FPS_MAX, min: LTX2_FPS_MIN },
   frames: LTX2_FRAMES,
   minSteps: 1,
-  // Every conditioning shape the family supports: text-to-video, a held first and/or last frame,
-  // continuing an existing clip, and the two whole-modality modes -- all with a generated
-  // soundtrack.
+  // Every conditioning shape the family supports: text-to-video, a held first and/or last frame, continuing an existing
+  // clip, and the two whole-modality modes -- all with a generated soundtrack.
   modes: ['txt2vid', 'first-frame', 'last-frame', 'first-last', 'extend', 'audio-to-video', 'video-to-audio'] as const,
   pixelMultiple: LTX2_CANVAS_MULTIPLE,
   targetResolutions: LTX2_TARGET_RESOLUTION_OPTIONS,
 };
 
 /**
- * The dev checkpoint: a guided 30-step schedule with all four of LTX-2's
- * guidance terms. The scales are the released pipeline's for this generation
- * (ltx-pipelines `PipelineParams`), including an audio CFG far above the
- * video's — audio follows the prompt much less readily.
+ * The dev checkpoint: a guided 30-step schedule with all four of LTX-2's guidance terms. The scales are the released
+ * pipeline's for this generation (ltx-pipelines `PipelineParams`), including an audio CFG far above the video's — audio
+ * follows the prompt much less readily.
  */
 const LTX2_DEV: VideoVariantConfig = {
   ...LTX2_COMMON,
-  // Only Dev offers it. The distilled *checkpoint* already is the fast path, and stacking the LoRA
-  // on top of it would patch a model the distillation was not fitted to.
+  // Only Dev offers it. The distilled *checkpoint* already is the fast path, and stacking the LoRA on top of it would
+  // patch a model the distillation was not fitted to.
   accelerator: LTX2_DISTILLED_ACCELERATOR,
-  // The release guides against this list, not against an empty string: it is as much a part of the
-  // recipe as the scales are. Mirrors LTX2_DEFAULT_NEGATIVE_PROMPT in
-  // invokeai/backend/ltx2/constants.py, which is the node's own default.
+  // The release guides against this list, not against an empty string: it is as much a part of the recipe as the scales
+  // are. Mirrors LTX2_DEFAULT_NEGATIVE_PROMPT in invokeai/backend/ltx2/constants.py, which is the node's own default.
   defaultNegativePrompt: LTX2_DEFAULT_NEGATIVE_PROMPT,
   defaults: {
     audioCfgScale: 7,
@@ -403,18 +398,17 @@ const LTX2_DEV: VideoVariantConfig = {
   },
   guidance: { audioVisible: true, modalityVisible: true, stgVisible: true },
   negativePrompt: { usage: 'cfg-gated', visible: true },
-  // Dev pays four forwards a step -- cond, uncond, STG and modality -- so the refine pass gets a
-  // budget of its own rather than the 30 the base pass runs. This is the count the pass actually
-  // samples, not a schedule resolution it is truncated out of.
+  // Dev pays four forwards a step -- cond, uncond, STG and modality -- so the refine pass gets a budget of its own
+  // rather than the 30 the base pass runs. This is the count the pass actually samples, not a schedule resolution it is
+  // truncated out of.
   refineSteps: 8,
   stepsEditable: true,
 };
 
 /**
- * The guidance-distilled checkpoint: eight fixed noise levels, one forward per
- * step, and no guidance at all — the denoise node ignores the scales rather
- * than letting them wreck the output, so the panel offers none of them and
- * shows the step count as the fixed value it is.
+ * The guidance-distilled checkpoint: eight fixed noise levels, one forward per step, and no guidance at all — the
+ * denoise node ignores the scales rather than letting them wreck the output, so the panel offers none of them and shows
+ * the step count as the fixed value it is.
  */
 const LTX2_DISTILLED: VideoVariantConfig = {
   ...LTX2_COMMON,
@@ -435,9 +429,8 @@ export const VIDEO_GENERATION: Record<
   SupportedVideoBase,
   { variants: Record<string, VideoVariantConfig>; fallback: VideoVariantConfig }
 > = {
-  // Register Ref2VA explicitly so it never inherits FL2VA fallback modes.
-  // Dev is the fallback: an unrecognised variant gets the guided schedule, which is merely slow on a distilled
-  // checkpoint, where the reverse produces noise.
+  // Register Ref2VA explicitly so it never inherits FL2VA fallback modes. Dev is the fallback: an unrecognised variant
+  // gets the guided schedule, which is merely slow on a distilled checkpoint, where the reverse produces noise.
   'ltx-2': { fallback: LTX2_DEV, variants: { ltx2_dev: LTX2_DEV, ltx2_distilled: LTX2_DISTILLED } },
   'minimax-h3': { fallback: MINIMAX_H3_FL2VA, variants: { fl2va: MINIMAX_H3_FL2VA, ref2va: MINIMAX_H3_REF2VA } },
   wan: { fallback: WAN_FALLBACK_VARIANT, variants: WAN_VARIANTS },
@@ -459,8 +452,8 @@ export const isSupportedVideoModel = <T extends { base: string; type: string; fo
       (model.format === 'diffusers' || model.format === 'checkpoint' || model.format === 'gguf_quantized')));
 
 /**
- * Select runnable identity-bearing models. Components-only and Ref2VA Diffusers folders remain supported for
- * stored state but serve only as component sources, not selectable mains.
+ * Select runnable identity-bearing models. Components-only and Ref2VA Diffusers folders remain supported for stored
+ * state but serve only as component sources, not selectable mains.
  */
 export const isVideoModelSelectable = <T extends ModelConfig>(model: T): boolean =>
   isSupportedVideoModel(model) &&
@@ -487,8 +480,7 @@ const getVideoVariantConfig = (
   return baseEntry.variants[variant] ?? baseEntry.fallback;
 };
 
-// Fallback keeps UI selectors crash-safe while nothing is selected;
-// isSupportedVideoModel() still blocks invocation.
+// Fallback keeps UI selectors crash-safe while nothing is selected; isSupportedVideoModel() still blocks invocation.
 const FALLBACK_VARIANT_CONFIG = WAN_FALLBACK_VARIANT;
 
 const getVideoConfig = (
@@ -496,10 +488,10 @@ const getVideoConfig = (
 ): VideoVariantConfig => getVideoVariantConfig(model) ?? FALLBACK_VARIANT_CONFIG;
 
 /**
- * Whether a mode can run a two-stage target resolution. A conditioning clip cannot: `ltx2_denoise`
- * refuses a refine pass alongside a held-clean modality, because the refine pass re-noises every
- * token and the held stream would have to be re-encoded at the refine canvas the way a first frame
- * is. Asked by validation and by the graph-coverage matrix, so the two cannot disagree.
+ * Whether a mode can run a two-stage target resolution. A conditioning clip cannot: `ltx2_denoise` refuses a refine
+ * pass alongside a held-clean modality, because the refine pass re-noises every token and the held stream would have to
+ * be re-encoded at the refine canvas the way a first frame is. Asked by validation and by the graph-coverage matrix, so
+ * the two cannot disagree.
  */
 export const isTwoStageSupportedForMode = (mode: VideoGenerationMode): boolean =>
   mode !== 'audio-to-video' && mode !== 'video-to-audio';
@@ -531,11 +523,10 @@ const coerceTargetResolution = (
     : config.defaults.targetResolution;
 
 /**
- * The preset a model will actually run, which is not always the one the settings hold: a record
- * persisted under another family keeps its own preset (`normalizeVideoSettings` accepts any
- * family's), and only a model *selection* re-coerces it. Every consumer has to agree on this one
- * answer -- `getVideoDimensions` resolves its canvas from it, so a caller reading the raw value
- * would be describing a different run than the dimensions it was handed.
+ * The preset a model will actually run, which is not always the one the settings hold: a record persisted under another
+ * family keeps its own preset (`normalizeVideoSettings` accepts any family's), and only a model *selection* re-coerces
+ * it. Every consumer has to agree on this one answer -- `getVideoDimensions` resolves its canvas from it, so a caller
+ * reading the raw value would be describing a different run than the dimensions it was handed.
  */
 export const getVideoTargetResolution = (
   model: MainModelConfig | undefined,
@@ -587,9 +578,8 @@ export const getVideoDimensions = (
   const config = getVideoConfig(model);
   const targetResolution = coerceTargetResolution(config, settings.targetResolution);
 
-  // Only in the `video` role: there the clip's picture *is* the generation, fitted to the canvas
-  // the preset picks for its ratio. In the `audio` role the picture is what gets made, so the
-  // aspect-ratio control still owns the frame.
+  // Only in the `video` role: there the clip's picture *is* the generation, fitted to the canvas the preset picks for
+  // its ratio. In the `audio` role the picture is what gets made, so the aspect-ratio control still owns the frame.
   const conditioningPicture =
     settings.conditioningClip?.role === 'video' && config.modes.includes('video-to-audio')
       ? settings.conditioningClip.clip
@@ -623,13 +613,12 @@ export const getVideoDimensions = (
 };
 
 /**
- * The frame count and frame rate a run will actually use. A conditioning clip decides both for
- * the modality it holds clean: its picture is as long as it is, and its soundtrack covers as many
- * frames as the chosen rate spans. The panel's own stored values are left untouched underneath, so
- * clearing the clip restores what the user had set.
+ * The frame count and frame rate a run will actually use. A conditioning clip decides both for the modality it holds
+ * clean: its picture is as long as it is, and its soundtrack covers as many frames as the chosen rate spans. The
+ * panel's own stored values are left untouched underneath, so clearing the clip restores what the user had set.
  *
- * Only ever the clip's when the model supports the mode -- a clip left behind by a model switch is
- * stale state the panel offers to clear, not a timing source.
+ * Only ever the clip's when the model supports the mode -- a clip left behind by a model switch is stale state the
+ * panel offers to clear, not a timing source.
  */
 export interface EffectiveVideoTiming {
   numFrames: number;
@@ -642,12 +631,12 @@ export interface EffectiveVideoTiming {
 /**
  * Whether this mode has a length left for the duration head to decide.
  *
- * A conditioning clip drives `num_frames` by its own edge, and a second edge into one input is a
- * malformed graph. An extension has no such edge: its prompt describes the continuation, so the
- * head sizes the new material and the held context is added in front of it.
+ * A conditioning clip drives `num_frames` by its own edge, and a second edge into one input is a malformed graph. An
+ * extension has no such edge: its prompt describes the continuation, so the head sizes the new material and the held
+ * context is added in front of it.
  *
- * Separate from `isAutoDurationActive` because the panel needs to say *why* the control is
- * unavailable, which "not active" alone cannot tell it.
+ * Separate from `isAutoDurationActive` because the panel needs to say *why* the control is unavailable, which "not
+ * active" alone cannot tell it.
  */
 export const isAutoDurationSupportedForMode = (
   settings: Pick<
@@ -661,8 +650,8 @@ export const isAutoDurationSupportedForMode = (
 };
 
 /**
- * Whether the duration head will choose this run's length: the user asked for it, a head is
- * selected, and the mode has a length left to decide.
+ * Whether the duration head will choose this run's length: the user asked for it, a head is selected, and the mode has
+ * a length left to decide.
  */
 export const isAutoDurationActive = (
   settings: Pick<
@@ -691,9 +680,8 @@ export const getEffectiveVideoTiming = (
     return { fps: settings.fps, fpsFromClip: false, numFrames: settings.numFrames, numFramesFromClip: false };
   }
 
-  // The picture is the given one, so its own rate is the run's -- but only when the gallery knew
-  // that rate. A generated picture is made at whatever rate the panel asks for, and only the
-  // length follows from the soundtrack.
+  // The picture is the given one, so its own rate is the run's -- but only when the gallery knew that rate. A generated
+  // picture is made at whatever rate the panel asks for, and only the length follows from the soundtrack.
   const fpsFromClip = conditioning.role === 'video' && conditioning.fpsKnown;
   const fps = fpsFromClip ? conditioning.clip.fps : settings.fps;
 
@@ -708,15 +696,14 @@ export const getEffectiveVideoTiming = (
 /**
  * Whether the run is guidance-free because an accelerator made it so.
  *
- * An accelerator that declares a guidance triple drives every scale to its identity AND makes the
- * graph send `schedule: 'distilled'`. The backend then *discards* the guidance scales and the step
- * count outright (`_resolve_guidance` and the step clamp in `ltx2_denoise.py`, both of which log
- * that they are ignoring what was asked). So those controls are not merely redundant while the
- * accelerator is on -- they cannot take effect at all, and the panel must stop offering them.
+ * An accelerator that declares a guidance triple drives every scale to its identity AND makes the graph send `schedule:
+ * 'distilled'`. The backend then *discards* the guidance scales and the step count outright (`_resolve_guidance` and
+ * the step clamp in `ltx2_denoise.py`, both of which log that they are ignoring what was asked). So those controls are
+ * not merely redundant while the accelerator is on -- they cannot take effect at all, and the panel must stop offering
+ * them.
  *
- * Which is to say: an accelerated Dev model *is* the family's distilled variant, and presents like
- * it. Families whose accelerator declares no guidance (Wan, MiniMax H3) only change steps and CFG
- * and are unaffected.
+ * Which is to say: an accelerated Dev model *is* the family's distilled variant, and presents like it. Families whose
+ * accelerator declares no guidance (Wan, MiniMax H3) only change steps and CFG and are unaffected.
  */
 const isGuidanceDistilled = (
   config: VideoVariantConfig,
@@ -742,19 +729,18 @@ export const getVideoPromptPolicy = (
     (model?.format === 'diffusers' || settings.wanLowNoiseModel !== null) &&
     settings.cfgScaleLowNoise !== null &&
     settings.cfgScaleLowNoise > 1;
-  // And LTX-2's audio stream is guided on its own scale, off one shared unconditional pass
-  // (`LTX2Guidance.passes`): audio CFG above 1 consumes the negative prompt even at video CFG 1.
+  // And LTX-2's audio stream is guided on its own scale, off one shared unconditional pass (`LTX2Guidance.passes`):
+  // audio CFG above 1 consumes the negative prompt even at video CFG 1.
   const audioCfgActive = config.guidance.audioVisible && settings.audioCfgScale !== null && settings.audioCfgScale > 1;
-  // An accelerator that declares a guidance triple drives every scale to its identity, which makes
-  // the run guidance-free -- the same model the family's distilled *checkpoint* variant is, and that
-  // variant declares `usage: 'never'`. Presenting the accelerated model any differently leaves a
-  // populated negative prompt on screen that silently stops mattering, and the user never typed the
-  // CFG of 1 that disabled it: the toggle did. Families whose accelerator declares no guidance
-  // (Wan, MiniMax H3) are unaffected.
+  // An accelerator that declares a guidance triple drives every scale to its identity, which makes the run
+  // guidance-free -- the same model the family's distilled *checkpoint* variant is, and that variant declares `usage:
+  // 'never'`. Presenting the accelerated model any differently leaves a populated negative prompt on screen that
+  // silently stops mattering, and the user never typed the CFG of 1 that disabled it: the toggle did. Families whose
+  // accelerator declares no guidance (Wan, MiniMax H3) are unaffected.
   //
-  // Not conditioned on the live scale values: with the accelerator on the backend discards them, so
-  // there is no state in which raising one makes the negative prompt count again. The scales are
-  // not editable in that state either (see `isGuidanceDistilled`), so this cannot strand a value.
+  // Not conditioned on the live scale values: with the accelerator on the backend discards them, so there is no state
+  // in which raising one makes the negative prompt count again. The scales are not editable in that state either (see
+  // `isGuidanceDistilled`), so this cannot strand a value.
   const guidanceDistilled = isGuidanceDistilled(config, settings);
   const negativeUsedInGraph =
     !guidanceDistilled &&
@@ -771,8 +757,8 @@ export const getVideoPromptPolicy = (
 };
 
 /**
- * What Expand Prompt starts from for this family: its enhancer and system prompts, with the first frame
- * offered when one is set (only a first frame opens the video it describes).
+ * What Expand Prompt starts from for this family: its enhancer and system prompts, with the first frame offered when
+ * one is set (only a first frame opens the video it describes).
  */
 export const getVideoExpandPromptSuggestion = (
   enhancer: VideoPromptEnhancer | null,
@@ -829,10 +815,9 @@ export interface VideoModelPolicy {
     /** False when the schedule is fixed: the steps control shows the count read-only. */
     stepsEditable: boolean;
     /**
-     * The extend-mode context control, or null when the mode or family does not have one. `max`
-     * moves with the source's own pixels (the join blends at the clip's native resolution), and
-     * `newFrames` is what the run actually adds once the crossfade has consumed the context from
-     * both halves — the number Frames alone does not reveal.
+     * The extend-mode context control, or null when the mode or family does not have one. `max` moves with the source's
+     * own pixels (the join blends at the clip's native resolution), and `newFrames` is what the run actually adds once
+     * the crossfade has consumed the context from both halves — the number Frames alone does not reveal.
      */
     extendContext: { value: number; min: number; max: number; step: number; newFrames: number } | null;
     /** The family's distillation fast path, or null when it has none. */
@@ -859,15 +844,13 @@ export interface AutoDurationBounds {
 /**
  * The range the duration head chooses this run's length from, or null when it does not run.
  *
- * It runs when auto duration is on and the mode leaves the length open, and chooses between the
- * family's shortest clip and the Frames value, which under auto duration is the ceiling the user
- * sized the run for. A ceiling at or under that floor leaves nothing to choose: the head is skipped
- * and the run uses the Frames value as set. The graph and the panel both read this, so the panel's
- * description of the run is the run.
+ * It runs when auto duration is on and the mode leaves the length open, and chooses between the family's shortest clip
+ * and the Frames value, which under auto duration is the ceiling the user sized the run for. A ceiling at or under that
+ * floor leaves nothing to choose: the head is skipped and the run uses the Frames value as set. The graph and the panel
+ * both read this, so the panel's description of the run is the run.
  *
- * A continuation plays at its source's rate, and its prompt describes only what follows the held
- * context, so the head chooses the new material: from the family's shortest clip up to whatever of
- * the Frames ceiling the context leaves.
+ * A continuation plays at its source's rate, and its prompt describes only what follows the held context, so the head
+ * chooses the new material: from the family's shortest clip up to whatever of the Frames ceiling the context leaves.
  */
 export const getAutoDurationBounds = (
   model: MainModelConfig | undefined,
@@ -903,11 +886,11 @@ export const getAutoDurationBounds = (
 
 export const getVideoModelPolicy = (model: MainModelConfig | undefined, settings: VideoSettings): VideoModelPolicy => {
   const config = getVideoConfig(model);
-  // With an accelerator that removes guidance, the backend ignores the scales and the step count
-  // outright, so the panel stops offering the controls it would ignore.
+  // With an accelerator that removes guidance, the backend ignores the scales and the step count outright, so the panel
+  // stops offering the controls it would ignore.
   const guidanceDistilled = isGuidanceDistilled(config, settings);
-  // Offered only where it means something: LTX-2's extend mode, with a source picked. The ceiling
-  // is the source's, so it cannot be computed without one.
+  // Offered only where it means something: LTX-2's extend mode, with a source picked. The ceiling is the source's, so
+  // it cannot be computed without one.
   const extendContext =
     model?.base === 'ltx-2' && resolveVideoMode(settings) === 'extend' && settings.sourceVideo
       ? {
@@ -945,8 +928,8 @@ export const getVideoModelPolicy = (model: MainModelConfig | undefined, settings
       cfgVisible: config.cfg.visible && !guidanceDistilled,
       fpsVisible: config.fps.editable,
       modalityVisible: config.guidance.modalityVisible && !guidanceDistilled,
-      // The distilled schedule is a fixed step count the backend clamps to; an editable scrubber
-      // here would silently do nothing.
+      // The distilled schedule is a fixed step count the backend clamps to; an editable scrubber here would silently do
+      // nothing.
       stepsEditable: config.stepsEditable && !guidanceDistilled,
       stgVisible: config.guidance.stgVisible && !guidanceDistilled,
     },
@@ -969,14 +952,14 @@ export interface FindMiniMaxH3TurboLoraOptions extends FindAcceleratorLoraOption
   variant?: string | null;
 }
 
-// Delimit both sides with non-alphanumerics: word boundaries miss underscore-separated tokens, while suffix
-// matching accepts Slow/Thigh.
+// Delimit both sides with non-alphanumerics: word boundaries miss underscore-separated tokens, while suffix matching
+// accepts Slow/Thigh.
 const HIGH_NOISE_PATTERN = /(?:^|[^a-z0-9])high(?:[^a-z0-9]|$)/i;
 const LOW_NOISE_PATTERN = /(?:^|[^a-z0-9])low(?:[^a-z0-9]|$)/i;
 
 /**
- * Prefer the main's family and assign experts from names. requireFamilyName rejects fallback matches, including
- * models with no known family token.
+ * Prefer the main's family and assign experts from names. requireFamilyName rejects fallback matches, including models
+ * with no known family token.
  */
 export const findWanLightningLoraPair = (
   models: readonly ModelConfig[],
@@ -1022,8 +1005,8 @@ export const findMiniMaxH3TurboLora = (
   models: readonly ModelConfig[],
   { requireFamilyName = false, variant = 'fl2va' }: FindMiniMaxH3TurboLoraOptions = {}
 ): LoraModelConfig | null => {
-  // Family name first (0/2), then the LightX2V generation (0/1): a family-named
-  // older repack still beats a LightX2V-named look-alike that omits the family.
+  // Family name first (0/2), then the LightX2V generation (0/1): a family-named older repack still beats a
+  // LightX2V-named look-alike that omits the family.
   const score = (model: LoraModelConfig): number =>
     (MINIMAX_H3_NAME_PATTERN.test(model.name) ? 0 : 2) + (LIGHTX2V_RELEASE_PATTERN.test(model.name) ? 0 : 1);
   // Within a tier, higher stated schedules rank newer. Ref2VA requires Ref2V-trained releases; other tasks exclude
@@ -1055,11 +1038,10 @@ export const findMiniMaxH3TurboLora = (
 /**
  * The LTX-2.5 step-distillation LoRA in a catalog, or null.
  *
- * Unlike the H3 and Wan families there is one release, and its name states its rank rather than its
- * schedule (`ltx-2.5-22b-distilled-lora-450`), so matching keys on the word that names what it does.
- * `requireFamilyName` exists for the same reason it does elsewhere: on a model switch the panel
- * re-verifies a recorded accelerator, and a bare "distilled" in some other family's LoRA should not
- * satisfy that check.
+ * Unlike the H3 and Wan families there is one release, and its name states its rank rather than its schedule
+ * (`ltx-2.5-22b-distilled-lora-450`), so matching keys on the word that names what it does. `requireFamilyName` exists
+ * for the same reason it does elsewhere: on a model switch the panel re-verifies a recorded accelerator, and a bare
+ * "distilled" in some other family's LoRA should not satisfy that check.
  */
 const LTX2_DISTILLED_PATTERN = /(?:^|[^a-z0-9])distill(?:ed|ation)?(?:[^a-z0-9]|$)/i;
 const LTX2_NAME_PATTERN = /(?:^|[^a-z0-9])ltx[ _-]?2(?:\.\d)?(?:[^a-z0-9]|$)/i;
@@ -1099,8 +1081,8 @@ export const findAcceleratorLorasIn = (
 };
 
 /**
- * How each family locates its own accelerator LoRAs, keyed by base so a new family plugs in without
- * touching the others. Wan's is a *pair* (one per expert); the rest are a single LoRA.
+ * How each family locates its own accelerator LoRAs, keyed by base so a new family plugs in without touching the
+ * others. Wan's is a *pair* (one per expert); the rest are a single LoRA.
  */
 const ACCELERATOR_FINDERS: Record<
   SupportedVideoBase,
@@ -1167,8 +1149,8 @@ const getRecordedAcceleratorLoras = (
 };
 
 /**
- * Accept complete model-family matches or the exact catalog-selected set; the latter permits unusual names
- * installed by the toggle itself.
+ * Accept complete model-family matches or the exact catalog-selected set; the latter permits unusual names installed by
+ * the toggle itself.
  */
 const findAcceleratorAmong = (
   model: MainModelConfig,
@@ -1187,8 +1169,8 @@ const findAcceleratorAmong = (
 };
 
 /**
- * Validate only recorded accelerator keys so another enabled candidate cannot displace the user's anchored set
- * through tie-breaking.
+ * Validate only recorded accelerator keys so another enabled candidate cannot displace the user's anchored set through
+ * tie-breaking.
  */
 const isRecordedAcceleratorIntact = (
   settings: Pick<VideoSettings, 'acceleratorLoraKeys' | 'loras'>,
@@ -1215,8 +1197,8 @@ const isRecordedAcceleratorIntact = (
 };
 
 /**
- * Choose only from the installed catalog; user-list names cannot reliably distinguish distillation from personal
- * style LoRAs.
+ * Choose only from the installed catalog; user-list names cannot reliably distinguish distillation from personal style
+ * LoRAs.
  */
 const findAcceleratorLoraEntries = (model: MainModelConfig, models: readonly ModelConfig[]): GenerateLora[] | null =>
   findAcceleratorLorasIn(model, models)?.map((lora) => ({ isEnabled: true, model: lora, weight: 1 })) ?? null;
@@ -1228,8 +1210,7 @@ export interface AcceleratorToggleResult {
 }
 
 /**
- * Encode acceleration through visible LoRAs and sampling settings so graph compilation needs no hidden toggle
- * behavior.
+ * Encode acceleration through visible LoRAs and sampling settings so graph compilation needs no hidden toggle behavior.
  */
 export const getAcceleratorToggleResult = (
   settings: VideoSettings,
@@ -1238,8 +1219,8 @@ export const getAcceleratorToggleResult = (
   enabled: boolean
 ): AcceleratorToggleResult => {
   const config = getVideoConfig(model);
-  // Remove exactly the entries a previous toggle added — never a user's own
-  // LoRA that happens to share a Lightning/Turbo-style name.
+  // Remove exactly the entries a previous toggle added — never a user's own LoRA that happens to share a
+  // Lightning/Turbo-style name.
   const previousKeys = new Set(settings.acceleratorLoraKeys);
   const withoutAccelerators = settings.loras.filter((lora) => !previousKeys.has(lora.model.key));
 
@@ -1252,9 +1233,8 @@ export const getAcceleratorToggleResult = (
         acceleratorLoraKeys: [],
         cfgScale: config.defaults.cfgScale,
         cfgScaleLowNoise: config.defaults.cfgScaleLowNoise,
-        // Only for a family whose accelerator drove these down in the first place. Restoring them
-        // unconditionally would reset a user's own guidance tweak on families whose accelerator
-        // never touched it.
+        // Only for a family whose accelerator drove these down in the first place. Restoring them unconditionally would
+        // reset a user's own guidance tweak on families whose accelerator never touched it.
         ...(config.accelerator?.guidance
           ? {
               audioCfgScale: config.defaults.audioCfgScale,
@@ -1288,9 +1268,9 @@ export const getAcceleratorToggleResult = (
       acceleratorLoraKeys: entries.map((entry) => entry.model.key),
       cfgScale: config.accelerator.cfgScale,
       cfgScaleLowNoise: config.accelerator.cfgScaleLowNoise,
-      // A step-distilled model predicts the clean sample directly; leaving the extra guidance
-      // scales at their guided defaults samples off the distribution it was fitted to, not merely
-      // slower. Families without extra guidance declare none and keep whatever is set.
+      // A step-distilled model predicts the clean sample directly; leaving the extra guidance scales at their guided
+      // defaults samples off the distribution it was fitted to, not merely slower. Families without extra guidance
+      // declare none and keep whatever is set.
       ...config.accelerator.guidance,
       loras: [
         ...withoutAccelerators.filter((lora) => !entries.some((e) => e.model.key === lora.model.key)),
@@ -1314,9 +1294,9 @@ export interface AcceleratorLoraChangeResult {
 }
 
 /**
- * Repair an enabled accelerator from the edited Concepts list: reanchor a complete replacement or disable and
- * restore model defaults. Never enable from a list edit; name heuristics cannot establish that a user LoRA
- * supports distillation.
+ * Repair an enabled accelerator from the edited Concepts list: reanchor a complete replacement or disable and restore
+ * model defaults. Never enable from a list edit; name heuristics cannot establish that a user LoRA supports
+ * distillation.
  */
 export const getAcceleratorLoraChangeResult = (
   settings: VideoSettings,
@@ -1364,10 +1344,10 @@ export const getAcceleratorLoraChangeResult = (
       acceleratorLoraKeys: [],
       cfgScale: config.defaults.cfgScale,
       cfgScaleLowNoise: config.defaults.cfgScaleLowNoise,
-      // The same restore the toggle-off path does. Without it, turning the accelerator off by
-      // disabling its LoRA leaves the extra scales at the identity values the accelerator wrote --
-      // a guided run with three quarters of its guidance silently off, which is the washed-out
-      // output this file works to prevent. Only for accelerators that set them in the first place.
+      // The same restore the toggle-off path does. Without it, turning the accelerator off by disabling its LoRA leaves
+      // the extra scales at the identity values the accelerator wrote -- a guided run with three quarters of its
+      // guidance silently off, which is the washed-out output this file works to prevent. Only for accelerators that
+      // set them in the first place.
       ...(config.accelerator?.guidance
         ? {
             audioCfgScale: config.defaults.audioCfgScale,
@@ -1429,18 +1409,17 @@ const VIDEO_COMPONENT_SETTING_LABELS: Record<VideoComponentValueKey, string> = {
 
 const isTi2v5b = (variant: unknown): boolean => variant === 'ti2v_5b';
 
-// A Diffusers Wan main bundles its own VAE and encoder; a GGUF/checkpoint main
-// needs them from standalone models or a Diffusers component source.
+// A Diffusers Wan main bundles its own VAE and encoder; a GGUF/checkpoint main needs them from standalone models or a
+// Diffusers component source.
 const getWanComponentSource = (ctx: VideoComponentPolicyContext) =>
   getCompatibleDiffusersComponentSource(ctx.model, ctx.settings.componentSourceModel);
 
-// The UMT5-XXL encoder is shared across Wan families, so any Diffusers source
-// supplies it.
+// The UMT5-XXL encoder is shared across Wan families, so any Diffusers source supplies it.
 const isWanEncoderSatisfied = (ctx: VideoComponentPolicyContext): boolean =>
   ctx.model.format === 'diffusers' || Boolean(getWanComponentSource(ctx));
 
-// The VAE is family-bound (wan_model_loader's source-VAE validation): a source
-// only covers it when its TI2V-5B-ness matches the main's.
+// The VAE is family-bound (wan_model_loader's source-VAE validation): a source only covers it when its TI2V-5B-ness
+// matches the main's.
 const isWanVaeSatisfied = (ctx: VideoComponentPolicyContext): boolean => {
   if (ctx.model.format === 'diffusers') {
     return true;
@@ -1485,8 +1464,8 @@ const isWanLowNoiseExpertCandidate = (candidate: ModelConfig, ctx: VideoComponen
     typeof ctx.model.variant !== 'string' ||
     candidate.variant === ctx.model.variant);
 
-// TI2V-5B requires 48 VAE channels; A14B requires 16. Allow unspecified channels. Do not await capabilities here:
-// early widget sync could otherwise delete and persist a valid stored VAE.
+// TI2V-5B requires 48 VAE channels; A14B requires 16. Allow unspecified channels. Do not await capabilities here: early
+// widget sync could otherwise delete and persist a valid stored VAE.
 const isWanVaeForMain = (candidate: ModelConfig, ctx: VideoComponentPolicyContext): boolean => {
   if (candidate.type !== 'vae' || candidate.base !== 'wan') {
     return false;
@@ -1569,8 +1548,8 @@ export const getVideoComponentSectionPolicy = (
     return createComponentPolicy(model.format !== 'diffusers', slots);
   }
 
-  // LTX-2 ships as separate files: the transformer, a component folder (VAEs, vocoder, connectors), and the
-  // Gemma-4 encoder that no LTX-2 main carries, so its slot is required rather than an override.
+  // LTX-2 ships as separate files: the transformer, a component folder (VAEs, vocoder, connectors), and the Gemma-4
+  // encoder that no LTX-2 main carries, so its slot is required rather than an override.
   if (model.base === 'ltx-2') {
     const needsComponentSource = model.format !== 'diffusers' || isComponentsOnlyVideoMain(model);
 
@@ -1605,8 +1584,8 @@ export const getVideoComponentSectionPolicy = (
         helpTextKey: 'widgets.video.componentSlots.ltx2DurationHeadHelp',
         key: 'ltx2DurationHeadModel',
         label: 'Duration head',
-        // Optional, and deliberately has no `missingMessage`: without it a run simply uses the
-        // frame count the user set, which is what every LTX-2 run did before this model existed.
+        // Optional, and deliberately has no `missingMessage`: without it a run simply uses the frame count the user
+        // set, which is what every LTX-2 run did before this model existed.
         modelTypes: ['ltx2_duration_head'],
         required: () => false,
         valueKind: 'component',
@@ -1614,11 +1593,11 @@ export const getVideoComponentSectionPolicy = (
     ]);
   }
 
-  // H3 checkpoint mains require a Diffusers component source; components-only sources also require a Qwen3-VL
-  // override. Full Diffusers mains bundle both.
+  // H3 checkpoint mains require a Diffusers component source; components-only sources also require a Qwen3-VL override.
+  // Full Diffusers mains bundle both.
   if (model.format === 'diffusers') {
-    // Legacy components-only mains remain visible; require the missing encoder while validation requests a
-    // single-file transformer main.
+    // Legacy components-only mains remain visible; require the missing encoder while validation requests a single-file
+    // transformer main.
     const componentsOnly = isComponentsOnlyVideoMain(model);
 
     return createComponentPolicy(componentsOnly, [
@@ -1660,8 +1639,7 @@ export const getVideoComponentSectionPolicy = (
       required: (ctx) => !isH3TextEncoderSatisfied(ctx),
       valueKind: 'component',
     },
-    // The hybrid replaces non-AdaLN weights with an FL2VA base while retaining Ref2VA task identity and
-    // projections.
+    // The hybrid replaces non-AdaLN weights with an FL2VA base while retaining Ref2VA task identity and projections.
     ...(model.variant === 'ref2va'
       ? [
           {
@@ -1677,8 +1655,7 @@ export const getVideoComponentSectionPolicy = (
   ]);
 };
 
-// Pruned/full AdaLN shapes differ: require matching checkpoint kinds, leaving unspecified flags to backend
-// validation.
+// Pruned/full AdaLN shapes differ: require matching checkpoint kinds, leaving unspecified flags to backend validation.
 const isH3HybridBaseCandidate = (candidate: ModelConfig, ctx: VideoComponentPolicyContext): boolean =>
   candidate.type === 'main' &&
   candidate.base === 'minimax-h3' &&
@@ -1696,8 +1673,8 @@ const getH3ComponentSource = (ctx: VideoComponentPolicyContext): MainModelConfig
   return source && source.base === 'minimax-h3' && source.format === 'diffusers' ? source : null;
 };
 
-// A full Diffusers source carries text-encoder weights; a components-only one
-// does not, so the single-file Qwen3-VL override becomes required.
+// A full Diffusers source carries text-encoder weights; a components-only one does not, so the single-file Qwen3-VL
+// override becomes required.
 const isH3TextEncoderSatisfied = (ctx: VideoComponentPolicyContext): boolean => {
   const source = getH3ComponentSource(ctx);
 
@@ -1772,8 +1749,8 @@ export const getWanExpertWiringWarning = (
     return null;
   }
 
-  // Single expert running the whole schedule: fine for an untagged or
-  // high-tagged file, but a low-tagged one is usually the wrong single pick.
+  // Single expert running the whole schedule: fine for an untagged or high-tagged file, but a low-tagged one is usually
+  // the wrong single pick.
   return mainTag === 'low' ? { kind: 'single-low' } : null;
 };
 
@@ -1802,8 +1779,8 @@ const findLtx2TextEncoder = (models: readonly ModelConfig[]): ModelConfig | null
   models.find((candidate) => candidate.type === 'gemma4_encoder' && candidate.base === 'ltx-2') ?? null;
 
 /**
- * An installed duration head, selected so its Auto duration switch is there to find. Selecting it
- * turns nothing on: the switch itself stays off until the user flips it.
+ * An installed duration head, selected so its Auto duration switch is there to find. Selecting it turns nothing on: the
+ * switch itself stays off until the user flips it.
  */
 const findLtx2DurationHead = (models: readonly ModelConfig[]): ModelConfig | null =>
   models.find((candidate) => candidate.type === 'ltx2_duration_head' && candidate.base === 'ltx-2') ?? null;
@@ -1940,8 +1917,8 @@ export interface VideoModelSwitchLoss {
 }
 
 /**
- * Values the target model constrains or re-defaults. The state does not record whether the user set them, they
- * stay on screen, and each is one number or toggle to re-enter, so they are reported rather than confirmed.
+ * Values the target model constrains or re-defaults. The state does not record whether the user set them, they stay on
+ * screen, and each is one number or toggle to re-enter, so they are reported rather than confirmed.
  */
 export type VideoModelSwitchAdjustment =
   | 'frames'
@@ -1960,8 +1937,8 @@ export interface VideoModelSelectionResult {
 }
 
 /**
- * Use one model-selection transition to reconcile media, sampling constraints, LoRAs, and components, and report
- * what it discards and adjusts. Previewing and applying a switch both call this, so they cannot disagree.
+ * Use one model-selection transition to reconcile media, sampling constraints, LoRAs, and components, and report what
+ * it discards and adjusts. Previewing and applying a switch both call this, so they cannot disagree.
  */
 export const getVideoModelSelectionResult = ({
   currentSettings,
@@ -1973,8 +1950,8 @@ export const getVideoModelSelectionResult = ({
   models: readonly ModelConfig[];
 }): VideoModelSelectionResult => {
   const config = getVideoConfig(model);
-  // Missing modelKey means healing defaults, not user choices; bootstrap selected-model defaults before
-  // reconciling seeded media.
+  // Missing modelKey means healing defaults, not user choices; bootstrap selected-model defaults before reconciling
+  // seeded media.
   const start = currentSettings.modelKey
     ? currentSettings
     : getVideoSettingsWithModelDefaults(currentSettings, model, models);
@@ -1986,8 +1963,8 @@ export const getVideoModelSelectionResult = ({
   const previousConfig = previousModel && isSupportedVideoModel(previousModel) ? getVideoConfig(previousModel) : null;
 
   if (next.references.length > 0 && !modes.includes('reference')) {
-    // An untouched Initial Video anchor is derived from the initial video and re-derived on the way back; a set
-    // trim or conditioning on it is not.
+    // An untouched Initial Video anchor is derived from the initial video and re-derived on the way back; a set trim or
+    // conditioning on it is not.
     const supplied = next.references.filter(
       (entry) =>
         !(
@@ -2016,8 +1993,7 @@ export const getVideoModelSelectionResult = ({
     losses.push({ count: 1, key: 'conditioningClip' });
   }
 
-  // Snap frame count before deriving reference context so cross-family switches cannot retain an undersized Wan
-  // budget.
+  // Snap frame count before deriving reference context so cross-family switches cannot retain an undersized Wan budget.
   const snappedFrames = snapVideoNumFrames(model, next.numFrames);
   const framesChanged = snappedFrames !== next.numFrames;
 
@@ -2051,8 +2027,8 @@ export const getVideoModelSelectionResult = ({
   }
 
   if (next.lastFrameImage) {
-    // The end-frame anchor rides the FLF2V channel whether its partner is a
-    // first frame or a source video; alone it needs a dedicated last-frame mode.
+    // The end-frame anchor rides the FLF2V channel whether its partner is a first frame or a source video; alone it
+    // needs a dedicated last-frame mode.
     const lastFrameSupported =
       next.firstFrameImage || next.sourceVideo ? modes.includes('first-last') : modes.includes('last-frame');
 
@@ -2078,8 +2054,8 @@ export const getVideoModelSelectionResult = ({
   }
 
   if (next.acceleratorEnabled) {
-    // Preserve tuned acceleration when its LoRAs remain compatible. Otherwise reapply the new family's accelerator
-    // or restore normal sampling if unavailable.
+    // Preserve tuned acceleration when its LoRAs remain compatible. Otherwise reapply the new family's accelerator or
+    // restore normal sampling if unavailable.
     if (!isRecordedAcceleratorIntact(next, model, models, config)) {
       const targetEntries = config.accelerator ? findAcceleratorLoraEntries(model, models) : null;
       const result = getAcceleratorToggleResult(next, model, models, targetEntries !== null);
@@ -2094,9 +2070,8 @@ export const getVideoModelSelectionResult = ({
     adjustments.add('cfgLowNoise');
   }
 
-  // The per-modality guidance scales follow the same rule as CFG (Low Noise): a
-  // family that does not offer a control carries no value for it, and one that
-  // does starts from its own default rather than another family's number.
+  // The per-modality guidance scales follow the same rule as CFG (Low Noise): a family that does not offer a control
+  // carries no value for it, and one that does starts from its own default rather than another family's number.
   const guidanceTransitions = [
     ['audioCfgScale', config.guidance.audioVisible],
     ['stgScale', config.guidance.stgVisible],
@@ -2110,29 +2085,27 @@ export const getVideoModelSelectionResult = ({
       const dropped = next[key] !== null;
 
       next[key] = wanted;
-      // Only a value the panel is taking away is a clearing; filling one in for a family that has
-      // the control is not. One label for the section rather than one per scale, because they
-      // live together under a collapsed "Advanced guidance" heading.
+      // Only a value the panel is taking away is a clearing; filling one in for a family that has the control is not.
+      // One label for the section rather than one per scale, because they live together under a collapsed "Advanced
+      // guidance" heading.
       if (dropped) {
         adjustments.add('advancedGuidance');
       }
     }
   }
 
-  // A family that guides against a list ships it as part of the recipe, exactly like the scales
-  // above -- and like them, the fill is from the "this panel carries none" sentinel rather than from
-  // any empty value. A variant whose negative prompt is never used hides the field and encodes
-  // nothing, so a panel arriving from one holds none to carry, and dev would otherwise guide against
-  // an empty string at CFG 3: the one part of the recipe left silently missing. A panel whose
-  // previous model cannot be resolved (never seeded, or the model was uninstalled under it) holds
-  // none for the same reason, so the automatic re-pick agrees with the manual switch.
+  // A family that guides against a list ships it as part of the recipe, exactly like the scales above -- and like them,
+  // the fill is from the "this panel carries none" sentinel rather than from any empty value. A variant whose negative
+  // prompt is never used hides the field and encodes nothing, so a panel arriving from one holds none to carry, and dev
+  // would otherwise guide against an empty string at CFG 3: the one part of the recipe left silently missing. A panel
+  // whose previous model cannot be resolved (never seeded, or the model was uninstalled under it) holds none for the
+  // same reason, so the automatic re-pick agrees with the manual switch.
   //
-  // An empty box on a variant that does show the field is the user's own value and is left alone --
-  // that is also what keeps recall's contract that an empty recorded negative prompt does not
-  // disturb the panel's. The two cannot be told apart once a panel has passed through a variant that
-  // hides the field, so clearing the box, detouring through distilled and coming back restores the
-  // list; dev quietly running without it is the worse failure. Filling an empty field in is not a
-  // clearing, so it is not reported.
+  // An empty box on a variant that does show the field is the user's own value and is left alone -- that is also what
+  // keeps recall's contract that an empty recorded negative prompt does not disturb the panel's. The two cannot be told
+  // apart once a panel has passed through a variant that hides the field, so clearing the box, detouring through
+  // distilled and coming back restores the list; dev quietly running without it is the worse failure. Filling an empty
+  // field in is not a clearing, so it is not reported.
   if (config.defaultNegativePrompt && next.negativePromptEnabled && !next.negativePrompt.trim()) {
     const previousCarriesNone = previousModel ? previousConfig?.negativePrompt.usage === 'never' : true;
 
@@ -2147,30 +2120,27 @@ export const getVideoModelSelectionResult = ({
     adjustments.add('steps');
   }
 
-  // Steps and CFG have no "carries none" sentinel like the scales above, so a control the previous
-  // variant did not offer stands in for one: the user cannot have chosen a number they were never
-  // shown, and if it is still that variant's own recommendation it is not one they carried in
-  // either. Both conditions are needed. The fixed-schedule variant pins 8 steps at CFG 1, and
-  // without this dev arrives holding them -- dev with no guidance at all, which is the recipe that
-  // produces washed-out output.
+  // Steps and CFG have no "carries none" sentinel like the scales above, so a control the previous variant did not
+  // offer stands in for one: the user cannot have chosen a number they were never shown, and if it is still that
+  // variant's own recommendation it is not one they carried in either. Both conditions are needed. The fixed-schedule
+  // variant pins 8 steps at CFG 1, and without this dev arrives holding them -- dev with no guidance at all, which is
+  // the recipe that produces washed-out output.
   //
-  // Compared against the variant's static recipe, never `getDefaultVideoSettings`: that applies an
-  // installed accelerator's numbers, so on a machine with the Lightning LoRAs a Wan panel's
-  // "default" is 4/1, and comparing against it would both miss real carry-overs and rewrite a step
-  // count the user typed. A control the previous variant *did* show is the user's and is never
-  // touched, whatever it holds.
+  // Compared against the variant's static recipe, never `getDefaultVideoSettings`: that applies an installed
+  // accelerator's numbers, so on a machine with the Lightning LoRAs a Wan panel's "default" is 4/1, and comparing
+  // against it would both miss real carry-overs and rewrite a step count the user typed. A control the previous variant
+  // *did* show is the user's and is never touched, whatever it holds.
   //
-  // Skipped while the accelerator is on: the fast path owns steps and CFG and restores the model's
-  // own when it turns off, so its numbers are not a variant's recommendation to compare. An
-  // unresolvable previous model leaves both alone -- unlike the blank negative prompt above, where
-  // seeding only adds, guessing here would rewrite tuned values on any panel whose model is missing
-  // from the catalog. Placed after the fixed-schedule reset so a step count the user did choose is
-  // still reported as taken away; adopting a recommendation they never set is not a clearing, and
-  // both numbers are on screen.
+  // Skipped while the accelerator is on: the fast path owns steps and CFG and restores the model's own when it turns
+  // off, so its numbers are not a variant's recommendation to compare. An unresolvable previous model leaves both alone
+  // -- unlike the blank negative prompt above, where seeding only adds, guessing here would rewrite tuned values on any
+  // panel whose model is missing from the catalog. Placed after the fixed-schedule reset so a step count the user did
+  // choose is still reported as taken away; adopting a recommendation they never set is not a clearing, and both
+  // numbers are on screen.
   //
-  // Known gap: a value the user deliberately set to exactly the hiding variant's own default (CFG 1
-  // on dev, say) is indistinguishable from one carried in and is replaced. Telling them apart needs
-  // a real sentinel on both fields, which is a change to the persisted settings across every family.
+  // Known gap: a value the user deliberately set to exactly the hiding variant's own default (CFG 1 on dev, say) is
+  // indistinguishable from one carried in and is replaced. Telling them apart needs a real sentinel on both fields,
+  // which is a change to the persisted settings across every family.
   if (!next.acceleratorEnabled && previousConfig) {
     if (!previousConfig.stepsEditable && next.steps === previousConfig.defaults.steps) {
       next.steps = config.defaults.steps;
@@ -2212,8 +2182,8 @@ export const getVideoModelSelectionResult = ({
     }
   }
 
-  // Auto duration belongs to the head it was turned on with. Once that head is gone, a head filled
-  // in below (or picked later) must not bring the switch back on by itself.
+  // Auto duration belongs to the head it was turned on with. Once that head is gone, a head filled in below (or picked
+  // later) must not bring the switch back on by itself.
   if (!next.ltx2DurationHeadModel) {
     if (next.autoDuration) {
       adjustments.add('autoDuration');
@@ -2313,8 +2283,8 @@ const VIDEO_FIELD_SECTIONS: Record<VideoField, VideoSection> = {
 };
 
 /**
- * One reason Video cannot run, in English, and every control that can fix it: a conflict between two media lists
- * both, since clearing either fixes it. None when only the model picker can, or no control sets the value.
+ * One reason Video cannot run, in English, and every control that can fix it: a conflict between two media lists both,
+ * since clearing either fixes it. None when only the model picker can, or no control sets the value.
  */
 export interface VideoValidationIssue {
   fields: readonly VideoField[];
@@ -2340,8 +2310,8 @@ const VIDEO_MODE_FIELDS: Record<VideoGenerationMode, readonly VideoField[]> = {
 
 /**
  * The controls the panel shows, and lets the user change, for this model and these settings. The panel renders its
- * media sections and its locked controls from it, and an issue counts only in the sections of the controls listed
- * here, so a count never points at a control the panel hides or holds read-only.
+ * media sections and its locked controls from it, and an issue counts only in the sections of the controls listed here,
+ * so a count never points at a control the panel hides or holds read-only.
  */
 export const getVideoPanelFields = (
   model: MainModelConfig | undefined,
@@ -2460,8 +2430,8 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
   }
 
   if (settings.conditioningClip && (settings.sourceVideo || settings.references.length > 0)) {
-    // Both claim the run's conditioning wholesale, and `resolveVideoMode` would silently drop one
-    // rather than run something it cannot express.
+    // Both claim the run's conditioning wholesale, and `resolveVideoMode` would silently drop one rather than run
+    // something it cannot express.
     issues.push({
       fields: [
         'conditioningClip',
@@ -2476,8 +2446,8 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
     isConditioningClipExcludingFrames(settings.conditioningClip) &&
     (settings.firstFrameImage || settings.lastFrameImage)
   ) {
-    // A clip's picture already fills every frame these would hold. Its soundtrack does not, which is
-    // why the frames stay available in that role.
+    // A clip's picture already fills every frame these would hold. Its soundtrack does not, which is why the frames
+    // stay available in that role.
     issues.push({
       fields: [
         'conditioningClip',
@@ -2552,8 +2522,8 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
     }
   }
 
-  // The effective values rather than the stored ones: a conditioning clip decides both, and the
-  // stored numbers it overrides are the user's own -- still theirs once the clip is cleared.
+  // The effective values rather than the stored ones: a conditioning clip decides both, and the stored numbers it
+  // overrides are the user's own -- still theirs once the clip is cleared.
   const timing = getEffectiveVideoTiming(model, settings);
 
   if (!isValidVideoNumFrames(model, timing.numFrames)) {
@@ -2575,9 +2545,9 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
     });
   }
 
-  // fps and steps are integer fields on the backend nodes; a fractional value
-  // would fail pydantic coercion at enqueue, so reject it here instead. A rate read off a clip is
-  // exempt from the integer rule -- LTX-2's own fps fields are floats, and 29.97 is a real clip.
+  // fps and steps are integer fields on the backend nodes; a fractional value would fail pydantic coercion at enqueue,
+  // so reject it here instead. A rate read off a clip is exempt from the integer rule -- LTX-2's own fps fields are
+  // floats, and 29.97 is a real clip.
   if (
     !Number.isFinite(timing.fps) ||
     (!timing.fpsFromClip && !Number.isInteger(timing.fps)) ||
@@ -2598,14 +2568,14 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
     issues.push({ fields: ['steps'], message: `Steps must be a whole number of at least ${config.minSteps}.` });
   }
 
-  // A two-stage preset caps the refine pass at the base pass's budget, and a refine of one step can
-  // only re-enter its schedule at the bottom -- which the backend refuses, after the base pass and
-  // the upscale have already run. Refused here so the cost is never paid.
+  // A two-stage preset caps the refine pass at the base pass's budget, and a refine of one step can only re-enter its
+  // schedule at the bottom -- which the backend refuses, after the base pass and the upscale have already run. Refused
+  // here so the cost is never paid.
   const preset = config.targetResolutions.find((option) => option.id === settings.targetResolution);
 
-  // `ltx2_denoise` refuses a refine pass alongside a held-clean modality: the refine pass re-noises
-  // every token, so the conditioning would have to be re-encoded at the refine canvas the way a
-  // first frame is. Caught here, before the base pass and the upscale have been paid for.
+  // `ltx2_denoise` refuses a refine pass alongside a held-clean modality: the refine pass re-noises every token, so the
+  // conditioning would have to be re-encoded at the refine canvas the way a first frame is. Caught here, before the
+  // base pass and the upscale have been paid for.
   if (preset?.stages === 2 && !isTwoStageSupportedForMode(mode)) {
     issues.push({
       fields: ['targetResolution', 'conditioningClip'],
@@ -2622,10 +2592,9 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
     });
   }
 
-  // An LTX-2 continuation replays the front of the source and then joins the two halves by
-  // crossfading exactly those frames out of each. Both sides therefore have a floor, and both fail
-  // late and confusingly without one: the generated side after the encoders have run, the source
-  // side inside the join, after the whole generation.
+  // An LTX-2 continuation replays the front of the source and then joins the two halves by crossfading exactly those
+  // frames out of each. Both sides therefore have a floor, and both fail late and confusingly without one: the
+  // generated side after the encoders have run, the source side inside the join, after the whole generation.
   if (mode === 'extend' && model.base === 'ltx-2' && settings.sourceVideo) {
     // The user's own value now, not a constant, so every message quotes what they actually set.
     const context = settings.ltx2ExtendContextFrames;
@@ -2650,8 +2619,8 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
           `allowed even at the smallest context. Use a source at or below about 2560x1440.`,
       });
     } else if (context > affordable) {
-      // Reachable by loading a recalled or stored setting against a larger source than it was made
-      // for; the control itself is bounded, so dragging cannot get here.
+      // Reachable by loading a recalled or stored setting against a larger source than it was made for; the control
+      // itself is bounded, so dragging cannot get here.
       issues.push({
         fields: ['extendContext'],
         message:
@@ -2681,8 +2650,8 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
     issues.push({ fields: ['cfgLowNoise'], message: 'CFG (Low Noise) must be at least 1.' });
   }
 
-  // The floors are the denoise node's own `ge`: a value below one fails
-  // pydantic validation at enqueue, after the graph has been built.
+  // The floors are the denoise node's own `ge`: a value below one fails pydantic validation at enqueue, after the graph
+  // has been built.
   const guidanceBounds = [
     {
       field: 'audioCfg' as const,
@@ -2712,8 +2681,8 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
     });
   }
 
-  // The trim bounds are integer fields on extract_video_range; a fractional
-  // persisted value would fail pydantic coercion at enqueue.
+  // The trim bounds are integer fields on extract_video_range; a fractional persisted value would fail pydantic
+  // coercion at enqueue.
   if (
     settings.sourceVideo &&
     (!Number.isInteger(settings.sourceVideo.startFrame) || !Number.isInteger(settings.sourceVideo.endFrame))

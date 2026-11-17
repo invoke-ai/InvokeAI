@@ -3,8 +3,8 @@ import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { useSyncExternalStore } from 'react';
 
 /**
- * Share palette visibility across topbar, editor command, and Launchpad shortcut; each surface hosts its own
- * subscribed dialog.
+ * Share palette visibility across topbar, editor command, and Launchpad shortcut; each surface hosts its own subscribed
+ * dialog.
  */
 
 export const commandPaletteStore = createExternalStoreCore<{ isOpen: boolean }>({ isOpen: false });

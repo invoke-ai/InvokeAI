@@ -525,9 +525,9 @@ const copyMediaToBoard = async <Entry>({
     }
 
     try {
-      // Deliberately unaborted: the server works synchronously and may create identities after the
-      // browser disconnects, and its response is the only way the ledger learns to remove them.
-      // Cancellation is honoured between requests instead.
+      // Deliberately unaborted: the server works synchronously and may create identities after the browser disconnects,
+      // and its response is the only way the ledger learns to remove them. Cancellation is honoured between requests
+      // instead.
       const body = await apiFetchJson<{ copied?: Entry[]; failed?: string[] }>(endpoint, {
         body: JSON.stringify({ board_id: boardId, [requestKey]: batch }),
         method: 'POST',
@@ -643,8 +643,8 @@ export const createStagingBoard = async (boardName: string, signal?: AbortSignal
 };
 
 /**
- * Move a staging board that holds a member board's media into the project it now belongs to, and archive it if
- * the source had. Only after the project exists: a board is a member of a project the server already has.
+ * Move a staging board that holds a member board's media into the project it now belongs to, and archive it if the
+ * source had. Only after the project exists: a board is a member of a project the server already has.
  */
 export const placeBoardInProject = async (
   boardId: string,
@@ -665,9 +665,8 @@ export const getBoardProjectId = async (boardId: string, signal?: AbortSignal): 
     .project_id ?? null;
 
 /**
- * Drop a staging board whose project was never created. `include_images=false` deliberately: the
- * restore deletes its own identities one by one, and a generation that landed on the board
- * meanwhile must survive as Uncategorized.
+ * Drop a staging board whose project was never created. `include_images=false` deliberately: the restore deletes its
+ * own identities one by one, and a generation that landed on the board meanwhile must survive as Uncategorized.
  */
 export const deleteStagingBoard = async (boardId: string, signal?: AbortSignal): Promise<void> => {
   await apiFetchJson<unknown>(`${BOARDS_BASE}/${encodeURIComponent(boardId)}?include_images=false`, {
@@ -677,8 +676,8 @@ export const deleteStagingBoard = async (boardId: string, signal?: AbortSignal):
 };
 
 /**
- * Delete in batches the server accepts. Every batch is sent even after one fails, so as much as possible is cleaned
- * up; the first failure is thrown once all have run.
+ * Delete in batches the server accepts. Every batch is sent even after one fails, so as much as possible is cleaned up;
+ * the first failure is thrown once all have run.
  */
 const deleteArchiveMedia = async (
   names: readonly string[],

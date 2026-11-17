@@ -11,9 +11,9 @@ import type { HistoryEntry } from './history';
 import { NO_HELD_ASSET_REFS } from './history';
 
 /**
- * Engine-owned pixel write at the layer-local rect, including invalidation/versioning and dirty persistence
- * marking. It first makes the layer's cache trustworthy (rasterizing an evicted or stale one) and rejects, leaving
- * the cache unchanged, when it cannot.
+ * Engine-owned pixel write at the layer-local rect, including invalidation/versioning and dirty persistence marking. It
+ * first makes the layer's cache trustworthy (rasterizing an evicted or stale one) and rejects, leaving the cache
+ * unchanged, when it cannot.
  */
 export type ImagePatchApply = (layerId: string, rect: Rect, pixels: ImageData) => Promise<void>;
 
@@ -47,8 +47,7 @@ export const createImagePatchEntry = (opts: CreateImagePatchEntryOptions): Histo
   assertDims(rect, before, 'before');
   assertDims(rect, after, 'after');
 
-  // Snapshot the rect so a later external mutation of the caller's object can't
-  // shift where undo/redo write.
+  // Snapshot the rect so a later external mutation of the caller's object can't shift where undo/redo write.
   const patchRect: Rect = { height: rect.height, width: rect.width, x: rect.x, y: rect.y };
   const bytes = before.data.byteLength + after.data.byteLength;
 

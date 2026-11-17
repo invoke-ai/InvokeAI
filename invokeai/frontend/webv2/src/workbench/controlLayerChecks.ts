@@ -30,9 +30,9 @@ export interface ControlLayerCheckContext {
 }
 
 /**
- * Before capabilities load every kind counts as supported, so resolution still finds models; validation then
- * reports `capabilities_unavailable` instead of a misleading missing model. Without a main model (`base` null) no
- * base restricts kinds either.
+ * Before capabilities load every kind counts as supported, so resolution still finds models; validation then reports
+ * `capabilities_unavailable` instead of a misleading missing model. Without a main model (`base` null) no base
+ * restricts kinds either.
  */
 export const createControlLayerCheckContext = (
   base: string | null,
@@ -132,9 +132,9 @@ const getControlMapState = (layer: CanvasControlLayerContract): ControlMapState 
 };
 
 /**
- * One layer as the settings panel, the layer row and Invoke present it. With `earlier` (the contributing layers
- * above it) the reason includes per-generation limits, as Invoke judges it; without, it is the ambient warning.
- * Without a main model the layer resolves across every base and only resolution and detection give a reason.
+ * One layer as the settings panel, the layer row and Invoke present it. With `earlier` (the contributing layers above
+ * it) the reason includes per-generation limits, as Invoke judges it; without, it is the ambient warning. Without a
+ * main model the layer resolves across every base and only resolution and detection give a reason.
  */
 export const describeControlLayer = (
   layer: CanvasControlLayerContract,

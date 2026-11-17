@@ -86,9 +86,9 @@ export interface VideoPlayerProps extends Omit<
   onLoopChange?: (loop: boolean) => void;
   /**
    * Plays this window instead of the whole clip. Playback that reaches its end wraps to its start while looping;
-   * otherwise it pauses on the window's last frame, and playing from there starts the window over. It is clamped to
-   * the media; a collapsed or inverted window is none, so playback covers the whole clip. Seeks never act on it, and
-   * one that leaves it keeps it: retiring it is the caller's call (`onSeeking`). A new window takes effect in the passive
+   * otherwise it pauses on the window's last frame, and playing from there starts the window over. It is clamped to the
+   * media; a collapsed or inverted window is none, so playback covers the whole clip. Seeks never act on it, and one
+   * that leaves it keeps it: retiring it is the caller's call (`onSeeking`). A new window takes effect in the passive
    * effects of the commit that renders it; playback started before then (a caller's `play()` in the same task) is
    * judged against the previous window, so a caller starts it from an effect after the player's in that commit.
    */
@@ -196,8 +196,8 @@ const CONTROLS_BAR_PROPS = {
 const RATE_MENU_POSITIONING = { placement: 'top-end' } as const;
 
 /**
- * The player's shortcuts. While focus is inside the player they are always its own, even when one does nothing in
- * the current state or size, so they never reach application hotkeys behind it.
+ * The player's shortcuts. While focus is inside the player they are always its own, even when one does nothing in the
+ * current state or size, so they never reach application hotkeys behind it.
  */
 const PLAYER_KEYS = new Set([' ', ',', '.', 'f', 'k', 'l', 'm']);
 // Keys these targets own outright, and the activation key buttons and links own.
@@ -379,8 +379,8 @@ const Scrubber = ({
     },
     [disabled, isScrubbable, onScrubStart]
   );
-  // The slider's step is fine so a drag lands anywhere; arrow keys move by the coarser keyboard step instead, which
-  // the slider cannot take separately. A handled key never reaches the slider (it ignores prevented keys).
+  // The slider's step is fine so a drag lands anywhere; arrow keys move by the coarser keyboard step instead, which the
+  // slider cannot take separately. A handled key never reaches the slider (it ignores prevented keys).
   const handleKeyDownCapture = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       const direction = ARROW_DIRECTIONS[event.key];

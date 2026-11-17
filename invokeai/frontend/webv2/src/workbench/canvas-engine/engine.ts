@@ -281,10 +281,7 @@ export interface CanvasEngineOptions {
    * outside the core.
    */
   uploadImage(blob: Blob): Promise<{ height: number; imageName: string; width: number }>;
-  /**
-   * Uploads unreferenced composites as transient intermediates so each invocation does not leave a permanent
-   * image.
-   */
+  /** Uploads unreferenced composites as transient intermediates so each invocation does not leave a permanent image. */
   uploadIntermediateImage(blob: Blob): Promise<{ height: number; imageName: string; width: number }>;
   /** Supplies the currently selected model base for core-created control layer contracts. */
   getMainModelBase?: () => string | null;
@@ -370,8 +367,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     diagnostics,
     getDocument: () => mirror.getDocument(),
     imageResolver,
-    // A raster-image pixel transaction replaces the live cache with pixels that already include adjustments while
-    // the contract keeps them until commit; applying them again would double them and snap back on pointer-up.
+    // A raster-image pixel transaction replaces the live cache with pixels that already include adjustments while the
+    // contract keeps them until commit; applying them again would double them and snap back on pointer-up.
     isAdjustmentBaked: (layerId) => pixelEditController?.isOpenFor([layerId]) === true,
     isLayerHeld: (layerId) => isLayerHeldBySession(layerId) || bitmapStore.hasPendingWork(layerId),
     onAdjustedSurfaceSettled: (layerId) => onAdjustedSurfaceSettled(layerId),
@@ -456,8 +453,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ['sam', createSamTool()],
   ]);
 
-  // Render-time transform previews leave the mirror untouched; move overrides position, transform overrides the
-  // full matrix.
+  // Render-time transform previews leave the mirror untouched; move overrides position, transform overrides the full
+  // matrix.
   const transformOverrides = new Map<
     string,
     { x: number; y: number; scaleX?: number; scaleY?: number; rotation?: number }
@@ -521,8 +518,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   let applicationEscapeHandler: ((gestureWasActive: boolean) => boolean) | null = null;
 
   /**
-   * Current layer source shared by persistence guards and self-echo checks. The closure is called only after
-   * `mirror` initialization.
+   * Current layer source shared by persistence guards and self-echo checks. The closure is called only after `mirror`
+   * initialization.
    */
   const getLayerSourceById = (layerId: string): CanvasLayerSourceContract | null => {
     const doc = mirror.getDocument();
@@ -537,8 +534,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   /**
-   * Swap persisted refs/offsets via paint-source actions for raster/control or mask-config actions preserving
-   * fill. Self-echo tracking covers both, avoiding redundant rasterization.
+   * Swap persisted refs/offsets via paint-source actions for raster/control or mask-config actions preserving fill.
+   * Self-echo tracking covers both, avoiding redundant rasterization.
    */
   const dispatchLayerBitmap = (layerId: string, bitmap: CanvasImageRef, offset: { x: number; y: number }): boolean => {
     const doc = mirror.getDocument();
@@ -634,8 +631,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
           layerId
         );
         if (result === 'emptied' || result === 'trimmed') {
-          // Derived surfaces are keyed on the old extent; both calls are synchronous,
-          // so they land before the clear dispatch and no frame sees a mismatch.
+          // Derived surfaces are keyed on the old extent; both calls are synchronous, so they land before the clear
+          // dispatch and no frame sees a mismatch.
           deleteDerivedSurfaces(layerId);
           notifyLayerPainted(layerId);
         }
@@ -661,8 +658,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         reportError(
           info.willRetry ? 'Bitmap persistence failed' : 'Bitmap persistence suspended',
           layerId,
-          // Lead circuit-opening feedback with persistence stopping until a fresh stroke, rather than repeating
-          // the underlying error.
+          // Lead circuit-opening feedback with persistence stopping until a fresh stroke, rather than repeating the
+          // underlying error.
           info.willRetry ? error : new Error('Canvas changes are no longer uploading. A new stroke will retry.')
         );
       },
@@ -672,9 +669,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const historyController = new HistoryController({
     droppedSteps: opts.droppedHistorySteps ?? 0,
-    // A live float holds pixels no history entry knows about, and a preview holds unrecorded document values:
-    // replaying over either would land on state the entry never saw. Put both back first; neither is itself
-    // undoable until it commits.
+    // A live float holds pixels no history entry knows about, and a preview holds unrecorded document values: replaying
+    // over either would land on state the entry never saw. Put both back first; neither is itself undoable until it
+    // commits.
     beforeReplay: () => {
       paintLineEnds.clear();
       editingController.transform.onReplay();
@@ -698,8 +695,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const unsubscribeHistoryEpoch = history.subscribe(() => stores.historyEpoch.set(stores.historyEpoch.get() + 1));
   let engineMutationDepth = 0;
   const dispatchCanvasMutation = (action: CanvasProjectMutation, origin: 'system' | 'user' = 'user'): boolean => {
-    // Engine edits can select temporary layers, replay selections, or repair them on rollback. They are not
-    // explicit layer navigation, even when the edit itself is user-originated.
+    // Engine edits can select temporary layers, replay selections, or repair them on rollback. They are not explicit
+    // layer navigation, even when the edit itself is user-originated.
     engineMutationDepth += 1;
     try {
       return mutationPort.dispatch(action, origin);
@@ -707,8 +704,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       engineMutationDepth -= 1;
     }
   };
-  // Direct pixel writes do not replace the reducer canvas object. Snapshot
-  // freshness therefore also binds to this engine-local direct-pixel epoch.
+  // Direct pixel writes do not replace the reducer canvas object. Snapshot freshness therefore also binds to this
+  // engine-local direct-pixel epoch.
   let directPixelEpoch = 0;
   const resolveSelectedLayerIds = (document: CanvasDocumentContractV3): readonly string[] => {
     const primaryId = document.selectedLayerId;
@@ -762,8 +759,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   /**
-   * Replaces the whole cache with pixels at a layer-local rect. Transform undo/redo needs exact extent replacement
-   * to remove stale pixels outside smaller bounds; shield from rasterization and mark dirty.
+   * Replaces the whole cache with pixels at a layer-local rect. Transform undo/redo needs exact extent replacement to
+   * remove stale pixels outside smaller bounds; shield from rasterization and mark dirty.
    */
   const restoreLayerCache = (layerId: string, rect: Rect, pixels: ImageData): void => {
     layerCache.delete(layerId);
@@ -806,9 +803,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   /**
-   * A spatial adjustment result changed what a layer displays, with no cache publication: recomposite the layer,
-   * redraw its thumbnail, the overview and the group surfaces holding it. Its own adjusted surface is current, so it
-   * stays.
+   * A spatial adjustment result changed what a layer displays, with no cache publication: recomposite the layer, redraw
+   * its thumbnail, the overview and the group surfaces holding it. Its own adjusted surface is current, so it stays.
    */
   const onAdjustedSurfaceSettled = (layerId: string): void => {
     if (disposed) {
@@ -889,9 +885,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   let antsPhase = 0;
 
   const onSelectionChanged = (): void => {
-    // Selection state is already authoritative before this notification runs.
-    // Keep each derived UI/render notification independent and best-effort so a
-    // faulty observer cannot make an applied selection report false failure.
+    // Selection state is already authoritative before this notification runs. Keep each derived UI/render notification
+    // independent and best-effort so a faulty observer cannot make an applied selection report false failure.
     try {
       stores.hasSelection.set(selection.hasSelection());
     } catch {
@@ -910,8 +905,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   const documentEditOwner = Symbol('canvas-operation-document-edit-owner');
-  // Later-defined engine values are passed as thunks: the context never
-  // invokes them during construction.
+  // Later-defined engine values are passed as thunks: the context never invokes them during construction.
   const mutationContext = createCanvasMutationContext({
     commitEdit: (intent) => mutationPort.commitEdit(intent),
     createLayerId,
@@ -1061,8 +1055,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
   const reducedMotionQuery =
     typeof globalThis.matchMedia === 'function' ? globalThis.matchMedia('(prefers-reduced-motion: reduce)') : null;
-  // Reduced motion stills the pulse only; the 5fps ants march on, matching the
-  // selection ants' pre-existing behavior.
+  // Reduced motion stills the pulse only; the 5fps ants march on, matching the selection ants' pre-existing behavior.
   const samPulseActive = (): boolean =>
     renderController.previews.getSam() !== null && reducedMotionQuery?.matches === false;
   const antsAnimator: AntsAnimator = createAntsAnimator({
@@ -1082,8 +1075,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     requestFrame: (callback) => globalThis.requestAnimationFrame(callback),
   });
 
-  // Assumes data dims === rect dims (the decode bridge validates this), so the
-  // pixel-grid trace offset by rect origin is exact document space.
+  // Assumes data dims === rect dims (the decode bridge validates this), so the pixel-grid trace offset by rect origin
+  // is exact document space.
   const traceSamOutline = (preview: { data: RasterSurface; rect: Rect }): Path2D | null => {
     try {
       const { data, rect } = preview;
@@ -1128,8 +1121,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cancelFloatingSelection: () => floatingSelection.cancel(),
     commitFloatingSelection: () => floatingSelection.commit(),
     commitSelection: (commit) => {
-      // A new selection supersedes the float's own; land the pixels first so the
-      // committed op applies to the document the user can see.
+      // A new selection supersedes the float's own; land the pixels first so the committed op applies to the document
+      // the user can see.
       floatingSelection.commit();
       selection.commit(commit);
     },
@@ -1217,8 +1210,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   /**
-   * A pointer that left the canvas takes its hover chrome along, unless a gesture still owns it; the loupe follows
-   * the pipeline's hover point, which leaves with it.
+   * A pointer that left the canvas takes its hover chrome along, unless a gesture still owns it; the loupe follows the
+   * pipeline's hover point, which leaves with it.
    */
   const onCanvasPointerLeave = (): void => {
     pipeline.onPointerLeave();
@@ -1399,8 +1392,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         try {
           await prepareLayerRasterCache(layerId);
         } catch {
-          // Each target can retry independently through its next paint/fill
-          // gesture; one failed source must not starve the rest of the batch.
+          // Each target can retry independently through its next paint/fill gesture; one failed source must not starve
+          // the rest of the batch.
         }
       }
     })();
@@ -1444,8 +1437,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     layerController.copy.copy(layerId, 'control');
 
   /**
-   * Leases rasterized layer pixels for a composite export. Missing, ineligible or unsupported layers throw so
-   * exports cannot silently omit selected contributors.
+   * Leases rasterized layer pixels for a composite export. Missing, ineligible or unsupported layers throw so exports
+   * cannot silently omit selected contributors.
    */
   const requireLayerSurfaceForExport = async (layerId: string): Promise<RasterReadLease> => {
     const result = await rasterizeLayerPixels(layerId);
@@ -1465,9 +1458,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   const dropLayer = (layerId: string): void => {
-    // Generation-cancel persistence before the id can be restored by undo/redo.
-    // A late upload from the removed incarnation must never target a recreated
-    // paint layer with the same id.
+    // Generation-cancel persistence before the id can be restored by undo/redo. A late upload from the removed
+    // incarnation must never target a recreated paint layer with the same id.
     try {
       bitmapStore.discardLayer(layerId);
     } catch {
@@ -1535,8 +1527,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   let sessionEditsStagingHiddenStack = false;
   /**
    * The gesture flag is set once per gesture, so its pointer moves read a flag; the session flag follows the transform
-   * session and floating selection stores, and document changes, since a conversion or its undo moves the held layer
-   * to another stack. While a preview is shown or toggled off, the stacks showing (above the preview) or hiding again
+   * session and floating selection stores, and document changes, since a conversion or its undo moves the held layer to
+   * another stack. While a preview is shown or toggled off, the stacks showing (above the preview) or hiding again
    * repaints in full.
    */
   const setStagingHiddenStackEdits = (gesture: boolean, session: boolean): void => {
@@ -1621,8 +1613,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     stores,
     transformOverrides,
   });
-  // Stay paused until attached: invalidations accumulate but never request a
-  // (DOM) frame, keeping the engine node-safe before it has render targets.
+  // Stay paused until attached: invalidations accumulate but never request a (DOM) frame, keeping the engine node-safe
+  // before it has render targets.
   scheduler.pause();
 
   // ---- Staged generation and filter previews ------------------------------
@@ -1683,8 +1675,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       cleanup.run(cancelOpenPixelEdit);
       cleanup.run(() => rasterController.invalidateDocument());
       cleanup.run(() => stores.thumbnailStatus.clear());
-      // Whole-document swaps invalidate pixel history. Cancel the pointer gesture first to discard stale tool
-      // anchors and clear active-gesture state; also clear any lingering bbox preview.
+      // Whole-document swaps invalidate pixel history. Cancel the pointer gesture first to discard stale tool anchors
+      // and clear active-gesture state; also clear any lingering bbox preview.
       cleanup.run(() => stores.bboxPreview.set(null));
       cleanup.run(() => history.clear());
       paintLineEnds.clear();
@@ -1693,9 +1685,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       // A text-edit session likewise belongs to the outgoing document; drop it.
       cleanup.run(() => stores.textEditSession.set(null));
       cleanup.run(clearStagedPreview);
-      // Per-layer control-filter previews likewise belong to the outgoing
-      // document — a swap can reuse a layer id with different content, so
-      // pruning only "missing" ids isn't enough; drop them all.
+      // Per-layer control-filter previews likewise belong to the outgoing document — a swap can reuse a layer id with
+      // different content, so pruning only "missing" ids isn't enough; drop them all.
       cleanup.run(clearAllFilterPreviews);
       cleanup.run(() => controlView.clear());
       // Drop document-scoped selection/lasso state and cancel outgoing floats; committing would target a replaced
@@ -1717,8 +1708,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
           cleanup.run(() => dropLayer(layerId));
         }
       }
-      // Invalidate every incoming cache on wholesale replacement: reused ids may still hold outgoing pixels,
-      // regardless of reference diffs.
+      // Invalidate every incoming cache on wholesale replacement: reused ids may still hold outgoing pixels, regardless
+      // of reference diffs.
       for (const layerId of present) {
         cleanup.run(() => invalidateLayerCache(layerId));
       }
@@ -1746,9 +1737,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       cleanup.run(retainSpatialSurfaces);
       const floatLayerId = floatingSelection.get()?.layerId;
       if (floatLayerId && ids.includes(floatLayerId)) {
-        // The float's layer was replaced or removed. Drop the float rather than
-        // baking pixels into a layer whose content just changed underneath them;
-        // `cancel` is a no-op restore when the layer is already gone.
+        // The float's layer was replaced or removed. Drop the float rather than baking pixels into a layer whose
+        // content just changed underneath them; `cancel` is a no-op restore when the layer is already gone.
         cleanup.run(() => floatingSelection.cancel());
       }
       if (pixelEditController?.isOpenFor(ids)) {
@@ -1779,8 +1769,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         if (decision.kind === 'removed') {
           rasterController.deleteThumbnailKey(id);
           cleanup.run(() => dropLayer(id));
-          // Removed preview layers must drop decoded pixels and advance decode tokens so late results or restored
-          // ids cannot revive stale previews.
+          // Removed preview layers must drop decoded pixels and advance decode tokens so late results or restored ids
+          // cannot revive stale previews.
           cleanup.run(() => clearFilterPreview(id));
           if (decision.cancelTransformSession) {
             cleanup.run(cancelTransform);
@@ -1818,8 +1808,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     onSelectionChanged: (selectedLayerId) => {
       const cleanup = createCleanupAccumulator();
       if (selectedLayerId !== null && selectedLayerId !== lastSelectedLayerId) {
-        // A deletion/merge may choose a replacement after removing the current layer. Keep the surviving
-        // previous choice instead of replacing it with the removed id.
+        // A deletion/merge may choose a replacement after removing the current layer. Keep the surviving previous
+        // choice instead of replacing it with the removed id.
         if (
           engineMutationDepth === 0 &&
           lastSelectedLayerId !== null &&
@@ -1827,12 +1817,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         ) {
           stores.layerQuickSwitch.set({ ...stores.layerQuickSwitch.get(), previousLayerId: lastSelectedLayerId });
         }
-        // Internal selections do not change the return target, but the next explicit switch must return
-        // to the layer actually being left (including a deletion fallback or an automatically selected layer).
+        // Internal selections do not change the return target, but the next explicit switch must return to the layer
+        // actually being left (including a deletion fallback or an automatically selected layer).
         lastSelectedLayerId = selectedLayerId;
       }
-      // A float belongs to exactly one layer; selecting another banks it rather
-      // than leaving pixels in flight over a layer the user is no longer on.
+      // A float belongs to exactly one layer; selecting another banks it rather than leaving pixels in flight over a
+      // layer the user is no longer on.
       cleanup.run(() => floatingSelection.commit());
       cleanup.run(() => controlView.clear((id) => id !== selectedLayerId));
       const session = stores.transformSession.get();
@@ -1890,9 +1880,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     rasterController.setThumbnailKey(layer.id, getLayerThumbnailDisplayKey(layer));
   }
 
-  // A guarded filter preview belongs to one continuous active-project epoch.
-  // Switching away invalidates published and in-flight work, so returning to
-  // this project cannot resurrect it.
+  // A guarded filter preview belongs to one continuous active-project epoch. Switching away invalidates published and
+  // in-flight work, so returning to this project cannot resurrect it.
   let projectWasPresent = mutationPort.getCanvasState() !== null;
   const unsubscribeProjectPreviewLifecycle = mutationPort.subscribe(() => {
     syncActiveFontSources();
@@ -1916,8 +1905,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     projectWasPresent = projectIsPresent;
   });
 
-  // During synchronous resize repaint, suppress viewport frame scheduling to avoid a second identical composite
-  // next animation frame.
+  // During synchronous resize repaint, suppress viewport frame scheduling to avoid a second identical composite next
+  // animation frame.
   let suppressViewportInvalidate = false;
 
   const unsubscribeViewport = viewport.subscribe(() => {
@@ -1977,8 +1966,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const interactionController = new InteractionController({
     beforeSwitch: (from, to, switchOptions) => {
-      // A REAL tool switch banks a float — the pixels are already cut, and
-      // carrying them into an unrelated tool would strand them. A temporary
+      // A REAL tool switch banks a float — the pixels are already cut, and carrying them into an unrelated tool would
+      // strand them. A temporary
       // modifier-hold switch (space → view to pan) must not: the user has not
       // finished the move.
       if (!switchOptions?.temporary) {
@@ -2011,9 +2000,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   /**
    * After gesture cancellation, Escape cancels defocused text editing, then transform, then a float, then the tool's
-   * own open session (a polygon between clicks), then an application operation, then selection. Focused portals
-   * handle Escape themselves. If a gesture or a tool session consumed Escape, preserve committed selection. Shared
-   * with pipeline wiring and node tests.
+   * own open session (a polygon between clicks), then an application operation, then selection. Focused portals handle
+   * Escape themselves. If a gesture or a tool session consumed Escape, preserve committed selection. Shared with
+   * pipeline wiring and node tests.
    */
   const handleEscapePriority = ({ gestureWasActive }: { gestureWasActive: boolean }): void => {
     if (colorSamples.onEscape()) {
@@ -2031,8 +2020,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       return;
     }
     if (floatingSelection.has()) {
-      // Escape restores lifted pixels while retaining selection; Enter, deselect and tool switches commit the
-      // float.
+      // Escape restores lifted pixels while retaining selection; Enter, deselect and tool switches commit the float.
       floatingSelection.cancel();
       return;
     }
@@ -2059,8 +2047,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     handleEscape: handleEscapePriority,
     hasTool: (id) => tools.has(id),
     isReplaying: () => history.isReplaying(),
-    // A primary-button pointerdown while a text-edit session is open commits it
-    // (engine reads the live portal content). The pipeline swallows that press.
+    // A primary-button pointerdown while a text-edit session is open commits it (engine reads the live portal content).
+    // The pipeline swallows that press.
     maybeCommitModalSession: () => commitOpenTextSession(),
     onGestureChange,
     setTool: (id, opts) => setTool(id, opts),
@@ -2081,9 +2069,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   // Lifecycle flushes reduce paint-loss exposure but cannot reliably block unload; invoke/export await the actual
   // barrier. Blur also resets held temporary tools.
   const kickPendingFlush = (): void => {
-    // Lifecycle events cannot await this best-effort flush. Real persistence
-    // failures are already reported through BitmapStore.onError; consume the
-    // rejection so pagehide/visibilitychange never creates an unhandled promise.
+    // Lifecycle events cannot await this best-effort flush. Real persistence failures are already reported through
+    // BitmapStore.onError; consume the rejection so pagehide/visibilitychange never creates an unhandled promise.
     void persistenceController.flush().catch(() => undefined);
   };
   const onPageHide = (): void => {
@@ -2173,8 +2160,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       },
       () => {
         if (!disposed && lifecycleGeneration === generation) {
-          // Retain the cooling state and live caches, but clear the completed
-          // attempt so a zero-reference registry entry can retry persistence.
+          // Retain the cooling state and live caches, but clear the completed attempt so a zero-reference registry
+          // entry can retry persistence.
           cooldownPromise = null;
         }
         return 'dirty';
@@ -2193,16 +2180,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     const backingWidth = Math.round(cssWidth * backingDpr);
     const backingHeight = Math.round(cssHeight * backingDpr);
     renderController.resize(backingWidth, backingHeight);
-    // Resize clears canvas pixels; force full recomposition in the same task to prevent a blank browser frame.
-    // Detached rendering is a no-op.
+    // Resize clears canvas pixels; force full recomposition in the same task to prevent a blank browser frame. Detached
+    // rendering is a no-op.
     render({ all: true, damage: FULL_DAMAGE, layers: new Set<string>(), overlay: true, view: true });
   };
 
   let hasEverFitToView = false;
 
   /**
-   * The document's navigable extent: the bbox (the empty-canvas anchor) joined with every enabled renderable
-   * layer's source bounds. Fit-to-view and the overview share it so both show the same canvas.
+   * The document's navigable extent: the bbox (the empty-canvas anchor) joined with every enabled renderable layer's
+   * source bounds. Fit-to-view and the overview share it so both show the same canvas.
    */
   const getDocumentExtent = (doc: CanvasDocumentContractV3): Rect => {
     let extent: Rect = { ...doc.bbox };
@@ -2224,8 +2211,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   /**
-   * Fit only once per engine. Kept-alive widgets reattach after layout switches, and the project engine preserves
-   * their existing zoom/pan.
+   * Fit only once per engine. Kept-alive widgets reattach after layout switches, and the project engine preserves their
+   * existing zoom/pan.
    */
   const fitToViewOnFirstShow = (): void => {
     if (hasEverFitToView) {
@@ -2246,9 +2233,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
    * Unreadable while an `unreadable` failure is recorded for the layer's current source, `not-ready` while it loads or
    * its image could not be fetched for now. The image is tried again in the background (a layer off screen or disabled
    * is never redrawn to do so), so one that became available recovers: at once after an `unavailable` failure, since
-   * the user asking again is the moment a recovered server should be noticed, and only once the backoff has ended
-   * after an `unreadable` one. A retry that fails again only restarts the backoff; a running job is joined, not
-   * duplicated.
+   * the user asking again is the moment a recovered server should be noticed, and only once the backoff has ended after
+   * an `unreadable` one. A retry that fails again only restarts the backoff; a running job is joined, not duplicated.
    */
   const layerCacheReadinessForOp = (layer: CanvasLayerContract, doc: CanvasDocumentContractV3): LayerCacheReadiness => {
     if (isLayerCacheReadyForOp(layer, doc)) {
@@ -2274,14 +2260,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     const { layerId } = prepared;
     const target = layerCache.installReplacement(prepared);
 
-    // After prepared cache installation and document dispatch, observer, scheduler and persistence hooks only
-    // notify; their failures cannot veto the completed transaction.
+    // After prepared cache installation and document dispatch, observer, scheduler and persistence hooks only notify;
+    // their failures cannot veto the completed transaction.
     const notifyBestEffort = (notify: () => void): void => {
       try {
         notify();
       } catch {
-        // The document and cache are already converged. A later render or dirty
-        // mark can retry ancillary work without reporting a false failed commit.
+        // The document and cache are already converged. A later render or dirty mark can retry ancillary work without
+        // reporting a false failed commit.
       }
     };
     notifyBestEffort(() => deleteDerivedSurfaces(layerId));
@@ -2383,10 +2369,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     const entry = layerCache.get(layer.id);
     if (!entry || isEmpty(entry.rect)) {
-      // Persistence clearing is failure-tolerant: the live cache may already be
-      // empty while the contract still names the old bitmap. The cache is the
-      // pixel authority in that state, so the duplicate must explicitly start
-      // empty rather than resurrecting the durable image.
+      // Persistence clearing is failure-tolerant: the live cache may already be empty while the contract still names
+      // the old bitmap. The cache is the pixel authority in that state, so the duplicate must explicitly start empty
+      // rather than resurrecting the durable image.
       if (source.type === 'paint' && bitmapStore.hasPendingClear(layer.id)) {
         return { type: 'empty' };
       }
@@ -2571,8 +2556,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const beginTransformSession = (layerId: string): void => editingController.transform.begin(layerId);
   const updateTransformSession = (transform: LayerTransform): void => editingController.transform.update(transform);
-  // A framed float is the session — Apply banks it, Cancel abandons it. Only
-  // with no float in flight do these reach the layer transform session.
+  // A framed float is the session — Apply banks it, Cancel abandons it. Only with no float in flight do these reach the
+  // layer transform session.
   const cancelTransform = (): void => {
     if (floatingSelection.has()) {
       floatingSelection.cancel();
@@ -2588,14 +2573,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     editingController.transform.apply();
   };
 
-  // Text sessions expose a portal with DOM-owned typing until commit. Creation/add or source update records one
-  // undo entry; unchanged edits and empty creation cancel. Live style changes remain in session state.
+  // Text sessions expose a portal with DOM-owned typing until commit. Creation/add or source update records one undo
+  // entry; unchanged edits and empty creation cancel. Live style changes remain in session state.
 
   const setTextEditContentReader = (reader: (() => string) | null): void =>
     editingController.text.setContentReader(reader);
   const openTextCreate = (point: Vec2): void => editingController.text.openCreate(point);
-  // The pane keeps styling the layer after the portal's blur commits the
-  // session, so opening an edit also makes that layer the document selection.
+  // The pane keeps styling the layer after the portal's blur commits the session, so opening an edit also makes that
+  // layer the document selection.
   const openTextEdit = (layerId: string): void => {
     editingController.text.openEdit(layerId);
     if (stores.textEditSession.get()?.layerId === layerId && mirror.getDocument()?.selectedLayerId !== layerId) {
@@ -2614,8 +2599,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
    * Select-all and invert use content union bbox as their bounded domain, matching fit-to-view and anchoring empty
    * canvases.
    */
-  // Commit live floats before selection operations so they see displayed pixels; Escape instead abandons the
-  // float.
+  // Commit live floats before selection operations so they see displayed pixels; Escape instead abandons the float.
   const selectAll = (): void => {
     floatingSelection.commit();
     editingController.selectAll();
@@ -2661,8 +2645,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const pasteImage = (pixels: ImageData, center?: Vec2): NewRasterLayerResult => {
     floatingSelection.commit();
     const doc = mirror.getDocument();
-    // Centred on the generation frame by default — the part of an unbounded
-    // canvas the user is actually composing in.
+    // Centred on the generation frame by default — the part of an unbounded canvas the user is actually composing in.
     const target =
       center ?? (doc ? { x: doc.bbox.x + doc.bbox.width / 2, y: doc.bbox.y + doc.bbox.height / 2 } : undefined);
     return layerController.newRasterLayer.pasteImage(pixels, 'Pasted', 'Paste', target);
@@ -2759,8 +2742,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   const clearCaches = async (): Promise<void> => {
-    // Flush paint before invalidating caches; otherwise rerasterizing the older persisted source would erase
-    // unuploaded strokes.
+    // Flush paint before invalidating caches; otherwise rerasterizing the older persisted source would erase unuploaded
+    // strokes.
     await persistenceController.flush();
     const doc = mirror.getDocument();
     for (const layer of getDocumentLeaves(doc)) {
@@ -2792,8 +2775,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   /**
-   * Menus target the selected layer without hit testing. Suppress them during gestures, transforms and text
-   * editing, when right-click belongs to the interaction.
+   * Menus target the selected layer without hit testing. Suppress them during gestures, transforms and text editing,
+   * when right-click belongs to the interaction.
    */
   const canTargetLayerFromContextMenu = (): boolean =>
     !pipeline.isGestureActive() &&
@@ -3095,8 +3078,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (isEmpty(extent)) {
       return null;
     }
-    // Overview requests missing offscreen caches and repaints after publication. Attempt each layer once per
-    // document to avoid repeated failures; never pin against memory-budget eviction.
+    // Overview requests missing offscreen caches and repaints after publication. Attempt each layer once per document
+    // to avoid repeated failures; never pin against memory-budget eviction.
     if (overviewRequestedDoc !== doc) {
       overviewRequestedDoc = doc;
       overviewRequestedLayerIds.clear();

@@ -23,10 +23,9 @@ const handleRefresh = () => {
 export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
   const { t } = useTranslation();
   const { data, indexCounts, indexUpdatedAt, loadState } = imageMapStore.useSnapshot();
-  // Before the early return, and keyed on the array the store swaps wholesale.
-  // The footer re-renders on every index-progress tick, and those patch other
-  // snapshot keys and leave `data` identity intact — so the count runs once per
-  // points refresh rather than once per tick, which matters at 170k points.
+  // Before the early return, and keyed on the array the store swaps wholesale. The footer re-renders on every
+  // index-progress tick, and those patch other snapshot keys and leave `data` identity intact — so the count runs once
+  // per points refresh rather than once per tick, which matters at 170k points.
   const points = data?.points ?? NO_POINTS;
   const clusterSummary = useMemo(() => describeClusters(summarizeClusters(points), t), [points, t]);
 

@@ -104,8 +104,8 @@ const CanvasShortcutHintRegistration = ({
 };
 
 /**
- * Wire reducer chrome, commands, settings, and staging around the pixel/input engine. Properties owns tool
- * settings; {@link CanvasHeaderActions} owns view controls.
+ * Wire reducer chrome, commands, settings, and staging around the pixel/input engine. Properties owns tool settings;
+ * {@link CanvasHeaderActions} owns view controls.
  */
 export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const { t } = useTranslation();
@@ -129,13 +129,11 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   // Warm the split invocation chunk when Canvas mounts so the first submission need not download it.
   useMountEffect(preloadCanvasInvocation);
 
-  // Right-click on the canvas surface targets the selected layer (the panel is
-  // the sole authority; the stack is never hit-tested) and opens either the
-  // shared per-layer menu or the global menu at the pointer.
+  // Right-click on the canvas surface targets the selected layer (the panel is the sole authority; the stack is never
+  // hit-tested) and opens either the shared per-layer menu or the global menu at the pointer.
   const [contextMenuTarget, setContextMenuTarget] = useState<CanvasContextMenuTarget | null>(null);
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
-  // Feed model grid policy into the model-agnostic engine using primitive selectors for value-stable
-  // subscriptions.
+  // Feed model grid policy into the model-agnostic engine using primitive selectors for value-stable subscriptions.
   const modelBase = useActiveProjectSelector((project) => {
     const values = getProjectWidgetValues(project, 'generate') as { model?: { base?: unknown } } | undefined;
     return typeof values?.model?.base === 'string' ? values.model.base : null;
@@ -156,20 +154,19 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       return;
     }
     for (const setting of CANVAS_SETTINGS) {
-      // Only engine-backed settings feed a store; settings consumed elsewhere
-      // in the frontend have no store and are skipped here.
+      // Only engine-backed settings feed a store; settings consumed elsewhere in the frontend have no store and are
+      // skipped here.
       if (setting.store) {
         engine.interaction.set(setting.store, settings[setting.key]);
       }
     }
   }, [engine, settings]);
 
-  // The pair↔engine bridge lives in a null child so per-pointermove pair
-  // edits never re-render this shell; the commands feed the X/D hotkeys below.
+  // The pair↔engine bridge lives in a null child so per-pointermove pair edits never re-render this shell; the commands
+  // feed the X/D hotkeys below.
   const colorCommands = useActiveColorCommands();
 
-  // Resolve checker colors from live theme tokens after ThemeController updates data-theme, then feed the engine
-  // store.
+  // Resolve checker colors from live theme tokens after ThemeController updates data-theme, then feed the engine store.
   const themeId = useWorkbenchSettingsSelector((snapshot) => snapshot.preferences.themeId);
   useEffect(() => {
     engine?.interaction.set('checkerColors', resolveCheckerColors());
@@ -196,9 +193,9 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const isDocumentEditingLocked = operationKind !== null;
   const canAcceptStagedImage = engine !== null && selectedCandidate !== undefined && !isDocumentEditingLocked;
 
-  // Files dragged in from the desktop show the gallery drag's zones and land the same way once uploaded. The upload
-  // and import load on the first drop, keeping them out of Canvas startup. A canvas held by a running operation shows
-  // no zones, so it takes no drop; the overlay says why.
+  // Files dragged in from the desktop show the gallery drag's zones and land the same way once uploaded. The upload and
+  // import load on the first drop, keeping them out of Canvas startup. A canvas held by a running operation shows no
+  // zones, so it takes no drop; the overlay says why.
   const queryClient = useQueryClient();
   const startDroppedFileUpload = useDroppedFileUpload({
     pendingKey: 'widgets.canvas.fileDrop.pending',
@@ -265,8 +262,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         return;
       }
 
-      // Capture the destination project and mounted engine before any network
-      // work so a project switch cannot retarget this import mid-flight.
+      // Capture the destination project and mounted engine before any network work so a project switch cannot retarget
+      // this import mid-flight.
       const project = queries.getSnapshot().activeProject;
       const mountedEngine = engine;
 
@@ -438,8 +435,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     [canvasDispatch]
   );
 
-  // "Show progress on canvas" gates ONLY the selected placeholder's live denoise
-  // frame; a selected finished candidate still previews (that's staging, not progress).
+  // "Show progress on canvas" gates ONLY the selected placeholder's live denoise frame; a selected finished candidate
+  // still previews (that's staging, not progress).
   const selectedPlaceholderProgressImage = useQueueItemProgressImage(
     selectedPlaceholder?.queueItemId ?? '',
     selectedPlaceholder?.itemIndex ?? 0
@@ -462,8 +459,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   useEffect(() => {
     applyStagedPreview();
   }, [engine, previewKey]);
-  // Clear the preview when the widget (or engine) goes away, so an accepted /
-  // discarded candidate never lingers over the canvas.
+  // Clear the preview when the widget (or engine) goes away, so an accepted / discarded candidate never lingers over
+  // the canvas.
   useEffect(() => {
     return () => engine?.previews.setStagedPreview(null);
   }, [engine]);

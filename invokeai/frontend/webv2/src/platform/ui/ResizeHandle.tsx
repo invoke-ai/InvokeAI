@@ -110,8 +110,8 @@ export const beginPointerDrag = (
 };
 
 /**
- * Owns one gesture at a time and ends it silently when the component unmounts. The returned controller lets the
- * caller end the gesture early, without `onEnd`, when what it was dragging stops making sense.
+ * Owns one gesture at a time and ends it silently when the component unmounts. The returned controller lets the caller
+ * end the gesture early, without `onEnd`, when what it was dragging stops making sense.
  */
 export const usePointerDrag = (): ((
   event: ReactPointerEvent<HTMLElement>,
@@ -355,9 +355,8 @@ const toCssProperty = (property: NonNullable<ResizeHandleProps['sizeProperty']>)
   property === 'flexBasis' ? 'flex-basis' : property;
 
 /**
- * A window's bottom-right resize grip: the labelled, keyboard-operable handle. The caller owns the pointer
- * gesture, so it runs on the same path as the window's other handles, and marks the grip `data-dragging` while
- * it does.
+ * A window's bottom-right resize grip: the labelled, keyboard-operable handle. The caller owns the pointer gesture, so
+ * it runs on the same path as the window's other handles, and marks the grip `data-dragging` while it does.
  */
 export const ResizeCorner = ({
   label,

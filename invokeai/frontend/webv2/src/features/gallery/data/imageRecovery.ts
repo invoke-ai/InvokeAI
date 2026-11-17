@@ -5,16 +5,16 @@ import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/acco
 /** Gathers the failures a screen of images reports together into one probe. */
 const GALLERY_IMAGE_PROBE_FIRST_DELAY_MS = 2_000;
 /**
- * The waits between probes while the server is not serving images yet (409 during a move, or down while it
- * restarts); the last repeats for as long as that lasts.
+ * The waits between probes while the server is not serving images yet (409 during a move, or down while it restarts);
+ * the last repeats for as long as that lasts.
  */
 const GALLERY_IMAGE_PROBE_BUSY_DELAYS_MS: readonly number[] = [15_000, 30_000];
 
 /** Probing for one account lifetime; dropped with it. */
 interface ImageRecoveryProbe {
   /**
-   * Failed image URLs waiting for the server to serve images again, oldest first, each with the recovery revision
-   * its failed load carried (0 for the plain URL).
+   * Failed image URLs waiting for the server to serve images again, oldest first, each with the recovery revision its
+   * failed load carried (0 for the plain URL).
    */
   readonly failed: Map<string, number>;
   /** Waiting answers since the last success, which pick the next wait. */
@@ -89,8 +89,8 @@ const schedule = (current: ImageRecoveryProbe, delayMs: number): void => {
 const WAITING_STATUSES = new Set([409, 502, 503, 504]);
 
 /**
- * The probe's answer: `wait` while the server cannot serve images yet, `served` once it serves the image again,
- * `other` for anything that will not change by waiting (missing, refused, or a page in place of the image).
+ * The probe's answer: `wait` while the server cannot serve images yet, `served` once it serves the image again, `other`
+ * for anything that will not change by waiting (missing, refused, or a page in place of the image).
  */
 const readAnswer = async (url: string, signal: AbortSignal): Promise<'other' | 'served' | 'wait'> => {
   let response: Response;
@@ -98,8 +98,8 @@ const readAnswer = async (url: string, signal: AbortSignal): Promise<'other' | '
   try {
     response = await fetch(url, { cache: 'no-store', signal });
   } catch {
-    // No answer at all: a server restarting mid-move refuses connections until it is back. An abort from the owner
-    // also lands here; its probe is already dropped and does not reschedule.
+    // No answer at all: a server restarting mid-move refuses connections until it is back. An abort from the owner also
+    // lands here; its probe is already dropped and does not reschedule.
     return 'wait';
   }
 
@@ -139,8 +139,8 @@ const runProbe = async (current: ImageRecoveryProbe): Promise<void> => {
     return;
   }
 
-  // An image whose failed load already carried the current recovery revision failed after the server served it
-  // again: it is broken, not waiting, and another reload would not help.
+  // An image whose failed load already carried the current recovery revision failed after the server served it again:
+  // it is broken, not waiting, and another reload would not help.
   const isFreshFailure = failedRevision === 0 || failedRevision < recoveryRevision;
 
   if (answer === 'served' && isFreshFailure) {
@@ -159,12 +159,12 @@ const runProbe = async (current: ImageRecoveryProbe): Promise<void> => {
 };
 
 /**
- * An image element failed to load `url`, carrying recovery `revision` (0 for the plain URL). An element cannot see
- * why, and during an image move the server answers every image read with 409 for minutes. One probe per account
- * lifetime asks for one failed URL at a time with a request that can see the status: while the server cannot serve
- * images (409, 502-504, no connection) the probe keeps asking, paused while the tab is hidden; a success raises the
- * recovery revision so every image that failed before it reloads once; any other answer drops that URL. An account
- * change stops the probe and forgets its URLs.
+ * An image element failed to load `url`, carrying recovery `revision` (0 for the plain URL). An element cannot see why,
+ * and during an image move the server answers every image read with 409 for minutes. One probe per account lifetime
+ * asks for one failed URL at a time with a request that can see the status: while the server cannot serve images (409,
+ * 502-504, no connection) the probe keeps asking, paused while the tab is hidden; a success raises the recovery
+ * revision so every image that failed before it reloads once; any other answer drops that URL. An account change stops
+ * the probe and forgets its URLs.
  */
 export const reportGalleryImageFailure = (
   url: string,

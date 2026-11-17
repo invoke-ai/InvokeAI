@@ -122,11 +122,11 @@ export class TransformEditingController {
   }
 
   /**
-   * Opens a session on `layerId` now, whatever tool is active: selects it, enters the tool and opens the session
-   * even when transform is already active, cancelling a session on another layer. Every refusal is decided before
-   * the selection or tool changes. A leaf whose only content is a stroke persistence has not acknowledged yet (a new
-   * paint layer's first upload) has no persisted extent to frame, so the request waits in `pending` and the session
-   * opens once the bitmap lands.
+   * Opens a session on `layerId` now, whatever tool is active: selects it, enters the tool and opens the session even
+   * when transform is already active, cancelling a session on another layer. Every refusal is decided before the
+   * selection or tool changes. A leaf whose only content is a stroke persistence has not acknowledged yet (a new paint
+   * layer's first upload) has no persisted extent to frame, so the request waits in `pending` and the session opens
+   * once the bitmap lands.
    */
   request(layerId: string): BeginTransformResult {
     const document = this.deps.getDocument();
@@ -161,8 +161,8 @@ export class TransformEditingController {
   }
 
   /**
-   * Every document change settles a wait: the session opens once the layer's pixels are persisted, if it is still
-   * the selection, transform is the tool the user is on and no session opened meanwhile; otherwise the wait ends.
+   * Every document change settles a wait: the session opens once the layer's pixels are persisted, if it is still the
+   * selection, transform is the tool the user is on and no session opened meanwhile; otherwise the wait ends.
    */
   onDocumentChanged(): void {
     const layerId = this.deps.pending.get();

@@ -16,7 +16,8 @@ import { ProjectActionsMenuBody } from './ProjectActionsMenu';
 import { useProjectCardActions } from './useProjectCardActions';
 
 // The dialog reads the gallery's board query, and this host sits in a boot graph the performance gates pin by source
-// file, so even a shared three-line wrapper module would register as growth. Loaded the first time a delete is asked for.
+// file, so even a shared three-line wrapper module would register as growth. Loaded the first time a delete is asked
+// for.
 const LazyDeleteProjectDialog = lazy(() =>
   import('@workbench/projects/components/DeleteProjectDialog').then((module) => ({
     default: module.DeleteProjectDialog,
@@ -217,8 +218,8 @@ const HostedProjectActionsMenu = ({
   const handleOpenChange = useCallback(
     (event: { open: boolean }) => {
       if (!event.open) {
-        // Focus would otherwise drop to the body (Escape, item select). When
-        // an outside click moved it already, leave the browser's target alone.
+        // Focus would otherwise drop to the body (Escape, item select). When an outside click moved it already, leave
+        // the browser's target alone.
         if (document.activeElement?.closest('[data-scope="menu"]')) {
           request.returnFocus?.focus();
         }

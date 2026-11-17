@@ -63,8 +63,8 @@ export interface CanvasStagingAreaContract {
   areThumbnailsVisible: boolean;
 }
 
-// Four top-first stack forests hold raster, control, regional guidance and inpaint nodes. Leaves use transforms
-// and stable image names, never ephemeral URLs. Groups gate descendant enabled, locked and hidden state.
+// Four top-first stack forests hold raster, control, regional guidance and inpaint nodes. Leaves use transforms and
+// stable image names, never ephemeral URLs. Groups gate descendant enabled, locked and hidden state.
 
 export type CanvasBlendMode =
   | 'normal'
@@ -85,8 +85,8 @@ export type CanvasBlendMode =
   | 'luminosity';
 
 /**
- * Stable custom-font identity. Persist family and label for unresolved-font recovery; browser-only family aliases
- * are never persisted.
+ * Stable custom-font identity. Persist family and label for unresolved-font recovery; browser-only family aliases are
+ * never persisted.
  */
 export interface CanvasTextFontRef {
   id: string;
@@ -162,8 +162,8 @@ export type CanvasLayerSourceContract =
       width?: number;
       height?: number;
       /**
-       * Where the gradient sits in the extent (layer-local px): the midpoint of
-       * a linear ramp, or the radial center. Absent = the extent center.
+       * Where the gradient sits in the extent (layer-local px): the midpoint of a linear ramp, or the radial center.
+       * Absent = the extent center.
        */
       center?: { x: number; y: number };
       /** Linear stop distance or radial radius; absence fits the ramp to the extent. */
@@ -246,8 +246,9 @@ export type CanvasAdjustmentEntry =
        */
       grain: 'monochrome' | 'color' | 'chroma';
       /**
-       * `flat`: the same strength at every tone. `midtones`: strength scales by 4·Y′·(1 − Y′), with Y′ the Rec. 709 luma
-       * (0–1) of the pixel entering the noise pass, so grain is full at mid-grey and fades to none at black and white.
+       * `flat`: the same strength at every tone. `midtones`: strength scales by 4·Y′·(1 − Y′), with Y′ the Rec. 709
+       * luma (0–1) of the pixel entering the noise pass, so grain is full at mid-grey and fades to none at black and
+       * white.
        */
       response: 'flat' | 'midtones';
       /**
@@ -271,10 +272,10 @@ export type CanvasAdjustmentEntry =
       seed: number;
     })
   /**
-   * Spatial entries match the backend's Clarity, Texture and Contrast Dehaze nodes. Each reads a neighborhood of
-   * OKLab lightness across the owner's whole surface (layer-local pixels for a layer's stack, document pixels for a
-   * group's) within its alpha bounds, so unlike the entries above it is neither per-pixel nor region independent.
-   * `amount` is a percentage, −200 to 200 (0 is identity); out-of-range values are clamped when evaluated.
+   * Spatial entries match the backend's Clarity, Texture and Contrast Dehaze nodes. Each reads a neighborhood of OKLab
+   * lightness across the owner's whole surface (layer-local pixels for a layer's stack, document pixels for a group's)
+   * within its alpha bounds, so unlike the entries above it is neither per-pixel nor region independent. `amount` is a
+   * percentage, −200 to 200 (0 is identity); out-of-range values are clamped when evaluated.
    */
   | (CanvasAdjustmentEntryBase & {
       /** Local contrast of mid-size detail, midtones weighted. `size`: feature size in pixels, 4–1000. */
@@ -328,8 +329,8 @@ export interface CanvasMaskContract {
 }
 
 /**
- * Singleton regenerate region using the raster layer's live alpha as inpaint coverage. It follows strokes, erasure
- * and transforms, contributes while the layer does, and stores only overlay fill. Absence means never added.
+ * Singleton regenerate region using the raster layer's live alpha as inpaint coverage. It follows strokes, erasure and
+ * transforms, contributes while the layer does, and stores only overlay fill. Absence means never added.
  */
 export interface CanvasLayerRegionContract {
   isEnabled: boolean;
@@ -357,12 +358,10 @@ export interface CanvasControlDetectionContract {
 }
 
 /**
- * Control layers may derive their map from a kept original. Invariants (`document/controlDerivation.ts`):
- * I1 no `controlType` ⇒ no `detection`, `original` or `originalTransform`;
- * I2 `detection === null` ⇒ no `original`: `source` is used as-is;
- * I3 `original` present ⇒ `detection` is an object and `source` is the map derived from it;
- * I4 the map is current when `detection` is null or absent, or an `original` is kept and `filter` structurally equals
- * `detection`;
+ * Control layers may derive their map from a kept original. Invariants (`document/controlDerivation.ts`): I1 no
+ * `controlType` ⇒ no `detection`, `original` or `originalTransform`; I2 `detection === null` ⇒ no `original`: `source`
+ * is used as-is; I3 `original` present ⇒ `detection` is an object and `source` is the map derived from it; I4 the map
+ * is current when `detection` is null or absent, or an `original` is kept and `filter` structurally equals `detection`;
  * I5 detection runs on `original ?? (filter ? null : source)`, so map-only layers cannot re-detect.
  */
 export interface CanvasControlLayerContract extends CanvasLayerBaseContract {
@@ -374,8 +373,8 @@ export interface CanvasControlLayerContract extends CanvasLayerBaseContract {
   /** The filter that produced `source`'s pixels; absent when they are not a filter result. */
   filter?: CanvasControlDetectionContract;
   /**
-   * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers
-   * instead use `isEnabled` for both visibility and participation.
+   * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers instead
+   * use `isEnabled` for both visibility and participation.
    */
   isHidden?: boolean;
   /** What the image controls. Absent means no type chosen (legacy or new); never written as null. */
@@ -397,8 +396,8 @@ export interface CanvasControlLayerContract extends CanvasLayerBaseContract {
 export const CANVAS_REGIONAL_LAYOUT_KINDS = ['object', 'character', 'text'] as const;
 
 /**
- * A region's role for models that compose the image from layout boxes (MOSS-Image). `text` is the exact visible text
- * of a `text` region; other kinds keep it so switching back restores it.
+ * A region's role for models that compose the image from layout boxes (MOSS-Image). `text` is the exact visible text of
+ * a `text` region; other kinds keep it so switching back restores it.
  */
 export interface CanvasRegionalLayoutContract {
   kind: (typeof CANVAS_REGIONAL_LAYOUT_KINDS)[number];
@@ -415,8 +414,8 @@ export interface CanvasRegionalGuidanceLayerContract extends CanvasLayerBaseCont
   /** Layout role for layout-based models; absence means an object region. Mask-based models ignore it. */
   layout?: CanvasRegionalLayoutContract;
   /**
-   * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers
-   * instead use `isEnabled` for both visibility and participation.
+   * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers instead
+   * use `isEnabled` for both visibility and participation.
    */
   isHidden?: boolean;
 }
@@ -440,8 +439,8 @@ export interface CanvasInpaintMaskLayerContract extends CanvasLayerBaseContract 
   noise?: CanvasMaskNoiseContract;
   denoise?: CanvasMaskDenoiseContract;
   /**
-   * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers
-   * instead use `isEnabled` for both visibility and participation.
+   * Display-only visibility for overlay layers; generation is unchanged. Absence means visible. Raster layers instead
+   * use `isEnabled` for both visibility and participation.
    */
   isHidden?: boolean;
 }
@@ -497,11 +496,10 @@ export const CANVAS_MAX_NODE_COUNT = 10_000;
 
 export interface CanvasDocumentContractV3 {
   /**
-   * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise or spatial
-   * (clarity, texture, dehaze) adjustments, 6 for control-layer derivation fields. Each document mutation raises it to
-   * the newer of its content's need and the canvas state's version. A restored snapshot's document keeps its own,
-   * possibly lower, version until the next mutation; the state's version and the project's compatibility floor stay
-   * put meanwhile.
+   * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise or spatial (clarity,
+   * texture, dehaze) adjustments, 6 for control-layer derivation fields. Each document mutation raises it to the newer
+   * of its content's need and the canvas state's version. A restored snapshot's document keeps its own, possibly lower,
+   * version until the next mutation; the state's version and the project's compatibility floor stay put meanwhile.
    */
   version: 3 | 4 | 5 | 6;
   width: number;
@@ -517,9 +515,9 @@ export interface CanvasDocumentContractV3 {
  * Why a restore point exists. `clear-canvas` holds the document (and any staged results) a Clear canvas replaced;
  * restoring it puts both back. `discard-results` holds staged results a Discard all dropped; restoring re-stages them
  * and leaves the document alone. A point without a kind restores like `clear-canvas`. A `discard-results` point lasts
- * one document session: its results are placed on that document, so a Clear canvas, any other document replacement
- * or an offset resize drops it. Restoring the replaced canvas later does not bring those results back; they remain
- * in the gallery.
+ * one document session: its results are placed on that document, so a Clear canvas, any other document replacement or
+ * an offset resize drops it. Restoring the replaced canvas later does not bring those results back; they remain in the
+ * gallery.
  */
 export type CanvasSnapshotKind = 'clear-canvas' | 'discard-results';
 
@@ -544,8 +542,8 @@ export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {
 
 export interface CanvasStateContractV3 {
   /**
-   * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's
-   * (3 plain, 4 custom-font typography, 5 noise or spatial adjustments, 6 control-layer derivation fields). Sticky:
+   * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's (3
+   * plain, 4 custom-font typography, 5 noise or spatial adjustments, 6 control-layer derivation fields). Sticky:
    * removing that content never lowers it.
    */
   version: 3 | 4 | 5 | 6;

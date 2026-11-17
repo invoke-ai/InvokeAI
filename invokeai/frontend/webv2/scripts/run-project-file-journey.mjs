@@ -295,8 +295,8 @@ const importArchive = async ({ archivePath, browser, contexts, errors, phase }) 
 };
 
 /**
- * Verify imports copy board media despite name collisions, reuse external references, and exclude
- * intermediate/other items.
+ * Verify imports copy board media despite name collisions, reuse external references, and exclude intermediate/other
+ * items.
  */
 const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory }) => {
   const sourceBoard = await getBoardSnapshot(sourceProjectId);
@@ -497,8 +497,8 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   assertNoBrowserErrors(errors);
 
   // The fixture was a schema-2 document with one `projectGraph`; export canonicalized it with that graph as the only
-  // workflow and no library write target, and import created it split, with the exporter's workspace as the
-  // importer's own.
+  // workflow and no library write target, and import created it split, with the exporter's workspace as the importer's
+  // own.
   assert.equal(imported.data.documentSchemaVersion, 4);
   assert.equal(imported.minimum_document_schema_version, 4);
   assert.equal(imported.data.workflows.entries.length, 1);
@@ -588,9 +588,9 @@ const runDuplication = async ({ browser, contexts, errors, imported, importedBoa
 };
 
 /**
- * The primary workflow journey: open a template into the project, edit it, switch away and back, save it to the
- * library under a new name, restart, and find both workflows intact. Project edits and runs issue no library writes;
- * the In this project view reads no library pages or records (the rail's one-row place totals and tag counts aside).
+ * The primary workflow journey: open a template into the project, edit it, switch away and back, save it to the library
+ * under a new name, restart, and find both workflows intact. Project edits and runs issue no library writes; the In
+ * this project view reads no library pages or records (the rail's one-row place totals and tag counts aside).
  */
 const runWorkflowCollection = async ({ browser, contexts, errors, imported }) => {
   const projectId = imported.project_id;
@@ -645,8 +645,8 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   const openProjectWorkflows = () => openWorkflowLibraryFromName(page);
   const currentWorkflowName = () => currentWorkflowNameOf(page);
 
-  // The migrated project owns exactly its old graph, marked active. Opening on In this project reads no library page
-  // (a listing of more than one row) and no workflow record; the rail's one-row place totals and tag counts may run.
+  // The migrated project owns exactly its old graph, marked active. Opening on In this project reads no library page (a
+  // listing of more than one row) and no workflow record; the rail's one-row place totals and tag counts may run.
   await openProjectWorkflows();
   assert.equal(await cards.count(), 1);
   await cards.first().locator('[data-active-workflow]').waitFor();
@@ -806,8 +806,8 @@ const isRecoverable = (page, marker) =>
   }, marker);
 
 /**
- * Edits made just before the page goes away survive a real unload. A rename commits at once and each navigation
- * follows its click immediately, normally well inside the autosave debounce, so the edit crosses in the unload journal.
+ * Edits made just before the page goes away survive a real unload. A rename commits at once and each navigation follows
+ * its click immediately, normally well inside the autosave debounce, so the edit crosses in the unload journal.
  */
 const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
   const context = await browser.newContext();
@@ -827,8 +827,8 @@ const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
   };
   const rename = (name) => renameActiveWorkflow(page, name);
 
-  // Navigating away: browser recovery holds the edit before any editor loads again. Saves to the server are held,
-  // so it is there only through the journal written while the page unloaded, or through an autosave's local stage.
+  // Navigating away: browser recovery holds the edit before any editor loads again. Saves to the server are held, so it
+  // is there only through the journal written while the page unloaded, or through an autosave's local stage.
   await openEditor();
   // Never answered: the page goes away with the request still open, so nothing is logged.
   const holdProjectSaves = (route) => (route.request().method() === 'PUT' ? new Promise(() => {}) : route.fallback());
@@ -961,9 +961,9 @@ const seedMediaUrls = async (projectId, base, [selected, compare, recent, staged
 };
 
 /**
- * A project saved at one origin opens at another (another computer, or `localhost` after `127.0.0.1`) with every
- * stored media URL rebuilt for the origin it opens at: nothing is requested from the first, which is out of reach, and
- * opening saves nothing. The next edits save the second origin's URLs.
+ * A project saved at one origin opens at another (another computer, or `localhost` after `127.0.0.1`) with every stored
+ * media URL rebuilt for the origin it opens at: nothing is requested from the first, which is out of reach, and opening
+ * saves nothing. The next edits save the second origin's URLs.
  */
 const runSecondOrigin = async ({ browser, contexts, errors, imported, importedBoardNames }) => {
   const imageNames = importedBoardNames.filter((name) => name.endsWith('.png'));
@@ -1147,8 +1147,8 @@ const getDefaultDependencies = () => ({
   killPreview,
   launchBrowser: ({ timeoutMs }) =>
     chromium.launch({
-      // `lan.test` reaches the preview without being a secure context; `localhost` is pinned to the address the
-      // preview binds, where a runner resolving it to `::1` first would find nothing.
+      // `lan.test` reaches the preview without being a secure context; `localhost` is pinned to the address the preview
+      // binds, where a runner resolving it to `::1` first would find nothing.
       args: [`--host-resolver-rules=MAP ${plainHttpHost} 127.0.0.1, MAP localhost 127.0.0.1`],
       headless: true,
       timeout: timeoutMs,

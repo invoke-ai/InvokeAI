@@ -1,6 +1,6 @@
 /**
- * Where a project still uses gallery media the user is about to delete. Deleting such media removes the backing
- * file under authored work, so the deletion flow must warn even when ordinary confirmations are turned off.
+ * Where a project still uses gallery media the user is about to delete. Deleting such media removes the backing file
+ * under authored work, so the deletion flow must warn even when ordinary confirmations are turned off.
  *
  * The scan fails safe. The surfaces the panel names are listed below; whatever else in the project names a selected
  * item counts too, as `otherProjectState`, unless an exclusion below says it only shows or records media. A field this
@@ -45,8 +45,8 @@ const STACK_KINDS = Object.keys(STACK_SURFACES) as StackKind[];
  * session state that is never saved. Typed against `Project`, so a new field fails to compile until it is placed here.
  */
 const PROJECT_FIELDS = {
-  // The listed surfaces read its layer stacks, staged results and each snapshot's document and staged results; the
-  // rest of it, a stack kind or snapshot field added later included, is scanned here.
+  // The listed surfaces read its layer stacks, staged results and each snapshot's document and staged results; the rest
+  // of it, a stack kind or snapshot field added later included, is scanned here.
   canvas: 'scanned',
   // Session-only run log; it names every generated image.
   events: 'excluded',
@@ -89,8 +89,8 @@ const without = <Value extends object>(record: Value, keys: readonly PropertyKey
 /**
  * The project without its excluded fields and without exactly what the listed surfaces scan (most of its bulk), so
  * anything they do not read, a stack kind or snapshot field added later included, is still scanned. Excluded within
- * scanned fields: Gallery instances (selection, recents, compare image, searches: they show media) and workflows'
- * last runs (a record of a run's output).
+ * scanned fields: Gallery instances (selection, recents, compare image, searches: they show media) and workflows' last
+ * runs (a record of a run's output).
  */
 const remainderRoots = (project: Project): unknown[] => {
   const { canvas, widgetInstances, workflows } = project;

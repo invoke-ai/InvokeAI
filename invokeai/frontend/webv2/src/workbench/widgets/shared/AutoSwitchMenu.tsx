@@ -29,7 +29,8 @@ const MODE_LABEL_KEYS: Record<AutoSwitchMode, string> = {
 /**
  * Each mode's shape says what it does, on the trigger and its menu item alike: Off is a crossed-out follow target (the
  * view stays put), In progress a live trace (it follows a generation as it streams), Newest the front of a stack (it
- * jumps to each finished result). Pin is not used for Off: the Preview filmstrip already marks a pinned session with it.
+ * jumps to each finished result). Pin is not used for Off: the Preview filmstrip already marks a pinned session with
+ * it.
  */
 const MODE_ICONS: Record<AutoSwitchMode, LucideIcon> = {
   latest: GalleryHorizontalEndIcon,

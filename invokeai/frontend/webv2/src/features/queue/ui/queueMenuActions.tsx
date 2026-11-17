@@ -76,8 +76,8 @@ interface QueueActionDescriptor extends Omit<QueueAction, 'trigger'> {
 }
 
 /**
- * The counts an action reports and confirms with, as far as it reaches for this viewer: unfinished work is the
- * viewer's own, or everyone's for an administrator; history is null where the server cannot count the viewer's part.
+ * The counts an action reports and confirms with, as far as it reaches for this viewer: unfinished work is the viewer's
+ * own, or everyone's for an administrator; history is null where the server cannot count the viewer's part.
  */
 export interface QueueActionCounts {
   history: { canceled: number; completed: number; failed: number; total: number } | null;
@@ -117,8 +117,8 @@ const withRunningItemKept = (t: TFunction, text: string, keepsRunningItem: boole
  * The confirmation policy, shared by the top bar, the queue widget, its menus and shortcuts. Cancelling the running
  * item is cheap and a Retry brings it back, so it never asks. Anything that stops or deletes many items asks first,
  * naming its scope and how many items it reaches; the way out never reads "Cancel" next to a cancel. Both bulk cancels
- * also stop this tab's runs the backend has not accepted yet, so they stay available offline while there are any;
- * such a run is never the current item, so cancel-all-except-current stops all of them.
+ * also stop this tab's runs the backend has not accepted yet, so they stay available offline while there are any; such
+ * a run is never the current item, so cancel-all-except-current stops all of them.
  */
 export const getQueueActionDescriptors = ({
   canManageProcessor,

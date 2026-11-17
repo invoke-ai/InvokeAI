@@ -1,9 +1,9 @@
 /**
  * Gradient drag defines linear start/end or radial center/radius. Editable selected gradients update placement in
- * layer-local space while preserving kind/stops/extent; locked or hidden gradients, and a selected mask or region
- * (a gradient is a raster layer of its own), refuse at the press, with the not-allowed cursor beforehand. Otherwise
- * create a bbox-sized gradient from options. Preview/cancel never dispatch; one real drag makes one commit. Selection
- * masks do not clip parametric gradients.
+ * layer-local space while preserving kind/stops/extent; locked or hidden gradients, and a selected mask or region (a
+ * gradient is a raster layer of its own), refuse at the press, with the not-allowed cursor beforehand. Otherwise create
+ * a bbox-sized gradient from options. Preview/cancel never dispatch; one real drag makes one commit. Selection masks do
+ * not clip parametric gradients.
  */
 
 import type { CanvasLayerEditRefusal } from '@workbench/canvas-engine/capabilities';
@@ -44,9 +44,8 @@ const angleFromDrag = (start: Vec2, end: Vec2): number =>
   (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI;
 
 /**
- * The placement a drag from `start` to `end` (layer-local px) gives a gradient:
- * a linear ramp is centered on the drag's midpoint and as long as the drag; a
- * radial one is centered on the press point with the drag length as radius.
+ * The placement a drag from `start` to `end` (layer-local px) gives a gradient: a linear ramp is centered on the drag's
+ * midpoint and as long as the drag; a radial one is centered on the press point with the drag length as radius.
  */
 export const placementFromDrag = (
   kind: 'linear' | 'radial',

@@ -12,8 +12,8 @@ import { useCallback, useId, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * The library's left rail: the places it browses, then the current place's tags as any-of checkboxes. Counts are
- * the place's own, never narrowed by the search or the checked tags, so checking a tag never changes its neighbours.
+ * The library's left rail: the places it browses, then the current place's tags as any-of checkboxes. Counts are the
+ * place's own, never narrowed by the search or the checked tags, so checking a tag never changes its neighbours.
  */
 
 const RAIL_WIDTH = '12.25rem';

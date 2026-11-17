@@ -63,11 +63,11 @@ interface ModelSwitchNotifier {
 }
 
 /**
- * Reports a switch that already happened, naming what it set aside, with an Undo that restores the earlier choices.
- * The Undo acts only while the project still uses the model the switch picked, and then puts back only the keys that
- * still hold what the switch wrote, so an edit made since (steps, size) is kept; a newer whole-form change withdraws it.
- * Call it right after the switch committed synchronously: what the project stores then is taken as what the switch
- * wrote, which the commit resolved and so may differ from `result.settings`.
+ * Reports a switch that already happened, naming what it set aside, with an Undo that restores the earlier choices. The
+ * Undo acts only while the project still uses the model the switch picked, and then puts back only the keys that still
+ * hold what the switch wrote, so an edit made since (steps, size) is kept; a newer whole-form change withdraws it. Call
+ * it right after the switch committed synchronously: what the project stores then is taken as what the switch wrote,
+ * which the commit resolved and so may differ from `result.settings`.
  */
 export const notifyGenerateModelSwitched = ({
   locale,

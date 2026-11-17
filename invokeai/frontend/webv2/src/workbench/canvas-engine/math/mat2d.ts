@@ -61,8 +61,8 @@ export const fromTRS = (translation: Vec2, rotationRad: number, scaleX: number, 
 };
 
 /**
- * Approximate uniform scale from the geometric mean of transformed unit-axis lengths; exact for uniform scale
- * without shear.
+ * Approximate uniform scale from the geometric mean of transformed unit-axis lengths; exact for uniform scale without
+ * shear.
  */
 export const getScale = (m: Mat2d): number => {
   const scaleX = Math.hypot(m.a, m.b);

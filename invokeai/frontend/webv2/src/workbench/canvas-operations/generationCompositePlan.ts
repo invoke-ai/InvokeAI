@@ -194,9 +194,9 @@ const deriveMaskKey = (kind: string, bbox: Rect, layers: CompositeMaskLayerRef[]
   `${kind}|${rectKey(bbox)}|${layers.map(maskLayerKey).join('|')}`;
 
 /**
- * Plan a base raster plus inpaint masks with content. Missing/disabled denoise means full denoise; enabled
- * regenerate regions add their own alpha at full denoise. Add a noise mask only for enabled noise modifiers;
- * absent/disabled noise is not zero, and regions add none.
+ * Plan a base raster plus inpaint masks with content. Missing/disabled denoise means full denoise; enabled regenerate
+ * regions add their own alpha at full denoise. Add a noise mask only for enabled noise modifiers; absent/disabled noise
+ * is not zero, and regions add none.
  */
 export const planComposites = (document: CanvasDocumentContractV3, bbox: Rect): CompositePlan => {
   const entries: CompositeEntry[] = [planBaseRasterComposite(document, bbox)];
@@ -256,8 +256,8 @@ const controlContentRect = (
 };
 
 /**
- * Force control contributions to opacity 1 and normal blend; display opacity, blend, and transparency effects must
- * not affect backend pixels or dedupe keys.
+ * Force control contributions to opacity 1 and normal blend; display opacity, blend, and transparency effects must not
+ * affect backend pixels or dedupe keys.
  */
 const toControlLayerRef = (layer: CanvasControlLayerContract, doc: CanvasDocumentContractV3): CompositeLayerRef => {
   const rect = controlContentRect(layer, doc);
@@ -285,8 +285,8 @@ export interface ControlCompositeEntry {
 }
 
 /**
- * Plan separate bbox composites for enabled controls with content. Never blend controls together or include them
- * in base-raster content.
+ * Plan separate bbox composites for enabled controls with content. Never blend controls together or include them in
+ * base-raster content.
  */
 export const planControlComposites = (document: CanvasDocumentContractV3, bbox: Rect): ControlCompositeEntry[] =>
   contributingLayers(document, isControlLayerWithContent).map((layer) => {
@@ -316,8 +316,7 @@ const regionalMaskContentRect = (
 };
 
 /**
- * Use opacity 1 and normal blend for regional alpha masks; display settings must not affect alpha_mask_to_tensor
- * input.
+ * Use opacity 1 and normal blend for regional alpha masks; display settings must not affect alpha_mask_to_tensor input.
  */
 const toRegionalMaskRef = (layer: CanvasRegionalGuidanceLayerContract): CompositeLayerRef => {
   const rect = regionalMaskContentRect(layer);

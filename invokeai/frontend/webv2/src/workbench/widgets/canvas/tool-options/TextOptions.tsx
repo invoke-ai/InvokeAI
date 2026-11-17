@@ -216,8 +216,8 @@ const textStyleOf = (options: TextToolOptions, owner: TextSource | null): TextTo
 });
 
 /**
- * Prefer live text session, selected text, then defaults. Style edits update defaults and the current owner;
- * unowned color edits change the foreground pair.
+ * Prefer live text session, selected text, then defaults. Style edits update defaults and the current owner; unowned
+ * color edits change the foreground pair.
  */
 const useTextEditor = (engine: ToolFormProps['engine']) => {
   const { t } = useTranslation();
@@ -254,8 +254,8 @@ const useTextEditor = (engine: ToolFormProps['engine']) => {
     [align, color, fontFamily, fontRef, fontSize, fontStyle, fontVariations, fontWeight, lineHeight]
   );
   const selectedId = selected?.id ?? null;
-  // Scrubbers keep the handler a gesture started with, so everything an edit builds on is read when it is written:
-  // an undo, hotkey or session change landing mid-gesture survives the release.
+  // Scrubbers keep the handler a gesture started with, so everything an edit builds on is read when it is written: an
+  // undo, hotkey or session change landing mid-gesture survives the release.
   const applyEdit = useCallback(
     (edit: TextEdit, commit: boolean) => {
       const liveSession = engine.interaction.get('textEditSession');
@@ -305,8 +305,8 @@ const useTextEditor = (engine: ToolFormProps['engine']) => {
 
 export const TextPreview = ({ engine }: ToolFormProps) => {
   const { active, content, targetName } = useTextEditor(engine);
-  // The instanced face the canvas rasterizes with; the engine keeps the
-  // session's, the document's and the defaults' faces active, so the load is shared.
+  // The instanced face the canvas rasterizes with; the engine keeps the session's, the document's and the defaults'
+  // faces active, so the load is shared.
   const face = useMemo((): TextSource => ({ ...active, content: '', type: 'text' }), [active]);
   const fontFamily = useResolvedTextFontFamily(engine.fonts, face);
   const style = useMemo(

@@ -36,8 +36,8 @@ const STAR_LABEL_KEYS = {
 } as const;
 
 /**
- * The selection's actions in the Preview header. An image gets Edit (every way to continue working with it) and Use
- * (it as an input, or its settings); a video gets Use alone. ⋮ then keeps only housekeeping: labelled at full density,
+ * The selection's actions in the Preview header. An image gets Edit (every way to continue working with it) and Use (it
+ * as an input, or its settings); a video gets Use alone. ⋮ then keeps only housekeeping: labelled at full density,
  * icon-only at compact, where compare moves into ⋮ too. Minimal density keeps star and the full ⋮ alone.
  */
 export const PreviewActionStrip = ({
@@ -245,8 +245,8 @@ const EditMenu = ({ actions, image, isIconOnly = false }: ItemMenuProps) => {
 };
 
 /**
- * What to take from the item: it as an input, or its recorded settings; for an image, with the viewer keys that do
- * the same.
+ * What to take from the item: it as an input, or its recorded settings; for an image, with the viewer keys that do the
+ * same.
  */
 const UseMenu = ({
   actions,

@@ -1,9 +1,9 @@
 /**
  * Shared brush/eraser gesture resolves or creates a target, drives a StrokeSession and commits/cancels. Only
- * gesture-start layer creation dispatches here; moves never dispatch. Fill/erase differ by blend and option
- * source. The eraser never creates a layer: a selection it cannot erase in place, or none, is refused. A Shift press
- * on a layer with a remembered stroke end draws a straight segment from it; the end is kept layer-local, so moving or
- * transforming the layer carries it.
+ * gesture-start layer creation dispatches here; moves never dispatch. Fill/erase differ by blend and option source. The
+ * eraser never creates a layer: a selection it cannot erase in place, or none, is refused. A Shift press on a layer
+ * with a remembered stroke end draws a straight segment from it; the end is kept layer-local, so moving or transforming
+ * the layer carries it.
  */
 
 import type { CanvasLayerEditRefusal } from '@workbench/canvas-engine/capabilities';
@@ -57,9 +57,9 @@ interface PaintTarget {
   /** Optional gesture color override; mask RGB is irrelevant because compositing colorizes alpha. */
   color?: string;
   /**
-   * True when the target is a transparency-LOCKED raster paint layer. The brush
-   * then composites `source-atop` (colour only on existing pixels); the eraser is
-   * refused (erasing would change the locked alpha). Never set for mask targets.
+   * True when the target is a transparency-LOCKED raster paint layer. The brush then composites `source-atop` (colour
+   * only on existing pixels); the eraser is refused (erasing would change the locked alpha). Never set for mask
+   * targets.
    */
   transparencyLocked?: boolean;
   /**
@@ -174,17 +174,16 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
       return refuse(ctx, selected, 'layer-loading');
     }
     const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
-    // No transform on purpose: materialization BAKES the layer's placement
-    // into document-space pixels and resets the layer to identity, so the
-    // session's document coordinates already are the cache's coordinates.
+    // No transform on purpose: materialization BAKES the layer's placement into document-space pixels and resets the
+    // layer to identity, so the session's document coordinates already are the cache's coordinates.
     return transaction
       ? editTarget(transaction, transaction.layerId, tool === 'brush' ? { transparencyLocked } : {})
       : null;
   }
 
   if (leaf && selected && isMaskLayer(selected)) {
-    // Paint mask alpha directly, adding/removing coverage. Locked/hidden masks refuse and never auto-create
-    // paint layers.
+    // Paint mask alpha directly, adding/removing coverage. Locked/hidden masks refuse and never auto-create paint
+    // layers.
     const refusal = leafPaintRefusal(leaf);
     if (refusal) {
       return refuse(ctx, selected, refusal);
@@ -257,8 +256,8 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
       edit.cancel();
       ctx.layers.delete(layerId);
       ctx.dispatch({ ids: [layerId], type: 'removeCanvasLayers' });
-      // The reducer's nearest-neighbour fallback would otherwise select whatever sits
-      // at the top, not what the user had selected when the gesture began.
+      // The reducer's nearest-neighbour fallback would otherwise select whatever sits at the top, not what the user had
+      // selected when the gesture began.
       ctx.dispatch({ id: previousSelectedLayerId, type: 'setCanvasSelectedLayer' });
     },
     createdLayer: { anchor, layer },
@@ -360,8 +359,7 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
           clipRect: ctx.getStrokeClipRect?.() ?? null,
           color: target.color ?? spec.color(ctx),
           composite,
-          // Mask strokes are an all-or-nothing stencil; a feathered edge would
-          // silently attenuate the denoise strength.
+          // Mask strokes are an all-or-nothing stencil; a feathered edge would silently attenuate the denoise strength.
           hardness: target.forceOpaque ? 1 : (spec.hardness?.(ctx) ?? 1),
           createdLayer: target.createdLayer ?? null,
           ctx,
@@ -373,8 +371,8 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
           // The session restored the layer; the target still removes a layer it created.
           onRefused: () => abortSession(),
           opacity: target.forceOpaque ? 1 : spec.opacity(ctx),
-          // A mask stroke is an all-or-nothing alpha stencil, so pressure must not thin it —
-          // a partially-transparent mask would silently attenuate the denoise strength.
+          // A mask stroke is an all-or-nothing alpha stencil, so pressure must not thin it — a partially-transparent
+          // mask would silently attenuate the denoise strength.
           pressureOpacity: !target.forceOpaque && (spec.pressureOpacity?.(ctx) ?? false),
           size: spec.size(ctx),
           thinning: spec.thinning(ctx),

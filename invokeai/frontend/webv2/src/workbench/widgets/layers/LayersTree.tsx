@@ -159,8 +159,8 @@ const anchorOfItem = (host: HTMLElement | null, key: string): LayerSurfaceAnchor
 const VirtualSlot = ({ children, size, start }: { children: ReactNode; size: number; start: number }) => {
   const style = useMemo(() => ({ height: size, top: start }), [size, start]);
   return (
-    // Absolute children ignore the container's padding; the slot carries the
-    // panel-edge inset itself, and the indicator and pinned header match it.
+    // Absolute children ignore the container's padding; the slot carries the panel-edge inset itself, and the indicator
+    // and pinned header match it.
     <Box left="1.5" position="absolute" right="1.5" role="presentation" style={style}>
       {children}
     </Box>
@@ -168,8 +168,8 @@ const VirtualSlot = ({ children, size, start }: { children: ReactNode; size: num
 };
 
 /**
- * Own subscriptions and commits in one virtualized tree with fixed rows, shared drag/menu hosts, and one roving
- * tab stop.
+ * Own subscriptions and commits in one virtualized tree with fixed rows, shared drag/menu hosts, and one roving tab
+ * stop.
  */
 export const LayersTree = ({
   degraded,
@@ -365,8 +365,8 @@ export const LayersTree = ({
     const { commitPrepared: commit } = latest.current;
     return commit(label, (model) => model.prepare(command));
   }, []);
-  // A child row's command is built from the engine's document inside the commit: a preview gesture open
-  // elsewhere has ended and been restored by then, so the row's siblings carry committed values, not previewed ones.
+  // A child row's command is built from the engine's document inside the commit: a preview gesture open elsewhere has
+  // ended and been restored by then, so the row's siblings carry committed values, not previewed ones.
   const runChildStructural = useCallback((label: string, child: ProjectedChildRow, action: LayerChildRowAction) => {
     const { commitPrepared: commit } = latest.current;
     return commit(label, (model) => {
@@ -388,8 +388,7 @@ export const LayersTree = ({
   const selectChildRow = useCallback(
     (child: Pick<ProjectedChildRow, 'itemId' | 'key' | 'layerId'>, reveal: boolean) => {
       const { dispatch: send, panel: current, projectId: project } = latest.current;
-      // The owner becomes the single selected layer, published before the
-      // dispatch so reconciliation keeps it.
+      // The owner becomes the single selected layer, published before the dispatch so reconciliation keeps it.
       publishLayerPanelSelection({ primaryId: child.layerId, projectId: project, selectedIds: [child.layerId] });
       panelSelectedPrimary.current = child.layerId;
       if (current.primaryId !== child.layerId) {
@@ -404,9 +403,9 @@ export const LayersTree = ({
     []
   );
 
-  // A drop or menu move; one that changes owner carries the sub-selection and focus to the item's new row,
-  // opening the groups and child rows that would hide it. The row exists only after the commit renders, so the
-  // focus effect scrolls to and focuses it then.
+  // A drop or menu move; one that changes owner carries the sub-selection and focus to the item's new row, opening the
+  // groups and child rows that would hide it. The row exists only after the commit renders, so the focus effect scrolls
+  // to and focuses it then.
   const commitChildMove = useCallback(
     (child: ProjectedChildRow, target: LayerChildDropTarget) => {
       const { commitPrepared: commit } = latest.current;
@@ -721,8 +720,8 @@ export const LayersTree = ({
     }
   }, []);
 
-  // A primary that changed outside the panel (canvas, undo, a new layer) is scrolled into view once,
-  // as soon as it has a row; later list changes leave the scroll position alone.
+  // A primary that changed outside the panel (canvas, undo, a new layer) is scrolled into view once, as soon as it has
+  // a row; later list changes leave the scroll position alone.
   useLayoutEffect(() => {
     if (!primaryId || revealedPrimary.current === primaryId) {
       return;
@@ -739,8 +738,8 @@ export const LayersTree = ({
     }
   }, [primaryId, rowIndexByKey]);
 
-  // Reveal external Properties requests, scroll after render, and open once; discard requests for removed nodes
-  // and, while an operation runs, for any layer but its target: the operation's panel supersedes them.
+  // Reveal external Properties requests, scroll after render, and open once; discard requests for removed nodes and,
+  // while an operation runs, for any layer but its target: the operation's panel supersedes them.
   useLayoutEffect(() => {
     if (!propertiesRequest) {
       pendingProperties.current = null;
@@ -858,8 +857,8 @@ export const LayersTree = ({
               ? overChild.kind === 'reference-image'
               : container.data.current?.stack === 'regional_guidance';
           }
-          // Adjustments land among any raster owner's adjustment rows (below its region row), or on a raster
-          // layer or group row to append; the drop plan asks the model about locks.
+          // Adjustments land among any raster owner's adjustment rows (below its region row), or on a raster layer or
+          // group row to append; the drop plan asks the model about locks.
           if (overChild) {
             return isOrderedChildKind(overChild.kind) || overChild.kind === 'layer-region';
           }
@@ -1005,8 +1004,8 @@ export const LayersTree = ({
       rows: stacks[drag.stack].rows,
     });
   }, [drag, stacks]);
-  // Cache drag validation by semantic move rather than equivalent visual gaps; clear on completion and revalidate
-  // the prepared landing against the latest document.
+  // Cache drag validation by semantic move rather than equivalent visual gaps; clear on completion and revalidate the
+  // prepared landing against the latest document.
   const refusalCommandKey = target ? JSON.stringify(reparentCommandForTarget(target)) : null;
   const refusal = useMemo(
     () =>
@@ -1208,8 +1207,8 @@ export const LayersTree = ({
             w="full"
           >
             {virtualItems.map((item) => {
-              // The window applies a changed key set one commit late; a slot draws the row its key
-              // names, never the row at its index, so no node is relabelled in between.
+              // The window applies a changed key set one commit late; a slot draws the row its key names, never the row
+              // at its index, so no node is relabelled in between.
               const rowIndex = rowIndexByKey.get(String(item.key));
               const panelRow = rowIndex === undefined ? undefined : panelRows[rowIndex];
               if (!panelRow) {

@@ -26,8 +26,8 @@ export interface ModelsUiSnapshot {
   /** Model focused in the manager library's detail pane. */
   activeModelKey: string | null;
   /**
-   * Whether the detail, not the library, is the pane shown when the manager is too narrow for both; null until the
-   * user opens or leaves one, when the manager decides from whether the library is empty.
+   * Whether the detail, not the library, is the pane shown when the manager is too narrow for both; null until the user
+   * opens or leaves one, when the manager decides from whether the library is empty.
    */
   detailOpen: boolean | null;
   /** Consume provider reveal once so returning to Keys does not replay an old highlight. */
@@ -79,9 +79,9 @@ registerAccountOwnedResource({
 });
 
 /**
- * Every opener reveals the detail and every clear returns to the library, so no caller has to remember the
- * single-pane state: setting a tab or a different model opens the detail; clearing the open model while its Details
- * tab shows closes it. An explicit `detailOpen` wins.
+ * Every opener reveals the detail and every clear returns to the library, so no caller has to remember the single-pane
+ * state: setting a tab or a different model opens the detail; clearing the open model while its Details tab shows
+ * closes it. An explicit `detailOpen` wins.
  */
 const withDetailOpen = (current: ModelsUiSnapshot, next: Partial<ModelsUiSnapshot>): Partial<ModelsUiSnapshot> => {
   if (next.detailOpen !== undefined) {
@@ -147,8 +147,8 @@ export const closeModelDetail = (): void => {
 };
 
 /**
- * Decide the starting pane once, when the library first loads: an empty library opens on Add Models, any other on
- * the list. Later installs and deletes never move the user; only openers and Back do.
+ * Decide the starting pane once, when the library first loads: an empty library opens on Add Models, any other on the
+ * list. Later installs and deletes never move the user; only openers and Back do.
  */
 export const settleInitialModelsPane = (isLibraryEmpty: boolean): void => {
   if (store.getSnapshot().detailOpen === null) {

@@ -1,6 +1,6 @@
 /**
- * After callers flush drafts and validate route/connection, send Canvas through async preparation and other
- * sources through reducer submission. Inject Canvas preparation to keep this decision independent of the engine.
+ * After callers flush drafts and validate route/connection, send Canvas through async preparation and other sources
+ * through reducer submission. Inject Canvas preparation to keep this decision independent of the engine.
  */
 
 import type { ParseDynamicPromptsResponse } from '@features/generation/prompts';
@@ -89,8 +89,8 @@ export interface SubmitResolvedInvocationDeps {
   /** Loaded models (or `undefined` while loading), forwarded verbatim to both paths. */
   models: readonly ModelConfig[] | undefined;
   /**
-   * The project workflow a workflow route submits. Captured with the project snapshot so a switch during
-   * generator resolution never submits another workflow; defaults to the snapshot's active workflow.
+   * The project workflow a workflow route submits. Captured with the project snapshot so a switch during generator
+   * resolution never submits another workflow; defaults to the snapshot's active workflow.
    */
   workflowId?: string;
   /** Identity lifetime that initiated this submission. */
@@ -149,8 +149,8 @@ const getPendingWorkflowGenerators = (
 };
 
 /**
- * Resolves the pending generators, the only asynchronous step before the reducer; their outputs travel with the
- * action and the planner re-checks them against the document it compiles.
+ * Resolves the pending generators, the only asynchronous step before the reducer; their outputs travel with the action
+ * and the planner re-checks them against the document it compiles.
  */
 const resolveWorkflowGeneratorsForRoute = async (
   project: Project,
@@ -231,11 +231,11 @@ export const submitResolvedInvocation = async ({
   }
 
   // The reducer resolves where results land (the auto-add board, a workflow node's board) from the cached board
-  // listing, so a board is judged from a listing and never trusted unseen. Any cached listing decides at once, a
-  // stale one refreshing in the background for the next run; only with none cached does a read start now, alongside
-  // generator resolution and prompt expansion, to be awaited as the run is dispatched. So this path is synchronous
-  // but for the first run after the listings were cleared, which the Invoke control shows as preparing. A run bound
-  // for the canvas names no board, unless it is a workflow, whose nodes carry their boards whatever the destination.
+  // listing, so a board is judged from a listing and never trusted unseen. Any cached listing decides at once, a stale
+  // one refreshing in the background for the next run; only with none cached does a read start now, alongside generator
+  // resolution and prompt expansion, to be awaited as the run is dispatched. So this path is synchronous but for the
+  // first run after the listings were cleared, which the Invoke control shows as preparing. A run bound for the canvas
+  // names no board, unless it is a workflow, whose nodes carry their boards whatever the destination.
   const pendingBoards =
     route.destination === 'gallery' || route.sourceId === 'workflow'
       ? ensureGalleryBoardDestinations(queryClient)
@@ -274,8 +274,7 @@ export const submitResolvedInvocation = async ({
       return;
     }
 
-    // Reject failed expansions for hotkey and preview callers too, so literal dynamic syntax never reaches
-    // generation.
+    // Reject failed expansions for hotkey and preview callers too, so literal dynamic syntax never reaches generation.
     if (expansion === null || expansion.error) {
       // A request that never answered has no server reason, so the notice says what failed instead.
       commands.notifications.add({
@@ -351,8 +350,8 @@ const dispatchResolvedInvocation = async (
   pendingBoards: Promise<void> | null,
   pendingUpscaleMetadata: Promise<UpscaleSourceMetadataRead> | null = null
 ): Promise<void> => {
-  // The board listing the destination is judged from, read while the rest was resolved when none was cached;
-  // nothing to wait for keeps the dispatch synchronous.
+  // The board listing the destination is judged from, read while the rest was resolved when none was cached; nothing to
+  // wait for keeps the dispatch synchronous.
   if (pendingBoards) {
     await pendingBoards;
     if (!isAccountScopeCurrent(owner)) {
@@ -380,8 +379,8 @@ const dispatchResolvedInvocation = async (
   }
 
   if (route.sourceId === 'canvas') {
-    // Await Canvas preparation to retain the submission guard until completion; pass the resolved destination so
-    // Canvas can output to Gallery.
+    // Await Canvas preparation to retain the submission guard until completion; pass the resolved destination so Canvas
+    // can output to Gallery.
     const canvasValues = getResolvedProjectWidgetValues(project, 'canvas', scopedDefaults);
     await prepareCanvasInvocation({
       compositing: readCanvasCompositingSettings(canvasValues),

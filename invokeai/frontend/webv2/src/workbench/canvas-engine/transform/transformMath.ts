@@ -14,8 +14,8 @@ import { snapMovedPoint } from '@workbench/canvas-engine/math/snapping';
 export type LayerTransform = CanvasLayerBaseContract['transform'];
 
 /**
- * All frames and anchors derive from local content rects, including negative paint offsets, never assumed
- * origin-zero bounds.
+ * All frames and anchors derive from local content rects, including negative paint offsets, never assumed origin-zero
+ * bounds.
  */
 export interface TransformRect {
   x: number;
@@ -112,9 +112,8 @@ const localOutward = (handle: TransformHandle): Vec2 => ({
 });
 
 /**
- * Geometry the overlay needs to draw the transform frame, in DOCUMENT space
- * (the overlay projects each point through the view). `handles` is ordered to
- * match {@link TRANSFORM_HANDLES}.
+ * Geometry the overlay needs to draw the transform frame, in DOCUMENT space (the overlay projects each point through
+ * the view). `handles` is ordered to match {@link TRANSFORM_HANDLES}.
  */
 export interface TransformOverlayGeometry {
   /** The four rotated-rect corners (nw, ne, se, sw) for the bounds polygon. */
@@ -202,8 +201,8 @@ export const transformTargetAt = (params: TransformHitTestParams): TransformTarg
     return { kind: 'move' };
   }
 
-  // Test the outward top-edge nub after interior and before corner rotate zones. Missing this hit would
-  // reopen/reset the session instead of rotating.
+  // Test the outward top-edge nub after interior and before corner rotate zones. Missing this hit would reopen/reset
+  // the session instead of rotating.
   const anchorScreen = screenOf('n');
   const centerScreen = toScreen(applyToPoint(m, { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 }));
   const outX = anchorScreen.x - centerScreen.x;
@@ -289,8 +288,8 @@ export interface ScaleParams {
 }
 
 /**
- * Scale about opposite handle or Alt center; edges affect one axis, Shift corners preserve aspect. Allow flips
- * with minimum absolute scale. Snap the handle's document target, not scale factors, to preserve the anchor.
+ * Scale about opposite handle or Alt center; edges affect one axis, Shift corners preserve aspect. Allow flips with
+ * minimum absolute scale. Snap the handle's document target, not scale factors, to preserve the anchor.
  */
 export const applyScale = (p: ScaleParams): LayerTransform => {
   const { alt, handle, rect, shift, start } = p;
@@ -299,9 +298,8 @@ export const applyScale = (p: ScaleParams): LayerTransform => {
   const anchorLocal = alt ? localCenter(rect) : localHandlePoint(rect, OPPOSITE[handle]);
   const anchorDoc = applyToPoint(m, anchorLocal);
   const handleDoc = applyToPoint(m, handleLocal);
-  // `snapMovedPoint`'s per-axis rule matters here too: an axis the pointer never
-  // moved along must keep its scale, or a purely horizontal corner drag would
-  // resize the layer vertically just because the handle did not start on a line.
+  // `snapMovedPoint`'s per-axis rule matters here too: an axis the pointer never moved along must keep its scale, or a
+  // purely horizontal corner drag would resize the layer vertically just because the handle did not start on a line.
   const targetDoc = snapMovedPoint(
     handleDoc,
     { x: p.pointerDoc.x - p.startPointerDoc.x, y: p.pointerDoc.y - p.startPointerDoc.y },
@@ -383,8 +381,8 @@ export const applyRotate = (p: RotateParams): LayerTransform => {
 };
 
 /**
- * Bake matrix maps local pixels through TRS into document space, preserving appearance when the layer transform
- * resets to identity.
+ * Bake matrix maps local pixels through TRS into document space, preserving appearance when the layer transform resets
+ * to identity.
  */
 export const bakeMatrix = (transform: LayerTransform): Mat2d => layerTransformMatrix(transform);
 

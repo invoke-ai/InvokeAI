@@ -156,8 +156,8 @@ export const SortableListStack = <Id extends string>({
 };
 
 /**
- * The handle sits in the row's leading slot, so the row's primary area must stay a plain container: the props that
- * make it a button (press, menu, List focus key) are left out, and the row acts through its `actions`.
+ * The handle sits in the row's leading slot, so the row's primary area must stay a plain container: the props that make
+ * it a button (press, menu, List focus key) are left out, and the row acts through its `actions`.
  */
 export interface SortableListItemProps extends Omit<
   ListItemProps,

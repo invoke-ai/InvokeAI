@@ -6,8 +6,8 @@ import { isExportableRasterLayer, isNodeHidden } from '@workbench/canvas-engine/
 export type StackActionId = 'mergeVisible' | 'cancelExportPsd' | 'exportPsd' | 'toggleVisibility' | 'new';
 
 /**
- * Offer merge/export only for raster stacks and hide/show only for overlays, where visibility must not disable
- * image content. Place New nearest the panel add menu.
+ * Offer merge/export only for raster stacks and hide/show only for overlays, where visibility must not disable image
+ * content. Place New nearest the panel add menu.
  */
 export const getStackActions = (stack: LayerStackKind): StackActionId[] => {
   if (stack === 'raster') {
@@ -23,9 +23,9 @@ export const canExportRasterPsd = (leaves: readonly CanvasLayerContract[]): bool
 export type StackVisibilityAxis = 'enabled' | 'hidden';
 
 /**
- * Which axis a stack's show/hide-all button drives. The three overlay stacks drive the DISPLAY
- * axis: their layers are drawn to show where an effect applies, so getting them out of the way
- * must not change the image. The raster stack IS the generation input, so it drives enablement.
+ * Which axis a stack's show/hide-all button drives. The three overlay stacks drive the DISPLAY axis: their layers are
+ * drawn to show where an effect applies, so getting them out of the way must not change the image. The raster stack IS
+ * the generation input, so it drives enablement.
  */
 export const stackVisibilityAxis = (stack: LayerStackKind): StackVisibilityAxis =>
   stack === 'raster' ? 'enabled' : 'hidden';
@@ -41,9 +41,9 @@ export const isStackAllVisible = (nodes: readonly SemanticNode[], axis: StackVis
   nodes.every((node) => node.kind === 'group' || isVisible(node, axis));
 
 /**
- * Plans a stack show/hide-all toggle as ONE reversible bulk edit. When every leaf is visible the
- * roots alone are turned off, so descendants keep their own flags; otherwise every node that is
- * off in its own right is turned on, so nothing stays gated behind an ancestor.
+ * Plans a stack show/hide-all toggle as ONE reversible bulk edit. When every leaf is visible the roots alone are turned
+ * off, so descendants keep their own flags; otherwise every node that is off in its own right is turned on, so nothing
+ * stays gated behind an ancestor.
  */
 export const planStackVisibilityToggle = (
   nodes: readonly SemanticNode[],

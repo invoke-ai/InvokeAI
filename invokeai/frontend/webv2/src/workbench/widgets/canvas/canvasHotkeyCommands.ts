@@ -44,9 +44,9 @@ import {
 /** Keys that act only while the Canvas itself holds focus; rows and fields own them elsewhere. */
 export const CANVAS_ONLY_HOTKEYS = [
   ...CANVAS_HISTORY_HOTKEYS,
-  // With several results staged or generating `alt+[` / `alt+]` step through them; otherwise they walk the layers.
-  // Left and right step through them too unless the Move or Transform tool is active (see STAGING_NUDGE_TOOLS); the
-  // other arrows always nudge, and Delete always acts on the document: the staging bar handles its own keys.
+  // With several results staged or generating `alt+[` / `alt+]` step through them; otherwise they walk the layers. Left
+  // and right step through them too unless the Move or Transform tool is active (see STAGING_NUDGE_TOOLS); the other
+  // arrows always nudge, and Delete always acts on the document: the staging bar handles its own keys.
   ['canvas.prevEntity', 'widgets.canvas.commands.previousEntity', ['alt+[']],
   ['canvas.nextEntity', 'widgets.canvas.commands.nextEntity', ['alt+]']],
   ['canvas.quickSwitch', 'widgets.canvas.commands.quickSwitch', ['q']],
@@ -109,8 +109,8 @@ const REORDER_KINDS: Record<string, LayerStackMoveKind> = {
 };
 
 /**
- * The layer `steps` away from the selection in layer order, wrapping. A selected group stands at its first
- * descendant leaf: next enters the group there, previous leaves it upward. None selected starts from either end.
+ * The layer `steps` away from the selection in layer order, wrapping. A selected group stands at its first descendant
+ * leaf: next enters the group there, previous leaves it upward. None selected starts from either end.
  */
 const cycleLayerId = (document: CanvasDocumentContractV3, steps: 1 | -1): string | null => {
   const { byId, leaves } = getDocumentIndex(document);
@@ -133,8 +133,8 @@ const cycleLayerId = (document: CanvasDocumentContractV3, steps: 1 | -1): string
 };
 
 /**
- * Q: the bookmarked layer when one is set and not already selected, else the previously selected layer. Ids whose
- * layer no longer exists are skipped rather than cleared, so a removed bookmark never selects nothing.
+ * Q: the bookmarked layer when one is set and not already selected, else the previously selected layer. Ids whose layer
+ * no longer exists are skipped rather than cleared, so a removed bookmark never selects nothing.
  */
 const quickSwitchLayerId = (document: CanvasDocumentContractV3, engine: CanvasEngine): string | null => {
   const { byId } = getDocumentIndex(document);
@@ -152,8 +152,8 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
   readonly engine: CanvasEngine | null;
   /**
    * More than one staging slot exists, so alt+[ / alt+] step through results (a placeholder shows its progress) instead
-   * of layers, and left / right do too outside the Move and Transform tools. With a single slot there is nothing to step
-   * to: they walk the layers and nudge as usual.
+   * of layers, and left / right do too outside the Move and Transform tools. With a single slot there is nothing to
+   * step to: they walk the layers and nudge as usual.
    */
   readonly hasMultipleStagingSlots: boolean;
   readonly selectedLayerIds: readonly string[];
@@ -291,8 +291,8 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   } else if (commandId === 'canvas.invertSelection') {
     engine?.selection.invertSelection();
   } else if (commandId === 'canvas.duplicateLayer') {
-    // With a live pixel selection, mod+J is "layer via copy" — it lifts just
-    // the selected pixels. With none, it duplicates the whole layer.
+    // With a live pixel selection, mod+J is "layer via copy" — it lifts just the selected pixels. With none, it
+    // duplicates the whole layer.
     if (engine?.interaction.get('hasSelection')) {
       const result = engine.selection.liftSelectionToLayer();
       if (result.status !== 'created' && result.status !== 'empty') {
@@ -320,8 +320,8 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
           ctx.reportLayerOperation(result.status === 'unreadable' ? result : result.status);
         })
         .catch(() => {
-          // The engine keeps rejected transactions atomic; route both rejection
-          // and preflight refusal through the same user-facing command feedback.
+          // The engine keeps rejected transactions atomic; route both rejection and preflight refusal through the same
+          // user-facing command feedback.
           ctx.notifyLayerDuplicateFailed();
         });
     }

@@ -18,11 +18,11 @@ import {
 
 /**
  * A library card is presentation only: the grid handles its click (select), double-click (open), right-click and menu
- * button (its own actions menu, which leaves the selection alone) and quick actions by delegation from the data attributes below, so a card renders again only
- * when its own entry or state changes. Reserve enrichment height so async facts cannot reflow the grid. Pointer hover
- * (and focus within the card) reveals quick actions over the top of the image: Open and Preview are pointer
- * conveniences outside the tab order that never take focus (the grid hands it to the card on press), and the menu
- * button beside them is the card's keyboard-reachable control.
+ * button (its own actions menu, which leaves the selection alone) and quick actions by delegation from the data
+ * attributes below, so a card renders again only when its own entry or state changes. Reserve enrichment height so
+ * async facts cannot reflow the grid. Pointer hover (and focus within the card) reveals quick actions over the top of
+ * the image: Open and Preview are pointer conveniences outside the tab order that never take focus (the grid hands it
+ * to the card on press), and the menu button beside them is the card's keyboard-reachable control.
  */
 
 const CARD_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const;
@@ -60,8 +60,8 @@ export const getWorkflowLibraryCardMenuId = (workflowId: string): string =>
   `${getWorkflowLibraryCardId(workflowId)}-menu`;
 
 /**
- * The card's actions menu content, named so the tile button can point at it: the dialog's focus trap only lets
- * focus into portalled content that an expanded control inside the dialog names with aria-controls.
+ * The card's actions menu content, named so the tile button can point at it: the dialog's focus trap only lets focus
+ * into portalled content that an expanded control inside the dialog names with aria-controls.
  */
 export const getWorkflowLibraryCardMenuContentId = (workflowId: string): string =>
   `${getWorkflowLibraryCardId(workflowId)}-actions`;
@@ -110,8 +110,8 @@ const QUICK_ACTION_INTERACTION = { bg: 'color-mix(in oklab, {colors.gray.hoverTi
 /**
  * The library's menus (a card's, the rail's More, the sheet's More) are siblings, never nested. Zag handles an outside
  * press a frame after its pointerdown, so a quick press on one menu's trigger while another is open opens the new menu
- * first; the old one then leaves the layer stack with the new one above it and would dismiss it as its nested layer.
- * A dismissal requested by a closing menu is ignored; a closing dialog still dismisses its menus.
+ * first; the old one then leaves the layer stack with the new one above it and would dismiss it as its nested layer. A
+ * dismissal requested by a closing menu is ignored; a closing dialog still dismisses its menus.
  */
 export const keepMenuOpenWhenSiblingMenuCloses = (event: {
   detail: { targetLayer: HTMLElement | undefined };
@@ -190,8 +190,8 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
     </Text>
   );
 
-  // The quick actions and menu button are siblings of the card button, never nested in it: a button cannot hold
-  // another control.
+  // The quick actions and menu button are siblings of the card button, never nested in it: a button cannot hold another
+  // control.
   return (
     <Box
       css={CARD_ROOT_CSS}

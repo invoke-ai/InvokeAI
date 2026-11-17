@@ -338,7 +338,8 @@ export const coerceSchedulerForGraph = (
 ): string => {
   const config = getBaseGenerationConfig(model);
 
-  // Some graph builders ignore scheduler entirely; coerce to stable metadata/defaults instead of leaking stale UI state.
+  // Some graph builders ignore scheduler entirely; coerce to stable metadata/defaults instead of leaking stale UI
+  // state.
   if (!config.schedulerAppliesToGraph) {
     return config.defaults.scheduler;
   }
@@ -446,8 +447,8 @@ const IMAGE_PROMPT_ENHANCERS: Partial<Record<string, ImagePromptEnhancer>> = {
     modelSource: 'google/gemma-4-E4B-it',
     systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011',
   },
-  // The text-only rewrite uses BFL's `t2i` system prompt; reference images and boxes only reach the upsampler node.
-  // The bf16 folder and ComfyUI's two single files (int8 convrot, bf16) are the same model.
+  // The text-only rewrite uses BFL's `t2i` system prompt; reference images and boxes only reach the upsampler node. The
+  // bf16 folder and ComfyUI's two single files (int8 convrot, bf16) are the same model.
   flux3: {
     modelFileNames: [
       'qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors',
@@ -509,8 +510,8 @@ export const isSupportedGenerateModel = <T extends { base: string; type: string 
   (model.type === 'external_image_generator' && model.base === 'external');
 
 /**
- * Exclude unconditional Ideogram branches from selection but retain lookup support. Wan's other expert can span
- * the full schedule.
+ * Exclude unconditional Ideogram branches from selection but retain lookup support. Wan's other expert can span the
+ * full schedule.
  */
 export const isGenerateModelSelectable = <T extends ModelConfig>(model: T): model is T & GenerateModelConfig =>
   isSupportedGenerateModel(model) && !isIdeogram4UnconditionalBranch(model);
@@ -817,9 +818,9 @@ export interface ComponentSectionPolicy {
 }
 
 /**
- * What a model switch does to one choice the user made. `turnedOff` keeps it and the new model just does not run it,
- * so switching back runs it again; `adjusted` moves a value into the new model's range; `removed` clears a selection
- * and `reset` returns a value to its default, both lost for good once the switch is kept.
+ * What a model switch does to one choice the user made. `turnedOff` keeps it and the new model just does not run it, so
+ * switching back runs it again; `adjusted` moves a value into the new model's range; `removed` clears a selection and
+ * `reset` returns a value to its default, both lost for good once the switch is kept.
  */
 export type GenerateModelSwitchChangeKind = 'adjusted' | 'removed' | 'reset' | 'turnedOff';
 
@@ -1742,10 +1743,10 @@ export type ReferenceVisionComponents = Partial<
 
 /**
  * The encoder that reads the references is the selected Qwen3-VL 8B encoder when there is one, else the model's own.
- * Only a Diffusers main brings its own. A GGUF encoder keeps no vision tower (llama.cpp splits it into an mmproj
- * file), so it reads references only beside a separately selected 8B tower; a tower beside any other encoder is
- * never sent. The 8B filters are Qwen-Image-2.1's, the only base with `reference_images_require_vision_tower`; a base
- * that sets the flag with another encoder size needs its own filters here.
+ * Only a Diffusers main brings its own. A GGUF encoder keeps no vision tower (llama.cpp splits it into an mmproj file),
+ * so it reads references only beside a separately selected 8B tower; a tower beside any other encoder is never sent.
+ * The 8B filters are Qwen-Image-2.1's, the only base with `reference_images_require_vision_tower`; a base that sets the
+ * flag with another encoder size needs its own filters here.
  */
 const hasReferenceVisionTower = (
   model: Exclude<GenerateModelConfig, { type: 'external_image_generator' }>,
@@ -1847,8 +1848,8 @@ export const getMaxReferenceImages = (
 const IP_ADAPTER_BASES: ReadonlySet<string> = new Set(['sd-1', 'sdxl', 'flux', 'anima']);
 
 /**
- * Anima's IP-Adapter node takes a strength alone: it has no method choice and brings its own SigLIP2 encoder, so the
- * UI hides those controls and the graph never sends them.
+ * Anima's IP-Adapter node takes a strength alone: it has no method choice and brings its own SigLIP2 encoder, so the UI
+ * hides those controls and the graph never sends them.
  */
 export const isStrengthOnlyIPAdapterBase = (base: string | undefined): boolean => base === 'anima';
 
@@ -1981,8 +1982,8 @@ interface ReferenceImageAddition {
 }
 
 /**
- * Configs for `additions` joining `referenceImages`. A Krea-2 addition is the style reference only when it would be
- * the sole running Krea-2 reference, counting the other additions and itself as switched on; arriving with or beside
+ * Configs for `additions` joining `referenceImages`. A Krea-2 addition is the style reference only when it would be the
+ * sole running Krea-2 reference, counting the other additions and itself as switched on; arriving with or beside
  * others, it is an edit reference.
  */
 const getDefaultReferenceImageConfigs = (
@@ -2032,8 +2033,8 @@ const canRunWithEnabledReferenceImages = (
 };
 
 /**
- * The list's one running reference when it is a Krea-2 style reference still at its default strength, which an
- * addition turns into an edit reference.
+ * The list's one running reference when it is a Krea-2 style reference still at its default strength, which an addition
+ * turns into an edit reference.
  */
 const getLoneDefaultStyleReference = (
   referenceImages: readonly GenerateReferenceImage[]
@@ -2110,9 +2111,9 @@ const needsStrengthOnlyRetarget = (
 };
 
 /**
- * Drop unsupported references; retarget incompatible ones, and strength-only IP-Adapter references left unusable,
- * while preserving image/enabled state. The re-targeted ones are typed together, beside the others; a strength-only
- * base then keeps their step window, same-base adapter and strength. No changes return the same array.
+ * Drop unsupported references; retarget incompatible ones, and strength-only IP-Adapter references left unusable, while
+ * preserving image/enabled state. The re-targeted ones are typed together, beside the others; a strength-only base then
+ * keeps their step window, same-base adapter and strength. No changes return the same array.
  */
 export const getCompatibleReferenceImages = (
   referenceImages: GenerateReferenceImage[],
@@ -2175,10 +2176,10 @@ export const getCompatibleReferenceImages = (
 };
 
 /**
- * References as a switch to `model` leaves them, for every path that puts references in front of a model they were
- * not set up for (a model switch, an Undo that brings removed ones back). Incompatible ones are retargeted (see
- * `getCompatibleReferenceImages`); enabled ones the family cannot run together are switched off rather than deleted,
- * so Invoke is not left blocked, the first enabled ones keep running, and a model that takes the rest can turn them on
+ * References as a switch to `model` leaves them, for every path that puts references in front of a model they were not
+ * set up for (a model switch, an Undo that brings removed ones back). Incompatible ones are retargeted (see
+ * `getCompatibleReferenceImages`); enabled ones the family cannot run together are switched off rather than deleted, so
+ * Invoke is not left blocked, the first enabled ones keep running, and a model that takes the rest can turn them on
  * again. A model without references keeps them as they are, all switched off, for the next model that takes them.
  * `retargetedReferenceImages` is the list before the switch-off, for reporting what each step changed. No changes
  * return the same array.
@@ -2293,8 +2294,8 @@ const getSettingsWithCompatibleModelSelections = (
 
   if (compatibleReferenceImages !== settings.referenceImages) {
     nextSettings.referenceImages = compatibleReferenceImages;
-    // A retargeted reference keeps its image; its adapter and weights take the new family's defaults. Only tuning
-    // the user chose is lost: a reference still at the previous family's defaults loses nothing.
+    // A retargeted reference keeps its image; its adapter and weights take the new family's defaults. Only tuning the
+    // user chose is lost: a reference still at the previous family's defaults loses nothing.
     const isPreviousDefault = (referenceImage: GenerateReferenceImage) => {
       if (!previousModel || !isGenerateModelConfig(previousModel)) {
         return false;
@@ -2466,8 +2467,8 @@ const issue = (
 const MODEL_TARGET: GenerationIssue['target'] = { section: 'model' };
 
 /**
- * How an issue names one reference: its own name, else its position. `describeGenerationIssue` turns the position
- * into the localized default ("Reference image 2"), so the message reads as the reference's row does.
+ * How an issue names one reference: its own name, else its position. `describeGenerationIssue` turns the position into
+ * the localized default ("Reference image 2"), so the message reads as the reference's row does.
  */
 const referenceNameValues = (
   referenceImage: Pick<GenerateReferenceImage, 'name'>,
@@ -3020,9 +3021,9 @@ const getModelFamilyValidationIssues = (model: MainModelConfig, settings: Genera
     );
   }
 
-  // The field commits only lists in range, but a persisted one can still name a block MOSS-Image lacks, which would fail
-  // the queue item. Without CFG the negative branch never runs, so the list has no effect and its disabled field cannot
-  // be fixed.
+  // The field commits only lists in range, but a persisted one can still name a block MOSS-Image lacks, which would
+  // fail the queue item. Without CFG the negative branch never runs, so the list has no effect and its disabled field
+  // cannot be fixed.
   if (
     model.base === 'moss-image' &&
     settings.cfgScale > 1 &&

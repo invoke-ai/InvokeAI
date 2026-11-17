@@ -206,9 +206,9 @@ export const isInvocationFlowNodeInvalid = (data: InvocationFlowNodeType['data']
 };
 
 /**
- * One place turns what is known about a node into its chrome and its status button. The chrome facts stay
- * independent so they compose; the status button shows the one that most needs attention: a live run, then a failed
- * one, then what blocks the next run, then a version change, then a completed run.
+ * One place turns what is known about a node into its chrome and its status button. The chrome facts stay independent
+ * so they compose; the status button shows the one that most needs attention: a live run, then a failed one, then what
+ * blocks the next run, then a version change, then a completed run.
  */
 export const getInvocationNodeState = ({
   execution,
@@ -337,8 +337,8 @@ const NodeStatusButton = ({
 /** The editor a label double-click opens: Enter or blur commits, Escape keeps the current name. */
 /**
  * The rename input a double-click opens, for node titles and field labels alike. It lies over its label on the same
- * line, a little wider and taller than it, in the label's own text size and on its own surface (so a tinted header
- * does not tint it). The label keeps its place underneath, so nothing around it moves when the input opens or closes.
+ * line, a little wider and taller than it, in the label's own text size and on its own surface (so a tinted header does
+ * not tint it). The label keeps its place underneath, so nothing around it moves when the input opens or closes.
  */
 const INLINE_RENAME_FIELD_PROPS = {
   left: '-6px',
@@ -702,13 +702,13 @@ const ProvidedByConnectionNote = () => {
 };
 
 /**
- * A node's value controls sit in a well of the canvas colour, a step darker than the node body, so a value reads as
- * the thing to edit. The colour is defined once, as `--wb-control-well` on the row, which also carries
- * `data-control-well`, and every surface that paints a control's background reads it: the value surfaces below (text
- * and number inputs, text areas, select, combobox and listbox pickers such as the model picker, not switches, plain
- * buttons or media drop zones), the text area's faded bottom (`ResizableTextarea`) and the export snapshot's value
- * box. Borders, including the error border, are untouched.
- * Scoped to the node's rows, so the form view and the form builder's cards keep their own surfaces.
+ * A node's value controls sit in a well of the canvas colour, a step darker than the node body, so a value reads as the
+ * thing to edit. The colour is defined once, as `--wb-control-well` on the row, which also carries `data-control-well`,
+ * and every surface that paints a control's background reads it: the value surfaces below (text and number inputs, text
+ * areas, select, combobox and listbox pickers such as the model picker, not switches, plain buttons or media drop
+ * zones), the text area's faded bottom (`ResizableTextarea`) and the export snapshot's value box. Borders, including
+ * the error border, are untouched. Scoped to the node's rows, so the form view and the form builder's cards keep their
+ * own surfaces.
  */
 const NODE_FIELD_WELL_VARIABLE = { '--wb-control-well': '{colors.bg}' } as const;
 const NODE_FIELD_WELL_CSS = {
@@ -836,8 +836,8 @@ const InputFieldRow = ({
   const showsInForm = isExposed && !isWorkflowImageExport;
   const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
-  // Legacy's label: semibold where the row holds a value, muted where a connection feeds it; red when the field
-  // blocks a run, blue with a link mark when the field is in the form.
+  // Legacy's label: semibold where the row holds a value, muted where a connection feeds it; red when the field blocks
+  // a run, blue with a link mark when the field is in the form.
   const fieldTitle = (
     <Text
       alignItems="center"
@@ -1173,9 +1173,9 @@ const MergedPort = ({ side }: { side: 'left' | 'right' }) => (
 );
 
 /**
- * A collapsed node shows one merged port per side, as legacy did. Every field keeps its handle, hidden at that port,
- * so the document's edges stay as they are and draw from it; expanding draws them from their own rows again. The
- * hidden handles cannot connect: a new connection needs the node open, as in legacy.
+ * A collapsed node shows one merged port per side, as legacy did. Every field keeps its handle, hidden at that port, so
+ * the document's edges stay as they are and draw from it; expanding draws them from their own rows again. The hidden
+ * handles cannot connect: a new connection needs the node open, as in legacy.
  */
 const CollapsedPorts = ({
   connected,

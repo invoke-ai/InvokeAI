@@ -130,9 +130,9 @@ const isFormLike = (value: unknown): boolean =>
 const METADATA_KEYS = ['author', 'contact', 'description', 'name', 'notes', 'tags', 'workflowVersion'] as const;
 
 /**
- * Reads a persisted version-2 document. Authored content (nodes, edges, form) must carry the structure the editor
- * and the linear form read, or the document is refused (`null`), never quietly replaced; missing metadata strings
- * are the only thing filled in.
+ * Reads a persisted version-2 document. Authored content (nodes, edges, form) must carry the structure the editor and
+ * the linear form read, or the document is refused (`null`), never quietly replaced; missing metadata strings are the
+ * only thing filled in.
  */
 export const readPersistedProjectGraph = (candidate: unknown): ProjectGraphState | null => {
   if (
@@ -309,9 +309,8 @@ const removeFormElement = (form: WorkflowForm, elementId: string): WorkflowForm 
 };
 
 /**
- * Reparents an element to `parentId` at `index` (the drag-and-drop primitive).
- * No-ops when the move is impossible: unknown ids, non-container targets, or
- * dropping a container into its own subtree.
+ * Reparents an element to `parentId` at `index` (the drag-and-drop primitive). No-ops when the move is impossible:
+ * unknown ids, non-container targets, or dropping a container into its own subtree.
  */
 const moveFormElementTo = (form: WorkflowForm, elementId: string, parentId: string, index: number): WorkflowForm => {
   const element = form.elements[elementId];
@@ -418,8 +417,8 @@ const parseVersion = (version: string): Version | null => {
 const compareVersions = (a: Version, b: Version): number => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
 
 /**
- * Whether a stored node can take its template's version. Only a same-major template merges safely: a template
- * bumps its major when a value-preserving merge would leave the node invalid (the legacy rule).
+ * Whether a stored node can take its template's version. Only a same-major template merges safely: a template bumps its
+ * major when a value-preserving merge would leave the node invalid (the legacy rule).
  */
 export const getNodeUpdateStatus = (
   node: WorkflowInvocationNode,
@@ -496,9 +495,9 @@ export const migrateMiniMaxH3NumFramesValue = (
 };
 
 /**
- * Fresh template defaults underneath the node's own values: existing labels, values, and node settings win, new
- * inputs start at their defaults, inputs the template no longer declares are dropped (dynamic and extra inputs
- * aside). The id is kept so edges survive.
+ * Fresh template defaults underneath the node's own values: existing labels, values, and node settings win, new inputs
+ * start at their defaults, inputs the template no longer declares are dropped (dynamic and extra inputs aside). The id
+ * is kept so edges survive.
  */
 const updateInvocationNodeToTemplate = (
   node: WorkflowInvocationNode,
@@ -549,8 +548,8 @@ const updateInvocationNodeToTemplate = (
     migrateImageCollectionInputValues(inputs, template, connectedInputNames.has('collection'));
   }
 
-  // `minimax_h3_denoise` 1.3.0 turned the free frame count into a choice list; a count still on the grid becomes
-  // that choice, anything else falls back to the default.
+  // `minimax_h3_denoise` 1.3.0 turned the free frame count into a choice list; a count still on the grid becomes that
+  // choice, anything else falls back to the default.
   if (node.data.type === 'minimax_h3_denoise' && sourceVersion && compareVersions(sourceVersion, [1, 3, 0]) < 0) {
     migrateMiniMaxH3NumFramesValue(inputs, template);
   }
@@ -802,8 +801,8 @@ const getUndoMergeKey = (action: ProjectGraphAction): string | undefined => {
     case 'setFieldLabel':
       return `${action.type}:${action.nodeId}:${action.fieldName}`;
     case 'setFieldValue':
-      // Typed text and dragged numbers stream, as do the rows of a scalar list; a pick (model, board,
-      // switch, image list) is one step of its own.
+      // Typed text and dragged numbers stream, as do the rows of a scalar list; a pick (model, board, switch, image
+      // list) is one step of its own.
       if (action.fieldName === 'workflow_id') {
         return undefined;
       }
@@ -930,8 +929,8 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
         return document;
       }
 
-      // Guard against id collisions (a stale paste after an undo): existing
-      // ids win, incoming duplicates are dropped along with their edges.
+      // Guard against id collisions (a stale paste after an undo): existing ids win, incoming duplicates are dropped
+      // along with their edges.
       const existingNodeIds = new Set(document.nodes.map((node) => node.id));
       const nodes = action.nodes.filter((node) => !existingNodeIds.has(node.id));
 
@@ -947,8 +946,8 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
       const filledInputs = new Set<string>();
       const edges = action.edges.filter((edge) => {
         const target = acceptedNodesById.get(edge.target);
-        // Pasted nodes can be fed by nodes already in the document (paste with connections), but never by an
-        // existing node that merely shares a dropped duplicate's id, and never by a node that no longer exists.
+        // Pasted nodes can be fed by nodes already in the document (paste with connections), but never by an existing
+        // node that merely shares a dropped duplicate's id, and never by a node that no longer exists.
         const sourceExists =
           acceptedNodesById.has(edge.source) || (existingNodeIds.has(edge.source) && !droppedNodeIds.has(edge.source));
 

@@ -1,6 +1,6 @@
 /**
- * Run isolated utility graphs with unique origins. Subscribe before enqueue to cover fast completion;
- * abort/timeout best-effort cancels all accepted items, including late enqueue responses.
+ * Run isolated utility graphs with unique origins. Subscribe before enqueue to cover fast completion; abort/timeout
+ * best-effort cancels all accepted items, including late enqueue responses.
  */
 
 import type { QueueBackendGraph } from '@features/queue/core/types';
@@ -115,8 +115,8 @@ export interface RunUtilityGraphOptions {
   /** The graph to enqueue and await. */
   graph: QueueBackendGraph;
   /**
-   * The source node id whose `invocation_complete` output image is the result.
-   * When omitted, the first image-bearing completion for our origin is used.
+   * The source node id whose `invocation_complete` output image is the result. When omitted, the first image-bearing
+   * completion for our origin is used.
    */
   outputNodeId?: string;
   /**
@@ -226,8 +226,8 @@ export const reconcileUtilityCompletedOutput: UtilityCompletedOutputReconciler =
 };
 
 /**
- * Active watches read every 15 seconds, coalescing overlapping reads. An open item re-arms the timer;
- * the watch ends on a terminal status, removal, persistent read failure, or an abort.
+ * Active watches read every 15 seconds, coalescing overlapping reads. An open item re-arms the timer; the watch ends on
+ * a terminal status, removal, persistent read failure, or an abort.
  */
 export const DEFAULT_UTILITY_RECONCILE_INTERVAL_MS = 15_000;
 
@@ -288,11 +288,11 @@ interface UtilityItemWatch {
 }
 
 /**
- * Watches one utility origin and reports each terminal outcome it learns of until detached: `null` for completion,
- * the error for failure, cancellation, or removal; callers settle once. Status events report directly. Events that
- * can settle or delete an item without a status event for it re-read the accepted items instead: a queue clear, a
- * bulk cancel or delete naming one of them (`queue_items_canceled` carries only the owner's ids), and a reconnect
- * after a disconnect.
+ * Watches one utility origin and reports each terminal outcome it learns of until detached: `null` for completion, the
+ * error for failure, cancellation, or removal; callers settle once. Status events report directly. Events that can
+ * settle or delete an item without a status event for it re-read the accepted items instead: a queue clear, a bulk
+ * cancel or delete naming one of them (`queue_items_canceled` carries only the owner's ids), and a reconnect after a
+ * disconnect.
  */
 const watchUtilityItems = ({
   hub,
@@ -466,8 +466,8 @@ export interface SubmitUtilityGraphOptions {
   /** The graph to enqueue; its outputs stay wherever the graph sends them (a board, intermediates). */
   graph: QueueBackendGraph;
   /**
-   * The socket hub. A queue clear, a bulk cancel or delete, and, when observable, a reconnect re-read the item in
-   * case its settlement was missed or it was deleted without a terminal event.
+   * The socket hub. A queue clear, a bulk cancel or delete, and, when observable, a reconnect re-read the item in case
+   * its settlement was missed or it was deleted without a terminal event.
    */
   hub: UtilityHub;
   /** Put the item ahead of queued generations. */
@@ -481,8 +481,8 @@ export interface SubmitUtilityGraphOptions {
   /** Injectable id source (defaults to `createUuid`). */
   createId?: () => string;
   /**
-   * Ends the watch (listener and timer) with an `aborted` settlement, for example when the account changes. The
-   * backend item is never canceled: the caller only asked to stop watching.
+   * Ends the watch (listener and timer) with an `aborted` settlement, for example when the account changes. The backend
+   * item is never canceled: the caller only asked to stop watching.
    */
   signal?: AbortSignal;
 }
@@ -494,16 +494,16 @@ export interface UtilityGraphSubmission {
   /** The origin used, for diagnostics/tests. */
   origin: string;
   /**
-   * Resolves once the backend completes the item; rejects with {@link UtilityQueueError} when it fails, is
-   * canceled, is removed from the queue (`removed`), or the watch is aborted.
+   * Resolves once the backend completes the item; rejects with {@link UtilityQueueError} when it fails, is canceled, is
+   * removed from the queue (`removed`), or the watch is aborted.
    */
   settled: Promise<void>;
 }
 
 /**
- * Enqueue a utility graph whose results land where the graph sends them (such as a gallery board) rather than
- * being returned. Resolves when the backend accepts it; `settled` tracks the item afterwards. Rejects as
- * {@link UtilityQueueError} when the enqueue fails or its response is inconsistent.
+ * Enqueue a utility graph whose results land where the graph sends them (such as a gallery board) rather than being
+ * returned. Resolves when the backend accepts it; `settled` tracks the item afterwards. Rejects as {@link
+ * UtilityQueueError} when the enqueue fails or its response is inconsistent.
  */
 export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Promise<UtilityGraphSubmission> => {
   const { graph, hub, prepend, signal } = options;
@@ -525,8 +525,8 @@ export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Pr
     settleResolve = resolve;
     settleReject = reject;
   });
-  // The watch can settle (abort, a fast terminal event) before the caller holds `settled`, and an enqueue failure
-  // never hands it over at all; callers still observe the rejection through their own handlers.
+  // The watch can settle (abort, a fast terminal event) before the caller holds `settled`, and an enqueue failure never
+  // hands it over at all; callers still observe the rejection through their own handlers.
   settled.catch(() => {});
   let isSettled = false;
   const detachers: Array<() => void> = [];
@@ -606,8 +606,8 @@ export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Pr
 };
 
 /**
- * Return utility output metadata without project routing; reject failures, cancellation, timeout, abort, and
- * enqueue errors as {@link UtilityQueueError}.
+ * Return utility output metadata without project routing; reject failures, cancellation, timeout, abort, and enqueue
+ * errors as {@link UtilityQueueError}.
  */
 export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<UtilityGraphResult> => {
   const { graph, hub, outputNodeId, signal } = options;
@@ -896,8 +896,8 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
       }, timeoutMs);
     }
 
-    // Enqueue last. A synchronous listener callback could already have fired by
-    // the time this resolves; `settled` guards against a late enqueue result.
+    // Enqueue last. A synchronous listener callback could already have fired by the time this resolves; `settled`
+    // guards against a late enqueue result.
     void Promise.resolve()
       .then(() => {
         if (!isAccountScopeCurrent(owner)) {

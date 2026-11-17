@@ -134,10 +134,9 @@ export const useRegisterFirstPartyCommands = () => {
   });
 
   /**
-   * Submits the active route. `destinationOverride` applies to this run only and
-   * is never written back to the project — "just this once, send it to the
-   * gallery" must not silently retarget every subsequent invoke. `prepend` is
-   * likewise per run: Invoke Front puts this batch ahead of the user's pending work.
+   * Submits the active route. `destinationOverride` applies to this run only and is never written back to the project —
+   * "just this once, send it to the gallery" must not silently retarget every subsequent invoke. `prepend` is likewise
+   * per run: Invoke Front puts this batch ahead of the user's pending work.
    */
   const submitInvocation = async (destinationOverride?: ResultDestination, prepend = false) => {
     await submitActiveInvocation({
@@ -220,8 +219,8 @@ export const useRegisterFirstPartyCommands = () => {
 
       const didRecall = await executeImageRecall({
         commands,
-        // Re-read on every call: recall awaits the image record, and a snapshot from the keypress would overwrite
-        // edits and recalls committed meanwhile.
+        // Re-read on every call: recall awaits the image record, and a snapshot from the keypress would overwrite edits
+        // and recalls committed meanwhile.
         getGenerateValues: () => {
           const project = queries.getProject(activeProject.id);
 

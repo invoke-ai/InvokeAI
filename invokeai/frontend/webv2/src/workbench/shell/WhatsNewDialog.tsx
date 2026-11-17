@@ -68,8 +68,8 @@ export const WhatsNewDialog = ({ onExitComplete }: { onExitComplete?: () => void
     ...readItems(t('whatsNew.items', { returnObjects: true })),
   ];
   const contentRef = useRef<HTMLDivElement | null>(null);
-  // Start on the panel, not the first link: focus that opens without a click (the automatic showing) counts as
-  // keyboard focus and would ring the link. Tab still reaches the links, and Escape still closes.
+  // Start on the panel, not the first link: focus that opens without a click (the automatic showing) counts as keyboard
+  // focus and would ring the link. Tab still reaches the links, and Escape still closes.
   const getInitialFocusEl = useCallback(() => contentRef.current, []);
 
   const handleOpenChange = useCallback(

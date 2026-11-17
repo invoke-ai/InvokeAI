@@ -97,8 +97,8 @@ export const getPersistedSelectedGalleryItemKeys = (galleryValues: Record<string
 };
 
 /**
- * Successor after deleting `primaryKey`: the next eligible entry in display
- * order, else the nearest earlier one — later-first stays out of the starred block.
+ * Successor after deleting `primaryKey`: the next eligible entry in display order, else the nearest earlier one —
+ * later-first stays out of the starred block.
  */
 export const getGalleryDeletionSuccessor = (
   orderedRefs: readonly GalleryItemRef[],
@@ -227,8 +227,8 @@ export const isGalleryNavigationCurrent = (sequence: number): boolean => sequenc
 
 /**
  * The Gallery navigation a user controls, as one comparable value: the latest claimed navigation, plus the board,
- * selection, view, filters, search and page in the Gallery widget's values. Ordinary clicks claim no navigation, so
- * the values cover them.
+ * selection, view, filters, search and page in the Gallery widget's values. Ordinary clicks claim no navigation, so the
+ * values cover them.
  */
 export interface GalleryNavigationSnapshot {
   readonly sequence: number;

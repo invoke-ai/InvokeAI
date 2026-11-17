@@ -123,8 +123,8 @@ export const PaintStrokePreview = ({
     canvas.height = Math.max(1, Math.round(height * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
-    // Fit radius + curve swing + the full 3-sigma feather inside the box, so
-    // softness has room to demonstrate instead of clipping at the edges.
+    // Fit radius + curve swing + the full 3-sigma feather inside the box, so softness has room to demonstrate instead
+    // of clipping at the edges.
     const swing = height * 0.14;
     const featherFactor = 1 + 1.5 * (1 - hardness);
     const drawn = Math.max(1, Math.min(size, (height - 2 * swing - 8) / featherFactor));

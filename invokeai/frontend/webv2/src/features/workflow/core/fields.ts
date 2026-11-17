@@ -29,8 +29,7 @@ const STATEFUL_FIELD_TYPE_NAMES = new Set([
   'ImageGeneratorField',
   'IntegerField',
   'IntegerGeneratorField',
-  // Collection loaders accept scalar or list LoRA fields; edit lists inline without extra selector/collector
-  // nodes.
+  // Collection loaders accept scalar or list LoRA fields; edit lists inline without extra selector/collector nodes.
   'LoRAField',
   'ModelIdentifierField',
   'SchedulerField',
@@ -95,10 +94,10 @@ export const finiteNumberOrNull = (value: number | null | undefined): number | n
 const exactStepIndex = (value: number, step: number): number | null => {
   const quotient = value / step;
   const nearest = Math.round(quotient);
-  // How far the quotient may sit from an integer and still count, relative to its size so float noise scales with
-  // it: 0.3 / 0.1 is 2.9999…, and 1.001 / 0.001 is 1000.9999…; both are multiples. Evaluated here rather than at
-  // module scope: a top-level global member access marks this module side-effectful, which keeps the workflow
-  // barrels that re-export through it from being tree-shaken and pulls their other chunks into the Launchpad.
+  // How far the quotient may sit from an integer and still count, relative to its size so float noise scales with it:
+  // 0.3 / 0.1 is 2.9999…, and 1.001 / 0.001 is 1000.9999…; both are multiples. Evaluated here rather than at module
+  // scope: a top-level global member access marks this module side-effectful, which keeps the workflow barrels that
+  // re-export through it from being tree-shaken and pulls their other chunks into the Launchpad.
   const tolerance = Number.EPSILON * 100 * Math.max(1, Math.abs(quotient));
 
   return Math.abs(quotient - nearest) <= tolerance ? nearest : null;
@@ -116,9 +115,9 @@ export interface WorkflowFieldStepIndexBounds {
 
 /**
  * Which multiples of `step` (counted from zero, as validation counts them) lie inside the template's bounds, as the
- * indices of the first and last. Shuffle and the slider track both read this, so neither offers a value the node
- * would reject: a field stepping by 8 between 1 and 100 admits 8…96, and one stepping by 8 between 1 and 7 none
- * (`first` exceeds `last`).
+ * indices of the first and last. Shuffle and the slider track both read this, so neither offers a value the node would
+ * reject: a field stepping by 8 between 1 and 100 admits 8…96, and one stepping by 8 between 1 and 7 none (`first`
+ * exceeds `last`).
  */
 export const getWorkflowFieldStepIndexBounds = (
   template: FieldInputTemplate,
@@ -146,8 +145,8 @@ export const getWorkflowFieldStepIndexBounds = (
 };
 
 /**
- * False when the bounds admit no multiple of the field's step (every integer, for an integer field without one), so
- * no value passes validation: a field stepping by 8 between 1 and 7. Fields without a step admit any value in range.
+ * False when the bounds admit no multiple of the field's step (every integer, for an integer field without one), so no
+ * value passes validation: a field stepping by 8 between 1 and 7. Fields without a step admit any value in range.
  */
 export const admitsWorkflowFieldStepValue = (template: FieldInputTemplate): boolean => {
   const multipleOf = finiteNumberOrNull(template.multipleOf);
@@ -179,8 +178,7 @@ export const getRandomWorkflowFieldValue = (template: FieldInputTemplate, random
     return min + random() * (max - min);
   }
 
-  // Draw among the step multiples that lie inside the bounds (exclusive ends excluded), so the
-  // result is always valid.
+  // Draw among the step multiples that lie inside the bounds (exclusive ends excluded), so the result is always valid.
   const bounds = getWorkflowFieldStepIndexBounds(template, step);
   const first = bounds.first ?? 0;
   const last = bounds.last ?? Math.floor(SEED_MAX / step);
@@ -268,8 +266,8 @@ const getLoraCollectionInvalidReason = (items: readonly unknown[]): string | nul
 };
 
 /**
- * Normalize absent/scalar/list values into lists without discarding unreadable entries, which subsequent edits
- * must preserve.
+ * Normalize absent/scalar/list values into lists without discarding unreadable entries, which subsequent edits must
+ * preserve.
  */
 export const toLoraFieldCollectionList = (value: unknown): unknown[] => {
   if (Array.isArray(value)) {
@@ -424,8 +422,7 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
     case 'ModelIdentifierField':
       return hasNonEmptyStringProp(value, 'key');
     case 'LoRAField':
-      // An empty list is a legitimate value: a collection loader with no LoRAs passes its
-      // models through untouched.
+      // An empty list is a legitimate value: a collection loader with no LoRAs passes its models through untouched.
       return (
         (Array.isArray(value) || isLoraFieldCollectionEntry(value)) &&
         getLoraCollectionInvalidReason(toLoraFieldCollectionList(value)) === null
@@ -449,8 +446,8 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
     case 'ImageField':
       return hasNonEmptyStringProp(value, 'image_name');
     case 'VideoField':
-      // COLLECTION video values are arrays no direct-input widget authors; keep the
-      // generic non-null check so persisted values (imported workflows) stay valid.
+      // COLLECTION video values are arrays no direct-input widget authors; keep the generic non-null check so persisted
+      // values (imported workflows) stay valid.
       if (template.type.cardinality === 'COLLECTION') {
         return value !== undefined && value !== null;
       }

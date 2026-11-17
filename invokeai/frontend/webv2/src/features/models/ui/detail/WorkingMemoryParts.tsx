@@ -231,8 +231,8 @@ const useNotCountedLabel = () => {
 };
 
 /**
- * One estimator line: its state, the models whose measurements it pools (named when another model is among them,
- * this model first), the range the user line was fitted on, and every measured size.
+ * One estimator line: its state, the models whose measurements it pools (named when another model is among them, this
+ * model first), the range the user line was fitted on, and every measured size.
  */
 export const LineMeasurements = ({ line, modelKey }: { line: WorkingMemoryLine; modelKey: string }) => {
   const { t } = useTranslation();

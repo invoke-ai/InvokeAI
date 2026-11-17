@@ -14,8 +14,8 @@ export type BboxHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 export type BboxTarget = BboxHandle | 'move';
 
 /**
- * Handles in hit-test priority order: corners first, so at a small bbox where a
- * corner and an adjacent edge midpoint overlap, the corner wins.
+ * Handles in hit-test priority order: corners first, so at a small bbox where a corner and an adjacent edge midpoint
+ * overlap, the corner wins.
  */
 export const BBOX_HANDLES: readonly BboxHandle[] = ['nw', 'ne', 'se', 'sw', 'n', 'e', 's', 'w'];
 
@@ -50,8 +50,8 @@ export const isInsideRect = (rect: Rect, point: Vec2): boolean =>
   point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
 
 /**
- * The handle whose square grab area (side `hitSize`, screen px) contains
- * `point`, or `null`. `screenRect` is the bbox already projected to screen space.
+ * The handle whose square grab area (side `hitSize`, screen px) contains `point`, or `null`. `screenRect` is the bbox
+ * already projected to screen space.
  */
 export const bboxHandleAt = (
   screenRect: Rect,
@@ -85,8 +85,8 @@ export const bboxTargetAt = (
 export const bboxMinSize = (grid: number): number => Math.max(1, grid);
 
 /**
- * Translates `start` by a document-space delta. Model-grid snapping may be
- * bypassed, but the origin always lands on whole document pixels.
+ * Translates `start` by a document-space delta. Model-grid snapping may be bypassed, but the origin always lands on
+ * whole document pixels.
  */
 export const moveBbox = (start: Rect, dx: number, dy: number, grid: number, snap: boolean): Rect => {
   const moved = snapMovedPoint({ x: start.x, y: start.y }, { x: dx, y: dy }, snap ? grid : 1);
@@ -293,9 +293,8 @@ const mirroredPixelSpan = (
 };
 
 /**
- * Quantizes a model-grid-bypassed resize without breaking its fixed anchor or
- * center. The persisted bbox is canonicalized to integer pixels at hydration,
- * so every fixed edge and doubled center is already integral here.
+ * Quantizes a model-grid-bypassed resize without breaking its fixed anchor or center. The persisted bbox is
+ * canonicalized to integer pixels at hydration, so every fixed edge and doubled center is already integral here.
  */
 const pixelAlignResize = (rect: Rect, p: ResizeBboxParams): Rect => {
   const startRight = p.start.x + p.start.width;
@@ -349,8 +348,8 @@ const pixelAlignResize = (rect: Rect, p: ResizeBboxParams): Rect => {
 };
 
 /**
- * Apply drag delta, grid snap, minimum size and optional aspect constraint. Symmetric resize doubles the anchored
- * delta then recenters, preserving pointer alignment and the same constraints.
+ * Apply drag delta, grid snap, minimum size and optional aspect constraint. Symmetric resize doubles the anchored delta
+ * then recenters, preserving pointer alignment and the same constraints.
  */
 export const resizeBbox = (p: ResizeBboxParams): Rect => {
   const resized = p.symmetric

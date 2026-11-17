@@ -13,19 +13,19 @@ import { isModalPresent } from './modalPresence';
 import { Tooltip, useTooltipTriggerIds } from './Tooltip';
 
 /**
- * The list/detail shell shared by the Launchpad managers (models, nodes, fonts, preferences). Side by side when
- * both panes fit; below that one pane at a time, the library first, the detail behind a Back control in its header.
- * A footer (install queue, activity) stays visible under whichever pane shows. The column and the detail header
- * share one header height so their bottom borders line up. A bare `/` focuses the manager's search field (a
- * {@link ManagerSearchField}, or any field marked `data-manager-search`) while it is in view.
+ * The list/detail shell shared by the Launchpad managers (models, nodes, fonts, preferences). Side by side when both
+ * panes fit; below that one pane at a time, the library first, the detail behind a Back control in its header. A footer
+ * (install queue, activity) stays visible under whichever pane shows. The column and the detail header share one header
+ * height so their bottom borders line up. A bare `/` focuses the manager's search field (a {@link ManagerSearchField},
+ * or any field marked `data-manager-search`) while it is in view.
  */
 
 /** The library takes 39% of the manager, between 20rem and 28rem. */
 const LIBRARY_WIDTH = 'clamp(20rem, 39cqi, 28rem)';
 /**
- * Side by side while the detail keeps 30rem beside a 20rem library (50rem, 800px): the managers' detail headers
- * wrap their actions under the title and shorten the item tab below that width. Measured on the manager's own box,
- * so it also answers when the Launchpad rail takes width.
+ * Side by side while the detail keeps 30rem beside a 20rem library (50rem, 800px): the managers' detail headers wrap
+ * their actions under the title and shorten the item tab below that width. Measured on the manager's own box, so it
+ * also answers when the Launchpad rail takes width.
  */
 const SINGLE_PANE = '@container manager (width < 50rem)';
 const SINGLE_PANE_FLAG = '--manager-single-pane';
@@ -46,8 +46,8 @@ const TABBABLE_SELECTOR = [
 /** How long a pane switch made from a popup waits for that popup to return focus. */
 const HANDOFF_TIMEOUT_MS = 4000;
 /**
- * How long focus is watched after it moves with a pane: the list re-keys its virtual rows a frame or two after its
- * data changes, which can unmount the row just focused.
+ * How long focus is watched after it moves with a pane: the list re-keys its virtual rows a frame or two after its data
+ * changes, which can unmount the row just focused.
  */
 const SETTLE_MS = 300;
 
@@ -60,10 +60,10 @@ const ROOT_CSS: SystemStyleObject = {
 };
 
 /**
- * Both panes stay mounted. In single-pane mode they share one grid cell and the other is visibility-hidden: out of
- * the accessibility tree and tab order, but still laid out, so scroll positions, virtualized rows and form state
- * survive and nothing remounts or refetches. Side by side the footer sits under the detail; in single-pane mode it
- * spans the manager under both.
+ * Both panes stay mounted. In single-pane mode they share one grid cell and the other is visibility-hidden: out of the
+ * accessibility tree and tab order, but still laid out, so scroll positions, virtualized rows and form state survive
+ * and nothing remounts or refetches. Side by side the footer sits under the detail; in single-pane mode it spans the
+ * manager under both.
  */
 const GRID_CSS: SystemStyleObject = {
   display: 'grid',
@@ -103,9 +103,9 @@ const ManagerBackContext = createContext<ManagerBack | null>(null);
 const isShown = (element: Element): boolean => element.checkVisibility({ visibilityProperty: true });
 
 /**
- * Where Back lands: the open row, else a non-row control last used in the library (the Add shortcut, search), else
- * the list's roving row, else the first control. Rows are found by the list's own state, never by a remembered
- * element: virtual rows are re-keyed and recycled.
+ * Where Back lands: the open row, else a non-row control last used in the library (the Add shortcut, search), else the
+ * list's roving row, else the first control. Rows are found by the list's own state, never by a remembered element:
+ * virtual rows are re-keyed and recycled.
  */
 const findLibraryEntry = (library: HTMLElement, lastFocused: HTMLElement | null): HTMLElement | null =>
   library.querySelector<HTMLElement>('[data-list-primary][aria-current="true"]') ??
@@ -136,8 +136,8 @@ export interface ManagerLayoutProps {
   /** The footer takes the panes' place, as a maximized queue does. */
   footerFills?: boolean;
   /**
-   * Whether the detail is the pane shown when only one fits: set it when the user opens an item or a detail tab,
-   * clear it in `onBack`. Side by side it changes nothing.
+   * Whether the detail is the pane shown when only one fits: set it when the user opens an item or a detail tab, clear
+   * it in `onBack`. Side by side it changes nothing.
    */
   isDetailOpen: boolean;
   /** Names the library Back returns to, e.g. "Back to models". */
@@ -146,9 +146,9 @@ export interface ManagerLayoutProps {
 }
 
 /**
- * Focus follows the pane switch in single-pane mode: opening moves it to Back, Back returns it to the row it came
- * from. It never stays on a hidden element: a resize across the threshold, or a dialog or menu returning focus to a
- * trigger the switch hid, hands it to the shown pane's entry instead.
+ * Focus follows the pane switch in single-pane mode: opening moves it to Back, Back returns it to the row it came from.
+ * It never stays on a hidden element: a resize across the threshold, or a dialog or menu returning focus to a trigger
+ * the switch hid, hands it to the shown pane's entry instead.
  */
 export const ManagerLayout = ({
   backLabel,
@@ -212,8 +212,8 @@ export const ManagerLayout = ({
   /**
    * After a switch, watch focus for a moment: a dialog or menu the switch was made from (a confirmed delete, an Open
    * item) still holds focus and will return it to a trigger the switch may have hidden or removed, and a list may
-   * re-key the row just focused. Whatever happens, focus ends in the shown pane, never on a hidden element or the
-   * body. `popupTimeoutMs` extends the watch while a popup holds focus.
+   * re-key the row just focused. Whatever happens, focus ends in the shown pane, never on a hidden element or the body.
+   * `popupTimeoutMs` extends the watch while a popup holds focus.
    */
   const watchFocus = (popupTimeoutMs = 0) => {
     const now = performance.now();
@@ -256,8 +256,8 @@ export const ManagerLayout = ({
     handoff.current.frame = requestAnimationFrame(tick);
   };
 
-  // Focus moves with the pane before paint, so the ring never sits on a pane that just went away; reading the
-  // switched panes' computed visibility is the pre-paint measurement.
+  // Focus moves with the pane before paint, so the ring never sits on a pane that just went away; reading the switched
+  // panes' computed visibility is the pre-paint measurement.
   useLayoutEffect(() => {
     if (shownView.current === isDetailOpen) {
       return;
@@ -385,8 +385,8 @@ const SEARCH_HINT = (
 );
 
 /**
- * The library's search field, which `/` focuses; the key's hint shows while it is empty. With a `clearLabel`, a
- * query puts a clear control in the hint's place.
+ * The library's search field, which `/` focuses; the key's hint shows while it is empty. With a `clearLabel`, a query
+ * puts a clear control in the hint's place.
  */
 export const ManagerSearchField = ({
   clearLabel,
@@ -501,8 +501,8 @@ export const ManagerFilterMenu = ({
 };
 
 /**
- * The last row of a manager's filter menu, under a separator: clears the filters `ManagerFilterMenu` counts and
- * leaves sort order and search alone. Disabled while none is active.
+ * The last row of a manager's filter menu, under a separator: clears the filters `ManagerFilterMenu` counts and leaves
+ * sort order and search alone. Disabled while none is active.
  */
 export const ManagerFilterResetItem = ({ activeCount, onReset }: { activeCount: number; onReset: () => void }) => {
   const { t } = useTranslation();
@@ -537,8 +537,8 @@ export const ManagerColumn = ({
   /** Controls at the end of the column header. */
   actions?: ReactNode;
   /**
-   * Opens the detail on its Add tab. Shown only in single-pane mode, where the detail's tabs are out of reach from
-   * the library; side by side the tab itself is the entry.
+   * Opens the detail on its Add tab. Shown only in single-pane mode, where the detail's tabs are out of reach from the
+   * library; side by side the tab itself is the entry.
    */
   addAction?: ManagerAddAction;
   children: ReactNode;
@@ -590,9 +590,9 @@ const DETAIL_HEADER_CSS: SystemStyleObject = {
 };
 
 /**
- * Holds the detail pane's tabs or title, bottom-aligned so a tab list's indicator sits on the border. In
- * single-pane mode it starts with the layout's Back control. Mark the item tab `data-manager-item-tab` so it is the
- * one that shrinks.
+ * Holds the detail pane's tabs or title, bottom-aligned so a tab list's indicator sits on the border. In single-pane
+ * mode it starts with the layout's Back control. Mark the item tab `data-manager-item-tab` so it is the one that
+ * shrinks.
  */
 export const ManagerDetailHeader = ({ children }: { children: ReactNode }) => {
   const back = useContext(ManagerBackContext);

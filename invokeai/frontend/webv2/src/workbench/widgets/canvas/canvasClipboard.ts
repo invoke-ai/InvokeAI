@@ -13,8 +13,8 @@ const IMAGE_TYPES = ['image/png', 'image/webp', 'image/jpeg'] as const;
 /**
  * The first image on the clipboard, or `null` when it holds none or cannot be read (permission refused, document not
  * focused): a paste that finds nothing is an ordinary outcome. Rejects with `ClipboardUnavailableError` when the
- * browser has no clipboard API (plain HTTP), so paste can say why, and with the item's own error when an image it
- * lists cannot be retrieved.
+ * browser has no clipboard API (plain HTTP), so paste can say why, and with the item's own error when an image it lists
+ * cannot be retrieved.
  */
 export const readClipboardImage = async (deps: ClipboardAccess = {}): Promise<Blob | null> => {
   let items: readonly ClipboardItem[];
@@ -79,10 +79,10 @@ export const decodeImageBlob = async (blob: Blob, deps: DecodeImageBlobDeps = {}
 };
 
 /**
- * Copies the selected pixels with `write`, and for a cut then removes them from the layer. A cut asks first whether
- * the removal could run, so one the engine refuses (it says why) writes nothing to the clipboard rather than turning
- * into a copy. Resolves without writing when there is nothing selected to copy; a failed write rejects before
- * anything is removed.
+ * Copies the selected pixels with `write`, and for a cut then removes them from the layer. A cut asks first whether the
+ * removal could run, so one the engine refuses (it says why) writes nothing to the clipboard rather than turning into a
+ * copy. Resolves without writing when there is nothing selected to copy; a failed write rejects before anything is
+ * removed.
  */
 export const copyCanvasSelection = async (
   selection: Pick<CanvasSelectionCapability, 'admitSelectionErase' | 'eraseSelection' | 'exportSelectionBlob'>,

@@ -8,9 +8,9 @@ import {
 } from './fields';
 
 /**
- * Per-element control settings an author gives a form field: which control renders it and, for numbers, the
- * bounds the form offers. They are stored in the element's legacy settings bag (`NodeFieldFormElement.data.settings`)
- * in the shape the v6 editor wrote, so a workflow authored in either editor opens the same in the other.
+ * Per-element control settings an author gives a form field: which control renders it and, for numbers, the bounds the
+ * form offers. They are stored in the element's legacy settings bag (`NodeFieldFormElement.data.settings`) in the shape
+ * the v6 editor wrote, so a workflow authored in either editor opens the same in the other.
  */
 
 export type NumberFieldComponent = 'number-input' | 'slider' | 'number-input-and-slider';
@@ -101,9 +101,9 @@ export const getDefaultNodeFieldFormSettings = (template: FieldInputTemplate): N
 };
 
 /**
- * The authored settings of a form element for `template`, or null when the element has none for this kind of
- * field. A bag tagged for another field kind (the field's type changed under it) is ignored rather than misread;
- * a bag with unusable bounds keeps its control choice and drops the bounds.
+ * The authored settings of a form element for `template`, or null when the element has none for this kind of field. A
+ * bag tagged for another field kind (the field's type changed under it) is ignored rather than misread; a bag with
+ * unusable bounds keeps its control choice and drops the bounds.
  */
 export const getNodeFieldFormSettings = (
   settings: Record<string, unknown> | undefined,
@@ -152,9 +152,9 @@ const hasInvertedNodeFieldBounds = (settings: NodeFieldFormSettings | null): boo
 const OWNED_SETTINGS_KEYS = new Set(['component', 'max', 'min', 'options', 'showShuffle', 'step', 'type']);
 
 /**
- * The settings bag to store for `settings` on a field of `template`, in the legacy shape: tagged with the field
- * kind, and carrying `showShuffle` on number fields as the v6 editor does. Keys of `stored` these settings do not
- * own (another editor's) are kept.
+ * The settings bag to store for `settings` on a field of `template`, in the legacy shape: tagged with the field kind,
+ * and carrying `showShuffle` on number fields as the v6 editor does. Keys of `stored` these settings do not own
+ * (another editor's) are kept.
  */
 export const serializeNodeFieldFormSettings = (
   settings: NodeFieldFormSettings,
@@ -215,11 +215,11 @@ const isStepAcceptedByTemplate = (template: FieldInputTemplate, step: number): b
   (template.multipleOf === null || template.multipleOf <= 0 || isMultipleOf(step, template.multipleOf));
 
 /**
- * The template narrowed by the authored number settings: a bound applies only where it tightens the template's own
- * end and stays inside its other one (an inverted pair not at all), and a step only when the template has none or
- * the step keeps every value a multiple of the template's. Validation, shuffle and the control all read this
- * template, so the form never offers a value the node would reject. Ignored settings stay stored for the author to
- * correct; `getNodeFieldSettingsIssue` says why.
+ * The template narrowed by the authored number settings: a bound applies only where it tightens the template's own end
+ * and stays inside its other one (an inverted pair not at all), and a step only when the template has none or the step
+ * keeps every value a multiple of the template's. Validation, shuffle and the control all read this template, so the
+ * form never offers a value the node would reject. Ignored settings stay stored for the author to correct;
+ * `getNodeFieldSettingsIssue` says why.
  */
 export const applyNodeFieldFormSettings = (
   template: FieldInputTemplate,
@@ -272,13 +272,12 @@ export interface NodeFieldSliderRange {
 const FLOAT_SLIDER_STEP = 0.01;
 
 /**
- * The range a slider can show for `template` (already narrowed by `applyNodeFieldFormSettings`), or null when it
- * has no track: an end is unbounded, or fewer than two stops would pass validation. The host then keeps the number
- * input.
+ * The range a slider can show for `template` (already narrowed by `applyNodeFieldFormSettings`), or null when it has no
+ * track: an end is unbounded, or fewer than two stops would pass validation. The host then keeps the number input.
  *
- * Validation accepts only multiples of the step counted from zero (every integer, for an integer field without
- * one), so the track runs between the first and last multiples inside the bounds rather than the bounds
- * themselves; a slider stepping by 8 between 1 and 100 offers 8…96, not 1…97.
+ * Validation accepts only multiples of the step counted from zero (every integer, for an integer field without one), so
+ * the track runs between the first and last multiples inside the bounds rather than the bounds themselves; a slider
+ * stepping by 8 between 1 and 100 offers 8…96, not 1…97.
  */
 export const getNodeFieldSliderRange = (template: FieldInputTemplate): NodeFieldSliderRange | null => {
   const multipleOf = finiteNumberOrNull(template.multipleOf);
@@ -311,10 +310,10 @@ export const getNodeFieldSliderRange = (template: FieldInputTemplate): NodeField
 export type NodeFieldSettingsIssue = 'inverted' | 'outOfRange' | 'stepIgnored' | 'noValue' | 'noTrack';
 
 /**
- * Why the form cannot honour authored number settings as written, in the order an author would fix them; null when
- * it can. `inverted` and `outOfRange` bounds and a `stepIgnored` step are ignored by `applyNodeFieldFormSettings`;
- * with `noValue` no value passes validation, so Invoke stays blocked; with `noTrack` a slider control falls back to
- * the number input.
+ * Why the form cannot honour authored number settings as written, in the order an author would fix them; null when it
+ * can. `inverted` and `outOfRange` bounds and a `stepIgnored` step are ignored by `applyNodeFieldFormSettings`; with
+ * `noValue` no value passes validation, so Invoke stays blocked; with `noTrack` a slider control falls back to the
+ * number input.
  */
 export const getNodeFieldSettingsIssue = (
   template: FieldInputTemplate,
@@ -351,9 +350,9 @@ export const getNodeFieldSettingsIssue = (
 };
 
 /**
- * The template a node field is validated against: the invocation template narrowed by the settings of the form
- * element exposing it, or the template itself when the field is not on the form. Invoke readiness and the builder's
- * invalid markers read this so they agree with the control.
+ * The template a node field is validated against: the invocation template narrowed by the settings of the form element
+ * exposing it, or the template itself when the field is not on the form. Invoke readiness and the builder's invalid
+ * markers read this so they agree with the control.
  */
 export const getFormFieldTemplate = (
   form: WorkflowForm,

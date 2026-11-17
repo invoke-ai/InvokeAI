@@ -61,9 +61,9 @@ const EMPTY_LIVE_REGION = { position: 'absolute' } as const;
 const STOP_WAIT_FRAMES = 30;
 
 /**
- * Working-memory calibration of one model on this machine's GPU: what was measured and whether estimates use it,
- * and the runs that measure it. Every read is the server's; the section keeps no copy of a run's state, so a reload or
- * a reconnect shows the same thing.
+ * Working-memory calibration of one model on this machine's GPU: what was measured and whether estimates use it, and
+ * the runs that measure it. Every read is the server's; the section keeps no copy of a run's state, so a reload or a
+ * reconnect shows the same thing.
  *
  * Collapsed on every visit; its header still names the GPU and the state, or the progress of a running calibration.
  */
@@ -287,9 +287,9 @@ const WorkingMemoryBody = ({
   // compiles its cases over the model records the server holds now. Graphs compiled earlier are never reused: equal
   // cases can name a model whose record changed meanwhile. The section renders the plan read. A plan that no longer
   // holds is `unavailable`: the section shows the new reason, or the read's error with a retry. A plan the server
-  // supports can still fail to compile here, say for a text encoder that is not installed. Last, the running check
-  // is made again on the fresh status of this GPU, which takes one attempt at a time: this section's summary knows
-  // only this model's runs, and may predate an attempt another tab started meanwhile.
+  // supports can still fail to compile here, say for a text encoder that is not installed. Last, the running check is
+  // made again on the fresh status of this GPU, which takes one attempt at a time: this section's summary knows only
+  // this model's runs, and may predate an attempt another tab started meanwhile.
   const readCalibration = async (
     compiler: CalibrationGraphCompiler,
     signal?: AbortSignal
@@ -313,8 +313,8 @@ const WorkingMemoryBody = ({
       return { kind: 'uncompilable', message: getApiErrorMessage(error, t('common.unknownError')) };
     }
 
-    // A failed read leaves its error in the status query, which the section shows with a retry. A busy GPU shows
-    // as this model's running attempt, or as the reason beside Calibrate naming the model that holds it.
+    // A failed read leaves its error in the status query, which the section shows with a retry. A busy GPU shows as
+    // this model's running attempt, or as the reason beside Calibrate naming the model that holds it.
     const busy = await calibrationOnGpuNow(queryClient).catch(() => undefined);
 
     if (busy === undefined) {
@@ -360,8 +360,9 @@ const WorkingMemoryBody = ({
     }
 
     // The busy Calibrate dropped focus and no dialog takes it, so return it unless it moved on meanwhile: to Calibrate,
-    // enabled again, beside a compile error or the model that holds the GPU; else to the section's toggle, since the plan read is about to disable Calibrate for its reason, or
-    // replace this panel with its error (the query tells the section a tick later).
+    // enabled again, beside a compile error or the model that holds the GPU; else to the section's toggle, since the
+    // plan read is about to disable Calibrate for its reason, or replace this panel with its error (the query tells the
+    // section a tick later).
     flushSync(() => {
       setIsPreparing(false);
       setCompileError(readiness.kind === 'uncompilable' ? readiness.message : null);
@@ -383,10 +384,10 @@ const WorkingMemoryBody = ({
   };
 
   // The dialog may have stood open while the GPU's free memory or the stored measurements moved: read the plan once
-  // more, and start what that read returns. A plan that no longer holds or compiles closes the dialog for the
-  // section's reason. One that changes what was confirmed (`changesCalibration`) starts nothing: the dialog shows it,
-  // flagged, to be confirmed again. New sizes alone start: a running generation moves them, and the dialog says sizes
-  // follow free memory. An unmount meanwhile does not take the confirmation back; only closing the dialog does.
+  // more, and start what that read returns. A plan that no longer holds or compiles closes the dialog for the section's
+  // reason. One that changes what was confirmed (`changesCalibration`) starts nothing: the dialog shows it, flagged, to
+  // be confirmed again. New sizes alone start: a running generation moves them, and the dialog says sizes follow free
+  // memory. An unmount meanwhile does not take the confirmation back; only closing the dialog does.
   const confirmCalibration = async () => {
     if (!compile || confirmation.current) {
       return;

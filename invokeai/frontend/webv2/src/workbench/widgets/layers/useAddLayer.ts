@@ -31,8 +31,8 @@ import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
 /**
- * Share guarded undoable creation across add menus and stack buttons. Insert above the selection, inside its group
- * for selected leaves.
+ * Share guarded undoable creation across add menus and stack buttons. Insert above the selection, inside its group for
+ * selected leaves.
  */
 export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
   const { t } = useTranslation();

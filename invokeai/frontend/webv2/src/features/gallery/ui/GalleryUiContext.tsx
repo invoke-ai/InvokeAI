@@ -152,13 +152,13 @@ export interface GalleryUiAdapter {
   /** The account's projects, for naming the boards that belong to each; the open project need not be among them. */
   projects: readonly GalleryProjectRef[];
   /**
-   * Make the open project exist on the server before a board is created in or moved into it: a new project is
-   * saved only after its first debounced flush. Absent for hosts without a workbench, which never create in one.
+   * Make the open project exist on the server before a board is created in or moved into it: a new project is saved
+   * only after its first debounced flush. Absent for hosts without a workbench, which never create in one.
    */
   ensureProjectOnServer?: () => Promise<void>;
   /**
-   * Export a project as an `.invk`, reporting progress itself. Keyed by project rather than
-   * board because a board menu can offer this for any project's board, not only the open one.
+   * Export a project as an `.invk`, reporting progress itself. Keyed by project rather than board because a board menu
+   * can offer this for any project's board, not only the open one.
    */
   exportProject(projectId: string, projectName: string): void;
   progressSessions: QueueProgressSession[];

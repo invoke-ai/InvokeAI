@@ -87,7 +87,8 @@ export const IntermediatesManager = ({
   const searchRef = useRef<HTMLInputElement | null>(null);
   const operationRegionRef = useRef<HTMLDivElement | null>(null);
   const operation = useFollowedOperation({ fallbackFocusRef: searchRef });
-  // Operations live in server memory; after a restart the server no longer knows this one, and asking again cannot help.
+  // Operations live in server memory; after a restart the server no longer knows this one, and asking again cannot
+  // help.
   const isLookupGone =
     operation.query.isError && operation.query.error instanceof ApiError && operation.query.error.status === 404;
   const lookupError = !operation.query.isError

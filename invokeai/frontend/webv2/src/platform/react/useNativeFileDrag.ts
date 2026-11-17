@@ -38,9 +38,9 @@ const isWithin = (event: ReactDragEvent<HTMLElement>): boolean =>
  * surface's descendants open (a dialog, a menu) is not the surface: a drag over it is left to the page's navigation
  * guard, so a drop on an open confirmation never lands behind it.
  *
- * The drag ends when it leaves the surface for the rest of the page, leaves the window or is cancelled (a leave with
- * no related target), and on any drop or `dragend`. It is not tied to window focus: a window manager that moves focus
- * with the pointer would otherwise end a drag still in progress.
+ * The drag ends when it leaves the surface for the rest of the page, leaves the window or is cancelled (a leave with no
+ * related target), and on any drop or `dragend`. It is not tied to window focus: a window manager that moves focus with
+ * the pointer would otherwise end a drag still in progress.
  */
 export const useNativeFileDrag = <Zone extends string>({
   findZone,

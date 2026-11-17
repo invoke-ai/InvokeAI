@@ -40,8 +40,8 @@ export interface StrokeEdits {
 }
 
 /**
- * Ordinary strokes paint their preview straight into the layer cache, so publication records the already-applied
- * pixels as one undo step. Auto-created layers compose layer removal/recreation into the same step.
+ * Ordinary strokes paint their preview straight into the layer cache, so publication records the already-applied pixels
+ * as one undo step. Auto-created layers compose layer removal/recreation into the same step.
  */
 export const createStrokeEdits = (deps: CreateStrokeEditsDeps): StrokeEdits => {
   const { applyImagePatch, ctx, layerCache } = deps;

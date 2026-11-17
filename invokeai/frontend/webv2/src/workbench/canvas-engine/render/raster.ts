@@ -1,6 +1,6 @@
 /**
- * Injected RasterBackend owns all canvas/ImageBitmap creation, allowing node tests to use recording surfaces
- * instead of browser globals.
+ * Injected RasterBackend owns all canvas/ImageBitmap creation, allowing node tests to use recording surfaces instead of
+ * browser globals.
  */
 
 /** A single drawable/resizable 2D surface, backed by either an OffscreenCanvas or an HTMLCanvasElement. */

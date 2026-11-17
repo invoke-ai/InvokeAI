@@ -71,9 +71,9 @@ export type ProjectDraftKey = [projectId: string, editorSessionId: string];
 
 /**
  * The lineage's writer has settled its unload journal through `generation`: the server or the lineage's draft holds a
- * document at least that new, or the writer discarded it. Entries of that writer at or below it are obsolete even
- * when they outlive their deletion. A mark of an earlier writer means nothing. Optional, so claims written before it
- * existed read as having settled nothing.
+ * document at least that new, or the writer discarded it. Entries of that writer at or below it are obsolete even when
+ * they outlive their deletion. A mark of an earlier writer means nothing. Optional, so claims written before it existed
+ * read as having settled nothing.
  */
 export interface ProjectUnloadJournalSettlement {
   generation: number;
@@ -189,9 +189,9 @@ export interface ProjectUnloadJournalEntry {
   /** The lineage it is written under, which the session blob may have handed on from another page's session. */
   editorSessionId: string;
   /**
-   * The draft generation the writer reserved for this document: above every generation it staged before and below
-   * every one it stages after (or that of a stage of the same document still in flight), so the lineage alone tells
-   * whether the journal is still the newest copy.
+   * The draft generation the writer reserved for this document: above every generation it staged before and below every
+   * one it stages after (or that of a stage of the same document still in flight), so the lineage alone tells whether
+   * the journal is still the newest copy.
    */
   generation: number;
   journaledAt: number;
@@ -324,11 +324,11 @@ export interface ProjectDraftStore {
     options?: ProjectUnloadJournalLivenessOptions
   ): Promise<{ kind: 'available'; projectIds: string[] } | { kind: 'unavailable' }>;
   /**
-   * Turns each unload journal entry into its lineage's newest draft, or discards it, by `decideUnloadJournalEntry`:
-   * one fenced draft transaction per entry, then the entry's removal. An entry left behind by a crash in between is
+   * Turns each unload journal entry into its lineage's newest draft, or discards it, by `decideUnloadJournalEntry`: one
+   * fenced draft transaction per entry, then the entry's removal. An entry left behind by a crash in between is
    * superseded by the draft it produced, so running again is safe. Run before any writer of this load claims a lineage.
-   * Entries written by a page that still runs elsewhere are skipped: a page that is merely hidden is still writing
-   * its lineages, and staging its journal would hand another tab an edit it may yet undo.
+   * Entries written by a page that still runs elsewhere are skipped: a page that is merely hidden is still writing its
+   * lineages, and staging its journal would hand another tab an edit it may yet undo.
    */
   reconcileUnloadJournal(
     accountId: string,
@@ -388,8 +388,9 @@ export interface ProjectDraftStore {
     refusal: ProjectSchemaRefusal
   ): Promise<ProjectDraftSettlementResult>;
   /**
-   * Settles the writer's unload journal of a lineage through `throughGeneration` (claiming an unclaimed lineage for it),
-   * then deletes those entries. `settled` once the mark commits; the deletion is best effort, the mark makes it moot.
+   * Settles the writer's unload journal of a lineage through `throughGeneration` (claiming an unclaimed lineage for
+   * it), then deletes those entries. `settled` once the mark commits; the deletion is best effort, the mark makes it
+   * moot.
    */
   settleUnloadJournal(
     projectId: string,

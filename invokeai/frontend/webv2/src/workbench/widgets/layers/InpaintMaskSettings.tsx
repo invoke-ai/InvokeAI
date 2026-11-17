@@ -33,8 +33,8 @@ interface InpaintMaskSettingsProps {
 }
 
 /**
- * Properties owns fill/style and invert; noise/denoise modifiers have tree-child editors. Fill uses undoable
- * config patches, invert uses engine pixels.
+ * Properties owns fill/style and invert; noise/denoise modifiers have tree-child editors. Fill uses undoable config
+ * patches, invert uses engine pixels.
  */
 export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps) => {
   const { t } = useTranslation();

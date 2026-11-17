@@ -496,8 +496,8 @@ export const ReferenceImageCropDialog = ({
     }
   }, [close, cropBox, gallery, image, notifications, onApply, onClose]);
 
-  // A durable copy of the crop in Uploads on the Gallery's auto-add board, unrelated to applying it: the dialog
-  // stays open and the reference unchanged.
+  // A durable copy of the crop in Uploads on the Gallery's auto-add board, unrelated to applying it: the dialog stays
+  // open and the reference unchanged.
   const saveToAssets = useCallback(async () => {
     const owner = captureAccountScope();
     setIsSaving(true);

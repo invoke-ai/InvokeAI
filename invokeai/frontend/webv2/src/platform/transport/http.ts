@@ -1,6 +1,6 @@
 /**
- * Each request captures the Identity-owned credential once and reports its outcome (a replacement token, a 401)
- * against that capture, so a late response can never renew or expire a newer credential.
+ * Each request captures the Identity-owned credential once and reports its outcome (a replacement token, a 401) against
+ * that capture, so a late response can never renew or expire a newer credential.
  */
 
 import { recordLogEvent } from '@platform/logging/logger';
@@ -173,20 +173,20 @@ const fetchAuthenticated = async (path: string, init: RequestInit | undefined): 
   const credential = authAdapter.capture();
   const headers = new Headers(init?.headers);
   const method = (init?.method ?? 'GET').toUpperCase();
-  // Breadcrumbs carry the path only; query strings can hold tokens and user input. They are fenced to the account
-  // that started the request so late settlements never land in the next account's history.
+  // Breadcrumbs carry the path only; query strings can hold tokens and user input. They are fenced to the account that
+  // started the request so late settlements never land in the next account's history.
   const safePath = path.split(/[?#]/, 1)[0] ?? path;
   const owner = captureAccountScope();
-  // A caller-supplied Authorization header (a lease released for an earlier account) is not this tab's credential,
-  // so its response reports nothing about it.
+  // A caller-supplied Authorization header (a lease released for an earlier account) is not this tab's credential, so
+  // its response reports nothing about it.
   const sent = credential.token !== null && !headers.has('Authorization') ? credential : null;
 
   if (sent) {
     headers.set('Authorization', `Bearer ${sent.token}`);
   }
 
-  // Use same-origin credentials so login stores the media cookie. Cross-origin API callers must opt into include
-  // and configure server credential support.
+  // Use same-origin credentials so login stores the media cookie. Cross-origin API callers must opt into include and
+  // configure server credential support.
   let response: Response;
 
   try {

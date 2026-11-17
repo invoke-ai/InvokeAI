@@ -55,8 +55,8 @@ export const GalleryBoardsPanel = () => {
   const [boardMenuTarget, setBoardMenuTarget] = useState<GalleryBoardMenuTarget | null>(null);
   const boardsViewportRef = useRef<HTMLDivElement>(null);
 
-  // The shell keeps the gallery mounted across layout switches, and a scroll
-  // container that stops being rendered loses its offset outright.
+  // The shell keeps the gallery mounted across layout switches, and a scroll container that stops being rendered loses
+  // its offset outright.
   usePreservedScrollOffset(boardsViewportRef);
 
   const { showArchivedBoards, showDateBoards, showOtherProjectBoards } = gallery.settings;
@@ -113,8 +113,8 @@ export const GalleryBoardsPanel = () => {
     [createBoardIn, groups.canCreateFromSearch, trimmedSearchTerm]
   );
 
-  // Enter creates only with no matches, avoiding accidental near-duplicate boards; it takes the project's row,
-  // the first of the two the typed name offers.
+  // Enter creates only with no matches, avoiding accidental near-duplicate boards; it takes the project's row, the
+  // first of the two the typed name offers.
   const handleSubmitSearch = useCallback(() => {
     if (!groups.hasAnyMatch) {
       createBoardFromSearch('project');
@@ -178,8 +178,8 @@ export const GalleryBoardsPanel = () => {
       actions.updateSettings(toggleGalleryProjectGroup(gallery.settings, groupProjectId, isOpen)),
     [actions, gallery.settings]
   );
-  // Without the backend's list, the placeholder Uncategorized row (and "no matches") would claim there is nothing
-  // else; the failure takes the rows' place instead. While it loads, the fixed rows alone would read as empty tiers.
+  // Without the backend's list, the placeholder Uncategorized row (and "no matches") would claim there is nothing else;
+  // the failure takes the rows' place instead. While it loads, the fixed rows alone would read as empty tiers.
   const isBoardListUnavailable = boardsState.status === 'error';
   const isBoardListSettled = boardsState.status !== 'loading' && !isBoardListUnavailable;
   const focusBoardList = useCallback(() => focusVisibleOperable(boardsViewportRef.current), []);
@@ -291,8 +291,8 @@ export const GalleryBoardsPanel = () => {
     );
   const projectBoards = isBoardListUnavailable ? [] : groups.projectBoards;
   const libraryBoards = isBoardListUnavailable ? [] : groups.libraryBoards;
-  // Each tier counts its boards, the project's inbox among them; Uncategorized is where media on no board shows, not
-  // a board.
+  // Each tier counts its boards, the project's inbox among them; Uncategorized is where media on no board shows, not a
+  // board.
   const countBoards = (boards: GalleryBoard[]) => boards.filter((board) => board.kind === 'board').length;
 
   return (
@@ -398,7 +398,8 @@ export const GalleryBoardsPanel = () => {
                         onToggle={handleToggleProjectGroup}
                       >
                         {group.boards.map((board) =>
-                          // Every other project's inbox is called "Inbox"; assistive tech needs the project in the name.
+                          // Every other project's inbox is called "Inbox"; assistive tech needs the project in the
+                          // name.
                           renderRow(
                             board,
                             board.isInbox ? t('widgets.gallery.inboxOf', { project: group.label }) : undefined

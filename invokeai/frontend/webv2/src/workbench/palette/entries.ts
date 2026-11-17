@@ -12,8 +12,7 @@ import fuzzysort from 'fuzzysort';
 import { getPaletteContributionKey } from './contributionKey';
 
 /**
- * Normalize sources to PaletteEntry; rank fuzzily within fixed sections so command/settings placement remains
- * stable.
+ * Normalize sources to PaletteEntry; rank fuzzily within fixed sections so command/settings placement remains stable.
  */
 
 export interface PaletteStageOption {
@@ -92,9 +91,8 @@ export interface PaletteSearchProvider {
   contextKey: string;
   label: string;
   /**
-   * Provider filters by created-at date range. Date-less providers are
-   * skipped entirely for pure-date queries (empty text + range), where they
-   * could only return broad unfiltered results.
+   * Provider filters by created-at date range. Date-less providers are skipped entirely for pure-date queries (empty
+   * text + range), where they could only return broad unfiltered results.
    */
   supportsCreatedAtRange?: boolean;
   /** Searches only once the user scopes into it; root mode offers just its scope row. For costly searches. */
@@ -172,8 +170,8 @@ const groupRank = (group: string): number => {
 /** Omit navigation, caret nudges, and the palette toggle from searchable rows. */
 const PALETTE_HIDDEN_COMMANDS = new Set([
   'app.openCommandPalette',
-  // Both palettes already ship `buildOpenSettingsEntry` under this id, and it
-  // carries search keywords and an empty-state slot the catalog entry lacks.
+  // Both palettes already ship `buildOpenSettingsEntry` under this id, and it carries search keywords and an
+  // empty-state slot the catalog entry lacks.
   'app.openSettings',
   'app.promptWeightDown',
   'app.promptWeightUp',
@@ -597,8 +595,8 @@ const buildEmptyStateRows = (
 };
 
 /**
- * Empty queries show recents/navigation. Otherwise rank title/keywords/down-weighted subtitle within fixed
- * sections, breaking ties by recency then title.
+ * Empty queries show recents/navigation. Otherwise rank title/keywords/down-weighted subtitle within fixed sections,
+ * breaking ties by recency then title.
  */
 export const searchPaletteRows = (
   entries: readonly PaletteEntry[],
@@ -614,8 +612,7 @@ export const searchPaletteRows = (
   const trimmed = query.trim();
 
   if (trimmed.length === 0) {
-    // Stage mode lists every option before the user types; the root palette
-    // shows the curated launcher instead.
+    // Stage mode lists every option before the user types; the root palette shows the curated launcher instead.
     if (showAllOnEmpty) {
       const all = new Map<string, RankedEntry[]>();
 
@@ -695,9 +692,8 @@ export interface ProviderResultSection {
 }
 
 /**
- * Entity sections render below local sections as each provider resolves.
- * Empty non-fetching sections drop silently in root mode; `cap` bounds root
- * mode to a teaser (depth lives behind the scope), null means uncapped.
+ * Entity sections render below local sections as each provider resolves. Empty non-fetching sections drop silently in
+ * root mode; `cap` bounds root mode to a teaser (depth lives behind the scope), null means uncapped.
  */
 export const buildProviderSectionRows = (
   sections: readonly ProviderResultSection[],
@@ -763,8 +759,8 @@ export const buildScopeRows = (
   }
 
   return [
-    // Distinct id: the scope-command *group* label ("label:Search in") can
-    // render in the same list when a query fuzzy-matches those commands.
+    // Distinct id: the scope-command *group* label ("label:Search in") can render in the same list when a query
+    // fuzzy-matches those commands.
     { id: 'label:scope-rows', kind: 'label', label: t?.('commandPalette.search.in') ?? SEARCH_SCOPE_GROUP },
     ...providers.map<PaletteRow>((provider) => ({
       id: getPaletteContributionKey('scope', provider.providerKey),

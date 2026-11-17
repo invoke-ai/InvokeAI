@@ -38,8 +38,8 @@ const clamp = (value: number, min: number, max: number): number => Math.min(max,
 const FORMAT_HOVER_PROPS = { bg: 'bg.muted', color: 'fg' };
 
 /**
- * Edit one persisted foreground/background pair using the user's preferred wheel/box and shared channels. Keep
- * only sticky HSV locally to preserve hue through greys; shelves live in Swatches.
+ * Edit one persisted foreground/background pair using the user's preferred wheel/box and shared channels. Keep only
+ * sticky HSV locally to preserve hue through greys; shelves live in Swatches.
  */
 export const ColorPane = () => {
   const { t } = useTranslation();
@@ -48,8 +48,8 @@ export const ColorPane = () => {
   const target = useActiveColorTarget();
   const commands = useActiveColorCommands();
   const mode = useColorPickerMode();
-  // The explicit non-pair target: the selected mask's tint, when armed. Its
-  // edits commit through the document seam — live preview, one entry a gesture.
+  // The explicit non-pair target: the selected mask's tint, when armed. Its edits commit through the document seam —
+  // live preview, one entry a gesture.
   const maskTint = useMaskTintEditor(engine);
   const selectedMask = useActiveProjectSelector((project) => {
     const { document } = project.canvas;
@@ -60,8 +60,8 @@ export const ColorPane = () => {
   }, areSelectedMasksEqual);
   const activeHex = maskTint ? maskTint.color : pair[target];
 
-  // The picker holds HSV so hue survives greys; it resyncs from the pair only
-  // when the pair changed to something the current HSV does not already mean.
+  // The picker holds HSV so hue survives greys; it resyncs from the pair only when the pair changed to something the
+  // current HSV does not already mean.
   const [hsv, setHsv] = useState<HsvColor>(() => hexToHsv(activeHex));
   const [syncedHex, setSyncedHex] = useState(activeHex);
   if (activeHex !== syncedHex) {
@@ -130,10 +130,9 @@ export const ColorPane = () => {
     }
     const hex = await engine.tools.requestColorSample();
     if (hex) {
-      // Routed through the command so the target is read when the sample lands,
-      // not when the pipette was armed. This one-shot sample is claimed before
-      // the standing router (CanvasColorFeed), which routes Alt-picks to the
-      // same armed tint, a selected shape or text, or the pair.
+      // Routed through the command so the target is read when the sample lands, not when the pipette was armed. This
+      // one-shot sample is claimed before the standing router (CanvasColorFeed), which routes Alt-picks to the same
+      // armed tint, a selected shape or text, or the pair.
       settlePendingRecent(false);
       if (maskTint) {
         maskTint.commit(hex);

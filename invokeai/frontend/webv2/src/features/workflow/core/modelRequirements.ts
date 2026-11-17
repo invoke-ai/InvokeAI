@@ -10,8 +10,8 @@ import { isLoraFieldCollectionEntry, isModelFieldType, toLoraFieldCollectionList
 import { isInvocationNode } from './types';
 
 /**
- * Extract exact models and template-described empty required slots; blank slots are normal workflow requirements,
- * not merely a fallback.
+ * Extract exact models and template-described empty required slots; blank slots are normal workflow requirements, not
+ * merely a fallback.
  */
 
 export interface WorkflowModelIdentifier {
@@ -194,8 +194,8 @@ const computePrimaryBase = (requirements: readonly WorkflowModelRequirement[]): 
 };
 
 /**
- * Visits the model each of a node's model fields names, and each required model field left empty; connection-fed
- * inputs are owned upstream and skipped.
+ * Visits the model each of a node's model fields names, and each required model field left empty; connection-fed inputs
+ * are owned upstream and skipped.
  */
 const visitNodeModelNeeds = (
   node: WorkflowInvocationNode,
@@ -217,8 +217,7 @@ const visitNodeModelNeeds = (
 
     const value = node.data.inputs[fieldTemplate.name]?.value;
 
-    // Inspect nested identifiers in LoRA collections so their requirements match equivalent selector-node
-    // graphs.
+    // Inspect nested identifiers in LoRA collections so their requirements match equivalent selector-node graphs.
     if (isLoraCollection) {
       const entries = toLoraFieldCollectionList(value);
 
@@ -228,8 +227,8 @@ const visitNodeModelNeeds = (
         }
       }
 
-      // An empty collection still falls through to the slot path below, so a required-but-blank
-      // field keeps describing what it needs the way every other blank model field does.
+      // An empty collection still falls through to the slot path below, so a required-but-blank field keeps describing
+      // what it needs the way every other blank model field does.
       if (entries.length > 0) {
         continue;
       }
@@ -319,8 +318,8 @@ export interface WorkflowFieldModelRequirement {
 }
 
 /**
- * The same requirements per invocation node and field, so a view can mark the node or the input that needs a model.
- * A node lists each model it names and each empty required model field; nodes with neither are absent.
+ * The same requirements per invocation node and field, so a view can mark the node or the input that needs a model. A
+ * node lists each model it names and each empty required model field; nodes with neither are absent.
  */
 export const extractNodeModelRequirements = (
   document: ProjectGraphState,
@@ -496,8 +495,8 @@ const resolveFromStarter = (
 };
 
 /**
- * Resolve exact requirements by key, hash, then name/base/type; slots by base/type. Starter fallback reports
- * installing sources, including dependencies.
+ * Resolve exact requirements by key, hash, then name/base/type; slots by base/type. Starter fallback reports installing
+ * sources, including dependencies.
  */
 export const resolveWorkflowModelRequirements = (
   requirements: readonly WorkflowModelRequirement[],
@@ -532,8 +531,8 @@ export const resolveWorkflowModelRequirements = (
   });
 
 /**
- * Link only missing requirements to Add Models. Prefer catalog names, then exact model names or raw slot
- * base/type; display prose is not searchable taxonomy.
+ * Link only missing requirements to Add Models. Prefer catalog names, then exact model names or raw slot base/type;
+ * display prose is not searchable taxonomy.
  */
 export const getAddModelsSearchTerm = (resolved: ResolvedModelRequirement): string | null => {
   if (resolved.status === 'installed') {

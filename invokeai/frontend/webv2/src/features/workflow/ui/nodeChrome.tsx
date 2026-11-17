@@ -35,8 +35,8 @@ export const WORKFLOW_NODE_DENSITY = {
   /** A header's inset from the border to text at its start or end. */
   headerTextInset: '2.5',
   /**
-   * A field row's label line: the height of the line that holds the label and its port, which is centred on it, and
-   * the label's line height. The browser lays text out on whole pixels in the node's own coordinates, before the flow's
+   * A field row's label line: the height of the line that holds the label and its port, which is centred on it, and the
+   * label's line height. The browser lays text out on whole pixels in the node's own coordinates, before the flow's
    * zoom, so a shorter line box centred in a taller line starts between pixels and its glyphs round a pixel away from
    * the port; zoomed in, that pixel grows.
    */
@@ -238,8 +238,8 @@ export const WORKFLOW_NODE_FIELD_CONTROL_ATTRIBUTE = 'data-node-field-control';
 
 /**
  * When the body ends in a field's control, the space under that control matches the rows' side inset, so the control
- * sits evenly inside the node. Both come from `rowPaddingX`; the last row's bottom padding makes up the difference
- * from the body's own. A body ending in a label-only row keeps its tighter rhythm.
+ * sits evenly inside the node. Both come from `rowPaddingX`; the last row's bottom padding makes up the difference from
+ * the body's own. A body ending in a label-only row keeps its tighter rhythm.
  */
 const BODY_LAST_CONTROL_CSS = {
   [`& > [${WORKFLOW_NODE_FIELD_ROW_ATTRIBUTE}]:last-child:has([${WORKFLOW_NODE_FIELD_CONTROL_ATTRIBUTE}], [data-workflow-export-field-value])`]:
@@ -262,10 +262,7 @@ const HANDLE_ANGULAR_RADIUS = 2;
 const HANDLE_BORDER_WIDTH = 2;
 const HANDLE_RING_WIDTH = 1.5;
 
-/**
- * One visual grammar for field handles: filled = single cardinality,
- * angular = model/batch types, diamond = batch.
- */
+/** One visual grammar for field handles: filled = single cardinality, angular = model/batch types, diamond = batch. */
 const getHandleVisual = (type: FieldType) => ({
   color: getFieldTypeColor(type),
   isAngular: isModelFieldType(type) || type.batch,

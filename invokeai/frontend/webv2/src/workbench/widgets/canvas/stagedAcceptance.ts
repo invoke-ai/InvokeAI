@@ -27,8 +27,8 @@ export interface StagedAcceptancePorts {
 
 /**
  * Accepts the candidate, then stops the rest of its batch so later siblings cannot reopen staging. The stop is
- * requested only after the layer has landed, so a refused accept leaves generation running; banking a disabled
- * layer keeps comparing, and the batch with it.
+ * requested only after the layer has landed, so a refused accept leaves generation running; banking a disabled layer
+ * keeps comparing, and the batch with it.
  */
 export const acceptStagedCandidate = (
   ports: StagedAcceptancePorts,

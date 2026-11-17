@@ -44,8 +44,8 @@ interface PaneBlockLabels {
 }
 
 /**
- * Dock fixed pane blocks at either panel edge with preferred height, resize, and collapse-to-tabs; they are not
- * movable widgets.
+ * Dock fixed pane blocks at either panel edge with preferred height, resize, and collapse-to-tabs; they are not movable
+ * widgets.
  */
 const LayerPaneBlock = ({
   activePane,

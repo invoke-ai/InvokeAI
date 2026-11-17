@@ -118,9 +118,9 @@ const toRowRuns = <T,>(virtualItems: readonly VirtualItem[], rows: readonly Pick
 };
 
 /**
- * Searchable single-choice list for a popup: an editable combobox that keeps focus while the arrows move a
- * virtualized listbox's active option. The active option always stays mounted, so `aria-activedescendant` never
- * names a missing element. Mount it with the popup: each mount starts from an empty search.
+ * Searchable single-choice list for a popup: an editable combobox that keeps focus while the arrows move a virtualized
+ * listbox's active option. The active option always stays mounted, so `aria-activedescendant` never names a missing
+ * element. Mount it with the popup: each mount starts from an empty search.
  */
 export const Picker = <T,>({
   emptyMessage,
@@ -222,9 +222,9 @@ export const Picker = <T,>({
   }, [getIsOptionDisabled, getOptionId, showHeaders, visibleGroups]);
 
   // A new result set remounts the listbox, which opens scrolled to its active option (see PickerListbox). Callers
-  // rebuild groups on unrelated renders, so the set is compared by content: the search that produced it and its
-  // ordered row keys. Equal content keeps the mounted list, its scroll position and rows, and data-only changes
-  // re-render those rows in place. Built once per rows change; renders with unchanged rows compare one reference.
+  // rebuild groups on unrelated renders, so the set is compared by content: the search that produced it and its ordered
+  // row keys. Equal content keeps the mounted list, its scroll position and rows, and data-only changes re-render those
+  // rows in place. Built once per rows change; renders with unchanged rows compare one reference.
   const resultKey = useMemo(() => `${deferredSearchTerm}\u0001${rowKeys}`, [deferredSearchTerm, rowKeys]);
   const [listMount, setListMount] = useState({ generation: 0, resultKey });
 
@@ -367,9 +367,9 @@ export const Picker = <T,>({
 };
 
 /**
- * One result set's virtualized listbox. It is keyed by the result set, so each mount opens with the active option
- * in view: the virtualizer's initial offset places it from estimates, as Platform List's `revealActiveOnMount` does,
- * and a pre-paint reveal corrects for measured row heights. Keyboard moves within the set scroll through the handle.
+ * One result set's virtualized listbox. It is keyed by the result set, so each mount opens with the active option in
+ * view: the virtualizer's initial offset places it from estimates, as Platform List's `revealActiveOnMount` does, and a
+ * pre-paint reveal corrects for measured row heights. Keyboard moves within the set scroll through the handle.
  */
 const PickerListbox = <T,>({
   activeIndex,
@@ -433,8 +433,8 @@ const PickerListbox = <T,>({
     paddingStart: LIST_PADDING_PX,
     rangeExtractor,
     scrollPaddingStart: headerHeight,
-    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error
-    // for any scroll event dispatched while React is rendering or flushing effects.
+    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error for
+    // any scroll event dispatched while React is rendering or flushing effects.
     useFlushSync: false,
   });
   const { measureElement, scrollToIndex, virtualItems } = virtualizer;
@@ -548,8 +548,8 @@ const getRailColor = (group: { colorPalette?: string }): string =>
   group.colorPalette ? `${group.colorPalette}.solid` : 'border.emphasized';
 
 /**
- * Visual only: the enclosing group carries the name for assistive technology. The pinned header stays in flow as
- * the list's only non-absolute row, so `sticky` holds it at the top until the next header pushes it out.
+ * Visual only: the enclosing group carries the name for assistive technology. The pinned header stays in flow as the
+ * list's only non-absolute row, so `sticky` holds it at the top until the next header pushes it out.
  */
 const PickerGroupHeader = <T,>({
   group,

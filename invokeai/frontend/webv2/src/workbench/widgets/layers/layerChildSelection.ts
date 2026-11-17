@@ -6,9 +6,8 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { getLayerChildItem } from './layerChildRows';
 
 /**
- * The panel's sub-selection: the one projected child row being edited. Widget
- * UI state, never document state — it creates no history, and it survives only
- * while its owner stays the selected layer and the item still exists.
+ * The panel's sub-selection: the one projected child row being edited. Widget UI state, never document state — it
+ * creates no history, and it survives only while its owner stays the selected layer and the item still exists.
  */
 export interface LayerChildSelection {
   readonly projectId: string;

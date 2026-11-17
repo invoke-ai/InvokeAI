@@ -18,8 +18,7 @@ export const DEFAULT_NODE_PACK_FILTERS: NodePackFilters = {
 };
 
 /**
- * Zero nodes indicates failed import or pending reload/restart because counts come from the live invocation
- * registry.
+ * Zero nodes indicates failed import or pending reload/restart because counts come from the live invocation registry.
  */
 export const isProblemPack = (pack: Pick<NodePackInfo, 'nodeCount'>): boolean => pack.nodeCount === 0;
 

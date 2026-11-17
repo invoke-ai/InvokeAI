@@ -45,7 +45,8 @@ export const readLockedAspectRatio = (generate: Record<string, unknown>): number
 
 /**
  * Carry a manual render size to a new locked ratio at about the same area, on the model grid. Null when it already
- * holds the ratio, meaning one side is the other's grid-snapped counterpart (as the Size section derives a locked side).
+ * holds the ratio, meaning one side is the other's grid-snapped counterpart (as the Size section derives a locked
+ * side).
  */
 export const fitCanvasScalingToRatio = (
   size: { height: number; width: number },

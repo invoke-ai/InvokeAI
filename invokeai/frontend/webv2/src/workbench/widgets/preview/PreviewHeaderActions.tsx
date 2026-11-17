@@ -21,7 +21,8 @@ const AUTO_SWITCH_POSITIONING = { placement: 'bottom-end' } as const;
 
 /**
  * The selection's actions, then the viewer's own controls (zoom, auto-switch, Details), sized by the density the view
- * publishes: its measured width in the center or a floating window (side rails are always compact). The filmstrip toggle lives in the gear's quick settings and on the `T` key.
+ * publishes: its measured width in the center or a floating window (side rails are always compact). The filmstrip
+ * toggle lives in the gear's quick settings and on the `T` key.
  */
 export const PreviewHeaderActions = (_props: WidgetViewProps) => {
   const livePreview = useLivePreviewFollow();

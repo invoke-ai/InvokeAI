@@ -19,8 +19,8 @@ const OPERATION_TITLE_KEYS = {
 } as const;
 
 /**
- * The running operation's section: its groups and actions, the busy phase beside the title, and any error last, where it
- * can grow without moving a control. One component per form, so each calls one status hook for its lifetime.
+ * The running operation's section: its groups and actions, the busy phase beside the title, and any error last, where
+ * it can grow without moving a control. One component per form, so each calls one status hook for its lifetime.
  */
 export const createOperationSection = (form: OperationPropertyForm) => {
   const useStatus = form.useStatus;

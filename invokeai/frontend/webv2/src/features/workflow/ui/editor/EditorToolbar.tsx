@@ -42,9 +42,8 @@ const POPOVER_POSITIONING = { placement: 'right' } as const;
 const TOOLTIP_POSITIONING = { placement: 'right-start' } as const;
 
 /**
- * Clears the center region's floating chrome, whose inset already includes the
- * gap below the islands. In the left and bottom panels the variable is
- * undefined and the strip falls back to its own top margin.
+ * Clears the center region's floating chrome, whose inset already includes the gap below the islands. In the left and
+ * bottom panels the variable is undefined and the strip falls back to its own top margin.
  */
 const EDITOR_TOOLBAR_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 

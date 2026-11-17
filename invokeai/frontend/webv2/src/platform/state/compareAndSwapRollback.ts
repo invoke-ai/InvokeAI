@@ -1,6 +1,6 @@
 /**
- * Roll back only if the slot still equals this mutation's optimistic value; unconditional restore would erase
- * newer writes.
+ * Roll back only if the slot still equals this mutation's optimistic value; unconditional restore would erase newer
+ * writes.
  */
 
 /** What a rollback needs to know about a slot: what was there, and what we put there. */

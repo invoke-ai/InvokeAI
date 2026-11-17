@@ -91,11 +91,11 @@ const CONTENT_CSS: SystemStyleObject = {
   },
 };
 /**
- * Wide (`WORKFLOW_LIBRARY_WIDE`): the body is one grid, matching the artboard. The places rail and the detail rail
- * are flush full-height columns from under the header to the dialog's bottom edge, each separated by a 1px border;
- * the toolbar, result line and cards share the centre column between them. The centre and panes boxes dissolve
- * (`display: contents`) so their parts become the grid's items, and the body is the container the cards and detail
- * rail lay out against (`workflow-library-content`); a body too short for them scrolls as a whole.
+ * Wide (`WORKFLOW_LIBRARY_WIDE`): the body is one grid, matching the artboard. The places rail and the detail rail are
+ * flush full-height columns from under the header to the dialog's bottom edge, each separated by a 1px border; the
+ * toolbar, result line and cards share the centre column between them. The centre and panes boxes dissolve (`display:
+ * contents`) so their parts become the grid's items, and the body is the container the cards and detail rail lay out
+ * against (`workflow-library-content`); a body too short for them scrolls as a whole.
  */
 const BODY_CSS: SystemStyleObject = {
   display: 'flex',
@@ -208,8 +208,8 @@ const selectLibraryNavigation = (snapshot: ReturnType<typeof workflowUiStore.get
 
 /**
  * Mounted while a template place shows: on opening, or on leaving This project. It applies the opening filter, and on
- * leaving (closing, or switching to This project) drops the search and tags from the listing, so the next opening
- * never paints a filtered view first. The project view never loads library pages.
+ * leaving (closing, or switching to This project) drops the search and tags from the listing, so the next opening never
+ * paints a filtered view first. The project view never loads library pages.
  */
 const WorkflowLibraryBrowseSession = ({
   opening,
@@ -337,8 +337,8 @@ export const WorkflowLibraryDialog = ({
     }
   }, []);
   const closeDialog = useCallback(() => {
-    // Closing the library removes its preview immediately; the parent surface is leaving too. The search it would
-    // have applied is cleared with the rest of the query.
+    // Closing the library removes its preview immediately; the parent surface is leaving too. The search it would have
+    // applied is cleared with the rest of the query.
     cancelPendingSearch();
     setContextMenuAnchor(null);
     onOpenChange(false);
@@ -384,8 +384,8 @@ export const WorkflowLibraryDialog = ({
   // The project selection belongs to the project it was made in; another project starts from its active workflow.
   const projectSelectionId = selection?.projectId === projectId ? selection.workflowId : null;
 
-  // The order the toolbar shows. Before a template place's first listing the store still holds another place's
-  // filter, so the account's stored order stands in for it.
+  // The order the toolbar shows. Before a template place's first listing the store still holds another place's filter,
+  // so the account's stored order stands in for it.
   const libraryOrder = getWorkflowLibraryOrder(
     !isProjectTab && filter.place === tab
       ? filter
@@ -426,8 +426,8 @@ export const WorkflowLibraryDialog = ({
   // preview mode it closes a node card, else leaves the preview. Only the next Escape closes the library.
   const handleEscapeKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      // One keypress can arrive twice (StrictMode registers the open dialog's layer twice); only the first acts, and the
-      // default it prevented keeps the second from closing the library.
+      // One keypress can arrive twice (StrictMode registers the open dialog's layer twice); only the first acts, and
+      // the default it prevented keeps the second from closing the library.
       if (event.defaultPrevented) {
         return;
       }
@@ -449,8 +449,8 @@ export const WorkflowLibraryDialog = ({
     }
   }, []);
 
-  // Previewing selects the workflow, so the rail describes what the stage shows. The stage takes focus from the
-  // control that asked, which the collection's hiding would otherwise drop to the document.
+  // Previewing selects the workflow, so the rail describes what the stage shows. The stage takes focus from the control
+  // that asked, which the collection's hiding would otherwise drop to the document.
   const enterPreview = useCallback(
     (workflowId: string, view?: WorkflowPreviewView) => {
       const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;

@@ -20,10 +20,10 @@ import { useTranslation } from 'react-i18next';
 import type * as WorkflowPreviewJsonModule from './WorkflowPreviewJson';
 
 /**
- * The parts every workflow preview stage shares (the library's preview mode and the graph preview dialog): the bar
- * over the stage, its find field, its Nodes / Inputs / Graph views and the messages the stage shows in their place.
- * The bar keeps its tabs at the start and its menu at the end in every view; only the find field, shown with the
- * nodes, comes and goes in the space between, so nothing a reader aims at moves.
+ * The parts every workflow preview stage shares (the library's preview mode and the graph preview dialog): the bar over
+ * the stage, its find field, its Nodes / Inputs / Graph views and the messages the stage shows in their place. The bar
+ * keeps its tabs at the start and its menu at the end in every view; only the find field, shown with the nodes, comes
+ * and goes in the space between, so nothing a reader aims at moves.
  */
 
 /**

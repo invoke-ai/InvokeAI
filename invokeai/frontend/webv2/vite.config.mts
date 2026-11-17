@@ -48,8 +48,8 @@ const ROUTE_SHARED_MODULES = [
   '/features/nodes/data/nodeExecutionStore.ts',
   '/features/nodes/index.ts',
   '/features/nodes/ui/NodesPage.tsx',
-  // Gallery tiles, the lazy Preview and the Launchpad's gallery picker share the failed-image recovery; alone it costs a
-  // startup request.
+  // Gallery tiles, the lazy Preview and the Launchpad's gallery picker share the failed-image recovery; alone it costs
+  // a startup request.
   '/features/gallery/data/imageRecovery.ts',
   '/features/gallery/ui/useGalleryImageRecovery.ts',
   '/platform/browser/downloadBlob.ts',
@@ -58,7 +58,8 @@ const ROUTE_SHARED_MODULES = [
   // The settings dialog (boot) and the lazy Launchpad managers share the `/` search shortcut; alone it costs a startup
   // request.
   '/platform/browser/searchShortcut.ts',
-  // The route's recovery peek and the lazy editor share the editor-session lock probe; alone they cost a startup request.
+  // The route's recovery peek and the lazy editor share the editor-session lock probe; alone they cost a startup
+  // request.
   '/platform/browser/webLocks.ts',
   '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
@@ -66,8 +67,8 @@ const ROUTE_SHARED_MODULES = [
   // The eager Generate and Gallery surfaces and the lazily loaded managed-file field share it; alone it costs both
   // routes a startup request.
   '/platform/ui/DropZone.tsx',
-  // Sign-in and deferred user management share session/form primitives. Keep the already-eager code together;
-  // splitting by the new importer sets would add a startup request on both routes.
+  // Sign-in and deferred user management share session/form primitives. Keep the already-eager code together; splitting
+  // by the new importer sets would add a startup request on both routes.
   '/features/identity/core/schemas.ts',
   '/features/identity/core/sessionPolicy.ts',
   '/features/identity/core/storedCredential.ts',
@@ -87,13 +88,13 @@ const ROUTE_SHARED_MODULES = [
   '/platform/ui/JsonPreview.tsx',
   '/platform/ui/Tabs.tsx',
   '/platform/ui/toaster.tsx',
-  // The Fonts page, the Generate render section and the lazy workflow number fields share the slider controls;
-  // alone they cost the editor a boot request, and the editor boot chunk would drag the editor into the Launchpad.
+  // The Fonts page, the Generate render section and the lazy workflow number fields share the slider controls; alone
+  // they cost the editor a boot request, and the editor boot chunk would drag the editor into the Launchpad.
   '/platform/ui/Slider.tsx',
   '/platform/ui/SliderNumberField.tsx',
   '/platform/ui/Tooltip.tsx',
-  // Eager menus and popovers and the lazily loaded video player share these controls and their overlay registry;
-  // alone they cost both routes a request.
+  // Eager menus and popovers and the lazily loaded video player share these controls and their overlay registry; alone
+  // they cost both routes a request.
   '/platform/ui/Menu.tsx',
   '/platform/ui/Popover.tsx',
   '/platform/ui/widgetOverlayRegistry.ts',
@@ -111,7 +112,8 @@ const ROUTE_SHARED_MODULES = [
   '/platform/transport/connectionStore.ts',
   '/platform/transport/socketHub.ts',
   '/platform/ui/ConfirmDialog.tsx',
-  // Every dialog, eager or lazy, is built on these and the hotkey runtime reads the presence; alone they cost a startup request.
+  // Every dialog, eager or lazy, is built on these and the hotkey runtime reads the presence; alone they cost a startup
+  // request.
   '/platform/ui/Dialog.tsx',
   '/platform/ui/modalPresence.ts',
   // Confirm/Rename dialogs and the boot gates keep closing overlays mounted with it; alone it costs a startup request.
@@ -136,8 +138,8 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/hotkeys/catalog.ts',
   '/workbench/hotkeys/modalLayer.ts',
   '/workbench/launchpad/formatRelativeTime.ts',
-  // The router, the editor context and the project library (below) share the startup launch and the project sync
-  // stores it reads; split from the entry they cost a startup request.
+  // The router, the editor context and the project library (below) share the startup launch and the project sync stores
+  // it reads; split from the entry they cost a startup request.
   '/workbench/launchpad/StayOnLaunchpadButton.tsx',
   '/workbench/launchpad/startupLaunch.ts',
   '/workbench/projects/openProjects.ts',
@@ -232,8 +234,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/widgets/layers/revealLayerProperties.ts',
   // The reveal opens widgets through this; its own imports (focus regions, context, widget registry) boot already.
   '/workbench/useOpenWorkbenchWidget.ts',
-  // The boot toaster, the palette and the lazy Notifications widget share the notification actions and the queue
-  // reveal they run. Alone they cost boot requests.
+  // The boot toaster, the palette and the lazy Notifications widget share the notification actions and the queue reveal
+  // they run. Alone they cost boot requests.
   '/features/queue/reveal.ts',
   '/features/queue/ui/queueUiStore.ts',
   '/workbench/shell/notifications/editorNotificationActions.ts',
@@ -289,8 +291,8 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/platform/react/useDebouncedValue.ts',
 ] as const;
 
-// The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of
-// them and the Launchpad palette reaches the barrel lazily, so splitting them by importer only adds requests.
+// The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of them
+// and the Launchpad palette reaches the barrel lazily, so splitting them by importer only adds requests.
 const WORKFLOW_CORE_MODULES = [
   '/features/workflow/core/batch.ts',
   '/features/workflow/core/callSavedWorkflow.ts',
@@ -346,8 +348,8 @@ const WIDGET_METADATA_MODULES = [
 
 // The gallery picker and the pieces its view shares with the Gallery widget. The Launchpad's model manager uses the
 // picker, so it cannot sit in editor-boot-shared (which imports the editor itself: loading that early mis-orders the
-// editor's modules) nor in gallery-state (which the Launchpad home loads, so it would pay for the picker there).
-// Its query and drag modules join it, so the editor trades their separate chunks for this one; backend.ts stays out because
+// editor's modules) nor in gallery-state (which the Launchpad home loads, so it would pay for the picker there). Its
+// query and drag modules join it, so the editor trades their separate chunks for this one; backend.ts stays out because
 // the Launchpad home reads it for recent outputs.
 const GALLERY_PICKER_MODULES = [
   '/features/gallery/ui/galleryDnd.ts',
@@ -407,8 +409,8 @@ const GALLERY_STATE_MODULES = [
   '/features/gallery/ui/GalleryMediaUsagePanel.tsx',
   '/features/gallery/ui/galleryStateView.ts',
   '/features/queue/contracts.ts',
-  // The queue contracts, index and React entries re-export these; the lazy queue rows and widget share them. Alone
-  // they cost boot requests.
+  // The queue contracts, index and React entries re-export these; the lazy queue rows and widget share them. Alone they
+  // cost boot requests.
   '/features/queue/core/itemLabels.ts',
   '/features/queue/core/queueActivity.ts',
   '/features/queue/core/retryReport.ts',
@@ -433,9 +435,9 @@ const WIDGET_HOST_MODULES = [
 ] as const;
 
 // The image menus and actions the Gallery and Preview boot with, which the lazy queue recall chunks (the queue row and
-// details actions, the staging menu's recall verbs, the queue's Recall all) import as well. The lazy Canvas reaches only
-// their import notices and reference append, so without the group Rolldown splits those out, costing every editor boot
-// a request.
+// details actions, the staging menu's recall verbs, the queue's Recall all) import as well. The lazy Canvas reaches
+// only their import notices and reference append, so without the group Rolldown splits those out, costing every editor
+// boot a request.
 const IMAGE_ACTIONS_MODULES = [
   '/workbench/canvas-operations/canvasImportNotice.ts',
   '/workbench/image-actions/ContextSubMenu.tsx',

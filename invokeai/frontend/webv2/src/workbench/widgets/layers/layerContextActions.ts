@@ -234,8 +234,8 @@ interface LayerContextActionDefinitionBase {
 }
 
 /**
- * A picker action is its own submenu, so it cannot also sit in a static one: there it would render as a plain item
- * that runs without a board.
+ * A picker action is its own submenu, so it cannot also sit in a static one: there it would render as a plain item that
+ * runs without a board.
  */
 export type LayerContextActionDefinition = LayerContextActionDefinitionBase &
   (
@@ -339,9 +339,9 @@ const toggleLabel = (key: string, defaultLabel: string, icon: LucideIcon): Enabl
   icon,
   key: `widgets.layers.actions.${key}`,
 });
-// Overlays name the enabled flag for what it decides there, taking part in generation, since their canvas visibility
-// is its own action; raster layers show and hide; a selection holding both is turned off or on, which is true of each.
-// The overlay icons are the row dot's shapes: a plain ring for off, a dot for on (the dashed ring means a group above
+// Overlays name the enabled flag for what it decides there, taking part in generation, since their canvas visibility is
+// its own action; raster layers show and hide; a selection holding both is turned off or on, which is true of each. The
+// overlay icons are the row dot's shapes: a plain ring for off, a dot for on (the dashed ring means a group above
 // leaves the layer out, which no action sets).
 const OVERLAY_LAYER: EnabledToggleLabels = {
   off: toggleLabel('excludeFromGeneration', 'Exclude from generation', CircleIcon),
@@ -455,8 +455,8 @@ const hasFilterableLayerContent = (context: LayerContextActionState): boolean =>
   }
   const { source } = context.layer;
   if (source.type === 'image' || source.type === 'paint') {
-    // `hasSupportedContent` distinguishes empty paint from live unpersisted
-    // cache pixels, which are intentionally filterable despite `bitmap: null`.
+    // `hasSupportedContent` distinguishes empty paint from live unpersisted cache pixels, which are intentionally
+    // filterable despite `bitmap: null`.
     return true;
   }
   if (context.layer.type !== 'raster') {

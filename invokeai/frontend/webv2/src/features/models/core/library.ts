@@ -153,11 +153,11 @@ export const hasModelPickerCandidates = (
 export const getModelPickerGroups = (models: ModelConfig[], options: ModelPickerOptions): ModelPickerResult => {
   const allowedTypes = new Set(options.modelTypes);
   const candidates = models.filter((model) => isModelPickerCandidate(model, allowedTypes, options));
-  // Chips are derived from candidates — before the base filter — so the chip
-  // row stays stable while the user toggles chips.
+  // Chips are derived from candidates — before the base filter — so the chip row stays stable while the user toggles
+  // chips.
   const availableBases = collectBasesForDisplay(candidates);
-  // A remembered base that this picker does not offer (uninstalled, or a
-  // sibling picker's choice) must not filter everything out behind a hidden chip.
+  // A remembered base that this picker does not offer (uninstalled, or a sibling picker's choice) must not filter
+  // everything out behind a hidden chip.
   const baseFilter = new Set(availableBases.filter((base) => options.baseFilter?.has(base)));
   const { relatedKeys } = options;
   const visibleModels = candidates

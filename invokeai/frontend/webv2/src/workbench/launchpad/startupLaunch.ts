@@ -2,9 +2,9 @@ import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
- * A launch that skips the Launchpad to reopen the last work (the "Most recent project" startup), while it is under
- * way. The splash offers a way to stay on the Launchpad meanwhile, and a launch whose editor never rendered (it failed
- * to load, or crashed first) leaves a mark in the account's browser storage so the next launch does not try again.
+ * A launch that skips the Launchpad to reopen the last work (the "Most recent project" startup), while it is under way.
+ * The splash offers a way to stay on the Launchpad meanwhile, and a launch whose editor never rendered (it failed to
+ * load, or crashed first) leaves a mark in the account's browser storage so the next launch does not try again.
  *
  * `beginStartupLaunch` when the launch starts deciding, `openStartupLaunch` when it redirects into the editor,
  * `settleStartupLaunch` whenever the editor renders (or the launch stays home after all), `leaveStartupLaunch` when
@@ -49,8 +49,8 @@ const writeMark = (value: string | null): void => {
 };
 
 /**
- * Starts the launch decision for the current account. Returns false, and forgets the mark, when that account's
- * previous launch never rendered the editor: this launch then stays on the Launchpad.
+ * Starts the launch decision for the current account. Returns false, and forgets the mark, when that account's previous
+ * launch never rendered the editor: this launch then stays on the Launchpad.
  */
 export const beginStartupLaunch = (): boolean => {
   if (readMark() !== null) {

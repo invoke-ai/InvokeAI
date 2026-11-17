@@ -134,8 +134,8 @@ const resolveVideoRecallMedia = async (
 };
 
 /**
- * A partial recall names media on top of the panel's own. One the effective model cannot use would still displace
- * the held media it conflicts with before the reconcile below dropped it, so it is dropped up front instead.
+ * A partial recall names media on top of the panel's own. One the effective model cannot use would still displace the
+ * held media it conflicts with before the reconcile below dropped it, so it is dropped up front instead.
  */
 const pruneUnusablePartialMedia = ({
   mediaNames: names,
@@ -240,8 +240,8 @@ export const executeVideoRecall = async ({
     return false;
   }
 
-  // Values are synced against the catalog: an empty one (not loaded yet, or failed) would drop the panel's model,
-  // LoRAs and components on commit. A prompts recall commits only the prompt keys, so it needs no catalog.
+  // Values are synced against the catalog: an empty one (not loaded yet, or failed) would drop the panel's model, LoRAs
+  // and components on commit. A prompts recall commits only the prompt keys, so it needs no catalog.
   if (models.length === 0 && kind !== 'prompts') {
     commands.notifications.add({
       kind: 'info',
@@ -296,9 +296,9 @@ export const executeVideoRecall = async ({
 };
 
 /**
- * Apply a video metadata record — read from a gallery video, or sent by the external recall API — to the Video
- * panel: build the values, hydrate the media it names from the gallery, drop media the resulting model cannot use,
- * and commit. Resolves whether anything was applied.
+ * Apply a video metadata record — read from a gallery video, or sent by the external recall API — to the Video panel:
+ * build the values, hydrate the media it names from the gallery, drop media the resulting model cannot use, and commit.
+ * Resolves whether anything was applied.
  */
 export const applyVideoRecallMetadata = async ({
   commands,
@@ -354,9 +354,9 @@ export const applyVideoRecallMetadata = async ({
       : NO_RESOLVED_MEDIA;
 
     assertAccountScopeCurrent(owner);
-    // Snapshot the panel AFTER every read, and yield nothing until the commit: an edit made while the metadata or
-    // its media loaded must survive into the base the recall applies on top of. A medium this build names that the
-    // first did not (the panel's model changed meanwhile) was not read, and is left out like a deleted one.
+    // Snapshot the panel AFTER every read, and yield nothing until the commit: an edit made while the metadata or its
+    // media loaded must survive into the base the recall applies on top of. A medium this build names that the first
+    // did not (the panel's model changed meanwhile) was not read, and is left out like a deleted one.
     const { currentValues, result } = build(getVideoValues());
 
     if (!result) {
@@ -406,8 +406,8 @@ export const applyVideoRecallMetadata = async ({
 
       // A clip that is gone leaves the rest of the recall to apply.
       if (conditioningClip && clipItem) {
-        // The recorded role, not the one a fresh drop would default to: the run held that
-        // modality clean, and the other role is a different generation entirely.
+        // The recorded role, not the one a fresh drop would default to: the run held that modality clean, and the other
+        // role is a different generation entirely.
         result.values = {
           ...result.values,
           conditioningClip: {
@@ -494,8 +494,8 @@ export const applyVideoRecallMetadata = async ({
           const endFrame = recorded.trim
             ? Math.min(Math.max(recorded.trim.endFrame, startFrame), clip.numFrames - 1)
             : clip.numFrames - 1;
-          // Any valid recorded conditioning wins; otherwise use add-path defaults, including soundtrack
-          // conditioning for wrapped audio.
+          // Any valid recorded conditioning wins; otherwise use add-path defaults, including soundtrack conditioning
+          // for wrapped audio.
           const conditioning = isVideoReferenceConditioning(recorded.conditioning)
             ? recorded.conditioning
             : getDefaultReferenceConditioning(item.mediaOrigin);
@@ -509,9 +509,8 @@ export const applyVideoRecallMetadata = async ({
             firstFrameImage: null,
             lastFrameImage: null,
             references,
-            // A source video recorded alongside references is reference-extend
-            // state (hydrated above) — keep it; clear only a leftover. A partial
-            // recall keeps the panel's own, subject to the mode check below.
+            // A source video recorded alongside references is reference-extend state (hydrated above) — keep it; clear
+            // only a leftover. A partial recall keeps the panel's own, subject to the mode check below.
             sourceVideo: result.mediaNames.sourceVideoName || partial ? result.values.sourceVideo : null,
           };
           recalledMedia = true;
@@ -522,8 +521,8 @@ export const applyVideoRecallMetadata = async ({
         result.fields = result.fields.filter((field) => field !== 'media');
       }
 
-      // Reconcile hydrated media with the effective model's modes; deleted frames or unavailable models must not
-      // leave an ungeneratable panel.
+      // Reconcile hydrated media with the effective model's modes; deleted frames or unavailable models must not leave
+      // an ungeneratable panel.
       const effectiveModel = result.values.model;
 
       if (effectiveModel) {
@@ -532,8 +531,8 @@ export const applyVideoRecallMetadata = async ({
         const referenceExtend = Boolean(policy.references?.extend);
 
         // A partial recall can replace the references or the initial video alone, which on a reference-extend panel
-        // would orphan the clip's continuity reference or leave it pointing at the previous clip. Relink it the way
-        // the panel's Initial Video field does, dropping the clip when no reference slot is left for it.
+        // would orphan the clip's continuity reference or leave it pointing at the previous clip. Relink it the way the
+        // panel's Initial Video field does, dropping the clip when no reference slot is left for it.
         if (partial && referenceExtend && result.values.sourceVideo) {
           const linked = getInitialVideoPatch({
             maxVideos: policy.references?.maxVideos ?? 0,
@@ -554,8 +553,8 @@ export const applyVideoRecallMetadata = async ({
           references = [];
         }
         if (references.length > 0) {
-          // References replace the frame slots; the source video survives only
-          // on a reference-extend panel (the new clip is appended to it).
+          // References replace the frame slots; the source video survives only on a reference-extend panel (the new
+          // clip is appended to it).
           firstFrameImage = null;
           lastFrameImage = null;
           if (!referenceExtend) {
@@ -597,8 +596,8 @@ export const applyVideoRecallMetadata = async ({
       return false;
     }
 
-    // Commit only prompt keys: resnapshotted values may contain an unrelated model-family transition and would
-    // widen the lost-update window for concurrent media recall.
+    // Commit only prompt keys: resnapshotted values may contain an unrelated model-family transition and would widen
+    // the lost-update window for concurrent media recall.
     if (result.fields.every((field) => field === 'prompts')) {
       commands.widgets.patchValues(
         'video',
@@ -728,10 +727,10 @@ export type VideoImagePlacement =
   | { status: 'full' | 'unsupported' };
 
 /**
- * Place a gallery image where the Video panel's model takes images. A model with reference images gets it as one:
- * it replaces the reference images (reference videos stay), or with `append` joins them. A frame model gets it as
- * the first frame, clearing the last, as if the frames were a two-image list; with `append` it fills the first free
- * frame slot, and an initial video holds the first. The panel's model is never switched to make the image fit.
+ * Place a gallery image where the Video panel's model takes images. A model with reference images gets it as one: it
+ * replaces the reference images (reference videos stay), or with `append` joins them. A frame model gets it as the
+ * first frame, clearing the last, as if the frames were a two-image list; with `append` it fills the first free frame
+ * slot, and an initial video holds the first. The panel's model is never switched to make the image fit.
  */
 export const placeVideoImage = ({
   append,
@@ -776,9 +775,9 @@ export const placeVideoImage = ({
     return { status: 'unsupported' };
   }
 
-  // Through the panel's own frame patch: a first frame displaces the initial video, and either frame displaces a
-  // clip that holds the picture, while a soundtrack stays to be anchored by it. The stored clip, not the normalized
-  // one, which hides a picture-role clip behind a first frame; only a visible clip is reported as displaced.
+  // Through the panel's own frame patch: a first frame displaces the initial video, and either frame displaces a clip
+  // that holds the picture, while a soundtrack stays to be anchored by it. The stored clip, not the normalized one,
+  // which hides a picture-role clip behind a first frame; only a visible clip is reported as displaced.
   const storedClip = isVideoConditioningClip(videoValues.conditioningClip) ? videoValues.conditioningClip : null;
   const clipDisplaced = isConditioningClipExcludingFrames(values.conditioningClip);
 
@@ -840,9 +839,9 @@ const canConditionInRole = (policy: VideoModelPolicy | null, role: VideoConditio
 
 /**
  * Set the video as the Video panel's conditioning clip in `role`. The panel's own field refuses a clip while
- * conflicting conditioning media is set; this explicit action clears that media instead, as Extend in Video displaces
- * a first frame, and reports it. Frames conflict only with the picture role. Unlike the Initial Video, a clip the panel's model cannot use is declined: it would clear
- * the other media for nothing.
+ * conflicting conditioning media is set; this explicit action clears that media instead, as Extend in Video displaces a
+ * first frame, and reports it. Frames conflict only with the picture role. Unlike the Initial Video, a clip the panel's
+ * model cannot use is declined: it would clear the other media for nothing.
  */
 export const placeConditioningClip = ({
   models,

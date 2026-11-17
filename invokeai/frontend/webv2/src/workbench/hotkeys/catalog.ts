@@ -3,8 +3,8 @@ import type { HotkeyCategory, HotkeyDefinition, HotkeyScope } from './types';
 import { IS_MAC_OS } from './keys';
 
 /**
- * Every binding the app ships, so Hotkeys settings list each under its widget whether or not that widget is mounted.
- * A widget registers the same ids with the same defaults while it is mounted (parity tests hold them together); only
+ * Every binding the app ships, so Hotkeys settings list each under its widget whether or not that widget is mounted. A
+ * widget registers the same ids with the same defaults while it is mounted (parity tests hold them together); only
  * registered handlers intercept chords. App chords are global, other chords require widget focus, and editable fields
  * are excluded unless explicitly allowed. Overrides include print/search/settings, undo/redo, selection/clipboard, and
  * Canvas merge/deselect/invert; browser-reserved chords work only when delivered to the page.
@@ -25,18 +25,15 @@ const categoryScopes = {
  */
 const selectedImageScope: HotkeyScope = { kind: 'widget', typeIds: ['preview', 'gallery'] };
 
-/**
- * Keep invocation shortcuts available inside text and numeric fields so prompt editing does not swallow
- * submission.
- */
+/** Keep invocation shortcuts available inside text and numeric fields so prompt editing does not swallow submission. */
 const editableAppHotkeys = new Set([
   'app.focusPrompt',
   'app.invoke',
   'app.invokeFront',
   'app.invokeToOtherDestination',
   'app.openProjectSwitcher',
-  // Settings is a global destination with no meaning inside a text field, so
-  // the caret's location should not decide whether it opens.
+  // Settings is a global destination with no meaning inside a text field, so the caret's location should not decide
+  // whether it opens.
   'app.openSettings',
   'app.promptHistoryNext',
   'app.promptHistoryPrev',
@@ -79,8 +76,8 @@ const hotkey = (
   };
 };
 
-// The palette must open while typing and toggle closed above its own modal
-// layer, so it opts into both editable and modal contexts.
+// The palette must open while typing and toggle closed above its own modal layer, so it opts into both editable and
+// modal contexts.
 export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
   allowInEditable: true,
   allowInModal: true,
@@ -94,8 +91,8 @@ export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
 };
 
 /**
- * Generation's `PromptTextarea` marks an editable prompt this way only while the selected model reads attention
- * syntax. Anywhere else Ctrl+Up/Down keeps its text-field meaning.
+ * Generation's `PromptTextarea` marks an editable prompt this way only while the selected model reads attention syntax.
+ * Anywhere else Ctrl+Up/Down keeps its text-field meaning.
  */
 const PROMPT_ATTENTION_TARGET_SELECTOR = 'textarea[data-prompt-attention-target="true"]:not([readonly])';
 
@@ -108,11 +105,11 @@ const QUEUE_RECALL_ITEM_TARGET_SELECTOR = '[data-queue-recall-item], [data-queue
 export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
 
 /**
- * Region focus stays reachable from text fields, so its chord must be one no text field binds: Alt+Shift+Arrow,
- * except on macOS, where most modified arrows are taken. Option+Shift+Arrow selects by word or paragraph,
- * Control+Arrow and Control+Shift+Arrow belong to Mission Control (and never reach the page), Control+Option+Arrow
- * is VoiceOver's navigation chord, and Command+Option+Left/Right switch browser tabs. Control+Command+Arrow has no
- * stock macOS, browser, text-field or VoiceOver binding that we know of.
+ * Region focus stays reachable from text fields, so its chord must be one no text field binds: Alt+Shift+Arrow, except
+ * on macOS, where most modified arrows are taken. Option+Shift+Arrow selects by word or paragraph, Control+Arrow and
+ * Control+Shift+Arrow belong to Mission Control (and never reach the page), Control+Option+Arrow is VoiceOver's
+ * navigation chord, and Command+Option+Left/Right switch browser tabs. Control+Command+Arrow has no stock macOS,
+ * browser, text-field or VoiceOver binding that we know of.
  */
 export const getRegionFocusDefaultKey = (direction: RegionFocusDirection, isMacOs = IS_MAC_OS): string =>
   `${isMacOs ? 'mod+ctrl' : 'alt+shift'}+arrow${direction}`;
@@ -271,8 +268,8 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('viewer', 'zoomToActual', ['1'], { title: 'Zoom to Actual Size' }),
   hotkey('viewer', 'zoomToFit', ['f'], { title: 'Zoom to Fit' }),
   hotkey('gallery', 'selectAllOnPage', ['mod+a']),
-  // No default key: Esc in the Gallery is left to Preview interactions, and the Preview label's clear button
-  // deselects. Users can still assign one.
+  // No default key: Esc in the Gallery is left to Preview interactions, and the Preview label's clear button deselects.
+  // Users can still assign one.
   hotkey('gallery', 'clearSelection', []),
   hotkey('gallery', 'galleryNavUp', ['up']),
   hotkey('gallery', 'galleryNavRight', ['right']),
@@ -282,8 +279,8 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('gallery', 'galleryNavRightAlt', ['alt+right']),
   hotkey('gallery', 'galleryNavDownAlt', ['alt+down']),
   hotkey('gallery', 'galleryNavLeftAlt', ['alt+left']),
-  // Shift extends the selection; Ctrl (Cmd on macOS) moves focus alone. Toggling the focused item has no default
-  // key: Cmd+Space is Spotlight on macOS, and Ctrl+Space already toggles by activating the focused thumbnail as a
+  // Shift extends the selection; Ctrl (Cmd on macOS) moves focus alone. Toggling the focused item has no default key:
+  // Cmd+Space is Spotlight on macOS, and Ctrl+Space already toggles by activating the focused thumbnail as a
   // Ctrl+click. Ctrl+Enter is not used: it invokes from anywhere, the gallery included.
   hotkey('gallery', 'extendSelectionUp', ['shift+up']),
   hotkey('gallery', 'extendSelectionRight', ['shift+right']),

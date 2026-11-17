@@ -128,9 +128,8 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   });
 
   const { loadMore, selectedBoardId, total } = data;
-  // No strip under a ranked result (no starred filter applies), under the
-  // starred-only listing (it would repeat the grid), or in a window anchored
-  // mid-board (the banner promises a slice, not the top of the board).
+  // No strip under a ranked result (no starred filter applies), under the starred-only listing (it would repeat the
+  // grid), or in a window anchored mid-board (the banner promises a slice, not the top of the board).
   const starredStrip = useGalleryStarredStrip({
     enabled: semanticQuery === null && !starredOnly && getGalleryAnchoredWindowPage(galleryValues) === 0,
     filter: data.filter,
@@ -200,8 +199,8 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     selectedBoardId,
   });
 
-  // Publish fetched totals for footer pagination. React only to this instance's total; reacting to shared totals
-  // can make simultaneous views dispatch indefinitely.
+  // Publish fetched totals for footer pagination. React only to this instance's total; reacting to shared totals can
+  // make simultaneous views dispatch indefinitely.
   const publishGalleryTotal = useEffectEvent((nextTotal: number) => {
     const lastPublishedTotal = lastPublishedTotalRef.current;
 
@@ -220,8 +219,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     publishGalleryTotal(total);
   }, [total]);
 
-  // Clamp both paginated pages and infinite anchors after shrinkage so stale positions cannot appear as empty
-  // boards.
+  // Clamp both paginated pages and infinite anchors after shrinkage so stale positions cannot appear as empty boards.
   useEffect(() => {
     if (total === null) {
       return;
@@ -286,8 +284,8 @@ const STARRED_NOTICES: Partial<Record<GalleryReadStatus, string>> = {
 };
 
 /**
- * What the non-blocking notices say, for the widget's live region. A failed listing is left out: its error state is
- * an alert of its own.
+ * What the non-blocking notices say, for the widget's live region. A failed listing is left out: its error state is an
+ * alert of its own.
  */
 const getGalleryFailureAnnouncement = (
   {

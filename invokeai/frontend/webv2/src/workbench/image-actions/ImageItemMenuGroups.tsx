@@ -199,8 +199,8 @@ const SingleImageHandOffItems = ({
   }, [generation, image.height, image.imageName, image.width, openWidget, widgets]);
   const handleSendToVideo = useCallback(() => {
     openWidget('video', { preferredRegions: ['left'] });
-    // The first frame, an initial video, and Ref2VA references all claim the same
-    // conditioning slot: sending a frame clears the rivals.
+    // The first frame, an initial video, and Ref2VA references all claim the same conditioning slot: sending a frame
+    // clears the rivals.
     widgets.patchValues('video', {
       firstFrameImage: { height: image.height, image_name: image.imageName, width: image.width },
       references: [],
@@ -462,8 +462,8 @@ const VIDEO_REUSE_ITEMS: readonly VideoReuseItem[] = [
 
 /**
  * "Use video as" and "Reuse from video": the video as a Video panel input, then its recorded settings. Reads the
- * video's metadata when it mounts, so hosts mount it with their open menu. The entry is the gallery's shared one,
- * which Preview Details and recall commands also read; a failed read holds no answer, so the next open reads it again.
+ * video's metadata when it mounts, so hosts mount it with their open menu. The entry is the gallery's shared one, which
+ * Preview Details and recall commands also read; a failed read holds no answer, so the next open reads it again.
  */
 export const VideoUseGroups = ({
   actions,

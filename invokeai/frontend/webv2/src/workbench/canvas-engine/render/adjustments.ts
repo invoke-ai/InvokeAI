@@ -163,9 +163,9 @@ export const isPositionDependentAdjustments = (adjustments: CanvasAdjustmentsCon
 type SpatialAdjustmentEntry = Extract<CanvasAdjustmentEntry, { type: 'clarity' | 'texture' | 'dehaze' }>;
 
 /**
- * Spatial entries read a neighborhood across the owner's whole surface (its alpha bounds), so they are neither
- * region independent nor resample-commuting. `compileAdjustments` and `applyAdjustments` skip them: they run in the
- * spatial worker on the owner's full source.
+ * Spatial entries read a neighborhood across the owner's whole surface (its alpha bounds), so they are neither region
+ * independent nor resample-commuting. `compileAdjustments` and `applyAdjustments` skip them: they run in the spatial
+ * worker on the owner's full source.
  */
 export const isSpatialAdjustmentEntry = (entry: CanvasAdjustmentEntry): entry is SpatialAdjustmentEntry =>
   entry.type === 'clarity' || entry.type === 'texture' || entry.type === 'dehaze';
@@ -215,10 +215,9 @@ export const toSpatialPlan = (adjustments: CanvasAdjustmentsContract | undefined
 };
 
 /**
- * One step of the compiled pixel pass. Per-channel entries fold into LUT
- * segments (adjacent ones compose into ONE lut); saturation and hue are
- * cross-channel and stand alone. Noise depends on pixel position, so it is its
- * own pass and LUTs never fold across it.
+ * One step of the compiled pixel pass. Per-channel entries fold into LUT segments (adjacent ones compose into ONE lut);
+ * saturation and hue are cross-channel and stand alone. Noise depends on pixel position, so it is its own pass and LUTs
+ * never fold across it.
  */
 export type CompiledAdjustmentSegment =
   | {
@@ -285,8 +284,8 @@ const inverseNormalCdf = (p: number): number => {
 
 /**
  * `NOISE_TABLE_SIZE` equiprobable quantiles of a zero-mean, unit-variance distribution. A uniform table index then
- * samples the distribution with no per-pixel `log`/`sqrt`. Mirrored so the mean is exactly zero, and rescaled so
- * the discrete variance is exactly one; uniform spans ±√3 to match gaussian's standard deviation.
+ * samples the distribution with no per-pixel `log`/`sqrt`. Mirrored so the mean is exactly zero, and rescaled so the
+ * discrete variance is exactly one; uniform spans ±√3 to match gaussian's standard deviation.
  */
 const buildUnitNoiseTable = (quantile: (p: number) => number): Float64Array => {
   const table = new Float64Array(NOISE_TABLE_SIZE);
@@ -315,11 +314,11 @@ const unitNoiseTable = (distribution: 'gaussian' | 'uniform'): Float64Array =>
 const GRAIN_MIN_OUTER_TAP = 1e-3;
 
 /**
- * Taps 0…R of the symmetric, separable grain kernel for `size`: a Gaussian of σ `√(size² − 1) / 2` pixels truncated
- * at 3σ, scaled so the full kernel's squared taps sum to one. Blurring unit-variance white noise along both axes then
- * keeps unit variance exactly, so size never changes strength. The σ makes a grain about `size` pixels across: a
- * pixel itself spans one, and blurring adds 4σ² to its squared width. Null at size 1 and wherever the first outer tap
- * would stay under `GRAIN_MIN_OUTER_TAP` (sizes under about 1.14, within one 0.1 slider step of 1).
+ * Taps 0…R of the symmetric, separable grain kernel for `size`: a Gaussian of σ `√(size² − 1) / 2` pixels truncated at
+ * 3σ, scaled so the full kernel's squared taps sum to one. Blurring unit-variance white noise along both axes then
+ * keeps unit variance exactly, so size never changes strength. The σ makes a grain about `size` pixels across: a pixel
+ * itself spans one, and blurring adds 4σ² to its squared width. Null at size 1 and wherever the first outer tap would
+ * stay under `GRAIN_MIN_OUTER_TAP` (sizes under about 1.14, within one 0.1 slider step of 1).
  */
 const grainKernel = (size: number): Float64Array | null => {
   if (size <= 1) {
@@ -615,8 +614,8 @@ const noiseRowStart = (seedKey: number, y: number): number => hash32((seedKey + 
 const noiseRowStep = (rowStart: number): number => hash32(rowStart ^ NOISE_STEP_SALT) | 1;
 
 /**
- * Fills `out` with white table samples keyed by `(seed, x, y)` for `count` pixels of row `y` from column `x0`. One
- * hash feeds every channel from disjoint 10-bit fields.
+ * Fills `out` with white table samples keyed by `(seed, x, y)` for `count` pixels of row `y` from column `x0`. One hash
+ * feeds every channel from disjoint 10-bit fields.
  */
 const fillWhiteRow = (
   out: readonly Float64Array[],
@@ -653,9 +652,9 @@ const fillWhiteRow = (
 /**
  * Streams the region's noise rows top to bottom, `emit(row, noise)` receiving each row's per-channel values. At size 1
  * they are the white samples; above it, the separable kernel blurs the white field, horizontally into a ring of 2R + 1
- * rows and then vertically. White samples past the region's edges come from the same hash, never from pixels, and
- * every output sums the same samples in the same order wherever the region starts, so the field stays a pure
- * function of the coordinate. Memory is O(R × width), never a padded copy of the region.
+ * rows and then vertically. White samples past the region's edges come from the same hash, never from pixels, and every
+ * output sums the same samples in the same order wherever the region starts, so the field stays a pure function of the
+ * coordinate. Memory is O(R × width), never a padded copy of the region.
  */
 const streamNoiseRows = (
   width: number,
@@ -766,8 +765,8 @@ const encodeSrgb = (toSrgb: Uint8Array, linear: number): number =>
   linear <= 0 ? 0 : linear >= 1 ? 255 : toSrgb[(linear * LINEAR_TABLE_MAX + 0.5) | 0];
 
 /**
- * Cube root of a non-negative value: the float32 exponent-divide guess (within ~4%) and one Halley step, relative
- * error < 3·10⁻⁵ (far below one 8-bit code) at about a third of `Math.cbrt`'s cost.
+ * Cube root of a non-negative value: the float32 exponent-divide guess (within ~4%) and one Halley step, relative error
+ * < 3·10⁻⁵ (far below one 8-bit code) at about a third of `Math.cbrt`'s cost.
  */
 const fastCbrt = (value: number, bits: Float32Array, word: Uint32Array): number => {
   bits[0] = value;
@@ -854,8 +853,8 @@ const applyRgbRow = (
 
 /**
  * Size 1 monochrome or color grain straight from the hash, the most common case. Flat response adds integer offsets;
- * midtones scales the samples by the pixel's weight and rounds in the clamped store. Monochrome reuses the first
- * 10-bit field for every channel.
+ * midtones scales the samples by the pixel's weight and rounds in the clamped store. Monochrome reuses the first 10-bit
+ * field for every channel.
  */
 const applyPixelRgbNoise = (
   data: Uint8ClampedArray,
@@ -963,10 +962,10 @@ export interface AdjustablePixels {
 }
 
 /**
- * Applies the compiled stack in place, preserving alpha; identity is a no-op. `origin` places the pixels in the
- * stack's reference space. Spatial entries are skipped (see {@link isSpatialAdjustmentEntry}); every entry applied is
- * region independent: adjusting a sub-rectangle with its matching origin yields exactly the pixels a whole-surface
- * pass would there.
+ * Applies the compiled stack in place, preserving alpha; identity is a no-op. `origin` places the pixels in the stack's
+ * reference space. Spatial entries are skipped (see {@link isSpatialAdjustmentEntry}); every entry applied is region
+ * independent: adjusting a sub-rectangle with its matching origin yields exactly the pixels a whole-surface pass would
+ * there.
  */
 export const applyAdjustments = (
   imageData: AdjustablePixels,

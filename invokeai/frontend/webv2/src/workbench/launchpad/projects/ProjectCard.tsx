@@ -17,8 +17,7 @@ import { ProjectCompatibilityBadge } from './ProjectCompatibilityBadge';
 import { ProjectCover } from './ProjectCover';
 
 /**
- * Cards deep-link to the editor and preload on hover; the shared menu host handles overflow and right-click
- * actions.
+ * Cards deep-link to the editor and preload on hover; the shared menu host handles overflow and right-click actions.
  */
 
 const CARD_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const;

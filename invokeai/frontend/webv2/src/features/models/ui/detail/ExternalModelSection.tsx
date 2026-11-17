@@ -61,9 +61,9 @@ import { DraftConflictNotice, UnsavedChangesLabel } from './ModelDraftNotices';
 
 /**
  * Edits the hosted-provider record: which provider and model ID requests route to, the modes and inputs the model
- * advertises, its limits, and the size/count the provider is asked for by default. A record the starter catalog
- * manages stays read-only: the backend overlays the catalog entry matched by `source` on every response, so a
- * changed route would keep the original entry's capabilities. Unsaved values live in the model's retained draft;
+ * advertises, its limits, and the size/count the provider is asked for by default. A record the starter catalog manages
+ * stays read-only: the backend overlays the catalog entry matched by `source` on every response, so a changed route
+ * would keep the original entry's capabilities. Unsaved values live in the model's retained draft;
  * `externalModelFields` owns the record mapping and validation.
  */
 
@@ -189,8 +189,8 @@ export const ExternalModelSection = ({
   // A failed lookup cannot establish that edits persist: the backend may still overlay catalog metadata.
   const isStarterManaged = starters !== null && isStarterManagedExternalModel(model, starters);
   const canEdit = starters !== null && !isStarterManaged;
-  // The registered providers are what requests can route to; a record's own id stays offered even when it is not
-  // among them, so an unknown provider reads as what it is rather than as nothing.
+  // The registered providers are what requests can route to; a record's own id stays offered even when it is not among
+  // them, so an unknown provider reads as what it is rather than as nothing.
   const providerCollection = useMemo(
     () =>
       providerConfigs === null
@@ -269,8 +269,8 @@ export const ExternalModelSection = ({
     void refreshStarters().then(() => setHasRequestedRetry(false));
   };
 
-  // A successful retry removes the button that held focus: hand it to the editor the catalog unlocked, or to the
-  // note explaining why a catalog-managed record stays locked. A user who already moved focus elsewhere keeps it.
+  // A successful retry removes the button that held focus: hand it to the editor the catalog unlocked, or to the note
+  // explaining why a catalog-managed record stays locked. A user who already moved focus elsewhere keeps it.
   const retryButtonRef = useRef<HTMLButtonElement | null>(null);
   const attachRetryButton = useCallback((node: HTMLButtonElement | null) => {
     const previous = retryButtonRef.current;

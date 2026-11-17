@@ -48,9 +48,8 @@ export const createImageResolver = (): ImageResolver => async (imageName, signal
 };
 
 /**
- * Turns one registry lease into a React external store. The first subscriber
- * acquires the engine and the last subscriber releases it, so speculative
- * renders never create engines and StrictMode subscriptions remain balanced.
+ * Turns one registry lease into a React external store. The first subscriber acquires the engine and the last
+ * subscriber releases it, so speculative renders never create engines and StrictMode subscriptions remain balanced.
  */
 export const createCanvasEngineResource = (projectId: string, deps: EngineDeps): CanvasEngineResource => {
   let engine: CanvasEngine | null = null;

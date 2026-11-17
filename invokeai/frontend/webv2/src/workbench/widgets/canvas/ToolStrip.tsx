@@ -114,8 +114,8 @@ const ShapeFamilyButton = ({ engine, hotkey }: { engine: ToolStripEngine; hotkey
 };
 
 /**
- * A tool's effective bindings, remaps included, from the hotkeys the canvas widget registered; none outside a
- * workbench or while unbound.
+ * A tool's effective bindings, remaps included, from the hotkeys the canvas widget registered; none outside a workbench
+ * or while unbound.
  */
 const toolHotkeys = (
   definitions: readonly HotkeyDefinition[],
@@ -181,9 +181,8 @@ const SelectFamilyButton = ({ engine }: { engine: ToolStripEngine }) => {
 };
 
 /**
- * Clears the center region's floating chrome, whose inset already includes the
- * gap below the islands. Outside the center the variable is undefined and the
- * strip falls back to its own top margin.
+ * Clears the center region's floating chrome, whose inset already includes the gap below the islands. Outside the
+ * center the variable is undefined and the strip falls back to its own top margin.
  */
 const TOOL_STRIP_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 

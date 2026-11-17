@@ -124,8 +124,8 @@ export const QueueWidgetView = ({
 const QUEUE_RECALL_ALL_COMMAND = 'queue.recallAll';
 
 /**
- * Recalls the focused row's settings. The key goes to the focused element, so that is the row it names. Registered
- * once per mount; the queue keys it by project, region and language, which its source and title follow.
+ * Recalls the focused row's settings. The key goes to the focused element, so that is the row it names. Registered once
+ * per mount; the queue keys it by project, region and language, which its source and title follow.
  */
 const QueueRecallAllCommand = ({ runtime }: { runtime: QueueWidgetRuntime }) => {
   const { t } = useTranslation();
@@ -250,9 +250,9 @@ const RETRY_ANNOUNCEMENT_KEYS = {
 
 /**
  * Tells screen readers why a run retries. Each retried run has one line keyed by its reason and naming no attempt, so a
- * line is added, and spoken, only when a run starts retrying or its reason changes, never on another attempt. It
- * stays mounted, whatever the filter, because a region inserted with its text is not announced, and switching tabs is
- * no news. Being offline, and the final failure that removes the run, are left to their own notices.
+ * line is added, and spoken, only when a run starts retrying or its reason changes, never on another attempt. It stays
+ * mounted, whatever the filter, because a region inserted with its text is not announced, and switching tabs is no
+ * news. Being offline, and the final failure that removes the run, are left to their own notices.
  */
 const LocalRunAnnouncements = ({ runs }: { runs: readonly QueueLocalRun[] }) => {
   const { t } = useTranslation();

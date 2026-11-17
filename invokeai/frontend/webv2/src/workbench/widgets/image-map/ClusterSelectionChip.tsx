@@ -30,8 +30,7 @@ export const ClusterSelectionChip = () => {
   const clearClusterSelection = useClearClusterSelection();
   const handleClear = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
-      // The button unmounts with the chip; hand focus to the map instead of
-      // letting it fall to the page.
+      // The button unmounts with the chip; hand focus to the map instead of letting it fall to the page.
       event.currentTarget.closest<HTMLElement>('[data-image-map-surface]')?.focus();
       clearClusterSelection();
     },

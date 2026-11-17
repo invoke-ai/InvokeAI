@@ -278,8 +278,8 @@ export const deleteLibraryProject = async (
 };
 
 /**
- * Rename a project. An open one renames through the reducer so its document, its revision chain and
- * its board stay in step; a closed one is a read-modify-write against the server.
+ * Rename a project. An open one renames through the reducer so its document, its revision chain and its board stay in
+ * step; a closed one is a read-modify-write against the server.
  */
 export const renameLibraryProject = async (projectId: string, name: string): Promise<void> => {
   const owner = captureAccountScope();

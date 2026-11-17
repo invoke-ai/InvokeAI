@@ -77,8 +77,8 @@ const VIEW_MENU_CONTENT_CSS = { gap: '2', ...compactViewMenu({ gap: '1' }) };
 const VIEW_MENU_LABEL_CSS = compactViewMenu({ display: 'none' });
 /**
  * The start island gives way first, down to this width: room for the view menu at its own floor, clear of the end cue.
- * The compact icon-only menu is narrower than that floor, so the reserve also covers it.
- * The end island's zoom and actions keep their full width up to what that leaves, then scroll.
+ * The compact icon-only menu is narrower than that floor, so the reserve also covers it. The end island's zoom and
+ * actions keep their full width up to what that leaves, then scroll.
  */
 const START_ISLAND_MIN_WIDTH = getChromeIslandMinWidth(VIEW_MENU_MIN_WIDTH);
 const END_ISLAND_MAX_WIDTH = `calc(100% - ${START_ISLAND_MIN_WIDTH} - {spacing.2})`;
@@ -388,8 +388,8 @@ const CenterViewMenu = ({
 };
 
 /**
- * Use Suspense for the center icon's loading state because DeferredResource has no subscription and center widgets
- * lack frame headers.
+ * Use Suspense for the center icon's loading state because DeferredResource has no subscription and center widgets lack
+ * frame headers.
  */
 const CenterViewIcon = ({ instanceId, widget }: { instanceId: string; widget: RegisteredWidget }) => {
   const fallback = useMemo(
@@ -466,8 +466,8 @@ const FloatedCenterView = ({
   typeId: string;
 }) => {
   'use no memo';
-  // A cold path that renders only while the center's last view floats: it needs no memo cache, and skipping one
-  // keeps it small in the editor's startup chunk, whose size budget guards it.
+  // A cold path that renders only while the center's last view floats: it needs no memo cache, and skipping one keeps
+  // it small in the editor's startup chunk, whose size budget guards it.
   const { t } = useTranslation();
   const { widgets } = useWorkbenchCommands();
   const { focusFloating, focusRegion } = useWorkbenchFocus();

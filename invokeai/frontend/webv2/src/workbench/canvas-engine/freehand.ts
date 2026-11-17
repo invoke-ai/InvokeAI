@@ -1,9 +1,8 @@
 /**
  * Pressure-sampled strokes use pure outline geometry and an injected Path2D factory. Large brushes need three
  * corrections to perfect-freehand: decimate subpixel direction jitter that creates radius-sized corner caps; keep
- * size*smoothing near {@link TARGET_VERTEX_SPACING}; and use {@link START_GATE_SIZE} independently of brush
- * diameter to retain early pressure samples. {@link traceSmoothPolygon} uses quadratic curves for remaining
- * outline facets.
+ * size*smoothing near {@link TARGET_VERTEX_SPACING}; and use {@link START_GATE_SIZE} independently of brush diameter to
+ * retain early pressure samples. {@link traceSmoothPolygon} uses quadratic curves for remaining outline facets.
  */
 
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
@@ -25,8 +24,8 @@ export interface FreehandOptions {
   /** Effect of pressure on width, [0, 1]. 0 disables pressure sensitivity. */
   thinning?: number;
   /**
-   * Outline vertex density, [0, 1]. Defaults to {@link outlineSmoothing} of
-   * `size`; only set this to override the size-relative default.
+   * Outline vertex density, [0, 1]. Defaults to {@link outlineSmoothing} of `size`; only set this to override the
+   * size-relative default.
    */
   smoothing?: number;
   /** Input smoothing / lag, [0, 1]. */
@@ -43,8 +42,8 @@ const DEFAULT_STREAMLINE = 0.5;
 const DEFAULT_THINNING = 0.5;
 
 /**
- * Size-independent outline spacing via {@link outlineSmoothing}, chosen for quadratic tracing. Finer spacing
- * increases per-pointer-batch tessellation and fill work.
+ * Size-independent outline spacing via {@link outlineSmoothing}, chosen for quadratic tracing. Finer spacing increases
+ * per-pointer-batch tessellation and fill work.
  */
 export const TARGET_VERTEX_SPACING = 24;
 
@@ -52,9 +51,8 @@ export const TARGET_VERTEX_SPACING = 24;
 export const MIN_SAMPLE_SPACING = 1;
 
 /**
- * Largest spacing (document units) the input decimator will gate on. Kept well
- * under {@link TARGET_VERTEX_SPACING} so decimation can never drop detail the
- * outline it feeds could have represented.
+ * Largest spacing (document units) the input decimator will gate on. Kept well under {@link TARGET_VERTEX_SPACING} so
+ * decimation can never drop detail the outline it feeds could have represented.
  */
 export const MAX_SAMPLE_SPACING = 8;
 
@@ -62,8 +60,8 @@ export const MAX_SAMPLE_SPACING = 8;
 const SAMPLE_SPACING_RATIO = 0.02;
 
 /**
- * Diameter (document units) handed to `getStrokePoints` purely to size its
- * start-of-stroke noise gate — see the module docs. Never the real brush size.
+ * Diameter (document units) handed to `getStrokePoints` purely to size its start-of-stroke noise gate — see the module
+ * docs. Never the real brush size.
  */
 export const START_GATE_SIZE = 24;
 
@@ -114,8 +112,8 @@ export const decimateSamples = (
 };
 
 /**
- * Appends samples one at a time while keeping {@link decimateSamples}' output for the prefix seen so far, so a
- * growing stroke never re-scans the samples it has already gated.
+ * Appends samples one at a time while keeping {@link decimateSamples}' output for the prefix seen so far, so a growing
+ * stroke never re-scans the samples it has already gated.
  */
 export interface SampleDecimator {
   push(point: StrokeSamplePoint): void;
@@ -140,8 +138,8 @@ export const createSampleDecimator = (spacing: number): SampleDecimator => {
 };
 
 /**
- * Document-space outline of already-decimated samples. Separate perfect-freehand stages keep the start gate small
- * while using the real diameter for outline width.
+ * Document-space outline of already-decimated samples. Separate perfect-freehand stages keep the start gate small while
+ * using the real diameter for outline width.
  */
 export const strokeOutlineFromSamples = (samples: readonly StrokeSamplePoint[], opts: FreehandOptions): Vec2[] => {
   const first = samples[0];
@@ -149,9 +147,8 @@ export const strokeOutlineFromSamples = (samples: readonly StrokeSamplePoint[], 
     return [];
   }
   const last = opts.last ?? false;
-  // perfect-freehand gives a lone sample a pen-oriented fallback dot whose
-  // diameter bottoms out around 2.5px. Repeating the tap makes it use the real
-  // outline size, which matters now that brushes can be smaller than one pixel.
+  // perfect-freehand gives a lone sample a pen-oriented fallback dot whose diameter bottoms out around 2.5px. Repeating
+  // the tap makes it use the real outline size, which matters now that brushes can be smaller than one pixel.
   const input = samples.length === 1 ? [first, first] : samples;
   const strokePoints = getStrokePoints(
     input.map((p) => [p.x, p.y, p.pressure]),
@@ -189,9 +186,9 @@ export const polygonToSvgPath = (polygon: readonly Vec2[]): string => {
 };
 
 /**
- * Trace quadratic segments between edge midpoints using vertices as controls. The curve stays inside the polygon
- * hull, preserving dirty bounds and collinear runs. Direct path calls avoid SVG parsing on each batch; fewer than
- * three vertices use lines.
+ * Trace quadratic segments between edge midpoints using vertices as controls. The curve stays inside the polygon hull,
+ * preserving dirty bounds and collinear runs. Direct path calls avoid SVG parsing on each batch; fewer than three
+ * vertices use lines.
  */
 export const traceSmoothPolygon = (path: Path2D, polygon: readonly Vec2[]): void => {
   const n = polygon.length;

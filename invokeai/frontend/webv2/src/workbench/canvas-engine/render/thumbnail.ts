@@ -13,8 +13,8 @@ export interface ThumbnailSize {
 export type LayerThumbnailFallbackStage = 'thumbnail' | 'full' | 'failed';
 
 /**
- * Aspect-preserving fit without upscaling; positive sources return at least 1px dimensions, degenerate sources
- * return zero size.
+ * Aspect-preserving fit without upscaling; positive sources return at least 1px dimensions, degenerate sources return
+ * zero size.
  */
 export const fitThumbnailSize = (srcW: number, srcH: number, maxSize: number): ThumbnailSize => {
   if (srcW <= 0 || srcH <= 0 || maxSize <= 0) {

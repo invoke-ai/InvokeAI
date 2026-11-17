@@ -4,21 +4,21 @@
  * advances when a client reads the model's summary: a read at least a second after the last step finishes the running
  * item and starts the next, which a section polling every two seconds turns into visible progress.
  *
- * Main models (`fixture-model-001`, `-006`, ...) each show one state, by key (`MODEL_SCENARIOS`); every other main model is never
- * calibrated, and VAEs are unsupported. `SHARED_LINES` pairs models whose decode lines pool their measurements, so one
- * of them shows lines only the other measured. `fixture-model-046` follows a warm RX 9060 XT: its largest fp32 size
- * measured allocator fragmentation and is not counted, and two of three windows at one fp16 size ran partially resident,
- * which leaves that size counted on the third. `POST /__faults` with `workingMemory` selects a device scenario instead,
- * with `stoppedCalibration: <model key>` replaces that main model's runs with an attempt Stop aborted, with
- * `runningCalibration: <model key>` with one still running, which holds the GPU, and with
- * `modelChangedCalibration: <model key>` with one whose later steps failed because the model changed after queuing.
- * A calibrate request with an attempt is refused (409, coded) while another attempt runs on the GPU or is open (between
+ * Main models (`fixture-model-001`, `-006`, ...) each show one state, by key (`MODEL_SCENARIOS`); every other main
+ * model is never calibrated, and VAEs are unsupported. `SHARED_LINES` pairs models whose decode lines pool their
+ * measurements, so one of them shows lines only the other measured. `fixture-model-046` follows a warm RX 9060 XT: its
+ * largest fp32 size measured allocator fragmentation and is not counted, and two of three windows at one fp16 size ran
+ * partially resident, which leaves that size counted on the third. `POST /__faults` with `workingMemory` selects a
+ * device scenario instead, with `stoppedCalibration: <model key>` replaces that main model's runs with an attempt Stop
+ * aborted, with `runningCalibration: <model key>` with one still running, which holds the GPU, and with
+ * `modelChangedCalibration: <model key>` with one whose later steps failed because the model changed after queuing. A
+ * calibrate request with an attempt is refused (409, coded) while another attempt runs on the GPU or is open (between
  * its steps, short of them, not aborted, active within the last two minutes of `clock`), for a later step once another
  * run was created since the attempt's first (`calibration_interleaved`), and for a graph naming a model whose hash,
- * base, type, format or variant changed since it compiled, or that was removed. Like the server, it takes a request only
- * with `graph_models` stating every model the graph names and no other (422).
- * Calibration items live here rather than in the fixture queue, so profile counts stay fixed. Tests pass their own
- * `clock` to advance runs without waiting.
+ * base, type, format or variant changed since it compiled, or that was removed. Like the server, it takes a request
+ * only with `graph_models` stating every model the graph names and no other (422). Calibration items live here rather
+ * than in the fixture queue, so profile counts stay fixed. Tests pass their own `clock` to advance runs without
+ * waiting.
  */
 
 export const WORKING_MEMORY_SCENARIOS = new Set(['ok', 'multiGpu', 'noGpu', 'storeUnusable', 'error', 'notVerified']);
@@ -191,8 +191,8 @@ const graphModelsProblem = (graph, graphModels) => {
 };
 
 /**
- * `currentModel` reads a model's record as it is now, so a graph compiled over an older record is refused as the
- * server refuses it; the fixture's records stand in without it.
+ * `currentModel` reads a model's record as it is now, so a graph compiled over an older record is refused as the server
+ * refuses it; the fixture's records stand in without it.
  */
 export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel } = {}) => {
   const mainModels = models.filter((model) => model.type === 'main');
@@ -326,8 +326,8 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
   const seedRunning = (modelKey) => seedOpted(modelKey, 'running');
 
   /**
-   * Replaces a main model's runs with an attempt whose later steps failed because the model's record changed after
-   * they were queued (`POST /__faults` with `modelChangedCalibration`); false for a key that names no main model.
+   * Replaces a main model's runs with an attempt whose later steps failed because the model's record changed after they
+   * were queued (`POST /__faults` with `modelChangedCalibration`); false for a key that names no main model.
    */
   const seedModelChanged = (modelKey) => seedOpted(modelKey, 'modelChanged');
 
@@ -367,8 +367,8 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
   /** The windows that count: those of the run's completed items. */
   const pointCountOf = (run) => run.items.filter((item) => item.status === 'completed').length;
   /**
-   * The windows the run stored, as `point_count` reports them: the valid ones, plus the invalid window a decode
-   * leaves that failed or was canceled while it ran.
+   * The windows the run stored, as `point_count` reports them: the valid ones, plus the invalid window a decode leaves
+   * that failed or was canceled while it ran.
    */
   const storedPointsOf = (run) =>
     pointCountOf(run) + run.items.filter((item) => item.status === 'failed' || item.interrupted).length;
@@ -464,8 +464,8 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
   };
 
   /**
-   * A model's lines: its own points, plus its partners' points in the current environment, which the server pools
-   * the same way. A line only partners measured appears with `own_windows` 0.
+   * A model's lines: its own points, plus its partners' points in the current environment, which the server pools the
+   * same way. A line only partners measured appears with `own_windows` 0.
    */
   const linesOf = (modelKey, scenario) => {
     const reasons = heldBack();
@@ -767,14 +767,14 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
       }
 
       // One attempt per device class, as the server judges it: a request with an attempt is refused while another
-      // attempt, of any model, runs or is open (`attemptBlocks`). A run without an attempt holds nothing, and a
-      // request without one is never refused for it.
+      // attempt, of any model, runs or is open (`attemptBlocks`). A run without an attempt holds nothing, and a request
+      // without one is never refused for it.
       if (attemptId !== null && attemptBlocks(attemptId)) {
         return { body: { detail: RUNNING_REFUSAL }, status: 409 };
       }
 
-      // Every model the graph names must still be the record it compiled over: as its identifier and its
-      // graph_models entry name it.
+      // Every model the graph names must still be the record it compiled over: as its identifier and its graph_models
+      // entry name it.
       for (const identifier of modelIdentifiersOf(body.graph)) {
         const record = currentModel ? currentModel(identifier.key) : byKey.get(identifier.key);
         const name = identifier.name ?? record?.name ?? identifier.key;

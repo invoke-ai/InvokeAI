@@ -74,8 +74,8 @@ const formContainerDepth = (form: WorkflowForm, containerId: string): number => 
 };
 
 /**
- * Choose deepest landing container, then prefer precise edge insertion at equal depth. Independent depth
- * calculation makes collision ordering irrelevant.
+ * Choose deepest landing container, then prefer precise edge insertion at equal depth. Independent depth calculation
+ * makes collision ordering irrelevant.
  */
 export const pickInnermostFormCollision = (collisions: { id: string }[], form: WorkflowForm): string | null => {
   if (collisions.length === 0) {
@@ -116,8 +116,8 @@ export const pickInnermostFormCollision = (collisions: { id: string }[], form: W
 };
 
 /**
- * Reject self, descendant, and unresolved drops before rendering affordances; reducer validation independently
- * enforces the same move constraints.
+ * Reject self, descendant, and unresolved drops before rendering affordances; reducer validation independently enforces
+ * the same move constraints.
  */
 export const resolveFormDrop = (
   form: WorkflowForm,

@@ -200,8 +200,8 @@ const LayerChildRowComponent = ({
     (refocus: boolean) => {
       const draft = nameInput.current?.value.trim() ?? '';
       const cancelled = renameCancelled.current;
-      // Refocusing the row blurs the still-mounted input, which re-enters this
-      // handler; claiming the commit first keeps it to one dispatch.
+      // Refocusing the row blurs the still-mounted input, which re-enters this handler; claiming the commit first keeps
+      // it to one dispatch.
       renameCancelled.current = true;
       finishRename(refocus);
       if (!cancelled) {

@@ -38,9 +38,9 @@ export interface ThemeDefinition {
   colorScheme: 'dark' | 'light';
   colors: ThemeColors;
   /**
-   * How far interaction fills (hovered rows, ghost buttons, tabs) lean from the foreground toward the accent, 0–100.
-   * A fill is this colour at low alpha, so the right amount depends on the surfaces under it: near-grey surfaces want
-   * a trace, or the hover reads as coloured beside a neutral selected fill; strongly tinted surfaces want more, or it
+   * How far interaction fills (hovered rows, ghost buttons, tabs) lean from the foreground toward the accent, 0–100. A
+   * fill is this colour at low alpha, so the right amount depends on the surfaces under it: near-grey surfaces want a
+   * trace, or the hover reads as coloured beside a neutral selected fill; strongly tinted surfaces want more, or it
    * reads as a white film.
    */
   interactionTint: number;

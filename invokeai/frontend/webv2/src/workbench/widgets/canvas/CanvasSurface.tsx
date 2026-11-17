@@ -19,8 +19,8 @@ export type CanvasSurfaceEngine = Pick<
 >;
 
 /**
- * Focus the canvas container in capture before engine handlers so hotkeys resolve here. Preserve focus already
- * inside, especially text editing, to avoid blur-commit before the engine's commit-and-swallow path.
+ * Focus the canvas container in capture before engine handlers so hotkeys resolve here. Preserve focus already inside,
+ * especially text editing, to avoid blur-commit before the engine's commit-and-swallow path.
  */
 const focusCanvasSurface = (event: ReactPointerEvent<HTMLDivElement>) => {
   if (shouldFocusCanvasSurface(event.currentTarget, event.target, document.activeElement)) {
@@ -29,8 +29,8 @@ const focusCanvasSurface = (event: ReactPointerEvent<HTMLDivElement>) => {
 };
 
 /**
- * Bind document/overlay canvases and ResizeObserver through an engine-keyed ref callback with cleanup. The engine
- * owns input without React interaction renders.
+ * Bind document/overlay canvases and ResizeObserver through an engine-keyed ref callback with cleanup. The engine owns
+ * input without React interaction renders.
  */
 export const CanvasSurface = ({ engine, instanceId }: { engine: CanvasSurfaceEngine; instanceId: string }) => {
   const screenRef = useRef<HTMLCanvasElement>(null);
@@ -66,8 +66,8 @@ export const CanvasSurface = ({ engine, instanceId }: { engine: CanvasSurfaceEng
 
     engine.surface.attach(screen, overlay, container, { resolveKeyOwner });
 
-    // A handle drag defers the resize and full recomposition to its release; pixel CSS sizes make the interim
-    // canvas crop or reveal rather than stretch.
+    // A handle drag defers the resize and full recomposition to its release; pixel CSS sizes make the interim canvas
+    // crop or reveal rather than stretch.
     let isSizeStale = false;
     let syncedSize = '';
     const syncSize = (canDefer: boolean) => {
@@ -93,9 +93,8 @@ export const CanvasSurface = ({ engine, instanceId }: { engine: CanvasSurfaceEng
 
     // The first sync never waits: the fit below needs a sized viewport.
     syncSize(false);
-    // Fit the document into view the first time this canvas is shown, once the
-    // viewport is sized. The shell keeps widgets mounted across layout switches,
-    // so this callback re-runs on every re-show and an unconditional fit would
+    // Fit the document into view the first time this canvas is shown, once the viewport is sized. The shell keeps
+    // widgets mounted across layout switches, so this callback re-runs on every re-show and an unconditional fit would
     // reset the user's zoom and pan each time they came back.
     engine.viewport.fitToViewOnFirstShow();
 

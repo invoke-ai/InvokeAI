@@ -17,13 +17,13 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Track inset from the frame edge. The label and value sit 12px in (`INSIDE_LABEL_INSET`, the value's `pe`), so an
- * end thumb lands a stop's text clearance outside them and the fill's rounded end stops short of the first glyph.
+ * Track inset from the frame edge. The label and value sit 12px in (`INSIDE_LABEL_INSET`, the value's `pe`), so an end
+ * thumb lands a stop's text clearance outside them and the fill's rounded end stops short of the first glyph.
  */
 const TRACK_INSET_PX = 6;
 /**
- * At the track's start the fill ends this far past the thumb's centre, just enough for its rounded end to frame the
- * 2px thumb without drifting away from it.
+ * At the track's start the fill ends this far past the thumb's centre, just enough for its rounded end to frame the 2px
+ * thumb without drifting away from it.
  */
 const FILL_OVERHANG_PX = 4;
 /** Clearance between the fill and the frame's border. */
@@ -64,9 +64,9 @@ type OwnProps = {
   inputMin?: number;
   inputMax?: number;
   /**
-   * How values spread along the track. `'log'` gives equal travel to equal ratios, so small values get room; the
-   * thumb, stops, drags (Shift-fine included) and Alt-snap follow it, while `value`, typing, keys and bounds stay in
-   * real units. It needs `min > 0` and positive typed values; with `min <= 0` the track stays linear.
+   * How values spread along the track. `'log'` gives equal travel to equal ratios, so small values get room; the thumb,
+   * stops, drags (Shift-fine included) and Alt-snap follow it, while `value`, typing, keys and bounds stay in real
+   * units. It needs `min > 0` and positive typed values; with `min <= 0` the track stays linear.
    */
   scale?: 'linear' | 'log';
   /** The keyboard step from `value` in `direction`, for steps that grow with the value. Shift/Page keys ×10. */
@@ -84,8 +84,8 @@ type OwnProps = {
   onChange: (value: number) => void;
   /**
    * Fires once with the final value after every gesture that called `onChange`: a drag's release, a held step key's
-   * release or blur, a typed commit, a reset, or unmounting mid-gesture. Pair it with `onChange` previews to record
-   * one undo step per gesture; a drag or held key keeps the handler it started with.
+   * release or blur, a typed commit, a reset, or unmounting mid-gesture. Pair it with `onChange` previews to record one
+   * undo step per gesture; a drag or held key keeps the handler it started with.
    */
   onChangeEnd?: (value: number) => void;
 };
@@ -229,8 +229,8 @@ const isSameExtents = (a: TextExtents | null, b: TextExtents): boolean =>
   a !== null && a.labelEnd === b.labelEnd && a.valueStart === b.valueStart && a.width === b.width;
 
 /**
- * Relative drag; Shift fine, Alt stops. Click the value to edit; arrows step, Shift/Page keys ×10, Home/End
- * bounds. Double-click or Backspace/Delete resets. Caller owns debouncing or per-gesture commits (`onChangeEnd`).
+ * Relative drag; Shift fine, Alt stops. Click the value to edit; arrows step, Shift/Page keys ×10, Home/End bounds.
+ * Double-click or Backspace/Delete resets. Caller owns debouncing or per-gesture commits (`onChangeEnd`).
  */
 export const ScrubberField = ({
   defaultValue,

@@ -1,7 +1,6 @@
 /**
- * Persist canvas preferences in per-project widget values outside undo history. Feed engine-backed settings
- * one-way into stores; other consumers read values directly. Popover and engine bindings derive from this data
- * list.
+ * Persist canvas preferences in per-project widget values outside undo history. Feed engine-backed settings one-way
+ * into stores; other consumers read values directly. Popover and engine bindings derive from this data list.
  */
 
 import { CANVAS_COMPOSITING_KEYS, DEFAULT_CANVAS_COMPOSITING } from './invoke/canvasCompositing';
@@ -65,9 +64,8 @@ export const CANVAS_SETTINGS: readonly CanvasBooleanSetting[] = [
     store: 'invertBrushSizeScroll',
   },
   {
-    // Legacy parity: brush/eraser strokes cannot paint outside the generation
-    // frame. Resolved once per gesture, so moving the frame mid-stroke cannot
-    // change where the stroke already landed.
+    // Legacy parity: brush/eraser strokes cannot paint outside the generation frame. Resolved once per gesture, so
+    // moving the frame mid-stroke cannot change where the stroke already landed.
     defaultValue: false,
     key: CANVAS_CLIP_TO_BBOX_KEY,
     labelKey: 'widgets.canvas.settings.clipToBbox',

@@ -80,9 +80,9 @@ type NativeDragFile = { base64: string; name: string };
  * Chromium's own drag input: enters at the first point (the test frame's viewport coordinates), hovers each point and
  * drops at the last one. The browser dispatches each drag event in its own task, with a microtask checkpoint between
  * listeners, which events a test dispatches itself never have. It always drops, even when a step fails: a drag left
- * open swallows the next one's enter, and CDP's `dragCancel` reaches the page as no event at all, so it cannot stand
- * in for a cancel. The files are deleted once the command returns: read a dropped file's contents in a drop handler,
- * not after the drag.
+ * open swallows the next one's enter, and CDP's `dragCancel` reaches the page as no event at all, so it cannot stand in
+ * for a cancel. The files are deleted once the command returns: read a dropped file's contents in a drop handler, not
+ * after the drag.
  */
 const nativeDrag: BrowserCommand<
   [

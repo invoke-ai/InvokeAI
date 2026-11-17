@@ -219,8 +219,8 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
       : (entries[0]?.item.workflow_id ?? null);
   const activeEntry = selectWorkflowLibraryEntry({ entries, selectedEntry }, activeWorkflowId) ?? null;
   const activeAccess = getLibraryEntryAccess(activeEntry, authSession, tab);
-  // The menu acts on the card it was raised for, resident or the selected pin; once that leaves, it has nothing to
-  // act on and stays closed (the shell clears its anchor).
+  // The menu acts on the card it was raised for, resident or the selected pin; once that leaves, it has nothing to act
+  // on and stays closed (the shell clears its anchor).
   const menuEntry = contextMenuTarget
     ? (selectWorkflowLibraryEntry({ entries, selectedEntry }, contextMenuTarget.workflowId) ?? null)
     : null;

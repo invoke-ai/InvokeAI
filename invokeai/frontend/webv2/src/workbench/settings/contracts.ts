@@ -32,8 +32,8 @@ export type WorkflowLibraryThumbnailFit = 'cover' | 'contain';
 export type StartupDestination = 'launchpad' | 'recentProject';
 
 /**
- * Export document generation settings with the project; personal editor choices belong in {@link
- * WorkbenchPreferences} so imports cannot overwrite them.
+ * Export document generation settings with the project; personal editor choices belong in {@link WorkbenchPreferences}
+ * so imports cannot overwrite them.
  */
 export interface ProjectSettings {
   /**
@@ -62,14 +62,14 @@ export type EffectiveProjectSettings = Required<ProjectSettings>;
 /**
  * The user's defaults for per-project settings, keyed by owner: a widget type id (`gallery`, `canvas`, `preview`,
  * `image-map`), and `generate` for the layered {@link ProjectSettings} flags the Generate widget's settings show (they
- * layer over the project settings, never over the Generate widget's values). Each record holds only layerable keys
- * the user chose (`getLayeredSettings`); owners normalize the values on read, as they do their widget values.
+ * layer over the project settings, never over the Generate widget's values). Each record holds only layerable keys the
+ * user chose (`getLayeredSettings`); owners normalize the values on read, as they do their widget values.
  */
 export type ScopedDefaults = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
 /**
- * Store the RebalancePreset shape locally to keep generation out of Launchpad's bundle. Generation owns and
- * revalidates weights on read.
+ * Store the RebalancePreset shape locally to keep generation out of Launchpad's bundle. Generation owns and revalidates
+ * weights on read.
  */
 export interface StoredRebalancePreset {
   id: string;
@@ -90,9 +90,8 @@ export interface StoredAspectRatioPreset {
 }
 
 /**
- * A named Generate settings snapshot ("recipe") as it is persisted. `values` is
- * opaque to Settings for the same bundle reason as {@link StoredRebalancePreset}:
- * the generation feature owns the shape and re-normalizes it on apply.
+ * A named Generate settings snapshot ("recipe") as it is persisted. `values` is opaque to Settings for the same bundle
+ * reason as {@link StoredRebalancePreset}: the generation feature owns the shape and re-normalizes it on apply.
  */
 export interface StoredGeneratePreset {
   id: string;
@@ -161,8 +160,8 @@ export interface WorkbenchPreferences {
   /** Raise text and border contrast on every theme (a11y). */
   highContrast: boolean;
   /**
-   * Select Object updates its preview after each input change; kept across sessions, Reset, and reloads. Stored under
-   * a new name since auto-update became the default: the old `selectObjectAutoProcess` field was written as `false` by
+   * Select Object updates its preview after each input change; kept across sessions, Reset, and reloads. Stored under a
+   * new name since auto-update became the default: the old `selectObjectAutoProcess` field was written as `false` by
    * any settings save, so it cannot tell a choice from the old default, and normalization drops it.
    */
   selectObjectAutoUpdate: boolean;

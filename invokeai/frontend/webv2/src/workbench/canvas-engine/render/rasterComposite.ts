@@ -71,8 +71,8 @@ export interface RenderRasterCompositeDeps {
   /** Owned access to a layer's pixels, released once they are drawn. */
   getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect; release(): void }>;
   /**
-   * The display's memoized layer-local adjusted copy of `surface` when it is exact, or null on a miss or when
-   * `surface` is not a live cache. Never builds one: {@link compositeScratchPixels} covers only what a miss adjusts.
+   * The display's memoized layer-local adjusted copy of `surface` when it is exact, or null on a miss or when `surface`
+   * is not a live cache. Never builds one: {@link compositeScratchPixels} covers only what a miss adjusts.
    */
   adjustedSurface?(
     layerId: string,
@@ -82,8 +82,8 @@ export interface RenderRasterCompositeDeps {
   readImageData?(surface: RasterSurface, rect: Rect): ImageData;
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
   /**
-   * Evaluates spatial adjustment runs. Without it, a layer or group whose stack has a contributing spatial entry
-   * throws {@link AdjustmentRefusedError} rather than render without it.
+   * Evaluates spatial adjustment runs. Without it, a layer or group whose stack has a contributing spatial entry throws
+   * {@link AdjustmentRefusedError} rather than render without it.
    */
   runSpatial?: SpatialRunner;
   /** Cancels spatial jobs; an aborted render throws an `AbortError`. */
@@ -100,8 +100,8 @@ export interface RenderRasterCompositeDeps {
 }
 
 /**
- * Thrown when a composite's pixels cannot be reserved; nothing beyond the reservation was allocated. Generation
- * shows the message as its notice; export maps the class to `over-budget`.
+ * Thrown when a composite's pixels cannot be reserved; nothing beyond the reservation was allocated. Generation shows
+ * the message as its notice; export maps the class to `over-budget`.
  */
 export class RasterCompositeOverBudgetError extends Error {
   constructor() {
@@ -254,8 +254,8 @@ const scopeKey = (scope: GroupCompositeScope): string =>
   `${scope.id}@${scope.start}-${scope.end}:${adjustmentsKey(scope.adjustments)}:${scope.opacity}:${scope.blendMode}(${scope.children.map(scopeKey).join(',')})`;
 
 /**
- * Plans `leaves` (drawn raster leaves, top first) over a document-space rectangle with the group scopes enclosing
- * them. `contentRects` replaces a leaf's planned content rect with the extent of the pixels it will draw.
+ * Plans `leaves` (drawn raster leaves, top first) over a document-space rectangle with the group scopes enclosing them.
+ * `contentRects` replaces a leaf's planned content rect with the extent of the pixels it will draw.
  */
 export const planRasterComposite = (
   document: CanvasDocumentContractV3,
@@ -336,8 +336,8 @@ const layerSourceRegion = (
 };
 
 /**
- * Detached source pixels sufficient for this renderer, including enclosing groups' source context. Capture aligns
- * the renderer's already-rounded sample region to the source pixel grid so fractional paint origins never clip it.
+ * Detached source pixels sufficient for this renderer, including enclosing groups' source context. Capture aligns the
+ * renderer's already-rounded sample region to the source pixel grid so fractional paint origins never clip it.
  * Rotation/rescaling keeps the full source: changing Canvas2D's source origin can change transformed sampling.
  */
 export const getRasterSnapshotCaptureRect = (
@@ -379,9 +379,9 @@ export const getRasterSnapshotCaptureRect = (
 const areaOf = (rect: Rect | null): number => (rect ? Math.max(0, rect.width) * Math.max(0, rect.height) : 0);
 
 /**
- * Scratch pixels an adjusted layer whose pixels cover `content` needs in an output over `frame`: output-sized,
- * except that a position-dependent stack adjusts the whole layer-local region the output samples, which exceeds the
- * output when the layer is downscaled, and a spatial stack adjusts all of `content`.
+ * Scratch pixels an adjusted layer whose pixels cover `content` needs in an output over `frame`: output-sized, except
+ * that a position-dependent stack adjusts the whole layer-local region the output samples, which exceeds the output
+ * when the layer is downscaled, and a spatial stack adjusts all of `content`.
  */
 const layerScratchPixels = (ref: CompositeLayerRef, frame: Rect, content: Rect): number => {
   if (requiresWholeSource(ref.adjustments)) {
@@ -413,11 +413,11 @@ const plannedScopeExtent = (entry: CompositeEntry, scope: GroupCompositeScope): 
   placedExtent(entry.layers.slice(scope.start, scope.end).map((ref) => ({ rect: plannedContent(ref), ref })));
 
 /**
- * Pixels of the scratch buffers {@link renderRasterComposite} may allocate beyond its output, each also read back
- * once as ImageData: one per group scope and adjusted layer. A group scope's buffer covers its frame, except that a
- * spatial scope's covers the union of its members' bounds, which is also the frame of everything inside it.
- * Estimated from planned content bounds; a layer or spatial scope whose rasterized pixels exceed them (measured text)
- * reserves the difference through `deps.reserve` while it draws.
+ * Pixels of the scratch buffers {@link renderRasterComposite} may allocate beyond its output, each also read back once
+ * as ImageData: one per group scope and adjusted layer. A group scope's buffer covers its frame, except that a spatial
+ * scope's covers the union of its members' bounds, which is also the frame of everything inside it. Estimated from
+ * planned content bounds; a layer or spatial scope whose rasterized pixels exceed them (measured text) reserves the
+ * difference through `deps.reserve` while it draws.
  */
 export const compositeScratchPixels = (entry: CompositeEntry): number => {
   const scratchOf = (start: number, end: number, scopes: readonly GroupCompositeScope[], frame: Rect): number => {
@@ -486,8 +486,8 @@ export const renderRasterComposite = async (
   };
 
   /**
-   * The caller reserved scratch from planned content bounds; rasterized pixels can exceed them (measured text), so
-   * the excess surface and ImageData are reserved before they are allocated.
+   * The caller reserved scratch from planned content bounds; rasterized pixels can exceed them (measured text), so the
+   * excess surface and ImageData are reserved before they are allocated.
    */
   const reserveExcess = (actualPixels: number, plannedPixels: number): { release(): void } | null => {
     const excess = actualPixels - plannedPixels;
@@ -544,8 +544,8 @@ export const renderRasterComposite = async (
         // Adjust layer-local pixels before resampling, as the display does: reuse the display's exact adjusted copy,
         // else adjust all pixels when the stack is spatial (it reads the whole source), and otherwise only the region
         // the output samples. A downscaled layer samples more pixels than the output holds; a color-only stack then
-        // adjusts after resampling, keeping the work bounded by the output. Noise must stay layer-local so
-        // resampling averages it exactly as the display does, so its work is the sampled region.
+        // adjusts after resampling, keeping the work bounded by the output. Noise must stay layer-local so resampling
+        // averages it exactly as the display does, so its work is the sampled region.
         const shared = deps.adjustedSurface?.(ref.id, source, ref.adjustments) ?? null;
         const sampled = shared ? null : layerSourceRegion(ref, frame, origin);
         if (shared) {
@@ -621,9 +621,9 @@ export const renderRasterComposite = async (
   };
 
   /**
-   * A spatial scope composites its members over the union of their bounds (the display's group surface), never
-   * clipped to the output, then evaluates its stack there in document pixels. Its members' pixels are leased first,
-   * since that union comes from their actual extents; nested scopes draw from the same leases.
+   * A spatial scope composites its members over the union of their bounds (the display's group surface), never clipped
+   * to the output, then evaluates its stack there in document pixels. Its members' pixels are leased first, since that
+   * union comes from their actual extents; nested scopes draw from the same leases.
    */
   const drawSpatialScope = async (
     ctx: Ctx,

@@ -156,9 +156,9 @@ export interface WorkflowPreviewMetrics {
 }
 
 /**
- * The preview's node chips: 136px by 48px, a 26px row per pill above. Layers stay close, so a workflow six layers
- * deep fits a ~870px stage at a readable zoom; rows sit well apart, since a layered graph is wide and short and the
- * stage has the height to spare.
+ * The preview's node chips: 136px by 48px, a 26px row per pill above. Layers stay close, so a workflow six layers deep
+ * fits a ~870px stage at a readable zoom; rows sit well apart, since a layered graph is wide and short and the stage
+ * has the height to spare.
  */
 export const WORKFLOW_PREVIEW_METRICS: WorkflowPreviewMetrics = {
   authorScale: 0.5,
@@ -199,8 +199,8 @@ export const getWorkflowPreviewMetrics = (width: number): WorkflowPreviewMetrics
 
 /**
  * A drawing's chip width: wide enough for its longest title (`wanted`), within the minimum and maximum, and no wider
- * than the drawing still `fits` its stage at (laid out at that width, read at a legible zoom); else the minimum.
- * Tried in steps from the widest wanted down.
+ * than the drawing still `fits` its stage at (laid out at that width, read at a legible zoom); else the minimum. Tried
+ * in steps from the widest wanted down.
  */
 export const chooseWorkflowPreviewChipWidth = (wanted: number, fits: (width: number) => boolean): number => {
   const widest = Math.min(
@@ -220,9 +220,9 @@ export const chooseWorkflowPreviewChipWidth = (wanted: number, fits: (width: num
 /** Plumbing the simplified view hides. */
 const PLUMBING_TYPES = new Set(['collect', 'core_metadata']);
 /**
- * Plumbing that only records the values it receives on an output (metadata): almost every parameter reaches the
- * decoder through it, which is no data flow worth drawing, so nothing is rerouted through it. A collect is rerouted:
- * what feeds it, feeds what it feeds.
+ * Plumbing that only records the values it receives on an output (metadata): almost every parameter reaches the decoder
+ * through it, which is no data flow worth drawing, so nothing is rerouted through it. A collect is rerouted: what feeds
+ * it, feeds what it feeds.
  */
 const RECORDING_TYPES = new Set(['core_metadata']);
 const VALUE_PRIMITIVE_TYPES = new Set(['string', 'integer', 'float', 'boolean']);
@@ -354,10 +354,10 @@ const getNeighbours = (
 
 /**
  * Layered layout: one column per depth, as narrow as the chips. Each chip sits level with the middle of the chips
- * feeding it, and a column's nodes are then pushed apart to keep the row gap between a chip and the pills stacked
- * above the next one, so edges (which meet chips, not pills) run level where they can and the graph spreads over rows
- * rather than stacking every column from the top. Unconnected first-column nodes stack. Positions are the chips'; the
- * topmost pill stack starts at 0.
+ * feeding it, and a column's nodes are then pushed apart to keep the row gap between a chip and the pills stacked above
+ * the next one, so edges (which meet chips, not pills) run level where they can and the graph spreads over rows rather
+ * than stacking every column from the top. Unconnected first-column nodes stack. Positions are the chips'; the topmost
+ * pill stack starts at 0.
  */
 const getPreviewLayeredPositions = (
   nodes: readonly { id: string; pillsHeight: number }[],
@@ -413,8 +413,8 @@ const getPreviewLayeredPositions = (
 };
 
 /**
- * The form's tree from its root, as the preview reads it. Elements naming a missing node or element are skipped, and
- * a container is entered once, so a malformed form cannot loop.
+ * The form's tree from its root, as the preview reads it. Elements naming a missing node or element are skipped, and a
+ * container is entered once, so a malformed form cannot loop.
  */
 const readForm = (
   document: ProjectGraphState,
@@ -853,8 +853,8 @@ const COMPILED_META_INPUTS = new Set(['id', 'type', 'is_intermediate', 'use_cach
 
 /**
  * A compiled graph (Generate's, a widget's) as a document the preview draws, so it takes the one model path: every
- * node, its type known here or not, with the compiled values, or the text `overrides` gives where the compiled value
- * is not what runs (a seed drawn afresh each run). The fields `getSetLabel` names (a setting the person made) become the
+ * node, its type known here or not, with the compiled values, or the text `overrides` gives where the compiled value is
+ * not what runs (a seed drawn afresh each run). The fields `getSetLabel` names (a setting the person made) become the
  * document's form, labelled as that setting ("Seed" rather than the field's generic "Value"), which is how the preview
  * marks and names what was set. Nodes take `positionHints` where given, else a layered arrangement in editor units, so
  * the full view scales them like a document's.

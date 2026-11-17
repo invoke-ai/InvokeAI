@@ -50,9 +50,9 @@ import { WorkflowLibraryThumbnail } from './WorkflowLibraryThumbnail';
 import { getMissingNodePacks, resolveEntryRequirements, WorkflowRequirementsList } from './WorkflowRequirementsList';
 
 /**
- * The selected template: preview, name with Open, facts, requirements with Install, and its standing in the library
- * and this project. Keep the detail rail mounted across selections to prevent flashing. The narrow layout shows it as
- * a bottom sheet (`WorkflowDetailSheet`).
+ * The selected template: preview, name with Open, facts, requirements with Install, and its standing in the library and
+ * this project. Keep the detail rail mounted across selections to prevent flashing. The narrow layout shows it as a
+ * bottom sheet (`WorkflowDetailSheet`).
  */
 
 const INSTALL_HOVER = { opacity: 0.85 } as const;
@@ -155,8 +155,7 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
   const restoreVisibilityFocus = useRef<string | null>(null);
 
   const enrichment = entry?.enrichment ?? null;
-  // Shares the grid's per-entry cache, so selecting a card the badges already
-  // resolved costs nothing.
+  // Shares the grid's per-entry cache, so selecting a card the badges already resolved costs nothing.
   const resolved = useMemo(
     () => (enrichment?.status === 'ready' ? resolveEntryRequirements(enrichment, deps) : null),
     [deps, enrichment]
@@ -205,8 +204,8 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
       }
 
       for (const source of getStarterModelInstallSources(starter)) {
-        // Two requirements routinely share a dependency (an encoder, a VAE),
-        // and an install may have started between this render and the click.
+        // Two requirements routinely share a dependency (an encoder, a VAE), and an install may have started between
+        // this render and the click.
         if (seen.has(source.source) || deps.activeInstallSources.has(source.source)) {
           continue;
         }

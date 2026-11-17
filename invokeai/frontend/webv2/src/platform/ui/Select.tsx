@@ -70,16 +70,13 @@ const DEFAULT_ITEMS_MAX_H = 'min(20rem, calc(var(--available-height) - 0.5rem))'
 
 export interface SelectProps<T extends CollectionItem> extends Omit<SelectRootProps<T>, 'children'> {
   contentProps?: SelectContentProps;
-  /**
-   * Caps menu height and routes keyboard scrolling through Scrollable; null restores the machine's native
-   * overflow.
-   */
+  /** Caps menu height and routes keyboard scrolling through Scrollable; null restores the machine's native overflow. */
   itemsMaxH?: string | null;
   /** Only consecutive equal keys form a group; callers must order items by group. */
   groupBy?: (item: T) => string;
   /**
-   * The visible header for a group key; defaults to the key itself. `null` renders the group without a header,
-   * under a divider unless it opens the list.
+   * The visible header for a group key; defaults to the key itself. `null` renders the group without a header, under a
+   * divider unless it opens the list.
    */
   renderGroupLabel?: (group: string) => ReactNode;
   getItemKey?: (item: T, index: number) => Key;
@@ -121,8 +118,8 @@ export const Select = <T extends CollectionItem>({
   // Inside Field, reuse its label ID; rendering another Label would duplicate it.
   const field = useFieldContext();
   const insideLabel = useInsideFieldLabel();
-  // An inside label or a content-sized trigger keeps the chevron in the trigger's flow, so the value truncates
-  // before it (or the trigger grows to hold it) instead of running under it.
+  // An inside label or a content-sized trigger keeps the chevron in the trigger's flow, so the value truncates before
+  // it (or the trigger grows to hold it) instead of running under it.
   const isIndicatorInTrigger = insideLabel !== null || fitContent;
   // Zag names the trigger by the field's label but leaves its help and error text to the hidden select.
   const fieldControlProps = field?.getInputProps();
@@ -149,8 +146,8 @@ export const Select = <T extends CollectionItem>({
       unmountOnExit
       w={fitContent ? 'auto' : undefined}
       {...rootProps}
-      // An empty list is nothing to choose from: the trigger disables instead of opening a blank menu.
-      // An explicit prop would otherwise override the enclosing Field's disabled state.
+      // An empty list is nothing to choose from: the trigger disables instead of opening a blank menu. An explicit prop
+      // would otherwise override the enclosing Field's disabled state.
       disabled={rootProps.disabled || field?.disabled || collection.items.length === 0}
     >
       {/* Materialize the trigger's aria-labelledby target; aria-label on Root would name a generic div instead. */}
@@ -187,8 +184,8 @@ export const Select = <T extends CollectionItem>({
                         {itemIndicator ? <ChakraSelect.ItemIndicator /> : null}
                       </ChakraSelect.Item>
                     ));
-                    // A header-less group is not a labelled listbox group: its options follow a divider, which
-                    // stays out of the accessibility tree because a listbox owns only options and groups.
+                    // A header-less group is not a labelled listbox group: its options follow a divider, which stays
+                    // out of the accessibility tree because a listbox owns only options and groups.
                     return label === null ? (
                       <Fragment key={group}>
                         {startIndex > 0 ? <Separator aria-hidden borderColor="border.subtle" mx="-1" my="1" /> : null}

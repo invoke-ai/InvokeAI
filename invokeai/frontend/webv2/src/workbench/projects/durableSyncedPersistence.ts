@@ -330,8 +330,8 @@ interface DurableSyncedPersistenceDependencies {
 
 /**
  * What the server holds of a project, as this page last learned it. The content and the caller's workspace are
- * acknowledged one after the other, so each has its own pushed copy and revision; `pushedDoc` is the whole document
- * as last acknowledged with both.
+ * acknowledged one after the other, so each has its own pushed copy and revision; `pushedDoc` is the whole document as
+ * last acknowledged with both.
  */
 interface SyncEntry {
   minimumCanvasSchemaVersion: number;
@@ -707,8 +707,8 @@ export const createDurableSyncedWorkbenchPersistence = (
    */
   const unjournaledDocuments = new Map<string, number>();
   /**
-   * Projects whose journal record no longer stands for a stored entry, so its document is journaled again: retired at
-   * a hidden event (the record stays, so the next save writes the settled mark), or being settled right now.
+   * Projects whose journal record no longer stands for a stored entry, so its document is journaled again: retired at a
+   * hidden event (the record stays, so the next save writes the settled mark), or being settled right now.
    */
   const retiredJournalProjectIds = new Set<string>();
   const settlingJournalProjectIds = new Set<string>();
@@ -1447,8 +1447,8 @@ export const createDurableSyncedWorkbenchPersistence = (
     let fenceContent =
       previousSent?.content.some((body) => body !== halves.contentJson && body !== documentJson) === true;
     let fenceWorkspace = previousSent?.workspace.some((body) => body !== halves.workspaceJson) === true;
-    // Split content that repeats an item id would be refused by every later load, so such a project, which only a
-    // build before the split could have written, is created whole and keeps saving whole (see `toProjectCreation`).
+    // Split content that repeats an item id would be refused by every later load, so such a project, which only a build
+    // before the split could have written, is created whole and keeps saving whole (see `toProjectCreation`).
     const keepsWhole = findRepeatedWorkflowItem(halves.content.workflows.entries) !== null;
     if (keepsWhole && entry && entry.pushedContent !== null) {
       hasPending = true;
@@ -1457,9 +1457,9 @@ export const createDurableSyncedWorkbenchPersistence = (
       );
     }
     /**
-     * The whole document the server holds once `entry` is, only when that is this one: with one half acknowledged
-     * and not the other, it holds neither this document nor the last one, and the shortcut that trusts `pushedDoc`
-     * must not take either for it.
+     * The whole document the server holds once `entry` is, only when that is this one: with one half acknowledged and
+     * not the other, it holds neither this document nor the last one, and the shortcut that trusts `pushedDoc` must not
+     * take either for it.
      */
     const acknowledgedDocument = (entry: Omit<SyncEntry, 'pushedDoc'>): string =>
       entry.pushedContent === halves.contentJson && entry.pushedWorkspace === halves.workspaceJson ? documentJson : '';
@@ -1531,8 +1531,8 @@ export const createDurableSyncedWorkbenchPersistence = (
 
     /**
      * A project's first save, and the split of one the server holds whole, are one request each, which stores the
-     * content and the caller's workspace together: between two requests the server would hold the content alone, and
-     * a page gone at that moment (sign-out deletes its drafts) would leave the member's workspace lost for good. Once
+     * content and the caller's workspace together: between two requests the server would hold the content alone, and a
+     * page gone at that moment (sign-out deletes its drafts) would leave the member's workspace lost for good. Once
      * split, the halves go one after the other, content first: the server takes one write per account at a time, and
      * the content's save is what raises the document floor, so a workspace never sits beside a project an older page
      * could still save whole.
@@ -1625,10 +1625,10 @@ export const createDurableSyncedWorkbenchPersistence = (
         }
         acknowledgeHalf('content');
         pendingBoardAssignments.set(project.id, { boardId: created.board_id, projectId: project.id });
-        // The answer names the workspace it stored, which is this save's only when it is what this save sent: a
-        // create settled by a read of an earlier attempt that committed unanswered carries that attempt's workspace,
-        // and the content it is judged by may not have changed since. Any other workspace stays owed, and is sent
-        // next against the revision the answer named; a server that stored none leaves it owed the same way.
+        // The answer names the workspace it stored, which is this save's only when it is what this save sent: a create
+        // settled by a read of an earlier attempt that committed unanswered carries that attempt's workspace, and the
+        // content it is judged by may not have changed since. Any other workspace stays owed, and is sent next against
+        // the revision the answer named; a server that stored none leaves it owed the same way.
         const workspaceStored =
           created.workspace !== null && JSON.stringify(created.workspace.data) === halves.workspaceJson;
         if (workspaceStored) {
@@ -1746,9 +1746,9 @@ export const createDurableSyncedWorkbenchPersistence = (
     };
 
     /**
-     * After a revision conflict: what the server holds of each half. A half it holds as ours is acknowledged; a half
-     * it still holds as this page last saw it was moved by a save of the same bytes, and is retried at its revision;
-     * any other half diverged.
+     * After a revision conflict: what the server holds of each half. A half it holds as ours is acknowledged; a half it
+     * still holds as this page last saw it was moved by a save of the same bytes, and is retried at its revision; any
+     * other half diverged.
      */
     const reconcile = async (): Promise<
       | { kind: 'acknowledged' | 'retry'; entry: SyncEntry }
@@ -1921,8 +1921,8 @@ export const createDurableSyncedWorkbenchPersistence = (
       hasPending = true;
       return { documentJson: plan.serialized.documentJson, kind: 'unsynced' };
     }
-    // Only an undo requested after this journal, or the same document already in recovery, can retire it.
-    // Capture the target before the store await; a later hidden edit is a different intent.
+    // Only an undo requested after this journal, or the same document already in recovery, can retire it. Capture the
+    // target before the store await; a later hidden edit is a different intent.
     const journalToRetire = journaledDocuments.get(plan.project.id);
     if (journalToRetire && isInRecovery(plan.project.id, plan.serialized.documentJson)) {
       await settleJournaledDocument(plan.project.id, await getDraftStore(), journalToRetire);
@@ -2146,8 +2146,8 @@ export const createDurableSyncedWorkbenchPersistence = (
   /**
    * Settles this writer's journal of a project in its lineage's claim (the mark makes a deletion that fails moot), then
    * deletes it. The record is kept, for a later retry, until the mark commits. A fenced lineage needs no mark: its
-   * entries are discarded anyway. False while the targeted journal could still come back; a replacement belongs to
-   * a newer intent and is left untouched.
+   * entries are discarded anyway. False while the targeted journal could still come back; a replacement belongs to a
+   * newer intent and is left untouched.
    */
   const settleJournaledDocument = async (
     projectId: string,
@@ -3309,11 +3309,11 @@ export const createDurableSyncedWorkbenchPersistence = (
             loadedProjects.set(projectId, serverLoad.project);
             return;
           }
-          // The journal replaced a staged draft whose save reached the server without its answer reaching the page:
-          // the server holds exactly that document, so the journal is its successor, as if the answer had arrived.
-          // Judged half by half: of a split save, one half may have landed and not the other. Both sides are judged
-          // in the form a load gives the server's copy, with the project's board applied: a first save's draft could
-          // not carry the board, which only the create's lost answer named.
+          // The journal replaced a staged draft whose save reached the server without its answer reaching the page: the
+          // server holds exactly that document, so the journal is its successor, as if the answer had arrived. Judged
+          // half by half: of a split save, one half may have landed and not the other. Both sides are judged in the
+          // form a load gives the server's copy, with the project's board applied: a first save's draft could not carry
+          // the board, which only the create's lost answer named.
           const replaced = journalReplacedDrafts.get(projectId)?.replacedDraft;
           if (
             replaced &&
@@ -3852,7 +3852,8 @@ export const createDurableSyncedWorkbenchPersistence = (
           return result;
         }
         const conflict = conflicts.get(projectId);
-        // Without a workspace row (one never saved, or since removed) the merge takes the one a new project starts with.
+        // Without a workspace row (one never saved, or since removed) the merge takes the one a new project starts
+        // with.
         if (conflict?.kind === 'revision' && conflict.half === 'workspace' && isSplitProjectRecord(record)) {
           return useServerWorkspace(projectId, record, result.project);
         }

@@ -12,8 +12,8 @@ import { ProjectSwitcher } from './ProjectSwitcher';
 import { TopbarProgressRail } from './TopbarProgressRail';
 
 /**
- * Use minmax(0,1fr) side columns to center presets independently of project-name width. Collapse left labels
- * first; preserve route and queue indicators.
+ * Use minmax(0,1fr) side columns to center presets independently of project-name width. Collapse left labels first;
+ * preserve route and queue indicators.
  */
 const TOPBAR_COLUMNS = 'minmax(0, 1fr) auto minmax(0, 1fr)';
 
@@ -29,8 +29,8 @@ export const TopBar = () => (
       gap="2"
       gridTemplateColumns={TOPBAR_COLUMNS}
       h="44px"
-      // Positioning context for the progress rail, which overlays the bottom
-      // border rather than taking a row of its own.
+      // Positioning context for the progress rail, which overlays the bottom border rather than taking a row of its
+      // own.
       position="relative"
       px="1.5"
       w="full"

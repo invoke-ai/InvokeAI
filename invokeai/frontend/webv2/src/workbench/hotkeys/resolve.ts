@@ -4,8 +4,8 @@ import { IS_MAC_OS, isEditableHotkeyTarget, isNativeControlKeyPress, normalizeHo
 
 /**
  * The keys a binding presses on this platform: `mod` is Cmd on macOS and Ctrl elsewhere. The runtime fires the first
- * binding a press matches, so `mod+arrowup` and `ctrl+arrowup` must resolve as one press and leave the choice to
- * scope; compared by spelling, one would shadow the other everywhere.
+ * binding a press matches, so `mod+arrowup` and `ctrl+arrowup` must resolve as one press and leave the choice to scope;
+ * compared by spelling, one would shadow the other everywhere.
  */
 export const toPlatformHotkey = (hotkey: string, isMacOs = IS_MAC_OS): string =>
   normalizeHotkeyString(
@@ -61,8 +61,8 @@ export const applyCustomHotkeys = <Hotkey extends { defaultKeys: string[]; id: s
 /**
  * An open menu or listbox owns the unmodified presses inside it: arrows, Enter, Escape, Space and typeahead, Shift
  * included because it types capitals. Zag prevents the default of a typed letter but lets it bubble, and a portaled
- * popup sits outside every widget's DOM, so the press would otherwise resolve against whichever widget holds focus.
- * A Ctrl, Meta or Alt chord is never popup input and resolves as usual.
+ * popup sits outside every widget's DOM, so the press would otherwise resolve against whichever widget holds focus. A
+ * Ctrl, Meta or Alt chord is never popup input and resolves as usual.
  */
 const isPopupOwnedPress = (event: KeyboardEvent): boolean =>
   !event.ctrlKey &&

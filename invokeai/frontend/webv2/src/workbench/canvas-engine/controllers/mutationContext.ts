@@ -64,9 +64,9 @@ export type EditPublishResult =
 export type EditEntry = Omit<HistoryEntry, 'label'>;
 
 /**
- * An admitted edit. Admission happens before any mutation, so an edit that could never keep its undo entry is
- * refused while the document, pixels and history are still untouched. Every resource the transaction reserves or
- * holds is released by `end`, which callers run in `finally`.
+ * An admitted edit. Admission happens before any mutation, so an edit that could never keep its undo entry is refused
+ * while the document, pixels and history are still untouched. Every resource the transaction reserves or holds is
+ * released by `end`, which callers run in `finally`.
  */
 export interface EditTransaction {
   /** Whether publication would still be accepted (permit, gesture, replay, disposal). */
@@ -153,8 +153,8 @@ export interface CanvasMutationContextDeps {
   readonly reserveRaster: (bytes: number) => RasterMemoryReservationResult;
   readonly isGestureActive: () => boolean;
   /**
-   * Ends an open structural preview, restoring its baseline; see {@link CanvasMutationContext.getDocument} and
-   * {@link CanvasMutationContext.begin}.
+   * Ends an open structural preview, restoring its baseline; see {@link CanvasMutationContext.getDocument} and {@link
+   * CanvasMutationContext.begin}.
    */
   readonly endStructuralPreview?: () => void;
   readonly createLayerId: () => string;
@@ -170,8 +170,8 @@ const runBestEffort = (notify: (() => void) | undefined): void => {
 };
 
 /**
- * Owns edit-permit epochs and the transaction protocol. The editing-lock and reducer subscriptions last until
- * {@link dispose}.
+ * Owns edit-permit epochs and the transaction protocol. The editing-lock and reducer subscriptions last until {@link
+ * dispose}.
  */
 export const createCanvasMutationContext = (
   deps: CanvasMutationContextDeps

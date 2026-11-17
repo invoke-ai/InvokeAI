@@ -51,8 +51,8 @@ interface NotificationMenuTarget extends ListContextMenuAnchor {
 
 /**
  * The buttons a notice offers, as its toast offered them. Undo closures live outside workbench state, so the notice's
- * still-offered undos are a snapshot of their own (they go when run elsewhere or withdrawn). The actions are filtered by
- * that snapshot rather than by the registry alone, so memoization sees the change.
+ * still-offered undos are a snapshot of their own (they go when run elsewhere or withdrawn). The actions are filtered
+ * by that snapshot rather than by the registry alone, so memoization sees the change.
  */
 const useNotificationActions = (
   notification: WorkbenchNotification,

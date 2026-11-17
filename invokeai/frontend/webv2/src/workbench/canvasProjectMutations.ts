@@ -89,8 +89,8 @@ const pickStagedSlot = (project: Project, imageIndex: number): Project => {
 };
 
 /**
- * Restore points a canvas keeps of each kind (Clear canvas and Discard all each make one); older ones of that kind
- * are dropped, so a run of discards never pushes out a cleared canvas.
+ * Restore points a canvas keeps of each kind (Clear canvas and Discard all each make one); older ones of that kind are
+ * dropped, so a run of discards never pushes out a cleared canvas.
  */
 export const MAX_CANVAS_SNAPSHOTS = 5;
 
@@ -299,8 +299,8 @@ const setCanvasLayerPositions = (
 };
 
 /**
- * Swaps the leaf `layer.id` names for `layer`. A leaf of another type cannot stay in its forest, so
- * it leaves its group and lands in its new stack at `anchor`, or at the top like a fresh layer.
+ * Swaps the leaf `layer.id` names for `layer`. A leaf of another type cannot stay in its forest, so it leaves its group
+ * and lands in its new stack at `anchor`, or at the top like a fresh layer.
  */
 const replaceLeaf = (
   projectId: string,
@@ -389,8 +389,8 @@ const siblingKey = (stack: CanvasNodeInsertionAnchor['stack'], parentId: string 
   `${stack}\0${parentId ?? ''}`;
 
 /**
- * Batch rebuilds must match sequential moves. Use the sequential path when anchors name moving nodes or blocks
- * nest, because intermediate forests affect resolution.
+ * Batch rebuilds must match sequential moves. Use the sequential path when anchors name moving nodes or blocks nest,
+ * because intermediate forests affect resolution.
  */
 const applyMoves = (stacks: CanvasStackForests, moves: readonly CanvasNodeMove[], projectId: string) => {
   if (moves.length === 0) {
@@ -1066,8 +1066,8 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       const height = Math.max(1, Math.round(mutation.height));
       const offsetX = mutation.offsetX ?? 0;
       const offsetY = mutation.offsetY ?? 0;
-      // An offset moves every leaf and the bbox but not the rects pending results were pinned to at submission, so
-      // it would land them off their content: refused while this session has any.
+      // An offset moves every leaf and the bbox but not the rects pending results were pinned to at submission, so it
+      // would land them off their content: refused while this session has any.
       if ((offsetX !== 0 || offsetY !== 0) && hasPendingCanvasResults(project.canvas, project.queue.items)) {
         return project;
       }

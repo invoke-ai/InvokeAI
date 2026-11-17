@@ -63,8 +63,8 @@ const PREVIEW_IMAGE_STYLE = {
 /** Leaves room for the star button in the opposite corner. */
 const LABEL_MAX_WIDTH = 'calc(100% - 2.25rem)';
 /**
- * A label that resolves mid-hover mounts already revealed; fade it in like the overlays it joins. Important
- * because the tile's hover reveal outranks a single-class rule.
+ * A label that resolves mid-hover mounts already revealed; fade it in like the overlays it joins. Important because the
+ * tile's hover reveal outranks a single-class rule.
  */
 const LABEL_CSS = { '@starting-style': { opacity: '0 !important' } } as const;
 
@@ -198,8 +198,8 @@ const GalleryThumbnail = ({
             pointerEvents: 'none',
             position: 'fixed',
             top: `${String(dragOrigin.top)}px`,
-            // Translate only: the full transform carries dnd-kit's scale factors,
-            // which squash the preview to whatever it is hovering over.
+            // Translate only: the full transform carries dnd-kit's scale factors, which squash the preview to whatever
+            // it is hovering over.
             transform: CSS.Translate.toString(transform),
             width: `${String(dragOrigin.width)}px`,
             zIndex: 1500,
@@ -228,10 +228,8 @@ const GalleryThumbnail = ({
     (event: MouseEvent) => {
       event.preventDefault();
 
-      // A long-press that armed or started a touch drag is drag intent, not
-      // menu intent: the native menu is already suppressed by the sensor, and
-      // the app menu must not open under a gesture that is about to move the
-      // image.
+      // A long-press that armed or started a touch drag is drag intent, not menu intent: the native menu is already
+      // suppressed by the sensor, and the app menu must not open under a gesture that is about to move the image.
       if (!isDragging) {
         onContextMenu(item, event.clientX, event.clientY);
       }
@@ -263,9 +261,9 @@ const GalleryThumbnail = ({
     [item, onOpen]
   );
 
-  // Composes with the drag sensor's own mousedown, which starts primary-button drags from the same cell. Middle
-  // button only: the primary button's click/double-click stay selection and open. Its mousedown default (autoscroll
-  // on some platforms) is suppressed so the release reliably delivers the auxclick.
+  // Composes with the drag sensor's own mousedown, which starts primary-button drags from the same cell. Middle button
+  // only: the primary button's click/double-click stay selection and open. Its mousedown default (autoscroll on some
+  // platforms) is suppressed so the release reliably delivers the auxclick.
   const handleMouseDown = useCallback(
     (event: MouseEvent) => {
       if (onOpenInNewTab && event.button === 1) {
@@ -306,8 +304,8 @@ const GalleryThumbnail = ({
     [item, onOpen]
   );
 
-  // Fetched on reveal rather than per rendered tile: labels cost a request each, and the cache makes repeat
-  // reveals free while still picking up a rebuilt vocabulary.
+  // Fetched on reveal rather than per rendered tile: labels cost a request each, and the cache makes repeat reveals
+  // free while still picking up a rebuilt vocabulary.
   const [label, setLabel] = useState<string | null>(null);
   const handleRevealLabel = useCallback(() => {
     if (getItemLabel) {

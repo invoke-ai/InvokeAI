@@ -127,8 +127,8 @@ export const useMaskTintEditor = (engine: MaskTintEngine | null): MaskTintEditor
       clearMaskTintTarget();
     }
   }, [armedLayerId, layer]);
-  // Disarm and unmount both flush the pending gesture; the gesture carries its
-  // own layer, so this works even after the selection has moved on.
+  // Disarm and unmount both flush the pending gesture; the gesture carries its own layer, so this works even after the
+  // selection has moved on.
   useEffect(() => {
     if (!armedLayerId) {
       settleRef.current();

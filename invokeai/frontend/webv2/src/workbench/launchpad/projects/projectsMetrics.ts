@@ -27,9 +27,8 @@ export const getProjectsColumnCount = (widthPx: number): number => {
 };
 
 /**
- * A grid row is one card tall: a 16:10 cover over a fixed meta block, plus the
- * gap below it. Derived from the measured width because the cover's height
- * follows the column width.
+ * A grid row is one card tall: a 16:10 cover over a fixed meta block, plus the gap below it. Derived from the measured
+ * width because the cover's height follows the column width.
  */
 export const getProjectsGridRowHeight = ({
   aspectRatio,

@@ -26,9 +26,8 @@ export const canUngroupSelection = (model: CanvasDocumentModel | null, ids: read
 };
 
 /**
- * Wraps `ids` in a new group, selects it, and shows its children. The selection is published only
- * for an edit the model accepted, before the commit so reconciliation keeps it, and rolled back if
- * the commit does not land.
+ * Wraps `ids` in a new group, selects it, and shows its children. The selection is published only for an edit the model
+ * accepted, before the commit so reconciliation keeps it, and rolled back if the commit does not land.
  */
 export const groupLayers = (
   engine: CanvasPreparedEngine | null,

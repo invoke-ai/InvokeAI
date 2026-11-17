@@ -17,8 +17,7 @@ import type { GalleryItemActions, GalleryWidgetProps, GalleryWidgetRuntime } fro
 import type { GalleryListingState, GallerySparseListing } from './useGalleryData';
 
 /**
- * The provider maps widget intents to workbench/backend actions; shared ImageActions owns cross-widget item
- * operations.
+ * The provider maps widget intents to workbench/backend actions; shared ImageActions owns cross-widget item operations.
  */
 export interface GalleryActions {
   archiveBoard: (boardId: string, archived: boolean) => Promise<void>;
@@ -82,9 +81,8 @@ export interface GalleryWidgetContextValue {
   /** The board list's standing; its failure is the board panel's to show, never the grid's. */
   boardsState: GalleryReadState;
   /**
-   * The query filter the visible items came from. Shared rather than re-derived
-   * so range selection and the item list can never disagree about which query
-   * they are operating on.
+   * The query filter the visible items came from. Shared rather than re-derived so range selection and the item list
+   * can never disagree about which query they are operating on.
    */
   filter: GalleryItemsFilter;
   itemActions: GalleryItemActions;

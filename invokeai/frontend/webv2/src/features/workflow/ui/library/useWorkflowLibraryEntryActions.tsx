@@ -93,8 +93,8 @@ export interface WorkflowLibraryEntryActions {
 }
 
 /**
- * The workflow a dialog was opened for, and its name then. Write access was checked when it opened; the dialog
- * answers to this target alone, so a refresh that drops the entry neither hides it nor leaves it to reappear later.
+ * The workflow a dialog was opened for, and its name then. Write access was checked when it opened; the dialog answers
+ * to this target alone, so a refresh that drops the entry neither hides it nor leaves it to reappear later.
  */
 interface DialogTarget {
   name: string;
@@ -105,8 +105,8 @@ const toFileSlug = (name: string): string => name.trim().replaceAll(/\s+/g, '-')
 
 /**
  * One library workflow's actions and the dialogs they open. Every action reads the record by id and revision, so it
- * acts on `entry` whether or not it is the selection; each caller (the detail rail, a card's context menu) owns its
- * own instance, and with it its own rename and delete dialogs.
+ * acts on `entry` whether or not it is the selection; each caller (the detail rail, a card's context menu) owns its own
+ * instance, and with it its own rename and delete dialogs.
  */
 export const useWorkflowLibraryEntryActions = ({
   duplicateGuard,
@@ -171,8 +171,8 @@ export const useWorkflowLibraryEntryActions = ({
 
       assertAccountScopeCurrent(owner);
       invalidateWorkflowLibraryCache();
-      // The copy is forced into the user category, so from the Browse tab it
-      // lands out of sight — the notice is the only thing that says it worked.
+      // The copy is forced into the user category, so from the Browse tab it lands out of sight — the notice is the
+      // only thing that says it worked.
       notify.success(t('workflowLibrary.duplicated'));
       onDuplicated(workflowId);
     } catch (error) {
@@ -243,8 +243,8 @@ export const useWorkflowLibraryEntryActions = ({
 
       const { document } = parseWorkflowJson({ ...record.workflow, id: record.workflow_id });
 
-      // The port creates and activates a fresh project first, so the project
-      // the library was opened from is left exactly as it was.
+      // The port creates and activates a fresh project first, so the project the library was opened from is left
+      // exactly as it was.
       openDocumentInNewProject(document, item.name, {
         libraryWorkflowId: record.workflow_id,
         ...(getWorkflowRecordCategory(record) === 'user' ? { ownerUserId: record.user_id } : {}),

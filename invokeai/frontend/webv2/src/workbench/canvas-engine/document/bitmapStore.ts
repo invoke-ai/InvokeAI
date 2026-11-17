@@ -1,10 +1,10 @@
 /**
- * Content-hashed paint persistence: debounce dirty layers, encode PNG, dedupe uploads, and swap the bitmap ref
- * only on success. Failures leave pixels dirty. Self-echo detection avoids rerasterizing accepted pixels.
+ * Content-hashed paint persistence: debounce dirty layers, encode PNG, dedupe uploads, and swap the bitmap ref only on
+ * success. Failures leave pixels dirty. Self-echo detection avoids rerasterizing accepted pixels.
  *
  * Recheck source type before trim and after awaits because cache surfaces survive source changes. Compare dispatch
- * dedupe against the current document, not remembered refs. Trim to visible pixels before encoding; clear empty
- * bitmaps so content bounds remain truthful.
+ * dedupe against the current document, not remembered refs. Trim to visible pixels before encoding; clear empty bitmaps
+ * so content bounds remain truthful.
  */
 
 import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
@@ -49,8 +49,8 @@ export class BitmapPersistenceError extends Error {
 
 export interface FlushPendingUploadsOptions {
   /**
-   * Whether to wait while an open edit (a session, gesture or suspension) holds dirty pixels. Document pushes
-   * that the user cannot see through pass false and fail fast instead.
+   * Whether to wait while an open edit (a session, gesture or suspension) holds dirty pixels. Document pushes that the
+   * user cannot see through pass false and fail fast instead.
    */
   readonly waitForHeldPixels?: boolean;
   /** Limits the barrier to these layers' dirty and in-flight work; absent means every layer. */
@@ -73,14 +73,13 @@ export interface BitmapStoreDeps {
    */
   getLayerSurface(layerId: string): { surface: RasterSurface; offset: { x: number; y: number } } | 'empty' | null;
   /**
-   * Reads the current source to prevent an old dirty mark from persisting surviving cache pixels over a layer
-   * converted away from paint.
+   * Reads the current source to prevent an old dirty mark from persisting surviving cache pixels over a layer converted
+   * away from paint.
    */
   getLayerSource(layerId: string): CanvasLayerSourceContract | null;
   /**
-   * Reads a layer source from reducer-owned project state, bypassing subscriber-
-   * refreshed mirrors. Used only to verify whether a dispatch that threw after
-   * reducer commit nevertheless landed exactly as intended.
+   * Reads a layer source from reducer-owned project state, bypassing subscriber- refreshed mirrors. Used only to verify
+   * whether a dispatch that threw after reducer commit nevertheless landed exactly as intended.
    */
   getAuthoritativeLayerSource?(layerId: string): CanvasLayerSourceContract | null;
   /** Encodes a surface to an image `Blob` (PNG). Usually `backend.encodeSurface`. */
@@ -90,18 +89,18 @@ export interface BitmapStoreDeps {
   /** Dispatches to the reducer (the single swap-on-success `updateCanvasLayerSource`). */
   dispatch(action: CanvasProjectMutation): boolean;
   /**
-   * Swap-on-success bitmap/offset dispatch. The engine chooses paint-source versus mask-config actions; absence
-   * uses the paint-source default.
+   * Swap-on-success bitmap/offset dispatch. The engine chooses paint-source versus mask-config actions; absence uses
+   * the paint-source default.
    */
   dispatchBitmap?(layerId: string, bitmap: CanvasImageRef, offset: { x: number; y: number }): boolean;
   /**
-   * Trim visible bounds before reading the surface. Deferred trims stay dirty; barriers retry until ownership
-   * releases. Absence behaves as kept.
+   * Trim visible bounds before reading the surface. Deferred trims stay dirty; barriers retry until ownership releases.
+   * Absence behaves as kept.
    */
   trimLayerPixels?(layerId: string): PaintCacheTrim;
   /**
-   * Clears empty bitmap refs and reports acceptance like {@link dispatchBitmap}. Separate dispatch preserves mask
-   * fill and needs no offset.
+   * Clears empty bitmap refs and reports acceptance like {@link dispatchBitmap}. Separate dispatch preserves mask fill
+   * and needs no offset.
    */
   clearBitmap?(layerId: string): boolean;
   /** Content-hashes a blob (defaults to SHA-256 hex via `@platform/browser/sha256`). */
@@ -122,10 +121,7 @@ export interface BitmapStoreDeps {
   timers?: BitmapStoreTimers;
   /** Injectable delay used for retry backoff (default: `timers.setTimeout`). */
   sleep?(ms: number): Promise<void>;
-  /**
-   * Reports the first failure and circuit opening in a streak; intermediate retries stay silent. Optional
-   * callback.
-   */
+  /** Reports the first failure and circuit opening in a streak; intermediate retries stay silent. Optional callback. */
   onError?(error: unknown, layerId: string, info: { consecutiveFailures: number; willRetry: boolean }): void;
 }
 
@@ -138,8 +134,8 @@ export interface BitmapStore {
   /** Marks a layer dirty and (re)arms its debounce timer. Called on each committed stroke. */
   markLayerDirty(layerId: string): void;
   /**
-   * Temporarily prevents persistence from reading or dispatching `layerId` while
-   * preserving dirty work. Returns an idempotent release; leases may be nested.
+   * Temporarily prevents persistence from reading or dispatching `layerId` while preserving dirty work. Returns an
+   * idempotent release; leases may be nested.
    */
   suspendLayer(layerId: string): () => void;
   /** Cancels pending persistence and invalidates an in-flight result for one layer. */
@@ -193,8 +189,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   /** Layers awaiting a flush (either debounced or re-dirtied during a flush). */
   const dirty = new Set<string>();
   /**
-   * Dirty reasons: new strokes may retry within a barrier; failures may not, preventing spin; deferred pixel
-   * ownership is polled until released. A new stroke resets either reason.
+   * Dirty reasons: new strokes may retry within a barrier; failures may not, preventing spin; deferred pixel ownership
+   * is polled until released. A new stroke resets either reason.
    */
   const dirtyReason = new Map<string, 'deferred' | 'failure' | 'stroke'>();
   /** Active debounce timers, keyed by layer id. */
@@ -212,9 +208,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   /** Empty-cache clears that have not yet been accepted by the document. */
   const pendingClears = new Set<string>();
   /**
-   * Per-layer generation used only while invalidated work is still in flight.
-   * Idle ids are removed so ordinary layer deletion cannot accumulate permanent
-   * tombstones for the lifetime of the engine.
+   * Per-layer generation used only while invalidated work is still in flight. Idle ids are removed so ordinary layer
+   * deletion cannot accumulate permanent tombstones for the lifetime of the engine.
    */
   const layerGenerations = new Map<string, number>();
   /** Active nested persistence-suspension generation per layer. */
@@ -320,9 +315,9 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   };
 
   /**
-   * Throws and declined dispatches share backoff and circuit accounting. Report the first non-silent failure and
-   * always report circuit opening, including silent declines. Commit bookkeeping before notifying observers, whose
-   * reentrant changes must win.
+   * Throws and declined dispatches share backoff and circuit accounting. Report the first non-silent failure and always
+   * report circuit opening, including silent declines. Commit bookkeeping before notifying observers, whose reentrant
+   * changes must win.
    */
   const recordFlushFailure = (layerId: string, error: unknown, options: { silent: boolean }): void => {
     const failures = (failureCounts.get(layerId) ?? 0) + 1;
@@ -344,9 +339,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
 
   /** Clears empty bitmap refs synchronously, requiring no generation recheck. */
   const clearLayerBitmap = (layerId: string, requeueFailure: (error: unknown) => void): void => {
-    // Drop the self-echo entry on every path: the trim established that the live
-    // cache no longer matches the last bitmap this store dispatched, including
-    // when the document has already independently reached `bitmap: null`.
+    // Drop the self-echo entry on every path: the trim established that the live cache no longer matches the last
+    // bitmap this store dispatched, including when the document has already independently reached `bitmap: null`.
     lastApplied.delete(layerId);
     // Redundant-dispatch skip against GROUND TRUTH, not `lastApplied` — see the header.
     const sourceNow = deps.getLayerSource(layerId);
@@ -369,8 +363,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
           });
     } catch (error) {
       const authoritativeSource = (deps.getAuthoritativeLayerSource ?? deps.getLayerSource)(layerId);
-      // As on the upload path: a dispatch that threw after the reducer committed
-      // still landed, so it must not be requeued — and it closes the breaker.
+      // As on the upload path: a dispatch that threw after the reducer committed still landed, so it must not be
+      // requeued — and it closes the breaker.
       if (authoritativeSource?.type === 'paint' && !authoritativeSource.bitmap) {
         pendingClears.delete(layerId);
         failureCounts.delete(layerId);
@@ -383,8 +377,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       return;
     }
     if (accepted !== true && deps.getLayerSource(layerId) !== null) {
-      // Declined clears advance the shared breaker without a network-error toast. Keep the clear pending even
-      // after trim collapses the cache.
+      // Declined clears advance the shared breaker without a network-error toast. Keep the clear pending even after
+      // trim collapses the cache.
       recordFlushFailure(layerId, new Error('Bitmap clear was not accepted.'), { silent: true });
       return;
     }
@@ -399,8 +393,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     const isCurrentGeneration = (): boolean => !disposed && (layerGenerations.get(layerId) ?? 0) === generationAtEntry;
     const requeueFailure = (error: unknown): void => {
       if (!isCurrentGeneration()) {
-        // A discard/reset already invalidated this flush; its own bookkeeping
-        // stands, and this stale failure has nothing left to report.
+        // A discard/reset already invalidated this flush; its own bookkeeping stands, and this stale failure has
+        // nothing left to report.
         return;
       }
       recordFlushFailure(layerId, error, { silent: false });
@@ -437,20 +431,19 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       clearLayerBitmap(layerId, requeueFailure);
       return;
     }
-    // A failed clear may outlive the empty cache that requested it. A later
-    // rasterization can restore visible pixels without calling markLayerDirty,
-    // so the fresh surface verdict wins over the stale clear intent.
+    // A failed clear may outlive the empty cache that requested it. A later rasterization can restore visible pixels
+    // without calling markLayerDirty, so the fresh surface verdict wins over the stale clear intent.
     pendingClears.delete(layerId);
     if (!placed) {
       // Unpersisted pixels without a cache cannot be saved; reporting success would upload nothing.
       requeueFailure(new Error('Canvas pixels for this layer are no longer available.'));
       return;
     }
-    // Capture surface and offset atomically for encoding. Growth during awaits marks dirty again, so a follow-up
-    // flush converges placement.
+    // Capture surface and offset atomically for encoding. Growth during awaits marks dirty again, so a follow-up flush
+    // converges placement.
     const { offset, surface } = placed;
-    // Consume the dirty flag up front; a failure re-adds it below. A stroke that
-    // lands mid-flush re-marks the layer, so the finally handler re-schedules.
+    // Consume the dirty flag up front; a failure re-adds it below. A stroke that lands mid-flush re-marks the layer, so
+    // the finally handler re-schedules.
     dirty.delete(layerId);
     clearTimer(layerId);
 
@@ -492,14 +485,14 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     if (!isCurrentGeneration()) {
       return;
     }
-    // Recheck source type after encode/hash/upload awaits before dispatching, preventing overwrite of a newly
-    // restored parametric source.
+    // Recheck source type after encode/hash/upload awaits before dispatching, preventing overwrite of a newly restored
+    // parametric source.
     const sourceNow = deps.getLayerSource(layerId);
     if (!sourceNow || sourceNow.type !== 'paint') {
       return;
     }
-    // Skip only when the current document matches both bitmap and offset. Remembered refs survive source round
-    // trips, and byte-identical translations still need their new offset persisted.
+    // Skip only when the current document matches both bitmap and offset. Remembered refs survive source round trips,
+    // and byte-identical translations still need their new offset persisted.
     const currentOffset = sourceNow.bitmap ? (sourceNow.offset ?? { x: 0, y: 0 }) : null;
     if (
       sourceNow.bitmap?.imageName === result.imageName &&
@@ -516,8 +509,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       imageName: result.imageName,
       width: result.width,
     };
-    // Record BEFORE dispatching: `dispatch` may notify the mirror synchronously,
-    // so `isSelfEcho` must already see the applied name when the engine reacts.
+    // Record BEFORE dispatching: `dispatch` may notify the mirror synchronously, so `isSelfEcho` must already see the
+    // applied name when the engine reacts.
     lastApplied.set(layerId, result.imageName);
     let accepted: boolean;
     try {
@@ -557,8 +550,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     if (accepted !== true) {
       lastApplied.delete(layerId);
       if (deps.getLayerSource(layerId) !== null) {
-        // A declined acceptance isn't a network error worth a toast of its own,
-        // but it still advances (and can open) the shared breaker.
+        // A declined acceptance isn't a network error worth a toast of its own, but it still advances (and can open)
+        // the shared breaker.
         recordFlushFailure(layerId, new Error('Bitmap update was not accepted.'), { silent: true });
       }
       return;
@@ -588,13 +581,12 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
           if (failures < maxConsecutiveFailures) {
             scheduleFlush(layerId, failureBackoffMs[Math.min(failures - 1, failureBackoffMs.length - 1)] ?? debounceMs);
           }
-          // failures >= max: the circuit is open — stay dirty, no timer. A new
-          // stroke (markLayerDirty) or a flushPendingUploads barrier call is
-          // the only way back in.
+          // failures >= max: the circuit is open — stay dirty, no timer. A new stroke (markLayerDirty) or a
+          // flushPendingUploads barrier call is the only way back in.
         }
       } else {
-        // Any invalidated operation for this id has now settled and there is no
-        // successor waiting to inherit its generation. Retire the tombstone.
+        // Any invalidated operation for this id has now settled and there is no successor waiting to inherit its
+        // generation. Retire the tombstone.
         layerGenerations.delete(layerId);
       }
     });
@@ -661,9 +653,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
 
   const discardLayer = (layerId: string): void => {
     if (inFlight.has(layerId)) {
-      // Keep an invalidating generation only while obsolete async work can
-      // still settle. Same-id work arriving before it settles inherits this
-      // generation and is scheduled after the old operation completes.
+      // Keep an invalidating generation only while obsolete async work can still settle. Same-id work arriving before
+      // it settles inherits this generation and is scheduled after the old operation completes.
       layerGenerations.set(layerId, (layerGenerations.get(layerId) ?? 0) + 1);
     } else {
       layerGenerations.delete(layerId);
@@ -701,8 +692,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     signal,
     waitForHeldPixels = true,
   }: FlushPendingUploadsOptions = {}): Promise<void> => {
-    // Flush dirty layers and await in-flight work until newer strokes also persist. Do not retry failures within
-    // this barrier; poll deferred ownership until pixels are released, unless the caller cannot wait.
+    // Flush dirty layers and await in-flight work until newer strokes also persist. Do not retry failures within this
+    // barrier; poll deferred ownership until pixels are released, unless the caller cannot wait.
     const scope = layerIds ? new Set(layerIds) : null;
     const inScope = (layerId: string): boolean => scope === null || scope.has(layerId);
     const blockedThisBarrier = new Set<string>();
@@ -782,8 +773,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     notifySuspensionWaiters();
     // Clear per-document self-echo state before ids are reused; retain content-addressed `hashToImage`.
     lastApplied.clear();
-    // Same reasoning as `lastApplied`: a reused layer id in the new document
-    // must start with a closed circuit, not inherit the old document's streak.
+    // Same reasoning as `lastApplied`: a reused layer id in the new document must start with a closed circuit, not
+    // inherit the old document's streak.
     failureCounts.clear();
     reportedStreaks.clear();
   };

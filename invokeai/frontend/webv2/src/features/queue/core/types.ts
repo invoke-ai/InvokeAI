@@ -81,8 +81,8 @@ export type QueueCompiledSubmission =
       /** Batch-node value lists resolved at compile time: outer groups multiply, inner datums zip. */
       batchData?: QueueWorkflowBatchDatum[][];
       /**
-       * The project workflow the graph was compiled from, so results return to it whatever is active later. Absent
-       * on records queued before projects owned several workflows; those results keep their destination only.
+       * The project workflow the graph was compiled from, so results return to it whatever is active later. Absent on
+       * records queued before projects owned several workflows; those results keep their destination only.
        */
       projectWorkflowId?: string;
       /** Library binding captured at enqueue, independent of later relinking or removing the project copy. */
@@ -200,8 +200,8 @@ export interface QueueItemReadModel {
 }
 
 /**
- * The saved execution data of one queue item, read on demand for diagnostics. It carries the session graph the
- * backend actually ran, its per-node results and the embedded workflow, which the live read model leaves out.
+ * The saved execution data of one queue item, read on demand for diagnostics. It carries the session graph the backend
+ * actually ran, its per-node results and the embedded workflow, which the live read model leaves out.
  */
 export interface QueueItemDetailReadModel {
   errorMessage: string | null;

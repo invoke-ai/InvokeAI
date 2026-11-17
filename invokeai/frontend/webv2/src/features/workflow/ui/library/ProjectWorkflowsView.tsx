@@ -78,8 +78,8 @@ import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workf
 
 /**
  * The project's own workflows, presented through the library's card contract. The dialog filters and orders them
- * (`queryProjectWorkflowEntries`) for its toolbar, tags and result line. Everything here is a local collection
- * command; the library is only consulted for the selected workflow's source, and only on request.
+ * (`queryProjectWorkflowEntries`) for its toolbar, tags and result line. Everything here is a local collection command;
+ * the library is only consulted for the selected workflow's source, and only on request.
  */
 
 const NO_NODE_PACKS: readonly string[] = [];

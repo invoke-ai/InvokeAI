@@ -73,10 +73,10 @@ export const buildParametricShapePath = (
 };
 
 /**
- * Draw into an isolated transparent target: the shape rasterizer clears it, and the Shape tool supplies fresh
- * scratch pixels. With an outline, compose the styles first and mask them to the silhouette once; clipping the
- * stroke over an already-antialiased fill would expose fill color along the exterior edge. The final mask clears
- * everything outside the shape, so this must never draw directly over existing layer pixels.
+ * Draw into an isolated transparent target: the shape rasterizer clears it, and the Shape tool supplies fresh scratch
+ * pixels. With an outline, compose the styles first and mask them to the silhouette once; clipping the stroke over an
+ * already-antialiased fill would expose fill color along the exterior edge. The final mask clears everything outside
+ * the shape, so this must never draw directly over existing layer pixels.
  */
 export const drawShapeSource = (
   ctx: Ctx,

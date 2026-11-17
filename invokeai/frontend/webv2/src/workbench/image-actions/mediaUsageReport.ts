@@ -9,13 +9,13 @@
  * jobs and other accounts are taken from the server as they are.
  *
  * A project in memory is fresher than the server for edits made here, which autosave after a short debounce, but not
- * for a save from another tab or device since it loaded. Its scan stands when it reports every name the server found
- * in it (the server's copy can hold no checked name the server did not list), or when the server read those names at
- * the very revisions of the content and of the caller's workspace that the copy here builds on: an edit here then
- * removed what the scan dropped. A copy in conflict or refused for its schema builds on no reported revision: its
- * revisions count as unknown. Otherwise (the server is ahead, or either side's revisions are unknown) the server's
- * copy is read as a closed project is, and a ref either copy uses is in use. When that read cannot be made, the project
- * keeps what its copy uses and the server's count, marked `savedCopyUnchecked`.
+ * for a save from another tab or device since it loaded. Its scan stands when it reports every name the server found in
+ * it (the server's copy can hold no checked name the server did not list), or when the server read those names at the
+ * very revisions of the content and of the caller's workspace that the copy here builds on: an edit here then removed
+ * what the scan dropped. A copy in conflict or refused for its schema builds on no reported revision: its revisions
+ * count as unknown. Otherwise (the server is ahead, or either side's revisions are unknown) the server's copy is read
+ * as a closed project is, and a ref either copy uses is in use. When that read cannot be made, the project keeps what
+ * its copy uses and the server's count, marked `savedCopyUnchecked`.
  *
  * For items, the requested refs are scanned. For a board, only the server knows the board's members, so a project in
  * memory is scanned for the names the server attributed to it, and a use added here since its last save is missed.
@@ -77,8 +77,8 @@ export interface MediaUsageHost {
 
 export interface MediaUsageOptions {
   /**
-   * How long each request of the server check may take before the report says it could not finish: a selection past
-   * one request's cap is checked in several, and gets this long for each.
+   * How long each request of the server check may take before the report says it could not finish: a selection past one
+   * request's cap is checked in several, and gets this long for each.
    */
   serverTimeoutMs?: number;
   /** How long reading projects from the server may take; any not read by then are listed as the server counts them. */
@@ -228,8 +228,8 @@ interface ProjectRead {
 }
 
 /**
- * Where the requested media is used. For items, the server check failing (offline, an older server without the check,
- * a timeout) does not fail the report: the projects this tab holds are still scanned and the report says the rest went
+ * Where the requested media is used. For items, the server check failing (offline, an older server without the check, a
+ * timeout) does not fail the report: the projects this tab holds are still scanned and the report says the rest went
  * unchecked. A board's members are known only to the server, so for a board that failure rejects. Otherwise rejects
  * only when `signal` aborts or the account changes.
  */

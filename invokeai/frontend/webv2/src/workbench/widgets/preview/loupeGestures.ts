@@ -23,8 +23,8 @@ export const trackPointerDown = (
 };
 
 /**
- * Tolerate capture failure for already-released pointers; uncaptured gestures still work while pointers remain on
- * the surface.
+ * Tolerate capture failure for already-released pointers; uncaptured gestures still work while pointers remain on the
+ * surface.
  */
 export const capturePointer = (element: Element, pointerId: number): void => {
   try {

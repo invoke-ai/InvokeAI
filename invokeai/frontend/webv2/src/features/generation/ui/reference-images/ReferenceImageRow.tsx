@@ -102,9 +102,9 @@ const MODEL_ISSUE_KEYS = new Set(
 const INDEX_PLACEHOLDER = '\u0000';
 
 /**
- * Whether a name reads as some position's default ("Reference image 7"), in the active language and any case; null
- * when the locale's template cannot be matched safely (only the number, or a number formatter that drops the
- * placeholder), and then only a row's own default is recognized.
+ * Whether a name reads as some position's default ("Reference image 7"), in the active language and any case; null when
+ * the locale's template cannot be matched safely (only the number, or a number formatter that drops the placeholder),
+ * and then only a row's own default is recognized.
  */
 export const getPositionalDefaultNameTest = (t: TFunction): ((name: string) => boolean) | null => {
   const parts = t('widgets.generate.referenceImageNumbered', { index: INDEX_PLACEHOLDER }).split(INDEX_PLACEHOLDER);
@@ -173,16 +173,16 @@ export const describeReferenceImage = (
 export interface ReferenceImageRowProps {
   count: number;
   /**
-   * An installed model the row's picker could offer. Without one, an issue asking for a model offers the Model
-   * Manager instead of a picker with nothing in it.
+   * An installed model the row's picker could offer. Without one, an issue asking for a model offers the Model Manager
+   * instead of a picker with nothing in it.
    */
   hasModelChoice?: boolean;
   /** Opens Add Models filtered to a model type, for an issue no installed model fixes. */
   onOpenModelManager?: (modelType: string) => void;
   index: number;
   /**
-   * False lists the row dimmed, badged and inert: the selected model takes no references, and the list above it says
-   * so with its one way out.
+   * False lists the row dimmed, badged and inert: the selected model takes no references, and the list above it says so
+   * with its one way out.
    */
   isSupported?: boolean;
   /** How the prompt names this reference, for models that address references by tag. */
@@ -199,10 +199,10 @@ export interface ReferenceImageRowProps {
 }
 
 /**
- * One reference image as a list row, the same construction as a concept row: its image tile, name and live summary,
- * a switch and a menu, with its one main control on the row and the rest of its settings under a disclosure. The
- * row's button opens the menu (Enter, Space, right-click); F2 or a double-click renames; Right and Left open and
- * close the settings; Alt+Up and Alt+Down move it; Delete removes it.
+ * One reference image as a list row, the same construction as a concept row: its image tile, name and live summary, a
+ * switch and a menu, with its one main control on the row and the rest of its settings under a disclosure. The row's
+ * button opens the menu (Enter, Space, right-click); F2 or a double-click renames; Right and Left open and close the
+ * settings; Alt+Up and Alt+Down move it; Delete removes it.
  */
 const ReferenceImageRowBase = ({
   count,
@@ -337,8 +337,8 @@ const ReferenceImageRowBase = ({
     },
     [focusRowSoon]
   );
-  // This row's default stores no name, so it keeps following the row's position. The default when editing began
-  // counts too: a reorder from another tab while the field is open must not store the untouched text as a name.
+  // This row's default stores no name, so it keeps following the row's position. The default when editing began counts
+  // too: a reorder from another tab while the field is open must not store the untouched text as a name.
   const isPositionalDefault = useMemo(() => getPositionalDefaultNameTest(t), [t]);
   const [renameError, setRenameError] = useState<string | null>(null);
   const renameErrorId = useId();

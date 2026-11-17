@@ -47,10 +47,7 @@ export type DefaultSettingsControl =
 export interface FieldSpec {
   key: keyof AnyModelDefaultSettings;
   labelKey: string;
-  /**
-   * Omitted for a boolean default, where the row's own enable switch already
-   * expresses both states.
-   */
+  /** Omitted for a boolean default, where the row's own enable switch already expresses both states. */
   control?: DefaultSettingsControl;
   /** Value used when the toggle is switched on; also previewed while off. */
   defaultValue: unknown;
@@ -76,8 +73,8 @@ const FP8_STORAGE_FIELD: FieldSpec = {
 
 const VAE_FIELD: FieldSpec = {
   control: { kind: 'model', modelTypes: ['vae'], placeholderKey: 'models.defaultVae', sameBase: true },
-  // The backend sentinel for "the compatible default VAE" — what legacy
-  // writes when the toggle is on but no specific model is picked.
+  // The backend sentinel for "the compatible default VAE" — what legacy writes when the toggle is on but no specific
+  // model is picked.
   defaultValue: 'default',
   inheritLabelKey: 'models.defaultFieldInherited.vae',
   key: 'vae',
@@ -190,14 +187,14 @@ const CONTROL_ADAPTER_FIELDS: FieldSpec[] = [
 ];
 
 /**
- * `fp8StorageSupported` is the backend's answer (see `data/fp8StorageSupportStore`), not a rule applied
- * here. It used to be `type === 'main' || 'controlnet' || 't2i_adapter'`, which offered the control for
- * 19 of the 52 loader keys that ignore it: the answer also depends on the model's format, and on
- * whether its loader implements the cast at all — neither of which this module can see.
+ * `fp8StorageSupported` is the backend's answer (see `data/fp8StorageSupportStore`), not a rule applied here. It used
+ * to be `type === 'main' || 'controlnet' || 't2i_adapter'`, which offered the control for 19 of the 52 loader keys that
+ * ignore it: the answer also depends on the model's format, and on whether its loader implements the cast at all —
+ * neither of which this module can see.
  *
- * `schedulerRules` is Generate's rule set for a main model's base. Where the base's graph ignores the
- * scheduler the row is left out, as Generate hides it, unless a stored value needs a row to be cleared. While the
- * rules load or after they fail the row shows disabled, so it neither jumps in later nor silently disappears.
+ * `schedulerRules` is Generate's rule set for a main model's base. Where the base's graph ignores the scheduler the row
+ * is left out, as Generate hides it, unless a stored value needs a row to be cleared. While the rules load or after
+ * they fail the row shows disabled, so it neither jumps in later nor silently disappears.
  */
 export const getFieldsForModel = (
   model: Pick<ModelConfig, 'default_settings' | 'type'>,

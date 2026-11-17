@@ -17,8 +17,8 @@ export type FindInGalleryButtonProps = Omit<
 
 export const FindInGalleryButton = ({ name, onFind, ...buttonProps }: FindInGalleryButtonProps) => {
   const { t } = useTranslation();
-  // One string for both: a tooltip that is not part of the accessible name
-  // leaves speech input with nothing to match when the user says what they see.
+  // One string for both: a tooltip that is not part of the accessible name leaves speech input with nothing to match
+  // when the user says what they see.
   const label =
     name === undefined ? t('widgets.gallery.findInGallery') : t('widgets.gallery.findNamedInGallery', { name });
 
@@ -31,13 +31,13 @@ export const FindInGalleryButton = ({ name, onFind, ...buttonProps }: FindInGall
   );
 };
 
-// Reveal on keyboard focus as well as hover; opacity and pointer-events preserve tab access that display:none
-// would remove.
+// Reveal on keyboard focus as well as hover; opacity and pointer-events preserve tab access that display:none would
+// remove.
 const REVEALED = { opacity: 1, pointerEvents: 'auto' } as const;
 
 /**
- * Host with className="group" and positioned layout. Inset the overlay by the focus ring's reach to prevent
- * thumbnail clipping.
+ * Host with className="group" and positioned layout. Inset the overlay by the focus ring's reach to prevent thumbnail
+ * clipping.
  */
 export const FindInGalleryThumbnailButton = (buttonProps: FindInGalleryButtonProps) => (
   <FindInGalleryButton

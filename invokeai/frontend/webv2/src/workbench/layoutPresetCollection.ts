@@ -5,8 +5,8 @@ import { layoutPresets } from './layoutPresets';
 import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 
 /**
- * Preserve saved relative order, inserting unseen presets beside canonical neighbors so newly shipped presets do
- * not always append.
+ * Preserve saved relative order, inserting unseen presets beside canonical neighbors so newly shipped presets do not
+ * always append.
  */
 export const normalizeLayoutPresetOrder = (value: unknown, presets: readonly LayoutPreset[]): LayoutPresetId[] => {
   const knownIds = new Set(presets.map(({ id }) => id));

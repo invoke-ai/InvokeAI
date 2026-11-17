@@ -1,11 +1,10 @@
 /**
- * PSD export separates pure geometry planning from raster baking, worker `ag-psd` serialization and download.
- * Reverse every top-first tree level for ag-psd's bottom-first children; omit empty leaves/folders and size the
- * document to exported world bounds.
+ * PSD export separates pure geometry planning from raster baking, worker `ag-psd` serialization and download. Reverse
+ * every top-first tree level for ag-psd's bottom-first children; omit empty leaves/folders and size the document to
+ * exported world bounds.
  *
- * Export disabled content as hidden layers/folders; flatten only effectively enabled content for the merged
- * preview. Opacity stays in [0,1]. Bake raster adjustments into pixels, but retain opacity/blend as PSD
- * properties.
+ * Export disabled content as hidden layers/folders; flatten only effectively enabled content for the merged preview.
+ * Opacity stays in [0,1]. Bake raster adjustments into pixels, but retain opacity/blend as PSD properties.
  */
 
 import type { CanvasAdjustmentsContract, CanvasBlendMode, CanvasColorLabel } from '@workbench/canvas-engine/contracts';
@@ -189,8 +188,8 @@ const layerMatrix = (t: PsdLayerTransform): Mat2d => fromTRS({ x: t.x, y: t.y },
 const clamp01 = (value: number): number => (value < 0 ? 0 : value > 1 ? 1 : value);
 
 /**
- * Plans world-AABB union bounds and a bottom-first PSD tree. Omit empty/degenerate leaves and empty folders;
- * return empty or too-large when applicable.
+ * Plans world-AABB union bounds and a bottom-first PSD tree. Omit empty/degenerate leaves and empty folders; return
+ * empty or too-large when applicable.
  */
 export const planPsdExport = (
   inputs: readonly PsdExportNodeInput[],
@@ -198,8 +197,8 @@ export const planPsdExport = (
 ): PsdExportPlan => {
   const maxDimension = options.maxDimension ?? PSD_MAX_DIMENSION;
 
-  // Top-first depth-first leaves with effective enablement and world bounds; null bounds indicate empty or
-  // degenerate content.
+  // Top-first depth-first leaves with effective enablement and world bounds; null bounds indicate empty or degenerate
+  // content.
   const withBounds: { input: PsdExportLayerInput; contributes: boolean; worldRect: Rect | null }[] = [];
   const walk = (nodes: readonly PsdExportNodeInput[], enabled: boolean): void => {
     for (const node of nodes) {
@@ -233,8 +232,7 @@ export const planPsdExport = (
   }
 
   const unmappedBlends = new Set<string>();
-  // ag-psd order is bottom-to-top; leaves are top-first, so reverse. Layers
-  // without content are dropped.
+  // ag-psd order is bottom-to-top; leaves are top-first, so reverse. Layers without content are dropped.
   const layers: PsdPlanLayer[] = [];
   const byId = new Map<string, PsdPlanLayer>();
   for (let i = withBounds.length - 1; i >= 0; i -= 1) {
@@ -282,10 +280,9 @@ export const planPsdExport = (
         if (children.length > 0) {
           const blendMode = node.blendMode ?? 'normal';
           const opacity = clamp01(node.opacity ?? 1);
-          // A default group is PASS-THROUGH: its members blend with what is
-          // below the group. Photoshop's folder default is the same, so only a
-          // group that actually composites in isolation (opacity or blend)
-          // gets an isolating folder blend key.
+          // A default group is PASS-THROUGH: its members blend with what is below the group. Photoshop's folder default
+          // is the same, so only a group that actually composites in isolation (opacity or blend) gets an isolating
+          // folder blend key.
           const isolated = opacity !== 1 || blendMode !== 'normal';
           const mapped = BLEND_MODE_TO_PSD[blendMode];
           if (!mapped) {
@@ -469,10 +466,10 @@ const evaluate = async (
 };
 
 /**
- * Bakes transformed pixels and adjustments into world-AABB bounds, returning surface and straight-alpha ImageData.
- * The layer's own stack adjusts all its layer-local pixels before the transform resamples them, as the display does,
- * spatial entries included; the enclosing group stacks then adjust the world pixels, which are document pixels at
- * scale 1. Opacity/blend remain PSD properties.
+ * Bakes transformed pixels and adjustments into world-AABB bounds, returning surface and straight-alpha ImageData. The
+ * layer's own stack adjusts all its layer-local pixels before the transform resamples them, as the display does,
+ * spatial entries included; the enclosing group stacks then adjust the world pixels, which are document pixels at scale
+ * 1. Opacity/blend remain PSD properties.
  */
 const bakeLayer = async (
   planLayer: PsdPlanLayer,
@@ -517,16 +514,15 @@ const bakeLayer = async (
     for (const stack of planLayer.groupStacks) {
       imageData = await evaluate(imageData, stack.adjustments, worldRect, stack.id, deps);
     }
-    // Write the adjusted pixels back so the flattened composite (below) reuses
-    // this surface directly.
+    // Write the adjusted pixels back so the flattened composite (below) reuses this surface directly.
     write(surface, imageData, 0, 0);
   }
   return { imageData, surface };
 };
 
 /**
- * Bakes layers, builds the enabled merged preview (ag-psd does not generate it), serializes and downloads. Non-ok
- * plans do nothing.
+ * Bakes layers, builds the enabled merged preview (ag-psd does not generate it), serializes and downloads. Non-ok plans
+ * do nothing.
  */
 export const executePsdExport = async (
   plan: PsdExportPlan,

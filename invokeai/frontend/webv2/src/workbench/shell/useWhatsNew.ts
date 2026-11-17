@@ -11,8 +11,8 @@ export interface WhatsNewState {
 }
 
 /**
- * Show the notes once per server version for each account, after its preferences are known and the beta
- * notice is out of the way, and whenever the app menu asks for them.
+ * Show the notes once per server version for each account, after its preferences are known and the beta notice is out
+ * of the way, and whenever the app menu asks for them.
  */
 export const useWhatsNew = (): WhatsNewState => {
   const { isDismissed, isRequested, version } = useWhatsNewSnapshot();

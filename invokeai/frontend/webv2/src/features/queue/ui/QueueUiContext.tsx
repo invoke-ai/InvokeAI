@@ -44,8 +44,8 @@ export interface QueueUiAdapter {
   notify: QueueUiNotificationPort;
   openQueue(): void;
   /**
-   * Warms the `ItemActions` chunk ahead of the first expand. Optional: an
-   * adapter that supplies `ItemActions` eagerly has nothing to preload.
+   * Warms the `ItemActions` chunk ahead of the first expand. Optional: an adapter that supplies `ItemActions` eagerly
+   * has nothing to preload.
    */
   preloadItemActions?(): void;
   queueJobsScope: 'active-project' | 'all';
@@ -57,8 +57,8 @@ export interface QueueUiAdapter {
    */
   loadingModel: QueueLoadingModelPort;
   /**
-   * Who bulk actions act for: single-user, an administrator (whose cancel-all and clear reach every user's items), or
-   * a member (whose reach only their own).
+   * Who bulk actions act for: single-user, an administrator (whose cancel-all and clear reach every user's items), or a
+   * member (whose reach only their own).
    */
   viewer: QueueViewer;
 }

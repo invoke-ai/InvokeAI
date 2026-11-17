@@ -12,9 +12,9 @@ export interface ListContextMenuAnchor {
   x: number;
   y: number;
   /**
-   * Where keyboard focus belongs once the menu, or a dialog it opened, closes: this row while it exists, otherwise
-   * the list's current tab stop. Resolved late because virtualization or the action itself can unmount the row;
-   * suits a Dialog's `finalFocusEl`.
+   * Where keyboard focus belongs once the menu, or a dialog it opened, closes: this row while it exists, otherwise the
+   * list's current tab stop. Resolved late because virtualization or the action itself can unmount the row; suits a
+   * Dialog's `finalFocusEl`.
    */
   focusTarget: () => HTMLElement | null;
   restoreFocus: () => void;
@@ -25,9 +25,9 @@ export interface ListItemProps {
   /**
    * An editor shown in place of the title, such as a rename field; it names itself. While set, the primary area is a
    * plain container instead of a button, since a field cannot sit inside a button, and the row opens no context menu,
-   * so the field keeps the browser's text menu. Size it to the title's line so the row keeps its height. Inside a `List`
-   * the field keeps its own arrows, Home and End; the caller ends the edit (Enter, Escape, blur) and moves focus back
-   * to the row, whose button returns with the List's tab stop.
+   * so the field keeps the browser's text menu. Size it to the title's line so the row keeps its height. Inside a
+   * `List` the field keeps its own arrows, Home and End; the caller ends the edit (Enter, Escape, blur) and moves focus
+   * back to the row, whose button returns with the List's tab stop.
    */
   titleEditor?: ReactNode;
   /** Identifiers keep their tail visible; prose keeps its start. */
@@ -94,8 +94,8 @@ export interface ListItemProps {
   /** Renders the leading checkbox. */
   onCheckedChange?: (checked: boolean) => void;
   /**
-   * Without onPress, activating the primary button also opens this menu, except from a mouse click, where
-   * right-click is the path; keyboard, assistive-technology, touch, and pen activation all open it.
+   * Without onPress, activating the primary button also opens this menu, except from a mouse click, where right-click
+   * is the path; keyboard, assistive-technology, touch, and pen activation all open it.
    */
   onContextMenu?: (anchor: ListContextMenuAnchor) => void;
 }
@@ -104,8 +104,8 @@ const PRIMARY_SELECTOR = '[data-list-primary]';
 const TRUNCATE_CSS = { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
 
 /**
- * The checkbox and the actions are siblings of the primary button so nothing nests an interactive control. The
- * whole surface hovers as one; the primary button carries the accessible name and the focus ring wraps the row.
+ * The checkbox and the actions are siblings of the primary button so nothing nests an interactive control. The whole
+ * surface hovers as one; the primary button carries the accessible name and the focus ring wraps the row.
  */
 export const ListItem = ({
   actions,

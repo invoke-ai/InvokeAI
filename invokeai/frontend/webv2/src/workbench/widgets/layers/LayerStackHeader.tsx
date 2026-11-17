@@ -96,8 +96,8 @@ const LayerStackHeaderComponent = ({
   const hintId = STACK_HINTS[stack];
   const descriptionId = `layer-stack-hint-${stack}`;
   return (
-    // Attach hints to tree-item focus/hover with persistent described-by text; exclude action buttons with their
-    // own tooltips.
+    // Attach hints to tree-item focus/hover with persistent described-by text; exclude action buttons with their own
+    // tooltips.
     <FeatureHint hint={hintId}>
       <Box
         ref={element}

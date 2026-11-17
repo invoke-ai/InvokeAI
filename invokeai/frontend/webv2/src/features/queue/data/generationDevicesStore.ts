@@ -18,8 +18,8 @@ import { apiFetchJson, getApiErrorMessage } from '@platform/transport/http';
 export type GenerationDevicesSetting = 'auto' | string[];
 
 /**
- * How many finished (completed, failed, canceled) items the server keeps at startup: a count, `null` when the
- * server prunes nothing, or `undefined` while unknown (not loaded, or the reader is not an administrator).
+ * How many finished (completed, failed, canceled) items the server keeps at startup: a count, `null` when the server
+ * prunes nothing, or `undefined` while unknown (not loaded, or the reader is not an administrator).
  */
 export type MaxQueueHistorySetting = number | null;
 
@@ -54,8 +54,8 @@ registerAccountOwnedResource({
 });
 
 /**
- * `GET/PATCH /api/v1/app/runtime_config` answer with the config nested under `config`
- * alongside the `set_fields` list — not with the settings at the top level.
+ * `GET/PATCH /api/v1/app/runtime_config` answer with the config nested under `config` alongside the `set_fields` list —
+ * not with the settings at the top level.
  */
 interface RuntimeConfigResponse {
   config?: {
@@ -79,8 +79,7 @@ const readMaxQueueHistory = (response: RuntimeConfigResponse | null): MaxQueueHi
 };
 
 /**
- * Non-admins can read device options but not runtime config; return a null setting without failing the read-only
- * view.
+ * Non-admins can read device options but not runtime config; return a null setting without failing the read-only view.
  */
 export const refreshGenerationDevices = (): Promise<void> => {
   if (inflight) {
@@ -153,9 +152,9 @@ export const updateGenerationDevices = async (setting: GenerationDevicesSetting)
 };
 
 /**
- * Sends only `max_queue_history`, so the PATCH leaves generation devices alone; `null` clears the limit. Takes
- * effect at the next startup, when the server prunes its history. The stored value is what the server answers, not
- * what was asked; an unreadable answer leaves the setting unknown.
+ * Sends only `max_queue_history`, so the PATCH leaves generation devices alone; `null` clears the limit. Takes effect
+ * at the next startup, when the server prunes its history. The stored value is what the server answers, not what was
+ * asked; an unreadable answer leaves the setting unknown.
  */
 export const updateMaxQueueHistory = async (value: MaxQueueHistorySetting): Promise<void> => {
   const owner = captureAccountScope();
