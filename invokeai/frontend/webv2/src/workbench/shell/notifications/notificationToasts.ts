@@ -47,14 +47,7 @@ const getUndoProjectIds = (notifications: readonly WorkbenchNotification[]): str
   ),
 ];
 
-/**
- * Toasts each notification recorded after start, oldest first. Notifications already present at start were seen before
- * (or belong to a session restore) and stay quiet. Stopping dismisses the toasts whose buttons would act on this
- * editor, and the persistent ones, which would otherwise outlive the account that saw them.
- *
- * It also keeps the undo registry in step with the list: an undo lives while its record is listed or a toast holds it,
- * and goes once neither does or its project closes.
- */
+/** Toasts notifications recorded after start; stopping dismisses toasts that would act on this editor. */
 export const startNotificationToasts = ({
   actionContext,
   getNotifications,

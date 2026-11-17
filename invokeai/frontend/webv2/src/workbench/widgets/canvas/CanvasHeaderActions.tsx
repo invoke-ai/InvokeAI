@@ -473,10 +473,7 @@ const describeSave = (
   return board ?? undefined;
 };
 
-/**
- * The frame save, then the whole canvas, each saying what it would save and where. Mounted only while the menu is open,
- * so the canvas content bounds (the rect the canvas save exports) are planned then, not on every edit.
- */
+/** Mounted only while the menu is open, so the content bounds are planned then, not on every edit. */
 const SaveMenuItems = ({
   board,
   document,

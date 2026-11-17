@@ -38,7 +38,6 @@ import {
 
 type Ctx = RasterSurface['ctx'];
 
-/** The engine-owned structural subset needed to plan and render a raster layer contribution. */
 export interface CompositeLayerRef {
   id: string;
   sourceRef: string;
@@ -50,11 +49,10 @@ export interface CompositeLayerRef {
   adjustments?: CanvasAdjustmentsContract;
 }
 
-/** The engine-owned structural subset consumed by the raster compositor. */
 export interface CompositeEntry {
   bbox: Rect;
   layers: readonly CompositeLayerRef[];
-  /** Adjusted-group isolation scopes over `layers` (top-first, nested). Absent ⇒ fully pass-through. */
+  /** Top-first, nested; absent means fully pass-through. */
   groupScopes?: readonly GroupCompositeScope[];
 }
 
@@ -68,12 +66,8 @@ export interface RenderRasterCompositeDeps {
   backend: {
     createSurface(width: number, height: number): RasterSurface;
   };
-  /** Owned access to a layer's pixels, released once they are drawn. */
   getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect; release(): void }>;
-  /**
-   * The display's memoized layer-local adjusted copy of `surface` when it is exact, or null on a miss or when `surface`
-   * is not a live cache. Never builds one: {@link compositeScratchPixels} covers only what a miss adjusts.
-   */
+  /** Exact copies only, never built here: {@link compositeScratchPixels} covers what a miss adjusts. */
   adjustedSurface?(
     layerId: string,
     surface: RasterSurface,
@@ -81,17 +75,10 @@ export interface RenderRasterCompositeDeps {
   ): RasterSurface | null;
   readImageData?(surface: RasterSurface, rect: Rect): ImageData;
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
-  /**
-   * Evaluates spatial adjustment runs. Without it, a layer or group whose stack has a contributing spatial entry throws
-   * {@link AdjustmentRefusedError} rather than render without it.
-   */
+  /** Without it, a contributing spatial entry throws {@link AdjustmentRefusedError} rather than render without it. */
   runSpatial?: SpatialRunner;
-  /** Cancels spatial jobs; an aborted render throws an `AbortError`. */
   signal?: AbortSignal;
-  /**
-   * Reserves transient raster bytes. The caller reserves {@link compositeScratchPixels} up front; rendering reserves
-   * here only what a layer's actual pixels need beyond that estimate, and refuses when it does not fit.
-   */
+  /** Rendering reserves here only what actual pixels need beyond {@link compositeScratchPixels}. */
   reserve?(
     bytes: number
   ):
@@ -99,10 +86,7 @@ export interface RenderRasterCompositeDeps {
     | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
 }
 
-/**
- * Thrown when a composite's pixels cannot be reserved; nothing beyond the reservation was allocated. Generation shows
- * the message as its notice; export maps the class to `over-budget`.
- */
+/** Nothing beyond the reservation was allocated; export maps the class to `over-budget`. */
 export class RasterCompositeOverBudgetError extends Error {
   constructor() {
     super('The canvas composite exceeds the available raster memory budget.');
@@ -110,10 +94,7 @@ export class RasterCompositeOverBudgetError extends Error {
   }
 }
 
-/**
- * Thrown when a contributor's pixels cannot be read (its image is gone or does not decode); export reports its
- * `unreadable` refusal, which names the layer.
- */
+/** Export reports it as an `unreadable` refusal naming the layer. */
 export class RasterCompositeUnreadableError extends Error {
   constructor(readonly refusal: LayerUnreadable) {
     super(`The pixels of layer ${refusal.layerId} could not be read.`);
@@ -121,7 +102,7 @@ export class RasterCompositeUnreadableError extends Error {
   }
 }
 
-/** Thrown when a contributor's pixels are still loading or could not be fetched for now; export maps it to `not-ready`. */
+/** Export maps it to `not-ready`. */
 export class RasterCompositeNotReadyError extends Error {
   constructor(readonly layerId: string) {
     super(`The pixels of layer ${layerId} are not ready.`);
@@ -135,8 +116,6 @@ const defaultReadImageData = (surface: RasterSurface, rect: Rect): ImageData =>
 const defaultWriteImageData = (surface: RasterSurface, imageData: ImageData, x: number, y: number): void =>
   surface.ctx.putImageData(imageData, x, y);
 
-/** True when a leaf is a contributing raster layer with rasterizable, non-empty pixels. */
-/** A raster layer whose source the generation composite draws: an image, painted pixels, or non-empty text. */
 export const isBaseRasterContentLayer = (layer: CanvasLayerContract): layer is CanvasRasterLayerContractV2 => {
   if (layer.type !== 'raster') {
     return false;
@@ -153,7 +132,7 @@ export const isBaseRasterContentLayer = (layer: CanvasLayerContract): layer is C
 const isBaseRasterLeaf = (leaf: SemanticLeaf): leaf is SemanticLeaf & { layer: CanvasRasterLayerContractV2 } =>
   leaf.contributionEnabled && isBaseRasterContentLayer(leaf.layer);
 
-/** JSON with recursively sorted object keys, so text edits produce deterministic identities. */
+/** Sorted keys, so text edits produce deterministic identities. */
 const stableSourceKey = (value: unknown): string =>
   JSON.stringify(value, (_key, entry: unknown) =>
     entry && typeof entry === 'object' && !Array.isArray(entry)
@@ -161,7 +140,6 @@ const stableSourceKey = (value: unknown): string =>
       : entry
   );
 
-/** A stable string identifying a source's pixels (its asset name, or an empty sentinel). */
 const sourceRefOf = (source: CanvasLayerSourceContract): string => {
   switch (source.type) {
     case 'image':
@@ -175,7 +153,6 @@ const sourceRefOf = (source: CanvasLayerSourceContract): string => {
   }
 };
 
-/** The native (unscaled) content rect of a base-raster layer's source (layer-local). */
 const contentRectOf = (layer: CanvasRasterLayerContractV2, doc: CanvasDocumentContractV3): Rect => {
   const { source } = layer;
   if (source.type === 'image') {
@@ -191,7 +168,6 @@ const contentRectOf = (layer: CanvasRasterLayerContractV2, doc: CanvasDocumentCo
   return { height: doc.height, width: doc.width, x: 0, y: 0 };
 };
 
-/** Projects a document layer into its frozen composite contribution. */
 const toLayerRef = (layer: CanvasRasterLayerContractV2, doc: CanvasDocumentContractV3): CompositeLayerRef => {
   const rect = contentRectOf(layer, doc);
   const hasAdjustments = !isIdentityAdjustments(layer.adjustments);
@@ -234,7 +210,6 @@ const layerKey = (ref: CompositeLayerRef): string => {
   ].join(':');
 };
 
-/** Union of the provided composite-layer bounds in document space, or `null` when empty. */
 export const getCompositeLayerBounds = (layers: readonly CompositeLayerRef[]): Rect | null => {
   let bounds: Rect | null = null;
   for (const ref of layers) {
@@ -253,10 +228,7 @@ export const getCompositeLayerBounds = (layers: readonly CompositeLayerRef[]): R
 const scopeKey = (scope: GroupCompositeScope): string =>
   `${scope.id}@${scope.start}-${scope.end}:${adjustmentsKey(scope.adjustments)}:${scope.opacity}:${scope.blendMode}(${scope.children.map(scopeKey).join(',')})`;
 
-/**
- * Plans `leaves` (drawn raster leaves, top first) over a document-space rectangle with the group scopes enclosing them.
- * `contentRects` replaces a leaf's planned content rect with the extent of the pixels it will draw.
- */
+/** `contentRects` replaces a leaf's planned content rect with the extent of the pixels it will draw. */
 export const planRasterComposite = (
   document: CanvasDocumentContractV3,
   leaves: readonly (SemanticLeaf & { layer: CanvasRasterLayerContractV2 })[],
@@ -278,7 +250,6 @@ export const planRasterComposite = (
   return { bbox: rect, layers, ...(groupScopes.length > 0 ? { groupScopes } : {}) };
 };
 
-/** Plans the enabled base-raster layers over an exact document-space rectangle. */
 export const planBaseRasterComposite = (document: CanvasDocumentContractV3, rect: Rect): BaseRasterCompositeEntry => {
   const { layers, groupScopes } = planRasterComposite(
     document,
@@ -294,21 +265,17 @@ export const planBaseRasterComposite = (document: CanvasDocumentContractV3, rect
   };
 };
 
-/** Tight outward-rounded bounds of all enabled raster content in the document. */
 export const getBaseRasterContentBounds = (document: CanvasDocumentContractV3): Rect | null => {
   const bounds = getCompositeLayerBounds(planBaseRasterComposite(document, document.bbox).layers);
   return bounds === null ? null : roundOut(bounds);
 };
 
-/** Document→bbox translate matrix (the "view" the entry is composited under). */
 const bboxView = (bbox: Rect): Mat2d => ({ a: 1, b: 0, c: 0, d: 1, e: -bbox.x, f: -bbox.y });
 
-/** Applies a matrix to a 2D context's transform. */
 const setTransform = (ctx: Ctx, m: Mat2d): void => {
   ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
 };
 
-/** The layer's local→document transform matrix. */
 const layerMatrix = (ref: Pick<CompositeLayerRef, 'transform'>): Mat2d =>
   fromTRS(
     { x: ref.transform.x, y: ref.transform.y },
@@ -317,11 +284,10 @@ const layerMatrix = (ref: Pick<CompositeLayerRef, 'transform'>): Mat2d =>
     ref.transform.scaleY
   );
 
-/** Source-context policy shared by layer sampling, isolated group frames, and immutable capture. */
 const requiresWholeSource = (adjustments: CanvasAdjustmentsContract | undefined): boolean =>
   hasSpatialAdjustments(adjustments);
 
-/** Whole source for context-dependent stacks; otherwise the output's layer-local samples plus resampling margin. */
+/** Whole source for context-dependent stacks; otherwise the sampled region plus resampling margin. */
 const layerSourceRegion = (
   ref: Pick<CompositeLayerRef, 'transform' | 'adjustments'>,
   frame: Rect,
@@ -335,11 +301,7 @@ const layerSourceRegion = (
   return inverse ? intersect(roundOut(expand(transformBounds(inverse, output), 1)), content) : content;
 };
 
-/**
- * Detached source pixels sufficient for this renderer, including enclosing groups' source context. Capture aligns the
- * renderer's already-rounded sample region to the source pixel grid so fractional paint origins never clip it.
- * Rotation/rescaling keeps the full source: changing Canvas2D's source origin can change transformed sampling.
- */
+/** Aligned to the source pixel grid; rotation or rescaling keeps the full source, since its origin affects sampling. */
 export const getRasterSnapshotCaptureRect = (
   document: CanvasDocumentContractV3,
   layer: CanvasLayerContract,
@@ -378,11 +340,7 @@ export const getRasterSnapshotCaptureRect = (
 
 const areaOf = (rect: Rect | null): number => (rect ? Math.max(0, rect.width) * Math.max(0, rect.height) : 0);
 
-/**
- * Scratch pixels an adjusted layer whose pixels cover `content` needs in an output over `frame`: output-sized, except
- * that a position-dependent stack adjusts the whole layer-local region the output samples, which exceeds the output
- * when the layer is downscaled, and a spatial stack adjusts all of `content`.
- */
+/** Position-dependent stacks adjust the whole sampled layer-local region; spatial stacks all of `content`. */
 const layerScratchPixels = (ref: CompositeLayerRef, frame: Rect, content: Rect): number => {
   if (requiresWholeSource(ref.adjustments)) {
     return areaOf(layerSourceRegion(ref, frame, content));
@@ -397,7 +355,6 @@ const plannedContent = (ref: CompositeLayerRef): Rect => ({
   y: ref.contentOffset.y,
 });
 
-/** The document-space bounds of `rects` placed by their layers, rounded out; null when nothing has area. */
 const placedExtent = (placed: readonly { readonly ref: CompositeLayerRef; readonly rect: Rect }[]): Rect | null => {
   let extent: Rect | null = null;
   for (const { rect, ref } of placed) {
@@ -412,13 +369,7 @@ const placedExtent = (placed: readonly { readonly ref: CompositeLayerRef; readon
 const plannedScopeExtent = (entry: CompositeEntry, scope: GroupCompositeScope): Rect | null =>
   placedExtent(entry.layers.slice(scope.start, scope.end).map((ref) => ({ rect: plannedContent(ref), ref })));
 
-/**
- * Pixels of the scratch buffers {@link renderRasterComposite} may allocate beyond its output, each also read back once
- * as ImageData: one per group scope and adjusted layer. A group scope's buffer covers its frame, except that a spatial
- * scope's covers the union of its members' bounds, which is also the frame of everything inside it. Estimated from
- * planned content bounds; a layer or spatial scope whose rasterized pixels exceed them (measured text) reserves the
- * difference through `deps.reserve` while it draws.
- */
+/** One buffer per group scope and adjusted layer, each read back once; measured excess reserves via `deps.reserve`. */
 export const compositeScratchPixels = (entry: CompositeEntry): number => {
   const scratchOf = (start: number, end: number, scopes: readonly GroupCompositeScope[], frame: Rect): number => {
     let pixels = 0;
@@ -449,11 +400,7 @@ type LeasedLayerSurface = Awaited<ReturnType<RenderRasterCompositeDeps['getLayer
 
 const IDENTITY: Mat2d = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 
-/**
- * Composites an entry's layers, in z-order, onto a fresh bbox-sized surface. Spatial stacks evaluate on their owner's
- * whole source whatever the bbox: a layer's on all its leased pixels before resampling, a group's on the union of its
- * members' bounds, landed at its offset. Any bbox over the same content therefore draws the same pixels there.
- */
+/** Spatial stacks evaluate on their owner's whole source, so any bbox over the same content draws the same pixels. */
 export const renderRasterComposite = async (
   entry: CompositeEntry,
   deps: RenderRasterCompositeDeps
@@ -468,7 +415,6 @@ export const renderRasterComposite = async (
     y: 0,
   });
 
-  /** The whole stack on `pixels`, whose (0,0) sits at `origin`; throws when `ownerId`'s stack cannot run. */
   const evaluate = async (
     pixels: ImageData,
     adjustments: CanvasAdjustmentsContract,
@@ -485,10 +431,7 @@ export const renderRasterComposite = async (
     return result.data === pixels.data ? pixels : imageDataOf(result.data, pixels.width, pixels.height);
   };
 
-  /**
-   * The caller reserved scratch from planned content bounds; rasterized pixels can exceed them (measured text), so the
-   * excess surface and ImageData are reserved before they are allocated.
-   */
+  /** Rasterized pixels can exceed the planned bounds (measured text), so the excess is reserved first. */
   const reserveExcess = (actualPixels: number, plannedPixels: number): { release(): void } | null => {
     const excess = actualPixels - plannedPixels;
     const reservation = excess > 0 ? deps.reserve?.(excess * 2 * 4) : undefined;
@@ -498,10 +441,7 @@ export const renderRasterComposite = async (
     return reservation?.lease ?? null;
   };
 
-  /**
-   * Adjusts `[source at origin]` after resampling into an output-sized buffer; bounded by the output, not the layer.
-   * Only for position-independent stacks: they are per-pixel color maps, so the origin is irrelevant.
-   */
+  /** Position-independent stacks only: per-pixel color maps ignore the origin. */
   const drawAdjustedAtOutput = (
     ctx: Ctx,
     frame: Rect,
@@ -528,7 +468,6 @@ export const renderRasterComposite = async (
     ctx.restore();
   };
 
-  /** Draws a layer into `ctx`, whose (0,0) is `frame`'s document-space origin. */
   const drawLayer = async (
     ctx: Ctx,
     frame: Rect,
@@ -541,11 +480,7 @@ export const renderRasterComposite = async (
       let source = layerSurface.surface;
       let origin: Rect = layerSurface.rect;
       if (ref.adjustments) {
-        // Adjust layer-local pixels before resampling, as the display does: reuse the display's exact adjusted copy,
-        // else adjust all pixels when the stack is spatial (it reads the whole source), and otherwise only the region
-        // the output samples. A downscaled layer samples more pixels than the output holds; a color-only stack then
-        // adjusts after resampling, keeping the work bounded by the output. Noise must stay layer-local so resampling
-        // averages it exactly as the display does, so its work is the sampled region.
+        // Adjust layer-local pixels before resampling, as the display does, so resampling averages noise alike.
         const shared = deps.adjustedSurface?.(ref.id, source, ref.adjustments) ?? null;
         const sampled = shared ? null : layerSourceRegion(ref, frame, origin);
         if (shared) {
@@ -580,7 +515,7 @@ export const renderRasterComposite = async (
       ctx.globalAlpha = ref.opacity;
       ctx.globalCompositeOperation = blendToComposite(ref.blendMode);
       setTransform(ctx, placed);
-      // Draw at the layer-local content origin (content-sized paint layers place their pixels off-zero).
+      // Content-sized paint layers place their pixels off-zero.
       ctx.drawImage(source.canvas, origin.x, origin.y);
       ctx.restore();
     } finally {
@@ -588,7 +523,6 @@ export const renderRasterComposite = async (
     }
   };
 
-  /** Draws layer `index`, through its already leased pixels when a spatial scope holds them. */
   const drawRef = async (
     ctx: Ctx,
     frame: Rect,
@@ -610,7 +544,6 @@ export const renderRasterComposite = async (
     }
   };
 
-  /** Lands an isolated scope buffer whose (0,0) sits at document `at` into `ctx` over `frame`. */
   const landScope = (ctx: Ctx, frame: Rect, scope: GroupCompositeScope, buffer: RasterSurface, at: Rect): void => {
     ctx.save();
     setTransform(ctx, IDENTITY);
@@ -620,11 +553,7 @@ export const renderRasterComposite = async (
     ctx.restore();
   };
 
-  /**
-   * A spatial scope composites its members over the union of their bounds (the display's group surface), never clipped
-   * to the output, then evaluates its stack there in document pixels. Its members' pixels are leased first, since that
-   * union comes from their actual extents; nested scopes draw from the same leases.
-   */
+  /** Composites over the members' union, never clipped to the output; members are leased first to measure it. */
   const drawSpatialScope = async (
     ctx: Ctx,
     frame: Rect,
@@ -668,10 +597,6 @@ export const renderRasterComposite = async (
     }
   };
 
-  /**
-   * Draws `[start, end)` bottom→top into `ctx`, whose (0,0) is `frame`'s document-space origin at scale 1. A scope
-   * isolates into a buffer, applies its stack, lands source-over.
-   */
   const renderRange = async (
     ctx: Ctx,
     frame: Rect,

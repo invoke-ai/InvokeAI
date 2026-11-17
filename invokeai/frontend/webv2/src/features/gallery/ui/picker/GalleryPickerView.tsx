@@ -289,8 +289,7 @@ export const GalleryPickerView = ({
   const visibleBoardCount = boardGroups.reduce((count, group) => count + group.boards.length, 0);
 
   const focusSearch = useCallback(() => searchInputRef.current?.focus(), [searchInputRef]);
-  // The view is lazy-loaded, so it arrives after the popover's own initial focus pass; the field takes focus itself as
-  // it mounts.
+  // The lazy view arrives after the popover's initial focus pass, so the field takes focus itself as it mounts.
   const attachSearchInput = useCallback(
     (node: HTMLInputElement | null) => {
       searchInputRef.current = node;
@@ -298,8 +297,7 @@ export const GalleryPickerView = ({
     },
     [searchInputRef]
   );
-  // The clicked row unmounts with the pane; without this, focus falls to the body and the next keystrokes reach the
-  // workbench hotkeys.
+  // The clicked row unmounts with the pane; without this focus falls to the body and keys reach workbench hotkeys.
   const handleSelectBoard = useCallback(
     (boardId: string) => {
       selectBoard(boardId);

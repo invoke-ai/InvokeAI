@@ -9,9 +9,8 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * The stored boards a "to board" submenu offers, grouped in the panel's tiers (the open project, the Library, shared,
- * other users', other projects). Only stored boards (`kind: 'board'`, not date or Uncategorized entries) that accept
- * the caller's media (`add_media`) are listed.
+ * The stored boards a "to board" submenu offers, in the panel's tiers (open project, Library, shared, other users',
+ * other projects): only `kind: 'board'` entries, not date or Uncategorized, that grant the caller `add_media`.
  */
 export const GalleryBoardDestinationGroups = ({
   boards,

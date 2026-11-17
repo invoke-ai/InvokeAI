@@ -22,10 +22,7 @@ import { useTranslation } from 'react-i18next';
 import { useWhatsNew } from './useWhatsNew';
 import { dismissWhatsNew } from './whatsNewStore';
 
-/**
- * Headline features get an icon and a title; the `whatsNew.items` catalog lists the smaller notes beneath them. Notes
- * about sharing (`multiuser`, and `whatsNew.multiuserItems`) show only where there are other accounts to share with.
- */
+/** Headline features get an icon and a title; the `whatsNew.items` catalog lists the smaller notes beneath them. */
 const HIGHLIGHTS: readonly { descriptionKey: string; icon: LucideIcon; multiuser?: true; titleKey: string }[] = [
   {
     descriptionKey: 'whatsNew.highlights.interface.description',

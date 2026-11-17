@@ -1,10 +1,6 @@
 import type { ModelConfig } from '@features/models';
 import type { ControlType } from '@workbench/canvas-engine/api';
 
-/**
- * What a control map encodes. A control type groups the families its detectors produce; a control model is trained on
- * one family (or, for union models, several).
- */
 export type ControlFamily =
   | 'openpose'
   | 'face'
@@ -20,7 +16,6 @@ export type ControlFamily =
   | 'shuffle'
   | 'tile';
 
-/** A detector a control type offers: a filter type from `CONTROL_FILTERS`, with settings it fixes. */
 export interface ControlDetectorSpec {
   type: string;
   family: ControlFamily;
@@ -33,7 +28,6 @@ export interface ControlTypeSpec {
   detectors: readonly ControlDetectorSpec[];
   /** The detector a new image starts with; null when the image is usually already the map. */
   defaultDetector: string | null;
-  /** The family of a map that skipped detection. */
   primaryFamily: ControlFamily;
   /** FLUX InstantX Union `instantx_control_mode` per family; absent families run without a mode. */
   instantxMode: Partial<Record<ControlFamily, number>>;
@@ -90,7 +84,6 @@ export const CONTROL_TYPE_SPECS: Readonly<Record<ControlType, ControlTypeSpec>> 
     instantxMode: { openpose: 4 },
     primaryFamily: 'openpose',
   },
-  // Sketches are usually drawn as the map already, so a new sketch layer skips detection.
   sketch: {
     defaultDetector: null,
     detectors: [
@@ -123,16 +116,12 @@ export const CONTROL_TYPE_SPECS: Readonly<Record<ControlType, ControlTypeSpec>> 
 const settingsMatch = (required: Record<string, unknown>, actual: Record<string, unknown> | undefined): boolean =>
   Object.entries(required).every(([key, value]) => actual?.[key] === value);
 
-/** The family a type's detector produces; no detector (or one the type does not list) means its primary family. */
 export const getDetectorFamily = (type: ControlType, detectorType: string | null): ControlFamily => {
   const spec = CONTROL_TYPE_SPECS[type];
   return spec.detectors.find((detector) => detector.type === detectorType)?.family ?? spec.primaryFamily;
 };
 
-/**
- * The control type a detector run belongs to, for maps made outside a control layer (a raster filter saved as control).
- * An entry that fixes settings beats a generic one, so PiDi with `scribble` is a sketch.
- */
+/** An entry that fixes settings beats a generic one, so PiDi with `scribble` is a sketch. */
 export const controlTypeForDetector = (detector: {
   type: string;
   settings?: Record<string, unknown>;
@@ -155,10 +144,7 @@ export const controlTypeForDetector = (detector: {
   return generic;
 };
 
-/**
- * Model `default_settings.preprocessor` values mapped to the family they produce: the legacy `*_image_processor` ids
- * older installs carry, the filter node ids the model manager saves today, and `tile`.
- */
+/** Legacy `*_image_processor` ids, today's filter node ids, and `tile`. */
 export const PREPROCESSOR_FAMILY: Readonly<Record<string, ControlFamily>> = {
   canny_edge_detection: 'canny',
   canny_image_processor: 'canny',
@@ -207,25 +193,19 @@ const FAMILY_PURPOSE: Readonly<Record<ControlFamily, ControlType>> = {
   tile: 'tile',
 };
 
-/** What a control model was trained for, as far as its name and saved preprocessor tell. */
 export interface ControlModelClass {
   /** The control type it is made for; null for union models and models nothing identifies. */
   purpose: ControlType | null;
   family: ControlFamily | null;
   union: boolean;
-  /** Families a union model handles without an explicit pick. */
   covers: readonly ControlFamily[];
 }
 
-/**
- * The Fun-ControlNet-Union models these bases install as `controlnet`. Both coverage lists follow the model cards'
- * advertised conditions and still need confirming against them.
- */
+/** Coverage follows the model cards' advertised conditions, still unconfirmed. */
 const FUN_UNION_BASES: ReadonlySet<string> = new Set(['z-image', 'qwen-image', 'flux2']);
 const FUN_UNION_COVERS: readonly ControlFamily[] = ['canny', 'mlsd', 'softedge', 'depth', 'openpose'];
 /** The InstantX Qwen-Image ControlNet-Union, which also installs as a Qwen-Image `controlnet`: no MLSD. */
 const INSTANTX_QWEN_UNION_COVERS: readonly ControlFamily[] = ['canny', 'softedge', 'depth', 'openpose'];
-/** InstantX FLUX.1 Union modes the control types map onto. */
 const FLUX_UNION_COVERS: readonly ControlFamily[] = ['canny', 'tile', 'depth', 'openpose'];
 /** The xinsir SDXL Union (ProMax) conditions; upscale also takes an SDXL union as its tile ControlNet. */
 const SDXL_UNION_COVERS: readonly ControlFamily[] = [
@@ -245,7 +225,6 @@ const UNION_COVERS_BY_BASE: Readonly<Record<string, readonly ControlFamily[]>> =
   sdxl: SDXL_UNION_COVERS,
 };
 
-/** Lowercase name words, split at punctuation and camelCase boundaries. */
 const nameTokens = (name: string): string[] =>
   name
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -310,17 +289,9 @@ const classify = (model: ClassifiableModel): ControlModelClass => {
   return { covers: [], family, purpose: family ? FAMILY_PURPOSE[family] : null, union: false };
 };
 
-/**
- * Resolution, row renders and readiness ticks classify the same model configs over and over. Configs are replaced,
- * never mutated, so a config object keys its class for as long as anything holds it.
- */
+/** Configs are replaced, never mutated, so a config object keys its class. */
 const classCache = new WeakMap<ClassifiableModel, ControlModelClass>();
 
-/**
- * Classify a control model: union models first (a base's Fun union; a FLUX or SDXL union, covering its known
- * conditions; any other `union` name, covering nothing), then strong name words, the saved preprocessor, and the
- * remaining name words.
- */
 export const classifyControlModel = (model: ClassifiableModel): ControlModelClass => {
   let modelClass = classCache.get(model);
   if (!modelClass) {

@@ -36,9 +36,8 @@ const positiveFiniteNumberOrUndefined = (value: number | null | undefined): numb
 };
 
 /**
- * The text exactly as typed, held while the control is focused and dropped on blur. Rendering the committed value
- * instead lets its echo rewrite the input under the caret (dropping a trailing `.` or `0`, moving the caret to the
- * end), and the Canvas rebuilds its flow model in a transition, so the echo can lag a keystroke behind.
+ * Held while focused: rendering the committed value lets its echo, which can lag a keystroke in Canvas, rewrite the
+ * input under the caret.
  */
 export const useFocusedDraft = () => {
   const [draft, setDraft] = useState<string | null>(null);
@@ -47,7 +46,6 @@ export const useFocusedDraft = () => {
   return [draft, setDraft, clearDraft] as const;
 };
 
-/** The slice of a field template the control reads: its kind, name, and the bounds it reports to the browser. */
 export type NumericInputTemplate = Pick<
   FieldInputTemplate,
   'exclusiveMaximum' | 'exclusiveMinimum' | 'maximum' | 'minimum' | 'multipleOf' | 'title' | 'type'
@@ -69,13 +67,9 @@ export interface NumericInputProps {
 // Tenths, as in v6; a template's `multipleOf` or the host's `step` takes precedence.
 const FLOAT_STEP = '0.1';
 
-/** A double-click anywhere in the box selects the whole value, not just the word under the pointer. */
 const selectInputText = (event: MouseEvent<HTMLInputElement>) => event.currentTarget.select();
 
-/**
- * The one numeric entry control for workflow values: the text stays as typed while focused, every parseable entry
- * commits unchanged, and the host marks what cannot run instead of the control correcting it.
- */
+/** Every parseable entry commits unchanged; the host marks what cannot run instead of the control correcting it. */
 export const NumericInput = ({
   ariaLabel,
   disabled,
@@ -103,8 +97,7 @@ export const NumericInput = ({
 
       setDraft(nextText);
       setHasBadInput(validity.badInput);
-      // Committed as typed: rounding, clamping, or dropping a sign would change what is on screen. The host marks
-      // fractional integers, out-of-range values, and an empty required field invalid instead.
+      // Committed as typed; the host marks fractional integers, out-of-range and empty required values instead.
       onChange(toFiniteNumber(nextText));
     },
     [onChange, setDraft]
@@ -180,7 +173,6 @@ export const NumericInput = ({
 export interface NumericSliderInputProps {
   ariaLabel?: string;
   disabled?: boolean;
-  /** The track; `getNodeFieldSliderRange` derives it from a bounded template. */
   range: { max: number; min: number; step: number };
   onChange: (value: number) => void;
   template: NumericInputTemplate;

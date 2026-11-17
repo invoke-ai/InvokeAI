@@ -77,9 +77,7 @@ const TIMESTEP_SHIFT_MARKS = [{ label: String(DEFAULT_TIMESTEP_SHIFT), value: DE
 const DYPE_EXPONENT_SLIDER_MAX = 10;
 const formatPercent = (value: number): string => `${value}%`;
 
-/**
- * Slider tracks are practical ranges, distinct from input/validation bounds; FLUX Fill's default 30 exceeds its track.
- */
+/** Slider tracks are practical ranges, not input bounds: FLUX Fill's default of 30 exceeds its track. */
 const GUIDANCE_SLIDER_MAX = 10;
 const GUIDANCE_INPUT_MAX = 100;
 
@@ -610,7 +608,6 @@ const SeedField = ({ onCommit, settings }: RenderFieldsProps) => {
   );
 };
 
-/** The section reset's wording by where its values come from. */
 const RENDER_RESET_LABEL_KEYS = {
   withScheduler: {
     base: 'widgets.generate.sectionMenu.resetStepsGuidanceAndSchedulerBase',

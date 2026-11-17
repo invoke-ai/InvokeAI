@@ -61,15 +61,13 @@ export interface LegacyImageContextMenuTarget {
 export type ImageContextMenuTarget = LegacyImageContextMenuTarget | GalleryItemContextMenuTarget;
 
 /**
- * `housekeeping` leaves out the groups a host already offers beside the menu (Preview's Edit and Use menus): what to
- * continue working on with the image, and what to take from the image or video. Single items only; selections stay
- * full.
+ * `housekeeping` leaves out the groups a host offers beside the menu (Preview's Edit and Use menus): what to continue
+ * working on with the image, and what to take from the image or video. Single items only; selections stay full.
  */
 export type ImageContextMenuVariant = 'full' | 'housekeeping';
 
 /**
- * Extra actions owned by Preview's selected native video. Other hosts omit this port, so gallery/grid video menus
- * retain their common-action-only contract and never gain a frame-copy item.
+ * Extra actions of Preview's selected native video; other hosts omit this port, so grid menus never gain frame copy.
  */
 export interface PreviewVideoContextActions {
   isCopyCurrentFrameAvailable: boolean;

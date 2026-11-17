@@ -13,8 +13,6 @@ import { INVK_MAX_ARCHIVE_BYTES } from './archive';
 import { clampBoardName } from './board';
 import { InvkFormatError } from './format';
 
-/** Launchpad-safe transport. Document references upload privately; board items retain their archived categories. */
-
 /** One budget for the whole transfer: a per-phase limit would multiply what it exists to bound. */
 export const INVK_TRANSFER_CONCURRENCY = 5;
 
@@ -26,14 +24,9 @@ const VIDEOS_BASE = '/api/v1/videos';
 export const isRequestCancellation = (error: unknown): boolean =>
   error instanceof HttpRequestIdentityExpiredError || (error instanceof Error && error.name === 'AbortError');
 
-/** Names per existence request, so one slow lookup cannot stall the whole check. */
 const EXISTENCE_BATCH_SIZE = 500;
 
-/**
- * Maximum names the backend's synchronous batch routes accept (`MAX_IMAGE_BATCH_SIZE`, `MAX_VIDEO_BATCH_SIZE` and
- * `MAX_COPY_BATCH_SIZE` in `invokeai/app/api/routers/_limits.py`); the gallery's transports split by the same limit.
- * Adapters below own the split.
- */
+/** The backend's synchronous batch route limit (`invokeai/app/api/routers/_limits.py`); adapters below split by it. */
 const MEDIA_REQUEST_BATCH_SIZE = 1_000;
 
 const toBatches = <T>(items: readonly T[], size: number): T[][] => {
@@ -105,7 +98,6 @@ const getDeclaredContentLength = (response: Response): number | null => {
   return Number.isSafeInteger(byteLength) ? byteLength : Number.POSITIVE_INFINITY;
 };
 
-/** Share one streaming byte budget across all export responses. */
 export const createAssetResponseReader = (): AssetResponseReader => {
   type AssetStreamReader = ReadableStreamDefaultReader<Uint8Array>;
 
@@ -253,12 +245,10 @@ export const createAssetResponseReader = (): AssetResponseReader => {
   };
 };
 
-/** Which of `imageNames` the server already has; anything omitted must come out of the archive. */
 export const findExistingImageNames = async (
   imageNames: readonly string[],
   signal?: AbortSignal
 ): Promise<Set<string>> => {
-  // Use the shared bounded pool for existence checks; do not serialize chunks.
   const found = await mapWithConcurrency(
     toBatches(imageNames, EXISTENCE_BATCH_SIZE),
     INVK_TRANSFER_CONCURRENCY,
@@ -286,7 +276,6 @@ export const findExistingVideoNames = async (
       const response = await apiFetchRaw(`${VIDEOS_BASE}/i/${encodeURIComponent(videoName)}`, { signal });
 
       if (response.ok) {
-        // Discard unused response bodies to release connections.
         await discardBody(response);
         return videoName;
       }
@@ -305,7 +294,6 @@ export const findExistingVideoNames = async (
   return new Set(found.filter((videoName): videoName is string => videoName !== null));
 };
 
-/** Null means unavailable; exports may complete with missing assets. */
 const fetchAsset = async (
   url: string,
   signal: AbortSignal | undefined,
@@ -346,7 +334,6 @@ export const fetchVideoBytes = (videoName: string, signal?: AbortSignal): Promis
 
 export interface FetchedThumbnail {
   bytes: Uint8Array;
-  /** Response MIME type, which decides the cover entry's extension. */
   contentType: string;
 }
 
@@ -363,7 +350,6 @@ const fetchImageThumbnailWithReader = async (
 export const fetchImageThumbnail = (imageName: string, signal?: AbortSignal): Promise<FetchedThumbnail | null> =>
   fetchImageThumbnailWithReader(imageName, signal, createAssetResponseReader());
 
-/** Production export transport with one cumulative response budget. */
 export const createAssetExportTransport = () => {
   const readResponse = createAssetResponseReader();
 
@@ -402,7 +388,6 @@ const uploadMedia = async <T>(
 const IMAGE_UPLOAD_MIME = 'application/octet-stream';
 const VIDEO_UPLOAD_MIME = 'video/mp4';
 
-/** Dimensions travel for images because the document needs them; nothing needs a video's. */
 const toUploadedImage = (dto: ImageDTOSubset): UploadedImage => ({
   height: dto.height,
   imageName: dto.image_name,
@@ -443,9 +428,7 @@ export const uploadArchiveVideo = async (
 });
 
 export interface BoardUploadOptions {
-  /** The project's staging board. Board media is never uploaded unboarded. */
   boardId: string;
-  /** The category the exporting server had it filed under. */
   category: InvkMediaCategory;
   contentType?: string;
   signal?: AbortSignal;
@@ -484,14 +467,12 @@ export const uploadBoardVideo = async (
   ).video_name,
 });
 
-/** One copy the server made, under the identity it assigned. */
 export interface CopiedMedia {
   name: string;
   sourceName: string;
 }
 
 export interface CopyMediaResult {
-  /** Source names the server would not copy. Reported per name, never fatal for the batch. */
   failed: string[];
   copied: CopiedMedia[];
 }
@@ -505,7 +486,6 @@ interface CopyMediaRequest<Entry> {
   toCopiedMedia: (entry: Entry) => CopiedMedia;
 }
 
-/** Enforce the synchronous-route ceiling once for every server-side copy transport. */
 const copyMediaToBoard = async <Entry>({
   boardId,
   endpoint,
@@ -525,9 +505,7 @@ const copyMediaToBoard = async <Entry>({
     }
 
     try {
-      // Deliberately unaborted: the server works synchronously and may create identities after the browser disconnects,
-      // and its response is the only way the ledger learns to remove them. Cancellation is honoured between requests
-      // instead.
+      // Deliberately unaborted: the server may create identities after a disconnect, and only its response tells the ledger.
       const body = await apiFetchJson<{ copied?: Entry[]; failed?: string[] }>(endpoint, {
         body: JSON.stringify({ board_id: boardId, [requestKey]: batch }),
         method: 'POST',
@@ -566,7 +544,6 @@ export const copyImagesToBoard = (
     toCopiedMedia: (entry) => ({ name: entry.image_name, sourceName: entry.source_image_name }),
   });
 
-/** The same, for videos. */
 export const copyVideosToBoard = (
   videoNames: readonly string[],
   boardId: string,
@@ -581,7 +558,6 @@ export const copyVideosToBoard = (
     toCopiedMedia: (entry) => ({ name: entry.video_name, sourceName: entry.source_video_name }),
   });
 
-/** Names the server would not star, out of the names asked for. */
 export interface BulkStarResult {
   failed: string[];
 }
@@ -593,7 +569,6 @@ const toBulkStarResult = (requested: readonly string[], starred: readonly string
   return { failed: requested.filter((name) => !succeeded.has(name)) };
 };
 
-/** Star in batches the server accepts; a failed batch's names are reported, not thrown, and later batches still run. */
 const starMedia = async (
   names: readonly string[],
   endpoint: string,
@@ -623,11 +598,9 @@ const starMedia = async (
   return { failed };
 };
 
-/** Star restored images. Starring is never part of an upload or a copy — it is always this call. */
 export const starImages = (imageNames: readonly string[], signal?: AbortSignal): Promise<BulkStarResult> =>
   starMedia(imageNames, `${IMAGES_BASE}/star`, 'image_names', 'starred_images', signal);
 
-/** The same, for videos. */
 export const starVideos = (videoNames: readonly string[], signal?: AbortSignal): Promise<BulkStarResult> =>
   starMedia(videoNames, `${VIDEOS_BASE}/star`, 'video_names', 'starred_videos', signal);
 
@@ -642,10 +615,7 @@ export const createStagingBoard = async (boardName: string, signal?: AbortSignal
   return dto.board_id;
 };
 
-/**
- * Move a staging board that holds a member board's media into the project it now belongs to, and archive it if the
- * source had. Only after the project exists: a board is a member of a project the server already has.
- */
+/** Only after the project exists: a board is a member of a project the server already has. */
 export const placeBoardInProject = async (
   boardId: string,
   projectId: string,
@@ -659,15 +629,11 @@ export const placeBoardInProject = async (
   });
 };
 
-/** The project a board is in; null is the Library. */
 export const getBoardProjectId = async (boardId: string, signal?: AbortSignal): Promise<string | null> =>
   (await apiFetchJson<{ project_id?: string | null }>(`${BOARDS_BASE}/${encodeURIComponent(boardId)}`, { signal }))
     .project_id ?? null;
 
-/**
- * Drop a staging board whose project was never created. `include_images=false` deliberately: the restore deletes its
- * own identities one by one, and a generation that landed on the board meanwhile must survive as Uncategorized.
- */
+/** `include_images=false`: a generation that landed on the board meanwhile must survive as Uncategorized. */
 export const deleteStagingBoard = async (boardId: string, signal?: AbortSignal): Promise<void> => {
   await apiFetchJson<unknown>(`${BOARDS_BASE}/${encodeURIComponent(boardId)}?include_images=false`, {
     method: 'DELETE',
@@ -675,10 +641,6 @@ export const deleteStagingBoard = async (boardId: string, signal?: AbortSignal):
   });
 };
 
-/**
- * Delete in batches the server accepts. Every batch is sent even after one fails, so as much as possible is cleaned up;
- * the first failure is thrown once all have run.
- */
 const deleteArchiveMedia = async (
   names: readonly string[],
   endpoint: string,
@@ -709,11 +671,9 @@ const deleteArchiveMedia = async (
   }
 };
 
-/** Delete image identities created by a restore whose project could not be created. */
 export const deleteArchiveImages = (imageNames: string[], signal?: AbortSignal): Promise<void> =>
   deleteArchiveMedia(imageNames, `${IMAGES_BASE}/delete`, 'image_names', signal);
 
-/** Delete video identities created by a restore whose project could not be created. */
 export const deleteArchiveVideos = (videoNames: string[], signal?: AbortSignal): Promise<void> =>
   deleteArchiveMedia(videoNames, `${VIDEOS_BASE}/delete`, 'video_names', signal);
 
@@ -723,7 +683,6 @@ const EXTENSION_BY_MIME: Readonly<Record<string, string>> = {
   'image/webp': 'webp',
 };
 
-/** Extension for a cover entry, given what the server said it served. */
 export const coverExtensionForMime = (contentType: string): string =>
   EXTENSION_BY_MIME[contentType.split(';')[0]!.trim().toLowerCase()] ?? 'png';
 
@@ -743,7 +702,6 @@ const VIDEO_MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
   webm: 'video/webm',
 };
 
-/** Use a kind-specific MIME fallback so unknown video extensions remain video uploads. */
 export const mimeForEntryName = (entryName: string, kind: 'image' | 'video' = 'image'): string => {
   const extension = entryName.split('.').pop()?.toLowerCase() ?? '';
 

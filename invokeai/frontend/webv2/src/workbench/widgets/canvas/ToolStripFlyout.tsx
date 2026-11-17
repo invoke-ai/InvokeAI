@@ -41,11 +41,7 @@ const menuItemValueAt = (event: ReactPointerEvent): string | null =>
   document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>(MENU_ITEM_SELECTOR)?.dataset.value ??
   null;
 
-/**
- * A strip slot standing for a family of subtools. Click selects the current subtool; hold, right-click, ArrowRight or
- * the context-menu key open a menu of the family. Releasing a hold over an entry selects it; releasing elsewhere leaves
- * the menu open for a click.
- */
+/** A slot for a subtool family: click selects; hold, right-click or ArrowRight opens the family menu. */
 export const ToolFamilyButton = ({
   currentId,
   icon,
@@ -118,8 +114,7 @@ export const ToolFamilyButton = ({
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (holdTimer.current !== null) {
         clearHoldTimer();
-        // Short press: an ordinary click on the slot — but only released over it. Capture retargets the release here
-        // even after a drag-off, and a drag-off release must cancel, like any button.
+        // Short press: an ordinary click on the slot — but only released over it.
         if (!isOverElement(event.currentTarget, event)) {
           return;
         }

@@ -15,16 +15,7 @@ import {
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchQueries, useWorkbenchSubscription } from '@workbench/WorkbenchContext';
 
-/**
- * Refresh loaded maps on projection events and reconnects; feed footer counts without fetching for sessions that never
- * open the map.
- */
-/**
- * An event naming a user other than the session's. Admins receive index and projection events for every user, and an
- * admin refetch usually finds its own all-images projection stale and enqueues another full recompute — so one user's
- * activity would drive UMAP fits on every admin's client. Unknown on either side is not evidence of a foreign event:
- * single-user mode has no session user at all, and an event without a user id predates the field.
- */
+/** Admins get every user's events, which would drive UMAP fits on each admin; unknown users are not foreign. */
 const isForAnotherUser = (userId: unknown): boolean => {
   const sessionUserId = getAuthSession().user?.user_id;
 
@@ -37,6 +28,7 @@ export interface ImageMapMediaFilterSource {
   subscribe: (listener: () => void) => () => void;
 }
 
+/** Refreshes loaded maps on projection events and reconnects; footer counts never fetch. */
 export const attachImageMapDataRuntime = (mediaFilterSource: ImageMapMediaFilterSource): (() => void) => {
   // The store ignores an unchanged kind, so every Workbench change may push; only an actual change refetches.
   const syncMediaKind = () => setImageMapMediaKind(toGalleryMediaKind(mediaFilterSource.getMediaFilter()));
@@ -72,8 +64,7 @@ export const attachImageMapDataRuntime = (mediaFilterSource: ImageMapMediaFilter
     void refreshImageMapPoints();
   };
 
-  // Allow projection-ready during loading: recompute can overtake the fetch and invalidate labels. Store dedupe queues
-  // at most one rerun.
+  // Allow projection-ready during loading: recompute can overtake the fetch and invalidate labels.
   const refreshProjectionReady = () => {
     const { loadState, renderError } = imageMapStore.getSnapshot();
 
@@ -92,8 +83,7 @@ export const attachImageMapDataRuntime = (mediaFilterSource: ImageMapMediaFilter
         refreshProjectionReady();
       }
     }),
-    // Counts-free per-user poke: the owner's images just reached the index. This is the only index signal non-admins
-    // receive (status events below are admin-only), so it is what makes a non-admin's map follow their own generations.
+    // Counts-free per-user poke: the owner's images just reached the index.
     socketHub.on('image_index_updated', refreshIfLoaded),
     socketHub.on('image_index_status', (payload: never) => {
       const event = payload as unknown as ImageIndexStatusEvent;
@@ -103,8 +93,7 @@ export const attachImageMapDataRuntime = (mediaFilterSource: ImageMapMediaFilter
         pending: event.pending,
         total: event.total,
       });
-      // At indexing quiescence, refresh to trigger scope-hash comparison and needed recomputation. Admin counts cover
-      // all users; non-admin embed pokes cover their own images, while deletions may need manual refresh.
+      // At indexing quiescence, refresh to trigger scope-hash comparison and needed recomputation.
       if (event.pending === 0) {
         refreshIfLoaded();
       }

@@ -2,7 +2,6 @@
 
 export type LayerEditorPaneId = 'properties' | 'transform' | 'overview';
 
-/** What every pane block persists: its preferred height and whether it is collapsed to its strip. */
 export interface PaneBlockLayout {
   isCollapsed: boolean;
   sizePx: number;

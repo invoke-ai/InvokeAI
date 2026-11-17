@@ -43,40 +43,26 @@ import type { GalleryActions } from './GalleryWidgetContext';
 import { useGalleryHost, useOptionalGalleryUi } from './GalleryUiContext';
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-/** A real board's id: not Uncategorized and not a virtual board, which hold no uploads. */
+/** Uncategorized and virtual boards hold no uploads. */
 const isGalleryBoardId = (boardId: string): boolean => boardId !== 'none' && !isInvalidGalleryBoardDestination(boardId);
 const uploadLogger = createLogger({ area: 'upload', namespace: 'gallery' });
 
 export interface GalleryUploadOptions {
   boards: readonly GalleryBoard[];
-  /** Selects the newest upload where the Gallery shows it; absent hosts leave the selection alone. */
+  /** Absent hosts leave the selection alone. */
   gallery?: Pick<GalleryCommandsPort, 'selectItem' | 'setView'>;
-  /**
-   * Where the Gallery widget is showing on completion; the newest upload visible there gets selected. Omit to leave the
-   * selection alone, as hosts without a workbench must.
-   */
+  /** Omit to leave the selection alone, as hosts without a workbench must. */
   getCurrentGalleryLocation?: () => { galleryView: GalleryView; selectedBoardId: string };
   notifications: GalleryNotificationsPort;
   queryClient: QueryClient;
-  /**
-   * The upload was made in the Gallery itself: when none of it landed on the tab showing, switch to the tab that
-   * received it so it is seen. Uploads made elsewhere (a paste bound for Canvas) leave the Gallery's tab alone.
-   */
+  /** Gallery uploads switch to the tab that received them; uploads made elsewhere (a Canvas paste) leave it alone. */
   revealInReceivingTab?: boolean;
-  /**
-   * A getter is read when the upload starts and, when it names a real board, once more after the listing of every
-   * readable board is ensured, the second reading deciding: for hosts that resolve the board from that listing or must
-   * not re-render on board changes.
-   */
+  /** A getter naming a real board is read again after the all-boards listing is ensured, and that reading decides. */
   selectedBoardId: string | (() => string);
   t: TFunction;
 }
 
-/**
- * Uploads media files to a board and reports how it went: refusals before anything is sent, then a summary of what
- * landed or why nothing did. Resolves to the uploaded items, empty when nothing landed or the account changed on the
- * way. For callers outside React (a file dropped on Canvas); components use {@link useGalleryUploadAction}.
- */
+/** Resolves to the uploaded items, empty when nothing landed or the account changed; for callers outside React. */
 export const uploadGalleryFiles = async (
   files: File[],
   {
@@ -91,13 +77,13 @@ export const uploadGalleryFiles = async (
   }: GalleryUploadOptions
 ): Promise<GalleryItem[]> => {
   const owner = captureAccountScope();
-  // Where the Gallery was when the upload started: only while it is still there may the upload switch its tab.
+  // Only while the Gallery is still where the upload started may it switch the tab.
   const launchLocation = getCurrentGalleryLocation?.();
   const readSelectedBoardId = () =>
     typeof selectedBoardIdOrGetter === 'function' ? selectedBoardIdOrGetter() : selectedBoardIdOrGetter;
   let selectedBoardId = readSelectedBoardId();
 
-  // A search of every board has no board of its own to upload to; Uncategorized would be a guess.
+  // A search of every board has no board of its own; Uncategorized would be a guess.
   if (selectedBoardId === ALL_READABLE_BOARDS_ID) {
     notifications.reportError({
       area: 'gallery-upload',
@@ -107,9 +93,7 @@ export const uploadGalleryFiles = async (
     return [];
   }
 
-  // A board is judged from the listing of every readable board, never trusted as given: an upload to a board that was
-  // deleted, archived out of reach or shared read-only since the panel listed it would only fail. Uncategorized and
-  // virtual boards need no listing.
+  // Judged from the all-boards listing, never trusted as given: the board may be gone or read-only since it was listed.
   if (isGalleryBoardId(selectedBoardId)) {
     await ensureGalleryBoardDestinations(queryClient);
     if (!isAccountScopeCurrent(owner)) {
@@ -142,14 +126,11 @@ export const uploadGalleryFiles = async (
     return [];
   }
 
-  // A caller without the panel's listing names the board from the cached listing that decided.
   const selectedBoard =
     boards.find((board) => board.id === selectedBoardId) ?? getCachedGalleryBoard(selectedBoardId, queryClient);
   const targetBoardName = selectedBoard ? getGalleryBoardLabel(selectedBoard, t) : t('widgets.gallery.uncategorized');
 
-  // Refused before any upload: the server would refuse each file, leaving nothing but errors. The reason comes from the
-  // listing that decided, not the panel's older view of the board. The listing is read again at once, so the panel
-  // stops offering the board and the next upload is judged afresh.
+  // Refused before any upload, from the listing that decided; reread the listing so the panel stops offering the board.
   if (isGalleryBoardId(selectedBoardId) && !canAddToCachedGalleryBoard(selectedBoardId, queryClient)) {
     const cachedBoard = getCachedGalleryBoard(selectedBoardId, queryClient);
     const cachedBoardName = cachedBoard ? getGalleryBoardLabel(cachedBoard, t) : targetBoardName;
@@ -171,7 +152,6 @@ export const uploadGalleryFiles = async (
     notifications.reportError({ area: 'gallery-actions', message: toErrorMessage(error), namespace: 'gallery' });
 
   try {
-    // A virtual board holds no uploads; a real board was judged above.
     const targetBoardId = isGalleryBoardId(selectedBoardId) ? selectedBoardId : 'none';
     const imageUploads = accepted.filter((upload) => upload.kind === 'image');
     const videoUploads = accepted.filter((upload) => upload.kind === 'video');
@@ -211,7 +191,7 @@ export const uploadGalleryFiles = async (
     const failedCount = files.length - uploadedItems.length;
     const firstRejection = [...imageResults, ...videoResults].find((result) => result.status === 'rejected');
 
-    // A total failure is reported once, by the notification path below.
+    // A total failure is reported once, below.
     if (uploadedItems.length > 0) {
       uploadLogger[failedCount > 0 ? 'warn' : 'info']({
         context: {
@@ -230,8 +210,7 @@ export const uploadGalleryFiles = async (
       });
     }
 
-    // What landed is listed; a board that refused a file leaves the listing's view of it stale. Either way the gallery,
-    // boards included, reads again.
+    // A board that refused a file leaves the listing stale, so the gallery reads again either way.
     void invalidateGallery(queryClient);
 
     if (uploadedItems.length === 0) {
@@ -252,9 +231,7 @@ export const uploadGalleryFiles = async (
     const visibleUploads = uploadsOnBoard.filter(
       (item) => getGalleryItemView(item) === currentGalleryLocation?.galleryView
     );
-    // Uploaded images and videos land on different tabs; when nothing landed on the one showing, switch to the one that
-    // received them, so the upload is seen. A mixed upload always has some on the tab showing. A Gallery the user moved
-    // while the upload ran keeps where they took it.
+    // Images and videos land on different tabs; a Gallery the user moved meanwhile keeps where they took it.
     const isGalleryWhereLaunched =
       revealInReceivingTab &&
       launchLocation !== undefined &&

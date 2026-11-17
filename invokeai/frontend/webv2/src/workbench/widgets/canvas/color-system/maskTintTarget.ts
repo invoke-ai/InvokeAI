@@ -1,17 +1,10 @@
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
-/**
- * Track the transient mask-tint editing target; clear it when it is no longer the selected mask. Tint itself remains
- * document state.
- */
+/** Track the transient mask-tint editing target; clear it when it is no longer the selected mask. */
 export const maskTintTargetStore = createExternalStore<{ layerId: string | null }>({ layerId: null });
 
-/**
- * Records the Color pane's tint gesture that previews but has not yet recorded. The canvas allows one structural
- * preview at a time, so an Alt-pick into the tint records this gesture before it starts its own; otherwise the pane's
- * late settle would land after the pick and overwrite it.
- */
+/** The pane's unrecorded tint preview; an Alt-pick records it first so a late settle cannot overwrite the pick. */
 let pendingTintSettle: (() => void) | null = null;
 
 registerAccountOwnedResource({

@@ -222,10 +222,7 @@ const RailGroup = ({
   );
 };
 
-/**
- * Use brand color on active icons over neutral fill for cross-theme contrast. Attribute selectors preserve active
- * styling on hover.
- */
+/** Use brand color on active icons over neutral fill for cross-theme contrast. */
 export const WIDGET_ITEM_SX: SystemStyleObject = {
   display: 'flex',
   alignItems: 'center',

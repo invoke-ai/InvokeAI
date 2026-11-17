@@ -78,10 +78,7 @@ interface RegionalGuidanceSettingsProps {
   layer: CanvasRegionalGuidanceLayerContract;
 }
 
-/**
- * Edit regional prompts/toggles/fill through undoable config patches and invert through engine pixels. Reference images
- * have dedicated tree-child editors.
- */
+/** Prompts, toggles and fill use config patches; invert uses engine pixels. */
 export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSettingsProps) => {
   const { t } = useTranslation();
   const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
@@ -102,8 +99,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 
   const attentionSyntax = supportsPromptAttentionSyntax(base) ? 'edit' : 'none';
   const fill = layer.mask.fill;
-  // Resolve support inside the capability selector to update memoized answers. Distinguish unavailable policy from
-  // unsupported models.
+  // Resolve support inside the capability selector to update memoized answers.
   const { hasCapabilities, support } = useExternalStoreSelector(
     subscribeArchitectureCapabilities,
     getArchitectureCapabilitiesSnapshot,
@@ -142,8 +138,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
       return;
     }
     const positive = positiveDraft === null ? layer.positivePrompt : positiveDraft || null;
-    // Clearing the text keeps the negative prompt; only its remove control takes it out. A draft left behind after the
-    // prompt was removed elsewhere (undo) does not bring it back.
+    // Clearing the text keeps the negative prompt; only its remove control takes it out.
     const negative = negativeDraft === null || layer.negativePrompt === null ? layer.negativePrompt : negativeDraft;
     const patch: RegionalConfigPatch = {
       ...(positive === layer.positivePrompt ? {} : { positivePrompt: positive }),
@@ -173,9 +168,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
     []
   );
 
-  // Adding or removing the prompt swaps the field and its add button; focus follows to whichever one mounts. Only the
-  // render that commit causes may take it: a later mount (an undo, a model switch back) must not steal focus, so the
-  // request lapses after a frame. Another layer's settings remount (keyed by layer id) with no request.
+  // Adding or removing the prompt swaps the field and its add button; focus follows to whichever one mounts.
   const pendingNegativeFocus = useRef<'add' | 'field' | null>(null);
   const requestNegativeFocus = useCallback((target: 'add' | 'field') => {
     pendingNegativeFocus.current = target;
@@ -307,8 +300,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
     []
   );
 
-  // Generation skips a region the layout cannot place. The warning sits under the missing value and describes its
-  // control; a status region that exists before any warning announces each change.
+  // Generation skips a region the layout cannot place.
   const layoutIssue = isLayout
     ? getLayoutRegionIssue({ layout: { kind: layoutKind, text: visibleText }, positivePrompt }, layoutKinds)
     : null;

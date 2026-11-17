@@ -11,11 +11,7 @@ import { useCallback, useRef, useState, type MouseEvent, type PointerEvent as Re
 
 import { capturePointer, releasePointer, trackPointerDown } from './loupeGestures';
 
-/**
- * Apply one imperative transform to both comparison panes in pane-fraction space: each image stays fitted to its own
- * pane, and the shared zoom and pan (fractions of each pane) keep the same region of both pictures in view, whatever
- * their pixel sizes or aspect ratios. Pinch zooms/pans together; one finger pans an already-zoomed pair.
- */
+/** One transform for both panes in pane-fraction space, so both show the same region at any resolution. */
 
 const MAX_ACTUAL_ZOOM = 8;
 const PIXELATED_ACTUAL_ZOOM = 2;
@@ -144,10 +140,7 @@ export const useCompareLoupe = ({
     [apply]
   );
 
-  /**
-   * Never below fit, never past `MAX_ACTUAL_ZOOM` of the sharper image's own pixels, so a pair of different resolutions
-   * can still be inspected down to the larger one's detail; the other pane goes pixelated first.
-   */
+  /** Fit up to `MAX_ACTUAL_ZOOM` of the sharper image's pixels; the other pane pixelates first. */
   const constrainScale = useCallback((scale: number): number => {
     let maxScale = 0;
 
@@ -340,10 +333,7 @@ export const useCompareLoupe = ({
         }
       },
     });
-    /**
-     * Carry the zoom to a pair that keeps an image (a new selection against the same comparison image, or a swap),
-     * zooming out around the view's centre where the new pair's limit is lower; a wholly new pair opens at fit.
-     */
+    /** Keeps zoom for a pair sharing an image, zooming out to its lower limit; a new pair opens at fit. */
     const reconcilePair = (): void => {
       const [first, second] = imagesRef.current;
       const previous = pairRef.current;
@@ -371,10 +361,7 @@ export const useCompareLoupe = ({
       };
     };
 
-    /**
-     * Measure/capture both fingers in the midpoint pane, using fallback only outside both. Reject unmeasurable or
-     * coincident-pointer gestures.
-     */
+    /** Both fingers measured in the midpoint pane; unmeasurable or coincident gestures are rejected. */
     const beginPinch = (fallbackPane: 0 | 1, pointerIds: [number, number]): PinchGesture | null => {
       const first = pointersRef.current.get(pointerIds[0]);
       const second = pointersRef.current.get(pointerIds[1]);

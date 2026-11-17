@@ -121,8 +121,7 @@ export const useGalleryActions = ({
       const owner = captureAccountScope();
       const rollback = patchGalleryBoardCaches(queryClient, boardId, { archived });
       const movedSelectionAway = archived && boardId === selectedBoardId;
-      // An archived board is out of the way, as a deleted one is: results stop going to it rather than to a board
-      // nothing on screen shows.
+      // An archived board is out of the way, as a deleted one is: results stop going to a board no screen shows.
       const stoppedAutoAdding = archived && autoAddBoardId === boardId;
 
       if (movedSelectionAway) {
@@ -145,8 +144,7 @@ export const useGalleryActions = ({
             return;
           }
           // Back to what the archive changed, in the project it changed them in (the toast outlives a project switch),
-          // and each only while that project still has what the archive left: no destination, and Uncategorized on
-          // screen.
+          // each only while that project still has what the archive left: no destination, Uncategorized on screen.
           const values = movedSelectionAway || stoppedAutoAdding ? getProjectGalleryValues?.(projectId) : null;
 
           if (!values) {

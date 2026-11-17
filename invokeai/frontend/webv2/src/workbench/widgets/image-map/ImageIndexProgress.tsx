@@ -34,10 +34,7 @@ interface ImageIndexProgressProps {
   updatedAt: number | null;
 }
 
-/**
- * Show server-wide embedding progress only to admins receiving status events; non-admins see the empty state instead of
- * a frozen bar.
- */
+/** Server-wide progress for admins receiving status events only; non-admins would see a frozen bar. */
 export const ImageIndexProgressPanel = ({
   counts,
   error,
@@ -57,9 +54,8 @@ export const ImageIndexProgressPanel = ({
       </Text>
       <Stack gap="1" mt="2" w="full">
         <Progress.Root max={100} size="lg" value={progress.percent}>
-          {/* The name goes on the track: that is the element carrying
-              role="progressbar", and Chakra otherwise names it "25%", which
-              tells a screen reader the number but never what it counts. */}
+          {/* The name goes on the track: that is the element carrying role="progressbar", and Chakra otherwise names it
+              "25%", which tells a screen reader the number but never what it counts. */}
           <Progress.Track aria-label={t('widgets.imageMap.progress.label')} aria-valuenow={progress.percent}>
             <Progress.Range />
           </Progress.Track>
@@ -68,9 +64,8 @@ export const ImageIndexProgressPanel = ({
           <Text fontVariantNumeric="tabular-nums">{progress.counts}</Text>
           <Text fontVariantNumeric="tabular-nums">{progress.percent}%</Text>
         </HStack>
-        {/* States the fact and stops there. Nothing here can tell an indexer
-            waiting out a generation from one that has died, and the first is
-            routine, so neither may be claimed. */}
+        {/* States the fact and stops there. Nothing here can tell an indexer waiting out a generation from one that has
+            died, and the first is routine, so neither may be claimed. */}
         {progress.stale ? (
           <Text color="fg.subtle" fontSize="md">
             {progress.stale}
@@ -96,10 +91,7 @@ export const ImageIndexProgressPanel = ({
   );
 };
 
-/**
- * Overlay rebuild progress while the stale map remains usable; explain missing labels during vocabulary embedding
- * rebuilds.
- */
+/** Overlays rebuild progress over the usable stale map and explains missing labels during rebuilds. */
 export const ImageIndexActivityBadge = ({ counts, updatedAt }: ImageIndexProgressProps) => {
   const { t } = useTranslation();
   const progress = describeIndexProgress(counts, t, useCountsAge(updatedAt));
@@ -153,9 +145,8 @@ export const ImageIndexProgressInline = ({ counts, updatedAt }: ImageIndexProgre
       {/* Use minW=0 and truncation so six-digit footer counts cannot cover refresh in narrow panels. */}
       <HStack gap="1.5" minW="0" overflow="hidden">
         <Progress.Root flexShrink="0" max={100} value={progress.percent} w="10">
-          {/* The counts go in the name too: at the widget's minimum width the
-              label beside it truncates to a couple of characters, and the
-              tooltip carrying the full text is hover-only. */}
+          {/* The counts go in the name too: at the widget's minimum width the label beside it truncates to a couple of
+              characters, and the tooltip carrying the full text is hover-only. */}
           <Progress.Track
             aria-label={`${t('widgets.imageMap.progress.label')}: ${label}`}
             aria-valuenow={progress.percent}

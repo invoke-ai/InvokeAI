@@ -1,8 +1,4 @@
-/**
- * The project's workflow collection and its session edit histories. Documents are edited through structural sharing so
- * an inactive workflow keeps its identity while another is edited, and histories keep previous document references
- * rather than deep copies.
- */
+/** Structural sharing keeps an inactive workflow's identity; histories keep document references, never deep copies. */
 
 import type {
   ProjectGraphState,
@@ -30,18 +26,12 @@ export interface WorkflowHistoryEntry {
   id: string;
   createdAt: string;
   label: string;
-  /** The document as it was before the edit; the reference the collection held, never a clone. */
   document: ProjectGraphState;
-  /** Edits that arrive as a stream (typing, dragging) share a key so they fold into one step. */
   mergeKey?: string;
-  /** When the entry last absorbed a same-key edit; the merge window runs from here. */
   mergedAt?: string;
   /** Global order across the project's histories; the aggregate cap evicts the lowest first. */
   sequence: number;
-  /**
-   * The library source the copy had before the step, for steps that move it (a library replace); null means none. Undo
-   * restores it with the document, so the copy never claims a revision its graph is not based on.
-   */
+  /** Restored with the document on undo, so the copy never claims a revision its graph is not based on; null is none. */
   source?: ProjectWorkflowSource | null;
 }
 
@@ -52,15 +42,12 @@ export interface WorkflowEditHistory {
 
 export type ProjectWorkflowHistories = Record<string, WorkflowEditHistory>;
 
-/** Session-only state the project carries beside its persisted collection. */
 export interface ProjectWorkflowSession {
   workflows: ProjectWorkflowCollection;
   workflowHistories: ProjectWorkflowHistories;
 }
 
-/** One project keeps at most this many undo entries across all of its workflows. */
 export const WORKFLOW_HISTORY_LIMIT = 40;
-/** A pause this long between same-key edits (typing, dragging) starts a new undo step. */
 export const WORKFLOW_UNDO_MERGE_WINDOW_MS = 1500;
 
 const EMPTY_HISTORY: WorkflowEditHistory = { future: [], past: [] };
@@ -101,8 +88,6 @@ export const getProjectWorkflowHistory = <Session extends ProjectWorkflowSession
   workflowId: string
 ): WorkflowEditHistory => project.workflowHistories[workflowId] ?? EMPTY_HISTORY;
 
-// #region Persistence shapes
-
 const normalizeSource = (candidate: unknown): ProjectWorkflowSource | null | undefined => {
   if (candidate === undefined) {
     return undefined;
@@ -122,7 +107,6 @@ const normalizeSource = (candidate: unknown): ProjectWorkflowSource | null | und
   };
 };
 
-/** A run preview is decoration: a damaged one is dropped rather than costing the project. */
 const normalizeRunPreview = (candidate: unknown): ProjectWorkflowRunPreview | undefined => {
   if (
     !isRecord(candidate) ||
@@ -137,10 +121,7 @@ const normalizeRunPreview = (candidate: unknown): ProjectWorkflowRunPreview | un
   return { completedAt: candidate.completedAt, imageName: candidate.imageName, submittedAt: candidate.submittedAt };
 };
 
-/**
- * Validates a persisted collection. Anything that would silently lose a workflow (a malformed entry, a repeated id, an
- * active id naming nothing) is refused rather than repaired.
- */
+/** Refuses rather than repairs anything that would silently lose a workflow. */
 export const normalizeProjectWorkflowCollection = (candidate: unknown): ProjectWorkflowCollection | null => {
   if (!isRecord(candidate) || typeof candidate.activeWorkflowId !== 'string' || !Array.isArray(candidate.entries)) {
     return null;
@@ -158,7 +139,6 @@ export const normalizeProjectWorkflowCollection = (candidate: unknown): ProjectW
       return null;
     }
 
-    // Authored content is refused when damaged, never replaced with a blank the user did not write.
     const document = readPersistedProjectGraph(raw.document);
 
     if (!document || ids.has(document.id)) {
@@ -184,14 +164,7 @@ export const normalizeProjectWorkflowCollection = (candidate: unknown): ProjectW
   return { activeWorkflowId: candidate.activeWorkflowId, entries };
 };
 
-/**
- * A schema-2 document owned one graph. It becomes the first, active workflow; a library binding becomes source metadata
- * with an unknown revision, because nothing proves the old graph still matches the library's contents.
- */
-/**
- * A legacy single graph becomes the first, active workflow. Only the Phase-1 placeholder (no authored content) is
- * converted into a blank; a damaged version-2 graph or any other unrecognised graph is refused (`null`).
- */
+/** Only the Phase-1 placeholder converts to a blank; any other unrecognised graph is refused (`null`). */
 export const migrateProjectGraphToCollection = (projectGraph: unknown): ProjectWorkflowCollection | null => {
   const graph = isRecord(projectGraph) ? projectGraph : {};
   const { libraryWorkflowId, ...rest } = graph;
@@ -221,10 +194,6 @@ export const stripProjectWorkflowSources = (collection: ProjectWorkflowCollectio
       }
     : collection;
 
-// #endregion
-
-// #region Collection edits
-
 const replaceEntry = <Session extends ProjectWorkflowSession>(
   project: Session,
   workflowId: string,
@@ -250,7 +219,6 @@ const replaceEntry = <Session extends ProjectWorkflowSession>(
   return { ...project, workflows: { ...project.workflows, entries } };
 };
 
-/** A workflow nobody has authored into: the blank a fresh project starts with. Opening a template may take it over. */
 export const isPlaceholderProjectWorkflow = (entry: ProjectWorkflowEntry): boolean => {
   const { document } = entry;
   const root = document.form.elements[document.form.rootElementId];
@@ -274,11 +242,10 @@ export const isPlaceholderProjectWorkflow = (entry: ProjectWorkflowEntry): boole
 
 export interface AddProjectWorkflowOptions {
   source?: ProjectWorkflowSource;
-  /** Take over the active workflow when it is an untouched placeholder instead of adding beside it. */
   reusePlaceholder?: boolean;
 }
 
-/** Adds and activates a workflow. The document id is the project copy's identity and must be new to the project. */
+/** The document id is the copy's identity and must be new to the project. */
 export const addProjectWorkflow = <Session extends ProjectWorkflowSession>(
   project: Session,
   document: ProjectGraphState,
@@ -323,7 +290,7 @@ export const selectProjectWorkflow = <Session extends ProjectWorkflowSession>(
     ? project
     : { ...project, workflows: { ...project.workflows, activeWorkflowId: workflowId } };
 
-/** Copies a workflow under a fresh document id. Node ids may repeat: editor and execution state are scoped by workflow. */
+/** Node ids may repeat: editor and execution state are scoped by workflow. */
 export const duplicateProjectWorkflow = <Session extends ProjectWorkflowSession>(
   project: Session,
   workflowId: string,
@@ -351,10 +318,6 @@ export const duplicateProjectWorkflow = <Session extends ProjectWorkflowSession>
   return { ...project, workflows: { activeWorkflowId: copyId, entries } };
 };
 
-/**
- * Removes a workflow and releases its history. Selection moves to the next neighbour, or the previous one for the last
- * entry; removing the only workflow leaves a fresh blank in its place.
- */
 export const removeProjectWorkflow = <Session extends ProjectWorkflowSession>(
   project: Session,
   workflowId: string
@@ -401,10 +364,6 @@ export const setProjectWorkflowSource = <Session extends ProjectWorkflowSession>
     return source ? { ...rest, source } : rest;
   });
 
-/**
- * Puts a freshly loaded document in a copy's place as one undoable step. The copy keeps its id and name, and its source
- * moves to the revision it now holds.
- */
 export const replaceProjectWorkflowDocument = <Session extends ProjectWorkflowSession>(
   project: Session,
   workflowId: string,
@@ -435,7 +394,7 @@ export const replaceProjectWorkflowDocument = <Session extends ProjectWorkflowSe
   }));
 };
 
-/** Records a successful run's output. An older submission that finishes later never replaces a newer one. */
+/** An older submission that finishes later never replaces a newer one. */
 export const recordProjectWorkflowRun = <Session extends ProjectWorkflowSession>(
   project: Session,
   workflowId: string,
@@ -444,10 +403,6 @@ export const recordProjectWorkflowRun = <Session extends ProjectWorkflowSession>
   replaceEntry(project, workflowId, (entry) =>
     entry.lastRun && entry.lastRun.submittedAt > run.submittedAt ? entry : { ...entry, lastRun: run }
   );
-
-// #endregion
-
-// #region Document edits and history
 
 let nextHistorySequence = 0;
 
@@ -518,8 +473,7 @@ const pushHistory = <Session extends ProjectWorkflowSession>(
   const history = getProjectWorkflowHistory(project, workflowId);
   const last = history.past.at(-1);
 
-  // An undo in between (`future` non-empty) ends the burst: the state the user just stood on must stay reachable as its
-  // own step.
+  // An undo in between ends the burst: the state the user stood on stays its own step.
   if (
     mergeKey &&
     last?.mergeKey === mergeKey &&
@@ -558,11 +512,9 @@ const pushHistory = <Session extends ProjectWorkflowSession>(
 
 export interface ApplyWorkflowActionResult<Session> {
   project: Session;
-  /** True when the reducer produced a new document. */
   didChange: boolean;
 }
 
-/** Applies a graph action to one workflow, recording an undo step when the action earns one. */
 export const applyProjectWorkflowAction = <Session extends ProjectWorkflowSession>(
   project: Session,
   workflowId: string,
@@ -592,7 +544,6 @@ export const applyProjectWorkflowAction = <Session extends ProjectWorkflowSessio
   };
 };
 
-/** Puts a history entry's document back, and its source when the step moved it. */
 const restoreHistoryEntry = (current: ProjectWorkflowEntry, step: WorkflowHistoryEntry): ProjectWorkflowEntry => {
   if (step.source === undefined) {
     return { ...current, document: step.document };
@@ -674,12 +625,9 @@ export const redoProjectWorkflow = <Session extends ProjectWorkflowSession>(
   };
 };
 
-/** Replaces a document without touching history: seed advances and other non-undoable bookkeeping. */
 export const setProjectWorkflowDocument = <Session extends ProjectWorkflowSession>(
   project: Session,
   workflowId: string,
   document: ProjectGraphState
 ): Session =>
   replaceEntry(project, workflowId, (entry) => (entry.document === document ? entry : { ...entry, document }));
-
-// #endregion

@@ -1,6 +1,5 @@
 /**
- * Admin-maintained server-wide supplementary terms augment bundled label vocabulary. All users can read; admin-only
- * saves replace the full list idempotently.
+ * Admin-maintained server-wide terms augment the bundled vocabulary; all read, only admins save (whole, idempotent).
  */
 
 import {

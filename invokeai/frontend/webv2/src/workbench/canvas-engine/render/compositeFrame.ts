@@ -282,7 +282,6 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         controlView: isolatedGuard ? null : deps.getControlView(),
         derivedSurfaces: derivedSurfaceCache,
         diagnostics,
-        // Pixels in flight, drawn directly above the layer they were cut from.
         floatingSelection: isolatedGuard ? null : (floatFrame?.composite ?? null),
         imageSmoothing: shouldSmoothAtZoom(viewport.getZoom()),
         isolationLayerId: isolatedGuard?.layerId ?? null,
@@ -306,7 +305,6 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
                 surface: stagedPreview.surface,
               }
             : null,
-        // Skip the edited text layer because its portal renders live content.
         skipLayerId: stores.textEditSession.get()?.layerId ?? null,
         transformOverrides: overrides,
       });

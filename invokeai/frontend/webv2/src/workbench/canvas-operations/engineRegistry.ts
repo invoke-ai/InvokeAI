@@ -1,8 +1,4 @@
-/**
- * Share one engine per project through reference-counted leases. Delay disposal after the last release; reacquisition
- * cancels it so quick remounts reuse the warm engine. A disposed engine leaves its project's next engine the tool the
- * person was on, their quick-switch bookmark and how many undo steps went with it, for this session.
- */
+/** Reference-counted engine leases with delayed disposal, so quick remounts reuse the warm engine. */
 
 import type {
   CanvasDocumentContractV3,
@@ -19,56 +15,37 @@ import {
   type CanvasEngineOptions,
 } from '@workbench/canvas-operations/createCanvasEngine';
 
-/** Engine creation dependencies, minus what the registry supplies: the project id and its previous engine's carry. */
 export type EngineDeps = Omit<CanvasEngineOptions, 'droppedHistorySteps' | 'projectId'> & {
-  /**
-   * The mounted Workbench's held-media registry. It also identifies that Workbench: an engine is bound to the one that
-   * created it, so a released engine is replaced rather than reused by the next Workbench.
-   */
+  /** Identifies the Workbench: a released engine is replaced rather than reused by the next one. */
   liveEngines?: LiveCanvasEngines;
 };
 
-/** Default grace period before a released engine is disposed (30s). */
 export const DEFAULT_GRACE_PERIOD_MS = 30_000;
 
-/** Projects whose disposed engine's carry is kept; the oldest goes first. */
 const MAX_CARRIES = 32;
 
-/** What a disposed engine hands its project's next engine within the session. */
 interface EngineCarry {
   activeTool: ToolId;
   bookmarkedLayerId: string | null;
-  /** Undo and redo steps the disposal dropped, with those its history had already let go; History says so. */
   droppedHistorySteps: number;
 }
 
-/** Whether the canvas holds nothing yet: no raster, control or regional layer, and no mask with coverage. */
 export const isBlankCanvasDocument = (document: CanvasDocumentContractV3 | null): boolean =>
   getDocumentLeaves(document).every((layer) => layer.type === 'inpaint_mask' && layer.mask.bitmap === null);
 
-/**
- * The tool a fresh engine starts on: the one its project's last engine was on, else Brush on a blank canvas with
- * nothing selected (a new project's), whose first stroke paints a new layer. A selected empty mask, as older projects
- * have, opens on View, so a first stroke never paints the mask by surprise.
- */
+/** A selected empty mask opens on View, so a first stroke never paints the mask by surprise. */
 const initialTool = (carry: EngineCarry | undefined, document: CanvasDocumentContractV3 | null): ToolId =>
   carry?.activeTool ?? (isBlankCanvasDocument(document) && !document?.selectedLayerId ? 'brush' : 'view');
 
-/** Injectable timer seam (defaults to the global timers). */
 export interface RegistryTimers {
   setTimeout(handler: () => void, ms: number): number;
   clearTimeout(handle: number): void;
 }
 
-/** The registry handle. */
 export interface EngineRegistry {
-  /** Immediately disposes every engine, including active and cooling leases. */
   disposeAll(): void;
-  /** Returns the engine for `projectId`, creating it if needed, and adds a reference. */
   getOrCreateEngine(projectId: string, deps: EngineDeps): CanvasEngine;
-  /** Returns the engine for `projectId` without changing its reference count. */
   getEngine(projectId: string): CanvasEngine | undefined;
-  /** Drops a reference; schedules grace-period disposal when the last reference is released. */
   releaseEngine(projectId: string): void;
 }
 
@@ -87,7 +64,6 @@ const defaultTimers: RegistryTimers = {
   setTimeout: (handler, ms) => globalThis.setTimeout(handler, ms),
 };
 
-/** Creates an engine registry with an optional grace period and injectable timers. */
 export const createEngineRegistry = (
   options: {
     gracePeriodMs?: number;
@@ -104,11 +80,9 @@ export const createEngineRegistry = (
     const activeTool = engine.interaction.get('activeTool');
     carries.delete(projectId);
     carries.set(projectId, {
-      // Select Object's tool belongs to its operation, which ends with the engine. Transform opens an edit session on
-      // the selected layer when chosen, so reopening the canvas on it would start an edit the user never asked for.
+      // Select Object's operation ended with the engine; Transform would open an edit session nobody asked for.
       activeTool: activeTool === 'sam' || activeTool === 'transform' ? 'view' : activeTool,
       bookmarkedLayerId: engine.interaction.get('layerQuickSwitch').bookmarkedLayerId,
-      // Steps trimmed at cooldown or evicted before count too: History's start point says how many went.
       droppedHistorySteps: past.length + future.length + evicted + dropped,
     });
     if (carries.size > MAX_CARRIES) {
@@ -194,7 +168,6 @@ export const createEngineRegistry = (
       const engine = createCanvasEngine({ projectId, ...deps, droppedHistorySteps: carry?.droppedHistorySteps ?? 0 });
       engine.tools.setTool(initialTool(carry, engine.document.getDocument()));
       if (carry?.bookmarkedLayerId) {
-        // A bookmark naming a layer that is gone is ignored by its readers.
         engine.interaction.set('layerQuickSwitch', {
           bookmarkedLayerId: carry.bookmarkedLayerId,
           previousLayerId: null,
@@ -241,7 +214,6 @@ export const createEngineRegistry = (
   };
 };
 
-/** The process-wide default registry shared by all widget surfaces. */
 const defaultRegistry = createEngineRegistry();
 
 registerAccountOwnedResource({

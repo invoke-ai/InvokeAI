@@ -1,8 +1,4 @@
-/**
- * Draws cached content: clear/checkerboard across the viewport, bottom-first transformed layers with opacity/blend, and
- * the staged preview between the raster stack and the overlay stacks. Missing caches are skipped; callers own
- * rasterization. RasterSurface contexts make ordering testable.
- */
+/** Draws cached content bottom first, the staged preview between raster and overlay stacks; callers rasterize. */
 
 import type {
   CanvasBlendMode,
@@ -32,102 +28,61 @@ import { renderControlTransparency } from './controlTransparency';
 import { collectCompositedGroups, planGroupCompositeScopes } from './groupCompositeScopes';
 import { colorizeMask } from './maskFill';
 
-/** Screen-space size (px) of each checkerboard square for transparent backgrounds. */
 export const CHECKERBOARD_SQUARE_PX = 8;
 
 export const SMOOTHING_MAX_ZOOM = 1;
 
-/**
- * Smooth only below 1x for clean downscaling. Magnification uses nearest-neighbor for crisp pixels without per-frame
- * bilinear upscaling.
- */
+/** Nearest-neighbor magnification keeps pixels crisp without per-frame bilinear upscaling. */
 export const shouldSmoothAtZoom = (zoom: number): boolean => zoom < SMOOTHING_MAX_ZOOM;
 
-/** The two square colors of the transparency checkerboard. */
 export interface CheckerColors {
-  /** The base color, filled across the whole tile. */
   a: string;
-  /** The alternating color, drawn on the tile's diagonal cells. */
   b: string;
 }
 
-/** Dark checker fallback before React supplies semantic theme colors, and for DOM-free callers. */
+/** Fallback before React supplies theme colors, and for DOM-free callers. */
 export const DEFAULT_CHECKER_COLORS: CheckerColors = { a: '#2a2a2a', b: '#363636' };
 
-/** Opacity of the display-only regenerate tint drawn over a raster layer's coverage. */
 export const REGION_OVERLAY_ALPHA = 0.5;
 
-/** Strength of a control layer's map over its original in the Overlay view, relative to the layer's opacity. */
+/** Relative to the layer's opacity. */
 export const CONTROL_OVERLAY_MAP_ALPHA = 0.5;
 
-/** Optional inputs to {@link compositeDocument}. */
 export interface CompositeOptions {
-  /** Allocates mask, control-effect and group intermediates; every composite renders through it. */
   backend: RasterBackend;
-  /** Clips document layers to this document-space rect without clipping the background or staged preview. */
+  /** Clips document layers only, not the background or staged preview. */
   clipRect?: Rect | null;
-  /**
-   * A staged generation candidate to draw at its placement (document space), above the raster stack and below control
-   * layers, masks and regions, which show over it only when the staging view leaves them on. The overlay outlines it.
-   */
+  /** Document space, above the raster stack and below control layers, masks and regions. */
   stagedPreview?: { surface: RasterSurface; rect: Rect; opacity?: number } | null;
-  /**
-   * Checker tile fills the unbounded viewport. Null/absence disables it, revealing themed widget background through the
-   * cleared surface.
-   */
+  /** Null disables it, revealing the widget background. */
   checkerboardTile?: RasterSurface | null;
-  /**
-   * Smoothing defaults true for non-viewport callers; engine frames use {@link shouldSmoothAtZoom} for crisp
-   * magnification.
-   */
+  /** Defaults true for non-viewport callers. */
   imageSmoothing?: boolean;
-  /**
-   * Bounded damage clips clear, checkerboard and every draw to the screen union of its regions and culls contributors
-   * outside it; damage resolving offscreen draws nothing. Absence repaints the whole target.
-   */
+  /** Clips and culls to the screen union of its regions; absent repaints the whole target. */
   damage?: FrameDamage;
-  /**
-   * Transient transforms override committed values without changing the mirror. Missing scale/rotation retain committed
-   * values, supporting position-only move previews.
-   */
+  /** Missing scale or rotation keep committed values, for position-only move previews. */
   transformOverrides?: ReadonlyMap<
     string,
     { x: number; y: number; scaleX?: number; scaleY?: number; rotation?: number }
   > | null;
-  /** Skip an edited text layer to avoid drawing beneath its live portal; null/absence skips nothing. */
+  /** Skips an edited text layer drawn by its live portal. */
   skipLayerId?: string | null;
-  /** Cached mask pattern by style/color; null means direct solid fill. Without a provider, only solid fills render. */
+  /** Null means direct solid fill; without a provider only solid fills render. */
   maskPatternTile?: ((style: string, color: string) => RasterSurface | null) | null;
-  /**
-   * Display-only regenerate overlays for screen/Overview. Pixel-consuming composites must omit them or their tint
-   * becomes generated, sampled or exported content.
-   */
+  /** Display-only: pixel-consuming composites must omit them, or the tint becomes generated content. */
   regionOverlays?: boolean;
-  /**
-   * Filter previews replace committed pixels at layer-local output bounds through the layer transform without document
-   * mutation. Null/absence means none.
-   */
+  /** Layer-local output bounds, drawn through the layer transform. */
   layerPreviews?: ReadonlyMap<string, { surface: RasterSurface; rect: Rect }> | null;
-  /** Isolate one leaf and suppress staged/filter previews; disabled or hidden leaves remain undrawn. */
+  /** Also suppresses staged and filter previews. */
   isolationLayerId?: string | null;
-  /** Overlay stacks the screen draws; absence draws all. An isolated target draws whatever its stack. */
+  /** Absent draws all; an isolated target draws whatever its stack. */
   showOverlayStacks?: Readonly<Record<OverlayStackKind, boolean>>;
-  /**
-   * Memoized adjusted raster surface, or null for raw pixels. Optional provider; without it adjustments are ignored.
-   * Cache versions prevent per-frame recomputation.
-   */
+  /** Null for raw pixels; without a provider adjustments are ignored. */
   adjustedSurface?: ((layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null) | null;
-  /** Shared memoized surfaces for mask and control display effects. */
   derivedSurfaces?: DerivedSurfaceCache | null;
-  /**
-   * Draw floating pixels immediately above their cut source layer with its opacity/blend. Surface, rect and float
-   * matrix are layer-local and compose with the layer transform.
-   */
+  /** Layer-local, composed with the layer transform. */
   floatingSelection?: { layerId: string; surface: RasterSurface; rect: Rect; matrix: Mat2d } | null;
-  /**
-   * Display-only control layer view: the kept original (layer-local through `matrix`, at the layer's opacity and blend)
-   * in place of the map, or under the map at {@link CONTROL_OVERLAY_MAP_ALPHA}. Suppressed under isolation.
-   */
+  /** Suppressed under isolation. */
   controlView?: {
     layerId: string;
     view: 'original' | 'overlay';
@@ -135,17 +90,10 @@ export interface CompositeOptions {
     rect: Rect;
     matrix: Mat2d;
   } | null;
-  /** Optional deterministic render counters; omitted in the normal zero-overhead path. */
   diagnostics?: CanvasDiagnostics | null;
-  /**
-   * Reused frame description from {@link prepareComposite}; ignored unless it was prepared for this document,
-   * isolation, overlay stacks, grouping and transform overrides.
-   */
+  /** Ignored unless prepared for this document, isolation, overlay stacks, grouping and overrides. */
   preparation?: CompositePreparation | null;
-  /**
-   * An isolated group's document-space composite (stack applied), `null` when it has no drawable content. Filter
-   * previews and the float of its members draw inside it. Absent ⇒ members draw flat.
-   */
+  /** `null` without drawable content; absent draws members flat. */
   groupSurface?:
     | ((
         scope: GroupCompositeScope,
@@ -158,7 +106,6 @@ export interface CompositeOptions {
 
 type Ctx = RasterSurface['ctx'];
 
-/** Maps a document blend mode to the canvas `globalCompositeOperation`. Also used by `colorSample.ts`. */
 export const blendToComposite = (mode: CanvasBlendMode): GlobalCompositeOperation =>
   mode === 'normal' ? 'source-over' : (mode as GlobalCompositeOperation);
 
@@ -167,7 +114,7 @@ const isIsolated = (opts: CompositeOptions): boolean =>
 
 type TransformOverrides = NonNullable<CompositeOptions['transformOverrides']>;
 
-/** A stable key for override contents; engines mutate one map in place, so identity cannot tell revisions apart. */
+/** Engines mutate one map in place, so identity cannot tell revisions apart. */
 export const transformOverridesKey = (overrides: TransformOverrides | null | undefined): string => {
   if (!overrides || overrides.size === 0) {
     return '';
@@ -179,17 +126,12 @@ export const transformOverridesKey = (overrides: TransformOverrides | null | und
   return key;
 };
 
-/** A stable key for the overlay stack switches; absence shows every stack. */
 const overlayStacksKey = (shown: CompositeOptions['showOverlayStacks']): string => {
   const stacks = shown ?? ALL_OVERLAY_STACKS_SHOWN;
   return `${+stacks.control}${+stacks.inpaint_mask}${+stacks.regional_guidance}`;
 };
 
-/**
- * One frame description: the leaves drawn (bottom first), their effective matrices with overrides applied, the isolated
- * group scopes, and optionally each leaf's document-space bounds this frame. Stable while the document, isolation,
- * overlay stacks, grouping and override contents are, so frame demand, compositing and sampling share it.
- */
+/** Stable while document, isolation, overlay stacks, grouping and overrides are, so callers share it. */
 export interface CompositePreparation {
   readonly document: CanvasDocumentContractV3;
   readonly isolationLayerId: string | null;
@@ -199,7 +141,7 @@ export interface CompositePreparation {
   readonly leaves: readonly SemanticLeaf[];
   readonly matrices: readonly Mat2d[];
   readonly scopes: readonly GroupCompositeScope[];
-  /** Document-space bounds a leaf's pixels can cover this frame (a superset is safe); null bounds draw nothing. */
+  /** A superset is safe; null draws nothing. */
   readonly bounds?: readonly (Rect | null)[];
 }
 
@@ -217,18 +159,16 @@ const effectiveMatrix = (leaf: SemanticLeaf, overrides: TransformOverrides | nul
   );
 };
 
-/** Plans the draw order, placement and isolated group scopes for `doc`, for callers compositing it repeatedly. */
 export const prepareComposite = (
   doc: CanvasDocumentContractV3,
   opts: Pick<CompositeOptions, 'groupSurface' | 'isolationLayerId' | 'showOverlayStacks' | 'transformOverrides'> = {}
 ): CompositePreparation => {
   const isolationLayerId = opts.isolationLayerId ?? null;
-  // The plan lists the leaves to draw bottom first; the `stagedPreview` lands above the raster stack.
   const { leaves } = planScreenComposition(compileDocumentLeaves(doc), {
     isolationLayerId,
     showOverlayStacks: opts.showOverlayStacks ?? ALL_OVERLAY_STACKS_SHOWN,
   });
-  // Isolation mode inspects raw members, so scopes are bypassed while active.
+  // Isolation inspects raw members, so scopes are bypassed.
   const grouped = !!opts.groupSurface && isolationLayerId === null;
   const scopes = grouped ? planGroupCompositeScopes(leaves, collectCompositedGroups(doc)) : [];
   const overrides = opts.transformOverrides ?? null;
@@ -256,7 +196,6 @@ const isPreparedFor = (
   preparation.grouped === (!!opts.groupSurface && !isIsolated(opts)) &&
   preparation.overridesKey === transformOverridesKey(opts.transformOverrides);
 
-/** Reuses `previous` while it still describes `doc` under these options, else prepares a new description. */
 export const reusePreparation = (
   previous: CompositePreparation | null | undefined,
   doc: CanvasDocumentContractV3,
@@ -271,7 +210,6 @@ const identityTransform = (ctx: Ctx): void => {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 };
 
-/** Build a reusable 2x2 checker tile through {@link RasterBackend}; frames use patterns instead of per-cell fills. */
 export const createCheckerboardTile = (
   backend: RasterBackend,
   colors: CheckerColors = DEFAULT_CHECKER_COLORS,
@@ -282,7 +220,6 @@ export const createCheckerboardTile = (
   const ctx = tile.ctx;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, size, size);
-  // Base color across the whole tile, then the alternating cells on the diagonal.
   ctx.fillStyle = colors.a;
   ctx.fillRect(0, 0, size, size);
   ctx.fillStyle = colors.b;
@@ -291,13 +228,9 @@ export const createCheckerboardTile = (
   return tile;
 };
 
-/**
- * Fill the unbounded viewport, ignoring document background. Identity-transform placement fixes checker cell
- * size/origin during pan and zoom. Without a tile, the cleared target reveals widget background.
- */
+/** Identity-transform placement fixes checker cell size and origin during pan and zoom. */
 const drawBackground = (ctx: Ctx, tile: RasterSurface | null, bounds: Rect): void => {
   if (!tile) {
-    // Checkerboard disabled: leave the cleared surface showing `bg.inset`.
     return;
   }
   const pattern = ctx.createPattern(tile.canvas, 'repeat');
@@ -310,10 +243,7 @@ const drawBackground = (ctx: Ctx, tile: RasterSurface | null, bounds: Rect): voi
 
 type ScreenDamage = { kind: 'full' } | { kind: 'none' } | { kind: 'rect'; rect: Rect };
 
-/**
- * Transform local damage by view*layerMatrix into screen bounds, rounded outward with a one-pixel pad for antialiased
- * seams. Unknown layers or non-finite geometry repaint everything; regions off the target repaint nothing.
- */
+/** Rounded outward with a one-pixel pad for antialiased seams; unknown layers repaint everything. */
 const resolveDamage = (
   plan: CompositePreparation,
   view: Mat2d,
@@ -346,7 +276,7 @@ const resolveDamage = (
     x: accumulated.x - 1,
     y: accumulated.y - 1,
   });
-  // A degenerate matrix yields NaN, which compares false against every bound; widen rather than skip drawing.
+  // A degenerate matrix yields NaN, which compares false against every bound; widen rather than skip.
   if (![grown.x, grown.y, grown.width, grown.height].every(Number.isFinite)) {
     return { kind: 'full' };
   }
@@ -359,7 +289,6 @@ const isMaskLayer = (
 ): layer is Extract<CanvasLayerContract, { type: 'regional_guidance' | 'inpaint_mask' }> =>
   layer.type === 'regional_guidance' || layer.type === 'inpaint_mask';
 
-/** Colorize mask alpha with fill/pattern on a source-in intermediate, then draw with the current layer transform. */
 const drawMaskLayer = (
   ctx: Ctx,
   layer: Extract<CanvasLayerContract, { type: 'regional_guidance' | 'inpaint_mask' }>,
@@ -380,7 +309,7 @@ const drawMaskLayer = (
         sourceVersion,
       })
     : colorizeMask(opts.backend, surface, surface.width, surface.height, fill, tile);
-  // Draw at local content origin; the outer context already applies layer opacity.
+  // The outer context already applies layer opacity.
   ctx.drawImage(colorized.canvas, origin.x, origin.y);
 };
 
@@ -399,13 +328,9 @@ const drawCachedLayer = (
   ctx.globalCompositeOperation = blendToComposite(layer.blendMode);
   setTransformFromMat(ctx, multiply(view, matrix));
 
-  // The cache surface holds pixels for `entry.rect` in layer-local space; draw it at that local origin (offset
-  // paint/mask layers place their content off-zero).
   const origin = { x: entry.rect.x, y: entry.rect.y };
   const preview = isIsolated(opts) ? null : (opts.layerPreviews?.get(layer.id) ?? null);
   if (preview) {
-    // Draw the full filter output at its local rect with the same control-transparency display effect as committed
-    // pixels.
     const displayPreview =
       layer.type === 'control' && layer.withTransparencyEffect
         ? opts.derivedSurfaces
@@ -443,8 +368,6 @@ const drawCachedLayer = (
       : renderControlTransparency(opts.backend, entry.surface, entry.surface.width, entry.surface.height);
     ctx.drawImage(effect.canvas, origin.x, origin.y);
   } else {
-    // Version-keyed adjusted surfaces refresh stroke damage on each cache write and reuse idle frames. Without
-    // adjustments/provider, draw raw cache pixels.
     const adjusted = layer.type === 'raster' && opts.adjustedSurface ? opts.adjustedSurface(layer, entry) : null;
     ctx.drawImage((adjusted ?? entry.surface).canvas, origin.x, origin.y);
   }
@@ -456,10 +379,6 @@ const drawCachedLayer = (
   ctx.restore();
 };
 
-/**
- * Colorize the raster layer's own alpha above it as a regenerate overlay; strokes, erasure and transforms update
- * coverage without separate pixel persistence.
- */
 const drawRegionCoverage = (
   ctx: Ctx,
   layerId: string,
@@ -492,11 +411,7 @@ const drawRegionCoverage = (
   ctx.drawImage(colorized.canvas, coverage.rect.x, coverage.rect.y);
 };
 
-/**
- * Draws layer-local pixels that are not the layer's cache (a floating selection, a control layer's original) with the
- * layer's opacity and blend. They go through the layer's (possibly overridden) matrix and then their own, never
- * resampled into document space and back.
- */
+/** Drawn through the layer matrix then their own, never resampled into document space and back. */
 const drawLayerLocalSurface = (
   ctx: Ctx,
   leaf: SemanticLeaf,
@@ -513,7 +428,6 @@ const drawLayerLocalSurface = (
   ctx.restore();
 };
 
-/** `bounds` joined with where layer-local `pixels` land through the leaf's matrix. */
 const unionLanding = (
   bounds: Rect | null,
   matrix: Mat2d,
@@ -529,10 +443,6 @@ const unionLanding = (
 const controlViewOf = (leaf: SemanticLeaf, opts: CompositeOptions): CompositeOptions['controlView'] =>
   !isIsolated(opts) && leaf.layer.type === 'control' && opts.controlView?.layerId === leaf.id ? opts.controlView : null;
 
-/**
- * Document-space bounds a leaf can cover this frame: committed pixels joined with its preview, float and shown control
- * original.
- */
 const leafBounds = (leaf: SemanticLeaf, matrix: Mat2d, committed: Rect | null, opts: CompositeOptions): Rect | null => {
   const preview = isIsolated(opts) ? null : (opts.layerPreviews?.get(leaf.id) ?? null);
   let bounds = committed;
@@ -544,7 +454,7 @@ const leafBounds = (leaf: SemanticLeaf, matrix: Mat2d, committed: Rect | null, o
   return unionLanding(unionLanding(bounds, matrix, float), matrix, controlViewOf(leaf, opts));
 };
 
-/** Whether document-space `bounds` reach the screen region; non-finite geometry counts as visible. */
+/** Non-finite geometry counts as visible. */
 const reaches = (bounds: Rect | null, view: Mat2d, region: Rect): boolean => {
   if (!bounds) {
     return false;
@@ -574,10 +484,10 @@ export const compositeDocument = (
   const repaint = damage.kind === 'rect' ? damage.rect : targetRect;
 
   ctx.save();
-  // Set smoothing once under the outer save; nested layer restores preserve it.
+  // Nested layer restores preserve it.
   ctx.imageSmoothingEnabled = opts.imageSmoothing ?? true;
 
-  // Clear and checker-fill the repaint region, clipping every draw to it. Unchanged pixels keep the previous frame.
+  // Unchanged pixels outside the repaint region keep the previous frame.
   identityTransform(ctx);
   if (damage.kind === 'rect') {
     ctx.beginPath();
@@ -598,7 +508,7 @@ export const compositeDocument = (
   };
   applyClipRect();
 
-  // The staged preview lands once, unclipped, before the first overlay-stack leaf (or after every leaf).
+  // Lands once, unclipped, before the first overlay-stack leaf (or after every leaf).
   const staged = isIsolated(opts) ? null : (opts.stagedPreview ?? null);
   let stagedPending = staged !== null;
   const drawStaged = (): void => {
@@ -641,7 +551,6 @@ export const compositeDocument = (
     }
     const matrix = matrices[index]!;
     const entry = caches.get(leaf.id);
-    // The original replaces the map, or lies under it in the Overlay view; it shows even when there is no map.
     const controlView = controlViewOf(leaf, opts);
     if (controlView) {
       drawLayerLocalSurface(ctx, leaf, matrix, view, controlView);
@@ -695,8 +604,7 @@ export const compositeDocument = (
         ctx.restore();
         opts.diagnostics?.increment('layersDrawn');
       }
-      // Region overlays are display-only, so they ride ABOVE the group composite rather than being baked into (and
-      // staled with) its memo.
+      // Display-only, so drawn above the group composite rather than baked into its memo.
       for (let member = scope.start; opts.regionOverlays && member < scope.end; member += 1) {
         const { layer } = leaves[member]!;
         if (

@@ -92,10 +92,7 @@ export const eventToHotkeyString = (event: KeyboardEvent, isMacOs = IS_MAC_OS): 
     modifiers.push('alt');
   }
 
-  // A key is recorded as typed, so the binding keeps its meaning on any layout. Only a chord the matching falls back to
-  // position for (Alt with Cmd, Ctrl or Meta) records a dead key or symbol by its position: there macOS's Option
-  // reports `Dead` or `˜` for N. Option alone keeps the typed character (`alt+å`), as it matches only by character.
-  // AltGr typed a character of the layout (`ń`): that character is the binding, as matching refuses position under it.
+  // A key is recorded as typed, so the binding keeps its meaning on any layout.
   const fallsBackToPosition =
     event.altKey &&
     modifiers.some((modifier) => modifier !== 'shift' && modifier !== 'alt') &&
@@ -107,11 +104,7 @@ export const eventToHotkeyString = (event: KeyboardEvent, isMacOs = IS_MAC_OS): 
   return normalizeHotkeyString([...modifiers, key].join('+'));
 };
 
-/**
- * Whether a binding may also match its letter or digit by position: an Alt chord with Cmd, Ctrl or Meta, which types no
- * character. macOS's Option still changes the key such a chord reports (`Dead`, `˜`), so `mod+alt+n` would never fire
- * by character. An Alt chord alone keeps to the character, so Option+A still types `å` in a text field.
- */
+/** Alt chords with Cmd/Ctrl/Meta type no character, so they match by position (macOS Option alters `key`). */
 const hasPositionFallback = (parts: readonly string[]): boolean => {
   const key = parts.at(-1) ?? '';
 
@@ -140,12 +133,7 @@ export const toTinykeysBinding = (hotkey: string): string => {
     .join('+');
 };
 
-/**
- * The checks a press must pass beyond the tinykeys match, for a binding matched by its key's position: the press must
- * have typed no Latin character, so a non-QWERTY layout's letters keep their meaning; and it must not hold AltGr, which
- * some layouts need to type a character at that position (`ń`). Every other match stands as tinykeys made it, including
- * its reading of AltGr as Alt (browsers report AltGr for Ctrl+Alt on those layouts).
- */
+/** A positional match also requires no typed Latin character and no AltGr, so other layouts keep their letters. */
 export const acceptsHotkeyPress = (event: KeyboardEvent, hotkey: string): boolean => {
   const parts = normalizeHotkeyString(hotkey).split('+').filter(Boolean);
   const key = parts.at(-1) ?? '';
@@ -159,10 +147,7 @@ export const acceptsHotkeyPress = (event: KeyboardEvent, hotkey: string): boolea
   );
 };
 
-/**
- * Whether a press is this binding, matched exactly as the hotkey runtime's tinykeys listener matches it, so a local
- * handler and the window runtime agree on every press.
- */
+/** Matches exactly as the runtime's tinykeys listener does, so local handlers and the runtime agree. */
 export const isHotkeyPress = (event: KeyboardEvent, hotkey: string): boolean => {
   const binding = toTinykeysBinding(hotkey);
   const [press] = binding ? parseKeybinding(binding) : [];
@@ -238,7 +223,6 @@ const ARIA_KEY_LABELS: Record<string, string> = {
   shift: 'Shift',
 };
 
-/** A binding in `aria-keyshortcuts` syntax. */
 export const formatHotkeyAriaLabel = (hotkey: string, isMacOs: boolean = IS_MAC_OS): string =>
   formatHotkeyForPlatform(hotkey, isMacOs)
     .map((part) => ARIA_KEY_LABELS[part] ?? (part.length === 1 ? part.toUpperCase() : part))
@@ -281,13 +265,7 @@ const ACTIVATABLE_CONTROL_SELECTOR = [
   '[role="tab"]',
 ].join(', ');
 
-/**
- * Whether a press is the focused control's own: a radio group's or slider's navigation (arrows, Home, End), or the
- * Space or Enter that activates a focused button, link, toggle or tab, all without Ctrl, Meta or Alt. These controls
- * take no typed text, so {@link isEditableHotkeyTarget} lets chords through from them, but a plain shortcut on the same
- * key (Gallery's arrow navigation, the workflow editor's Space for Add node) would prevent the default and freeze or
- * skip the control.
- */
+/** A focused radio, slider, button, link, toggle or tab owns its unmodified navigation and activation keys. */
 export const isNativeControlKeyPress = (event: KeyboardEvent): boolean =>
   !event.ctrlKey &&
   !event.metaKey &&

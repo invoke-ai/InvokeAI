@@ -11,10 +11,6 @@ import fuzzysort from 'fuzzysort';
 
 import { getPaletteContributionKey } from './contributionKey';
 
-/**
- * Normalize sources to PaletteEntry; rank fuzzily within fixed sections so command/settings placement remains stable.
- */
-
 export interface PaletteStageOption {
   id: string;
   label: string;
@@ -90,10 +86,7 @@ export interface PaletteSearchProvider {
   /** Immutable snapshot of every host value that can affect search results. */
   contextKey: string;
   label: string;
-  /**
-   * Provider filters by created-at date range. Date-less providers are skipped entirely for pure-date queries (empty
-   * text + range), where they could only return broad unfiltered results.
-   */
+  /** Provider filters by created-at date range. */
   supportsCreatedAtRange?: boolean;
   /** Searches only once the user scopes into it; root mode offers just its scope row. For costly searches. */
   scopedOnly?: boolean;
@@ -268,11 +261,7 @@ export const getEntryKeys = (
   return keys[0] ? formatHotkey(keys[0]) : undefined;
 };
 
-/**
- * The catalog commands that open one widget. The palette offers each widget once, as a widget entry (see
- * `buildWidgetEntries`) that keeps the command's id and key; the Workflow editor's command stays a command, since it
- * opens the editor in the center rather than the widget wherever it is.
- */
+/** The catalog commands that open one widget. */
 export const WIDGET_OPEN_COMMANDS: Readonly<Record<string, string>> = {
   'app.selectCanvasTab': 'canvas',
   'app.selectGenerateTab': 'generate',
@@ -294,10 +283,7 @@ export const buildCatalogCommandEntries = ({
   customHotkeys: CustomHotkeys;
   execute: (commandId: string) => unknown;
   formatHotkey: (key: string) => string[];
-  /**
-   * Whether a command has a handler now. The catalog mirrors widget keys a widget registers only in some states
-   * (Preview's item arrows and zoom); an entry with nothing to run is left out.
-   */
+  /** Whether a command has a handler now. */
   isHandled?: (commandId: string) => boolean;
   presentWidgetTypeIds: ReadonlySet<string>;
   t: TFunction;
@@ -341,10 +327,7 @@ export const buildCatalogCommandEntries = ({
       };
     });
 
-/**
- * One entry per widget the layout can show, so a widget removed from every rail is never lost: running it brings the
- * widget forward where the layout has it, else opens it.
- */
+/** One entry per widget the layout can show, so a widget removed from every rail is never lost. */
 export const buildWidgetEntries = ({
   catalog,
   customHotkeys,
@@ -594,10 +577,7 @@ const buildEmptyStateRows = (
   return [...rows, ...toGroupedRows(launcher)];
 };
 
-/**
- * Empty queries show recents/navigation. Otherwise rank title/keywords/down-weighted subtitle within fixed sections,
- * breaking ties by recency then title.
- */
+/** Empty queries show recents/navigation. */
 export const searchPaletteRows = (
   entries: readonly PaletteEntry[],
   query: string,
@@ -691,10 +671,7 @@ export interface ProviderResultSection {
   retry: () => void;
 }
 
-/**
- * Entity sections render below local sections as each provider resolves. Empty non-fetching sections drop silently in
- * root mode; `cap` bounds root mode to a teaser (depth lives behind the scope), null means uncapped.
- */
+/** Entity sections render below local sections as each provider resolves. */
 export const buildProviderSectionRows = (
   sections: readonly ProviderResultSection[],
   cap: number | null = PROVIDER_ROOT_RESULT_CAP,

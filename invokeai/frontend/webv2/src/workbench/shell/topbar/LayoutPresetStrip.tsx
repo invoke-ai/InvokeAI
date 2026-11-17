@@ -559,8 +559,7 @@ const PresetTab = ({
 
 const MENU_AFFORDANCE_HOVER_PROPS = { bg: 'bg.hover', color: 'fg' } as const;
 
-// A pointed inactive preset takes the shared tinted hover; the active one keeps the widget rail's active fill. Each
-// fill also names the tab's surface, which the unsaved dot rings itself with to stand clear of the icon.
+// A pointed inactive preset takes the shared tinted hover; the active one keeps the widget rail's active fill.
 const PRESET_TAB_SURFACE = '--preset-tab-surface';
 const PRESET_TAB_CSS = { [PRESET_TAB_SURFACE]: '{colors.bg.subtle}' } as const;
 const PRESET_TAB_HOVER_PROPS = {
@@ -573,10 +572,7 @@ const PRESET_TAB_SELECTED_PROPS = {
 } as const;
 const UNSAVED_DOT_CSS = { boxShadow: `0 0 0 1.5px var(${PRESET_TAB_SURFACE})` } as const;
 
-/**
- * The strip's one tip, describing the tab it is on: the preset's name and shortcut, what a built-in is for while it is
- * still the built-in (not renamed), and the unsaved state its dot marks. The shared tooltip reports which tab that is.
- */
+/** The strip's single tip for the tab it is on: name, shortcut, built-in purpose and unsaved state. */
 const PresetTipContent = ({
   hasTip,
   isUnsaved,

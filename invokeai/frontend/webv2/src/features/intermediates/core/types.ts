@@ -108,7 +108,6 @@ export type IntermediatesAffectedDocumentKind =
 
 export interface IntermediatesAffectedDocument {
   kind: IntermediatesAffectedDocumentKind;
-  /** The document's owner. */
   userId: string;
   userDisplayName: string | null;
   userEmail: string | null;

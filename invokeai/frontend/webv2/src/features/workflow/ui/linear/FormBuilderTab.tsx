@@ -294,7 +294,6 @@ const ContainerDropZoneBase = ({ container, isEmpty }: { container: ContainerFor
 
 const ContainerDropZone = memo(ContainerDropZoneBase);
 
-/** The shared description popover, bound through the form element. */
 /** Seed fields own a dice already; other numeric fields opt into one per form element. */
 const ShuffleToggleAction = ({
   element,

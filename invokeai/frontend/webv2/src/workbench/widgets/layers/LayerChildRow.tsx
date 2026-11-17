@@ -85,10 +85,7 @@ interface LayerChildRowProps {
   selected: boolean;
 }
 
-/**
- * Modifier child rows share tree focus and route Properties; toggle/Delete edit them, while drops land below their
- * owning layer.
- */
+/** Modifier rows share tree focus; drops land below their owning layer. */
 const LayerChildRowComponent = ({
   ariaSetSize,
   child,

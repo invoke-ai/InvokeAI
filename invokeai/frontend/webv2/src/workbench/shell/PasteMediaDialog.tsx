@@ -94,9 +94,7 @@ const CanvasDestinationButton = ({
   );
 };
 
-/**
- * Upload pasted media to the current board before forwarding it to canvas/reference actions so assets remain findable.
- */
+/** Uploads pasted media to the current board first so assets stay findable. */
 export const PasteMediaDialog = ({
   isOpen,
   onExitComplete,
@@ -124,10 +122,7 @@ export const PasteMediaDialog = ({
       })
     ).data
   );
-  // Uploads land where generation results do: the auto-add board — never a date bucket, which cannot hold items. Judged
-  // from the listing of every readable board, observed while this short-lived dialog is open so the label follows it as
-  // it arrives; the upload action ensures the same listing as the paste is chosen (sharing this read) and reads the
-  // getter after, so an archived or revoked board is decided from a listing, not for want of one.
+  // Uploads land where generation results do: the auto-add board — never a date bucket, which cannot hold items.
   useQuery(galleryBoardsOptions({ includeArchived: true }));
   const queryClient = useQueryClient();
   const getDestinationBoardId = useCallback(

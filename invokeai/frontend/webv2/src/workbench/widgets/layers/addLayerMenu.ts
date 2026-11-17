@@ -1,8 +1,3 @@
-/**
- * Share React-free add-layer grouping/gating; headers use {@link ADD_LAYER_MENU}, stack buttons use {@link
- * stackAddItemId}.
- */
-
 import type { LayerStackKind } from '@workbench/canvas-engine/api';
 
 import { canAddRegionalReferenceImage } from './layerOps';
@@ -22,7 +17,6 @@ export interface AddLayerMenuItem {
   labelKey: string;
 }
 
-/** A titled group of add-layer menu entries. */
 export interface AddLayerMenuGroup {
   titleKey: string;
   items: AddLayerMenuItem[];
@@ -47,7 +41,6 @@ export const ADD_LAYER_MENU: readonly AddLayerMenuGroup[] = [
   },
 ];
 
-/** Whether an add action is supported by the selected model base. */
 export const isAddLayerItemAvailable = (id: AddLayerItemId, base: string | null): boolean =>
   id !== 'regional_reference_image' || canAddRegionalReferenceImage(base);
 

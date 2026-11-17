@@ -86,9 +86,7 @@ export const QueueCluster = () => {
   const isCancellable = !cancelCurrent?.disabled;
   const [lastCancellable, setLastCancellable] = useState(isCancellable);
 
-  // Hover is tracked only while the "x" is enabled, so the shift gesture cannot arm a button that does nothing. It
-  // turns disabled under a resting pointer when the running job finishes, and that pointer's leave goes unhandled;
-  // reset the gesture state with it.
+  // Hover is tracked only while the "x" is enabled, so the shift gesture cannot arm a button that does nothing.
   if (isCancellable !== lastCancellable) {
     setLastCancellable(isCancellable);
 
@@ -195,9 +193,8 @@ export const QueueCluster = () => {
             </IconButton>
           </Tooltip>
         ) : null}
-        {/* Shift over the hovered button swaps it to cancel-all live; pointer
-            events alone cannot see a bare shift press, so watch the keyboard
-            only while hovered. */}
+        {/* Shift over the hovered button swaps it to cancel-all live; pointer events alone cannot see a bare shift
+            press, so watch the keyboard only while hovered. */}
         {isCancelHovered ? <ShiftKeyWatcher onChange={setIsShiftHeld} /> : null}
 
         <Menu.Trigger asChild>

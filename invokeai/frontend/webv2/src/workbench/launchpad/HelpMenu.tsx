@@ -72,8 +72,7 @@ export const HelpMenu = ({ compact = false }: { compact?: boolean }) => {
   const { t } = useTranslation();
   const ids = useTooltipTriggerIds();
   const queryClient = useQueryClient();
-  // Rendered only once loaded: a lazy() boundary would suspend on open and React delays its reveal, shifting rows. A
-  // chunk that fails to load (e.g. after an upgrade) leaves the optional link absent.
+  // Rendered only once loaded: a lazy() boundary would suspend on open and React delays its reveal, shifting rows.
   const [DonationMenuItem, setDonationMenuItem] = useState<ComponentType | null>(null);
   const preloadDonationMenuItem = useCallback(() => {
     void loadDonationMenuItem().then(

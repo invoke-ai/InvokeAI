@@ -42,9 +42,6 @@ const selectSelectedNode = (project: {
   canvas: { document: Pick<CanvasDocumentContractV3, 'stacks' | 'selectedLayerId'> };
 }): CanvasNodeContract | null => getDocumentNode(project.canvas.document, project.canvas.document.selectedLayerId);
 
-/**
- * Render selected-layer editors here; blend/opacity remain in LayerBlendRow and all edits retain their document seams.
- */
 export const LayerSection = ({ disabled }: { disabled: boolean }) => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
@@ -146,7 +143,6 @@ const ChildEditor = ({
   return null;
 };
 
-/** Dispatches to the correct per-type settings block for the layer. */
 const LayerTypeSettings = ({
   documentRevision,
   engine,

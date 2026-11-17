@@ -96,7 +96,6 @@ const nextBboxFor = (
   });
 };
 
-/** Creates a fresh bbox tool with its own gesture state. */
 export const createBboxTool = (): Tool => {
   let state: GestureState | null = null;
   let hoverTarget: BboxTarget | null = null;
@@ -147,7 +146,6 @@ export const createBboxTool = (): Tool => {
     },
     onPointerMove: (ctx, input) => {
       if (!state) {
-        // Idle hover: reflect the handle/interior under the pointer in the cursor.
         const doc = ctx.getDocument();
         const target = doc ? bboxTargetAt(bboxToScreen(ctx, doc.bbox), input.screenPoint) : null;
         if (target !== hoverTarget) {
@@ -182,7 +180,6 @@ export const createBboxTool = (): Tool => {
 
       const next = roundBbox(nextBboxFor(ctx, current, input.documentPoint, input.modifiers));
       if (bboxEquals(next, current.startBbox)) {
-        // Zero-delta gesture: nothing to commit.
         clearPreview(ctx);
         return;
       }

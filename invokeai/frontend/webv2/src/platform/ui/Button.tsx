@@ -148,7 +148,6 @@ export const IconButton = ({
   );
 };
 
-/** Dismissal chrome is muted. */
 export const CloseButton = (props: CloseButtonProps) => <ChakraCloseButton color="fg.muted" {...props} />;
 
 export interface ToggleIconButtonProps extends Omit<

@@ -27,7 +27,6 @@ const renderDefaultItem = <T extends CollectionItem>(item: T): ReactNode => {
   return labelledItem.label ?? labelledItem.value;
 };
 
-/** Consecutive same-group runs, keeping the collection's flat order and indices. */
 const partitionByGroup = <T,>(
   items: readonly T[],
   groupBy: (item: T) => string
@@ -45,11 +44,7 @@ const partitionByGroup = <T,>(
   return runs;
 };
 
-/**
- * With the chevron in the trigger's flow (an inside label, or a trigger sized to its value) the value fills the room
- * left before it, end-aligned and truncating on one line; rich value text (an icon and a name) aligns as one inline box
- * that can still shrink.
- */
+/** With the chevron in flow, the value fills the room before it, end-aligned and truncating on one line. */
 const IN_FLOW_VALUE_TEXT_CSS = {
   display: 'block',
   flex: '1',
@@ -65,7 +60,6 @@ const IN_FLOW_VALUE_TEXT_CSS = {
 /** The trigger already dims when disabled; the chevron inside it keeps its resting colour rather than dimming twice. */
 const IN_TRIGGER_INDICATOR_CSS = { _disabled: { color: 'fg.muted' } } as const;
 
-/** Fits the anchor's available space with the same headroom the settings selects use. */
 const DEFAULT_ITEMS_MAX_H = 'min(20rem, calc(var(--available-height) - 0.5rem))';
 
 export interface SelectProps<T extends CollectionItem> extends Omit<SelectRootProps<T>, 'children'> {
@@ -74,18 +68,12 @@ export interface SelectProps<T extends CollectionItem> extends Omit<SelectRootPr
   itemsMaxH?: string | null;
   /** Only consecutive equal keys form a group; callers must order items by group. */
   groupBy?: (item: T) => string;
-  /**
-   * The visible header for a group key; defaults to the key itself. `null` renders the group without a header, under a
-   * divider unless it opens the list.
-   */
+  /** Defaults to the key; `null` renders the group without a header, under a divider unless it opens the list. */
   renderGroupLabel?: (group: string) => ReactNode;
   getItemKey?: (item: T, index: number) => Key;
   indicatorGroupProps?: SelectIndicatorGroupProps;
   itemIndicator?: boolean;
-  /**
-   * Sizes the select to its value instead of its container's width, for a select trailing its label in a row; cap it
-   * with `maxW`. The chevron joins the trigger's flow, so a truncated value stops before it.
-   */
+  /** Sizes to its value instead of the container (cap with `maxW`); the chevron joins the trigger's flow. */
   fitContent?: boolean;
   portalled?: boolean;
   positionerProps?: SelectPositionerProps;
@@ -95,7 +83,6 @@ export interface SelectProps<T extends CollectionItem> extends Omit<SelectRootPr
   valueTextProps?: SelectValueTextProps;
 }
 
-/** Workbench Select: Chakra's custom Select with the standard trigger, portal, and item markup pre-wired. */
 export const Select = <T extends CollectionItem>({
   'aria-label': ariaLabel,
   collection,
@@ -118,8 +105,7 @@ export const Select = <T extends CollectionItem>({
   // Inside Field, reuse its label ID; rendering another Label would duplicate it.
   const field = useFieldContext();
   const insideLabel = useInsideFieldLabel();
-  // An inside label or a content-sized trigger keeps the chevron in the trigger's flow, so the value truncates before
-  // it (or the trigger grows to hold it) instead of running under it.
+  // The chevron stays in the trigger's flow so the value truncates before it instead of running under it.
   const isIndicatorInTrigger = insideLabel !== null || fitContent;
   // Zag names the trigger by the field's label but leaves its help and error text to the hidden select.
   const fieldControlProps = field?.getInputProps();
@@ -146,8 +132,7 @@ export const Select = <T extends CollectionItem>({
       unmountOnExit
       w={fitContent ? 'auto' : undefined}
       {...rootProps}
-      // An empty list is nothing to choose from: the trigger disables instead of opening a blank menu. An explicit prop
-      // would otherwise override the enclosing Field's disabled state.
+      // An empty list disables the trigger; an explicit prop would otherwise override the Field's disabled state.
       disabled={rootProps.disabled || field?.disabled || collection.items.length === 0}
     >
       {/* Materialize the trigger's aria-labelledby target; aria-label on Root would name a generic div instead. */}
@@ -184,8 +169,7 @@ export const Select = <T extends CollectionItem>({
                         {itemIndicator ? <ChakraSelect.ItemIndicator /> : null}
                       </ChakraSelect.Item>
                     ));
-                    // A header-less group is not a labelled listbox group: its options follow a divider, which stays
-                    // out of the accessibility tree because a listbox owns only options and groups.
+                    // A header-less group's divider stays out of the a11y tree: a listbox owns only options and groups.
                     return label === null ? (
                       <Fragment key={group}>
                         {startIndex > 0 ? <Separator aria-hidden borderColor="border.subtle" mx="-1" my="1" /> : null}
@@ -212,7 +196,6 @@ export const Select = <T extends CollectionItem>({
   );
 };
 
-/** Items pass through untouched unless a max height asks for a scroll viewport. */
 const SelectItems = ({
   children,
   maxH,

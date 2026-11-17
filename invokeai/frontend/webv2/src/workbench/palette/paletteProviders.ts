@@ -28,10 +28,7 @@ import { getObjectIdentity } from './objectIdentity';
 
 const PROVIDER_PAGE_SIZE = 8;
 
-/**
- * Boards back two providers on every debounced keystroke; read them through the query cache (60s staleTime) instead of
- * refetching per search.
- */
+/** Boards back two providers per keystroke; read through the query cache instead of refetching. */
 const loadActiveBoards = (): Promise<GalleryBoard[]> =>
   queryClient.fetchQuery(galleryBoardsOptions({ includeArchived: false }));
 
@@ -318,8 +315,7 @@ export const createImagesProvider = (deps: ImageEntryDeps): PaletteSearchProvide
     providerKey: getPaletteContributionKey('provider', 'images'),
     supportsCreatedAtRange: true,
     search: async (query, { signal }) => {
-      // Search the explicit all-readable scope. The endpoint excludes archived and inaccessible boards; the active
-      // board list supplies display labels.
+      // Search the explicit all-readable scope.
       const [page, boards] = await Promise.all([
         listPaletteImages({
           boardId: ALL_READABLE_BOARDS_ID,
@@ -338,10 +334,7 @@ export const createImagesProvider = (deps: ImageEntryDeps): PaletteSearchProvide
   };
 };
 
-/**
- * Ranks every accessible image by meaning, unlike the gallery's search, which stays within its board. Scoped-only: each
- * search runs the server's text encoder, and cosine ranking matches any query, so root typing never triggers it.
- */
+/** Ranks images by meaning; scoped-only, since each search runs the server's text encoder. */
 export const createSemanticImagesProvider = (deps: ImageEntryDeps): PaletteSearchProvider => {
   const toEntries = createImageEntryMapper(deps);
 

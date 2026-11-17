@@ -85,7 +85,6 @@ const predictRefusal = (ctx: ToolContext): CanvasLayerEditRefusal | null => {
   return status ? { layerId: selected.id, layerName: selected.name, status } : null;
 };
 
-/** Creates a fresh gradient tool with its own gesture state. */
 export const createGradientTool = (): Tool => {
   let state: GestureState | null = null;
 
@@ -193,8 +192,7 @@ export const createGradientTool = (): Tool => {
 
       // New gradients use bbox size and origin; subtract that origin to map drag coordinates locally.
       const options = ctx.stores.gradientOptions.get();
-      // The built-in FG→BG preset resolves the pair now; custom stops are
-      // explicit and independent of later pair edits.
+      // The built-in FG→BG preset resolves the pair now; custom stops are explicit and ignore later pair edits.
       const pair = ctx.stores.colorPair.get();
       const stops =
         options.preset === 'pair'

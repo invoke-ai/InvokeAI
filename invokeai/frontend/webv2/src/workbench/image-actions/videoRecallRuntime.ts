@@ -10,9 +10,8 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import type { PlaceableVideo } from './index';
 import type { PendingRecallEvent, RecallRevealContext, RecallRuntime } from './recallEventRuntime';
 
-// Through the package entry, not the modules themselves: the gallery's actions share these modules, and importing them
-// from this lazy runtime directly would split them out of the image-actions chunk into one more request on every editor
-// route.
+// Through the package entry, not the modules: the gallery's actions share them, and importing them directly from this
+// lazy runtime would split them out of the image-actions chunk into one more request on every editor route.
 import {
   appendReferenceVideo,
   applyVideoRecallMetadata,

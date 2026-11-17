@@ -66,8 +66,7 @@ export interface GalleryBoard {
   createdAt?: string | null;
   ownerName?: string | null;
   /**
-   * The project this board belongs to; null is the Library. Members are ordinary boards; only the inbox is managed
-   * through its project.
+   * The board's project; null is the Library. Members are ordinary boards; only the inbox is managed through it.
    */
   projectId: string | null;
   /** Its project's inbox: named after the project and only renamed, archived, moved or deleted through it. */
@@ -112,7 +111,6 @@ export interface GalleryImage extends GeneratedImageContract {
   hasWorkflow?: boolean;
 }
 
-/** A gallery item's recorded generation metadata, image or video. */
 export type GalleryMediaMetadata = Record<string, unknown>;
 
 export type GalleryImageMetadata = GalleryMediaMetadata;

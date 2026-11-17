@@ -27,7 +27,6 @@ import { layerMatrix } from './moveHitTest';
 const PRIMARY_BUTTON = 1;
 
 type TextSource = Extract<CanvasLayerSourceContract, { type: 'text' }>;
-/** A text-sourced raster layer. */
 type TextLayer = Extract<CanvasLayerContract, { type: 'raster' }> & { source: TextSource };
 
 const isTextLayer = (layer: CanvasLayerContract): layer is TextLayer =>

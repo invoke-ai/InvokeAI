@@ -25,10 +25,7 @@ import {
 } from './assetTransport';
 import { buildMissingMediaName, createTransferIssueLog, toMediaKey } from './transfer';
 
-/**
- * Shared materialization always remaps failed names away from existing media; loss reporting includes only live
- * references.
- */
+/** Failed names always remap away from existing media; loss reporting counts only live references. */
 
 /** Ancillary/probe failures are best-effort; operation cancellation propagates. */
 const degradeUnlessCancelled =
@@ -41,10 +38,8 @@ const degradeUnlessCancelled =
     return fallback;
   };
 
-/** One board item that now exists here, under the name this server chose for it. */
 export interface MaterializedMedia {
   kind: InvkMediaKind;
-  /** The authoritative identity this server assigned. */
   name: string;
   /** The name the exporting server used, which the document still refers to. */
   sourceName: string;
@@ -52,7 +47,6 @@ export interface MaterializedMedia {
 
 export interface MaterializeFailure {
   kind: InvkMediaKind;
-  /** The source name, so a caller can match it against the descriptor it came from. */
   name: string;
   reason: 'missing-entry' | 'upload-failed';
 }
@@ -62,27 +56,18 @@ export interface MaterializeResult {
   materialized: MaterializedMedia[];
 }
 
-/**
- * Takes every board at once, so it schedules the work across them: many small boards should not run one at a time.
- * onItemSettled fires exactly once per descriptor.
- */
+/** Takes every board at once so small boards are scheduled together; onItemSettled fires once per descriptor. */
 export type MediaMaterializer = (
   boards: readonly RestoreBoardInput[],
   onItemSettled: () => void
 ) => Promise<MaterializeResult>;
 
-/**
- * Every identity a restore created, so a failure can undo exactly what it did. Filled in as it runs, not returned at
- * the end: a restore that throws part way has still created things.
- */
+/** Filled in as the restore runs, so a restore that throws part way can still be undone. */
 export interface RestoredMediaLedger {
-  /** The staging boards these were created on: one per archive board that carried media. */
   boardIds: string[];
   boardImageNames: string[];
   boardVideoNames: string[];
-  /** A cover thumbnail uploaded as a fallback, unboarded. */
   coverImageName: string | null;
-  /** Unboarded uploads made to satisfy document-only references. */
   imageNames: string[];
   videoNames: string[];
 }
@@ -96,31 +81,22 @@ export const createRestoredMediaLedger = (boardIds: readonly string[]): Restored
   videoNames: [],
 });
 
-/** One of the source's boards and where its media lands here. */
 export interface RestoreBoardInput {
-  /** The board's contents as the source enumerated them, canonically ordered. */
   items: readonly InvkBoardItem[];
-  /** The staging board to materialize onto. */
   stagingBoardId: string;
 }
 
 export interface RestoreProjectMediaInput {
   /** The source's boards, inbox first; an item is on exactly one of them. */
   boards: readonly RestoreBoardInput[];
-  /** Bundled cover bytes, for the case where the cover's source image cannot be restored. */
   coverBytes: { bytes: Uint8Array; entryName: string } | null;
-  /** The image the document nominates as its cover, under its pre-restore name. */
   coverSourceImageName: string | null;
-  /** Live references collected from the canonical document. */
   documentRefs: readonly InvkMediaRef[];
-  /** Written as the restore runs; the caller keeps it for rollback. */
   ledger: RestoredMediaLedger;
-  /** The id the project will be created under. Placeholder names derive from it. */
   projectId: string;
 }
 
 export interface RestoreProjectMediaDeps {
-  /** Bytes for a document-only reference this server is missing, when the source carries any. */
   documentMediaBytes?: (ref: InvkMediaRef) => Uint8Array | undefined;
   findExistingImageNames?: (imageNames: readonly string[], signal?: AbortSignal) => Promise<Set<string>>;
   findExistingVideoNames?: (videoNames: readonly string[], signal?: AbortSignal) => Promise<Set<string>>;
@@ -142,9 +118,7 @@ export interface RestoreProjectMediaDeps {
 }
 
 export interface RestoreProjectMediaResult extends ProjectTransferIssues {
-  /** The image to record as this project's cover, or `null` for a project that has none. */
   coverImageName: string | null;
-  /** Old name to new name, per kind, for the document rewrite. */
   mappings: { images: Map<string, string>; videos: Map<string, string> };
 }
 
@@ -163,7 +137,6 @@ interface RestoreKindAdapter {
   upload: (bytes: Uint8Array, name: string, signal?: AbortSignal) => Promise<string>;
 }
 
-/** Reuse the restored cover source before uploading fallback bytes. */
 const resolveCoverImageName = async (input: {
   coverBytes: { bytes: Uint8Array; entryName: string } | null;
   coverSourceImageName: string | null;
@@ -195,7 +168,6 @@ const resolveCoverImageName = async (input: {
 
     return uploaded.imageName;
   } catch {
-    // Cover failure is nonfatal; fall back to a missing cover.
     return null;
   }
 };
@@ -215,12 +187,10 @@ export const restoreProjectMedia = async (
   const issues = createTransferIssueLog();
   const mappings = { images: new Map<string, string>(), videos: new Map<string, string>() };
   const documentKeys = new Set(input.documentRefs.map(toMediaKey));
-  /** Every board item in board order; an item is on one board, so this is a set. */
   const boardItems = input.boards.flatMap((board) => board.items);
   const boardKeys = new Set(boardItems.map(toMediaKey));
   /** Descriptor position, so a placeholder name does not depend on the order failures happened in. */
   const descriptorIndexes = new Map(boardItems.map((item, index) => [toMediaKey(item), index]));
-  /** Allocate unique placeholders even without descriptor positions. */
   let nextUnknownIndex = boardItems.length;
   const missingNameIndex = (key: string): number => {
     const index = descriptorIndexes.get(key);
@@ -242,7 +212,6 @@ export const restoreProjectMedia = async (
   const stagedBoards = input.boards.filter((board) => board.items.length > 0);
 
   let completed = 0;
-  // Use the worst-case progress total until existence probes resolve.
   let total =
     stagedBoards.reduce((count, board) => count + board.items.length, 0) +
     documentOnlyRefs.length +
@@ -252,7 +221,6 @@ export const restoreProjectMedia = async (
     deps.onProgress?.({ completed, total });
   };
 
-  /** Names this server can serve once the restore is done, under their final identities. */
   const restoredImageNames = new Set<string>();
   const kindAdapters: Record<InvkMediaKind, RestoreKindAdapter> = {
     image: {
@@ -273,8 +241,7 @@ export const restoreProjectMedia = async (
     },
   };
 
-  // Run probes alongside uploads and attach allSettled immediately to prevent unhandled rejection. Propagate
-  // cancellation at the ordered await.
+  // Attach allSettled now to prevent unhandled rejection; cancellation propagates at the ordered await.
   const settledProbes = Promise.allSettled([
     documentOnlyImages.length === 0
       ? Promise.resolve(new Set<string>())
@@ -284,7 +251,6 @@ export const restoreProjectMedia = async (
       : checkExistingVideos(documentOnlyVideos, deps.signal).catch(degradeUnlessCancelled(new Set<string>())),
   ]);
 
-  // Each staging board receives exactly its source board's media.
   const boardResult = await deps.materializeBoardMedia(stagedBoards, advance);
 
   const starTargets = { image: [] as string[], video: [] as string[] };
@@ -310,7 +276,6 @@ export const restoreProjectMedia = async (
     }
   }
 
-  /** A board item that did not arrive: forced dangling everywhere, and reported where it shows. */
   const failBoardItem = (failure: MaterializeFailure): void => {
     const key = toMediaKey(failure);
 
@@ -321,13 +286,11 @@ export const restoreProjectMedia = async (
     settledBoardKeys.add(key);
     issues.addBoardItemIssue(failure, failure.reason);
 
-    // Remap all references, including history; reporting scans only live references.
     kindAdapters[failure.kind].mapping.set(
       failure.name,
       buildMissingMediaName(input.projectId, failure.kind, missingNameIndex(key))
     );
 
-    // Exclude recents/history from live loss counts.
     if (documentKeys.has(key)) {
       issues.addDocumentReferenceIssue(failure, failure.reason);
     }
@@ -337,7 +300,6 @@ export const restoreProjectMedia = async (
     failBoardItem(failure);
   }
 
-  // Treat unreported descriptors as failures with missing placeholders.
   for (const item of boardItems) {
     if (!settledBoardKeys.has(toMediaKey(item))) {
       failBoardItem({ kind: item.kind, name: item.name, reason: 'upload-failed' });
@@ -380,7 +342,6 @@ export const restoreProjectMedia = async (
       if (existing.has(name)) {
         kindAdapters[kind].markResolvable(name);
 
-        // Satisfied by media that is already here, which is the whole point of the dedup.
         total -= 1;
         continue;
       }
@@ -397,7 +358,6 @@ export const restoreProjectMedia = async (
     }
   }
 
-  // Reduce progress totals for deduplication and absent bytes.
   if (total !== plannedTotal) {
     deps.onProgress?.({ completed, total });
   }
@@ -453,10 +413,7 @@ export const restoreProjectMedia = async (
   return { coverImageName, mappings, ...issues.toIssues() };
 };
 
-/**
- * Rollback requires all three: creation did not succeed, ProjectCreateAbsentError proves absence through
- * createProjectSettled, and the original account is still current. Unknown outcomes never authorize deletion.
- */
+/** Rollback only when creation failed, `ProjectCreateAbsentError` proves absence, and the account is unchanged. */
 export const rollbackUnlessProjectExists = async (
   error: unknown,
   didCreateProject: boolean,
@@ -470,7 +427,7 @@ export const rollbackUnlessProjectExists = async (
   try {
     await rollback();
   } catch {
-    // Best-effort, per the docblock above.
+    // Best-effort: unknown outcomes never authorize deletion.
   }
 };
 
@@ -502,7 +459,7 @@ export const rollbackRestoredMedia = async (
   ]);
 
   await Promise.allSettled(
-    // A staging board left behind is a Library board its owner can delete, not a broken state, so each is best-effort.
+    // A staging board left behind is a deletable Library board, not a broken state.
     ledger.boardIds.map((boardId) => deleteBoard(boardId, deps.signal))
   );
 };

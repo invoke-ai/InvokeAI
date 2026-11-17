@@ -1,6 +1,5 @@
 /**
- * Pure progress arithmetic reports completed work and time since progress. Generation pauses make remaining-time
- * estimates unreliable.
+ * Pure arithmetic: work done and time since progress (generation pauses make remaining-time estimates unreliable).
  */
 
 /** Embedding-index counts as the backend reports them. */
@@ -19,8 +18,7 @@ export const STALE_AFTER_MS = 2 * 60_000;
 const getProcessed = (counts: ImageIndexCounts): number => Math.max(0, counts.total - counts.pending);
 
 /**
- * Completion percent derives from pending so drained queues reach 100%, including abandoned items without shrinking the
- * denominator.
+ * Percent derives from pending so drained queues hit 100%, abandoned items included, without shrinking the denominator.
  */
 export const getIndexPercent = (counts: ImageIndexCounts): number => {
   if (counts.total <= 0) {
@@ -83,8 +81,7 @@ export interface IndexProgressDescription {
 }
 
 /**
- * Shared panel/footer progress wording, in the language `t` translates to. `sinceMs` reports inactivity without
- * claiming whether the worker is paused for generation or has failed.
+ * Shared panel/footer progress wording in `t`'s language; `sinceMs` reports inactivity, not whether paused or failed.
  */
 export const describeIndexProgress = (
   counts: ImageIndexCounts,

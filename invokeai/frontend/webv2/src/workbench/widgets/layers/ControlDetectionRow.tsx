@@ -33,10 +33,6 @@ const groupDetection = (item: DetectionItem): string => (item.value === DETECTIO
 const noGroupLabel = (): null => null;
 const ignoreFilterTypeChange = (): void => undefined;
 
-/**
- * The Detection row: the type's detectors and "None: use the image as it is", a spinner while one runs, Run again after
- * a failure, Detect again for an out-of-date map, and the detector's settings inline under the row.
- */
 export const ControlDetectionRow = ({
   disabled,
   model,

@@ -156,7 +156,6 @@ const LineStateHelp = ({ line }: { line: WorkingMemoryLine }) => {
 
 const HINT_POSITIONING = { placement: 'top' } as const;
 
-/** A column header with an info button after its label. */
 const HintedColumnHeader = ({ hint, label }: { hint: string; label: string }) => {
   const { t } = useTranslation();
   const name = t('models.workingMemory.aboutColumn', { column: label });

@@ -8,9 +8,7 @@ import { ConfirmDialog } from '@platform/ui';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * Warn that uninstall deletes imported workflows; use a best-effort tag count and generic copy if unavailable or zero.
- */
+/** Warns that uninstall deletes imported workflows: a best-effort tag count, generic copy if unavailable or zero. */
 export const UninstallPackDialog = ({
   finalFocusEl,
   onClose,
@@ -25,8 +23,7 @@ export const UninstallPackDialog = ({
 }) => {
   const { t } = useTranslation();
   const { uninstall } = useNodePackActions();
-  // Keyed by pack name so a count fetched for one pack never leaks into another's dialog; no reset needed when the
-  // target changes.
+  // Keyed by pack name so one pack's count never leaks into another's dialog; no reset needed when the target changes.
   const [countState, setCountState] = useState<{ count: number; packName: string } | null>(null);
 
   useEffect(() => {

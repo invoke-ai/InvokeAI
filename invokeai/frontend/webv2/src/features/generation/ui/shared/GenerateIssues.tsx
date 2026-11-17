@@ -91,7 +91,6 @@ export const areGenerationIssuesEqual = (
       JSON.stringify(issue.fix) === JSON.stringify(right[index]?.fix)
   );
 
-/** How many issues a section holds, for its title's count. */
 export const useGenerateSectionIssueCount = (section: string | undefined): number => {
   const counts = use(SectionIssueCountsContext);
 
@@ -262,7 +261,7 @@ const IssueFixButton = ({
   </Button>
 );
 
-/** How many issues a section holds, for sections that place their own badge. */
+/** A section's issues, for sections that place their own badge. */
 export const useGenerateSectionIssues = (section: GenerateSectionId): readonly GenerationIssue[] => {
   const issues = use(GenerateIssuesContext)?.issues ?? NO_ISSUES;
 

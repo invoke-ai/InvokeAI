@@ -10,8 +10,7 @@ import { childrenOf, isGroupNode, replaceChildren } from './documentTree';
 
 /**
  * The four stack forests of a v3 document. The compositor draws the stacks bottom to top in {@link LAYER_STACK_ORDER}
- * and the Layers panel lists them top first; within a stack, nodes are ordered by their depth-first preorder position,
- * top first.
+ * and the Layers panel lists them top first; within a stack, nodes are in depth-first preorder, top first.
  */
 export type LayerStackKind = CanvasLayerStackKind;
 

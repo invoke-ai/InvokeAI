@@ -18,7 +18,6 @@ interface UploadImageResponseDTO {
   height: number;
 }
 
-/** Options for {@link uploadCanvasImage}. */
 export interface UploadCanvasImageOptions {
   /** Overrides the default `'other'` category. */
   imageCategory?: 'other' | 'general' | 'control' | 'mask' | 'user';

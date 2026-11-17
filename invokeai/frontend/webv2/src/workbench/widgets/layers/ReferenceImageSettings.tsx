@@ -33,10 +33,7 @@ import { useTranslation } from 'react-i18next';
 import { DEFAULT_REGIONAL_REFERENCE_WEIGHT } from './layerOps';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
-/**
- * Edit regional references through whole-array patch-config; tree rows remain the sole inventory, enable, and removal
- * controls.
- */
+/** Edits references through whole-array patch-config; tree rows own inventory, enable and removal. */
 
 const IP_ADAPTER_METHODS: readonly RegionalGuidanceIPAdapterMethod[] = [
   'full',
@@ -164,7 +161,6 @@ interface ReferenceImageCollections {
   models: readonly ModelConfig[];
 }
 
-/** The model/method option collections the editor selects from. */
 const useReferenceImageCollections = (): ReferenceImageCollections => {
   const { t } = useTranslation();
   const models = useModelsSelector((snapshot) => snapshot.models);
@@ -202,10 +198,7 @@ const useReferenceImageCollections = (): ReferenceImageCollections => {
   return useMemo(() => ({ fluxRedux, ipAdapter, method, models }), [fluxRedux, ipAdapter, method, models]);
 };
 
-/**
- * Resolves the sub-selected reference image; renders nothing once the item is gone — the sub-selection reconciler hands
- * the pane back to the layer.
- */
+/** Renders nothing once the item is gone; the sub-selection reconciler hands the pane back. */
 export const ReferenceImageSettings = ({
   engine,
   layer,
@@ -300,8 +293,7 @@ const ReferenceImageEditor = ({
     [config, referenceImage, replaceRef]
   );
 
-  // The weight is not previewed on the canvas, so a gesture shows locally and records once when it ends. A drag keeps
-  // the handlers it started with, so the commit patches only the weight onto the references as they are then.
+  // The weight is not previewed on the canvas, so a gesture shows locally and records once when it ends.
   const [liveWeight, setLiveWeight] = useState<number | null>(null);
 
   const handleWeightEnd = useCallback(

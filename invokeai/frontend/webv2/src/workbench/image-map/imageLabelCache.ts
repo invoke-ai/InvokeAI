@@ -18,9 +18,8 @@ const labels = new Map<string, ImageMapImageLabels | null>();
 const inflight = new Map<string, Promise<ImageMapImageLabels | null>>();
 
 /**
- * Server-wide cooldowns prevent one failing request per hovered point or thumbnail while allowing recovery. A 409
- * usually means the index worker is still building the vocabulary, which on a warm disk cache lands in about a second,
- * so it backs off briefly; outages back off longer.
+ * Server-wide cooldowns stop one failing request per hovered point or thumbnail yet allow recovery. A 409 usually means
+ * the vocabulary is still building (about a second on a warm disk cache), so it backs off briefly; outages longer.
  */
 const BUILDING_COOLDOWN_MS = 5_000;
 const OUTAGE_COOLDOWN_MS = 60_000;
@@ -41,8 +40,7 @@ registerAccountOwnedResource({
 });
 
 /**
- * Vocabulary rebuild clears hover labels and cooldown so item tags agree with refreshed cluster labels and
- * pending-build retries resume.
+ * Vocabulary rebuild clears hover labels and cooldown so tags match refreshed cluster labels and build retries resume.
  */
 export const clearImageLabels = (): void => {
   generation += 1;
@@ -59,8 +57,7 @@ imageMapStore.subscribe(() => {
   const { data } = imageMapStore.getSnapshot();
   const missing = data?.state === 'model_missing';
   const nextModelId = data?.modelId ?? null;
-  // A replacement may become ready while the map is closed or its tab is suspended, so availability transitions alone
-  // cannot retire old labels.
+  // A replacement may turn ready while the map is closed or its tab suspended: transitions cannot retire old labels.
   if ((missing && !modelMissing) || nextModelId !== modelId) {
     clearImageLabels();
   }
@@ -70,8 +67,7 @@ imageMapStore.subscribe(() => {
 
 export const getImageLabels = (item: GalleryItemRef): Promise<ImageMapImageLabels | null> => {
   const key = toGalleryItemKey(item);
-  // Checked before the cooldown: labels already fetched for this item stay available even while a server-wide 409 is
-  // being backed off.
+  // Checked before the cooldown: labels already fetched for this item stay available while a server-wide 409 backs off.
   const cached = labels.get(key);
 
   if (cached !== undefined) {

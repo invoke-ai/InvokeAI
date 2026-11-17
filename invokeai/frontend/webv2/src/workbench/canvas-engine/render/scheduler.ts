@@ -7,7 +7,6 @@ import type { FrameDamage, LayerDamage, RenderFlags } from '@workbench/canvas-en
 
 import { FULL_DAMAGE, NO_DAMAGE } from '@workbench/canvas-engine/types';
 
-/** The partial invalidation payload accepted by {@link RenderScheduler.invalidate}. */
 export interface InvalidatePayload {
   /** The viewport transform (pan/zoom) changed. */
   view?: true;
@@ -34,7 +33,6 @@ export interface RenderSchedulerDeps {
   cancelFrame?: (handle: number) => void;
 }
 
-/** The imperative scheduler handle returned by {@link createRenderScheduler}. */
 export interface RenderScheduler {
   /** Merge a partial invalidation into the pending flags and schedule a frame. */
   invalidate(payload: InvalidatePayload): void;
@@ -47,7 +45,6 @@ export interface RenderScheduler {
   pause(): void;
   /** Resume scheduling; flushes any invalidations accumulated while paused. */
   resume(): void;
-  /** True while paused. */
   readonly isPaused: boolean;
   /** Cancel any pending frame and stop accepting further work. */
   dispose(): void;

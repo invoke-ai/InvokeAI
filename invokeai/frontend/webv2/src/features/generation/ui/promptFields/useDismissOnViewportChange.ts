@@ -1,9 +1,6 @@
 import { useMountEffect } from '@platform/react/useMountEffect';
 
-/**
- * Marks the prompt-trigger autocomplete list, the scroll container for its options. Scrolling that list is the
- * suggestion moving, not the anchored field leaving the viewport.
- */
+/** Marks the prompt-trigger autocomplete's scroller: scrolling it moves the options, not the anchored field. */
 const PROMPT_TRIGGER_AUTOCOMPLETE_ATTR = 'data-prompt-trigger-autocomplete';
 export const PROMPT_TRIGGER_AUTOCOMPLETE_SCROLL_PROPS = { [PROMPT_TRIGGER_AUTOCOMPLETE_ATTR]: '' } as const;
 

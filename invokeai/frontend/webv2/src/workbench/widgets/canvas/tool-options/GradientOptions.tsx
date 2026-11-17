@@ -44,10 +44,7 @@ interface SelectedGradient {
   source: GradientSource;
 }
 
-/**
- * Edit selected gradients or creation defaults; FG-to-BG follows the live pair until explicit stop edits switch to
- * custom colors. Stop gestures commit once on release.
- */
+/** Edits selected gradients or creation defaults; FG-to-BG follows the live pair until a stop is edited. */
 const useGradientEditor = (engine: ToolFormProps['engine']) => {
   const { t } = useTranslation();
   const commitPrepared = usePreparedCommit(engine);
@@ -109,10 +106,7 @@ const useGradientEditor = (engine: ToolFormProps['engine']) => {
     },
     [engine, options, pairStops]
   );
-  /**
-   * Routes a settled stop edit to its owner: the selected layer (one entry) or the custom defaults. The update runs
-   * against the owner's stops at write time, so a stop edit landing mid-gesture is kept.
-   */
+  /** Routes a settled stop edit to its owner, applied to the owner's stops at write time. */
   const updateStops = useCallback(
     (update: StopsUpdate) => {
       if (selectedId) {

@@ -39,7 +39,6 @@ type SelectedLayerDrag =
   | { kind: 'refused'; leaf: SemanticLeaf; status: CanvasLayerEditRefusal['status'] }
   | { kind: 'none' };
 
-/** Target comes solely from document selection, regardless of press location. */
 const planSelectedLayerDrag = (ctx: ToolContext): SelectedLayerDrag => {
   const doc = ctx.getDocument();
   const selectedId = doc?.selectedLayerId;
@@ -95,7 +94,6 @@ interface GestureState {
   moved: boolean;
 }
 
-/** Creates a fresh move tool with its own gesture state. */
 export const createMoveTool = (): Tool => {
   let state: GestureState | null = null;
 
@@ -221,8 +219,7 @@ export const createMoveTool = (): Tool => {
     },
     onPointerCancel: (ctx) => {
       if (state?.mode.kind === 'float') {
-        // Revert just this drag; the float itself survives (Escape's own float-cancel is a separate, engine-level
-        // step).
+        // Revert just this drag; the float itself survives (Escape's own float-cancel is a separate engine-level step).
         ctx.setFloatingTransform?.(state.mode.origin);
       }
       clearOverride(ctx);

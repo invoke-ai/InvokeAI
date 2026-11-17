@@ -61,11 +61,7 @@ const getUpscalePromptDraft = (project: Project): ProjectPromptDraft | null =>
     ? getPromptDraftFromValues(getProjectWidgetValues(project, 'generate'))
     : null;
 
-/**
- * What the route's positive prompt expands from, with the sample seed to draw with, or null when the route sends its
- * prompt as typed: workflows and Model only upscales never expand, and dynamic prompts may be off or the prompt plain.
- * Canvas and Upscale expand Generate's prompt.
- */
+/** Null when the route sends its prompt as typed; Canvas and Upscale expand Generate's prompt. */
 export const getDynamicPromptsExpansionSource = (
   project: Project,
   sourceId: InvocationSourceId
@@ -98,7 +94,6 @@ export const getDynamicPromptsExpansionSource = (
     : null;
 };
 
-/** Whether a submission prepared from `prepared` (null: not expanded) still describes what `current` compiles. */
 export const isSameDynamicPromptsExpansionSource = (
   prepared: DynamicPromptsExpansionSource | null,
   current: DynamicPromptsExpansionSource | null
@@ -112,7 +107,6 @@ export const isSameDynamicPromptsExpansionSource = (
 export interface InvocationSourceMeta {
   id: InvocationSourceId;
   label: string;
-  /** Whether the source is selectable yet, or a forward-looking placeholder. */
   available: boolean;
 }
 
@@ -178,18 +172,10 @@ export interface InvocationRouteInput {
   projectId: string;
   /** The canvas generation frame (document space) — its area gates a canvas invoke. */
   canvasBbox: { width: number; height: number };
-  /** The canvas layer stack (identity-stable) — control layers gate a canvas invoke. */
   canvasLayers: readonly CanvasLayerContract[];
-  /**
-   * Whether a visible raster layer's bounds overlap the frame, so a text-only hosted model is blocked before invoke
-   * without reading pixels. Measured only with such a model, whatever the selected source; false otherwise.
-   */
+  /** Measured only with a text-only hosted model, which a raster in frame blocks; false otherwise. */
   canvasRasterInFrame: boolean;
-  /**
-   * The enabled, painted regional guidance layers whose mask bounds overlap the frame (identity-stable), which a layout
-   * base places around the global prompt. Measured whatever the model: which bases read them is capability data that
-   * can arrive after the project, so readiness decides that when it runs.
-   */
+  /** Measured whatever the model: which bases read regions is capability data that can arrive later. */
   canvasRegionalLayersInFrame: readonly CanvasRegionalGuidanceLayerContract[];
 }
 
@@ -220,19 +206,13 @@ const getMountedWidgetIds = (project: Project): WidgetId[] => {
 
 type FrameRect = Project['canvas']['document']['bbox'];
 
-/** Whether document-space bounds overlap the frame's interior; touching its edge does not. */
 const overlapsFrame = (bounds: FrameRect, frame: FrameRect): boolean =>
   bounds.x < frame.x + frame.width &&
   frame.x < bounds.x + bounds.width &&
   bounds.y < frame.y + frame.height &&
   frame.y < bounds.y + bounds.height;
 
-/**
- * Whether a raster layer the generation composite draws overlaps the frame's interior with its own bounds. Invoke
- * decides from the composite's pixels, so this errs toward not blocking where geometry is uncertain: text is skipped
- * (readiness only has an estimate of its extent) and so is anything at zero opacity, its own or a group's. The one
- * remaining approximation is transparent pixels inside a layer's bounds, which this treats as content.
- */
+/** Errs toward not blocking: text and zero-opacity layers are skipped; transparent pixels count as content. */
 const hasRasterContentInFrame = (document: Project['canvas']['document']): boolean => {
   const { bbox } = document;
 
@@ -260,12 +240,7 @@ const hasRasterContentInFrame = (document: Project['canvas']['document']): boole
 
 const NO_REGIONAL_LAYERS: readonly CanvasRegionalGuidanceLayerContract[] = [];
 
-/**
- * The compositable regional guidance layers whose mask bounds, offset and transform included, overlap the frame's
- * interior: the regions a layout base can place. The one remaining approximation is a mask bitmap that reaches into the
- * frame with transparent pixels only (a legacy document-sized mask, say), which still counts here although the canvas
- * compiler, reading the uploaded mask's pixels, leaves it out.
- */
+/** A mask reaching the frame with transparent pixels only still counts here, though the compiler leaves it out. */
 const getRegionalLayersInFrame = (
   document: Project['canvas']['document'],
   layers: readonly CanvasLayerContract[]
@@ -286,9 +261,7 @@ const getRegionalLayersInFrame = (
 
 export const getInvocationRouteInput = (project: Project): InvocationRouteInput => {
   const generateValues = getProjectWidgetValues(project, 'generate');
-  // Canvas facts are measured whatever source is selected: a graph preview resolves the Canvas route from this same
-  // input while another source is. This runs on every project change, over leaves the document index caches; raster
-  // layers are measured only for the model they gate.
+  // Measured whatever source is selected: a graph preview resolves the Canvas route from this input.
   const measuresRaster =
     isGenerateModelConfig(generateValues.model) && isExternalTextOnlyCanvasModel(generateValues.model);
   const canvasLayers = compileContributingLayers(project.canvas.document);
@@ -368,7 +341,6 @@ export const resolveInvocationRoute = (
   mode: InvocationMode = 'global',
   route: InvocationRoute = project.invocation,
   models?: readonly ModelConfig[],
-  /** Validate a specific project workflow (a captured submission target) instead of the active one. */
   workflowDocument?: ProjectGraphState,
   templates?: Readonly<InvocationTemplatesSnapshot>
 ): ResolvedInvocationRoute =>
@@ -428,7 +400,6 @@ export const resolveInvocationRouteInput = (
   }
 
   if (sourceId === 'canvas') {
-    // Canvas shares Generate readiness and additionally requires a nonzero generation frame.
     validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models, input.canvasBbox));
 
     if (input.canvasBbox.width <= 0 || input.canvasBbox.height <= 0) {
@@ -465,7 +436,6 @@ export const resolveInvocationRouteInput = (
           }).map((controlLayerIssue) => ({ controlLayerIssue }))
         );
       }
-      // Before anything uploads, so only the regions whose mask bounds reach into the frame count.
       const layoutPromptReason = getLayoutPromptRejectionReason({
         base: values.model.base,
         prompt: getEffectivePrompts(values).positivePrompt,
@@ -509,7 +479,6 @@ export const resolveInvocationRouteInput = (
 export const isInvocationRouteValid = (route: ResolvedInvocationRoute): boolean =>
   route.sourceValid && route.destinationValid;
 
-/** What each source and destination is called in the UI: the widget that runs or receives the work. */
 export const ROUTE_LABEL_KEYS: Record<InvocationSourceId | ResultDestination, string> = {
   canvas: 'widgets.labels.canvas',
   gallery: 'widgets.labels.gallery',
@@ -525,7 +494,6 @@ const describeRouteIssue = (issue: RouteIssue, t: (key: string, options?: Record
     issue.kind === 'sourceNotMounted' ? { source: t(ROUTE_LABEL_KEYS[issue.sourceId]) } : undefined
   );
 
-/** Words any route validation reason for display; every structured reason comes from the locale. */
 export const localizeInvocationValidationReason = (
   reason: InvocationValidationReason,
   t: (key: string, options?: Record<string, unknown>) => string

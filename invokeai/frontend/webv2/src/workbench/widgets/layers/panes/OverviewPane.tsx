@@ -18,11 +18,7 @@ const CHECKERBOARD_CSS = {
   backgroundSize: '12px 12px',
 };
 
-/**
- * The viewport outline is three 1px bands inside the box, dark/light/dark, matching the canvas brush ring so it reads
- * over any pixels. Fixed black/white rather than theme tokens: contrast must not depend on the content or the theme.
- * Borders, unlike box-shadow spreads, snap to whole device pixels, so each band stays crisp at any device pixel ratio.
- */
+/** Fixed dark/light/dark 1px border bands, not theme tokens, so the outline reads over any pixels at any DPR. */
 const VIEW_RECT_DARK = '#000000';
 const VIEW_RECT_LIGHT = '#ffffff';
 /** Smallest drawn outline: the three bands on each side plus a 2px hollow, so a tiny viewport still reads as a box. */
@@ -39,10 +35,7 @@ const VIEW_RECT_INNER_CSS = {
 
 const VIEW_RECT_TRANSITION = `left ${VIEW_RECT_INTERVAL_MS}ms linear, top ${VIEW_RECT_INTERVAL_MS}ms linear, width ${VIEW_RECT_INTERVAL_MS}ms linear, height ${VIEW_RECT_INTERVAL_MS}ms linear`;
 
-/**
- * Show a fitted composite with viewport outline; click/drag centers, wheel zooms, and arrows pan. Throttle painting and
- * update the outline imperatively.
- */
+/** Fitted composite with viewport outline; painting is throttled and the outline updated imperatively. */
 export const OverviewPane = () => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
@@ -124,7 +117,6 @@ const ConnectedOverview = ({ engine }: { engine: CanvasEngineHandle }) => {
         outline.style.width = `${drawnWidth}px`;
         outline.style.height = `${drawnHeight}px`;
       };
-      // Throttle DOM outline updates and let CSS interpolate between them.
       const outlineThrottle = { last: 0, timer: null as ReturnType<typeof setTimeout> | null };
       const updateOutline = () => {
         if (outlineThrottle.timer !== null) {
@@ -144,7 +136,6 @@ const ConnectedOverview = ({ engine }: { engine: CanvasEngineHandle }) => {
       };
 
       // Only a real composite consumes throttle budget, so the pre-measure clearing draw never defers the first paint.
-      // The outline follows every draw at once, so it never disagrees with the bitmap.
       const drawComposite = (): boolean => {
         const rect = maxSizePx < 16 ? null : engine.previews.drawDocumentOverview(canvas, maxSizePx);
         if (!rect) {

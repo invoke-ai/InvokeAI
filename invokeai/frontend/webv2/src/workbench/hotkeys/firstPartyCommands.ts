@@ -133,11 +133,7 @@ export const useRegisterFirstPartyCommands = () => {
     void ensureModelsLoaded();
   });
 
-  /**
-   * Submits the active route. `destinationOverride` applies to this run only and is never written back to the project —
-   * "just this once, send it to the gallery" must not silently retarget every subsequent invoke. `prepend` is likewise
-   * per run: Invoke Front puts this batch ahead of the user's pending work.
-   */
+  /** Submits the active route; `destinationOverride` and `prepend` apply to this run only, never persisted. */
   const submitInvocation = async (destinationOverride?: ResultDestination, prepend = false) => {
     await submitActiveInvocation({
       commands,

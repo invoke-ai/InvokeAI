@@ -37,10 +37,7 @@ export interface ControlSourceRowProps {
   onDraw(): void;
 }
 
-/**
- * The Image row: Upload / Frame / Draw while the layer is empty, else a thumbnail, its name and a Replace menu with the
- * same three actions. Focus that sat on the part that went away moves to the part that replaced it.
- */
+/** Upload / Frame / Draw while empty, else a thumbnail and Replace; focus moves to the part that replaced it. */
 export const ControlSourceRow = ({
   busy,
   disabled,

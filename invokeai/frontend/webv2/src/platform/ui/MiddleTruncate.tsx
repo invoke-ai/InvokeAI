@@ -49,7 +49,6 @@ const prefixLength = (text: string, graphemes: number): number => {
   return length;
 };
 
-/** The drawn width of `[start, end)` of the label's text, wherever its spans currently split it. */
 const textRangeWidth = (root: HTMLElement, start: number, end: number): number => {
   let offset = 0;
   let width = 0;
@@ -77,11 +76,7 @@ const textRangeWidth = (root: HTMLElement, start: number, end: number): number =
   return width;
 };
 
-/**
- * Whether the label's content box can hold the whole tail plus the head's first graphemes. Glyph extents come from
- * ranges, which ignore clipping, so the answer is the same in either form and cannot oscillate. Range widths include
- * ancestor transforms (an opening menu's scale), so the content width is read in the same space.
- */
+/** Range extents ignore clipping, so both forms answer alike and cannot oscillate; transforms apply to both sides. */
 const fitsSplit = (
   root: HTMLElement,
   { headLength, minHeadLength, textLength }: { headLength: number; minHeadLength: number; textLength: number }
@@ -125,14 +120,10 @@ const observeResize = (node: Element, onResize: () => void): (() => void) => {
 /** The root's ref measures the split, so callers cannot take it. */
 export interface MiddleTruncateProps extends Omit<TextProps, 'children' | 'ref'> {
   text: string;
-  /** How many graphemes stay visible at the end when space runs out. */
   tailGraphemes?: number;
 }
 
-/**
- * The split's flex items read as separate words to assistive technology ("S DXL Main"), so a split label hides them and
- * exposes the whole string once through generated content, which stays out of text selection and copy.
- */
+/** Split flex items read as separate words, so the whole string is exposed once through generated content. */
 const SPLIT_LABEL_CSS = {
   '&::before': {
     clip: 'rect(0 0 0 0)',
@@ -145,13 +136,7 @@ const SPLIT_LABEL_CSS = {
   },
 } as const;
 
-/**
- * For identifiers whose suffix matters. Keep white-space: pre across the head/tail boundary so the space there
- * survives; a head with no tail collapses newlines like any single-line label. Preserve full DOM text for copy and
- * accessibility. Where the width cannot hold the tail and a few head graphemes, the head span takes the whole text and
- * ends it in an ellipsis instead of showing a clipped tail fragment; it keeps the split's white-space, so both forms
- * measure the same.
- */
+/** Keeps the suffix visible; too narrow for the tail plus a few head graphemes, the head takes the whole text. */
 export const MiddleTruncate = ({
   css,
   tailGraphemes = DEFAULT_TAIL_GRAPHEMES,
@@ -164,8 +149,7 @@ export const MiddleTruncate = ({
   const [isEndTruncated, setIsEndTruncated] = useState(false);
   const endTruncated = tail !== '' && isEndTruncated;
 
-  // Measured when the root attaches, so the first paint already has the right form, then on every resize. Reattaches
-  // whenever the text changes: same-length text can still draw at a different width.
+  // Measured on attach so the first paint is right; reattaches on text change, as same-length text can differ in width.
   const rootRef = useCallback(
     (node: HTMLElement | null) => {
       if (!node || !tail) {

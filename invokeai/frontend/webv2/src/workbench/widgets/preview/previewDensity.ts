@@ -2,10 +2,7 @@ import type { WorkbenchRegion } from '@workbench/widgetContracts';
 
 import { useCallback, useLayoutEffect, useRef, useState, type Ref } from 'react';
 
-/**
- * Share density across Preview zones: full exposes all controls, compact reduces actions/summaries, and minimal keeps
- * frame, progress, and navigation.
- */
+/** Density across Preview zones: full, compact, then minimal (frame, progress, navigation). */
 const isRailRegion = (region: string): boolean => region === 'left' || region === 'right';
 
 export type PreviewDensity = 'full' | 'compact' | 'minimal';
@@ -31,11 +28,7 @@ export const getPreviewDensity = ({
   return widthPx >= PREVIEW_FULL_MIN_WIDTH_PX ? 'full' : 'compact';
 };
 
-/**
- * Measure root width when it attaches and observe it after, with a cleaned-up ref callback; update state only when its
- * density bucket changes. `onMeasure` (stable for the hook's lifetime) receives every measured density, so chrome
- * outside the view follows it, and null when the root detaches, so that chrome stops following a view that is gone.
- */
+/** Updates only on bucket changes; `onMeasure` gets every density, and null on detach. */
 export const usePreviewDensity = (
   region: WorkbenchRegion,
   onMeasure?: (density: PreviewDensity | null) => void

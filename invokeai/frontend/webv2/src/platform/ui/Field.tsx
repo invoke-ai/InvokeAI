@@ -24,11 +24,7 @@ const RenderedLabelIdProvider = ({ children }: { children: ReactNode }) => {
   return <RenderedLabelIdContext value={field?.ids.label ?? null}>{children}</RenderedLabelIdContext>;
 };
 
-/**
- * The id of the label naming the nearest field's control, or null when that field renders none. For custom controls
- * that reference the label themselves; Chakra controls read Field context directly. An inside Field renders no label of
- * its own: a control that shows it takes the id from `useInsideFieldLabel` along with the label.
- */
+/** For custom controls that reference the label; an inside Field renders none (see `useInsideFieldLabel`). */
 export const useFieldLabelId = (): string | null => {
   const field = useFieldContext();
   const labelId = useContext(RenderedLabelIdContext);
@@ -46,9 +42,7 @@ const renderLabelText = (label: string, hint: FeatureHintId | undefined): ReactN
     label
   );
 
-/** What a `labelPlacement="inside"` Field hands its control. */
 export interface InsideFieldLabel {
-  /** The Field's label id: the control names itself by the element `FieldInsideLabel` renders with it. */
   id: string;
   text: string;
   hint?: FeatureHintId;
@@ -71,10 +65,7 @@ const InsideLabelProvider = ({
   return <InsideLabelContext value={value}>{children}</InsideLabelContext>;
 };
 
-/**
- * The label the nearest field asks its control to show at the start of the control's own box; null when that field
- * shows its label outside, or is a raw `Field.Root` nested in an inside Field.
- */
+/** Null when the field shows its label outside, or for a raw `Field.Root` nested in an inside Field. */
 export const useInsideFieldLabel = (): InsideFieldLabel | null => {
   const field = useFieldContext();
   const label = useContext(InsideLabelContext);
@@ -86,7 +77,6 @@ export const useInsideFieldLabel = (): InsideFieldLabel | null => {
 export const INSIDE_LABEL_INSET = '3';
 
 const INSIDE_LABEL_CSS = {
-  // The field label's type, as ScrubberField's inside label uses: stacked scrubbers and selects read as one set.
   ...fieldLabelRecipe.base,
   flexShrink: 0,
   // The value gives way first; only a label longer than half the box truncates.
@@ -96,11 +86,7 @@ const INSIDE_LABEL_CSS = {
   whiteSpace: 'nowrap',
 } as const;
 
-/**
- * The inside label at the start of a control's box. In a trigger button it is a span the trigger's aria-labelledby
- * points at (a `<label>` may not sit in a button); beside an input, `htmlFor` makes it a native label, so a click on it
- * focuses and opens the input like the rest of the box.
- */
+/** A span in a trigger button (a `<label>` may not sit in a button); beside an input, a native label via `htmlFor`. */
 export const FieldInsideLabel = ({ htmlFor, label }: { htmlFor?: string; label: InsideFieldLabel }) => {
   const text = renderLabelText(label.text, label.hint);
 
@@ -132,10 +118,8 @@ interface FieldBaseProps extends Omit<StackProps, 'disabled' | 'id' | 'readOnly'
   invalid?: boolean;
   readOnly?: boolean;
   required?: boolean;
-  /** Validation error, shown in place of `helpText`; also marks the field invalid by default. */
   error?: string | null;
   helpText?: string;
-  /** Opens an informational hint card when the label is hovered. */
   hint?: FeatureHintId;
   children: ReactNode;
 }
@@ -143,24 +127,18 @@ interface FieldBaseProps extends Omit<StackProps, 'disabled' | 'id' | 'readOnly'
 export type FieldProps = FieldBaseProps &
   (
     | {
-        /** `outside` (default) stacks the label above the control, or beside it when horizontal. */
         labelPlacement?: 'outside';
         labelEnd?: ReactNode;
         orientation?: 'horizontal' | 'vertical';
       }
     | {
-        /**
-         * `inside` hands the label to the control, which shows it at the start of its own box: one compact row for
-         * dense panels. Help and error text stay below the box. Only Select, Combobox and ModelSelect render it; any
-         * other child (Input, NumberInput, ScrubberField) is left without a label or an accessible name.
-         */
+        /** Only Select, Combobox and ModelSelect render it; any other child is left without an accessible name. */
         labelPlacement: 'inside';
         labelEnd?: never;
         orientation?: never;
       }
   );
 
-/** A labelled form field: an uppercase label stacked above its control, with an optional help/error line below. */
 export const Field = ({
   children,
   disabled,

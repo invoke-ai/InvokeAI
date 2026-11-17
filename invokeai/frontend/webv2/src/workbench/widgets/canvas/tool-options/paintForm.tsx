@@ -102,10 +102,7 @@ const PaintColorSettings = ({ engine }: ToolFormProps) => {
   );
 };
 
-/**
- * Width and opacity are separate pressure responses (opacity also costs a scratch refill per frame). The eraser exposes
- * width only: pressure never modulates erase strength.
- */
+/** Separate pressure responses; the eraser exposes width only, since pressure never modulates erase strength. */
 const PaintDynamicsSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const { isEraser, options, set } = usePaintOptions(engine);

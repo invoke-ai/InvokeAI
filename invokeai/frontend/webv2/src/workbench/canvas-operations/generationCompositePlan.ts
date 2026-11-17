@@ -40,7 +40,6 @@ const sourceRefOf = (source: CanvasLayerSourceContract): string => {
   }
 };
 
-/** Serializes a rect into a compact, deterministic key fragment. */
 const rectKey = (rect: Rect): string => `${rect.x},${rect.y},${rect.width},${rect.height}`;
 
 /** Serializes a layer ref's pixel-determining fields into a key fragment. */
@@ -189,7 +188,6 @@ const maskLayerKey = (ref: CompositeMaskLayerRef): string => {
   return [ref.id, ref.sourceRef, o.x, o.y, t.x, t.y, t.scaleX, t.scaleY, t.rotation, ref.attributeValue].join(':');
 };
 
-/** Derives the stable identity key for a grayscale mask entry. */
 const deriveMaskKey = (kind: string, bbox: Rect, layers: CompositeMaskLayerRef[]): string =>
   `${kind}|${rectKey(bbox)}|${layers.map(maskLayerKey).join('|')}`;
 
@@ -315,9 +313,7 @@ const regionalMaskContentRect = (
   return { height: 0, width: 0, x: 0, y: 0 };
 };
 
-/**
- * Use opacity 1 and normal blend for regional alpha masks; display settings must not affect alpha_mask_to_tensor input.
- */
+/** Regional alpha masks take opacity 1 and normal blend: display settings must not reach alpha_mask_to_tensor input. */
 const toRegionalMaskRef = (layer: CanvasRegionalGuidanceLayerContract): CompositeLayerRef => {
   const rect = regionalMaskContentRect(layer);
   return {
@@ -343,10 +339,7 @@ export interface RegionalMaskCompositeEntry {
   entry: CompositeEntry;
 }
 
-/**
- * Plan separate alpha masks for enabled regions with content; omit empty regions and exclude all regions from
- * base-raster.
- */
+/** Plan separate alpha masks for enabled regions with content, omitting empty ones; no region joins the base raster. */
 export const planRegionalMaskComposites = (
   document: CanvasDocumentContractV3,
   bbox: Rect

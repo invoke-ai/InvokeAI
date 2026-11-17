@@ -16,10 +16,6 @@ import { useProjectActionsMenu, useProjectActionsMenuTrigger } from './ProjectAc
 import { ProjectCompatibilityBadge } from './ProjectCompatibilityBadge';
 import { ProjectCover } from './ProjectCover';
 
-/**
- * Cards deep-link to the editor and preload on hover; the shared menu host handles overflow and right-click actions.
- */
-
 const CARD_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const;
 const REVEAL_ON_HOVER = { opacity: 1 } as const;
 // The pin sits on the cover, so it carries its own scrim and edge: a tint alone vanishes on a light image.

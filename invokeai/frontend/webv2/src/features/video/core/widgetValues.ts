@@ -36,9 +36,7 @@ export const createDefaultVideoWidgetValues = (models: readonly ModelConfig[] = 
   return { ...getDefaultVideoSettings(model ?? undefined, models), model };
 };
 
-/**
- * Resolve catalog references while preserving object identity when unchanged to avoid reconciliation write-back loops.
- */
+/** Resolve catalog references, preserving object identity when unchanged to avoid reconciliation write-back loops. */
 export const syncVideoWidgetValuesWithModels = (
   values: VideoWidgetValues,
   models: readonly ModelConfig[]
@@ -138,10 +136,9 @@ export const syncVideoWidgetValuesWithModels = (
       };
     }
   } else if (acceleratorSync && acceleratorSync.outcome !== 'unchanged') {
-    // Every field the change result rewrites, not a hand-picked five. An accelerator that removes guidance also
-    // restores it when it goes away, and naming fields here meant the Concepts-list route honoured that while this one
-    // -- the LoRA leaving the catalog entirely -- dropped it, leaving a guided run with its audio, STG and modality
-    // guidance silently pinned at identity.
+    // Every field the change result rewrites, not a hand-picked few: an accelerator that removes guidance restores it
+    // when it goes away, and a partial copy here (the LoRA leaving the catalog) would leave a guided run with its
+    // audio, STG and modality guidance silently pinned at identity.
     accelerator = {
       acceleratorEnabled: acceleratorSync.settings.acceleratorEnabled,
       acceleratorLoraKeys: acceleratorSync.settings.acceleratorLoraKeys,

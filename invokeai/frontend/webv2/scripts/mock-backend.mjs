@@ -21,7 +21,6 @@ import { createWorkingMemoryMock, WORKING_MEMORY_SCENARIOS } from './mock-workin
 /** The canvas schema every mock project declares; the real server keeps the same floor per record. */
 const DEFAULT_CANVAS_SCHEMA_VERSION = 3;
 
-/** The 412 the real router raises when a client's maximum is below a project's floor. */
 const schemaUnsupported = (minimum, maximum) => [
   412,
   {
@@ -65,7 +64,6 @@ const writtenRecordOf = ({ workspace, ...project }) => ({
 const FIXED_EPOCH_MS = Date.parse(MOCK_BACKEND_FIXED_EPOCH);
 const FIXTURE_VIDEO = readFileSync(resolve(import.meta.dirname, 'mock-assets/fixture-video.mp4'));
 const FIXTURE_VIDEO_POSTER = readFileSync(resolve(import.meta.dirname, 'mock-assets/fixture-video.webp'));
-// Share the backend-pinned capabilities fixture to keep journey payloads aligned with the real API.
 const ARCHITECTURE_CAPABILITIES = JSON.parse(
   readFileSync(
     resolve(import.meta.dirname, '../src/features/generation/core/__fixtures__/architectureCapabilities.json'),
@@ -74,20 +72,8 @@ const ARCHITECTURE_CAPABILITIES = JSON.parse(
 );
 
 /**
- * POST /__faults sets capabilities to error, empty, or ok, and `intermediatesCaller` to admin, user or multiuser-admin,
- * until POST /__reset; independent of workload profile. `user` and `multiuser-admin` also turn on multi-user auth, with
- * a non-admin or an admin session: sign in with any email and password (or reload a page that already holds the token).
- * `sharedBoards: true` adds boards other accounts own (`SHARED_BOARD_FIXTURES`), which the caller sees through general
- * access, a membership, or admin rights. `user` also makes the admin-only image storage routes answer 403. `imageMoves`
- * seeds the image move journal: `idle` (the default), `needs-recovery` (an interrupted job that only Recover can
- * finish), `failed` (a job that ended in error, which counts as finished) or `instant` (a move so small it commits
- * before the POST answers, so `is_running` is already false). Like the real service, Start Move is refused while any
- * queue item is pending or in progress (the representative profile seeds some; clear the queue first). While a move
- * runs or a job awaits recovery, image files, media mutations and enqueueing answer 409 like the real maintenance
- * guard; listings stay readable. `workingMemory` selects a calibration device scenario, and `stoppedCalibration: <main
- * model key>` gives that model an attempt Stop aborted, `runningCalibration: <main model key>` one still running, which
- * holds the GPU, `modelChangedCalibration: <main model key>` one whose steps failed for a changed model (see
- * mock-working-memory.mjs).
+ * POST /__faults overrides until POST /__reset: capabilities, `intermediatesCaller` (user/multiuser-admin enable auth),
+ * `sharedBoards`, `imageMoves` (idle/needs-recovery/failed/instant) and calibration (mock-working-memory.mjs).
  */
 const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
 const INTERMEDIATES_CALLERS = new Set(['admin', 'user', 'multiuser-admin']);
@@ -96,7 +82,6 @@ const IMAGE_MOVE_MAINTENANCE_DETAIL = 'Image storage maintenance is active';
 /** The job states the real service counts as finished; any other journaled job still needs recovery. */
 const FINISHED_IMAGE_MOVE_JOB_STATES = new Set(['committed', 'error']);
 const IMAGE_STORAGE_LAYOUTS = new Set(['flat', 'date', 'type', 'hash']);
-/** Status reads a running move or recovery takes to finish, so polling clients observe it in progress. */
 const IMAGE_MOVE_TICKS = 2;
 
 const createFaults = () => ({
@@ -106,10 +91,7 @@ const createFaults = () => ({
   workingMemory: 'ok',
 });
 
-/**
- * Every fixture image is stored flat, so the move count is the whole library whenever the configured layout differs
- * from the one the last committed move left the files in.
- */
+/** Fixture images are stored flat, so a move counts the whole library whenever the layout differs. */
 const createImageStorage = () => ({
   layout: 'flat',
   storedLayout: 'flat',
@@ -176,7 +158,6 @@ const startImageMoveOperation = (state, operation, { instant = false } = {}) => 
   }
 };
 
-/** Each status read advances a running operation; it commits on the last tick. */
 const tickImageMove = (state) => {
   const storage = state.imageStorage;
 
@@ -197,10 +178,7 @@ const isImageMoveMaintenanceActive = (state) =>
 const hasActiveQueueWork = (state) =>
   [...state.queueItems.values()].some((item) => item.status === 'pending' || item.status === 'in_progress');
 
-/**
- * The real maintenance guard covers image uploads, deletions, edits, star changes, copies, downloads, image files and
- * board-image membership, plus deleting a board with its images; listings and DTO reads stay open.
- */
+/** Mirrors the real maintenance guard: media mutations and files refuse; listings and DTO reads stay open. */
 const isImageMoveMaintenanceRoute = (method, path, url) => {
   if (path.startsWith('/api/v1/board_images')) {
     return true;
@@ -232,7 +210,6 @@ const INBOX_MANAGED_ACTIONS = new Set(['rename', 'archive', 'set_general_access'
 
 const OTHER_USER_NAMES = { 'user-ana': 'Ana', 'user-ben': 'Ben', 'user-cleo': 'Cleo', 'user-dee': 'Dee' };
 
-/** Boards other accounts own: one per way the caller can see one, and one only an admin sees. */
 const SHARED_BOARD_FIXTURES = [
   {
     board_id: 'shared-editor',
@@ -263,7 +240,6 @@ const seedSharedBoards = (state) => {
   }
 };
 
-/** The caller's access to a board, as `BoardAccessService` reports it. */
 const boardAccessFor = (state, faults, board, { ignoreInbox = false } = {}) => {
   const ownerId = board.user_id ?? MOCK_USER_ID;
   const isAdmin = isAdminCaller(faults);
@@ -292,13 +268,11 @@ const BOARD_UNREADABLE = [
   { detail: { code: 'board_unreadable', message: 'Not authorized to access this board' } },
 ];
 
-/** The server's answer for a readable board whose action the caller's role forbids. */
 const BOARD_ACTION_FORBIDDEN = [
   403,
   { detail: { code: 'board_action_denied', message: 'Not authorized to change this board' } },
 ];
 
-/** 403 for a board the caller cannot read or an action their role does not allow, else null. */
 const boardRefusal = (state, faults, board, action) => {
   const access = boardAccessFor(state, faults, board);
   if (!access.readable) {
@@ -307,10 +281,7 @@ const boardRefusal = (state, faults, board, action) => {
   return access.allows(action) ? null : BOARD_ACTION_FORBIDDEN;
 };
 
-/**
- * Mirrors the server's claim rule: an import commits by adopting a staging board, which must be the caller's own,
- * unshared (restricted, with no members), in no project, and nobody's inbox.
- */
+/** Mirrors the server's claim rule: the staging board is the caller's own, unshared, projectless, nobody's inbox. */
 const boardClaimRefusal = (state, board) =>
   (board.user_id ?? MOCK_USER_ID) !== MOCK_USER_ID ||
   (board.general_access ?? 'restricted') !== 'restricted' ||
@@ -322,7 +293,6 @@ const boardClaimRefusal = (state, board) =>
 
 const MOCK_USER_ID = 'fixture-user';
 
-/** The intermediates rows a summary shows under its filters; a `matching` preview scope resolves the same way. */
 const matchingIntermediates = (rows, { isAdmin, ownerFilter, projectId, search }) => {
   const needle = (search ?? '').toLowerCase();
   return rows
@@ -351,7 +321,6 @@ const mockNonAdminUser = () => ({
 
 const clone = (value) => structuredClone(value);
 
-/** Starter bundles keep fresh-install onboarding reachable in journeys. */
 const STARTER_MODEL = {
   base: 'sd-1',
   description: 'Fixture starter model',
@@ -362,7 +331,6 @@ const STARTER_MODEL = {
   type: 'main',
 };
 
-/** The hosted starter whose source a fixture record carries, so that record reads as catalog-managed. */
 const EXTERNAL_STARTER_MODEL = {
   base: 'external',
   description: 'Fixture hosted starter model',
@@ -405,10 +373,7 @@ const getStarterModelsResponse = (state) => {
 /** The backend's `EXTERNAL_PROVIDER_FIELDS`, in its order: the config route lists each, configured or not. */
 const EXTERNAL_PROVIDER_IDS = ['alibabacloud', 'atlascloud', 'gemini', 'openai', 'seedream'];
 
-/**
- * Hosted-provider credentials as the config route reports them. A provider the profile's hosted records route to has a
- * key, since the backend removes a provider's records when its key is removed; the rest have none.
- */
+/** The backend removes a provider's records with its key, so providers the hosted records route to have one. */
 const createExternalProviderConfigs = (models) => {
   const routed = new Set(
     models.filter((model) => model.type === 'external_image_generator').map((model) => model.provider_id)
@@ -422,7 +387,6 @@ const createExternalProviderConfigs = (models) => {
   );
 };
 
-/** The backend drops a provider's hosted records when its key is removed or reset. */
 const removeExternalModelsForProvider = (state, providerId) => {
   for (const [key, model] of state.models) {
     if (model.type === 'external_image_generator' && model.provider_id === providerId) {
@@ -433,13 +397,11 @@ const removeExternalModelsForProvider = (state, providerId) => {
 
 const DELIVERY_CLAIM_TTL_MS = 120_000;
 
-/** The wildcard the server stores; the caller owns every wildcard the mock holds. */
 const SEEDED_WILDCARD_NAMES = ['animals', 'colors', 'styles/painting'];
 
 /** Most ids one `POST /api/v1/wildcards/delete` takes, as `MAX_WILDCARD_BATCH_SIZE` on the server. */
 const MAX_WILDCARD_BATCH_SIZE = 1000;
 
-/** `count` wildcards: the seeded names first, then numbered ones, as `?wildcards=<count>` on a reset asks. */
 const createWildcards = (count) =>
   new Map(
     Array.from({ length: count }, (_, index) => {
@@ -456,7 +418,6 @@ const sortedWildcards = (state) =>
 const wildcardNameTaken = (state, name, exceptId = null) =>
   [...state.wildcards.values()].some((wildcard) => wildcard.name === name && wildcard.id !== exceptId);
 
-/** `clock` is the working-memory mock's time source (see mock-working-memory.mjs). */
 const createState = (profile, clock) => {
   const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
   const models = new Map(fixture.models.map((model) => [model.key, clone(model)]));
@@ -475,7 +436,6 @@ const createState = (profile, clock) => {
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     imageStorage: createImageStorage(),
     models,
-    /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
     modelProbes: new Map(),
     mutationClock: 0,
     nextBoardNumber: fixture.boards.length + 1,
@@ -501,7 +461,6 @@ const createState = (profile, clock) => {
     /** Custom workflow thumbnails by workflow id; the version stands in for the server's cache-busting query. */
     workflowThumbnails: new Map(),
     nextWorkflowThumbnailVersion: 1,
-    /** Every workflow-library request since the last reset, so journeys can prove which writes happened. */
     workflowRequests: [],
     libraryScenario: null,
     hasLibraryPageFailed: false,
@@ -537,7 +496,6 @@ const timestamp = (state) => {
 /** Keep both map endpoints on one fixed projection timestamp; timestamp(state) advances on every call. */
 const IMAGE_MAP_UPDATED_AT = '2026-01-01 00:00:00.000';
 
-/** The backend's `media_kind` query param: 'image' or 'video', or null (both) when absent or unknown. */
 const getRequestedMediaKind = (url) => {
   const mediaKind = url.searchParams.get('media_kind');
 
@@ -606,7 +564,6 @@ const readRawBody = (request) =>
     request.on('error', reject);
   });
 
-/** The bytes and declared type of one named part of a multipart/form-data body, or null. */
 const readMultipartFile = async (request, fieldName) => {
   const boundary = /boundary=(?:"([^"]+)"|([^;]+))/.exec(request.headers['content-type'] ?? '');
 
@@ -703,11 +660,7 @@ const parseClientStateValue = (value) => {
   }
 };
 
-/**
- * Mirrors `POST /api/v1/gallery/usage` over the fixtures: projects (content and the caller's workspace), library
- * workflows, legacy editor client state and active queue items that name checked media. The mock has one account, so
- * other accounts never use anything.
- */
+/** Mirrors `POST /api/v1/gallery/usage` over the fixtures; the mock has one account, so other accounts use nothing. */
 const galleryMediaUsage = (state, faults, body) => {
   const imageNames = Array.isArray(body.image_names) ? body.image_names : [];
   const videoNames = Array.isArray(body.video_names) ? body.video_names : [];
@@ -717,8 +670,7 @@ const galleryMediaUsage = (state, faults, body) => {
     return [422, { detail: 'board_id cannot be combined with image_names or video_names' }];
   }
 
-  // As the server: only media the caller may delete is checked, images and videos alike (fixture images carry no owner
-  // and are the caller's).
+  // As the server: only media the caller may delete is checked; fixture images carry no owner.
   const isCallers = (item) => (item.owner_user_id ?? MOCK_USER_ID) === MOCK_USER_ID;
   let checked;
 
@@ -940,10 +892,7 @@ const compareGalleryItems = (left, right, orderDir, starredFirst) => {
   );
 };
 
-/**
- * Whether `board_id=all` lists the board's items, as the server's listing of every readable board: an active board the
- * caller may read.
- */
+/** As the server's `board_id=all` listing: an active board the caller may read. */
 const isListedBoard = (state, faults, boardId) => {
   const board = state.boards.get(boardId);
 
@@ -1104,7 +1053,7 @@ const listVideos = (state, url) => {
   };
 };
 
-/** The project this board is the inbox of, if any. Derived from `projects.board_id`, as the backend derives it. */
+/** Derived from `projects.board_id`, as the backend derives it. */
 const inboxProjectIdForBoard = (state, boardId) =>
   [...state.projects.values()].find((project) => project.board_id === boardId)?.project_id ?? null;
 
@@ -1184,8 +1133,7 @@ const boardDto = (state, board, faults) => {
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     image_count: images.filter((image) => image.image_category === 'general').length,
     is_inbox: inboxProjectIdForBoard(state, board.board_id) !== null,
-    // Membership is stored on the board; the backend sends null for a Library board, and to anyone but the owner and
-    // admins.
+    // The backend sends null for a Library board, and to anyone but the owner and admins.
     project_id: access.role === 'owner' || isAdminCaller(faults) ? projectId : null,
     video_count: videos.length,
   };
@@ -1382,7 +1330,6 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
       }
 
       if (method === 'POST' && path === '/__models') {
-        // Test seam: adds model records, from a named seed set or given whole; the profiles' counts stay fixed.
         const body = await readJsonBody(request);
         if (body.set !== undefined && !Object.hasOwn(MODEL_SEED_SETS, body.set)) {
           return json(400, { detail: `Unknown model seed set: ${String(body.set)}` });
@@ -1476,7 +1423,6 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         return json(200, { ok: true, faults: { ...faults } });
       }
 
-      // Changes what another account's board grants the caller behind the page's back: a share or a revocation.
       if (method === 'POST' && path === '/__board-access') {
         const body = await readJsonBody(request);
         const board = state.boards.get(body.board_id);
@@ -1763,8 +1709,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           const name = requested.name ?? `Project Name #${projectNumber}`;
           const projectId = requested.project_id ?? `mock-project-${projectNumber}`;
 
-          // Refusals come before anything is written: a refused create claims no board, as the server's one transaction
-          // would not.
+          // Refusals come before any write: a refused create claims no board.
           const minimum = requested.minimum_canvas_schema_version ?? DEFAULT_CANVAS_SCHEMA_VERSION;
           const maximum = clientMaximum(requested.max_canvas_schema_version);
           if (minimum > maximum) {
@@ -1776,7 +1721,6 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
               ...documentSchemaUnsupported(documentFloor, documentMaximum(requested.max_document_schema_version))
             );
           }
-          // The caller's first workspace, stored with the content: only beside split content, as the server has it.
           const workspaceData = requested.workspace ?? null;
           if (workspaceData !== null && documentFloor < SPLIT_DOCUMENT_SCHEMA_VERSION) {
             return json(400, {
@@ -1834,7 +1778,6 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           state.nextProjectNumber += 1;
           state.projects.set(project.project_id, project);
 
-          // The answer carries the workspace this create stored, null when it carried none.
           return json(200, { ...writtenRecordOf(project), workspace: project.workspace });
         }
       }
@@ -1954,14 +1897,12 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
             };
           }
 
-          // The board's name tracks the project's; the two commit together.
           const board = state.boards.get(project.board_id);
           if (board) {
             board.board_name = project.name;
             board.updated_at = project.updated_at;
           }
 
-          // The answer carries the workspace this write saved, null when it carried none.
           return json(200, { ...writtenRecordOf(project), workspace: workspaceRequest ? project.workspace : null });
         }
         if (method === 'DELETE') {
@@ -1971,8 +1912,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
               return json(422, { detail: 'boards must be release or delete' });
             }
             state.projects.delete(projectId);
-            // The inbox goes with the project; the other boards are released or go too. Media survives as uncategorized
-            // either way.
+            // The inbox goes with the project; other boards are released or deleted; media survives uncategorized.
             const removedBoardIds = new Set([project.board_id]);
             for (const board of state.boards.values()) {
               if ((board.project_id ?? null) === projectId && board.board_id !== project.board_id) {
@@ -2093,8 +2033,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
 
       const queueItemDeliveryMatch = /^\/api\/v1\/queue\/[^/]+\/i\/(\d+)\/delivery$/.exec(path);
       if (queueItemDeliveryMatch && method === 'POST') {
-        // Like the backend: one claimant at a time stages an item's results until it confirms, releases, or its claim
-        // expires; a confirmed item stays delivered.
+        // Like the backend: one claimant stages an item until it confirms, releases or expires.
         const itemId = Number(queueItemDeliveryMatch[1]);
         if (!state.queueItems.has(itemId)) {
           return json(404, { detail: 'Queue item not found' });
@@ -2232,7 +2171,6 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
             ids
               .map((itemId) => itemsById.get(itemId))
               .filter((item) => item !== undefined)
-              // SessionQueueItemSummary: an item without its session, workflow or lineage beyond the parent.
               .map((item) =>
                 Object.fromEntries(
                   [
@@ -2258,8 +2196,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         if (action === 'item_ids' || action === 'list') {
           const descending = url.searchParams.get('order_dir')?.toUpperCase() !== 'ASC';
           const itemIds = scopedItems.map((item) => item.item_id).sort((left, right) => left - right);
-          // Like the backend: an optional limit from 1 to MAX_QUEUE_ITEM_IDS_PER_REQUEST returns the head of the order,
-          // and total_count is then the number of ids returned.
+          // Like the backend: a limit returns the head of the order, and total_count is then the number returned.
           const limit = action === 'item_ids' ? url.searchParams.get('limit') : null;
 
           if (limit !== null && !(/^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= 1000)) {
@@ -2276,7 +2213,6 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         if (action === 'cancel_all' && method === 'PUT') {
           const originPrefix = url.searchParams.get('origin_prefix');
 
-          // Calibration items live with the working-memory mock; see mock-working-memory.mjs.
           if (originPrefix !== null && state.workingMemory.isCalibrationPrefix(originPrefix)) {
             return json(200, { canceled: state.workingMemory.cancelByOrigin(originPrefix) });
           }
@@ -2327,8 +2263,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           return json(200, { canceled });
         }
         if (action === 'retry_items_by_id' && method === 'PUT') {
-          // Like the backend: a failed or canceled item retries its failed or canceled root, once, as a new pending
-          // item with a fresh session; the result names the retried roots and pairs each with its rerun.
+          // Like the backend: each failed or canceled root retries once as a new pending item paired with its rerun.
           const itemIds = await readJsonBody(request, []);
           const retriedItems = [];
           const seenRoots = new Set();
@@ -2432,8 +2367,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           return json(404, { detail: 'Model not found' });
         }
         if (method === 'PATCH') {
-          // Submitted fields replace stored ones wholesale and the key stays, as in ModelRecordService.update_model.
-          // Unlike the backend, it accepts any field: no validation and no 409 for a field the model's config lacks.
+          // Fields replace stored ones wholesale, as in update_model, but without the backend's validation or 409s.
           const updated = { ...model, ...(await readJsonBody(request)), key };
           state.models.set(key, updated);
           return json(200, clone(updated));
@@ -2836,8 +2770,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
             ...(changes.general_access !== undefined ? ['set_general_access'] : []),
             ...(moves ? ['move'] : []),
           ];
-          // As the router does: the caller's role first, as if the board were not an inbox; then the inbox, which takes
-          // its name, archived state and access from the project and cannot move, refuses what its project owns.
+          // As the router: the caller's role first, then the inbox refuses what its project owns.
           for (const action of requiredActions) {
             if (!boardAccessFor(state, faults, board, { ignoreInbox: true }).allows(action)) {
               return json(...BOARD_ACTION_FORBIDDEN);
@@ -3655,7 +3588,6 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         const query = url.searchParams.get('query')?.trim().toLocaleLowerCase() ?? '';
         const tags = url.searchParams.getAll('tags');
         const isPublic = url.searchParams.get('is_public');
-        // The API pages from 0; the client asks for page 0 first.
         const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
         const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
         if (state.libraryScenario === 'failed-page' && page === 2 && !state.hasLibraryPageFailed) {
@@ -3664,8 +3596,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         }
         const orderBy = url.searchParams.get('order_by') ?? 'updated_at';
         const sign = url.searchParams.get('direction') === 'ASC' ? 1 : -1;
-        // As the server orders: names ignoring ASCII case (SQLite's NOCASE), NULLs last in both directions, the id
-        // breaking ties.
+        // As the server: NOCASE names, NULLs last in both directions, the id breaking ties.
         const sortKey = (workflow) =>
           orderBy === 'name'
             ? workflow.name.replace(/[A-Z]/g, (letter) => letter.toLowerCase())

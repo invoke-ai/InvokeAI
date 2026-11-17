@@ -1,5 +1,3 @@
-/** Keep layout helpers independent of xyflow and UI contracts; callers adapt minimal node/edge shapes. */
-
 export interface LayoutGraphNode {
   id: string;
 }
@@ -9,7 +7,6 @@ export interface LayoutGraphEdge {
   targetNodeId: string;
 }
 
-/** Append to a map of lists, creating the list on first use. */
 const pushTo = <K, V>(lists: Map<K, V[]>, key: K, value: V): void => {
   const list = lists.get(key);
 
@@ -154,11 +151,7 @@ interface ComponentLayout {
   width: number;
 }
 
-/**
- * Layered layout of one connected graph at the origin: layers are columns as wide as their widest node, nodes stack top
- * to bottom within a layer, and a layer's rows follow the mean row of their parents in the layer before (ties keep
- * node-array order) so edges tend not to cross.
- */
+/** Rows follow the mean row of their parents in the previous layer (ties keep node order), so edges rarely cross. */
 const layoutComponent = (
   nodes: LayoutSizedNode[],
   edges: LayoutGraphEdge[],
@@ -215,12 +208,7 @@ const layoutComponent = (
   return { height, positions, width: Math.max(0, x - layerGap) };
 };
 
-/**
- * Layered layout that respects each node's size. Each connected component is laid out on its own (see
- * `layoutComponent`); components then fill rows left to right in node-array order, wrapping at a width that keeps the
- * arrangement roughly square, so unconnected nodes form a grid rather than one tall column. A single connected graph is
- * simply its layered layout at the origin.
- */
+/** Components fill rows in node order, wrapping to stay roughly square, so unconnected nodes form a grid. */
 export const getSizedLayeredPositions = (
   nodes: LayoutSizedNode[],
   edges: LayoutGraphEdge[],
@@ -285,10 +273,8 @@ export interface ArrangedLayout {
 export const UNMEASURED_ARRANGE_SIZE = { height: 160, width: 288 } as const;
 
 /**
- * The editor's Arrange command: lays out `selectedIds` (every node when null) with `getSizedLayeredPositions`, anchored
- * at the arranged nodes' current top-left corner so the result stays where the author was working. Nodes outside the
- * selection keep their positions, and edges to them do not rank the arranged ones. Loop linkages are ignored too: they
- * point backwards, and ranking by them would fold a loop body onto its own head.
+ * Anchored at the arranged nodes' top-left; unselected nodes keep positions and do not rank the arranged ones. Loop
+ * linkages are ignored: they point backwards and would fold a loop body onto its head.
  */
 export const getArrangedLayout = (
   nodes: readonly ArrangeNode[],

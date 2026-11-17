@@ -40,18 +40,11 @@ import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/acco
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
-/**
- * Own Preview query merging, cursor derivation, boundary fetches, and neighbor prefetch. Shared absolute pages let
- * Preview reach deep selections without replaying every earlier page.
- */
+/** Query merging, cursor, boundary fetches and prefetch over shared absolute pages. */
 
 const EMPTY_PREVIEW_ITEMS: GalleryItem[] = [];
 
-/**
- * The page Preview opens on. An ordinary listing is the stamp's own, so its page holds. A ranked filmstrip follows the
- * Gallery's live ranking, board and media kind; the stamped page is reused only while all three still match what it was
- * stamped in, and otherwise Preview mirrors the Gallery's page.
- */
+/** A ranked filmstrip reuses the stamped page only while ranking, board and kind still match. */
 export const getPreviewSelectedPage = ({
   galleryPage,
   navigationBoardId,
@@ -188,10 +181,7 @@ export interface PreviewNavigationState {
   navigationQueryKey: string;
   /** The page a selection of `item` is stamped with — see the action context's `getItemSelectionPage`. */
   getSelectionPage: (item: GalleryItem) => number;
-  /**
-   * The page `item` holds in the listing Preview navigates: its loaded page, else the page Preview opened on. Unlike
-   * `getSelectionPage`, an item not loaded yet never reads as the top of the listing.
-   */
+  /** The loaded page of `item`, else the opening page; unloaded items never read as the top. */
   getNavigatedPage: (item: GalleryItem) => number;
   /** Lazily fetch the full ordered listing when an action needs an item beyond the sparse loaded pages. */
   loadOrderedRefs: (signal: AbortSignal) => Promise<GalleryItemRef[]>;
@@ -246,8 +236,7 @@ export const usePreviewNavigation = ({
     () => parseDateTokens(selectedImageQuery.searchTerm),
     [selectedImageQuery.searchTerm]
   );
-  // A ranked filmstrip follows the gallery's current search, board and paging; a listing follows the selection's. A
-  // selection made outside the Gallery navigates its own board even while the Gallery ranks.
+  // A ranked filmstrip follows the gallery's current search, board and paging; a listing follows the selection's.
   const navigationSemanticQuery = selectedImageQuery.itemBoard ? null : semanticQuery;
   const navigationBoardId = navigationSemanticQuery ? galleryBoardId : selectedImageQuery.boardId;
   const navigationGalleryView = selectedImageQuery.galleryView;
@@ -391,8 +380,7 @@ export const usePreviewNavigation = ({
       const itemKey = toGalleryItemKey(item);
       const page = pages.find(({ data }) => data.items.some((candidate) => toGalleryItemKey(candidate) === itemKey));
 
-      // Ranked picks retain their exact result page. Ordinary picks use their exact shared page; local anchors fall
-      // back to the selected page in paginated mode or the board top for recent items outside this page set.
+      // Ranked picks retain their exact result page.
       if (navigationSemanticQuery !== null) {
         return page === undefined ? selectedPage : page.offset / GALLERY_PAGE_SIZE;
       }
@@ -459,8 +447,7 @@ export const usePreviewNavigation = ({
     [queueItems]
   );
   const navigationLocalItems = useMemo(() => {
-    // Keep recent results until listings catch up, except in filtered or deep windows where they do not belong. Those
-    // windows merge only in-flight work and selection.
+    // Keep recent results until listings catch up, except in filtered or deep windows where they do not belong.
     const hasActiveSearch =
       navigationStarredOnly || selectedImageSearch.text.trim() !== '' || selectedImageSearch.range !== undefined;
 

@@ -1,12 +1,10 @@
 import type { RasterSurface } from './render/raster';
 
-/** A 2D point or vector. */
 export interface Vec2 {
   x: number;
   y: number;
 }
 
-/** An axis-aligned rectangle. */
 export interface Rect {
   x: number;
   y: number;
@@ -34,7 +32,6 @@ export interface Mat2d {
   f: number;
 }
 
-/** Identifiers for the tools the engine's interaction layer can dispatch to. */
 export type ToolId =
   | 'brush'
   | 'eraser'
@@ -53,7 +50,6 @@ export type ToolId =
 /** Selection operations replace, union, subtract or intersect the existing alpha mask. */
 export type SelectionOp = 'replace' | 'add' | 'subtract' | 'intersect';
 
-/** Modifier key state accompanying a pointer sample. */
 export interface PointerModifiers {
   shift: boolean;
   alt: boolean;

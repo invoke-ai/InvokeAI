@@ -12,7 +12,6 @@ import type { Mat2d, PlacedSurface, Rect, Vec2 } from '@workbench/canvas-engine/
 import { applyToPoint, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { intersect, isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
 
-/** A live floating selection. */
 export interface FloatingSelection {
   /** The layer the pixels were cut from, and the only layer they can bake into. */
   readonly layerId: string;
@@ -34,7 +33,6 @@ export interface FloatingSelection {
 /** A lift took the pixels, was refused admission (and reported it), or found nothing it could lift. */
 export type FloatLiftResult = 'lifted' | 'refused' | 'unavailable';
 
-/** Inputs to {@link liftSelectedPixels}. */
 export interface LiftSelectedPixelsParams {
   backend: RasterBackend;
   /** The layer's cache surface and its layer-local content rect. */
@@ -92,8 +90,7 @@ const projectIntoLocal = (
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
-  // document → layer-local → region-local, so the source's own document-space
-  // origin can be passed straight to `drawImage`.
+  // document → layer-local → region-local, so the source's own document-space origin can be passed to `drawImage`.
   const toRegion = multiply({ a: 1, b: 0, c: 0, d: 1, e: -region.x, f: -region.y }, inverseLayerMatrix);
   ctx.setTransform(toRegion.a, toRegion.b, toRegion.c, toRegion.d, toRegion.e, toRegion.f);
   ctx.drawImage(source.surface.canvas, source.rect.x, source.rect.y);

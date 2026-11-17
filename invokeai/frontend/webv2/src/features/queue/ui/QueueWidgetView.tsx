@@ -36,22 +36,15 @@ type LocalRunListModule = Pick<typeof LocalRunListExports, 'LocalRunList'>;
 
 type LocalRunListRows = ComponentType<ComponentProps<typeof LocalRunListExports.LocalRunList>>;
 
-/** An external store of the rows component, so the section renders the fresh one a Retry creates. */
 export interface LocalRunListLoader {
-  /** The rows, lazily; replaced on Retry after a failure, since `React.lazy` keeps its first rejection. */
+  /** Replaced on Retry, since `React.lazy` keeps its first rejection. */
   getSnapshot(): { Rows: LocalRunListRows };
-  /** Starts the import without waiting; a failed one stays failed until `retry`. */
   preload(): void;
-  /** Imports again after a failure (an import in flight or done is reused), for the section's Retry. */
   retry(): Promise<unknown>;
   subscribe(listener: () => void): () => void;
 }
 
-/**
- * Loads the Submitting section's rows. Runs the backend has not accepted are rare, so they load with the first one, not
- * with the widget. A failed import stays failed until Retry, so re-rendering never refetches it: the server that
- * refused the run usually serves the chunk too.
- */
+/** Loads with the first unaccepted run, not the widget; a failed import stays failed until Retry. */
 export const createLocalRunListLoader = (importer: () => Promise<LocalRunListModule>): LocalRunListLoader => {
   const listeners = new Set<() => void>();
   let failed = false;
@@ -95,7 +88,7 @@ export const createLocalRunListLoader = (importer: () => Promise<LocalRunListMod
 
 const localRunList = createLocalRunListLoader(() => import('./LocalRunList'));
 
-/** The part of the Workbench's widget runtime the queue uses: Queue cannot import Workbench. */
+/** Queue cannot import Workbench. */
 export interface QueueWidgetRuntime {
   commands: {
     register(command: { handler: () => unknown; id: string; title: string }): () => void;
@@ -123,10 +116,7 @@ export const QueueWidgetView = ({
 /** The Workbench's hotkey catalog binds `queue.recallAll` (A) to it, claimed only on a row offering recall. */
 const QUEUE_RECALL_ALL_COMMAND = 'queue.recallAll';
 
-/**
- * Recalls the focused row's settings. The key goes to the focused element, so that is the row it names. Registered once
- * per mount; the queue keys it by project, region and language, which its source and title follow.
- */
+/** The key goes to the focused element, so that is the row it names. */
 const QueueRecallAllCommand = ({ runtime }: { runtime: QueueWidgetRuntime }) => {
   const { t } = useTranslation();
   const { recallAllFromItem } = useQueueUi();
@@ -171,8 +161,7 @@ const QueueContent = ({ region, runtime }: { region: QueueWidgetRegion; runtime:
     setFilter('all');
   }
 
-  // The counted filters stay put while the item lists scroll on their own. Sections bleed out of the list padding, so
-  // the extra row gap keeps row surfaces off the panel edges by the same distance that separates rows.
+  // Sections bleed out of the list padding, so the extra row gap keeps row surfaces off the panel edges.
   return (
     <Stack gap="2" h="full" minH="0" pt="2">
       <QueueRecallAllCommand key={`${activeProjectId}:${region}:${i18n.language}`} runtime={runtime} />
@@ -191,21 +180,12 @@ const QueueContent = ({ region, runtime }: { region: QueueWidgetRegion; runtime:
   );
 };
 
-/**
- * Fetches the rows with the first unaccepted run, shown or not, while the server that serves them likely still answers.
- * Mounted while there is one; mounting again later reuses the import, or keeps a failed one failed until Retry.
- */
 const LocalRunListPreload = ({ rows }: { rows: LocalRunListLoader }) => {
   useMountEffect(rows.preload);
   return null;
 };
 
-/**
- * SUBMITTING — this tab's runs the backend has not accepted yet: being sent, or retried after failures. The backend has
- * no row for them, so this is the one place to see why they wait and to cancel them. Like the current batch, they are
- * unfinished, so they show under All and Active alone. The header shows at once, so the section does not jump when its
- * rows arrive; rows that fail to load leave the rest of the widget working.
- */
+/** The backend has no row for these, so this is the only place to see why they wait and cancel them. */
 export const LocalRunsSection = ({
   filter,
   rows,
@@ -249,10 +229,8 @@ const RETRY_ANNOUNCEMENT_KEYS = {
 } satisfies Record<NonNullable<QueueLocalRun['retry']>['reason'], string>;
 
 /**
- * Tells screen readers why a run retries. Each retried run has one line keyed by its reason and naming no attempt, so a
- * line is added, and spoken, only when a run starts retrying or its reason changes, never on another attempt. It stays
- * mounted, whatever the filter, because a region inserted with its text is not announced, and switching tabs is no
- * news. Being offline, and the final failure that removes the run, are left to their own notices.
+ * One line per retried run keyed by its reason, so it speaks only when retrying starts or the reason changes.
+ * Stays mounted whatever the filter: a region inserted with its text is not announced.
  */
 const LocalRunAnnouncements = ({ runs }: { runs: readonly QueueLocalRun[] }) => {
   const { t } = useTranslation();

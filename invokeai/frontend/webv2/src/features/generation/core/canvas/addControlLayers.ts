@@ -12,7 +12,6 @@ import { createControlValidationSequence } from './controlValidation';
 
 const LLLITE_COLLECTOR_NODE_ID = 'control_lllite_collector';
 
-/** The control-adapter kinds a control layer can carry. */
 export type { ControlAdapterKind } from './controlValidation';
 
 /** A resolved control-adapter model identifier (the backend model field shape). */
@@ -76,7 +75,6 @@ const feedImage = (
   }
 };
 
-/** Options for {@link addControlLayers}. */
 export interface AddControlLayersOptions {
   /** The main model base — selects the adapter nodes and support. */
   base: SupportedGenerateBase;
@@ -152,7 +150,6 @@ export const getOrAddLliteCollector = (
   return collector;
 };
 
-/** Resolves the backend node type for a controlnet layer on `base`. */
 const controlNetNodeType = (base: string): string => (base === 'flux' ? 'flux_controlnet' : 'controlnet');
 
 /** Validate defensively through the shared policy before graph wiring. */

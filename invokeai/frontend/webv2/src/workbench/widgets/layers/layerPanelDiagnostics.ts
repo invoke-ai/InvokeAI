@@ -1,7 +1,4 @@
-/**
- * Deterministic counters for the panel's performance contract: how many times each row committed and how many
- * thumbnails were requested. Read by budget tests only; production never reads them.
- */
+/** Row-commit and thumbnail-request counters for the panel's budget tests; production never reads them. */
 const rowCommits = new Map<string, number>();
 
 export const recordLayerRowCommit = (id: string): void => {

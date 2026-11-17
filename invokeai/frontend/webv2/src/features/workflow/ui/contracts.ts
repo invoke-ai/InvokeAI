@@ -121,10 +121,6 @@ export interface GraphPreviewProvenance {
   label: string;
 }
 
-/**
- * isLive distinguishes recompilation from current project state from replaying a saved compiled graph and controls the
- * dialog subtitle.
- */
 /** The host's Invoke for a graph preview's source, rendered by the host (the preview owns no route). */
 export interface GraphPreviewInvoke {
   control: ReactNode;
@@ -142,6 +138,7 @@ export interface GraphPreviewSourceState {
   /** Human-readable result destination (e.g. "Gallery"), set for every source by the builder. */
   destinationLabel: string | null;
   invalidReasons: Array<string | ForLoopValidationReason>;
+  /** Recompiled from current project state, rather than a saved compiled graph replayed; sets the dialog subtitle. */
   isLive: boolean;
   notices: GraphPreviewNotice[];
   positionHints?: Record<string, XYPosition>;
@@ -151,5 +148,4 @@ export interface GraphPreviewSourceState {
   getProvenance?: (nodeId: string, fieldName: string) => GraphPreviewProvenance | null;
 }
 
-/** Attribution for editor timings. */
 export type WorkflowPerfSource = LogSource;

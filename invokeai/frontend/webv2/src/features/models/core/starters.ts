@@ -5,8 +5,7 @@ import { getModelBaseLabel } from './baseIdentity';
 
 /** Pure filter/sort for the starter-models catalog; the installed-library twin is `library.ts`. */
 
-/** Starter models have no local files, so `size` is not a meaningful sort. */
-// The catalog has no file sizes or install paths, and its type facet is the filter, not a sort.
+/** The catalog has no file sizes or install paths, and its type facet is the filter, not a sort. */
 export type StarterSortField = Exclude<ModelSortField, 'size' | 'type' | 'path'>;
 
 export interface StarterModelFilters {

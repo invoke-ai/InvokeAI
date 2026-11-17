@@ -75,7 +75,6 @@ const clampWeight = (weight: number, scale: number): number => Math.min(scale, M
 export const getRebalanceBarScale = (weights: readonly number[]): number =>
   weights.reduce((scale, weight) => Math.max(scale, weight), REBALANCE_WEIGHT_TRACK_MAX);
 
-/** Puts an arbitrary weight onto the step grid and inside the track. */
 export const snapRebalanceWeight = (weight: number, scale: number): number => snapWeight(clampWeight(weight, scale));
 
 /** Pointer position to weight. `fractionFromTop` is 0 at the track's top edge, 1 at its bottom. */

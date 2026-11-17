@@ -76,8 +76,7 @@ const GalleryDragEndMonitor = ({ onDragEnd }: { onDragEnd: (event: DragEndEvent)
 };
 
 /**
- * Own async resolution and report complete items through onChange. onUploadFile and custom thumbnails support media
- * stored outside the gallery.
+ * Owns async resolution, reports complete items via onChange; onUploadFile/custom thumbnails serve non-gallery media.
  */
 export const GalleryMediaSlot = ({
   accept,

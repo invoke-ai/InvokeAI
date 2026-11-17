@@ -6,10 +6,7 @@ import type { AxisRanges } from './imageMapViewport';
 
 import { CLUSTER_PALETTE, getClusterColor } from './clusterPalette';
 
-/**
- * Pure WebGL-independent trace builders follow PhotoMapAI's fixed named order, placing Current Image last so gold
- * markers render above other traces.
- */
+/** Trace builders in PhotoMapAI's fixed order; Current Image last, so gold markers draw on top. */
 
 export const ALL_POINTS_TRACE = 'All Points';
 export const CLUSTER_SELECTION_IMAGES_TRACE = 'Cluster Selection';
@@ -17,7 +14,7 @@ export const CLUSTER_SELECTION_VIDEOS_TRACE = 'Cluster Selection Videos';
 export const HIGHLIGHTED_POINTS_TRACE = 'Highlighted Points';
 export const CURRENT_IMAGE_TRACE = 'Current Image';
 
-/** Opacity for DBSCAN noise points (cluster -1); clustered points are solid. */
+/** DBSCAN noise is cluster -1. */
 const NOISE_OPACITY = 0.25;
 const POINT_OPACITY = 0.85;
 
@@ -39,35 +36,16 @@ export interface ScatterTrace {
   };
 }
 
-/** Marker shapes per media kind; see `buildAllPointsTraces`. */
 const IMAGE_SYMBOL = 'circle';
 const VIDEO_SYMBOL = 'diamond';
 
 /**
- * The base points, split into one trace per distinct appearance.
- *
- * A single trace carrying per-point `color`/`opacity`/`symbol` arrays is what made zooming a large map slow: plotly
- * reprocesses every one of those arrays on each relayout, and a zoom is a relayout per frame. Splitting the points so
- * every marker property is scalar cuts a zoom step by roughly 14x at 170k points and 20x at 300k, and builds the scene
- * about twice as fast while retaining half the heap.
- *
- * Each point keeps the appearance it had, but the ORDER changes: points now paint grouped rather than in gallery order,
- * so where two points overlap the one on top can differ. Markers are translucent, so that is visible. Noise is emitted
- * first, which is the deliberate part — dimmed points belong under the clustered ones. Within a group the original
- * point order is preserved.
- *
- * The cost is hover. Plotly builds a kd-tree for hit-testing only on traces of 100k points or more, so one 170k trace
- * had one and none of these do: hover goes from ~1.5ms to ~7ms at 170k and ~11ms at 300k, throttled to 20/s. Zoom was
- * 180ms+ at those sizes, so this trades a cost nobody could work through for one that is merely warm.
- *
- * At most (palette + noise) x (image, video) groups exist, so the trace count is bounded by the palette rather than by
- * the gallery. Below roughly 5k points the per-trace overhead makes this a small net loss (~2.5ms a frame at 200
- * points) — accepted rather than switched on a threshold, because making the draw order depend on gallery size is a
- * worse bargain than the milliseconds.
+ * One trace per distinct appearance: per-point marker arrays made each zoom relayout ~14x slower at 170k points.
+ * Noise is emitted first so dimmed points sit underneath. Hover gets slower (~1.5ms to ~7ms at 170k, kd-trees only for
+ * 100k+ point traces); below ~5k points the per-trace overhead is a small accepted loss.
  */
 export const buildAllPointsTraces = (points: ImageMapPoint[]): ScatterTrace[] => {
-  // Bucketed by a small integer rather than a composed string key: this runs over every point on each data change, and
-  // building a key per point is the one part of it that would allocate.
+  // Bucketed by a small integer, not a composed string key, so the per-point pass does not allocate.
   const buckets: ImageMapPoint[][] = [];
 
   for (const point of points) {
@@ -79,7 +57,6 @@ export const buildAllPointsTraces = (points: ImageMapPoint[]): ScatterTrace[] =>
   }
 
   const traces: ScatterTrace[] = [];
-  // Noise occupies the slots just past the palette, and emitting it first is what puts the dimmed points underneath.
   const order = [...buckets.keys()].sort(
     (left, right) => Number(right >= CLUSTER_PALETTE.length * 2) - Number(left >= CLUSTER_PALETTE.length * 2)
   );
@@ -95,16 +72,14 @@ export const buildAllPointsTraces = (points: ImageMapPoint[]): ScatterTrace[] =>
     const cluster = clusterOf(first);
 
     traces.push({
-      // The gallery's item key, so a click or hover resolves back to the kind the point stands for — plotly carries
-      // strings, and a bare name would not say whether it names an image or a video.
+      // Plotly carries strings, and a bare name would not say whether it names an image or a video.
       customdata: group.map((point) => point.key),
       hoverinfo: 'none',
       marker: {
         color: getClusterColor(cluster),
         opacity: cluster < 0 ? NOISE_OPACITY : POINT_OPACITY,
         size: 5,
-        // Videos are diamonds. Color already carries the cluster, so kind needs the one remaining channel: without it a
-        // clip is pixel-identical to an image and can only be found by hovering points one at a time.
+        // Color already carries the cluster, so kind takes the shape channel.
         symbol: first.item.kind === 'video' ? VIDEO_SYMBOL : IMAGE_SYMBOL,
       },
       mode: 'markers',
@@ -118,17 +93,10 @@ export const buildAllPointsTraces = (points: ImageMapPoint[]): ScatterTrace[] =>
   return traces;
 };
 
-/**
- * The point's DBSCAN label, or noise for anything that cannot be one.
- *
- * The bucket slot below is an array index, so a non-integer label would write a string property that `buckets.keys()`
- * never yields — those points would silently never reach a trace, and a fractional one would collide with another
- * cluster's slot and take its colour. The endpoint declares `int` and the client does not validate the body, so this is
- * the guard that keeps a contract slip from quietly deleting part of the map.
- */
+/** The bucket slot is an array index; the client does not validate the `int` the endpoint declares. */
 const clusterOf = (point: ImageMapPoint): number => (Number.isInteger(point.cluster) ? point.cluster : -1);
 
-/** A base trace's own look, kept so a dimmed map can be restored exactly. */
+/** Kept so a dimmed map can be restored exactly. */
 export interface PointAppearance {
   color: string;
   opacity: number;
@@ -139,8 +107,7 @@ export const getTraceAppearance = (trace: ScatterTrace): PointAppearance => ({
   opacity: trace.marker.opacity as number,
 });
 
-// Dimmed points keep a trace of their hue — enough to read the map's structure, not enough to compete with the selected
-// cluster. Opacity alone was not: dense clusters stack translucent markers back up to near full colour.
+// Opacity alone does not dim: dense clusters stack translucent markers back up to near full colour.
 const DIM_TARGET = [110, 110, 116] as const;
 const DIM_DESATURATION = 0.85;
 const DIM_OPACITY = 0.18;
@@ -155,16 +122,12 @@ const mixTowardDimTarget = (hex: string): string => {
   return `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 };
 
-/** How a base trace looks while a cluster is selected; noise stays fainter than clustered points. */
 export const dimAppearance = ({ color, opacity }: PointAppearance): PointAppearance => ({
   color: mixTowardDimTarget(color),
   opacity: DIM_OPACITY * (opacity / POINT_OPACITY),
 });
 
-/**
- * Restyle for the base traces, dimmed or restored. One scalar per trace: a per-point array here would put back the zoom
- * cost the per-appearance split removed.
- */
+/** One scalar per trace: per-point arrays would undo the zoom win. */
 export const toBaseAppearanceRestyle = (
   appearances: readonly PointAppearance[],
   dimmed: boolean
@@ -177,10 +140,7 @@ export const toBaseAppearanceRestyle = (
   };
 };
 
-/**
- * The cluster most of these items belong to on the current map. A refresh can renumber clusters after the selection was
- * made, so the colour is read from the points now drawn rather than remembered from the click.
- */
+/** A refresh can renumber clusters, so the colour is read from the points now drawn. */
 export const getDominantCluster = (points: ImageMapPoint[], keys: ReadonlySet<GalleryItemKey>): number | null => {
   const counts = new Map<number, number>();
 
@@ -205,10 +165,7 @@ export const getDominantCluster = (points: ImageMapPoint[], keys: ReadonlySet<Ga
   return dominant;
 };
 
-/**
- * A selected cluster redrawn at full colour over the dimmed map: one trace per kind, every marker property scalar, so a
- * 100k-member cluster zooms like the base points do. Hit-testing falls through to the base points underneath.
- */
+/** Every marker property scalar, so a 100k-member cluster zooms like the base points; hits fall through to them. */
 export const buildClusterSelectionTraces = (
   points: ImageMapPoint[],
   keys: ReadonlySet<GalleryItemKey>
@@ -243,7 +200,6 @@ export const buildClusterSelectionTraces = (
   ];
 };
 
-/** In-place update for both cluster-selection traces, in trace order. */
 export const toClusterSelectionRestyle = (traces: readonly ScatterTrace[]): Record<string, unknown[]> => ({
   customdata: traces.map((trace) => trace.customdata),
   'marker.color': traces.map((trace) => trace.marker.color),
@@ -251,10 +207,7 @@ export const toClusterSelectionRestyle = (traces: readonly ScatterTrace[]): Reco
   y: traces.map((trace) => trace.y),
 });
 
-/**
- * White-outlined enlarged trace for hand-made multi-selections; fewer than two items need only the gold current target.
- * Cluster clicks use the cluster-selection traces, since per-point arrays are affordable only at hand-picked sizes.
- */
+/** Hand-made multi-selections only: per-point arrays are affordable only at hand-picked sizes. */
 export const buildHighlightedPointsTrace = (
   points: ImageMapPoint[],
   selectedKeys: ReadonlySet<GalleryItemKey>
@@ -263,15 +216,12 @@ export const buildHighlightedPointsTrace = (
 
   return {
     customdata: selected.map((point) => point.key),
-    // 'skip': highlighted points sit over their base points, which carry the same customdata — hit-testing should fall
-    // through to them.
+    // Hit-testing falls through to the base points with the same customdata.
     hoverinfo: 'skip',
     marker: {
       color: selected.map((point) => getClusterColor(point.cluster)),
       line: { color: '#FFFFFF', width: 1 },
       opacity: 1,
-      // The overlay sits on top of the base point, so it carries the kind's shape too — otherwise selecting a video
-      // turns its diamond into a circle.
       symbol: selected.map((point) => (point.item.kind === 'video' ? VIDEO_SYMBOL : IMAGE_SYMBOL)),
       size: 8,
     },
@@ -283,11 +233,9 @@ export const buildHighlightedPointsTrace = (
   };
 };
 
-/** Gold current-item target, populated by live selection restyles. */
 export const buildCurrentImageTrace = (): ScatterTrace => ({
   customdata: [],
-  // 'skip' (not 'none') excludes the marker from hit-testing entirely, so clicks and hovers land on the underlying data
-  // point it covers.
+  // 'skip' (not 'none') drops the marker from hit-testing, so clicks and hovers land on the data point it covers.
   hoverinfo: 'skip',
   marker: {
     color: '#FFD700',
@@ -303,14 +251,10 @@ export const buildCurrentImageTrace = (): ScatterTrace => ({
   y: [],
 });
 
-// Theme-independent grid with a stronger origin for orientation.
 const GRID_LINE_COLOR = 'rgba(128, 128, 128, 0.16)';
 const GRID_ZERO_COLOR = 'rgba(128, 128, 128, 0.32)';
 
-/**
- * Restyle every per-point array derived from the trace. Plotly retains omitted arrays, causing scattergl length
- * mismatches after selection changes.
- */
+/** Restyle every per-point array: Plotly keeps omitted ones, mismatching scattergl lengths. */
 export const toHighlightRestyle = (trace: ScatterTrace): Record<string, unknown[]> => ({
   customdata: [trace.customdata],
   'marker.color': [trace.marker.color as string[]],
@@ -329,7 +273,6 @@ export const buildMapLayout = (
   paper_bgcolor: 'rgba(0,0,0,0)',
   plot_bgcolor: 'rgba(0,0,0,0)',
   showlegend: false,
-  // Preserves the user's pan/zoom across Plotly.react data updates.
   uirevision: 'image-map',
   xaxis: {
     gridcolor: GRID_LINE_COLOR,
@@ -368,10 +311,7 @@ export interface ClusterAnnotation {
   yshift: number;
 }
 
-/**
- * Place theme-independent cluster pills above topmost points with fixed-pixel clearance. Sort largest clusters first,
- * then id, defining declutter priority.
- */
+/** Largest, then id, wins decluttering. */
 export const buildClusterAnnotations = (
   points: ImageMapPoint[],
   labelsByCluster: Record<string, string> | null
@@ -411,12 +351,11 @@ export const buildClusterAnnotations = (
     }));
 };
 
-// Estimate SVG label collision width from fixed-10px text length because labels cannot be measured before drawing.
+// Labels cannot be measured before drawing, so width is estimated from fixed-10px text length.
 const LABEL_CHAR_WIDTH_PX = 6;
 const LABEL_HEIGHT_PX = 18;
-/** Two labels closer than this (edge to edge) count as colliding. */
 const LABEL_GAP_PX = 4;
-/** Marker half-extent includes its 18px size, 2px outline and one extra pixel of label clearance. */
+/** 18px marker, 2px outline and one pixel of label clearance. */
 const MARKER_RADIUS_PX = 11;
 
 interface LabelRect {
@@ -432,10 +371,7 @@ const rectsCollide = (a: LabelRect, b: LabelRect): boolean =>
   a.top < b.bottom + LABEL_GAP_PX &&
   a.bottom > b.top - LABEL_GAP_PX;
 
-/**
- * Return onscreen marker footprint only; offscreen reservations churn invisible labels during panning. Bounds checks
- * reject NaN too.
- */
+/** Onscreen only: offscreen reservations churn hidden labels while panning. Bounds checks reject NaN. */
 const markerRectFor = (
   markerPoint: { x: number; y: number },
   ranges: AxisRanges,
@@ -462,10 +398,7 @@ const markerRectFor = (
     : null;
 };
 
-/**
- * Greedily retain noncolliding labels in priority order. Current-image markers outrank labels because Plotly SVG
- * annotations render above WebGL and cannot be stacked underneath the gold target.
- */
+/** Current-image markers outrank labels: Plotly SVG annotations render above WebGL and cannot go underneath. */
 export const declutterAnnotations = (
   annotations: ClusterAnnotation[],
   ranges: AxisRanges,
@@ -481,15 +414,12 @@ export const declutterAnnotations = (
   }
 
   const kept: ClusterAnnotation[] = [];
-  // Footprints later labels must avoid: every label that won its spot, including the ones the marker then hid (see
-  // below).
   const blockingRects: LabelRect[] = [];
   const markerRect = markerPoint ? markerRectFor(markerPoint, ranges, spanX, spanY, widthPx, heightPx) : null;
 
   for (const annotation of annotations) {
     const centerX = ((annotation.x - ranges.x[0]) / spanX) * widthPx;
-    // Screen y grows downward; yanchor 'bottom' + positive yshift puts the pill's bottom edge yshift pixels above the
-    // anchor point.
+    // Screen y grows downward: yanchor 'bottom' + positive yshift puts the pill's bottom yshift px above the anchor.
     const bottom = ((ranges.y[1] - annotation.y) / spanY) * heightPx - annotation.yshift;
     const halfWidth = (annotation.text.length * LABEL_CHAR_WIDTH_PX) / 2 + annotation.borderpad;
     const rect: LabelRect = {
@@ -503,8 +433,7 @@ export const declutterAnnotations = (
       continue;
     }
 
-    // Reserve a winning label's space before testing marker overlap, preventing lower-priority replacements in the
-    // cleared region. Labels already losing to another label reserve nothing.
+    // Reserve before testing marker overlap, so lower-priority labels cannot take the cleared spot.
     blockingRects.push(rect);
 
     if (markerRect !== null && rectsCollide(rect, markerRect)) {

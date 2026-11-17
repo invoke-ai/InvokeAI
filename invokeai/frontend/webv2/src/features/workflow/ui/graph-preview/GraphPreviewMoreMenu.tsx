@@ -48,9 +48,7 @@ interface GraphPreviewMoreMenuProps {
   onClose: () => void;
 }
 
-/**
- * The preview's graph as a workflow of its own, for the More menu's Open-as items and the footer's "Edit as workflow".
- */
+/** The preview's graph as a workflow of its own, for the More menu's Open-as items and the footer's "Edit as workflow". */
 export const useGraphAsWorkflow = ({
   graph,
   sourceDocument,
@@ -109,7 +107,6 @@ export const useGraphAsWorkflow = ({
     [graph, notifications, sourceDocument, sourceLabel, t, templatesSnapshot]
   );
 
-  /** Adds the graph to the project as a workflow and opens it in the editor, closing the preview. */
   const editInEditor = useCallback(() => {
     const document = toNewDocument('graphPreview.editInEditorFailed');
 

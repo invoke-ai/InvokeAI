@@ -37,7 +37,6 @@ export const TRANSFORM_DRAG_THRESHOLD_PX = 3;
 
 interface GestureState {
   target: TransformTarget;
-  /** Whether this drag moves the layer session or a floating selection. */
   kind: 'layer' | 'float';
   /** The subject transform captured at gesture start (revert target for cancel). */
   startTransform: LayerTransform;
@@ -48,7 +47,6 @@ interface GestureState {
   rect: TransformRect;
   /** Converts a document-space pointer into the subject's space. */
   fromDocument: (point: Vec2) => Vec2;
-  /** The cursor held for the duration of this gesture. */
   cursor: string;
   moved: boolean;
 }
@@ -90,7 +88,6 @@ export const isTransformEligible = (
   liveRect?: Rect
 ): boolean => isLeafEditable(lookupDocumentLeaf(doc, layer.id)) && hittableLayerRect(layer, doc, liveRect) !== null;
 
-/** Creates a fresh transform tool with its own session/gesture state. */
 export const createTransformTool = (): Tool => {
   let gesture: GestureState | null = null;
   // The cursor for the target under the pointer while idle (session but no drag).
@@ -230,8 +227,7 @@ export const createTransformTool = (): Tool => {
     onDeactivate: (ctx, opts) => {
       hoverCursor = null;
       if (opts?.temporary) {
-        // Temporary switches occur only between gestures and clear hover state while preserving session/preview. Real
-        // switches cancel.
+        // Temporary switches (only between gestures) clear hover but keep session/preview; real switches cancel.
         endGesture();
         return;
       }

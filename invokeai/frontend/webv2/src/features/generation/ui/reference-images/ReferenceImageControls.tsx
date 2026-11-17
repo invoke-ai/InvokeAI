@@ -94,7 +94,6 @@ export const ControlSurface = ({ children, ...props }: { children: ReactNode } &
   </Box>
 );
 
-/** Tiny muted label row above a control, with optional right-aligned content. */
 const FieldHeader = ({ children, hint, label }: { children?: ReactNode; hint?: FeatureHintId; label: string }) => {
   const labelText = (
     <Text color="fg.muted" fontSize="xs" fontWeight="medium">
@@ -110,10 +109,7 @@ const FieldHeader = ({ children, hint, label }: { children?: ReactNode; hint?: F
   );
 };
 
-/**
- * The adapter's weight, its one control on the row. `strengthOnly` adapters (Anima) take a strength alone, which cannot
- * go negative.
- */
+/** The adapter's weight, its one control on the row; `strengthOnly` adapters (Anima) take a non-negative strength. */
 export const IPAdapterWeightField = ({
   config,
   disabled,
@@ -440,9 +436,8 @@ const KREA2_MODE_SEGMENTS = [
 ] as const;
 
 /**
- * Switches a Krea-2 reference between Style and Edit; the image stays and Style restarts at its default strength. It
- * stays live while the row is off, so switched-off references can be turned into the set they will join before they
- * run.
+ * Switches a Krea-2 reference between Style and Edit; the image stays and Style restarts at its default strength. Live
+ * while the row is off, so a switched-off reference can be moved into the set it will join before it runs.
  */
 export const Krea2ReferenceModeControl = ({
   config,

@@ -135,7 +135,6 @@ export interface CanvasMutationContext extends CanvasEditConcurrency {
   installPrepared(prepared: PreparedLayerCacheReplacement, persist?: boolean): void;
 }
 
-/** Engine-side wiring for {@link createCanvasMutationContext}. */
 export interface CanvasMutationContextDeps {
   readonly projectId: string;
   readonly history: History;

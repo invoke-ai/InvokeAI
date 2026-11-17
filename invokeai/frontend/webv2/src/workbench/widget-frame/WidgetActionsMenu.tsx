@@ -23,10 +23,7 @@ import { useTranslation } from 'react-i18next';
 
 import { GraphPreviewInvokeScopeContext } from './graphPreviewInvoke';
 
-/**
- * Combine graph actions and manifest headerMenu contributions in one menu. Floating has its own {@link
- * WidgetFloatButton} mode toggle.
- */
+/** Combine graph actions and manifest headerMenu contributions in one menu. */
 
 const GraphPreviewHost = lazy(() => import('./GraphPreviewHost'));
 

@@ -3,30 +3,18 @@ export type WorkbenchThemeId = 'classic' | 'light' | 'osakaJade' | 'mono' | 'ult
 /** Keep the ramp absolute: 50 lightest, 950 darkest, matching Chakra gray. */
 export type NeutralStep = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950;
 
-/**
- * Themes supply a neutral ramp and hue seeds; inset/fill/grid/control stay explicit because their elevation order
- * varies by theme.
- */
+/** Inset, fill, grid and control stay explicit because their elevation order varies by theme. */
 export interface ThemeColors {
-  /** Neutral ramp, lightest (`50`) → darkest (`950`). Source of all bg/fg/border. */
   neutral: Record<NeutralStep, string>;
   /** Invoke identity (lime). Two seeds; the palette's other steps derive in `system.ts`. */
   brand: { solid: string; contrast: string };
-  /** Selection / focus (blue). */
   accent: { solid: string; contrast: string };
-  /** Destructive / error intent. */
   danger: string;
-  /** Positive / success intent. */
   success: string;
-  /** Caution / warning intent. */
   warning: string;
-  /** Recessed work-area floor framed by the chrome (`bg.inset`). Off-ramp. */
   inset: string;
-  /** Subtle neutral fill for hovered/ghost controls (`gray.subtle`). Off-ramp. */
   fill: string;
-  /** Dot-grid decoration drawn on inset surfaces (`fg.grid`). Off-ramp. */
   grid: string;
-  /** Control / chip fill inside panels (`bg.emphasized`). Off-ramp. */
   control: string;
 }
 
@@ -34,15 +22,9 @@ export interface ThemeDefinition {
   id: WorkbenchThemeId;
   label: string;
   description: string;
-  /** Native color-scheme hint for form controls, scrollbars, and `<select>` popups. */
   colorScheme: 'dark' | 'light';
   colors: ThemeColors;
-  /**
-   * How far interaction fills (hovered rows, ghost buttons, tabs) lean from the foreground toward the accent, 0–100. A
-   * fill is this colour at low alpha, so the right amount depends on the surfaces under it: near-grey surfaces want a
-   * trace, or the hover reads as coloured beside a neutral selected fill; strongly tinted surfaces want more, or it
-   * reads as a white film.
-   */
+  /** 0–100 lean from foreground toward accent: near-grey surfaces want a trace, strongly tinted ones more. */
   interactionTint: number;
 }
 
@@ -259,7 +241,6 @@ if (!defaultTheme) {
   throw new Error('At least one workbench theme must be defined.');
 }
 
-/** The default theme. Its ramp/seeds are emitted as the semantic-token `base` value. */
 export const DEFAULT_THEME = defaultTheme;
 
 export const DEFAULT_THEME_ID: WorkbenchThemeId = DEFAULT_THEME.id;
@@ -280,7 +261,6 @@ const LEGACY_THEME_IDS: Record<string, WorkbenchThemeId> = {
   forest: 'osakaJade',
 };
 
-/** A stored theme preference → a current theme id, or `null` for junk. */
 export const resolveWorkbenchThemeId = (value: unknown): WorkbenchThemeId | null => {
   if (isWorkbenchThemeId(value)) {
     return value;
@@ -289,7 +269,6 @@ export const resolveWorkbenchThemeId = (value: unknown): WorkbenchThemeId | null
   return typeof value === 'string' ? (LEGACY_THEME_IDS[value] ?? null) : null;
 };
 
-/** The default panel surface of a theme (lightest end in light mode, near-darkest in dark). */
 const surfaceOf = (theme: ThemeDefinition): string =>
   theme.colorScheme === 'light' ? theme.colors.neutral[50] : theme.colors.neutral[900];
 

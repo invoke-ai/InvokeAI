@@ -13,9 +13,7 @@ const TAB_DISABLED_PROPS = { layerStyle: 'disabled' } as const;
 // Inset: the tablist clips at the tabs' own height, so an outside ring would be cut off.
 const TAB_FOCUS_VISIBLE_PROPS = { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' } as const;
 const ENABLED_TAB = '[role="tab"]:not([aria-disabled="true"])';
-// A hovered tab's background replaces its neighbouring dividers, as the shown tab's does. The theme's `_hover`
-// condition already skips `aria-disabled` controls, so a disabled tab gets no hover fill; this raw selector must skip
-// it too.
+// This raw hover selector must skip `aria-disabled` tabs, as the theme's `_hover` condition does.
 const TABLIST_CSS = {
   [`& > ${ENABLED_TAB}:hover + [data-segment-divider], & > [data-segment-divider]:has(+ ${ENABLED_TAB}:hover)`]: {
     opacity: 0,
@@ -45,21 +43,15 @@ export const SEGMENT_TABS_HEIGHT_PX = 40;
 
 export interface SegmentTab<T extends string = string> {
   id: T;
-  /** Usually a string; gallery tabs carry a dimmed count span. */
   label: ReactNode;
   /** The tab's name when its label is an icon; it is also shown as the tab's tooltip. */
   ariaLabel?: string;
-  /** Nothing to show: the tab stays in place, reads as disabled, ignores clicks and is skipped by the arrow keys. */
   disabled?: boolean;
 }
 
 const isTabEnabled = (tab: HTMLElement): boolean => tab.getAttribute('aria-disabled') !== 'true';
 
-/**
- * Scroll only a scrolling strip, never its ancestors, until `tab` lies wholly inside it and clear of the edge fades.
- * The scroll clamps at either end, where no fade shows. Focus scrolling cannot be relied on: a pointer press does not
- * focus a button in every browser. Physical offsets suit either direction. A strip whose tabs fit is left alone.
- */
+/** Focus scrolling cannot be relied on: a pointer press does not focus a button in every browser. */
 const revealInStrip = (tab: HTMLElement): void => {
   const strip = tab.closest<HTMLElement>('[role="tablist"]');
   if (!strip || strip.scrollWidth <= strip.clientWidth) {
@@ -76,18 +68,13 @@ const revealInStrip = (tab: HTMLElement): void => {
   }
 };
 
-/** Keeps a scrolling strip's selected tab in view whenever selection moves, however it moved (and on mount). */
 const revealSelectedTab = (tab: HTMLElement | null): void => {
   if (tab) {
     revealInStrip(tab);
   }
 };
 
-/**
- * Roving focus for a horizontal tablist: arrows cycle, Home/End jump, all over enabled tabs. A focused disabled tab
- * (the selected one, when it has nothing to show) still steps to its enabled neighbours. A scrolling strip brings the
- * focused tab into view itself, so focus never scrolls the strip's ancestors.
- */
+/** A focused disabled tab still steps to its enabled neighbours; focus never scrolls the strip's ancestors. */
 const focusSibling = (event: ReactKeyboardEvent<HTMLElement>, isScrollable: boolean) => {
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') {
     return;
@@ -125,10 +112,7 @@ const focusSibling = (event: ReactKeyboardEvent<HTMLElement>, isScrollable: bool
 const focusSiblingInScrollingStrip = (event: ReactKeyboardEvent<HTMLElement>) => focusSibling(event, true);
 const focusSiblingInStrip = (event: ReactKeyboardEvent<HTMLElement>) => focusSibling(event, false);
 
-/**
- * Wire caller-owned panels with segmentTabsPanelId/segmentTabsTabId. Active-tab clicks call onSelect again;
- * showActivePanel=false retains selection. trailing sits outside the tablist.
- */
+/** Wire caller-owned panels with segmentTabsPanelId/segmentTabsTabId; showActivePanel=false keeps selection. */
 export const SegmentTabs = <T extends string>({
   activeId,
   ariaLabel,
@@ -143,13 +127,8 @@ export const SegmentTabs = <T extends string>({
   activeId: T;
   ariaLabel: string;
   idBase: string;
-  /** Embedded strips (popovers, dialog headers) drop the panel-strip height and outer padding. */
   isCompact?: boolean;
-  /**
-   * Tabs keep their full labels and the strip scrolls sideways when they do not fit, instead of squeezing every tab.
-   * The selected tab and a tab focused by the arrow keys are brought into view; a vertical wheel scrolls the strip, and
-   * an end hiding tabs fades out.
-   */
+  /** Tabs keep full labels and the strip scrolls sideways; a vertical wheel scrolls it and a hiding end fades. */
   isScrollable?: boolean;
   onSelect: (id: T) => void;
   showActivePanel?: boolean;
@@ -186,7 +165,6 @@ export const SegmentTabs = <T extends string>({
               data-segment-divider=""
               flexShrink={0}
               h="3.5"
-              // Only the shown tab's background replaces its neighbouring dividers; a collapsed strip keeps them all.
               opacity={showActivePanel && (tab.id === activeId || tabs[index - 1]!.id === activeId) ? 0 : 1}
               rounded="full"
               transition="opacity var(--wb-motion-duration-fast)"

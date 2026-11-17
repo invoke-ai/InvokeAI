@@ -45,7 +45,6 @@ export interface CanvasCompositingSettings {
 /** The legacy-parity generation modes a canvas invoke resolves to. */
 export type CanvasGenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
 
-/** The generation modes the pure canvas graph compiler supports (full matrix). */
 export type CanvasCompileMode = CanvasGenerationMode;
 
 /** Pure compiler inputs reference already-uploaded media. */
@@ -81,7 +80,6 @@ export interface CompileCanvasGraphInput {
   canvasMetadata?: Record<string, unknown>;
   /** Prevalidated per-layer composites, each uploaded separately. */
   controlLayers?: readonly ControlLayerGraphInput[];
-  /** Resolved inputs for each supported region. */
   regionalGuidance?: readonly RegionalGuidanceInput[];
 }
 

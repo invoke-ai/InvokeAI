@@ -12,21 +12,10 @@ import { MenuActionItem } from './Menu';
 import { isModalPresent } from './modalPresence';
 import { Tooltip, useTooltipTriggerIds } from './Tooltip';
 
-/**
- * The list/detail shell shared by the Launchpad managers (models, nodes, fonts, preferences). Side by side when both
- * panes fit; below that one pane at a time, the library first, the detail behind a Back control in its header. A footer
- * (install queue, activity) stays visible under whichever pane shows. The column and the detail header share one header
- * height so their bottom borders line up. A bare `/` focuses the manager's search field (a {@link ManagerSearchField},
- * or any field marked `data-manager-search`) while it is in view.
- */
+/** List/detail shell for the Launchpad managers: side by side when both panes fit, else one pane with Back. */
 
-/** The library takes 39% of the manager, between 20rem and 28rem. */
 const LIBRARY_WIDTH = 'clamp(20rem, 39cqi, 28rem)';
-/**
- * Side by side while the detail keeps 30rem beside a 20rem library (50rem, 800px): the managers' detail headers wrap
- * their actions under the title and shorten the item tab below that width. Measured on the manager's own box, so it
- * also answers when the Launchpad rail takes width.
- */
+/** Below this the detail headers wrap; measured on the manager's own box, so it also answers to the Launchpad rail. */
 const SINGLE_PANE = '@container manager (width < 50rem)';
 const SINGLE_PANE_FLAG = '--manager-single-pane';
 const HEADER_MIN_HEIGHT = '2.75rem';
@@ -43,12 +32,8 @@ const TABBABLE_SELECTOR = [
 ]
   .map((selector) => `${selector}:not([tabindex="-1"])`)
   .join(', ');
-/** How long a pane switch made from a popup waits for that popup to return focus. */
 const HANDOFF_TIMEOUT_MS = 4000;
-/**
- * How long focus is watched after it moves with a pane: the list re-keys its virtual rows a frame or two after its data
- * changes, which can unmount the row just focused.
- */
+/** The list re-keys its virtual rows a frame or two after data changes, which can unmount the row just focused. */
 const SETTLE_MS = 300;
 
 const ROOT_CSS: SystemStyleObject = {
@@ -59,12 +44,7 @@ const ROOT_CSS: SystemStyleObject = {
   w: 'full',
 };
 
-/**
- * Both panes stay mounted. In single-pane mode they share one grid cell and the other is visibility-hidden: out of the
- * accessibility tree and tab order, but still laid out, so scroll positions, virtualized rows and form state survive
- * and nothing remounts or refetches. Side by side the footer sits under the detail; in single-pane mode it spans the
- * manager under both.
- */
+/** Both panes stay mounted; the hidden one is visibility-hidden so scroll, virtual rows and form state survive. */
 const GRID_CSS: SystemStyleObject = {
   display: 'grid',
   gridTemplateColumns: `${LIBRARY_WIDTH} minmax(0, 1fr)`,
@@ -97,16 +77,11 @@ interface ManagerBack {
 
 const BACK_SELECTOR = '[data-manager-back]';
 
-/** Lets the detail header place the layout's Back control at its start. */
 const ManagerBackContext = createContext<ManagerBack | null>(null);
 
 const isShown = (element: Element): boolean => element.checkVisibility({ visibilityProperty: true });
 
-/**
- * Where Back lands: the open row, else a non-row control last used in the library (the Add shortcut, search), else the
- * list's roving row, else the first control. Rows are found by the list's own state, never by a remembered element:
- * virtual rows are re-keyed and recycled.
- */
+/** Rows are found by the list's own state, never a remembered element: virtual rows are re-keyed and recycled. */
 const findLibraryEntry = (library: HTMLElement, lastFocused: HTMLElement | null): HTMLElement | null =>
   library.querySelector<HTMLElement>('[data-list-primary][aria-current="true"]') ??
   (lastFocused?.isConnected &&
@@ -119,7 +94,6 @@ const findLibraryEntry = (library: HTMLElement, lastFocused: HTMLElement | null)
   [...library.querySelectorAll<HTMLElement>(TABBABLE_SELECTOR)].find(isShown) ??
   null;
 
-/** Back while it shows, else the selected tab, else the detail's first control. */
 const findDetailEntry = (detail: HTMLElement): HTMLElement | null =>
   [...detail.querySelectorAll<HTMLElement>(BACK_SELECTOR)].find(isShown) ??
   [...detail.querySelectorAll<HTMLElement>('[role="tab"][aria-selected="true"]')].find(isShown) ??
@@ -127,29 +101,17 @@ const findDetailEntry = (detail: HTMLElement): HTMLElement | null =>
   null;
 
 export interface ManagerLayoutProps {
-  /** The library pane, usually a {@link ManagerColumn}. */
   library: ReactNode;
-  /** The detail pane, headed by a {@link ManagerDetailHeader}, which carries Back in single-pane mode. */
   detail: ReactNode;
-  /** Progress that must stay in view whichever pane shows: an install queue, recent activity, upload results. */
   footer?: ReactNode;
-  /** The footer takes the panes' place, as a maximized queue does. */
   footerFills?: boolean;
-  /**
-   * Whether the detail is the pane shown when only one fits: set it when the user opens an item or a detail tab, clear
-   * it in `onBack`. Side by side it changes nothing.
-   */
+  /** Which pane shows when only one fits; side by side it changes nothing. */
   isDetailOpen: boolean;
-  /** Names the library Back returns to, e.g. "Back to models". */
   backLabel: string;
   onBack: () => void;
 }
 
-/**
- * Focus follows the pane switch in single-pane mode: opening moves it to Back, Back returns it to the row it came from.
- * It never stays on a hidden element: a resize across the threshold, or a dialog or menu returning focus to a trigger
- * the switch hid, hands it to the shown pane's entry instead.
- */
+/** Focus never stays on a hidden element: a resize or a popup refocusing a hidden trigger moves it to the pane. */
 export const ManagerLayout = ({
   backLabel,
   detail,
@@ -172,7 +134,6 @@ export const ManagerLayout = ({
   const readSinglePane = (): boolean =>
     gridRef.current !== null && getComputedStyle(gridRef.current).getPropertyValue(SINGLE_PANE_FLAG).trim() === '1';
 
-  /** The entry of the pane the user should be in: the shown one, or side by side the one focus was last in. */
   const focusEntry = (): boolean => {
     const libraryPane = libraryRef.current;
     const detailPane = detailRef.current;
@@ -189,10 +150,6 @@ export const ManagerLayout = ({
     return target !== null && document.activeElement === target;
   };
 
-  /**
-   * Moves focus off a hidden element here, or back from the body when it was lost from this manager or, while
-   * `isSwitching`, lost to anything at all.
-   */
   const repairFocus = (isSwitching: boolean): boolean => {
     const grid = gridRef.current;
     const active = document.activeElement as HTMLElement | null;
@@ -209,12 +166,7 @@ export const ManagerLayout = ({
     return (isHiddenHere || (isLost && (isSwitching || lostFromHere))) && focusEntry();
   };
 
-  /**
-   * After a switch, watch focus for a moment: a dialog or menu the switch was made from (a confirmed delete, an Open
-   * item) still holds focus and will return it to a trigger the switch may have hidden or removed, and a list may
-   * re-key the row just focused. Whatever happens, focus ends in the shown pane, never on a hidden element or the body.
-   * `popupTimeoutMs` extends the watch while a popup holds focus.
-   */
+  /** A popup the switch came from may return focus to a hidden trigger, and the list may re-key the focused row. */
   const watchFocus = (popupTimeoutMs = 0) => {
     const now = performance.now();
 
@@ -239,7 +191,6 @@ export const ManagerLayout = ({
 
       if (!isWaiting) {
         const shownPane = shownView.current ? detailRef.current : libraryRef.current;
-        // Returned to a control outside the shown pane (the footer, a hidden trigger) or lost: lead into the pane.
         const isOutsideShownPane =
           active !== null && grid.contains(active) && shownPane !== null && !shownPane.contains(active);
 
@@ -256,8 +207,7 @@ export const ManagerLayout = ({
     handoff.current.frame = requestAnimationFrame(tick);
   };
 
-  // Focus moves with the pane before paint, so the ring never sits on a pane that just went away; reading the switched
-  // panes' computed visibility is the pre-paint measurement.
+  // Before paint, so the ring never sits on a pane that just went away.
   useLayoutEffect(() => {
     if (shownView.current === isDetailOpen) {
       return;
@@ -279,7 +229,6 @@ export const ManagerLayout = ({
     }
 
     if (isLost || grid.contains(active)) {
-      // From the pane being hidden, or the footer, which stays in view but still leads into the shown pane.
       if (!(isDetailOpen ? detailRef.current : libraryRef.current)?.contains(active)) {
         focusEntry();
       }
@@ -330,8 +279,7 @@ export const ManagerLayout = ({
     };
   });
 
-  // Every manager the Launchpad keeps mounted listens; only the shown one has its search field in view. A modal
-  // suspends the key, as it does application shortcuts.
+  // Every mounted manager listens; only the shown one has its search field in view. A modal suspends the key.
   useMountEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (gridRef.current && !isModalPresent(event)) {
@@ -384,10 +332,6 @@ const SEARCH_HINT = (
   </Kbd>
 );
 
-/**
- * The library's search field, which `/` focuses; the key's hint shows while it is empty. With a `clearLabel`, a query
- * puts a clear control in the hint's place.
- */
 export const ManagerSearchField = ({
   clearLabel,
   label,
@@ -432,19 +376,10 @@ export const ManagerSearchField = ({
   );
 };
 
-/**
- * Trimmed to the digits' cap height and baseline, the count's box is its ink, so the badge's flex centring centres the
- * digits; untrimmed, the font's descender room lifts them off centre.
- */
+/** Trimmed to cap height so flex centring centres the digits. */
 const FILTER_COUNT_TEXT: SystemStyleObject = { textBox: 'trim-both cap alphabetic' };
 
-/**
- * The manager toolbar's filter menu: an icon-only trigger, named and tooltipped by `label`, opening `children` (the
- * menu's portalled positioner and content). It owns the menu root so the root and the trigger's tooltip share one
- * trigger id. A count badge on the trigger's corner says how many filters narrow the list, so filtering shows with the
- * menu closed; sort order is not a filter and is not counted. The name ends with the count, so the visible digits stay
- * part of it (label in name; a parenthetical would not count).
- */
+/** The name ends with the count so the visible digits stay in it; sort order is not counted. */
 export const ManagerFilterMenu = ({
   activeCount,
   children,
@@ -500,10 +435,7 @@ export const ManagerFilterMenu = ({
   );
 };
 
-/**
- * The last row of a manager's filter menu, under a separator: clears the filters `ManagerFilterMenu` counts and leaves
- * sort order and search alone. Disabled while none is active.
- */
+/** Clears what `ManagerFilterMenu` counts; sort order and search stay. */
 export const ManagerFilterResetItem = ({ activeCount, onReset }: { activeCount: number; onReset: () => void }) => {
   const { t } = useTranslation();
 
@@ -522,7 +454,6 @@ export const ManagerFilterResetItem = ({ activeCount, onReset }: { activeCount: 
 };
 
 export interface ManagerAddAction {
-  /** The Add tab's label, e.g. "Add Models". */
   label: string;
   onAdd: () => void;
 }
@@ -534,12 +465,8 @@ export const ManagerColumn = ({
   count,
   title,
 }: {
-  /** Controls at the end of the column header. */
   actions?: ReactNode;
-  /**
-   * Opens the detail on its Add tab. Shown only in single-pane mode, where the detail's tabs are out of reach from the
-   * library; side by side the tab itself is the entry.
-   */
+  /** Shown only in single-pane mode, where the detail's tabs are out of reach. */
   addAction?: ManagerAddAction;
   children: ReactNode;
   count?: ReactNode;
@@ -589,11 +516,7 @@ const DETAIL_HEADER_CSS: SystemStyleObject = {
   '& [role="tab"][data-manager-item-tab]': { flexShrink: 1, minW: '0' },
 };
 
-/**
- * Holds the detail pane's tabs or title, bottom-aligned so a tab list's indicator sits on the border. In single-pane
- * mode it starts with the layout's Back control. Mark the item tab `data-manager-item-tab` so it is the one that
- * shrinks.
- */
+/** Mark the item tab `data-manager-item-tab` so it is the one that shrinks. */
 export const ManagerDetailHeader = ({ children }: { children: ReactNode }) => {
   const back = useContext(ManagerBackContext);
 

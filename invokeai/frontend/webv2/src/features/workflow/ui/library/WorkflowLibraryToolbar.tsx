@@ -128,8 +128,7 @@ export const WorkflowLibraryToolbar = ({
     [onThumbnailFitChange]
   );
 
-  // The order: the key, then its two directions spelled out for that key (Newest first / Oldest first, A to Z / Z to
-  // A).
+  // The order: the key, then its two directions spelled out for it (Newest first / Oldest first, A to Z / Z to A).
   const orderGroups = (
     <>
       <Menu.ItemGroup>

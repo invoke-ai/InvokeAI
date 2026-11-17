@@ -54,7 +54,6 @@ export interface ProjectSummary {
   createdAt: string;
   /** The later of the content's save and the caller's own workspace save: when they last worked on it. */
   updatedAt: string;
-  /** The cover index is independent of document-free listings; absent entries yield no cover. */
   coverUrl?: string;
 }
 
@@ -96,7 +95,6 @@ const toSummary = (dto: ProjectSummaryDTO): ProjectSummary =>
       .reduce((latest, timestamp) => (timestamp > latest ? timestamp : latest)),
   });
 
-/** Recompute summaries when the independent cover index changes. */
 subscribeProjectCovers(() => {
   const { status, summaries } = store.getSnapshot();
 
@@ -116,7 +114,6 @@ subscribeProjectCovers(() => {
   }
 });
 
-/** Most recently edited first — the order Home and the Open dialog present. */
 const sortSummaries = (summaries: ProjectSummary[]): ProjectSummary[] =>
   [...summaries].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
@@ -126,7 +123,6 @@ export const useProjectLibrarySelector = store.useSelector;
 
 export const getProjectLibrary = (): ProjectLibrarySnapshot => store.getSnapshot();
 
-/** Adopt summaries already fetched elsewhere (the workbench boot pass). */
 export const seedProjectLibrary = (dtos: ProjectSummaryDTO[], owner: AccountScope): void => {
   if (!isAccountScopeCurrent(owner)) {
     return;
@@ -137,7 +133,6 @@ export const seedProjectLibrary = (dtos: ProjectSummaryDTO[], owner: AccountScop
 
 const refreshFlight = createSingleFlight<void>();
 
-/** Re-list from the server; concurrent calls share one request. */
 export const refreshProjectLibrary = (): Promise<void> =>
   (() => {
     const owner = captureAccountScope();
@@ -154,7 +149,6 @@ export const refreshProjectLibrary = (): Promise<void> =>
           }
 
           store.patchSnapshot({
-            // The server's own reason, not its raw JSON body: the Launchpad shows it under its own title.
             error: getApiErrorMessage(error, 'Failed to load projects.'),
             status: 'error',
           });
@@ -194,13 +188,6 @@ export const isProjectSummaryCompatible = (summary: ProjectSummary): boolean =>
   isCanvasSchemaVersionSupported(summary.minimumCanvasSchemaVersion) &&
   (summary.minimumDocumentSchemaVersion ?? 0) <= PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION;
 
-/** Open projects mutate through their sync engine; closed projects use the HTTP API directly. */
-
-/**
- * Why a delete was refused before anything was sent: `active-runs` while queue runs for the project are still active
- * (in any tab), `runs-unverified` when the queue-run journal could not be read, `coordination-unavailable` when the
- * cross-tab lock could not be requested. Callers translate it and offer the way forward (the queue for active runs).
- */
 export type ProjectDeletionRefusal = 'active-runs' | 'runs-unverified' | 'coordination-unavailable';
 
 export class ProjectDeletionRefusedError extends Error {
@@ -210,10 +197,6 @@ export class ProjectDeletionRefusedError extends Error {
   }
 }
 
-/**
- * What to tell the viewer about a failed delete, for the editor's notice and the Launchpad's toast alike: a refusal's
- * reason, or the server's message; `offersQueue` when the runs holding it are the way forward.
- */
 export const describeProjectDeletionFailure = (
   error: unknown,
   t: TFunction
@@ -222,10 +205,7 @@ export const describeProjectDeletionFailure = (
     ? { message: t(`projects.deleteRefused.${error.reason}`), offersQueue: error.reason === 'active-runs' }
     : { message: getApiErrorMessage(error, t('common.unknownError')), offersQueue: false };
 
-/**
- * Permanently remove a project from the server, its inbox with it. The only deletion path. Its other boards are
- * released to the Library unless asked to go too; media survives either way.
- */
+/** The only deletion path. Other boards are released to the Library unless asked to go; media survives. */
 export const deleteLibraryProject = async (
   projectId: string,
   boards: DeleteProjectBoards = 'release'
@@ -268,7 +248,6 @@ export const deleteLibraryProject = async (
     forgetStartupLaunchProject(projectId);
     store.patchSnapshot({ summaries: store.getSnapshot().summaries.filter((summary) => summary.id !== projectId) });
 
-    // Remove deleted projects from durable session state so missing records do not reopen.
     await pruneSessionProject(projectId, owner.signal);
     await refreshOpenProjects();
   } finally {
@@ -277,10 +256,6 @@ export const deleteLibraryProject = async (
   }
 };
 
-/**
- * Rename a project. An open one renames through the reducer so its document, its revision chain and its board stay in
- * step; a closed one is a read-modify-write against the server.
- */
 export const renameLibraryProject = async (projectId: string, name: string): Promise<void> => {
   const owner = captureAccountScope();
   const openProject = getOpenProject(projectId);
@@ -288,7 +263,6 @@ export const renameLibraryProject = async (projectId: string, name: string): Pro
   if (openProject) {
     await openProject.rename(name);
     assertAccountScopeCurrent(owner);
-    // The flush has already told the server; this only keeps the grid from waiting for a refetch.
     upsertProjectSummary({ id: projectId, name, revision: null }, owner);
 
     return;
@@ -319,7 +293,6 @@ export const readAcknowledgedProject = async (
   const openProject = getOpenProject(projectId);
 
   if (openProject) {
-    // Written bytes must include canvas pixels that only the live engine holds.
     await openProject.flushPixels();
     assertProjectFlushed(await openProject.flush());
   }
@@ -329,7 +302,6 @@ export const readAcknowledgedProject = async (
   return apiGetProject(projectId, owner.signal);
 };
 
-/** Adopt a project this account just created elsewhere (an import, a duplication). */
 export const adoptCreatedProject = (record: ProjectRecordDTO, owner: AccountScope): ProjectSummary => {
   const summary = toSummary(record);
 
@@ -350,10 +322,6 @@ export interface DuplicatedProject extends ProjectTransferIssues {
   summary: ProjectSummary;
 }
 
-/**
- * Duplicate with a fresh identity and whole-board copy. Enumeration failure is fatal; restoration stays lazy and
- * shared.
- */
 export const duplicateLibraryProject = async (
   projectId: string,
   options: Pick<DuplicateProjectDeps, 'onProgress'> & { owner?: AccountScope } = {}

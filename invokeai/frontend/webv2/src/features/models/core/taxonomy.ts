@@ -106,7 +106,6 @@ export const getModelSourceHref = (source: string, sourceType: string): string |
   return null;
 };
 
-/** Long display names for every known variant value. */
 export const MODEL_VARIANT_LABELS: Record<string, string> = {
   '5b': 'Wan 2.2 5B LoRA',
   a14b: 'Wan 2.2 A14B LoRA',

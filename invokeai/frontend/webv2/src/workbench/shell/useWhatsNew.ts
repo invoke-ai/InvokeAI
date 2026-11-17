@@ -10,10 +10,7 @@ export interface WhatsNewState {
   version: string | null;
 }
 
-/**
- * Show the notes once per server version for each account, after its preferences are known and the beta notice is out
- * of the way, and whenever the app menu asks for them.
- */
+/** Notes once per server version and account, after preferences load and the beta notice, or on request. */
 export const useWhatsNew = (): WhatsNewState => {
   const { isDismissed, isRequested, version } = useWhatsNewSnapshot();
   const isUnseen = useWorkbenchSettingsSelector(

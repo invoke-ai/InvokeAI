@@ -138,10 +138,7 @@ export const nextControlTypeLayerName = (typeLabel: string, existingNames: reado
   return `${typeLabel} ${n}`;
 };
 
-/**
- * Whether a control layer still has a name the app gave it ("Control Layer N", or "<Type> N" from a type change), so
- * choosing a type may rename it; a name the user typed is kept.
- */
+/** Whether a control layer still has an app-given name, so a type change may rename it; typed names stay. */
 export const isAutoControlLayerName = (name: string, typeLabels: readonly string[]): boolean =>
   ['Control Layer', ...typeLabels].some((prefix) => numberedSuffix(prefix, name) !== null);
 
@@ -169,10 +166,7 @@ export const REGIONAL_GUIDANCE_FILL_COLORS: readonly string[] = [
   '#a178d6',
 ];
 
-/**
- * Derive colors from document region count with legacy pre-increment ordering: the first region uses palette index
- * 1. Avoid session-global cross-project state.
- */
+/** Colors from the document's region count, legacy pre-increment: the first region uses palette index 1. */
 export const nextRegionalGuidanceFillColor = (existingRegionalGuidanceCount: number): string =>
   REGIONAL_GUIDANCE_FILL_COLORS[(existingRegionalGuidanceCount + 1) % REGIONAL_GUIDANCE_FILL_COLORS.length];
 
@@ -246,16 +240,11 @@ export const createRegionalGuidanceFromImage = (
   },
 });
 
-/** Mints a fresh regional-guidance reference-image id. */
 export const createReferenceImageId = (): string => createItemId('rgref');
 
-/** Mints a fresh raster adjustment-entry id. */
 export const createAdjustmentId = (): string => createItemId('adj');
 
-/**
- * A new noise entry's amount: σ ≈ 13 of 255, grain clearly visible at 100% zoom without swamping detail. Lower values
- * suit subtle grain or dither; the slider covers both.
- */
+/** A new noise entry's amount: σ ≈ 13 of 255, grain clearly visible at 100% zoom without swamping detail. */
 export const DEFAULT_NOISE_AMOUNT = 0.1;
 
 /** A new noise entry's grain size: one independent sample per pixel, the finest grain. */
@@ -268,10 +257,7 @@ export const DEFAULT_TEXTURE_SIZE = 8;
 /** A fresh uint32 pattern seed for a noise entry. */
 export const createNoiseSeed = (): number => crypto.getRandomValues(new Uint32Array(1))[0]!;
 
-/**
- * A fresh adjustment entry of `type`. Parametric types start at identity so adding one changes nothing until edited;
- * invert has no parameters and noise starts at a visible grain with a fresh seed, so both apply at once.
- */
+/** Parametric types start at identity; invert and noise (fresh seed, visible grain) apply at once. */
 export const createAdjustmentEntry = (type: CanvasAdjustmentEntry['type']): CanvasAdjustmentEntry => {
   const id = createAdjustmentId();
   switch (type) {
@@ -311,13 +297,9 @@ export const createAdjustmentEntry = (type: CanvasAdjustmentEntry['type']): Canv
   }
 };
 
-/** A new regional IP-Adapter reference's weight. */
 export const DEFAULT_REGIONAL_REFERENCE_WEIGHT = 1;
 
-/**
- * Create shared regional-reference defaults: FLUX uses Redux, other bases IP-Adapter. Users choose models and assign
- * images via drop/upload.
- */
+/** Regional-reference defaults: FLUX uses Redux, other bases IP-Adapter. */
 export const createRegionalReferenceImage = (
   base: string | null,
   id: string = createReferenceImageId()
@@ -413,11 +395,7 @@ export const canConvertRasterControl = (layer: CanvasLayerContract): boolean => 
 
 type PixelLayer = CanvasRasterLayerContractV2 | CanvasControlLayerContract;
 
-/**
- * Whether a raster layer's adjustments change its pixels. Control layers carry no adjustments, so such a layer reaches
- * the control stack only with its pixels baked by the engine (`copyLayerToControl`, `convertLayerToControl`); its
- * alpha, all a mask conversion reads, no adjustment changes.
- */
+/** Whether adjustments change the pixels, so moving to the control stack must bake them. */
 export const needsBakedControlPixels = (layer: CanvasLayerContract): boolean =>
   layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments);
 
@@ -469,10 +447,7 @@ const destinationBase = (layer: CanvasLayerContract, id: string, isCopy: boolean
   transform: cloneTransform(layer),
 });
 
-/**
- * An untyped, model-less control layer over the same pixels; generation resolves its model. Null for a layer {@link
- * needsBakedControlPixels}, which no clone represents.
- */
+/** An untyped, model-less control layer over the same pixels; generation resolves its model. */
 const pixelLayerToControl = (
   layer: PixelLayer,
   id: string,
@@ -583,10 +558,7 @@ export const copyRegionalGuidanceToInpaintMask = (
   type: 'inpaint_mask',
 });
 
-/**
- * Convert raster/control types while preserving source, identity, transform, and base properties; reject unsupported or
- * unchanged targets.
- */
+/** Converts raster/control types keeping source, identity, transform and base; rejects unsupported targets. */
 export const convertRasterControlLayer = (
   layer: CanvasLayerContract,
   targetType: 'raster' | 'control',

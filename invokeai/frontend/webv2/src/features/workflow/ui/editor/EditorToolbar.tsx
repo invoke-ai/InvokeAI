@@ -166,10 +166,8 @@ export const EditorToolbar = ({
             positioning={TOOLTIP_POSITIONING}
           >
             <Popover.Trigger asChild>
-              {/*
-               * Render a plain button because asChild would clone ToolbarButton's Tooltip wrapper. Match xs sizing
-               * so one child cannot stretch the column.
-               */}
+              {/* A plain button, because asChild would clone ToolbarButton's Tooltip wrapper. Match xs sizing so one
+                  child cannot stretch the column. */}
               <IconButton
                 aria-label={t('widgets.workflow.toolbar.nodeOpacity')}
                 aria-pressed={nodeOpacity < 1}

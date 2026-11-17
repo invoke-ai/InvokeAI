@@ -28,7 +28,6 @@ const STROKE_COMMIT_LABELS: Record<StrokeCommittedEvent['tool'], string> = {
   'shape-cutout': 'Cut out shape',
 };
 
-/** The history label for a committed pixel stroke. */
 export const strokeCommitLabel = (tool: StrokeCommittedEvent['tool']): string => STROKE_COMMIT_LABELS[tool];
 
 export interface StrokeEdits {

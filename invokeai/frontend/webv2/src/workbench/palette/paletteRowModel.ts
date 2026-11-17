@@ -16,10 +16,7 @@ import {
   searchPaletteRows,
 } from './entries';
 
-/**
- * Single source for stage row construction. `t` is optional so the synchronous stage-preview path can build rows
- * without translation-dependent labels; rendered rows always pass it.
- */
+/** Stage row construction; `t` is optional for the synchronous preview path. */
 export const buildStageRows = (
   stage: PaletteStage,
   onStageApplied: () => void,

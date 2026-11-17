@@ -112,10 +112,6 @@ const HybridStartBlockRow = memo(function HybridStartBlockRow({
   );
 });
 
-/**
- * Expert tags are filename heuristics; explicit wiring remains authoritative, so warn and offer a swap without
- * blocking.
- */
 // Spelled out rather than interpolated, so the translation-key scan can see them and fail the build if a string goes
 // missing.
 const EXPERT_WIRING_MESSAGE_KEYS = {

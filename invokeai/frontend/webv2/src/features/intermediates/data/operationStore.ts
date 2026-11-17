@@ -43,8 +43,7 @@ export const adoptIntermediatesOperation = (
 /** A fresh listing after a timed-out start must answer quickly or not at all; the dialog stays usable either way. */
 const FRESH_LISTING_TIMEOUT_MS = 10_000;
 
-// One listing per account at a time, so a remount (or StrictMode's replayed mount) shares a request; a sign-out and
-// back in gets a fresh one.
+// One listing per account at a time: a remount or StrictMode replay shares a request; a new sign-in gets a fresh one.
 const listings = new Map<string, Promise<IntermediatesOperation[]>>();
 
 const listOnce = (owner: AccountScope): Promise<IntermediatesOperation[]> => {

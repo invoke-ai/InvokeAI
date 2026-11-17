@@ -1,16 +1,7 @@
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createListenerChannel } from '@platform/state/externalStoreCore';
 
-/**
- * The closures behind `{ kind: 'undo' }` notification actions. Notifications are plain workbench state, so they name an
- * undo by id and the closure stays here, for this tab and account only. The record owns the entry and a toast only
- * borrows it: an entry lives while a listed notification names it (`retainNotificationUndos`) or a toast holds it,
- * until it runs, is withdrawn, or the account changes. Entries neither referenced nor held (say, recorded while the
- * editor shell was not mounted) are capped, oldest dropped first. With the list capped at 100, a tab keeps at most 100
- * listed and 20 idle closures, plus what open toasts hold (Clear's toast can hold up to 100 cleared notices'). Most
- * capture ids or small records; Canvas's restore undo keeps a document (metadata only, pixels stay engine-owned), one
- * per project through `supersedes`.
- */
+/** Closures behind undo actions, per tab and account; listed or toast-held entries live, idle ones are capped. */
 const MAX_IDLE_UNDOS = 20;
 
 interface PendingUndo {
@@ -39,10 +30,7 @@ const dropOldestIdleUndo = (): void => {
   }
 };
 
-/**
- * `supersedes` names what the undo reverts, such as one project's Generate settings. A newer undo with the same key
- * withdraws the older ones (their toasts close): undoing an older step after a newer one would leave a mix of both.
- */
+/** A newer undo with the same `supersedes` key withdraws older ones. */
 export const registerNotificationUndo = (onUndo: () => void, supersedes?: string): string => {
   const undoId = `undo-${++nextUndoId}`;
 
@@ -67,10 +55,7 @@ const withdraw = (undoId: string, entry: PendingUndo): void => {
   entry.withdrawal.abort();
 };
 
-/**
- * Withdraws every undo registered under `supersedes` (their toasts close, their buttons go), for an owner that knows
- * the change they revert is no longer the latest: undone another way, or built on since.
- */
+/** Withdraws every undo under `supersedes`, for an owner whose change is no longer the latest. */
 export const withdrawNotificationUndos = (supersedes: string): void => {
   let changed = false;
 
@@ -130,10 +115,7 @@ export const releaseNotificationUndo = (undoId: string): void => {
   }
 };
 
-/**
- * Marks the entries the listed notifications name, after the list changed. The rest lose their reference; those no
- * toast holds go: their record was dismissed, cleared or pushed past the list's limit.
- */
+/** Marks the entries the listed notifications name, after the list changed. */
 export const retainNotificationUndos = (referencedIds: ReadonlySet<string>): void => {
   let changed = false;
 

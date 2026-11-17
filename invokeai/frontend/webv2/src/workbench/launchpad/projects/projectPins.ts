@@ -24,10 +24,7 @@ export const dropProjectPin = (projectId: string): void => {
   });
 };
 
-/**
- * Drop pins whose project no longer exists — deleted from another device or another tab. Writes only when something
- * actually changed, so this is safe to call after every library refresh.
- */
+/** Drop pins whose project no longer exists — deleted from another device or another tab. */
 export const prunePinnedProjects = (summaries: readonly ProjectSummary[]): void => {
   const current = getWorkbenchPreferences().launchpadPinnedProjectIds;
 

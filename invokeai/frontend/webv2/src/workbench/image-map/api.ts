@@ -59,8 +59,7 @@ interface BackendImageMapPointsResponse {
 }
 
 /**
- * Opt into videos because item-kind routing resolves both backend namespaces. A media kind, when set, overrides that
- * server-side and serves only its own kind.
+ * Opt into videos (item-kind routing resolves both namespaces); a set media kind overrides it server-side to that kind.
  */
 const toServedKindsParams = (mediaKind: GalleryItemKind | undefined): URLSearchParams => {
   const query = new URLSearchParams({ include_videos: 'true' });
@@ -107,8 +106,7 @@ export const fetchImageMapPoints = async (options?: ImageMapClusteringOptions): 
     query.set('min_samples', String(options.minSamples));
   }
 
-  // Not URLSearchParams.size: it is newer than the build's browser baseline (undefined on Safari 16, which would
-  // silently drop the params).
+  // Not URLSearchParams.size: newer than the browser baseline (undefined on Safari 16, silently dropping params).
   const queryString = query.toString();
   const body = await apiFetchJson<BackendImageMapPointsResponse>(
     `/api/v1/image_map/points${queryString ? `?${queryString}` : ''}`
@@ -207,9 +205,7 @@ export const fetchImageMapClusterLabels = async (
 };
 
 export interface ImageMapImageLabels {
-  /** Best-matching vocabulary phrase. */
   label: string;
-  /** Runner-up phrases, best first. */
   alternates: string[];
 }
 

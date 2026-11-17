@@ -39,8 +39,7 @@ export const GallerySelectionBar = () => {
   }, [loadedItems, selectedItemKeys]);
   const hasUnloadedMembers = loadedSelection.length < selectionCount;
 
-  // Star acts on the whole selection: only "unstar all" when every selected item is already starred, matching the `.`
-  // hotkey.
+  // Star acts on the whole selection: "unstar all" only when every selected item is starred, matching the `.` hotkey.
   const shouldStar = useGallerySelectionStarred(selectedItemRefs, loadedItems);
 
   const moveTargets = useMemo(

@@ -49,11 +49,7 @@ import { keepMenuOpenWhenSiblingMenuCloses } from './WorkflowLibraryCard';
 import { WorkflowLibraryThumbnail } from './WorkflowLibraryThumbnail';
 import { getMissingNodePacks, resolveEntryRequirements, WorkflowRequirementsList } from './WorkflowRequirementsList';
 
-/**
- * The selected template: preview, name with Open, facts, requirements with Install, and its standing in the library and
- * this project. Keep the detail rail mounted across selections to prevent flashing. The narrow layout shows it as a
- * bottom sheet (`WorkflowDetailSheet`).
- */
+/** Kept mounted across selections to prevent flashing. */
 
 const INSTALL_HOVER = { opacity: 0.85 } as const;
 /** The large preview is wide-only; the expanded sheet's summary carries a small one. */
@@ -70,31 +66,22 @@ type VisibilityState =
     };
 
 export interface WorkflowLibraryDetailPanelProps {
-  /** Allows the authenticated owner to change visibility, only on Yours. */
   canChangeVisibility?: boolean;
   entry: WorkflowLibraryEntry | null;
   /** Shared with the card menus, so one workflow gets one copy per press. */
   duplicateGuard: WorkflowLibraryDuplicateGuard;
   /** Hides writes to bundled templates and to other accounts' (`getLibraryEntryAccess`). */
   isReadOnly: boolean;
-  /** The shell closes the library when a fork takes the user to a new project. */
   onClose: () => void;
-  /** Receives the deleted workflow's id. */
   onDeleted: (workflowId: string) => void;
-  /** Carries the copy's id so the shell can select it once the list refreshes. */
   onDuplicated: (workflowId: string) => void;
-  /** Adds the first copy, or asks what to do when the project already holds one. */
   onOpen: (item: WorkflowLibraryListItem) => void;
-  /** Enters preview mode on the entry (on a given view, else the last shown); its stage shows loading and unreadable
-   * documents too. */
+  /** Enters preview mode on the entry (on a given view, else the last shown), also while loading or unreadable. */
   onPreview: (workflowId: string, view?: WorkflowPreviewView) => void;
-  /** The project's workflows, so the rail can say when opening will ask about existing copies. */
   projectWorkflows: readonly ProjectWorkflowEntry[];
-  /** Preview mode's stepper (`WorkflowDetailSheet`); none outside preview mode. */
   stepper?: WorkflowPreviewStepperProps | null;
 }
 
-/** One label/value row of a detail rail's facts list. */
 export const WorkflowDetailFact = ({ children, label }: { children: ReactNode; label: string }) => (
   <DataList.Item alignItems="center" gap="2" minW="0">
     <DataList.ItemLabel color="fg.muted" flex="0 0 5.5rem" fontSize="xs" minW="0">
@@ -181,7 +168,6 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
   const workflowDocument = enrichment?.status === 'ready' ? enrichment.document : null;
   const previewModel = useWorkflowPreviewModel(workflowDocument);
 
-  // Close the library before navigating to Add Models.
   const handleFindModel = useCallback(
     (query: string) => {
       openAddModels(query);
@@ -204,8 +190,7 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
       }
 
       for (const source of getStarterModelInstallSources(starter)) {
-        // Two requirements routinely share a dependency (an encoder, a VAE), and an install may have started between
-        // this render and the click.
+        // Requirements often share a dependency, and an install may have started since this render.
         if (seen.has(source.source) || deps.activeInstallSources.has(source.source)) {
           continue;
         }
@@ -448,10 +433,7 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
               </Box>
 
               <Stack css={WORKFLOW_DETAIL_WIDE_ONLY_CSS} gap="0.5" minW="0">
-                {/*
-                 * Wrap full names, including delimiter-free strings, in the detail rail; zero content min-width
-                 * permits containment without truncation.
-                 */}
+                {/* Full names wrap, delimiter-free ones too; zero min-width contains them without truncating. */}
                 <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
                   {name}
                 </Text>
@@ -601,8 +583,7 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
             </Stack>
           </Scrollable>
 
-          {/* The pinned footer ends in the primary action, as a picker's commit button; the narrow sheet's summary
-          carries Open and More instead. */}
+          {/* The pinned footer ends in the primary action; the narrow sheet's summary carries Open and More. */}
           <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" minW="0" p="2.5">
             <Button
               css={WORKFLOW_PREVIEW_TRIGGER_CSS}
@@ -625,8 +606,7 @@ export const WorkflowLibraryDetailPanel = memo(function WorkflowLibraryDetailPan
                 positioning={menuPositioning}
                 onRequestDismiss={keepMenuOpenWhenSiblingMenuCloses}
               >
-                {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
-                menu never takes focus and the first pointer move onto it closes it. */}
+                {/* The tooltip must sit inside the menu trigger in a dialog, or the menu never takes focus. */}
                 <Menu.Trigger asChild>
                   <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
                     <IconButton aria-label={t('workflowLibrary.moreActions')} size="lg" variant="outline">

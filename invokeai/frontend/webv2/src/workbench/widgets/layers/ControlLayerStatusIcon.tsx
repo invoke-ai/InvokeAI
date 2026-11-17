@@ -23,18 +23,13 @@ import { useSelectedMainModel } from './useSelectedMainModel';
 const selectCapabilitiesStatus = (snapshot: ArchitectureCapabilitiesSnapshot) => snapshot.status;
 const selectControlModelMemory = (preferences: WorkbenchPreferences) => preferences.controlModelMemory;
 
-/**
- * A control layer row's status: a spinner while its map is queued for or being detected, else a warning when the layer
- * needs attention, judged as its Properties panel judges it. `contributing` is the effective enablement; a layer gated
- * by a group is not validated.
- */
+/** Spinner while detecting, else a warning judged as Properties does; group-gated layers are not validated. */
 export const ControlLayerStatusIcon = ({
   layer,
   contributing = layer.isEnabled,
   engine,
 }: {
   contributing?: boolean;
-  /** The canvas engine whose detection status the row reflects. */
   engine: object | null;
   layer: CanvasControlLayerContract;
 }) => {

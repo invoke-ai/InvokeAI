@@ -9,9 +9,8 @@ const OPERABLE = ['button', '[href]', 'input', 'select', 'textarea', '[tabindex]
   .join(', ');
 
 /**
- * Focuses the first (or last) element matching `selector` (any operable element by default) that `viewport` currently
- * shows, without scrolling it: a focus handoff must never move the content the user is looking at. Reports whether
- * anything took focus.
+ * Focuses the first (or last) element matching `selector` (any operable element by default) that `viewport` shows,
+ * without scrolling: a focus handoff must never move the content in view. Reports whether anything took focus.
  */
 export const focusVisibleOperable = (
   viewport: HTMLElement | null,
@@ -50,8 +49,7 @@ export const GalleryAnnouncer = ({ message }: { message: string }) => (
 );
 
 /**
- * A compact, non-blocking failure beside content that still belongs to the current scope. Its owner announces it
- * through `GalleryAnnouncer`.
+ * A compact, non-blocking failure beside content of the current scope; its owner announces it via `GalleryAnnouncer`.
  */
 export const GalleryLoadNotice = ({
   message,

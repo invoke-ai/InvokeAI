@@ -2,7 +2,6 @@
 
 import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
 
-/** Returns the identity matrix. */
 export const identity = (): Mat2d => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
 
 /** Returns a*b: apply b first, then a, matching DOMMatrix multiplication. */
@@ -45,7 +44,6 @@ export const rotate = (m: Mat2d, rad: number): Mat2d => {
   return multiply(m, { a: cos, b: sin, c: -sin, d: cos, e: 0, f: 0 });
 };
 
-/** Applies a matrix to a point, returning the transformed point. */
 export const applyToPoint = (m: Mat2d, p: Vec2): Vec2 => ({
   x: m.a * p.x + m.c * p.y + m.e,
   y: m.b * p.x + m.d * p.y + m.f,

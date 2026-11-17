@@ -3,8 +3,7 @@ import type { AxisRanges } from './imageMapViewport';
 import { zoomFactorFromWheel, zoomRangesAroundFraction } from './imageMapViewport';
 
 /**
- * Custom wheel/pinch zoom replaces Plotly scrollZoom for Safari/trackpad behavior, following PhotoMapAI. Single-touch
- * pan remains native.
+ * Wheel/pinch zoom replaces Plotly scrollZoom for Safari/trackpads, after PhotoMapAI; single-touch pan stays native.
  */
 
 interface ZoomHost {
@@ -48,8 +47,7 @@ export const attachWheelZoom = (element: HTMLElement, host: ZoomHost): (() => vo
 
   const queueZoom = (clientX: number, clientY: number, factor: number) => {
     if (factor === 1) {
-      // A horizontal-only wheel scales nothing; scheduling a frame for it would cost a callback per event to apply no
-      // change.
+      // A horizontal-only wheel scales nothing; a frame for it would cost a callback per event for no change.
       return;
     }
 
@@ -87,8 +85,7 @@ export const attachWheelZoom = (element: HTMLElement, host: ZoomHost): (() => vo
 
   let pinchDistance: number | null = null;
 
-  // Rebaseline every transition into two touches; movement during a third-finger pause must not cause a zoom jump on
-  // resume.
+  // Rebaseline every transition into two touches so movement during a third-finger pause cannot jump the zoom.
   const handleTouchStart = (event: TouchEvent) => {
     if (event.touches.length === 2) {
       pinchDistance = touchDistance(event.touches);
@@ -108,8 +105,7 @@ export const attachWheelZoom = (element: HTMLElement, host: ZoomHost): (() => vo
       return;
     }
 
-    // Capture-phase + stopPropagation keeps plotly's own touch handling from fighting the pinch (it would pan with one
-    // of the two fingers).
+    // Capture phase + stopPropagation stops plotly's touch handling fighting the pinch (it pans with one finger).
     event.preventDefault();
     event.stopPropagation();
     const distance = touchDistance(event.touches);

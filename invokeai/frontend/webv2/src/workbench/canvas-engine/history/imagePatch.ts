@@ -17,7 +17,6 @@ import { NO_HELD_ASSET_REFS } from './history';
  */
 export type ImagePatchApply = (layerId: string, rect: Rect, pixels: ImageData) => Promise<void>;
 
-/** Options for {@link createImagePatchEntry}. */
 export interface CreateImagePatchEntryOptions {
   layerId: string;
   /** The painted region in LAYER-LOCAL space; its w/h must match the ImageData. */
@@ -26,13 +25,10 @@ export interface CreateImagePatchEntryOptions {
   before: ImageData;
   /** Cache pixels within `rect` after the stroke. */
   after: ImageData;
-  /** Entry label (e.g. "Brush stroke" / "Eraser stroke"). */
   label: string;
-  /** The engine's pixel-write bridge. */
   apply: ImagePatchApply;
 }
 
-/** Throws if an ImageData's dimensions disagree with the patch rect. */
 const assertDims = (rect: Rect, image: ImageData, which: 'before' | 'after'): void => {
   if (image.width !== rect.width || image.height !== rect.height) {
     throw new Error(
@@ -41,7 +37,6 @@ const assertDims = (rect: Rect, image: ImageData, which: 'before' | 'after'): vo
   }
 };
 
-/** Creates a reversible paint-edit entry from a committed stroke's before/after pixels. */
 export const createImagePatchEntry = (opts: CreateImagePatchEntryOptions): HistoryEntry => {
   const { after, apply, before, label, layerId, rect } = opts;
   assertDims(rect, before, 'before');

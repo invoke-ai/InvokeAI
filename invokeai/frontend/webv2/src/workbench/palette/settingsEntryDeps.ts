@@ -6,11 +6,7 @@ import { getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/s
 
 import type { SettingsEntryDeps } from './entries';
 
-/**
- * Live workbench bindings for the palette's settings entries, shared by both palette hosts. Theme preview writes the
- * DOM directly and never persists; clearing re-applies whatever the store holds at that moment, so a preview followed
- * by an actual pick reverts to the picked value (a no-op).
- */
+/** Live workbench bindings for the palette's settings entries, shared by both palette hosts. */
 export const SETTINGS_ENTRY_DEPS: SettingsEntryDeps = {
   clearThemePreview: () => applyThemeToRoot(getWorkbenchPreferences().themeId),
   languageOptions: WORKBENCH_LANGUAGE_OPTIONS,

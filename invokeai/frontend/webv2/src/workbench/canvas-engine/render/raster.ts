@@ -32,7 +32,6 @@ export interface RasterBackend {
 
 const isOffscreenCanvasSupported = (): boolean => typeof OffscreenCanvas !== 'undefined';
 
-/** Encodes a DOM/Offscreen surface's canvas to an image `Blob`. */
 const encodeDomSurface = (surface: RasterSurface, type: string): Promise<Blob> => {
   const { canvas } = surface;
   if (typeof (canvas as OffscreenCanvas).convertToBlob === 'function') {

@@ -130,7 +130,6 @@ export interface WorkflowLibraryContextMenuProps {
   isReadOnly: boolean;
   projectWorkflows: readonly ProjectWorkflowEntry[];
   target: WorkflowContextMenuTarget | null;
-  /** The shell closes the library when a fork takes the user to a new project. */
   onClose: () => void;
   onDeleted: (workflowId: string) => void;
   onDuplicated: (workflowId: string) => void;

@@ -13,9 +13,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * Share action order between right-click and overflow menus; ProjectActionsMenuHost owns the single menu and dialogs.
- */
+/** Shared action order for right-click and overflow menus. */
 export const ProjectActionsMenuBody = ({
   isCompatible,
   isPinned,

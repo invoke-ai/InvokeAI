@@ -6,17 +6,11 @@ import { apiFetchJson } from '@platform/transport/http';
 const logger = createLogger({ area: 'whats-new', namespace: 'app' });
 
 export interface WhatsNewSnapshot {
-  /**
-   * Closed during this page load. A version that arrives after a manual close must not reopen the notes the user just
-   * dismissed; the next load still shows an unseen version.
-   */
+  /** Closed during this page load, so a version arriving after a manual close does not reopen the notes. */
   isDismissed: boolean;
   /** Opened from the app menu; the automatic first-run showing is derived from preferences instead. */
   isRequested: boolean;
-  /**
-   * The server version, or null while unknown. Held here rather than in the query cache: the gate lives above the
-   * router, and account transitions clear that cache without remounting it.
-   */
+  /** The server version, or null while unknown; held here because account transitions clear the query cache. */
   version: string | null;
 }
 

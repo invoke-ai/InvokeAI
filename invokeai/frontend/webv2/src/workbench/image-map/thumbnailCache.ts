@@ -9,10 +9,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 
-/**
- * Hover thumbnail and optional video duration derive from immutable item names and can be cached independently of
- * mutable DTOs.
- */
+/** Hover thumbnails and optional video durations derive from immutable item names: cacheable apart from DTOs. */
 export interface HoverThumbnail {
   url: string;
   /** Seconds, for videos only; images have no duration to show. */

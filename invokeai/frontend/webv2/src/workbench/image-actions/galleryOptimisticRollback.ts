@@ -45,8 +45,7 @@ const EXCLUSIVE_RIVAL_FIELDS: ReadonlyArray<{ key: string; rivalKey: string; wid
   { key: 'sourceVideo', rivalKey: 'firstFrameImage', widgetId: 'video' },
   { key: 'references', rivalKey: 'firstFrameImage', widgetId: 'video' },
   { key: 'references', rivalKey: 'lastFrameImage', widgetId: 'video' },
-  // sourceVideo and references coexist for Ref2VA reference-extend; treating them as rivals would lose valid data on
-  // rollback.
+  // sourceVideo and references coexist for Ref2VA reference-extend; as rivals, rollback would lose valid data.
 ];
 
 const trackedFieldKey = (projectId: string, widgetId: WidgetTypeId, key: string): string =>

@@ -58,11 +58,7 @@ const CENTER_COMPACT_MAX_WIDTH_PX = 560;
 const CHROME_INSET_PX = 8;
 const CHROME_CONTAINER_CSS = { containerName: 'center-chrome', containerType: 'inline-size' } as const;
 const COMPACT_CHROME = `@container center-chrome (width < ${CENTER_COMPACT_MAX_WIDTH_PX - 2 * CHROME_INSET_PX}px)`;
-/**
- * The view menu also minimises when the room left to the start island beside the end island is below this, so its name
- * does not crowd the widget's label (the Preview's board and item name). Queried on a wrapper filling that room: a
- * content-sized island cannot be its own inline-size container, since containment would collapse it to nothing.
- */
+/** The view menu also minimises when the start island's room is below this, sparing the widget's label. */
 const START_ISLAND_ROOM_CSS = {
   containerName: 'center-start',
   containerType: 'inline-size',
@@ -75,11 +71,7 @@ const compactViewMenu = <T extends object>(styles: T) => ({ [COMPACT_CHROME]: st
 const VIEW_MENU_TRIGGER_CSS = compactViewMenu({ flexShrink: 0, minW: '8', px: '0' });
 const VIEW_MENU_CONTENT_CSS = { gap: '2', ...compactViewMenu({ gap: '1' }) };
 const VIEW_MENU_LABEL_CSS = compactViewMenu({ display: 'none' });
-/**
- * The start island gives way first, down to this width: room for the view menu at its own floor, clear of the end cue.
- * The compact icon-only menu is narrower than that floor, so the reserve also covers it. The end island's zoom and
- * actions keep their full width up to what that leaves, then scroll.
- */
+/** The start island gives way first, down to this width: the view menu at its floor, clear of the end cue. */
 const START_ISLAND_MIN_WIDTH = getChromeIslandMinWidth(VIEW_MENU_MIN_WIDTH);
 const END_ISLAND_MAX_WIDTH = `calc(100% - ${START_ISLAND_MIN_WIDTH} - {spacing.2})`;
 
@@ -387,10 +379,7 @@ const CenterViewMenu = ({
   );
 };
 
-/**
- * Use Suspense for the center icon's loading state because DeferredResource has no subscription and center widgets lack
- * frame headers.
- */
+/** Suspense for the center icon: DeferredResource has no subscription and center widgets lack frame headers. */
 const CenterViewIcon = ({ instanceId, widget }: { instanceId: string; widget: RegisteredWidget }) => {
   const fallback = useMemo(
     () => <WidgetIdentityIcon boxSize="3.5" icon={widget.manifest.icon} isLoading />,

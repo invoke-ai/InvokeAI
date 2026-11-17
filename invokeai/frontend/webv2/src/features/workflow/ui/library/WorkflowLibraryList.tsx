@@ -42,14 +42,6 @@ import {
 import { getWorkflowLibraryEntryFacts, WorkflowLibraryFactsLine } from './WorkflowLibraryFacts';
 import { getMissingNodePacks } from './WorkflowRequirementsList';
 
-/**
- * The library's list layout: the platform List over the same collection the grid shows. A templates place lists every
- * server position, rows outside the resident window as placeholders, and loads the window around the List's visible
- * range through the shared demand module; the This-project view lists its own entries. Rows select on press, open on
- * double-click, and raise the same actions menu as a card from a right-click, Shift+F10 or their More button.
- */
-
-/** The date column a row shows, chosen by the caller from the current order; null shows none. */
 export type WorkflowLibraryListTrailingField = 'updated_at' | 'opened_at' | 'created_at' | 'last_run_at' | null;
 
 export interface WorkflowLibraryListProps extends WorkflowLibraryGridProps {
@@ -67,20 +59,14 @@ const ROW_PITCH = getListContentHeight([{ kind: 'item' }], 'comfortable');
 /** Rows loaded past each edge of the visible range; the List mounts as many, so they show data once scrolled to. */
 const DEMAND_OVERSCAN_ROWS = 8;
 const NO_MISSING_COUNTS: ReadonlyMap<string, number> = new Map();
-/**
- * Row controls take the row's text colour and a border and hover tint mixed from it, so they read on the selected row's
- * accent fill as on the panel, without a fill of their own.
- */
+/** Row controls mix their colours from the row's text, so they read on the selected accent fill as on the panel. */
 const ROW_ACTION_CSS: SystemStyleObject = {
   borderColor: 'color-mix(in oklab, currentColor 35%, transparent)',
   color: 'inherit',
   _hover: { bg: 'color-mix(in oklab, currentColor 12%, transparent)' },
   _expanded: { bg: 'color-mix(in oklab, currentColor 12%, transparent)' },
 };
-/**
- * A position not yet resident: a thumbnail well and a line in a translucent tint of the text colour, static so fast
- * scrolls paint nothing, and never a solid block on any row surface.
- */
+/** Translucent tints of the text colour, static so fast scrolls paint nothing. */
 const PLACEHOLDER_THUMBNAIL_PROPS = {
   aspectRatio: 3 / 2,
   bg: 'fg/10',
@@ -91,10 +77,8 @@ const PLACEHOLDER_THUMBNAIL_PROPS = {
 const PLACEHOLDER_LINE_PROPS = { bg: 'fg/10', display: 'block', h: '2', rounded: 'full', w: '8rem' } as const;
 
 /**
- * Open and Preview are always mounted and keep their width, so rows never reflow under the pointer; they show while the
- * pointer is over the row, focus is inside it or its menu is open. One that does not apply (Open on the active project
- * workflow, both on a placeholder) stays hidden. Without hover (touch) they never show and More, always visible,
- * carries the row's actions.
+ * Open and Preview stay mounted at full width, so rows never reflow under the pointer; CSS shows them on hover, focus
+ * or an open menu. Without hover (touch) More carries the row's actions.
  */
 const LIST_CSS: SystemStyleObject = {
   display: 'flex',
@@ -147,7 +131,6 @@ const entryAt = (rows: readonly ListRow<WorkflowLibraryListItem>[], index: numbe
   return row?.kind === 'item' ? row.item.entry : null;
 };
 
-/** A windowed row's key: its server position, whether or not its metadata is resident. */
 const positionKey = (index: number) => `position:${index}`;
 
 export const WorkflowLibraryList = ({
@@ -175,7 +158,6 @@ export const WorkflowLibraryList = ({
   const templatesSnapshot = useInvocationTemplatesSnapshot();
   const templates = templatesSnapshot.status === 'loaded' ? templatesSnapshot.templates : null;
   const isWindowed = browseWindow !== undefined;
-  // Only library rows mark templates the project holds; the project view is that collection.
   const linkedTemplates = useLinkedLibraryTemplates(!isWindowed);
   const filter = browseWindow?.filter;
   const visibleEntries = useMemo(() => dedupeWorkflowLibraryEntries(entries), [entries]);
@@ -183,9 +165,8 @@ export const WorkflowLibraryList = ({
   const total = browseWindow?.total ?? visibleEntries.length;
 
   /**
-   * Rows kept while their page is not resident, with their positions: the one last focused or given a menu, and the
-   * selected one. Each stays rendered with its name, so focus and the List's tab stop never land on a placeholder. The
-   * copies drop their parsed documents, like the grid's pinned card, so memory stays within the window.
+   * Rows kept while their page is not resident (last focused or given a menu, and selected), so focus and the tab stop
+   * never land on a placeholder. They drop parsed documents, like the grid's pinned card.
    */
   const [focusedRow, setFocusedRow] = useState<KeptRow | null>(null);
   const [selectedRow, setSelectedRow] = useState<KeptRow | null>(null);
@@ -236,8 +217,7 @@ export const WorkflowLibraryList = ({
       }
     }
 
-    // Keyed by position, so a placeholder and the entry that replaces it are one row: its button, and focus on it,
-    // survive the page arriving.
+    // Keyed by position, so a placeholder and its arriving entry are one row and keep focus.
     return Array.from({ length: total }, (_, index): ListRow<WorkflowLibraryListItem> => ({
       item: { entry: visibleEntries[index - startIndex] ?? keptRows.get(index) ?? null, index },
       key: positionKey(index),
@@ -245,9 +225,7 @@ export const WorkflowLibraryList = ({
     }));
   }, [focusedRow, isWindowed, selectedRow, startIndex, total, visibleEntries]);
 
-  // The selected row's key: the position showing the selected workflow, resident or kept. A kept position another
-  // workflow now holds (the server reordered while the selection was out of the window) marks nothing, so the List's
-  // tab stop falls back rather than highlight the wrong row.
+  // A kept position another workflow now holds marks nothing, so the tab stop falls back rather than mislead.
   const selectedIndex =
     selectedResident !== undefined
       ? startIndex + selectedResidentIndex
@@ -260,7 +238,6 @@ export const WorkflowLibraryList = ({
       ? positionKey(selectedIndex)
       : null;
 
-  // The visible range the List reports; null until its viewport has measured.
   const [range, setRange] = useState<ListRange | null>(null);
   const rangeReports = useRef(0);
   const handleRangeChange = useCallback(
@@ -272,8 +249,7 @@ export const WorkflowLibraryList = ({
       setRange(next);
       rangeReports.current += 1;
 
-      // The first report is the restored position itself; later ones keep the view's anchor current, so leaving for
-      // another filter (which unmounts this list after the store has moved on) still returns here.
+      // The first report is the restored position; later ones keep the anchor current for returning to this filter.
       if (filter && viewport && rangeReports.current > 1) {
         rememberWorkflowLibraryScroll(filter, toScrollAnchor(viewport.scrollTop));
       }
@@ -321,8 +297,7 @@ export const WorkflowLibraryList = ({
   const handleRetry = useCallback(() => {
     void loadWorkflowLibraryRange(first, last, true);
   }, [first, last]);
-  // With nothing resident there is no window to reread: the first listing itself failed. The button stays busy until
-  // that listing settles.
+  // Nothing resident means the first listing failed; the button stays busy until that listing settles.
   const [isReloading, setIsReloading] = useState(false);
   const handleReload = useCallback(() => {
     setIsReloading(true);
@@ -501,10 +476,8 @@ interface WorkflowLibraryListRowProps extends ListRowProps {
   /** Null while the position's metadata is not resident: the row is a busy placeholder with the same controls. */
   entry: WorkflowLibraryEntry | null;
   index: number;
-  /** The project's active workflow: badged, and offers no Open since it is already open. */
   isActiveWorkflow: boolean;
   isInProject: boolean;
-  /** Which of the row's controls has the actions menu open, if any; that control names the menu for the dialog. */
   menuOpenedBy: 'row' | 'button' | null;
   missingCount: number;
   missingNodePackCount: number | null;
@@ -517,10 +490,7 @@ const ignoreContextMenu = () => {};
 const PLACEHOLDER_LEADING = <Box {...PLACEHOLDER_THUMBNAIL_PROPS} data-workflow-list-placeholder="" />;
 const PLACEHOLDER_DESCRIPTION = <Box as="span" {...PLACEHOLDER_LINE_PROPS} />;
 
-/**
- * One component for a position whether or not its page is resident, so the ListItem and its primary button persist when
- * the page arrives. Memoised: range loads, enrichment and scrolling re-render the list, but rarely a given row.
- */
+/** One component per position, so the ListItem and its button persist when the page arrives; memoised for scrolling. */
 const WorkflowLibraryListRow = memo(function WorkflowLibraryListRow({
   actions,
   canPreview,
@@ -583,7 +553,6 @@ const WorkflowLibraryListRow = memo(function WorkflowLibraryListRow({
             css={ROW_ACTION_CSS}
             data-row-action="open"
             data-row-quick-action
-            // The active project workflow is already open; its rail disables Open too.
             data-unavailable={entry === null || isActiveWorkflow || undefined}
             size="xs"
             tabIndex={-1}
@@ -673,7 +642,6 @@ const WorkflowLibraryListRow = memo(function WorkflowLibraryListRow({
           PLACEHOLDER_LEADING
         )
       }
-      // A placeholder has no name yet; its button says it is loading.
       pressLabel={entry === null ? t('workflowLibrary.loading') : undefined}
       title={item ? item.name || t('workflowLibrary.untitled') : ''}
       titleTruncate="end"

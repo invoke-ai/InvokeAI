@@ -8,10 +8,7 @@ import { getFirstOutputImageName } from '@platform/core/outputImages';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
 
-/**
- * Keep transient execution state outside the workbench reducer; subscribe per source node ID to isolate frequent
- * renders.
- */
+/** Transient execution state outside the workbench reducer; per-source-node subscriptions isolate frequent renders. */
 
 export type NodeExecutionStatus = 'running' | 'completed' | 'failed';
 

@@ -283,10 +283,7 @@ const STARRED_NOTICES: Partial<Record<GalleryReadStatus, string>> = {
   'stale-error': 'widgets.gallery.starredRefreshFailed',
 };
 
-/**
- * What the non-blocking notices say, for the widget's live region. A failed listing is left out: its error state is an
- * alert of its own.
- */
+/** The non-blocking notices for the widget's live region; a failed listing's error state is its own alert. */
 const getGalleryFailureAnnouncement = (
   {
     boardsState,

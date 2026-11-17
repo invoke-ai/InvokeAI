@@ -25,11 +25,7 @@ const HeaderSeparator = () => (
   </Text>
 );
 
-/**
- * The item's image-map tags, best first. The label cache is loaded on open, keeping it out of the editor's initial
- * graph, and answers repeat opens without a request; it owns invalidation (vocabulary rebuilds, accounts), so this
- * query keeps nothing once closed.
- */
+/** Image-map tags, best first; the label cache loads on open and owns invalidation. */
 const PreviewImageTags = ({ accountEpoch, item }: { accountEpoch: number; item: GalleryItem }): ReactNode => {
   const { t } = useTranslation();
   const { data: indexAvailability } = useQuery(imageIndexAvailabilityOptions());
@@ -71,20 +67,11 @@ const PreviewImageTags = ({ accountEpoch, item }: { accountEpoch: number; item: 
   );
 };
 
-/**
- * The centre region's inset already spans its chrome islands' top offset, their height and an equal gap below them, so
- * the panel sits as far under the islands as they sit under the region's top. Elsewhere the variable is unset and the
- * panel takes the islands' own offset from the stage's corner; `insetEnd` matches their end inset either way.
- */
+/** The centre region's inset already includes the islands and a gap; elsewhere the islands' own offset applies. */
 const PANEL_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 const PANEL_MAX_HEIGHT = `calc(100% - ${PANEL_TOP} - var(--chakra-spacing-2))`;
 
-/**
- * Details as a panel pinned to the media stage's top-end corner, beside the header trigger and off the filmstrip;
- * images offer parsed details alongside raw payload tabs. It is not a popup: nothing outside closes it, and it listens
- * to no document events, so other surfaces keep their own Escape, pointer and focus handling. Only its trigger, or
- * Escape from within it, closes it. It follows the selection and re-anchors whenever the stage remounts.
- */
+/** Pinned to the stage, not a popup: only its trigger or Escape inside closes it; no document listeners. */
 export const PreviewDetailsPanel = ({
   actions,
   image,
@@ -183,8 +170,7 @@ export const PreviewDetailsPanel = ({
   const panel =
     isOpen && stageElement
       ? createPortal(
-          // A named region rather than a group: a pinned panel is a place to return to, so it is a landmark. It follows
-          // the stage's media in DOM order, so Tab reaches it from the Preview without moving focus on open.
+          // A named region rather than a group: a pinned panel is a place to return to, so it is a landmark.
           <Box
             ref={restoreFocusOnRemoval}
             aria-label={label}

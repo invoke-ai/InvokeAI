@@ -32,9 +32,7 @@ const getChangedKeys = (before: ProjectPromptDraft, written: ProjectPromptDraftP
     (key) => !areJsonValuesStructurallyEqual(before[key], written[key])
   );
 
-/**
- * Compare prompt/LoRA content across reconstructed values to avoid costly rerenders and disturbed autocomplete state.
- */
+/** Compare prompt/LoRA content across reconstructed values to avoid costly rerenders and reset autocomplete state. */
 
 export const UpscalePromptFields = memo(
   function UpscalePromptFields({

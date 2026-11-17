@@ -33,7 +33,6 @@ export interface PreviewGraphDocumentResult {
   skippedNodeTypes: string[];
 }
 
-/** Converts a read-only preview graph into an editable project graph document. */
 export const previewGraphToDocument = (
   graph: PreviewGraphLike,
   templates: InvocationTemplates

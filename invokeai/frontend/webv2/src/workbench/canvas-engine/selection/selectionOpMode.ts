@@ -1,6 +1,4 @@
-/**
- * Shared selection-op resolution: commit-time modifiers override persistent mode consistently across lasso and marquee.
- */
+/** Commit-time modifiers override the persistent selection-op mode, consistently across lasso and marquee. */
 
 import type { PointerModifiers, SelectionOp } from '@workbench/canvas-engine/types';
 

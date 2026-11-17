@@ -60,13 +60,7 @@ const EMPTY_LIVE_REGION = { position: 'absolute' } as const;
 /** How long a Calibrate that found this model's own attempt running waits for Stop to render, in frames. */
 const STOP_WAIT_FRAMES = 30;
 
-/**
- * Working-memory calibration of one model on this machine's GPU: what was measured and whether estimates use it, and
- * the runs that measure it. Every read is the server's; the section keeps no copy of a run's state, so a reload or a
- * reconnect shows the same thing.
- *
- * Collapsed on every visit; its header still names the GPU and the state, or the progress of a running calibration.
- */
+/** Every read is the server's, so a reload shows the same thing. Collapsed on every visit. */
 export const WorkingMemorySection = ({ modelKey }: { modelKey: string }) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -86,7 +80,6 @@ export const WorkingMemorySection = ({ modelKey }: { modelKey: string }) => {
 
   useMountEffect(() => attachWorkingMemoryRealtime(queryClient));
 
-  // Without the plan, an attempt's step count comes from this tab's record or the attempt id.
   const progress = deriveCalibrationProgress({
     local,
     runs: summary.data?.runs ?? [],
@@ -157,8 +150,7 @@ export const WorkingMemorySection = ({ modelKey }: { modelKey: string }) => {
         setIsOpen(open);
         if (open) {
           setWasOpened(true);
-          // Every opening reads the plan again: the GPU's free memory may have moved since the last one. The table
-          // keeps the plan it has meanwhile.
+          // Every opening rereads the plan: free GPU memory may have moved.
           void refreshWorkingMemoryPlan(queryClient, modelKey);
         }
       }}
@@ -220,7 +212,6 @@ const WorkingMemoryBody = ({
 }: {
   coverage: CalibrationCoverage;
   deviceName: string | null;
-  /** Takes focus back when a confirmation's opener is gone or disabled. */
   focusFallbackRef: RefObject<HTMLButtonElement | null>;
   modelKey: string;
   plan: WorkingMemoryPlan;
@@ -240,7 +231,6 @@ const WorkingMemoryBody = ({
   const [isConfirming, setIsConfirming] = useState(false);
   // How often a confirmation found the plan changed in this dialog; each change is announced anew.
   const [planChanges, setPlanChanges] = useState(0);
-  // Why the plan read last could not compile; shown as the reason Calibrate opened nothing.
   const [compileError, setCompileError] = useState<string | null>(null);
   // The confirmation under way; closing the dialog aborts it, which takes it back.
   const confirmation = useRef<AbortController | null>(null);
@@ -270,10 +260,8 @@ const WorkingMemoryBody = ({
         ? t('models.workingMemory.recalibrate')
         : t('models.workingMemory.calibrate');
   const blockerText = useBlockerText(blocker);
-  // A plan that does not compile leaves Calibrate enabled: installing what is missing is fixed outside this section,
-  // and the next click checks again.
+  // A compile error leaves Calibrate enabled: what is missing is installed elsewhere, and the next click checks again.
   const compileReason = compileError ? t('models.workingMemory.blockedCompile', { problem: compileError }) : null;
-  // Calibrate stays enabled beside it: the next click checks again, and the model is named so it can be found.
   const busyReason = gpuHolderName ? t('models.workingMemory.busyOnGpu', { model: gpuHolderName }) : null;
   const reasonText = blockerText ?? compileReason ?? busyReason;
 
@@ -283,13 +271,8 @@ const WorkingMemoryBody = ({
   // Starting records the attempt synchronously, so Stop has rendered by the time the closing dialog restores focus.
   const getCalibrateFinalFocus = () => stopRef.current ?? getFinalFocus();
 
-  // Reads the plan as the server builds it now (its sizes follow the GPU's free memory and the stored measurements) and
-  // compiles its cases over the model records the server holds now. Graphs compiled earlier are never reused: equal
-  // cases can name a model whose record changed meanwhile. The section renders the plan read. A plan that no longer
-  // holds is `unavailable`: the section shows the new reason, or the read's error with a retry. A plan the server
-  // supports can still fail to compile here, say for a text encoder that is not installed. Last, the running check is
-  // made again on the fresh status of this GPU, which takes one attempt at a time: this section's summary knows only
-  // this model's runs, and may predate an attempt another tab started meanwhile.
+  // Read and compile fresh: equal cases can name a model whose record changed. The running check is redone on
+  // fresh status, as the summary knows only this model's runs.
   const readCalibration = async (
     compiler: CalibrationGraphCompiler,
     signal?: AbortSignal
@@ -313,8 +296,7 @@ const WorkingMemoryBody = ({
       return { kind: 'uncompilable', message: getApiErrorMessage(error, t('common.unknownError')) };
     }
 
-    // A failed read leaves its error in the status query, which the section shows with a retry. A busy GPU shows as
-    // this model's running attempt, or as the reason beside Calibrate naming the model that holds it.
+    // A failed read leaves its error in the status query, which the section shows with a retry.
     const busy = await calibrationOnGpuNow(queryClient).catch(() => undefined);
 
     if (busy === undefined) {
@@ -345,8 +327,7 @@ const WorkingMemoryBody = ({
     }
 
     if (readiness.kind === 'running' && readiness.own) {
-      // This model's attempt runs: Stop appears once the refreshed summary reaches the section, and Calibrate turns
-      // disabled then, which drops its focus. Wait a bounded number of frames for Stop, then move focus there.
+      // Stop appears once the refreshed summary lands and Calibrate disables; wait bounded frames, then focus Stop.
       flushSync(() => setIsPreparing(false));
       for (let frame = 0; frame < STOP_WAIT_FRAMES && !stopRef.current; frame += 1) {
         await new Promise<void>((resolve) => {
@@ -359,10 +340,7 @@ const WorkingMemoryBody = ({
       return;
     }
 
-    // The busy Calibrate dropped focus and no dialog takes it, so return it unless it moved on meanwhile: to Calibrate,
-    // enabled again, beside a compile error or the model that holds the GPU; else to the section's toggle, since the
-    // plan read is about to disable Calibrate for its reason, or replace this panel with its error (the query tells the
-    // section a tick later).
+    // Calibrate dropped focus and no dialog takes it: return it to Calibrate if enabled, else the section toggle.
     flushSync(() => {
       setIsPreparing(false);
       setCompileError(readiness.kind === 'uncompilable' ? readiness.message : null);
@@ -383,11 +361,8 @@ const WorkingMemoryBody = ({
     setIsCalibrateOpen(false);
   };
 
-  // The dialog may have stood open while the GPU's free memory or the stored measurements moved: read the plan once
-  // more, and start what that read returns. A plan that no longer holds or compiles closes the dialog for the section's
-  // reason. One that changes what was confirmed (`changesCalibration`) starts nothing: the dialog shows it, flagged, to
-  // be confirmed again. New sizes alone start: a running generation moves them, and the dialog says sizes follow free
-  // memory. An unmount meanwhile does not take the confirmation back; only closing the dialog does.
+  // Re-read the plan on confirm; a changed calibration (`changesCalibration`) starts nothing and asks again.
+  // Only closing the dialog, not an unmount, takes the confirmation back.
   const confirmCalibration = async () => {
     if (!compile || confirmation.current) {
       return;
@@ -491,8 +466,7 @@ const WorkingMemoryBody = ({
       ) : null}
 
       <ActivityPanel activity={activity} />
-      {/* Always present, so an outcome that appears (a stop, a failed submission) is announced; one already shown when
-          the section opens is part of the page and is not. Empty, it leaves the stack's flow and adds no gap. */}
+      {/* Always mounted so a new outcome is announced; empty, it leaves the flow. */}
       <Box _empty={EMPTY_LIVE_REGION} role="status">
         <OutcomePanel outcome={outcome} />
       </Box>
@@ -649,7 +623,6 @@ const OutcomePanel = ({ outcome }: { outcome: CalibrationOutcome }) => {
     return null;
   }
 
-  // Canceled before anything was measured: nothing is lost.
   if (outcome.kind === 'canceled') {
     return (
       <Text color="fg.muted" fontSize="sm">
@@ -664,8 +637,7 @@ const OutcomePanel = ({ outcome }: { outcome: CalibrationOutcome }) => {
   const kept = outcome.kind === 'failed' && outcome.kept ? t('models.workingMemory.failedKept') : null;
 
   const isFailed = outcome.kind === 'failed';
-  // A model whose record changed after its graphs compiled is calibrated again over the new record; an attempt another
-  // calibration ran in between of is calibrated again from its first step.
+  // A changed model or an interleaved calibration means calibrating again.
   const detail =
     (outcome.refusal === 'modelChanged'
       ? t('models.workingMemory.modelChanged')

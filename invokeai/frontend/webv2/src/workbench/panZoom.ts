@@ -118,7 +118,6 @@ export const snapWheelZoom = (
     : { activeSnapPoint: snapPoint, at: now, intendedZoom, zoom: snapPoint };
 };
 
-/** Pans by a screen-space delta. */
 export const panBy = (transform: PanZoomTransform, screenDelta: PanZoomPoint): PanZoomTransform => ({
   pan: { x: transform.pan.x + screenDelta.x, y: transform.pan.y + screenDelta.y },
   zoom: transform.zoom,

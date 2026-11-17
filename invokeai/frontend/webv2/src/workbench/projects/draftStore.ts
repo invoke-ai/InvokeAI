@@ -5,14 +5,12 @@ export type ProjectDraftConflict =
   | { kind: 'deleted' }
   | { half?: 'workspace'; kind: 'revision'; serverRevision: number };
 
-/** The server revisions a draft builds on, per half, and the canvas floor with them. */
 export type ProjectDraftBases = Partial<
   Pick<ProjectDraftInput, 'baseMinimumCanvasSchemaVersion' | 'baseRevision' | 'baseWorkspaceRevision'>
 >;
 
 export interface ProjectDraftInput {
   baseMinimumCanvasSchemaVersion?: number;
-  /** The project content's revision the draft builds on. */
   baseRevision: number | null;
   /** The caller's workspace revision the draft builds on; absent (from builds before the split) means none. */
   baseWorkspaceRevision?: number | null;
@@ -69,12 +67,7 @@ export interface ProjectDraftSummary {
 
 export type ProjectDraftKey = [projectId: string, editorSessionId: string];
 
-/**
- * The lineage's writer has settled its unload journal through `generation`: the server or the lineage's draft holds a
- * document at least that new, or the writer discarded it. Entries of that writer at or below it are obsolete even when
- * they outlive their deletion. A mark of an earlier writer means nothing. Optional, so claims written before it existed
- * read as having settled nothing.
- */
+/** Entries of this writer at or below `generation` are obsolete; optional, so older claims read as settled nothing. */
 export interface ProjectUnloadJournalSettlement {
   generation: number;
   writerToken: string;
@@ -172,11 +165,7 @@ export type ProjectDraftCopyReservationResult =
   | (ProjectDraftCopyReservation & { kind: 'reserved' })
   | { kind: 'corrupt' | 'fenced' | 'missing' | 'quota' | 'stale' | 'unavailable' };
 
-/**
- * A document a writer had not staged when its page was hidden or unloaded. Staging takes fenced read-then-write
- * transactions that cannot finish while a page unloads; this record is written blind instead, keyed by its writer and
- * generation so it overwrites nothing else, and becomes a draft only through reconciliation.
- */
+/** Written blind at unload, keyed by writer and generation; becomes a draft only through reconciliation. */
 export interface ProjectUnloadJournalEntry {
   /** The account whose lifetime wrote it; the database is already per account, so this is defence in depth. */
   accountId: string;
@@ -186,19 +175,11 @@ export interface ProjectUnloadJournalEntry {
   documentByteSize: number;
   documentJson: string;
   documentSchemaVersion: number;
-  /** The lineage it is written under, which the session blob may have handed on from another page's session. */
   editorSessionId: string;
-  /**
-   * The draft generation the writer reserved for this document: above every generation it staged before and below every
-   * one it stages after (or that of a stage of the same document still in flight), so the lineage alone tells whether
-   * the journal is still the newest copy.
-   */
+  /** Reserved between the writer's earlier and later stages, so the lineage alone tells whether this is newest. */
   generation: number;
   journaledAt: number;
-  /**
-   * The editor session of the page that wrote it, whose Web Lock tells whether that page still runs. Absent from
-   * entries written before it existed, which are treated as a gone page's.
-   */
+  /** The writing page's editor session, whose Web Lock tells if it still runs; absent means a gone page. */
   ownerEditorSessionId?: string;
   projectId: string;
   recordType: 'unload-journal';
@@ -213,11 +194,10 @@ export type ProjectUnloadJournalKey = [
 ];
 export interface ProjectUnloadJournalWrite {
   entries: readonly ProjectUnloadJournalEntry[];
-  /** Each writer lineage's entries through the key's generation are deleted: what they held is in recovery now. */
   retired: readonly ProjectUnloadJournalKey[];
 }
 export type ProjectUnloadJournalWriteResult =
-  /** `written` settles true once the write commits, false if it aborted. */
+  /** `written` settles false if the write aborted. */
   { kind: 'started'; written: Promise<boolean> } | { kind: 'unavailable' };
 export type ProjectUnloadJournalOutcome =
   | 'applied'
@@ -241,18 +221,13 @@ export type ProjectUnloadJournalReconcileResult =
   | { kind: 'available'; outcomes: ProjectUnloadJournalReconciliation[] }
   | { kind: 'unavailable' };
 export interface ProjectUnloadJournalLivenessOptions {
-  /**
-   * True for an editor session a page other than this one still holds. The entries that page wrote (its
-   * `ownerEditorSessionId`) are its own to settle (its save acknowledges or retires them): reconciliation leaves them
-   * in place, outcome `'live'`, and the peek does not count them, until the page is gone.
-   */
+  /** True for an editor session another page still holds; its entries are left to it (outcome `'live'`). */
   isEditorSessionLive?: (editorSessionId: string) => Promise<boolean>;
 }
 export type ProjectUnloadJournalSettleResult = { kind: 'corrupt' | 'fenced' | 'quota' | 'settled' | 'unavailable' };
 export type ProjectUnloadJournalDecision =
   | { draft: ProjectDraft; kind: 'apply' }
   | { kind: 'discard'; reason: 'expired' | 'fenced' | 'foreign-account' | 'invalid' | 'settled' | 'superseded' }
-  /** The lineage is damaged; the entry waits for its cleanup, for at most the retention period. */
   | { kind: 'retain'; reason: 'corrupt' };
 
 export interface RetargetAcknowledgedCopyOptions {
@@ -287,7 +262,6 @@ export interface ProjectDraftStore {
     nextWriterToken: string
   ): Promise<ProjectDraftClaimResult>;
   close(): void;
-  /** With `settledThroughGeneration`, also settles the writer's unload journal through it, in the same transaction. */
   delete(
     projectId: string,
     editorSessionId: string,
@@ -295,10 +269,7 @@ export interface ProjectDraftStore {
     settledThroughGeneration?: number
   ): Promise<ProjectDraftDeleteResult>;
   deleteCorrupt(projectId: string, editorSessionId: string): Promise<ProjectDraftCorruptDeleteResult>;
-  /**
-   * Removes one writer's unload journal entries for a lineage, through `throughGeneration` (all when omitted). A blind
-   * range delete: it reads nothing, so it never holds up a journal write of a page that is unloading.
-   */
+  /** A blind range delete: it reads nothing, so it never holds up an unloading page's journal write. */
   discardUnloadJournal(
     projectId: string,
     editorSessionId: string,
@@ -306,11 +277,7 @@ export interface ProjectDraftStore {
     throughGeneration?: number
   ): Promise<{ kind: 'deleted' | 'unavailable' }>;
   get(projectId: string, editorSessionId: string): Promise<ProjectDraftGetResult>;
-  /**
-   * Synchronously starts one blind, explicitly committed write: the only kind that outlives a page unload. Each entry
-   * replaces its writer's lower generations for the lineage; `retired` lineages lose theirs. It reads nothing, so it
-   * cannot check fencing; reconciliation does.
-   */
+  /** The only write that outlives a page unload; it reads nothing, so reconciliation does the fencing. */
   journalBeforeUnload(write: ProjectUnloadJournalWrite): ProjectUnloadJournalWriteResult;
   list(options?: { after?: ProjectDraftKey; limit?: number }): Promise<ProjectDraftPageResult>;
   listForProject(projectId: string, options?: { after?: string; limit?: number }): Promise<ProjectDraftListResult>;
@@ -318,17 +285,13 @@ export interface ProjectDraftStore {
     after?: ProjectDraftRetargetCursor;
     limit?: number;
   }): Promise<ProjectDraftRetargetListResult>;
-  /** The projects with unload journal entries (of pages that are gone, given liveness), for whether anything would open. */
   peekUnloadJournalProjectIds(
     limit: number,
     options?: ProjectUnloadJournalLivenessOptions
   ): Promise<{ kind: 'available'; projectIds: string[] } | { kind: 'unavailable' }>;
   /**
-   * Turns each unload journal entry into its lineage's newest draft, or discards it, by `decideUnloadJournalEntry`: one
-   * fenced draft transaction per entry, then the entry's removal. An entry left behind by a crash in between is
-   * superseded by the draft it produced, so running again is safe. Run before any writer of this load claims a lineage.
-   * Entries written by a page that still runs elsewhere are skipped: a page that is merely hidden is still writing its
-   * lineages, and staging its journal would hand another tab an edit it may yet undo.
+   * One fenced draft transaction per entry, then its removal; rerunning after a crash is safe. Run before any writer of
+   * this load claims a lineage. A still-running page's entries are skipped: it may yet undo them.
    */
   reconcileUnloadJournal(
     accountId: string,
@@ -342,18 +305,13 @@ export interface ProjectDraftStore {
     proposed: ProjectDraftCopyReservation,
     replaceCopyProjectId?: string
   ): Promise<ProjectDraftCopyReservationResult>;
-  /** A schema-refused or conflicted draft back to dirty: its refusal or conflict is resolved by keeping it. */
   resumeDraft(
     projectId: string,
     editorSessionId: string,
     writerToken: string,
     generation: number
   ): Promise<ProjectDraftSettlementResult>;
-  /**
-   * The lineage's draft (at or above `generation`) rebased onto what the server acknowledged of one half or both,
-   * keeping its document and state: a half saved while the draft held newer edits, or a save that landed with its
-   * answer lost. Omitted bases are kept.
-   */
+  /** Rebases the lineage's draft onto acknowledged bases, keeping its document; omitted bases are kept. */
   rebaseDraft(
     projectId: string,
     editorSessionId: string,
@@ -362,7 +320,6 @@ export interface ProjectDraftStore {
     bases: ProjectDraftBases
   ): Promise<ProjectDraftRebaseResult>;
   retargetAcknowledgedCopy(options: RetargetAcknowledgedCopyOptions): Promise<ProjectDraftSettlementResult>;
-  /** Also settles the writer's unload journal through `sentGeneration`, in the same transaction. */
   settleAcknowledgement(
     projectId: string,
     editorSessionId: string,
@@ -387,11 +344,7 @@ export interface ProjectDraftStore {
     sentGeneration: number,
     refusal: ProjectSchemaRefusal
   ): Promise<ProjectDraftSettlementResult>;
-  /**
-   * Settles the writer's unload journal of a lineage through `throughGeneration` (claiming an unclaimed lineage for
-   * it), then deletes those entries. `settled` once the mark commits; the deletion is best effort, the mark makes it
-   * moot.
-   */
+  /** `settled` once the mark commits; the deletion is best effort, the mark makes it moot. */
   settleUnloadJournal(
     projectId: string,
     editorSessionId: string,
@@ -411,12 +364,8 @@ export const PROJECT_DRAFT_MAX_BYTES = 32 * 1024 * 1024;
 export const PROJECT_DRAFT_PAGE_LIMIT = 100;
 export const PROJECT_DRAFT_PROJECT_LIMIT = 32;
 export const PROJECT_UNLOAD_JOURNAL_SCHEMA_VERSION = 1;
-/**
- * The most document bytes one hidden-page journal writes. Serializing and cloning the documents is synchronous in the
- * `pagehide` handler; above this a document is left to the ordinary autosave.
- */
+/** Serializing runs synchronously in `pagehide`; larger documents are left to ordinary autosave. */
 export const PROJECT_UNLOAD_JOURNAL_MAX_BYTES = 8 * 1024 * 1024;
-/** How long an entry for a damaged lineage waits for that lineage's cleanup before it is discarded. */
 export const PROJECT_UNLOAD_JOURNAL_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** The claim with its writer's unload journal settled through `generation`; the mark never moves back. */
@@ -715,7 +664,6 @@ export const toDirtyProjectDraft = (draft: ProjectDraft, changes: Partial<Projec
   return next as unknown as ProjectDraft;
 };
 
-/** The draft on other bases, in its state; undefined bases are kept. */
 export const withBases = (draft: ProjectDraft, bases: ProjectDraftBases): ProjectDraft => ({
   ...draft,
   ...Object.fromEntries(Object.entries(bases).filter(([, value]) => value !== undefined)),
@@ -764,17 +712,13 @@ const isProjectUnloadJournalEntry = (
   );
 };
 
-/** The page that wrote a stored entry, read before the entry is validated; `null` when it does not name one. */
 export const getUnloadJournalOwnerEditorSessionId = (entry: unknown): string | null => {
   const owner =
     entry && typeof entry === 'object' ? (entry as Partial<ProjectUnloadJournalEntry>).ownerEditorSessionId : undefined;
   return isNonEmptyString(owner) ? owner : null;
 };
 
-/**
- * Whether the page that wrote an entry still runs, by `isEditorSessionLive`, asked once per page. An entry that names
- * no page, or without a probe, counts as a gone page's.
- */
+/** An entry naming no page, or checked without a probe, counts as a gone page's. */
 export const createUnloadJournalLivenessCheck = (
   isEditorSessionLive: ProjectUnloadJournalLivenessOptions['isEditorSessionLive']
 ): ((entry: unknown) => Promise<boolean>) => {
@@ -793,13 +737,7 @@ export const createUnloadJournalLivenessCheck = (
   };
 };
 
-/**
- * The reconciliation rules for one unload journal entry, given its lineage as the draft store holds it. The entry is
- * staged exactly as its writer would have staged it, so it is only applied where that writer could still write: the
- * lineage is unclaimed or claimed by the same writer, which has not settled its journal that far, and holds nothing at
- * or above the entry's generation. Sticky conflict, schema refusal, copy reservation and base revision of an existing
- * draft are kept, as staging keeps them.
- */
+/** Applied only where the entry's writer could still write; existing drafts keep conflict, refusal, reservation, base. */
 export const decideUnloadJournalEntry = ({
   accountId,
   claim,
@@ -809,7 +747,6 @@ export const decideUnloadJournalEntry = ({
   now,
 }: {
   accountId: string;
-  /** `'corrupt'` for a stored claim that does not validate. */
   claim: ProjectDraftWriterClaim | 'corrupt' | undefined;
   /** The lineage's draft, `null` when it holds none, `'corrupt'` when its records do not agree with the claim. */
   current: ProjectDraft | 'corrupt' | null;

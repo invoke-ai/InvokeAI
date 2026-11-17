@@ -33,18 +33,9 @@ import { WorkflowLibraryPreviewStage } from './WorkflowLibraryPreviewStage';
 import { WORKFLOW_LIBRARY_WIDE } from './WorkflowLibraryRail';
 import { useWorkflowLibraryMissingCounts } from './WorkflowRequirementsList';
 
-/**
- * The template places' result line, grid or list, detail rail and card actions menu. They alone subscribe to the
- * listing's entries, so range loads and enrichment results re-render this subtree, never the dialog shell, its rail or
- * its toolbar.
- */
+/** Only this subtree subscribes to listing entries, so range loads and enrichment never re-render the dialog shell. */
 
-/**
- * The card grid (or the list) and the detail rail, in both views. In the wide layout their box dissolves into the
- * dialog body's grid (see `WorkflowLibraryDialog`): the cards take the centre column under the toolbar, and the detail
- * rail becomes a flush column from under the header to the dialog's bottom edge, separated by a 1px border rather than
- * drawn as a card. The narrow layout keeps the sheet's own grid (`WORKFLOW_DETAIL_PANES_CSS`).
- */
+/** Wide, this box dissolves into the dialog body's grid; narrow, it keeps the sheet's own grid. */
 export const WORKFLOW_LIBRARY_PANES_CSS: SystemStyleObject = {
   ...WORKFLOW_DETAIL_PANES_CSS,
   [WORKFLOW_LIBRARY_WIDE]: {
@@ -65,10 +56,7 @@ export const WORKFLOW_LIBRARY_PANES_CSS: SystemStyleObject = {
 
 type AuthSession = ReturnType<typeof useAuthSession>;
 
-/**
- * What the account may do to a library entry: only its own templates (on a multi-user server, the ones it owns) are
- * writable, and visibility changes only from My library on a multi-user server.
- */
+/** Only the account's own templates are writable; visibility changes only from My library on a multi-user server. */
 const getLibraryEntryAccess = (
   entry: WorkflowLibraryEntry | null | undefined,
   session: AuthSession,
@@ -97,14 +85,10 @@ const selectPanes = (snapshot: WorkflowLibraryBrowseSnapshot) => ({
 export interface WorkflowLibraryResultLineProps {
   /** Matching workflows; null while unknown. */
   count: number | null;
-  /** The checked tags as a localized "a or b" list; empty when none. */
   tagsText: string;
 }
 
-/**
- * "N workflows · tags" above the cards. Nothing about requirements: on a server-paginated place only the enriched
- * window is known, so any aggregate would change while scrolling.
- */
+/** No requirement aggregate: a server-paginated place knows only its enriched window, which changes while scrolling. */
 export const WorkflowLibraryResultLine = memo(function WorkflowLibraryResultLine({
   count,
   tagsText,
@@ -136,13 +120,10 @@ export interface WorkflowLibraryBrowsePanesProps {
   isOpen: boolean;
   layout: WorkflowLibraryLayout;
   tab: WorkflowLibraryTab;
-  /** The date the list's rows show, from the current order. */
   trailingField: WorkflowLibraryListTrailingField;
   tagsText: string;
   emptyMessage: string | undefined;
-  /** Where the card actions menu is anchored; null while it is closed. */
   contextMenuAnchor: WorkflowCardMenuAnchor | null;
-  /** The workflow the card actions menu was raised for, kept through its close. */
   contextMenuTarget: WorkflowContextMenuTarget | null;
   /** The user's explicit choice; the panes fall back to the selected pin or the first resident entry. */
   selectedWorkflowId: string | null;
@@ -151,29 +132,23 @@ export interface WorkflowLibraryBrowsePanesProps {
   onClose: () => void;
   onContextMenu: WorkflowCardContextMenuHandler;
   onContextMenuClose: () => void;
-  /** Receives the deleted workflow, from the rail or a card's menu. */
   onDeleted: (workflowId: string) => void;
   onOpen: (workflowId: string) => void;
   onOpenItem: (item: WorkflowLibraryListItem) => void;
-  /** Enters preview mode on a workflow, selecting it; on a given view, else the one last shown. */
   onPreview: (workflowId: string, view?: WorkflowPreviewView) => void;
   onSelect: (workflowId: string) => void;
   preview: WorkflowLibraryPanesPreview;
-  /** The stage's handle, through which the dialog's Escape reaches it. */
   previewStageRef: RefObject<WorkflowLibraryPreviewStageHandle | null>;
 }
 
-/** Preview mode, which the shell owns: the stage replaces the collection while the detail rail stays. */
 export interface WorkflowLibraryPanesPreview {
   isActive: boolean;
-  /** The place the stage's back button returns to. */
   placeLabel: string;
   onLeave: (workflowId: string | null) => void;
   view: WorkflowPreviewView;
   onViewChange: (view: WorkflowPreviewView) => void;
 }
 
-/** What the stage shows for an entry: its enriched document, or why there is none yet. */
 const getLibraryPreviewStatus = (entry: WorkflowLibraryEntry | null): WorkflowLibraryPreviewStatus =>
   entry?.enrichment.status === 'ready'
     ? { document: entry.enrichment.document, kind: 'ready' }
@@ -210,7 +185,6 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
   const { t } = useTranslation();
   const missingCounts = useWorkflowLibraryMissingCounts(entries);
 
-  // Derive a fallback selection when filtering/deletion removes the selected row.
   const desiredWorkflowId = selectedWorkflowId ?? selectedEntry?.item.workflow_id ?? null;
   const activeWorkflowId =
     selectedEntry?.item.workflow_id === desiredWorkflowId ||
@@ -219,8 +193,7 @@ export const WorkflowLibraryBrowsePanes = memo(function WorkflowLibraryBrowsePan
       : (entries[0]?.item.workflow_id ?? null);
   const activeEntry = selectWorkflowLibraryEntry({ entries, selectedEntry }, activeWorkflowId) ?? null;
   const activeAccess = getLibraryEntryAccess(activeEntry, authSession, tab);
-  // The menu acts on the card it was raised for, resident or the selected pin; once that leaves, it has nothing to act
-  // on and stays closed (the shell clears its anchor).
+  // The menu acts on the card it was raised for; once that leaves, it stays closed (the shell clears its anchor).
   const menuEntry = contextMenuTarget
     ? (selectWorkflowLibraryEntry({ entries, selectedEntry }, contextMenuTarget.workflowId) ?? null)
     : null;

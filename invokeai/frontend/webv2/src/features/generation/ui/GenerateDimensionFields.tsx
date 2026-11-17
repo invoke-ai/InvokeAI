@@ -618,7 +618,6 @@ export const GenerateDimensionFields = ({
     dimensionGrid
   );
   const frameLabel = `${displayDimensions.width}×${displayDimensions.height}`;
-  // Without model defaults there is nothing to differ from.
   const isAtModelDefaultSize =
     modelDefaults === null ||
     (displayDimensions.width === modelDefaults.width && displayDimensions.height === modelDefaults.height);

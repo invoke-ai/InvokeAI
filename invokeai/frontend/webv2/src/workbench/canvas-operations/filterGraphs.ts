@@ -36,7 +36,6 @@ export const FILTER_CATEGORY_ORDER: readonly FilterCategory[] = ['edge', 'depth'
 export interface FilterDefinition {
   /** The persisted/UI filter id. */
   type: string;
-  /** The picker group the filter belongs to. */
   category: FilterCategory;
   /** Backend node type when this definition is a named preset. */
   nodeType?: string;
@@ -44,7 +43,6 @@ export interface FilterDefinition {
   params: readonly FilterParamSpec[];
 }
 
-/** Builds the default settings object for a filter definition. */
 export const buildFilterDefaults = (definition: FilterDefinition): Record<string, unknown> => {
   const settings: Record<string, unknown> = {};
   for (const param of definition.params) {

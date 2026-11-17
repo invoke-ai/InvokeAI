@@ -46,7 +46,6 @@ const constraintsFor = (modifiers: { shift: boolean; alt: boolean }, state: Gest
   };
 };
 
-/** Creates a fresh marquee tool with its own gesture state. */
 export const createMarqueeTool = (): Tool => {
   let state: GestureState | null = null;
 
@@ -120,8 +119,7 @@ export const createMarqueeTool = (): Tool => {
       }
       const rect = dragRect(current.startDoc, input.documentPoint, constraintsFor(input.modifiers, current));
       if (rect.width < 1 || rect.height < 1) {
-        // Degenerate drag: selecting nothing would silently wipe the selection under `replace`, so treat it as a no-op
-        // instead.
+        // Degenerate drag: selecting nothing would silently wipe the selection under `replace`, so it is a no-op.
         return;
       }
       const { kind } = ctx.stores.marqueeOptions.get();

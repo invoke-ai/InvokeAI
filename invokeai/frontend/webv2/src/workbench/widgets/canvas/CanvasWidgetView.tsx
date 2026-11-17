@@ -103,10 +103,7 @@ const CanvasShortcutHintRegistration = ({
   return null;
 };
 
-/**
- * Wire reducer chrome, commands, settings, and staging around the pixel/input engine. Properties owns tool settings;
- * {@link CanvasHeaderActions} owns view controls.
- */
+/** Wire reducer chrome, commands, settings, and staging around the pixel/input engine. */
 export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -154,8 +151,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       return;
     }
     for (const setting of CANVAS_SETTINGS) {
-      // Only engine-backed settings feed a store; settings consumed elsewhere in the frontend have no store and are
-      // skipped here.
+      // Only engine-backed settings feed a store; settings without one are consumed elsewhere in the frontend.
       if (setting.store) {
         engine.interaction.set(setting.store, settings[setting.key]);
       }
@@ -193,9 +189,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const isDocumentEditingLocked = operationKind !== null;
   const canAcceptStagedImage = engine !== null && selectedCandidate !== undefined && !isDocumentEditingLocked;
 
-  // Files dragged in from the desktop show the gallery drag's zones and land the same way once uploaded. The upload and
-  // import load on the first drop, keeping them out of Canvas startup. A canvas held by a running operation shows no
-  // zones, so it takes no drop; the overlay says why.
+  // Files dragged in from the desktop show the gallery drag's zones and land the same way once uploaded.
   const queryClient = useQueryClient();
   const startDroppedFileUpload = useDroppedFileUpload({
     pendingKey: 'widgets.canvas.fileDrop.pending',
@@ -238,8 +232,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   });
   const handleSurfaceContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
-      // Preserve native menus in inline editors. Canvas context actions target the selected layer without changing
-      // selection.
+      // Preserve native menus in inline editors.
       const resolution = resolveCanvasContextMenu({
         clientX: event.clientX,
         clientY: event.clientY,

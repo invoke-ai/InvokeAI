@@ -16,11 +16,7 @@ export interface ToolFormProps {
 
 export type ToolFormComponent = ComponentType<ToolFormProps>;
 
-/**
- * One named group of a tool's property form. Group ids are GLOBAL keys: shared across tools when (and only when) the
- * tools share the group's component, so React keeps the DOM alive across the tool switch and collapse state follows the
- * group rather than the tool.
- */
+/** Group ids are global keys, shared only by tools sharing the component, so DOM and collapse state persist. */
 export interface ToolPropertyGroup {
   id: string;
   labelKey: string;
@@ -29,10 +25,6 @@ export interface ToolPropertyGroup {
   body: ToolFormComponent;
 }
 
-/**
- * Describe tool panes with optional previews and typed row groups; the pane supports this form alongside migrating
- * region adapters.
- */
 export interface ToolPropertyForm {
   id: ToolId;
   /** Paints into one leaf: a selected group gets the "select a layer" notice instead of strokes. */

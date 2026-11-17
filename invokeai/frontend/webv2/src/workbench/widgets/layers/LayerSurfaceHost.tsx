@@ -31,10 +31,7 @@ interface LayerSurfaceHostProps {
   onClose: () => void;
 }
 
-/**
- * The one menu and one properties popover the whole panel shares. A row asks for a surface by id and anchor; nothing
- * heavier than a button lives in the row. A surface whose node has gone closes itself.
- */
+/** One menu and one popover for the panel; rows hold only buttons, and a surface whose node went closes. */
 export const LayerSurfaceHost = ({
   commands,
   document,

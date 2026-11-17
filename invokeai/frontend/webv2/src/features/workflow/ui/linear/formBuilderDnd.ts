@@ -24,11 +24,9 @@ export const parseFormDroppableId = (
   return null;
 };
 
-/** The id of `elementId`'s container, or null for the root element (which has no parent). */
 export const findFormParentId = (form: WorkflowForm, elementId: string): string | null =>
   form.elements[elementId]?.parentId ?? null;
 
-/** True when `candidateId` is `ancestorId` itself or nested anywhere under it. */
 export const isFormDescendantOrSelf = (form: WorkflowForm, ancestorId: string, candidateId: string): boolean => {
   if (ancestorId === candidateId) {
     return true;

@@ -47,15 +47,9 @@ type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
 
 const THUMBNAIL_STRIP_HEIGHT = '5rem';
 const MENU_POSITIONING = { placement: 'top-end' } as const;
-/**
- * Below this bar width the "Generating" text and "Discard all" collapse to icons, so the accept split button (the only
- * pointer path to "Keep as hidden layer") stays inside the canvas. Measured on the staging slot itself.
- */
+/** Below this width, text collapses to icons so the accept split button stays inside the canvas. */
 const COMPACT = '@container staging-bar (width < 56rem)';
-/**
- * Below this the remaining text goes too (the candidate counter, the auto-switch mode, Cancel and the accept label),
- * leaving icons whose names and tooltips carry the words, so the bar fits a canvas down to about 360px.
- */
+/** Below this the remaining text goes too, so the bar fits a canvas down to about 360px. */
 const NARROW = '@container staging-bar (width < 36rem)';
 const STAGING_ROOT_CSS = { containerName: 'staging-bar', containerType: 'inline-size' } as const;
 const WIDE_ONLY_CSS = { [COMPACT]: { display: 'none' } } as const;
@@ -93,7 +87,6 @@ interface StagingBarProps {
   canAccept: boolean;
   hasMultipleSlots: boolean;
   isGenerating: boolean;
-  /** A gallery save of the selected candidate is in flight. */
   isSavingToGallery: boolean;
   isVisible: boolean;
   selectedCandidate: CanvasStagingCandidateContract | undefined;
@@ -116,10 +109,6 @@ interface StagingBarProps {
   onToggleVisibility: () => void;
 }
 
-/**
- * Show staging controls for running or pending canvas results. {@link CanvasWidgetView} feeds pixels to
- * engine.previews; the parent positions this bar above tool options.
- */
 export const StagingBar = ({
   antialiasProgressImages,
   areThumbnailsVisible,
@@ -170,12 +159,7 @@ export const StagingBar = ({
     }
   };
 
-  /**
-   * After a discard or a closed thumbnail menu, focus stays with the results instead of falling to the page: on
-   * `preferred` (the thumbnail the menu opened from), else the result now selected when thumbnails show, else a step
-   * button that still works, else the bar itself. Once the last result is gone, and the bar with it, the canvas surface
-   * takes focus, so the canvas's keys keep working. Focus the user already moved elsewhere stays there.
-   */
+  /** Keeps focus with the results after a discard or closed menu; the canvas takes it once the bar is gone. */
   const keepFocusWithResults = (preferred?: () => HTMLElement | null) => {
     const root = rootRef.current;
     if (!root) {
@@ -247,8 +231,7 @@ export const StagingBar = ({
       const direction = event.key === 'ArrowLeft' ? -1 : 1;
       const index = thumbnail ? Number(thumbnail.getAttribute(THUMBNAIL_ATTR)) : Number.NaN;
       if (Number.isInteger(index)) {
-        // Roving focus: an arrow is the pick (it steers Auto-switch), and focus goes with it. Tab only ever reaches the
-        // selected thumbnail, so passing through the strip picks nothing.
+        // Roving focus: an arrow is the pick (it steers Auto-switch), and focus goes with it.
         const next = (index + direction + slots.length) % slots.length;
         onSelectImage(next);
         event.currentTarget.querySelector<HTMLElement>(`[${THUMBNAIL_ATTR}="${next}"]`)?.focus();
@@ -304,12 +287,9 @@ export const StagingBar = ({
           w="full"
         >
           <ScrollArea.Viewport ref={wheelScrollsHorizontally} h="full" scrollPaddingInline="2" w="full">
-            {/*
-             * Leave the content slot's width alone: its inline `min-width:
-             * fit-content` grows it to hold every thumbnail, so `justify` only
-             * centers when the strip fits and no thumbnail ever lands at a
-             * negative offset that scrolling cannot reach.
-             */}
+            {/* Leave the content slot's width alone: its inline `min-width: fit-content` grows it to hold every
+                thumbnail, so `justify` only centers when the strip fits and no thumbnail ever lands at a negative
+                offset that scrolling cannot reach. */}
             <ScrollArea.Content asChild>
               <HStack h="full" justify="center">
                 {slots.map((slot, index) => (
@@ -324,8 +304,7 @@ export const StagingBar = ({
                       if (slot.kind !== 'candidate') {
                         return;
                       }
-                      // The menu acts on the selected candidate, so a right-click selects first. The keyboard's
-                      // context-menu key reports no pointer; anchor to the thumbnail.
+                      // The menu acts on the selected candidate, so a right-click selects first.
                       event.preventDefault();
                       onSelectImage(index);
                       const rect = event.currentTarget.getBoundingClientRect();

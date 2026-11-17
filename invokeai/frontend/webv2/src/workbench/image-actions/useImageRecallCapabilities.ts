@@ -10,12 +10,10 @@ import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from '.
 
 /**
  * What an image's menus can recall and reuse from it, read when the menu mounts: hosts mount it on open, so a selection
- * change alone requests nothing. A null image (a bulk target) requests nothing. The metadata entry is the gallery's
- * shared one, so Preview Details and recall commands read it once between them. Capabilities derive from the server
- * facts on every render, so a Generate model change re-derives without another request.
- *
- * A failed read offers what the other read and the image itself answer (no metadata, or no workflow); the errored entry
- * holds no answer, so the next open reads it again.
+ * change alone, or a null (bulk) image, requests nothing. The metadata entry is the gallery's shared one, read once
+ * between Preview Details and recall commands. Capabilities derive from the server facts on every render, so a Generate
+ * model change re-derives without another request. A failed read offers what the other read and the image itself
+ * answer (no metadata, or no workflow); the errored entry holds no answer, so the next open reads it again.
  */
 export const useImageRecallCapabilities = (
   actions: Pick<ImageActions, 'deriveImageRecallCapabilities'>,

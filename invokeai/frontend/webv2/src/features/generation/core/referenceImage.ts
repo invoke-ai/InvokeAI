@@ -220,8 +220,7 @@ export const getReferenceImagePromptTags = (
       )
     : NO_PROMPT_TAGS;
 
-// ---- Crop-box geometry for the reference image crop editor -------------------------------------------------------
-// Boxes are percentages of the original image, so an aspect ratio (width / height in pixels) becomes a width% per
+// Crop-editor boxes are percentages of the original image, so an aspect ratio (width / height in pixels) becomes a width% per
 // height% factor through the image's own proportions.
 
 export type ReferenceCropAspectRatioId = 'free' | '16:9' | '3:2' | '4:3' | '1:1' | '3:4' | '2:3' | '9:16';
@@ -410,7 +409,6 @@ const resolveRatioDrag = (
   };
 };
 
-/** The box after moving the pointer to `point` during `drag`. */
 export const resolveReferenceCropDrag = (
   drag: ReferenceCropDrag,
   point: { x: number; y: number },

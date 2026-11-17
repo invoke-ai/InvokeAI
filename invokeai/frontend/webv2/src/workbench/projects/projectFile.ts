@@ -43,7 +43,6 @@ interface ProjectFile {
   version: typeof PROJECT_FILE_VERSION;
 }
 
-/** Returns the embedded legacy document, or null when the text is not one of our exports. */
 export const parseProjectFile = (text: string): Record<string, unknown> | null => {
   try {
     const parsed = JSON.parse(text) as Partial<ProjectFile> | null;
@@ -65,8 +64,6 @@ export const parseProjectFile = (text: string): Record<string, unknown> | null =
   }
 };
 
-/** Imports receive fresh IDs; ZIP and reducer dependencies remain lazy. */
-
 /** Asset-count phases exclude ZIP packing. */
 export interface ProjectFileProgress {
   completed: number;
@@ -78,12 +75,10 @@ export interface ProjectFileOptions {
   onProgress?: (progress: ProjectFileProgress) => void;
   owner?: AccountScope;
   includeFonts?: boolean;
-  /** Export only: whether the file carries the exporter's workspace. On unless turned off. */
   includeWorkspace?: boolean;
   skipEmbeddedFonts?: boolean;
 }
 
-/** What an archive's `project.json` and `workspace.json` carry, and the document schema the first is written in. */
 interface ArchivedProject {
   content: Record<string, unknown>;
   documentSchemaVersion: number;
@@ -91,7 +86,6 @@ interface ArchivedProject {
 }
 
 export interface ProjectExportOutcome extends ProjectTransferIssues {
-  /** The name the archive was downloaded under. */
   fileName: string;
 }
 
@@ -121,7 +115,6 @@ const readProjectDocument = async (file: File) => {
   return { contents: await readInvkArchive(file), format: 'invk' as const };
 };
 
-/** A whole document as an archive carries it: its content, and the exporter's workspace unless it stays out. */
 const toArchivedProject = (document: ProjectDocumentV3, includeWorkspace: boolean): ArchivedProject => {
   const halves = splitProjectDocument(document);
 
@@ -132,11 +125,7 @@ const toArchivedProject = (document: ProjectDocumentV3, includeWorkspace: boolea
   };
 };
 
-/**
- * What the server holds of a project this build cannot read, verbatim, so it can still be recovered: content (schema 4
- * on, as a newer build may write it) beside the caller's workspace, or a whole document, whose workspace no build that
- * cannot read it can take out.
- */
+/** Verbatim, so a project this build cannot read can still be recovered. */
 const toRecoveryArchive = (record: ProjectWithWorkspaceDTO, includeWorkspace: boolean): ArchivedProject => {
   const { documentSchemaVersion } = record.data;
   const schema = typeof documentSchemaVersion === 'number' ? documentSchemaVersion : 1;
@@ -203,7 +192,6 @@ const exportProjectDocument = async (
   };
 };
 
-/** Export a project from its server record, flushing it first — see {@link readAcknowledgedProject}. */
 export const exportLibraryProject = async (
   projectId: string,
   options: ProjectFileOptions = {}
@@ -234,7 +222,6 @@ export const exportLibraryProject = async (
   });
 };
 
-/** Export an open project from its live in-memory document. */
 export const exportOpenProject = async (
   requested: Project,
   options: ProjectFileOptions = {}
@@ -266,20 +253,14 @@ export const exportOpenProject = async (
   );
 };
 
-/**
- * An imported project is new to this library, so it starts on a new project's Auto-switch (In progress) unless the file
- * names a mode of its own; a file from before the mode existed would otherwise read as a stored project's Off.
- */
+/** A file from before the mode existed would otherwise read as a stored project's Off. */
 const withImportedViewerAutoSwitch = (settings: unknown): Record<string, unknown> => {
   const record = settings !== null && typeof settings === 'object' ? (settings as Record<string, unknown>) : {};
 
   return isViewerAutoSwitchMode(record.viewerAutoSwitch) ? record : { ...record, viewerAutoSwitch: 'progress' };
 };
 
-/**
- * Project creation commits remapped/staged media. Every import stages an inbox board first, an empty one for a file
- * without board entries, so the create claims it and carries the importer's workspace, open on it, in one request.
- */
+/** Every import stages an inbox board first, so the create claims it and carries the workspace in one request. */
 export const importProjectFile = async (
   file: File,
   options: ProjectFileOptions = {}
@@ -288,7 +269,6 @@ export const importProjectFile = async (
   const source = await readProjectDocument(file);
   const archivedDocument = source.format === 'invk' ? source.contents.projectDocument : source.projectDocument;
   let projectDocument = archivedDocument;
-  // Project content (v3) is joined with the exporter's workspace, or without one with a new project's defaults.
   if (archivedDocument.documentSchemaVersion === PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION) {
     const { joinProjectHalves } = await import('./projectHydration');
     const joined = joinProjectHalves(archivedDocument, source.format === 'invk' ? source.contents.workspace : null);
@@ -324,15 +304,13 @@ export const importProjectFile = async (
     throw new InvkFormatError('damaged', 'The project document will not rehydrate.');
   }
 
-  // An imported archive never inherits library write targets from the ids its workflows carry. Lazy like the other
-  // document modules here: this file is shared with the Launchpad, which never loads the workflow core eagerly.
+  // Lazy: this file is shared with the Launchpad, which never loads the workflow core eagerly.
   const { stripProjectWorkflowSources } = await import('@workbench/projectWorkflows');
   const project = { ...loaded.project, workflows: stripProjectWorkflowSources(loaded.project.workflows) };
 
   const { serializeProjectDocument } = await import('./projectDocument');
   const canonicalDocument = serializeProjectDocument(project);
   const archive = source.format === 'invk' ? source.contents : null;
-  // Every import stages at least its inbox board, which a failed create must undo, legacy JSON included.
   const [restoreMedia, memberBoards, { toTransferredProjectCreation }] = await Promise.all([
     import('./invk/restoreProjectMedia'),
     import('./invk/memberBoards'),
@@ -349,8 +327,7 @@ export const importProjectFile = async (
   assertAccountScopeCurrent(owner);
 
   const archiveBoards = archive?.boardSnapshot?.boards ?? [];
-  // Made before anything is staged: every staging board joins it as it is created, so a restore abandoned at any point
-  // can delete them all.
+  // Made before staging so a restore abandoned at any point can delete every staging board.
   const ledger = restoreMedia.createRestoredMediaLedger([]);
   let didCreateProject = false;
   let didAttemptProjectCreate = false;
@@ -369,7 +346,6 @@ export const importProjectFile = async (
       assertAccountScopeCurrent(owner);
     }
 
-    // One staging board per archive board; the inbox's rides the create, the rest are placed after.
     const { boards: stagedBoards, inboxStagingBoardId } = await memberBoards.createStagingBoards(
       archiveBoards,
       name,
@@ -409,8 +385,7 @@ export const importProjectFile = async (
       getProjectCanvasSchemaRequirement(document),
       archive?.manifest.minimumCanvasSchemaVersion ?? 1
     );
-    // The content and the importer's workspace (the archive's, or a new project's), open on the staged inbox, in one
-    // request: the project never exists without it. A project created whole carries the workspace inside.
+    // One request, so the project never exists without the importer's workspace.
     didAttemptProjectCreate = true;
     const record = await createProjectSettled(
       {
@@ -424,8 +399,7 @@ export const importProjectFile = async (
 
     didCreateProject = true;
     assertAccountScopeCurrent(owner);
-    // The project exists; its other boards can now belong to it. Reported, never fatal, from here on. Lists fetched
-    // while they were still staged, the create's own refresh among them, would keep showing them in the Library.
+    // Never fatal from here on; lists fetched while staged would keep showing these boards in the Library.
     const boardIssues = await memberBoards
       .placeMemberBoards(stagedBoards, record.project_id, {
         onProgress: (completed, total) => options.onProgress?.({ completed, phase: 'placing-boards', total }),
@@ -462,7 +436,6 @@ export const importProjectFile = async (
         await restoreMedia.rollbackUnlessProjectExists(error, didCreateProject, owner, rollback);
       }
     }
-    // The staging boards it deletes may already be listed: uploads to them announce themselves.
     const rollback = () =>
       restoreMedia.rollbackRestoredMedia(ledger, { signal: owner.signal }).finally(() => invalidateBoardLists(owner));
     if (!didAttemptProjectCreate && isAccountScopeCurrent(owner)) {
@@ -475,7 +448,6 @@ export const importProjectFile = async (
   }
 };
 
-/** Open the browser's file picker for a project file; null when dismissed. */
 export const pickProjectFile = (owner: AccountScope = captureAccountScope()): Promise<File | null> =>
   new Promise((resolve) => {
     const input = document.createElement('input');

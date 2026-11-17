@@ -23,10 +23,7 @@ export const getHotkeyExecutionSource = (
   activeSource: WidgetContributionSource | null
 ): WidgetContributionSource | null => (hotkey.scope.kind === 'global' ? (hotkey.source ?? null) : activeSource);
 
-/**
- * Claimed bindings suppress browser defaults unless preventDefault is explicitly false. Unclaimed events retain browser
- * behavior.
- */
+/** Claimed bindings suppress browser defaults unless preventDefault is explicitly false. */
 export const shouldPreventHotkeyDefault = (hotkey: RegisteredHotkey | null): boolean =>
   hotkey !== null && hotkey.preventDefault !== false;
 

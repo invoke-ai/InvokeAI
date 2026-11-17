@@ -18,7 +18,6 @@ export { WHEEL_ZOOM_STEP } from '@workbench/panZoom';
 /** Maximum device-pixel ratio the engine honors; higher DPRs are clamped to bound backing-store size. */
 export const MAX_DPR = 2;
 
-/** The mutable view state. */
 export interface ViewState {
   pan: Vec2;
   zoom: number;
@@ -30,13 +29,10 @@ export interface Size {
   height: number;
 }
 
-/** The imperative viewport handle. */
 export interface Viewport {
   /** Current `{ pan, zoom }` (a fresh copy — never mutate the return value). */
   getState(): ViewState;
-  /** Current zoom factor. */
   getZoom(): number;
-  /** Current CSS viewport size. */
   getViewportSize(): Size;
   /** Current (clamped) device-pixel ratio. */
   getDpr(): number;
@@ -59,14 +55,12 @@ export interface Viewport {
   fitToView(documentRect: Rect, viewportSize: Size, padding?: number): void;
   /** Records the CSS viewport size and device-pixel ratio (capped at {@link MAX_DPR}; invalid ratios read as 1). */
   setViewportSize(width: number, height: number, dpr: number): void;
-  /** Subscribes to any view change. Returns an unsubscribe function. */
   subscribe(listener: () => void): () => void;
 }
 
 /** Default fit-to-view padding in CSS pixels. */
 const DEFAULT_FIT_PADDING = 48;
 
-/** Creates a viewport, optionally seeded with an initial view state / size. */
 export const createViewport = (initial?: Partial<ViewState>): Viewport => {
   let pan: Vec2 = { x: initial?.pan?.x ?? 0, y: initial?.pan?.y ?? 0 };
   let zoom = clampZoom(initial?.zoom ?? 1);

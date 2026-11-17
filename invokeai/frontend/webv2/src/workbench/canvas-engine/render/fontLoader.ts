@@ -149,7 +149,6 @@ const sourceKey = (source: CanvasTextSource): string => {
   ].join('|');
 };
 
-/** Creates a font loader bound to a legacy API or an application custom-font runtime. */
 export const createFontLoader = (api: FontLoadApi | CanvasFontRuntime | null): FontLoader => {
   const cssApi = api && isCanvasFontRuntime(api) ? domFontLoadApi() : api;
   const pending = new Map<string, Promise<string>>();

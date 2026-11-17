@@ -465,7 +465,6 @@ export const GenerateAdvancedFields = ({
                   const mode = value[0];
 
                   if (isPidMode(mode)) {
-                    // Commit immediately because native mode changes the valid dimension grid.
                     onCommitImmediate({ pidMode: mode });
                   }
                 }}

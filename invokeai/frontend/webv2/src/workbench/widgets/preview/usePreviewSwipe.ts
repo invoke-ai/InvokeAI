@@ -24,13 +24,7 @@ import {
   type SwipeSample,
 } from './previewSwipe';
 
-/**
- * Touch carousel over the fitted preview: one finger drags the media and its neighbors sideways, and release either
- * settles back or slides the neighbor in and navigates. Offsets are written to the elements' `translate` property
- * outside React, leaving `transform` to the loupe. A committed slide parks on the neighbor until the displayed source
- * changes; React itself clears the offset in the commit that renders the new source (see `restStyle`), so the newly
- * selected image lands where its neighbor stood, with no frame of either image out of place.
- */
+/** Writes `translate` outside React (the loupe owns `transform`); a commit parks until the source changes. */
 
 /** How long a committed slide may wait, fetch included, for its selection to render before returning. */
 const PARK_TIMEOUT_MS = 1500;
@@ -408,9 +402,7 @@ export const usePreviewSwipe = ({
 
       const settle = settleRef.current;
 
-      // A committed slide completes now, so a quick follow-up flick is never dropped behind an animation. A return is
-      // caught where it is and resumes from the finger travel that put it there; until the touch moves far enough to be
-      // a swipe, it can still be a tap or a hold-to-drag, and either sends the image home.
+      // A committed slide completes now, so a quick follow-up flick is never dropped behind an animation.
       let baseOffset = 0;
 
       if (settle && settle.target !== 0) {

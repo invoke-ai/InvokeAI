@@ -20,8 +20,7 @@ const TONE_COLORS: Record<PanelTone, string> = {
 };
 const PLACEHOLDER_PROPS = { color: 'fg.muted' } as const;
 const INVALID_PLACEHOLDER_PROPS = { color: 'fg.warning' } as const;
-// The recipe paints `aria-invalid` triggers as errors; a missing type only warns, so its rule is outranked here. The
-// theme has no `border.warning`; warning borders use the warning foreground, as the warning input shell does.
+// The recipe paints `aria-invalid` triggers as errors; a missing type only warns, so its rule is outranked here.
 const WARNING_TRIGGER_CSS = {
   '&[aria-invalid=true]': { borderColor: 'fg.warning' },
   '&[aria-invalid=true]:hover': { bg: 'bg.warning', borderColor: 'fg.warning' },

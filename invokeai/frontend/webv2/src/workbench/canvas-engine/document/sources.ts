@@ -17,17 +17,13 @@ import { estimateTextExtent } from '@workbench/canvas-engine/render/rasterizers/
 
 import { isLayerContributing } from './layerEligibility';
 
-/** A layer type that carries a rasterizable `source` (raster or control). */
 type SourceLayer = Extract<CanvasLayerContract, { source: CanvasLayerSourceContract }>;
 
-/** A mask-bearing layer (inpaint mask / regional guidance); its `mask` holds an alpha bitmap. */
 type MaskLayer = Extract<CanvasLayerContract, { mask: unknown }>;
 
-/** True when a layer carries a `source` field (raster / control layers). */
 const hasSource = (layer: CanvasLayerContract): layer is SourceLayer =>
   layer.type === 'raster' || layer.type === 'control';
 
-/** True when a layer carries a `mask` (inpaint mask / regional guidance). */
 export const isMaskLayer = (layer: CanvasLayerContract): layer is MaskLayer =>
   layer.type === 'inpaint_mask' || layer.type === 'regional_guidance';
 
@@ -81,9 +77,8 @@ export const isRenderableLayer = (layer: CanvasLayerContract): boolean => {
 };
 
 /**
- * Untransformed local cache extent: native image size, shape/text extent, explicit gradient extent (legacy document
- * dimensions), or paint bitmap size at its offset (legacy zero). Empty paint has an empty rect; unsupported sources
- * throw.
+ * Untransformed local cache extent: native image size, shape/text extent, explicit gradient extent (legacy: document
+ * dims), or paint bitmap size at its offset (legacy: zero). Empty paint is an empty rect; unsupported sources throw.
  */
 export const getSourceContentRect = (layer: CanvasLayerContract, doc: CanvasDocumentContractV3): Rect => {
   const source = renderableSourceOf(layer);

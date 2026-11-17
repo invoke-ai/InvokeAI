@@ -69,7 +69,6 @@ interface AddPidDecodeArg {
   graph: BackendGraphContract;
   settings: GenerateSettings;
   base: string;
-  /** The denoise node producing the latents to decode. */
   denoise: BackendInvocationContract;
   /** The positive prompt node — PiD conditions its decode on the same caption. */
   positivePrompt: BackendInvocationContract;
@@ -148,7 +147,6 @@ export const addPidDecode = ({
   return resize;
 };
 
-/** The PiD fields to record in image metadata. */
 export const getPidMetadata = (settings: GenerateSettings): Record<string, unknown> & { pid_mode: PidMode } => ({
   gemma2_encoder: settings.gemma2EncoderModel,
   pid_decoder: settings.pidDecoderModel,

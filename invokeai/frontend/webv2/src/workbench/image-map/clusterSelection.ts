@@ -6,8 +6,7 @@ import type { ImageMapPoint } from './api';
 
 /**
  * Every member, however large: DBSCAN can put most of a huge gallery in one cluster, and a silent cap showed only the
- * part nearest the click. The map draws the whole cluster with scalar marker properties, and the gallery hydrates the
- * list a page at a time.
+ * part nearest the click. The map draws it with scalar marker properties; the gallery hydrates a page at a time.
  */
 export const collectClusterSelection = (
   points: ImageMapPoint[],
@@ -29,8 +28,7 @@ export const collectClusterSelection = (
     .map((entry) => entry.key);
 };
 
-// The map widget is English-only, so its numbers are grouped to match its words rather than by whatever locale the
-// browser reports.
+// The map widget is English-only, so its numbers group to match its words, not the browser's reported locale.
 const CLUSTER_SIZE_FORMAT = new Intl.NumberFormat('en-US');
 
 /** A cluster's size as the map words it; also the selection's name while the cluster has no label. */

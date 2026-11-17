@@ -1,9 +1,6 @@
 import type { PreviewDensity } from './previewDensity';
 
-/**
- * The bar docked under Preview's stage: the filmstrip, or the compare toolbar in its place. A full-width subtle surface
- * split from the dot-grid stage by a hairline, shared so the two read as one surface family.
- */
+/** The bar under Preview's stage: the filmstrip, or the compare toolbar in its place. */
 export const PREVIEW_DOCK_BAR_PROPS = {
   bg: 'bg.subtle',
   borderColor: 'border.subtle',

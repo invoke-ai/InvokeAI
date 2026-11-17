@@ -17,10 +17,7 @@ import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
 
 type LayerTransform = CanvasLayerBaseContract['transform'];
 
-/**
- * Local content bounds include off-origin paint/mask pixels and share {@link getSourceContentRect}. Empty or
- * unsupported layers return null.
- */
+/** Off-origin-aware local content bounds via {@link getSourceContentRect}; null for empty or unsupported layers. */
 export const hittableLayerRect = (
   layer: CanvasLayerContract,
   doc: CanvasDocumentContractV3,
@@ -72,10 +69,7 @@ export const hitTestLayer = (
   return local.x >= rect.x && local.x <= rect.x + rect.width && local.y >= rect.y && local.y <= rect.y + rect.height;
 };
 
-/**
- * Returns transformed content corners or null. Partial overrides preview move/scale/rotation without mutation; omitted
- * fields retain committed values.
- */
+/** Transformed content corners or null; a partial override previews without mutation, omitted fields stay committed. */
 export const layerOutlineCorners = (
   layer: CanvasLayerContract,
   doc: CanvasDocumentContractV3,

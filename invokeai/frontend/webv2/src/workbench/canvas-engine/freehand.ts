@@ -9,7 +9,6 @@ import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { getStrokeOutlinePoints, getStrokePoints } from 'perfect-freehand';
 
-/** A single pressure-sampled input point for a stroke. */
 export interface StrokeSamplePoint {
   x: number;
   y: number;
@@ -19,7 +18,6 @@ export interface StrokeSamplePoint {
 
 /** Tuning for the freehand outline. `size` is the base stroke diameter in document units. */
 export interface FreehandOptions {
-  /** Base stroke diameter (document units). */
   size: number;
   /** Effect of pressure on width, [0, 1]. 0 disables pressure sensitivity. */
   thinning?: number;
@@ -65,7 +63,6 @@ const SAMPLE_SPACING_RATIO = 0.02;
  */
 export const START_GATE_SIZE = 24;
 
-/** Squared distance between two sample points. */
 const dist2 = (a: StrokeSamplePoint, b: StrokeSamplePoint): number => {
   const dx = a.x - b.x;
   const dy = a.y - b.y;

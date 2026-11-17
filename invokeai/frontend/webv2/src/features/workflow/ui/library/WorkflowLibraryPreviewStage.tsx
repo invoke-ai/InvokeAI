@@ -38,12 +38,7 @@ import { buildLibraryGraphPreviewSource, DeferredWorkflowDocumentGraph } from '.
 import { keepMenuOpenWhenSiblingMenuCloses } from './WorkflowLibraryCard';
 import { WORKFLOW_LIBRARY_NARROW, WORKFLOW_LIBRARY_WIDE } from './WorkflowLibraryRail';
 
-/**
- * Preview mode's stage: it takes the places rail's and the collection's place in the dialog while the detail rail stays
- * where it is (and steps through the view's results). The bar leaves (back to the place), switches the view, finds a
- * node and exports the saved workflow; the body draws the selected workflow's document. The collection stays laid out
- * underneath, hidden, so leaving returns to it exactly as it was.
- */
+/** The collection stays laid out underneath, hidden, so leaving returns to it exactly as it was. */
 
 export interface WorkflowLibraryPreviewStageHandle {
   /** Escape in preview mode: closes an open node card, else leaves the preview. */
@@ -57,7 +52,6 @@ export type WorkflowLibraryPreviewStatus =
 
 export interface WorkflowLibraryPreviewStageProps {
   ref: Ref<WorkflowLibraryPreviewStageHandle>;
-  /** The place the preview leaves back to, for the back button. */
   placeLabel: string;
   /** The previewed workflow; null when the view has nothing selected. */
   workflowId: string | null;
@@ -65,15 +59,11 @@ export interface WorkflowLibraryPreviewStageProps {
   status: WorkflowLibraryPreviewStatus;
   /** Leaves preview mode; receives the workflow shown last, whose card or row then takes focus. */
   onLeave: (workflowId: string | null) => void;
-  /** The view, which the library keeps while it is open. */
   view: WorkflowPreviewView;
   onViewChange: (view: WorkflowPreviewView) => void;
 }
 
-/**
- * Wide: over the places rail and the centre column, from under the header to the dialog's foot, reaching across the
- * column gap to the detail rail's border. Narrow: the panes grid lays it over the collection.
- */
+/** Wide: over the places rail and centre column, to the detail rail's border; narrow: over the collection. */
 const STAGE_CSS: SystemStyleObject = {
   bg: 'bg',
   minH: '0',
@@ -113,16 +103,12 @@ export const WorkflowLibraryPreviewStage = ({
     () => (document && templates ? buildWorkflowPreviewModel(document, templates) : null),
     [document, templates]
   );
-  /**
-   * Each document the stage draws is a new drawing: a workflow replaced under the same id (updated from its template)
-   * must not inherit the last one's selected node, find matches, simplified state or viewport.
-   */
+  /** A new drawing per document, so a workflow replaced under the same id inherits no selection, find or viewport. */
   const [drawing, setDrawing] = useState({ key: 0, model });
   if (drawing.model !== model) {
     setDrawing({ key: drawing.key + 1, model });
   }
   const needsModel = useNodesNeedingModel(model);
-  // The drawing at a wider chip, where the stage has the room.
   const relayout = useCallback(
     (metrics: WorkflowPreviewMetrics, previous: WorkflowPreviewModel | null) =>
       buildWorkflowPreviewModel(document!, templates!, metrics, previous),
@@ -176,7 +162,6 @@ export const WorkflowLibraryPreviewStage = ({
     [document, notify, t]
   );
   const copyJson = useCallback(() => exportDocument('copy'), [exportDocument]);
-  // Each switch draws the graph afresh, so the find field starts over with it.
   const { reset: resetFind } = find;
   const selectView = useCallback(
     (next: WorkflowPreviewView) => {
@@ -243,8 +228,7 @@ export const WorkflowLibraryPreviewStage = ({
           positioning={menuPositioning}
           onRequestDismiss={keepMenuOpenWhenSiblingMenuCloses}
         >
-          {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the menu
-              never takes focus and the first pointer move onto it closes it. */}
+          {/* The tooltip must sit inside the menu trigger in a dialog, or the menu never takes focus. */}
           <Menu.Trigger asChild>
             <Tooltip content={t('workflowLibrary.preview.exportMenu')} ids={exportMenuIds}>
               <IconButton
@@ -305,7 +289,6 @@ export const WorkflowLibraryPreviewStage = ({
               />
             </Suspense>
           ) : (
-            // Why it would not run, in words: the Nodes and Inputs views still show the document.
             <WorkflowPreviewStageMessage isAlert>
               {t('graphPreview.invalidTitle')}{' '}
               {compiled.invalidReasons.map((reason) => localizeForLoopValidationReason(reason, t)).join(' ')}

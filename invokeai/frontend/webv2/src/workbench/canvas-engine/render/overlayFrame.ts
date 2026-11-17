@@ -101,7 +101,6 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
     return layerOutlineCorners(target, doc, transformOverrides.get(target.id) ?? null);
   };
 
-  /** The transform-tool frame (rotated bounds + handles + rotation nub), or `null`. */
   const transformFrame = (doc: CanvasDocumentContractV3): TransformFrameOverlay | null => {
     if (getActiveToolId() !== 'transform') {
       return null;

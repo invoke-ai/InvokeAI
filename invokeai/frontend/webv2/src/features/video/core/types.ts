@@ -8,7 +8,6 @@ import type {
 } from '@features/generation/contracts';
 import type { SeedMode } from '@platform/core/seed';
 
-/** Infer conditioning mode from populated inputs through resolveVideoMode. */
 export type VideoGenerationMode =
   | 'txt2vid'
   | 'first-frame'
@@ -19,7 +18,6 @@ export type VideoGenerationMode =
   | 'audio-to-video'
   | 'video-to-audio';
 
-/** A gallery video's identity and geometry, as the panel stores it. */
 export interface VideoClipRef {
   video_name: string;
   width: number;
@@ -28,7 +26,6 @@ export interface VideoClipRef {
   fps: number;
 }
 
-/** A gallery video selected as the clip to extend, with the trim range to keep. */
 export interface VideoSourceClip extends VideoClipRef {
   /** Inclusive trim bounds forwarded to `extract_video_range`; negative indices count from the end. */
   startFrame: number;
@@ -38,10 +35,7 @@ export interface VideoSourceClip extends VideoClipRef {
 /** Which stream of a conditioning clip the model is given, and which it therefore generates. */
 export type VideoConditioningRole = 'audio' | 'video';
 
-/**
- * A clip conditioning the opposite modality. One slot, because LTX-2 holds one modality clean and samples the other, so
- * a clip can only be given in one role at a time.
- */
+/** One slot: LTX-2 holds one modality clean and samples the other. */
 export interface VideoConditioningClip {
   /** Whole-clip and untrimmed: the conditioning nodes consume the whole recording. */
   clip: VideoClipRef;
@@ -62,20 +56,11 @@ export type VideoReferenceItem =
       kind: 'video';
       clip: VideoSourceClip;
       conditioning: VideoReferenceConditioning;
-      /**
-       * Panel-only marker for the Initial Video continuity anchor, pinned last. Its default trim follows source
-       * cutpoints and generated frame count unless trimOverridden is set.
-       */
+      /** Panel-only Initial Video anchor, pinned last; its default trim follows the source unless trimOverridden. */
       fromSourceVideo?: boolean;
-      /**
-       * Panel-only anchor override disables cutpoint/frame-count re-derivation after manual trim edits. Clear/reset
-       * source removes it; meaningful only with fromSourceVideo.
-       */
+      /** Panel-only: stops trim re-derivation after manual edits; meaningful only with fromSourceVideo. */
       trimOverridden?: boolean;
-      /**
-       * Panel-only requested length stays separate from clamped clip bounds so drags can restore it; read through
-       * referenceSampleFrames.
-       */
+      /** Panel-only requested length, kept apart from clamped bounds; read through referenceSampleFrames. */
       sampleFrames?: number;
     }
   | { kind: 'image'; image: ImageWithDims; detail: VideoReferenceImageDetail };
@@ -100,9 +85,7 @@ export interface VideoSettings extends DynamicPromptsSettings {
   negativePromptHeightPx: number;
   /** Image-to-video conditioning. Mutually exclusive with `sourceVideo`. */
   firstFrameImage: ImageWithDims | null;
-  /**
-   * Last frame supplies interpolation's endpoint or an extension destination, paired with first frame or source video.
-   */
+  /** Interpolation's endpoint or an extension's destination, paired with first frame or source video. */
   lastFrameImage: ImageWithDims | null;
   /** Source excludes first frame; FL2VA uses extend mode while Ref2VA appends using a linked tail reference. */
   sourceVideo: VideoSourceClip | null;
@@ -118,46 +101,28 @@ export interface VideoSettings extends DynamicPromptsSettings {
   cfgScale: number;
   /** Guidance for the low-noise half of a Wan A14B schedule; null reuses `cfgScale`. */
   cfgScaleLowNoise: number | null;
-  /**
-   * LTX-2 guides audio separately from video and far harder (7 against 3). Null on a family with one guidance scale,
-   * like `cfgScaleLowNoise` outside Wan A14B.
-   */
+  /** LTX-2 guides audio separately and harder; null on families with one guidance scale. */
   audioCfgScale: number | null;
   /** LTX-2 spatio-temporal guidance; 0 turns it off and saves a forward per step. Null on families without it. */
   stgScale: number | null;
   /** LTX-2 modality-isolation guidance; 1 turns it off. Null on families without it. */
   modalityScale: number | null;
-  /**
-   * Acceleration patches visible sampling settings and LoRAs; this flag records intent rather than hidden graph state.
-   */
-  /**
-   * Frames of the source an LTX-2 continuation opens with, held clean so the model reads the clip's motion rather than
-   * just its last still. On the VAE's 8k + 1 grid, and it is spent twice over: the generation reproduces these frames,
-   * and the join then crossfades exactly them out of both halves — so raising it costs new material one frame for one
-   * against a fixed Frames budget.
-   */
+  /** On the 8k + 1 grid; spent twice (reproduced, then crossfaded), so each frame costs one of new material. */
   ltx2ExtendContextFrames: number;
+  /** Records intent: acceleration patches visible sampling settings and LoRAs, not hidden graph state. */
   acceleratorEnabled: boolean;
-  /**
-   * Track exactly the toggle-added LoRA keys for removal; never remove matching user-owned entries, and clear enabled
-   * intent if they disappear.
-   */
+  /** Only toggle-added LoRA keys, so user-owned entries are never removed. */
   acceleratorLoraKeys: string[];
   seed: number;
   seedMode: SeedMode;
   loras: GenerateLora[];
   /** Optional VAE override; null uses the VAE bundled with the main model or component source. */
   vae: VaeModelConfig | null;
-  /** Wan 2.2's UMT5-XXL text encoder. */
   wanT5EncoderModel: ModelIdentifierConfig | null;
-  /** The low-noise expert of a Wan 2.2 A14B mixture-of-experts pair. */
   wanLowNoiseModel: MainModelConfig | null;
   /** Diffusers component source supplies missing non-transformer components for standalone Wan/H3 mains. */
   componentSourceModel: MainModelConfig | null;
-  /**
-   * Legacy-only transformer override: reconciliation promotes it to model and retains the old main as
-   * componentSourceModel; new writes omit it.
-   */
+  /** Legacy only: reconciliation promotes it to `model`, keeping the old main as componentSourceModel. */
   h3TransformerModel: MainModelConfig | null;
   /** Optional single-file MiniMax H3 Qwen3-VL text-encoder override. */
   h3TextEncoderModel: ModelIdentifierConfig | null;
@@ -165,18 +130,9 @@ export interface VideoSettings extends DynamicPromptsSettings {
   ltx2TextEncoderModel: ModelIdentifierConfig | null;
   /** LTX-2's duration head. Optional: without it the run uses the frame count the panel holds. */
   ltx2DurationHeadModel: ModelIdentifierConfig | null;
-  /**
-   * Let the duration head choose the clip's length instead of the Frames control.
-   *
-   * Healed against the head only: a stored `true` whose model is gone becomes `false`. It is deliberately NOT healed
-   * against the mode, which is transient -- dropping in a source clip and taking it out again would otherwise silently
-   * lose the setting. `isAutoDurationActive` is what decides whether it applies to a given run.
-   */
+  /** Healed against the head only, not the transient mode, or a source clip round trip would lose it. */
   autoDuration: boolean;
-  /**
-   * Hybrid loads FL2VA base weights and overlays selected Ref2VA AdaLN from h3HybridStartBlock onward while retaining
-   * reference conditioning.
-   */
+  /** Hybrid: FL2VA base weights with Ref2VA AdaLN from h3HybridStartBlock onward. */
   h3HybridBaseModel: MainModelConfig | null;
   /** First transformer block (0-49) whose AdaLN projection stays Ref2VA's under the hybrid. */
   h3HybridStartBlock: number;

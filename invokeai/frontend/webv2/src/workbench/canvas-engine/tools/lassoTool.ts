@@ -69,14 +69,12 @@ const appendFreehandPoint = (session: FreehandSession, sample: PointerInput): vo
   screenPoints.push({ x: screen.x, y: screen.y });
 };
 
-/** A polygon vertex-placing session spanning multiple clicks. */
 interface PolygonSession extends PolylineSession {
   kind: 'polygon';
 }
 
 type Session = FreehandSession | PolygonSession;
 
-/** Creates a fresh lasso tool with its own per-gesture point buffer. */
 export const createLassoTool = (): Tool => {
   let session: Session | null = null;
 
@@ -84,7 +82,6 @@ export const createLassoTool = (): Tool => {
     session = null;
   };
 
-  /** Publishes the in-progress outline for the overlay. */
   const publishPreview = (ctx: ToolContext): void => {
     if (!session || session.points.length === 0) {
       ctx.stores.lassoPreview.set(null);
@@ -141,8 +138,7 @@ export const createLassoTool = (): Tool => {
     usesAltKey: true,
     onDeactivate: (ctx, opts) => {
       if (opts?.temporary) {
-        // Temporary switches preserve polygon sessions for panning; mid-drag switches are already blocked by the
-        // pipeline.
+        // Temporary switches preserve polygon sessions for panning; the pipeline already blocks mid-drag switches.
         return;
       }
       reset();

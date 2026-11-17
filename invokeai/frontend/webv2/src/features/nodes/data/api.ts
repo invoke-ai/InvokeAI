@@ -2,8 +2,6 @@ import { normalizeNodePackCatalog, type NodePackCatalog } from '@features/nodes/
 
 import { browserNodesDataPort } from './transport';
 
-/** REST client for the custom nodes manager (`/api/v2/custom_nodes`). */
-
 const CUSTOM_NODES_BASE = '/api/v2/custom_nodes';
 const { requestJson } = browserNodesDataPort;
 
@@ -42,10 +40,7 @@ export const uninstallCustomNodePack = (packName: string, signal?: AbortSignal):
 export const reloadCustomNodes = (signal?: AbortSignal): Promise<{ status: string }> =>
   requestJson<{ status: string }>(`${CUSTOM_NODES_BASE}/reload`, { method: 'POST', signal });
 
-/**
- * Estimate imported workflows by pack tag for confirmation; uninstall uses manifest IDs, so retagging can change the
- * count.
- */
+/** Imported workflows by pack tag, an estimate for the confirmation: uninstall uses manifest IDs, so retags differ. */
 export const getPackWorkflowCount = async (packName: string, signal?: AbortSignal): Promise<number> => {
   const tag = `node-pack:${packName}`;
   const counts = await requestJson<Record<string, number>>(

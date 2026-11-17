@@ -78,10 +78,7 @@ const readRanges = (plot: PlotElement): AxisRanges | null => {
   return x && y ? { x: [x[0], x[1]], y: [y[0], y[1]] } : null;
 };
 
-/**
- * Fit the percentile box plus current marker once the container is measured, preserving equal axis scale so a zero-size
- * initial fit cannot become the permanent view.
- */
+/** Fits once the container is measured, at equal axis scale, so a zero-size first fit cannot stick. */
 const computeInitialFit = (
   points: ImageMapPoint[],
   selectedKey: GalleryItemKey | null,
@@ -162,8 +159,7 @@ const ImageMapPlot = ({
   const [plotRevision, setPlotRevision] = useState(0);
   const lastPinchAtRef = useRef(0);
   const lastMapSelectionRef = useRef<{ name: string; at: number } | null>(null);
-  // The selection the marker effect last decluttered for. Seeded with the mounting selection so the initial scene,
-  // whose labels the effect below applies from scratch, does not also get a redundant pass here.
+  // The selection the marker effect last decluttered for.
   const lastDeclutteredSelectionRef = useRef(selectedKey);
   // The points array `fullAnnotationsRef` was built from, so the marker effect can tell whether those annotations
   // describe the embedding now on screen.
@@ -191,8 +187,7 @@ const ImageMapPlot = ({
   const baseDimmedRef = useRef(false);
   const appliedAnnotationsKeyRef = useRef<string | null>(null);
 
-  // Declutter against the current view and skip unchanged visibility to avoid relayout feedback. Reserve space for the
-  // gold target beneath Plotly's annotation layer.
+  // Declutter against the current view and skip unchanged visibility to avoid relayout feedback.
   const applyDeclutteredAnnotations = useCallback((container: PlotElement) => {
     const ranges = readRanges(container);
     const selectedItemKey = selectedKeyRef.current;
@@ -270,8 +265,7 @@ const ImageMapPlot = ({
       }
     }
 
-    // Apply annotations via relayout, not scene reconstruction. Clear their applied key when rebuilding layout so
-    // identical labels are restored.
+    // Apply annotations via relayout, not scene reconstruction.
     appliedAnnotationsKeyRef.current = null;
     const layout = buildMapLayout(initialRanges);
 
@@ -377,8 +371,7 @@ const ImageMapPlot = ({
     };
   }, [applyDeclutteredAnnotations, points, selectCluster, selectMapItem]);
 
-  // Cluster selection: the members redrawn at full colour over a dimmed map. Restyled in place like the other overlays;
-  // the base traces take one scalar per trace, so neither the click nor later zooms pay per point.
+  // Cluster selection: the members redrawn at full colour over a dimmed map.
   useEffect(() => {
     const container = containerRef.current as PlotElement | null;
 
@@ -431,8 +424,7 @@ const ImageMapPlot = ({
   // Dispose the timer at component lifetime, not on every points update.
   useEffect(() => clearHover, []);
 
-  // Retire hover sessions when items leave; hiding alone could resurrect stale pointer coordinates. Recenter the live
-  // selected marker near view edges while preserving zoom.
+  // Retire hover sessions when items leave; hiding alone could resurrect stale pointer coordinates.
   useEffect(() => {
     const container = containerRef.current as PlotElement | null;
 
@@ -580,8 +572,7 @@ const ImageMapPlot = ({
     };
   }, []);
 
-  // Keep hover across refreshes only while its item remains in live points. Null points on account invalidation must
-  // also remove the old thumbnail.
+  // Keep hover across refreshes only while its item remains in live points.
   const hoverPreview =
     pendingHoverPreview && points?.some((point) => point.key === pendingHoverPreview.key) ? pendingHoverPreview : null;
 

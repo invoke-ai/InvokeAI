@@ -1,12 +1,6 @@
 import { MouseSensor, type Activator, type SensorOptions, type SensorProps } from '@dnd-kit/core';
 
-/**
- * For touch on pannable surfaces, hold first, then require movement: early movement yields to scrolling and motionless
- * holds remain taps. Pen and touch-action:none surfaces activate by distance, unless the surface marks itself with
- * `data-drag-hold-on-touch` because it owns one-finger gestures of its own (the preview swipe); early movement then
- * yields to that gesture. Once armed, a non-passive touchmove listener prevents native pan from stealing the gesture.
- * Every exit, including pointercancel, calls onEnd/onCancel to clear dnd-kit's activation guard.
- */
+/** Touch on pannable surfaces: hold, then move; early movement scrolls and motionless holds stay taps. */
 
 export const TOUCH_DRAG_HOLD_DELAY_MS = 400;
 export const TOUCH_DRAG_MOVE_TOLERANCE_PX = 10;
@@ -19,11 +13,7 @@ const ARMED_CUE_ATTRIBUTE = 'data-drag-armed';
 const isScrollableOverflow = (overflow: string) =>
   overflow === 'auto' || overflow === 'scroll' || overflow === 'overlay';
 
-/**
- * Whether the browser may pan from a touch starting on `target`: true unless a `touch-action: none` appears on the
- * element itself or an ancestor below the first scroll container. (`touch-action` intersects down the ancestor chain,
- * so a `none` anywhere below the scroller forbids the pan outright.)
- */
+/** Whether the browser may pan from `target`: no `touch-action: none` between it and the first scroller. */
 const canSurfacePan = (target: EventTarget | null): boolean => {
   let element = target instanceof Element ? target : null;
 
@@ -83,10 +73,7 @@ export class HoldToDragSensor {
     },
   ];
 
-  /**
-   * Mirror of `TouchSensor.setup()`: a non-passive `touchmove` listener present from startup makes `preventDefault()`
-   * work in touchmove listeners added later (required for iOS Safari), which the active drag relies on.
-   */
+  /** Mirrors `TouchSensor.setup()`: a startup non-passive touchmove lets later listeners preventDefault (iOS). */
   static setup(): () => void {
     const noop = () => {};
 

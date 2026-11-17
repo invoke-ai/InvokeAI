@@ -1,8 +1,4 @@
-/**
- * Canvas mode's render size: generate at the frame's size, the model's optimal size, or a custom size, then resize the
- * result back to the frame. The choice persists in canvas values for invocation compilation. A locked ratio links the
- * custom sides; the workbench's canvas dims sync carries them to a new locked ratio.
- */
+/** Canvas render size: frame, model-optimal or custom, with the result resized back to the frame. */
 
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasScaleMethod, CanvasScalingSettings, PidMode } from '@features/generation/contracts';

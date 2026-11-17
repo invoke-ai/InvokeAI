@@ -227,9 +227,7 @@ export const WorkbenchShell = () => {
         return;
       }
 
-      // The marker's menu that asked and the marker itself are both gone. Focus goes to the center when it gets its
-      // view back, otherwise to the panel the window's own rail is showing. Removing leaves that rail as it was, so a
-      // rail showing no panel — emptied by the float, or collapsed — hands focus to the center instead.
+      // The marker's menu that asked and the marker itself are both gone.
       if (removed.restoresCenter) {
         focusRegion('center', typeId);
         return;
@@ -355,10 +353,8 @@ export const WorkbenchShell = () => {
           <FloatingWidgetLayer />
           <GalleryDragCursor />
           <PasteMediaRuntime />
-          {/*
-           * Allow pointer events through the full-size drag overlay so another finger can reach Preview pinch
-           * handlers.
-           */}
+          {/* Allow pointer events through the full-size drag overlay so another finger can reach Preview pinch
+              handlers. */}
           <DragOverlay style={DRAG_OVERLAY_STYLE}>
             {activeDrag ? <WidgetDragPreview activeDrag={activeDrag} /> : null}
           </DragOverlay>

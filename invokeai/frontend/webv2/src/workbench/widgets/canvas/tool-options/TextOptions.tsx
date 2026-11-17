@@ -215,10 +215,7 @@ const textStyleOf = (options: TextToolOptions, owner: TextSource | null): TextTo
   lineHeight: owner?.lineHeight ?? options.lineHeight,
 });
 
-/**
- * Prefer live text session, selected text, then defaults. Style edits update defaults and the current owner; unowned
- * color edits change the foreground pair.
- */
+/** Prefer live text session, selected text, then defaults. */
 const useTextEditor = (engine: ToolFormProps['engine']) => {
   const { t } = useTranslation();
   const commitPrepared = usePreparedCommit(engine);

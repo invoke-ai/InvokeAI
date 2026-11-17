@@ -40,10 +40,7 @@ import {
   ZapIcon,
 } from 'lucide-react';
 
-/**
- * Persist stable icon ids; never rename them. The curated set supports quick selection, and removed/unknown ids fall
- * back safely.
- */
+/** Persisted icon ids: never rename them; unknown ids fall back safely. */
 export interface LayoutPresetIconOption {
   id: string;
   icon: LucideIcon;

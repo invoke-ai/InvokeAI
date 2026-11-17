@@ -49,11 +49,7 @@ interface NotificationMenuTarget extends ListContextMenuAnchor {
   notificationId: string;
 }
 
-/**
- * The buttons a notice offers, as its toast offered them. Undo closures live outside workbench state, so the notice's
- * still-offered undos are a snapshot of their own (they go when run elsewhere or withdrawn). The actions are filtered
- * by that snapshot rather than by the registry alone, so memoization sees the change.
- */
+/** Filtered by the notice's own undo snapshot, not the registry alone, so memoization sees changes. */
 const useNotificationActions = (
   notification: WorkbenchNotification,
   actionContext: NotificationActionContext
@@ -73,10 +69,7 @@ const useNotificationActions = (
   return resolveNotificationActions(offered, actionContext);
 };
 
-/**
- * The expanded notifications list, loaded with the popover rather than with the status-bar chip. Rows are measured:
- * messages wrap in full, so nothing needs a details view to be read.
- */
+/** Loaded with the popover, not the status-bar chip; rows are measured so messages wrap in full. */
 export const NotificationsList = () => {
   const { i18n, t } = useTranslation();
   const notifications = useWorkbenchSelector((snapshot) => snapshot.notifications);
@@ -102,11 +95,7 @@ export const NotificationsList = () => {
     [commands, focus, getWidgetById, getWidgetsForRegion, i18n, queries]
   );
   const [menuTarget, setMenuTarget] = useState<NotificationMenuTarget | null>(null);
-  /**
-   * Focus moves to the next notice's dismiss, else the previous one's. The List keeps the focused row and its overscan
-   * mounted, so a neighbour's dismiss is always in the DOM. With none left the header's buttons are disabled, so focus
-   * holds on the panel until the empty state that replaces the list can take it.
-   */
+  /** Focus moves to the next notice's dismiss, else the previous one's, both kept mounted by the List. */
   const dismiss = useCallback(
     (notificationId: string) => {
       const panel = panelRef.current;
@@ -206,11 +195,7 @@ export const NotificationsList = () => {
   );
 };
 
-/**
- * One menu for the list, opened from a row's button or by right-click: the row's actions and its dismiss. An item that
- * moved focus on (a dismiss to the next notice, Show in queue to the queue) keeps it; otherwise focus returns to the
- * row.
- */
+/** An item that moved focus on keeps it; otherwise focus returns to the row. */
 const NotificationMenu = ({
   actionContext,
   notifications,
@@ -315,10 +300,7 @@ const NotificationRow = memo(
     onSeen: (notificationId: string) => void;
   }) => {
     const { t } = useTranslation();
-    /**
-     * Seeing a notice is reading it: an unread row that stays at least half on screen for a moment becomes read. One
-     * scrolled out of view, or a glance shorter than that (a StrictMode remount included), leaves it new.
-     */
+    /** A row at least half on screen for a moment becomes read; a shorter glance (StrictMode too) does not. */
     const watchSeen = useCallback(
       (node: HTMLElement | null) => {
         if (!node || notification.isRead) {

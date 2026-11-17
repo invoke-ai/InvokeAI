@@ -93,11 +93,7 @@ export const queueItemDetailOptions = (backend: QueueBackendPort, itemId: number
     });
   })();
 
-/**
- * Refresh queue reads after queue activity; coalesced by QueryClient, and only active observers refetch. A finished
- * item's execution data no longer changes, so its open details are not read again on every queue event; a details view
- * opened again reads them afresh.
- */
+/** Only active observers refetch; a finished item's open details are not re-read on every queue event. */
 export const invalidateQueueQueries = async (queryClient: QueryClient): Promise<void> => {
   await queryClient.invalidateQueries({
     predicate: ({ queryKey, state }) =>
@@ -107,13 +103,9 @@ export const invalidateQueueQueries = async (queryClient: QueryClient): Promise<
   });
 };
 
-/** An item's new status as the server reported it in a status event, or as the viewer's own cancel assumes it. */
 export interface QueueItemStatusChange {
   item: QueueItemReadModel;
-  /**
-   * The whole queue's counts after the change, as a status event carries them; null when unknown. Their own-item fields
-   * belong to the item's owner, whoever receives the event (an administrator receives every user's).
-   */
+  /** Null when unknown; own-item fields belong to the item's owner (admins receive every user's events). */
   queueCounts: QueueCounts | null;
 }
 
@@ -124,11 +116,7 @@ const isFinished = (status: QueueItemReadModel['status']): boolean =>
 export const compareQueuedItems = (left: QueueItemReadModel, right: QueueItemReadModel): number =>
   (right.priority ?? 0) - (left.priority ?? 0) || left.id - right.id;
 
-/**
- * Whether `change` is newer than the reading the model holds. Both carry a status sequence: the higher one wins, so a
- * late event never undoes a read, and a server that started over (a reset queue reuses item ids) is followed once a
- * read has brought its own sequences in. Without both: a finished item never runs again.
- */
+/** The higher sequence wins, so a late event never undoes a read; without both, finished items stay finished. */
 const isNewerReading = (known: QueueItemReadModel, change: QueueItemReadModel): boolean =>
   known.statusSequence !== null &&
   known.statusSequence !== undefined &&
@@ -146,7 +134,6 @@ const COUNT_KEYS: Record<QueueItemReadModel['status'], keyof QueueCounts> = {
   waiting: 'waiting',
 };
 
-/** The whole-queue counts an event carries, over the reading's own counts of the viewer's items. */
 const withEventCounts = (counts: QueueCounts, event: QueueCounts): QueueCounts => ({
   ...counts,
   canceled: event.canceled,
@@ -158,10 +145,7 @@ const withEventCounts = (counts: QueueCounts, event: QueueCounts): QueueCounts =
   waiting: event.waiting,
 });
 
-/**
- * Moves one item between two count buckets, as a change of an item in the counts' scope does; the viewer's own counts
- * wait for the read, since whose item it is is not known here.
- */
+/** The viewer's own counts wait for the read: whose item it is is not known here. */
 const shiftCounts = (
   counts: QueueCounts,
   from: QueueItemReadModel['status'],
@@ -175,13 +159,7 @@ const shiftCounts = (
         [COUNT_KEYS[to]]: (counts[COUNT_KEYS[to]] as number) + 1,
       };
 
-/**
- * The read model with one item's status change applied at once, so the current and next items and the counts are right
- * before the read that reconciles them lands. A change outside the model's scope, or not newer than what the model
- * holds, changes no item. Counts: an unscoped model takes an event's whole-queue counts, even when it already shows the
- * item so (as after the viewer's own cancel); otherwise a change to an item the model knows moves it between buckets.
- * The viewer's own counts wait for the read: an event's are the item owner's.
- */
+/** Applied at once so the current and next items and counts are right before the reconciling read; own counts wait. */
 export const applyQueueItemStatusChange = (
   model: QueueReadModel,
   { item, queueCounts }: QueueItemStatusChange
@@ -223,10 +201,7 @@ export const applyQueueItemStatusChange = (
         : model.current;
   const counts =
     eventCounts ?? (known ? shiftCounts(model.status.queue, known.status, item.status) : model.status.queue);
-  // Until the read names the server's next item, the window's first pending item in run order stands in, but only when
-  // the window holds exactly the pending items the counts report: the window is the newest items, and the true next may
-  // be older than all of them (a long batch, or a member's own items among everyone's). An item the window does not
-  // list turning pending, or counts that disagree with the window, leave the next item unknown until then.
+  // The window's first pending item stands in for the next only when the window holds exactly the counted pending ones.
   const pendingInWindow = items.filter((candidate) => candidate.status === 'pending');
   const standIn =
     (known || item.status !== 'pending') && pendingInWindow.length === counts.pending
@@ -244,21 +219,13 @@ export const applyQueueItemStatusChange = (
   return { ...model, current, items, next, status: { ...model.status, queue: counts } };
 };
 
-/**
- * Guesses awaiting the server's answer. A reported change of the same item to the same status confirms one: it may
- * change nothing in the cache (the item already reads so, and equal data keeps its reference), so the cache alone
- * cannot tell it happened.
- */
+/** A same-status report confirms a guess, though it may change nothing in the cache. */
 const pendingGuesses = new Set<{ client: QueryClient; confirmed: boolean; item: QueueItemReadModel }>();
 
 const readQueueReadModels = (queryClient: QueryClient) =>
   queryClient.getQueriesData<QueueReadModel>({ queryKey: [...queueKeys.all, 'read-model'] });
 
-/**
- * Apply a status change to every loaded read model at once, and to the whole queue's status read, so the current and
- * next items and what runs anywhere are right before the coalesced invalidation's read reconciles them. Only data
- * already in the cache changes.
- */
+/** Only data already in the cache changes. */
 export const applyQueueItemStatusToReadModels = (queryClient: QueryClient, change: QueueItemStatusChange): void => {
   for (const guess of pendingGuesses) {
     if (guess.client === queryClient && guess.item.id === change.item.id && guess.item.status === change.item.status) {
@@ -287,27 +254,18 @@ export const applyQueueItemStatusToReadModels = (queryClient: QueryClient, chang
   );
 };
 
-/** Everything `applyQueueItemStatusToReadModels` writes: every loaded read model and the whole queue's status read. */
 const readQueueItemStatusData = (queryClient: QueryClient): Array<[QueryKey, unknown]> => [
   ...readQueueReadModels(queryClient),
   [queueKeys.status({}), queryClient.getQueryData(queueKeys.status({}))],
 ];
 
 export interface QueueItemStatusGuess {
-  /** The request was answered: the guess no longer waits. Apply the answer as any other change. */
   settle: () => void;
-  /**
-   * The request failed: puts back each read model and the whole queue's status the guess changed, only where nothing
-   * changed it since, and nothing once a reported change confirmed the guess. True when one did: the server made the
-   * change though its answer was lost.
-   */
+  /** Restores only data nothing changed since, and nothing once a report confirmed the guess; true when one did. */
   revert: () => boolean;
 }
 
-/**
- * Applies the viewer's own change at once, ahead of the server (a cancel assumes the item canceled), and returns how to
- * settle it. The caller settles or reverts it once its request ends, whichever way.
- */
+/** The caller settles or reverts it once its request ends. */
 export const applyQueueItemStatusGuess = (
   queryClient: QueryClient,
   change: QueueItemStatusChange

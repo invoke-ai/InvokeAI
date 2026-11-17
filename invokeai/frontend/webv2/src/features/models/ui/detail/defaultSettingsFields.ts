@@ -187,10 +187,8 @@ const CONTROL_ADAPTER_FIELDS: FieldSpec[] = [
 ];
 
 /**
- * `fp8StorageSupported` is the backend's answer (see `data/fp8StorageSupportStore`), not a rule applied here. It used
- * to be `type === 'main' || 'controlnet' || 't2i_adapter'`, which offered the control for 19 of the 52 loader keys that
- * ignore it: the answer also depends on the model's format, and on whether its loader implements the cast at all —
- * neither of which this module can see.
+ * `fp8StorageSupported` is the backend's answer (see `data/fp8StorageSupportStore`), not a rule applied here: it
+ * depends on the model's type, its format and whether its loader implements the cast, which this module cannot see.
  *
  * `schedulerRules` is Generate's rule set for a main model's base. Where the base's graph ignores the scheduler the row
  * is left out, as Generate hides it, unless a stored value needs a row to be cleared. While the rules load or after

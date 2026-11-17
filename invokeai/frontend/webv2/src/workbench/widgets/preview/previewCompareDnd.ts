@@ -11,10 +11,7 @@ export const PREVIEW_COMPARE_DROP_DATA: PreviewCompareDropData = { kind: 'previe
 export const isPreviewCompareDropData = (value: unknown): value is PreviewCompareDropData =>
   typeof value === 'object' && value !== null && (value as PreviewCompareDropData).kind === 'preview-compare-target';
 
-/**
- * Reject foreign drops and self-comparison, which would pause follow despite displaying nothing. Require callers to
- * provide currentImageName or null.
- */
+/** Reject foreign drops and self-comparison, which would pause follow despite displaying nothing. */
 export const resolvePreviewCompareDrop = (
   activeData: unknown,
   overData: unknown,

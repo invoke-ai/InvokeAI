@@ -7,7 +7,6 @@
 export interface CompareAndSwapEntry<Value> {
   /** The value this mutation painted. The slot must still hold it to be revertible. */
   after: Value;
-  /** The value to restore. */
   before: Value;
 }
 

@@ -18,8 +18,7 @@ export const derivePackNameFromSource = (source: string): string | null => {
     packName = packName.slice(0, -'.git'.length);
   }
 
-  // The regex also rejects '.', '..', backslashes, and empty names — the backend's explicit pre-checks are subsumed by
-  // the fullmatch.
+  // The regex also rejects '.', '..', backslashes and empty names: the fullmatch subsumes the backend's pre-checks.
   return PACK_NAME_RE.test(packName) ? packName : null;
 };
 

@@ -1,8 +1,3 @@
-/**
- * Expose canvas-only infill/coherence/mask controls in Generate. Persist them in canvas values for
- * prepareCanvasInvocation and graph compilation.
- */
-
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasCoherenceMode, CanvasInfillMethod } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 

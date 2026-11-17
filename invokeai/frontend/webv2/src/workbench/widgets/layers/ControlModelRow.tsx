@@ -37,11 +37,7 @@ interface ModelItem {
 
 const groupOf = (item: ModelItem): string => item.group;
 
-/**
- * The models a typed layer can pick, grouped: made for its type (or its detector's family), every union model on the
- * base (one that does not cover the type is still a deliberate pick), then models whose purpose nothing names. Models
- * made for another type stay out. An untyped layer (one from before types) lists every usable model.
- */
+/** Models for the type, then union models on the base, then unnamed ones; other types' models stay out. */
 const groupModels = (
   resolution: ControlModelResolution,
   controlType: ControlType | null

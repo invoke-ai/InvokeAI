@@ -10,7 +10,6 @@ import { PlayIcon } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/** Bounds the hover card's thumbnail. */
 const HOVER_PREVIEW_MAX_PX = 160;
 const HOVER_PREVIEW_OFFSET_PX = 14;
 /** Keep the hover card at least this clear of the viewport edges. */
@@ -24,9 +23,7 @@ export interface HoverPreview {
   clientY: number;
 }
 
-/**
- * Resolve hovered cluster identity from current points; live reclustering may renumber ids under a stationary pointer.
- */
+/** Cluster identity from current points: live reclustering may renumber ids under a still pointer. */
 export interface HoverCluster {
   /** DBSCAN cluster of the hovered point; -1 means unclustered noise. */
   cluster: number;
@@ -47,10 +44,7 @@ const HoverTagsRow = ({ prefix, tags }: { prefix: string; tags: string[] }) => (
   </Text>
 );
 
-/**
- * Measure asynchronous hover-card content invisibly before cursor-relative placement and viewport flipping. Key by item
- * for clean state and label video thumbnails explicitly.
- */
+/** Measured invisibly before cursor-relative placement and viewport flipping. */
 export const MapHoverCard = ({
   preview,
   hoverCluster,

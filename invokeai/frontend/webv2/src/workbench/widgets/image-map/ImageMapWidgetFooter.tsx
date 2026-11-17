@@ -44,10 +44,9 @@ export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
         <Text whiteSpace="nowrap">
           {t('widgets.imageMap.pointCount', { count: data.pointCount, formatted: data.pointCount.toLocaleString() })}
         </Text>
-        {/* Every sibling in this row is nowrap, so this is the only segment
-            flex can shrink and it absorbs all of the row's overflow: below
-            roughly 500px the numbers are clipped off the page and the tooltip
-            is the only way left to read them. */}
+        {/* Every sibling in this row is nowrap, so this is the only segment flex can shrink and it absorbs all of the
+            row's overflow: below roughly 500px the numbers are clipped off the page and the tooltip is the only way
+            left to read them. */}
         <Tooltip content={clusterSummary}>
           <Text truncate>· {clusterSummary}</Text>
         </Tooltip>

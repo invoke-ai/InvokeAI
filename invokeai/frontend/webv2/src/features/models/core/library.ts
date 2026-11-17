@@ -11,7 +11,6 @@ export interface ModelLibraryFilters {
   typeFilter: ModelTaxonomyType | null;
   /** null = all bases. */
   baseFilter: string | null;
-  /** Only models whose files are missing on disk. */
   missingOnly: boolean;
   sortField: ModelSortField;
   sortDirection: 'asc' | 'desc';
@@ -199,7 +198,6 @@ export const collectBases = (models: Pick<ModelConfig, 'base'>[]): string[] =>
 /** Bases that exist but carry no architecture meaning, sorted after the rest. */
 const DEPRIORITIZED_BASES: ReadonlySet<string> = new Set(['any', 'external', 'unknown']);
 
-/** Order known bases by registry, then unfamiliar bases, with any/external/unknown last. */
 const KNOWN_BASE_RANKS = new Map<string, number>(KNOWN_MODEL_BASES.map((base, index) => [base, index]));
 
 /** Display rank for a base: registry order, unknown bases next, meaningless bases last. */

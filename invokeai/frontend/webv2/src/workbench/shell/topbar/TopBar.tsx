@@ -11,10 +11,7 @@ import { LayoutPresetStrip } from './LayoutPresetStrip';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { TopbarProgressRail } from './TopbarProgressRail';
 
-/**
- * Use minmax(0,1fr) side columns to center presets independently of project-name width. Collapse left labels first;
- * preserve route and queue indicators.
- */
+/** Use minmax(0,1fr) side columns to center presets independently of project-name width. */
 const TOPBAR_COLUMNS = 'minmax(0, 1fr) auto minmax(0, 1fr)';
 
 export const TopBar = () => (
@@ -48,9 +45,8 @@ export const TopBar = () => (
 
       <TopbarProgressRail />
     </Grid>
-    {/* Dialog hosts, not controls: every surface that can open one writes to a
-        store, so the body cannot belong to whichever trigger happens to be
-        mounted. */}
+    {/* Dialog hosts, not controls: every surface that can open one writes to a store, so the body cannot belong to
+        whichever trigger happens to be mounted. */}
     <LayoutPresetManagerDialog />
     <LayoutPresetAdminDialogs />
     <SettingsDialogHost />

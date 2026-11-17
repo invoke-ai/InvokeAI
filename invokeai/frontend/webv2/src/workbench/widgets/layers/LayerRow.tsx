@@ -38,7 +38,6 @@ const CHEVRON_HOVER = { bg: 'bg.muted', color: 'fg' };
 const THUMBNAIL_SIZE = `${LAYER_LEADING_BOX_PX}px`;
 const GROUP_PILE_OFFSET_PX = 4;
 
-/** How a row takes part in the current drag. */
 export type LayerRowDragState = 'source' | 'travelling' | null;
 
 interface LayerRowProps {
@@ -69,11 +68,7 @@ interface LayerRowProps {
 
 const stopPropagation = (event: { stopPropagation: () => void }): void => event.stopPropagation();
 
-/**
- * One tree item. The row element itself carries the tree role, the roving tab stop and the keyboard model; every
- * control inside it is pointer-only (`tabIndex={-1}`) and reachable from the keyboard through the row's menu, so the
- * tree stays a single tab stop.
- */
+/** The row carries the tree role and roving tab stop; controls inside are pointer-only, reached via its menu. */
 const LayerRowComponent = ({
   ancestorOfPrimary,
   ariaPosInSet,
@@ -485,8 +480,7 @@ const LayerRowComponent = ({
               </Tooltip>
             </>
           ) : (
-            // Raster layers have one axis: the eye takes a layer off the canvas and out of generation alike. The empty
-            // dot slot keeps the eye and lock columns aligned with the overlay stacks.
+            // Raster layers have one axis: the eye takes a layer off the canvas and out of generation alike.
             <>
               <Box aria-hidden flexShrink="0" w={LAYER_ACTIVE_DOT_SIZE} />
               <Tooltip

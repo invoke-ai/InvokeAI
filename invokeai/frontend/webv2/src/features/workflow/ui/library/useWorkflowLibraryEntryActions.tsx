@@ -30,18 +30,13 @@ import { useTranslation } from 'react-i18next';
 
 import { findProjectCopiesOf } from './projectWorkflowEntries';
 
-/**
- * Workflows whose duplicate is in flight. One guard serves every surface that offers Duplicate (the rail and a card's
- * menu), so one workflow gets one copy per press, and a pending copy of one workflow leaves the others free.
- */
+/** One guard for every Duplicate surface, so a workflow gets one copy per press and the others stay free. */
 export interface WorkflowLibraryDuplicateGuard {
   pendingIds: ReadonlySet<string>;
-  /** False when that workflow's duplicate is already in flight. */
   begin: (workflowId: string) => boolean;
   end: (workflowId: string) => void;
 }
 
-/** Owned by the surface that hosts every Duplicate of a view: the template panes. */
 export const useWorkflowLibraryDuplicateGuard = (): WorkflowLibraryDuplicateGuard => {
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(() => new Set());
   // The ref answers a second press before the first press's render lands.
@@ -65,37 +60,26 @@ export const useWorkflowLibraryDuplicateGuard = (): WorkflowLibraryDuplicateGuar
 
 export interface WorkflowLibraryEntryActionsOptions {
   duplicateGuard: WorkflowLibraryDuplicateGuard;
-  /** The workflow the actions act on: the rail's selection, or the card a context menu was raised on. */
   entry: WorkflowLibraryEntry | null;
   /** Whether the account may not rename or delete `entry` (`getLibraryEntryAccess`); the server still enforces. */
   isReadOnly: boolean;
-  /** The project's workflows, so Open can say it will ask about existing copies. */
   projectWorkflows: readonly ProjectWorkflowEntry[];
-  /** The shell closes the library when a fork takes the user to a new project. */
   onClose: () => void;
-  /** Receives the deleted workflow's id. */
   onDeleted: (workflowId: string) => void;
-  /** Carries the copy's id so the shell can select it once the list refreshes. */
   onDuplicated: (workflowId: string) => void;
-  /** Adds the first copy, or asks what to do when the project already holds one. */
   onOpen: (item: WorkflowLibraryListItem) => void;
 }
 
 export interface WorkflowLibraryEntryActions {
-  /** The menu items: Open, Duplicate, Fork, Download JSON and, for the account's own templates, Rename and Delete. */
   actionItems: ReactNode;
   /** The rename and delete dialogs the items open; render them outside anything a delete empties. */
   dialogs: ReactNode;
   open: () => void;
-  /** "Open…" once the project holds a copy, since opening then asks what to do (`planLibraryWorkflowOpen`). */
   openLabel: string;
   projectCopies: readonly ProjectWorkflowEntry[];
 }
 
-/**
- * The workflow a dialog was opened for, and its name then. Write access was checked when it opened; the dialog answers
- * to this target alone, so a refresh that drops the entry neither hides it nor leaves it to reappear later.
- */
+/** Captured when the dialog opens, so a refresh that drops the entry neither hides the dialog nor revives it. */
 interface DialogTarget {
   name: string;
   workflowId: string;
@@ -103,11 +87,7 @@ interface DialogTarget {
 
 const toFileSlug = (name: string): string => name.trim().replaceAll(/\s+/g, '-').toLowerCase() || 'workflow';
 
-/**
- * One library workflow's actions and the dialogs they open. Every action reads the record by id and revision, so it
- * acts on `entry` whether or not it is the selection; each caller (the detail rail, a card's context menu) owns its own
- * instance, and with it its own rename and delete dialogs.
- */
+/** Every action reads the record by id and revision; each caller owns its own instance and dialogs. */
 export const useWorkflowLibraryEntryActions = ({
   duplicateGuard,
   entry,
@@ -140,7 +120,6 @@ export const useWorkflowLibraryEntryActions = ({
     }
   }, [item, onOpen]);
 
-  /** Duplicate the library record directly without loading or modifying the active project graph. */
   const duplicate = useCallback(async () => {
     // Guard until the copy exists, including copies landing outside the visible category.
     if (!item || !duplicateGuard.begin(item.workflow_id)) {
@@ -162,7 +141,6 @@ export const useWorkflowLibraryEntryActions = ({
       const workflowId = await createLibraryWorkflow(
         {
           ...copy,
-          // A copy of a default is still the user's own workflow.
           meta: { ...meta, category: 'user' },
           name: t('workflowLibrary.duplicateName', { name: item.name || t('workflowLibrary.untitled') }),
         },
@@ -171,8 +149,7 @@ export const useWorkflowLibraryEntryActions = ({
 
       assertAccountScopeCurrent(owner);
       invalidateWorkflowLibraryCache();
-      // The copy is forced into the user category, so from the Browse tab it lands out of sight — the notice is the
-      // only thing that says it worked.
+      // The copy lands in the user category, possibly out of sight, so the notice is the only confirmation.
       notify.success(t('workflowLibrary.duplicated'));
       onDuplicated(workflowId);
     } catch (error) {
@@ -243,8 +220,7 @@ export const useWorkflowLibraryEntryActions = ({
 
       const { document } = parseWorkflowJson({ ...record.workflow, id: record.workflow_id });
 
-      // The port creates and activates a fresh project first, so the project the library was opened from is left
-      // exactly as it was.
+      // The port creates and activates a fresh project first, leaving the project the library opened from as it was.
       openDocumentInNewProject(document, item.name, {
         libraryWorkflowId: record.workflow_id,
         ...(getWorkflowRecordCategory(record) === 'user' ? { ownerUserId: record.user_id } : {}),
@@ -309,7 +285,6 @@ export const useWorkflowLibraryEntryActions = ({
     }
   }, [deleteTarget, notify, onDeleted, t]);
 
-  // Bundled defaults and other accounts' templates are not the account's to rename or delete.
   const canWrite = item !== null && !isReadOnly;
   const actionItems = (
     <>

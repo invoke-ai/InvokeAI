@@ -7,37 +7,26 @@ export interface MediaElementSnapshot {
   currentTime: number;
   /** Finite seconds once known; 0 while unknown or unbounded. */
   duration: number;
-  /** The element holds a media error; a new source clears it. */
   error: boolean;
   muted: boolean;
   paused: boolean;
   playbackRate: number;
-  /** Metadata loaded: duration is known and seeks can land. */
   ready: boolean;
   volume: number;
-  /** Playback is wanted but stalled on data or a seek. */
   waiting: boolean;
 }
 
 export interface MediaElementStore {
-  /**
-   * A React 19 ref callback: binds the store to `video` and returns the unbinding. Unbinding removes every listener and
-   * frame callback and resets the snapshot; it leaves playback alone.
-   */
+  /** Unbinding removes every listener and frame callback and resets the snapshot; playback is left alone. */
   attach: (video: HTMLVideoElement) => () => void;
   getSnapshot: () => MediaElementSnapshot;
   pause: () => void;
   /** Playback the browser refuses (autoplay policy, a missing source) leaves the element paused, as reported. */
   play: () => void;
-  /** Clamped to the media. */
   seek: (seconds: number) => void;
   /**
-   * While set, playback that reaches the window's end wraps to its start with `loop`, including at the media end;
-   * without it, playback pauses and rests at `restSeconds`. A seek is not playback: one that lands at or past the end
-   * never wraps or pauses, though playback from before the window does once it reaches the end. Playing from the rest,
-   * or past it, starts the window over, whatever starts the playback (`play`, media keys, a caller's own `play()`).
-   * Playback is judged against the window set when it starts, so a caller playing a new window sets it first. Returns
-   * the clearing; a later window replaces this one, and clearing a replaced window does nothing.
+   * Playback reaching the window's end wraps with `loop`, else rests at `restSeconds`; seeks never wrap or pause.
+   * Judged against the window set when playback starts; returns the clearing, a no-op once replaced.
    */
   setPlaybackWindow: (window: PlaybackWindow, options: { loop: boolean; restSeconds: number }) => () => void;
   setMuted: (muted: boolean) => void;
@@ -110,11 +99,7 @@ const ignoreRefusal = (): void => {};
 // A playhead this close to a window's rest is at it: seeks land within a decoder's rounding of their target.
 const REST_TOLERANCE_SECONDS = 0.001;
 
-/**
- * One media element's state as an external store, for `useSyncExternalStore` with narrow selectors. Every media event
- * re-reads the element, so the snapshot cannot drift from it. The playhead follows animation frames only while playing,
- * for a smooth scrubber; `timeupdate` covers paused seeks and background tabs, where frames stop.
- */
+/** Every media event re-reads the element; the playhead follows frames only while playing, `timeupdate` otherwise. */
 export const createMediaElementStore = (): MediaElementStore => {
   const core = createExternalStoreCore<MediaElementSnapshot>(DETACHED_SNAPSHOT);
   let element: HTMLVideoElement | null = null;
@@ -130,7 +115,6 @@ export const createMediaElementStore = (): MediaElementStore => {
       frame = null;
     }
   };
-  // A finished window plays again from its start, as an ended clip does. An ended element is past the rest too.
   const replayFinishedWindow = (video: HTMLVideoElement): void => {
     if (
       playbackWindow &&
@@ -141,13 +125,7 @@ export const createMediaElementStore = (): MediaElementStore => {
       sampledTime = null;
     }
   };
-  /**
-   * Samples the playhead and acts when playback carried it to or past the window's end. Samples can be sparse
-   * (throttled frames, timeupdate every quarter second), so playback that jumps from before the window to past it
-   * between two samples has reached the end all the same. Frames and timeupdate both sample, so the window holds in
-   * visible tabs to the frame and in background tabs at all; a window ending at the media end is reached when playback
-   * ends, which pauses before any frame sees it.
-   */
+  /** Samples can be sparse (throttled frames, quarter-second timeupdate), so jumping past the end still reaches it. */
   const sampleWindowEnd = (): void => {
     if (!element) {
       return;

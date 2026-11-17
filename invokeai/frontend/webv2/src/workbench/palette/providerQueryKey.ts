@@ -1,9 +1,6 @@
 import type { PaletteProviderQuery, PaletteSearchProvider } from './entries';
 
-/**
- * Keyed on the semantic query — stripped text plus the *resolved* date range — so relative tokens (`from:7d`) typed on
- * different days cannot collide on a stale cache entry.
- */
+/** Keyed on stripped text plus the resolved date range, so relative tokens cannot hit a stale entry. */
 export const getPaletteProviderQueryKey = (provider: PaletteSearchProvider, query: PaletteProviderQuery) =>
   [
     'command-palette',

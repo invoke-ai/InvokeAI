@@ -23,16 +23,12 @@ const getRequirementKey = (requirement: WorkflowModelRequirement): string =>
 
 type ReadyEnrichment = Extract<WorkflowLibraryEntryEnrichment, { status: 'ready' }>;
 
-/**
- * Cache by enrichment identity and catalog dependencies to avoid quadratic row resolution as individual entries finish
- * parsing.
- */
+/** Cached by enrichment identity and catalog dependencies: no quadratic row resolution as entries finish parsing. */
 const resolutionCache = new WeakMap<
   ReadyEnrichment,
   { deps: ModelRequirementDeps; resolved: ResolvedModelRequirement[] }
 >();
 
-/** Resolves one entry's requirements, reusing the previous result when nothing it depends on changed. */
 export const resolveEntryRequirements = (
   enrichment: ReadyEnrichment,
   deps: ModelRequirementDeps

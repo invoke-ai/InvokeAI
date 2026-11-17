@@ -169,9 +169,8 @@ export const DefaultSettingsSection = ({
   onSaved: () => void;
 }) => {
   const { t } = useTranslation();
-  // Whether FP8 Storage reaches this model depends on its format and on its loader, so the backend answers it. Fetched
-  // here because this section is the only thing that asks, and the table is static per backend build. While it is
-  // unknown the row stays hidden: a control that arrives a moment late is better than one that does nothing.
+  // The backend answers whether FP8 Storage reaches this model; fetched here because this section is the only thing
+  // that asks. While unknown the row stays hidden: a control that arrives late beats one that does nothing.
   useMountEffect(() => {
     void ensureFp8StorageSupportLoaded();
   });

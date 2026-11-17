@@ -22,7 +22,6 @@ export interface AdjustedSurfaceCacheOptions {
   readonly spatial?: SpatialDisplayOptions;
 }
 
-/** The imperative adjusted-surface store returned by {@link createAdjustedSurfaceCache}. */
 export interface AdjustedSurfaceCache {
   /**
    * Returns the surface the display shows for `entry`'s pixels with `adjustments`, or `null` when the adjustments are
@@ -67,13 +66,11 @@ export interface AdjustedSurfaceCache {
   retainSpatial(keep: (layerId: string) => boolean): void;
   /** Number of memoized adjusted surfaces (for tests / accounting). */
   size(): number;
-  /** Bytes held by adjusted surfaces. */
   byteSize(): number;
   /** Releases every memoized derived surface and abandons all spatial work; the cache stays usable. */
   dispose(): void;
 }
 
-/** Creates an {@link AdjustedSurfaceCache} backed by the given {@link RasterBackend}. */
 export const createAdjustedSurfaceCache = (
   backend: RasterBackend,
   cache: DerivedSurfaceCache = createDerivedSurfaceCache(),

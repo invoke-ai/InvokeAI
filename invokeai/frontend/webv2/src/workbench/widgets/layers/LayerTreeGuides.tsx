@@ -13,10 +13,7 @@ const columnLeft = (column: number): number =>
   column * LAYER_TREE_INDENT_PX + LAYER_ROW_INSET_PX + LAYER_LEADING_BOX_PX / 2 - 1;
 /** A branch ends where the next level's surface (and its selection fill) begins. */
 const BRANCH_WIDTH_PX = LAYER_TREE_INDENT_PX - columnLeft(0);
-/**
- * Rows keep a 2px gap below their surface, so the leading box is centred at `50% - 1px`. The branch's 1px stroke fills
- * the pixel just below that centre, and a stem starts 2px under the parent's leading box.
- */
+/** Rows keep a 2px gap below their surface, so the leading box is centred at `50% - 1px`. */
 const BRANCH_HEIGHT = '50%';
 const STEM_TOP = `calc(50% - 1px + ${LAYER_LEADING_BOX_PX / 2 + 2}px)`;
 
@@ -70,11 +67,7 @@ const Guide = ({ column, glyph }: { column: number; glyph: string }) => {
   }
 };
 
-/**
- * One row's connector lines, drawn behind it in its virtual slot. Each row draws only its own full-height segments, so
- * consecutive rows join without knowing about each other. Decorative: hidden from assistive technology and transparent
- * to the pointer, so hit-testing, drag and drop and focus see only the row.
- */
+/** One row's own full-height segments, so rows join without knowing each other; decorative and inert. */
 const LayerTreeGuidesComponent = ({ guides }: { guides: string }) => (
   <Box aria-hidden data-tree-guides="" inset="0" pointerEvents="none" position="absolute">
     {[...guides].map((glyph, column) => (

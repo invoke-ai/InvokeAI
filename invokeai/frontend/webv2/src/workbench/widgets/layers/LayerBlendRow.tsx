@@ -60,8 +60,7 @@ const SLIDER_STEP_KEYS = new Set([
   'PageDown',
   'PageUp',
 ]);
-// Keys Zag's number input steps or commits on (Home/End only without Ctrl/Alt/Meta). Any other key, a caret move
-// included, leaves a typed value pending.
+// Keys Zag's number input steps or commits on (Home/End only without Ctrl/Alt/Meta).
 const FIELD_COMMIT_KEYS = new Set(['ArrowDown', 'ArrowUp', 'Enter']);
 const FIELD_BOUND_KEYS = new Set(['End', 'Home']);
 
@@ -73,8 +72,7 @@ const getPercentValueText = ({ value }: { value: number }): string => `${value}%
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 
-// Reference equality is exact: the document index hands back the same node object until the node itself changes. A
-// raster-stack GROUP is a valid target (opacity/blend on its isolated composite); overlay-stack groups are not.
+// Reference equality is exact: the document index hands back the same node object until the node itself changes.
 export const selectBlendTarget = (project: {
   canvas: { document: Pick<CanvasDocumentContractV3, 'stacks' | 'selectedLayerId'> };
 }): CanvasNodeContract | null => {
@@ -124,11 +122,7 @@ const pinnedBlendMode = (
 ): CanvasBlendMode | undefined =>
   layer && baseline?.id === layer.id ? baselinePatch(baseline, { blendMode: 'normal' })?.blendMode : undefined;
 
-/**
- * Highlighting an option (hover or arrow keys) previews its mode unrecorded. Choosing one records a single step from
- * the mode the preview started on; closing without a choice or unmounting restores that mode. An undo or an edit from
- * elsewhere while the menu is open ends the preview in the engine, and a choice then records from the live mode.
- */
+/** Highlighting previews unrecorded; choosing records one step from the starting mode, closing restores it. */
 const BlendModeControl = ({
   editingLocked,
   engine,
@@ -189,8 +183,7 @@ const BlendModeControl = ({
     [endPreview, layer]
   );
 
-  // Leaving every option clears the highlight, which shows the mode the open preview replaced again. Once the engine
-  // ended the preview, that is the document's own mode, so there is nothing to preview.
+  // Leaving every option clears the highlight, which shows the mode the open preview replaced again.
   const handleHighlightChange = useCallback(
     ({ highlightedValue }: SelectHighlightChangeDetails<BlendModeOption>) => {
       const session = previewRef.current;
@@ -252,12 +245,7 @@ const BlendModeControl = ({
   );
 };
 
-/**
- * Typed entry, arrow keys, and a slider in a popover at the field's end. Every change previews on the layer; each
- * completed gesture records one history entry: a typed value on Enter or blur, a held key on its release, a slider drag
- * when the pointer lifts. The field shows the slider's live value, so the thumb carries no tooltip to cover the
- * trigger.
- */
+/** Every change previews; each completed gesture (Enter, blur, key release, pointer lift) records once. */
 const OpacityRow = ({
   editingLocked,
   engine,

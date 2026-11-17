@@ -12,14 +12,7 @@ const FloatingWidgetWindow = lazy(() =>
 
 const EMPTY_FLOATING: Record<WidgetInstanceId, FloatingWidgetState> = {};
 
-/**
- * Render floating windows with z-order derived from stackOrder rank, keeping persisted ordering within UI layer bounds.
- * The windows render in a fixed order and stack by z-index alone: raising one must not move its DOM node, which would
- * drop keyboard focus from the very window that focus just raised.
- *
- * Each host is keyed by project as well as instance: instance ids repeat across projects, and a window carried over
- * from the previous project would keep that project's gesture, pending cleanup, and widget state.
- */
+/** Windows render in a fixed DOM order and stack by z-index: moving a node would drop its keyboard focus. */
 export const FloatingWidgetLayer = () => {
   const projectId = useActiveProjectId();
   const floatingWidgets = useActiveProjectSelector(

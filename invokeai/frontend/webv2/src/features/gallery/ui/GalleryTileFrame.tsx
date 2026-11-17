@@ -24,8 +24,7 @@ export const GALLERY_TILE_MEDIA_SELECTOR = '[data-gallery-tile-media]';
 const MAX_MEDIA_RATIO = 3;
 
 /**
- * Aspect fit sizes the media box to the media's own ratio, clamped, when its dimensions are known; otherwise the box
- * fills the square cell and the media letterboxes inside it.
+ * Aspect fit sizes the media box to the media's ratio (clamped) when known; else it fills the cell and letterboxes.
  */
 export const getGalleryTileMediaRatio = (
   { height, width }: { height: number; width: number },

@@ -21,7 +21,6 @@ export interface DocumentMirrorStore {
   subscribe(listener: () => void): () => void;
 }
 
-/** Callbacks fired when the mirrored document changes. */
 export interface DocumentMirrorCallbacks {
   /**
    * Reports leaf or ancestor-effective changes in document order. `sourceChanged` contains added leaves and changed
@@ -38,24 +37,20 @@ export interface DocumentMirrorCallbacks {
   onLayerOrderChanged(): void;
   /** The document was replaced wholesale (dims/background change, appear/disappear) — full invalidate. */
   onDocumentReplaced(): void;
-  /** The generation bounding box changed. */
   onBboxChanged(): void;
   /**
-   * Selection-only changes reuse stacks and bbox, requiring a separate callback for selection chrome and per-layer
-   * session cleanup.
+   * Selection-only changes reuse stacks and bbox, so selection chrome and per-layer session cleanup need this callback.
    */
   onSelectionChanged?(selectedLayerId: string | null): void;
   /** Any change to the mirrored document, after the callbacks above have reacted to it (even when one threw). */
   onDocumentChanged?(): void;
 }
 
-/** The imperative mirror handle. */
 export interface DocumentMirror {
   /** The current mirrored document, or `null` if the project is gone. */
   getDocument(): CanvasDocumentContractV3 | null;
   /** Synchronously reconciles from store state when ordinary notification was interrupted. */
   refresh(): void;
-  /** Removes the store subscription. */
   dispose(): void;
 }
 

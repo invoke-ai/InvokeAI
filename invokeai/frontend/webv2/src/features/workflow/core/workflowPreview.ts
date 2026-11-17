@@ -17,13 +17,10 @@ import { extractNodeModelRequirements } from './modelRequirements';
 import { isInvocationNode } from './types';
 
 /**
- * The library's read-only preview of a saved workflow document: its nodes as the editor names them, the markers a
- * reader decides by, a simplified view that folds value-only helpers into the nodes they feed and hides plumbing, and
- * the form's inputs as authored. Drawn from the document, not the compiled graph, so a workflow that does not compile
- * still previews.
+ * The library's read-only preview of a saved workflow. Drawn from the document, not the compiled graph, so a workflow
+ * that does not compile still previews.
  */
 
-/** A value as the preview shows it; the view words and formats each kind. */
 export type WorkflowPreviewValue =
   | { kind: 'text'; text: string }
   | { kind: 'number'; value: number }
@@ -37,7 +34,6 @@ export interface WorkflowPreviewField {
   /** The author's label, else the template's title, else the field name. */
   label: string;
   value: WorkflowPreviewValue;
-  /** The workflow's form exposes it. */
   isExposed: boolean;
 }
 
@@ -48,19 +44,15 @@ export interface WorkflowPreviewNode {
   title: string;
   /** No template on this server: its node pack is missing. */
   isUnknown: boolean;
-  /** The author's note on the node. */
   notes: string;
   /** Inputs with a value of their own (not fed by a connection), in template order. */
   fields: readonly WorkflowPreviewField[];
-  /** The same inputs' raw values by field name, for type-specific summaries. */
   values: Readonly<Record<string, unknown>>;
   /** Its first exposed field with a value short enough for a one-line summary. */
   exposedSummary: WorkflowPreviewField | null;
-  /** At least one of its fields is in the form. */
   isExposed: boolean;
   /** Nothing consumes it and it is not a helper: what the workflow makes. */
   isResult: boolean;
-  /** Models it names and empty model fields it requires; the view resolves them against the catalog. */
   modelRequirements: readonly WorkflowModelRequirement[];
 }
 
@@ -68,7 +60,6 @@ export interface WorkflowPreviewEdge {
   id: string;
   source: string;
   target: string;
-  /** Drawn through hidden plumbing in the simplified view. */
   isRerouted: boolean;
   isLoopLinkage: boolean;
 }
@@ -78,7 +69,6 @@ export interface WorkflowPreviewPill {
   nodeId: string;
   /** The form's label for its value when exposed, else the helper's title. */
   label: string;
-  /** Shown beside the label when short. */
   value: WorkflowPreviewValue | null;
 }
 
@@ -96,23 +86,18 @@ export interface WorkflowPreviewLayout {
   neighbours: Readonly<Record<string, { sources: readonly string[]; targets: readonly string[] }>>;
 }
 
-/** One input the form exposes, read-only. */
 export interface WorkflowPreviewInput {
-  /** The form element's id. */
   id: string;
   nodeId: string;
   fieldName: string;
-  /** The author's label, else the template's title, else the field name. */
   label: string;
   nodeTitle: string;
   /** The saved value; null when empty. */
   value: WorkflowPreviewValue | null;
   isModelField: boolean;
-  /** What the field needs from the model catalog: the model it names, or the kind it asks for while empty. */
   modelRequirements: readonly WorkflowModelRequirement[];
 }
 
-/** The form as authored: its layout elements and inputs, in order. */
 export type WorkflowPreviewFormItem =
   | { kind: 'heading'; id: string; text: string }
   | { kind: 'text'; id: string; text: string }
@@ -128,23 +113,17 @@ export interface WorkflowPreviewInputGroup {
 
 export interface WorkflowPreviewModel {
   nodes: ReadonlyMap<string, WorkflowPreviewNode>;
-  /**
-   * The drawn structure (node ids and connections), equal across documents that differ only in values: a live source
-   * recompiled after a setting change keeps its drawing, and a different graph starts a new one.
-   */
+  /** Node ids and connections only: equal across value-only changes, so a recompiled live source keeps its drawing. */
   structureKey: string;
   /** Every node at the author's positions, scaled to the chips. */
   all: WorkflowPreviewLayout;
   /** Helpers folded and plumbing hidden, in a layered layout; null when nothing folds or hides. */
   simplified: WorkflowPreviewLayout | null;
-  /** The form's root children. */
   form: readonly WorkflowPreviewFormItem[];
-  /** Every input the form shows, in its order. */
   inputs: readonly WorkflowPreviewInput[];
   inputGroups: readonly WorkflowPreviewInputGroup[];
 }
 
-/** The chip sizes the layouts space; each pill adds a row of its height above its chip. */
 export interface WorkflowPreviewMetrics {
   nodeWidth: number;
   nodeHeight: number;
@@ -156,9 +135,8 @@ export interface WorkflowPreviewMetrics {
 }
 
 /**
- * The preview's node chips: 136px by 48px, a 26px row per pill above. Layers stay close, so a workflow six layers deep
- * fits a ~870px stage at a readable zoom; rows sit well apart, since a layered graph is wide and short and the stage
- * has the height to spare.
+ * Layers stay close, so a workflow six layers deep fits a ~870px stage at a readable zoom; rows sit well apart, since a
+ * layered graph is wide and short and the stage has the height to spare.
  */
 export const WORKFLOW_PREVIEW_METRICS: WorkflowPreviewMetrics = {
   authorScale: 0.5,
@@ -169,7 +147,6 @@ export const WORKFLOW_PREVIEW_METRICS: WorkflowPreviewMetrics = {
   rowGap: 56,
 };
 
-/** The chip widths a drawing chooses between: wide enough for its titles, where the stage has the room. */
 export const WORKFLOW_PREVIEW_MIN_CHIP_WIDTH = WORKFLOW_PREVIEW_METRICS.nodeWidth;
 export const WORKFLOW_PREVIEW_MAX_CHIP_WIDTH = 200;
 const CHIP_WIDTH_STEP = 16;
@@ -178,10 +155,7 @@ const metricsByWidth = new Map<number, WorkflowPreviewMetrics>([
   [WORKFLOW_PREVIEW_METRICS.nodeWidth, WORKFLOW_PREVIEW_METRICS],
 ]);
 
-/**
- * The metrics for chips `width` wide, one object per width (models cache by metrics). The author's arrangement scales
- * with the chips, so wider chips keep the gaps the author left between nodes.
- */
+/** One object per width, since models cache by metrics; the author's arrangement scales with the chips. */
 export const getWorkflowPreviewMetrics = (width: number): WorkflowPreviewMetrics => {
   let metrics = metricsByWidth.get(width);
 
@@ -197,11 +171,7 @@ export const getWorkflowPreviewMetrics = (width: number): WorkflowPreviewMetrics
   return metrics;
 };
 
-/**
- * A drawing's chip width: wide enough for its longest title (`wanted`), within the minimum and maximum, and no wider
- * than the drawing still `fits` its stage at (laid out at that width, read at a legible zoom); else the minimum. Tried
- * in steps from the widest wanted down.
- */
+/** The widest width from `wanted` down, within the bounds, at which the drawing still `fits`; else the minimum. */
 export const chooseWorkflowPreviewChipWidth = (wanted: number, fits: (width: number) => boolean): number => {
   const widest = Math.min(
     WORKFLOW_PREVIEW_MAX_CHIP_WIDTH,
@@ -217,13 +187,8 @@ export const chooseWorkflowPreviewChipWidth = (wanted: number, fits: (width: num
   return WORKFLOW_PREVIEW_MIN_CHIP_WIDTH;
 };
 
-/** Plumbing the simplified view hides. */
 const PLUMBING_TYPES = new Set(['collect', 'core_metadata']);
-/**
- * Plumbing that only records the values it receives on an output (metadata): almost every parameter reaches the decoder
- * through it, which is no data flow worth drawing, so nothing is rerouted through it. A collect is rerouted: what feeds
- * it, feeds what it feeds.
- */
+/** Recorders (metadata) receive almost every parameter, so nothing reroutes through them; a collect does. */
 const RECORDING_TYPES = new Set(['core_metadata']);
 const VALUE_PRIMITIVE_TYPES = new Set(['string', 'integer', 'float', 'boolean']);
 const SCALAR_FIELD_TYPES = new Set(['StringField', 'IntegerField', 'FloatField', 'BooleanField']);
@@ -256,7 +221,6 @@ const isSameData = (a: unknown, b: unknown): boolean => {
 const keepSame = <T>(previous: T | undefined, next: T): T =>
   previous !== undefined && isSameData(previous, next) ? previous : next;
 
-/** The kinds of value the preview can say something about; a choice reads as its template's label. */
 const describeValue = (value: unknown, template: FieldInputTemplate | undefined): WorkflowPreviewValue | null => {
   if (typeof value === 'string') {
     return value.trim() === '' ? null : { kind: 'text', text: template?.uiChoiceLabels?.[value] ?? value };
@@ -353,11 +317,8 @@ const getNeighbours = (
 };
 
 /**
- * Layered layout: one column per depth, as narrow as the chips. Each chip sits level with the middle of the chips
- * feeding it, and a column's nodes are then pushed apart to keep the row gap between a chip and the pills stacked above
- * the next one, so edges (which meet chips, not pills) run level where they can and the graph spreads over rows rather
- * than stacking every column from the top. Unconnected first-column nodes stack. Positions are the chips'; the topmost
- * pill stack starts at 0.
+ * Layered layout, one column per depth. Each chip sits level with the middle of its parents, then a column is pushed
+ * apart to clear the pills stacked above each chip. Unconnected first-column nodes stack; the topmost pill starts at 0.
  */
 const getPreviewLayeredPositions = (
   nodes: readonly { id: string; pillsHeight: number }[],
@@ -394,7 +355,6 @@ const getPreviewLayeredPositions = (
     });
     let bottom = -Infinity;
 
-    // Parentless nodes keep node order at the top; the rest go where their parents are, in that order.
     for (const { id, y } of wanted.sort((a, b) => (a.y ?? -Infinity) - (b.y ?? -Infinity) || a.index - b.index)) {
       const top = Math.max(y ?? 0, bottom + metrics.rowGap + pillsHeights.get(id)!);
 
@@ -412,10 +372,7 @@ const getPreviewLayeredPositions = (
   return positions;
 };
 
-/**
- * The form's tree from its root, as the preview reads it. Elements naming a missing node or element are skipped, and a
- * container is entered once, so a malformed form cannot loop.
- */
+/** Skips elements naming a missing node or element and enters each container once, so a malformed form cannot loop. */
 const readForm = (
   document: ProjectGraphState,
   toInput: (id: string, nodeId: string, fieldName: string) => WorkflowPreviewInput | null
@@ -640,7 +597,6 @@ const buildModel = (
     }
   }
 
-  // Node ids and types and the drawn connections, in no particular order: what the layouts depend on besides values.
   const structureKey = JSON.stringify([
     order.map((id) => `${id}\u0000${documentNodes.get(id)!.data.type}`).sort(),
     allEdges.map((edge) => `${edge.source}\u0000${edge.target}\u0000${edge.isLoopLinkage}`).sort(),
@@ -648,7 +604,6 @@ const buildModel = (
   // A rebuild of the same structure (a live source recompiled with new values) keeps the previous layouts.
   const same = previous?.structureKey === structureKey ? previous : null;
 
-  // The author's arrangement, scaled from editor-sized nodes to the chips and moved to the origin.
   const authorX = Math.min(...order.map((id) => documentNodes.get(id)!.position.x));
   const authorY = Math.min(...order.map((id) => documentNodes.get(id)!.position.y));
   const authorPositions = Object.fromEntries(
@@ -756,7 +711,6 @@ const buildModel = (
   }
 
   if (same?.simplified) {
-    // Pills carry values; the rest of the layout is structure. Unchanged pill rows keep their identity.
     const kept = Object.fromEntries(
       Object.entries(pills).map(([consumer, row]) => [consumer, keepSame(same.simplified!.pills[consumer], row)])
     );
@@ -797,11 +751,7 @@ const modelCache = new WeakMap<ProjectGraphState, (ModelInputs & { model: Workfl
 const MODEL_CACHE_SIZE = 4;
 const modelInputs = new WeakMap<WorkflowPreviewModel, ModelInputs>();
 
-/**
- * Builds the preview of a document, once per document, templates and metrics. Given the `previous` model of the same
- * source (a live source recompiled), the new one keeps every node, pill row and layout that did not change, so a view
- * redraws only what did; a structure unchanged keeps its layouts without laying them out again.
- */
+/** Cached per document, templates, metrics; a `previous` model's unchanged nodes, pills and layouts stay as-is. */
 export const buildWorkflowPreviewModel = (
   document: ProjectGraphState,
   templates: InvocationTemplates,
@@ -829,7 +779,6 @@ export const buildWorkflowPreviewModel = (
   return model;
 };
 
-/** The drawn nodes whose title or type id contains the query, in keyboard order; none for a blank query. */
 export const findWorkflowPreviewNodes = (
   model: WorkflowPreviewModel,
   layout: WorkflowPreviewLayout,
@@ -848,16 +797,11 @@ export const findWorkflowPreviewNodes = (
   });
 };
 
-/** Compiled inputs that are the backend's bookkeeping, not values a node is set to. */
 const COMPILED_META_INPUTS = new Set(['id', 'type', 'is_intermediate', 'use_cache']);
 
 /**
- * A compiled graph (Generate's, a widget's) as a document the preview draws, so it takes the one model path: every
- * node, its type known here or not, with the compiled values, or the text `overrides` gives where the compiled value is
- * not what runs (a seed drawn afresh each run). The fields `getSetLabel` names (a setting the person made) become the
- * document's form, labelled as that setting ("Seed" rather than the field's generic "Value"), which is how the preview
- * marks and names what was set. Nodes take `positionHints` where given, else a layered arrangement in editor units, so
- * the full view scales them like a document's.
+ * A compiled graph as a preview document. `overrides` gives the text for values that differ at run time (a fresh seed);
+ * fields `getSetLabel` names become the form, labelled as that setting.
  */
 export const compiledGraphToPreviewDocument = (
   graph: PreviewGraphLike & { id: string },
@@ -867,7 +811,6 @@ export const compiledGraphToPreviewDocument = (
     overrides,
     positionHints,
   }: {
-    /** The setting a field was set by, as a field label; null when nothing set it. */
     getSetLabel?: (nodeId: string, fieldName: string) => string | null;
     metrics?: WorkflowPreviewMetrics;
     overrides?: Readonly<Record<string, Readonly<Record<string, string>>>>;

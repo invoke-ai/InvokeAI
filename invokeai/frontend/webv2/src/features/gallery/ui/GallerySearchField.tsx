@@ -63,8 +63,7 @@ const MIRROR_CHIP_CSS = {
 } as const;
 
 /**
- * Share a zero-padded cell to align date chips with transparent input text. Semantic descriptions remain plain text
- * with persistent mode tint.
+ * Share a zero-padded cell so date chips align with transparent input text; semantic text stays plain, mode-tinted.
  */
 export const GallerySearchField = ({
   ariaLabel,

@@ -1,9 +1,4 @@
-/**
- * Working-memory calibration as the Model Manager sees it: the order a plan's cases run in, the retry keys that make a
- * lost response safe to resend, which of a model's runs make up the latest attempt, and what the section shows for a
- * plan, a summary and the device status. The server owns every measurement and every state; this module only orders,
- * groups and reads them.
- */
+/** Calibration step order, retry keys and attempt grouping; the server owns every measurement and state. */
 
 import type { components } from '@api/schema';
 
@@ -21,10 +16,7 @@ export type WorkingMemoryStatus = Schemas['WorkingMemoryCalibrationStatus'];
 export type WorkingMemoryRunCreated = Schemas['WorkingMemoryCalibrationRunCreated'];
 export type WorkingMemoryLineState = WorkingMemoryLine['state'];
 export type WorkingMemoryLineContributor = Schemas['WorkingMemoryCalibrationLineContributor'];
-/**
- * A model the graph names, as the record the graph was compiled over has it: what the server compares with the model's
- * record when the step arrives (`graph_models`). Format and variant are null for a record without one.
- */
+/** As the compiled-over record has it; the server compares it with the model's record (`graph_models`). */
 export type CalibrationCompiledModel = Schemas['CalibrationCompiledModel'];
 
 /** The server reserves this origin prefix for calibration queue items; the run id follows it. */
@@ -39,14 +31,12 @@ export const isCalibrationOrigin = (origin: unknown): boolean =>
 export const supportsWorkingMemoryCalibration = (model: { type: string }): boolean =>
   model.type === 'main' || model.type === 'vae';
 
-/** A case's enqueue payload as Generate would build it: the graph and its batch data. */
 export interface CalibrationGraph {
   caseId: string;
   graph: unknown;
   data: unknown;
 }
 
-/** A case's graph with the identity of every model it names, from the records it was compiled over. */
 export interface CompiledCalibration extends CalibrationGraph {
   models: Readonly<Record<string, CalibrationCompiledModel>>;
 }
@@ -56,20 +46,12 @@ type JsonObject = Record<string, unknown>;
 const isJsonObject = (value: unknown): value is JsonObject =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-/**
- * A model identifier as the server reads one in a graph: an object that validates as its `ModelIdentifierField`, with a
- * string key, hash, name, base and type, and a submodel type that is absent, null or a string. The server also checks
- * base, type and submodel type against its enums. This module has no list of those that stays current with the
- * server's, and a compiled graph's identifiers come from server records, whose values are the server's own.
- */
+/** `ModelIdentifierField` shape; the server's enum checks are skipped, since no list here stays current. */
 const isModelIdentifier = (value: JsonObject): value is JsonObject & { key: string } =>
   ['key', 'hash', 'name', 'base', 'type'].every((field) => typeof value[field] === 'string') &&
   (value.submodel_type === undefined || value.submodel_type === null || typeof value.submodel_type === 'string');
 
-/**
- * The keys of every model the graph's nodes name, in a field or nested in one (a LoRA collection's list, a metadata
- * node's record), as the server finds them (`graph_model_identifiers`): it takes the identities of exactly those.
- */
+/** Every model key the nodes name, nested ones included, as the server's `graph_model_identifiers` finds them. */
 const modelKeysOf = (graph: unknown): Set<string> => {
   const keys = new Set<string>();
   const visit = (value: unknown): void => {
@@ -93,10 +75,7 @@ const modelKeysOf = (graph: unknown): Set<string> => {
   return keys;
 };
 
-/**
- * The identity of every model `graph` names, from `records`, the records it was compiled over. Throws for a model they
- * lack, which a compiler over them cannot have named.
- */
+/** Throws for a model `records` lack, which a compiler over them cannot have named. */
 export const compiledModelIdentities = (
   graph: unknown,
   records: readonly ModelConfig[]
@@ -121,12 +100,7 @@ export const compiledModelIdentities = (
   return identities;
 };
 
-/**
- * Builds every case's graph over `models`, or rejects naming the case that cannot compile, with the records' read
- * error, or once `signal` aborts. `models` are the records the server holds now, still being read when the compiler is
- * called, so it can fetch what else it needs meanwhile. Generation owns graph compilation and depends on Models, so App
- * supplies this; its implementation loads lazily on first call.
- */
+/** `models` is still being read when called. Generation owns compilation and depends on Models, so App supplies it. */
 export type CalibrationGraphCompiler = (
   cases: readonly WorkingMemoryCase[],
   models: Promise<readonly ModelConfig[]>,
@@ -141,15 +115,10 @@ export interface CalibrationStep {
   index: number;
   case: WorkingMemoryCase;
   phase: CalibrationPhase;
-  /** 1-based within the phase. */
   repetition: number;
 }
 
-/**
- * The plan's cases grouped by line (one decode dtype each), each case's warm-ups right before its measured runs.
- * Grouping keeps one precision switch per dtype: the first decode after a switch recasts the VAE, and the server
- * excludes those windows, so a switch must land on a warm-up.
- */
+/** Grouped by decode dtype, so each precision switch (it recasts the VAE; the server excludes it) hits a warm-up. */
 export const planCalibrationSteps = (plan: Pick<WorkingMemoryPlan, 'cases' | 'repetitions'>): CalibrationStep[] => {
   const groups = new Map<string, WorkingMemoryCase[]>();
 
@@ -180,11 +149,7 @@ export const planCalibrationSteps = (plan: Pick<WorkingMemoryPlan, 'cases' | 're
   return steps;
 };
 
-/**
- * Whether a plan read again when a calibration is confirmed asks for another calibration than the one confirmed: other
- * lines (an operation in another dtype), or another number of runs. The sizes follow the GPU memory free when the plan
- * is read, which a running generation moves by its working set, so new sizes alone are no reason to ask again.
- */
+/** Sizes follow free GPU memory, which a running generation moves, so only new lines or run counts count. */
 export const changesCalibration = (
   confirmed: Pick<WorkingMemoryPlan, 'cases' | 'repetitions'>,
   current: Pick<WorkingMemoryPlan, 'cases' | 'repetitions'>
@@ -198,25 +163,17 @@ export const changesCalibration = (
   );
 };
 
-/**
- * The retry key of one step. Resending a step after a lost response with the same key returns the run the first request
- * created. The key carries the attempt id: the server keys its retry receipts on the key alone, so a key reused by a
- * new attempt would be refused.
- */
+/** Carries the attempt id: the server keys retry receipts on the key alone, so reuse by a new attempt is refused. */
 export const calibrationIdempotencyKey = (attemptId: string, step: CalibrationStep): string =>
   `webv2:wm-calibration:${attemptId}:${String(step.index)}:${step.case.id}:${step.phase}-${String(step.repetition)}`;
 
 const byCreation = (left: WorkingMemoryRun, right: WorkingMemoryRun): number =>
   Date.parse(left.created_at) - Date.parse(right.created_at);
 
-/** The id of the most recently created run, or null without runs. */
 export const newestRunId = (runs: readonly WorkingMemoryRun[]): string | null =>
   [...runs].sort(byCreation).at(-1)?.run_id ?? null;
 
-/**
- * The runs of one attempt, oldest first: those carrying `attemptId`, or by default those of the newest run's attempt. A
- * run without an attempt id (created before the server stored one) is an attempt of its own.
- */
+/** Defaults to the newest run's attempt; a run without an attempt id is an attempt of its own. */
 export const selectAttemptRuns = (runs: readonly WorkingMemoryRun[], attemptId?: string): WorkingMemoryRun[] => {
   const ordered = [...runs].sort(byCreation);
   const newest = ordered.at(-1);
@@ -229,30 +186,17 @@ export const selectAttemptRuns = (runs: readonly WorkingMemoryRun[], attemptId?:
   return ordered.filter((run) => run.attempt_id === target);
 };
 
-/**
- * Why the server refused a calibration's step, where the section says it in its own words: another attempt is running
- * on this GPU, the model's record changed after the graphs were compiled over it, or another calibration ran on this
- * GPU between this attempt's steps (`interleaved`), whose later steps then no longer combine with its earlier ones.
- */
+/** `interleaved`: another calibration ran on this GPU between this attempt's steps, so they no longer combine. */
 export type CalibrationRefusal = 'alreadyRunning' | 'interleaved' | 'modelChanged';
 
-/** What this tab knows of an attempt it started. */
 export interface LocalAttempt {
   attemptId: string;
-  /** Steps the attempt meant to queue. */
   total: number;
-  /** Still posting steps. */
   submitting: boolean;
-  /** Why posting stopped early, when it did. */
   submissionError: string | null;
-  /** The refusal that error was, when the server named one. */
   submissionRefusal?: CalibrationRefusal;
-  /** The user stopped it. */
   stopped: boolean;
-  /**
-   * The newest of the model's runs this tab knew when the attempt started. While the attempt has no runs of its own (it
-   * failed before queuing anything), it is the latest attempt only until a newer run appears.
-   */
+  /** While the attempt has no runs, it is the latest only until a run newer than this appears. */
   newestRunAtStart: string | null;
 }
 
@@ -260,20 +204,14 @@ export type CalibrationActivity =
   | { kind: 'idle' }
   | {
       kind: 'running';
-      /** Steps settled so far. */
       done: number;
       total: number;
       /** The case the queue is running or about to run, when it can be told. */
       currentCase: WorkingMemoryCase | null;
-      /** Still posting steps. */
       queuing: boolean;
     };
 
-/**
- * `discarded`: the attempt measured something, but the server aborted it (stopped, a run canceled, or its queuing ended
- * early), so none of its windows feeds a fit. A run that failed does not abort it: `kept` says that the other steps
- * measured something, which still counts.
- */
+/** `discarded`: the server aborted a measuring attempt, so no window feeds a fit; a failed run does not abort it. */
 export type CalibrationOutcome =
   | { kind: 'none' }
   | { kind: 'completed' }
@@ -285,17 +223,13 @@ export type CalibrationOutcome =
       canceled: boolean;
       discarded: boolean;
       error: string | null;
-      /** The refusal that `error` was, when the server named one. */
       refusal?: CalibrationRefusal;
       queued: number;
       total: number;
     }
   | { kind: 'failed'; discarded: boolean; error: string | null; kept: boolean; refusal?: CalibrationRefusal };
 
-/**
- * Progress and the latest attempt's outcome. A run counts as running while any of its items is pending or running (the
- * server derives that from the queue), so a pending item blocks a second start across reloads and tabs.
- */
+/** A run counts as running while any item is pending, so a pending item blocks a second start across tabs. */
 export const deriveCalibrationProgress = ({
   local,
   runs,
@@ -305,8 +239,7 @@ export const deriveCalibrationProgress = ({
   runs: readonly WorkingMemoryRun[];
   steps: readonly CalibrationStep[];
 }): { activity: CalibrationActivity; outcome: CalibrationOutcome } => {
-  // Another tab may have started a newer attempt since; this tab's record then describes an older one. A record whose
-  // attempt queued nothing (it failed to compile or to post its first step) stays current until a newer run exists.
+  // Another tab may have started a newer attempt; one that queued nothing stays current until a newer run exists.
   const newest = [...runs].sort(byCreation).at(-1);
   const current =
     local !== null &&
@@ -318,9 +251,7 @@ export const deriveCalibrationProgress = ({
       ? local
       : null;
   const attempt = selectAttemptRuns(runs, current?.attemptId);
-  // The attempt's own step count: this tab's record, else the one the server stored with its runs, so any tab can tell
-  // an attempt whose queuing ended early (a reload, a closed tab) from a complete one. A running attempt with neither
-  // is assumed to follow the current plan; a settled one is judged by its runs alone, since the plan may have changed.
+  // The step count from this tab, else the server's, so any tab can tell an attempt cut short from a complete one.
   const planned = current?.total ?? attempt.find((run) => run.attempt_steps !== null)?.attempt_steps ?? null;
   const total = Math.max(planned ?? steps.length, attempt.length);
   const plannedTotal = planned ?? attempt.length;
@@ -341,11 +272,7 @@ export const deriveCalibrationProgress = ({
   const idle: CalibrationActivity = { kind: 'idle' };
   const canceled =
     (current?.stopped ?? false) || attempt.some((run) => run.status === 'canceled' || run.status === 'partial');
-  // Once the attempt settled, the server alone says whether it discards the attempt's windows: a Stop that came after
-  // the last step finished cancels nothing, and a step whose response was lost may still have been recorded. Before the
-  // summary lists the attempt's runs, nothing of it was measured, so nothing reads as discarded either. Measured means
-  // a run that completed, or partly did: `point_count` also counts the invalid windows of a decode that failed or was
-  // canceled.
+  // Once settled, only the server says whether windows are discarded; `point_count` counts invalid windows too.
   const measured = attempt.some((run) => run.status === 'completed' || run.status === 'partial');
   const aborted = attempt.some((run) => run.held_back === 'aborted_attempt');
   const discarded = measured && aborted;
@@ -359,8 +286,7 @@ export const deriveCalibrationProgress = ({
     total: plannedTotal,
   });
 
-  // A submission error stands until the server lists every step this tab meant to queue: then the step whose answer
-  // failed was recorded after all (a lost response, a 503 after queuing), and the runs alone tell the outcome.
+  // A submission error stands until the server lists every planned step (a lost response may have been recorded).
   if (current?.submissionError && attempt.length < plannedTotal) {
     return {
       activity: idle,
@@ -381,8 +307,7 @@ export const deriveCalibrationProgress = ({
     return { activity: idle, outcome: current?.stopped ? { kind: 'canceled' } : { kind: 'none' } };
   }
 
-  // A model of the graph changed after the attempt was planned: its items fail as they are admitted, and the section
-  // says so in its own words rather than the server's.
+  // A graph model changed after planning: its items fail on admission, and the section says so in its own words.
   const failed =
     attempt.find((run) => run.status === 'failed' && run.error_code === 'model_changed') ??
     attempt.find((run) => run.status === 'failed');
@@ -414,11 +339,7 @@ export const deriveCalibrationProgress = ({
   return { activity: idle, outcome: partial(null) };
 };
 
-/**
- * How a line reads: its server state, or `interrupted` for a line that only aborted attempts measured (Stop, a queue
- * clear, a failed submission, a changed model). The server calls that line `insufficient`, but its cause is the
- * interruption, not a lack of sizes.
- */
+/** `interrupted`: a line only aborted attempts measured, which the server calls `insufficient`. */
 export type LineDisplayState = WorkingMemoryLineState | 'interrupted';
 
 export const lineDisplayState = (line: Pick<WorkingMemoryLine, 'sizes' | 'state'>): LineDisplayState =>
@@ -430,19 +351,15 @@ export const lineDisplayState = (line: Pick<WorkingMemoryLine, 'sizes' | 'state'
 
 const LINE_STATE_SEVERITY: readonly LineDisplayState[] = ['unusable', 'stale', 'insufficient', 'interrupted', 'in_use'];
 
-/** The most severe of the lines' display states, or null without lines. */
 export const summarizeLineStates = (states: readonly LineDisplayState[]): LineDisplayState | null =>
   LINE_STATE_SEVERITY.find((state) => states.includes(state)) ?? null;
 
-/** What a summary says about the model as a whole. */
 export interface CalibrationCoverage {
   /** The headline state: of the current environment's lines, or of all lines when it has none. */
   state: LineDisplayState | null;
-  /** Some line of the current environment exists, measured by this model or another. */
   hasCurrentLines: boolean;
   /** This model has windows on some line or has runs, so a reset removes something. */
   hasOwnMeasurements: boolean;
-  /** Estimates use lines that only other models measured. */
   usesOthersOnly: boolean;
 }
 
@@ -460,8 +377,7 @@ export const describeCoverage = (
   const current = lines.filter((line) => line.env_id === summary?.current_env_id);
   const hasOwnWindows = lines.some((line) => line.own_windows > 0);
   const applies = (line: (typeof lines)[number]) => line.state === 'in_use' || line.state === 'stale';
-  // An estimator update leaves the old version's windows as an unusable line; once the new version's line applies, the
-  // old one is superseded and does not head the section.
+  // An estimator update leaves the old line unusable; once the new version's line applies, the old one is superseded.
   const headline = current.filter(
     (line) =>
       line.state !== 'unusable' ||
@@ -497,10 +413,7 @@ export type CalibrationBlocker =
   | { kind: 'storeUnusable'; reason: string | null }
   | { kind: 'running' };
 
-/**
- * Why Calibrate is unavailable, in the order a user can act on: nothing helps an unsupported model; a missing or second
- * GPU and an unusable store are machine problems; a running attempt only needs to finish.
- */
+/** Ordered by what a user can act on. */
 export const getCalibrationBlocker = ({
   isRunning,
   plan,
@@ -528,21 +441,13 @@ export const getCalibrationBlocker = ({
   return isRunning ? { kind: 'running' } : null;
 };
 
-/**
- * The model whose calibration attempt holds this GPU, as the status lists it, or null. The server takes one attempt per
- * device class at a time; a run without an attempt holds nothing. An attempt between its steps runs nothing and reads
- * as free here: the status cannot tell it from an abandoned one, which the server judges by its last activity. The
- * server's refusal covers that gap of seconds.
- */
+/** One attempt per device class; an attempt between steps reads as free here, and the server's refusal covers it. */
 export const modelCalibratingOnGpu = (status: Pick<WorkingMemoryStatus, 'device_classes'>): string | null =>
   status.device_classes
     .find((entry) => entry.is_current)
     ?.runs.find((run) => run.status === 'running' && run.attempt_id !== null)?.model_key ?? null;
 
-/**
- * Whether the server's way of measuring GPU memory was checked against real hardware on this GPU's backend: the model
- * summary's answer, else the current device class's; null while neither can tell.
- */
+/** The model summary's answer, else the current device class's; null while neither can tell. */
 export const isMeasurementMethodVerified = (
   summary: Pick<WorkingMemorySummary, 'measurement_verified'> | null,
   status: WorkingMemoryStatus
@@ -560,10 +465,8 @@ export const splitLine = (line: string): { dtype: string | null; operation: stri
     : { dtype: line.slice(separator + 1), operation: line.slice(0, separator) };
 };
 
-/** Changed facts the section names with a translated label. */
 export type TranslatedFact = 'allocator' | 'driver' | 'invokeai' | 'osBuild' | 'sdpaGuard' | 'torchBuild';
 
-/** Facts named by a product or runtime name, which needs no translation. */
 const FACT_NAMES: Readonly<Record<string, string>> = {
   cuda: 'CUDA',
   cudnn: 'cuDNN',
@@ -583,10 +486,7 @@ const TRANSLATED_FACTS: Readonly<Record<string, TranslatedFact>> = {
   torch_build: 'torchBuild',
 };
 
-/**
- * How the section names a changed environment fact (the server's fingerprint keys): a product name, a translated label,
- * or for environment variables and Invoke settings their own name. An unknown key shows as sent.
- */
+/** Product name, translated label, or the key itself for env vars and settings; unknown keys show as sent. */
 export const describeFact = (key: string): { name: string } | { translated: TranslatedFact } => {
   const translated = TRANSLATED_FACTS[key];
 

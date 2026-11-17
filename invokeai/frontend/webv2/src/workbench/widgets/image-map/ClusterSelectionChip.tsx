@@ -20,10 +20,7 @@ export const selectClusterSelectionId = (values: Record<string, unknown>): strin
   return reference?.kind === 'cluster' ? reference.clusterId : null;
 };
 
-/**
- * Names the selected cluster over the dimmed map and offers the way back to full colour. It is what explains the grey:
- * without it a dimmed map reads as a rendering fault, and the only clear lived in the Gallery's search field.
- */
+/** Names the selected cluster over the dimmed map, explaining the grey, and offers the clear. */
 export const ClusterSelectionChip = () => {
   const { t } = useTranslation();
   const clusterId = useWidgetValuesSelector('gallery', selectClusterSelectionId);

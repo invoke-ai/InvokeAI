@@ -1,8 +1,4 @@
-/**
- * Resolve the active engine, flush paint uploads, compose the fresh snapshot, compile, and enqueue. Invalid controls
- * and unsupported hosted-provider regions block. Publish dedupe only after dispatch succeeds and report failures as
- * notices. A per-project in-flight guard prevents overlapping preparation.
- */
+/** Flush, compose, compile and enqueue; dedupe publishes only after dispatch, one run per project at a time. */
 
 import type {
   CanvasScalingSettings,
@@ -54,7 +50,6 @@ import {
 
 import { readCanvasScaling } from './canvasScaling';
 
-/** Title on every canvas-invoke failure notice. */
 export const CANVAS_INVOKE_ERROR_TITLE = 'Canvas generation failed';
 
 /** A control layer that blocks the invocation, as `formatControlLayerError` words it for the notice. */
@@ -78,10 +73,7 @@ export class ControlLayerValidationError extends Error implements ControlLayerRe
 export interface RunCanvasInvocationDeps {
   /** The active project id (also the in-flight guard key). */
   projectId: string;
-  /**
-   * The resolved result destination. Drives the compiled output node's `is_intermediate` flag (`destination ===
-   * 'canvas'`) and the enqueued snapshot's destination, so a Canvas source can target the Gallery.
-   */
+  /** Drives the output node's `is_intermediate` and the snapshot's destination, so Canvas can target Gallery. */
   destination: ResultDestination;
   /** Capture and upload generation composites, releasing pixel resources on success or failure. */
   composeForGeneration: (options: ComposeForGenerationOptions) => Promise<ComposeForGenerationResult>;
@@ -103,7 +95,6 @@ export interface RunCanvasInvocationDeps {
   models?: readonly ModelConfig[];
   /** Remembered control-model picks, which resolve control layers left on automatic. */
   controlModelMemory: ControlModelMemory;
-  /** The project settings the compiler consults. */
   projectSettings: GenerationProjectSettings;
   /** Runtime-derived accelerator family recorded in generation metadata. */
   randDevice?: string;
@@ -126,11 +117,7 @@ const recordNotice = (
   notifications.add({ kind, message, title: CANVAS_INVOKE_ERROR_TITLE });
 };
 
-/**
- * Validate enabled content-bearing controls in z-order with the same judge Invoke readiness uses, resolving each
- * layer's model; invalid controls throw and block invocation, and layers with no type or model are left out. Join
- * uploaded names with captured model metadata for graph inputs.
- */
+/** Validates controls with Invoke readiness's judge; invalid ones throw, untyped or modelless ones are skipped. */
 const createControlLayerCollector = (
   model: GenerateModelConfig,
   models: readonly ModelConfig[] | undefined,
@@ -252,11 +239,7 @@ export const resolveRegionalReferenceImages = (
   return inputs;
 };
 
-/**
- * Reject hosted-provider regions; resolve local references and skip unsupported/noncontributing local regions (on
- * layout bases the region's settings name the reason). Join uploaded masks and their bounds with captured
- * prompt/reference/layout metadata for graph inputs.
- */
+/** Rejects hosted-provider regions; skips unsupported or noncontributing local ones. */
 const createRegionalGuidanceCollector = (
   model: GenerateModelConfig,
   cfgScale: number
@@ -316,10 +299,7 @@ const ADJUSTMENT_REFUSAL_NOTICES: Record<'too-large' | 'over-budget' | 'error', 
     `Clarity, Texture and Dehaze can’t run on “${name}”: its content is larger than 16.8 megapixels (4096 × 4096 px). Disable or remove them, or crop the content, then invoke again.`,
 };
 
-/**
- * Runs the canvas-invoke pipeline with injected dependencies. Never throws: every failure is turned into a notice, and
- * the in-flight guard is always cleared. Returns when the graph has been dispatched (or the invoke aborted).
- */
+/** Never throws: failures become notices and the in-flight guard always clears. */
 export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promise<void> => {
   const { commands, inFlight, projectId } = deps;
   const inFlightKey = deps.inFlightKey ?? projectId;
@@ -450,7 +430,6 @@ registerAccountOwnedResource({
   name: 'canvas-invocation-guards',
 });
 
-/** Arguments for the thin command-layer {@link prepareCanvasInvocation}. */
 export interface PrepareCanvasInvocationArgs {
   projectId: string;
   /** The resolved result destination (Canvas staging vs. a durable Gallery image). */
@@ -459,32 +438,20 @@ export interface PrepareCanvasInvocationArgs {
   models?: readonly ModelConfig[];
   /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
   owner?: AccountScope;
-  /** Expanded by the caller before submitting. */
   expansion?: ExpandedPositivePrompts;
-  /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
   prepend?: boolean;
   projectSettings: GenerationProjectSettings;
-  /**
-   * The canvas widget's persisted values. The scaling policy is read here, in the lazily loaded orchestrator, so its
-   * reader stays out of the eager submit path.
-   */
+  /** Read here, in the lazy orchestrator, so the scaling reader stays out of the eager submit path. */
   canvasValues?: Record<string, unknown>;
   strength: number;
   signal?: AbortSignal;
-  /**
-   * Persisted compositing settings, already defaulted + clamped by the caller (`readCanvasCompositingSettings`). Falls
-   * back to legacy defaults when omitted.
-   */
+  /** Persisted compositing settings, already defaulted and clamped by the caller; legacy defaults when omitted. */
   compositing?: CanvasCompositingSettings;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
-  /** Words a control-layer rejection from the locale; its error message is for logs only. */
   formatControlLayerError: (rejection: ControlLayerRejection) => string;
 }
 
-/**
- * Settle after dispatch or reported failure so the active command keeps its preparing acknowledgement through the
- * entire pre-queue window.
- */
+/** Settles after dispatch or a reported failure, keeping the preparing acknowledgement until queued. */
 export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs): Promise<void> => {
   const owner = args.owner ?? captureAccountScope();
   if (!isAccountScopeCurrent(owner)) {

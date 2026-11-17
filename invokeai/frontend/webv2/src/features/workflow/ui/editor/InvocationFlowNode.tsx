@@ -84,13 +84,8 @@ import { getExecutionStatusText, getFieldIssueMessage, type InvocationNodeFieldI
 const NODE_WIDTH = '18rem';
 /** Row padding-x in px; inline handles sit in the label rows, so they pull back out past it. */
 const ROW_PADDING_X = 12;
-/** A field port's centre, on its row's label line. */
 const PORT_TOP = `calc(${WORKFLOW_NODE_DENSITY.labelLine} / 2)`;
-/**
- * An export's output title wraps instead of truncating, so it is not one line to centre on the port. Its first line's
- * letters are put there instead: the trimmed box starts at their x-height, `ex` is that height, and the padding sets
- * their middle on the port's centre.
- */
+/** A wrapping export title has no single line to centre; `ex` padding sets its first line's x-height on the port. */
 const EXPORT_OUTPUT_TITLE_CSS = {
   '@supports (text-box: trim-start ex alphabetic)': {
     pt: `calc(${PORT_TOP} - 0.5ex)`,
@@ -100,7 +95,6 @@ const EXPORT_OUTPUT_TITLE_CSS = {
 /** Below this viewport zoom, field content renders as skeleton bars (ComfyUI-style) for performance/readability. */
 export const CONTENT_VISIBILITY_ZOOM = 0.4;
 
-/** True while the viewport is zoomed out far enough that field content is unreadable noise. */
 const useIsZoomedOut = (): boolean => {
   const isWorkflowImageExport = useIsWorkflowImageExport();
   const isZoomedOut = useStore((state) => state.transform[2] < CONTENT_VISIBILITY_ZOOM);
@@ -108,11 +102,9 @@ const useIsZoomedOut = (): boolean => {
   return isZoomedOut && !isWorkflowImageExport;
 };
 
-/** The node-level loading hint is only useful while a selected child signature is being fetched. */
 export const shouldShowCallSavedWorkflowLoadingHint = (node: WorkflowInvocationNode): boolean =>
   node.data.type === 'call_saved_workflow' && node.data.callSavedWorkflowStatus === 'loading';
 
-/** A callable child can be valid without exposing any fields; explain the empty body instead of showing a blank node. */
 export const shouldShowCallSavedWorkflowNoExposedFieldsHint = (node: WorkflowInvocationNode): boolean => {
   if (node.data.type !== 'call_saved_workflow' || node.data.callSavedWorkflowStatus !== 'ready') {
     return false;
@@ -130,14 +122,12 @@ export const shouldShowCallSavedWorkflowNoExposedFieldsHint = (node: WorkflowInv
 /** Static placeholder bar standing in for text/controls at far zoom. No animation — there may be hundreds. */
 const SkeletonBar = ({ h = '2', w }: { h?: string; w?: string }) => <Box bg="bg.emphasized" h={h} rounded="sm" w={w} />;
 
-/** A field that keeps its node from running, named as the node shows it. */
 const HIDIFFUSION_RATIO_FIELDS = ['hidiffusion_t1_ratio', 'hidiffusion_t2_ratio'] as const;
 /** Invoke's validation reports the ratio order on T2 (buildGraph); the status lists it once, there. */
 const HIDIFFUSION_RATIO_REPORTED_FIELD = 'hidiffusion_t2_ratio';
 
 const EMPTY_FIELD_ISSUES: InvocationNodeFieldIssue[] = [];
 
-/** Every field that keeps the node from running, in row order; the node, its rows and its status panel share it. */
 const getInvocationNodeFieldIssues = (
   node: WorkflowInvocationNode,
   inputTemplates: readonly FieldInputTemplate[],
@@ -181,11 +171,7 @@ const getInvocationNodeFieldIssues = (
 
 const invalidByFlowData = new WeakMap<InvocationFlowNodeType['data'], boolean>();
 
-/**
- * Whether a node's fields or type keep it from running, as its chrome shows it. Cached per flow-node data, which the
- * flow model rebuilds only when the node's document, template or connections change, so the minimap can ask on every
- * render.
- */
+/** Cached per flow-node data (rebuilt only when its document, template or edges change), so the minimap can ask. */
 export const isInvocationFlowNodeInvalid = (data: InvocationFlowNodeType['data']): boolean => {
   const cached = invalidByFlowData.get(data);
 
@@ -205,11 +191,7 @@ export const isInvocationFlowNodeInvalid = (data: InvocationFlowNodeType['data']
   return invalid;
 };
 
-/**
- * One place turns what is known about a node into its chrome and its status button. The chrome facts stay independent
- * so they compose; the status button shows the one that most needs attention: a live run, then a failed one, then what
- * blocks the next run, then a version change, then a completed run.
- */
+/** Status priority: a live run, a failed run, a run blocker, a version change, then a completed run. */
 export const getInvocationNodeState = ({
   execution,
   hasFieldIssues,
@@ -265,9 +247,7 @@ const NodeShell = ({
   </Box>
 );
 
-// The panel bodies load on first open; hovering or focusing a header button starts the load, so the panel is usually
-// ready by the time its tooltip opens. Tooltips mount their content per open, so a failed load is tried again on the
-// next one; while loading, and if it fails, a panel shows its button's own label, so the state stays readable.
+// Panels load on first hover or focus; a failed load retries on the next open, showing the button's label meanwhile.
 const nodePanels = createDeferredModule(() => import('./NodePanels'));
 const preloadNodePanels = nodePanels.preload;
 
@@ -279,7 +259,6 @@ const DeferredNodePanel = ({
   render: (module: typeof NodePanelsModule) => ReactNode;
 }) => <nodePanels.Deferred fallback={<Text>{label}</Text>} render={render} />;
 
-/** The header's one status slot, hidden while there is nothing to report. */
 const NodeStatusButton = ({
   execution,
   isPlain = false,
@@ -334,12 +313,7 @@ const NodeStatusButton = ({
   );
 };
 
-/** The editor a label double-click opens: Enter or blur commits, Escape keeps the current name. */
-/**
- * The rename input a double-click opens, for node titles and field labels alike. It lies over its label on the same
- * line, a little wider and taller than it, in the label's own text size and on its own surface (so a tinted header does
- * not tint it). The label keeps its place underneath, so nothing around it moves when the input opens or closes.
- */
+/** Lies over its label in the label's text size, on its own surface, so nothing around it moves when it opens. */
 const INLINE_RENAME_FIELD_PROPS = {
   left: '-6px',
   minW: '10rem',
@@ -353,7 +327,6 @@ const INLINE_RENAME_INPUT_PROPS = { bg: 'bg', color: 'fg', fontWeight: '400', px
 
 const INLINE_RENAME_HIDDEN_LABEL_CSS = { '& > :first-child': { visibility: 'hidden' } } as const;
 
-/** Holds a label and, while it is being renamed, the input over it. */
 const InlineRename = ({ children, editor }: { children: ReactNode; editor: ReactNode }) => (
   <Box
     alignItems="center"
@@ -367,7 +340,6 @@ const InlineRename = ({ children, editor }: { children: ReactNode; editor: React
   </Box>
 );
 
-/** The editor a label double-click opens: Enter or blur commits, Escape keeps the current name. */
 const InlineLabelInput = ({
   ariaLabel,
   fontSize,
@@ -376,7 +348,6 @@ const InlineLabelInput = ({
   onEnd,
 }: {
   ariaLabel: string;
-  /** The text size of the label it replaces: the header's `md` for a node title, `sm` for a field label. */
   fontSize: 'md' | 'sm';
   initialValue: string;
   onCommit: (value: string) => void;
@@ -459,7 +430,6 @@ const NodeTitle = ({
           <InlineLabelInput
             ariaLabel={t('nodes.nodeLabel')}
             fontSize="md"
-            // Start from the displayed title, including the template fallback for unset labels.
             initialValue={title}
             onCommit={(label) => editGraph({ label, nodeId: node.id, type: 'setNodeLabel' })}
             onEnd={() => setIsEditing(false)}
@@ -472,7 +442,6 @@ const NodeTitle = ({
         fontWeight="600"
         minW="0"
         text={title}
-        // Keeps the full title MiddleTruncate would show, for a title cut short.
         title={t('nodes.nodeTitleHint', { title })}
         onDoubleClick={() => setIsEditing(true)}
       />
@@ -533,7 +502,6 @@ const OutputFieldTooltip = ({
   );
 };
 
-/** One line naming the node's version against its template's, for the tooltip and the inspector. */
 const getUpdateStatusText = (
   t: ReturnType<typeof useTranslation>['t'],
   node: WorkflowInvocationNode,
@@ -560,7 +528,6 @@ const BATCH_GROUP_COLORS: Record<string, string> = {
   'Group 5': 'yellow.fg',
 };
 
-/** A batch node's group beside its title: zipped groups share a colour, an ungrouped node says so. */
 const BatchGroupSuffix = ({ node }: { node: WorkflowInvocationNode }) => {
   const { t } = useTranslation();
 
@@ -592,7 +559,6 @@ const CLASSIFICATION_GLYPHS: Record<string, { color: string; icon: LucideIcon }>
 
 const CLASSIFICATION_TOOLTIP_POSITIONING = { placement: 'top-start' } as const;
 
-/** Legacy's mark left of the title for a node that is not stable, explained on hover. */
 const NodeClassificationIcon = ({ classification, isPlain = false }: { classification: string; isPlain?: boolean }) => {
   const { t } = useTranslation();
   const glyph = CLASSIFICATION_GLYPHS[classification];
@@ -690,7 +656,7 @@ const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: Workflo
   );
 };
 
-/** The upstream node owns the seed now; the local mode waits for a disconnect. A leaf so only this row subscribes to i18n. */
+/** A leaf, so only this row subscribes to i18n. */
 const ProvidedByConnectionNote = () => {
   const { t } = useTranslation();
 
@@ -702,13 +668,8 @@ const ProvidedByConnectionNote = () => {
 };
 
 /**
- * A node's value controls sit in a well of the canvas colour, a step darker than the node body, so a value reads as the
- * thing to edit. The colour is defined once, as `--wb-control-well` on the row, which also carries `data-control-well`,
- * and every surface that paints a control's background reads it: the value surfaces below (text and number inputs, text
- * areas, select, combobox and listbox pickers such as the model picker, not switches, plain buttons or media drop
- * zones), the text area's faded bottom (`ResizableTextarea`) and the export snapshot's value box. Borders, including
- * the error border, are untouched. Scoped to the node's rows, so the form view and the form builder's cards keep their
- * own surfaces.
+ * Value controls sit in a `--wb-control-well` of the canvas colour, a step darker than the node body; every control
+ * surface reads it. Scoped to the node's rows, so the form view and the form builder keep their own surfaces.
  */
 const NODE_FIELD_WELL_VARIABLE = { '--wb-control-well': '{colors.bg}' } as const;
 const NODE_FIELD_WELL_CSS = {
@@ -727,7 +688,6 @@ const INPUT_ROW_CSS = {
     { opacity: 1 },
 } as const;
 
-/** Legacy's row actions, in its order: description, reset, add to or remove from the form. */
 const InputFieldActions = ({
   fieldName,
   isExposed,
@@ -816,7 +776,6 @@ const InputFieldRow = ({
   connectedFieldNames: ReadonlySet<string>;
   isConnected: boolean;
   isExposed: boolean;
-  /** The field's entry in the node's issue list, null when it is fine. */
   issue: InvocationNodeFieldIssue | null;
   isSkeleton: boolean;
   node: WorkflowInvocationNode;
@@ -836,8 +795,6 @@ const InputFieldRow = ({
   const showsInForm = isExposed && !isWorkflowImageExport;
   const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
   const [isEditingLabel, setIsEditingLabel] = useState(false);
-  // Legacy's label: semibold where the row holds a value, muted where a connection feeds it; red when the field blocks
-  // a run, blue with a link mark when the field is in the form.
   const fieldTitle = (
     <Text
       alignItems="center"
@@ -896,8 +853,7 @@ const InputFieldRow = ({
       w="full"
     >
       <Field.Root gap="0" invalid={isInvalid && !isWorkflowImageExport} minW="0" w="full">
-        {/* The handle lives inside the label row so it stays centered on the
-            label even when the value control below grows the row. */}
+        {/* Inside the label row, so the handle stays centred on the label as the control grows the row. */}
         <HStack
           gap="1.5"
           h={WORKFLOW_NODE_DENSITY.labelLine}
@@ -1002,7 +958,7 @@ const InputFieldRow = ({
         ) : !isWorkflowImageExport && isConnected && isSeedInputField(template) ? (
           <ProvidedByConnectionNote />
         ) : null}
-        {/* The reason is read with the control; on screen it lives in the status panel and the label's hover. */}
+        {/* On screen the reason lives in the status panel and the label's hover. */}
         {showInvalid && issue ? <Field.ErrorText srOnly>{getFieldIssueMessage(t, issue)}</Field.ErrorText> : null}
       </Field.Root>
     </Box>
@@ -1143,10 +1099,7 @@ const HiddenHandles = ({
 );
 
 const MERGED_PORT_SIZE = 14;
-/**
- * A field handle behind a merged port: present so its edges attach there, but neither seen nor connectable. It takes
- * the port's size, so an edge leaves the port's outer side as it leaves an open node's dot.
- */
+/** Behind a merged port: present so edges attach there, port-sized so they leave its outer side; not connectable. */
 const COLLAPSED_FIELD_HANDLE_STYLE = {
   height: MERGED_PORT_SIZE,
   minHeight: 0,
@@ -1155,7 +1108,6 @@ const COLLAPSED_FIELD_HANDLE_STYLE = {
   width: MERGED_PORT_SIZE,
 } as const;
 
-/** Legacy's merged port: one per side of a collapsed node, a rounded square in the neutral port colour. */
 const MergedPort = ({ side }: { side: 'left' | 'right' }) => (
   <Box
     aria-hidden
@@ -1172,11 +1124,7 @@ const MergedPort = ({ side }: { side: 'left' | 'right' }) => (
   />
 );
 
-/**
- * A collapsed node shows one merged port per side, as legacy did. Every field keeps its handle, hidden at that port, so
- * the document's edges stay as they are and draw from it; expanding draws them from their own rows again. The hidden
- * handles cannot connect: a new connection needs the node open, as in legacy.
- */
+/** Every field keeps a hidden, unconnectable handle at the merged port, so edges draw from it unchanged. */
 const CollapsedPorts = ({
   connected,
   inputTemplates,
@@ -1265,7 +1213,6 @@ const CompactNodeBody = ({ inputCount, outputCount }: { inputCount: number; outp
   );
 };
 
-/** What a node without a template says: still loading, definitions unavailable, or a type this backend lacks. */
 const getTemplatelessNodeMessage = (
   t: TFunction,
   { documentNode, templateStatus }: InvocationFlowNodeType['data'],
@@ -1279,10 +1226,6 @@ const getTemplatelessNodeMessage = (
         ? t('nodes.unknownNodeType')
         : t('nodes.unknownNodeTypeOnBackend', { type: documentNode.data.type });
 
-/**
- * Where a node type this backend lacks can come from: the Nodes Manager installs node packs, for an account that may;
- * anyone else is told who can.
- */
 const MissingNodeTypeAction = () => {
   const { t } = useTranslation();
   const canManageNodes = useWorkflowCapabilitiesSelector((capabilities) => capabilities.canManageNodes);
@@ -1423,7 +1366,6 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   const issuesByField = new Map(
     fieldIssues.flatMap((fieldIssue) => fieldIssue.markedFieldNames.map((name) => [name, fieldIssue] as const))
   );
-  // The static export draws the document only: no run, validity or version state.
   const { chrome, status } = isWorkflowImageExport
     ? { chrome: undefined, status: null }
     : getInvocationNodeState({
@@ -1443,7 +1385,6 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
       {/* Buttons at either end of the header sit at the same inset from the border. */}
       <Flex
         {...getWorkflowNodeHeaderProps({
-          // Far zoom drops the status and info buttons, leaving the title at the end.
           endsWithButton: !isWorkflowImageExport && !isZoomedOut,
           roundedBottom: !isOpen,
           startsWithButton: !isWorkflowImageExport,

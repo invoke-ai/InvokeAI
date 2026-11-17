@@ -31,13 +31,11 @@ export const FindInGalleryButton = ({ name, onFind, ...buttonProps }: FindInGall
   );
 };
 
-// Reveal on keyboard focus as well as hover; opacity and pointer-events preserve tab access that display:none would
-// remove.
+// Reveal on keyboard focus as well as hover; opacity and pointer-events keep the tab access display:none would remove.
 const REVEALED = { opacity: 1, pointerEvents: 'auto' } as const;
 
 /**
- * Host with className="group" and positioned layout. Inset the overlay by the focus ring's reach to prevent thumbnail
- * clipping.
+ * Host with className="group" and positioned layout. Inset by the focus ring's reach so the thumbnail cannot clip it.
  */
 export const FindInGalleryThumbnailButton = (buttonProps: FindInGalleryButtonProps) => (
   <FindInGalleryButton

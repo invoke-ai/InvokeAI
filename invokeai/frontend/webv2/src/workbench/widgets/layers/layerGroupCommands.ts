@@ -25,10 +25,7 @@ export const canUngroupSelection = (model: CanvasDocumentModel | null, ids: read
   return groupIds.length > 0 && !!model && model.refusalFor({ ids: groupIds, type: 'ungroup' }) === null;
 };
 
-/**
- * Wraps `ids` in a new group, selects it, and shows its children. The selection is published only for an edit the model
- * accepted, before the commit so reconciliation keeps it, and rolled back if the commit does not land.
- */
+/** Groups `ids` and selects it; selection publishes before the commit and rolls back if it does not land. */
 export const groupLayers = (
   engine: CanvasPreparedEngine | null,
   projectId: string,
@@ -79,10 +76,7 @@ export const ungroupLayers = (
     return groupIds.length === 0 ? { status: 'unchanged' } : model.prepare({ ids: groupIds, type: 'ungroup' });
   });
 
-/**
- * The reparent that lifts `ids` out of their shared parent group to sit directly above it, in document order; null
- * unless every id is a leaf of the same group.
- */
+/** Lifts `ids` out of their shared parent to sit above it; null unless all are leaves of one group. */
 export const removeFromGroupCommand = (
   document: CanvasDocumentContractV3,
   ids: readonly string[]

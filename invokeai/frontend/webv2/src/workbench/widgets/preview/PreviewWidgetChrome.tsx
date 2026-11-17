@@ -20,11 +20,7 @@ import { useTranslation } from 'react-i18next';
 
 import { usePreviewHeaderContext } from './previewHeaderStore';
 
-/**
- * Show board/image context from previewHeaderStore, falling back to Preview except where the center trigger already
- * names it. The named item opens a mini gallery at that item's board to select another item, and carries a control that
- * clears the gallery selection it shows.
- */
+/** Board and item context from previewHeaderStore, except where the center trigger already names it. */
 export const PreviewWidgetLabel = ({ region }: WidgetLabelProps) => {
   const { t } = useTranslation();
   const { actionItem, boardName, itemName } = usePreviewHeaderContext();
@@ -41,8 +37,7 @@ export const PreviewWidgetLabel = ({ region }: WidgetLabelProps) => {
     );
   }
 
-  // Pad the truncated label away from the first header action in a panel header. In the center the label ends its
-  // chrome island, whose own padding sets the clear button's inset like the island's other edge icon buttons.
+  // Pad the truncated label away from the first header action in a panel header.
   return (
     <HStack flex="1" gap="1" minW="0" pe={region === 'center' ? undefined : '2'}>
       <PreviewItemPicker boardName={boardName} item={actionItem} itemName={itemName} />
@@ -53,14 +48,7 @@ export const PreviewWidgetLabel = ({ region }: WidgetLabelProps) => {
 
 const PREVIEW_PICKER_ACCEPT: GalleryPickerAccept = ['image', 'video'];
 
-/**
- * The trigger shrinks before anything overlaps, keeping the item name longest: the board name truncates first, then
- * "Board /" drops out as a whole, and only then does the item name middle-truncate. The drop is a one-line wrapping row
- * clipped to its height, laid out in reverse: the name group comes first in the DOM, so it is the board group that
- * wraps onto the clipped second line once the two floors no longer fit side by side, while `row-reverse` still shows
- * "Board / name" from the left. Above the floors the name takes the free space first, up to its own width. CSS alone,
- * so no measuring on resize.
- */
+/** Board truncates, then "Board /" drops whole via a clipped wrapping `row-reverse` row; CSS only. */
 const NAME_ROW_CSS = {
   alignContent: 'flex-start',
   alignItems: 'center',
@@ -81,11 +69,7 @@ const NAME_ROW_CSS = {
 const ITEM_NAME_CSS = { flex: '1000000 1 16ch', maxW: 'max-content', minW: '0' } as const;
 const BOARD_GROUP_CSS = { columnGap: '1', display: 'flex', flex: '1 1 8ch', maxW: 'max-content', minW: '0' } as const;
 
-/**
- * The board and item name as the trigger of a mini gallery that opens at the item's own board and view, with the item
- * highlighted. The picker browses any board, so a pick is selected within its own board: Preview's next/previous then
- * step through that board rather than the listing the Gallery shows.
- */
+/** Opens a mini gallery at the item's board; a pick selects within its own board. */
 const PreviewItemPicker = ({
   boardName,
   item,
@@ -100,8 +84,7 @@ const PreviewItemPicker = ({
   const triggerIds = useTooltipTriggerIds();
   const rowRef = useRef<HTMLDivElement>(null);
   const selectItem = useCallback((picked: GalleryItem) => gallery.selectItemInItsBoard(picked), [gallery]);
-  // Open on the item's board and the view that lists it. No view lists a Canvas-owned item, so the picker keeps the
-  // Gallery's view for it.
+  // Open on the item's board and the view that lists it.
   const itemView = getGalleryItemView(item);
   const openingScope = useMemo<GalleryPickerOpeningScope>(
     () => (itemView ? { boardId: item.boardId, galleryView: itemView } : { boardId: item.boardId }),
@@ -175,8 +158,7 @@ const ClearSelectionButton = ({ region }: { region: WorkbenchRegion }) => {
   const { gallery } = useWorkbenchCommands();
   const { focusRegion } = useWorkbenchFocus();
   const label = t('widgets.gallery.commands.clearSelection');
-  // The gallery's clear-selection command. This button leaves with the selection, so focus moves to the Preview's
-  // region instead of falling to the document body.
+  // The gallery's clear-selection command.
   const clearSelection = useCallback(() => {
     if (isWidgetRegion(region)) {
       focusRegion(region, 'preview');

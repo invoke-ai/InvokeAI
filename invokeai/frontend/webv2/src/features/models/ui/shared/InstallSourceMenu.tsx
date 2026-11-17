@@ -81,7 +81,6 @@ export const InstallSourceContextMenu = ({
   onClose: () => void;
   /** Releases the retained target once the menu has animated out. */
   onExitComplete: () => void;
-  /** Installs the target source. */
   onInstall: () => void;
   /** Null when the target is no longer listed. */
   status: InstallSourceStatus | null;

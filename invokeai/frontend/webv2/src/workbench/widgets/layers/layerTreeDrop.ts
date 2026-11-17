@@ -45,10 +45,7 @@ const subtreeEnds = (rows: readonly LayerTreeRow[]): Int32Array => {
   return ends;
 };
 
-/**
- * Project vertical gaps and horizontal depth after removing the dragged block. Reject self/invalid/depth-exceeding
- * targets; model validation owns locks and other refusals. Linear in row count.
- */
+/** Projects gaps and depth with the dragged block removed; the model owns locks and other refusals. */
 export const projectLayerDrop = (input: LayerDropInput): LayerDropTarget | null => {
   const { rows } = input;
   if (rows.length === 0) {

@@ -11,12 +11,7 @@ import { getActualZoomLimits, type PreviewZoomControls } from './previewHeaderSt
 const ZOOM_PRESETS = [100, 200, 400] as const;
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 
-/**
- * Expose fitted/actual zoom and keyboard presets in the header; the stage owns wheel, pinch, and double-click gestures.
- * A `full` header shows the magnifier and, only while zoomed, the percent, so the fit readout does not cost the widget
- * title its width; the tooltip and accessible name always carry the percent. A `compact` header (a narrow view, down to
- * 280px) keeps only the readout and chevron.
- */
+/** Header zoom presets; the stage owns wheel, pinch and double-click gestures. */
 export const PreviewZoomMenu = ({
   density = 'full',
   zoom,
@@ -78,11 +73,7 @@ export const PreviewZoomMenu = ({
   );
 };
 
-/**
- * A preset outside the loupe's zoom limits cannot be reached, and the preset equal to fit is fit itself, its own menu
- * item. Below an enlarging fit, presets down to 100% stay offered. Judged on the unrounded fit: a 100.2% fit reads as
- * 100% yet is not the image's own size.
- */
+/** Presets inside the loupe's limits, excluding fit; judged on the unrounded fit (100.2% is not 100%). */
 const isPresetUnreachable = (preset: number, fitPercent: number | null): boolean => {
   if (fitPercent === null) {
     return false;

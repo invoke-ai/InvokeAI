@@ -71,7 +71,6 @@ const cloneDynamicFieldTemplate = (
   uiOrder: null,
 });
 
-/** Returns the fields exposed by a selected workflow in the order shown by its form. */
 export const getSavedWorkflowDynamicFields = (
   workflow: ProjectGraphState | undefined,
   templates: InvocationTemplates
@@ -125,7 +124,6 @@ export const getSavedWorkflowDynamicFields = (
   return dynamicFields;
 };
 
-/** Selects query data only when it belongs to the currently selected workflow id. */
 export const getSelectedSavedWorkflow = <T extends { workflow_id: string }>(
   workflowId: string | null | undefined,
   workflow: T | undefined
@@ -140,9 +138,8 @@ export const shouldSyncSavedWorkflowDynamicFields = ({
 }): boolean => !workflowId || workflow !== undefined;
 
 /**
- * Returns the dynamic inbound edges the next signature cannot take: every edge into an input it does not have, and
- * every resolvable edge whose source type it does not accept. An edge from a connector with nothing upstream yet has no
- * type to check, so it stays while its input does.
+ * Edges the next signature cannot take: into an input it lacks, or from a source type it refuses. An edge from a
+ * connector with nothing upstream has no type, so it stays while its input does.
  */
 export const getSavedWorkflowDynamicEdgeIdsToRemove = (
   document: Pick<ProjectGraphState, 'edges' | 'nodes'>,
@@ -211,11 +208,8 @@ const removeFormElement = (form: WorkflowForm, elementId: string): WorkflowForm 
 };
 
 /**
- * Applies the selected child workflow's field signature to a call node. A refresh of the same workflow keeps compatible
- * values and the user's label and description overrides; incompatible or new fields use the child workflow's initial
- * values. After another workflow was selected every field starts from that workflow's own values, even where the two
- * share field identities (copies of one template): only connections carry over, which the caller filters through
- * `edgeIdsToRemove`.
+ * A refresh of the same workflow keeps compatible values and label/description overrides. After a switch every field
+ * starts from the new workflow's values; only connections carry over, filtered by `edgeIdsToRemove`.
  */
 export const syncCallSavedWorkflowFields = (
   document: ProjectGraphState,
@@ -303,10 +297,7 @@ export const syncCallSavedWorkflowFields = (
   };
 };
 
-/**
- * Removes a call node's dynamic inputs and every connection into them: its selection was cleared, or the newly selected
- * workflow could not be loaded and the inputs left describe the previous one.
- */
+/** For a cleared selection, or a newly selected workflow that failed to load. */
 export const clearSavedWorkflowDynamicFields = (
   document: ProjectGraphState,
   nodeId: string,
@@ -344,11 +335,7 @@ const getSelectedWorkflowId = (node: WorkflowInvocationNode): string => {
   return typeof value === 'string' ? value : '';
 };
 
-/**
- * Starts loading another selected workflow. The current dynamic inputs and their connections stay until its signature
- * arrives, remembered as built from the workflow they came from; selecting that workflow again before then makes them
- * current once more.
- */
+/** Keeps the dynamic inputs until the signature arrives; reselecting their workflow first makes them current. */
 export const beginCallSavedWorkflowSwitch = (
   document: ProjectGraphState,
   nodeId: string,
@@ -385,9 +372,8 @@ export const setCallSavedWorkflowStatus = (
     return document;
   }
 
-  // A workflow that cannot be loaded leaves no signature to replace the previous workflow's inputs with, and those no
-  // longer describe the selection. Inputs built from the selection itself stay through a failure: a transient
-  // revalidation error must not cost the user's connections.
+  // A failed load leaves the previous workflow's inputs describing nothing, so they go; the selection's own inputs
+  // survive a transient revalidation error.
   if (status === 'error' && node.data.callSavedWorkflowFieldsFrom !== undefined) {
     return clearSavedWorkflowDynamicFields(document, nodeId, 'error');
   }

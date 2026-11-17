@@ -103,10 +103,7 @@ const stopped = (
   return null;
 };
 
-/**
- * Reserve seeds after layer upload in the graph-build turn. Serialized runs advance consecutively; pre-build refusals
- * consume none, later failures do. Apply advances to the project graph with value/mode fences so concurrent edits win.
- */
+/** Seeds reserved after upload; pre-build refusals consume none, later failures do. */
 export const reserveLayerWorkflowSeeds = (
   document: ProjectGraphState,
   templatesSnapshot: InvocationTemplatesSnapshot
@@ -144,8 +141,6 @@ export const runLayerWorkflow = async (options: RunLayerWorkflowOptions): Promis
     }
 
     failureStage = 'graph';
-    // Reserve seeds with graph build after upload; earlier refusals consume none, later failures retain the
-    // reservation.
     const seedPlan = deps.reserveSeeds();
 
     if (seedPlan.seedAdvances.length > 0) {

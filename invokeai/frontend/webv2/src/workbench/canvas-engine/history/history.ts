@@ -73,7 +73,6 @@ export type HistoryReplayResult =
   | { status: 'applied' | 'empty' | 'busy' }
   | { status: 'failed'; label: string; error: unknown };
 
-/** Options for {@link createHistory}. */
 export interface CreateHistoryOptions {
   /** Undo-entry cap (default {@link HISTORY_MAX_ENTRIES}). */
   maxEntries?: number;
@@ -83,11 +82,9 @@ export interface CreateHistoryOptions {
   dropped?: number;
 }
 
-/** The imperative history handle. */
 export interface History {
   /** Reserves capacity for an edit's entry, or null when an entry that size could never be retained. */
   admit(bytes: number): HistoryAdmission | null;
-  /** The newest undo entry, or null. */
   top(): HistoryEntryToken | null;
   /** Reverts the newest entry. Resolves `busy` while another replay runs. */
   undo(): Promise<HistoryReplayResult>;
@@ -123,7 +120,6 @@ interface StackRecord {
 
 const normalizedBytes = (bytes: number): number => (Number.isFinite(bytes) ? Math.max(0, Math.ceil(bytes)) : Infinity);
 
-/** Creates a bounded history stack. */
 export const createHistory = (opts: CreateHistoryOptions = {}): History => {
   const maxEntries = Math.max(1, opts.maxEntries ?? HISTORY_MAX_ENTRIES);
   const byteBudget = Math.max(0, opts.byteBudget ?? HISTORY_BYTE_BUDGET);

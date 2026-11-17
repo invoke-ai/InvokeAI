@@ -121,7 +121,6 @@ export const createRecallEventRuntime = <Event extends { user_id: string }>({
   };
 };
 
-/** What bringing a recall's widget to the front needs from the app. */
 export interface RecallRevealContext {
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
   /** Whether the user is typing in a text field; a reveal must not switch tabs out from under them. */
@@ -129,10 +128,9 @@ export interface RecallRevealContext {
 }
 
 /**
- * Bring the widget a recall just changed to the front of its project, so the caller sees the result: reveal it where
- * the layout has it (see `revealPlacedWidget`), or open it when the layout has none. A floating window stays floating.
- * Nothing moves while the user is typing, or when the project is no longer the one on screen; the notification reports
- * the change either way.
+ * Bring the widget a recall just changed to the front of its project so the caller sees the result: reveal it where
+ * the layout has it (see `revealPlacedWidget`), else open it. A floating window stays floating. Nothing moves while the
+ * user types or once the project is off screen; the notification reports the change either way.
  */
 export const bringRecallWidgetToFront = ({
   commands,

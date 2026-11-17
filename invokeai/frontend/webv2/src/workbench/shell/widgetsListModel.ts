@@ -31,10 +31,7 @@ const PLACEMENT_RANK: Record<string, number> = { bottom: 3, center: 0, floating:
 const getPlacementRank = ({ placement }: WidgetsListRow): number =>
   PLACEMENT_RANK[placement.kind === 'docked' ? placement.region : placement.kind]!;
 
-/**
- * A status chip: a widget that lives only as a chip in the status bar (a tooltip or popover there), which placement
- * opens refuse because it renders no panel.
- */
+/** A widget that lives only as a status-bar chip; placement opens refuse it because it renders no panel. */
 const isStatusChip = (widget: RegisteredWidget): boolean =>
   widget.manifest.allowedRegions.includes('bottom') &&
   (widget.manifest.bottomPanel === 'tooltip' || widget.manifest.bottomPanel === 'popover');
@@ -42,10 +39,7 @@ const isStatusChip = (widget: RegisteredWidget): boolean =>
 /** The regions an Add tries, in the order a placement open tries them. */
 const ADD_REGIONS: readonly WidgetRegion[] = ['center', 'right', 'left', 'bottom'];
 
-/**
- * Whether a placement open can show this widget as a panel or view somewhere. A pure check: lists ask it on every
- * render, so unlike the open itself it starts no chunk load.
- */
+/** Whether a placement open can show this widget; pure, so lists can ask on every render without chunk loads. */
 export const canOpenWidget = (
   widget: RegisteredWidget,
   getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[]
@@ -103,10 +97,7 @@ export const addWidgetToLayout = ({
 const findRegion = (project: WidgetPlacementProject, instanceId: WidgetInstanceId): WidgetRegion | undefined =>
   REGION_ORDER.find((region) => project.widgetRegions[region].instanceIds.includes(instanceId));
 
-/**
- * One row per placed instance, then one per widget type the layout holds none of (or that allows more), so every widget
- * can be found and brought back from one list. Placed rows come first, each group by label.
- */
+/** Placed instances first, then each widget type the layout lacks, so every widget can be brought back here. */
 export const getWidgetsListRows = ({
   getLabel,
   getWidgetById,

@@ -74,16 +74,11 @@ export type QueueCompiledSubmission =
       batchCount: number;
       graph: QueueBackendGraph;
       kind: 'workflow';
-      /** Serialized parent workflow, compatible with the backend's `WorkflowWithoutID` schema. */
       workflow?: Record<string, unknown>;
       /** The seed inputs that vary between runs, expanded into one zipped batch group at send time. */
       seeds?: QueueWorkflowSeed[];
-      /** Batch-node value lists resolved at compile time: outer groups multiply, inner datums zip. */
       batchData?: QueueWorkflowBatchDatum[][];
-      /**
-       * The project workflow the graph was compiled from, so results return to it whatever is active later. Absent on
-       * records queued before projects owned several workflows; those results keep their destination only.
-       */
+      /** Absent on records queued before projects owned several workflows. */
       projectWorkflowId?: string;
       /** Library binding captured at enqueue, independent of later relinking or removing the project copy. */
       libraryWorkflowSource?: { libraryWorkflowId: string; ownerUserId?: string };
@@ -137,7 +132,6 @@ export interface QueueResultVideo {
   /** Board the video is on when read (after any destination attach); unset when uncategorized. */
   boardId?: string;
   category: 'general' | 'control' | 'mask' | 'user' | 'other';
-  /** Backend creation timestamp; `queuedAt` is the submission instant. */
   createdAt?: string;
   durationSeconds: number;
   fps?: number;
@@ -166,7 +160,6 @@ export interface QueueNodeFieldValue {
   value: string | number | { imageName?: string } | null;
 }
 
-/** Live, UI-facing representation of one backend queue item. */
 export interface QueueItemReadModel {
   batchId: string;
   completedAt?: string | null;
@@ -199,10 +192,7 @@ export interface QueueItemReadModel {
   workflowName?: string | null;
 }
 
-/**
- * The saved execution data of one queue item, read on demand for diagnostics. It carries the session graph the backend
- * actually ran, its per-node results and the embedded workflow, which the live read model leaves out.
- */
+/** Read on demand for diagnostics; carries the executed graph, results and workflow the live read model omits. */
 export interface QueueItemDetailReadModel {
   errorMessage: string | null;
   errorTraceback: string | null;
@@ -211,11 +201,9 @@ export interface QueueItemDetailReadModel {
   graph: Record<string, unknown>;
   id: number;
   priority: number | null;
-  /** Node results keyed by executed node id; empty until the session produced output. */
   results: Record<string, unknown>;
   sessionId: string;
   status: QueueItemStatus;
-  /** The workflow embedded with the batch, when one was submitted. */
   workflow: Record<string, unknown> | null;
 }
 
@@ -294,19 +282,15 @@ export interface QueueRunOrigin {
 }
 
 export interface QueueResultVideoOptions extends QueueResultImageOptions {
-  /** Drop videos whose DTO reports is_intermediate — the video analogue of filterIntermediateResults. */
   excludeIntermediate?: boolean;
 }
 
-/** User-facing Queue commands; transport and adapter details stay private. */
 export interface QueueFeatureCommands {
-  /** Cancels every unfinished item of one batch; resolves with how many the backend canceled. */
   cancelBatch(batchId: string): Promise<number>;
   /** Resolves with the item as the cancel left it: unchanged, so not canceled, when it had already finished. */
   cancelItem(itemId: number): Promise<QueueItemReadModel>;
   cancelScopedItems(scope?: QueueQueryScope, options?: { keepCurrent?: boolean }): Promise<void>;
   clearFailedItems(scope?: QueueQueryScope): Promise<void>;
-  /** Removes completed, canceled and failed items; pending and running work is kept. */
   clearFinishedItems(scope?: QueueQueryScope): Promise<void>;
   clearItems(scope?: QueueQueryScope): Promise<void>;
   pauseProcessor(): Promise<void>;
@@ -315,7 +299,6 @@ export interface QueueFeatureCommands {
   retryItems(itemIds: number[]): Promise<number[]>;
 }
 
-/** Own command transport and realtime events together so runtimes do not assemble HTTP/socket plumbing. */
 /** Feed preview snapshots through the socket handler's revision gate to reject frames already delivered live. */
 export interface QueueProgressPreviewPayload {
   queue_id: string;
@@ -338,17 +321,13 @@ export type QueueItemDeliveryClaim =
 
 export interface QueueBackendPort extends QueueFeatureCommands {
   acknowledgeEnqueue?(projectId: string, sourceQueueItemId: string): Promise<void>;
-  /**
-   * Claim, confirm or release the delivery of an item's results. A claim is held until its claimant confirms or
-   * releases it, or until it expires; an item once confirmed is delivered for good.
-   */
+  /** A claim holds until confirmed, released or expired; a confirmed item is delivered for good. */
   claimItemDelivery(
     itemId: number,
     action: 'claim' | 'confirm' | 'release',
     claimant: string
   ): Promise<QueueItemDeliveryClaim>;
   getEnqueueReceipt?(projectId: string, sourceQueueItemId: string): Promise<QueueEnqueueResult | null>;
-  /** The latest preview frame of each of the user's running items (`GET queue/{id}/previews`). */
   readProgressPreviews?(signal?: AbortSignal): Promise<QueueProgressPreviewPayload[]>;
   cancelQueueItems(itemIds: number[]): Promise<void>;
   cancelQueueItemsByBatchIds(batchIds: string[]): Promise<void>;
@@ -361,7 +340,6 @@ export interface QueueBackendPort extends QueueFeatureCommands {
     queuedAt: string,
     options?: QueueResultImageOptions
   ): Promise<QueueResultImage[]>;
-  /** Names of the videos a completed backend item produced (no DTO hydration needed). */
   getResultVideoNames(itemId: number, options?: QueueResultVideoOptions): Promise<string[]>;
   /** Hydrate result videos for display; videos that are gone or unreadable are omitted. */
   getResultVideos(videoNames: string[], sourceQueueItemId: string, queuedAt: string): Promise<QueueResultVideo[]>;
@@ -377,7 +355,6 @@ export interface QueueBackendPort extends QueueFeatureCommands {
   readItemsById(itemIds: number[], signal?: AbortSignal): Promise<QueueItemReadModel[]>;
   readNext(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemReadModel | null>;
   readStatus(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueStatusReadModel>;
-  /** The saved execution data of one item, read on demand. */
   readItemDetail(itemId: number, signal?: AbortSignal): Promise<QueueItemDetailReadModel>;
   retryItems(itemIds: number[]): Promise<number[]>;
   emit(event: string, payload: unknown): void;

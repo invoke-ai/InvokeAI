@@ -113,7 +113,6 @@ interface LayersTreeProps {
   stacks: LayerStackRowsByKind;
 }
 
-/** Which half of the row under the pointer it sits in. */
 /** Use a group's middle drop band to enter it, including empty groups; leaves split at their midpoint. */
 const edgeOf = (
   rect: { top: number; height: number } | undefined,
@@ -146,10 +145,7 @@ const reparentCommandForTarget = (target: LayerDropTarget): ReparentCommand => (
 const isMenuKey = (event: KeyboardEvent<HTMLElement>): boolean =>
   event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey);
 
-/**
- * A keyboard-opened menu anchors where a right-click would: a point, at the rendered item's bottom-left corner. A point
- * keeps it a context menu, without the arrow a menu anchored to a box gets.
- */
+/** A keyboard-opened menu anchors at a point, as a right-click does, so it shows no arrow. */
 const anchorOfItem = (host: HTMLElement | null, key: string): LayerSurfaceAnchor | null => {
   const rect = host?.querySelector<HTMLElement>(`[data-layer-row-id="${CSS.escape(key)}"]`)?.getBoundingClientRect();
   return rect ? anchorFromPoint(rect.left, rect.bottom) : null;
@@ -167,10 +163,6 @@ const VirtualSlot = ({ children, size, start }: { children: ReactNode; size: num
   );
 };
 
-/**
- * Own subscriptions and commits in one virtualized tree with fixed rows, shared drag/menu hosts, and one roving tab
- * stop.
- */
 export const LayersTree = ({
   degraded,
   dispatch,
@@ -410,7 +402,6 @@ export const LayersTree = ({
     (child: ProjectedChildRow, target: LayerChildDropTarget) => {
       const { commitPrepared: commit } = latest.current;
       const { layerId } = target;
-      // Built from the engine's document inside the commit, like the other child-row commands.
       const outcome = commit(t(layerChildMoveLabelKey(child, layerId)), (model) => {
         const command = layerChildDropCommand(model.document, child, target);
         return command ? model.prepare(command) : { status: 'unchanged' };

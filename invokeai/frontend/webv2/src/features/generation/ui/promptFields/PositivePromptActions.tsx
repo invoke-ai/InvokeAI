@@ -104,10 +104,7 @@ const getFirstModelByName = (models: readonly ModelConfig[]): ModelConfig | null
     null
   );
 
-/**
- * The picked model when it is still installed, else the suggested one, else the first listed. A pick is saved to the
- * surface when it keeps one, and only when it differs from what is saved.
- */
+/** Picked if still installed, else suggested, else first listed; saved only when it differs from the saved pick. */
 const usePromptModelPick = ({
   candidates,
   onSave,
@@ -142,9 +139,7 @@ const usePromptModelPick = ({
 };
 
 export interface PromptTemplateState {
-  /** The applied template, or null when none is. */
   active: PromptTemplateSnapshot | null;
-  /** Whether the box is showing the merged result rather than the authored text. */
   isViewMode: boolean;
   /** Absent on surfaces with no template concept (Video). */
   onApply?: (template: PromptTemplateSnapshot | null, change: PromptTemplateChange) => void;
@@ -158,7 +153,6 @@ export interface PromptTemplateState {
 
 interface PositivePromptActionsProps {
   batchCount: number;
-  /** An image dropped on the prompt box, for the image-to-prompt popover to open on. */
   droppedImage: DroppedPromptImage;
   /** Absent on surfaces whose prompt is not batch-expanded. */
   dynamicPrompts: DynamicPromptsFieldConfig | null;
@@ -242,7 +236,6 @@ export const PositivePromptActions = ({
   );
 };
 
-/** Show the view toggle only for an applied template. */
 const PromptTemplateControls = ({
   showSyntaxHighlighting,
   template,
@@ -468,11 +461,8 @@ interface PromptRewrite {
 const HELD_RESULT_PREVIEW_LENGTH = 280;
 
 /**
- * One Expand or Image to Prompt request at a time; it keeps running when its popover closes. Its result replaces the
- * prompt only while the prompt reads as it did when the request started: as an edit (Ctrl+Z) while the popover is still
- * open, else without taking focus from wherever the user went; an Undo toast covers both. A prompt changed meanwhile is
- * never overwritten: the result is offered in a toast instead. A field that unmounts or moves to another project drops
- * the request, so a late result never lands in the wrong prompt.
+ * One request at a time, surviving popover close. Its result replaces the prompt only if unchanged since the
+ * request began (Undo toast); otherwise it is offered in a toast. Unmount or project change drops the request.
  */
 const usePromptRewrite = ({
   editor,
@@ -484,10 +474,8 @@ const usePromptRewrite = ({
   editor: PromptEditor;
   /** Whether the popover is open, read when the result lands. */
   isOpen: () => boolean;
-  /** Closes the popover after a result landed while it was open. */
   onLandedOpen: () => void;
   projectId: string;
-  /** The Undo toast's title once a result replaced the prompt. */
   title: string;
 }): PromptRewrite => {
   const { t } = useTranslation();
@@ -606,10 +594,7 @@ const StopWaitingButton = ({ rewrite }: { rewrite: PromptRewrite }) => {
   ) : null;
 };
 
-/**
- * A popover that runs a prompt rewrite. It sits beside its trigger rather than over the prompt, and closes like any
- * popover: the request keeps running (the trigger spins) and its result lands on its own.
- */
+/** Closing leaves the request running (the trigger spins); its result lands on its own. */
 const usePromptRewritePopover = ({
   editor,
   onClose,
@@ -734,7 +719,6 @@ const ExpandPromptButton = ({
       async (taskId) =>
         (
           await expandPrompt({
-            // Forward the selected prompt's optional token cap to expansion.
             image_name: conditioningImage?.image_name,
             max_tokens: selectedSystemPrompt?.maxTokens ?? undefined,
             model_key: selectedModel.key,
@@ -945,7 +929,6 @@ const ImageToPromptButton = ({
     onSave: saveModelKey,
     savedKey: savedPromptModels?.imageToPromptModelKey,
   });
-  // Dropped images take precedence over gallery selection.
   const image = droppedImage.image ?? selectedImage;
   const droppedImageName = droppedImage.image?.imageName ?? null;
   // Each drop opens the popover once, keyed by image name, so later renders cannot reopen it.

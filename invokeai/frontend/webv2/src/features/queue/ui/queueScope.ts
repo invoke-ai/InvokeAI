@@ -22,12 +22,7 @@ export const isQueueItemReadModelInProject = (
   return project.queue.items.some((item) => item.backendItemIds?.includes(serverItem.id) ?? false);
 };
 
-/**
- * The viewer's open work in the queue scope that is not among the project's own runs: their scoped count of pending and
- * running items, less the open items the read model shows belonging to the project. Counting from the project's side
- * keeps a run that just finished here, still open in a read model awaiting its refetch, from reading as work elsewhere;
- * the project's own record of the backend items its open runs wait on covers those past the read model's recent window.
- */
+/** Counted from the project's side so a run that just finished here, awaiting refetch, is not work elsewhere. */
 export const getQueueOpenWorkElsewhere = (
   model: Pick<QueueReadModel, 'current' | 'items' | 'next'>,
   scopedOpen: number,
@@ -48,8 +43,7 @@ export const getQueueOpenWorkElsewhere = (
     }
   }
 
-  // The window holds at most the newest items; a large run of the project's reaches past it, so its own record of the
-  // backend items it still waits on counts too. The window covers the moment after a run ends here, before the refetch.
+  // A large run reaches past the newest-items window, so its own record of awaited backend items counts too.
   const projectOpenLocally = project.queue.items
     .filter((item) => item.status === 'pending' || item.status === 'running')
     .reduce((sum, item) => {
@@ -78,11 +72,7 @@ export const useQueueQueryScope = (): QueueQueryScope => {
   return useMemo(() => getQueueQueryScope({ projectId, queueJobsScope }), [projectId, queueJobsScope]);
 };
 
-/**
- * This tab's runs the backend has not accepted, within the queue scope setting: the active project's alone, or every
- * open project's. The same reach as the query scope and the bulk actions; cancel-all counts all of them, shown or not
- * (`useShownLocalRuns`).
- */
+/** Same reach as the query scope and bulk actions; cancel-all counts all of them, shown or not. */
 export const useScopedLocalRuns = (): readonly QueueLocalRun[] => {
   const { activeProjectId, localRuns, queueJobsScope } = useQueueUi();
   const projectId = queueJobsScope === 'active-project' ? activeProjectId : null;
@@ -93,10 +83,7 @@ export const useScopedLocalRuns = (): readonly QueueLocalRun[] => {
   );
 };
 
-/**
- * A first enqueue usually lands well within this. Showing it sooner would flash a row, and a count, on every Invoke
- * before the backend's row replaces it.
- */
+/** Showing it sooner would flash a row on every Invoke before the backend's row replaces it. */
 export const LOCAL_RUN_REVEAL_DELAY_MS = 1000;
 
 const NO_LOCAL_RUNS: readonly QueueLocalRun[] = [];
@@ -105,11 +92,7 @@ const NO_LOCAL_RUNS: readonly QueueLocalRun[] = [];
 const getRevealAt = (run: QueueLocalRun, isConnected: boolean): number =>
   run.retry !== null || !isConnected ? Number.NEGATIVE_INFINITY : run.submittedAt + LOCAL_RUN_REVEAL_DELAY_MS;
 
-/**
- * The scoped runs the queue widget lists and counts: those `getRevealAt` has reached. A run restored from storage is
- * old, so it shows at once; a hung first request shows after the delay. Its caller re-renders as each one comes due, on
- * one timer at a time, cleared when it unmounts.
- */
+/** A restored run is old, so it shows at once; one timer at a time re-renders as each comes due. */
 export const useShownLocalRuns = (): readonly QueueLocalRun[] => {
   const { isConnected } = useQueueUi();
   const runs = useScopedLocalRuns();
@@ -132,8 +115,7 @@ export const useShownLocalRuns = (): readonly QueueLocalRun[] => {
         const next = revealTimes.find((time) => time > now);
 
         if (next !== undefined) {
-          // At most the delay: a reveal further off means the clock moved back since the run was queued, and a delay
-          // past setTimeout's 2^31-1 ms range would fire at once, again and again.
+          // At most the delay: further off means the clock moved back, and past 2^31-1 ms setTimeout fires at once.
           timer = setTimeout(
             () => {
               notify();
@@ -166,11 +148,7 @@ export const useShownLocalRuns = (): readonly QueueLocalRun[] => {
   }, [dueCount, isConnected, revealTimes, runs]);
 };
 
-/**
- * The reach of a bulk action as the viewer meets it: one project; every project (single-user); every project and user
- * (an administrator, whose cancel and clear reach everyone's items); or every project of the viewer's own (a member,
- * for whom the server counts nobody's history but the whole queue's, so history counts are unknown).
- */
+/** A member's server counts nobody's history but the whole queue's, so their history counts are unknown. */
 export type QueueActionScope = { kind: 'all' | 'allUsers' | 'mine' } | { kind: 'project'; project: string };
 
 export const getQueueActionScope = ({
@@ -200,10 +178,7 @@ export const useQueueActionScope = (): QueueActionScope => {
   );
 };
 
-/**
- * A sentence that names the scope, translated whole: `<key>.<scope kind>`, so no translation stitches a fragment in.
- * `count` null leaves the count out, for the variants that cannot know it.
- */
+/** Translated whole as `<key>.<scope kind>`, so no translation stitches in a fragment; `count` null omits it. */
 export const translateScoped = (t: TFunction, key: string, scope: QueueActionScope, count?: number | null): string =>
   t(`${key}.${scope.kind}`, {
     ...(count === null || count === undefined ? {} : { count }),

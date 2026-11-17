@@ -27,10 +27,7 @@ import {
   useProjectsMetrics,
 } from './projectsMetrics';
 
-/**
- * Virtualize derived-height rows in both layouts: grid rows hold multiple cards, list rows one. Headings share the same
- * flat index space.
- */
+/** Virtualize derived-height rows in both layouts: grid rows hold multiple cards, list rows one. */
 
 const MEASURE_SX: SystemStyleObject = {
   maxW: '6xl',
@@ -54,10 +51,7 @@ const NO_MATCHES_ICON = <Icon as={SearchXIcon} />;
 const NO_PROJECTS_ICON = <Icon as={FolderIcon} />;
 
 export interface ProjectsBrowserProps {
-  /**
-   * When "today" starts, captured once by the page rather than read here — reading the clock during render is impure
-   * and would rebucket unstably across re-renders.
-   */
+  /** Captured once by the page: reading the clock during render would rebucket unstably. */
   now: number;
   pinnedIds: readonly string[];
   searchTerm: string;

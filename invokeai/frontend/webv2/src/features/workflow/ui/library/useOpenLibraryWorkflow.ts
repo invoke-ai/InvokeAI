@@ -33,7 +33,6 @@ export type OpenLibraryWorkflowMode =
   /** Another, independent copy beside the existing ones. */
   | 'add-copy';
 
-/** What opening a template involves given the project's current copies. */
 export type LibraryWorkflowOpenPlan = { kind: 'add' } | { kind: 'choose'; copies: readonly ProjectWorkflowEntry[] };
 
 export const planLibraryWorkflowOpen = (

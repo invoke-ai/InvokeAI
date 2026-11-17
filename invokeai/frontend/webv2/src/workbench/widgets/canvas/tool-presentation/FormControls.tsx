@@ -37,10 +37,7 @@ const affixOffset = (chars: number): string => `${INPUT_HEIGHT_PX - AFFIX_GUTTER
 const START_ELEMENT_PROPS = { ...AFFIX_PROPS, fontWeight: 'medium', pointerEvents: 'auto', ps: '1.5' } as const;
 const END_ELEMENT_PROPS = { ...AFFIX_PROPS, pe: '1.5', pointerEvents: 'none' } as const;
 
-/**
- * Keep drafts through typing/scrubbing and commit once on blur, Enter, or release only after edits. Do not overwrite
- * precise values by tabbing through rounded displays; show the accepted clamped result.
- */
+/** Drafts commit once on blur, Enter or release, and only after edits, so tabbing keeps precise values. */
 export const FormNumberField = ({
   'aria-label': ariaLabel,
   disabled,
@@ -134,11 +131,7 @@ export const useNumberCommit = (apply: (value: number) => void) =>
     [apply]
   );
 
-/**
- * Gesture state for a slider or scrubber whose settled value lives in the document: the draft follows the thumb,
- * `settle` runs ONCE on release (one history entry per gesture), and optional `preview` mirrors ticks into a
- * non-committing store.
- */
+/** Slider gesture state: `settle` runs once on release (one history entry); `preview` mirrors ticks. */
 export const useSliderGesture = (
   committed: number,
   settle: (value: number) => void,

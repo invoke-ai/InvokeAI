@@ -32,7 +32,6 @@ import { useCallback, useSyncExternalStore } from 'react';
 
 const EMPTY_LAYER_QUICK_SWITCH: LayerQuickSwitchState = { bookmarkedLayerId: null, previousLayerId: null };
 
-/** Subscribes the calling component to a single engine scalar store. */
 const useCanvasInteractionState = <K extends keyof CanvasInteractionState>(
   engine: CanvasCoreStoreCapability,
   key: K
@@ -42,10 +41,7 @@ const useCanvasInteractionState = <K extends keyof CanvasInteractionState>(
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
-/**
- * Subscribe only to one layer's thumbnail version; null engines return undefined without subscribing for fallback
- * rendering.
- */
+/** Subscribes to one layer's thumbnail version; a null engine returns undefined without subscribing. */
 export const useLayerThumbnailVersion = (
   engine: CanvasCoreStoreCapability | null,
   layerId: string
@@ -59,11 +55,7 @@ export const useLayerThumbnailVersion = (
   return useSyncExternalStore(subscribe, getSnapshot);
 };
 
-/**
- * A primitive read of live engine state (document model, cached pixels), taken on every render and whenever the
- * engine's document changes or a layer publishes pixels. The React Compiler memoizes a plain render-time engine call on
- * its arguments, so it would keep a stale answer after a paint or another layer's edit; route such reads through here.
- */
+/** Render-time engine reads: the React Compiler would memoize a plain call on its args and go stale. */
 export const useCanvasEngineRead = <T extends boolean | number | string | null>(
   engine: CanvasCoreStoreCapability | null,
   read: () => T
@@ -102,7 +94,6 @@ export const useLayerThumbnailStatus = (
   return useSyncExternalStore(subscribe, getSnapshot);
 };
 
-/** Current viewport zoom factor for `engine` (re-renders on zoom change). */
 export const useCanvasZoom = (engine: CanvasCoreStoreCapability): number => useCanvasInteractionState(engine, 'zoom');
 
 /** Whether `engine` has render targets bound and its viewport is live. */
@@ -121,7 +112,6 @@ export const useCanvasStagingHidesOverlays = (engine: CanvasCoreStoreCapability)
 export const useCanvasBboxPreview = (engine: CanvasCoreStoreCapability): CanvasInteractionState['bboxPreview'] =>
   useCanvasInteractionState(engine, 'bboxPreview');
 
-/** The active tool id for `engine`. */
 export const useCanvasActiveTool = (engine: CanvasCoreStoreCapability): ToolId =>
   useCanvasInteractionState(engine, 'activeTool');
 
@@ -171,11 +161,9 @@ export const useControlDetectionStatus = (engine: object | null, layerId: string
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
-/** Whether the engine-owned canvas history has an entry to undo (enables the header undo button). */
 export const useCanvasCanUndo = (engine: CanvasCoreStoreCapability): boolean =>
   useCanvasInteractionState(engine, 'canUndo');
 
-/** Whether the engine-owned canvas history has an entry to redo (enables the header redo button). */
 export const useCanvasCanRedo = (engine: CanvasCoreStoreCapability): boolean =>
   useCanvasInteractionState(engine, 'canRedo');
 
@@ -225,7 +213,6 @@ export const useCanvasDocumentEditingLocked = (engine: CanvasCoreStoreCapability
 export const useBrushOptions = (engine: CanvasCoreStoreCapability): BrushOptions =>
   useCanvasInteractionState(engine, 'brushOptions');
 
-/** The eraser tool's current options (size / opacity). Write through `engine.interaction.set`. */
 export const useEraserOptions = (engine: CanvasCoreStoreCapability): EraserOptions =>
   useCanvasInteractionState(engine, 'eraserOptions');
 
@@ -242,14 +229,12 @@ export const useLayerQuickSwitch = (engine: CanvasCoreStoreCapability | null): L
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
-/** The bbox tool's current options (aspect lock / ratio). Write through `engine.interaction.set`. */
 export const useBboxOptions = (engine: CanvasCoreStoreCapability): BboxToolOptions =>
   useCanvasInteractionState(engine, 'bboxOptions');
 
 /** The bbox tool's current snapping grid size (document px). */
 export const useBboxGrid = (engine: CanvasCoreStoreCapability): number => useCanvasInteractionState(engine, 'bboxGrid');
 
-/** The active transform-tool session (layer id + live transform), or `null`. */
 export const useTransformSession = (engine: CanvasCoreStoreCapability): TransformSession | null =>
   useCanvasInteractionState(engine, 'transformSession');
 
@@ -265,27 +250,21 @@ export const useCanvasHasSelection = (engine: CanvasCoreStoreCapability): boolea
 export const useCanvasHasFloatingSelection = (engine: CanvasCoreStoreCapability): boolean =>
   useCanvasInteractionState(engine, 'hasFloatingSelection');
 
-/** The lasso tool's current options (the committed boolean op mode). Write through `engine.interaction.set`. */
 export const useLassoOptions = (engine: CanvasCoreStoreCapability): LassoToolOptions =>
   useCanvasInteractionState(engine, 'lassoOptions');
 
-/** The marquee tool's current options (shape kind / boolean op mode). Write through `engine.interaction.set`. */
 export const useMarqueeOptions = (engine: CanvasCoreStoreCapability): MarqueeToolOptions =>
   useCanvasInteractionState(engine, 'marqueeOptions');
 
-/** The shape tool's current options (kind / fill / stroke / stroke width). Write through `engine.interaction.set`. */
 export const useShapeOptions = (engine: CanvasCoreStoreCapability): ShapeToolOptions =>
   useCanvasInteractionState(engine, 'shapeOptions');
 
-/** The gradient tool's current options (kind / angle / stops). Write through `engine.interaction.set`. */
 export const useGradientOptions = (engine: CanvasCoreStoreCapability): GradientToolOptions =>
   useCanvasInteractionState(engine, 'gradientOptions');
 
-/** The text tool's current options (font / size / weight / line-height / align / color). */
 export const useTextOptions = (engine: CanvasCoreStoreCapability): TextToolOptions =>
   useCanvasInteractionState(engine, 'textOptions');
 
-/** The active text-editing session (create/edit mode + live source + transform), or `null`. */
 export const useTextEditSession = (engine: CanvasCoreStoreCapability): TextEditSession | null =>
   useCanvasInteractionState(engine, 'textEditSession');
 

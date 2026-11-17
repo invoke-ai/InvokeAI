@@ -51,11 +51,7 @@ interface SelectedLeafTransform {
   transform: LayerTransform;
 }
 
-/**
- * The one layer-transform write path the Move and Transform tools (and the Transform pane) share: a live transform
- * session absorbs edits into its single Apply commit; otherwise each settled field is one undoable patch on the
- * selected, unlocked leaf.
- */
+/** The shared layer-transform write path: a live session absorbs edits; otherwise each field is one patch. */
 export const useLayerTransformEditor = (engine: ToolFormProps['engine'], labelKey = 'widgets.transform.edit') => {
   const { t } = useTranslation();
   const commitPrepared = usePreparedCommit(engine);
@@ -180,11 +176,7 @@ export const TransformScaleSettings = ({ engine }: ToolFormProps) => {
   );
 };
 
-/**
- * Frame width/height plus the aspect preset and lock, as form rows. While the canvas drives Generate the lock is
- * Generate's own, one lock for both (the Frame tool follows it, see `CanvasFrameLockFeed`); otherwise it is the Frame
- * tool's alone.
- */
+/** Frame size, aspect preset and lock; the lock is Generate's own while the canvas drives Generate. */
 const FrameSizeSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const { generation } = useWorkbenchCommands();
@@ -283,10 +275,7 @@ const FrameSizeSettings = ({ engine }: ToolFormProps) => {
   );
 };
 
-/**
- * Apply / Cancel stay live for a floating selection, which frames its own pixels instead of opening a layer session;
- * the numerics meanwhile edit the settled selected layer, matching the Transform pane.
- */
+/** Apply / Cancel stay live for a floating selection; the numerics edit the settled selected layer. */
 const TransformActions = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useTransformSession(engine);

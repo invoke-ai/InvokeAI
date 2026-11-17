@@ -1,8 +1,4 @@
-/**
- * Interaction overlays render in CSS pixels through `view` under a device-pixel-ratio base transform, keeping strokes
- * and handles constant in CSS pixels at any zoom and DPR, where pointer hit testing measures them. The unbounded plane
- * has no document outline; all drawing uses {@link RasterSurface} contexts.
- */
+/** Overlays draw in CSS pixels under a DPR base transform, so chrome stays constant at any zoom, matching hit tests. */
 
 import type { ParametricShapeKind } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
@@ -17,61 +13,43 @@ import { TRANSFORM_ROTATE_NUB_PX } from '@workbench/canvas-engine/transform/tran
 import type { RgbaSample } from './colorSample';
 import type { RasterSurface } from './raster';
 
-/** Minimum screen-space grid spacing (px) below which the grid is too dense to draw. */
 export const MIN_GRID_SPACING_PX = 8;
 
 const BBOX_COLOR = '#3b82f6';
 const BBOX_DASH: readonly number[] = [4, 4];
-/**
- * The generation frame's dashes are an accent hairline cased by the accent's darkest shade outside and white inside.
- * White carries backgrounds up to about 0.30 relative luminance, navy those from about 0.16, so some band of every dash
- * keeps at least about 3.8:1 contrast with any content (least at the accent itself, where both casings do), and the
- * frame stays blue rather than the brush ring's neutral dark/light/dark. Navy outside keeps the handles, which wrap the
- * same bands around a white face, edged dark over light content. The gaps stay clear, so a pending result's outline
- * under the frame still shows through them.
- */
+/** Accent hairline cased navy outside and white inside, so some band of every dash keeps about 3.8:1 contrast. */
 const BBOX_CASING_OUTSIDE = '#172554';
 const BBOX_CASING_INSIDE = '#ffffff';
-/** Target frame dash and gap length (CSS px); each edge fits a whole odd number of them, dashes at both corners. */
+/** CSS px; each edge fits a whole odd number of dashes and gaps, dashes at both corners. */
 const BBOX_FRAME_DASH_PX = 4;
-/** Pending results' landing rects: amber, so a frame moved off them still reads as a different thing. */
+/** Amber, so a frame moved off them still reads as a different thing. */
 const STAGED_REGION_COLOR = '#f59e0b';
 const STAGED_REGION_DASH: readonly number[] = [6, 4];
-/** Others stay readable; the selected one is wider and opaque. */
 const STAGED_REGION_ALPHA = 0.8;
 const STAGED_REGION_WIDTH_PX = 1.5;
 const STAGED_REGION_SELECTED_WIDTH_PX = 2.5;
-/** A dark halo under the dashes keeps them visible over light and busy pixels alike. */
 const STAGED_REGION_HALO = 'rgba(0, 0, 0, 0.55)';
-/** The bbox-overlay dim fill when no theme surround color has been fed in. */
 const BBOX_OVERLAY_FILL = 'hsl(220 12% 10%)';
-/** The shade is the surround color at this opacity: the dimmed area reads as "outside the document". */
 const BBOX_OVERLAY_ALPHA = 0.8;
 const GRID_COLOR = 'rgba(128, 128, 128, 0.25)';
 const CURSOR_DARK = '#000000';
 const CURSOR_LIGHT = '#ffffff';
 const CURSOR_OUTER_WIDTH_PX = 3;
 const CURSOR_INNER_WIDTH_PX = 1;
-/** Side (CSS px) of a bbox resize handle's white face, inside its accent ring and dark casing hairlines. */
 const BBOX_HANDLE_FACE_PX = 7;
 const BBOX_HANDLE_FILL = '#ffffff';
-/** Solid accent used for the selected-layer bounds outline while the move tool is active. */
 const LAYER_OUTLINE_COLOR = '#38bdf8';
-/** Accent for the transform frame (outline, handles, rotation nub). */
 const TRANSFORM_COLOR = '#38bdf8';
 const TRANSFORM_HANDLE_FILL = '#ffffff';
-/** Side length (screen px) of a drawn transform scale handle. */
 const TRANSFORM_HANDLE_DRAW_PX = 8;
-/** Screen-px radius of the rotation-indicator knob at the nub's tip. */
 const TRANSFORM_ROTATE_KNOB_PX = 3.5;
 
-/** The brush cursor ring: center in document space, radius in document units. */
+/** Center in document space, radius in document units. */
 export interface OverlayCursor {
   point: Vec2;
   radiusDoc: number;
 }
 
-/** The color picker's loupe diameter in CSS pixels. */
 const COLOR_LOUPE_DIAMETER_PX = 120;
 /** Each magnified pixel spans at least this many CSS pixels, and twice the canvas zoom. */
 const COLOR_LOUPE_MIN_CELL_PX = 8;
@@ -79,66 +57,47 @@ const COLOR_LOUPE_RING = '#d4d4d4';
 const COLOR_LOUPE_LABEL_FONT = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
 const COLOR_LOUPE_LABEL_FILL = 'rgba(0, 0, 0, 0.72)';
 
-/** Document pixels across the loupe at `zoom`: odd, so the sampled one sits at the center, and at least three. */
+/** Odd, so the sampled pixel sits at the center, and at least three. */
 export const colorLoupePixels = (zoom: number): number => {
   const cell = Math.max(COLOR_LOUPE_MIN_CELL_PX, zoom * 2);
   const count = Math.floor(COLOR_LOUPE_DIAMETER_PX / cell);
   return Math.max(3, count % 2 === 0 ? count - 1 : count);
 };
 
-/** The color picker's magnified view of the pixels under the pointer. */
 export interface ColorLoupeOverlay {
-  /** The pointer in document space; the loupe is centered on it. */
   point: Vec2;
-  /** A square of document pixels around the sampled one, which is the center pixel. */
   pixels: RasterSurface;
-  /** The sampled color, or null over empty canvas. */
+  /** Null over empty canvas. */
   color: RgbaSample | null;
-  /** The canvas checkerboard tile, shown where the canvas is empty. */
   checker: RasterSurface;
 }
 
-/** A live parametric-shape drag outline in document space (shape and marquee tools). */
 export interface RectShapePreview {
   rect: Rect;
   kind: ParametricShapeKind;
 }
 
-/** Everything the overlay needs to draw a frame. */
 export interface OverlayState {
-  /** Document→CSS-pixel transform. */
+  /** Document to CSS pixels. */
   view: Mat2d;
-  /** Backing-store pixels per CSS pixel. */
   dpr: number;
-  /** The viewport in CSS pixels. */
   viewportSize: { readonly width: number; readonly height: number };
-  /** Generation bounding box in document space. */
   bbox: Rect;
-  /** Where each pending result lands (document space); the selected one is emphasized. Absent: none. */
   stagedRegions?: readonly { readonly rect: Rect; readonly selected: boolean }[];
-  /** Whether to draw the eight bbox resize handles (bbox tool active). */
   bboxHandles?: boolean;
-  /** Whether to draw the passive bbox frame (default when absent: drawn). */
+  /** Absent means drawn. */
   showBbox?: boolean;
-  /** Whether to dim everything outside the bbox (the legacy "bbox overlay" shade). */
   bboxOverlay?: boolean;
-  /** Opaque CSS color for that shade — the theme's canvas surround, resolved by the widget. */
+  /** The theme's canvas surround, resolved by the widget. */
   bboxOverlayColor?: string;
-  /** Whether to draw the rule-of-thirds guides inside the bbox. */
   ruleOfThirds?: boolean;
-  /** Whether to draw the grid. */
   showGrid?: boolean;
-  /** Grid spacing in document units. */
   gridSize?: number;
-  /** Brush cursor ring, or `null`/absent to hide it. */
   cursor?: OverlayCursor | null;
-  /** The color picker's loupe, or `null`/absent to hide it. */
   colorLoupe?: ColorLoupeOverlay | null;
-  /** Move outline uses four document-space content corners projected through view; null/absence hides it. */
+  /** Four document-space content corners. */
   layerOutline?: readonly Vec2[] | null;
-  /** Document-space rotated transform bounds, eight handles and rotation-nub anchors; null/absence means no session. */
   transformFrame?: TransformFrameOverlay | null;
-  /** Document-space freehand/polygon lasso preview with vertices and close cue; null/absence means idle. */
   lassoPreview?:
     | { kind: 'freehand'; points: readonly Vec2[] }
     | {
@@ -149,36 +108,26 @@ export interface OverlayState {
         closeArmed: boolean;
       }
     | null;
-  /** Committed document-space selection paths and animated dash phase; absent without selection. */
   marchingAnts?: MarchingAntsRender | null;
-  /** Document-space shape creation preview; null/absence means idle. */
   shapePreview?: RectShapePreview | null;
-  /** Document-space marquee drag preview; committed selections instead use ants. */
   marqueePreview?: RectShapePreview | null;
-  /** Gradient drag start/end defines the linear vector or radial center/radius; absent when idle. */
   gradientPreview?: { kind: 'linear' | 'radial'; start: Vec2; end: Vec2 } | null;
-  /** Dedicated Select Object mask preview, already colorized by the engine. */
+  /** Already colorized by the engine. */
   samPreview?: {
     surface: RasterSurface;
     rect: Rect;
     opacity: number;
-    /** True-edge outline for marching ants, document space; `null` skips the ants. */
+    /** `null` skips the ants. */
     outline: Path2D | null;
     phase: number;
   } | null;
-  /** Select Object visual prompt geometry in document space. */
   samInput?: { includePoints: readonly Vec2[]; excludePoints: readonly Vec2[]; bbox: Rect | null } | null;
 }
 
-/** Document-space geometry the overlay draws for an active transform session. */
 export interface TransformFrameOverlay {
-  /** The four rotated-rect corners (closed polygon). */
   corners: readonly Vec2[];
-  /** The eight scale-handle positions. */
   handles: readonly Vec2[];
-  /** The layer center (rotation nub direction reference). */
   center: Vec2;
-  /** The top edge midpoint (root of the rotation nub). */
   rotationAnchor: Vec2;
 }
 
@@ -188,10 +137,7 @@ const strokeRectScreen = (ctx: Ctx, screenRect: Rect): void => {
   ctx.strokeRect(screenRect.x, screenRect.y, screenRect.width, screenRect.height);
 };
 
-/**
- * Project viewport bounds into document space and snap outward to grid cells for seamless pan/zoom. Skip overly dense
- * grids; never clip to document bounds.
- */
+/** Snaps outward to grid cells for seamless pan and zoom; never clips to document bounds. */
 const drawGrid = (ctx: Ctx, state: OverlayState): void => {
   const gridSize = state.gridSize ?? 0;
   if (gridSize <= 0) {
@@ -207,7 +153,6 @@ const drawGrid = (ctx: Ctx, state: OverlayState): void => {
   if (!inv) {
     return;
   }
-  // Document-space bounds of the viewport's four screen corners.
   const corners = [
     applyToPoint(inv, { x: 0, y: 0 }),
     applyToPoint(inv, { x: state.viewportSize.width, y: 0 }),
@@ -216,7 +161,6 @@ const drawGrid = (ctx: Ctx, state: OverlayState): void => {
   ];
   const xs = corners.map((p) => p.x);
   const ys = corners.map((p) => p.y);
-  // Snap outward to whole grid cells so lines are stable across pan/zoom.
   const left = Math.floor(Math.min(...xs) / gridSize) * gridSize;
   const top = Math.floor(Math.min(...ys) / gridSize) * gridSize;
   const right = Math.ceil(Math.max(...xs) / gridSize) * gridSize;
@@ -243,7 +187,6 @@ const drawGrid = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
-/** Draws the brush cursor ring at the pointer, radius scaled from document units. */
 const drawCursor = (ctx: Ctx, state: OverlayState): void => {
   const cursor = state.cursor;
   if (!cursor) {
@@ -255,8 +198,7 @@ const drawCursor = (ctx: Ctx, state: OverlayState): void => {
   ctx.setLineDash([]);
   ctx.beginPath();
   ctx.arc(center.x, center.y, Math.max(0, radius), 0, Math.PI * 2);
-  // A dark outer ring plus a light inner ring stays legible over either end of the value range without sampling pixels
-  // or relying on blend-mode support.
+  // Dark outer plus light inner ring stays legible over any pixels without sampling or blend modes.
   ctx.strokeStyle = CURSOR_DARK;
   ctx.lineWidth = CURSOR_OUTER_WIDTH_PX;
   ctx.stroke();
@@ -266,7 +208,6 @@ const drawCursor = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
-/** Strokes the current path dark-then-light so it reads over any pixels. */
 const strokeOutlined = (ctx: Ctx, light: string, lightWidth: number): void => {
   ctx.strokeStyle = CURSOR_DARK;
   ctx.lineWidth = lightWidth + 2;
@@ -276,10 +217,7 @@ const strokeOutlined = (ctx: Ctx, light: string, lightWidth: number): void => {
   ctx.stroke();
 };
 
-/**
- * Draws the picker's loupe: the pixels around the pointer magnified without smoothing inside a ring, the sampled center
- * pixel boxed as the target (the picker hides the system cursor), and its RGB values below.
- */
+/** The picker hides the system cursor, so the center pixel is boxed as the target. */
 const drawColorLoupe = (ctx: Ctx, state: OverlayState): void => {
   const loupe = state.colorLoupe;
   if (!loupe) {
@@ -334,7 +272,6 @@ const drawColorLoupe = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
-/** Draws a layer's rendered-bounds outline as a closed polygon in screen space. */
 const drawLayerOutline = (ctx: Ctx, state: OverlayState): void => {
   const corners = state.layerOutline;
   if (!corners || corners.length < 2) {
@@ -358,10 +295,6 @@ const drawLayerOutline = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
-/**
- * Screen-space transform bounds and fixed-size handles. Rotation nub extends from the top edge away from center,
- * following layer rotation.
- */
 const drawTransformFrame = (ctx: Ctx, state: OverlayState): void => {
   const frame = state.transformFrame;
   if (!frame || frame.corners.length < 3) {
@@ -373,7 +306,6 @@ const drawTransformFrame = (ctx: Ctx, state: OverlayState): void => {
   ctx.strokeStyle = TRANSFORM_COLOR;
   ctx.lineWidth = 1;
 
-  // Bounds polygon.
   ctx.beginPath();
   frame.corners.forEach((corner, index) => {
     const p = applyToPoint(view, corner);
@@ -403,7 +335,6 @@ const drawTransformFrame = (ctx: Ctx, state: OverlayState): void => {
   ctx.fill();
   ctx.stroke();
 
-  // Scale handles.
   const half = TRANSFORM_HANDLE_DRAW_PX / 2;
   ctx.fillStyle = TRANSFORM_HANDLE_FILL;
   for (const handle of frame.handles) {
@@ -417,10 +348,8 @@ const drawTransformFrame = (ctx: Ctx, state: OverlayState): void => {
 const LASSO_PREVIEW_COLOR = '#38bdf8';
 const LASSO_PREVIEW_DASH: readonly number[] = [4, 4];
 
-/** Screen-space half-size of a placed polygon vertex knob. */
 const LASSO_VERTEX_HALF_PX = 2;
 
-/** Dashed lasso preview; polygons add vertices and a first-vertex close-radius cue filled on hover. */
 const drawLassoPreview = (ctx: Ctx, state: OverlayState): void => {
   const preview = state.lassoPreview;
   if (!preview) {
@@ -444,7 +373,6 @@ const drawLassoPreview = (ctx: Ctx, state: OverlayState): void => {
       ctx.lineTo(p.x, p.y);
     }
   });
-  // Close the loop back to the start so the enclosed region reads clearly.
   ctx.closePath();
   ctx.stroke();
   ctx.setLineDash([]);
@@ -480,7 +408,6 @@ const drawRectShapePreview = (ctx: Ctx, state: OverlayState, preview: RectShapeP
   ctx.strokeStyle = LAYER_OUTLINE_COLOR;
   ctx.lineWidth = 1;
   ctx.setLineDash([...BBOX_DASH]);
-  // The same path the rasterizer commits, so the outline is the shape it makes.
   buildParametricShapePath(ctx, preview.kind, screen.x, screen.y, Math.abs(screen.width), Math.abs(screen.height));
   ctx.stroke();
   ctx.setLineDash([]);
@@ -579,10 +506,6 @@ const drawSamGeometry = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
-/**
- * Even-odd viewport/bbox fill shades outside the generation frame; globalAlpha controls opacity independently of theme
- * color.
- */
 const drawBboxOverlayShade = (ctx: Ctx, target: RasterSurface, state: OverlayState): void => {
   if (!state.bboxOverlay) {
     return;
@@ -599,10 +522,7 @@ const drawBboxOverlayShade = (ctx: Ctx, target: RasterSurface, state: OverlaySta
   ctx.restore();
 };
 
-/**
- * Dashed amber outlines where pending results land, over a dark halo so they read on busy content, as given:
- * `PreviewStateController` already lists each rect once with the selected one last.
- */
+/** `PreviewStateController` already lists each rect once with the selected one last. */
 const drawStagedRegions = (ctx: Ctx, state: OverlayState): void => {
   const regions = state.stagedRegions;
   if (!regions || regions.length === 0) {
@@ -647,25 +567,17 @@ const drawRuleOfThirds = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
-/**
- * The bbox frame in device pixels: core-line centres where whole device pixels of the hairline's width land crisply, so
- * an unaligned 1px line never smears into two half-strength pixels. The frame and its handles draw in device space.
- */
+/** Core lines sit on whole device pixels, so a 1px line never smears into two half-strength pixels. */
 interface BboxFrameGeometry {
-  /** Core-line centres, device px. */
   rect: Rect;
-  /** Hairline width in whole device pixels: about one CSS pixel, never thinner than one device pixel. */
+  /** About one CSS pixel, never thinner than one device pixel. */
   hairline: number;
-  /** The backing store's device size: dashes beyond it are skipped, so a deep zoom traces only what shows. */
+  /** Dashes beyond it are skipped, so a deep zoom traces only what shows. */
   width: number;
   height: number;
 }
 
-/**
- * The device coordinate within half a pixel of `device` that centres a run of device pixels with odd (or even) width.
- * Where two qualify (an odd run on a pixel boundary, an even one on a pixel centre), it takes the one toward `outward`
- * (-1 before, +1 after), so a frame on whole pixels keeps its core just outside the area it marks on every side.
- */
+/** Ties go toward `outward`, keeping a whole-pixel frame's core just outside the area it marks. */
 const snapCentre = (device: number, odd: boolean, outward: -1 | 1): number => {
   if (odd) {
     return outward < 0 ? Math.ceil(device) - 0.5 : Math.floor(device) + 0.5;
@@ -690,14 +602,13 @@ const bboxFrameGeometry = (target: RasterSurface, state: OverlayState): BboxFram
   };
 };
 
-/** Edges run clockwise from the top-left corner: 0 top, 1 right, 2 bottom, 3 left; each starts at its own corner. */
+/** Edges run clockwise from the top-left: 0 top, 1 right, 2 bottom, 3 left; each starts at its own corner. */
 const frameEdgeLength = (rect: Rect, edge: number): number => (edge % 2 === 0 ? rect.width : rect.height);
 
-/** Dash and gap count along `edge`: an odd number near its length over the target, so it starts and ends on a dash. */
+/** An odd count, so the edge starts and ends on a dash. */
 const frameEdgeSegments = (rect: Rect, edge: number, dash: number): number =>
   Math.max(1, Math.round((frameEdgeLength(rect, edge) / dash + 1) / 2)) * 2 - 1;
 
-/** Distance along `edge` of the boundary after its `k`th of `segments` dashes and gaps, on a whole device pixel. */
 const frameBoundary = (rect: Rect, edge: number, k: number, segments: number): number => {
   const length = frameEdgeLength(rect, edge);
   if (k <= 0 || k >= segments) {
@@ -708,10 +619,7 @@ const frameBoundary = (rect: Rect, edge: number, k: number, segments: number): n
   return sign * (Math.round(start + (sign * k * length) / segments) - start);
 };
 
-/**
- * Adds one band of one dash as a device-space rect. `from`/`to` run along `edge` from its starting corner; `inner` and
- * `outer` are the band's offsets from the core line's centre, positive outward.
- */
+/** `inner` and `outer` are offsets from the core line's centre, positive outward. */
 const frameBandRect = (
   ctx: Ctx,
   rect: Rect,
@@ -737,17 +645,11 @@ const frameBandRect = (
   }
 };
 
-/**
- * Traces one band of the dashed frame in device space as axis-aligned rects on whole device pixels, so every edge is
- * crisp. Each edge fits its dashes between its corners, and a dash at a corner extends past it by the band's outer
- * offset: the bands of the two edges meeting there tile one whole L, with no seam, cap or join to notch it. Dash and
- * gap lengths vary by at most a device pixel along an edge.
- */
+/** Corner dashes extend by the band's outer offset so both edges tile one whole L with no seam. */
 const traceBboxFrameBand = (ctx: Ctx, frame: BboxFrameGeometry, dash: number, inner: number, outer: number): void => {
   const { rect } = frame;
   const right = rect.x + rect.width;
   const bottom = rect.y + rect.height;
-  // The inside band's offsets are negative: the band reaches as far as its larger magnitude.
   const reach = Math.max(Math.abs(inner), Math.abs(outer));
   ctx.beginPath();
   for (let edge = 0; edge < 4; edge++) {
@@ -755,7 +657,6 @@ const traceBboxFrameBand = (ctx: Ctx, frame: BboxFrameGeometry, dash: number, in
     if (across + reach < 0 || across - reach > (edge % 2 === 0 ? frame.height : frame.width)) {
       continue;
     }
-    // The stretch of the edge inside the backing store, as distances from the edge's starting corner.
     const near = edge === 0 ? -rect.x : edge === 1 ? -rect.y : edge === 2 ? right - frame.width : bottom - frame.height;
     const far = edge === 0 ? frame.width - rect.x : edge === 1 ? frame.height - rect.y : edge === 2 ? right : bottom;
     const segments = frameEdgeSegments(rect, edge, dash);
@@ -770,10 +671,6 @@ const traceBboxFrameBand = (ctx: Ctx, frame: BboxFrameGeometry, dash: number, in
   }
 };
 
-/**
- * Fills the dashed frame's three bands, each one batched fill: the outside casing, the inside casing, then the accent
- * core between them, every band one hairline wide.
- */
 const drawBboxFrame = (ctx: Ctx, frame: BboxFrameGeometry, dpr: number): void => {
   const { hairline } = frame;
   const dash = BBOX_FRAME_DASH_PX * dpr;
@@ -792,27 +689,20 @@ const drawBboxFrame = (ctx: Ctx, frame: BboxFrameGeometry, dpr: number): void =>
   ctx.restore();
 };
 
-/** Adds a square of half-side `half` (device px) around each bbox handle, centred on the frame's core line. */
 const traceBboxHandles = (ctx: Ctx, rect: Rect, odd: boolean, half: number): void => {
   ctx.beginPath();
   for (const handle of BBOX_HANDLES) {
     const point = bboxHandlePoint(rect, handle);
-    // Corners are already centred; an edge midpoint snaps either way.
     const x = snapCentre(point.x, odd, 1);
     const y = snapCentre(point.y, odd, 1);
     ctx.rect(x - half, y - half, half * 2, half * 2);
   }
 };
 
-/**
- * Draws the eight bbox resize handles centred on the frame's core line as the frame's bands wrapped into a square: an
- * outside-colored hairline, an accent ring, and a white face. Each band is one batched fill, so handles a small frame
- * overlaps merge into one shape.
- */
+/** Each band is one batched fill, so handles a small frame overlaps merge into one shape. */
 const drawBboxHandles = (ctx: Ctx, frame: BboxFrameGeometry, dpr: number): void => {
   const { hairline, rect } = frame;
   const odd = hairline % 2 === 1;
-  // Whole device pixels with the hairline's parity, so the face centres on the core line's pixels.
   const parity = odd ? 1 : 0;
   const faceHalf = Math.max(1, Math.round((BBOX_HANDLE_FACE_PX * dpr - parity) / 2) * 2 + parity) / 2;
   ctx.save();
@@ -829,7 +719,6 @@ const drawBboxHandles = (ctx: Ctx, frame: BboxFrameGeometry, dpr: number): void 
   ctx.restore();
 };
 
-/** Clears the backing store, then redraws the overlay in CSS pixels under the state's device-pixel ratio. */
 export const renderOverlay = (target: RasterSurface, state: OverlayState): void => {
   const ctx = target.ctx;
   const base: Mat2d = { a: state.dpr, b: 0, c: 0, d: state.dpr, e: 0, f: 0 };
@@ -839,21 +728,17 @@ export const renderOverlay = (target: RasterSurface, state: OverlayState): void 
   ctx.clearRect(0, 0, target.width, target.height);
   ctx.setTransform(base.a, base.b, base.c, base.d, base.e, base.f);
 
-  // Shade outside bbox first, then draw overlay chrome above it. The unbounded plane has no document outline.
   drawBboxOverlayShade(ctx, target, state);
 
-  // Grid next (behind the bbox), spanning the whole viewport.
   if (state.showGrid) {
     drawGrid(ctx, state);
   }
 
-  // Rule-of-thirds guides sit inside the bbox, behind its frame.
   drawRuleOfThirds(ctx, state);
 
-  // Pending results' rects sit under the bbox frame, which may coincide with one of them.
   drawStagedRegions(ctx, state);
 
-  // Passive bbox visibility is optional; active-tool handles remain editable even when hidden.
+  // Active-tool handles stay editable even when the passive frame is hidden.
   const bboxFrame = bboxFrameGeometry(target, state);
   if (state.showBbox ?? true) {
     drawBboxFrame(ctx, bboxFrame, state.dpr);

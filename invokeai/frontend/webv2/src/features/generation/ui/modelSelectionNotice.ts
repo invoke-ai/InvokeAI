@@ -139,6 +139,5 @@ export const clearGenerateModelSwitchConfirmation = (): void => {
   }
 };
 
-/** The model awaiting confirmation for `projectId`, or null. */
 export const usePendingGenerateModelSwitch = (projectId: string): GenerateModelConfig | null =>
   pendingSwitch.useSelector(({ request }) => (request?.projectId === projectId ? request.model : null), Object.is);

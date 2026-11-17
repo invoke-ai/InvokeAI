@@ -1,7 +1,4 @@
-/**
- * Persist canvas preferences in per-project widget values outside undo history. Feed engine-backed settings one-way
- * into stores; other consumers read values directly. Popover and engine bindings derive from this data list.
- */
+/** Per-project canvas preferences, outside undo history; engine-backed ones feed stores one way. */
 
 import { CANVAS_COMPOSITING_KEYS, DEFAULT_CANVAS_COMPOSITING } from './invoke/canvasCompositing';
 
@@ -16,7 +13,6 @@ export type CanvasSettingStore =
   | 'snapToGrid'
   | 'clipToBbox';
 
-/** The popover section a setting is grouped under. */
 export type CanvasSettingSection = 'behavior' | 'display' | 'grid';
 
 /** Persisted keys inside the canvas widget's `state.values`. */
@@ -39,23 +35,18 @@ const OUTPUT_ONLY_MASKED_REGIONS_SETTING: CanvasBooleanSetting = {
   section: 'behavior',
 };
 
-/** A single boolean canvas setting: its persisted key, default, label, section, and (optional) engine store. */
 export interface CanvasBooleanSetting {
   /** The persisted key inside the canvas widget's `state.values`. */
   key: string;
   /** The engine store this value drives; absent when another frontend path consumes the setting. */
   store?: CanvasSettingStore;
-  /** Default value applied when the key is unset. */
   defaultValue: boolean;
-  /** i18n key for the popover label. */
   labelKey: string;
-  /** Which popover section the setting belongs to. */
   section: CanvasSettingSection;
 }
 
 /** Derive popover order, persistence, and engine feeds from these sectioned entries. */
 export const CANVAS_SETTINGS: readonly CanvasBooleanSetting[] = [
-  // ── Behavior ──────────────────────────────────────────────────────────────
   {
     defaultValue: false,
     key: CANVAS_INVERT_BRUSH_SCROLL_KEY,
@@ -73,7 +64,6 @@ export const CANVAS_SETTINGS: readonly CanvasBooleanSetting[] = [
     store: 'clipToBbox',
   },
   OUTPUT_ONLY_MASKED_REGIONS_SETTING,
-  // ── Display ───────────────────────────────────────────────────────────────
   {
     defaultValue: true,
     key: CANVAS_SHOW_PROGRESS_KEY,
@@ -104,7 +94,6 @@ export const CANVAS_SETTINGS: readonly CanvasBooleanSetting[] = [
     section: 'display',
     store: 'checkerboard',
   },
-  // ── Grid ──────────────────────────────────────────────────────────────────
   {
     defaultValue: false,
     key: CANVAS_SHOW_GRID_KEY,
@@ -140,7 +129,6 @@ export const readCanvasBooleanSetting = (
   return typeof raw === 'boolean' ? raw : setting.defaultValue;
 };
 
-/** Resolves every canvas setting from persisted values into a key→boolean map. */
 export const resolveCanvasSettings = (values: Record<string, unknown> | undefined): ResolvedCanvasSettings => {
   const resolved: ResolvedCanvasSettings = {};
   for (const setting of CANVAS_SETTINGS) {

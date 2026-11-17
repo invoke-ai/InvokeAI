@@ -40,7 +40,6 @@ const previewColor = (ctx: ToolContext, hex: string): void => {
   }
 };
 
-/** Creates a fresh color-picker tool. */
 export const createColorPickerTool = (): Tool => {
   // One engine owns the tool and its backend, so the sampler can outlive a gesture.
   let sampler: ColorSampler | null = null;

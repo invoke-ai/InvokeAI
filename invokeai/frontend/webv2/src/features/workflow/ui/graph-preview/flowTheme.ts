@@ -40,5 +40,4 @@ export const flowThemeCss: SystemStyleObject = {
   },
 };
 
-/** The xyflow color mode matching a workbench theme. */
 export const getFlowColorMode = (themeId: WorkbenchThemeId): 'light' | 'dark' => THEMES_BY_ID[themeId].colorScheme;

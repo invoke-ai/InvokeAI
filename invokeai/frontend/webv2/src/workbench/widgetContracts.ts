@@ -272,7 +272,6 @@ export interface WidgetManifest {
   /** Compact content uses the strip's remaining width while keeping its trigger sized to visible content. */
   compactSizing?: 'remaining-space';
   centerPlacement?: 'toolbar' | 'view';
-  /** Opt-in: the widget can be detached into a movable floating window. */
   allowFloating?: boolean;
   /** Only offered while an admin is signed in to a multi-user backend. */
   requiresAdmin?: boolean;

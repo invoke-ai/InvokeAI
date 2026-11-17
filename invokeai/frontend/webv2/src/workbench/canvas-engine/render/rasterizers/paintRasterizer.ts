@@ -13,7 +13,6 @@ import { blitBitmap, resolveBitmap } from './imageRasterizer';
 /** A `paint` source (its optional layer-local bitmap offset). */
 type PaintSource = { type: 'paint'; bitmap: CanvasImageRef | null; offset?: { x: number; y: number } };
 
-/** Rasterizes a `paint` source into a content-sized surface placed at its offset. */
 export const rasterizePaintSource = async (
   source: PaintSource,
   deps: RasterizeDeps,

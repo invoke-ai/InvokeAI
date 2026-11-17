@@ -61,18 +61,7 @@ const MARGIN = `${FLOATING_VIEWPORT_MARGIN_PX}px`;
 // Inset, so it shows on a maximized window too and is not clipped at the viewport's edge.
 const FOCUS_RING = { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' } as const;
 
-/**
- * One static rule set for every window. The stored geometry arrives as custom properties, so committing a move or a
- * raise changes inline values rather than minting a class per geometry.
- *
- * The position keeps a grabbable sliver on screen and the size never exceeds the viewport, both without touching what
- * is stored: a window persisted on a larger display, or left behind by a shrunken browser window, comes back as it was
- * when there is room again. A gesture commits the same clamp, against the same viewport (the window's viewport probe),
- * and only on the axes it changed (`commitChangedAxes`).
- *
- * A gesture previews its geometry in `--fw-preview-*` and names the mode it started in. The preview applies only while
- * the window is still in that mode, so a window that maximizes or shades under a gesture shows its new frame at once.
- */
+/** Geometry arrives as custom properties; on-screen clamping never rewrites the stored rectangle. */
 const WINDOW_SX: SystemStyleObject = {
   '--fw-left': 'var(--fw-x)',
   '--fw-top': 'var(--fw-y)',
@@ -106,10 +95,7 @@ interface OnScreen {
   viewport: { height: number; width: number };
 }
 
-/**
- * What moving the rectangle on screen commits, or null for nothing (see {@link commitChangedAxes}). The move starts
- * from the stored size at the position on screen: a move never changes the size, so the stored one is kept.
- */
+/** What a move commits, or null for nothing; a move never changes the stored size. */
 const moveOnScreen = (
   stored: FloatingGeometry,
   { start, viewport }: OnScreen,
@@ -177,11 +163,7 @@ const HANDLE_OFFSET = `-${HANDLE_REACH}`;
 const EDGE_THICKNESS = `calc(${HANDLE_REACH} * 2)`;
 const OUTER_CORNER = `calc(${HANDLE_CORNER} + ${HANDLE_REACH})`;
 
-/**
- * The pointer-only resize handles: four edges and four corners. The bottom-right corner's inside is the labelled
- * `ResizeCorner`, the one handle that also takes the keyboard, so the strips beside it stop at its square and the
- * pointer-only handle there is clipped to the band outside the border.
- */
+/** Pointer-only resize handles; the bottom-right inside is the keyboard `ResizeCorner`. */
 const RESIZE_HANDLES: readonly { cursor: string; edge: FloatingResizeEdge; sx: SystemStyleObject }[] = [
   {
     cursor: 'ns-resize',
@@ -268,10 +250,7 @@ const FloatingResizeHandles = ({
   );
 };
 
-/**
- * One pointer gesture on the window. Everything it needs from the moment it began is here, so nothing it does later
- * depends on which render its handlers were created in.
- */
+/** One pointer gesture, holding all it needs from its start so later renders cannot change it. */
 interface WindowGesture {
   edge: FloatingResizeEdge | 'move';
   /** What a release would commit; null until the pointer has actually moved. */
@@ -291,11 +270,7 @@ const subscribeToViewportSize = (onChange: () => void): (() => void) => {
 const getViewportWidthPx = (): number => window.innerWidth;
 const getViewportHeightPx = (): number => window.innerHeight;
 
-/**
- * The window's one labelled resize control. It announces the size on screen, which the viewport may cap below the
- * stored one, and follows the viewport: a browser window that shrinks re-renders this grip and nothing else, so it
- * never announces a size nobody sees.
- */
+/** The labelled resize control; it announces the on-screen size, which the viewport may cap. */
 const FloatingResizeCorner = ({
   heightPx,
   onKeyDown,
@@ -328,10 +303,7 @@ const FloatingResizeCorner = ({
   );
 };
 
-/**
- * Isolate arbitrary widget controls from title-bar drag and double-click maximize gestures; not every control is a
- * button.
- */
+/** Isolates widget controls (not only buttons) from title-bar drag and double-click maximize. */
 const stopChromeEvent = (event: ReactPointerEvent<HTMLDivElement> | ReactMouseEvent<HTMLDivElement>): void =>
   event.stopPropagation();
 
@@ -376,15 +348,7 @@ export const FloatingWidgetWindow = ({
     [instanceId, widgets]
   );
 
-  /**
-   * Where the window is on screen right now, and the viewport CSS holds it in. Gestures and key steps start here, not
-   * from the stored geometry: CSS may be holding the window inside the viewport or capping its size, and starting from
-   * the stored values would make it jump.
-   *
-   * The viewport is the probe's, not `innerWidth` and `innerHeight`: at a fractional zoom `100vw` and `100vh` are
-   * fractional pixels, which those round. Clamped to a rounded edge, a push into the edge the window already sits at
-   * would read as a move by the difference and store that edge over the stored position.
-   */
+  /** On-screen geometry and the probe's viewport; gestures start here so a clamped window does not jump. */
   const readOnScreen = useCallback((): OnScreen | null => {
     const rect = windowRef.current?.getBoundingClientRect();
     const viewport = viewportProbeRef.current?.getBoundingClientRect();
@@ -476,16 +440,12 @@ export const FloatingWidgetWindow = ({
           if (!isCurrent()) {
             return;
           }
-          // The window changed mode under the gesture — a shortcut, an undo, a preset. Its offsets no longer describe
-          // anything on screen, so it stands down and commits nothing.
+          // The window changed mode under the gesture — a shortcut, an undo, a preset.
           if (windowRef.current?.dataset.floatingMode !== gesture.mode) {
             cancelGesture();
             return;
           }
-          // A gesture commits only what it changed. A press that never moves, or a drag against the minimum or the
-          // viewport's cap, changes nothing and commits nothing; a move keeps the stored size, and a move or resize
-          // keeps the stored value of an axis it does not touch. What is on screen there may only be the viewport's
-          // clamp or cap, which is not the user's choice to persist.
+          // A gesture commits only what it changed.
           gesture.live =
             edge === 'move'
               ? moveOnScreen(stored, onScreen, deltaX, deltaY)
@@ -598,12 +558,7 @@ export const FloatingWidgetWindow = ({
     [commitGeometry, heightPx, readOnScreen, widthPx, x, y]
   );
 
-  // Pointer-down and keyboard focus make this the active window and raise it; hover does neither. A late event from a
-  // project that has left the screen is refused before it can raise anything.
-  //
-  // Focus raises only when it makes this window the active one. Focus moving around inside the window that is already
-  // active — a Tab, a closing dialog or popover handing focus back — writes nothing, and cannot re-bury a window that a
-  // recall just revealed on top of it. A press always asks; that is a no-op for the topmost window.
+  // Pointer-down and keyboard focus make this the active window and raise it; hover does neither.
   const handleFocusCapture = useCallback(() => {
     if (activate() === 'activated') {
       widgets.raiseFloating(instanceId);
@@ -626,8 +581,7 @@ export const FloatingWidgetWindow = ({
     [activate, instanceId, widgets]
   );
   const typeId = instance?.typeId;
-  // Flush drafts before docking remounts the widget; registry cleanup only removes flushers. Focus follows the widget
-  // to the region it returns to.
+  // Flush drafts before docking remounts the widget; registry cleanup only removes flushers.
   const handleDock = useCallback(() => {
     flushWorkbenchDrafts();
     widgets.dockFloating(instanceId);
@@ -635,8 +589,7 @@ export const FloatingWidgetWindow = ({
       focusRegion(state.returnRegion, typeId);
     }
   }, [focusRegion, instanceId, state.returnRegion, typeId, widgets]);
-  // Close takes the window out of the layout (an Undo toast brings it back). Focus goes where the window's marker menu
-  // sends it: the center when it gets its view back, else the panel the window's rail shows, else the center.
+  // Close takes the window out of the layout (an Undo toast brings it back).
   const handleClose = useCallback(() => {
     const { layout, widgetRegions } = queries.getSnapshot().activeProject;
     const restoresCenter = isAwaitedCenterView(widgetRegions.center, instanceId);
@@ -743,9 +696,7 @@ export const FloatingWidgetWindow = ({
           cursor={isMaximized ? 'default' : 'move'}
           flexShrink={0}
           gap="1.5"
-          // Tighter than a docked panel's header: a window's chrome should take as little of it as it can. The side
-          // padding on each end equals the space above and below what sits there: the 16px title icon at the start, the
-          // 24px controls at the end.
+          // Tighter than a docked panel's header: a window's chrome should take as little of it as it can.
           h={8}
           pe="1"
           ps="2"
@@ -760,22 +711,18 @@ export const FloatingWidgetWindow = ({
           onKeyDown={handleTitleKeyDown}
           onPointerDown={handleTitlePointerDown}
         >
-          {/*
-           * The label takes only the room the controls leave, so a narrow window truncates it first — down to its
-           * icon, which keeps its place rather than sliding over the actions.
-           */}
+          {/* The label takes only the room the controls leave, so a narrow window truncates it first — down to its
+              icon, which keeps its place rather than sliding over the actions. */}
           <HStack flex="1 1 0" gap="1.5" minW="4" overflow="hidden">
             {widget ? <WidgetIcon boxSize="4" flexShrink={0} icon={widget.manifest.icon} /> : null}
             <Text fontSize="md" fontWeight="700" truncate>
               {label}
             </Text>
           </HStack>
-          {/*
-           * Render widget actions and settings in a row because floating content has no frame header; window
-           * controls already own layout actions. Contributed actions give way before they can push the window's
-           * own controls out of a narrow title bar: the ones that do not fit scroll, so focus brings each into
-           * view and a sideways scroll or swipe reaches the rest.
-           */}
+          {/* Render widget actions and settings in a row because floating content has no frame header; window controls
+              already own layout actions. Contributed actions give way before they can push the window's own controls
+              out of a narrow title bar: the ones that do not fit scroll, so focus brings each into view and a sideways
+              scroll or swipe reaches the rest. */}
           {isEnabled && widget ? (
             <Suspense fallback={null}>
               <HStack
@@ -868,10 +815,8 @@ export const FloatingWidgetWindow = ({
           />
         </>
       )}
-      {/*
-       * The viewport exactly as the clamp above resolves `100vw` and `100vh`. Inside the window so it shares any
-       * CSS zoom an ancestor applies to the window; fixed only to keep it out of the window's layout.
-       */}
+      {/* The viewport exactly as the clamp above resolves `100vw` and `100vh`. Inside the window so it shares any CSS
+          zoom an ancestor applies to the window; fixed only to keep it out of the window's layout. */}
       <Box
         ref={viewportProbeRef}
         aria-hidden

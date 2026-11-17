@@ -1,10 +1,6 @@
 export type InvokeIconMode = { mode: 'front' } | { mode: 'play' } | { mode: 'progress'; value: number | null };
 
-/**
- * Replace play with progress only when running without hover or keyboard focus-visible. Preserve geometry and
- * availability; click-focus does not count. Holding the front-of-queue modifier over a hovered or focused, ready button
- * turns play into the front-of-queue glyph, since a click then queues next.
- */
+/** Replace play with progress only when running without hover or keyboard focus-visible. */
 export const getInvokeIconMode = ({
   hasOpenWork,
   isFrontHeld,

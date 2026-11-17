@@ -14,10 +14,7 @@ const readProjectSetting = (key: LayeredProjectSettingKey) => (values: Readonly<
   return typeof value === 'boolean' ? value : BUILT_IN_PROJECT_SETTINGS[key];
 };
 
-/**
- * The project's generation flags behind the Generate widget's settings: this project's pin inside a project, the user's
- * default outside one. They live in the project settings, not the Generate widget's values.
- */
+/** Generation flags in project settings: the project's pin inside a project, the user's default outside. */
 export const Field = ({ field, surface, target }: SettingFieldProps) => {
   const key = field.id as LayeredProjectSettingKey;
   const read = useMemo(() => readProjectSetting(key), [key]);

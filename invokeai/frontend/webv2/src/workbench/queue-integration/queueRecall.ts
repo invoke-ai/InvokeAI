@@ -6,10 +6,7 @@ import type { ImageRecallCapabilities, ImageRecallKind } from '@workbench/image-
 import { extractGenerationMeta, extractNamedGenerationMeta, isWebv2QueueItemOrigin } from '@features/queue/contracts';
 import { cloneVideoWidgetValues } from '@features/video';
 
-/**
- * Partial recall merges current values; all/remix restores the submission snapshot. Foreign items expose only session
- * prompts and executed seed.
- */
+/** Partial recall merges current values; all/remix restores the submission snapshot. */
 
 export const getQueueRecallCapabilities = (
   snapshot: GenerateWidgetValues | null,
@@ -37,11 +34,7 @@ export const getVideoQueueRecallCapabilities = (
   workflow: false,
 });
 
-/**
- * Whether the Generate panel can take a partial recall: one merges into its current values, which exist once a
- * supported model is selected under a loaded capability table. `loading` waits for the model catalog to load or fail:
- * it can hold the model the panel will select.
- */
+/** `loading` waits for the model catalog, which can hold the model the panel will select. */
 export type QueueRecallTargetState = 'ready' | 'loading' | 'no-model' | 'no-capabilities';
 
 export const getQueueRecallTargetState = ({
@@ -55,11 +48,7 @@ export const getQueueRecallTargetState = ({
 }): QueueRecallTargetState =>
   hasCurrentValues ? 'ready' : !hasCapabilityTable ? 'no-capabilities' : isCatalogSettled ? 'no-model' : 'loading';
 
-/**
- * What submitted an item, as far as this browser can tell. Its snapshot names the source; Workflow and Upscale
- * snapshots record no settings. Without one, `readQueueItemRecallInput` says whether the item ran something other than
- * a Generate-style graph. `unknown` is an item another browser or client queued, which may have come from Generate.
- */
+/** `unknown`: another browser or client queued it, so it may have come from Generate. */
 export type QueueRecallSource = 'generate' | 'video' | 'other' | 'unknown';
 
 export const getQueueRecallSource = (snapshotSourceId: string | null, isNonGenerateRun: boolean): QueueRecallSource =>
@@ -71,11 +60,7 @@ export const getQueueRecallSource = (snapshotSourceId: string | null, isNonGener
         ? 'other'
         : 'unknown';
 
-/**
- * What a queue item's session tells recall. The server keeps a submitted workflow, named or not. webv2's own Generate,
- * Canvas, Video and Upscale submissions name their prompts and seed, so a webv2 item without them ran something else,
- * and its other values are never read by type and order; items from other clients still are.
- */
+/** A webv2 item without named prompts and seed ran something else; its other values are never read by type and order. */
 export const readQueueItemRecallInput = (
   item: QueueItemReadModel
 ): { isNonGenerateRun: boolean; meta: QueueGenerationMeta } => {
@@ -92,7 +77,6 @@ export const readQueueItemRecallInput = (
 
 export interface QueueRecallAvailability {
   capabilities: ImageRecallCapabilities;
-  /** For each unavailable kind, the i18n key of why; none while the answer is still loading. */
   reasons: Partial<Record<ImageRecallKind, string>>;
 }
 
@@ -116,12 +100,7 @@ const getUnrecordedReason = (kind: ImageRecallKind, source: QueueRecallSource, h
         'widgets.queue.recallRandomSeed'
       : 'widgets.queue.recallSettingsNotKept';
 
-/**
- * What each recall kind can do for an item, and why not when it cannot; every reason holds wherever it is shown.
- * Without this browser's snapshot only the prompts and seed the server ran are known, and a Workflow or Upscale run
- * holds no Generate settings at all (its session values are not Generate's, whatever their names). A missing record
- * outranks an unready Generate panel: selecting a model would not make it recallable.
- */
+/** A missing record outranks an unready Generate panel: selecting a model would not make it recallable. */
 export const getQueueRecallAvailability = ({
   meta,
   snapshot,
@@ -150,8 +129,6 @@ export const getQueueRecallAvailability = ({
     ? getVideoQueueRecallCapabilities(videoSnapshot, meta)
     : getQueueRecallCapabilities(snapshot, meta);
   const capabilities = { ...recorded };
-  // Partial kinds then wait for the Generate panel while nothing else is recallable, which the "Nothing recallable"
-  // reasons say; beside an available full recall they name only what the panel lacks.
   const blockedReason =
     target === 'no-capabilities'
       ? hasSnapshot
@@ -226,8 +203,7 @@ export const buildQueueRecallValues = (
     return {
       ...current,
       positivePrompt,
-      // Restore templates with authored snapshot prompts; clear templates for already-merged session prompts to avoid
-      // double wrapping. Older snapshots must not write undefined templates.
+      // Clear templates for already-merged session prompts to avoid double wrapping; never write undefined.
       promptTemplate: snapshot ? (snapshot.promptTemplate ?? null) : null,
       ...(negativePrompt !== undefined
         ? { negativePrompt, negativePromptEnabled: snapshot?.negativePromptEnabled ?? negativePrompt.length > 0 }
@@ -284,8 +260,7 @@ export const buildVideoQueueRecallPatch = (
 
     return {
       positivePrompt: meta.positivePrompt,
-      // Absent/empty session negatives cannot identify disabled state, so preserve the toggle. H3 batch negatives may
-      // recall harmless hidden values absent from gallery metadata.
+      // Absent/empty session negatives cannot identify disabled state, so preserve the toggle.
       ...(meta.negativePrompt !== undefined && meta.negativePrompt.length > 0
         ? { negativePrompt: meta.negativePrompt, negativePromptEnabled: true }
         : {}),
@@ -300,7 +275,6 @@ export const buildVideoQueueRecallPatch = (
   return null;
 };
 
-/** Discriminate Video patches from complete Generate values so callers must handle the correct destination contract. */
 export type QueueRecallPlan =
   | { target: 'generate'; values: GenerateWidgetValues }
   | { target: 'video'; patch: Partial<VideoWidgetValues> };
@@ -315,10 +289,7 @@ export const planQueueRecall = (
     videoSnapshot = null,
   }: {
     current: GenerateWidgetValues | null;
-    /**
-     * Whether this item was submitted from Video BY THIS CLIENT. False also means "unknown" — a foreign item's
-     * `field_values` cannot distinguish a video batch from an image one, so the Generate-shaped default stands.
-     */
+    /** False also means unknown: a foreign item's `field_values` cannot tell a video batch from an image one. */
     isVideoItem: boolean;
     meta: QueueGenerationMeta;
     snapshot: GenerateWidgetValues | null;

@@ -94,10 +94,7 @@ const ReferenceCard = memo(function ReferenceCard({
   targetArea,
   videoLabel,
 }: {
-  /**
-   * Pass scalar labels: labels depend on the whole list, but fresh per-card objects would rerender every card on each
-   * trim step.
-   */
+  /** Scalar labels: they depend on the whole list, and per-card objects would rerender every card on each trim step. */
   audioLabel: number | null;
   collections: ReferenceCollections;
   disabled: boolean;

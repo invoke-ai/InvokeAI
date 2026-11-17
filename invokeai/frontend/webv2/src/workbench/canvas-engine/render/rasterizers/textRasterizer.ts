@@ -9,7 +9,6 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 
 import type { RasterizeDeps, RasterizeResult } from './types';
 
-/** A `text` layer source. */
 export type TextSource = Extract<CanvasLayerSourceContract, { type: 'text' }>;
 type Ctx = RasterSurface['ctx'];
 
@@ -77,7 +76,6 @@ export const rasterizeTextSource = (
     ctx as Ctx & { fontVariationSettings?: string };
   const variationSettings = textFontVariationSettings(source);
 
-  // Measure on the target's own ctx (or a fresh surface) with the font applied.
   const surface = target ?? deps.backend.createSurface(1, 1);
   surface.ctx.font = font;
   context(surface.ctx).fontVariationSettings = variationSettings || 'normal';

@@ -19,11 +19,7 @@ const Divider = () => <Box bg="border.subtle" flexShrink={0} h="4" w="1px" />;
 
 const AUTO_SWITCH_POSITIONING = { placement: 'bottom-end' } as const;
 
-/**
- * The selection's actions, then the viewer's own controls (zoom, auto-switch, Details), sized by the density the view
- * publishes: its measured width in the center or a floating window (side rails are always compact). The filmstrip
- * toggle lives in the gear's quick settings and on the `T` key.
- */
+/** Selection actions, then zoom, auto-switch and Details, sized by the view's published density. */
 export const PreviewHeaderActions = (_props: WidgetViewProps) => {
   const livePreview = useLivePreviewFollow();
   const autoSwitch = useActiveProjectSelector((project) => project.settings.viewerAutoSwitch);

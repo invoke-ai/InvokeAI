@@ -69,44 +69,30 @@ export interface VideoPlayerProps extends Omit<
   VideoHTMLAttributes<HTMLVideoElement>,
   'aria-label' | 'children' | 'controls' | 'loop' | 'src'
 > {
-  /** Names the player. */
   'aria-label': string;
   src: string;
   /** Enables frame stepping and the frame readout. */
   fps?: number;
-  /**
-   * The clip's frames, when the caller knows them (a probed count): it is authoritative over `duration × fps`, which
-   * container rounding can make disagree. Without it the count is derived from the duration. Needs `fps`.
-   */
+  /** Authoritative over `duration × fps`, which container rounding can make disagree; needs `fps`. */
   frameCount?: number;
-  /** Controlled loop state; pair with `onLoopChange`. */
   loop?: boolean;
-  /** Initial loop state when uncontrolled. */
   defaultLoop?: boolean;
   onLoopChange?: (loop: boolean) => void;
   /**
-   * Plays this window instead of the whole clip. Playback that reaches its end wraps to its start while looping;
-   * otherwise it pauses on the window's last frame, and playing from there starts the window over. It is clamped to the
-   * media; a collapsed or inverted window is none, so playback covers the whole clip. Seeks never act on it, and one
-   * that leaves it keeps it: retiring it is the caller's call (`onSeeking`). A new window takes effect in the passive
-   * effects of the commit that renders it; playback started before then (a caller's `play()` in the same task) is
-   * judged against the previous window, so a caller starts it from an effect after the player's in that commit.
+   * Clamped to the media; a collapsed window is none. Seeks never retire it: that is the caller's call (`onSeeking`).
+   * Takes effect in the passive effects of its commit, so a caller's `play()` must come from a later effect.
    */
   playbackWindow?: PlaybackWindow | null;
   /** `compact` fits a small box: play, loop, scrubber and one readout; volume and fullscreen are left out. */
   size?: 'compact' | 'full';
-  /** Caller content above the video and below the controls; the caller positions it. */
   overlay?: ReactNode;
-  /** The video element, for behavior the player does not own. */
   ref?: Ref<HTMLVideoElement>;
 }
 
 type PlayerSize = NonNullable<VideoPlayerProps['size']>;
 
-/** The frames of the clip; null without a frame rate. */
 interface FrameTiming {
   fps: number;
-  /** Authoritative count from the caller, or null to derive it from the duration. */
   frameCount: number | null;
 }
 
@@ -116,29 +102,17 @@ const resolveFrameCount = ({ fps, frameCount }: FrameTiming, duration: number): 
 const PLAYBACK_RATES = [0.25, 0.5, 1, 2] as const;
 const CONTROLS_IDLE_MS = 2000;
 const VIDEO_STYLE: CSSProperties = { display: 'block', height: '100%', objectFit: 'contain', width: '100%' };
-// The control bar and the player's own popups carry these.
 const VIDEO_PLAYER_CONTROLS_ATTRIBUTE = 'data-video-player-controls';
 const VIDEO_PLAYER_POPUP_ATTRIBUTE = 'data-video-player-popup';
 
-/** Whether `target` is in a player's control bar or one of its popups, so a caller can tell their input from the picture's. */
 export const isVideoPlayerControlsTarget = (target: Element): boolean =>
   target.closest(`[${VIDEO_PLAYER_CONTROLS_ATTRIBUTE}], [${VIDEO_PLAYER_POPUP_ATTRIBUTE}]`) !== null;
-// Idle controls fade out, but stay focusable: keyboard focus inside the player, or the pointer resting on the bar,
-// keeps them shown.
+// Idle controls fade out but stay focusable; focus inside or the pointer on the bar keeps them shown.
 const CONTROLS_SHOWN_ANYWAY = `:has(:focus-visible, [${VIDEO_PLAYER_CONTROLS_ATTRIBUTE}]:hover)`;
 const CONTROLS_HIDDEN = `[data-controls-hidden]:not(${CONTROLS_SHOWN_ANYWAY})`;
 const PLAYER_CONTAINER = 'video-player';
 
-/**
- * The full bar fits the player's own width by dropping controls, in this order as it narrows. Thresholds come from
- * measuring the bar: each leaves about 25px spare for the controls still shown, room for a longer clip's time.
- * - Below 450px the volume slider moves into a popover that the volume button opens, beside a mute toggle.
- * - Below 370px the frame readout goes; the time stays.
- * - Below 310px the frame-step buttons go; `,` and `.` still step.
- * - Below 250px the speed menu goes, and the speed can no longer be changed.
- * Play, loop, the scrubber, the time, volume and fullscreen always stay, and fit down to about 180px. A dropped control
- * leaves the tab order and the accessibility tree; one that had focus when the player narrowed loses it.
- */
+/** Thresholds come from measuring the bar, each leaving ~25px spare; a dropped control leaves the tab order. */
 const hiddenBelow = (width: number) => ({
   [`@container ${PLAYER_CONTAINER} (width < ${width}px)`]: { display: 'none' },
 });
@@ -153,7 +127,6 @@ const FRAME_STEP_CSS = hiddenBelow(310);
 const PLAYBACK_RATE_CSS = { display: 'flex', ...hiddenBelow(250) };
 
 const ROOT_CSS = {
-  // The full bar drops controls by the player's own width, wherever it is placed.
   containerName: PLAYER_CONTAINER,
   containerType: 'inline-size',
   [`&${CONTROLS_HIDDEN}`]: { cursor: 'none' },
@@ -195,10 +168,7 @@ const CONTROLS_BAR_PROPS = {
 } as const;
 const RATE_MENU_POSITIONING = { placement: 'top-end' } as const;
 
-/**
- * The player's shortcuts. While focus is inside the player they are always its own, even when one does nothing in the
- * current state or size, so they never reach application hotkeys behind it.
- */
+/** While focus is inside the player these keys are always its own, so they never reach application hotkeys. */
 const PLAYER_KEYS = new Set([' ', ',', '.', 'f', 'k', 'l', 'm']);
 // Keys these targets own outright, and the activation key buttons and links own.
 const KEY_OWNER_SELECTOR = 'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="menu"]';
@@ -276,7 +246,6 @@ const ControlButton = ({ disabled, icon, label, onClick, portalled, pressed, sho
   const content = useMemo(() => <ShortcutLabel label={label} shortcut={shortcut} />, [label, shortcut]);
 
   return (
-    // Above the bar, so a tooltip never covers whatever sits below the player.
     <Tooltip content={content} placement="top" portalled={portalled}>
       <IconButton
         _hover={pressed ? undefined : SCRIM_BUTTON_HOVER}
@@ -367,8 +336,7 @@ const Scrubber = ({
         : t('common.videoPlayer.frameOfLast', { frame: frameOf(seconds), last: frameCount - 1 }),
     [duration, frameCount, frameOf, frames, t]
   );
-  // Capture phase: the slider's control stops the pointerdown from bubbling. The conditions are the slider's own for
-  // starting a drag (primary button, no Ctrl/Alt/Meta), so every scrub this starts is one the slider ends or cancels.
+  // Capture phase: the slider stops pointerdown bubbling. Same conditions as the slider's, so it ends every scrub.
   const handlePointerDownCapture = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
       if (disabled || !isScrubbable || event.button !== 0 || event.ctrlKey || event.altKey || event.metaKey) {
@@ -379,8 +347,7 @@ const Scrubber = ({
     },
     [disabled, isScrubbable, onScrubStart]
   );
-  // The slider's step is fine so a drag lands anywhere; arrow keys move by the coarser keyboard step instead, which the
-  // slider cannot take separately. A handled key never reaches the slider (it ignores prevented keys).
+  // Arrow keys move by the coarser keyboard step, which the slider cannot take separately.
   const handleKeyDownCapture = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       const direction = ARROW_DIRECTIONS[event.key];
@@ -572,7 +539,6 @@ const VolumeSlider = ({
   value,
 }: {
   disabled: boolean;
-  /** On the bar's dark scrim, rather than on a themed panel. */
   onScrim: boolean;
   store: MediaElementStore;
   value: number[];
@@ -610,7 +576,6 @@ const VolumeSlider = ({
   );
 };
 
-/** Mute and the volume level: inline on a wide bar; on a narrow one, in a popover the volume button opens. */
 const VolumeControls = ({
   disabled,
   onOpenChange,
@@ -692,14 +657,7 @@ const VolumeControls = ({
   );
 };
 
-/**
- * A video with its own controls: play, loop (on by default), an optional playback window, scrubbing, frame steps with
- * `fps`, speed, volume and fullscreen. `isVideoPlayerControlsTarget` tells the controls' pointer input from the
- * picture's. Clicking the picture plays and pauses, except that a touch tap while the controls are hidden only brings
- * them back. Shortcuts act only while focus is inside the player. Hiding or unmounting the player pauses it, so audio
- * never outlives its controls. Media errors leave the picture to the caller (`onError` and `overlay`) and remove the
- * controls, since none of them could work.
- */
+/** Hiding or unmounting pauses it, so audio never outlives its controls; media errors remove the controls. */
 export const VideoPlayer = ({
   'aria-label': label,
   defaultLoop = true,
@@ -739,18 +697,15 @@ export const VideoPlayer = ({
   const isFullscreen = fullscreenElement !== null && fullscreenElement.id === rootId;
   const canFullscreen = size === 'full' && document.fullscreenEnabled;
   const [isIdle, setIsIdle] = useState(false);
-  // Set while a pointer drag on the scrubber holds playback paused; `resume` is whether it was playing before.
   const [scrub, setScrub] = useState<{ resume: boolean } | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isVolumeOpen, setIsVolumeOpen] = useState(false);
   const idleTimerRef = useRef<number | null>(null);
-  // Set by a touch press made while the controls were hidden: its tap only brings them back.
   const revealingTapRef = useRef(false);
   // A mid-playback error can leave metadata in place, but nothing the controls do would work.
   const disabled = !status.ready || status.error;
 
-  // The slider cancels a drag without ending it when it becomes disabled (a new source, an error); drop the scrub
-  // rather than leave playback paused by it and the controls pinned. Adjusted during render, as derived state.
+  // The slider cancels a drag without ending it when disabled; drop the scrub here (derived state, during render).
   if (scrub !== null && disabled) {
     setScrub(null);
   }
@@ -779,8 +734,7 @@ export const VideoPlayer = ({
       setIsIdle(true);
     }, CONTROLS_IDLE_MS);
   }, [clearIdleTimer]);
-  // Hiding (Activity) or unmounting must silence the clip. Here rather than in the ref cleanup, which also runs when a
-  // caller's ref changes identity; a hidden Activity detaches refs first, hence the element captured at mount.
+  // Not in the ref cleanup, which also runs when a caller's ref changes; a hidden Activity detaches refs first.
   useMountEffect(() => {
     const video = videoElementRef.current;
 
@@ -804,8 +758,7 @@ export const VideoPlayer = ({
     [loopProp, onLoopChange]
   );
   const toggleLoop = useCallback(() => setLoop(!loop), [loop, setLoop]);
-  // Pause while dragging so playback does not fight the thumb; resume once the drag ends. A second pointer joining a
-  // drag keeps the first one's resume.
+  // A second pointer joining a drag keeps the first one's resume.
   const startScrub = useCallback(() => {
     const resume = !store.getSnapshot().paused;
 
@@ -868,14 +821,12 @@ export const VideoPlayer = ({
     (event: KeyboardEvent<HTMLDivElement>) => {
       const target = event.target;
       const key = event.key.toLowerCase();
-      // React delivers keys from portalled popups here too. The volume popover is part of the player; the speed menu
-      // owns its keys (KEY_OWNER_SELECTOR).
+      // React delivers keys from portalled popups too; the speed menu owns its keys (KEY_OWNER_SELECTOR).
       const isOwnTarget =
         target instanceof Element &&
         (event.currentTarget.contains(target) || target.closest(`[${VIDEO_PLAYER_POPUP_ATTRIBUTE}]`) !== null);
 
-      // A focused control's activation keys are its own too. They stop here without being prevented, so the control
-      // still activates and no application hotkey behind the player acts on them, or cancels the press.
+      // Activation keys stop here unprevented, so the control still activates and no hotkey behind the player acts.
       if (
         ACTIVATION_KEYS.has(key) &&
         !event.altKey &&
@@ -940,8 +891,7 @@ export const VideoPlayer = ({
     },
     [canFullscreen, disabled, size, stepFrame, store, toggleFullscreen, toggleLoop, toggleMute, wake]
   );
-  // Hidden controls take no pointer input, so a touch lands on the picture; toggling playback there would leave a touch
-  // user no way to reach the controls of a playing clip.
+  // Hidden controls take no pointer input; a touch that toggled playback would leave no way to reach them.
   const handlePointerDown = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
       revealingTapRef.current = event.pointerType === 'touch' && event.currentTarget.matches(CONTROLS_HIDDEN);
@@ -963,8 +913,7 @@ export const VideoPlayer = ({
     (event: MouseEvent<HTMLVideoElement>) => {
       onClick?.(event);
 
-      // Only a click that a press produced (detail > 0): a touch press can end in no click, and an activation without a
-      // press (`click()`, assistive technology) must not be taken for its tap.
+      // Only a press-produced click (detail > 0); `click()` and assistive activations are not taps.
       const isRevealingTap = revealingTapRef.current && event.detail > 0;
 
       revealingTapRef.current = false;
@@ -983,8 +932,7 @@ export const VideoPlayer = ({
     },
     [onPlay, wake]
   );
-  // A new source disables the controls and an error removes them; either would drop a focused control's focus to the
-  // page, so it moves to the player first.
+  // A new source or error would drop a focused control's focus to the page, so move it to the player first.
   const keepFocusInPlayer = useCallback(() => {
     const root = rootRef.current;
 

@@ -17,12 +17,8 @@ import {
 } from './workflowThumbnail';
 
 /**
- * A library card is presentation only: the grid handles its click (select), double-click (open), right-click and menu
- * button (its own actions menu, which leaves the selection alone) and quick actions by delegation from the data
- * attributes below, so a card renders again only when its own entry or state changes. Reserve enrichment height so
- * async facts cannot reflow the grid. Pointer hover (and focus within the card) reveals quick actions over the top of
- * the image: Open and Preview are pointer conveniences outside the tab order that never take focus (the grid hands it
- * to the card on press), and the menu button beside them is the card's keyboard-reachable control.
+ * Presentation only: the grid handles clicks, menus and quick actions by delegation from the data attributes below, so
+ * a card re-renders only when its own entry changes. Quick actions never take focus; the menu button does.
  */
 
 const CARD_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const;
@@ -33,9 +29,8 @@ const CARD_TRANSITION =
   'border-color var(--wb-motion-duration-medium) ease, background var(--wb-motion-duration-medium) ease';
 
 /**
- * Quick actions show while the pointer is over the card, focus is inside it, or its menu is open, and take the pointer
- * only while shown: a transparent control would swallow a press meant for the card. Without hover (touch), the
- * pointer-only actions never show and the menu button always does, so a tap on the image still selects.
+ * Quick actions take the pointer only while shown: a transparent control would swallow a press meant for the card.
+ * Without hover (touch) only the menu button shows.
  */
 const QUICK_ACTION_SHOWN = { opacity: 1, pointerEvents: 'auto' } as const;
 const CARD_ROOT_CSS: SystemStyleObject = {
@@ -59,14 +54,10 @@ export const getWorkflowLibraryCardId = (workflowId: string): string => `workflo
 export const getWorkflowLibraryCardMenuId = (workflowId: string): string =>
   `${getWorkflowLibraryCardId(workflowId)}-menu`;
 
-/**
- * The card's actions menu content, named so the tile button can point at it: the dialog's focus trap only lets focus
- * into portalled content that an expanded control inside the dialog names with aria-controls.
- */
+/** Named by the tile button's aria-controls: the dialog's focus trap only admits portalled content named that way. */
 export const getWorkflowLibraryCardMenuContentId = (workflowId: string): string =>
   `${getWorkflowLibraryCardId(workflowId)}-actions`;
 
-/** What opened a card's actions menu: a pointer position on the card, or the tile's own menu button. */
 export type WorkflowCardMenuAnchor =
   | { kind: 'point'; workflowId: string; x: number; y: number }
   | { kind: 'trigger'; workflowId: string; triggerId: string };
@@ -76,10 +67,7 @@ export type WorkflowCardContextMenuHandler = (workflowId: string, anchor: Workfl
 /** A quick action's `data-card-action`; the grid reads it with the card root's `data-workflow-card-root`. */
 export type WorkflowCardQuickAction = 'open' | 'preview';
 
-/**
- * A right-click on a card (or its quick actions) or a list row, or a click on a tile's or row's menu button, re-anchors
- * or toggles the open menu through its own handler rather than dismissing it as an outside press.
- */
+/** Re-anchors or toggles the open menu through its own handler instead of dismissing it as an outside press. */
 export const keepCardMenuOpenForRetarget = (event: {
   detail: { originalEvent: Event };
   preventDefault(): void;
@@ -101,17 +89,12 @@ export const keepCardMenuOpenForRetarget = (event: {
   }
 };
 
-/**
- * Preview and More sit on an opaque panel fill so they read over any thumbnail. That fill replaces the outline recipe's
- * translucent hover and expanded tint, so they lay the same tint over the panel (`bg.muted` equals `bg.panel`).
- */
+/** Over an opaque panel fill, so the outline recipe's translucent tints are re-laid over the panel. */
 const QUICK_ACTION_INTERACTION = { bg: 'color-mix(in oklab, {colors.gray.hoverTint} 10%, {colors.bg.panel})' } as const;
 
 /**
- * The library's menus (a card's, the rail's More, the sheet's More) are siblings, never nested. Zag handles an outside
- * press a frame after its pointerdown, so a quick press on one menu's trigger while another is open opens the new menu
- * first; the old one then leaves the layer stack with the new one above it and would dismiss it as its nested layer. A
- * dismissal requested by a closing menu is ignored; a closing dialog still dismisses its menus.
+ * Zag handles an outside press a frame late, so pressing a sibling menu's trigger opens it first and the closing menu
+ * would dismiss it as nested; such a dismissal is ignored. A closing dialog still dismisses its menus.
  */
 export const keepMenuOpenWhenSiblingMenuCloses = (event: {
   detail: { targetLayer: HTMLElement | undefined };
@@ -127,22 +110,16 @@ const QUICK_ACTION_SIZE = { large: 'sm', small: 'xs' } as const;
 
 export interface WorkflowLibraryCardProps {
   entry: WorkflowLibraryEntry;
-  /** The project's active workflow; the card says so in the header. */
   isActive?: boolean;
-  /** The project already holds a copy of this library template. */
   isInProject?: boolean;
-  /** Which of the tile's controls has the actions menu open, if any; that control names the menu for the dialog. */
   menuOpenedBy?: 'card' | 'button' | null;
   isSelected: boolean;
   /** Multi-user servers badge public templates; project workflows have no library visibility. */
   showVisibilityStatus?: boolean;
-  /** Project workflows say when they last ran instead of their node count. */
   showLastRun?: boolean;
-  /** Models this workflow needs that are not installed; 0 when none. */
   missingCount: number;
   /** Node packs the workflow uses that this server lacks; null while node templates are unknown. */
   missingNodePackCount?: number | null;
-  /** Shows the Preview quick action. */
   canPreview?: boolean;
 }
 
@@ -170,8 +147,7 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
   const workflowId = item.workflow_id;
   const dataTime = useDataTimeSnapshot(showLastRun ? item : null);
 
-  // Pointer-only parts (Open, Preview, the name's tooltip) mount on the first pointer visit: a row of cards mounts in
-  // one scroll frame, and these controls would roughly double what each card costs to mount.
+  // Pointer-only parts mount on the first pointer visit: they would roughly double each card's mount cost.
   const [isPointerArmed, setIsPointerArmed] = useState(false);
   const armPointer = useCallback(() => setIsPointerArmed(true), []);
   const handleThumbnailError = useCallback(() => setHasThumbnailFailed(true), []);
@@ -190,8 +166,7 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
     </Text>
   );
 
-  // The quick actions and menu button are siblings of the card button, never nested in it: a button cannot hold another
-  // control.
+  // The quick actions and menu button are siblings of the card button: a button cannot hold another control.
   return (
     <Box
       css={CARD_ROOT_CSS}
@@ -268,8 +243,7 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
         </Stack>
       </Box>
       <HStack
-        // Over the top of the image, clear of the card's centre (there a press selects the card, and a strip the hover
-        // revealed would take it instead) and of the in-project marker at the image's bottom corner.
+        // Clear of the card's centre, where a press selects, and of the in-project marker at the image's bottom corner.
         top="1.5"
         data-workflow-card-actions={workflowId}
         gap="1"
@@ -312,8 +286,7 @@ export const WorkflowLibraryCard = memo(function WorkflowLibraryCard({
             </IconButton>
           </Tooltip>
         ) : null}
-        {/* Always mounted with its own tooltip: it is the card's keyboard control (Tab order, focus restore and the
-            grid's Tab handling find it by id), and wrapping it later would remount it under focus. */}
+        {/* Always mounted: it is the card's keyboard control, and wrapping it later would remount it under focus. */}
         <Tooltip content={t('workflowLibrary.moreActions')}>
           <IconButton
             aria-controls={menuOpenedBy === 'button' ? menuContentId : undefined}

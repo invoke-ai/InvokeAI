@@ -11,12 +11,9 @@ import { createTrailingSingleFlight } from '@platform/state/singleFlight';
 import { getFp8StorageSupport, type Fp8StorageSupportRow } from './api';
 
 /**
- * Which models may be offered the FP8 Storage default, answered by the backend.
- *
- * The client used to answer it from the model type alone — `main`, `controlnet` or `t2i_adapter` — and so offered the
- * control for 19 of the 52 loader keys that ignore it: a GGUF main model whose packed weights must never be re-encoded,
- * a FLUX ControlNet whose loader never casts. Type is not enough, and neither is base: FLUX main casts and FLUX
- * ControlNet does not. The server composes the whole answer per `(base, type, format)` and ships the finished boolean.
+ * Which models may be offered the FP8 Storage default, answered by the backend per `(base, type, format)`. Neither type
+ * nor base is enough: a GGUF main model's packed weights must never be re-encoded, and FLUX main casts while a FLUX
+ * ControlNet's loader never does.
  *
  * Static per backend build, so it is fetched once on first use rather than kept fresh.
  */
@@ -79,9 +76,8 @@ export const ensureFp8StorageSupportLoaded = (): Promise<void> => {
 /**
  * Whether FP8 Storage does anything for this model. `false` until the table has arrived.
  *
- * Unknown reads as unsupported in both directions — before the table loads, and for a key the table does not contain.
- * Offering a control that turns out to be inert is the defect this replaces; a control that appears a moment late is
- * not.
+ * Unknown reads as unsupported in both directions — before the table loads, and for a key the table does not contain:
+ * an inert control is a defect, a control that appears a moment late is not.
  *
  * A row with base `any` is a wildcard loader registration, resolved after the exact key and in the same order the
  * backend registry resolves a loader. T2I adapters are served entirely that way, so without the fallback they would all

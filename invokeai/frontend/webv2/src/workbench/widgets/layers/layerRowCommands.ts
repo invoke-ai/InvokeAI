@@ -12,10 +12,7 @@ export interface LayerSurfaceAnchor {
   readonly height: number;
 }
 
-/**
- * Share one stable command handle per tree; rows rerender for their own model/selection while the tree owns
- * subscriptions and commits.
- */
+/** One stable command handle per tree; rows rerender for their own state while the tree owns commits. */
 export interface LayerRowCommands {
   select(id: string, modifiers: LayerSelectionModifiers): void;
   focus(id: string): void;
@@ -29,12 +26,8 @@ export interface LayerRowCommands {
   openMenu(id: string, anchor: LayerSurfaceAnchor): void;
   openStackMenu(stack: LayerStackKind, anchor: LayerSurfaceAnchor): void;
   toggleCollapse(stack: LayerStackKind): void;
-  /** Shows or hides a layer's projected child rows. */
   toggleChildren(id: string): void;
-  /**
-   * Sub-selects a child row: its owner becomes the selected layer and its editor opens in Properties, unless `reveal:
-   * false` (a context menu selects without yanking the pane open).
-   */
+  /** Sub-selects a child row and opens its editor, unless `reveal: false` (context menus). */
   selectChild(child: ProjectedChildRow, options?: { reveal?: boolean }): void;
   setChildEnabled(child: ProjectedChildRow, isEnabled: boolean): void;
   removeChild(child: ProjectedChildRow): void;
@@ -42,10 +35,7 @@ export interface LayerRowCommands {
   renameChild(child: ProjectedChildRow, name: string | null): void;
   /** Ordered kinds only (adjustment entries): swap with the neighbour in `direction`. */
   moveChild(child: ProjectedChildRow, direction: -1 | 1): void;
-  /**
-   * Reference images and adjustment entries: append the item to another layer holding its kind as one atomic edit; the
-   * item stays sub-selected and focused at its new row.
-   */
+  /** Moves the item to another layer of its kind as one atomic edit; it stays sub-selected and focused. */
   moveChildToLayer(child: ProjectedChildRow, layerId: string): void;
   /** Ordered kinds only: insert a copy directly after the entry. */
   duplicateChild(child: ProjectedChildRow): void;

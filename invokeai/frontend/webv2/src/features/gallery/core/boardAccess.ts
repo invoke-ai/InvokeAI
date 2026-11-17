@@ -5,7 +5,6 @@ import type { GalleryBoard, GalleryBoardAction } from './types';
  * only read its answer. A board without `access` (a virtual board) is the caller's own and allows what it always did.
  */
 
-/** Whether the server lets the caller take an action on the board. */
 export const canOnBoard = (board: GalleryBoard, action: GalleryBoardAction): boolean =>
   board.access === undefined || board.access.actions.includes(action);
 

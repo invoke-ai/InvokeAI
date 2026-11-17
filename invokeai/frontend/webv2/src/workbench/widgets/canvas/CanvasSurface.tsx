@@ -18,20 +18,14 @@ export type CanvasSurfaceEngine = Pick<
   'document' | 'interaction' | 'layers' | 'projectId' | 'surface' | 'viewport'
 >;
 
-/**
- * Focus the canvas container in capture before engine handlers so hotkeys resolve here. Preserve focus already inside,
- * especially text editing, to avoid blur-commit before the engine's commit-and-swallow path.
- */
+/** Focuses the container in capture before engine handlers, keeping focus already inside (text editing). */
 const focusCanvasSurface = (event: ReactPointerEvent<HTMLDivElement>) => {
   if (shouldFocusCanvasSurface(event.currentTarget, event.target, document.activeElement)) {
     event.currentTarget.focus({ preventScroll: true });
   }
 };
 
-/**
- * Bind document/overlay canvases and ResizeObserver through an engine-keyed ref callback with cleanup. The engine owns
- * input without React interaction renders.
- */
+/** Engine-keyed ref callback: binds the canvases and ResizeObserver; the engine owns input without React renders. */
 export const CanvasSurface = ({ engine, instanceId }: { engine: CanvasSurfaceEngine; instanceId: string }) => {
   const screenRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);

@@ -23,14 +23,12 @@ export const isWidgetRegion = (value: unknown): value is WidgetRegion =>
 
 export type FloatingWidgetMode = 'windowed' | 'maximized' | 'shaded';
 
-/** Geometry + stacking for a widget instance detached into a floating window. */
 export interface FloatingWidgetState {
   x: number;
   y: number;
   widthPx: number;
   heightPx: number;
   mode: FloatingWidgetMode;
-  /** The dockable region this window returns to when docked. */
   returnRegion: WidgetRegion;
   /**
    * Position in the return region's complete order: its docked members plus one marker per floating window. Placement

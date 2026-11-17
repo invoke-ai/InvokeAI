@@ -33,8 +33,6 @@ export interface LayerPixels {
 
 export const rgbaBytes = (rect: Rect): number => Math.max(0, rect.width) * Math.max(0, rect.height) * 4;
 
-// ---- Publication outcomes ----------------------------------------------------------------------------------
-
 /**
  * Whether a layer operation can read a layer's cache now: `not-ready` while its pixels load or cannot be fetched for
  * now (waiting helps), {@link LayerUnreadable} once rasterizing its current source failed (waiting does not; the
@@ -87,8 +85,6 @@ export const guardedResultRefusal = (
   }
 };
 
-// ---- Replays -------------------------------------------------------------------------------------------------
-
 export type ReplayContext = Pick<CanvasMutationContext, 'reserveRaster'>;
 
 /** Why a replay that cannot reserve its preparation memory stays where it is. */
@@ -125,8 +121,6 @@ export const replayWithPixels = (
     ctx.applyStep(step(ctx.preparePixels(layerId, snapshot.rect, snapshot.pixels)))
   );
 };
-
-// ---- Steps ---------------------------------------------------------------------------------------------------
 
 /** Options shared by the in-place replace steps. */
 export interface ReplaceLayerStepOptions {
@@ -188,9 +182,8 @@ export const replaceLayerStep = (
 });
 
 /**
- * {@link replaceLayerStep} for several same-type leaves at once, as one `replaceCanvasLayers`. It rolls back to
- * `restore` (one contract per replaced layer) when its postconditions fail; without a complete restore set it has no
- * rollback.
+ * {@link replaceLayerStep} for several same-type leaves at once, as one `replaceCanvasLayers`. Failed postconditions
+ * roll back to `restore` (one contract per replaced layer); an incomplete restore set means no rollback.
  */
 export const replaceLayersStep = (
   ctx: Pick<CanvasMutationContext, 'installPrepared'>,
@@ -241,8 +234,6 @@ export const removeLayerStep = (layerId: string, selectedLayerId: string | null)
   accepted: (document) => isNodeAbsent(document, layerId) && document?.selectedLayerId === selectedLayerId,
   mutation: removeLayerMutation(layerId, selectedLayerId),
 });
-
-// ---- New paint layers ----------------------------------------------------------------------------------------
 
 /** A raster paint layer placing pixels at `rect` with an identity transform. */
 export const paintLayerAt = (id: string, name: string, rect: Rect): CanvasLayerContract => ({

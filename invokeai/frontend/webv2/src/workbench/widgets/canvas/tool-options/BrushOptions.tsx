@@ -65,10 +65,7 @@ export const PaintSizeControl = ({
 
 const formatPercent = (value: number): string => `${value}%`;
 
-/**
- * A 0–1 paint option (opacity, hardness) as a percent scrubber, shared by the brush and eraser. Tool options are not
- * history, so every step writes through.
- */
+/** A 0–1 paint option (opacity, hardness) as a percent scrubber, shared by the brush and eraser. */
 export const PaintPercentControl = ({
   defaultValue,
   label,

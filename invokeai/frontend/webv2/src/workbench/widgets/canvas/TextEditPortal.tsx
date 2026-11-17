@@ -18,11 +18,7 @@ import { useTranslation } from 'react-i18next';
 type TextEditEngine = Pick<CanvasEngineHandle, 'interaction' | 'layers' | 'viewport'> &
   Partial<Pick<CanvasEngineHandle, 'fonts'>>;
 
-/**
- * Render session text as document-unit contenteditable transformed by pan/zoom; the compositor skips that layer.
- * Preserve manual line breaks without wrapping. Keystrokes stay in DOM and stop hotkey propagation; blur/mod+enter
- * commits and Escape cancels.
- */
+/** Session text as a pan/zoom-transformed contenteditable; keystrokes stay in the DOM, out of hotkeys. */
 
 /** Re-renders on any viewport (pan/zoom) change via a value-stable snapshot string. */
 const useViewportTick = (engine: TextEditEngine): string => {
@@ -39,7 +35,6 @@ const useViewportTick = (engine: TextEditEngine): string => {
 /** Reads the editable's text with manual line breaks preserved (`\n` per visual line). */
 const readEditableText = (el: HTMLElement): string => el.innerText;
 
-/** Moves the caret to the end of `el`'s content. */
 const placeCaretAtEnd = (el: HTMLElement): void => {
   const selection = window.getSelection();
   if (!selection) {
@@ -78,7 +73,6 @@ interface TextEditableProps {
 
 /** Key by session.id so content/focus seed once while position and style remain reactive. */
 const TextEditable = ({ engine, session }: TextEditableProps) => {
-  // Re-render on pan/zoom so the transform below tracks the viewport.
   useViewportTick(engine);
   const viewport = engine.viewport.getViewport();
   const { source, transform } = session;
@@ -200,7 +194,6 @@ const TextEditable = ({ engine, session }: TextEditableProps) => {
   );
 };
 
-/** Renders the editable for the active session, or nothing. */
 export const TextEditPortal = ({ engine }: { engine: TextEditEngine }) => {
   const session = useTextEditSession(engine);
   if (!session) {

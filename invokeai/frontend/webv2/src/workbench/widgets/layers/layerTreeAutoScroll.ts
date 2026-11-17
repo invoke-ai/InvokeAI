@@ -8,11 +8,7 @@ export interface LayerTreeAutoScroller {
   stop(): void;
 }
 
-/**
- * Deterministic edge scrolling for drags: velocity grows linearly with depth into the band and the loop runs only while
- * there is velocity, so a pointer that leaves the band stops scrolling on the next frame and a finished drag stops it
- * at once.
- */
+/** Edge scrolling whose loop runs only while there is velocity, so leaving the band stops it next frame. */
 export const createLayerTreeAutoScroller = (
   element: { readonly current: HTMLElement | null },
   schedule: (callback: () => void) => number = (callback) => requestAnimationFrame(callback),

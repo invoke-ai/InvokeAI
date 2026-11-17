@@ -250,8 +250,7 @@ export const GalleryBoardRow = ({
       opacity={isDragging ? 0.4 : undefined}
       outline={isOver ? '2px solid' : canDropItems ? '1px dashed' : undefined}
       outlineColor={canDropItems ? 'accent.solid' : undefined}
-      // Inset keeps the ring inside the row; the selected row's opaque accent fill would cover it, so its ring stays
-      // outside where it reads.
+      // Inset keeps the ring inside the row; the selected row's opaque fill would cover it, so that ring stays outside.
       outlineOffset={isOver && !isSelected ? '-2px' : undefined}
       rounded="sm"
       transition="background var(--wb-motion-duration-fast) ease"

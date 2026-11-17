@@ -82,7 +82,6 @@ interface SpatialJob extends TargetKey {
 }
 
 interface SpatialSlot {
-  /** The latest display request. */
   target: SpatialDisplayTarget | null;
   /** Source version the surface's pixels reflect; null until this slot painted the surface. */
   shownVersion: number | null;
@@ -114,7 +113,6 @@ export interface SpatialDisplay {
   request(ownerId: string, target: SpatialDisplayTarget, rebuilt: boolean): void;
   /** Whether the owner shows the installed result for exactly `target`. */
   isExact(ownerId: string, target: TargetKey): boolean;
-  /** How final the owner's displayed pixels are for `target`. */
   state(ownerId: string, target: TargetKey): DisplayedPixelsState;
   status(ownerId: string): AdjustedSurfaceStatus | null;
   /** Forgets an owner, abandoning its job and clearing its status; false when it had no state. */

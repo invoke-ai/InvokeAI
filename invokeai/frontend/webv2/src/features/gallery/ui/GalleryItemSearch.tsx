@@ -21,10 +21,9 @@ import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const SEARCH_HINT_ID = 'gallery-search-hint';
-/** Debounce typing because each semantic commit embeds and reranks on the server. */
+/** Each semantic commit embeds and reranks on the server. */
 export const SEMANTIC_SEARCH_COMMIT_DEBOUNCE_MS = 300;
 
-/** The full identity of the reference, surfaced as the chip's hover title. */
 const getSemanticReferenceTitle = (reference: GallerySemanticReference): string => {
   switch (reference.kind) {
     case 'text':
@@ -40,7 +39,6 @@ const getSemanticReferenceTitle = (reference: GallerySemanticReference): string 
   }
 };
 
-/** A short human-readable name for the chip; empty when nothing legible exists. */
 const getSemanticReferenceName = (reference: GallerySemanticReference): string => {
   switch (reference.kind) {
     case 'text':
@@ -70,13 +68,11 @@ export const GalleryItemSearch = () => {
   const { data: indexAvailability } = useQuery(imageIndexAvailabilityOptions());
   const isSemanticMode = gallery.semanticSearchText !== null;
   const semanticText = gallery.semanticSearchText ?? '';
-  // Offer semantic mode whenever indexing is configured; keep the toggle reachable for persisted mode so users can exit
-  // it.
+  // A persisted mode keeps the toggle reachable so users can exit.
   const isIndexConfigured = indexAvailability !== undefined && indexAvailability.state !== 'disabled';
   const showSemanticToggle = isIndexConfigured || isSemanticMode;
 
-  // The commit trails typing on a timer that belongs to this render tree; a timer that outlives the field is cleared,
-  // and one that outlives its text is refused by the reducer.
+  // A timer that outlives the field is cleared; one that outlives its text is refused by the reducer.
   const inputRef = useRef<HTMLInputElement>(null);
   const commitTimerRef = useRef<number | null>(null);
   const cancelPendingCommit = useCallback(() => {
@@ -97,8 +93,7 @@ export const GalleryItemSearch = () => {
 
       actions.setSemanticSearchText(value);
       cancelPendingCommit();
-      // Commit text even without the model; listing errors explain unavailable search without leaving deferred text to
-      // reconcile.
+      // Commit even without the model: listing errors explain the unavailable search.
       commitTimerRef.current = window.setTimeout(() => {
         commitTimerRef.current = null;
         actions.commitSemanticSearch(value);
@@ -107,7 +102,6 @@ export const GalleryItemSearch = () => {
     [actions, cancelPendingCommit, isSemanticMode]
   );
 
-  // Enter is the explicit form of the same commit: no reason to keep waiting.
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
       if (!isSemanticMode || event.key !== 'Enter' || isImeComposing(event.nativeEvent)) {
@@ -124,18 +118,15 @@ export const GalleryItemSearch = () => {
   const handleToggleSemanticMode = useCallback(
     (enabled: boolean) => {
       cancelPendingCommit();
-      // Rendered before focus moves, so the field is announced under its semantic name — a name that changes on an
-      // already-focused element is not read out again.
+      // Rendered before focus moves: a name change on a focused element is not read out again.
       flushSync(() => actions.setSemanticSearchMode(enabled));
 
       if (!enabled) {
         return;
       }
 
-      // The next keystrokes are what the toggle was for.
       inputRef.current?.focus();
 
-      // Explain missing prerequisites on activation while retaining the inline hint for the active mode.
       if (indexAvailability?.state === 'model_missing') {
         notifications.add({
           kind: 'info',
@@ -157,8 +148,7 @@ export const GalleryItemSearch = () => {
     [actions]
   );
   const isSearchingAllBoards = gallery.searchScope === 'all';
-  // Only a search has a scope, and it sits inside the search row so choosing one never moves the grid. The selected
-  // board and where results go stay as they are.
+  // Inside the search row, so choosing a scope never moves the grid.
   const scopeToggle = useMemo(
     () =>
       gallery.isSearchActive ? (
@@ -178,8 +168,7 @@ export const GalleryItemSearch = () => {
     [gallery.isSearchActive, handleSearchScopeChange, isSearchingAllBoards, t]
   );
 
-  // In-app drags (dnd-kit) resolve through GalleryBoardDragMonitor; this hook only registers the drop target and
-  // reports hover for the highlight.
+  // In-app drags resolve through GalleryBoardDragMonitor; this only registers the target and reports hover.
   const { isOver: isItemDragOver, setNodeRef: setSemanticDropRef } = useGalleryImageDroppable({
     id: GALLERY_SEMANTIC_SEARCH_DROP_ID,
   });
@@ -206,8 +195,7 @@ export const GalleryItemSearch = () => {
     (event: React.DragEvent<HTMLDivElement>) => {
       const types = event.dataTransfer.types;
 
-      // Only claim drops this feature understands; a plain-text drop must fall through to the browser's default
-      // insertion into the input.
+      // Plain text falls through to the browser's default input insertion.
       if (!types.includes('Files') && !types.includes('text/uri-list')) {
         setIsNativeDropOver(false);
         return;
@@ -227,7 +215,7 @@ export const GalleryItemSearch = () => {
 
   const isDropTargetActive = isItemDragOver || isNativeDropOver;
 
-  // Position failure text outside flow so it cannot enlarge or misalign the search row.
+  // Out of flow so it cannot enlarge or misalign the search row.
   const invalidHint = useMemo(() => {
     if (isSemanticMode) {
       return null;
@@ -239,11 +227,9 @@ export const GalleryItemSearch = () => {
     return invalid ? t('widgets.gallery.dateFilterInvalid', { value: invalid.raw }) : null;
   }, [gallery.searchTerm, isSemanticMode, t]);
 
-  // The index leaves archived boards out, so a ranked search scoped to one can only come back empty. Clusters are
-  // explicit member lists, not rankings, so they are exempt.
+  // The index leaves archived boards out, so a ranked search there can only come back empty; clusters are exempt.
   const isRankedSearch =
     isSemanticMode || (gallery.semanticImageQuery !== null && gallery.semanticImageQuery.kind !== 'cluster');
-  // A search of every board leaves archived boards out by design, so the selected board's state says nothing then.
   const isArchivedBoard =
     gallery.searchScope === 'board' &&
     gallery.boards.some((board) => board.id === gallery.selectedBoardId && board.archived);
@@ -256,8 +242,7 @@ export const GalleryItemSearch = () => {
 
   const hint = invalidHint ?? semanticHint;
 
-  // The chips show which text is a filter, not what it resolved to, so the resolved range stays available to assistive
-  // tech.
+  // The chips show the filter text; assistive tech gets the resolved range.
   const appliedRange = useMemo(() => {
     const parse = parseDateTokens(gallery.searchTerm);
     const shape = parse.range ? describeDateRange(parse.range) : null;
@@ -283,7 +268,7 @@ export const GalleryItemSearch = () => {
     }
   }, [gallery.searchTerm, i18n.language, t]);
 
-  // One name in both states — the pressed state says which — and the tooltip names the action a click takes.
+  // One name in both states; the pressed state says which.
   const semanticToggle = useMemo(
     () =>
       showSemanticToggle ? (
@@ -322,7 +307,7 @@ export const GalleryItemSearch = () => {
             onClick={handleClearSearch}
           />
         ) : null}
-        {/* The help documents metadata grammar, which a semantic description has none of. */}
+        {/* The help documents metadata grammar. */}
         {isSemanticMode ? null : <GallerySearchHelp />}
       </HStack>
     ),
@@ -343,10 +328,7 @@ export const GalleryItemSearch = () => {
       onDrop={handleNativeDrop}
     >
       <Stack gap="1" minW="0">
-        {/*
-         * Image/file/cluster chips replace semantic text mode. Legacy text chips remain readable; toggling switches
-         * a chip to typed search.
-         */}
+        {/* Image/file/cluster chips replace semantic text mode. */}
         {!isSemanticMode && gallery.semanticImageQuery ? (
           <GallerySemanticChip
             reference={gallery.semanticImageQuery}
@@ -380,8 +362,7 @@ export const GalleryItemSearch = () => {
           fontSize="xs"
           id={SEARCH_HINT_ID}
           insetInlineStart="0"
-          // Out of flow and inert: it must never shift the header row, nor swallow clicks meant for the grid it now
-          // floats over.
+          // Inert: never shift the header row or swallow clicks meant for the grid.
           pointerEvents="none"
           position="absolute"
           role="status"
@@ -399,7 +380,6 @@ export const GalleryItemSearch = () => {
   );
 };
 
-/** Clearing the active semantic reference restores metadata search. */
 const GallerySemanticChip = ({
   onClear,
   reference,

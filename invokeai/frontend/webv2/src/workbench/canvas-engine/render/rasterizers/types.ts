@@ -23,11 +23,8 @@ export interface RasterizeResult {
   rect: Rect;
 }
 
-/** Dependencies shared by the source rasterizers. */
 export interface RasterizeDeps {
-  /** Surface + bitmap factory seam. */
   backend: RasterBackend;
-  /** Fetches image blobs by name for decoding. */
   resolver: ImageResolver;
   /** Cancels pending image resolution and prevents decode/cache publication. */
   signal?: AbortSignal;

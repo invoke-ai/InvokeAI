@@ -19,9 +19,7 @@ import { getDestinationLabel } from '@workbench/invocation';
 import { getActiveProjectGraph } from '@workbench/projectWorkflows';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
-/**
- * Translate project/surface to preview data without effects; callers load models/templates before per-edit compilation.
- */
+/** Pure project-to-preview translation; callers load models and templates first. */
 export interface GraphPreviewSourceDeps {
   models: readonly ModelConfig[] | undefined;
   project: Project;

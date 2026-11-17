@@ -52,8 +52,7 @@ const ConnectedProperties = ({ engine }: { engine: CanvasEngineHandle }) => {
   const regionProps = { engine };
   const ToolActions = tool.actions;
 
-  // `inert` will blur a focused tool control once an operation starts; hand focus to the operation's Cancel first. The
-  // Operation section comes first, so its Cancel is the first match; focusing it scrolls it into view.
+  // `inert` will blur a focused tool control once an operation starts; hand focus to the operation's Cancel first.
   const root = useRef<HTMLDivElement>(null);
   const toolSection = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {

@@ -2,7 +2,6 @@ import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { applyToPoint } from './mat2d';
 
-/** True if the rect has non-positive width or height. */
 export const isEmpty = (r: Rect): boolean => r.width <= 0 || r.height <= 0;
 
 /** Intersection of two rects, or `null` if they don't overlap (or either is empty). */
@@ -81,13 +80,9 @@ export const transformBounds = (m: Mat2d, r: Rect): Rect => {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 };
 
-/** Rect area, treating empty rects as zero area. */
 const area = (r: Rect): number => (isEmpty(r) ? 0 : r.width * r.height);
 
-/**
- * True if two rects overlap or touch within `slack` pixels of each other (i.e. their `slack`-expanded bounds
- * intersect).
- */
+/** True if two rects overlap or touch within `slack` pixels (their `slack`-expanded bounds intersect). */
 const isNearby = (a: Rect, b: Rect, slack: number): boolean => {
   const expandedA = slack === 0 ? a : expand(a, slack);
   return intersect(expandedA, b) !== null;

@@ -149,10 +149,8 @@ const cropPixels = (backend: RasterBackend, exported: RasterSurface, exportedRec
   return cropped;
 };
 
-/** What crop all makes of one leaf's export. */
 type CropExport = Extract<ExportResult, { status: 'ok' }> | { status: 'skip' } | LayerUnreadable | CropAllLayersResult;
 
-/** One leaf's crop: its contract and pixels before and after. */
 interface LayerCrop {
   readonly before: CanvasLayerContract;
   readonly beforePixels: LayerPixels;

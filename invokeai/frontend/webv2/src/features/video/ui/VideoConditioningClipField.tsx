@@ -12,11 +12,9 @@ import { useVideoUiActions } from './VideoUiContext';
 
 /**
  * The whole-modality conditioning slot: a clip whose soundtrack the model generates a picture for, or whose picture it
- * generates a soundtrack for. One slot with a role, not two slots, because LTX-2 holds exactly one modality clean and
- * samples the other. Start and end images can anchor the generated picture in the soundtrack role only, so while they
- * are set the picture role is closed.
- *
- * No trim bounds: the conditioning nodes consume the whole recording.
+ * generates a soundtrack for. One slot with a role, because LTX-2 holds exactly one modality clean and samples the
+ * other. Start and end images can anchor the generated picture in the soundtrack role only, so while they are set the
+ * picture role is closed. No trim bounds: the conditioning nodes consume the whole recording.
  */
 
 const DROP_ID = 'video-conditioning-clip';
@@ -87,8 +85,7 @@ export const VideoConditioningClipField = memo(
       },
       [onChange, readValues]
     );
-    // The whole premise of this field is what is inside the clip, so it gets the same way back to the gallery record
-    // that every other media slot has.
+    // Like every other media slot, the clip gets a way back to its gallery record.
     const videoName = conditioningClip?.clip.video_name;
     const handleFind = useCallback(() => {
       if (videoName !== undefined) {

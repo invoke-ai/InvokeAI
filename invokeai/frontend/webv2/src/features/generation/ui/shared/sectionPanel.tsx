@@ -151,7 +151,6 @@ export const revealPanelSection = (entry: SectionPanelEntry, persist: PersistSec
 
 const SectionPanelContext = createContext<string | null>(null);
 
-/** The panel id the sections inside belong to, or null outside a panel. */
 export const useSectionPanelId = (): string | null => use(SectionPanelContext);
 
 /**

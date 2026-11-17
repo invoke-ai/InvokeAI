@@ -66,9 +66,7 @@ const GALLERY_HOTKEYS = [
   readonly string[],
 ])[];
 
-/**
- * Read current handler state without re-registering commands on selection changes, avoiding palette and hotkey churn.
- */
+/** Read current handler state without re-registering commands on selection changes (palette and hotkey churn). */
 export const useGalleryGridHotkeys = ({
   actionSelectionRefs,
   columnCount,
@@ -88,19 +86,16 @@ export const useGalleryGridHotkeys = ({
   actionSelectionRefs: GalleryItemRef[];
   columnCount: number;
   /**
-   * Where the arrow keys step from, in priority order: the tile holding keyboard focus, the followed session, the
-   * selected item. The first the grid shows is the cursor.
+   * Where arrows step from, by priority: the focused tile, the followed session, the selection; the first shown wins.
    */
   getCursorCandidates: () => (string | null)[];
   /** Where focus returns from a dialog a command opens; undefined leaves that to the dialog. */
   getDialogReturnFocus: () => (() => HTMLElement | null) | undefined;
   /** The first thumbnail in view: where the arrows land when no cursor is on screen. */
   getFirstVisibleTileKey: () => string | null;
-  /** The thumbnail holding keyboard focus, if any. */
   getFocusedItem: () => GalleryItem | null;
   /**
-   * Applies `select` (none for a focus-only move), brings the entry's tile into view, and moves keyboard focus there
-   * when the grid holds it.
+   * Applies `select` (none for focus-only moves), brings the tile into view, and focuses it while the grid has focus.
    */
   moveToEntry: (entry: GalleryNavigationEntry, select: (() => void) | null) => void;
   /** The arrow-key sections in visual order: the starred strip, in progress, the listing. */

@@ -16,92 +16,78 @@ import type { GalleryReadState, GalleryStateView } from './galleryStateView';
 import type { GalleryItemActions, GalleryWidgetProps, GalleryWidgetRuntime } from './GalleryUiContext';
 import type { GalleryListingState, GallerySparseListing } from './useGalleryData';
 
-/**
- * The provider maps widget intents to workbench/backend actions; shared ImageActions owns cross-widget item operations.
- */
+/** Shared ImageActions owns cross-widget item operations. */
 export interface GalleryActions {
   archiveBoard: (boardId: string, archived: boolean) => Promise<void>;
-  /** Drops the whole selection, the item Preview shows included. */
   clearSelection: () => void;
-  /** In the given project, or in the Library for null. */
-  /** Resolves `true` once the board exists and is selected; a reported failure resolves `false`. */
+  /** In the project, or the Library for null; resolves `true` once the board exists and is selected. */
   createBoard: (boardName: string, projectId: string | null) => Promise<boolean>;
   deleteBoard: (boardId: string, includeImages: boolean) => Promise<void>;
   downloadBoard: (boardId: string) => Promise<void>;
-  /** Where the board's media is still used; see `GalleryUiAdapter.getBoardMediaUsage`. */
   getBoardMediaUsage: (boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>;
-  /** Export the project that owns this board as a complete `.invk` archive. */
   exportProject: (projectId: string, projectName: string) => void;
   loadMore: () => void;
-  /** Into a project, or to the Library for null; `destinationLabel` is what the confirmation names. */
+  /** `destinationLabel` is what the confirmation names. */
   moveBoard: (boardId: string, projectId: string | null, destinationLabel: string) => Promise<void>;
   refresh: () => void;
   renameBoard: (boardId: string, boardName: string) => Promise<void>;
-  /** Who else may open the board: its owner's (or an admin's) choice. */
   setBoardGeneralAccess: (boardId: string, generalAccess: GalleryGeneralAccess) => Promise<void>;
   selectBoard: (boardId: string) => void;
   selectItem: (item: GalleryItem, selectionPage?: number) => void;
   selectItemRange: (items: GalleryItemRef[], primaryItem: GalleryItem, selectionPage?: number) => void;
   setCompareItem: (image: GalleryImageItem | null) => void;
   setSearchTerm: (searchTerm: string) => void;
-  /** Where a search looks: the selected board, or every readable board; resets the page like a search. */
+  /** Resets the page like a search. */
   setSearchScope: (searchScope: GallerySearchScope) => void;
-  /** Restricts (or releases) the listing to starred items; resets the page like a search. */
+  /** Resets the page like a search. */
   setStarredOnly: (starredOnly: boolean) => void;
-  /** Clears the search field: its text, any ranking, and semantic mode. */
+  /** Clears text, ranking and semantic mode. */
   clearSearch: () => void;
-  /** Applies the semantic field's text as the ranking; a no-op once the field has moved on. */
+  /** A no-op once the field has moved on. */
   commitSemanticSearch: (text: string) => void;
-  /** Sets (or clears) the image-similarity query shown as a chip in the search field. */
   setSemanticImageQuery: (reference: GallerySemanticReference | null) => void;
-  /** Switches the search field between metadata and semantic search, keeping its text. */
+  /** Keeps the field's text. */
   setSemanticSearchMode: (enabled: boolean) => void;
-  /** The semantic field's live text, ahead of the debounced commit. */
+  /** Ahead of the debounced commit. */
   setSemanticSearchText: (text: string) => void;
   setView: (galleryView: GalleryView) => void;
   toggleItemInSelection: (item: GalleryItem, nextPrimaryItem: GalleryItem | null, selectionPage?: number) => void;
   updateSettings: (settings: Partial<GallerySettings>) => void;
-  /** Resolves with the confirmed uploads; empty when nothing landed. */
+  /** Empty when nothing landed. */
   uploadFiles: (files: File[]) => Promise<GalleryItem[]>;
 }
 
-/** The bounded starred strip above the listing; empty whenever it does not apply. */
+/** Empty whenever it does not apply. */
 export interface GalleryStarredStrip {
   items: GalleryItem[];
   state: GalleryReadState;
-  /** Starred items under the same filter, per the backend; 0 until known. */
+  /** Per the backend; 0 until known. */
   total: number;
 }
 
 export interface GalleryWidgetContextValue {
   gallery: GalleryStateView;
   actions: GalleryActions;
-  /** The server has more than one account, so boards can be shared; absent where it does not apply. */
   boardSharing?: boolean;
-  /** The board list's standing; its failure is the board panel's to show, never the grid's. */
+  /** Its failure is the board panel's to show, never the grid's. */
   boardsState: GalleryReadState;
-  /**
-   * The query filter the visible items came from. Shared rather than re-derived so range selection and the item list
-   * can never disagree about which query they are operating on.
-   */
+  /** Shared rather than re-derived so range selection and the list never disagree. */
   filter: GalleryItemsFilter;
   itemActions: GalleryItemActions;
-  /** How the listing behind `gallery.items` stands for the current scope, and its recovery. */
   listing: GalleryListingState;
-  /** Everything on hand — strip first, then the listing, without repeats — for lookups by key. */
+  /** Strip first, then the listing, without repeats. */
   loadedItems: GalleryItem[];
-  /** Main Gallery's absolute page slots. Other Gallery surfaces continue to use a dense loaded projection. */
+  /** Main Gallery only; other surfaces use a dense loaded projection. */
   sparseListing?: GallerySparseListing;
-  /** Reports the grid's virtual item range so only intersecting page queries stay subscribed. */
+  /** Only intersecting page queries stay subscribed. */
   setVisibleRange?: (range: { endIndexExclusive: number; startIndex: number }) => void;
-  /** See `GalleryData.pinRevealIndex`; offered for sparse infinite listings only. */
+  /** Sparse infinite listings only. */
   pinRevealIndex?: (absoluteIndex: number) => void;
   starredStrip: GalleryStarredStrip;
   projectId: string;
   projectName: string;
-  /** Names for the projects other boards belong to, keyed by project id. */
   projectNames: ReadonlyMap<string, string>;
-  /** Placement, used only to scope cached viewport measurements. */
+  /** Used only to scope cached viewport measurements. */
   region: GalleryWidgetProps['region'];
   runtime: GalleryWidgetRuntime;
 }
@@ -113,7 +99,6 @@ interface SelectionStarSnapshot {
 
 interface SelectionStarStore {
   getSnapshot: () => SelectionStarSnapshot;
-  /** Applies a star patch to the selection, or restores the flags a reverted patch replaced. */
   reconcilePatch: (event: GalleryItemStarPatchEvent) => void;
   subscribe: (listener: () => void) => () => void;
   sync: (identity: string, selectedKeys: readonly string[], loadedItems: readonly GalleryItem[]) => void;
@@ -122,7 +107,7 @@ interface SelectionStarStore {
 const createSelectionStarStore = (): SelectionStarStore => {
   let snapshot: SelectionStarSnapshot = { identity: '', starredByKey: new Map() };
   let selectedKeySet: ReadonlySet<string> = new Set();
-  // What each key held before the latest patch that set it; only that patch's rollback restores it.
+  // Only the rollback of the latest patch that set a key restores it.
   let patchedFrom = new Map<string, { patchId: number; starred: boolean | undefined }>();
   const listeners = new Set<() => void>();
   const publish = (identity: string, starredByKey: ReadonlyMap<string, boolean>) => {
@@ -176,7 +161,6 @@ const createSelectionStarStore = (): SelectionStarStore => {
     sync: (identity, selectedKeys, loadedItems) => {
       selectedKeySet = new Set(selectedKeys);
 
-      // Items that stay selected keep their known flags when the selection changes around them.
       const isStillSelected = ([key]: [string, unknown]) => selectedKeySet.has(key);
       const starredByKey = new Map([...snapshot.starredByKey].filter(isStillSelected));
 
@@ -197,10 +181,7 @@ const createSelectionStarStore = (): SelectionStarStore => {
   };
 };
 
-/**
- * Retains star flags for the current selection while sparse listing pages leave the loaded window, and follows star
- * patches from any surface for selected items no loaded page holds.
- */
+/** Follows star patches for selected items no page holds. */
 export const useGallerySelectionStarred = (
   selectedItems: readonly GalleryItemRef[],
   loadedItems: readonly GalleryItem[]
@@ -222,11 +203,9 @@ export const useGallerySelectionStarred = (
     () => new Map(loadedItems.map((item) => [toGalleryItemKey(item), item.starred])),
     [loadedItems]
   );
-  // In a starred-only listing every item is starred, including selected ones no page has loaded, but only when the
-  // selection was made in such a listing: one carried in from elsewhere may hold unstarred members.
+  // Starred-only listings imply starred members only when the selection was made in one.
   const unknownStarred = filter.starred === true && gallery.selectionStarredOnly;
 
-  // Flags are per item, so ones known before a selection change still answer for items that stay selected.
   return selectedKeys.some((key) => !(loadedStarred.get(key) ?? snapshot.starredByKey.get(key) ?? unknownStarred));
 };
 

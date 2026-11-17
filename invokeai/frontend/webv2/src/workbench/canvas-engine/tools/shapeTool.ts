@@ -1,20 +1,4 @@
-/**
- * Shapes use box drags, polygon clicks or closed freehand. Place on = selected layer draws into a selected paint layer
- * or mask (as opaque mask coverage); any other selection, or Place on = new layer, adds a parametric shape layer. Shift
- * squares a box and Alt grows it from the press point, both read live on every move and the release, as the marquee
- * does; polygon and freehand ignore them. The platform's mod key (⌘ on macOS, where Ctrl-click opens the context menu;
- * Ctrl elsewhere) cuts the shape's opaque footprint out of the selected paint layer or mask instead, whatever Place on
- * says, and never adds a layer: the release decides for drags and traces, the closing press for a click-closed polygon;
- * Enter always draws. Pixel commits clip to the selection and bbox. Hidden, locked or loading targets refuse with a
- * notice (a cutout also refuses a transparency lock or a selection it cannot cut), at the press when the press already
- * knows, so nothing is drawn in vain; a refused polygon close, by click or Enter, keeps its vertices. A new layer the
- * document refuses (busy, not ready, over budget) is reported too. Commits wait for the gesture to end, so a new layer
- * is never refused mid-gesture: a drag or trace commits on release, a polygon on Enter or on the release of the press
- * that closes it. Escape (through the engine ladder) or a cancelled press drops the session. A box or freehand gesture
- * bound for the selected layer's pixels tells the engine so as soon as its modifiers decide it, so a mask it edits
- * shows above a staged preview; polygons never do. Previews and cancellation do not dispatch, and a nonzero shape
- * produces one structural or stroke commit.
- */
+/** Place on = selected layer draws into a selected paint layer or mask; otherwise each shape gets its own layer. */
 
 import type { CanvasLayerEditRefusal, CanvasNoTargetRefusal } from '@workbench/canvas-engine/capabilities';
 import type { CanvasLayerSourceContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
@@ -55,26 +39,21 @@ import { shapeDrawsOnLayer, shapePaintSourceOf } from './shapeTarget';
 
 type ShapeSource = Extract<CanvasLayerSourceContract, { type: 'shape' }>;
 
-/** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
 const PRIMARY_BUTTON = 1;
 
-/** Screen-space distance (CSS px) the pointer must travel before a press becomes a drag. */
 export const SHAPE_DRAG_THRESHOLD_PX = 3;
 
-/** Whether a finished shape adds its pixels (or a layer) or erases its footprint from the selected layer. */
 type ShapeMode = 'draw' | 'cutout';
 
-/** The platform's mod key cuts the shape out: ⌘ on macOS, where Ctrl-click opens the context menu; Ctrl elsewhere. */
+/** ⌘ on macOS, where Ctrl-click opens the context menu; Ctrl elsewhere. */
 const modeOf = (modifiers: PointerModifiers, isMacOs: boolean): ShapeMode =>
   (isMacOs ? modifiers.meta : modifiers.ctrl) ? 'cutout' : 'draw';
 
-/** Shift squares a box drag and Alt centres it on the press point. */
 const constraintsOf = (modifiers: PointerModifiers): DragRectConstraints => ({
   fromCenter: modifiers.alt,
   square: modifiers.shift,
 });
 
-/** Legacy's subtract cue: the crosshair with a minus badge, falling back to the plain crosshair. */
 const CUTOUT_CURSOR_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>
   <g fill='none' stroke-linecap='round'>
     <path d='M12 3v5M12 16v5M3 12h5M16 12h5' stroke='white' stroke-width='3'/>
@@ -89,25 +68,19 @@ type Session =
   | {
       kind: 'polyline';
       session: PolylineSession;
-      /** A press is down; a close it asks for waits for its release. */
       pressed: boolean;
-      /** The close a press (or Enter during one) armed, committed on the release in this mode. */
       closing: ShapeMode | null;
     }
   | ({ kind: 'freehand'; editsSelected: boolean } & FreehandTrace);
 
 const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
 
-/** A shape to place: its source plus the document rect it covers. */
 interface PlacedShape {
   source: ShapeSource;
   rect: Rect;
 }
 
-/**
- * A polygon source for document-space vertices: the extent is the vertex bounds, and the stored points are relative to
- * that box's origin.
- */
+/** Stored points are relative to the bounds origin. */
 export const polygonShapeFrom = (
   vertices: readonly Vec2[],
   style: Pick<ShapeSource, 'fill' | 'stroke' | 'strokeWidth'>
@@ -131,24 +104,23 @@ export const polygonShapeFrom = (
   };
 };
 
-/** Where a finished shape goes: a new shape layer, the selected leaf's pixels, or nowhere, with the reason. */
 type ShapeTarget =
   | { kind: 'layer' }
   | { kind: 'pixels'; leaf: SemanticLeaf }
   | { kind: 'refused'; refusal: CanvasLayerEditRefusal | CanvasNoTargetRefusal };
 
-/** With fill off and no stroke to draw, a shape changes no pixel, so it records no step and uploads nothing. */
+/** Fill off and no stroke changes no pixel, so it records no step and uploads nothing. */
 const drawsNothing = (source: ShapeSource): boolean =>
   source.fill === null && (source.stroke === null || source.strokeWidth <= 0);
 
-/** The shape's footprint as coverage: each enabled part paints opaque, whatever its color. */
+/** Each enabled part paints opaque, whatever its color. */
 const coverageOf = (source: ShapeSource): ShapeSource => ({
   ...source,
   fill: source.fill === null ? null : MASK_PAINT_COLOR,
   stroke: source.stroke === null ? null : MASK_PAINT_COLOR,
 });
 
-/** Whether a session was started for the current kind option; a kind change mid-session drops it. */
+/** A kind change mid-session drops it. */
 const sessionFitsKind = (session: Session, kind: ShapeToolOptions['kind']): boolean =>
   kind === 'polygon'
     ? session.kind === 'polyline'
@@ -156,11 +128,7 @@ const sessionFitsKind = (session: Session, kind: ShapeToolOptions['kind']): bool
       ? session.kind === 'freehand'
       : session.kind === 'drag';
 
-/**
- * Where a shape finished in `mode` would go now. A cutout needs a selected paint layer or mask; a drawn shape takes one
- * only when Place on asks for it. `loading: 'request'` also refuses a target whose durable pixels are not cached yet
- * (drawing then would lose them) and asks for them; `'skip'` predicts without side effects, for the cursor.
- */
+/** A cutout needs a selected paint layer or mask; a drawn shape takes one only when Place on asks. */
 const resolveTarget = (ctx: ToolContext, mode: ShapeMode, loading: 'request' | 'skip'): ShapeTarget => {
   const doc = ctx.getDocument();
   const leaf = doc?.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
@@ -187,10 +155,8 @@ const resolveTarget = (ctx: ToolContext, mode: ShapeMode, loading: 'request' | '
     : { kind: 'pixels', leaf };
 };
 
-/** Creates a fresh shape tool with its own gesture state; `isMacOs` picks the cutout key. */
 export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } = {}): Tool => {
   let session: Session | null = null;
-  /** The cutout key on the latest pointer event, which picks the cursor cue. */
   let cutoutHeld = false;
   const cutoutCursor = `url("data:image/svg+xml,${encodeURIComponent(CUTOUT_CURSOR_SVG)}") 12 12, crosshair`;
 
@@ -213,12 +179,6 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     }
   };
 
-  /**
-   * Tells the engine, once per box or freehand gesture, that it writes the selected layer's pixels as soon as the
-   * modifiers make it so: at the press, or when the mod key turns a drag into a cutout. The engine asks
-   * `editsSelectedLayer` before the press reaches the tool, too early to see its modifiers, so the tool answers here
-   * instead. Polygons never count: vertex presses write nothing, and a close commits after its gesture has ended.
-   */
   const noteSelectedLayerEdit = (
     ctx: ToolContext,
     gesture: Extract<Session, { editsSelected: boolean }>,
@@ -230,7 +190,6 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     }
   };
 
-  /** Reports why a press in `mode` would place nothing, so the user learns before drawing; true when refused. */
   const refusesPress = (ctx: ToolContext, mode: ShapeMode): boolean => {
     const target = resolveTarget(ctx, mode, 'request');
     if (target.kind !== 'refused') {
@@ -240,7 +199,6 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     return true;
   };
 
-  /** The fill/stroke the next shape gets, resolved from the active pair now. */
   const styleFromOptions = (ctx: ToolContext): Pick<ShapeSource, 'fill' | 'stroke' | 'strokeWidth'> => {
     const options = ctx.stores.shapeOptions.get();
     const pair = ctx.stores.colorPair.get();
@@ -251,11 +209,7 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     };
   };
 
-  /**
-   * One pixel-shape stroke within selection/bbox clips, drawn through the layer inverse with the same masks as brush
-   * painting, on paint pixels or mask alpha alike. A drawn shape grows the cache to cover it; a cutout erases its
-   * opaque footprint from the pixels already cached and never grows it.
-   */
+  /** Same clips and masks as brush painting, through the layer inverse, on paint pixels or mask alpha. */
   const commitPixels = (ctx: ToolContext, leaf: SemanticLeaf, placed: PlacedShape, mode: ShapeMode): void => {
     const layer = leaf.layer;
     if (drawsNothing(placed.source)) {
@@ -284,7 +238,7 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     if (!dirtyRect || dirtyRect.width < 1 || dirtyRect.height < 1) {
       return;
     }
-    // Admitted before the first pixel changes: the before/after pair is the step's footprint.
+    // Admitted before the first pixel changes.
     const edit = ctx.beginStrokeEdit(dirtyRect.width * dirtyRect.height * 8);
     if (!edit) {
       return;
@@ -293,7 +247,6 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     let beforeImageData: ImageData | null = null;
     let sx = 0;
     let sy = 0;
-    /** Puts the pre-shape pixels and cache extent back and ends the edit unrecorded. */
     const restore = (): void => {
       const entry = ctx.layers.peek(layer.id);
       if (entry && beforeImageData) {
@@ -314,8 +267,6 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
       sy = dirtyRect.y - entry.rect.y;
       beforeImageData = surfaceCtx.getImageData(sx, sy, dirtyRect.width, dirtyRect.height);
 
-      // Draw into dirty-rect-local scratch so clipping and transparency lock apply in one composite; map through layer
-      // inverse then scratch offset.
       const scratch = ctx.backend.createSurface(dirtyRect.width, dirtyRect.height);
       const draw = scratch.ctx;
       const { rect } = placed;
@@ -325,12 +276,10 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
       drawShapeSource(draw, source, rect.x, rect.y, rect.width, rect.height);
       draw.globalCompositeOperation = 'destination-in';
       if (clipMask) {
-        // The mask sits in document space, so it goes through the same mapping.
         draw.drawImage(clipMask.surface.canvas, clipMask.rect.x, clipMask.rect.y);
       }
       if (clipRect && (toLocal.b !== 0 || toLocal.c !== 0)) {
-        // The dirty-rect clamp only bounds the AABB on a rotated/sheared layer; keep exactly the pixels inside the
-        // document-space rect.
+        // A rotated or sheared layer's clamp bounds only the AABB; keep exactly the document-space rect.
         draw.fillStyle = '#000';
         draw.beginPath();
         draw.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
@@ -377,17 +326,13 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     };
     const inverse: CanvasProjectMutation = { ids: [layerId], type: 'removeCanvasLayers' };
     const { status } = ctx.commitStructural('Add shape', forward, inverse);
-    // Refusals before dispatch say why the release added nothing; failures after it were reported where they arose.
+    // Refusals before dispatch say why; failures after it were reported where they arose.
     if (status === 'busy' || status === 'gesture-active' || status === 'not-ready' || status === 'over-budget') {
       ctx.reportEditRefusal?.(status);
     }
   };
 
-  /**
-   * Places a finished shape in `mode` and ends the session. Called only once the gesture has ended. A refused selected
-   * target places nothing, rather than adding a layer the user did not ask for, and says why; with `keepRefused` (a
-   * polygon close) the session stays, so the shape can close again once the layer is fixed.
-   */
+  /** Called only once the gesture has ended; a refused selected target places nothing. */
   const commit = (ctx: ToolContext, placed: PlacedShape | null, mode: ShapeMode, keepRefused = false): void => {
     const target = placed && ctx.getDocument() ? resolveTarget(ctx, mode, 'request') : null;
     if (target?.kind === 'refused') {
@@ -415,7 +360,6 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     return { rect, source: { ...styleFromOptions(ctx), height: rect.height, kind, type: 'shape', width: rect.width } };
   };
 
-  /** Every polygon close, by click, double-click or Enter; a refused one keeps the vertices. */
   const closePolyline = (ctx: ToolContext, polyline: Extract<Session, { kind: 'polyline' }>, mode: ShapeMode): void => {
     polyline.closing = null;
     commit(ctx, polygonShapeFrom(polyline.session.points, styleFromOptions(ctx)), mode, true);

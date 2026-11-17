@@ -20,11 +20,8 @@ export interface LayerChangeInput {
   readonly sourceChanged: boolean;
   /** The display key recorded for this layer's last-rendered thumbnail. */
   readonly currentThumbnailKey: string | undefined;
-  /** The version recorded for this layer's thumbnail, if any. */
   readonly currentThumbnailVersion: number | undefined;
-  /** Whether an open transform session belongs to this layer. */
   readonly hasTransformSession: boolean;
-  /** Whether an open text-edit session belongs to this layer. */
   readonly hasTextEditSession: boolean;
   /** Lazily checks bitmap self-echo only when the source changed. */
   readonly isSelfEcho: () => boolean;
@@ -50,8 +47,7 @@ export type LayerChangeDecision =
 
 /**
  * Pure layer-change decisions, applied by the caller in order. Properties and transforms need only recomposition;
- * rerasterizing them could erase unflushed paint. Source swaps invalidate except bitmap-store self-echoes, whose pixels
- * already match.
+ * rerasterizing them could erase unflushed paint. Source swaps invalidate, except bitmap-store self-echoes.
  */
 export const decideLayerChange = (input: LayerChangeInput): LayerChangeDecision => {
   const { layer } = input;

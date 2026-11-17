@@ -1,6 +1,4 @@
-/**
- * Persist decayed-use rankings per browser across projects; filter stale ids against current entries when rendering.
- */
+/** Decayed-use rankings per browser across projects; stale ids are filtered at render. */
 
 import type { PaletteEntry } from './entries';
 

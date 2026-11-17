@@ -13,10 +13,9 @@ interface FramesSlider {
 }
 
 /**
- * The run's length: the Frames control, and the Auto duration switch above it when a duration head is selected.
- *
- * Under auto duration Frames stays editable and becomes the ceiling the head chooses beneath -- the number the run's
- * memory is sized by -- and says so, with the range the head will actually use.
+ * The run's length: the Frames control, and the Auto duration switch above it when a duration head is selected. Under
+ * auto duration Frames stays editable as the ceiling the head chooses beneath (the number the run's memory is sized
+ * by), and says so, with the range the head will actually use.
  */
 export const VideoLengthControls = ({
   autoDuration,

@@ -35,7 +35,6 @@ export interface SelectionSnapshot {
   readonly selected: boolean;
 }
 
-/** The engine-facing selection handle. */
 export interface SelectionState {
   /** Whether a selection currently exists (drives clip/fill/ants gating). */
   hasSelection(): boolean;
@@ -55,7 +54,6 @@ export interface SelectionState {
   selectAll(domain: Rect): void;
   /** Complements within a bounded domain; empty selection selects it. Engine domain is content union bbox. */
   invert(domain: Rect): void;
-  /** Clears the selection (deselect). */
   clear(): void;
   /** Captures the selection for a later {@link restore}; the capture is immutable and detached. */
   snapshot(): SelectionSnapshot;
@@ -65,7 +63,6 @@ export interface SelectionState {
   dispose(): void;
 }
 
-/** Dependencies injected by the engine. */
 export interface SelectionStateDeps {
   backend: RasterBackend;
   createPath2D: CreatePath2D;
@@ -116,7 +113,6 @@ const compositeForOp = (op: SelectionOp): GlobalCompositeOperation => {
   }
 };
 
-/** Creates an engine-transient selection bound to the raster backend seam. */
 export const createSelectionState = (deps: SelectionStateDeps): SelectionState => {
   const { backend, createPath2D, getDocumentSize, onChange } = deps;
 
@@ -127,8 +123,7 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
   let commits: SelectionCommit[] = [];
   let selectionBounds: Rect | null = null;
   let selected = false;
-  // The last capture stays valid until the next mutation, so a change recorded as before/after reads the mask back
-  // once, not twice.
+  // The last capture stays valid until the next mutation, so a before/after change reads the mask back once, not twice.
   let cachedSnapshot: SelectionSnapshot | null = null;
 
   const changed = (): void => {
@@ -259,7 +254,6 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
 
   const commit = (next: SelectionCommit): void => {
     if (!getDocumentSize()) {
-      // No active document ⇒ no selection surface to build.
       return;
     }
     const bounds = isEmpty(next.bounds) ? null : roundOut(next.bounds);
@@ -279,13 +273,11 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
     }
 
     if (next.op === 'intersect' && (!selected || !selectionBounds)) {
-      // Intersecting with nothing yields nothing.
       clear();
       return;
     }
 
-    // For `add` the mask may need to grow to include the new path; `subtract` / `intersect` never grow the covered
-    // region (they only remove).
+    // `add` may grow the mask to include the new path; `subtract` / `intersect` only remove, never grow.
     const surface =
       next.op === 'add' && bounds
         ? ensureMask(bounds)
@@ -358,7 +350,6 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
 
   const invert = (domain: Rect): void => {
     if (!selected || !mask || !maskRect) {
-      // Inverting an empty selection selects the whole domain.
       selectAll(domain);
       return;
     }

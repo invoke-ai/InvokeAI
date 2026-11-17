@@ -443,7 +443,6 @@ export const ReferenceImageCropDialog = ({
     dragRef.current = null;
     if (panRef.current) {
       panRef.current = null;
-      // Space still held keeps the viewport ready for the next pan.
       setPanState(spaceHeldRef.current ? 'ready' : 'idle');
     }
     if (viewportRef.current?.hasPointerCapture(event.pointerId)) {
