@@ -25,7 +25,7 @@ import os
 import queue
 import threading
 from collections import deque
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from typing import Iterable, Iterator
 
@@ -51,7 +51,8 @@ STREAM_BUDGET_BYTES = 384 * 2**20
 # Tensors up to this size that are not registered (registration failed, or the pinned-RAM cap is reached) are copied
 # into a pinned staging buffer first. A single synchronous copy among the asynchronous ones would stall the CPU until
 # the GPU has drained, losing the overlap; for small tensors the extra CPU copy is cheap. Only while something is
-# registered at all: where every large weight copies synchronously anyway, staging the small ones gains nothing.
+# wanted on the device at all: where every large weight copies synchronously anyway, staging the small ones gains
+# nothing.
 STAGE_MAX_BYTES = 2**20
 # Page-locked RAM cannot be swapped out. ComfyUI caps it at 40 % of physical RAM on Windows; storages past the cap stay
 # pageable and stream synchronously.
@@ -305,11 +306,15 @@ def _self_test_on_current_device(device: torch.device) -> str | None:
 
 class PinHolder:
     """The storages one holder (a cached model wrapper) holds, and which of them its model streams in its current
-    lock. Mutated only under the registration lock."""
+    lock. Mutated only under the registration lock.
 
-    __slots__ = ("keys", "wanted", "active")
+    ``device`` is where the model computes: registration and the first self-test run there, and only copies to it may
+    stream what the holder wants (see `PinnedStorageRegistry.lookup`)."""
 
-    def __init__(self) -> None:
+    __slots__ = ("keys", "wanted", "active", "device")
+
+    def __init__(self, device: torch.device) -> None:
+        self.device = TorchDevice.normalize(device)
         self.keys: set[_StorageKey] = set()
         # What the model streams in its current lock (or streamed in its last one); counts only while `active`.
         self.wanted: set[_StorageKey] = set()
@@ -324,8 +329,15 @@ class _StorageEntry:
     # False when the storage was already page-locked (torch's pinned allocator): it is never unregistered here.
     registered_here: bool
     holders: set[PinHolder] = field(default_factory=set)
-    # Active holders that stream it in their current lock. At 0 a storage registered here is reclaimable.
-    wanted_by: int = 0
+    # Active holders that stream it in their current lock, per compute device of the holders: copies to a device
+    # stream the storage only if a holder computing there wants it. Mutated under the lookup lock, which `lookup` reads
+    # it under.
+    wanted_on: dict[torch.device, int] = field(default_factory=dict)
+
+    @property
+    def wanted_by(self) -> int:
+        """Active holders that stream it. At 0 a storage registered here is reclaimable."""
+        return sum(self.wanted_on.values())
 
 
 def _storage_key(storage: torch.UntypedStorage) -> _StorageKey:
@@ -352,10 +364,10 @@ class PinnedStorageRegistry:
     reclaimable: when a registration would pass `PINNED_RAM_CAP_BYTES`, reclaimable storages are unregistered, the
     longest unused first, and only as many as that registration needs.
 
-    Three locks. The lookup lock only guards which storages are registered; the streamer holds it from its check to the
-    enqueued copy. The registration lock serializes the slow driver calls. The small lock of `_unregistering` and
-    `_locked` (a condition) guards the exclusion between locks and unregistration, below, and is never held across a
-    driver call.
+    Three locks. The lookup lock only guards which storages are registered and which devices want them; the streamer
+    holds it from its check to the enqueued copy. The registration lock serializes the slow driver calls. The small
+    lock of `_unregistering` and `_locked` (a condition) guards the exclusion between locks and unregistration, below,
+    and is never held across a driver call.
 
     Unregistration removes the entries under the lookup lock first, so no copy can start from them, then waits for the
     streamers' side streams and unregisters. Copies that the registry does not see are different: a partial load's
@@ -381,6 +393,8 @@ class PinnedStorageRegistry:
         # Reclaimable entries (registered here, `wanted_by == 0`), the longest unused first, and their bytes.
         self._reclaimable: dict[_StorageKey, None] = {}
         self._reclaimable_bytes = 0
+        # Per compute device, the entries some active holder there wants. Mutated under the lookup lock, read without.
+        self._wanted_entries_on: dict[torch.device, int] = {}
         self._pinned_bytes = 0
         # Decided by the first registration (`_registration_self_test`).
         self._driver_ok: bool | None = None
@@ -394,22 +408,31 @@ class PinnedStorageRegistry:
         # Entries that were dropped while locked, still registered and counted, unregistered once unlocked. A storage
         # registered again meanwhile takes its entry back. Mutated under the registration lock.
         self._pending: dict[_StorageKey, _StorageEntry] = {}
+        # Set when an `unlock` freed a pending key: the only thing that makes retrying `_pending` worth a lock.
+        self._pending_freed = False
 
-    def update(
-        self,
-        holder: PinHolder,
-        storages: Iterable[torch.UntypedStorage],
-        device: torch.device | None = None,
-        register_new: bool = True,
-    ) -> None:
+    @contextmanager
+    def _registering(self) -> Iterator[None]:
+        """The registration lock. A non-blocking drain that lost the lock to this hold (`drain_deferred`) is made up
+        for after it: what it would have applied is still posted, and no one else is obliged to retry."""
+        try:
+            with self._registration_lock:
+                yield
+        finally:
+            self.drain_deferred()
+
+    def _has_work_to_drain(self) -> bool:
+        return not self._deferred.empty() or self._pending_freed
+
+    def update(self, holder: PinHolder, storages: Iterable[torch.UntypedStorage], register_new: bool = True) -> None:
         """Mark ``holder`` active and streaming exactly ``storages``, and register those it does not hold yet, as far
         as they fit under the cap. What it holds beyond them stays registered, reclaimable. Never raises a driver
-        error. ``device`` is where the model computes: registration and the first call's self-test run there.
+        error. Registration and the first call's self-test run on ``holder.device``.
         ``register_new=False``: the lock did not plan the VRAM for the copies that would follow, so the holder
         registers and joins nothing new; it streams only what it holds already."""
         candidates = {_storage_key(s): s for s in storages if s.nbytes() > 0}
         missing: dict[_StorageKey, torch.UntypedStorage] = {}
-        with self._registration_lock:
+        with self._registering():
             self._drain_deferred_locked()
             self._set_wanted_locked(holder, set(candidates), active=True)
             # Joining a storage another holder registered costs nothing, but it starts streaming from it: not in a
@@ -437,11 +460,11 @@ class PinnedStorageRegistry:
         # One storage per lock hold: a release (another device's offload or eviction, under its cache lock) waits
         # for at most one registration and the reclaim it needs, not for a whole model's.
         for key, storage in missing.items():
-            with self._registration_lock:
+            with self._registering():
                 if key in holder.keys or not holder.active or key not in holder.wanted:
                     continue  # Released or marked idle meanwhile.
                 try:
-                    if key not in self._entries and not self._register_locked(key, storage, device):
+                    if key not in self._entries and not self._register_locked(key, storage, holder.device):
                         continue
                     self._join_locked(holder, key)
                 except BaseException:
@@ -456,7 +479,7 @@ class PinnedStorageRegistry:
     def activate(self, holder: PinHolder) -> bool:
         """Mark ``holder`` active again, streaming what it streamed in its last `update`, for a lock that moved
         nothing. False if some of that is not registered (reclaimed, or refused at the cap): `update` it then."""
-        with self._registration_lock:
+        with self._registering():
             self._drain_deferred_locked()
             self._set_wanted_locked(holder, holder.wanted, active=True)
             return holder.wanted <= holder.keys
@@ -469,7 +492,7 @@ class PinnedStorageRegistry:
     def release(self, holder: PinHolder) -> bool:
         """Release everything ``holder`` holds; whether it held anything. Best effort: never raises on a failing
         device."""
-        with self._registration_lock:
+        with self._registering():
             self._drain_deferred_locked()
             held = bool(holder.keys)
             self._release_holder_locked(holder)
@@ -480,13 +503,16 @@ class PinnedStorageRegistry:
         self._deferred.put((holder, True))
 
     def drain_deferred(self) -> None:
-        """Apply posted releases and idle marks, unless another thread is registering right now (it applies them)."""
-        if (self._deferred.empty() and not self._pending) or not self._registration_lock.acquire(blocking=False):
-            return
-        try:
-            self._drain_deferred_locked()
-        finally:
-            self._registration_lock.release()
+        """Apply posted releases and idle marks, and unregister pending entries an `unlock` freed, unless another
+        thread holds the registration lock right now: it drains after its hold (`_registering`). Lock-free while
+        nothing is posted, so a streamed copy pays for it only when there is something to apply."""
+        # Looped: a thread that loses the acquire relies on the holder to drain after its release, and the holder's
+        # own drain may have cleared the flag before that thread's unlock set it again.
+        while self._has_work_to_drain() and self._registration_lock.acquire(blocking=False):
+            try:
+                self._drain_deferred_locked()
+            finally:
+                self._registration_lock.release()
 
     def is_registered(self, storage: torch.UntypedStorage) -> bool:
         return _storage_key(storage) in self._entries
@@ -494,10 +520,20 @@ class PinnedStorageRegistry:
     def holds_registrations(self) -> bool:
         return bool(self._entries)
 
+    def is_wanted_on(self, storage: torch.UntypedStorage, device: torch.device) -> bool:
+        """Whether an active holder computing on ``device`` wants ``storage``. Lock-free, so only a hint: `lookup`
+        decides. A stale answer costs a synchronous copy or a lookup that says no."""
+        entry = self._entries.get(_storage_key(storage))
+        return entry is not None and entry.wanted_on.get(device, 0) > 0
+
+    def wants_anything_on(self, device: torch.device) -> bool:
+        """Whether an active holder computing on ``device`` wants any storage. Lock-free, like `is_wanted_on`."""
+        return self._wanted_entries_on.get(device, 0) > 0
+
     def can_register(self, device: torch.device | None = None) -> bool:
         """Whether this driver passed the self-test (run on the first call, on ``device``). Needs a CUDA device."""
         if self._driver_ok is None:
-            with self._registration_lock:
+            with self._registering():
                 self._decide_driver_locked(device)
         return bool(self._driver_ok)
 
@@ -514,8 +550,11 @@ class PinnedStorageRegistry:
         return False
 
     def lock(self, keys: frozenset[_StorageKey]) -> None:
-        """Keep ``keys`` registered, or unregistered, as they are now until `unlock`: a cached model's cache lock
-        copies from them on its own streams (see the class docstring). Waits while any is being unregistered."""
+        """Keep ``keys`` from being unregistered until `unlock`: a cached model's cache lock copies from them on its own
+        streams (see the class docstring). Waits while any is being unregistered, so those copies never race an
+        unregistration. Registering a locked key meanwhile is allowed: the copies are then pageable or pinned, and
+        either works. (Best effort under an interrupt: `_register_locked` unregisters a range it may have registered
+        without regard to locks.)"""
         with self._cond:
             while not self._unregistering.isdisjoint(keys):
                 self._cond.wait()
@@ -523,7 +562,8 @@ class PinnedStorageRegistry:
                 self._locked[key] = self._locked.get(key, 0) + 1
 
     def unlock(self, keys: frozenset[_StorageKey]) -> None:
-        """Release a `lock`. A storage whose release was deferred is unregistered by the next registry call."""
+        """Release a `lock`. A storage whose release was deferred is unregistered by the next drain
+        (`drain_deferred`), which this makes due."""
         with self._cond:
             for key in keys:
                 count = self._locked[key] - 1
@@ -531,13 +571,18 @@ class PinnedStorageRegistry:
                     self._locked[key] = count
                 else:
                     del self._locked[key]
+                    if key in self._pending:
+                        self._pending_freed = True
 
     @contextmanager
-    def lookup(self, storage: torch.UntypedStorage) -> Iterator[bool]:
-        """Whether ``storage`` is registered, held stable for the block: a copy enqueued inside cannot race its
+    def lookup(self, storage: torch.UntypedStorage, device: torch.device) -> Iterator[bool]:
+        """Whether a copy of ``storage`` to ``device`` may stream: it is registered and an active holder computing on
+        ``device`` wants it. A holder whose lock planned no VRAM for copies in flight never wants what another
+        device's holder registered. Held stable for the block: a copy enqueued inside cannot race its
         unregistration."""
         with self._lookup_lock:
-            yield _storage_key(storage) in self._entries
+            entry = self._entries.get(_storage_key(storage))
+            yield entry is not None and entry.wanted_on.get(device, 0) > 0
 
     def _drain_deferred_locked(self) -> None:
         while True:
@@ -552,6 +597,8 @@ class PinnedStorageRegistry:
                 self._set_wanted_locked(holder, holder.wanted, active=False)
 
     def _unregister_pending_locked(self) -> None:
+        # Cleared before looking: an unlock that frees a key after this sets it again.
+        self._pending_freed = False
         if self._pending:
             self._unregister_locked(list(self._pending.values()))
 
@@ -573,26 +620,36 @@ class PinnedStorageRegistry:
         holder.keys.add(key)
         entry.holders.add(holder)
         if holder.active and key in holder.wanted:
-            self._want_locked(entry)
+            self._want_locked(entry, holder)
 
     def _set_wanted_locked(self, holder: PinHolder, wanted: set[_StorageKey], active: bool) -> None:
         before = holder.wanted & holder.keys if holder.active else set()
         holder.wanted, holder.active = wanted, active
         after = wanted & holder.keys if active else set()
         for key in after - before:
-            self._want_locked(self._entries[key])
+            self._want_locked(self._entries[key], holder)
         for key in before - after:
-            self._unwant_locked(self._entries[key])
+            self._unwant_locked(self._entries[key], holder)
 
-    def _want_locked(self, entry: _StorageEntry) -> None:
-        entry.wanted_by += 1
+    def _want_locked(self, entry: _StorageEntry, holder: PinHolder) -> None:
+        with self._lookup_lock:
+            wanted_here = entry.wanted_on.get(holder.device, 0) + 1
+            entry.wanted_on[holder.device] = wanted_here
+            if wanted_here == 1:
+                self._wanted_entries_on[holder.device] = self._wanted_entries_on.get(holder.device, 0) + 1
         if entry.wanted_by == 1 and entry.key in self._reclaimable:
             del self._reclaimable[entry.key]
             self._reclaimable_bytes -= entry.key[1]
 
-    def _unwant_locked(self, entry: _StorageEntry) -> None:
-        entry.wanted_by -= 1
-        if entry.wanted_by == 0 and entry.registered_here:
+    def _unwant_locked(self, entry: _StorageEntry, holder: PinHolder) -> None:
+        # Tolerant of a want that an interrupt cut short: this runs from `release`, which never raises.
+        with self._lookup_lock:
+            wanted_here = entry.wanted_on.get(holder.device, 0) - 1
+            if wanted_here > 0:
+                entry.wanted_on[holder.device] = wanted_here
+            elif entry.wanted_on.pop(holder.device, None) is not None:
+                self._wanted_entries_on[holder.device] = max(0, self._wanted_entries_on.get(holder.device, 0) - 1)
+        if entry.wanted_by == 0 and entry.registered_here and entry.key not in self._reclaimable:
             self._reclaimable[entry.key] = None
             self._reclaimable_bytes += entry.key[1]
 
@@ -641,7 +698,7 @@ class PinnedStorageRegistry:
                 f"async_weight_streaming: {reason}; weights in RAM are copied synchronously.",
             )
 
-    def _register_locked(self, key: _StorageKey, storage: torch.UntypedStorage, device: torch.device | None) -> bool:
+    def _register_locked(self, key: _StorageKey, storage: torch.UntypedStorage, device: torch.device) -> bool:
         """Register ``storage`` and track it in `_entries`; whether it is tracked now."""
         self._decide_driver_locked(device)
         if not self._driver_ok:
@@ -664,7 +721,7 @@ class PinnedStorageRegistry:
         # Counted before the call: an interrupt that arrives once the range is page-locked must find it counted.
         self._pinned_bytes += nbytes
         try:
-            with torch.cuda.device(device) if device is not None else nullcontext():
+            with torch.cuda.device(device):
                 error = _runtime.register(ptr, nbytes)
         except BaseException:
             # The call may or may not have registered the range before the interrupt. Unregistering one that is not
@@ -722,19 +779,20 @@ class PinnedStorageRegistry:
         be unregistered is stranded. An interrupt here strands what is left as well before it propagates: dropping
         them would free memory that may still be registered.
         """
-        with self._cond:
-            now: list[_StorageEntry] = []
-            for entry in entries:
-                if entry.key in self._locked:
-                    self._pending[entry.key] = entry
-                else:
-                    self._pending.pop(entry.key, None)
-                    self._unregistering.add(entry.key)
-                    now.append(entry)
-        if not now:
-            return
-        remaining = list(now)
+        now: list[_StorageEntry] = []
+        remaining: list[_StorageEntry] | None = None
         try:
+            with self._cond:
+                for entry in entries:
+                    if entry.key in self._locked:
+                        self._pending[entry.key] = entry
+                    else:
+                        self._pending.pop(entry.key, None)
+                        self._unregistering.add(entry.key)
+                        now.append(entry)
+            if not now:
+                return
+            remaining = list(now)
             try:
                 # Copies the streamers issued before the entries were removed may still be reading them. Everything
                 # else that copies from these storages holds a lock on them, which kept them out of `now`.
@@ -759,11 +817,15 @@ class PinnedStorageRegistry:
                     continue
                 self._pinned_bytes -= entry.key[1]
         except BaseException:
-            self._stranded.extend(remaining)
+            # An interrupt before `remaining` exists leaves entries that are out of `_entries` and in neither list.
+            self._stranded.extend(
+                [e for e in entries if self._pending.get(e.key) is not e] if remaining is None else remaining
+            )
             raise
         finally:
+            # Covers the moment keys enter `_unregistering`: a key left there would make every later `lock` wait.
             with self._cond:
-                self._unregistering.difference_update(entry.key for entry in now)
+                self._unregistering.difference_update(entry.key for entry in entries)
                 self._cond.notify_all()
 
 
@@ -807,8 +869,8 @@ class _DeviceStreamer:
         PINNED_STORAGES.drain_deferred()
         storage = t.untyped_storage()
         nbytes = t.nbytes
-        if not PINNED_STORAGES.is_registered(storage) and (
-            nbytes > STAGE_MAX_BYTES or not PINNED_STORAGES.holds_registrations()
+        if not PINNED_STORAGES.is_wanted_on(storage, self.device) and (
+            nbytes > STAGE_MAX_BYTES or not PINNED_STORAGES.wants_anything_on(self.device)
         ):
             return None
         with self._lock:
@@ -818,7 +880,7 @@ class _DeviceStreamer:
                 # Allocated before the lookup lock, which covers only the check and the enqueue.
                 dst = torch.empty(t.shape, dtype=t.dtype, device=self.device)
                 self._used = True
-                with PINNED_STORAGES.lookup(storage) as registered:
+                with PINNED_STORAGES.lookup(storage, self.device) as registered:
                     if registered:
                         dst.copy_(t, non_blocking=True)
                 if registered:

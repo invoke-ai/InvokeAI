@@ -336,7 +336,8 @@ class CachedModelWithPartialLoad:
             keys, self._locked_keys = self._locked_keys, None
             registry = weight_streaming.PINNED_STORAGES
             registry.unlock(keys)
-            # Unregisters what an eviction left pending behind this lock, unless a registration is under way (it does).
+            # Unregisters what an eviction left pending behind this lock. A thread holding the registration lock drains
+            # when it releases it.
             registry.drain_deferred()
 
     def weight_streaming_reserve_bytes(self) -> int:
@@ -393,7 +394,7 @@ class CachedModelWithPartialLoad:
         if not self._pins_stale and holder is not None and registry.activate(holder):
             return  # Nothing moved since the last lock, and all it streams is still pinned.
         if holder is None:
-            holder = weight_streaming.PinHolder()
+            holder = weight_streaming.PinHolder(self._compute_device)
             # Like the shared-weights finalizer: must not reference `self`, and only enqueues (GC context).
             finalizer = weakref.finalize(self, registry.release_deferred, holder)
             finalizer.atexit = False
@@ -413,7 +414,7 @@ class CachedModelWithPartialLoad:
             and ram_copy[key].untyped_storage().data_ptr() == tensor.untyped_storage().data_ptr()
         ]
         try:
-            registry.update(holder, streamed, self._compute_device, register_new=self._registration_planned)
+            registry.update(holder, streamed, register_new=self._registration_planned)
         except BaseException:
             self._pins_stale = True
             raise

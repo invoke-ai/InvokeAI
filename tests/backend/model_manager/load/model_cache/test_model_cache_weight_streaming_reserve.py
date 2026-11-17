@@ -331,7 +331,7 @@ def test_a_wrapper_that_never_streamed_locks_the_storages_another_wrapper_regist
     """Shared weights: the second device has no holder yet, but it copies from what the first registered."""
     registry, runtime = fake_streaming
     cached = _cached(_model())
-    holder = weight_streaming.PinHolder()
+    holder = weight_streaming.PinHolder(torch.device("cuda", 0))
     registry.update(holder, cached._streamable_ram_storages())
     cached.begin_streaming_lock()
 
@@ -395,8 +395,8 @@ def test_two_threads_pinning_a_model_for_the_first_time_create_one_holder(
     class _Holder(weight_streaming.PinHolder):
         __slots__ = ()
 
-        def __init__(self) -> None:
-            super().__init__()
+        def __init__(self, device: torch.device) -> None:
+            super().__init__(device)
             created.append(self)
             if len(created) == 1:
                 first_in_factory.set()

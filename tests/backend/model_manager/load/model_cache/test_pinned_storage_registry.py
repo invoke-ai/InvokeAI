@@ -18,6 +18,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.weigh
 )
 
 MB = 2**20
+CUDA0 = torch.device("cuda", 0)
 
 
 def _storage(nbytes: int = MB) -> torch.UntypedStorage:
@@ -40,7 +41,7 @@ def test_a_release_during_a_lock_keeps_the_storage_registered_until_the_lock_end
     registry, runtime = fake_streaming
     storage = _storage()
     keys = storage_keys([storage])
-    holder = PinHolder()
+    holder = PinHolder(CUDA0)
     registry.update(holder, [storage])
     registry.lock(keys)
 
@@ -57,7 +58,7 @@ def test_a_lock_is_released_per_holder_of_the_storage(fake_streaming):
     registry, runtime = fake_streaming
     storage = _storage()
     keys = storage_keys([storage])
-    holder = PinHolder()
+    holder = PinHolder(CUDA0)
     registry.update(holder, [storage])
     registry.lock(keys)
     registry.lock(keys)
@@ -75,7 +76,7 @@ def test_a_lock_is_released_per_holder_of_the_storage(fake_streaming):
 def test_reclaiming_for_room_skips_a_storage_a_lock_holds(fake_streaming, monkeypatch: pytest.MonkeyPatch):
     registry, runtime = fake_streaming
     monkeypatch.setattr(weight_streaming, "PINNED_RAM_CAP_BYTES", MB)
-    idle, taker = PinHolder(), PinHolder()
+    idle, taker = PinHolder(CUDA0), PinHolder(CUDA0)
     held, wanted = _storage(), _storage()
     registry.update(idle, [held])
     registry.idle(idle)
@@ -95,7 +96,7 @@ def test_a_storage_registered_again_while_its_release_is_pending_is_not_register
     registry, runtime = fake_streaming
     storage = _storage()
     keys = storage_keys([storage])
-    first, second = PinHolder(), PinHolder()
+    first, second = PinHolder(CUDA0), PinHolder(CUDA0)
     registry.update(first, [storage])
     registry.lock(keys)
     registry.release(first)
@@ -115,7 +116,7 @@ def test_a_lock_waits_for_an_unregistration_in_progress(fake_streaming, monkeypa
     registry, runtime = fake_streaming
     storage = _storage()
     keys = storage_keys([storage])
-    holder = PinHolder()
+    holder = PinHolder(CUDA0)
     registry.update(holder, [storage])
     in_unregister, proceed, waiting = threading.Event(), threading.Event(), threading.Event()
     registry._cond = _SignalingCondition(waiting)
@@ -151,7 +152,7 @@ def test_a_release_does_not_wait_for_a_lock_that_is_held(fake_streaming):
     """The unregistering side waits for no lock: a cache lock waits for it, so waiting back would deadlock."""
     registry, runtime = fake_streaming
     storage = _storage()
-    holder = PinHolder()
+    holder = PinHolder(CUDA0)
     registry.update(holder, [storage])
     registry.lock(storage_keys([storage]))
     done = threading.Event()
@@ -173,7 +174,7 @@ def test_register_new_false_neither_registers_nor_joins_anything_new(fake_stream
     """A lock that planned no VRAM for copies in flight must not start streaming from what another device registered."""
     registry, runtime = fake_streaming
     shared, fresh = _storage(), _storage()
-    first, second = PinHolder(), PinHolder()
+    first, second = PinHolder(CUDA0), PinHolder(CUDA0)
     registry.update(first, [shared])
 
     registry.update(second, [shared, fresh], register_new=False)
@@ -187,7 +188,7 @@ def test_register_new_false_neither_registers_nor_joins_anything_new(fake_stream
 def test_register_new_false_keeps_streaming_what_the_holder_holds(fake_streaming):
     registry, _ = fake_streaming
     held, other = _storage(), _storage()
-    holder = PinHolder()
+    holder = PinHolder(CUDA0)
     registry.update(holder, [held])
 
     registry.update(holder, [held, other], register_new=False)
@@ -201,7 +202,7 @@ def test_register_new_false_keeps_streaming_what_the_holder_holds(fake_streaming
 def test_room_is_found_for_a_storage_that_fits_or_is_registered_only(fake_streaming, monkeypatch: pytest.MonkeyPatch):
     registry, _ = fake_streaming
     monkeypatch.setattr(weight_streaming, "PINNED_RAM_CAP_BYTES", MB)
-    holder = PinHolder()
+    holder = PinHolder(CUDA0)
     held, other = _storage(), _storage()
     registry.update(holder, [held])
 
@@ -236,7 +237,7 @@ def test_an_interrupt_as_the_driver_call_returns_leaves_nothing_pinned_and_count
         raise KeyboardInterrupt
 
     monkeypatch.setattr(runtime, "register", register_then_interrupt)
-    holder = PinHolder()
+    holder = PinHolder(CUDA0)
 
     with pytest.raises(KeyboardInterrupt):
         registry.update(holder, [_storage()])
@@ -248,7 +249,7 @@ def test_an_interrupt_as_the_driver_call_returns_leaves_nothing_pinned_and_count
 def test_an_interrupt_while_tracking_the_registration_leaves_nothing_pinned_and_counted(fake_streaming):
     registry, runtime = fake_streaming
     registry._entries = _InterruptingEntries()
-    holder = PinHolder()
+    holder = PinHolder(CUDA0)
 
     with pytest.raises(KeyboardInterrupt):
         registry.update(holder, [_storage()])
@@ -259,7 +260,7 @@ def test_an_interrupt_while_tracking_the_registration_leaves_nothing_pinned_and_
 
 def test_an_interrupt_before_the_join_drops_the_entry_no_holder_holds(fake_streaming, monkeypatch):
     registry, runtime = fake_streaming
-    holder = PinHolder()
+    holder = PinHolder(CUDA0)
     join = registry._join_locked
     interrupted: list[bool] = []
 
@@ -281,7 +282,7 @@ def test_an_interrupt_before_the_join_drops_the_entry_no_holder_holds(fake_strea
 def test_an_interrupt_before_the_join_keeps_an_entry_another_holder_holds(fake_streaming, monkeypatch):
     registry, runtime = fake_streaming
     storage = _storage()
-    other, holder = PinHolder(), PinHolder()
+    other, holder = PinHolder(CUDA0), PinHolder(CUDA0)
 
     registered_meanwhile: list[bool] = []
 
@@ -355,9 +356,225 @@ def test_registration_runs_with_the_models_device_current(fake_streaming, monkey
         "register",
         lambda ptr, nbytes: at_call.append(current[-1] if current else None) or register(ptr, nbytes),
     )
-    holder = PinHolder()
+    holder = PinHolder(torch.device("cuda", 1))
 
-    registry.update(holder, [_storage()], torch.device("cuda", 1))
+    registry.update(holder, [_storage()])
 
     assert at_call == [1]
+    registry.release(holder)
+
+
+def test_a_device_streams_only_what_a_holder_computing_there_wants(fake_streaming):
+    """Multi-GPU: the holder on cuda:1 registered the shared weights; the holder on cuda:0 planned no VRAM for copies
+    in flight (`register_new=False`), so copies to cuda:0 of those weights stay synchronous."""
+    registry, _ = fake_streaming
+    cuda0, cuda1 = torch.device("cuda", 0), torch.device("cuda", 1)
+    shared = [_storage(), _storage()]
+    on1, on0 = PinHolder(cuda1), PinHolder(cuda0)
+    registry.update(on1, shared)
+
+    registry.update(on0, shared, register_new=False)
+
+    for storage in shared:
+        with registry.lookup(storage, cuda0) as streams:
+            assert not streams
+        with registry.lookup(storage, cuda1) as streams:
+            assert streams
+        assert registry.is_registered(storage) and not registry.is_wanted_on(storage, cuda0)
+        assert registry.is_wanted_on(storage, cuda1)
+    assert not registry.wants_anything_on(cuda0), "the staging gate is closed for the device that planned nothing"
+    assert registry.wants_anything_on(cuda1)
+
+    registry.update(on0, shared)  # A later lock that planned the reserve joins them.
+    with registry.lookup(shared[0], cuda0) as streams:
+        assert streams
+    assert registry.wants_anything_on(cuda0)
+
+    registry.release(on1)  # What cuda:0 holds stays wanted there, and stops being wanted on cuda:1.
+    with registry.lookup(shared[0], cuda0) as streams:
+        assert streams
+    with registry.lookup(shared[0], cuda1) as streams:
+        assert not streams
+    assert not registry.wants_anything_on(cuda1)
+    registry.release(on0)
+    assert not registry.wants_anything_on(cuda0)
+
+
+def test_an_idle_holder_does_not_stream(fake_streaming):
+    registry, _ = fake_streaming
+    cuda0 = torch.device("cuda", 0)
+    storage = _storage()
+    holder = PinHolder(cuda0)
+    registry.update(holder, [storage])
+
+    registry.idle(holder)
+    registry.drain_deferred()
+
+    assert registry.is_registered(storage) and not registry.is_wanted_on(storage, cuda0)
+    with registry.lookup(storage, cuda0) as streams:
+        assert not streams
+    assert registry.activate(holder)
+    assert registry.is_wanted_on(storage, cuda0)
+    registry.release(holder)
+
+
+def test_an_interrupt_while_unregistering_does_not_leave_keys_that_block_every_lock(fake_streaming):
+    registry, runtime = fake_streaming
+    storage = _storage()
+    keys = storage_keys([storage])
+    holder = PinHolder(CUDA0)
+    registry.update(holder, [storage])
+
+    class _Interrupt(BaseException):
+        pass
+
+    class _InterruptedSet(set):
+        def add(self, key) -> None:
+            super().add(key)
+            raise _Interrupt
+
+    registry._unregistering = _InterruptedSet()
+    with pytest.raises(_Interrupt):
+        registry.release(holder)
+
+    assert not registry._unregistering
+    assert runtime.registered and registry._pinned_bytes == MB, "what was not unregistered stays registered, counted"
+    assert [entry.key for entry in registry._stranded] == list(keys), "and kept alive"
+    waiter = threading.Thread(target=lambda: (registry.lock(keys), registry.unlock(keys)), daemon=True)
+    waiter.start()
+    waiter.join(timeout=10)
+    assert not waiter.is_alive(), "a later lock waits for an unregistration that never ends"
+
+
+def test_a_pending_release_whose_last_unlock_lost_the_drain_is_unregistered_by_the_registration_it_overlapped(
+    fake_streaming, monkeypatch: pytest.MonkeyPatch
+):
+    """The last unlock lands while another thread registers: its non-blocking drain loses the lock, and the
+    registration must apply it when it ends."""
+    registry, runtime = fake_streaming
+    released, other = _storage(), _storage()
+    keys = storage_keys([released])
+    first, second = PinHolder(CUDA0), PinHolder(CUDA0)
+    registry.update(first, [released])
+    registry.lock(keys)
+    registry.release(first)
+    assert runtime.registered, "pending behind the lock"
+    register = registry._register_locked
+
+    def register_while_the_lock_ends(*args, **kwargs):
+        result = register(*args, **kwargs)
+        registry.unlock(keys)
+        registry.drain_deferred()  # Loses the registration lock, which this thread holds.
+        return result
+
+    monkeypatch.setattr(registry, "_register_locked", register_while_the_lock_ends)
+
+    registry.update(second, [other])
+
+    assert runtime.registered == {other.data_ptr()}
+    assert registry._pinned_bytes == MB
+    registry.release(second)
+
+
+def test_pending_entries_cost_a_streamed_copy_no_lock_until_an_unlock_frees_one(fake_streaming):
+    registry, runtime = fake_streaming
+    storage = _storage()
+    keys = storage_keys([storage])
+    holder = PinHolder(CUDA0)
+    registry.update(holder, [storage])
+    registry.lock(keys)
+    registry.release(holder)
+
+    class _ForbiddenLock:
+        def acquire(self, *args, **kwargs):
+            raise AssertionError("the registration lock was taken with nothing to apply")
+
+    real_lock = registry._registration_lock
+    registry._registration_lock = _ForbiddenLock()
+    try:
+        for _ in range(3):
+            registry.drain_deferred()
+    finally:
+        registry._registration_lock = real_lock
+    assert runtime.registered
+
+    registry.unlock(keys)
+    registry.drain_deferred()
+
+    assert not runtime.registered and registry._pinned_bytes == 0
+    registry._registration_lock = _ForbiddenLock()
+    try:
+        registry.drain_deferred()  # The flag is cleared again: nothing is left to retry.
+    finally:
+        registry._registration_lock = real_lock
+
+
+def test_a_last_unlock_during_another_drain_is_drained_by_it_after_it_releases_the_lock(fake_streaming, monkeypatch):
+    """Thread A drains and finds the key still locked; B's last unlock then loses the non-blocking acquire, and A's
+    drain must go round again after releasing."""
+    registry, runtime = fake_streaming
+    storage = _storage()
+    keys = storage_keys([storage])
+    holder = PinHolder(CUDA0)
+    registry.update(holder, [storage])
+    registry.lock(keys)
+    registry.release_deferred(holder)
+    unregister_pending = registry._unregister_pending_locked
+
+    def unlock_during_the_drain() -> None:
+        unregister_pending()  # The key is still locked: it stays pending, and the flag is cleared.
+        monkeypatch.setattr(registry, "_unregister_pending_locked", unregister_pending)
+        registry.unlock(keys)
+        registry.drain_deferred()  # Loses the registration lock, which this thread holds.
+
+    monkeypatch.setattr(registry, "_unregister_pending_locked", unlock_during_the_drain)
+
+    registry.drain_deferred()
+
+    assert not runtime.registered and registry._pinned_bytes == 0 and not registry._pending
+
+
+def test_holders_on_one_device_count_a_shared_storage_once(fake_streaming):
+    registry, _ = fake_streaming
+    storage = _storage()
+    first, second = PinHolder(CUDA0), PinHolder(CUDA0)
+    registry.update(first, [storage])
+    registry.update(second, [storage])
+    assert registry._wanted_entries_on == {CUDA0: 1}
+
+    registry.release(first)
+    assert registry.wants_anything_on(CUDA0), "the second holder still wants it"
+    registry.release(second)
+
+    assert not registry.wants_anything_on(CUDA0)
+
+
+def test_releasing_a_want_that_an_interrupt_cut_short_does_not_raise(fake_streaming):
+    registry, _ = fake_streaming
+    storage = _storage()
+    holder = PinHolder(CUDA0)
+    registry.update(holder, [storage])
+    next(iter(registry._entries.values())).wanted_on.clear()
+    registry._wanted_entries_on.clear()  # A want cut short before its counters were updated.
+
+    registry.release(holder)
+
+    assert not registry._entries
+    assert registry._reclaimable_bytes == 0 and not registry._reclaimable
+    assert registry._wanted_entries_on.get(CUDA0, 0) == 0
+
+
+def test_an_unwant_of_an_already_reclaimable_storage_counts_its_bytes_once(fake_streaming):
+    registry, _ = fake_streaming
+    holder = PinHolder(CUDA0)
+    registry.update(holder, [_storage()])
+    registry.idle(holder)
+    registry.drain_deferred()
+    entry = next(iter(registry._entries.values()))
+    assert registry._reclaimable_bytes == MB
+
+    registry._unwant_locked(entry, holder)  # What a cut-short want leaves behind.
+
+    assert registry._reclaimable_bytes == MB and list(registry._reclaimable) == [entry.key]
+    assert registry._wanted_entries_on.get(CUDA0, 0) == 0
     registry.release(holder)

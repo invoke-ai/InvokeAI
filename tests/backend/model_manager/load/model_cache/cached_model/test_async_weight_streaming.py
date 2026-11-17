@@ -148,8 +148,8 @@ def streaming(monkeypatch: pytest.MonkeyPatch):
     class RecordingHolder(weight_streaming.PinHolder):
         __slots__ = ()
 
-        def __init__(self) -> None:
-            super().__init__()
+        def __init__(self, device: torch.device) -> None:
+            super().__init__(device)
             holders.append(self)
 
     monkeypatch.setattr(weight_streaming, "PINNED_STORAGES", registry)
@@ -469,7 +469,7 @@ class _TensorSubclass(torch.Tensor):
 @requires_cuda
 def test_ineligible_tensors_fall_back_to_the_synchronous_copy(streaming):
     weight = torch.randn(HIDDEN, DIM)
-    holder = weight_streaming.PinHolder()
+    holder = weight_streaming.PinHolder(DEVICE)
     streaming.registry.update(holder, [weight.untyped_storage()])
     assert weight.is_pinned()
 
@@ -549,7 +549,7 @@ def test_a_storage_the_driver_refuses_stays_pageable_and_still_copies(streaming,
     cudart = torch.cuda.cudart()
     assert int(cudart.cudaHostRegister(inner, 8 * page, 1)) == 0
     other = torch.randn(HIDDEN, DIM)
-    holder = weight_streaming.PinHolder()
+    holder = weight_streaming.PinHolder(DEVICE)
     try:
         streaming.registry.update(holder, [storage, other.untyped_storage()])
 
@@ -601,10 +601,10 @@ def test_an_eviction_during_the_first_pin_leaves_nothing_registered(streaming, m
     assert cached.weight_streaming_reserve_bytes() > 0
     update = streaming.registry.update
 
-    def evicted_while_registering(holder, storages, device=None, **kwargs):
+    def evicted_while_registering(holder, storages, **kwargs):
         # The cache evicts the record (another thread, under its own lock) before this update registers.
         cached.release_pinned_weights()
-        update(holder, storages, device, **kwargs)
+        update(holder, storages, **kwargs)
 
     monkeypatch.setattr(streaming.registry, "update", evicted_while_registering)
     cached.pin_streamed_weights()
@@ -705,7 +705,7 @@ def test_only_the_last_unlock_makes_the_pins_reclaimable(streaming, monkeypatch:
     count does not depend on which thread holds it)."""
     model = _build_model()
     cache = _cache_with_room_for_half_of(model)
-    other = weight_streaming.PinHolder()
+    other = weight_streaming.PinHolder(DEVICE)
     taker = torch.empty(2 * 2**20, dtype=torch.uint8)
     try:
         cache.put("m", model)
@@ -739,7 +739,7 @@ def test_shared_weights_one_device_still_streams_stay_pinned_when_the_other_goes
     cached_b = _half_loaded(model_b, shared_store=store, cache_key="k")
     shared = _cpu_storages(model_b)
     assert {s.data_ptr() for s in shared} == {s.data_ptr() for s in _cpu_storages(model_a)}
-    other = weight_streaming.PinHolder()
+    other = weight_streaming.PinHolder(DEVICE)
     taker = torch.empty(2 * 2**20, dtype=torch.uint8)
     monkeypatch.setattr(weight_streaming, "PINNED_RAM_CAP_BYTES", sum(s.nbytes() for s in shared) + taker.nbytes // 2)
 
@@ -770,9 +770,67 @@ def test_weights_a_lock_moves_to_ram_stream_for_the_rest_of_it(streaming, monkey
 
             assert all(p.device.type == "cpu" for p in model.parameters())
             assert all(s.is_pinned() for s in _cpu_storages(model))
+            reference = _forward(model, streaming=False)
+            assert torch.equal(_forward(model, streaming=True), reference)
+            assert _stats().streamed_tensors == len(_cpu_storages(model)), "the rest of the lock streams them"
         cache.drop_model("m")
     finally:
         cache.shutdown()
+
+
+def _unpinned_half_loaded_mlp() -> tuple[torch.nn.Module, CachedModelWithPartialLoad]:
+    model = _build_model()
+    cached = CachedModelWithPartialLoad(model=model, compute_device=DEVICE, keep_ram_copy=True)
+    cached.partial_load_to_vram(cached.total_bytes() // 2)
+    assert 0 < cached.cur_vram_bytes() < cached.total_bytes()
+    return model, cached
+
+
+@requires_cuda
+def test_registered_weights_no_active_holder_wants_copy_synchronously_and_stage_nothing(streaming):
+    """The copy path asks whether a holder computing on the device wants the storage, not whether it is registered:
+    an idle holder keeps its pins, and neither streams nor opens the staging gate for the small weights."""
+    model, _ = _unpinned_half_loaded_mlp()
+    storages = _cpu_storages(model)
+    holder = weight_streaming.PinHolder(DEVICE)
+    streaming.registry.update(holder, storages)
+    streaming.registry.idle(holder)
+    streaming.registry.drain_deferred()
+    assert all(s.is_pinned() for s in storages)
+    reference = _forward(model, streaming=False)
+
+    assert torch.equal(_forward(model, streaming=True), reference)
+
+    stats = _stats()
+    assert stats.streamed_tensors == 0 and stats.staged_tensors == 0
+    assert streaming.registry.activate(holder)
+    assert torch.equal(_forward(model, streaming=True), reference)
+    assert _stats().streamed_tensors == len(storages)
+    streaming.registry.release(holder)
+
+
+@pytest.mark.skipif(torch.cuda.device_count() < 2, reason="Requires two CUDA devices.")
+def test_weights_another_device_registered_stay_synchronous_until_a_holder_here_joins(streaming):
+    """Multi-GPU: the holder on cuda:1 registered the shared weights; a lock on cuda:0 that planned no VRAM for
+    copies in flight (`register_new=False`) must not stream them."""
+    model, _ = _unpinned_half_loaded_mlp()
+    storages = _cpu_storages(model)
+    reference = _forward(model, streaming=False)
+    other_device = weight_streaming.PinHolder(torch.device("cuda", 1))
+    streaming.registry.update(other_device, storages)
+    here = weight_streaming.PinHolder(DEVICE)
+    streaming.registry.update(here, storages, register_new=False)
+    assert all(s.is_pinned() for s in storages)
+
+    assert torch.equal(_forward(model, streaming=True), reference)
+
+    stats = _stats()
+    assert stats.streamed_tensors == 0 and stats.staged_tensors == 0
+    streaming.registry.update(here, storages)
+    assert torch.equal(_forward(model, streaming=True), reference)
+    assert _stats().streamed_tensors == len(storages)
+    streaming.registry.release(here)
+    streaming.registry.release(other_device)
 
 
 @requires_cuda
@@ -842,7 +900,7 @@ def test_a_lock_that_moves_nothing_pins_again_what_was_reclaimed(streaming, monk
     assert cached.cur_vram_bytes() == 0 and all(s.is_pinned() for s in storages)
     cached.mark_streamed_weights_idle()
     monkeypatch.setattr(weight_streaming, "PINNED_RAM_CAP_BYTES", 256 * 2**10)
-    other = weight_streaming.PinHolder()
+    other = weight_streaming.PinHolder(DEVICE)
     taker = torch.empty(200 * 2**10, dtype=torch.uint8)
     streaming.registry.update(other, [taker.untyped_storage()])
     assert taker.is_pinned() and not all(s.is_pinned() for s in storages)
