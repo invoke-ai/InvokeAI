@@ -27,11 +27,12 @@ def _load(
     path: Path,
     config_class: type[TinyAutoencoder_Checkpoint_Config_Base] = TinyAutoencoder_Checkpoint_SD1_Config,
     dtype: torch.dtype = torch.float32,
+    cpu_only: bool | None = None,
 ) -> TinyAutoencoderDecoder:
     loader = object.__new__(TinyAutoencoderLoader)
     loader._torch_dtype = dtype
     loader._logger = SimpleNamespace(info=lambda *_a, **_k: None, warning=lambda *_a, **_k: None)
-    config = config_class.model_construct(path=str(path), name=path.name)
+    config = config_class.model_construct(path=str(path), name=path.name, cpu_only=cpu_only)
     return loader._load_model(config)
 
 
@@ -104,6 +105,33 @@ def test_the_decoder_takes_the_loaders_dtype(tmp_path: Path) -> None:
     decoder = _load(tmp_path / "taesd_decoder.safetensors", dtype=torch.float16)
 
     assert all(p.dtype == torch.float16 for p in decoder.parameters())
+
+
+@pytest.mark.parametrize(
+    ("cpu_only", "expected"), [(True, torch.float32), (False, torch.float16), (None, torch.float16)]
+)
+def test_a_cpu_only_decoder_is_float32_whatever_the_loader_dtype(
+    tmp_path: Path, cpu_only: bool | None, expected: torch.dtype
+) -> None:
+    save_file(native_weights(TAESD), tmp_path / "taesd_decoder.safetensors")
+
+    decoder = _load(tmp_path / "taesd_decoder.safetensors", dtype=torch.float16, cpu_only=cpu_only)
+
+    assert all(p.dtype == expected for p in decoder.parameters())
+
+
+def test_a_cpu_only_decoder_executes_on_the_cpu_and_a_default_one_on_the_cache_device(tmp_path: Path) -> None:
+    path = tmp_path / "taesd_decoder.safetensors"
+    save_file(native_weights(TAESD), path)
+    config = ModelConfigFactory.from_model_on_disk(
+        path, {"hash": "blake3:fake", "file_size": 1, "source": str(path), "source_type": "path"}
+    ).config
+    assert isinstance(config, TinyAutoencoder_Checkpoint_Config_Base)
+    loader = object.__new__(TinyAutoencoderLoader)
+
+    assert config.cpu_only is None
+    assert loader._get_execution_device(config) is None
+    assert loader._get_execution_device(config.model_copy(update={"cpu_only": True})) == torch.device("cpu")
 
 
 @pytest.mark.parametrize("change", ["missing", "extra"])

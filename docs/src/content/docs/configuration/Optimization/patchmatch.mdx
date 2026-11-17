@@ -2,8 +2,6 @@
 title: Patchmatch
 ---
 
-import { Tabs, TabItem, Steps } from '@astrojs/starlight/components'
-
 PatchMatch is an algorithm used to infill images. It can greatly improve outpainting results. PyPatchMatch is a python wrapper around a C++ implementation of the algorithm.
 
 It uses the image data around the target area as a reference to generate new image data of a similar character and quality.
@@ -22,105 +20,18 @@ PatchMatch is CPU-bound, and the amount of time it takes increases proportionall
 
 ## Installation
 
-Unfortunately, installation can be somewhat challenging, as it requires some things that `pip` cannot install for you.
+PyPatchMatch is installed with Invoke. Its wheels include the prebuilt library for Windows (x64 and ARM64), macOS 11 or later (Intel and Apple silicon) and Linux (x86_64 and aarch64, glibc 2.28 or later), so there is nothing to compile and nothing is downloaded when Invoke starts. PatchMatch works offline.
 
-<Steps>
-  1. Ensure you have the necessary dependencies installed for your system (see below).
+To check that it loaded, run this in the Python environment Invoke uses:
 
-      <Tabs syncKey="operatingSystem">
-        <TabItem label="Windows" icon="seti:windows">
-          You're in luck! On Windows x64 PyPatchMatch will install automatically with no extra intervention. There is no prebuilt library for Windows on ARM64, where the `patchmatch` infill method is unavailable. Every startup there logs `ERROR patchmatch failed to load or compile`; that message is expected on ARM64 and can be ignored.
-        </TabItem>
-        <TabItem label="MacOS" icon="apple">
-          You need to have opencv installed so that pypatchmatch can be built:
+```sh
+python -c "from patchmatch import patch_match; print(patch_match.patchmatch_available)"
+```
 
-          ```bash
-          brew install opencv
-          ```
+It prints `True` when the `patchmatch` infill method is available.
 
-          The next time you start `invoke`, after successfully installing opencv, pypatchmatch will be built.
-        </TabItem>
-        <TabItem label="Linux" icon="linux">
-          Prior to installing PyPatchMatch, you need to take the following steps:
+On any other platform, PyPatchMatch is built from source when it is installed. That needs a C++ compiler, CMake and OpenCV. If the build fails, the package installs without its library and the `patchmatch` infill method is unavailable. Install the missing tools, then reinstall it without the cache:
 
-          <Tabs syncKey="linuxDistro">
-            <TabItem label="Debian">
-              <Steps>
-                1. Install the `build-essential` tools:
-
-                    ```sh
-                    sudo apt update # Update package lists
-                    sudo apt install build-essential
-                    ```
-
-                2. Install `opencv`:
-
-                    ```sh
-                    sudo apt install python3-opencv libopencv-dev
-                    ```
-
-                3. Activate the environment you use for invokeai, either with `conda` or with a virtual environment.
-              </Steps>
-            </TabItem>
-            <TabItem label="Arch">
-              <Steps>
-                1. Install the `base-devel` package:
-
-                    ```sh
-                    sudo pacman -Syu
-                    sudo pacman -S --needed base-devel
-                    ```
-
-                2. Install `opencv`, `blas`, and required dependencies:
-
-                    ```sh
-                    sudo pacman -S opencv blas fmt glew vtk hdf5
-                    ```
-
-                    or for CUDA support
-
-                    ```sh
-                    sudo pacman -S opencv-cuda blas fmt glew vtk hdf5
-                    ```
-
-                3. Fix the naming of the `opencv` package configuration file:
-
-                    ```sh
-                    cd /usr/lib/pkgconfig/
-                    ln -sf opencv4.pc opencv.pc
-                    ```
-              </Steps>
-            </TabItem>
-          </Tabs>
-        </TabItem>
-      </Tabs>
-
-  2. Install pypatchmatch:
-
-      ```sh
-      pip install pypatchmatch
-      ```
-
-  3. Confirm that pypatchmatch is installed. At the command-line prompt enter `python`, and then at the `>>>` line type `from patchmatch import patch_match`: It should look like the following:
-
-      ```py
-        Python 3.12.3 (main, Aug 14 2025, 17:47:21) [GCC 13.3.0] on linux
-        Type "help", "copyright", "credits" or "license" for more information.
-        >>> from patchmatch import patch_match
-        Compiling and loading c extensions from "/home/lstein/Projects/InvokeAI/.invokeai-env/src/pypatchmatch/patchmatch".
-        rm -rf build/obj libpatchmatch.so
-        mkdir: created directory 'build/obj'
-        mkdir: created directory 'build/obj/csrc/'
-        [dep] csrc/masked_image.cpp ...
-        [dep] csrc/nnf.cpp ...
-        [dep] csrc/inpaint.cpp ...
-        [dep] csrc/pyinterface.cpp ...
-        [CC] csrc/pyinterface.cpp ...
-        [CC] csrc/inpaint.cpp ...
-        [CC] csrc/nnf.cpp ...
-        [CC] csrc/masked_image.cpp ...
-        [link] libpatchmatch.so ...
-      ```
-
-      If you're not seeing any errors, you're ready to go!
-</Steps>
+```sh
+pip install --force-reinstall --no-deps --no-cache-dir pypatchmatch
+```

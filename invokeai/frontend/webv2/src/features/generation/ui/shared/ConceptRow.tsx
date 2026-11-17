@@ -3,7 +3,7 @@ import type { ConceptUpdate } from '@features/generation/core/conceptList';
 import type { GenerateLora } from '@features/generation/core/types';
 import type { MouseEvent, ReactNode } from 'react';
 
-import { Avatar, Badge, Box, Flex, Icon, Menu, Portal } from '@chakra-ui/react';
+import { Avatar, Badge, Box, chakra, Flex, Icon, Menu, Portal } from '@chakra-ui/react';
 import { DEFAULT_LORA_WEIGHT_CONFIG, getDefaultLoraWeight } from '@features/generation/core/settings';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
@@ -40,7 +40,7 @@ export interface ConceptRowProps {
    * saved state but is locked, and `issue` says what blocks and how to fix it.
    */
   isInstalled?: boolean;
-  /** Shown under the row: the issue that blocks Invoke because of this concept, with its fix. */
+  /** Shown beside the switch: the issue that blocks Invoke because of this concept, with its fix (an icon button). */
   issue?: ReactNode;
   /** The committed concept. Weight edits stay in a local draft until idle or a workbench flush. */
   lora: GenerateLora;
@@ -213,7 +213,8 @@ const ConceptRowContent = ({
       <Box aria-label={name} opacity={isCompatibleModel ? 1 : 0.68} role="group">
         <ListItem
           actions={
-            <Flex gap={1}>
+            <Flex align="center" gap={1}>
+              {issue}
               <GenerateRowSwitch
                 checked={isInstalled ? isActive : lora.isEnabled}
                 disabled={!isCompatible}
@@ -237,27 +238,32 @@ const ConceptRowContent = ({
               </Tooltip>
             </Flex>
           }
-          badges={
-            <>
-              <Badge colorPalette={models.getBaseColorPalette(lora.model.base)} variant="surface">
+          // The model type sits under the name, with the trigger phrases beside it on the same line.
+          description={
+            <Flex align="center" gap="1.5" minW="0">
+              <Badge colorPalette={models.getBaseColorPalette(lora.model.base)} flexShrink={0} variant="surface">
                 {models.getBaseLabel(lora.model.base)}
               </Badge>
               {isInstalled ? null : (
-                <Badge colorPalette="red" variant="solid">
+                <Badge colorPalette="red" flexShrink={0} variant="solid">
                   {t('widgets.generate.notInstalled')}
                 </Badge>
               )}
               {isCompatibleModel ? null : (
-                <Badge colorPalette="orange" variant="surface">
+                <Badge colorPalette="orange" flexShrink={0} variant="surface">
                   {t('widgets.generate.incompatible')}
                 </Badge>
               )}
-            </>
+              {triggerPhrases?.length ? (
+                <chakra.span minW="0" truncate>
+                  {triggerPhrases.join(', ')}
+                </chakra.span>
+              ) : null}
+            </Flex>
           }
-          description={triggerPhrases?.length ? triggerPhrases.join(', ') : undefined}
           detail={
-            // Backed with the settings section's surface so the row's hover tint never washes out the track and fill.
-            <Box bg="bg.muted" rounded="control">
+            // Backed with the widget's surface so the row's hover tint never washes out the track and fill.
+            <Box bg="var(--wb-field-surface, var(--chakra-colors-bg-subtle))" rounded="control">
               <GenerateFieldContextMenu
                 fieldLabel={t('widgets.generate.conceptWeightNamed', { name })}
                 copyValue={copyWeight}
@@ -306,11 +312,6 @@ const ConceptRowContent = ({
           onContextMenu={menu.open}
         />
       </Box>
-      {issue ? (
-        <Box pb="1.5" px="2">
-          {issue}
-        </Box>
-      ) : null}
       <Menu.Root
         lazyMount
         open={menu.anchor !== null}

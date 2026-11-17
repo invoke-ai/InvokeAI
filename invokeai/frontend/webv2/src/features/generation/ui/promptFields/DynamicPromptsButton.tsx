@@ -134,7 +134,7 @@ export const DynamicPromptsButton = ({
       <Portal>
         <Popover.Positioner>
           <PopoverContent w="26rem">
-            <Popover.Body p="2.5">
+            <Popover.Body p="1.5">
               <Stack gap="1.5">
                 <SegmentTabs
                   activeId={tab}
@@ -148,6 +148,8 @@ export const DynamicPromptsButton = ({
                   aria-labelledby={segmentTabsTabId(tabsIdBase, tab)}
                   gap="2.5"
                   id={segmentTabsPanelId(tabsIdBase)}
+                  pb="1"
+                  px="1"
                   role="tabpanel"
                 >
                   {tab === 'preview' ? (

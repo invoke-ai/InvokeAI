@@ -19,11 +19,14 @@ import { TopbarShortcutKeys } from './TopbarShortcutKeys';
 /** The Invoke card: what runs, where it goes, and each issue in the way with its fixes. Loads on first hover or focus. */
 export const InvokePopoverBody = ({
   frontShortcut,
+  isRouteFixed,
   onJump,
   shortcutParts,
   state,
 }: {
   frontShortcut: string | null;
+  /** The host fixes the route: it reads as text, with nothing to switch or lock. */
+  isRouteFixed: boolean;
   /** An action that leads elsewhere closes the list, leaving focus where the action put it. */
   onJump: () => void;
   shortcutParts: string[] | null;
@@ -74,7 +77,7 @@ export const InvokePopoverBody = ({
           </Kbd>
         ) : null}
       </HStack>
-      <InvokeRoute state={state} />
+      {isRouteFixed ? <FixedRoute state={state} /> : <InvokeRoute state={state} />}
       <Text color="fg.muted" fontSize="xs">
         {summary}
       </Text>
@@ -197,6 +200,27 @@ const InvokeRoute = ({ state }: { state: InvocationState }) => {
   );
 };
 
+/** The route as text: where Invoke runs from and where its results go, set by the host rather than here. */
+const FixedRoute = ({ state }: { state: InvocationState }) => {
+  const { t } = useTranslation();
+  const { invocation } = state;
+
+  return (
+    <Stack data-invoke-route="" data-invoke-route-fixed="" gap="2.5">
+      <Stack align="start" gap="1">
+        <Text {...ROUTE_LABEL_PROPS}>{t('topbar.routing.source')}</Text>
+        <Text {...ROUTE_VALUE_PROPS}>{t(ROUTE_LABEL_KEYS[invocation.sourceId])}</Text>
+      </Stack>
+      <Stack align="start" gap="1">
+        <Text {...ROUTE_LABEL_PROPS}>{t('topbar.routing.destination')}</Text>
+        <Text {...ROUTE_VALUE_PROPS}>
+          {t(ROUTE_LABEL_KEYS[invocation.sourceId === 'video' ? 'gallery' : invocation.destination])}
+        </Text>
+      </Stack>
+    </Stack>
+  );
+};
+
 const InvokeIssueList = ({ issues, onJump }: { issues: readonly InvocationIssue[]; onJump: () => void }) => {
   const getActions = useInvokeIssueActions();
 
@@ -204,6 +228,26 @@ const InvokeIssueList = ({ issues, onJump }: { issues: readonly InvocationIssue[
     <Stack as="ul" gap="2" listStyleType="none" m="0" p="0">
       {issues.map((issue, index) => {
         const actions = getActions(issue);
+        const buttons = actions.map((action) => (
+          <Button
+            key={action.id}
+            flexShrink={0}
+            size="xs"
+            data-issue-action=""
+            variant="outline"
+            // oxlint-disable-next-line react-perf/jsx-no-new-function-as-prop -- a few buttons per shown issue.
+            onClick={() => {
+              action.run();
+              if (!action.stays) {
+                onJump();
+              }
+            }}
+          >
+            {action.label}
+          </Button>
+        ));
+        // A lone action sits at the end of the message's row; several get a row of their own under it.
+        const isInline = actions.length === 1;
 
         return (
           // Two issues can read the same (two nodes missing the same input), so the position keeps keys apart.
@@ -218,29 +262,14 @@ const InvokeIssueList = ({ issues, onJump }: { issues: readonly InvocationIssue[
                 flexShrink={0}
                 mt="0.5"
               />
-              <Text color="fg" fontSize="sm" lineHeight="1.4" textWrap="pretty">
+              <Text color="fg" flex="1" fontSize="sm" lineHeight="1.4" minW="0" textWrap="pretty">
                 {issue.message}
               </Text>
+              {isInline ? buttons : null}
             </HStack>
-            {actions.length > 0 ? (
+            {actions.length > 1 ? (
               <HStack gap="1" ps="4.5" wrap="wrap">
-                {actions.map((action) => (
-                  <Button
-                    key={action.id}
-                    size="xs"
-                    data-issue-action=""
-                    variant="outline"
-                    // oxlint-disable-next-line react-perf/jsx-no-new-function-as-prop -- a few buttons per shown issue.
-                    onClick={() => {
-                      action.run();
-                      if (!action.stays) {
-                        onJump();
-                      }
-                    }}
-                  >
-                    {action.label}
-                  </Button>
-                ))}
+                {buttons}
               </HStack>
             ) : null}
           </Stack>

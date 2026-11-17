@@ -64,20 +64,20 @@ const buildWorkflowSource = (
   project: Project,
   templates: InvocationTemplatesSnapshot
 ): GraphPreviewSourceWithoutDestination => {
-  if (templates.status !== 'loaded') {
-    return { ...EMPTY_SOURCE_BASE, graph: null, isLive: true };
-  }
-
   const document = getActiveProjectGraph(project);
-  const positionHints = Object.fromEntries(document.nodes.map((node) => [node.id, node.position]));
+
+  if (templates.status !== 'loaded') {
+    return { ...EMPTY_SOURCE_BASE, document, graph: null, isLive: true };
+  }
 
   try {
     const graph = compileProjectGraph(document, templates.templates);
 
-    return { ...EMPTY_SOURCE_BASE, graph, isLive: true, positionHints };
+    return { ...EMPTY_SOURCE_BASE, document, graph, isLive: true };
   } catch (error) {
     return {
       ...EMPTY_SOURCE_BASE,
+      document,
       graph: null,
       invalidReasons: [
         error instanceof ForLoopGraphValidationError
@@ -87,7 +87,6 @@ const buildWorkflowSource = (
             : String(error),
       ],
       isLive: true,
-      positionHints,
     };
   }
 };
@@ -169,7 +168,9 @@ export const buildGraphPreviewSource = ({
   t,
   templates,
 }: GraphPreviewSourceDeps): GraphPreviewSourceState => {
-  const destinationLabel = getDestinationLabel(project.invocation.destination);
+  const destinationLabel = getDestinationLabel(
+    surface.sourceId === 'video' ? 'gallery' : project.invocation.destination
+  );
 
   switch (surface.sourceId) {
     case 'workflow':

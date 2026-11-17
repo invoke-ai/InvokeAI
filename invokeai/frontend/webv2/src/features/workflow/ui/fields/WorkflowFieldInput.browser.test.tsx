@@ -862,6 +862,36 @@ describe('WorkflowFieldInput media inputs', () => {
     expect(resolveItemMock).not.toHaveBeenCalled();
   });
 
+  it('keeps the empty image well in its hover look while its picker is open, and not after', async () => {
+    const imageTemplate = {
+      name: 'image',
+      title: 'Image',
+      type: { name: 'ImageField' },
+    } as unknown as FieldInputTemplate;
+
+    await renderField(imageTemplate, undefined, vi.fn());
+    const button = host.querySelector<HTMLButtonElement>('button.nodrag')!;
+    const well = button.firstElementChild as HTMLElement;
+    // Read once the well's border transition has finished.
+    const border = async () => {
+      await vi.waitFor(() => expect(well.getAnimations()).toHaveLength(0));
+      return getComputedStyle(well).borderColor;
+    };
+    const resting = await border();
+
+    await userEvent.hover(well);
+    const hovered = await border();
+    expect(hovered).not.toBe(resting);
+    await userEvent.unhover(well);
+    expect(await border()).toBe(resting);
+
+    // The gallery picker marks its trigger `data-hover` while open (its own test covers that); the picker is stubbed here.
+    button.setAttribute('data-hover', '');
+    expect(await border()).toBe(hovered);
+    button.removeAttribute('data-hover');
+    expect(await border()).toBe(resting);
+  });
+
   it('reveals the chosen image in the gallery from the field', async () => {
     const imageTemplate = {
       name: 'image',

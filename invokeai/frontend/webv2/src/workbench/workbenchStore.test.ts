@@ -77,7 +77,9 @@ describe('createWorkbenchStore', () => {
     runningState.projects[0] = {
       ...source,
       queue: {
-        items: [{ backendItemIds: [11], id: 'run-1', status: 'running' } as (typeof source.queue.items)[number]],
+        items: [
+          { backendItemIds: [11], id: 'run-1', snapshot: {}, status: 'running' } as (typeof source.queue.items)[number],
+        ],
       },
     };
     const runningStore = createWorkbenchStore(runningState);
@@ -106,6 +108,7 @@ describe('createWorkbenchStore', () => {
                 {
                   backendItemIds: [11],
                   id: 'run-1',
+                  snapshot: {},
                   status,
                 } as (typeof source.queue.items)[number],
               ],
@@ -119,7 +122,9 @@ describe('createWorkbenchStore', () => {
     const pendingState = createInitialWorkbenchState();
     pendingState.projects[0] = {
       ...pendingState.projects[0]!,
-      queue: { items: [{ id: 'pending-1', status: 'pending' } as (typeof source.queue.items)[number]] },
+      queue: {
+        items: [{ id: 'pending-1', snapshot: {}, status: 'pending' } as (typeof source.queue.items)[number]],
+      },
     };
     const pendingStore = createWorkbenchStore(pendingState);
     const pendingSource = pendingState.projects[0]!;
@@ -144,6 +149,7 @@ describe('createWorkbenchStore', () => {
             backendItemIds: [11],
             cancellationPending: true,
             id: 'run-1',
+            snapshot: {},
             status: 'cancelled',
           } as (typeof source.queue.items)[number],
         ],

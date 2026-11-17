@@ -105,7 +105,7 @@ describe('reconcileCanvasDims (pure)', () => {
       prev: snapshot(1024, 1024, 1024, 1024),
     });
 
-    // Update the numeric ratio too; getActiveRatio prefers it over the aspect id.
+    // Update the numeric ratio too; getActiveAspectRatio prefers it over the aspect id.
     expect(result).toMatchObject({ aspectRatioId: 'Free', aspectRatioValue: 1024 / 768, kind: 'patch-dims' });
   });
 
@@ -431,7 +431,7 @@ describe('createCanvasDimsSync (wiring)', () => {
     const width = values.width as number;
     const height = values.height as number;
 
-    // Mirror GenerateDimensionFields' getActiveRatio: prefer aspectRatioValue
+    // Mirror getActiveAspectRatio: prefer aspectRatioValue
     // when positive, else fall back to the live width/height.
     const activeRatio = aspectRatioValue > 0 ? aspectRatioValue : width / height;
     const nextWidth = 800;

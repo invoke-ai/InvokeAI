@@ -28,7 +28,7 @@ vi.mock('@workbench/WorkbenchContext', async () => {
 import { GenerateDenoisingStrength } from './GenerateDenoisingStrength';
 
 const generationUi = {
-  sectionPreferences: { sectionsOpen: {}, setSectionOpen: () => undefined },
+  sectionPreferences: { sectionsOpen: {}, setSectionsOpen: () => undefined },
 } as unknown as GenerationUiAdapter;
 
 let host: HTMLDivElement | null = null;
@@ -41,7 +41,7 @@ const Section = ({ slots }: { slots: CanvasDenoisingStrength }) => {
   sectionRendered();
   return (
     <div>
-      <div data-testid="header">{slots.badges}</div>
+      <div data-testid="header">{slots.summary}</div>
       {slots.field}
     </div>
   );
