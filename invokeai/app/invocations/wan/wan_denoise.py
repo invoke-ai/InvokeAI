@@ -53,6 +53,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
 from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.wan.memory_optimization import wan_memory_optimization
 from invokeai.backend.wan.sampling_utils import get_spatial_scale_factor, make_noise
@@ -256,10 +257,12 @@ class _ExpertSwapper:
         info = self._context.models.load(model_id)
         supports_partial_loading = getattr(info, "supports_partial_loading", None)
         if self._working_mem_bytes is None or supports_partial_loading is False:
-            # No estimate to add it to, so a quantized expert's per-forward dequantization transient is passed
-            # alone; the cache floors it at `device_working_mem_gb`, so zero asks for the default.
+            # No estimate to add it to, so a quantized expert's per-forward dequantization transient (module-level
+            # schemes and GGUF, then the float8 widening of FP8 Storage and kept scaled fp8) is passed alone;
+            # the cache floors it at `device_working_mem_gb`, so zero asks for the default.
             device_ctx = info.model_on_device(
                 working_mem_bytes=peak_dequant_transient_bytes(info.model, self._inference_dtype)
+                + peak_fp8_cast_transient_bytes(info.model, self._inference_dtype)
             )
         else:
             device_ctx = info.model_on_device(working_mem_bytes=self._working_mem_bytes)

@@ -53,7 +53,7 @@ import struct
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import torch
 
@@ -76,6 +76,8 @@ from invokeai.backend.quantization.int8_matmul import (
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger(__name__)
+
+_T = TypeVar("_T")
 
 CONVROT_GROUP_SIZE = 256
 
@@ -833,17 +835,15 @@ def drop_unconsumed_quantization_sidecars(sd: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in sd.items() if not (isinstance(k, str) and k.endswith(_UNCONSUMED_SIDECAR_SUFFIXES))}
 
 
-def resolve_quantized_module_paths(
-    markers: dict[str, dict[str, Any]], key_map: dict[str, str]
-) -> dict[str, dict[str, Any]]:
-    """Re-key markers from the checkpoint's names to the built model's names.
+def resolve_quantized_module_paths(markers: dict[str, _T], key_map: dict[str, str]) -> dict[str, _T]:
+    """Re-key per-layer entries (int8 markers, scaled-fp8 layers) from the checkpoint's names to the built model's names.
 
     The markers are read in the checkpoint's key space, because that is the only place where a
     marker and its weight are reliably paired: the key conversions rename `.weight` (and, by
     substring, `.weight_scale`) but leave `.comfy_quant` behind on the old name. Following the
     weight's own rename is therefore the only mapping that cannot drift from the conversion.
     """
-    resolved: dict[str, dict[str, Any]] = {}
+    resolved: dict[str, _T] = {}
     for path, marker in markers.items():
         weight_key = key_map.get(f"{path}.weight", f"{path}.weight")
         resolved[weight_key[: -len(".weight")]] = marker

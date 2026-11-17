@@ -374,7 +374,7 @@ export const useRegisterFirstPartyCommands = () => {
       commandApi.register({
         handler: () => requestQueueAction('cancel-current'),
         id: 'app.cancelQueueItem',
-        title: 'Cancel current queue item',
+        title: 'Cancel current or next queue item',
       }),
       commandApi.register({
         handler: () => requestQueueAction('cancel-all'),

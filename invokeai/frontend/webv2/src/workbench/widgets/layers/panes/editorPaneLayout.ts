@@ -50,7 +50,8 @@ export interface LayerColorPaneLayout extends PaneBlockLayout {
   activePane: LayerColorPaneId;
 }
 
-export const COLOR_PANE_MIN_SIZE_PX = 160;
+/** The tab strip (40) plus the picker tray's padding (16) and the 168px colour wheel: the wheel always shows whole. */
+export const COLOR_PANE_MIN_SIZE_PX = 224;
 export const COLOR_PANE_MAX_SIZE_PX = 560;
 
 export const COLOR_PANE_DEFAULTS: LayerColorPaneLayout = {

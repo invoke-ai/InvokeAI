@@ -19397,6 +19397,13 @@ export type components = {
             prepared_iteration_paths?: {
                 [key: string]: number[];
             };
+            /**
+             * Prepared Iteration Axes
+             * @description The named iteration axes of each prepared execution node
+             */
+            prepared_iteration_axes?: {
+                [key: string]: string[];
+            };
             /** Ready Order */
             ready_order?: string[];
             /**
@@ -58373,7 +58380,7 @@ export type components = {
          * @description The order by options for workflow records
          * @enum {string}
          */
-        WorkflowRecordOrderBy: "created_at" | "updated_at" | "opened_at" | "name" | "is_public";
+        WorkflowRecordOrderBy: "created_at" | "updated_at" | "opened_at" | "last_run_at" | "name" | "is_public";
         /** WorkflowRecordWithThumbnailDTO */
         WorkflowRecordWithThumbnailDTO: {
             /**

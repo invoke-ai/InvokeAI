@@ -8,12 +8,6 @@ import type {
   GalleryItemsPage,
   GalleryVideoItem,
 } from '@features/gallery/core/items';
-import type {
-  GalleryMediaUsage,
-  GalleryMediaUsageDocumentKind,
-  GalleryMediaUsageNames,
-  GalleryMediaUsageRequest,
-} from '@features/gallery/core/mediaUsage';
 import type { GallerySemanticQuery } from '@features/gallery/core/semanticImageQuery';
 import type {
   GalleryBoard,
@@ -36,11 +30,13 @@ import {
   parseGalleryItemKey,
 } from '@features/gallery/core/items';
 import { getExternalImageFile, getImageCluster } from '@features/gallery/core/semanticImageQuery';
+import { createLogger } from '@platform/logging/logger';
 import { isTimestampInRange } from '@platform/search/dateTokens';
 import {
   AccountScopeExpiredError,
   assertAccountScopeCurrent,
   captureAccountScope,
+  isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import {
   absolutizeApiUrl,
@@ -57,6 +53,26 @@ import { getGalleryVideoThumbnailUrl } from './videoUrls';
 type BackendBoardDTO = components['schemas']['BoardDTO'];
 
 export { ALL_READABLE_BOARDS_ID, isDateBoardId };
+
+/**
+ * The most media names one request body may carry: the server's `MAX_IMAGE_BATCH_SIZE` and `MAX_VIDEO_BATCH_SIZE`
+ * (`invokeai/app/api/routers/_limits.py`) refuse a longer list whole. Longer selections go in batches of this size.
+ */
+export const GALLERY_REQUEST_MAX_NAMES = 1000;
+
+const batchLogger = createLogger({ area: 'batch-requests', namespace: 'gallery' });
+
+/** Distinct names in request order, split into consecutive batches the server accepts. */
+export const toNameBatches = (names: readonly string[]): string[][] => {
+  const distinct = [...new Set(names)];
+  const batches: string[][] = [];
+
+  for (let offset = 0; offset < distinct.length; offset += GALLERY_REQUEST_MAX_NAMES) {
+    batches.push(distinct.slice(offset, offset + GALLERY_REQUEST_MAX_NAMES));
+  }
+
+  return batches;
+};
 
 const getDateFromBoardId = (boardId: string): string => boardId.slice(DATE_BOARD_ID_PREFIX.length);
 
@@ -412,17 +428,32 @@ export const listGalleryDateBoards = async (signal?: AbortSignal): Promise<Galle
   }));
 };
 
+/** The DTOs of the named images the caller may read, any number of names, one batch after another. */
+const fetchImagesByNames = async (imageNames: readonly string[], signal?: AbortSignal): Promise<BackendImageDTO[]> => {
+  const owner = captureAccountScope();
+  const images: BackendImageDTO[] = [];
+
+  for (const batch of toNameBatches(imageNames)) {
+    signal?.throwIfAborted();
+    assertAccountScopeCurrent(owner);
+    images.push(
+      ...(await apiFetchJson<BackendImageDTO[]>('/api/v1/images/images_by_names', {
+        body: JSON.stringify({ image_names: batch }),
+        method: 'POST',
+        signal,
+      }))
+    );
+  }
+
+  return images;
+};
+
 export const getGalleryImagesByNames = async (imageNames: string[], signal?: AbortSignal): Promise<GalleryImage[]> => {
   if (imageNames.length === 0) {
     return [];
   }
 
-  const body = await apiFetchJson<BackendImageDTO[]>('/api/v1/images/images_by_names', {
-    body: JSON.stringify({ image_names: imageNames }),
-    method: 'POST',
-    signal,
-  });
-
+  const body = await fetchImagesByNames(imageNames, signal);
   const imagesByName = new Map(body.map((image) => [image.image_name, mapImage(image)]));
 
   return imageNames.flatMap((imageName) => {
@@ -440,11 +471,7 @@ export const getGalleryImageItemsByNames = async (
     return [];
   }
 
-  const body = await apiFetchJson<BackendImageDTO[]>('/api/v1/images/images_by_names', {
-    body: JSON.stringify({ image_names: imageNames }),
-    method: 'POST',
-    signal,
-  });
+  const body = await fetchImagesByNames(imageNames, signal);
   const imagesByName = new Map(body.map((image) => [image.image_name, mapBackendImageToGalleryItem(image)]));
 
   return imageNames.flatMap((imageName) => {
@@ -1179,116 +1206,13 @@ export const deleteGalleryBoard = async (
   };
 };
 
-type GalleryMediaUsageWire = components['schemas']['GalleryMediaUsage'];
-type GalleryMediaUsageNamesWire = Pick<
-  components['schemas']['GalleryMediaUsageQueue'],
-  'image_count' | 'image_names' | 'video_count' | 'video_names'
->;
-type GalleryMediaUsageRequestWire = components['schemas']['GalleryMediaUsageRequest'];
-
-const GALLERY_MEDIA_USAGE_DOCUMENT_KINDS: Readonly<Record<string, GalleryMediaUsageDocumentKind>> = {
-  legacy_editor: 'legacyEditor',
-  project: 'project',
-  quarantined_project: 'quarantinedProject',
-  workflow: 'workflow',
-};
-
-/** A malformed answer must fail the check, never read as "nothing uses it". */
-const readUsageCount = (value: unknown, field: string): number => {
-  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
-    throw new TypeError(`Gallery media usage field "${field}" must be a non-negative integer.`);
-  }
-
-  return value;
-};
-
-const readUsageNames = (value: unknown, field: string): string[] => {
-  if (!Array.isArray(value) || !value.every((name): name is string => typeof name === 'string')) {
-    throw new TypeError(`Gallery media usage field "${field}" must be an array of strings.`);
-  }
-
-  return value;
-};
-
-/** A revision is only a hint for narrowing: one that is not a non-negative integer reads as unknown. */
-const readUsageRevision = (value: unknown): number | null =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
-
-const mapGalleryMediaUsageNames = (wire: GalleryMediaUsageNamesWire, field: string): GalleryMediaUsageNames => ({
-  imageCount: readUsageCount(wire.image_count, `${field}.image_count`),
-  imageNames: readUsageNames(wire.image_names, `${field}.image_names`),
-  videoCount: readUsageCount(wire.video_count, `${field}.video_count`),
-  videoNames: readUsageNames(wire.video_names, `${field}.video_names`),
-});
-
-const mapGalleryMediaUsage = (body: GalleryMediaUsageWire): GalleryMediaUsage => {
-  if (!Array.isArray(body.documents) || typeof body.queue !== 'object' || typeof body.other_accounts !== 'object') {
-    throw new TypeError('Gallery media usage response is malformed.');
-  }
-
-  return {
-    checkedImageCount: readUsageCount(body.checked_image_count, 'checked_image_count'),
-    checkedVideoCount: readUsageCount(body.checked_video_count, 'checked_video_count'),
-    documents: body.documents.map((document, index) => ({
-      ...mapGalleryMediaUsageNames(document, `documents[${index}]`),
-      id: String(document.id),
-      // A kind added after this build still uses the media: it is listed, not dropped.
-      kind: GALLERY_MEDIA_USAGE_DOCUMENT_KINDS[document.kind] ?? 'other',
-      name: typeof document.name === 'string' && document.name.trim() !== '' ? document.name : null,
-      revision: readUsageRevision(document.revision),
-      workspaceRevision: readUsageRevision(document.workspace_revision),
-    })),
-    documentsTotal: readUsageCount(body.documents_total, 'documents_total'),
-    inUseImageCount: readUsageCount(body.in_use_image_count, 'in_use_image_count'),
-    inUseVideoCount: readUsageCount(body.in_use_video_count, 'in_use_video_count'),
-    otherAccounts: {
-      documentCount: readUsageCount(body.other_accounts.document_count, 'other_accounts.document_count'),
-      imageCount: readUsageCount(body.other_accounts.image_count, 'other_accounts.image_count'),
-      queueItemCount: readUsageCount(body.other_accounts.queue_item_count, 'other_accounts.queue_item_count'),
-      videoCount: readUsageCount(body.other_accounts.video_count, 'other_accounts.video_count'),
-    },
-    queue: {
-      ...mapGalleryMediaUsageNames(body.queue, 'queue'),
-      itemCount: readUsageCount(body.queue.item_count, 'queue.item_count'),
-    },
-  };
-};
-
-/**
- * What still uses these items, or a board's items, per the server: the caller's projects, workflows and legacy editor
- * state, their waiting or running queue work, and other accounts' use without identities. Names the caller may not
- * delete are left out, as the delete endpoints skip them.
- */
-export const checkGalleryMediaUsage = async (
-  request: GalleryMediaUsageRequest,
-  signal?: AbortSignal
-): Promise<GalleryMediaUsage> => {
-  const owner = captureAccountScope();
-  const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
-  const payload: GalleryMediaUsageRequestWire =
-    request.kind === 'board'
-      ? { board_id: request.boardId }
-      : {
-          image_names: request.refs.filter((ref) => ref.kind === 'image').map((ref) => ref.name),
-          video_names: request.refs.filter((ref) => ref.kind === 'video').map((ref) => ref.name),
-        };
-  const body = await apiFetchJson<GalleryMediaUsageWire>('/api/v1/gallery/usage', {
-    body: JSON.stringify(payload),
-    method: 'POST',
-    signal: requestSignal,
-  });
-
-  assertAccountScopeCurrent(owner);
-
-  return mapGalleryMediaUsage(body);
-};
-
 export interface GalleryItemOrganizationTransportResult {
   affectedBoardIds: string[];
   succeededNames: string[];
 }
 
-interface GalleryImageDeleteTransportResult extends GalleryItemOrganizationTransportResult {
+interface GalleryNameBatchResult extends GalleryItemOrganizationTransportResult {
+  /** Names the server reported failing, and every name of a batch that failed or was never sent. */
   failedNames: string[];
 }
 
@@ -1347,27 +1271,75 @@ const emptyGalleryItemOrganizationTransportResult = (): GalleryItemOrganizationT
   succeededNames: [],
 });
 
+/**
+ * Sends a name-list mutation in batches the server accepts, one at a time (each name costs the server database work),
+ * and merges their answers. A batch failing or the caller aborting after earlier batches succeeded ends the run: those
+ * earlier items did change, so they are reported, and this batch's and the unsent batches' names are reported failed.
+ * A failure or abort before anything succeeded rejects as a single request would. An account change rejects whatever
+ * succeeded: the answers belong to an account no longer signed in.
+ */
+const mutateInNameBatches = async (
+  names: readonly string[],
+  signal: AbortSignal | undefined,
+  send: (batch: string[]) => Promise<GalleryItemOrganizationTransportResult & { failedNames?: string[] }>
+): Promise<GalleryNameBatchResult> => {
+  const owner = captureAccountScope();
+  const batches = toNameBatches(names);
+  const affectedBoardIds = new Set<string>();
+  const failedNames: string[] = [];
+  const succeededNames: string[] = [];
+
+  for (const [index, batch] of batches.entries()) {
+    try {
+      // Callers fence the last answer themselves; these stop the batches not yet sent.
+      signal?.throwIfAborted();
+      assertAccountScopeCurrent(owner);
+      const result = await send(batch);
+
+      succeededNames.push(...result.succeededNames);
+      failedNames.push(...(result.failedNames ?? []));
+      result.affectedBoardIds.forEach((boardId) => affectedBoardIds.add(boardId));
+    } catch (error: unknown) {
+      if (succeededNames.length === 0 || !isAccountScopeCurrent(owner)) {
+        throw error;
+      }
+      // A breadcrumb: the caller reports the partial outcome.
+      batchLogger.debug({
+        context: { batch: index + 1, batches: batches.length, unconfirmed: batches.slice(index).flat().length },
+        error,
+        message: 'A gallery batch request failed after earlier batches succeeded',
+        name: 'gallery.batch-request-failed',
+      });
+      failedNames.push(...batches.slice(index).flat());
+      break;
+    }
+  }
+
+  return { affectedBoardIds: [...affectedBoardIds], failedNames, succeededNames };
+};
+
 export const isInvalidGalleryBoardDestination = (boardId: string): boolean =>
   boardId === 'generated' || boardId === 'assets' || isDateBoardId(boardId);
 
-export const addGalleryImageItemsToBoard = async (
+export const addGalleryImageItemsToBoard = (
   boardId: string,
   imageNames: string[],
   signal?: AbortSignal
 ): Promise<GalleryItemOrganizationTransportResult> => {
-  if (boardId === 'none' || isInvalidGalleryBoardDestination(boardId) || imageNames.length === 0) {
-    return emptyGalleryItemOrganizationTransportResult();
+  if (boardId === 'none' || isInvalidGalleryBoardDestination(boardId)) {
+    return Promise.resolve(emptyGalleryItemOrganizationTransportResult());
   }
 
-  signal?.throwIfAborted();
-  const body = await apiFetchJson<unknown>('/api/v1/board_images/batch', {
-    body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
-    method: 'POST',
-    signal,
-  });
-  signal?.throwIfAborted();
+  return mutateInNameBatches(imageNames, signal, async (batch) => {
+    const body = await apiFetchJson<unknown>('/api/v1/board_images/batch', {
+      body: JSON.stringify({ board_id: boardId, image_names: batch }),
+      method: 'POST',
+      signal,
+    });
+    signal?.throwIfAborted();
 
-  return mapGalleryItemOrganizationTransportResult(body, 'added_images');
+    return mapGalleryItemOrganizationTransportResult(body, 'added_images');
+  });
 };
 
 export const addImagesToGalleryBoard = async (
@@ -1376,47 +1348,39 @@ export const addImagesToGalleryBoard = async (
   signal?: AbortSignal
 ): Promise<string[]> => (await addGalleryImageItemsToBoard(boardId, imageNames, signal)).succeededNames;
 
-export const removeGalleryImageItemsFromBoard = async (
+export const removeGalleryImageItemsFromBoard = (
   imageNames: string[],
   signal?: AbortSignal
-): Promise<GalleryItemOrganizationTransportResult> => {
-  if (imageNames.length === 0) {
-    return emptyGalleryItemOrganizationTransportResult();
-  }
+): Promise<GalleryItemOrganizationTransportResult> =>
+  mutateInNameBatches(imageNames, signal, async (batch) => {
+    const body = await apiFetchJson<unknown>('/api/v1/board_images/batch/delete', {
+      body: JSON.stringify({ image_names: batch }),
+      method: 'POST',
+      signal,
+    });
+    signal?.throwIfAborted();
 
-  signal?.throwIfAborted();
-  const body = await apiFetchJson<unknown>('/api/v1/board_images/batch/delete', {
-    body: JSON.stringify({ image_names: imageNames }),
-    method: 'POST',
-    signal,
+    return mapGalleryItemOrganizationTransportResult(body, 'removed_images');
   });
-  signal?.throwIfAborted();
-
-  return mapGalleryItemOrganizationTransportResult(body, 'removed_images');
-};
 
 export const removeImagesFromGalleryBoard = async (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
   (await removeGalleryImageItemsFromBoard(imageNames, signal)).succeededNames;
 
-export const setGalleryImageItemsStarred = async (
+export const setGalleryImageItemsStarred = (
   imageNames: string[],
   starred: boolean,
   signal?: AbortSignal
-): Promise<GalleryItemOrganizationTransportResult> => {
-  if (imageNames.length === 0) {
-    return emptyGalleryItemOrganizationTransportResult();
-  }
+): Promise<GalleryItemOrganizationTransportResult> =>
+  mutateInNameBatches(imageNames, signal, async (batch) => {
+    const body = await apiFetchJson<unknown>(`/api/v1/images/${starred ? 'star' : 'unstar'}`, {
+      body: JSON.stringify({ image_names: batch }),
+      method: 'POST',
+      signal,
+    });
+    signal?.throwIfAborted();
 
-  signal?.throwIfAborted();
-  const body = await apiFetchJson<unknown>(`/api/v1/images/${starred ? 'star' : 'unstar'}`, {
-    body: JSON.stringify({ image_names: imageNames }),
-    method: 'POST',
-    signal,
+    return mapGalleryItemOrganizationTransportResult(body, starred ? 'starred_images' : 'unstarred_images');
   });
-  signal?.throwIfAborted();
-
-  return mapGalleryItemOrganizationTransportResult(body, starred ? 'starred_images' : 'unstarred_images');
-};
 
 export const starGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
   setGalleryImageItemsStarred(imageNames, true, signal).then((result) => result.succeededNames);
@@ -1424,27 +1388,20 @@ export const starGalleryImages = (imageNames: string[], signal?: AbortSignal): P
 export const unstarGalleryImages = (imageNames: string[], signal?: AbortSignal): Promise<string[]> =>
   setGalleryImageItemsStarred(imageNames, false, signal).then((result) => result.succeededNames);
 
-export const deleteGalleryImageItems = async (
-  imageNames: string[],
-  signal?: AbortSignal
-): Promise<GalleryImageDeleteTransportResult> => {
-  if (imageNames.length === 0) {
-    return { ...emptyGalleryItemOrganizationTransportResult(), failedNames: [] };
-  }
+export const deleteGalleryImageItems = (imageNames: string[], signal?: AbortSignal): Promise<GalleryNameBatchResult> =>
+  mutateInNameBatches(imageNames, signal, async (batch) => {
+    const body = await apiFetchJson<unknown>('/api/v1/images/delete', {
+      body: JSON.stringify({ image_names: batch }),
+      method: 'POST',
+      signal,
+    });
+    signal?.throwIfAborted();
 
-  signal?.throwIfAborted();
-  const body = await apiFetchJson<unknown>('/api/v1/images/delete', {
-    body: JSON.stringify({ image_names: imageNames }),
-    method: 'POST',
-    signal,
+    return {
+      ...mapGalleryItemOrganizationTransportResult(body, 'deleted_images'),
+      failedNames: getOptionalStringArray(body, 'failed_images'),
+    };
   });
-  signal?.throwIfAborted();
-
-  return {
-    ...mapGalleryItemOrganizationTransportResult(body, 'deleted_images'),
-    failedNames: getOptionalStringArray(body, 'failed_images'),
-  };
-};
 
 /** Deletion can partially succeed. Evict only deletedImageNames; other names may still exist on the server. */
 export const deleteGalleryImages = async (
@@ -1459,26 +1416,22 @@ export const deleteGalleryImages = async (
   };
 };
 
-const mutateGalleryVideoItems = async (
+const mutateGalleryVideoItems = (
   videoNames: string[],
   operation: 'delete' | 'star' | 'unstar',
   succeededField: 'deleted_videos' | 'starred_videos' | 'unstarred_videos',
   signal?: AbortSignal
-): Promise<GalleryItemOrganizationTransportResult> => {
-  if (videoNames.length === 0) {
-    return emptyGalleryItemOrganizationTransportResult();
-  }
+): Promise<GalleryItemOrganizationTransportResult> =>
+  mutateInNameBatches(videoNames, signal, async (batch) => {
+    const body = await apiFetchJson<unknown>(`/api/v1/videos/${operation}`, {
+      body: JSON.stringify({ video_names: batch }),
+      method: 'POST',
+      signal,
+    });
+    signal?.throwIfAborted();
 
-  signal?.throwIfAborted();
-  const body = await apiFetchJson<unknown>(`/api/v1/videos/${operation}`, {
-    body: JSON.stringify({ video_names: videoNames }),
-    method: 'POST',
-    signal,
+    return mapGalleryVideoOrganizationTransportResult(body, succeededField);
   });
-  signal?.throwIfAborted();
-
-  return mapGalleryVideoOrganizationTransportResult(body, succeededField);
-};
 
 export const deleteGalleryVideoItems = (
   videoNames: string[],

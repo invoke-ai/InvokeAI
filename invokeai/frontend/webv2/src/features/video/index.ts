@@ -78,7 +78,6 @@ export {
   getVideoComponentSectionPolicy,
   getVideoAspectRatioOptions,
   getVideoDimensions,
-  getVideoModelAvailabilityReasons,
   getVideoModelPolicy,
   getVideoModelSelectionResult,
   getVideoTargetResolutionOptions,

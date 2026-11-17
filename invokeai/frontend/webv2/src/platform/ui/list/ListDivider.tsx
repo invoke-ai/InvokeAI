@@ -36,7 +36,7 @@ const IN_SLOT_CSS = {
 // A row shows its pointed fill while hovered or while its context menu is open; the hairlines either side of it hide
 // so that fill reads as one surface rather than a band between lines. `:has()` cannot nest, so a row wrapped by its
 // caller (menu state on a descendant) is matched as "a sibling containing it" instead.
-const POINTED = '[data-list-surface]:not([data-static]):is(:hover, [data-menu-open])';
+const POINTED = '[data-list-surface]:not([data-static], [data-disabled]):is(:hover, [data-menu-open])';
 const HIDDEN = { opacity: 0 } as const;
 
 /** For a container of in-flow rows and dividers (`ListStack`); rows may be wrapped by their caller. */

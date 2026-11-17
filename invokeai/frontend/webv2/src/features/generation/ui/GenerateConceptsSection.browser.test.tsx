@@ -223,7 +223,7 @@ describe('GenerateConceptsContent', () => {
 });
 
 describe('a concept that is not installed', () => {
-  it('reads as blocked: its saved state, a locked switch, an error badge, and the issue with its Remove fix', async () => {
+  it('reads as blocked: its saved state, a locked switch, an error badge, and an issue icon with its Remove fix', async () => {
     const missing: LoraModelConfig = { base: 'sdxl', key: 'gone', name: 'Gone', type: 'lora' };
     const applyFix = vi.fn();
     const issue = {
@@ -262,10 +262,18 @@ describe('a concept that is not installed', () => {
     expect(missingRow.textContent).toContain('widgets.generate.notInstalled');
     expect(toggle.matches(':checked') || toggle.getAttribute('aria-checked') === 'true').toBe(true);
     expect(toggle.matches(':disabled') || toggle.getAttribute('aria-disabled') === 'true').toBe(true);
-    expect(missingRow.textContent).toContain('widgets.generate.issues.conceptNotInstalled');
-    expect(installedRow.querySelector('[data-issue-fix]')).toBeNull();
+    // The issue is an icon beside the switch, named by its message; its fix waits in the icon's popover.
+    const icon = missingRow.querySelector<HTMLButtonElement>('button[data-issue-ids]')!;
+    expect(icon.getAttribute('data-issue-ids')).toBe(issue.id);
+    expect(icon.getAttribute('aria-label')).toBe('widgets.generate.issuesNamed');
+    expect(installedRow.querySelector('[data-issue-ids]')).toBeNull();
 
-    await act(() => missingRow.querySelector<HTMLButtonElement>('[data-issue-fix]')!.click());
+    await act(() => icon.click());
+    await expect.poll(() => document.querySelector('[data-issue-id] [data-issue-fix]')).not.toBeNull();
+    expect(document.querySelector('[data-issue-id]')?.textContent).toContain(
+      'widgets.generate.issues.conceptNotInstalled'
+    );
+    await act(() => document.querySelector<HTMLButtonElement>('[data-issue-id] [data-issue-fix]')!.click());
 
     expect(applyFix).toHaveBeenCalledExactlyOnceWith(issue.fix);
   });
