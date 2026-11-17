@@ -9,6 +9,7 @@ import { GalleryMediaSlot } from '@features/gallery/mediaSlot';
 import { GalleryHostProvider } from '@features/gallery/picker';
 import { deleteModelImage, getModelImageUrl, updateModelImage } from '@features/models/data/api';
 import { markCoverImageChanged, useModelsSelector } from '@features/models/data/modelsStore';
+import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
@@ -18,8 +19,7 @@ import { useTranslation } from 'react-i18next';
 
 const ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const IMAGE_ONLY: GalleryPickerAccept = ['image'];
-/** The model manager lives on the Launchpad: no project board to seed from and no Gallery widget to reveal. */
-const NO_GALLERY_VALUES = {} as ResolvedValues;
+const NO_GALLERY_DEFAULTS = {} as ResolvedValues;
 
 interface ModelImageUploadProps {
   model: Pick<ModelConfig, 'cover_image' | 'key' | 'name'>;
@@ -39,16 +39,17 @@ const ModelImageUploadForModel = ({ model, onError, onUpdated }: ModelImageUploa
   // Setting and removing share one busy flag: the slot hosts one action at a time.
   const { isBusy, run } = useScopedAction();
   const notify = useNotify();
+  const { galleryValues } = useModelsUi();
   const galleryHost = useMemo<GalleryHost>(
     () => ({
-      galleryValues: NO_GALLERY_VALUES,
+      galleryValues: galleryValues ?? NO_GALLERY_DEFAULTS,
       notifications: {
         add: ({ kind, message, title }) => notify[kind](title, message),
         reportError: ({ message }) => notify.error(message),
       },
       projectName: '',
     }),
-    [notify]
+    [galleryValues, notify]
   );
   const value = useMemo(
     () => (hasImage ? { kind: 'image' as const, name: t('models.modelCoverAlt', { name: model.name }) } : null),
