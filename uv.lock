@@ -2197,7 +2197,7 @@ requires-dist = [
     { name = "pydantic-settings" },
     { name = "pyjwt", specifier = ">=2.15.0" },
     { name = "pymysql", marker = "extra == 'mysql'", specifier = ">=1.2.3,<2" },
-    { name = "pypatchmatch" },
+    { name = "pypatchmatch", specifier = ">=2.2.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">6.0.0" },
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "pytest-datadir", marker = "extra == 'test'" },
@@ -3636,17 +3636,21 @@ wheels = [
 
 [[package]]
 name = "pypatchmatch"
-version = "1.0.2"
+version = "2.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "1.26.4", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'ARM64' or sys_platform != 'win32' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-xpu') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-xpu') or (extra == 'extra-8-invokeai-rocm' and extra == 'extra-8-invokeai-xpu')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'ARM64' and sys_platform == 'win32') or (platform_machine != 'ARM64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (platform_machine != 'ARM64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (platform_machine != 'ARM64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-xpu') or (platform_machine != 'ARM64' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (platform_machine != 'ARM64' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-xpu') or (platform_machine != 'ARM64' and extra == 'extra-8-invokeai-rocm' and extra == 'extra-8-invokeai-xpu') or (sys_platform != 'win32' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform != 'win32' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform != 'win32' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-xpu') or (sys_platform != 'win32' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (sys_platform != 'win32' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-xpu') or (sys_platform != 'win32' and extra == 'extra-8-invokeai-rocm' and extra == 'extra-8-invokeai-xpu')" },
     { name = "pillow" },
-    { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/89/7f/4403ceb49442988ec7aeb0d5fa372ea4a150967bb50fd64ecc7280d72d15/PyPatchMatch-1.0.2.tar.gz", hash = "sha256:7e01e332cdffa082a0c0fd752eb7644167e8f4e5297b464f501418eae7079b41", size = 16633, upload-time = "2025-05-06T21:23:52.3Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/04/82/7e41ba4c760d331d54eb7f940667f5a02b9d53decacd05bf410a7307f613/pypatchmatch-2.2.0.tar.gz", hash = "sha256:0baa0870e175173db1f9a6517be7a85c490ef344668bfece7a083d7569425b7b", size = 1631924, upload-time = "2026-10-20T16:04:32.51Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/85/403c3491d3820f85772c44cb411b16a249065f136fd85115fe3830acb620/PyPatchMatch-1.0.2-py3-none-any.whl", hash = "sha256:d749b411c5376086bbf2ca7a3638553c745c8e4318d7531e8e065106335cba9c", size = 20287, upload-time = "2025-05-06T21:23:50.965Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/49/75a7b8f276d4ef6c5d1aa329bb18d6b94abc81239d53bb5104ca68ea99c7/pypatchmatch-2.2.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:7239ac7682e9e84b35e5c13e8a531c7d9e46a788d92517c5c9b8989a16af47df", size = 401673, upload-time = "2026-10-20T16:04:21.505Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/b5/0c8e8d6aa85abde3b6fedce0a30cfaeaf05b433a408b563b3683f2689c50/pypatchmatch-2.2.0-py3-none-macosx_11_0_x86_64.whl", hash = "sha256:abcb4f4cdaba8dcc31da99b40a7d5d5d35b8c13534e242c8f638a5c7b15a9fa1", size = 568959, upload-time = "2026-10-20T16:04:23.359Z" },
+    { url = "https://files.pythonhosted.org/packages/71/7c/9aaa52b0438e30a3fb0282eff6622ad7b24679144ae13b507e6a9cd50a69/pypatchmatch-2.2.0-py3-none-manylinux_2_27_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:b7bdc098c021e6d944586c3f4ddbb881d3923582331f9491441754a0c49d7e5f", size = 488812, upload-time = "2026-10-20T16:04:25.455Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/24/a0646eb76ce9d968cccf08e63651e8aca78044b5f552f22135280f114f66/pypatchmatch-2.2.0-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:4baafe1c9d5d276b9e10e89f586bfed3c975d79aca883efb0265951579fd184d", size = 651238, upload-time = "2026-10-20T16:04:27.123Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/02/c814735cde25d08bf2f17c99314ea3aaa0fb9de939dad7b8078755c686a0/pypatchmatch-2.2.0-py3-none-win_amd64.whl", hash = "sha256:6d4f63217c1eb9570f05ee049f0d1d2aef5bff7bc7e4faf8fb0fb908360eb79b", size = 628660, upload-time = "2026-10-20T16:04:28.909Z" },
+    { url = "https://files.pythonhosted.org/packages/35/8d/969a21977f1b474b8168a839ec4ccd6842dd932dfe65882f57d648c82803/pypatchmatch-2.2.0-py3-none-win_arm64.whl", hash = "sha256:fd792444251df13c5990016de3db53760490b7c08c9398b6deada9fccb7d8050", size = 518747, upload-time = "2026-10-20T16:04:30.508Z" },
 ]
 
 [[package]]

@@ -166,7 +166,7 @@ qwen_vl_encoder_fp8 = StarterModel(
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
     description="ComfyUI's single-file FP8-scaled Qwen2.5-VL 7B encoder. Bundles the language model and "
-    "visual tower; its tokenizer and config ship with InvokeAI. (~7GB)",
+    "visual tower; its tokenizer and config ship with InvokeAI. (~9.4GB)",
     type=ModelType.QwenVLEncoder,
     format=ModelFormat.Checkpoint,
 )
