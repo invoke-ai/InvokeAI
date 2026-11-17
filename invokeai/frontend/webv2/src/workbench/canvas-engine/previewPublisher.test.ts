@@ -36,6 +36,7 @@ const build = (overrides: Partial<CreatePreviewPublisherDeps> = {}): PreviewPubl
     invalidateLayer,
     isGuardCurrent,
     previews,
+    publishHidesStagingOverlays: () => undefined,
     resolveImage,
     ...overrides,
   });
@@ -211,6 +212,59 @@ describe('staged previews', () => {
     publisher.setStagedPreview(null);
     expect(previews.getStaged()).toBeNull();
     expect(invalidateAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops a hidden candidate without decoding it, keeping the overlays hidden until staging ends', async () => {
+    const published = vi.fn<(hidden: boolean) => void>();
+    const publisher = build({ publishHidesStagingOverlays: published });
+    publisher.setStagedPreview(staged('shown.png'));
+    await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
+    invalidateAll.mockClear();
+
+    publisher.setStagedPreview({ ...staged('shown.png'), hidden: true });
+    expect(previews.getStaged()).toBeNull();
+    expect(previews.hidesStagingOverlays()).toBe(true);
+    expect(invalidateAll).toHaveBeenCalledOnce();
+    // Selecting another candidate while hidden changes nothing on screen.
+    publisher.setStagedPreview({ ...staged('other.png'), hidden: true });
+    expect(invalidateAll).toHaveBeenCalledOnce();
+    expect(decodeBlob).toHaveBeenCalledOnce();
+
+    publisher.setStagedPreview(null);
+    expect(previews.hidesStagingOverlays()).toBe(false);
+    expect(invalidateAll).toHaveBeenCalledTimes(2);
+    // Canvas chrome learns each change: shown, hidden to compare, then staging ended.
+    expect(published.mock.calls).toEqual([[true], [true], [false]]);
+  });
+
+  it('never shows a result the eye hid while it was still decoding, nor masks while showing it decodes', async () => {
+    const releases: Array<() => void> = [];
+    decodeBlob.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releases.push(() => resolve({ decodedHeight: 8, decodedWidth: 8, surface: surface() }));
+        })
+    );
+    const publisher = build();
+    publisher.setStagedPreview(staged('candidate.png'));
+    await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledOnce());
+    publisher.setStagedPreview({ ...staged('candidate.png'), hidden: true });
+    invalidateAll.mockClear();
+    releases[0]!();
+    // A macrotask runs only once the decode's whole promise chain has settled.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(previews.getStaged()).toBeNull();
+    expect(previews.hidesStagingOverlays()).toBe(true);
+    expect(invalidateAll).not.toHaveBeenCalled();
+
+    // Showing it again: no mask flashes up while the pixels decode.
+    publisher.setStagedPreview(staged('candidate.png'));
+    await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledTimes(2));
+    expect(previews.hidesStagingOverlays()).toBe(true);
+    releases[1]!();
+    await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
   });
 });
 

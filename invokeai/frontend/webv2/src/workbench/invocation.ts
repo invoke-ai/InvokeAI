@@ -21,15 +21,17 @@ import {
   expandsDynamicPrompts,
   getEffectivePrompts,
   getGenerateInvocationIssues,
+  getPromptDraftFromValues,
   isExternalTextOnlyCanvasModel,
   isGenerateModelConfig,
   isSupportedGenerateModel,
   NO_GENERATE_MODEL_ISSUE,
   normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
+  type ProjectPromptDraft,
   sanitizeBatchCount,
 } from '@features/generation/settings';
-import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from '@features/upscale';
+import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues, readsUpscalePrompt } from '@features/upscale';
 import { getVideoWidgetValidationReasons, normalizeVideoWidgetValues } from '@features/video';
 import { getProjectGraphReadiness } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
@@ -53,23 +55,31 @@ import { getActiveProjectGraph } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
 
+/** Upscale's Refine prompt is the draft it shares with Generate; Model only reads no prompt. */
+const getUpscalePromptDraft = (project: Project): ProjectPromptDraft | null =>
+  readsUpscalePrompt(getProjectWidgetValues(project, 'upscale'))
+    ? getPromptDraftFromValues(getProjectWidgetValues(project, 'generate'))
+    : null;
+
 /**
  * What the route's positive prompt expands from, with the sample seed to draw with, or null when the route sends its
- * prompt as typed: Upscale and workflows never expand, and dynamic prompts may be off or the prompt plain. Canvas
- * expands Generate's prompt.
+ * prompt as typed: workflows and Model only upscales never expand, and dynamic prompts may be off or the prompt plain.
+ * Canvas and Upscale expand Generate's prompt.
  */
 export const getDynamicPromptsExpansionSource = (
   project: Project,
   sourceId: InvocationSourceId
 ): (DynamicPromptsExpansionSource & { sampleSeed: number }) | null => {
-  if (sourceId === 'upscale' || sourceId === 'workflow') {
+  if (sourceId === 'workflow') {
     return null;
   }
 
   const settings =
     sourceId === 'video'
       ? normalizeVideoWidgetValues(getProjectWidgetValues(project, 'video'))
-      : normalizeGenerateSettings(getProjectWidgetValues(project, 'generate'));
+      : sourceId === 'upscale'
+        ? getUpscalePromptDraft(project)
+        : normalizeGenerateSettings(getProjectWidgetValues(project, 'generate'));
 
   if (!settings) {
     return null;

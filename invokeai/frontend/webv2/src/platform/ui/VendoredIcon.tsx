@@ -100,7 +100,8 @@ export const GradientIcon = createVendoredIcon({
   ],
   slug: 'gradient',
   title: 'Gradient',
-  viewBox: '0 0 32 32',
+  // Cropped from Carbon's 0 0 32 32 so the glyph fills its box as far as the stroke icons beside it (10/12 of it).
+  viewBox: '1.6 1.6 28.8 28.8',
 });
 
 export const LightbulbFilamentIcon = createVendoredIcon({

@@ -1,5 +1,7 @@
+import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
 import type { Project } from '@workbench/projectContracts';
 
+import { pickAutoSwitch } from '@features/queue/contracts';
 import {
   type CanvasDocumentContractV3,
   type CanvasLayerBasePatch,
@@ -60,6 +62,31 @@ import {
 } from './canvasStagingView';
 
 export type { CanvasLayerBasePatch, CanvasLayerConfigPatch, CanvasProjectMutation } from '@workbench/canvas-engine/api';
+
+/** Auto-switch after the user picks this slot: the one pick rule, shared with Preview. */
+export const pickStagedSlotAutoSwitch = (slot: CanvasStagingSlot) =>
+  pickAutoSwitch(slot.kind === 'placeholder' ? { id: slot.id, kind: 'live' } : { kind: 'result' });
+
+/**
+ * The user picked a staged slot, by a click or right-click, an arrow key from the selected thumbnail or a step (never
+ * by Tab focus): it is selected, and Auto-switch follows the pick as Preview's does (`pickStagedSlotAutoSwitch`). A
+ * finished result pauses it (Off); a slot still generating turns it to In progress, and the workbench pins that slot
+ * (`canvasStagingFollow`). Picking the slot already selected still counts.
+ */
+const pickStagedSlot = (project: Project, imageIndex: number): Project => {
+  const slots = getCanvasStagingSlots(project.canvas, project.queue.items);
+  const selectedImageIndex = clampStagedImageIndex(imageIndex, slots.length);
+  const slot = slots[selectedImageIndex];
+  const { stagingArea } = project.canvas;
+  const autoSwitchMode = slot ? pickStagedSlotAutoSwitch(slot).mode : stagingArea.autoSwitchMode;
+
+  return selectedImageIndex === stagingArea.selectedImageIndex && autoSwitchMode === stagingArea.autoSwitchMode
+    ? project
+    : {
+        ...project,
+        canvas: { ...project.canvas, stagingArea: { ...stagingArea, autoSwitchMode, selectedImageIndex } },
+      };
+};
 
 /**
  * Restore points a canvas keeps of each kind (Clear canvas and Discard all each make one); older ones of that kind
@@ -831,34 +858,12 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
         events: project.events.slice(1),
       };
     }
-    case 'setStagedImageIndex': {
-      const selectedImageIndex = clampStagedImageIndex(
-        mutation.imageIndex,
-        getCanvasStagingSlotCount(project.canvas, project.queue.items)
-      );
-      return selectedImageIndex === project.canvas.stagingArea.selectedImageIndex
-        ? project
-        : {
-            ...project,
-            canvas: {
-              ...project.canvas,
-              stagingArea: { ...project.canvas.stagingArea, selectedImageIndex },
-            },
-          };
-    }
+    case 'setStagedImageIndex':
+      return pickStagedSlot(project, mutation.imageIndex);
     case 'cycleStagedImage': {
       const count = getCanvasStagingSlotCount(project.canvas, project.queue.items);
       const current = project.canvas.stagingArea.selectedImageIndex;
-      const selectedImageIndex = count < 2 ? 0 : (current + mutation.direction + count) % count;
-      return selectedImageIndex === current
-        ? project
-        : {
-            ...project,
-            canvas: {
-              ...project.canvas,
-              stagingArea: { ...project.canvas.stagingArea, selectedImageIndex },
-            },
-          };
+      return pickStagedSlot(project, count < 2 ? 0 : (current + mutation.direction + count) % count);
     }
     case 'discardSelectedStagedImage': {
       const selected = selectedCandidate(project);

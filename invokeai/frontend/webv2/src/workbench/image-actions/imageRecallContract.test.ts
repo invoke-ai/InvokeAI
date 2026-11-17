@@ -151,6 +151,8 @@ const IMAGE_RECALL_CONTRACT = {
   vae: { restores: ['vae'] },
   qwen_image_vae: { consumed: "Qwen-Image's VAE alias, read only from records without `vae`; the graph writes both." },
   clip_embed_model: { restores: ['clipEmbedModel'] },
+  clip_g_model: { restores: ['clipGEmbedModel'] },
+  clip_l_model: { restores: ['clipLEmbedModel'] },
   t5_encoder: { restores: ['t5EncoderModel'] },
   mistral_encoder: { restores: ['mistralEncoderModel'] },
   qwen3_encoder: { restores: ['qwen3EncoderModel'] },

@@ -15,8 +15,10 @@ import { getGenerateFormCommitPatch } from './generateFormViewModel';
 import { GenerateSettingsForm } from './GenerateSettingsForm';
 import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
 import { CapabilitiesGate } from './shared/CapabilitiesGate';
+import { GenerationSectionPanel } from './shared/sectionPanel';
 
-export const GenerateWidgetView = () => {
+/** `instance` ties the form's sections to the header's jump menu; a view rendered outside a widget frame has none. */
+export const GenerateWidgetView = ({ instance }: { instance?: { id: string } }) => {
   const { t } = useTranslation();
   const ui = useGenerationUi();
   const capabilitiesStatus = useArchitectureCapabilitiesSelector((snapshot) => snapshot.status);
@@ -71,18 +73,20 @@ export const GenerateWidgetView = () => {
   // Gate the form so edits cannot persist fallback architecture defaults.
   return (
     <CapabilitiesGate isReady={capabilitiesStatus === 'loaded'} labels={gateLabels}>
-      <GenerateSettingsForm
-        isLoadingModels={status === 'idle' || status === 'loading'}
-        loadError={error}
-        loraModels={loraModels}
-        models={models}
-        projectId={projectId}
-        selectedModel={selectedModel}
-        settings={settings}
-        supportedModels={supportedModels}
-        onCommitSettings={commitSettings}
-        onPatchSettings={ui.settings.patchGenerateSettings}
-      />
+      <GenerationSectionPanel id={instance?.id}>
+        <GenerateSettingsForm
+          isLoadingModels={status === 'idle' || status === 'loading'}
+          loadError={error}
+          loraModels={loraModels}
+          models={models}
+          projectId={projectId}
+          selectedModel={selectedModel}
+          settings={settings}
+          supportedModels={supportedModels}
+          onCommitSettings={commitSettings}
+          onPatchSettings={ui.settings.patchGenerateSettings}
+        />
+      </GenerationSectionPanel>
     </CapabilitiesGate>
   );
 };

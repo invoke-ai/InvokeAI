@@ -23,11 +23,14 @@ import {
   getVideoComponentSectionPolicy,
   getVideoDimensions,
   getVideoExpandPromptSuggestion,
-  getVideoModelAvailabilityReasons,
+  getVideoIssueSections,
+  getVideoModelAvailabilityIssues,
   getVideoModelPolicy,
+  getVideoPanelFields,
   getVideoModelSelectionResult,
   getVideoModes,
   getVideoPromptPolicy,
+  getVideoValidationIssues,
   getVideoValidationReasons,
   getAutoDurationBounds,
   isAutoDurationActive,
@@ -40,7 +43,11 @@ import {
   snapVideoNumFrames,
   WAN_LIGHTNING_ACCELERATOR,
 } from './videoPolicies';
-import { syncVideoWidgetValuesWithModels } from './widgetValues';
+import {
+  createDefaultVideoWidgetValues,
+  getVideoWidgetValidationIssues,
+  syncVideoWidgetValuesWithModels,
+} from './widgetValues';
 
 const wanModel = (variant: string, format = 'gguf_quantized', key = `wan-${variant}-${format}`): MainModelConfig => ({
   base: 'wan',
@@ -1525,7 +1532,9 @@ describe('getVideoValidationReasons', () => {
   });
 });
 
-describe('getVideoModelAvailabilityReasons', () => {
+describe('getVideoModelAvailabilityIssues', () => {
+  const messagesOf = (issues: readonly { message: string }[]) => issues.map((issue) => issue.message);
+
   it('reports uninstalled selections by label', () => {
     const model = wanModel('i2v_a14b');
     const settings = settingsFor(model, {
@@ -1533,13 +1542,13 @@ describe('getVideoModelAvailabilityReasons', () => {
       wanT5EncoderModel: { base: 'any', key: 'umt5', name: 'UMT5-XXL', type: 'wan_t5_encoder' },
     });
 
-    const reasons = getVideoModelAvailabilityReasons(model, settings, []);
+    const reasons = messagesOf(getVideoModelAvailabilityIssues(model, settings, []));
 
     expect(reasons).toContainEqual(expect.stringContaining('is no longer installed'));
     expect(reasons.some((reason) => reason.includes('UMT5-XXL'))).toBe(true);
     expect(reasons.some((reason) => reason.includes('Lightning'))).toBe(true);
 
-    const installed = getVideoModelAvailabilityReasons(model, settingsFor(model), [model]);
+    const installed = messagesOf(getVideoModelAvailabilityIssues(model, settingsFor(model), [model]));
 
     expect(installed).toEqual([]);
   });
@@ -1553,7 +1562,7 @@ describe('getVideoModelAvailabilityReasons', () => {
       ],
     });
 
-    expect(getVideoModelAvailabilityReasons(model, settings, [model])).toEqual([]);
+    expect(messagesOf(getVideoModelAvailabilityIssues(model, settings, [model]))).toEqual([]);
   });
 });
 
@@ -2815,5 +2824,99 @@ describe('what a model switch discards', () => {
 
     expect(result.losses).toEqual([]);
     expect(result.adjustments).toEqual(expect.arrayContaining(['targetResolution', 'frames', 'fps']));
+  });
+});
+
+describe('the Video sections an issue is fixed from', () => {
+  const t2v = wanModel('t2v_a14b', 'diffusers');
+  const i2v = wanModel('i2v_a14b', 'diffusers');
+  const ti2v = wanModel('ti2v_5b', 'diffusers');
+  /** The sections the panel would count `message` in for these settings. */
+  const sectionsOf = (model: MainModelConfig, settings: VideoSettings, message: string) => {
+    const issue = getVideoValidationIssues(model, settings).find((candidate) => candidate.message.includes(message));
+
+    return issue ? getVideoIssueSections(issue, getVideoPanelFields(model, settings)) : undefined;
+  };
+
+  it.each([
+    [
+      'a first frame beside an initial video, both shown',
+      i2v,
+      { firstFrameImage: FIRST_FRAME, sourceVideo: SOURCE_VIDEO },
+      'A first frame and an initial video',
+      ['frames', 'source'],
+    ],
+    // TI2V-5B shows no last-frame field: only the initial video can be cleared from a section.
+    [
+      'a destination image while extending',
+      ti2v,
+      { lastFrameImage: LAST_FRAME, sourceVideo: SOURCE_VIDEO },
+      'cannot target a destination image',
+      ['source'],
+    ],
+    // The fix is adding media the model takes: a first or last frame, or a video to extend.
+    ['text-to-video on an image-to-video model', i2v, {}, 'does not support text-to-video', ['frames', 'source']],
+    // The first-frame field is hidden on T2V; only the stale-media stub clears it.
+    [
+      'a first frame the model cannot start from',
+      t2v,
+      { firstFrameImage: FIRST_FRAME },
+      'does not support starting from a first frame',
+      [],
+    ],
+    ['an extension the model cannot run', t2v, { sourceVideo: SOURCE_VIDEO }, 'does not support extending a video', []],
+    ['a frame count off the grid', t2v, { numFrames: 80 }, '4·n + 1', ['dimensions']],
+    ['an editable frame rate out of range', t2v, { fps: 0 }, 'FPS must be a whole number', ['dimensions']],
+    ['a fixed frame rate no field sets', h3Model(), { fps: 16 }, 'fixed 24 FPS', []],
+    ['too few steps', h3Model(), { steps: 1 }, 'at least 2', ['render']],
+    // The distilled checkpoint shows its step count as fixed text.
+    ['steps on a fixed schedule', ltx2('ltx2_distilled'), { steps: 0 }, 'Steps must be a whole number', []],
+    ['a low-noise CFG under 1', t2v, { cfgScaleLowNoise: 0.5 }, 'CFG (Low Noise)', ['render']],
+    [
+      'an initial video at a frame rate Wan cannot extend',
+      i2v,
+      { sourceVideo: { ...SOURCE_VIDEO, fps: 240 } },
+      '1-120 fps',
+      ['source'],
+    ],
+  ] as const)('places %s', (_, model, overrides, message, sections) => {
+    expect(sectionsOf(model, settingsFor(model, overrides as Partial<VideoSettings>), message)).toEqual(sections);
+  });
+
+  it('places what the components picker lacks under Components', () => {
+    const gguf = ltx2('ltx2_distilled', { format: 'gguf_quantized', key: 'ltx2-distilled-gguf' });
+    const settings = settingsFor(gguf, { ltx2TextEncoderModel: LTX2_ENCODER });
+    const issues = getVideoValidationIssues(gguf, settings);
+
+    expect(issues).not.toEqual([]);
+    expect(issues.map((issue) => getVideoIssueSections(issue, getVideoPanelFields(gguf, settings)))).toEqual(
+      issues.map(() => ['components'])
+    );
+  });
+
+  it('places an uninstalled component under Components, and the main model and a LoRA nowhere', () => {
+    const model = wanModel('i2v_a14b');
+    const settings = settingsFor(model, {
+      loras: [{ isEnabled: true, model: LIGHTNING_T2V_HIGH as never, weight: 1 }],
+      wanT5EncoderModel: { base: 'any', key: 'umt5', name: 'UMT5-XXL', type: 'wan_t5_encoder' },
+    });
+    const shown = getVideoPanelFields(model, settings);
+
+    expect(
+      getVideoModelAvailabilityIssues(model, settings, []).map((issue) => [
+        issue.message,
+        getVideoIssueSections(issue, shown),
+      ])
+    ).toEqual([
+      [`Selected model "${model.name}" is no longer installed.`, []],
+      ['Wan T5 Encoder "UMT5-XXL" is no longer installed.', ['components']],
+      [`LoRA "${LIGHTNING_T2V_HIGH.name}" is no longer installed.`, []],
+    ]);
+  });
+
+  it('places a missing model nowhere, since the model picker sits above the sections', () => {
+    expect(getVideoWidgetValidationIssues(createDefaultVideoWidgetValues())).toEqual([
+      { fields: [], message: 'Video needs a Wan 2.2, MiniMax H3 or LTX-2 main model.' },
+    ]);
   });
 });
