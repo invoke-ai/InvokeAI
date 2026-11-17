@@ -64,7 +64,7 @@ import {
 } from 'lucide-react';
 
 import { COLOR_LABEL_ITEMS } from './colorLabels';
-import { removeFromGroupCommand } from './layerGroupCommands';
+import { layerCommandTargets, removeFromGroupCommand } from './layerCommands';
 import { canAddRegionalReferenceImage, canConvertRasterControl, canMergeLayerDown } from './layerOps';
 
 export type LayerContextActionId =
@@ -146,6 +146,8 @@ export interface LayerContextActionState {
   canGroupSelection: boolean;
   /** The model's answer for removing `actionTargets`, asked the same way. */
   canDeleteSelection: boolean;
+  /** The model's answer for duplicating `actionTargets`, asked the same way. */
+  canDuplicateSelection: boolean;
   /** Whether the whole multi-selection can merge into one raster, asked the same way. */
   canMergeSelection: boolean;
   /** Whether merge masks would take `actionTargets`, and if not, whether only their generation settings differ. */
@@ -313,9 +315,9 @@ const REGIONAL_ONLY = ['regional_guidance'] as const;
 const alwaysVisible = (): boolean => true;
 const isOperationFree = (context: LayerContextActionState): boolean => !context.operationLocked;
 const layerEntry = (context: LayerContextActionState) => getDocumentIndex(context.document).byId.get(context.layer.id);
-/** The nodes a selection-wide action applies to: the whole selection when the layer is in it. */
+/** The nodes a selection-wide action applies to, by the layer commands' rule. */
 export const actionTargets = (context: Pick<LayerContextActionState, 'layer' | 'selectedIds'>): readonly string[] =>
-  context.selectedIds.includes(context.layer.id) ? context.selectedIds : [context.layer.id];
+  layerCommandTargets(context.selectedIds, context.layer.id);
 
 const targetCount = (context: LayerContextActionState): number => actionTargets(context).length;
 const isMultiTarget = (context: LayerContextActionState): boolean => targetCount(context) > 1;
@@ -565,7 +567,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     handler: ({ effects }) => effects.duplicate(),
     icon: CopyIcon,
     id: 'duplicate',
-    isEnabled: isOperationFree,
+    isEnabled: (context) => isOperationFree(context) && context.canDuplicateSelection,
     isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.duplicate',
     order: 10,

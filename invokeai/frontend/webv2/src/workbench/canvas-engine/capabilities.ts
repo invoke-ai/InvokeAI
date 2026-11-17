@@ -825,7 +825,8 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
    */
   cropAllLayersToBbox(): Promise<CropAllLayersResult>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
-  duplicateLayers(layerIds: readonly string[]): Promise<DuplicateLayersResult>;
+  /** Copies the outermost of `layerIds` with their pixels as one undo step named `label`, selecting the copies. */
+  duplicateLayers(label: string, layerIds: readonly string[]): Promise<DuplicateLayersResult>;
   /** Unions the masks' coverage into one new inpaint mask above the topmost source, removing the sources. */
   mergeInpaintMasks(layerIds: readonly string[]): Promise<MergeInpaintMasksResult>;
   mergeLayerDown(upperLayerId: string): Promise<MergeDownResult>;

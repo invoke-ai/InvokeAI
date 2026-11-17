@@ -4405,7 +4405,6 @@
         "copySelection": "Copy selection",
         "cutSelection": "Cut selection",
         "decreaseBrushSize": "Decrease brush/eraser size",
-        "deleteLayer": "Delete layer",
         "deleteSelected": "Delete selected canvas item",
         "deselect": "Deselect",
         "duplicateLayer": "Duplicate layer",

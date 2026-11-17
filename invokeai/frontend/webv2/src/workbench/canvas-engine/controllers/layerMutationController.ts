@@ -144,7 +144,7 @@ export class LayerMutationController {
 
   constructor(private readonly options: LayerMutationControllerOptions) {}
 
-  async duplicate(layerIds: readonly string[]): Promise<DuplicateLayersResult> {
+  async duplicate(label: string, layerIds: readonly string[]): Promise<DuplicateLayersResult> {
     const { ctx, ...o } = this.options;
     const permit = ctx.capturePermit();
     if (this.duplicateInFlight || !permit || ctx.isGestureActive()) {
@@ -162,7 +162,7 @@ export class LayerMutationController {
     const plans = sources.map((source) => o.getDuplicateRasterPlan(source, document));
     const notReadySources = sources.filter((_source, index) => plans[index]?.type === 'not-ready');
     if (notReadySources.length === 0) {
-      return this.commitDuplicate(layerIds);
+      return this.commitDuplicate(label, layerIds);
     }
 
     this.duplicateInFlight = true;
@@ -196,14 +196,14 @@ export class LayerMutationController {
       ) {
         return { status: 'stale' };
       }
-      return this.commitDuplicate(layerIds);
+      return this.commitDuplicate(label, layerIds);
     } finally {
       pinLease.release();
       this.duplicateInFlight = false;
     }
   }
 
-  private commitDuplicate(layerIds: readonly string[]): DuplicateLayersResult {
+  private commitDuplicate(label: string, layerIds: readonly string[]): DuplicateLayersResult {
     const { ctx, ...o } = this.options;
     const document = ctx.getDocument();
     if (!document) {
@@ -365,22 +365,18 @@ export class LayerMutationController {
           )
         );
       };
-      const result = txn.publish(
-        duplicates.length === 1 ? 'Duplicate layer' : 'Duplicate layers',
-        added(initialPrepared),
-        {
-          bytes: historyBytes,
-          dispose: () => detachedLease?.release(),
-          heldAssetRefs: collectHistoryMediaRefs(duplicates),
-          redo,
-          undo: () =>
-            ctx.applyStep(
-              stackStep(removeDuplicates, hasOriginals, addDuplicates, hasDuplicates, {
-                notify: () => o.publishSelectedLayerIds(previousSelectedLayerId, previousSelectedIds),
-              })
-            ),
-        }
-      );
+      const result = txn.publish(label, added(initialPrepared), {
+        bytes: historyBytes,
+        dispose: () => detachedLease?.release(),
+        heldAssetRefs: collectHistoryMediaRefs(duplicates),
+        redo,
+        undo: () =>
+          ctx.applyStep(
+            stackStep(removeDuplicates, hasOriginals, addDuplicates, hasDuplicates, {
+              notify: () => o.publishSelectedLayerIds(previousSelectedLayerId, previousSelectedIds),
+            })
+          ),
+      });
       if (result.status !== 'committed') {
         return { status: guardedResultRefusal(result) };
       }
