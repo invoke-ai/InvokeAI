@@ -1,6 +1,7 @@
 import sys
 import threading
 from collections import Counter, defaultdict
+from enum import Enum
 from functools import wraps
 from typing import Dict, Literal, Optional, Protocol, Union
 
@@ -26,17 +27,26 @@ MPS_DEVICE = torch.device("mps")
 _XPU_MEM_FALLBACK_WARNED: set[str] = set()
 
 
+class EmptyCacheOutcome(Enum):
+    """What `TorchDevice.empty_cache` did. Callers compare members explicitly; only RAN returned memory to the driver."""
+
+    RAN = "ran"
+    DEFERRED = "deferred"  # another generation device is mid-session; flush_deferred_empty_cache() runs it later
+    REFUSED = "refused"  # the backend raised; logged as a warning, the blocks stay reserved
+
+
 class EmptyCacheObserver(Protocol):
     def before_empty_cache(self) -> None: ...
 
-    def after_empty_cache(self) -> None: ...
+    def after_empty_cache(self, released: bool) -> None: ...
 
 
 EMPTY_CACHE_OBSERVERS: list[EmptyCacheObserver] = []
-"""Told about every `TorchDevice.empty_cache` that releases memory, just before and just after the release, in
-registration order. The working-memory probe registers here while a calibration scope is open, so that a release inside
-a measured window ends a segment there (`invokeai.backend.working_memory.probe`); otherwise the list is empty and a
-release pays one truth test for it. Observers must not raise."""
+"""Told about every `TorchDevice.empty_cache` that attempts a release, just before and just after it, in
+registration order; `released` is False when the backend refused (raised). The working-memory probe registers here
+while a calibration scope is open, so that a release inside a measured window ends a segment there
+(`invokeai.backend.working_memory.probe`); otherwise the list is empty and a release pays one truth test for it.
+Observers must not raise."""
 
 
 def _xpu_is_available() -> bool:
@@ -147,8 +157,8 @@ class TorchDevice:
 
     # Set when a peer-aware empty_cache (this class's or the installed torch.cuda wrapper) skipped
     # the real call because another generation device was mid-session. The skipped release is
-    # not lost: `flush_deferred_empty_cache()` performs it at the next quiet moment — a busy
-    # worker's step boundary or a session's end (see `flush_deferred_empty_cache`).
+    # not lost: `flush_deferred_empty_cache()` performs it at the first step boundary or session
+    # end that finds no other generation device mid-session.
     _empty_cache_deferred = threading.Event()
 
     @classmethod
@@ -441,8 +451,9 @@ class TorchDevice:
             torch.mps.synchronize()
 
     @classmethod
-    def empty_cache(cls, force: bool = False) -> bool:
-        """Clear the GPU device cache — unless another generation device is mid-session. Says whether it ran.
+    def empty_cache(cls, force: bool = False) -> EmptyCacheOutcome:
+        """Clear the GPU device cache — unless another generation device is mid-session.
+        Returns RAN, DEFERRED (skipped for a busy peer) or REFUSED (the backend raised).
 
         `force` runs it regardless, for callers whose alternative is worse than stalling a busy peer for the rest of
         its current step: a model about to run without the driver-free working memory it needs, which on Windows
@@ -466,8 +477,8 @@ class TorchDevice:
         VRAM accounting turns conservative until a quiet-moment call runs. On single-GPU
         installs a worker never sees another busy device, so its own calls run as before; only
         a thread with no session device (the cache keep-alive timer, the cache's background
-        worker) defers while the worker is mid-session, and that release now lands at the
-        worker's next step boundary instead of being dropped.
+        worker) defers while the worker is mid-session, and that release runs at the next flush
+        that finds no other device mid-session instead of being dropped.
 
         A skipped call is recorded as deferred rather than dropped: the memory it would have
         returned (a canceled session's working set, a timed-out cache's weights) stays cached in
@@ -475,19 +486,29 @@ class TorchDevice:
         driver and every other process — until `flush_deferred_empty_cache()` runs it from a
         quiet moment. Without that, VRAM freed on one GPU stayed resident until the peer's
         whole render finished and something else happened to call empty_cache.
+
+        A release the backend refuses (a `RuntimeError` such as `torch.AcceleratorError` or `OutOfMemoryError` from a
+        broken or exhausted device context) is, for an ordinary call, logged as a warning and reported as REFUSED,
+        never raised: the release is advisory, torch keeps reusing the blocks it could not return, and the operation
+        that asked for it (an eviction, an offload, the Empty Cache request, the release after a session) must still
+        complete. A context that stays broken fails the next real operation on its own. A `force` call raises the
+        error instead, because its caller cannot proceed as if the release ran: a short working-memory reserve on
+        Windows hangs instead of failing (`ModelCache._release_allocator_blocks_for_reserve`), and the working-memory
+        probe would record a measurement window whose baseline still counts the blocks.
         """
         if not force and cls._another_generation_device_busy():
             cls._empty_cache_deferred.set()
             InvokeAILogger.get_logger(cls.__name__).debug(
                 "Deferring empty_cache: another generation device is mid-session."
             )
-            return False
+            return EmptyCacheOutcome.DEFERRED
         # Clear before running: a skip that races in after this point re-sets the flag, so a
         # request is never lost, only (harmlessly) repeated.
         cls._empty_cache_deferred.clear()
         observers = tuple(EMPTY_CACHE_OBSERVERS) if EMPTY_CACHE_OBSERVERS else ()
         for observer in observers:
             observer.before_empty_cache()
+        released = False
         try:
             if torch.backends.mps.is_available():
                 torch.mps.empty_cache()
@@ -497,10 +518,21 @@ class TorchDevice:
                 (getattr(cuda_empty_cache, "__wrapped__", cuda_empty_cache) if force else cuda_empty_cache)()
             if _xpu_is_available():
                 torch.xpu.empty_cache()
+            released = True
+        except RuntimeError as e:
+            if force:
+                raise
+            reason = str(e)
+            InvokeAILogger.get_logger(cls.__name__).warning(
+                f"Could not release cached device memory: {reason.splitlines()[0] if reason else type(e).__name__}. "
+                "The memory stays reserved by this process; restart Invoke if generations keep failing with GPU "
+                "errors."
+            )
+            return EmptyCacheOutcome.REFUSED
         finally:
             for observer in observers:
-                observer.after_empty_cache()
-        return True
+                observer.after_empty_cache(released)
+        return EmptyCacheOutcome.RAN
 
     @classmethod
     def flush_deferred_empty_cache(cls) -> None:
@@ -510,10 +542,10 @@ class TorchDevice:
         and a driver-level free is cheap — a denoise step boundary (the progress path calls it)
         or the end of a session. It is a flag test when nothing is pending, so it is safe to call
         often. When a device other than the caller's is still mid-session the flush is skipped
-        again (and stays pending): on a two-GPU box the requester's session has ended, so the
-        busy worker's own step boundary is the first quiet moment and the release lands there —
-        within one of its steps instead of at the end of its render. The cost to the busy worker
-        is re-allocating its own cached working blocks on the next step, once per request.
+        again (and stays pending): the release runs at the first flush that finds no OTHER device
+        mid-session, which on a box whose GPUs stay busy is when one of them goes idle. The cost to
+        a busy worker that runs it is re-allocating its own cached working blocks on the next step,
+        once per request.
         """
         if not cls._empty_cache_deferred.is_set():
             return

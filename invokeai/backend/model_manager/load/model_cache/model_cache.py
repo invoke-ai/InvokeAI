@@ -34,7 +34,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 )
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
-from invokeai.backend.util.devices import TorchDevice, device_has_dedicated_vram
+from invokeai.backend.util.devices import EmptyCacheOutcome, TorchDevice, device_has_dedicated_vram
 from invokeai.backend.util.level_zero import xpu_device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.prefix_logger_adapter import PrefixedLoggerAdapter
@@ -423,13 +423,13 @@ def synchronized(method: Callable[..., Any]) -> Callable[..., Any]:
                     self._reconcile_budget_if_pending()
                 except Exception:
                     # The reconcile is deferrable housekeeping and must not fail the operation
-                    # that triggered it. It can raise from a sick CUDA context (empty_cache after
-                    # an eviction) - and this hook runs inside the caller's frame AFTER the
-                    # method body, so a raise out of lock_in_ram()/lock() here would propagate
-                    # before LoadedModel's unlock-pairing try block is entered, leaking a
-                    # permanently locked record (the same shape as a keep-alive Timer.start()
-                    # failure, handled in _record_activity). The pending flag is only cleared
-                    # once the budget is satisfied, so the next lock release retries.
+                    # that triggered it. It can still raise (the clear callbacks, budget bookkeeping) -
+                    # and this hook runs inside the caller's frame AFTER the method body, so a raise
+                    # out of lock_in_ram()/lock() here would propagate before LoadedModel's
+                    # unlock-pairing try block is entered, leaking a permanently locked record (the
+                    # same shape as a keep-alive Timer.start() failure, handled in _record_activity).
+                    # The pending flag is only cleared once the budget is satisfied, so the next lock
+                    # release retries.
                     self._logger.exception("Error reconciling the shared RAM budget after a lock release")
 
     return wrapper
@@ -461,6 +461,7 @@ class CacheEntrySnapshot:
 class CacheClearResult:
     models_cleared: int
     bytes_freed: int
+    vram_release_refused: bool  # the device refused to return its cached blocks after the drop
 
 
 class CacheMissCallback(Protocol):
@@ -1647,18 +1648,8 @@ class ModelCache:
                 bytes_requested=0,
                 bytes_freed=bytes_freed,
             )
-            try:
-                gc.collect()
-                TorchDevice.empty_cache()
-            except Exception:
-                # Deferrable housekeeping: empty_cache() can raise from a sick CUDA context after
-                # an eviction, and this runs in a dying worker's last frame. The eviction itself
-                # is already done and must not be undone by a failure to hand memory back.
-                _log_best_effort(
-                    self._logger,
-                    "exception",
-                    "Error releasing device memory after a stranded-record eviction",
-                )
+            gc.collect()
+            TorchDevice.empty_cache()
 
     @synchronized
     def _recover_from_dead_worker(self, worker: threading.Thread) -> None:
@@ -2288,7 +2279,7 @@ class ModelCache:
             releasable = self._get_reclaimable_allocator_bytes()
         if releasable < _MIN_RELEASABLE_FOR_RESERVE:
             return
-        if not TorchDevice.empty_cache(force=self._trim_past_busy_peer()):
+        if TorchDevice.empty_cache(force=self._trim_past_busy_peer()) is not EmptyCacheOutcome.RAN:
             return
         released_free, _ = TorchDevice.cuda_mem_get_info(self._execution_device)
         self._logger.debug(
@@ -2758,7 +2749,7 @@ class ModelCache:
                         f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed / MB):.0f} MB."
                     )
                     if empty_cache_per_offload:
-                        if TorchDevice.empty_cache(force=force_empty_cache):
+                        if TorchDevice.empty_cache(force=force_empty_cache) is EmptyCacheOutcome.RAN:
                             vram_bytes_freed_uncounted = 0
                         elif not capped:
                             vram_bytes_freed_uncounted += cache_entry_bytes_freed
@@ -2819,19 +2810,24 @@ class ModelCache:
         )
 
         if self._execution_device.type != "cpu":
-            vram_in_use_bytes = self._get_vram_in_use()
-            vram_available_bytes = self._get_vram_available(None)
-            vram_size_bytes = vram_in_use_bytes + vram_available_bytes
-            vram_in_use_bytes_percent = vram_in_use_bytes / vram_size_bytes if vram_size_bytes > 0 else 0
-            vram_available_bytes_percent = vram_available_bytes / vram_size_bytes if vram_size_bytes > 0 else 0
-            log += log_format.format(
-                f"Compute Device ({self._execution_device.type})",
-                vram_size_bytes / MB,
-                vram_in_use_bytes / MB,
-                vram_in_use_bytes_percent,
-                vram_available_bytes / MB,
-                vram_available_bytes_percent,
-            )
+            # Diagnostic only: a broken device context must not fail the eviction that logs its state.
+            try:
+                vram_in_use_bytes = self._get_vram_in_use()
+                vram_available_bytes = self._get_vram_available(None)
+            except RuntimeError as e:
+                log += f"  Compute Device ({self._execution_device.type}): unavailable ({e})\n"
+            else:
+                vram_size_bytes = vram_in_use_bytes + vram_available_bytes
+                vram_in_use_bytes_percent = vram_in_use_bytes / vram_size_bytes if vram_size_bytes > 0 else 0
+                vram_available_bytes_percent = vram_available_bytes / vram_size_bytes if vram_size_bytes > 0 else 0
+                log += log_format.format(
+                    f"Compute Device ({self._execution_device.type})",
+                    vram_size_bytes / MB,
+                    vram_in_use_bytes / MB,
+                    vram_in_use_bytes_percent,
+                    vram_available_bytes / MB,
+                    vram_available_bytes_percent,
+                )
 
         # Dispatch on this cache's execution device, not on availability order: a box with both
         # an NVIDIA card and an Arc would otherwise take the CUDA branch while running on XPU and
@@ -2975,11 +2971,12 @@ class ModelCache:
         # box: a no-op make_room during one worker's model load froze the other worker's denoise
         # step for its full duration). make_room runs on every put(), and most of those evict
         # nothing, so the unconditional call turned every submodel load into a cross-GPU stall.
-        if models_cleared > 0:
-            TorchDevice.empty_cache()
+        vram_release_refused = models_cleared > 0 and TorchDevice.empty_cache() is EmptyCacheOutcome.REFUSED
         self._logger.debug(f"Dropped {models_cleared} models to free {ram_bytes_freed / MB:.2f}MB of RAM.")
         self._log_cache_state(title="After dropping models:")
-        return CacheClearResult(models_cleared=models_cleared, bytes_freed=ram_bytes_freed)
+        return CacheClearResult(
+            models_cleared=models_cleared, bytes_freed=ram_bytes_freed, vram_release_refused=vram_release_refused
+        )
 
     def evict_unlocked_for_peer(self, is_satisfied: Callable[[], bool]) -> Optional[int]:
         """Evict this cache's unlocked entries on behalf of another device's cache (best effort).

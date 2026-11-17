@@ -107,12 +107,10 @@ export const Combobox = ({
   const { t } = useTranslation();
   const field = useFieldContext();
   const insideLabel = useInsideFieldLabel();
-  // Ark's input takes only the helper text from Field; an invalid field's error describes it too.
-  const fieldInputProps = field?.getInputProps();
-  const describedBy =
-    [fieldInputProps?.['aria-describedby'], fieldInputProps?.['aria-errormessage'], inputProps?.['aria-describedby']]
-      .filter(Boolean)
-      .join(' ') || undefined;
+  // Field's describedby names its error only while invalid and shown; Ark no longer sets aria-errormessage itself.
+  const fieldDescribedBy = field?.getInputProps()['aria-describedby'];
+  const fieldErrorId = fieldDescribedBy?.split(' ').includes(field.ids.errorText) ? field.ids.errorText : undefined;
+  const describedBy = [fieldDescribedBy, inputProps?.['aria-describedby']].filter(Boolean).join(' ') || undefined;
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const lastNotifiedInputValue = useRef('');
@@ -199,6 +197,15 @@ export const Combobox = ({
     },
     [onValueChange]
   );
+  // Zag announces the result count to screen readers as the query settles.
+  const translations = useMemo(
+    () => ({
+      loading: t('common.loading'),
+      noResults: noResultsText ?? t('common.noOptionsFound'),
+      resultsCount: (count: number) => t('common.matchCount', { count }),
+    }),
+    [noResultsText, t]
+  );
   // Zag's dismiss layer spares only the input and the triggers. A press elsewhere in the box, such as on an inside
   // label, would close the list and clear the query, and the label's click would then reopen it unfiltered.
   const handlePointerDownOutside = useCallback(
@@ -237,6 +244,7 @@ export const Combobox = ({
       positioning={COMBOBOX_POSITIONING}
       scrollToIndexFn={scrollHighlightedIntoView}
       selectionBehavior="replace"
+      translations={translations}
       value={selectedValues}
       onInputValueChange={handleInputValueChange}
       onOpenChange={handleOpenChange}
@@ -250,7 +258,7 @@ export const Combobox = ({
           css={insideLabel ? INSIDE_INPUT_CSS : undefined}
           {...inputProps}
           aria-describedby={describedBy}
-          aria-errormessage={inputProps?.['aria-errormessage'] ?? fieldInputProps?.['aria-errormessage']}
+          aria-errormessage={inputProps?.['aria-errormessage'] ?? fieldErrorId}
           aria-label={inputProps?.['aria-label'] ?? ariaLabel}
           placeholder={searchPlaceholder ?? t('common.searchOptions')}
         />
