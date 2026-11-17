@@ -91,6 +91,17 @@ def test_wan_memory_optimization_defaults_to_false_and_loads_from_yaml(tmp_path:
     assert load_and_migrate_config(temp_config_file).wan_memory_optimization is True
 
 
+@pytest.mark.parametrize(("yaml_line", "expected"), [("", True), ("multiuser: false\n", False)])
+def test_sign_in_is_required_unless_single_user_mode_is_set_explicitly(
+    tmp_path: Path, patch_rootdir: None, yaml_line: str, expected: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("INVOKEAI_MULTIUSER", raising=False)  # tests/conftest.py pins single-user for the suite
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(f'schema_version: "4.0.3"\n{yaml_line}')
+
+    assert load_and_migrate_config(temp_config_file).multiuser is expected
+
+
 @pytest.mark.parametrize(
     ("yaml_value", "expected"),
     [("on", "on"), ("off", "off"), ('"on"', "on"), ("auto", "auto")],
