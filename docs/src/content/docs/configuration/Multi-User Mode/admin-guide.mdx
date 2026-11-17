@@ -1,7 +1,7 @@
 ---
 title: Multi-User Administrator Guide
 description: Turn on multi-user mode, manage accounts, and keep a shared InvokeAI server safe.
-lastUpdated: 2026-10-26
+lastUpdated: 2026-11-17
 sidebar:
   order: 4
 ---
@@ -26,16 +26,17 @@ There are two roles. Any number of accounts can be administrators.
 
 Roles are read from the database on every request, so promoting or demoting someone takes effect on their next action. See [When changes take effect](#when-changes-take-effect).
 
-## Turn on multi-user mode
+## Set up multi-user mode
+
+Multi-user mode is on by default. An install that upgrades from a version where single-user mode was the default switches to multi-user mode unless its `invokeai.yaml` sets `multiuser: false`. See [Single-user mode](#single-user-mode).
 
 <Steps>
 
 1. **Back up.** Stop InvokeAI and copy the `databases` folder in your root directory. See [Backups](#backups).
 
-2. **Edit `invokeai.yaml`** in your root directory and add `multiuser: true`. To let other computers on your network reach the server, also add `host: 0.0.0.0`. Any `host` other than a loopback address (`127.0.0.1`, `::1`, `localhost`) turns multi-user mode on by itself, as a security feature, so a server on the network always requires sign-in:
+2. **Optionally edit `invokeai.yaml`** in your root directory. To let other computers on your network reach the server, add `host: 0.0.0.0`. Create the administrator account (step 4) before you do, so that no one else on the network can claim it:
 
    ```yaml
-   multiuser: true
    host: 0.0.0.0                  # optional: listen on the network, not only this computer
    strict_password_checking: true # optional: require strong passwords
    ```
@@ -61,7 +62,13 @@ Browsers turn off the clipboard and Web Locks for plain-HTTP pages at a network 
 InvokeAI cannot recover a password. If you lose the last administrator's password, reset it from the command line with [`invoke-usermod`](#troubleshooting).
 :::
 
-To go back to single-user mode, set `multiuser: false` (or remove the line), set `host` to a loopback address such as `127.0.0.1` (any other `host` keeps multi-user mode on), and restart. Browsers that had InvokeAI open may need a hard refresh.
+### Single-user mode
+
+Set `multiuser: false` in `invokeai.yaml` and restart to run without accounts or sign-in. Browsers that had InvokeAI open may need a hard refresh. Every visitor then has full administrator control, so use it only on a server that listens on `127.0.0.1` (the default `host`), never on one other computers can reach.
+
+:::caution[Single-user mode is deprecated]
+Single-user mode will be removed in a future release.
+:::
 
 ### What happens to existing data
 

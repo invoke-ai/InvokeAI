@@ -135,26 +135,3 @@ def test_the_server_starts_with_the_runtime_it_gives_the_calibration_scripts(
     run_app.apply_server_runtime(config, logging.getLogger(__name__))
 
     assert server == runtime_steps
-
-
-@pytest.mark.parametrize(
-    "host, forced",
-    [
-        ("127.0.0.1", False),
-        ("127.0.0.2", False),
-        ("::1", False),
-        ("[::1]", False),
-        ("localhost", False),
-        ("LOCALHOST", False),
-        ("0.0.0.0", True),
-        ("::", True),
-        ("192.168.1.20", True),
-        ("invoke.example.com", True),
-    ],
-)
-def test_a_server_reachable_from_the_network_requires_sign_in(host: str, forced: bool) -> None:
-    from invokeai.app.run_app import require_auth_off_loopback
-
-    config = InvokeAIAppConfig(host=host, multiuser=False)
-    require_auth_off_loopback(config, logging.getLogger("test"))
-    assert config.multiuser is forced

@@ -74,33 +74,6 @@ def _configure_torch_environment(config: "InvokeAIAppConfig", logger: logging.Lo
     apply_rocm_aotriton_setting(config.rocm_aotriton_experimental, config.generation_devices, logger)
 
 
-def require_auth_off_loopback(config: "InvokeAIAppConfig", logger: logging.Logger) -> None:
-    """Turn on multiuser mode when the server listens beyond this computer.
-
-    Single-user mode gives every request administrator rights, so a server reachable from the network would let anyone
-    who finds it view, change or delete everything. A host name other than `localhost` is treated as reachable.
-    """
-    import ipaddress
-
-    if config.multiuser:
-        return
-    host = config.host.strip("[]")
-    try:
-        loopback = ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        loopback = host.lower() == "localhost"
-    if loopback:
-        return
-    config.multiuser = True
-    logger.warning(
-        f"Invoke is listening on {config.host}, which other computers can reach, so multiuser mode is on whatever "
-        "`multiuser` says. This is a security feature: without sign-in, anyone who can reach the server could "
-        "view, change or delete your images, models and settings. If no administrator account exists yet, open Invoke "
-        "in a browser to create one. Projects made in single-user mode stay hidden until single-user mode returns. "
-        "To use Invoke without signing in, set `host: 127.0.0.1` so that only this computer can reach it."
-    )
-
-
 def apply_server_runtime(config: "InvokeAIAppConfig", logger: logging.Logger) -> None:
     """Give this process the server's kernels and allocation, for a process that measures what the server runs (the
     working-memory calibration scripts). Must run before torch is imported.
@@ -157,7 +130,6 @@ def run_app() -> None:
     app_config = get_config()
 
     logger = InvokeAILogger.get_logger(config=app_config)
-    require_auth_off_loopback(app_config, logger)
 
     # The server's runtime (`apply_server_runtime`) in its two parts, around the startup steps below that need torch:
     # first what torch, HIP and MIOpen read when they initialize, before torch is imported anywhere.

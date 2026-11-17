@@ -67,6 +67,10 @@ from tests.test_nodes import TestEventService
 if is_windows_arm64():
     install_cuda_stream_capture_shim()
 
+# Multiuser is the app's default; the suite tests single-user behavior unless a test passes `multiuser=True`, which
+# beats this environment value.
+os.environ.setdefault("INVOKEAI_MULTIUSER", "false")
+
 # torch's own SDPA priority order, read as the session starts and before anything in it installs one. It is torch's
 # state, not code under test, and its layout differs by release, so `sdpa_orders` picks literal expectations by it.
 try:

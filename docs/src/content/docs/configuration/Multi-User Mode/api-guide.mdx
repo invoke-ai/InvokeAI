@@ -12,14 +12,14 @@ This guide explains how to interact with InvokeAI's API in both single-user and 
 
 ### Single-User vs Multi-User Mode
 
-**Single-User Mode** (`multiuser: false` or option absent, and `host` a loopback address; any other `host` turns on multi-user mode):
+**Single-User Mode** (`multiuser: false`; deprecated):
 
 - No authentication required
 - All API endpoints accessible without tokens
 - Direct API access like previous InvokeAI versions
 - All content visible in unified view
 
-**Multi-User Mode** (`multiuser: true`):
+**Multi-User Mode** (`multiuser: true` or option absent, the default):
 
 - JWT token authentication required
 - User-scoped access to resources
@@ -1068,11 +1068,11 @@ InvokeAI supports both single-user and multi-user modes via the `multiuser` conf
 ```yaml
 # invokeai.yaml
 
-# Single-user mode (no authentication)
-multiuser: false  # or omit the option entirely
+# Multi-user mode (authentication required), the default
+multiuser: true  # or omit the option entirely
 
-# Multi-user mode (authentication required)
-multiuser: true
+# Single-user mode (no authentication; deprecated)
+multiuser: false
 ```
 
 **Checking Mode Programmatically:**

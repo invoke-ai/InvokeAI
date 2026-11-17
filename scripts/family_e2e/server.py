@@ -225,6 +225,8 @@ def build_scratch_root(
         # The index worker embeds every new image on the GPU between runs; a copied queue may hold pending items.
         image_index_enabled=False,
         clear_queue_on_startup=True,
+        # The runner drives the API without signing in; a template that sets `multiuser: true` is refused later.
+        multiuser=settings.get("multiuser", False),
     )
     if single_cuda_device:
         if str(config.get("device", "")).startswith("cuda:"):
