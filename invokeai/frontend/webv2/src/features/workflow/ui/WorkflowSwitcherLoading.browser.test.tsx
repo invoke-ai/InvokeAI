@@ -141,6 +141,10 @@ describe('the workflow switcher while its scrolling list loads', () => {
     const before = library().getBoundingClientRect().top;
     await act(() => scrollableChunk.release());
     await vi.waitFor(() => expect(themedList()).not.toBeNull(), { timeout: 8000 });
+    // Zag keeps the viewport a tab stop until it first measures its scrollbars; audit the measured list.
+    await vi.waitFor(() =>
+      expect(themedList()!.querySelector('[data-part="viewport"]')).not.toHaveAttribute('tabindex')
+    );
     expect(library().getBoundingClientRect().top).toBe(before);
     expect(await auditAccessibility(menu()!)).toEqual([]);
     expect(menu()!.contains(document.activeElement)).toBe(true);

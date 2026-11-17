@@ -263,6 +263,10 @@ const open = async () => {
     );
   });
   await waitFor(() => expect(card(0) ?? listRow(0)).not.toBeNull());
+  // The dialog opens scaled; geometry read before its animation ends is shrunken, and a slow runner can outlast a
+  // fixed settle.
+  const dialog = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
+  await act(() => Promise.all(dialog.getAnimations().map((animation) => animation.finished)));
 };
 beforeEach(async () => {
   accountLifecycle.invalidate();
