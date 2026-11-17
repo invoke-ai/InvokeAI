@@ -161,7 +161,7 @@ export const PropertySegmentedRow = <Value extends string>({
   disabled?: boolean;
   label: string;
   onValueChange: (value: Value) => void;
-  options: readonly { value: Value; label: string; icon?: ElementType; disabled?: boolean }[];
+  options: readonly { value: Value; label: ReactNode; icon?: ElementType; disabled?: boolean }[];
   value: Value;
 }) => {
   const handleChange = useCallback(

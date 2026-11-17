@@ -9,7 +9,7 @@ import { flushGenerateDrafts } from './generateDraftRegistry';
 
 /**
  * Generate's Undo slots, one pair per project. A newer Undo in a slot withdraws the older, since undoing an older step
- * after a newer one would leave a mix of both. Whole-form changes (a model switch, a preset, Reset all) share one slot;
+ * after a newer one would leave a mix of both. Whole-form changes (a model switch, a preset, Apply model defaults, Reset everything) share one slot;
  * prompt changes that Ctrl+Z in the prompt cannot undo (a template choice, a history entry, a rewrite) share the other.
  */
 export const getGenerateSettingsUndoKey = (projectId: string): string => `generate-settings:${projectId}`;

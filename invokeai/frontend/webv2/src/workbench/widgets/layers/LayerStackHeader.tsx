@@ -5,6 +5,7 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import { Box, HStack, Icon, Text, VisuallyHidden } from '@chakra-ui/react';
 import { IconButton, Tooltip } from '@platform/ui';
 import { FeatureHint, FeatureHintExclusion } from '@platform/ui/hints/FeatureHint';
+import { rowFocusRing } from '@theme/recipes';
 import { ChevronDownIcon } from 'lucide-react';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,8 +15,6 @@ import type { LayerRowCommands } from './layerRowCommands';
 import { anchorFromPoint } from './layerRowCommands';
 import { LAYER_PANEL_CONTROL_GAP, LAYER_PANEL_END_INSET } from './LayerRowSurface';
 import { useLayerStackActions, type LayerStackActionsEngine } from './useLayerStackActions';
-
-const HEADER_FOCUS = { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' };
 
 const STACK_HINTS: Record<LayerStackKind, FeatureHintId> = {
   control: 'layerStackControl',
@@ -115,7 +114,7 @@ const LayerStackHeaderComponent = ({
         role={pinned ? undefined : 'treeitem'}
         rounded="sm"
         tabIndex={pinned ? undefined : focused ? 0 : -1}
-        _focusVisible={HEADER_FOCUS}
+        _focusVisible={rowFocusRing}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         onFocus={pinned ? undefined : handleFocus}

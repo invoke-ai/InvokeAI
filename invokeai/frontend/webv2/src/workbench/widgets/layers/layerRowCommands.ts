@@ -55,11 +55,4 @@ export interface LayerRowCommands {
   keyDown(id: string, event: KeyboardEvent<HTMLElement>): void;
 }
 
-export const anchorFromRect = (rect: DOMRect): LayerSurfaceAnchor => ({
-  height: rect.height,
-  width: rect.width,
-  x: rect.left,
-  y: rect.top,
-});
-
 export const anchorFromPoint = (x: number, y: number): LayerSurfaceAnchor => ({ height: 1, width: 1, x, y });

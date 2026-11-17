@@ -6,7 +6,6 @@ import { ApiError } from '@platform/transport/http';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import {
-  MEDIA_USAGE_MAX_NAMES_PER_KIND,
   MEDIA_USAGE_MAX_PROJECT_READ_BYTES,
   MEDIA_USAGE_MAX_PROJECT_READS,
   resolveMediaUsage,
@@ -21,6 +20,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@features/gallery/mediaUsage', () => ({
+  GALLERY_REQUEST_MAX_NAMES: 1000,
   checkGalleryMediaUsage: (request: unknown, signal: AbortSignal) => mocks.check(request, signal),
 }));
 vi.mock('@workbench/projects/api', () => ({
@@ -484,19 +484,27 @@ describe('resolveMediaUsage', () => {
     expect(report.groups).toEqual([{ count: 1, kind: 'projectUnchecked', name: 'Big' }]);
   });
 
-  it('says a selection past what one check takes was too large, not that the server failed', async () => {
-    const names = Array.from({ length: MEDIA_USAGE_MAX_NAMES_PER_KIND + 1 }, (_, index) => `${index}.png`);
+  it('asks the server about a selection larger than one request takes, as about any other', async () => {
+    const names = Array.from({ length: 2500 }, (_, index) => `${index}.png`);
+    mocks.check.mockResolvedValue(
+      answer({ documents: [usageDocument('workflow', 'wf-1', 'Upscale pass', ['2400.png'])] })
+    );
 
     const report = await resolveMediaUsage(
       items(...names),
       host([project('open', 'Open', { raster: ['7.png'] })], 'open')
     );
 
-    expect(mocks.check).not.toHaveBeenCalled();
-    expect(report.serverCheck).toBe('tooManyItems');
-    expect(report.groups).toEqual([
-      { count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'canvasRaster' }] },
-    ]);
+    expect(mocks.check).toHaveBeenCalledWith({ kind: 'items', refs: names.map(image) }, expect.any(AbortSignal));
+    expect(report).toMatchObject({
+      checkedCount: 2500,
+      groups: [
+        { count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'canvasRaster' }] },
+        { count: 1, kind: 'workflow', name: 'Upscale pass' },
+      ],
+      inUseCount: 2,
+      serverCheck: 'complete',
+    });
   });
 
   it('takes workflows, the legacy editor, projects kept for repair, unknown documents, queued jobs and other accounts as they are', async () => {
@@ -573,6 +581,95 @@ describe('resolveMediaUsage', () => {
 
     expect(report.serverCheck).toBe('unavailable');
     expect(report.groups).toEqual([]);
+  });
+
+  it('gives a check sent in several requests that long for each of them', async () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    mocks.check.mockImplementation(
+      (_request, signal) =>
+        new Promise((resolve, reject) => {
+          setTimeout(() => resolve(answer()), 25);
+          signal.addEventListener('abort', () => reject(signal.reason));
+        })
+    );
+    // 2,500 images take three requests, so 30 ms in all.
+    const names = Array.from({ length: 2500 }, (_, index) => `${index}.png`);
+
+    const pending = resolveMediaUsage(items(...names), host(), { serverTimeoutMs: 10 });
+    await vi.advanceTimersByTimeAsync(25);
+
+    await expect(pending).resolves.toMatchObject({ serverCheck: 'complete' });
+  });
+
+  it('lists a document a batched check could not name in full as unchecked, counting at least what it named', async () => {
+    const xEntry = {
+      ...usageDocument('project', 'p-x', 'X', ['1001.png', '1002.png', '1003.png']),
+      namesIncomplete: true as const,
+    };
+    mocks.check.mockResolvedValue(answer({ checkedImageCount: 2000, documents: [xEntry], inUseImageCount: 503 }));
+    serveProjects([project('p-x', 'X', { raster: ['1001.png'] })]);
+    const names = Array.from({ length: 2000 }, (_, index) => `${index}.png`);
+
+    const report = await resolveMediaUsage(items(...names), host());
+
+    // Not read and narrowed to what the server happened to name: its other uses were never named.
+    expect(mocks.getProject).not.toHaveBeenCalled();
+    expect(report.groups).toEqual([{ count: 3, countAtLeast: true, kind: 'projectUnchecked', name: 'X' }]);
+    // The server's own exact total still stands.
+    expect(report.inUseCount).toBe(503);
+  });
+
+  it('reads an open project’s saved copy when a batched check could not name all its uses, keeping the server’s total', async () => {
+    // As a batched check answers: the flag exists only because a batch left documents unlisted.
+    const xEntry = { ...usageDocument('project', 'p-x', 'X', ['1001.png']), namesIncomplete: true as const };
+    const listed = [
+      xEntry,
+      ...Array.from({ length: 99 }, (_, index) =>
+        usageDocument('workflow', `wf-${index}`, `Flow ${index}`, ['1500.png'])
+      ),
+    ];
+    mocks.check.mockResolvedValue(
+      answer({ checkedImageCount: 2000, documents: listed, documentsTotal: 101, inUseImageCount: 503 })
+    );
+    // The saved copy also uses an image the first batch left unnamed; the copy here does not.
+    serveProjects([project('p-x', 'X', { raster: ['1001.png', '7.png'] })]);
+    const names = Array.from({ length: 2000 }, (_, index) => `${index}.png`);
+
+    const report = await resolveMediaUsage(items(...names), host([project('p-x', 'X', { raster: ['1001.png'] })]));
+
+    expect(mocks.getProject).toHaveBeenCalledOnce();
+    expect(report.groups[0]).toEqual({
+      count: 2,
+      kind: 'project',
+      name: 'X',
+      surfaces: [{ count: 2, surface: 'canvasRaster' }],
+    });
+    expect(report.groups.at(-1)).toEqual({ documentCount: 1, kind: 'moreDocuments' });
+    // The uses the server counted in unnamed documents count nowhere else: its total stands.
+    expect(report.inUseCount).toBe(503);
+  });
+
+  it('keeps the server’s total when a scan narrows a project but other documents went unlisted', async () => {
+    // The open project names a.png only as its Gallery selection; an unlisted document uses b.png.
+    mocks.check.mockResolvedValue(
+      answer({
+        documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png']))],
+        documentsTotal: 2,
+        inUseImageCount: 2,
+      })
+    );
+
+    const report = await resolveMediaUsage(
+      items('a.png', 'b.png'),
+      host([project('open', 'Open', { selected: 'a.png' })], 'open', { open: SERVED })
+    );
+
+    expect(mocks.getProject).not.toHaveBeenCalled();
+    expect(report.groups).toEqual([{ documentCount: 1, kind: 'moreDocuments' }]);
+    expect(report.inUseCount).toBe(2);
   });
 
   it('lists a closed project as the server counts it when reading it outlasts the deadline', async () => {

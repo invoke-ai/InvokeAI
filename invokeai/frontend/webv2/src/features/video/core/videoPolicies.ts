@@ -2257,22 +2257,151 @@ const VIDEO_MODE_DESCRIPTIONS: Record<VideoGenerationMode, string> = {
 const hasModelKey = (models: readonly ModelConfig[], key: string, type?: string): boolean =>
   models.some((model) => model.key === key && (!type || model.type === type));
 
-export const getVideoModelAvailabilityReasons = (
+/** The Video panel section whose fields fix an issue. */
+export type VideoSection =
+  | 'components'
+  | 'concepts'
+  | 'conditioningClip'
+  | 'dimensions'
+  | 'frames'
+  | 'guidance'
+  | 'references'
+  | 'render'
+  | 'source';
+
+/** A Video panel control an issue can be fixed from. */
+export type VideoField =
+  | 'accelerator'
+  | 'audioCfg'
+  | 'cfg'
+  | 'cfgLowNoise'
+  | 'components'
+  | 'concepts'
+  | 'conditioningClip'
+  | 'extendContext'
+  | 'firstFrame'
+  | 'fps'
+  | 'initialVideo'
+  | 'lastFrame'
+  | 'modality'
+  | 'numFrames'
+  | 'references'
+  | 'steps'
+  | 'stg'
+  | 'targetResolution';
+
+/** The section each control sits in. */
+const VIDEO_FIELD_SECTIONS: Record<VideoField, VideoSection> = {
+  accelerator: 'render',
+  audioCfg: 'guidance',
+  cfg: 'render',
+  cfgLowNoise: 'render',
+  components: 'components',
+  concepts: 'concepts',
+  conditioningClip: 'conditioningClip',
+  extendContext: 'source',
+  firstFrame: 'frames',
+  fps: 'dimensions',
+  initialVideo: 'source',
+  lastFrame: 'frames',
+  modality: 'guidance',
+  numFrames: 'dimensions',
+  references: 'references',
+  steps: 'render',
+  stg: 'guidance',
+  targetResolution: 'dimensions',
+};
+
+/**
+ * One reason Video cannot run, in English, and every control that can fix it: a conflict between two media lists
+ * both, since clearing either fixes it. None when only the model picker can, or no control sets the value.
+ */
+export interface VideoValidationIssue {
+  fields: readonly VideoField[];
+  message: string;
+}
+
+const when = (condition: unknown, field: VideoField): VideoField[] => (condition ? [field] : []);
+
+/**
+ * The media that put the panel in each mode, which an unsupported mode is fixed by clearing; text-to-video, which has
+ * none, is fixed by adding whichever media the model takes.
+ */
+const VIDEO_MODE_FIELDS: Record<VideoGenerationMode, readonly VideoField[]> = {
+  'audio-to-video': ['conditioningClip'],
+  extend: ['initialVideo'],
+  'first-frame': ['firstFrame'],
+  'first-last': ['firstFrame', 'lastFrame'],
+  'last-frame': ['lastFrame'],
+  reference: ['references'],
+  txt2vid: ['conditioningClip', 'firstFrame', 'initialVideo', 'lastFrame', 'references'],
+  'video-to-audio': ['conditioningClip'],
+};
+
+/**
+ * The controls the panel shows, and lets the user change, for this model and these settings. The panel renders its
+ * media sections and its locked controls from it, and an issue counts only in the sections of the controls listed
+ * here, so a count never points at a control the panel hides or holds read-only.
+ */
+export const getVideoPanelFields = (
+  model: MainModelConfig | undefined,
+  settings: VideoSettings,
+  policy: VideoModelPolicy = getVideoModelPolicy(model, settings)
+): ReadonlySet<VideoField> => {
+  const { modes, ui } = policy;
+  const supportsExtend = modes.includes('extend');
+  const fields: [VideoField, boolean][] = [
+    ['accelerator', Boolean(model && ui.accelerator)],
+    ['audioCfg', ui.audioCfgVisible],
+    ['cfg', ui.cfgVisible],
+    ['cfgLowNoise', ui.cfgLowNoiseVisible],
+    ['components', Boolean(model) && getVideoComponentSectionPolicy(model, settings).slots.length > 0],
+    ['concepts', true],
+    ['conditioningClip', modes.includes('audio-to-video') || modes.includes('video-to-audio')],
+    ['extendContext', ui.extendContext !== null],
+    ['firstFrame', modes.includes('first-frame') || modes.includes('first-last')],
+    // Locked to the initial video while extending, and to a clip that sets the rate.
+    [
+      'fps',
+      ui.fpsVisible && resolveVideoMode(settings) !== 'extend' && !getEffectiveVideoTiming(model, settings).fpsFromClip,
+    ],
+    ['initialVideo', supportsExtend || Boolean(policy.references?.extend)],
+    ['lastFrame', modes.includes('first-last') || modes.includes('last-frame')],
+    ['modality', ui.modalityVisible],
+    ['numFrames', true],
+    ['references', modes.includes('reference')],
+    ['steps', ui.stepsEditable],
+    ['stg', ui.stgVisible],
+    ['targetResolution', true],
+  ];
+
+  return new Set(fields.flatMap(([field, shown]) => (shown ? [field] : [])));
+};
+
+/** The sections whose shown controls can fix `issue`, each once. */
+export const getVideoIssueSections = (issue: VideoValidationIssue, shown: ReadonlySet<VideoField>): VideoSection[] => [
+  ...new Set(issue.fields.flatMap((field) => (shown.has(field) ? [VIDEO_FIELD_SECTIONS[field]] : []))),
+];
+
+export const getVideoModelAvailabilityIssues = (
   model: MainModelConfig,
   settings: VideoSettings,
   models: readonly ModelConfig[]
-): string[] => {
-  const reasons: string[] = [];
+): VideoValidationIssue[] => {
+  const issues: VideoValidationIssue[] = [];
 
   if (!hasModelKey(models, model.key, model.type)) {
-    reasons.push(`Selected model "${model.name}" is no longer installed.`);
+    issues.push({ fields: [], message: `Selected model "${model.name}" is no longer installed.` });
   }
 
   for (const key of Object.keys(VIDEO_COMPONENT_SETTING_LABELS) as VideoComponentValueKey[]) {
     const value = settings[key];
 
     if (value && !hasModelKey(models, value.key, value.type)) {
-      reasons.push(`${VIDEO_COMPONENT_SETTING_LABELS[key]} "${value.name}" is no longer installed.`);
+      issues.push({
+        fields: ['components'],
+        message: `${VIDEO_COMPONENT_SETTING_LABELS[key]} "${value.name}" is no longer installed.`,
+      });
     }
   }
 
@@ -2283,16 +2412,19 @@ export const getVideoModelAvailabilityReasons = (
       isLoraCompatibleWithModel(lora.model, model) &&
       !hasModelKey(models, lora.model.key, 'lora')
     ) {
-      reasons.push(`LoRA "${lora.model.name}" is no longer installed.`);
+      // The panel's synced list has already dropped the row, so no section can show it.
+      issues.push({ fields: [], message: `LoRA "${lora.model.name}" is no longer installed.` });
     }
   }
 
-  return reasons;
+  return issues;
 };
 
-export const getVideoValidationReasons = (model: MainModelConfig, settings: VideoSettings): string[] => {
+/** Why Video cannot run with this model, each with the controls that fix it, in the order Invoke lists them. */
+export const getVideoValidationIssues = (model: MainModelConfig, settings: VideoSettings): VideoValidationIssue[] => {
+  // The model picker fixes these, and it sits in no section.
   if (!isSupportedVideoModel(model)) {
-    return ['Video needs a supported video model before it can be invoked.'];
+    return [{ message: 'Video needs a supported video model before it can be invoked.', fields: [] }];
   }
 
   // Give repair guidance for stored supported-but-unselectable configurations.
@@ -2300,28 +2432,44 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     const family = model.base === 'ltx-2' ? 'LTX-2' : 'MiniMax H3';
 
     return [
-      `${model.name} is a components-only install. Select a single-file ${family} transformer as the model; this install then provides its components.`,
+      {
+        message: `${model.name} is a components-only install. Select a single-file ${family} transformer as the model; this install then provides its components.`,
+        fields: [],
+      },
     ];
   }
   if (model.base === 'minimax-h3' && model.format === 'diffusers' && model.variant === 'ref2va') {
     return [
-      `${model.name} is a Ref2VA folder install, whose transformer weights cannot be folder-loaded. Select a single-file Ref2VA transformer as the model; this install can serve as its Model Components.`,
+      {
+        message: `${model.name} is a Ref2VA folder install, whose transformer weights cannot be folder-loaded. Select a single-file Ref2VA transformer as the model; this install can serve as its Model Components.`,
+        fields: [],
+      },
     ];
   }
 
   const config = getVideoConfig(model);
-  const reasons: string[] = [];
+  const issues: VideoValidationIssue[] = [];
   const mode = resolveVideoMode(settings);
   const referenceOnly = config.modes.length === 1 && config.modes[0] === 'reference';
 
   if (settings.firstFrameImage && settings.sourceVideo) {
-    reasons.push('A first frame and an initial video cannot be combined. Clear one of them.');
+    issues.push({
+      fields: ['firstFrame', 'initialVideo'],
+      message: 'A first frame and an initial video cannot be combined. Clear one of them.',
+    });
   }
 
   if (settings.conditioningClip && (settings.sourceVideo || settings.references.length > 0)) {
     // Both claim the run's conditioning wholesale, and `resolveVideoMode` would silently drop one
     // rather than run something it cannot express.
-    reasons.push('A conditioning clip cannot be combined with an initial video or references. Clear one side.');
+    issues.push({
+      fields: [
+        'conditioningClip',
+        ...when(settings.sourceVideo, 'initialVideo'),
+        ...when(settings.references.length > 0, 'references'),
+      ],
+      message: 'A conditioning clip cannot be combined with an initial video or references. Clear one side.',
+    });
   }
 
   if (
@@ -2330,26 +2478,49 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
   ) {
     // A clip's picture already fills every frame these would hold. Its soundtrack does not, which is
     // why the frames stay available in that role.
-    reasons.push("A conditioning clip's picture cannot be combined with first/last frames. Clear one side.");
+    issues.push({
+      fields: [
+        'conditioningClip',
+        ...when(settings.firstFrameImage, 'firstFrame'),
+        ...when(settings.lastFrameImage, 'lastFrame'),
+      ],
+      message: "A conditioning clip's picture cannot be combined with first/last frames. Clear one side.",
+    });
   }
 
   if (settings.references.length > 0 && (settings.firstFrameImage || settings.lastFrameImage)) {
-    reasons.push('References cannot be combined with first/last frames. Clear one side.');
+    issues.push({
+      fields: [
+        'references',
+        ...when(settings.firstFrameImage, 'firstFrame'),
+        ...when(settings.lastFrameImage, 'lastFrame'),
+      ],
+      message: 'References cannot be combined with first/last frames. Clear one side.',
+    });
   }
 
   if (settings.references.length > 0 && settings.sourceVideo && !config.references?.extend) {
-    reasons.push('References cannot be combined with an initial video on this model. Clear one side.');
+    issues.push({
+      fields: ['references', 'initialVideo'],
+      message: 'References cannot be combined with an initial video on this model. Clear one side.',
+    });
   }
 
   if (!config.modes.includes(mode)) {
     if (referenceOnly && settings.references.length === 0) {
       // Explain the missing reference rather than implying a defective text-to-video model.
-      reasons.push('Reference-to-video needs at least one reference.');
+      issues.push({ fields: ['references'], message: 'Reference-to-video needs at least one reference.' });
     } else {
-      reasons.push(`${model.name} does not support ${VIDEO_MODE_DESCRIPTIONS[mode]}.`);
+      issues.push({
+        fields: VIDEO_MODE_FIELDS[mode],
+        message: `${model.name} does not support ${VIDEO_MODE_DESCRIPTIONS[mode]}.`,
+      });
     }
   } else if (mode === 'extend' && settings.lastFrameImage && !config.modes.includes('first-last')) {
-    reasons.push(`${model.name} cannot target a destination image while extending a video.`);
+    issues.push({
+      fields: ['initialVideo', 'lastFrame'],
+      message: `${model.name} cannot target a destination image while extending a video.`,
+    });
   }
 
   if (mode === 'reference') {
@@ -2357,17 +2528,17 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     const videoCount = settings.references.filter((reference) => reference.kind === 'video').length;
     const imageCount = settings.references.length - videoCount;
     if (caps && videoCount > caps.maxVideos) {
-      reasons.push(`At most ${caps.maxVideos} video references are supported.`);
+      issues.push({ fields: ['references'], message: `At most ${caps.maxVideos} video references are supported.` });
     }
     if (caps && imageCount > caps.maxImages) {
-      reasons.push(`At most ${caps.maxImages} image references are supported.`);
+      issues.push({ fields: ['references'], message: `At most ${caps.maxImages} image references are supported.` });
     }
     for (const reference of settings.references) {
       if (reference.kind !== 'video') {
         continue;
       }
       if (!Number.isInteger(reference.clip.startFrame) || !Number.isInteger(reference.clip.endFrame)) {
-        reasons.push('Reference video trim bounds must be whole frame numbers.');
+        issues.push({ fields: ['references'], message: 'Reference video trim bounds must be whole frame numbers.' });
         break;
       }
       if (
@@ -2375,7 +2546,7 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
         reference.clip.endFrame > reference.clip.numFrames - 1 ||
         reference.clip.endFrame < reference.clip.startFrame
       ) {
-        reasons.push('A reference video trim is outside its clip.');
+        issues.push({ fields: ['references'], message: 'A reference video trim is outside its clip.' });
         break;
       }
     }
@@ -2392,13 +2563,16 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
         ? config.frames.max
         : (config.frames.choices[config.frames.choices.length - 1] ?? 0);
 
-    reasons.push(
-      timing.numFramesFromClip
+    issues.push({
+      fields: timing.numFramesFromClip
+        ? ['conditioningClip', ...when(settings.conditioningClip?.role === 'audio', 'fps')]
+        : ['numFrames'],
+      message: timing.numFramesFromClip
         ? `The conditioning clip works out to ${timing.numFrames} frames, outside the ${framesFloor}-${framesCeiling} ${model.name} generates. Use a ${timing.numFrames < framesFloor ? 'longer' : 'shorter'} clip${settings.conditioningClip?.role === 'audio' ? ', or change the frame rate' : ''}.`
         : config.frames.kind === 'grid'
           ? `Frame count must be between ${config.frames.min} and ${config.frames.max} in steps of ${config.frames.step} (${describeVideoFramesGrid(config.frames)}).`
-          : `Frame count must be one of the ${model.name} grid values (17·n + 5, ${config.frames.choices[0]}–${config.frames.choices[config.frames.choices.length - 1]}).`
-    );
+          : `Frame count must be one of the ${model.name} grid values (17·n + 5, ${config.frames.choices[0]}–${config.frames.choices[config.frames.choices.length - 1]}).`,
+    });
   }
 
   // fps and steps are integer fields on the backend nodes; a fractional value
@@ -2410,17 +2584,18 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     timing.fps < config.fps.min ||
     timing.fps > config.fps.max
   ) {
-    reasons.push(
-      timing.fpsFromClip
+    issues.push({
+      fields: timing.fpsFromClip ? ['conditioningClip'] : ['fps'],
+      message: timing.fpsFromClip
         ? `The conditioning clip runs at ${timing.fps} fps, outside the ${config.fps.min}-${config.fps.max} fps range ${model.name} supports.`
         : config.fps.editable
           ? `FPS must be a whole number between ${config.fps.min} and ${config.fps.max}.`
-          : `${model.name} generates at a fixed ${config.fps.defaultValue} FPS.`
-    );
+          : `${model.name} generates at a fixed ${config.fps.defaultValue} FPS.`,
+    });
   }
 
   if (!Number.isInteger(settings.steps) || settings.steps < config.minSteps) {
-    reasons.push(`Steps must be a whole number of at least ${config.minSteps}.`);
+    issues.push({ fields: ['steps'], message: `Steps must be a whole number of at least ${config.minSteps}.` });
   }
 
   // A two-stage preset caps the refine pass at the base pass's budget, and a refine of one step can
@@ -2432,16 +2607,19 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
   // every token, so the conditioning would have to be re-encoded at the refine canvas the way a
   // first frame is. Caught here, before the base pass and the upscale have been paid for.
   if (preset?.stages === 2 && !isTwoStageSupportedForMode(mode)) {
-    reasons.push(
-      `${VIDEO_MODE_DESCRIPTIONS[mode][0]?.toUpperCase()}${VIDEO_MODE_DESCRIPTIONS[mode].slice(1)} does not run a two-stage target resolution. Pick a single-stage resolution, or clear the conditioning clip.`
-    );
+    issues.push({
+      fields: ['targetResolution', 'conditioningClip'],
+      message: `${VIDEO_MODE_DESCRIPTIONS[mode][0]?.toUpperCase()}${VIDEO_MODE_DESCRIPTIONS[mode].slice(1)} does not run a two-stage target resolution. Pick a single-stage resolution, or clear the conditioning clip.`,
+    });
   }
 
   if (preset?.stages === 2 && Number.isInteger(settings.steps) && settings.steps < LTX2_MIN_TWO_STAGE_STEPS) {
-    reasons.push(
-      `A two-stage target resolution needs at least ${LTX2_MIN_TWO_STAGE_STEPS} steps; the second pass ` +
-        `refines what the first produced and cannot run in one.`
-    );
+    issues.push({
+      fields: ['targetResolution', 'steps'],
+      message:
+        `A two-stage target resolution needs at least ${LTX2_MIN_TWO_STAGE_STEPS} steps; the second pass ` +
+        `refines what the first produced and cannot run in one.`,
+    });
   }
 
   // An LTX-2 continuation replays the front of the source and then joins the two halves by
@@ -2453,64 +2631,85 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     const context = settings.ltx2ExtendContextFrames;
 
     if (settings.numFrames <= context) {
-      reasons.push(
-        `A continuation opens with ${context} frames of the source, so anything at or ` +
-          `below that would be all replay and no continuation. Raise Frames above ${context}.`
-      );
+      issues.push({
+        fields: ['numFrames', 'extendContext'],
+        message:
+          `A continuation opens with ${context} frames of the source, so anything at or ` +
+          `below that would be all replay and no continuation. Raise Frames above ${context}.`,
+      });
     }
 
     const affordable = ltx2MaxExtendContextFrames(settings.sourceVideo.width, settings.sourceVideo.height);
 
     if (affordable === 0) {
-      reasons.push(
-        `The join blends the held frames of the initial video at its own ` +
+      issues.push({
+        fields: ['initialVideo'],
+        message:
+          `The join blends the held frames of the initial video at its own ` +
           `${settings.sourceVideo.width}x${settings.sourceVideo.height}, which needs more memory than it is ` +
-          `allowed even at the smallest context. Use a source at or below about 2560x1440.`
-      );
+          `allowed even at the smallest context. Use a source at or below about 2560x1440.`,
+      });
     } else if (context > affordable) {
       // Reachable by loading a recalled or stored setting against a larger source than it was made
       // for; the control itself is bounded, so dragging cannot get here.
-      reasons.push(
-        `Context Frames is ${context}, but blending that many frames of a ` +
+      issues.push({
+        fields: ['extendContext'],
+        message:
+          `Context Frames is ${context}, but blending that many frames of a ` +
           `${settings.sourceVideo.width}x${settings.sourceVideo.height} source needs more memory than the join ` +
-          `is allowed. Lower it to ${affordable} or less.`
-      );
+          `is allowed. Lower it to ${affordable} or less.`,
+      });
     }
 
     const kept = settings.sourceVideo.endFrame - settings.sourceVideo.startFrame + 1;
 
     if (kept < context) {
-      reasons.push(
-        `The join blends ${context} frames out of each half, but the initial video's trim ` +
-          `keeps only ${kept}. Keep at least ${context} frames of it, or lower Context Frames.`
-      );
+      issues.push({
+        fields: ['initialVideo', 'extendContext'],
+        message:
+          `The join blends ${context} frames out of each half, but the initial video's trim ` +
+          `keeps only ${kept}. Keep at least ${context} frames of it, or lower Context Frames.`,
+      });
     }
   }
 
   if (config.cfg.visible && (!Number.isFinite(settings.cfgScale) || settings.cfgScale < 1)) {
-    reasons.push('CFG must be at least 1.');
+    issues.push({ fields: ['cfg'], message: 'CFG must be at least 1.' });
   }
 
   if (config.cfg.lowNoiseVisible && settings.cfgScaleLowNoise !== null && settings.cfgScaleLowNoise < 1) {
-    reasons.push('CFG (Low Noise) must be at least 1.');
+    issues.push({ fields: ['cfgLowNoise'], message: 'CFG (Low Noise) must be at least 1.' });
   }
 
   // The floors are the denoise node's own `ge`: a value below one fails
   // pydantic validation at enqueue, after the graph has been built.
   const guidanceBounds = [
-    { floor: 1, label: 'Audio CFG', value: config.guidance.audioVisible ? settings.audioCfgScale : null },
-    { floor: 0, label: 'STG', value: config.guidance.stgVisible ? settings.stgScale : null },
-    { floor: 1, label: 'Modality guidance', value: config.guidance.modalityVisible ? settings.modalityScale : null },
+    {
+      field: 'audioCfg' as const,
+      floor: 1,
+      label: 'Audio CFG',
+      value: config.guidance.audioVisible ? settings.audioCfgScale : null,
+    },
+    { field: 'stg' as const, floor: 0, label: 'STG', value: config.guidance.stgVisible ? settings.stgScale : null },
+    {
+      field: 'modality' as const,
+      floor: 1,
+      label: 'Modality guidance',
+      value: config.guidance.modalityVisible ? settings.modalityScale : null,
+    },
   ];
 
-  for (const { floor, label, value } of guidanceBounds) {
+  for (const { field, floor, label, value } of guidanceBounds) {
     if (value !== null && (!Number.isFinite(value) || value < floor)) {
-      reasons.push(`${label} must be at least ${floor}.`);
+      issues.push({ fields: [field], message: `${label} must be at least ${floor}.` });
     }
   }
 
   if (settings.acceleratorEnabled && !config.accelerator) {
-    reasons.push(`${model.name} has no distillation fast path. Turn the accelerator off to generate with it.`);
+    issues.push({
+      fields: ['accelerator'],
+      message: `${model.name} has no distillation fast path. Turn the accelerator off to generate with it.`,
+    });
   }
 
   // The trim bounds are integer fields on extract_video_range; a fractional
@@ -2519,17 +2718,20 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     settings.sourceVideo &&
     (!Number.isInteger(settings.sourceVideo.startFrame) || !Number.isInteger(settings.sourceVideo.endFrame))
   ) {
-    reasons.push('The initial video trim bounds must be whole frame numbers.');
+    issues.push({ fields: ['initialVideo'], message: 'The initial video trim bounds must be whole frame numbers.' });
   } else if (settings.sourceVideo) {
     const { endFrame, numFrames, startFrame } = settings.sourceVideo;
 
     // Require valid source bounds and at least two frames for crossfade before encoding.
     if (startFrame < 0 || endFrame > numFrames - 1 || endFrame - startFrame + 1 < MIN_VIDEO_TRIM_FRAMES) {
-      reasons.push('The initial video trim must keep at least two frames within the clip.');
+      issues.push({
+        fields: ['initialVideo'],
+        message: 'The initial video trim must keep at least two frames within the clip.',
+      });
     }
 
     if (numFrames < MIN_VIDEO_TRIM_FRAMES) {
-      reasons.push('The initial video is too short to extend.');
+      issues.push({ fields: ['initialVideo'], message: 'The initial video is too short to extend.' });
     }
 
     // Wan extension inherits source fps; validate the backend's 1–120 range before expensive denoising.
@@ -2537,23 +2739,39 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
       const inheritedFps = Math.round(settings.sourceVideo.fps);
 
       if (inheritedFps < 1 || inheritedFps > 120) {
-        reasons.push(
-          `The initial video's frame rate (${settings.sourceVideo.fps} fps) is outside the 1-120 fps range Wan extension supports.`
-        );
+        issues.push({
+          fields: ['initialVideo'],
+          message: `The initial video's frame rate (${settings.sourceVideo.fps} fps) is outside the 1-120 fps range Wan extension supports.`,
+        });
       }
     }
   }
 
   if (!getVideoDimensions(model, settings)) {
-    reasons.push(
-      model.base === 'minimax-h3'
-        ? 'MiniMax H3 supports aspect ratios from 1:4 to 4:1. The conditioning media is outside that range.'
-        : 'The conditioning media is too small or degenerate to derive video dimensions from.'
-    );
+    issues.push({
+      fields: [
+        ...when(settings.firstFrameImage, 'firstFrame'),
+        ...when(settings.lastFrameImage, 'lastFrame'),
+        ...when(settings.references.length > 0, 'references'),
+        ...when(settings.sourceVideo, 'initialVideo'),
+        ...when(settings.conditioningClip, 'conditioningClip'),
+      ],
+      message:
+        model.base === 'minimax-h3'
+          ? 'MiniMax H3 supports aspect ratios from 1:4 to 4:1. The conditioning media is outside that range.'
+          : 'The conditioning media is too small or degenerate to derive video dimensions from.',
+    });
   }
 
   const componentPolicy = getVideoComponentSectionPolicy(model, settings);
-  reasons.push(...componentPolicy.validate(getVideoComponentPolicyContext(model, settings)));
+  issues.push(
+    ...componentPolicy
+      .validate(getVideoComponentPolicyContext(model, settings))
+      .map((message): VideoValidationIssue => ({ fields: ['components'], message }))
+  );
 
-  return reasons;
+  return issues;
 };
+
+export const getVideoValidationReasons = (model: MainModelConfig, settings: VideoSettings): string[] =>
+  getVideoValidationIssues(model, settings).map((issue) => issue.message);
