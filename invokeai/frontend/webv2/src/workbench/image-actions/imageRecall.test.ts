@@ -3321,3 +3321,129 @@ it.each(['array', 'entities'] as const)(
     ).toEqual([]);
   }
 );
+
+describe('CFG scale schedule recall', () => {
+  it('recalls the initial step value from a valid CFG schedule array', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ cfgScale: 7 }),
+      image,
+      kind: 'all',
+      metadata: { cfg_scale: [6.5, 4.5, 2.5], model: sdxlModel },
+      models: [sdxlModel],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toContain('cfg');
+    expect(result?.values.cfgScale).toBe(6.5);
+  });
+
+  it('recalls the initial step value from a valid guidance schedule array for distilled-guidance models', () => {
+    const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' };
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ cfgScale: 3.5, model: fluxModel, modelKey: fluxModel.key }),
+      image,
+      kind: 'all',
+      metadata: { guidance: [4.2, 3.0], model: fluxModel },
+      models: [fluxModel],
+      supportedModels: [fluxModel],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toContain('cfg');
+    expect(result?.values.cfgScale).toBe(4.2);
+  });
+
+  it.each<[unknown[]]>([[[]], [[6.5, 'bad']], [[6.5, Number.NaN]], [[0.5, 6]]])(
+    'ignores invalid or below-minimum CFG schedule array %j without overwriting cfgScale',
+    (cfgScale) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({ cfgScale: 7 }),
+        image,
+        kind: 'all',
+        metadata: { cfg_scale: cfgScale, model: sdxlModel, positive_prompt: 'keep recall active' },
+        models: [sdxlModel],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.fields).not.toContain('cfg');
+      expect(result?.values.cfgScale).toBe(7);
+    }
+  );
+});
+
+describe('Wan LoRA expert target recall', () => {
+  const wanMain: MainModelConfig = {
+    base: 'wan',
+    format: 'diffusers',
+    key: 'wan-main',
+    name: 'Wan A14B',
+    type: 'main',
+    variant: 't2v_a14b',
+  };
+  const wanLoraHigh: LoraModelConfig = {
+    base: 'wan',
+    key: 'wan-high',
+    name: 'Wan High',
+    type: 'lora',
+    variant: 'a14b',
+  };
+  const wanLoraLow: LoraModelConfig = { base: 'wan', key: 'wan-low', name: 'Wan Low', type: 'lora', variant: 'a14b' };
+  const wanLoraDual: LoraModelConfig = {
+    base: 'wan',
+    key: 'wan-dual',
+    name: 'Wan Dual',
+    type: 'lora',
+    variant: 'a14b',
+  };
+
+  it('preserves target and low_noise_weight and folds dual high/low entries for the same LoRA', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: wanMain, modelKey: wanMain.key }),
+      image,
+      kind: 'all',
+      metadata: {
+        generation_mode: 'wan_txt2img',
+        loras: [
+          { model: wanLoraHigh, target: 'high', weight: 0.9 },
+          { model: wanLoraLow, target: 'low', weight: 0.6 },
+          { low_noise_weight: 0.35, model: wanLoraDual, target: 'both', weight: 0.85 },
+        ],
+        model: wanMain,
+      },
+      models: [wanMain, wanLoraHigh, wanLoraLow, wanLoraDual],
+      supportedModels: [wanMain],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toContain('loras');
+    expect(result?.values.loras).toEqual([
+      { isEnabled: true, model: wanLoraHigh, target: 'high', weight: 0.9 },
+      { isEnabled: true, model: wanLoraLow, target: 'low', weight: 0.6 },
+      { isEnabled: true, lowNoiseWeight: 0.35, model: wanLoraDual, target: 'both', weight: 0.85 },
+    ]);
+
+    const folded = buildImageRecallSettings({
+      currentValues: createValues({ model: wanMain, modelKey: wanMain.key }),
+      image,
+      kind: 'all',
+      metadata: {
+        generation_mode: 'wan_txt2img',
+        loras: [
+          { model: wanLoraDual, target: 'low', weight: 0.4 },
+          { model: wanLoraDual, target: 'high', weight: 0.8 },
+        ],
+        model: wanMain,
+      },
+      models: [wanMain, wanLoraDual],
+      supportedModels: [wanMain],
+      vaeModels: [],
+    });
+
+    expect(folded?.skipped).toEqual([]);
+    expect(folded?.values.loras).toEqual([
+      { isEnabled: true, lowNoiseWeight: 0.4, model: wanLoraDual, target: 'both', weight: 0.8 },
+    ]);
+  });
+});

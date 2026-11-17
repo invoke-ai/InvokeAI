@@ -1,3 +1,5 @@
+import json
+from collections.abc import Hashable
 from typing import Any, Literal, Optional, Sequence, Union
 
 import torch
@@ -52,6 +54,14 @@ class LoRAMetadataField(BaseModel):
 
     model: ModelIdentifierField = Field(description=FieldDescriptions.lora_model)
     weight: float = Field(description=FieldDescriptions.lora_weight)
+    target: Optional[Literal["high", "low", "both"]] = Field(
+        default=None,
+        description="Target expert for dual-expert models (e.g., Wan 2.2 A14B): 'high', 'low', or 'both'",
+    )
+    low_noise_weight: Optional[float] = Field(
+        default=None,
+        description="Weight for the low-noise expert when target is 'both' and it differs from the high-noise weight",
+    )
 
 
 class IPAdapterMetadataField(BaseModel):
@@ -104,7 +114,39 @@ class MetadataItemOutput(BaseInvocationOutput):
     item: MetadataItemField = OutputField(description="Metadata Item")
 
 
-_SUBMODEL_WRAPPER_ATTRS: tuple[str, ...] = ("vae", "text_encoder", "unet", "transformer", "decoder")
+_SUBMODEL_WRAPPER_ATTRS: tuple[str, ...] = (
+    "vae",
+    "text_encoder",
+    "unet",
+    "transformer",
+    "decoder",
+    "vocoder",
+    "latent_upsampler",
+)
+
+_WAN_TRANSFORMER_DICT_KEYS: frozenset[str] = frozenset(
+    {"transformer", "transformer_low_noise", "loras", "loras_low_noise", "boundary_ratio"}
+)
+
+# (primary_key, allowed_keys, preserve_when_custom_keys)
+_WRAPPER_DICT_SPECS: tuple[tuple[str, frozenset[str], tuple[str, ...]], ...] = (
+    (
+        "text_encoder",
+        frozenset({"tokenizer", "processor", "text_encoder", "vision_tower", "connectors", "loras", "skipped_layers"}),
+        ("loras",),
+    ),
+    ("clip", frozenset({"tokenizer", "clip", "loras", "skipped_layers"}), ("loras",)),
+    ("vae", frozenset({"vae", "seamless_axes"}), ()),
+    ("transformer", frozenset({"transformer", "loras", "variant", "adaln_overlay"}), ("loras",)),
+    ("unet", frozenset({"unet", "scheduler", "loras", "seamless_axes", "freeu_config"}), ("loras", "seamless_axes")),
+    ("decoder", frozenset({"decoder"}), ()),
+    ("vocoder", frozenset({"vocoder"}), ()),
+    ("latent_upsampler", frozenset({"latent_upsampler"}), ()),
+)
+
+
+def _is_model_identifier_value(val: Any) -> bool:
+    return isinstance(val, ModelIdentifierField) or (isinstance(val, dict) and "key" in val)
 
 
 def unwrap_metadata_value(val: Any, label: Optional[str] = None) -> Any:
@@ -124,53 +166,42 @@ def unwrap_metadata_value(val: Any, label: Optional[str] = None) -> Any:
         if is_custom and (getattr(val, "loras", None) or getattr(val, "loras_low_noise", None)):
             return val
         if isinstance(val, WanTransformerField) and label == "wan_transformer_low_noise":
-            return val.transformer_low_noise or val.transformer
+            return val.transformer_low_noise
         return val.transformer
     if isinstance(val, VAEField):
         return val.vae
     if isinstance(val, PiDDecoderField):
         return val.decoder
     if isinstance(val, BaseModel) and not isinstance(val, ModelIdentifierField):
-        for attr in ("text_encoder", "clip", "transformer", "unet", "vae", "decoder"):
+        for attr in ("text_encoder", "clip", "transformer", "unet", "vae", "decoder", "vocoder", "latent_upsampler"):
             if hasattr(val, attr):
                 if is_custom and (getattr(val, "loras", None) or getattr(val, "seamless_axes", None)):
                     return val
                 inner = getattr(val, attr)
-                if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
+                if _is_model_identifier_value(inner):
                     return inner
     elif isinstance(val, dict) and "key" not in val and "image_name" not in val and "video_name" not in val:
         keys = set(val.keys())
-        if (
-            keys.issubset({"tokenizer", "text_encoder", "vision_tower", "connectors", "loras", "skipped_layers"})
-            and "text_encoder" in val
-        ):
-            if not is_custom or not val.get("loras"):
-                inner = val["text_encoder"]
-                if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
+        if keys.issubset(_WAN_TRANSFORMER_DICT_KEYS) and "transformer" in val:
+            if is_custom and (val.get("loras") or val.get("loras_low_noise")):
+                return val
+            if label == "wan_transformer_low_noise":
+                inner = val.get("transformer_low_noise")
+                if inner is None:
+                    return None
+                if _is_model_identifier_value(inner):
                     return inner
-        elif keys.issubset({"tokenizer", "clip", "loras", "skipped_layers"}) and "clip" in val:
-            if not is_custom or not val.get("loras"):
-                inner = val["clip"]
-                if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
-                    return inner
-        elif "vae" in val and keys.issubset({"vae", "seamless_axes"}):
-            inner = val["vae"]
-            if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
+                return val
+            inner = val["transformer"]
+            if _is_model_identifier_value(inner):
                 return inner
-        elif keys.issubset({"transformer", "loras"}) and "transformer" in val:
-            if not is_custom or not val.get("loras"):
-                inner = val["transformer"]
-                if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
+        for primary_key, allowed_keys, preserve_keys in _WRAPPER_DICT_SPECS:
+            if primary_key in val and keys.issubset(allowed_keys):
+                if is_custom and any(val.get(k) for k in preserve_keys):
+                    return val
+                inner = val[primary_key]
+                if _is_model_identifier_value(inner):
                     return inner
-        elif keys.issubset({"unet", "loras", "seamless_axes", "freeu_config"}) and "unet" in val:
-            if not is_custom or (not val.get("loras") and not val.get("seamless_axes")):
-                inner = val["unet"]
-                if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
-                    return inner
-        elif keys.issubset({"decoder"}) and "decoder" in val:
-            inner = val["decoder"]
-            if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
-                return inner
     return val
 
 
@@ -355,7 +386,41 @@ class MiniMaxH3ReferenceMetadataField(BaseModel):
 # other 1.x, ignoring unknown keys); a major bump renames, removes or retypes one. A record
 # without the key predates versioning and is read with the same rules. Documented, with the
 # field table, in docs/development/Architecture/media-metadata.
-CORE_METADATA_VERSION = "1.2.0"
+CORE_METADATA_VERSION = "1.3.0"
+
+
+def _serialize_lora_entry(
+    lora_model: Any,
+    weight: float,
+    target: Optional[Literal["high", "low", "both"]] = None,
+    low_noise_weight: Optional[float] = None,
+) -> dict[str, Any]:
+    if isinstance(lora_model, ModelIdentifierField):
+        return LoRAMetadataField(
+            model=lora_model,
+            weight=weight,
+            target=target,
+            low_noise_weight=low_noise_weight,
+        ).model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
+    entry: dict[str, Any] = {"model": lora_model, "weight": weight}
+    if target is not None:
+        entry["target"] = target
+    if low_noise_weight is not None:
+        entry["low_noise_weight"] = low_noise_weight
+    return entry
+
+
+def _lora_dedup_key(lora: Any) -> Any:
+    """Return a hashable deduplication key for ModelIdentifierField, dict, or fallback LoRA values."""
+    if isinstance(lora, dict):
+        key = lora.get("key")
+        if key is not None:
+            return key
+        return json.dumps(lora, sort_keys=True, default=str)
+    key = getattr(lora, "key", None)
+    if key is not None:
+        return key
+    return lora if isinstance(lora, Hashable) else id(lora)
 
 
 def serialize_lora_metadata(*lora_lists: Optional[Sequence[Any]]) -> list[dict[str, Any]]:
@@ -366,19 +431,53 @@ def serialize_lora_metadata(*lora_lists: Optional[Sequence[Any]]) -> list[dict[s
         if not lora_list:
             continue
         for item in lora_list:
-            key = getattr(item.lora, "key", item.lora)
+            key = _lora_dedup_key(item.lora)
             ident = (key, item.weight)
             if ident in seen:
                 continue
             seen.add(ident)
-            if isinstance(item.lora, ModelIdentifierField):
-                result.append(
-                    LoRAMetadataField(model=item.lora, weight=item.weight).model_dump(
-                        exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"}
-                    )
+            result.append(_serialize_lora_entry(item.lora, item.weight))
+    return result
+
+
+def serialize_wan_lora_metadata(
+    high_loras: Optional[Sequence[Any]],
+    low_loras: Optional[Sequence[Any]],
+) -> list[dict[str, Any]]:
+    """Serialize Wan high/low expert LoRA lists into one metadata entry per unique LoRA key."""
+    high_by_key: dict[Any, Any] = {}
+    for item in high_loras or ():
+        key = _lora_dedup_key(item.lora)
+        if key not in high_by_key:
+            high_by_key[key] = item
+
+    low_by_key: dict[Any, Any] = {}
+    for item in low_loras or ():
+        key = _lora_dedup_key(item.lora)
+        if key not in low_by_key:
+            low_by_key[key] = item
+
+    result: list[dict[str, Any]] = []
+    for key, high_item in high_by_key.items():
+        low_item = low_by_key.get(key)
+        if low_item is None:
+            result.append(_serialize_lora_entry(high_item.lora, high_item.weight, target="high"))
+        elif high_item.weight == low_item.weight:
+            result.append(_serialize_lora_entry(high_item.lora, high_item.weight, target="both"))
+        else:
+            result.append(
+                _serialize_lora_entry(
+                    high_item.lora,
+                    high_item.weight,
+                    target="both",
+                    low_noise_weight=low_item.weight,
                 )
-            else:
-                result.append({"model": item.lora, "weight": item.weight})
+            )
+
+    for key, low_item in low_by_key.items():
+        if key not in high_by_key:
+            result.append(_serialize_lora_entry(low_item.lora, low_item.weight, target="low"))
+
     return result
 
 
@@ -585,7 +684,7 @@ def build_denoise_metadata(existing: Optional[MetadataField], updates: dict[str,
     title="Core Metadata",
     tags=["metadata"],
     category="metadata",
-    version="2.9.0",
+    version="2.10.0",
     classification=Classification.Internal,
 )
 class CoreMetadataInvocation(BaseInvocation):
@@ -601,7 +700,9 @@ class CoreMetadataInvocation(BaseInvocation):
     height: Optional[int] = InputField(default=None, description="The height parameter")
     seed: Optional[int] = InputField(default=None, description="The seed used for noise generation")
     rand_device: Optional[str] = InputField(default=None, description="The device used for random number generation")
-    cfg_scale: Optional[float] = InputField(default=None, description="The classifier-free guidance scale parameter")
+    cfg_scale: Optional[float | list[float]] = InputField(
+        default=None, description="The classifier-free guidance scale parameter (scalar or per-step schedule)"
+    )
     cfg_rescale_multiplier: Optional[float] = InputField(
         default=None, description=FieldDescriptions.cfg_rescale_multiplier
     )

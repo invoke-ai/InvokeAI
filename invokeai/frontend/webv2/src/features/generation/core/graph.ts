@@ -63,6 +63,7 @@ import {
   addOutputPostprocessors,
   createId,
   getActiveCompatibleLoras,
+  hasDistinctWanLowNoiseWeight,
   toModelIdentifier,
   toGraphContract,
 } from './graphBuilder';
@@ -336,6 +337,59 @@ export const addTransformerLoraCollectionLoader = (
   }
 
   return loader;
+};
+
+/**
+ * Use `wan_lora_collection_loader` for ordinary untargeted LoRA sets; when any active LoRA carries a recalled Wan
+ * expert target or differing low-noise weight, chain `wan_lora_loader` nodes to preserve exact per-expert targeting.
+ */
+export const addWanLoraLoaders = (
+  graph: BackendGraphContract,
+  loras: GenerateLora[],
+  modelLoader: BackendInvocationContract
+): BackendInvocationContract => {
+  if (loras.every((lora) => lora.target === undefined && lora.lowNoiseWeight === undefined)) {
+    return addTransformerLoraCollectionLoader(graph, loras, 'wan_lora_collection_loader', modelLoader, ['transformer']);
+  }
+
+  let source = modelLoader;
+
+  for (const lora of loras) {
+    const model = toModelIdentifier(lora.model);
+
+    if (hasDistinctWanLowNoiseWeight(lora)) {
+      const highLoader = addNode(graph, {
+        id: createId('wan_lora_loader'),
+        lora: model,
+        target: 'high',
+        type: 'wan_lora_loader',
+        weight: lora.weight,
+      });
+      addEdge(graph, source, 'transformer', highLoader, 'transformer');
+
+      const lowLoader = addNode(graph, {
+        id: createId('wan_lora_loader'),
+        lora: model,
+        target: 'low',
+        type: 'wan_lora_loader',
+        weight: lora.lowNoiseWeight,
+      });
+      addEdge(graph, highLoader, 'transformer', lowLoader, 'transformer');
+      source = lowLoader;
+    } else {
+      const loader = addNode(graph, {
+        id: createId('wan_lora_loader'),
+        lora: model,
+        target: lora.target ?? 'auto',
+        type: 'wan_lora_loader',
+        weight: lora.weight,
+      });
+      addEdge(graph, source, 'transformer', loader, 'transformer');
+      source = loader;
+    }
+  }
+
+  return source;
 };
 
 const buildSDGraph = (
@@ -2109,9 +2163,7 @@ const buildWanGraph = (
     wan_t5_encoder_model: wanT5EncoderModel ?? undefined,
   });
   // Wan LoRAs patch only the transformer; the text encoder is untouched.
-  const loraSource = activeLoras.length
-    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'wan_lora_collection_loader', modelLoader, ['transformer'])
-    : modelLoader;
+  const loraSource = activeLoras.length ? addWanLoraLoaders(graph, activeLoras, modelLoader) : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'wan_text_encoder' });
   const negCond = addNode(graph, { id: 'neg_cond', type: 'wan_text_encoder' });
   const denoise = addNode(graph, {

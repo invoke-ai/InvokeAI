@@ -20301,7 +20301,7 @@
         "tags": ["anima", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - Anima + Metadata",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -31835,11 +31835,17 @@
                 "type": "number"
               },
               {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "The classifier-free guidance scale parameter",
+            "description": "The classifier-free guidance scale parameter (scalar or per-step schedule)",
             "field_kind": "input",
             "input": "any",
             "orig_default": null,
@@ -32691,7 +32697,7 @@
         "tags": ["metadata"],
         "title": "Core Metadata",
         "type": "object",
-        "version": "2.9.0",
+        "version": "2.10.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
@@ -35819,7 +35825,7 @@
         "tags": ["latents", "denoise", "ernie-image"],
         "title": "Denoise - ERNIE-Image",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -48452,6 +48458,9 @@
                   "$ref": "#/components/schemas/MetadataToVAEInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/MetadataToWanLorasInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
                 },
                 {
@@ -51896,7 +51905,7 @@
         "tags": ["image", "ideogram4"],
         "title": "Denoise - Ideogram 4",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -59250,6 +59259,9 @@
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
               },
               {
+                "$ref": "#/components/schemas/MetadataToWanLorasInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
               },
               {
@@ -60994,6 +61006,9 @@
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
               },
               {
+                "$ref": "#/components/schemas/MetadataToWanLorasInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
               },
               {
@@ -62214,6 +62229,9 @@
           "metadata_to_vae": {
             "$ref": "#/components/schemas/VAEOutput"
           },
+          "metadata_to_wan_loras": {
+            "$ref": "#/components/schemas/WanLoRALoaderOutput"
+          },
           "minimax_h3_denoise": {
             "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
           },
@@ -62862,6 +62880,7 @@
           "metadata_to_string_collection",
           "metadata_to_t2i_adapters",
           "metadata_to_vae",
+          "metadata_to_wan_loras",
           "minimax_h3_denoise",
           "minimax_h3_frame_conditioning",
           "minimax_h3_hybrid_overlay",
@@ -63792,6 +63811,9 @@
               },
               {
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MetadataToWanLorasInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
@@ -65118,6 +65140,9 @@
               },
               {
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MetadataToWanLorasInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
@@ -73319,6 +73344,33 @@
             "description": "The weight at which the LoRA is applied to each model",
             "title": "Weight",
             "type": "number"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "enum": ["high", "low", "both"],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Target expert for dual-expert models (e.g., Wan 2.2 A14B): 'high', 'low', or 'both'",
+            "title": "Target"
+          },
+          "low_noise_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Weight for the low-noise expert when target is 'both' and it differs from the high-noise weight",
+            "title": "Low Noise Weight"
           }
         },
         "required": ["model", "weight"],
@@ -89943,6 +89995,7 @@
               "hidiffusion",
               "hidiffusion_raunet",
               "hidiffusion_window_attn",
+              "hidiffusion_auto_ratios",
               "hidiffusion_t1_ratio",
               "hidiffusion_t2_ratio",
               "hrf_enabled",
@@ -90192,6 +90245,7 @@
               "hidiffusion",
               "hidiffusion_raunet",
               "hidiffusion_window_attn",
+              "hidiffusion_auto_ratios",
               "hrf_enabled",
               "krea2_rebalance_enabled",
               "krea2_reference_kv_cache",
@@ -90318,6 +90372,7 @@
               "hidiffusion",
               "hidiffusion_raunet",
               "hidiffusion_window_attn",
+              "hidiffusion_auto_ratios",
               "hrf_enabled",
               "krea2_rebalance_enabled",
               "krea2_reference_kv_cache",
@@ -92451,6 +92506,97 @@
         "version": "1.2.1",
         "output": {
           "$ref": "#/components/schemas/VAEOutput"
+        }
+      },
+      "MetadataToWanLorasInvocation": {
+        "category": "metadata",
+        "class": "invocation",
+        "classification": "beta",
+        "description": "Extracts Wan 2.2 LoRAs from metadata and applies them to a Wan transformer",
+        "node_pack": "invokeai",
+        "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WanTransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Wan Transformer"
+          },
+          "custom_label": {
+            "default": "loras",
+            "description": "Label for this metadata item",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": "loras",
+            "orig_required": false,
+            "title": "Custom Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "metadata_to_wan_loras",
+            "default": "metadata_to_wan_loras",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["metadata", "wan"],
+        "title": "Metadata To Wan LoRAs",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/WanLoRALoaderOutput"
         }
       },
       "MiniMaxH3AdaLNOverlayField": {
@@ -99707,7 +99853,7 @@
         "tags": ["image", "moss_image", "moss-image"],
         "title": "Denoise - MOSS-Image",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -106251,7 +106397,7 @@
         "tags": ["image", "qwen_image_2_1", "qwen-image-2.1"],
         "title": "Denoise - Qwen-Image-2.1",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -110636,7 +110782,7 @@
         "tags": ["image", "sd3"],
         "title": "Denoise - SD3",
         "type": "object",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }

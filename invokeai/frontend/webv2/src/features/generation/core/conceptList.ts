@@ -23,15 +23,22 @@ export const addConcept = (
 export const updateConcept = (loras: GenerateLora[], key: string, update: ConceptUpdate): GenerateLora[] => {
   let didUpdate = false;
   const next = loras.map((lora) => {
-    if (
-      lora.model.key !== key ||
-      ((update.isEnabled === undefined || update.isEnabled === lora.isEnabled) &&
-        (update.weight === undefined || update.weight === lora.weight))
-    ) {
+    const isEnabledUnchanged = update.isEnabled === undefined || update.isEnabled === lora.isEnabled;
+    const isWeightUnchanged =
+      update.weight === undefined || (update.weight === lora.weight && lora.lowNoiseWeight === undefined);
+
+    if (lora.model.key !== key || (isEnabledUnchanged && isWeightUnchanged)) {
       return lora;
     }
 
     didUpdate = true;
+
+    if (update.weight !== undefined && lora.lowNoiseWeight !== undefined) {
+      // A panel weight edit applies one uniform weight across experts, clearing any recalled low-noise split.
+      const { lowNoiseWeight: _clearedLowNoiseWeight, ...rest } = lora;
+      return { ...rest, ...update };
+    }
+
     return { ...lora, ...update };
   });
 

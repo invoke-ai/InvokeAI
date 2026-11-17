@@ -1732,3 +1732,76 @@ describe('legacy H3 duration recall', () => {
     }
   );
 });
+
+describe('Wan LoRA expert target recall', () => {
+  const highLora = { ...LIGHTNING_HIGH, key: 'wan-expert-high' };
+  const lowLora = { ...LIGHTNING_LOW, key: 'wan-expert-low' };
+  const dualLora = { base: 'wan', key: 'wan-expert-dual', name: 'Wan Dual', type: 'lora', variant: 'a14b' };
+  const currentValues = createDefaultVideoWidgetValues([WAN_T2V]);
+
+  it('restores target and low_noise_weight without altering untargeted LoRA records', () => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: highLora.key }, target: 'high', weight: 0.9 },
+          { model: { key: lowLora.key }, target: 'low', weight: 0.5 },
+          { low_noise_weight: 0.3, model: { key: dualLora.key }, target: 'both', weight: 0.8 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 1 },
+        ],
+      }),
+      models: [WAN_T2V, highLora, lowLora, dualLora, LIGHTNING_HIGH],
+    });
+
+    expect(result?.values.loras).toEqual([
+      { isEnabled: true, model: highLora, target: 'high', weight: 0.9 },
+      { isEnabled: true, model: lowLora, target: 'low', weight: 0.5 },
+      { isEnabled: true, lowNoiseWeight: 0.3, model: dualLora, target: 'both', weight: 0.8 },
+      { isEnabled: true, model: LIGHTNING_HIGH, weight: 1 },
+    ]);
+  });
+
+  it('folds legacy dual high/low entries for the same LoRA into one both entry', () => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: dualLora.key }, target: 'low', weight: 0.4 },
+          { model: { key: dualLora.key }, target: 'high', weight: 0.85 },
+        ],
+      }),
+      models: [WAN_T2V, dualLora],
+    });
+
+    expect(result?.values.loras).toEqual([
+      { isEnabled: true, lowNoiseWeight: 0.4, model: dualLora, target: 'both', weight: 0.85 },
+    ]);
+  });
+
+  it('deduplicates non-opposing duplicate entries for the same LoRA key', () => {
+    const sameTarget = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        loras: [
+          { model: { key: highLora.key }, target: 'high', weight: 0.9 },
+          { model: { key: highLora.key }, target: 'high', weight: 0.5 },
+          { model: { key: dualLora.key }, target: 'high', weight: 0.8 },
+          { model: { key: dualLora.key }, target: 'low', weight: 0.4 },
+          { model: { key: dualLora.key }, target: 'low', weight: 0.2 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 1 },
+          { model: { key: LIGHTNING_HIGH.key }, weight: 0.6 },
+        ],
+      }),
+      models: [WAN_T2V, highLora, dualLora, LIGHTNING_HIGH],
+    });
+
+    expect(sameTarget?.values.loras).toEqual([
+      { isEnabled: true, model: highLora, target: 'high', weight: 0.9 },
+      { isEnabled: true, lowNoiseWeight: 0.4, model: dualLora, target: 'both', weight: 0.8 },
+      { isEnabled: true, model: LIGHTNING_HIGH, weight: 1 },
+    ]);
+  });
+});

@@ -263,3 +263,192 @@ def test_metadata_linked_and_extractors_support_new_core_keys() -> None:
             metadata=metadata,
         ).invoke(model_ctx)
         assert extracted.model == model_id
+
+
+def test_core_metadata_cfg_scale_schedule_and_hidiffusion_auto_ratios_parity() -> None:
+    from invokeai.app.invocations.metadata_constants import CORE_BOOL_LABELS
+    from invokeai.app.invocations.metadata_linked import (
+        MetadataToBoolInvocation,
+        MetadataToFloatCollectionInvocation,
+        MetadataToFloatInvocation,
+    )
+
+    assert CORE_METADATA_VERSION == "1.3.0"
+    assert "hidiffusion_auto_ratios" in get_args(CORE_LABELS_BOOL)
+    assert "hidiffusion_auto_ratios" in CORE_BOOL_LABELS
+
+    ctx = SimpleNamespace()
+    schedule = [7.0, 5.5, 3.0]
+    core_out = CoreMetadataInvocation(
+        id="m-sched",
+        cfg_scale=schedule,
+        hidiffusion_auto_ratios=True,
+    ).invoke(ctx)
+    assert core_out.metadata.root["cfg_scale"] == schedule
+    assert core_out.metadata.root["hidiffusion_auto_ratios"] is True
+
+    md = MetadataField.model_validate(core_out.metadata.model_dump())
+    assert (
+        MetadataToFloatCollectionInvocation(id="fcoll", label="cfg_scale", default_value=[1.0], metadata=md)
+        .invoke(ctx)
+        .collection
+        == schedule
+    )
+    assert (
+        MetadataToFloatInvocation(id="fscalar", label="cfg_scale", default_value=1.0, metadata=md).invoke(ctx).value
+        == 7.0
+    )
+    assert (
+        MetadataToBoolInvocation(id="b-hidiff", label="hidiffusion_auto_ratios", default_value=False, metadata=md)
+        .invoke(ctx)
+        .value
+        is True
+    )
+
+
+def test_metadata_scalar_and_collection_extractors_handle_scalars_lists_and_bool_guards() -> None:
+    from invokeai.app.invocations.metadata_linked import (
+        MetadataToBoolCollectionInvocation,
+        MetadataToBoolInvocation,
+        MetadataToFloatCollectionInvocation,
+        MetadataToFloatInvocation,
+        MetadataToIntegerCollectionInvocation,
+        MetadataToIntegerInvocation,
+        MetadataToStringCollectionInvocation,
+        MetadataToStringInvocation,
+    )
+
+    ctx = SimpleNamespace()
+    md = MetadataField.model_validate(
+        {
+            "cfg_scale": 6.5,
+            "seed": 42,
+            "moss_image_uncond_skip_layers": [22, 24],
+            "positive_prompt": "alpine lake",
+            "positive_prompts": ["first prompt", "second prompt"],
+            "hidiffusion_auto_ratios": True,
+            "empty_list": [],
+            "bool_list": [True, False],
+            "bool_for_num": True,
+            "none_val": None,
+        }
+    )
+
+    # Float scalar <-> list
+    assert MetadataToFloatCollectionInvocation(id="fc-1", label="cfg_scale", default_value=[1.0], metadata=md).invoke(
+        ctx
+    ).collection == [6.5]
+    assert (
+        MetadataToFloatInvocation(
+            id="fs-list", label=CUSTOM_LABEL, custom_label="bool_list", default_value=9.9, metadata=md
+        )
+        .invoke(ctx)
+        .value
+        == 9.9
+    )
+    assert (
+        MetadataToFloatInvocation(
+            id="fs-empty", label=CUSTOM_LABEL, custom_label="empty_list", default_value=2.5, metadata=md
+        )
+        .invoke(ctx)
+        .value
+        == 2.5
+    )
+    assert (
+        MetadataToFloatCollectionInvocation(
+            id="fc-empty", label=CUSTOM_LABEL, custom_label="empty_list", default_value=[2.5], metadata=md
+        )
+        .invoke(ctx)
+        .collection
+        == []
+    )
+    assert MetadataToFloatCollectionInvocation(
+        id="fc-bool", label=CUSTOM_LABEL, custom_label="bool_for_num", default_value=[2.5], metadata=md
+    ).invoke(ctx).collection == [2.5]
+
+    # Integer scalar <-> list
+    assert (
+        MetadataToIntegerInvocation(id="is-list", label="moss_image_uncond_skip_layers", default_value=0, metadata=md)
+        .invoke(ctx)
+        .value
+        == 22
+    )
+    assert MetadataToIntegerCollectionInvocation(
+        id="ic-list", label="moss_image_uncond_skip_layers", default_value=[0], metadata=md
+    ).invoke(ctx).collection == [22, 24]
+    assert MetadataToIntegerCollectionInvocation(id="ic-scalar", label="seed", default_value=[0], metadata=md).invoke(
+        ctx
+    ).collection == [42]
+    assert (
+        MetadataToIntegerInvocation(
+            id="is-empty", label=CUSTOM_LABEL, custom_label="empty_list", default_value=7, metadata=md
+        )
+        .invoke(ctx)
+        .value
+        == 7
+    )
+    assert (
+        MetadataToIntegerInvocation(
+            id="is-bool", label=CUSTOM_LABEL, custom_label="bool_for_num", default_value=7, metadata=md
+        )
+        .invoke(ctx)
+        .value
+        == 7
+    )
+    assert MetadataToIntegerCollectionInvocation(
+        id="ic-bool", label=CUSTOM_LABEL, custom_label="bool_for_num", default_value=[7], metadata=md
+    ).invoke(ctx).collection == [7]
+
+    # String scalar <-> list
+    assert (
+        MetadataToStringInvocation(id="ss-list", label="positive_prompts", default_value="fallback", metadata=md)
+        .invoke(ctx)
+        .value
+        == "first prompt"
+    )
+    assert MetadataToStringCollectionInvocation(
+        id="sc-list", label="positive_prompts", default_value=["fallback"], metadata=md
+    ).invoke(ctx).collection == ["first prompt", "second prompt"]
+    assert MetadataToStringCollectionInvocation(
+        id="sc-scalar", label="positive_prompt", default_value=["fallback"], metadata=md
+    ).invoke(ctx).collection == ["alpine lake"]
+    assert (
+        MetadataToStringInvocation(
+            id="ss-empty", label=CUSTOM_LABEL, custom_label="empty_list", default_value="fallback", metadata=md
+        )
+        .invoke(ctx)
+        .value
+        == "fallback"
+    )
+
+    # Bool scalar <-> list
+    assert (
+        MetadataToBoolInvocation(
+            id="bs-list", label=CUSTOM_LABEL, custom_label="bool_list", default_value=False, metadata=md
+        )
+        .invoke(ctx)
+        .value
+        is True
+    )
+    assert MetadataToBoolCollectionInvocation(
+        id="bc-list", label=CUSTOM_LABEL, custom_label="bool_list", default_value=[False], metadata=md
+    ).invoke(ctx).collection == [True, False]
+    assert MetadataToBoolCollectionInvocation(
+        id="bc-scalar", label="hidiffusion_auto_ratios", default_value=[False], metadata=md
+    ).invoke(ctx).collection == [True]
+    assert (
+        MetadataToBoolInvocation(
+            id="bs-empty", label=CUSTOM_LABEL, custom_label="empty_list", default_value=True, metadata=md
+        )
+        .invoke(ctx)
+        .value
+        is True
+    )
+    assert (
+        MetadataToBoolInvocation(
+            id="bs-none", label=CUSTOM_LABEL, custom_label="none_val", default_value=True, metadata=md
+        )
+        .invoke(ctx)
+        .value
+        is True
+    )

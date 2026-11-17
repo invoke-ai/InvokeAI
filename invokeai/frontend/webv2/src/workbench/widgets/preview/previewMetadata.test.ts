@@ -283,3 +283,15 @@ it.each(['array', 'entities'] as const)(
     }
   }
 );
+
+it('formats CFG schedule arrays cleanly and omits malformed or empty arrays', () => {
+  expect(values(parsePreviewMetadata({ cfg_scale: [7, 5.5, 3] }, image))).toEqual({
+    cfgScale: '7, 5.5, 3',
+  });
+  expect(values(parsePreviewMetadata({ guidance: [3.5, 2.5] }, image))).toEqual({
+    guidance: '3.5, 2.5',
+  });
+  expect(values(parsePreviewMetadata({ cfg_scale: [] }, image))).toEqual({});
+  expect(values(parsePreviewMetadata({ cfg_scale: [7, 'bad'] }, image))).toEqual({});
+  expect(values(parsePreviewMetadata({ cfg_scale: [7, Number.NaN] }, image))).toEqual({});
+});

@@ -854,6 +854,32 @@ describe('references', () => {
 
     expect(sweptVideo.references).toEqual([IMAGE_REFERENCE]);
   });
+
+  it('preserves valid Wan LoRA targets and lowNoiseWeight and strips invalid ones on normalizeVideoSettings', () => {
+    const loraModel = { base: 'wan', key: 'wan-lora', name: 'Wan LoRA', type: 'lora' };
+    const normalized = normalizeVideoSettings(
+      createSettings({
+        loras: [
+          { isEnabled: true, lowNoiseWeight: 0.4, model: loraModel as never, target: 'both', weight: 0.8 },
+          { isEnabled: true, lowNoiseWeight: 0.4, model: loraModel as never, target: 'low', weight: 0.6 },
+          { isEnabled: true, model: loraModel as never, target: 'bogus' as never, weight: 0.5 },
+        ],
+      })
+    );
+
+    expect(normalized?.loras).toEqual([
+      { isEnabled: true, lowNoiseWeight: 0.4, model: loraModel, target: 'both', weight: 0.8 },
+      { isEnabled: true, model: loraModel, target: 'low', weight: 0.6 },
+      { isEnabled: true, model: loraModel, weight: 0.5 },
+    ]);
+    expect(isVideoSettings(normalized)).toBe(true);
+    expect(
+      isVideoSettings({
+        ...normalized,
+        loras: [{ isEnabled: true, lowNoiseWeight: 0.4, model: loraModel, target: 'low', weight: 0.6 }],
+      })
+    ).toBe(false);
+  });
 });
 
 describe('anchorReferenceConditioning', () => {

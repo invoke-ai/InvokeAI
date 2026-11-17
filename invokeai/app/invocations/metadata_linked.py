@@ -3,7 +3,7 @@
 # Thanks to @skunworkxdark for the original implementation!
 
 import copy
-from typing import Any, Dict, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, Optional, TypeVar, Union
 
 from pydantic import model_validator
 
@@ -70,6 +70,7 @@ from invokeai.app.invocations.model import (
     UNetField,
     VAEField,
     VAEOutput,
+    WanTransformerField,
 )
 from invokeai.app.invocations.primitives import (
     BooleanCollectionOutput,
@@ -86,6 +87,14 @@ from invokeai.app.invocations.sd.controlnet import ControlField, ControlNetInvoc
 from invokeai.app.invocations.sd.denoise_latents import DenoiseLatentsInvocation
 from invokeai.app.invocations.sd.ip_adapter import IPAdapterField, IPAdapterInvocation
 from invokeai.app.invocations.sd.t2i_adapter import T2IAdapterField, T2IAdapterInvocation
+from invokeai.app.invocations.wan.wan_lora_loader import (
+    WanLoRALoaderOutput,
+    WanLoRATarget,
+    _assert_is_wan_lora,
+    _assert_lora_variant_matches_main,
+    _correct_inert_low_routing,
+    _resolve_target,
+)
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
@@ -170,7 +179,7 @@ def extract_model_key(
         Model key
     """
 
-    if label in metadata:
+    if label in metadata and isinstance(metadata[label], dict):
         if "key" in metadata[label]:
             if context.models.exists(metadata[label]["key"]):
                 return metadata[label]["key"]
@@ -272,6 +281,90 @@ class MetadataFromImageInvocation(BaseInvocation):
         return MetadataOutput(metadata=MetadataField.model_validate(data))
 
 
+def _coerce_str(val: Any) -> Optional[str]:
+    if val is None or isinstance(val, (dict, list)):
+        return None
+    return str(val)
+
+
+def _coerce_int(val: Any) -> Optional[int]:
+    if val is None or isinstance(val, bool):
+        return None
+    if isinstance(val, (int, float, str)):
+        try:
+            return int(val)
+        except (ValueError, TypeError, OverflowError):
+            return None
+    return None
+
+
+def _coerce_float(val: Any) -> Optional[float]:
+    if val is None or isinstance(val, bool):
+        return None
+    if isinstance(val, (int, float, str)):
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
+def _coerce_bool(val: Any) -> Optional[bool]:
+    if val is None:
+        return None
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return bool(val)
+    if isinstance(val, str):
+        lowered = val.strip().lower()
+        if lowered in ("true", "1", "yes"):
+            return True
+        if lowered in ("false", "0", "no"):
+            return False
+    return None
+
+
+def _extract_scalar_metadata(
+    metadata: Optional[MetadataField],
+    label: str,
+    custom_label: Optional[str],
+    default_value: T,
+    coerce: Callable[[Any], Optional[T]],
+) -> T:
+    data: Dict[str, Any] = {} if metadata is None else metadata.root
+    raw = data.get(str(custom_label if label == CUSTOM_LABEL else label))
+    if isinstance(raw, list):
+        if not raw:
+            return default_value
+        raw = raw[0]
+    coerced = coerce(raw)
+    return default_value if coerced is None else coerced
+
+
+def _extract_collection_metadata(
+    metadata: Optional[MetadataField],
+    label: str,
+    custom_label: Optional[str],
+    default_value: list[T],
+    coerce: Callable[[Any], Optional[T]],
+) -> list[T]:
+    data: Dict[str, Any] = {} if metadata is None else metadata.root
+    raw = data.get(str(custom_label if label == CUSTOM_LABEL else label))
+    if raw is None:
+        return default_value
+    if isinstance(raw, list):
+        result: list[T] = []
+        for item in raw:
+            coerced = coerce(item)
+            if coerced is None:
+                return default_value
+            result.append(coerced)
+        return result
+    coerced = coerce(raw)
+    return default_value if coerced is None else [coerced]
+
+
 @invocation(
     "metadata_to_string",
     title="Metadata To String",
@@ -298,10 +391,11 @@ class MetadataToStringInvocation(BaseInvocation, WithMetadata):
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
     def invoke(self, context: InvocationContext) -> StringOutput:
-        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
-
-        return StringOutput(value=str(output))
+        return StringOutput(
+            value=_extract_scalar_metadata(
+                self.metadata, self.label, self.custom_label, self.default_value, _coerce_str
+            )
+        )
 
 
 @invocation(
@@ -330,10 +424,11 @@ class MetadataToIntegerInvocation(BaseInvocation, WithMetadata):
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
-        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
-
-        return IntegerOutput(value=int(output))
+        return IntegerOutput(
+            value=_extract_scalar_metadata(
+                self.metadata, self.label, self.custom_label, self.default_value, _coerce_int
+            )
+        )
 
 
 @invocation(
@@ -362,10 +457,11 @@ class MetadataToFloatInvocation(BaseInvocation, WithMetadata):
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
     def invoke(self, context: InvocationContext) -> FloatOutput:
-        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
-
-        return FloatOutput(value=float(output))
+        return FloatOutput(
+            value=_extract_scalar_metadata(
+                self.metadata, self.label, self.custom_label, self.default_value, _coerce_float
+            )
+        )
 
 
 @invocation(
@@ -394,10 +490,11 @@ class MetadataToBoolInvocation(BaseInvocation, WithMetadata):
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
     def invoke(self, context: InvocationContext) -> BooleanOutput:
-        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
-
-        return BooleanOutput(value=bool(output))
+        return BooleanOutput(
+            value=_extract_scalar_metadata(
+                self.metadata, self.label, self.custom_label, self.default_value, _coerce_bool
+            )
+        )
 
 
 @invocation(
@@ -650,7 +747,7 @@ class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation):
     title=f"{AnimaDenoiseInvocation.UIConfig.title} + Metadata",
     tags=["anima", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Deprecated,
 )
 class AnimaDenoiseMetaInvocation(AnimaDenoiseInvocation):
@@ -952,6 +1049,96 @@ class MetadataToSDXLLorasInvocation(BaseInvocation, WithMetadata):
                         )
 
         return output
+
+
+@invocation(
+    "metadata_to_wan_loras",
+    title="Metadata To Wan LoRAs",
+    tags=["metadata", "wan"],
+    category="metadata",
+    version="1.0.0",
+    classification=Classification.Beta,
+)
+class MetadataToWanLorasInvocation(BaseInvocation, WithMetadata):
+    """Extracts Wan 2.2 LoRAs from metadata and applies them to a Wan transformer"""
+
+    transformer: Optional[WanTransformerField] = InputField(
+        default=None,
+        description=FieldDescriptions.transformer,
+        input=Input.Connection,
+        title="Wan Transformer",
+    )
+    custom_label: str = InputField(
+        default="loras",
+        description=FieldDescriptions.metadata_item_label,
+        input=Input.Direct,
+    )
+
+    def invoke(self, context: InvocationContext) -> WanLoRALoaderOutput:
+        if self.transformer is None:
+            return WanLoRALoaderOutput()
+
+        output_transformer = self.transformer.model_copy(deep=True)
+        metadata = {} if self.metadata is None else self.metadata.root
+        key = self.custom_label.strip() or "loras"
+        raw_loras = metadata.get(key) or []
+        if not raw_loras or not isinstance(raw_loras, list):
+            return WanLoRALoaderOutput(transformer=output_transformer)
+
+        main_config = context.models.get_config(self.transformer.transformer)
+
+        for entry in raw_loras:
+            if not isinstance(entry, dict):
+                _warn(context, f"Skipping invalid Wan LoRA metadata entry: {entry}")
+                continue
+            model_key = extract_model_key(entry, "model", "", ModelType.LoRA, context) or extract_model_key(
+                entry, "lora", "", ModelType.LoRA, context
+            )
+            if not model_key or not context.models.exists(model_key):
+                _warn(context, f"Could not resolve Wan LoRA model from metadata: {entry}")
+                continue
+
+            lora_config = context.models.get_config(model_key)
+            _assert_is_wan_lora(lora_config, model_key)
+            _assert_lora_variant_matches_main(lora_config, main_config, model_key)
+            lora_model = ModelIdentifierField.from_config(lora_config)
+
+            raw_target = entry.get("target")
+            target: WanLoRATarget = raw_target if raw_target in ("high", "low", "both") else "auto"
+            lora_expert = getattr(lora_config, "expert", None)
+            to_primary, to_low_noise = _resolve_target(target, lora_expert)
+            to_primary, to_low_noise = _correct_inert_low_routing(
+                context, main_config, model_key, to_primary, to_low_noise
+            )
+
+            if "weight" in entry:
+                parsed_high_weight = _coerce_float(entry["weight"])
+                if parsed_high_weight is None:
+                    _warn(context, f"Invalid weight {entry['weight']!r} for Wan LoRA '{model_key}'; skipping entry.")
+                    continue
+                high_weight = parsed_high_weight
+            else:
+                high_weight = 1.0
+
+            low_weight_raw = entry.get("low_noise_weight")
+            low_weight = high_weight
+            if low_weight_raw is not None and (target == "both" or (to_primary and to_low_noise)):
+                parsed_low_weight = _coerce_float(low_weight_raw)
+                if parsed_low_weight is None:
+                    _warn(
+                        context,
+                        f"Invalid low_noise_weight {low_weight_raw!r} for Wan LoRA '{model_key}'; "
+                        f"falling back to weight {high_weight}.",
+                    )
+                else:
+                    low_weight = parsed_low_weight
+
+            if to_primary and not any(item.lora.key == model_key for item in output_transformer.loras):
+                output_transformer.loras.append(LoRAField(lora=lora_model, weight=high_weight))
+            if to_low_noise and not any(item.lora.key == model_key for item in output_transformer.loras_low_noise):
+                output_transformer.loras_low_noise.append(LoRAField(lora=lora_model, weight=low_weight))
+
+        return WanLoRALoaderOutput(transformer=output_transformer)
 
 
 def _resolve_ref_image_field(img_container: Any) -> Optional[dict[str, Any]]:
@@ -1478,15 +1665,11 @@ class MetadataToStringCollectionInvocation(BaseInvocation, WithMetadata):
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
-        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        val = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label))
-        if val is None:
-            return StringCollectionOutput(collection=self.default_value)
-        if isinstance(val, list):
-            return StringCollectionOutput(collection=val)
-        if isinstance(val, str):
-            return StringCollectionOutput(collection=[val])
-        return StringCollectionOutput(collection=self.default_value)
+        return StringCollectionOutput(
+            collection=_extract_collection_metadata(
+                self.metadata, self.label, self.custom_label, self.default_value, _coerce_str
+            )
+        )
 
 
 @invocation(
@@ -1515,10 +1698,11 @@ class MetadataToIntegerCollectionInvocation(BaseInvocation, WithMetadata):
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
     def invoke(self, context: InvocationContext) -> IntegerCollectionOutput:
-        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
-
-        return IntegerCollectionOutput(collection=output)
+        return IntegerCollectionOutput(
+            collection=_extract_collection_metadata(
+                self.metadata, self.label, self.custom_label, self.default_value, _coerce_int
+            )
+        )
 
 
 @invocation(
@@ -1547,10 +1731,11 @@ class MetadataToFloatCollectionInvocation(BaseInvocation, WithMetadata):
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
     def invoke(self, context: InvocationContext) -> FloatCollectionOutput:
-        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
-
-        return FloatCollectionOutput(collection=output)
+        return FloatCollectionOutput(
+            collection=_extract_collection_metadata(
+                self.metadata, self.label, self.custom_label, self.default_value, _coerce_float
+            )
+        )
 
 
 @invocation(
@@ -1579,7 +1764,8 @@ class MetadataToBoolCollectionInvocation(BaseInvocation, WithMetadata):
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
     def invoke(self, context: InvocationContext) -> BooleanCollectionOutput:
-        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
-
-        return BooleanCollectionOutput(collection=output)
+        return BooleanCollectionOutput(
+            collection=_extract_collection_metadata(
+                self.metadata, self.label, self.custom_label, self.default_value, _coerce_bool
+            )
+        )

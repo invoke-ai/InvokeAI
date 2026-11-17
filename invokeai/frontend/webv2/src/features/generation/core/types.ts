@@ -91,10 +91,14 @@ export type LoraModelConfig = ModelIdentifierConfig & {
   variant?: string | null;
 };
 
+export type WanLoraTarget = 'high' | 'low' | 'both';
+
 export interface GenerateLora {
   isEnabled: boolean;
   model: LoraModelConfig;
   weight: number;
+  target?: WanLoraTarget;
+  lowNoiseWeight?: number;
 }
 
 export interface ImageWithDims {

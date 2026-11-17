@@ -26,6 +26,10 @@ __all__ = [
 
 
 class MetadataType(str, Enum):
+    """Element type for a metadata key; applies to both scalars ``T`` and ``list[T]`` collections
+    (e.g. ``positive_prompts`` as ``STRING``, ``moss_image_uncond_skip_layers`` as ``INTEGER``, ``cfg_scale`` as ``FLOAT``).
+    """
+
     STRING = "string"
     INTEGER = "integer"
     FLOAT = "float"
@@ -86,6 +90,7 @@ CORE_METADATA_REGISTRY: tuple[tuple[str, MetadataType | tuple[MetadataType, ...]
     ("hidiffusion", T.BOOLEAN),
     ("hidiffusion_raunet", T.BOOLEAN),
     ("hidiffusion_window_attn", T.BOOLEAN),
+    ("hidiffusion_auto_ratios", T.BOOLEAN),
     ("hidiffusion_t1_ratio", T.FLOAT),
     ("hidiffusion_t2_ratio", T.FLOAT),
     ("hrf_enabled", T.BOOLEAN),

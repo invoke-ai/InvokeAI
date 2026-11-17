@@ -578,6 +578,74 @@ describe('saveCanvasToGallery', () => {
     await expect(save).resolves.toEqual({ status: 'stale' });
     expect(harness.uploadImage).not.toHaveBeenCalled();
   });
+
+  it('forwards optional Wan LoRA target and distinct low_noise_weight in canvas metadata', async () => {
+    const project = createProject('board-1', {
+      loras: [
+        {
+          isEnabled: true,
+          model: { base: 'wan', key: 'lora-plain', name: 'Plain', type: 'lora' },
+          weight: 0.7,
+        },
+        {
+          isEnabled: true,
+          model: { base: 'wan', key: 'lora-high', name: 'High', type: 'lora' },
+          target: 'high',
+          weight: 0.9,
+        },
+        {
+          isEnabled: false,
+          lowNoiseWeight: 0.4,
+          model: { base: 'wan', key: 'lora-dual', name: 'Dual', type: 'lora' },
+          target: 'both',
+          weight: 0.8,
+        },
+        {
+          isEnabled: true,
+          lowNoiseWeight: 0.8,
+          model: { base: 'wan', key: 'lora-equal', name: 'Equal', type: 'lora' },
+          target: 'both',
+          weight: 0.8,
+        },
+      ],
+    });
+    const harness = createHarness({ project });
+
+    await expect(
+      saveCanvasToGallery({
+        engine: harness.engine,
+        getProject: harness.getProject,
+        project: harness.project,
+        region: 'canvas',
+        scopedDefaults: {},
+        uploadImage: harness.uploadImage,
+      })
+    ).resolves.toEqual({ boardId: 'board-1', imageName: 'saved.png', status: 'saved' });
+
+    const uploadedMetadata = harness.uploadImage.mock.calls[0]?.[1]?.metadata as Record<string, unknown>;
+    expect(uploadedMetadata.loras).toEqual([
+      { isEnabled: true, model: { base: 'wan', key: 'lora-plain', name: 'Plain', type: 'lora' }, weight: 0.7 },
+      {
+        isEnabled: true,
+        model: { base: 'wan', key: 'lora-high', name: 'High', type: 'lora' },
+        target: 'high',
+        weight: 0.9,
+      },
+      {
+        isEnabled: false,
+        low_noise_weight: 0.4,
+        model: { base: 'wan', key: 'lora-dual', name: 'Dual', type: 'lora' },
+        target: 'both',
+        weight: 0.8,
+      },
+      {
+        isEnabled: true,
+        model: { base: 'wan', key: 'lora-equal', name: 'Equal', type: 'lora' },
+        target: 'both',
+        weight: 0.8,
+      },
+    ]);
+  });
 });
 
 describe('getCanvasSaveBoardId', () => {

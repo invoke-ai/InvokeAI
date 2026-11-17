@@ -111,7 +111,7 @@ def _effective_guidance_schedule(
     title="Denoise - Ideogram 4",
     tags=["image", "ideogram4"],
     category="latents",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class Ideogram4DenoiseInvocation(BaseInvocation, WithMetadata):

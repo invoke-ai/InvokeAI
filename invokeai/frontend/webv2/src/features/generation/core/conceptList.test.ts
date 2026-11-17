@@ -116,6 +116,23 @@ describe('updateConcept', () => {
 
     expect(updateConcept(list, 'chalk', { isEnabled: false, weight: 1.25 })).toBe(list);
   });
+
+  it('clears lowNoiseWeight when weight is edited (even to the same high-noise value) and preserves it on toggle', () => {
+    const wanLora = lora('wan-dual', 'wan');
+    const list: GenerateLora[] = [
+      { isEnabled: true, lowNoiseWeight: 0.8, model: wanLora, target: 'both', weight: 0.4 },
+    ];
+
+    const toggled = updateConcept(list, 'wan-dual', { isEnabled: false });
+    expect(toggled).toEqual([{ isEnabled: false, lowNoiseWeight: 0.8, model: wanLora, target: 'both', weight: 0.4 }]);
+
+    const samePrimaryWeight = updateConcept(list, 'wan-dual', { weight: 0.4 });
+    expect(samePrimaryWeight).toEqual([{ isEnabled: true, model: wanLora, target: 'both', weight: 0.4 }]);
+    expect('lowNoiseWeight' in samePrimaryWeight[0]!).toBe(false);
+
+    const changedWeight = updateConcept(list, 'wan-dual', { weight: 0.9 });
+    expect(changedWeight).toEqual([{ isEnabled: true, model: wanLora, target: 'both', weight: 0.9 }]);
+  });
 });
 
 describe('removeConcept', () => {

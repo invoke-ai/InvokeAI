@@ -1948,6 +1948,43 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     // The Wan encoder is fed straight from the model loader — Wan LoRAs do not touch it.
     expect(getEdge(graph, 'pos_cond', 'wan_t5_encoder')?.source.node_id).toBe('model_loader');
   });
+
+  it('chains wan_lora_loader nodes for targeted Wan LoRAs and records target and low_noise_weight in metadata', () => {
+    const highLora: LoraModelConfig = { base: 'wan', key: 'wan-high', name: 'High', type: 'lora', variant: '5b' };
+    const dualLora: LoraModelConfig = { base: 'wan', key: 'wan-dual', name: 'Dual', type: 'lora', variant: '5b' };
+    const graph = compile(wanDiffusers, {
+      loras: [
+        { isEnabled: true, model: highLora, target: 'high', weight: 0.9 },
+        { isEnabled: true, lowNoiseWeight: 0.4, model: dualLora, target: 'both', weight: 0.8 },
+      ],
+    });
+
+    expect(getNodeByType(graph, 'wan_lora_collection_loader')).toBeUndefined();
+    const loaders = Object.values(graph.nodes).filter((node) => node.type === 'wan_lora_loader');
+    expect(loaders).toHaveLength(3);
+    expect(
+      loaders.map((node) => ({ key: (node.lora as { key: string }).key, target: node.target, weight: node.weight }))
+    ).toEqual([
+      { key: 'wan-high', target: 'high', weight: 0.9 },
+      { key: 'wan-dual', target: 'high', weight: 0.8 },
+      { key: 'wan-dual', target: 'low', weight: 0.4 },
+    ]);
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loaders[2]?.id);
+    expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+      { model: expect.objectContaining({ key: 'wan-high' }), target: 'high', weight: 0.9 },
+      { low_noise_weight: 0.4, model: expect.objectContaining({ key: 'wan-dual' }), target: 'both', weight: 0.8 },
+    ]);
+
+    const equalLowNoiseGraph = compile(wanDiffusers, {
+      loras: [{ isEnabled: true, lowNoiseWeight: 0.8, model: dualLora, target: 'both', weight: 0.8 }],
+    });
+    const equalLoaders = Object.values(equalLowNoiseGraph.nodes).filter((node) => node.type === 'wan_lora_loader');
+    expect(equalLoaders).toHaveLength(1);
+    expect(equalLoaders[0]).toMatchObject({ target: 'both', weight: 0.8 });
+    expect(getNodeByType(equalLowNoiseGraph, 'core_metadata')?.loras).toEqual([
+      { model: expect.objectContaining({ key: 'wan-dual' }), target: 'both', weight: 0.8 },
+    ]);
+  });
 });
 
 describe('Qwen-Image-2.1 graphs', () => {

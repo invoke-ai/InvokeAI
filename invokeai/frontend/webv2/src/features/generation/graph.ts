@@ -2,6 +2,7 @@
 export {
   addLoraCollectionLoader,
   addTransformerLoraCollectionLoader,
+  addWanLoraLoaders,
   compileGenerateGraph,
   resolveGenerateSeed,
 } from './core/graph';
@@ -11,7 +12,9 @@ export {
   createId,
   getActiveCompatibleLoras,
   getLoadedLoras,
+  hasDistinctWanLowNoiseWeight,
   toGraphContract,
+  toMetadataLora,
   toModelIdentifier,
 } from './core/graphBuilder';
 export { detectCanvasMode } from './core/canvas/canvasMode';

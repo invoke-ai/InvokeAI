@@ -9,10 +9,11 @@ import {
   addEdge,
   addNode,
   addTransformerLoraCollectionLoader,
+  addWanLoraLoaders,
   createId,
   getActiveCompatibleLoras,
   toGraphContract,
-  toModelIdentifier,
+  toMetadataLora,
 } from '@features/generation/graph';
 import { getCompatibleDiffusersComponentSource } from '@features/generation/settings';
 
@@ -259,9 +260,7 @@ const addVideoMetadata = ({
           source_video_start_frame: settings.sourceVideo.startFrame,
         }
       : {}),
-    ...(activeLoras.length
-      ? { loras: activeLoras.map((lora) => ({ model: toModelIdentifier(lora.model), weight: lora.weight })) }
-      : {}),
+    ...(activeLoras.length ? { loras: activeLoras.map(toMetadataLora) } : {}),
     ...extras,
   });
 
@@ -306,9 +305,7 @@ const buildWanVideoGraph = (settings: VideoSettings, model: MainModelConfig): Ba
   });
   // Wan LoRAs patch transformers; auto routing uses probed high/low tags to place accelerator pairs correctly.
   const activeLoras = getActiveCompatibleLoras(settings, model);
-  const loraSource = activeLoras.length
-    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'wan_lora_collection_loader', modelLoader, ['transformer'])
-    : modelLoader;
+  const loraSource = activeLoras.length ? addWanLoraLoaders(graph, activeLoras, modelLoader) : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'wan_text_encoder' });
   const negCond = addNode(graph, { id: 'neg_cond', type: 'wan_text_encoder' });
   const denoise = addNode(graph, {

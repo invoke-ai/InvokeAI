@@ -2838,3 +2838,456 @@ def test_metadata_to_ip_adapters_tensor_mask() -> None:
     adapter = out.ip_adapter_list[0]
     assert isinstance(adapter.mask, TensorField)
     assert adapter.mask.tensor_name == "transient_tensor_mask_1"
+
+
+def test_denoise_latents_cfg_scale_schedule_roundtrip_via_extractors() -> None:
+    """JP-2: denoise_latents cfg_scale schedule extracts cleanly via FloatCollection and Float."""
+    from invokeai.app.invocations.metadata_linked import (
+        MetadataToFloatCollectionInvocation,
+        MetadataToFloatInvocation,
+    )
+
+    unet_id = _make_model_id(key="sd1-unet", base=BaseModelType.StableDiffusion1, submodel_type=SubModelType.UNet)
+    sched_id = _make_model_id(
+        key="sd1-sched", base=BaseModelType.StableDiffusion1, submodel_type=SubModelType.Scheduler
+    )
+    schedule = [8.0, 6.0, 4.0]
+    denoise = DenoiseLatentsInvocation.model_construct(
+        unet=UNetField(unet=unet_id, scheduler=sched_id, loras=[]),
+        cfg_scale=schedule,
+        steps=3,
+        scheduler="euler",
+        denoising_start=0.0,
+        denoising_end=1.0,
+        cfg_rescale_multiplier=0.0,
+        hidiffusion=False,
+        hidiffusion_raunet=True,
+        hidiffusion_window_attn=True,
+        hidiffusion_auto_ratios=True,
+        hidiffusion_t1_ratio=0.4,
+        hidiffusion_t2_ratio=0.8,
+        control=None,
+        ip_adapter=None,
+        t2i_adapter=None,
+        noise=None,
+        latents=None,
+        denoise_mask=None,
+        metadata=None,
+    )
+    md = denoise._build_metadata(512, 512)
+    assert md.root["cfg_scale"] == schedule
+    assert md.root["hidiffusion_auto_ratios"] is True
+
+    ctx = SimpleNamespace()
+    assert (
+        MetadataToFloatCollectionInvocation(id="extract-cfg-coll", label="cfg_scale", default_value=[1.0], metadata=md)
+        .invoke(ctx)
+        .collection
+        == schedule
+    )
+    assert (
+        MetadataToFloatInvocation(id="extract-cfg-scalar", label="cfg_scale", default_value=1.0, metadata=md)
+        .invoke(ctx)
+        .value
+        == 8.0
+    )
+
+
+def test_wan_lora_serialization_and_metadata_to_wan_loras_roundtrip() -> None:
+    """JP-3: Wan LoRA target + differing weight serialization and MetadataToWanLorasInvocation recall."""
+    from unittest.mock import MagicMock
+
+    from invokeai.app.invocations.metadata import serialize_wan_lora_metadata
+    from invokeai.app.invocations.metadata_linked import MetadataToWanLorasInvocation
+    from invokeai.backend.model_manager.taxonomy import WanLoRAVariantType, WanVariantType
+
+    high_tf = _make_model_id(key="wan-high", base=BaseModelType.Wan)
+    low_tf = _make_model_id(key="wan-low", base=BaseModelType.Wan)
+    lora_high = _make_model_id(key="lora-high", name="High LoRA", base=BaseModelType.Wan, model_type=ModelType.LoRA)
+    lora_low = _make_model_id(key="lora-low", name="Low LoRA", base=BaseModelType.Wan, model_type=ModelType.LoRA)
+    lora_same = _make_model_id(key="lora-same", name="Same LoRA", base=BaseModelType.Wan, model_type=ModelType.LoRA)
+    lora_diff = _make_model_id(key="lora-diff", name="Diff LoRA", base=BaseModelType.Wan, model_type=ModelType.LoRA)
+
+    wan_tf_field = WanTransformerField(
+        transformer=high_tf,
+        transformer_low_noise=low_tf,
+        loras=[
+            LoRAField(lora=lora_high, weight=0.9),
+            LoRAField(lora=lora_same, weight=0.8),
+            LoRAField(lora=lora_diff, weight=0.7),
+        ],
+        loras_low_noise=[
+            LoRAField(lora=lora_same, weight=0.8),
+            LoRAField(lora=lora_diff, weight=0.3),
+            LoRAField(lora=lora_low, weight=0.6),
+        ],
+    )
+
+    serialized = serialize_wan_lora_metadata(wan_tf_field.loras, wan_tf_field.loras_low_noise)
+    assert [e["model"]["key"] for e in serialized] == ["lora-high", "lora-same", "lora-diff", "lora-low"]
+    assert serialized[0]["target"] == "high" and serialized[0]["weight"] == 0.9
+    assert "low_noise_weight" not in serialized[0]
+    assert serialized[1]["target"] == "both" and serialized[1]["weight"] == 0.8
+    assert "low_noise_weight" not in serialized[1]
+    assert serialized[2]["target"] == "both"
+    assert serialized[2]["weight"] == 0.7
+    assert serialized[2]["low_noise_weight"] == 0.3
+    assert serialized[3]["target"] == "low" and serialized[3]["weight"] == 0.6
+    assert "low_noise_weight" not in serialized[3]
+
+    for denoise_md in (
+        WanDenoiseInvocation.model_construct(
+            transformer=wan_tf_field,
+            guidance_scale=4.0,
+            guidance_scale_low_noise=3.5,
+            denoising_start=0.0,
+            denoising_end=1.0,
+            add_noise=True,
+            width=1024,
+            height=1024,
+            steps=20,
+            seed=1,
+            metadata=None,
+        )._build_metadata(),
+        WanVideoDenoiseInvocation.model_construct(
+            transformer=wan_tf_field,
+            guidance_scale=5.0,
+            guidance_scale_low_noise=4.0,
+            width=832,
+            height=480,
+            num_frames=81,
+            steps=40,
+            seed=2,
+            metadata=None,
+        )._build_metadata(),
+    ):
+        assert denoise_md.root["loras"] == serialized
+
+    def _lora_cfg(model_id: ModelIdentifierField, expert: str | None = None, variant=WanLoRAVariantType.A14B):
+        return SimpleNamespace(
+            key=model_id.key,
+            hash=model_id.hash,
+            name=model_id.name,
+            base=BaseModelType.Wan,
+            type=ModelType.LoRA,
+            expert=expert,
+            variant=variant,
+        )
+
+    configs = {
+        "wan-high": SimpleNamespace(
+            key="wan-high",
+            hash=high_tf.hash,
+            name=high_tf.name,
+            base=BaseModelType.Wan,
+            type=ModelType.Main,
+            variant=WanVariantType.T2V_A14B,
+        ),
+        "lora-high": _lora_cfg(lora_high, expert="high"),
+        "lora-low": _lora_cfg(lora_low, expert="low"),
+        "lora-same": _lora_cfg(lora_same, expert=None),
+        "lora-diff": _lora_cfg(lora_diff, expert=None),
+    }
+
+    def _get_config(ident):
+        key = ident.key if hasattr(ident, "key") else ident
+        return configs[key]
+
+    mock_logger = MagicMock()
+    mock_ctx = SimpleNamespace(
+        logger=mock_logger,
+        models=SimpleNamespace(
+            exists=lambda k: k in configs,
+            get_config=_get_config,
+            search_by_attrs=lambda **kw: [],
+        ),
+    )
+
+    clean_tf = WanTransformerField(transformer=high_tf, transformer_low_noise=low_tf, loras=[], loras_low_noise=[])
+
+    # 1. Exact roundtrip from denoise metadata
+    restored = (
+        MetadataToWanLorasInvocation.model_construct(
+            transformer=clean_tf,
+            custom_label="loras",
+            metadata=MetadataField.model_validate({"loras": serialized}),
+        )
+        .invoke(mock_ctx)
+        .transformer
+    )
+    assert restored is not None
+    assert [(x.lora.key, x.weight) for x in restored.loras] == [
+        ("lora-high", 0.9),
+        ("lora-same", 0.8),
+        ("lora-diff", 0.7),
+    ]
+    assert [(x.lora.key, x.weight) for x in restored.loras_low_noise] == [
+        ("lora-same", 0.8),
+        ("lora-diff", 0.3),
+        ("lora-low", 0.6),
+    ]
+
+    # 2. Legacy metadata without `target` falls back to config.expert ("auto")
+    legacy_md = MetadataField.model_validate(
+        {
+            "loras": [
+                {"model": lora_high.model_dump(), "weight": 0.5},
+                {"model": lora_low.model_dump(), "weight": 0.4},
+                {"model": lora_same.model_dump(), "weight": 0.75},
+            ]
+        }
+    )
+    legacy_out = (
+        MetadataToWanLorasInvocation.model_construct(transformer=clean_tf, custom_label="loras", metadata=legacy_md)
+        .invoke(mock_ctx)
+        .transformer
+    )
+    assert [(x.lora.key, x.weight) for x in legacy_out.loras] == [("lora-high", 0.5), ("lora-same", 0.75)]
+    assert [(x.lora.key, x.weight) for x in legacy_out.loras_low_noise] == [("lora-low", 0.4), ("lora-same", 0.75)]
+
+    # 3. Dual entries + already-applied LoRA + missing LoRA warning
+    dual_and_missing_md = MetadataField.model_validate(
+        {
+            "loras": [
+                {"model": {"key": "missing-wan-lora"}, "weight": 0.5},
+                {"model": lora_diff.model_dump(), "weight": 0.65, "target": "high"},
+                {"model": lora_diff.model_dump(), "weight": 0.25, "target": "low"},
+                {"model": lora_high.model_dump(), "weight": 0.99, "target": "high"},
+            ]
+        }
+    )
+    prefilled_tf = WanTransformerField(
+        transformer=high_tf,
+        transformer_low_noise=low_tf,
+        loras=[LoRAField(lora=lora_high, weight=0.1)],
+        loras_low_noise=[],
+    )
+    dual_out = (
+        MetadataToWanLorasInvocation.model_construct(
+            transformer=prefilled_tf, custom_label="loras", metadata=dual_and_missing_md
+        )
+        .invoke(mock_ctx)
+        .transformer
+    )
+    assert [(x.lora.key, x.weight) for x in dual_out.loras] == [("lora-high", 0.1), ("lora-diff", 0.65)]
+    assert [(x.lora.key, x.weight) for x in dual_out.loras_low_noise] == [("lora-diff", 0.25)]
+    assert mock_logger.warning.called
+
+    # 4. None transformer returns empty output
+    assert (
+        MetadataToWanLorasInvocation.model_construct(transformer=None, custom_label="loras", metadata=legacy_md)
+        .invoke(mock_ctx)
+        .transformer
+        is None
+    )
+
+
+def test_unwrap_metadata_value_wan_none_and_wrapper_dicts() -> None:
+    """JP-4 & JP-5: Wan TI2V-5B transformer_low_noise=None and wrapper model_dump() dicts unwrap cleanly."""
+    from invokeai.app.invocations.metadata import unwrap_metadata_value
+    from invokeai.app.invocations.metadata_linked import MetadataItemLinkedInvocation
+    from invokeai.app.invocations.model import MiniMaxH3AdaLNOverlayField, MiniMaxH3TextEncoderField
+
+    high_tf = _make_model_id(key="wan-ti2v-5b", base=BaseModelType.Wan)
+    low_tf = _make_model_id(key="wan-low-tf", base=BaseModelType.Wan)
+    lora_id = _make_model_id(key="wan-lora", base=BaseModelType.Wan, model_type=ModelType.LoRA)
+
+    # JP-4: TI2V-5B instance & dict with transformer_low_noise=None must return None (never fallback to high_tf)
+    ti2v_field = WanTransformerField(transformer=high_tf, transformer_low_noise=None, loras=[], loras_low_noise=[])
+    assert unwrap_metadata_value(ti2v_field, label="wan_transformer_low_noise") is None
+    assert unwrap_metadata_value(ti2v_field.model_dump(), label="wan_transformer_low_noise") is None
+
+    linked_none = MetadataItemLinkedInvocation(
+        id="link-wan-low-none", label="wan_transformer_low_noise", value=ti2v_field
+    ).invoke(SimpleNamespace())
+    assert "wan_transformer_low_noise" not in linked_none.metadata.root
+
+    # JP-5: WanTransformerField.model_dump() with high, low, and custom+loras_low_noise
+    a14b_dict = WanTransformerField(
+        transformer=high_tf,
+        transformer_low_noise=low_tf,
+        loras=[],
+        loras_low_noise=[LoRAField(lora=lora_id, weight=0.5)],
+    ).model_dump()
+    assert unwrap_metadata_value(a14b_dict, label="model")["key"] == "wan-ti2v-5b"
+    assert unwrap_metadata_value(a14b_dict, label="wan_transformer_low_noise")["key"] == "wan-low-tf"
+    kept_wan = unwrap_metadata_value(a14b_dict, label="custom_wan_tf")
+    assert isinstance(kept_wan, dict) and len(kept_wan["loras_low_noise"]) == 1
+
+    # Sibling wrapper dicts: MiniMaxH3TextEncoderField, MiniMaxH3TransformerField, LTX2TransformerField
+    h3_enc_id = _make_model_id(key="h3-enc", base=BaseModelType.MiniMaxH3, submodel_type=SubModelType.TextEncoder)
+    h3_tok_id = _make_model_id(key="h3-tok", base=BaseModelType.MiniMaxH3, submodel_type=SubModelType.Tokenizer)
+    h3_proc_id = _make_model_id(key="h3-proc", base=BaseModelType.MiniMaxH3, submodel_type=SubModelType.Tokenizer)
+    h3_enc_dict = MiniMaxH3TextEncoderField(
+        tokenizer=h3_tok_id, processor=h3_proc_id, text_encoder=h3_enc_id
+    ).model_dump()
+    assert unwrap_metadata_value(h3_enc_dict, label="minimax_h3_text_encoder_model")["key"] == "h3-enc"
+
+    h3_tf_id = _make_model_id(key="h3-tf", base=BaseModelType.MiniMaxH3)
+    h3_overlay_id = _make_model_id(key="h3-overlay", base=BaseModelType.MiniMaxH3)
+    h3_tf_dict = MiniMaxH3TransformerField(
+        transformer=h3_tf_id,
+        loras=[LoRAField(lora=lora_id, weight=0.6)],
+        variant="fl2va",
+        adaln_overlay=MiniMaxH3AdaLNOverlayField(
+            overlay=h3_overlay_id, start_block=20, end_block=30, include_final_layer=True
+        ),
+    ).model_dump()
+    assert unwrap_metadata_value(h3_tf_dict, label="minimax_h3_transformer_model")["key"] == "h3-tf"
+    assert len(unwrap_metadata_value(h3_tf_dict, label="custom_h3_tf")["loras"]) == 1
+
+    ltx_tf_id = _make_model_id(key="ltx2-tf", base=BaseModelType.LTX2)
+    ltx_tf_dict = LTX2TransformerField(
+        transformer=ltx_tf_id,
+        loras=[LoRAField(lora=lora_id, weight=0.4)],
+        variant="ltx2_dev",
+    ).model_dump()
+    assert unwrap_metadata_value(ltx_tf_dict, label="model")["key"] == "ltx2-tf"
+    assert len(unwrap_metadata_value(ltx_tf_dict, label="custom_ltx_tf")["loras"]) == 1
+
+    from invokeai.app.invocations.model import LTX2LatentUpsamplerField, LTX2VocoderField
+
+    vocoder_id = _make_model_id(key="ltx2-vocoder", base=BaseModelType.LTX2)
+    vocoder_field = LTX2VocoderField(vocoder=vocoder_id)
+    assert unwrap_metadata_value(vocoder_field, label="model") == vocoder_id
+    assert unwrap_metadata_value(vocoder_field.model_dump(), label="model")["key"] == "ltx2-vocoder"
+
+    upsampler_id = _make_model_id(key="ltx2-upsampler", base=BaseModelType.LTX2)
+    upsampler_field = LTX2LatentUpsamplerField(latent_upsampler=upsampler_id)
+    assert unwrap_metadata_value(upsampler_field, label="model") == upsampler_id
+    assert unwrap_metadata_value(upsampler_field.model_dump(), label="model")["key"] == "ltx2-upsampler"
+
+
+def test_serialize_wan_lora_metadata_handles_raw_dict_lora_fields() -> None:
+    """Non-ModelIdentifierField dict item.lora inputs via model_construct() must not raise TypeError."""
+    from invokeai.app.invocations.metadata import serialize_wan_lora_metadata
+
+    dict_with_key_a = {"key": "raw-a", "name": "Raw A"}
+    dict_with_key_b = {"key": "raw-b", "name": "Raw B"}
+    dict_without_key = {"name": "Keyless LoRA"}
+
+    high = [
+        SimpleNamespace(lora=dict_with_key_a, weight=0.8),
+        SimpleNamespace(lora=dict_without_key, weight=0.6),
+    ]
+    low = [
+        SimpleNamespace(lora=dict_with_key_a, weight=0.4),
+        SimpleNamespace(lora=dict(dict_without_key), weight=0.6),
+        SimpleNamespace(lora=dict_with_key_b, weight=0.5),
+    ]
+    serialized = serialize_wan_lora_metadata(high, low)
+    assert len(serialized) == 3
+    assert serialized[0] == {"model": dict_with_key_a, "weight": 0.8, "target": "both", "low_noise_weight": 0.4}
+    assert serialized[1] == {"model": dict_without_key, "weight": 0.6, "target": "both"}
+    assert serialized[2] == {"model": dict_with_key_b, "weight": 0.5, "target": "low"}
+
+
+def test_metadata_to_wan_loras_guards_malformed_weights() -> None:
+    """MetadataToWanLorasInvocation warns and skips/falls back cleanly on None, bool, or non-numeric weights."""
+    from unittest.mock import MagicMock
+
+    from invokeai.app.invocations.metadata_linked import MetadataToWanLorasInvocation
+    from invokeai.backend.model_manager.taxonomy import WanLoRAVariantType, WanVariantType
+
+    high_tf = _make_model_id(key="wan-high", base=BaseModelType.Wan)
+    low_tf = _make_model_id(key="wan-low", base=BaseModelType.Wan)
+    lora_bad_none = _make_model_id(key="lora-none", base=BaseModelType.Wan, model_type=ModelType.LoRA)
+    lora_bad_bool = _make_model_id(key="lora-bool", base=BaseModelType.Wan, model_type=ModelType.LoRA)
+    lora_bad_str = _make_model_id(key="lora-str", base=BaseModelType.Wan, model_type=ModelType.LoRA)
+    lora_bad_low_w = _make_model_id(key="lora-bad-low", base=BaseModelType.Wan, model_type=ModelType.LoRA)
+
+    configs = {
+        "wan-high": SimpleNamespace(
+            key="wan-high",
+            hash=high_tf.hash,
+            name=high_tf.name,
+            base=BaseModelType.Wan,
+            type=ModelType.Main,
+            variant=WanVariantType.T2V_A14B,
+        ),
+        **{
+            m.key: SimpleNamespace(
+                key=m.key,
+                hash=m.hash,
+                name=m.name,
+                base=BaseModelType.Wan,
+                type=ModelType.LoRA,
+                expert=None,
+                variant=WanLoRAVariantType.A14B,
+            )
+            for m in (lora_bad_none, lora_bad_bool, lora_bad_str, lora_bad_low_w)
+        },
+    }
+
+    mock_logger = MagicMock()
+    mock_ctx = SimpleNamespace(
+        logger=mock_logger,
+        models=SimpleNamespace(
+            exists=lambda k: k in configs,
+            get_config=lambda ident: configs[ident.key if hasattr(ident, "key") else ident],
+            search_by_attrs=lambda **kw: [],
+        ),
+    )
+
+    md = MetadataField.model_validate(
+        {
+            "loras": [
+                {"model": lora_bad_none.model_dump(), "weight": None, "target": "high"},
+                {"model": lora_bad_bool.model_dump(), "weight": True, "target": "high"},
+                {"model": lora_bad_str.model_dump(), "weight": "not-a-number", "target": "low"},
+                {
+                    "model": lora_bad_low_w.model_dump(),
+                    "weight": 0.75,
+                    "target": "both",
+                    "low_noise_weight": "bad",
+                },
+            ]
+        }
+    )
+    clean_tf = WanTransformerField(transformer=high_tf, transformer_low_noise=low_tf, loras=[], loras_low_noise=[])
+    out = (
+        MetadataToWanLorasInvocation.model_construct(transformer=clean_tf, custom_label="loras", metadata=md)
+        .invoke(mock_ctx)
+        .transformer
+    )
+    assert out is not None
+    assert [(x.lora.key, x.weight) for x in out.loras] == [("lora-bad-low", 0.75)]
+    assert [(x.lora.key, x.weight) for x in out.loras_low_noise] == [("lora-bad-low", 0.75)]
+    assert mock_logger.warning.call_count == 4
+
+
+def test_all_denoise_build_metadata_keys_registered_in_core_registry() -> None:
+    """JP-6: Every scalar/model key emitted across _build_metadata() in all 19 active denoise nodes
+    must be registered in CORE_METADATA_REGISTRY."""
+    import ast
+    import inspect
+    import textwrap
+
+    from invokeai.app.invocations import load_all_modules
+    from invokeai.app.invocations.metadata_constants import CORE_METADATA_REGISTRY
+
+    load_all_modules()
+    registry_keys = {label for label, _ in CORE_METADATA_REGISTRY}
+    non_registry_collection_keys = {"loras", "controlnets", "t2iAdapters", "ref_images", "minimax_h3_references"}
+
+    active_denoise = [
+        cls
+        for cls in _discover_denoise_invocations()
+        if not cls.get_type().endswith(("_denoise_meta", "_latents_meta"))
+    ]
+    assert len(active_denoise) == 19
+
+    for cls in active_denoise:
+        src = textwrap.dedent(inspect.getsource(cls._build_metadata))
+        tree = ast.parse(src)
+        emitted_keys: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Dict):
+                for k in node.keys:
+                    if isinstance(k, ast.Constant) and isinstance(k.value, str):
+                        emitted_keys.add(k.value)
+            elif isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id == "updates":
+                if isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+                    emitted_keys.add(node.slice.value)
+        unregistered = emitted_keys - registry_keys - non_registry_collection_keys
+        assert not unregistered, f"{cls.get_type()}._build_metadata emits unregistered keys: {sorted(unregistered)}"

@@ -50,7 +50,7 @@ MOSS_IMAGE_RAW_LATENT_SCALE = 8
     title="Denoise - MOSS-Image",
     tags=["image", "moss_image", "moss-image"],
     category="image",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class MossImageDenoiseInvocation(BaseInvocation, WithMetadata):

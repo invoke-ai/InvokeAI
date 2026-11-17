@@ -17,6 +17,8 @@ export const areVideoLorasEquivalent = (left: VideoWidgetValues['loras'], right:
       lora.model.name === right[index]?.model.name &&
       lora.model.hash === right[index]?.model.hash &&
       lora.weight === right[index]?.weight &&
+      lora.target === right[index]?.target &&
+      lora.lowNoiseWeight === right[index]?.lowNoiseWeight &&
       lora.isEnabled === right[index]?.isEnabled
   );
 

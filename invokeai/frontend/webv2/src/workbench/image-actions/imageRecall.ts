@@ -66,7 +66,13 @@ import {
 } from '@features/generation/settings';
 import { SEED_MAX } from '@platform/core/seed';
 
-import { resolveRecordedModel, toRecordedModelRef, type RecordedModelPolicy } from './recordedModel';
+import {
+  mergeOpposingWanLoraTargets,
+  readMetadataLoraTarget,
+  resolveRecordedModel,
+  toRecordedModelRef,
+  type RecordedModelPolicy,
+} from './recordedModel';
 
 const hasCanvasRecall = (metadata: unknown): boolean =>
   isRecord(metadata) &&
@@ -231,16 +237,37 @@ export const getSteps = (metadata: unknown): number | null => {
   return steps !== null && steps >= 1 ? steps : null;
 };
 
+const getNumberOrFirstScheduleValue = (metadata: unknown, key: string): number | null => {
+  const scalar = getNumber(metadata, key);
+
+  if (scalar !== null) {
+    return scalar;
+  }
+
+  if (!isRecord(metadata)) {
+    return null;
+  }
+
+  const value = metadata[key];
+
+  return Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))
+    ? (value[0] as number)
+    : null;
+};
+
 /**
  * The value the model's single guidance slider holds. Distilled-guidance families record it as `guidance` and
- * their older records carry no `cfg_scale` at all, so for them the dedicated key wins.
+ * their older records carry no `cfg_scale` at all, so for them the dedicated key wins. Denoise nodes write
+ * `cfg_scale` as a finite-number list when a schedule is connected, so recall takes its initial step value.
  */
 export const getCfgScale = (metadata: unknown, model?: GenerateModelConfig): number | null => {
   const { guidanceLabel, guidanceMin } = getGenerationUiPolicy(model);
   const cfgScale =
     guidanceLabel === 'Guidance'
-      ? (getNumber(metadata, 'guidance') ?? getNumber(metadata, 'cfg_scale'))
-      : getNumber(metadata, 'cfg_scale');
+      ? (getNumberOrFirstScheduleValue(metadata, 'guidance') ?? getNumberOrFirstScheduleValue(metadata, 'cfg_scale'))
+      : getNumberOrFirstScheduleValue(metadata, 'cfg_scale');
 
   return cfgScale !== null && cfgScale >= guidanceMin ? cfgScale : null;
 };
@@ -1171,16 +1198,32 @@ const getMetadataConcepts = (
       });
     } else if (!isLoraCompatibleWithModel(installed, model)) {
       skipped.push({ name: installed.name, reason: 'incompatible', subject: 'concept' });
-    } else if (loras.some((lora) => lora.model.key === installed.key)) {
-      skipped.push({ name: installed.name, reason: 'duplicate', subject: 'concept' });
     } else {
-      // Kept exactly: graphs and model defaults accept weights beyond the panel's typed range, which bounds only edits.
-      loras.push({
-        isEnabled:
-          getString(metadata, 'metadata_source') === 'canvas_save' ? (getBoolean(entry, 'isEnabled') ?? true) : true,
-        model: installed,
-        weight,
-      });
+      const targetFields = isRecord(entry) ? readMetadataLoraTarget(entry, weight) : {};
+      const entryEnabled =
+        getString(metadata, 'metadata_source') === 'canvas_save' ? (getBoolean(entry, 'isEnabled') ?? true) : true;
+      const existingIndex = loras.findIndex((lora) => lora.model.key === installed.key);
+
+      if (existingIndex !== -1) {
+        const merged = mergeOpposingWanLoraTargets(loras[existingIndex]!, {
+          target: targetFields.target,
+          weight,
+        });
+
+        if (merged) {
+          loras[existingIndex] = { ...merged, isEnabled: merged.isEnabled || entryEnabled };
+        } else {
+          skipped.push({ name: installed.name, reason: 'duplicate', subject: 'concept' });
+        }
+      } else {
+        // Kept exactly: graphs and model defaults accept weights beyond the panel's typed range, which bounds only edits.
+        loras.push({
+          isEnabled: entryEnabled,
+          model: installed,
+          weight,
+          ...targetFields,
+        });
+      }
     }
   }
 

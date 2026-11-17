@@ -31,7 +31,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.metadata import (
     LatentsMetaOutput,
     build_denoise_metadata,
-    serialize_lora_metadata,
+    serialize_wan_lora_metadata,
 )
 from invokeai.app.invocations.model import WanTransformerField
 from invokeai.app.invocations.wan.wan_denoise import (
@@ -175,7 +175,7 @@ class WanVideoDenoiseInvocation(BaseInvocation, WithMetadata):
         if getattr(self.transformer, "transformer_low_noise", None) is not None:
             updates["wan_transformer_low_noise"] = self.transformer.transformer_low_noise
 
-        updates["loras"] = serialize_lora_metadata(
+        updates["loras"] = serialize_wan_lora_metadata(
             getattr(self.transformer, "loras", None),
             getattr(self.transformer, "loras_low_noise", None),
         )
