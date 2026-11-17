@@ -746,6 +746,16 @@ class TestTorchaoFp8Checkpoint:
 
         self._refused(monkeypatch, path)
 
+    def test_a_plain_fp8_weight_without_a_scale_inside_a_torchao_file_is_refused(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        path, _, _ = self._file(tmp_path)
+        stored = load_file(path)
+        stored["text_embedder.blocks.0.qkv.weight"] = torch.zeros(192, 64).to(torch.float8_e4m3fn)
+        save_file(stored, str(path))
+
+        self._refused(monkeypatch, path)
+
     def test_a_comfyui_scaled_fp8_layer_inside_a_torchao_file_is_refused(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:

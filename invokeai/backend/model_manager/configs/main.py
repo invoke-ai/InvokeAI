@@ -81,6 +81,7 @@ from invokeai.backend.patches.lora_conversions.sd3_lora_constants import sd3_var
 from invokeai.backend.quantization.fp8_scaled import (
     COMFY_QUANT_SUFFIX,
     FP8_WEIGHT_DTYPES,
+    STRAY_METADATA_KEYS,
     TORCHAO_QDATA_SUFFIX,
     find_torchao_fp8_problem,
     is_scale_metadata_key,
@@ -4775,7 +4776,9 @@ def _raise_for_unsupported_moss_image_quantization(mod: ModelOnDisk, state_dict:
         if key.endswith(".weight") and getattr(state_dict[key], "dtype", None) is torch.int8
     }
     for key in keys:
-        if is_scale_metadata_key(key) and key.rsplit(".", 1)[0] not in int8_layers:
+        # The loader judges keys after stripping the checkpoint prefix, so a stray marker counts under any prefix.
+        is_side_channel = is_scale_metadata_key(key) or key.rsplit(".", 1)[-1] in STRAY_METADATA_KEYS
+        if is_side_channel and key.rsplit(".", 1)[0] not in int8_layers:
             raise InvalidMatchError(
                 f"this MOSS-Image transformer carries a quantization side channel on a weight that is not int8 "
                 f"(found '{key}'), which is not supported yet. {_MOSS_IMAGE_SUPPORTED}"

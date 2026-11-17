@@ -46,6 +46,7 @@ from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, Mod
 from invokeai.backend.moss_image.checkpoint_layout import drop_comfy_attention_config, split_fused_qkv
 from invokeai.backend.moss_image.pipeline_moss_image import MOSSImageTransformer
 from invokeai.backend.quantization.fp8_scaled import (
+    FP8_WEIGHT_DTYPES,
     TORCHAO_QDATA_SUFFIX,
     attach_fp8_scales,
     cast_state_dict,
@@ -174,7 +175,7 @@ def _read_component_state_dict(directory: Path) -> dict[str, torch.Tensor]:
 
 
 def _reject_other_quantization_beside_torchao(sd: Mapping[str, Any], what: str) -> None:
-    """Refuse a torchao fp8 file that also carries any scale or `.comfy_quant` key.
+    """Refuse a torchao fp8 file that also carries any scale or `.comfy_quant` key, or a plain fp8 `.weight`.
 
     torchao's own `._weight_scale` is not one of them. The loader applies one quantization per file, as the installer
     enforces. Some of these files would load wrongly: a stray `X.weight_scale` beside a torchao pair is overwritten by
@@ -184,7 +185,12 @@ def _reject_other_quantization_beside_torchao(sd: Mapping[str, Any], what: str) 
     """
     if not any(isinstance(key, str) and key.endswith(TORCHAO_QDATA_SUFFIX) for key in sd):
         return
-    other = sorted(key for key in sd if is_scale_metadata_key(key))
+    other = sorted(
+        key
+        for key, tensor in sd.items()
+        if is_scale_metadata_key(key)
+        or (key.endswith(".weight") and getattr(tensor, "dtype", None) in FP8_WEIGHT_DTYPES)
+    )
     if other:
         raise ValueError(
             f"{what} mixes torchao fp8 layers with other quantization keys ({len(other)}, e.g. {other[:3]}), and only "

@@ -297,6 +297,25 @@ def test_an_unsupported_quantized_transformer_is_refused_not_registered(
     assert message in str(refusal)
 
 
+def test_a_prefixed_stray_scaled_fp8_marker_beside_torchao_layers_is_refused_like_an_unprefixed_one(
+    tmp_path: Path,
+) -> None:
+    """The loader judges keys after stripping the ComfyUI prefix, so the installer must not let the marker through."""
+    keys = _dit()
+    _torchao_fp8(keys)
+    keys = {f"model.diffusion_model.{key}": value for key, value in keys.items()}
+    keys["model.diffusion_model.scaled_fp8"] = ([0], "F8_E4M3")
+
+    result = ModelConfigFactory.from_model_on_disk(
+        write_header_only_safetensors(tmp_path / "moss-prefixed.safetensors", keys), allow_unknown=True
+    )
+
+    assert result.config is None
+    refusal = result.details[Main_Checkpoint_MossImage_Config.__name__]
+    assert isinstance(refusal, InvalidMatchError)
+    assert "side channel on a weight that is not int8" in str(refusal)
+
+
 def test_a_file_mixing_torchao_fp8_and_int8_convrot_layers_is_refused_at_install(tmp_path: Path) -> None:
     """The loader takes the int8 path or the fp8 path, so the other half of such a file could never be applied."""
     keys = _dit()
