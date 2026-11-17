@@ -23,7 +23,6 @@ from invokeai.backend import text_llm_pipeline
 from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.qwen3_5.qwen3_5_vl import build_qwen3_5_vl_processor
 from invokeai.backend.text_llm_pipeline import (
-    DEFAULT_SYSTEM_PROMPT,
     TextLLMPipeline,
     _SeededMultinomialMode,
     load_text_llm_tokenizer_and_processor,
@@ -142,6 +141,29 @@ def test_pipeline_uses_chat_template_when_available():
     messages = call_args[0][0]
     assert any(m["role"] == "system" for m in messages)
     assert any(m["role"] == "user" and m["content"] == "a cat" for m in messages)
+
+
+def test_system_role_is_folded_into_user_turn_when_the_template_rejects_it():
+    """Some chat templates (notably Gemma) raise "System role not supported"; the pipeline retries with the
+    system prompt folded into the user turn instead of failing prompt expansion."""
+    tokenizer = _make_mock_tokenizer(has_chat_template=True)
+
+    def apply_chat_template(messages, **kwargs):
+        if any(m["role"] == "system" for m in messages):
+            raise ValueError("System role not supported")
+        return "FORMATTED_PROMPT"
+
+    tokenizer.apply_chat_template.side_effect = apply_chat_template
+    pipeline = TextLLMPipeline(_make_mock_model(), tokenizer)
+
+    with _patch_streamer():
+        pipeline.run(prompt="a cat", system_prompt="be helpful", device=torch.device("cpu"), dtype=torch.float32)
+
+    assert tokenizer.apply_chat_template.call_count == 2
+    retry_messages = tokenizer.apply_chat_template.call_args_list[1].args[0]
+    assert all(m["role"] != "system" for m in retry_messages)
+    assert "be helpful" in retry_messages[0]["content"]
+    assert "a cat" in retry_messages[0]["content"]
 
 
 def test_pipeline_fallback_without_chat_template():
@@ -495,12 +517,6 @@ def test_pipeline_reraises_generation_error_without_hanging():
     assert len(result) == 1
     assert isinstance(result[0], RuntimeError)
     assert "CUDA out of memory" in str(result[0])
-
-
-def test_default_system_prompt_content():
-    """The default system prompt should mention image generation."""
-    assert "image generation" in DEFAULT_SYSTEM_PROMPT.lower()
-    assert "prompt" in DEFAULT_SYSTEM_PROMPT.lower()
 
 
 def test_pipeline_conditions_on_an_image_through_the_processor():
