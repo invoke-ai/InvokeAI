@@ -247,14 +247,24 @@ const useModelOnlyPlanNote = (nativeScale: number | null, scale: number): string
     : t('widgets.upscale.nativeScalePasses', { count: plan.passes, native: nativeScale });
 };
 
+/** The result's size. Refine floors it to the served grid; the revision is an argument for the reason `getFieldErrors` gives. */
+const getOutputDimensions = (
+  inputImage: NonNullable<UpscaleWidgetValues['inputImage']>,
+  values: Pick<UpscaleWidgetValues, 'mode' | 'model' | 'scale' | 'upscaleModel'>,
+  _capabilitiesRevision: number
+) => getUpscaleOutputDimensions(inputImage, values);
+
 const UpscaleOutputPreflight = memo(
   function UpscaleOutputPreflight({
+    capabilitiesRevision,
     inputImage,
     mode,
     model,
     scale,
     upscaleModel,
-  }: Pick<UpscaleWidgetValues, 'inputImage' | 'mode' | 'model' | 'scale' | 'upscaleModel'>) {
+  }: Pick<UpscaleWidgetValues, 'inputImage' | 'mode' | 'model' | 'scale' | 'upscaleModel'> & {
+    capabilitiesRevision: number;
+  }) {
     const { t } = useTranslation();
     // Refine's detail pass resizes to Scale whatever the upscaler does, so only Model only explains the upscaler.
     const nativeScale = mode === 'model-only' ? getSpandrelNativeScale(upscaleModel) : null;
@@ -264,7 +274,7 @@ const UpscaleOutputPreflight = memo(
       return null;
     }
 
-    const output = getUpscaleOutputDimensions(inputImage, { mode, model, scale, upscaleModel });
+    const output = getOutputDimensions(inputImage, { mode, model, scale, upscaleModel }, capabilitiesRevision);
     const outputMegapixels = (output.width * output.height) / 1_000_000;
     const isLargeOutput = outputMegapixels >= LARGE_OUTPUT_MEGAPIXELS;
 
@@ -368,10 +378,12 @@ const UpscaleOutputPreflight = memo(
     );
   },
   (previous, next) =>
+    previous.capabilitiesRevision === next.capabilitiesRevision &&
     previous.scale === next.scale &&
     previous.mode === next.mode &&
-    // The grid comes from the architecture, so another model of the same base changes nothing.
+    // The grid is served per base and variant, so another model of both changes nothing.
     previous.model?.base === next.model?.base &&
+    previous.model?.variant === next.model?.variant &&
     getSpandrelNativeScale(previous.upscaleModel) === getSpandrelNativeScale(next.upscaleModel) &&
     areInputImagesEquivalent(previous.inputImage, next.inputImage)
 );
@@ -753,6 +765,7 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
         <Stack gap="2.5">
           <UpscaleImageField inputImage={values.inputImage} onChange={set.inputImage} />
           <UpscaleOutputPreflight
+            capabilitiesRevision={capabilitiesRevision}
             inputImage={values.inputImage}
             mode={values.mode}
             model={values.model}
@@ -870,6 +883,7 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
         >
           <UpscalePromptFields
             batchCount={values.batchCount}
+            capabilitiesRevision={capabilitiesRevision}
             isSeedFixed={values.seedMode === 'fixed'}
             loras={values.loras}
             model={values.model}

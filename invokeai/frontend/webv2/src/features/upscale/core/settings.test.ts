@@ -1,7 +1,10 @@
 import type { GenerateLora, VaeModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 
-import { resetArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
@@ -221,6 +224,23 @@ describe('architecture-driven validation', () => {
     expect(values.tileControlnetModel).toBeNull();
   });
 
+  it("refuses an architecture the backend does not describe, rather than guess its node's grid", () => {
+    const values = upscaleReady([
+      model('main', 'main', 'flux'),
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('t5', 't5_encoder', 'any'),
+      model('clip', 'clip_embed', 'any'),
+      model('fluxvae', 'vae', 'flux'),
+    ]);
+
+    setArchitectureCapabilities(architectureCapabilitiesFixture.filter((row) => row.base !== 'flux'));
+
+    expect(getUpscaleValidationIssues(values)).toContainEqual({
+      message: 'The backend does not describe the FLUX.1 architecture, so Upscale cannot run it.',
+      section: 'generation',
+    });
+  });
+
   it('gives FLUX.1 a CLIP-L and never a CLIP-G, which its text encoder cannot run', () => {
     // A ComfyUI text_encoders folder installs both; whichever sorts first must not decide.
     const clipG = { ...model('clip-g', 'clip_embed', 'any'), variant: 'gigantic' } as ModelConfig;
@@ -264,11 +284,22 @@ describe('architecture-driven validation', () => {
     expect(getUpscaleValidationReasons(upscaleReady(installed))).toContain(reason);
   });
 
-  it('exempts a self-contained SDNQ pipeline, which ships its own parts', () => {
-    const sdnq = { ...model('main', 'main', 'flux'), format: 'sdnq_quantized' } as ModelConfig;
-    const values = upscaleReady([sdnq, model('spandrel', 'spandrel_image_to_image', 'any')]);
+  it('exempts a self-contained SDNQ pipeline, which ships its own parts, and asks one that lacks them for its encoders', () => {
+    const submodels = Object.fromEntries(
+      ['transformer', 'vae', 'text_encoder', 'tokenizer', 'text_encoder_2', 'tokenizer_2'].map((name) => [name, {}])
+    );
+    const complete = { ...model('main', 'main', 'flux'), format: 'sdnq_quantized', submodels } as ModelConfig;
+    const { text_encoder_2: _t5, ...withoutT5 } = submodels;
+    const partial = { ...complete, submodels: withoutT5 } as ModelConfig;
+    const spandrel = model('spandrel', 'spandrel_image_to_image', 'any');
 
-    expect(getUpscaleValidationReasons(values)).toEqual([]);
+    expect(getUpscaleValidationReasons(upscaleReady([complete, spandrel]))).toEqual([]);
+    // Generation's FLUX pipeline would refuse to compile it without them, so the widget asks for them instead.
+    expect(getUpscaleValidationReasons(upscaleReady([partial, spandrel]))).toEqual([
+      'Upscale needs a T5 encoder for this main model.',
+      'Upscale needs a CLIP Embed model for this main model.',
+      'Upscale needs a VAE for this main model.',
+    ]);
   });
 
   it('refuses a FLUX Fill model, which the denoise node cannot run without fill conditioning', () => {
@@ -333,17 +364,6 @@ describe('architecture-driven validation', () => {
     expect(getUpscaleValidationReasons({ ...dev, cfgScale: 25 })).toEqual(['CFG scale must be between 1 and 20.']);
     expect(getUpscaleValidationReasons({ ...dev, cfgScale: 20 })).toEqual([]);
     expect(getUpscaleValidationReasons({ ...flux, cfgScale: 25 })).toEqual([]);
-  });
-});
-
-describe('the architecture table', () => {
-  it.each(Object.entries(UPSCALE_ARCHITECTURES))('agrees with the served %s capabilities', (base, architecture) => {
-    // The fixture is the response the backend serves, pinned by `test_capabilities_fixture.py`, so
-    // a grid or negative-prompt change on a denoise node fails here instead of at enqueue.
-    const served = architectureCapabilitiesFixture.find((row) => row.base === base && row.variant === null);
-
-    expect(served?.features.dimension_grid).toBe(architecture.denoiseGrid);
-    expect(served?.features.negative_prompt.usage).toBe(architecture.negativePrompt);
   });
 });
 

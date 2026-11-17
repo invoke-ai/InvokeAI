@@ -17,7 +17,7 @@ import {
   getDynamicPromptsConfig,
   getDynamicPromptsSettingsPatch,
 } from '@features/generation/settings';
-import { upscaleArchitectureFor } from '@features/upscale/core/settings';
+import { upscaleNegativePromptUsage } from '@features/upscale/core/settings';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { memo, useCallback, useMemo } from 'react';
@@ -37,9 +37,14 @@ const getChangedKeys = (before: ProjectPromptDraft, written: ProjectPromptDraftP
  * state.
  */
 
+/** The served answer is read when this runs; the revision is an argument so the React Compiler re-reads it on reload. */
+const getNegativePromptUsage = (model: MainModelConfig | null, _capabilitiesRevision: number) =>
+  upscaleNegativePromptUsage(model);
+
 export const UpscalePromptFields = memo(
   function UpscalePromptFields({
     batchCount,
+    capabilitiesRevision,
     isSeedFixed,
     loras,
     model,
@@ -52,6 +57,7 @@ export const UpscalePromptFields = memo(
     showSyntaxHighlighting,
   }: {
     batchCount: number;
+    capabilitiesRevision: number;
     isSeedFixed: boolean;
     loras: GenerateLora[];
     model: MainModelConfig | null;
@@ -65,7 +71,7 @@ export const UpscalePromptFields = memo(
   }) {
     const { t } = useTranslation();
     const { notifications, readPromptDraft } = useUpscaleUiActions();
-    const negativePromptUsage = upscaleArchitectureFor(model)?.negativePrompt ?? 'always';
+    const negativePromptUsage = getNegativePromptUsage(model, capabilitiesRevision);
 
     /**
      * Applies a prompt change that reaches past the prompt text, which Ctrl+Z in the prompt cannot undo, with an Undo
@@ -290,6 +296,7 @@ export const UpscalePromptFields = memo(
   },
   (previous, next) =>
     previous.batchCount === next.batchCount &&
+    previous.capabilitiesRevision === next.capabilitiesRevision &&
     previous.isSeedFixed === next.isSeedFixed &&
     previous.negativePromptHeightPx === next.negativePromptHeightPx &&
     previous.onPatchPromptDraft === next.onPatchPromptDraft &&
