@@ -1,3 +1,5 @@
+import { getModelBaseLabel } from '@features/models/architectures';
+
 import type {
   FieldInputTemplate,
   InvocationTemplate,
@@ -33,32 +35,6 @@ export interface WorkflowModelRequirementSet {
 
 // #region Labeling
 
-/** Display labels for known model bases. Unknown bases fall back to a humanized form. */
-const BASE_LABELS: Record<string, string> = {
-  any: 'Any',
-  anima: 'Anima',
-  cogview4: 'CogView4',
-  'ernie-image': 'ERNIE-Image',
-  external: 'External',
-  flux: 'FLUX',
-  flux2: 'FLUX.2',
-  flux3: 'FLUX.3',
-  'ideogram-4': 'Ideogram 4',
-  'krea-2': 'Krea-2',
-  'minimax-h3': 'MiniMax H3',
-  'moss-image': 'MOSS-Image',
-  'qwen-image': 'Qwen Image',
-  'qwen-image-2-1': 'Qwen-Image-2.1',
-  'sd-1': 'SD 1.x',
-  'sd-2': 'SD 2.x',
-  'sd-3': 'SD 3.x',
-  sdxl: 'SDXL',
-  'sdxl-refiner': 'SDXL Refiner',
-  unknown: 'Unknown',
-  wan: 'Wan 2.2',
-  'z-image': 'Z-Image',
-};
-
 /** Display labels for known model taxonomy types. Unknown types fall back to a humanized form. */
 const MODEL_TYPE_LABELS: Record<string, string> = {
   clip_embed: 'CLIP embed',
@@ -93,14 +69,12 @@ const MODEL_TYPE_LABELS: Record<string, string> = {
 
 const humanize = (value: string): string => value.replaceAll(/[_-]+/g, ' ');
 
-const getBaseLabel = (base: string): string => BASE_LABELS[base] ?? humanize(base);
-
 const getModelTypeLabel = (modelType: string): string => MODEL_TYPE_LABELS[modelType] ?? humanize(modelType);
 
 const capitalize = (value: string): string => (value.length === 0 ? value : value[0]?.toUpperCase() + value.slice(1));
 
 const buildSlotLabel = (fieldTemplate: FieldInputTemplate, base: string | null, modelType: string | null): string => {
-  const baseLabel = base ? getBaseLabel(base) : null;
+  const baseLabel = base ? getModelBaseLabel(base) : null;
   const typeLabel = modelType ? getModelTypeLabel(modelType) : null;
 
   if (baseLabel && typeLabel) {
