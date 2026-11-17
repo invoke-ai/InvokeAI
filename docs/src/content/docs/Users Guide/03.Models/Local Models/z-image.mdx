@@ -64,7 +64,8 @@ The starter models:
 | Z-Image Turbo (SDNQ uint4 + SVD)   | SDNQ Diffusers pipeline     | ~5 GB   | nothing, everything is bundled                 |
 
 A full-precision **Z-Image Qwen3 Text Encoder** (~8 GB) and its community **int8** build (~4.4 GB download,
-about 4.4 GB once loaded) are also available as separate starters.
+about 4.4 GB once loaded) are also available as separate starters. A scaled-fp8 Qwen3 4B encoder file
+also stays fp8 in memory on a GPU that can hold it, about 4.4 GB instead of about 8.0 GB.
 
 The NVFP4 build keeps its quantized layers packed in memory and decodes them on the fly, so it needs about
 a third of the full-precision transformer's memory. The int8 build keeps its int8 layers as well, about 6.2 GB

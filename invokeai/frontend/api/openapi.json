@@ -1533,6 +1533,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -2135,6 +2138,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                     },
                     {
@@ -2735,6 +2741,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -3381,6 +3390,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -4054,6 +4066,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -5602,6 +5617,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -21593,6 +21611,9 @@
             "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
           },
           {
@@ -35603,10 +35624,15 @@
           "bytes_freed": {
             "type": "integer",
             "title": "Bytes Freed"
+          },
+          "vram_release_refused": {
+            "type": "boolean",
+            "title": "Vram Release Refused",
+            "description": "The device refused to return its cached memory to the driver after the models were dropped (for example an earlier error left it in a bad state). The models were still dropped; the memory stays reserved by this process."
           }
         },
         "type": "object",
-        "required": ["models_cleared", "bytes_freed"],
+        "required": ["models_cleared", "bytes_freed", "vram_release_refused"],
         "title": "EmptyModelCacheResponse"
       },
       "EnqueueBatchReceipt": {
@@ -49628,6 +49654,17 @@
             "type": "object",
             "title": "Prepared Iteration Paths",
             "description": "The iteration coordinates of each prepared execution node"
+          },
+          "prepared_iteration_axes": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Prepared Iteration Axes",
+            "description": "The named iteration axes of each prepared execution node"
           },
           "ready_order": {
             "items": {
@@ -87888,6 +87925,191 @@
         "title": "Main_GGUF_QwenImage_Config",
         "description": "Model config for GGUF-quantized Qwen Image transformer models."
       },
+      "Main_GGUF_SD3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/ModelRole"
+            },
+            "type": "array",
+            "title": "Roles",
+            "description": "Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh."
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "sd-3",
+            "title": "Base",
+            "default": "sd-3"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SD3VariantType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "roles",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_GGUF_SD3_Config",
+        "description": "Model config for GGUF-quantized SD3 transformers (single-file).\n\nBoth GGUF families keep Stability's MMDiT layout: city96's builds hold the transformer alone under bare\nkeys, stable-diffusion.cpp's put it behind `model.diffusion_model.` beside a VAE and sometimes the text\nencoders, of which only the transformer is read. Recognised by structure, since stable-diffusion.cpp writes\nno metadata at all. Text encoders and VAE are separate models, chosen on the loader node. Like the Diffusers\nconfig, it records the size (`variant`), from the transformer width its tensor shapes give, so the LoRAs that\nfit are offered alike for both formats."
+      },
       "Main_GGUF_Wan_Config": {
         "properties": {
           "key": {
@@ -96113,6 +96335,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
@@ -96961,6 +97186,9 @@
                     "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
                   },
                   {
@@ -97739,6 +97967,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
               },
               {
@@ -98326,6 +98557,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"
@@ -99495,6 +99729,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_GGUF_SD3_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_SDNQ_Diffusers_Flux2_Config"

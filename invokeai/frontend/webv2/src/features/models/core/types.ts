@@ -1,3 +1,5 @@
+import type { components } from '@api/schema';
+
 /**
  * Mirror snake_case backend model contracts with open unions so unknown architectures display generic labels
  * without a frontend release.
@@ -348,6 +350,8 @@ export interface BulkReidentifyModelsResponse {
   succeeded: string[];
   failed: { key: string; error: string }[];
 }
+
+export type EmptyModelCacheResponse = components['schemas']['EmptyModelCacheResponse'];
 
 export interface DeleteOrphanedModelsResponse {
   deleted: string[];
