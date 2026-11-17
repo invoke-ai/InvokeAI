@@ -38,6 +38,13 @@ No Python backend: `pnpm dev:mock` serves the app against the in-repo mock backe
 - Stop servers by PID (`ss -ltnp`), not `pkill -f`: its pattern can match the invoking shell. Restart after merges that add mock endpoints.
 - Provider/context error from a `?t=` module after source edits: full reload before calling it a product bug. HMR can split context modules.
 
+## Tests and comments
+
+The package keeps a lean suite and lets code speak for itself. These rules tighten the root standard.
+
+- Test each owner's core contract and its costliest failures: persisted-data compatibility, account/project isolation, security, destructive operations, recall contracts. Not every edge case, caller, past bug or layout detail. One test per behavior, at the cheapest level that proves it. Browser tests only for what needs a real browser: focus, pointer, storage, rendering. A marginal test is deleted, not kept just in case.
+- Names, types and structure carry meaning. Comment only what a reader would otherwise get wrong or undo: a hidden constraint, compatibility rule, backend/external parity, or workaround. One line where possible. No doc comments that restate a name or type, no test narration, no history.
+
 ## Performance and validation
 
 - Check rendering/subscriptions, galleries/lists, pointer handlers, Canvas resources, lazy loading, request scheduling. Use existing virtualization/lazy boundaries. Memoize only identified costs.
