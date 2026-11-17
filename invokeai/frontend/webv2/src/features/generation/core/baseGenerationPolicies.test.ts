@@ -3180,6 +3180,16 @@ describe('Krea-2, Ideogram 4 and Wan policies', () => {
     ).toEqual([]);
   });
 
+  it('blocks the I2V expert, which needs a reference frame Generate cannot supply, and allows T2V', () => {
+    const i2v = createModel('wan', { format: 'diffusers', variant: 'i2v_a14b' });
+    const t2v = createModel('wan', { format: 'diffusers', variant: 't2v_a14b' });
+
+    expect(getGenerationValidationReasons(i2v, createSettings(i2v))).toEqual([
+      'Wan 2.2 I2V models need a reference frame. Pick a T2V or TI2V model, or use the Video tab.',
+    ]);
+    expect(getGenerationValidationReasons(t2v, createSettings(t2v))).toEqual([]);
+  });
+
   it('never requires the low-noise Wan expert, which is an optional quality upgrade', () => {
     const diffusers = createModel('wan', { format: 'diffusers' });
 
@@ -3215,12 +3225,13 @@ describe('Krea-2, Ideogram 4 and Wan policies', () => {
     for (const variant of ['t2v_a14b', 'i2v_a14b']) {
       const main = createModel('wan', { format: 'diffusers', variant });
 
+      // The LoRA adds no reason of its own; I2V keeps its unrelated reference-frame reason.
       expect(
         getGenerationValidationReasons(
           main,
           createSettings(main, { loras: [{ isEnabled: true, model: a14bLora, weight: 1 }] })
         )
-      ).toEqual([]);
+      ).toEqual(getGenerationValidationReasons(main, createSettings(main)));
     }
   });
 

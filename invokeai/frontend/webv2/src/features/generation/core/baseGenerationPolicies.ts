@@ -3020,6 +3020,16 @@ const getModelFamilyValidationIssues = (model: MainModelConfig, settings: Genera
     );
   }
 
+  // The I2V-A14B transformer needs a reference-frame condition, which the Generate graph has no input for.
+  if (model.base === 'wan' && model.variant === 'i2v_a14b') {
+    issues.push(
+      createUntranslatedGenerationIssue(
+        'Wan 2.2 I2V models need a reference frame. Pick a T2V or TI2V model, or use the Video tab.',
+        MODEL_TARGET
+      )
+    );
+  }
+
   // The field commits only lists in range, but a persisted one can still name a block MOSS-Image lacks, which would fail
   // the queue item. Without CFG the negative branch never runs, so the list has no effect and its disabled field cannot
   // be fixed.
