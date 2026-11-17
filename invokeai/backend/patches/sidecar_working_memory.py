@@ -11,6 +11,7 @@ from invokeai.backend.patches.layers.full_layer import FullLayer
 from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch
 from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
@@ -45,12 +46,21 @@ def _elements(layer: BaseLayerPatch) -> int:
     """Elements of a patch layer's tensors, which a sidecar holds in the compute dtype whatever it was loaded in."""
     if isinstance(layer, SwappedHalvesLayerPatch):
         layer = layer.layer
+    if isinstance(layer, MergedLayerPatch):
+        return sum(_elements(sub_layer) for sub_layer in layer.lora_layers)
     return sum(value.numel() for value in vars(layer).values() if isinstance(value, torch.Tensor))
 
 
 def _weight_copies(layer: BaseLayerPatch) -> int:
     if isinstance(layer, SwappedHalvesLayerPatch):
         return _SWAPPED_SIDECAR_WEIGHT_COPIES[type(layer.layer)]
+    if isinstance(layer, MergedLayerPatch):
+        # The merge adds each sub-layer's update to a zero tensor of the whole weight, beside the largest sub-layer's
+        # own tensors; only MOSS-Image's LoKr on a fused qkv makes one, of LoKR pieces. Measured on the CPU with an
+        # fp8 weight, in copies of the weight, for two to four row ranges: a merge of LoKR pieces peaks at 2.5-3.5,
+        # the lower for more, smaller ranges. One copy for the merge plus a piece's 3 is a copy over the highest
+        # measure and over-reserves by up to two copies where the rows are cut small.
+        return 1 + max(_weight_copies(sub_layer) for sub_layer in layer.lora_layers)
     return _SIDECAR_WEIGHT_COPIES[type(layer)]
 
 

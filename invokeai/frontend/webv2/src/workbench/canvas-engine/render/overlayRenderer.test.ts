@@ -23,7 +23,7 @@ const baseState = (overrides: Partial<OverlayState> = {}): OverlayState => ({
 });
 
 describe('renderOverlay', () => {
-  it('clears then strokes ONLY the bbox (dashed) — no document outline (unbounded plane)', () => {
+  it('clears then draws ONLY the bbox frame — no document outline (unbounded plane)', () => {
     const backend = createTestStubRasterBackend();
     const target = backend.createSurface(200, 200);
 
@@ -31,11 +31,12 @@ describe('renderOverlay', () => {
 
     const ops = target.callLog.map((e) => e.op);
     expect(ops).toContain('clearRect');
-    // The document rect is retired as a visual boundary: the bbox is the only rect stroked.
-    expect(target.callLog.filter((e) => e.op === 'strokeRect')).toHaveLength(1);
-    // At least one dashed setLineDash for the bbox.
-    const dashArgs = target.callLog.filter((e) => e.op === 'setLineDash').map((e) => e.args[0]);
-    expect(dashArgs).toContainEqual([4, 4]);
+    // The document rect is retired as a visual boundary: nothing is stroked, and the frame's dashed bands are the
+    // only fills, many dash rects each.
+    expect(ops).not.toContain('strokeRect');
+    expect(ops).not.toContain('stroke');
+    expect(ops.filter((op) => op === 'fill')).toHaveLength(3);
+    expect(ops.filter((op) => op === 'rect').length).toBeGreaterThan(3 * 8);
   });
 
   it('draws no grid when showGrid is false', () => {
@@ -113,14 +114,15 @@ describe('renderOverlay', () => {
     const strokes = target.callLog.flatMap((entry, index) =>
       entry.op === 'strokeRect' ? [{ args: entry.args, index }] : []
     );
-    // A halo then the dashes for each region, then the bbox frame drawn last over them.
+    // A halo then the dashes for each region, then the bbox frame drawn over them.
     expect(strokes.map((stroke) => stroke.args)).toEqual([
       [0, 0, 20, 20],
       [0, 0, 20, 20],
       [120, 140, 60, 40],
       [120, 140, 60, 40],
-      [20, 20, 80, 80],
     ]);
+    const frameFills = target.callLog.flatMap((entry, index) => (entry.op === 'fill' ? [index] : []));
+    expect(frameFills[0]).toBeGreaterThan(strokes.at(-1)!.index);
     const lastSetBefore = (prop: string, index: number) =>
       target.callLog
         .slice(0, index)
@@ -136,30 +138,40 @@ describe('renderOverlay', () => {
     expect(selectedDash![1]).toBe(1);
     expect(otherDash![1] as number).toBeLessThan(1);
     expect(selectedHalo![2]).toBe(otherHalo![2]);
-    expect(lastSetBefore('strokeStyle', strokes[4]!.index)).not.toBe(selectedDash![2]);
+    expect(lastSetBefore('fillStyle', frameFills.at(-1)!)).not.toBe(selectedDash![2]);
   });
 
   it('draws no pending-result outline without regions', () => {
     const backend = createTestStubRasterBackend();
     const target = backend.createSurface(200, 200);
     renderOverlay(target, baseState({ stagedRegions: [] }));
-    expect(target.callLog.filter((e) => e.op === 'strokeRect')).toHaveLength(1);
+    expect(target.callLog.filter((e) => e.op === 'strokeRect')).toHaveLength(0);
   });
 
-  it('strokes the bbox in its own accent color (no document-outline color)', () => {
+  it('draws the bbox in its own accent color over its casings (no document-outline color)', () => {
     const backend = createTestStubRasterBackend();
     const target = backend.createSurface(200, 200);
     renderOverlay(target, baseState());
-    const strokeStyles = findSet(target.callLog, 'strokeStyle');
-    // Only bbox chrome is stroked; there is no document outline.
-    expect(strokeStyles).toEqual(['#3b82f6']);
+    const fillStyles = findSet(target.callLog, 'fillStyle');
+    // Only bbox chrome is drawn, the accent core last over both casings; there is no document outline.
+    expect(fillStyles).toHaveLength(3);
+    expect(fillStyles.at(-1)).toBe('#3b82f6');
+    expect(new Set(fillStyles).size).toBe(3);
+  });
+
+  it('traces only the frame dashes inside the surface at deep zoom', () => {
+    const backend = createTestStubRasterBackend();
+    const target = backend.createSurface(200, 200);
+    // Edges 8000 px long would hold about a thousand dashes each; a corner and two short stretches show.
+    renderOverlay(target, baseState({ view: { a: 200, b: 0, c: 0, d: 200, e: -1900, f: -1900 } }));
+    expect(target.callLog.filter((e) => e.op === 'rect').length).toBeLessThan(3 * 2 * 40);
   });
 
   it('hides the passive bbox frame when showBbox is false', () => {
     const backend = createTestStubRasterBackend();
     const target = backend.createSurface(200, 200);
     renderOverlay(target, baseState({ showBbox: false }));
-    expect(target.callLog.filter((e) => e.op === 'strokeRect')).toHaveLength(0);
+    expect(target.callLog.filter((e) => e.op === 'fill' || e.op === 'strokeRect')).toHaveLength(0);
   });
 
   it('draws the bbox-overlay shade (evenodd punch-out) only when bboxOverlay is on', () => {

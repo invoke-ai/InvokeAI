@@ -134,9 +134,13 @@ const createCommands = (
           itemKeys,
         })
       ),
-      removeItems: command('removeGalleryItems', (itemKeys: ActionPayload<'removeGalleryItems'>['itemKeys']) => ({
-        itemKeys,
-      })),
+      removeItems: command(
+        'removeGalleryItems',
+        (
+          itemKeys: ActionPayload<'removeGalleryItems'>['itemKeys'],
+          options?: Pick<ActionPayload<'removeGalleryItems'>, 'keepComparisonForSuccessor' | 'projectId'>
+        ) => ({ itemKeys, ...options })
+      ),
       reconcileDeletedBoardOutcome: command(
         'reconcileDeletedGalleryBoard',
         (outcome: ActionPayload<'reconcileDeletedGalleryBoard'>['outcome']) => ({ outcome })
@@ -505,6 +509,7 @@ const createCommands = (
       clearCompleted: command('clearCompletedQueueItems'),
       markBackendCancelled: command('markQueueItemBackendCancelled'),
       markBackendSubmitted: command('markQueueItemBackendSubmitted'),
+      noteFirstProgressFrame: command('noteQueueItemFirstProgressFrame'),
       recordSubmissionRetry: command('recordQueueItemSubmissionRetry'),
       setCancellationPending: command('setQueueItemCancellationPending'),
       setLocalRecoveryState: command('setQueueItemLocalRecoveryState'),

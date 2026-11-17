@@ -1,7 +1,10 @@
 import { MAX_WILDCARD_NAME_LENGTH } from '@features/generation/core/dynamicPrompts';
 
-/** Which surface's positive prompt: Generate (shared with Upscale) and Video are mounted side by side. */
-export type PositivePromptOwner = 'generate' | 'video';
+/**
+ * Which surface's positive prompt: Generate, Upscale and Video can be mounted side by side. Upscale shows the prompt
+ * it shares with Generate in a field of its own, so a request names the field it means.
+ */
+export type PositivePromptOwner = 'generate' | 'upscale' | 'video';
 
 const positivePromptElements = new Map<PositivePromptOwner, HTMLTextAreaElement>();
 
@@ -20,10 +23,11 @@ export const registerPositivePromptElement = (
   }
 };
 
+/** False when that field is not mounted or not shown: a field in a collapsed section stays mounted but hidden. */
 export const focusPositivePrompt = (owner: PositivePromptOwner = 'generate'): boolean => {
   const element = positivePromptElements.get(owner);
 
-  if (!element) {
+  if (!element || element.getClientRects().length === 0) {
     return false;
   }
 
@@ -31,6 +35,21 @@ export const focusPositivePrompt = (owner: PositivePromptOwner = 'generate'): bo
   element.select();
 
   return true;
+};
+
+/** How long a reveal waits for a widget, just opened, to show its prompt field. */
+const REVEAL_WAIT_MS = 1500;
+
+/** Focuses the field once it shows, for a caller that has just opened its widget or section; gives up quietly. */
+export const revealPositivePrompt = (owner: PositivePromptOwner): void => {
+  const deadline = performance.now() + REVEAL_WAIT_MS;
+  const attempt = () => {
+    if (!focusPositivePrompt(owner) && performance.now() < deadline) {
+      requestAnimationFrame(attempt);
+    }
+  };
+
+  requestAnimationFrame(attempt);
 };
 
 export const isPositivePromptFocused = (owner: PositivePromptOwner = 'generate'): boolean => {
