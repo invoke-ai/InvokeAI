@@ -1,5 +1,5 @@
 diff --git a/dist/presence.machine.js b/dist/presence.machine.js
-index 9b104c4..4e2b701 100644
+index f4d1b7a..0ba85f4 100644
 --- a/dist/presence.machine.js
 +++ b/dist/presence.machine.js
 @@ -49,6 +49,10 @@ var machine = (0, import_core.createMachine)({
@@ -25,7 +25,7 @@ index 9b104c4..4e2b701 100644
      },
      effects: {
 diff --git a/dist/presence.machine.mjs b/dist/presence.machine.mjs
-index 5c11a9e..9d66955 100644
+index 563d187..125f123 100644
 --- a/dist/presence.machine.mjs
 +++ b/dist/presence.machine.mjs
 @@ -25,6 +25,10 @@ var machine = createMachine({
