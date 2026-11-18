@@ -33,6 +33,9 @@ const readAppVersion = (): string => {
 
 // Group eager dependencies shared by both routes to avoid extra chunk requests.
 const ROUTE_SHARED_MODULES = [
+  // The editor's status bar reads the account's frontend config at boot; the lazy donation link (both routes) and the
+  // Server Output view read it too. A leaf with no Identity runtime; alone it costs the editor a startup request.
+  '/workbench/frontendConfig.ts',
   '/features/fonts/data/keys.ts',
   // Launchpad entry points and the intermediates settings metadata both read it.
   '/features/intermediates/data/focus.ts',

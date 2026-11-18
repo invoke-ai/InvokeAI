@@ -154,7 +154,7 @@ const WidgetChromeSlot = ({
 
   // Custom labels replace only standard titles; renamed instances retain selector text.
   if (slot === 'label') {
-    return HeaderLabel && !instanceMeta.title ? <HeaderLabel region={region} /> : null;
+    return HeaderLabel && !instanceMeta.title ? <HeaderLabel instanceId={instanceMeta.id} region={region} /> : null;
   }
 
   // Keep preferences beside floating widget actions without duplicating the window's layout controls.

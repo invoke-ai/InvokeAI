@@ -1189,6 +1189,45 @@ const createRepresentativeFixture = () => {
   };
 };
 
+/**
+ * Console lines the representative profile's server has printed before the first read: startup logging with
+ * InvokeAI's colored levels, a plain print, and a traceback. The empty profile starts with an empty console.
+ */
+export const createServerOutputStartupLines = (profile = 'empty') => {
+  assertMockBackendProfileName(profile);
+  if (profile !== 'representative') {
+    return [];
+  }
+
+  const log = (level, message) => {
+    const prefix = '[12:00:00,000]::[InvokeAI]::';
+    return {
+      styles: [
+        { fg: level === 'ERROR' ? '1' : level === 'WARNING' ? '3' : '6', length: level.length, offset: prefix.length },
+      ],
+      text: `${prefix}${level} --> ${message}`,
+    };
+  };
+
+  return [
+    log('INFO', 'Patchmatch initialized'),
+    log('INFO', 'Using torch device: NVIDIA GeForce RTX 4090'),
+    log('INFO', 'cuDNN version: 91002'),
+    log('INFO', 'InvokeAI version 7.0.0'),
+    log('INFO', 'Root directory = /home/fixture/invokeai'),
+    log('INFO', 'Initializing database at /home/fixture/invokeai/databases/invokeai.db'),
+    log('WARNING', 'Custom node pack "example-nodes" declares no version'),
+    { styles: [], text: 'example-nodes: loaded 3 nodes' },
+    log('INFO', 'Invoke running on http://127.0.0.1:9090 (Press CTRL+C to quit)'),
+    log('ERROR', 'Error while invoking session fixture-session-001, invocation fixture-node (example_node)'),
+    { styles: [], text: 'Traceback (most recent call last):' },
+    { styles: [], text: '  File "/home/fixture/invokeai/nodes/example_nodes/node.py", line 42, in invoke' },
+    { styles: [], text: '    raise ValueError("strength must be between 0 and 1")' },
+    { styles: [{ bold: true, fg: '1', length: 10, offset: 0 }], text: 'ValueError: strength must be between 0 and 1' },
+    { styles: [], text: '' },
+  ];
+};
+
 export const createMockBackendFixture = (profile = 'empty') => {
   assertMockBackendProfileName(profile);
 

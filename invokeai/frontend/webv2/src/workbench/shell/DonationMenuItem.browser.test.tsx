@@ -1,7 +1,11 @@
+import type * as HttpModule from '@platform/transport/http';
+
 import { ChakraProvider, Menu } from '@chakra-ui/react';
+import { getAuthSession } from '@features/identity';
 import { apiFetchJson } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { frontendConfigQueryOptions } from '@workbench/frontendConfig';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -11,7 +15,10 @@ import { page, userEvent } from 'vitest/browser';
 
 import { DonationMenuItem } from './DonationMenuItem';
 
-vi.mock('@platform/transport/http', () => ({ apiFetchJson: vi.fn() }));
+vi.mock('@platform/transport/http', async (importOriginal) => ({
+  ...(await importOriginal<typeof HttpModule>()),
+  apiFetchJson: vi.fn(),
+}));
 
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({
@@ -94,7 +101,9 @@ describe('DonationMenuItem', () => {
       await expect.element(page.getByRole('menuitem', { name: 'Other action' })).toBeVisible();
       if (state !== 'pending') {
         await vi.waitFor(() =>
-          expect(client.getQueryState(['frontend-config'])?.status).toBe(state === 'failed' ? 'error' : 'success')
+          expect(client.getQueryState(frontendConfigQueryOptions(getAuthSession()).queryKey)?.status).toBe(
+            state === 'failed' ? 'error' : 'success'
+          )
         );
       }
       expect(document.querySelector('a[href="https://github.com/sponsors/invoke-ai"]')).toBeNull();

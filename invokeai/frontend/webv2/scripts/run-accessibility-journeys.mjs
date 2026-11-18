@@ -148,6 +148,7 @@ const BUILT_IN_BOTTOM_WIDGETS = [
   'Gallery',
   'Notifications',
   'Queue status',
+  'Server Output',
   'Server Status',
   'Shortcuts',
   'Workflow',
@@ -1507,7 +1508,7 @@ const runSettingsJourney = async (browser) => {
     const sectionNames = await navigation.getByRole('button').allTextContents();
     assert.equal(
       sectionNames.length,
-      15,
+      16,
       'All application, project, widget, and system sections must be discoverable.'
     );
     assert(sectionNames.includes('Intermediates'), 'Intermediates settings must be discoverable.');

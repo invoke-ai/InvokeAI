@@ -82,6 +82,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   workflowEdgeStyle: 'curved',
   workflowEdgesBehindNodes: false,
   workflowGroupNodesByCategory: true,
+  serverOutputWrapLines: true,
   workflowLibraryCardSize: 'small',
   workflowLibraryLayout: 'grid',
   workflowLibrarySort: 'updated',
@@ -567,6 +568,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     preferences?.workflowLibraryThumbnailFit === 'contain'
       ? 'contain'
       : DEFAULT_PREFERENCES.workflowLibraryThumbnailFit,
+  serverOutputWrapLines:
+    typeof preferences?.serverOutputWrapLines === 'boolean'
+      ? preferences.serverOutputWrapLines
+      : DEFAULT_PREFERENCES.serverOutputWrapLines,
   workflowShowMinimap:
     typeof preferences?.workflowShowMinimap === 'boolean'
       ? preferences.workflowShowMinimap

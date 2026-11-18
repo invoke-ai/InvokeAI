@@ -2,6 +2,7 @@ import type { WidgetRegion } from '@workbench/layoutContracts';
 import type {
   NormalizedWidgetManifest,
   RegisteredWidget,
+  WidgetCapabilities,
   WidgetFailure,
   WidgetManifest,
   WidgetTypeId,
@@ -10,6 +11,7 @@ import type {
 import { getAuthSession } from '@features/identity';
 
 import { createDeferredResource } from './deferredResource';
+import { readWidgetCapabilities } from './widgetCapabilities';
 import { createWidgetImplementationResource } from './widgetImplementationResource';
 import { firstPartyWidgetManifests } from './widgets/manifests';
 
@@ -96,10 +98,18 @@ export const registeredWidgets = registerFirstPartyWidgets();
 
 /**
  * Admin widgets require a multi-user admin session; the route resolves session before mounting and remounts on
- * user changes.
+ * user changes. Capability widgets require the server's grant, which can change while the editor stays mounted:
+ * renders that list a region holding one (the status bar and the Widgets dialog) pass `useWidgetCapabilities()`,
+ * which also loads the grant; other callers, commands included, read the current grant from the query cache.
  */
-const isWidgetAvailable = (widget: RegisteredWidget): boolean => {
-  if (!widget.manifest.requiresAdmin) {
+export const isWidgetAvailable = (widget: RegisteredWidget, capabilities: WidgetCapabilities): boolean => {
+  const { requiresAdmin, requiresCapability } = widget.manifest;
+
+  if (requiresCapability && capabilities[requiresCapability] !== 'granted') {
+    return false;
+  }
+
+  if (!requiresAdmin) {
     return true;
   }
 
@@ -108,15 +118,20 @@ const isWidgetAvailable = (widget: RegisteredWidget): boolean => {
   return session.multiuserEnabled && session.user?.is_admin === true;
 };
 
-export const getWidgetsForRegion = (region: WidgetRegion): RegisteredWidget[] =>
+export const getWidgetsForRegion = (
+  region: WidgetRegion,
+  capabilities: WidgetCapabilities = readWidgetCapabilities()
+): RegisteredWidget[] =>
   registeredWidgets.filter(
     (widget) =>
-      widget.status !== 'hidden' && widget.manifest.allowedRegions.includes(region) && isWidgetAvailable(widget)
+      widget.status !== 'hidden' &&
+      widget.manifest.allowedRegions.includes(region) &&
+      isWidgetAvailable(widget, capabilities)
   );
 
-export const getWidgetHosts = (): RegisteredWidget[] =>
+export const getWidgetHosts = (capabilities: WidgetCapabilities = readWidgetCapabilities()): RegisteredWidget[] =>
   registeredWidgets.filter(
-    (widget) => widget.status === 'enabled' && widget.host !== undefined && isWidgetAvailable(widget)
+    (widget) => widget.status === 'enabled' && widget.host !== undefined && isWidgetAvailable(widget, capabilities)
   );
 
 export const getWidgetById = (widgetId: WidgetTypeId): RegisteredWidget | undefined =>

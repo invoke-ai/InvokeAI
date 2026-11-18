@@ -138,7 +138,7 @@ const render = async (region: 'center' | 'right' = 'center', width?: number) => 
         <ChakraProvider value={system}>
           <FocusRegionProvider controller={createTestFocusController()}>
             <div style={{ display: 'flex', width }}>
-              <PreviewWidgetLabel region={region} />
+              <PreviewWidgetLabel instanceId="preview" region={region} />
             </div>
           </FocusRegionProvider>
         </ChakraProvider>

@@ -5,6 +5,7 @@ import type * as ModelsApi from '@features/models/data/api';
 import type * as openProjects from '@workbench/projects/openProjects';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getAuthSession } from '@features/identity';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { closeModelDetail } from '@features/models/ui/uiStore';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
@@ -19,6 +20,7 @@ import {
 } from '@tanstack/react-router';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME_ID, system } from '@theme/system';
+import { frontendConfigQueryKey } from '@workbench/frontendConfig';
 import { type ReactNode, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -161,9 +163,13 @@ const isInView = (element: Element) => {
   );
 };
 
+/** The donation link stays hidden without a config read; a session the test signs in reads its own entry. */
+const seedFrontendConfig = (session: SessionModule.AuthSession) =>
+  queryClient.setQueryData(frontendConfigQueryKey(session), { show_donation_link: false });
+
 beforeEach(() => {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  queryClient.setQueryData(['frontend-config'], { show_donation_link: false });
+  seedFrontendConfig(getAuthSession());
   applyThemeToRoot(DEFAULT_THEME_ID);
   accountLifecycle.activate('launchpad-shell-test', ':user:launchpad-shell-test');
   setModelsSnapshotForTests({ models: [lora('a'), lora('b')], status: 'loaded' });
@@ -270,6 +276,7 @@ describe('Launchpad shell', () => {
         user_id: 'max',
       },
     };
+    seedFrontendConfig(auth.session);
     // The row is named by its lines, the icon-only button by its label; both start from the name.
     const account = page.getByRole('button', { name: new RegExp(name) });
     const help = page.getByRole('button', { name: 'launchpad.help.label' });

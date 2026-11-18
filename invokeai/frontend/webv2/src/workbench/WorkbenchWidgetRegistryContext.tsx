@@ -1,11 +1,12 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
-import type { RegisteredWidget, WidgetTypeId } from '@workbench/widgetContracts';
+import type { RegisteredWidget, WidgetCapabilities, WidgetTypeId } from '@workbench/widgetContracts';
 
 import { createContext, use, useMemo, type ReactNode } from 'react';
 
 interface WorkbenchWidgetRegistryContextValue {
   getWidgetById: (widgetId: WidgetTypeId) => RegisteredWidget | undefined;
-  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
+  /** Renders that list widgets pass `useWidgetCapabilities()`; other callers read the current grants. */
+  getWidgetsForRegion: (region: WidgetRegion, capabilities?: WidgetCapabilities) => RegisteredWidget[];
 }
 
 const WorkbenchWidgetRegistryContext = createContext<WorkbenchWidgetRegistryContextValue | null>(null);
@@ -17,7 +18,7 @@ export const WorkbenchWidgetRegistryProvider = ({
 }: {
   children: ReactNode;
   getWidgetById: (widgetId: WidgetTypeId) => RegisteredWidget | undefined;
-  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
+  getWidgetsForRegion: (region: WidgetRegion, capabilities?: WidgetCapabilities) => RegisteredWidget[];
 }) => {
   const value = useMemo<WorkbenchWidgetRegistryContextValue>(
     () => ({ getWidgetById, getWidgetsForRegion }),

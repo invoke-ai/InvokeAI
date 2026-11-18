@@ -11,6 +11,7 @@ import { ListStack } from '@platform/ui/list/ListStack';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { revealOrOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { useWidgetCapabilities } from '@workbench/widgetCapabilities';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import {
   closeWidgetPlacement,
@@ -68,6 +69,7 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
   const queries = useWorkbenchQueries();
   const focus = useWorkbenchFocus();
   const { getWidgetById, getWidgetsForRegion } = useWorkbenchWidgetRegistry();
+  const capabilities = useWidgetCapabilities();
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   // Show moves focus to the widget; closing then must not pull it back to whatever opened the list.
   const [returnsFocus, setReturnsFocus] = useState(true);
@@ -75,7 +77,7 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
     const byId = new Map<string, RegisteredWidget>();
 
     for (const region of REGIONS) {
-      for (const widget of getWidgetsForRegion(region)) {
+      for (const widget of getWidgetsForRegion(region, capabilities)) {
         if (widget.status === 'enabled') {
           byId.set(widget.manifest.id, widget);
         }
@@ -83,7 +85,7 @@ export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean;
     }
 
     return [...byId.values()];
-  }, [getWidgetsForRegion]);
+  }, [capabilities, getWidgetsForRegion]);
   const rows = useMemo(
     () =>
       getWidgetsListRows({

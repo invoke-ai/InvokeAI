@@ -2748,6 +2748,7 @@
         "preview": "Preview",
         "workflow": "Workflow",
         "queue": "Queue",
+        "serverOutput": "Server Output",
         "imageMap": "Image Map",
         "developer": "Developer",
         "server": "Server",
@@ -2765,7 +2766,11 @@
       },
       "resetLoggingDefaults": "Reset to defaults",
       "loggingDefaultsActive": "Default logging settings are active.",
-      "manageIntermediates": "Manage intermediates…"
+      "manageIntermediates": "Manage intermediates…",
+      "serverOutputWrapLines": {
+        "label": "Wrap long lines",
+        "description": "Wrap long server output lines. Off keeps each line whole and scrolls sideways."
+      }
     }
   },
   "shell": {
@@ -3047,6 +3052,7 @@
       "preview": "Preview",
       "queue": "Queue",
       "queueStatus": "Queue status",
+      "serverOutput": "Server Output",
       "serverStatus": "Server Status",
       "upscale": "Upscale",
       "workflow": "Workflow",
@@ -6586,6 +6592,41 @@
       "loadingModel": "Loading {{model}} · {{count}} queued",
       "loadingModelUnnamed": "Loading model · {{count}} queued",
       "offline": "{{count}} queued · reconnecting…"
+    },
+    "serverOutput": {
+      "copied": "Copied server output",
+      "copy": "Copy output",
+      "copyFailed": "Could not copy server output to the clipboard.",
+      "copyHint": "Copies the selected text, or all output when nothing is selected",
+      "empty": {
+        "description": "Console output appears here as the server writes it.",
+        "title": "No output yet"
+      },
+      "jumpToLatest": "Jump to latest",
+      "loading": "Loading server output…",
+      "logLabel": "Server console output",
+      "notices": {
+        "dismiss": "Dismiss",
+        "expired": "Some output was missed while this view fell behind. Showing the latest output.",
+        "restarted": "The server restarted. Output from before the restart is no longer available.",
+        "truncated": "Earlier output is no longer available."
+      },
+      "refused": {
+        "checkAgain": "Check again",
+        "denied": "This server is not sharing its console output with this account. Output capture may be off, or this account may no longer be an administrator.",
+        "forbidden": "Only administrators can view the server's console output.",
+        "remove": "Remove from layout",
+        "title": "Server output is unavailable",
+        "unavailable": "This server is not capturing its console output."
+      },
+      "status": {
+        "checking": "Checking access",
+        "connecting": "Connecting",
+        "live": "Live",
+        "reconnecting": "Reconnecting",
+        "unavailable": "Unavailable"
+      },
+      "waiting": "Can't reach the server yet. Retrying…"
     },
     "serverStatus": {
       "connected": "Connected to server",
