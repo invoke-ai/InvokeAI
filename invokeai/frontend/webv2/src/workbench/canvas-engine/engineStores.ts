@@ -223,8 +223,17 @@ export interface ControlLayerView {
   view: 'original' | 'overlay';
 }
 
+export interface TransformOptions {
+  smoothing: boolean;
+  resampleMode: 'bilinear' | 'bicubic' | 'hamming' | 'lanczos';
+  fitMode: 'contain' | 'cover' | 'fill';
+}
+
 /** Spans gestures until Apply or Cancel; `startTransform` is the undo and cancel baseline. */
 export interface TransformSession {
+  processing?: boolean;
+  processingPhase?: 'preparing' | 'queued' | 'resampling';
+  applyFailed?: boolean;
   layerId: string;
   startTransform: LayerTransform;
   transform: LayerTransform;
@@ -426,6 +435,8 @@ export interface EngineStores {
   /** React feeds this from generate settings. */
   bboxGrid: ScalarStore<number>;
   bboxPreview: ScalarStore<Rect | null>;
+  /** Transient; not part of the persisted document. */
+  transformOptions: ScalarStore<TransformOptions>;
   transformSession: ScalarStore<TransformSession | null>;
   pendingTransformLayerId: ScalarStore<string | null>;
   checkerboard: ScalarStore<boolean>;
@@ -537,6 +548,9 @@ const transformSessionEqual = (a: TransformSession | null, b: TransformSession |
     return a === b;
   }
   return (
+    a.processing === b.processing &&
+    a.processingPhase === b.processingPhase &&
+    a.applyFailed === b.applyFailed &&
     a.layerId === b.layerId &&
     transformEqual(a.startTransform, b.startTransform) &&
     transformEqual(a.transform, b.transform)
@@ -647,6 +661,11 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   thumbnailVersion: createKeyedVersionStore(),
   thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
   adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),
+  transformOptions: createScalarStore<TransformOptions>({
+    smoothing: false,
+    resampleMode: 'bicubic',
+    fitMode: 'contain',
+  }),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
   pendingTransformLayerId: createScalarStore<string | null>(null),
   viewportReady: createScalarStore<boolean>(false),

@@ -10,7 +10,7 @@ import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/ren
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
+import { createDocumentModel, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import {
   getDocumentIndex,
   getDocumentLayer,
@@ -87,6 +87,7 @@ export interface LayerMutationControllerOptions {
     | 'isGestureActive'
     | 'isPermitCurrent'
     | 'preparePixels'
+    | 'projectId'
     | 'reserveRaster'
   >;
   readonly backend: RasterBackend;
@@ -144,7 +145,7 @@ export class LayerMutationController {
 
   constructor(private readonly options: LayerMutationControllerOptions) {}
 
-  async duplicate(layerIds: readonly string[]): Promise<DuplicateLayersResult> {
+  async duplicate(label: string, layerIds: readonly string[]): Promise<DuplicateLayersResult> {
     const { ctx, ...o } = this.options;
     const permit = ctx.capturePermit();
     if (this.duplicateInFlight || !permit || ctx.isGestureActive()) {
@@ -162,7 +163,7 @@ export class LayerMutationController {
     const plans = sources.map((source) => o.getDuplicateRasterPlan(source, document));
     const notReadySources = sources.filter((_source, index) => plans[index]?.type === 'not-ready');
     if (notReadySources.length === 0) {
-      return this.commitDuplicate(layerIds);
+      return this.commitDuplicate(label, layerIds);
     }
 
     this.duplicateInFlight = true;
@@ -196,14 +197,14 @@ export class LayerMutationController {
       ) {
         return { status: 'stale' };
       }
-      return this.commitDuplicate(layerIds);
+      return this.commitDuplicate(label, layerIds);
     } finally {
       pinLease.release();
       this.duplicateInFlight = false;
     }
   }
 
-  private commitDuplicate(layerIds: readonly string[]): DuplicateLayersResult {
+  private commitDuplicate(label: string, layerIds: readonly string[]): DuplicateLayersResult {
     const { ctx, ...o } = this.options;
     const document = ctx.getDocument();
     if (!document) {
@@ -212,6 +213,15 @@ export class LayerMutationController {
     const roots = duplicateRoots(document, layerIds);
     if (!roots) {
       return { status: 'nothing' };
+    }
+    // Asked of the document being committed: callers check first, so a refusal here means a group was locked or the
+    // tree outgrew its limits while source pixels were prepared.
+    const refusal = createDocumentModel(document, {
+      editRevision: ctx.getEditRevision(),
+      projectId: ctx.projectId,
+    }).refusalFor({ createId: ctx.createLayerId, ids: layerIds, type: 'duplicate' });
+    if (refusal) {
+      return { status: 'stale' };
     }
     const sources = roots.flatMap((entry) => collectSubtreeLeaves(entry.node));
     const plans = sources.map((source) => o.getDuplicateRasterPlan(source, document));
@@ -365,22 +375,18 @@ export class LayerMutationController {
           )
         );
       };
-      const result = txn.publish(
-        duplicates.length === 1 ? 'Duplicate layer' : 'Duplicate layers',
-        added(initialPrepared),
-        {
-          bytes: historyBytes,
-          dispose: () => detachedLease?.release(),
-          heldAssetRefs: collectHistoryMediaRefs(duplicates),
-          redo,
-          undo: () =>
-            ctx.applyStep(
-              stackStep(removeDuplicates, hasOriginals, addDuplicates, hasDuplicates, {
-                notify: () => o.publishSelectedLayerIds(previousSelectedLayerId, previousSelectedIds),
-              })
-            ),
-        }
-      );
+      const result = txn.publish(label, added(initialPrepared), {
+        bytes: historyBytes,
+        dispose: () => detachedLease?.release(),
+        heldAssetRefs: collectHistoryMediaRefs(duplicates),
+        redo,
+        undo: () =>
+          ctx.applyStep(
+            stackStep(removeDuplicates, hasOriginals, addDuplicates, hasDuplicates, {
+              notify: () => o.publishSelectedLayerIds(previousSelectedLayerId, previousSelectedIds),
+            })
+          ),
+      });
       if (result.status !== 'committed') {
         return { status: guardedResultRefusal(result) };
       }

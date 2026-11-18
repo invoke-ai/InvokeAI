@@ -9,13 +9,24 @@ import type {
   NewRasterLayerResult,
 } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import type * as LayerCommandsModule from '@workbench/widgets/layers/layerCommands';
 import type { TFunction } from 'i18next';
 
 import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
+import { deleteLayers, duplicateLayers, groupLayers, ungroupLayers } from '@workbench/widgets/layers/layerCommands';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+
+// The layer commands own their eligibility, labels and feedback (see layerCommands tests); here only routing counts.
+vi.mock('@workbench/widgets/layers/layerCommands', async (importOriginal) => ({
+  ...(await importOriginal<typeof LayerCommandsModule>()),
+  deleteLayers: vi.fn(() => 'committed'),
+  duplicateLayers: vi.fn(() => Promise.resolve('committed')),
+  groupLayers: vi.fn(() => 'committed'),
+  ungroupLayers: vi.fn(() => 'committed'),
+}));
 
 import { CANVAS_HEADER_HOTKEYS } from './canvasHeaderCommands';
 import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
@@ -98,9 +109,11 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
 };
 
 let dispatch: Mock<(mutation: CanvasProjectMutation) => boolean>;
+let copySelection: Mock<(cut: boolean) => void>;
+let pasteFromClipboard: Mock<() => void>;
 
 const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyContext => ({
-  copySelection: vi.fn(),
+  copySelection,
   cropAllLayers: vi.fn(),
   dispatch,
   reportLayerOperation: vi.fn(),
@@ -111,8 +124,8 @@ const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyCo
   document: documentOf([rasterLayer('a'), rasterLayer('b')], 'a'),
   engine: createEngine(),
   hasMultipleStagingSlots: false,
-  notifyLayerDuplicateFailed: vi.fn(),
-  pasteFromClipboard: vi.fn(),
+  layerCommands: { engine: null, reportError: vi.fn(), t: ((key: string) => key) as TFunction },
+  pasteFromClipboard,
   resetActiveColors: vi.fn(),
   selectedLayerIds: ['a'],
   swapActiveColors: vi.fn(),
@@ -130,7 +143,10 @@ const run = (commandId: string, overrides: Partial<CanvasHotkeyContext> = {}) =>
 };
 
 beforeEach(() => {
+  vi.clearAllMocks();
   dispatch = vi.fn();
+  copySelection = vi.fn();
+  pasteFromClipboard = vi.fn();
 });
 
 describe('while results are staged', () => {
@@ -154,8 +170,8 @@ describe('while results are staged', () => {
     expect(erasing.selection.eraseSelection).toHaveBeenCalledOnce();
     expect(dispatch).not.toHaveBeenCalled();
 
-    const deleting = run('canvas.deleteSelected', { hasMultipleStagingSlots: true });
-    expect(deleting.layers.commitPrepared).toHaveBeenCalledOnce();
+    run('canvas.deleteSelected', { hasMultipleStagingSlots: true });
+    expect(deleteLayers).toHaveBeenCalledOnce();
     expect(dispatch).not.toHaveBeenCalled();
   });
 });
@@ -229,53 +245,28 @@ describe('layer reorder', () => {
   );
 });
 
-describe('delete: pixels vs layer', () => {
-  it('erases the pixel selection when one exists', () => {
+describe('layer commands', () => {
+  it.each([
+    ['canvas.deleteSelected', deleteLayers],
+    ['canvas.duplicateLayer', duplicateLayers],
+    ['canvas.groupLayers', groupLayers],
+    ['canvas.ungroupLayers', ungroupLayers],
+  ])('%s runs the shared layer command on the Layers-panel selection', (commandId, command) => {
+    const ctx = contextOf({ selectedLayerIds: ['a', 'b'] });
+    executeCanvasHotkeyCommand(commandId, ctx);
+    expect(command).toHaveBeenCalledExactlyOnceWith(ctx.layerCommands, ['a', 'b']);
+  });
+
+  it('Delete erases a live pixel selection instead of deleting layers', () => {
     const engine = run('canvas.deleteSelected', { engine: createEngine({ hasSelection: true }) });
-    expect(engine.selection.eraseSelection).toHaveBeenCalled();
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
+    expect(engine.selection.eraseSelection).toHaveBeenCalledOnce();
+    expect(deleteLayers).not.toHaveBeenCalled();
   });
 
-  it('deletes the selected layer when there is no pixel selection', () => {
-    const engine = run('canvas.deleteSelected');
-    expect(engine.selection.eraseSelection).not.toHaveBeenCalled();
-    expect(engine.layers.commitPrepared).toHaveBeenCalledWith(
-      'widgets.canvas.commands.deleteLayer',
-      expect.objectContaining({ forward: { ids: ['a'], type: 'removeCanvasLayers' } })
-    );
-  });
-
-  it('deletes the full Layers-panel selection as one history edit', () => {
-    const layers = [rasterLayer('a'), rasterLayer('b'), rasterLayer('c')];
-    const engine = run('canvas.deleteSelected', { document: documentOf(layers, 'a'), selectedLayerIds: ['a', 'c'] });
-
-    expect(engine.layers.commitPrepared).toHaveBeenCalledWith(
-      'widgets.canvas.commands.deleteLayer',
-      expect.objectContaining({
-        forward: { ids: ['a', 'c'], type: 'removeCanvasLayers' },
-        inverse: expect.objectContaining({
-          add: [expect.objectContaining({ nodes: [layers[0]] }), expect.objectContaining({ nodes: [layers[2]] })],
-          selectedLayerId: 'a',
-        }),
-      })
-    );
-  });
-
-  it('does not delete when any selected layer is locked', () => {
-    const engine = run('canvas.deleteSelected', {
-      document: documentOf([rasterLayer('a'), rasterLayer('b', { isLocked: true })], 'a'),
-      selectedLayerIds: ['a', 'b'],
-    });
-
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
-  });
-});
-
-describe('duplicate: lift vs whole layer', () => {
-  it('lifts the pixel selection into a new layer when one exists', () => {
+  it('mod+J lifts a live pixel selection into a new layer instead of duplicating layers', () => {
     const engine = run('canvas.duplicateLayer', { engine: createEngine({ hasSelection: true }) });
-    expect(engine.selection.liftSelectionToLayer).toHaveBeenCalled();
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
+    expect(engine.selection.liftSelectionToLayer).toHaveBeenCalledOnce();
+    expect(duplicateLayers).not.toHaveBeenCalled();
   });
 });
 
@@ -284,15 +275,13 @@ describe('clipboard', () => {
     ['canvas.copySelection', false],
     ['canvas.cutSelection', true],
   ] as const)('%s copies the selection with cut %s', (commandId, cut) => {
-    const copySelection = vi.fn();
-    run(commandId, { copySelection });
+    run(commandId);
     expect(copySelection).toHaveBeenCalledExactlyOnceWith(cut);
   });
 
   it('pastes', () => {
-    const pasteFromClipboard = vi.fn();
-    run('canvas.pasteImage', { pasteFromClipboard });
-    expect(pasteFromClipboard).toHaveBeenCalledOnce();
+    run('canvas.pasteImage');
+    expect(pasteFromClipboard).toHaveBeenCalled();
   });
 });
 
@@ -432,48 +421,12 @@ describe('group selection', () => {
     stacks: stacksFrom(nodes),
   });
 
-  it('reorders, deletes and duplicates a selected group', () => {
+  it('reorders a selected group', () => {
     const document = nodeDocument([groupContract('g', [rasterLayer('a')]), rasterLayer('b')], 'g');
     const reorder = run('canvas.layerToBack', { document, selectedLayerIds: ['g'] });
     expect(reorder.layers.commitPrepared).toHaveBeenCalledWith(
       'widgets.canvas.commands.reorderLayer',
       expect.objectContaining({ forward: expect.objectContaining({ type: 'reorderCanvasSiblings' }) })
-    );
-    const remove = run('canvas.deleteSelected', { document, selectedLayerIds: ['g'] });
-    expect(remove.layers.commitPrepared).toHaveBeenCalledWith(
-      'widgets.canvas.commands.deleteLayer',
-      expect.objectContaining({ forward: { ids: ['g'], type: 'removeCanvasLayers' } })
-    );
-    const duplicate = run('canvas.duplicateLayer', { document, selectedLayerIds: ['g'] });
-    expect(duplicate.layers.duplicateLayers).toHaveBeenCalledWith(['g']);
-  });
-
-  it('refuses to delete a leaf frozen by a locked group', () => {
-    const document = nodeDocument([groupContract('g', [rasterLayer('a')], { isLocked: true })], 'a');
-    const engine = run('canvas.deleteSelected', { document, selectedLayerIds: ['a'] });
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
-  });
-
-  it('groups and ungroups the selection', () => {
-    const grouped = run('canvas.groupLayers', {
-      document: nodeDocument([rasterLayer('a'), rasterLayer('b')], 'a'),
-      selectedLayerIds: ['a', 'b'],
-    });
-    expect(grouped.layers.commitPrepared).toHaveBeenCalledWith(
-      'widgets.canvas.commands.groupLayers',
-      expect.objectContaining({
-        forward: expect.objectContaining({
-          add: [expect.objectContaining({ nodes: [expect.objectContaining({ type: 'group' })] })],
-        }),
-      })
-    );
-    const ungrouped = run('canvas.ungroupLayers', {
-      document: nodeDocument([groupContract('g', [rasterLayer('a')])], 'g'),
-      selectedLayerIds: ['g'],
-    });
-    expect(ungrouped.layers.commitPrepared).toHaveBeenCalledWith(
-      'widgets.canvas.commands.ungroupLayers',
-      expect.objectContaining({ forward: expect.objectContaining({ removeIds: ['g'] }) })
     );
   });
 });

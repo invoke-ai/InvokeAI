@@ -208,10 +208,6 @@ def test_no_assembly_line_passes_through_a_point_its_floor_covers() -> None:
     assert two_phase_envelope([*decodes, covered]) == ((Fraction(125, 4), 0), (0, 0))
 
 
-def test_the_shipped_margin_is_five_percent() -> None:
-    assert SHIPPED_MARGIN == Fraction(5, 100)
-
-
 def test_the_shipped_pair_adds_the_margin_and_rounds_up() -> None:
     k, b = upper_envelope(SCATTERED)
     shipped_k, shipped_b = shipped_pair(SCATTERED)

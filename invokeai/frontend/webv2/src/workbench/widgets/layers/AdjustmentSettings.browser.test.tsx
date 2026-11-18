@@ -121,7 +121,10 @@ const setUp = (owner: Owner, adjustments: CanvasAdjustmentEntry[]): void => {
     },
   });
   adjustmentStatus = createFakeAdjustmentStatus();
-  Object.assign(stub.engine, { interaction: adjustmentStatus.interaction });
+  // The group menu reads its commands' availability on every render; the stub's document never changes beneath it.
+  Object.assign(stub.engine, {
+    interaction: { ...adjustmentStatus.interaction, subscribe: () => () => undefined },
+  });
 };
 
 const mount = async (element: ReactElement): Promise<void> => {

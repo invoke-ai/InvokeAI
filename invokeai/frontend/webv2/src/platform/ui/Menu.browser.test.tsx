@@ -128,7 +128,10 @@ describe('unavailable menu items', () => {
 
     await act(() => userEvent.click(item('rename')));
     expect(actions.rename).toHaveBeenCalledOnce();
-    expect(actions.rootSelect).toHaveBeenCalledWith({ value: 'rename' });
+    expect(actions.rootSelect).toHaveBeenCalledWith({
+      modifiers: { altKey: false, ctrlKey: false, metaKey: false, shiftKey: false },
+      value: 'rename',
+    });
   });
 });
 

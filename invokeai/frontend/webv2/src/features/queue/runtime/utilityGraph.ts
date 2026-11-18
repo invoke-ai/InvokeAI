@@ -101,7 +101,12 @@ const scheduleUtilityReconcileRetry: UtilityReconcileRetryScheduler = (callback,
   return () => clearTimeout(timer);
 };
 
+export type UtilityGraphExecutionStatus = 'pending' | 'in_progress';
+
 export interface RunUtilityGraphOptions {
+  /** Observed state for this utility only; never inferred before enqueue acceptance. */
+  onStatus?: (status: UtilityGraphExecutionStatus) => void;
+  prepend?: boolean;
   graph: QueueBackendGraph;
   /** Defaults to the first image-bearing completion for our origin. */
   outputNodeId?: string;
@@ -255,11 +260,13 @@ interface UtilityItemWatch {
 const watchUtilityItems = ({
   hub,
   onOutcome,
+  onStatus,
   origin,
   readItemStatus,
 }: {
   hub: UtilityHub;
   onOutcome: (error: UtilityQueueError | null) => void;
+  onStatus?: (status: UtilityGraphExecutionStatus) => void;
   origin: string;
   readItemStatus: UtilityItemStatusReader;
 }): UtilityItemWatch => {
@@ -295,6 +302,9 @@ const watchUtilityItems = ({
       try {
         const item = await readItemStatus(itemId, reads.signal);
         readFailures.delete(itemId);
+        if (!detached && (item.status === 'pending' || item.status === 'in_progress')) {
+          onStatus?.(item.status);
+        }
         const outcome = detached ? undefined : toTerminalUtilityOutcome(item.status, item.errorMessage, item.errorType);
         if (outcome !== undefined) {
           onOutcome(outcome);
@@ -372,6 +382,9 @@ const watchUtilityItems = ({
       hub.on('queue_item_status_changed', (event: QueueItemStatusChangedEvent) => {
         if (event.origin !== origin) {
           return;
+        }
+        if (!detached && (event.status === 'pending' || event.status === 'in_progress')) {
+          onStatus?.(event.status);
         }
         const outcome = toTerminalUtilityOutcome(event.status, event.error_message, event.error_type);
         if (outcome !== undefined) {
@@ -539,7 +552,7 @@ export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Pr
 };
 
 export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<UtilityGraphResult> => {
-  const { graph, hub, outputNodeId, signal } = options;
+  const { graph, hub, outputNodeId, prepend, signal } = options;
   const owner = captureAccountScope();
   const enqueue = options.enqueue ?? enqueueUtility;
   const cancel = options.cancel ?? cancelQueueItems;
@@ -579,7 +592,18 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     const detachers: Array<() => void> = [];
     let watch: UtilityItemWatch | null = null;
     let timer: ReturnType<typeof setTimeout> | null = null;
-
+    let executionStatus: UtilityGraphExecutionStatus | null = null;
+    const publishStatus = (status: UtilityGraphExecutionStatus): void => {
+      if (settled || completionReceived || status === executionStatus || executionStatus === 'in_progress') {
+        return;
+      }
+      executionStatus = status;
+      try {
+        options.onStatus?.(status);
+      } catch {
+        // A progress observer must not interrupt queue settlement or cancellation.
+      }
+    };
     const cancelAcceptedItems = (): void => {
       if (
         !isAccountScopeCurrent(owner) ||
@@ -784,6 +808,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
           completionReceived = true;
           reconcileCompletion();
         },
+        onStatus: options.onStatus ? publishStatus : undefined,
         origin,
         readItemStatus,
       });
@@ -829,7 +854,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         if (!isAccountScopeCurrent(owner)) {
           throw new UtilityQueueError('aborted', 'The utility graph account scope expired.');
         }
-        return enqueue({ graph, origin, idempotencyKey: origin });
+        return enqueue({ graph, origin, idempotencyKey: origin, ...(prepend === true ? { prepend: true } : {}) });
       })
       .then((result) => {
         const inspected = inspectUtilityEnqueueResult(result);
@@ -852,6 +877,9 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
         result.acknowledge?.();
         if (!settled) {
           reconcileCompletion();
+          if (options.onStatus && !completionReceived) {
+            void watch?.read();
+          }
         }
       })
       .catch((error: unknown) => {

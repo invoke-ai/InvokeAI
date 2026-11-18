@@ -110,13 +110,11 @@ const ReadOnlyValue = ({ label, value }: { label: string; value: string }) => (
   </Stack>
 );
 
-/** NumberInput takes only the Field's state; its description and error message are referenced here. */
+/** NumberInput takes only the Field's state; its helper and error text are referenced here. */
 const FieldNumberInputControl = ({ label, placeholder }: { label: string; placeholder: string }) => {
   const field = useFieldContext();
-  const describedBy =
-    [field?.ariaDescribedby, field?.getInputProps()['aria-errormessage']].filter(Boolean).join(' ') || undefined;
 
-  return <NumberInput.Input aria-describedby={describedBy} aria-label={label} placeholder={placeholder} />;
+  return <NumberInput.Input aria-describedby={field?.ariaDescribedby} aria-label={label} placeholder={placeholder} />;
 };
 
 const OptionalNumberField = ({

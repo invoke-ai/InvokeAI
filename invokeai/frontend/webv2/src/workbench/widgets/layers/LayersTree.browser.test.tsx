@@ -674,7 +674,11 @@ describe('LayersTree selection, surfaces and structure', () => {
       swapActiveColors: vi.fn(),
       resetActiveColors: vi.fn(),
       pasteFromClipboard: vi.fn(),
-      notifyLayerDuplicateFailed: vi.fn(),
+      layerCommands: {
+        engine: engine as CanvasEngine,
+        reportError: vi.fn(),
+        t: ((key: string) => key) as CanvasHotkeyContext['layerCommands']['t'],
+      },
       reportStructuralCommit: vi.fn(),
       reportPreparedCommit: vi.fn(),
       reportLayerOperation: vi.fn(),

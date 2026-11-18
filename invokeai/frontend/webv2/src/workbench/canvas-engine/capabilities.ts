@@ -46,6 +46,7 @@ import type {
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
+  TransformOptions,
   TransformSession,
 } from './engineStores';
 import type { RasterCompositeExportRequest, RasterCompositeExportResult } from './exportRasterComposite';
@@ -207,6 +208,7 @@ export interface CanvasInteractionState {
   stagingHidesOverlays: boolean;
   textEditSession: TextEditSession | null;
   textOptions: TextToolOptions;
+  transformOptions: TransformOptions;
   transformSession: TransformSession | null;
   /** Waits for fresh pixels to persist; clears on tool switch, selection change, Escape, removal or failure. */
   pendingTransformLayerId: string | null;
@@ -236,6 +238,7 @@ export type CanvasWritableInteractionKey = Extract<
   | 'showGrid'
   | 'snapToGrid'
   | 'textOptions'
+  | 'transformOptions'
 >;
 
 export interface CanvasInteractionStateCapability {
@@ -675,7 +678,7 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   /** One undo step, hidden and disabled leaves included; locked leaves are skipped and counted. */
   cropAllLayersToBbox(): Promise<CropAllLayersResult>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
-  duplicateLayers(layerIds: readonly string[]): Promise<DuplicateLayersResult>;
+  duplicateLayers(label: string, layerIds: readonly string[]): Promise<DuplicateLayersResult>;
   mergeInpaintMasks(layerIds: readonly string[]): Promise<MergeInpaintMasksResult>;
   mergeLayerDown(upperLayerId: string): Promise<MergeDownResult>;
   mergeSelectedRasterLayers(layerIds: readonly string[]): Promise<MergeVisibleResult>;
@@ -770,6 +773,7 @@ export type {
   ShapeToolTarget,
   TextEditSession,
   TextToolOptions,
+  TransformOptions,
   TransformSession,
 } from './engineStores';
 export {

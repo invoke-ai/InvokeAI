@@ -396,11 +396,11 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/widgets/layers/LayerSaveToBoardSubmenu.tsx',
   '/workbench/widgets/layers/RunLayerWorkflowDialog.tsx',
   '/workbench/widgets/layers/colorLabels.ts',
+  '/workbench/widgets/layers/layerCommands.ts',
   '/workbench/widgets/layers/layerActionSession.ts',
   '/workbench/widgets/layers/layerContextActions.ts',
   '/workbench/widgets/layers/layerContextMenuLayout.ts',
   '/workbench/widgets/layers/layerExportActions.ts',
-  '/workbench/widgets/layers/layerGroupCommands.ts',
   '/workbench/widgets/layers/layerMenuState.ts',
   '/workbench/widgets/layers/runLayerWorkflow.ts',
   '/workbench/widgets/layers/useSelectedModelBase.ts',
@@ -589,6 +589,14 @@ export default defineConfig({
               test: (id) =>
                 id.includes('/node_modules/html-parse-stringify/') ||
                 /\/node_modules\/react-i18next\/dist\/es\/Trans(?:WithoutContext)?\.js$/.test(id),
+            },
+            {
+              // Only the lazy command palette uses Chakra's Command parts. The `chakra` group below would pull them in
+              // through the package barrel and load them at startup.
+              includeDependenciesRecursively: false,
+              name: 'chakra-command',
+              priority: 30,
+              test: (id) => /\/node_modules\/@chakra-ui\/react\/dist\/[^/]+\/components\/command\//.test(id),
             },
             {
               // ~1 MB, only the lazy Image Map plot needs it.

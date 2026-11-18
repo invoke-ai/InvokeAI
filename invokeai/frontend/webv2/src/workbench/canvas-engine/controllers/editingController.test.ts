@@ -52,7 +52,6 @@ const createTransformOptions = () => ({
   pending: { get: () => null, set: vi.fn() },
   reportRefusal: vi.fn(),
   rebaseLineEnd: vi.fn(),
-  restoreCache: vi.fn(),
   select: vi.fn(),
   session: { get: () => null, set: vi.fn() },
   setOverride: vi.fn(),

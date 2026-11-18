@@ -194,21 +194,25 @@ it.each([
 // A closed menu stays in the DOM until its own exit animation ends.
 const openMenu = () => document.querySelector('[role="menu"][data-state="open"]');
 
+// Stretches a marked element's exit animation past CI driver round trips; presence unmounts at once without one.
+const holdExitStyle = document.createElement('style');
+holdExitStyle.textContent = '[data-hold-exit][data-state="closed"] { animation-duration: 600s !important; }';
+document.head.append(holdExitStyle);
+
 const renameThenDismiss = async (id: string) => {
   await act(() => openSurface({ anchor, id, kind: 'menu' }));
   await act(() => page.getByRole('menuitem', { name: 'Rename layer', exact: true }).click());
   await expect.element(page.getByRole('dialog', { name: 'Rename layer' })).toBeVisible();
   const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
   await Promise.all(dialog.getAnimations().map((animation) => animation.finished));
-  // Driver round trips can outlast the exit animation on CI; hold it before sending Escape.
-  dialog.style.animationPlayState = 'paused';
+  dialog.dataset.holdExit = '';
   await act(() => userEvent.keyboard('{Escape}'));
   expect(dialog.isConnected).toBe(true);
   expect(dialog).toHaveAttribute('data-state', 'closed');
   const animations = dialog.getAnimations();
   expect(animations).not.toHaveLength(0);
   for (const animation of animations) {
-    expect(animation.playState).toBe('paused');
+    expect(animation.playState).toBe('running');
   }
   return dialog;
 };
@@ -232,7 +236,8 @@ it('opens a group menu requested while its rename animates out, and keeps it onc
   await act(() => openSurface({ anchor: { ...anchor }, id: 'group', kind: 'menu' }));
   await expect.poll(openMenu).not.toBeNull();
   expect(dialog.isConnected).toBe(true);
-  dialog.style.removeProperty('animation-play-state');
+  // Released, the exit falls back to its real duration and ends.
+  delete dialog.dataset.holdExit;
   await expect.poll(() => dialog.isConnected).toBe(false);
 
   expect(openMenu()).not.toBeNull();

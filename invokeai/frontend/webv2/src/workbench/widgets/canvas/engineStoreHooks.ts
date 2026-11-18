@@ -77,6 +77,21 @@ export const useCanvasEngineRead = <T extends boolean | number | string | null>(
   return useSyncExternalStore(subscribe, read, read);
 };
 
+/**
+ * A primitive read of the engine's document model, as `useCanvasEngineRead` but re-read only when the document
+ * changes: for answers pixels cannot change, such as command eligibility, so painting never re-runs them.
+ */
+export const useCanvasDocumentRead = <T extends boolean | number | string | null>(
+  engine: CanvasCoreStoreCapability | null,
+  read: () => T
+): T => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('documentEpoch', listener) ?? (() => undefined),
+    [engine]
+  );
+  return useSyncExternalStore(subscribe, read, read);
+};
+
 /** Subscribes to one layer's thumbnail request state; an absent key is idle. */
 export const useLayerThumbnailStatus = (
   engine: CanvasCoreStoreCapability | null,
@@ -267,6 +282,9 @@ export const useTextOptions = (engine: CanvasCoreStoreCapability): TextToolOptio
 
 export const useTextEditSession = (engine: CanvasCoreStoreCapability): TextEditSession | null =>
   useCanvasInteractionState(engine, 'textEditSession');
+
+export const useTransformOptions = (engine: CanvasCoreStoreCapability) =>
+  useCanvasInteractionState(engine, 'transformOptions');
 
 /** PSD preparation/worker/download lifecycle belongs to the engine, across widget remounts. */
 export const usePsdExportStatus = (
