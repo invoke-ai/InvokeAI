@@ -39,7 +39,7 @@ import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
-import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
+import { useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
 import { reportTransformRefusal, showCanvasRefusalNotice } from '@workbench/widgets/canvas/canvasToolCommands';
 import {
@@ -80,6 +80,14 @@ import type {
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 
 import {
+  deleteLayers,
+  duplicateLayers,
+  groupLayers,
+  ungroupLayers,
+  useLayerCommandAvailability,
+  useLayerCommandDeps,
+} from './layerCommands';
+import {
   actionTargets,
   enabledToggleLabel,
   getLayerContextActions,
@@ -98,7 +106,6 @@ import {
   getLayerContextMenuRenderEntries,
 } from './layerContextMenuLayout';
 import { copyLayerToClipboard, saveLayerToBoard } from './layerExportActions';
-import { canGroupSelection, canRemoveFromGroup, groupLayers, removeFromGroup } from './layerGroupCommands';
 import { resolveMenuTargetForRender } from './layerMenuState';
 import {
   DEFAULT_INPAINT_MASK_FILL,
@@ -291,7 +298,8 @@ const LayerMenu = ({
   );
 
   const targets = actionTargets({ layer, selectedIds });
-  const canGroup = useCanvasEngineRead(engine, () => canGroupSelection(engine?.document.model() ?? null, targets));
+  const commandDeps = useLayerCommandDeps(engine);
+  const available = useLayerCommandAvailability(engine, targets);
   const canMerge = useCanvasEngineRead(engine, () => {
     const model = engine?.document.model() ?? null;
     return (
@@ -311,22 +319,17 @@ const LayerMenu = ({
         )
       : 'ineligible';
   });
-  const canRemoveTargetsFromGroup = useCanvasEngineRead(engine, () =>
-    canRemoveFromGroup(engine?.document.model() ?? null, targets)
-  );
-  const canDeleteSelection = useCanvasEngineRead(
-    engine,
-    () => engine?.document.model()?.refusalFor({ ids: targets, type: 'remove' }) === null
-  );
   const hiddenByAncestor =
     (lookupDocumentNodeState(document, layer.id)?.documentHidden ?? false) && !isNodeHidden(layer);
   const isQuickSwitchBookmark = useLayerQuickSwitch(engine).bookmarkedLayerId === layer.id;
   const actionState = useMemo<LayerContextActionState>(
     () => ({
-      canDeleteSelection,
-      canGroupSelection: canGroup,
+      canDeleteSelection: available.delete,
+      canDuplicateSelection: available.duplicate,
+      canGroupSelection: available.group,
       canMergeSelection: canMerge,
-      canRemoveFromGroup: canRemoveTargetsFromGroup,
+      // The item shows only for leaves of one group, where ungroup is exactly that lift.
+      canRemoveFromGroup: available.ungroup,
       hiddenByAncestor,
       isQuickSwitchBookmark,
       canRunWorkflow: workflowAvailability.canRunWorkflow,
@@ -345,10 +348,8 @@ const LayerMenu = ({
       base,
       hiddenByAncestor,
       isQuickSwitchBookmark,
-      canDeleteSelection,
-      canGroup,
+      available,
       canMerge,
-      canRemoveTargetsFromGroup,
       document,
       engine,
       hasSupportedContent,
@@ -377,57 +378,10 @@ const LayerMenu = ({
     [t]
   );
 
-  const handleDuplicate = useCallback(async () => {
-    if (engine) {
-      const panelSelection = readLayerPanelState(projectId, document.selectedLayerId);
-      const sourceIds = panelSelection.selectedIds.includes(layer.id) ? panelSelection.selectedIds : [layer.id];
-      try {
-        const result = await engine.layers.duplicateLayers(sourceIds);
-        if (result.status === 'duplicated') {
-          publishLayerPanelSelection({
-            primaryId: result.selectedLayerId,
-            projectId,
-            selectedIds: result.duplicateIds,
-          });
-          return;
-        }
-        if (result.status === 'busy') {
-          return;
-        }
-        if (result.status !== 'nothing') {
-          reportLayerOperation(result.status === 'unreadable' ? result : result.status, notify.error, t);
-          return;
-        }
-      } catch {
-        // Report rejected transactions in the menu; the document remains unchanged.
-      }
-      notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.copyFailed'));
-      return;
-    }
-    commitPrepared(t('widgets.layers.actions.duplicate'), (model) =>
-      model.prepare({ createId: createLayerId, ids: [layer.id], type: 'duplicate' })
-    );
-  }, [commitPrepared, document.selectedLayerId, engine, layer.id, notify, projectId, t]);
-
-  const handleDelete = useCallback(() => {
-    const ids = actionTargets({ layer, selectedIds });
-    commitPrepared(getActionLabel('delete'), (model) => model.prepare({ ids, type: 'remove' }));
-  }, [commitPrepared, getActionLabel, layer, selectedIds]);
-
-  const handleGroup = useCallback(() => {
-    const ids = actionTargets({ layer, selectedIds });
-    const outcome = groupLayers(engine, projectId, ids, t('widgets.layers.actions.group'));
-    if (outcome.status === 'refused') {
-      throw makeStatusError(outcome.refusal.status === 'locked' ? 'locked' : 'unsupported');
-    }
-  }, [engine, layer, makeStatusError, projectId, selectedIds, t]);
-
-  const handleRemoveFromGroup = useCallback(() => {
-    const outcome = removeFromGroup(engine, actionTargets({ layer, selectedIds }), getActionLabel('remove-from-group'));
-    if (outcome.status === 'refused') {
-      throw makeStatusError(outcome.refusal.status === 'locked' ? 'locked' : 'unsupported');
-    }
-  }, [engine, getActionLabel, layer, makeStatusError, selectedIds]);
+  const handleDuplicate = useCallback(() => duplicateLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleDelete = useCallback(() => deleteLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleGroup = useCallback(() => groupLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleRemoveFromGroup = useCallback(() => ungroupLayers(commandDeps, targets), [commandDeps, targets]);
 
   const handleMergeMasks = useCallback(async () => {
     if (!engine) {

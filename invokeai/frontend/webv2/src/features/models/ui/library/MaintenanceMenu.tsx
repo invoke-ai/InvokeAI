@@ -26,10 +26,15 @@ export const MaintenanceMenu = () => {
   const handleEmptyCache = () =>
     runEmptyCache(
       async (owner) => {
-        await emptyModelCache(owner.signal);
+        const { vram_release_refused } = await emptyModelCache(owner.signal);
 
         assertAccountScopeCurrent(owner);
-        notify.success(t('models.cacheEmptied'));
+
+        if (vram_release_refused) {
+          notify.error(t('models.vramNotReleased'), t('models.vramNotReleasedDescription'));
+        } else {
+          notify.success(t('models.cacheEmptied'));
+        }
       },
       (message) => notify.error(t('models.failedToEmptyCache'), message)
     );

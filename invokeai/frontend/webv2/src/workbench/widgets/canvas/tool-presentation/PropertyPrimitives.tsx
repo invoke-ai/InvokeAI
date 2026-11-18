@@ -45,12 +45,20 @@ export const PropertyControlRow = ({
   children,
   label,
   labelId,
+  labelWidth = '4.5rem',
 }: {
   children: ReactNode;
   label?: string;
   labelId?: string;
+  labelWidth?: string;
 }) => (
-  <Grid alignItems="center" columnGap="2" gridTemplateColumns="4.5rem minmax(0, 1fr) auto" minH="control.md" w="full">
+  <Grid
+    alignItems="center"
+    columnGap="2"
+    gridTemplateColumns={`${labelWidth} minmax(0, 1fr) auto`}
+    minH="control.md"
+    w="full"
+  >
     {label ? <PropertyRowLabel label={label} labelId={labelId} /> : <Text color="fg.muted" id={labelId} minW="0" />}
     {children}
   </Grid>
@@ -102,12 +110,14 @@ export const PropertyGroup = ({
   collapsible,
   id,
   label,
+  hideLabel = false,
 }: {
   children: ReactNode;
   /** Absent means always open with a plain header. */
   collapsible?: 'open' | 'collapsed';
   id: string;
   label: string;
+  hideLabel?: boolean;
 }) => {
   const collapsed = usePropertyGroupCollapsed(id, collapsible === 'collapsed');
   const onToggle = useCallback(() => setPropertyGroupCollapsed(id, !collapsed), [collapsed, id]);
@@ -139,7 +149,7 @@ export const PropertyGroup = ({
           </Text>
         </chakra.button>
       ) : (
-        <Text color="fg.muted" fontWeight="600">
+        <Text color="fg.muted" fontWeight="600" hidden={hideLabel}>
           {label}
         </Text>
       )}

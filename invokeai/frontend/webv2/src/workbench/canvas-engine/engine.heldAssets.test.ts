@@ -283,7 +283,7 @@ const cases: HeldCase[] = [
   {
     act: async ({ engine }) => {
       await warmCaches(engine, ['a']);
-      return engine.layers.duplicateLayers(['a']);
+      return engine.layers.duplicateLayers('Duplicate', ['a']);
     },
     heldAfterOp: ['original-duplicate.png'],
     heldAfterUndo: ['original-duplicate.png'],
