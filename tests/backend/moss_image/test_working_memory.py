@@ -61,14 +61,22 @@ def test_the_score_matrix_is_priced_for_the_whole_attended_sequence(monkeypatch:
         "text_tokens": 7,
         "score_matrix_bytes": 12345,
         "dequant_bytes": 0,
+        "fp8_cast_bytes": 0,
         "lora_sidecar_bytes": 0,
     }
     assert estimate.reservation_bytes == int(31 * k_token + 12345)
 
 
-def test_a_quantized_build_adds_its_dequant_transient() -> None:
+def test_a_quantized_build_adds_its_dequant_and_fp8_cast_transients() -> None:
     values = {"k_token": 1000.0}
-    features = {"height": 32, "width": 32, "text_tokens": 4, "score_matrix_bytes": 0, "dequant_bytes": 5000}
+    features = {
+        "height": 32,
+        "width": 32,
+        "text_tokens": 4,
+        "score_matrix_bytes": 0,
+        "dequant_bytes": 5000,
+        "fp8_cast_bytes": 7000,
+    }
 
     terms = MOSS_IMAGE_DENOISE_SPEC.terms(features, values)
 
@@ -76,8 +84,40 @@ def test_a_quantized_build_adds_its_dequant_transient() -> None:
         "activations": 8 * 1000.0,
         "attention_scores": 0,
         "dequant_transient": 5000,
+        "fp8_cast_transient": 7000,
         "lora_sidecar": 0,
     }
+
+
+def test_the_estimator_records_the_fp8_cast_transient_at_the_forwards_dtype() -> None:
+    transformer = _transformer()
+    layer = transformer.layers[0].proj["ffn_up_gate"]
+    layer.weight = torch.nn.Parameter(layer.weight.detach().to(torch.float8_e4m3fn), requires_grad=False)
+    layer.register_buffer("weight_scale", torch.ones(layer.weight.shape[0]), persistent=False)
+
+    estimate = estimate_moss_image_denoise_working_memory(
+        transformer,
+        height=32,
+        width=32,
+        text_tokens=4,
+        model_format=ModelFormat.Checkpoint,
+        device=torch.device("cpu"),
+        dtype=torch.bfloat16,
+    )
+
+    # ffn_up_gate is [2 * 96, 64]: its codes widen once, and again when the scale is applied.
+    assert estimate.features["fp8_cast_bytes"] == 2 * (2 * 96 * 64) * 2
+
+
+def test_a_forward_with_an_fp8_cast_transient_is_off_the_token_line() -> None:
+    features = {"height": 32, "width": 32, "text_tokens": 4, "score_matrix_bytes": 0, "dequant_bytes": 0}
+
+    on_line = module._line({**features, "fp8_cast_bytes": 0})
+    off_line = module._line({**features, "fp8_cast_bytes": 7000})
+
+    assert on_line is not None and on_line.fits
+    assert off_line is not None and not off_line.fits
+    assert "fp8_cast_transient=7000" in off_line.label
 
 
 def test_points_measured_without_loras_have_no_lora_term() -> None:
@@ -133,4 +173,4 @@ def test_a_forward_with_a_lora_is_off_the_plain_line_the_fit_reads() -> None:
 
     assert plain is not None and plain.fits
     assert with_lora is not None and not with_lora.fits
-    assert with_lora.label.endswith("lora_sidecar_bytes=4096")
+    assert with_lora.label.endswith("lora_sidecar=4096")

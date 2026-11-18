@@ -1,3 +1,4 @@
+import type { components } from '@api/schema';
 import type { TFunction } from 'i18next';
 
 import { formatBytes } from '@platform/i18n/languages';
@@ -41,12 +42,13 @@ export interface ModelCacheStats {
   loaded_model_sizes?: Record<string, number>;
 }
 
-export interface ModelCacheClearResult {
-  models_cleared: number;
-  bytes_freed: number;
-}
+export type ModelCacheClearResult = components['schemas']['EmptyModelCacheResponse'];
 
-const EMPTY_MODEL_CACHE_CLEAR_RESULT: ModelCacheClearResult = { bytes_freed: 0, models_cleared: 0 };
+const EMPTY_MODEL_CACHE_CLEAR_RESULT: ModelCacheClearResult = {
+  bytes_freed: 0,
+  models_cleared: 0,
+  vram_release_refused: false,
+};
 
 export const normalizeModelCacheClearResult = (result: ModelCacheClearResult | null): ModelCacheClearResult =>
   result ?? EMPTY_MODEL_CACHE_CLEAR_RESULT;
@@ -57,9 +59,17 @@ export const getModelCacheUsage = (stats: ModelCacheStats | null): { used: numbe
 });
 
 export const getModelCacheClearToast = (
-  { bytes_freed, models_cleared }: ModelCacheClearResult,
+  { bytes_freed, models_cleared, vram_release_refused }: ModelCacheClearResult,
   t: TFunction
-): { title: string; description: string; status: 'info' | 'success' } => {
+): { title: string; description: string; status: 'error' | 'info' | 'success' } => {
+  if (vram_release_refused) {
+    return {
+      description: t('widgets.queue.modelCache.vramNotReleasedDescription', { count: models_cleared }),
+      status: 'error',
+      title: t('widgets.queue.modelCache.vramNotReleased'),
+    };
+  }
+
   if (models_cleared === 0) {
     return {
       description: t('widgets.queue.modelCache.noModelsClearedDescription'),

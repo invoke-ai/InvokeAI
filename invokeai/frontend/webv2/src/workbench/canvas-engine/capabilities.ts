@@ -46,6 +46,7 @@ import type {
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
+  TransformOptions,
   TransformSession,
 } from './engineStores';
 import type { RasterCompositeExportRequest, RasterCompositeExportResult } from './exportRasterComposite';
@@ -234,6 +235,7 @@ export interface CanvasInteractionState {
   stagingHidesOverlays: boolean;
   textEditSession: TextEditSession | null;
   textOptions: TextToolOptions;
+  transformOptions: TransformOptions;
   transformSession: TransformSession | null;
   /**
    * The layer `layers.beginTransform` is waiting on: its session opens once the layer's fresh pixels are persisted.
@@ -267,6 +269,7 @@ export type CanvasWritableInteractionKey = Extract<
   | 'showGrid'
   | 'snapToGrid'
   | 'textOptions'
+  | 'transformOptions'
 >;
 
 export interface CanvasInteractionStateCapability {
@@ -825,7 +828,8 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
    */
   cropAllLayersToBbox(): Promise<CropAllLayersResult>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
-  duplicateLayers(layerIds: readonly string[]): Promise<DuplicateLayersResult>;
+  /** Copies the outermost of `layerIds` with their pixels as one undo step named `label`, selecting the copies. */
+  duplicateLayers(label: string, layerIds: readonly string[]): Promise<DuplicateLayersResult>;
   /** Unions the masks' coverage into one new inpaint mask above the topmost source, removing the sources. */
   mergeInpaintMasks(layerIds: readonly string[]): Promise<MergeInpaintMasksResult>;
   mergeLayerDown(upperLayerId: string): Promise<MergeDownResult>;
@@ -947,6 +951,7 @@ export type {
   ShapeToolTarget,
   TextEditSession,
   TextToolOptions,
+  TransformOptions,
   TransformSession,
 } from './engineStores';
 export {
