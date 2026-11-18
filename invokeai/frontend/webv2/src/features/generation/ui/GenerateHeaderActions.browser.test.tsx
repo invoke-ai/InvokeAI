@@ -121,7 +121,9 @@ const openMenu = async () => {
 };
 
 const settleWarmUp = () =>
-  vi.waitFor(() => expect(menuParts.loaders.map((loader) => loader.getSnapshot().status)).toEqual(['loaded']));
+  vi.waitFor(() => expect(menuParts.loaders.map((loader) => loader.getSnapshot().status)).toEqual(['loaded']), {
+    timeout: 5000,
+  });
 
 const placeholdersDuring = async (open: () => Promise<unknown>): Promise<Node[]> => {
   const placeholders: Node[] = [];

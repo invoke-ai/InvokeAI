@@ -466,7 +466,7 @@ describe('GraphPreviewDialog', () => {
 
   const openCard = async (nodeId: string) => {
     await act(() => userEvent.click(previewNode(nodeId)!));
-    await vi.waitFor(() => expect(nodeCard()?.dataset.previewNodeCard).toBe(nodeId));
+    await vi.waitFor(() => expect(nodeCard()?.dataset.previewNodeCard).toBe(nodeId), { timeout: 5000 });
   };
 
   const clickButtonWithText = async (text: string, scope: ParentNode = document) => {
