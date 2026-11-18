@@ -204,16 +204,12 @@ def run_app() -> None:
 
     # When running behind a reverse proxy that serves the app under a sub-path (e.g. `/invoke`),
     # wrap the app so route matching and openapi/docs work for both proxy styles (strip & preserve).
-    # Also honor X-Forwarded-* headers. Only enabled when `base_url` is set, so default installations
-    # are unaffected.
+    # Only enabled when `base_url` is set, so default installations are unaffected.
     from invokeai.app.api_app import SubPathASGIMiddleware
 
     asgi_app: Any = TrustedRouteGuard(app=app, routes=trusted_routes, frontend=trusted_frontend)
-    proxy_kwargs: dict[str, Any] = {}
     if app_config.base_url:
         asgi_app = SubPathASGIMiddleware(asgi_app, app_config.base_url)
-        # `proxy_headers=True` is already uvicorn's default; we only need to widen the trusted proxies.
-        proxy_kwargs = {"forwarded_allow_ips": app_config.forwarded_allow_ips}
 
     # Start the server.
     config = uvicorn.Config(
@@ -224,7 +220,9 @@ def run_app() -> None:
         log_level=app_config.log_level_network,
         ssl_certfile=app_config.ssl_certfile,
         ssl_keyfile=app_config.ssl_keyfile,
-        **proxy_kwargs,
+        # uvicorn's `proxy_headers` (on by default) takes the scheme and client address from these peers'
+        # X-Forwarded-Proto/For. The Socket.IO origin check relies on that scheme, so it applies at the domain root too.
+        forwarded_allow_ips=app_config.forwarded_allow_ips,
     )
     server = uvicorn.Server(config)
 

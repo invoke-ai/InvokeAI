@@ -25042,7 +25042,7 @@ export type components = {
          *     Attributes:
          *         host: IP address to bind to. Use `0.0.0.0` to serve to your local network.
          *         port: Port to bind to.
-         *         allow_origins: Allowed CORS origins.
+         *         allow_origins: Origins other than the server's own that browsers may use for the API and the Socket.IO connection, written as the browser sends them (`https://app.example.com`, no path or trailing slash). `*` allows any origin.
          *         allow_credentials: Allow CORS credentials.
          *         allow_methods: Methods allowed for CORS.
          *         allow_headers: Headers allowed for CORS.
@@ -25136,7 +25136,7 @@ export type components = {
          *         external_seedream_api_key: API key for Seedream image generation.
          *         external_seedream_base_url: Base URL override for Seedream image generation.
          *         base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.
-         *         forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
+         *         forwarded_allow_ips: Comma-separated IP addresses or networks (or `*`) whose X-Forwarded-Proto and X-Forwarded-For headers are trusted. Set to the reverse proxy's IP. The Socket.IO same-origin check uses the forwarded scheme only from these addresses.
          *         http_compression_level: Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.
          */
         InvokeAIAppConfig: {
@@ -25165,7 +25165,7 @@ export type components = {
             port?: number;
             /**
              * Allow Origins
-             * @description Allowed CORS origins.
+             * @description Origins other than the server's own that browsers may use for the API and the Socket.IO connection, written as the browser sends them (`https://app.example.com`, no path or trailing slash). `*` allows any origin.
              * @default []
              */
             allow_origins?: string[];
@@ -25208,7 +25208,7 @@ export type components = {
             base_url?: string | null;
             /**
              * Forwarded Allow Ips
-             * @description Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
+             * @description Comma-separated IP addresses or networks (or `*`) whose X-Forwarded-Proto and X-Forwarded-For headers are trusted. Set to the reverse proxy's IP. The Socket.IO same-origin check uses the forwarded scheme only from these addresses.
              * @default 127.0.0.1
              */
             forwarded_allow_ips?: string;

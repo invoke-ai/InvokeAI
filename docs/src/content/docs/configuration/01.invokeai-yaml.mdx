@@ -260,6 +260,75 @@ http_compression_level: 9 # default value
 
 The setting can also be given as the `INVOKEAI_HTTP_COMPRESSION_LEVEL` environment variable.
 
+#### Reverse Proxies and Frontend Origins
+
+Live updates reach the browser over a Socket.IO connection at `<base path>/ws/socket.io`. It accepts a browser page from:
+
+- the server's own origin: the scheme the server sees and the request's `Host` header;
+- an origin listed in `allow_origins`.
+
+Other origins are refused at the handshake. Clients that send no `Origin` header, such as scripts, are not checked, though multi-user mode still requires their token.
+
+Behind a reverse proxy, the server's own origin has to survive the proxy:
+
+- **Pass the original `Host` header, port included.** Caddy and Traefik do this by default. `X-Forwarded-Host` is never used.
+- **Pass `X-Forwarded-Proto` when the proxy terminates TLS**, so the server knows the page is HTTPS.
+- **Trust the proxy's address.** `X-Forwarded-Proto` counts only from addresses in `forwarded_allow_ips`, which defaults to `127.0.0.1`. Any other address needs an entry: a proxy on another machine or in another container, the Docker bridge gateway that published ports arrive from (such as `172.17.0.1`), a Kubernetes ingress, or a hosting platform's proxy. The setting takes addresses and networks, for example `forwarded_allow_ips: 127.0.0.1,172.16.0.0/12`. IPv6 loopback, `::1`, is not in the default.
+- **Set `base_url`** when the proxy serves InvokeAI under a sub-path.
+
+Caddy, serving InvokeAI at `https://invoke.example.com/invoke` with `base_url: /invoke` in `invokeai.yaml`:
+
+```text
+invoke.example.com {
+	handle /invoke* {
+		reverse_proxy 127.0.0.1:9090
+	}
+}
+```
+
+nginx. `$http_host` keeps a non-default port, which `$host` drops:
+
+```nginx
+proxy_set_header Host $http_host;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+Apache:
+
+```apache
+ProxyPreserveHost On
+RequestHeader set X-Forwarded-Proto "https"
+```
+
+A proxy that cannot pass `Host` or the scheme can instead list the site's public origin, such as `https://invoke.example.com`, in `allow_origins`.
+
+##### Frontend on a separate origin
+
+When the frontend is served from a different origin than the server, list that origin, exactly as the browser sends it: scheme, host and any non-default port, with no path or trailing slash. The same list governs the API's CORS responses.
+
+```yaml
+allow_origins:
+  - https://studio.example.com
+```
+
+Build that frontend with `VITE_INVOKEAI_API_BASE_URL` set to the server's URL, including any base path, such as `https://invoke.example.com/invoke`. The webv2 and legacy development servers proxy the connection from their own origin, so they need no entry.
+
+`*` allows every origin, so any website a user visits can connect to the server. Without [multi-user mode](/configuration/multi-user-mode/admin-guide/), it can read the server's live events. Matching the `Host` header does not protect against DNS rebinding either, where a website's own domain is pointed at your server: keep a server without multi-user mode on a network you trust.
+
+##### When the connection is refused
+
+The server log names the refused origin, once per origin:
+
+```text
+Refused a Socket.IO connection: https://invoke.example.com is not an accepted origin. ...
+```
+
+The app shows a red **Disconnected** badge in its header, and progress and queue updates stop. A separate-origin frontend that is not listed fails to load at all, because the API refuses it too. To fix it, check in this order:
+
+1. The proxy passes the original `Host`, with its port.
+2. The proxy sends `X-Forwarded-Proto`, and its address is in `forwarded_allow_ips`. The address is the one InvokeAI sees, not the proxy's public address.
+3. Otherwise, add the origin from the log line to `allow_origins`.
+
 If the UI feels sluggish while a large library is being browsed, lowering this is one of the cheapest wins available. Measured on the image-name list of a 200,000-image library (8.48 MB of JSON):
 
 | Level |    Time |        Output |

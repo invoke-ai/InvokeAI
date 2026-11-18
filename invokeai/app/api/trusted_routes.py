@@ -266,9 +266,11 @@ def _snapshot_asgi_app(app: Any) -> Any:
         clone = copy.copy(app)
         clone.static_files = _copy_config(app.static_files)
         return clone
-    if isinstance(getattr(app, "_app", None), SocketIOASGIApp):
+    # Wrappers around the Socket.IO app (`SocketIO` mounts it behind more than one) hold it as `_app`.
+    wrapped = getattr(app, "_app", None)
+    if wrapped is not None and (snapshot := _snapshot_asgi_app(wrapped)) is not wrapped:
         clone = copy.copy(app)
-        clone._app = _snapshot_asgi_app(app._app)
+        clone._app = snapshot
         return clone
     if not isinstance(app, StaticFiles):
         return app

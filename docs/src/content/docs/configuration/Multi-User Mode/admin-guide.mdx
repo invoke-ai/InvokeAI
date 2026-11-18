@@ -357,7 +357,7 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:9090;
-        proxy_set_header Host $host;
+        proxy_set_header Host $http_host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_http_version 1.1;
@@ -368,6 +368,8 @@ server {
 ```
 
 With the proxy on the same machine, keep InvokeAI's default `host: 127.0.0.1` so it is reachable only through the proxy.
+
+The live-updates connection accepts only the server's own origin and those in `allow_origins`, so the proxy must pass the original `Host` and `X-Forwarded-Proto` as above. A proxy at any address other than `127.0.0.1`, including one in another container, also needs `forwarded_allow_ips`. See [Reverse Proxies and Frontend Origins](/configuration/invokeai-yaml/#reverse-proxies-and-frontend-origins).
 
 :::danger[Exposing InvokeAI to the internet]
 InvokeAI has had no security audit and has no login rate limiting or lockout. Prefer a VPN. If you must expose it, you do so at your own risk: serve it over HTTPS, limit access to trusted networks and addresses, and rate-limit `POST /api/v1/auth/login` at the proxy. Router and firewall setup is beyond this guide.

@@ -25,7 +25,7 @@
     {
       "category": "WEB",
       "default": [],
-      "description": "Allowed CORS origins.",
+      "description": "Origins other than the server's own that browsers may use for the API and the Socket.IO connection, written as the browser sends them (`https://app.example.com`, no path or trailing slash). `*` allows any origin.",
       "env_var": "INVOKEAI_ALLOW_ORIGINS",
       "literal_values": [],
       "name": "allow_origins",
@@ -106,7 +106,7 @@
     {
       "category": "WEB",
       "default": "127.0.0.1",
-      "description": "Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.",
+      "description": "Comma-separated IP addresses or networks (or `*`) whose X-Forwarded-Proto and X-Forwarded-For headers are trusted. Set to the reverse proxy's IP. The Socket.IO same-origin check uses the forwarded scheme only from these addresses.",
       "env_var": "INVOKEAI_FORWARDED_ALLOW_IPS",
       "literal_values": [],
       "name": "forwarded_allow_ips",
