@@ -169,6 +169,13 @@ includes text-encoder layers, to the Qwen3 encoder. In the workflow editor use *
 DoRA LoRAs apply with their magnitudes in the `lora_A`/`lora_B` layout (LyCORIS `dora_scale`, PEFT
 `lora_magnitude_vector`, ai-toolkit `.magnitude`) as well as in the kohya layout. DoRA runs on the GGUF, int8 and fp8 builds, but not on bitsandbytes NF4 or LLM.int8 weights.
 
+Diffusers LoRAs of other transformers that use the same layer names (for example LTX-2, CogView4, PixArt, Sana)
+are not recognized as Anima, because their attention widths do not match Anima's. If no other supported model family
+matches, they install as unknown models.
+LTX-Video is the exception: its attention layers are as wide as Anima's, except the cross-attention key and value
+layers (`attn2.to_k`, `attn2.to_v`), which read a wider text embedding. An LTX-Video LoRA that trains those layers is
+not recognized as Anima; one without them installs as Anima.
+
 ## Character reference (IP-Adapter)
 
 The **Anima IP-Adapter (Character Reference)** starter model, by LuciferTC (~500 MB), carries a character
