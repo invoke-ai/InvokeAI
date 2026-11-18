@@ -319,6 +319,12 @@ describe('record rows of newer keys', () => {
       vae_precision: 'fp16',
     });
   });
+
+  it('labels the VAE precision as the requested one, since the backend can decode in fp32 regardless', () => {
+    const entries = parsePreviewMetadata({ vae_precision: 'fp16' }, image);
+
+    expect(entries.find((entry) => entry.key === 'vae_precision')?.label).toBe('Requested VAE precision');
+  });
 });
 
 /** Keys of a record the panel shows under another row, or not as one, with the reason. */

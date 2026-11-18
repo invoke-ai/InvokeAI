@@ -21,6 +21,7 @@ import { seedArchitectureCapabilities } from '@features/generation/core/architec
 import {
   getComponentPolicyContext,
   getComponentSectionPolicy,
+  getComponentSlotsSuppliedByMain,
   getEmptyComponentSupplier,
   getFlux2ComponentSource,
 } from '@features/generation/core/baseGenerationPolicies';
@@ -342,5 +343,21 @@ describe('empty component supplier', () => {
     for (const key of ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel', 'vae'] as const) {
       expect(getEmptyComponentSupplier(model, {}, key)?.key ?? null, key).toBe(supplierKey);
     }
+  });
+
+  it.each([
+    ['z-image', { format: 'diffusers' }, ['qwen3EncoderModel', 'vae']],
+    ['z-image', { format: 'gguf_quantized' }, []],
+    ['qwen-image', { format: 'diffusers' }, ['qwenVLEncoderModel', 'vae']],
+    ['wan', { format: 'diffusers' }, ['wanT5EncoderModel', 'vae']],
+    ['flux2', { format: 'diffusers', variant: 'klein_4b' }, ['qwen3EncoderModel', 'vae']],
+    ['flux2', { format: 'diffusers', variant: 'dev' }, ['mistralEncoderModel', 'vae']],
+    ['flux2', { format: 'gguf_quantized', variant: 'dev' }, []],
+    ['krea-2', { format: 'diffusers' }, ['qwen3VLEncoderModel', 'vae']],
+    ['sdxl', { format: 'diffusers' }, []],
+  ] as const)('lists the slots a %s %j main fills from its own components', (base, overrides, expected) => {
+    const { model } = satisfiedSettingsFor(base, { label: 'main', overrides });
+
+    expect(getComponentSlotsSuppliedByMain(model, {})).toEqual(expected);
   });
 });

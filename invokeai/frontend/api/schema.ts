@@ -11409,7 +11409,7 @@ export type components = {
             vae?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * Vae Precision
-             * @description The precision the VAE decoded and encoded at (SD 1.x, SD 2.x, SDXL)
+             * @description The VAE precision requested for decoding and encoding (SD 1.x, SD 2.x, SDXL); the backend may run the VAE in fp32 regardless, e.g. on CPU
              * @default null
              */
             vae_precision?: ("fp16" | "fp32") | null;

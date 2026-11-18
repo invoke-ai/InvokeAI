@@ -18,6 +18,7 @@ import {
   isIdeogram4SamplerPreset,
   deriveAspectRatioId,
   getCompatibleReferenceImages,
+  getComponentSlotsSuppliedByMain,
   getComponentSlotsSuppliedBySource,
   getDimensionGrid,
   getExternalProviderOptionKeys,
@@ -430,6 +431,21 @@ const getMetadataVaePrecision = (metadata: unknown): 'fp16' | 'fp32' | null => {
   const precision = getString(metadata, 'vae_precision');
 
   return precision === 'fp16' || precision === 'fp32' ? precision : null;
+};
+
+/** The decode settings a record restores onto `model`: only those its panel shows. Recall and its actions both ask. */
+const getMetadataVaeSettings = (
+  metadata: unknown,
+  model: GenerateModelConfig
+): Partial<Pick<GenerateWidgetValues, 'colorCompensation' | 'vaePrecision'>> => {
+  const policy = getGenerationUiPolicy(model);
+  const vaePrecision = getMetadataVaePrecision(metadata);
+  const colorCompensation = getBoolean(metadata, 'color_compensation');
+
+  return {
+    ...(vaePrecision !== null && policy.vaePrecisionVisible ? { vaePrecision } : {}),
+    ...(colorCompensation !== null && policy.colorCompensationVisible ? { colorCompensation } : {}),
+  };
 };
 
 const getPromptPatch = (
@@ -1449,6 +1465,7 @@ export const getImageRecallCapabilities = ({
   const hasPrompts = hasPrompt(metadata);
   const hasSize = hasMetadataSize(metadata, currentValues.model);
   const hasSettings = hasGenerationSettings(metadata, clipSkipModel);
+  const hasVaeSettings = Object.keys(getMetadataVaeSettings(metadata, clipSkipModel)).length > 0;
   const hasComponents = hasComponentModels(metadata, models);
   const referenceRecord = readMetadataReferenceImages(metadata);
   const recordedReferenceImages = referenceRecord.images;
@@ -1471,6 +1488,7 @@ export const getImageRecallCapabilities = ({
   const hasAnyMetadata =
     hasModel ||
     hasVae ||
+    hasVaeSettings ||
     hasPrompts ||
     hasSeed ||
     hasSize ||
@@ -1490,6 +1508,7 @@ export const getImageRecallCapabilities = ({
   const hasNonSeedMetadata =
     hasModel ||
     hasVae ||
+    hasVaeSettings ||
     hasPrompts ||
     hasSize ||
     hasSettings ||
@@ -1584,24 +1603,35 @@ export const buildImageRecallSettings = ({
       }
     }
 
-    // A record that names its source left out the slots the source supplied. Standalone picks left in the panel
-    // would take those slots over, so clear them to let the recorded source supply them again.
+    // A record that names its source left out the slots the source supplied, and a main that is its own source the
+    // slots it bundles. Standalone picks left in the panel would take those slots over, so clear them to let the
+    // recorded source supply them again. The encoders judged are the ones that survive recall: a recorded one that is
+    // gone leaves the panel's, and with it the question whether the source still supplies the VAE.
     const recordedSource = fittingSettings.includes('componentSourceModel')
       ? componentPatch.componentSourceModel
       : null;
-    const suppliedBySource =
-      recordedSource && recordedSource.key !== effectiveModel.key && isMainModelConfig(recordedSource)
-        ? getComponentSlotsSuppliedBySource(effectiveModel, recordedSource, {
-            mistralEncoderModel: componentPatch.mistralEncoderModel ?? null,
-            qwen3EncoderModel: componentPatch.qwen3EncoderModel ?? null,
-          })
-        : [];
     // A slot the record names stays with the record, resolved or not: an uninstalled component is not one the source
     // supplied, so the panel's own pick stays.
     const recordsComponent = (setting: RecalledComponentSetting): boolean =>
       RECALLED_COMPONENTS.some(
         (component) => component.setting === setting && isRecord(metadata) && component.metadataKey in metadata
       );
+    // The model selection below drops a pick the model does not accept, so only an accepted one counts here.
+    const survivingEncoder = (setting: 'mistralEncoderModel' | 'qwen3EncoderModel') => {
+      const encoder = values[setting];
+
+      return encoder && isComponentCompatibleWithModel(effectiveModel, values, setting, encoder) ? encoder : null;
+    };
+    const survivingEncoders = {
+      mistralEncoderModel: survivingEncoder('mistralEncoderModel'),
+      qwen3EncoderModel: survivingEncoder('qwen3EncoderModel'),
+    };
+    const suppliedBySource =
+      recordedSource && isMainModelConfig(recordedSource)
+        ? getComponentSlotsSuppliedBySource(effectiveModel, recordedSource, survivingEncoders)
+        : recordsComponent('componentSourceModel')
+          ? []
+          : getComponentSlotsSuppliedByMain(effectiveModel, survivingEncoders);
     const clearedSettings = suppliedBySource.filter(
       (key): key is RecalledComponentSetting & typeof key =>
         key !== 'vae' && !recordsComponent(key as RecalledComponentSetting)
@@ -1676,13 +1706,7 @@ export const buildImageRecallSettings = ({
     }
 
     // After the transition, which resets what the model's panel does not show. Older records carry none.
-    const vaePolicy = getGenerationUiPolicy(values.model);
-    const vaePrecision = getMetadataVaePrecision(metadata);
-    const colorCompensation = getBoolean(metadata, 'color_compensation');
-    const vaeSettings = {
-      ...(vaePrecision !== null && vaePolicy.vaePrecisionVisible ? { vaePrecision } : {}),
-      ...(colorCompensation !== null && vaePolicy.colorCompensationVisible ? { colorCompensation } : {}),
-    };
+    const vaeSettings = getMetadataVaeSettings(metadata, values.model);
 
     if (Object.keys(vaeSettings).length > 0) {
       values = { ...values, ...vaeSettings };

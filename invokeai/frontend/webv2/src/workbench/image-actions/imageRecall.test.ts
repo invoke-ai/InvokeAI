@@ -874,6 +874,24 @@ describe('image recall', () => {
     expect(capabilities.remix).toBe(true);
   });
 
+  it.each([
+    [{ vae_precision: 'fp16' }, { vaePrecision: 'fp16' }],
+    [{ color_compensation: true }, { colorCompensation: true }],
+  ] as const)('enables recall actions for the VAE-only record %j, which recall applies', (metadata, restored) => {
+    const input = {
+      currentValues: createValues({ model: sdxlModel, modelKey: sdxlModel.key }),
+      image,
+      metadata,
+      models: [],
+      supportedModels: [],
+      vaeModels: [],
+    };
+    const capabilities = getImageRecallCapabilities(input);
+
+    expect(capabilities).toMatchObject({ all: true, remix: true });
+    expect(buildImageRecallSettings({ ...input, kind: 'all' })?.values).toMatchObject(restored);
+  });
+
   it('recalls required component models for component-based families', () => {
     const result = buildImageRecallSettings({
       currentValues: createValues({ model: sd1Model, modelKey: sd1Model.key }),
@@ -3358,6 +3376,168 @@ describe('Diffusers main that records itself as its component source', () => {
     expect(sourceOf(original.backendGraph, key)).toBe(model.key);
     expect(result?.values.componentSourceModel).toBeNull();
     expect(sourceOf(recalled.backendGraph, key)).toBe(model.key);
+  });
+});
+
+describe('Diffusers main that supplied its own VAE', () => {
+  const projectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
+  const coreMetadata = (graph: { nodes: Record<string, Record<string, unknown>> }) =>
+    Object.values(graph.nodes).find((node) => node.type === 'core_metadata')!;
+
+  // What each family's loader takes from a bundled Diffusers main when no standalone model is picked. Written out by
+  // hand from the loaders; the record leaves these slots out, so a recall must not let a panel pick take them over.
+  const BUNDLED_CASES = [
+    ['z-image', {}, ['qwen3EncoderModel', 'vae']],
+    ['qwen-image', {}, ['qwenVLEncoderModel', 'vae']],
+    ['wan', {}, ['wanT5EncoderModel', 'vae']],
+    ['flux2', { variant: 'klein_4b' }, ['qwen3EncoderModel', 'vae']],
+    ['flux2', { variant: 'dev' }, ['mistralEncoderModel', 'vae']],
+    ['krea-2', {}, ['qwen3VLEncoderModel', 'vae']],
+    ['flux3', {}, ['qwen3VLEncoderModel', 'vae']],
+    ['moss-image', {}, ['qwen35EncoderModel', 'vae']],
+    ['qwen-image-2-1', {}, ['qwen3VLEncoderModel', 'vae']],
+    ['ernie-image', {}, ['mistralEncoderModel', 'vae']],
+    ['ideogram-4', {}, ['ideogram4UnconditionalModel', 'qwen3VLEncoderModel', 'vae']],
+  ] as const;
+
+  it.each(BUNDLED_CASES)(
+    'clears the standalone components a panel holds when a %s record left out what its bundled main supplied',
+    (base, variant, cleared) => {
+      const shape = { label: 'diffusers', overrides: { format: 'diffusers', ...variant } };
+      const { model, settings } = satisfiedSettingsFor(base, shape);
+      const { settings: filled } = fullyFilledSettingsFor(base, shape);
+      const recorded = {
+        ...settings,
+        componentSourceModel: null,
+        ...Object.fromEntries(cleared.map((key) => [key, null])),
+      };
+      const original = compileGenerateGraph(recorded, model, 'gallery', projectSettings);
+      const panel = { ...filled, componentSourceModel: null };
+      const picks = cleared.filter((key) => panel[key]);
+      const result = buildImageRecallSettings({
+        currentValues: createValues(panel),
+        image,
+        kind: 'all',
+        metadata: coreMetadata(original.backendGraph),
+        ...recallCatalogFor(model, panel),
+      });
+
+      expect(picks).toEqual(cleared);
+      for (const key of cleared) {
+        expect(result?.values[key], key).toBeNull();
+      }
+    }
+  );
+
+  it.each([
+    ['z-image', 'flux', null],
+    ['qwen-image', 'qwen-image', null],
+    ['wan', 'wan', 16],
+  ] as const)('drops the panel VAE when a %s record names no VAE', (base, vaeBase, latentChannels) => {
+    const { model, settings } = satisfiedSettingsFor(base, { label: 'diffusers', overrides: { format: 'diffusers' } });
+    const original = compileGenerateGraph(
+      { ...settings, componentSourceModel: null, vae: null },
+      model,
+      'gallery',
+      projectSettings
+    );
+    const panelVae = {
+      base: vaeBase,
+      key: `panel-${base}-vae`,
+      name: 'Panel VAE',
+      type: 'vae',
+      latent_channels: latentChannels,
+    } as VaeModelConfig;
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ ...settings, componentSourceModel: null, vae: panelVae }),
+      image,
+      kind: 'all',
+      metadata: coreMetadata(original.backendGraph),
+      models: [model],
+      supportedModels: [model],
+      vaeModels: [panelVae],
+    });
+    const recalled = compileGenerateGraph(result!.values, result!.values.model, 'gallery', projectSettings);
+
+    expect(coreMetadata(original.backendGraph)).not.toHaveProperty('vae');
+    expect(result?.values.vae).toBeNull();
+    expect(coreMetadata(recalled.backendGraph)).not.toHaveProperty('vae');
+  });
+});
+
+describe('FLUX.2 dev record whose standalone encoder is no longer installed', () => {
+  it('keeps the recorded VAE source beside the panel encoder that replaces it, and drops the panel VAE', () => {
+    const { model, otherModels, settings } = flux2DevSourceRecallCase();
+    const vaeSource = { ...settings.componentSourceModel!, key: 'flux2-klein-vae-source', variant: 'klein_9b' };
+    const recorded = { ...settings, componentSourceModel: vaeSource };
+    const metadata = Object.values(
+      compileGenerateGraph(recorded, model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      }).backendGraph.nodes
+    ).find((node) => node.type === 'core_metadata');
+    const panelEncoder = { ...settings.mistralEncoderModel!, key: 'panel-mistral', name: 'Panel Mistral' };
+    const panelVae: VaeModelConfig = { base: 'flux2', key: 'panel-vae', name: 'Panel VAE', type: 'vae' };
+    const installed = [...otherModels, ...recallCatalogFor(model, recorded).models].filter(
+      (candidate) => candidate.key !== settings.mistralEncoderModel!.key
+    );
+    const result = buildImageRecallSettings({
+      currentValues: createValues({
+        ...recorded,
+        componentSourceModel: null,
+        mistralEncoderModel: panelEncoder,
+        vae: panelVae,
+      }),
+      image,
+      kind: 'all',
+      metadata,
+      models: [...installed, panelEncoder],
+      supportedModels: [model],
+      vaeModels: [panelVae],
+    });
+
+    expect(metadata).not.toHaveProperty('vae');
+    expect(result?.values.mistralEncoderModel?.key).toBe('panel-mistral');
+    expect(result?.values.componentSourceModel?.key).toBe(vaeSource.key);
+    expect(result?.values.vae).toBeNull();
+  });
+});
+
+describe('FLUX.2 dev record recalled over a panel encoder of another family', () => {
+  it('does not let an encoder the model rejects decide that the recorded source supplies the VAE', () => {
+    const { model, otherModels, settings } = flux2DevSourceRecallCase();
+    const vaeSource = { ...settings.componentSourceModel!, key: 'flux2-klein-vae-source', variant: 'klein_9b' };
+    const recorded = { ...settings, componentSourceModel: vaeSource };
+    const metadata = Object.values(
+      compileGenerateGraph(recorded, model, 'gallery', {
+        useCpuNoise: true,
+        useNsfwChecker: false,
+        useWatermark: false,
+      }).backendGraph.nodes
+    ).find((node) => node.type === 'core_metadata');
+    const foreignEncoder = { ...settings.mistralEncoderModel!, key: 'sdxl-clip', base: 'sdxl', type: 'clip_embed' };
+    const panelVae: VaeModelConfig = { base: 'flux2', key: 'panel-vae', name: 'Panel VAE', type: 'vae' };
+    const installed = [...otherModels, ...recallCatalogFor(model, recorded).models].filter(
+      (candidate) => candidate.key !== settings.mistralEncoderModel!.key
+    );
+    const result = buildImageRecallSettings({
+      currentValues: createValues({
+        ...recorded,
+        componentSourceModel: null,
+        mistralEncoderModel: foreignEncoder as typeof settings.mistralEncoderModel,
+        vae: panelVae,
+      }),
+      image,
+      kind: 'all',
+      metadata,
+      models: installed,
+      supportedModels: [model],
+      vaeModels: [panelVae],
+    });
+
+    expect(result?.values.mistralEncoderModel).toBeNull();
+    expect(result?.values.vae?.key).toBe('panel-vae');
   });
 });
 

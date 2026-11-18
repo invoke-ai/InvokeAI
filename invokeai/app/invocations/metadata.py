@@ -298,7 +298,7 @@ class CoreMetadataInvocation(BaseInvocation):
     )
     vae_precision: Optional[Literal["fp16", "fp32"]] = InputField(
         default=None,
-        description="The precision the VAE decoded and encoded at (SD 1.x, SD 2.x, SDXL)",
+        description="The VAE precision requested for decoding and encoding (SD 1.x, SD 2.x, SDXL); the backend may run the VAE in fp32 regardless, e.g. on CPU",
     )
     color_compensation: Optional[bool] = InputField(
         default=None,
