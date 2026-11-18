@@ -87,6 +87,8 @@ Check the [configuration docs] for more detail about the settings and how to spe
 
 The models are large, VRAM is expensive, and you may find yourself faced with Out of Memory errors when generating images. Follow our [Low VRAM mode guide] to configure Invoke to prevent these.
 
+If generations keep failing with GPU errors after an out-of-memory error, clear the model cache: open **Cache** in the **Queue** panel header and click **Clear** in the **Models** row. On a server shared by several people, only administrators see **Cache**. If Invoke then reports that the GPU memory was not released, restart Invoke.
+
 ## Memory Leak (Linux)
 
 If you notice a memory leak, it could be caused by memory fragmentation as models are loaded and/or moved from CPU to GPU.

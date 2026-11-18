@@ -33,6 +33,8 @@ const t = ((key: string, values?: Record<string, unknown>) => {
     'widgets.queue.modelCache.cleared': 'Model cache cleared',
     'widgets.queue.modelCache.clearedDescription': `Cleared ${values?.count} cached models and freed ${values?.bytes}.`,
     'widgets.queue.modelCache.noModelsCleared': 'No cached models cleared',
+    'widgets.queue.modelCache.vramNotReleased': 'GPU memory not released',
+    'widgets.queue.modelCache.vramNotReleasedDescription': `Cleared ${values?.count}, GPU kept memory.`,
     'widgets.queue.modelCache.noModelsClearedDescription':
       'No unlocked cached models were available to clear. Active models stay loaded until they are no longer in use.',
   };
@@ -61,17 +63,25 @@ describe('model cache stats helpers', () => {
   });
 
   it('reports whether clear cache actually cleared models', () => {
-    expect(getModelCacheClearToast({ bytes_freed: 1024, models_cleared: 2 }, t)).toEqual({
+    expect(getModelCacheClearToast({ bytes_freed: 1024, models_cleared: 2, vram_release_refused: false }, t)).toEqual({
       description: 'Cleared 2 cached models and freed 1.0\u00a0KiB.',
       status: 'success',
       title: 'Model cache cleared',
     });
 
-    expect(getModelCacheClearToast({ bytes_freed: 0, models_cleared: 0 }, t)).toEqual({
+    expect(getModelCacheClearToast({ bytes_freed: 0, models_cleared: 0, vram_release_refused: false }, t)).toEqual({
       description:
         'No unlocked cached models were available to clear. Active models stay loaded until they are no longer in use.',
       status: 'info',
       title: 'No cached models cleared',
+    });
+  });
+
+  it('reports a refused VRAM release as an error even though models were cleared', () => {
+    expect(getModelCacheClearToast({ bytes_freed: 4096, models_cleared: 2, vram_release_refused: true }, t)).toEqual({
+      description: 'Cleared 2, GPU kept memory.',
+      status: 'error',
+      title: 'GPU memory not released',
     });
   });
 
@@ -84,7 +94,11 @@ describe('model cache stats helpers', () => {
   });
 
   it('normalizes legacy null clear-cache responses', () => {
-    expect(normalizeModelCacheClearResult(null)).toEqual({ bytes_freed: 0, models_cleared: 0 });
+    expect(normalizeModelCacheClearResult(null)).toEqual({
+      bytes_freed: 0,
+      models_cleared: 0,
+      vram_release_refused: false,
+    });
   });
 
   it('drops a stale stats response without releasing the replacement account refresh', async () => {
