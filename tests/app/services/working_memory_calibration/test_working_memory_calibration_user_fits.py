@@ -57,6 +57,8 @@ from invokeai.backend.working_memory.probe import CounterDelta, MeasuredWindow
 from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_DENOISE_SPEC
 from tests.fixtures.working_memory_calibration import (
     GPU,
+    GPU_CLASS,
+    OTHER_CLASS,
     HeldEnqueue,
     calibration_service,
     fake_environment,
@@ -1859,6 +1861,54 @@ def test_a_retry_of_a_run_without_an_attempt_between_another_attempts_steps_is_r
     )
 
 
+def test_a_retry_while_another_attempt_runs_is_refused_though_it_started_before_on_the_clock(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The wall clock stepped back before B was created: A's first step looks created after B, so nothing cut A off.
+    B's item still waits in the queue, and A's retry would measure around it: refused as B runs (`_attempt_blocks`)."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    failed = _failed(service, "tab-a")
+    clock = calibration_default._now
+    monkeypatch.setattr(calibration_default, "_now", lambda: clock() - datetime.timedelta(hours=1))
+    running = asyncio.run(service.create_run("model-a", _steps("tab-b", 2), "system"))
+    monkeypatch.setattr(calibration_default, "_now", clock)
+    before = queue.get_queue_item_ids("default").item_ids
+
+    with pytest.raises(CalibrationAttemptBusyError) as refused:
+        queue.retry_items_by_id("default", failed.item_ids)
+
+    assert str(refused.value) == (
+        "Another calibration is still running on this GPU. Wait until it has finished, or stop it, then calibrate "
+        "again."
+    )
+    _unchanged_by_a_refused_retry(tmp_path, queue, before, failed, running)
+
+
+def test_a_retry_count_left_over_blocks_neither_a_retry_nor_another_attempt(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A's retry was committed and its record failed: the count stays on A's run for good, keeping A out of every
+    fit. It must not hold the device class too: A's item can be retried again, and another administrator's attempt
+    may start once nothing of A runs."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    failed = _failed(service, "tab-a", steps=1)
+    _refuse_the_record(monkeypatch, service, [CalibrationStoreError("Cannot write the file")])
+    [lost] = queue.retry_items_by_id("default", failed.item_ids).retried_items
+    queue.cancel_queue_item(lost.item_id)
+    assert _stored_run(tmp_path, failed.run_id)["retries_in_flight"] == 1
+
+    [again] = queue.retry_items_by_id("default", failed.item_ids).retried_items
+    queue.cancel_queue_item(again.item_id)
+    _step(service, "tab-b", "other-admin")
+
+    assert _stored_run(tmp_path, failed.run_id)["retries_in_flight"] == 1
+    service.refresh_user_fits()
+    held = {run.run_id: run.held_back for run in service.get_model_summary("model-a").runs}
+    assert held[failed.run_id] == "aborted_attempt"
+
+
 @pytest.mark.parametrize("order", ["script first", "attempt first"])
 def test_a_bulk_retry_is_refused_when_any_of_its_runs_is_cut_off(tmp_path: Path, started, order: str) -> None:
     """The script's run, before A, may be retried on its own; A's step was cut off by a later run. Retried together,
@@ -1876,6 +1926,40 @@ def test_a_bulk_retry_is_refused_when_any_of_its_runs_is_cut_off(tmp_path: Path,
 
     _unchanged_by_a_refused_retry(tmp_path, queue, before, script, cut_off)
     assert len(queue.retry_items_by_id("default", script.item_ids).retried_items) == 1
+
+
+@pytest.mark.parametrize("failure", ["refused", "unexpected"])
+def test_a_retry_refused_on_one_device_class_counts_nothing_on_another(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    """A bulk retry of runs on two device classes' files: the first file counted its run before the second refused
+    (a cut-off attempt) or failed (any error): the first count is taken back, and nothing is retried."""
+    counted_class, failing_class = sorted([GPU_CLASS, OTHER_CLASS], key=lambda device_class: device_class.id)
+    counted_service = started(tmp_path, device_class=counted_class)
+    counted = _failed(counted_service, "tab-a")
+    failing_service = started(tmp_path, device_class=failing_class)
+    failing = _failed(failing_service, "tab-b")
+    if failure == "refused":
+        _step(failing_service, None)
+    else:
+        change = failing_service._store.change
+
+        def fail_on_the_second_file(device_class_id, apply, **kwargs):
+            if device_class_id == failing_class.id:
+                raise RuntimeError("unexpected")
+            return change(device_class_id, apply, **kwargs)
+
+        monkeypatch.setattr(failing_service._store, "change", fail_on_the_second_file)
+    queue = failing_service._services.session_queue
+    before = queue.get_queue_item_ids("default").item_ids
+
+    with pytest.raises(CalibrationAttemptInterleavedError if failure == "refused" else RuntimeError):
+        queue.retry_items_by_id("default", counted.item_ids + failing.item_ids)
+
+    _unchanged_by_a_refused_retry(tmp_path, queue, before)
+    for device_class in (counted_class, failing_class):
+        stored = json.loads((tmp_path / "working_memory" / f"{device_class.id}.json").read_bytes())
+        assert [run.get("retries_in_flight", 0) for run in stored["runs"]] == [0] * len(stored["runs"])
 
 
 def test_no_attempt_starts_between_a_retrys_check_and_its_commit(
