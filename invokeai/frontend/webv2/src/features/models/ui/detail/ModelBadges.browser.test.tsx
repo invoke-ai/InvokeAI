@@ -16,6 +16,7 @@ const UPDATED_BASES = new Set([
   'sd-2',
   'sdxl-refiner',
   'flux2',
+  'flux3',
   'z-image',
   'ideogram-4',
   'krea-2',

@@ -6,11 +6,12 @@ import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { GenerationUiProvider, type GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
-import { getDefaultVideoSettings } from '@features/video';
+import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { getDefaultVideoSettings, normalizeVideoWidgetValues } from '@features/video';
 import { VideoWidgetView } from '@features/video/ui/VideoWidgetView';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import i18next from 'i18next';
 import { act, useSyncExternalStore } from 'react';
@@ -140,7 +141,10 @@ vi.mock('@features/generation/components', async (importOriginal) => ({
   NegativePromptField: () => null,
   PositivePromptField: () => null,
 }));
-vi.mock('@platform/ui/toaster', () => ({ toaster: { create: notify } }));
+vi.mock('@platform/ui/toaster', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  toaster: { create: notify },
+}));
 vi.mock('@workbench/settings/store', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useWorkbenchPreferenceSelector: () => false,
@@ -150,6 +154,11 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: ()
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) =>
     selector(useSyncExternalStore(store.subscribe, store.getSnapshot).activeProject),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) => {
+    const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot);
+    return selector(getResolvedProjectWidgetValues(snapshot.activeProject, widgetId, snapshot.scopedDefaults));
+  },
+  useOptionalWorkbenchCommands: () => store.commands,
   useWorkbenchCommands: () => store.commands,
   useWorkbenchQueries: () => store.queries,
 }));
@@ -165,7 +174,7 @@ seedArchitectureCapabilities();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const generationAdapter = {
-  sectionPreferences: { sectionsOpen: {}, setSectionOpen: () => undefined },
+  sectionPreferences: { sectionsOpen: {}, setSectionsOpen: () => undefined },
 } as unknown as GenerationUiAdapter;
 
 const SOURCE_VIDEO = {
@@ -259,8 +268,8 @@ describe('video model switch confirmation', () => {
 
     await choose(wanT2v.key);
 
-    const confirmedList =
-      'Switching to Wan 2.2 T2V removes: the initial video (with its trim), the last frame, and 1 LoRA.';
+    // The LTX-2 LoRA is not lost: it stays listed, badged and off, for the next LTX-2 model.
+    const confirmedList = 'Switching to Wan 2.2 T2V removes: the initial video (with its trim) and the last frame.';
     expect(dialog()?.textContent).toContain(confirmedList);
     expect(dialog()?.textContent).toContain(
       'It also adjusts Target Resolution and Advanced guidance to fit this model.'
@@ -300,7 +309,7 @@ describe('video model switch confirmation', () => {
     }
     expect(stored()).toMatchObject({
       lastFrameImage: null,
-      loras: [],
+      loras: [{ model: { key: inkWash.key }, weight: 0.75 }],
       model: { key: wanT2v.key },
       modelKey: wanT2v.key,
       positivePrompt: 'a harbor at dusk',
@@ -348,9 +357,7 @@ describe('video model switch confirmation', () => {
       })
     );
 
-    expect(dialog()?.textContent).toContain(
-      'Switching to Wan 2.2 T2V removes: the initial video (with its trim) and 2 LoRAs.'
-    );
+    expect(dialog()?.textContent).toContain('Switching to Wan 2.2 T2V removes: the initial video (with its trim).');
 
     await act(async () => {
       await userEvent.click(dialogButton('Switch model'));
@@ -358,7 +365,7 @@ describe('video model switch confirmation', () => {
 
     expect(stored()).toMatchObject({
       lastFrameImage: null,
-      loras: [],
+      loras: [{ model: { key: inkWash.key } }, { model: { key: filmGrain.key } }],
       modelKey: wanT2v.key,
       positivePrompt: 'a harbor at night',
       sourceVideo: null,
@@ -409,7 +416,7 @@ describe('video model switch confirmation', () => {
     expect(new Set(pickerIds).size).toBe(1);
   });
 
-  it('commits a pending LoRA weight to the current model before judging the switch', async () => {
+  it('commits a pending LoRA weight to the current model before switching', async () => {
     await render();
     await nudgeLoraWeight();
 
@@ -417,8 +424,8 @@ describe('video model switch confirmation', () => {
 
     await choose(wanT2v.key);
 
-    // Committed on LTX-2 Dev, before the dialog asked about dropping it.
-    expect(dialog()?.textContent).toContain('1 LoRA');
+    // Committed on LTX-2 Dev, before the dialog asked about the switch.
+    expect(dialog()?.textContent).toContain('Switching to Wan 2.2 T2V removes');
     expect(stored()).toMatchObject({ loras: [{ weight: 0.8 }], modelKey: ltxDev.key });
 
     await act(async () => {
@@ -462,5 +469,140 @@ describe('video model switch confirmation', () => {
 
     expect(stored().modelKey).toBe(wanT2v.key);
     await vi.waitFor(() => expect(document.activeElement).toBe(modelSelect()));
+  });
+});
+
+describe('Video section issues', () => {
+  const section = (id: string) => host.querySelector<HTMLElement>(`.generate-section[data-generate-section="${id}"]`)!;
+  const chip = (id: string) =>
+    section(id).querySelector<HTMLElement>(':scope > [data-part="trigger"] [data-section-chip]')!;
+  const issues = (id: string) => section(id).querySelector(':scope > [data-part="trigger"] [data-section-issues]');
+  /** The number on the title, which assistive tech skips. */
+  const shownCount = (id: string) => issues(id)?.querySelector(':scope > span[aria-hidden]')?.textContent ?? null;
+  /** What assistive tech reads in its place. */
+  const spokenCount = (id: string) => issues(id)?.querySelector(':scope > :not([aria-hidden])')?.textContent ?? null;
+
+  it('counts an issue in each section that can fix it, tints those, and leaves the rest plain', async () => {
+    await render();
+    // The extension opens with 17 frames of the initial video, so 17 frames continue nothing: raise Frames under
+    // Dimensions, or lower the context under Initial video.
+    await act(() => store.commands.widgets.patchValues('video', { numFrames: 17 }));
+
+    for (const id of ['video-dimensions', 'video-source']) {
+      expect(shownCount(id), id).toBe('1');
+      expect(spokenCount(id), id).toBe('1 issue');
+      expect(chip(id).hasAttribute('data-issues'), id).toBe(true);
+    }
+    expect(issues('video-render')).toBeNull();
+    expect(chip('video-render').hasAttribute('data-issues')).toBe(false);
+    // The chip eases into its tint.
+    await expect
+      .poll(() => getComputedStyle(chip('video-dimensions')).backgroundColor)
+      .not.toBe(getComputedStyle(chip('video-render')).backgroundColor);
+
+    // A render-only issue counts there alone.
+    await act(() => store.commands.widgets.patchValues('video', { numFrames: 121, steps: 0 }));
+
+    expect(issues('video-dimensions')).toBeNull();
+    expect(issues('video-source')).toBeNull();
+    expect(shownCount('video-render')).toBe('1');
+  });
+
+  it('counts nothing in a section whose control for the issue is hidden', async () => {
+    const ti2v = model('wan-ti2v', 'wan', 'main', 'Wan 2.2 TI2V 5B', { variant: 'ti2v_5b' });
+    modelStore.set([...catalog, ti2v]);
+    await render();
+    // TI2V-5B cannot aim an extension at an end frame, and shows no last-frame field to clear it from.
+    await act(() =>
+      store.commands.widgets.patchValues('video', {
+        ...getDefaultVideoSettings(ti2v as never, [...catalog, ti2v] as never),
+        lastFrameImage: LAST_FRAME,
+        model: ti2v,
+        modelKey: ti2v.key,
+        sourceVideo: SOURCE_VIDEO,
+      })
+    );
+
+    expect(shownCount('video-source')).toBe('1');
+    expect(issues('video-frames')).toBeNull();
+  });
+});
+
+describe('video model field without a model', () => {
+  // The picker's install action reads the library itself; the field's message has to agree with it.
+  const renderEmpty = () =>
+    act(() =>
+      root.render(
+        <I18nextProvider i18n={i18n}>
+          <QueryClientProvider client={new QueryClient()}>
+            <ChakraProvider value={system}>
+              <GenerationUiProvider adapter={generationAdapter}>
+                <VideoUiAdapterProvider>
+                  <VideoWidgetView />
+                </VideoUiAdapterProvider>
+              </GenerationUiProvider>
+            </ChakraProvider>
+          </QueryClientProvider>
+        </I18nextProvider>
+      )
+    );
+
+  afterEach(() => setModelsSnapshotForTests({ error: null, models: [], status: 'idle' }));
+
+  it('says none is installed rather than asking for a choice the picker cannot offer', async () => {
+    modelStore.set([]);
+    setModelsSnapshotForTests({ error: null, models: [], status: 'loaded' });
+    await renderEmpty();
+
+    expect(host.textContent).toContain('No Wan 2.2, LTX-2 or MiniMax H3 model is installed.');
+
+    setModelsSnapshotForTests({ error: null, models: catalog as never, status: 'loaded' });
+    await renderEmpty();
+
+    expect(host.textContent).toContain('Select a Wan 2.2, LTX-2 or MiniMax H3 model.');
+  });
+});
+
+describe('the dynamic prompts decision on first mount', () => {
+  const mount = () =>
+    act(() =>
+      root.render(
+        <I18nextProvider i18n={i18n}>
+          <QueryClientProvider client={new QueryClient()}>
+            <ChakraProvider value={system}>
+              <GenerationUiProvider adapter={generationAdapter}>
+                <VideoUiAdapterProvider>
+                  <VideoWidgetView />
+                </VideoUiAdapterProvider>
+              </GenerationUiProvider>
+            </ChakraProvider>
+          </QueryClientProvider>
+        </I18nextProvider>
+      )
+    );
+
+  it('keeps a new panel expanding prompts when a partial edit lands before any model is installed', async () => {
+    modelStore.set([]);
+    await mount();
+
+    // A prompt resize: the first field a seeded panel stores, written alone.
+    store.commands.widgets.patchValues('video', { positivePromptHeightPx: 150 });
+
+    expect(normalizeVideoWidgetValues(stored())?.dynamicPromptsEnabled).toBe(true);
+  });
+
+  it('records a panel saved before Video expanded prompts as off', async () => {
+    const saved: Record<string, unknown> = {
+      ...getDefaultVideoSettings(ltxDev as never, catalog as never),
+      model: ltxDev,
+      modelKey: ltxDev.key,
+    };
+    for (const key of Object.keys(saved).filter((name) => name.startsWith('dynamicPrompts'))) {
+      delete saved[key];
+    }
+    store.commands.widgets.patchValues('video', saved);
+    await mount();
+
+    expect((stored() as unknown as Record<string, unknown>).dynamicPromptsEnabled).toBe(false);
   });
 });

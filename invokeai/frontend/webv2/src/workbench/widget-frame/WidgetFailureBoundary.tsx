@@ -9,12 +9,25 @@ import { Box, Code, Flex, HStack, ScrollArea, Stack, Text, useRecipe } from '@ch
 import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { createLogger } from '@platform/logging/logger';
 import { Button } from '@platform/ui/Button';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { toaster } from '@platform/ui/toaster';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { useScrollAreaPhantomHeal } from '@platform/ui/useScrollAreaPhantomHeal';
 import { chipRecipe } from '@theme/recipes';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
+import { isWidgetRegion } from '@workbench/layoutContracts';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { TriangleAlertIcon } from 'lucide-react';
-import { Component, type ErrorInfo, type ReactNode, useCallback, useRef } from 'react';
+import {
+  Component,
+  type ErrorInfo,
+  type MouseEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { WidgetPanelFrame, WidgetTooltipFrame } from './WidgetFrames';
@@ -23,6 +36,9 @@ const widgetFailureLogger = createLogger({ area: 'widget-render', namespace: 'sy
 
 interface WidgetFailureBoundaryProps {
   children: ReactNode;
+  fallback?: ReactNode;
+  isRetrying?: boolean;
+  framed?: boolean;
   /** Retain region framing, size, and resize handles on failure; headless hosts omit presentation context. */
   instance?: WidgetInstanceRuntimeMeta;
   presentation?: WidgetViewProps['presentation'];
@@ -33,6 +49,9 @@ interface WidgetFailureBoundaryProps {
   widget?: RegisteredWidget;
   widgetId: WidgetId;
   onRetry?: () => void;
+  onRequestReload?: () => (() => Promise<void>) | undefined;
+  onFailure?: (error: Error) => boolean;
+  onRecovered?: () => void;
 }
 
 interface WidgetFailureBoundaryState {
@@ -43,21 +62,88 @@ interface WidgetFailureBoundaryState {
 
 interface WidgetFailureFallbackProps extends Omit<WidgetFailureBoundaryProps, 'children' | 'resetKey' | 'onRetry'> {
   details: string;
+  message: string;
   onCopy: () => Promise<void>;
   onRetry: () => void;
 }
 
+const stopRecoveryActivation = (event: KeyboardEvent<HTMLButtonElement>) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.stopPropagation();
+  }
+};
+
+const WidgetReloadControl = ({
+  compact = false,
+  isBusy,
+  label,
+  onRequestReload,
+}: {
+  compact?: boolean;
+  isBusy?: boolean;
+  label: string;
+  onRequestReload: () => (() => Promise<void>) | undefined;
+}) => {
+  const { t } = useTranslation();
+  const [request, setRequest] = useState<{ run: () => Promise<void> } | null>(null);
+  const opener = useRef<HTMLButtonElement | null>(null);
+  const close = useCallback(() => setRequest(null), []);
+  const confirm = useCallback(async () => {
+    await request?.run();
+  }, [request]);
+  const open = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      const run = onRequestReload();
+      if (run) {
+        opener.current = event.currentTarget;
+        setRequest({ run });
+      }
+    },
+    [onRequestReload]
+  );
+  const returnFocus = useCallback(() => (opener.current?.getClientRects().length ? opener.current : null), []);
+  return (
+    <>
+      <Button
+        aria-label={compact ? t('widgets.failure.compactReloadLabel', { label }) : undefined}
+        disabled={isBusy}
+        size={compact ? 'xs' : 'sm'}
+        variant="outline"
+        maxH={compact ? '6' : undefined}
+        onClick={open}
+        onKeyDown={stopRecoveryActivation}
+      >
+        {t('widgets.failure.reloadEditor')}
+      </Button>
+      <ConfirmDialog
+        title={t('widgets.failure.reloadTitle')}
+        body={t('widgets.failure.reloadWarning')}
+        confirmLabel={t('widgets.failure.reloadEditor')}
+        isOpen={request !== null}
+        onClose={close}
+        onConfirm={confirm}
+        finalFocusEl={returnFocus}
+      />
+    </>
+  );
+};
+
 /** The error card itself: title, expanded detail, and the two recovery verbs. */
 const WidgetFailureCard = ({
   details,
+  isRetrying,
   label,
   onCopy,
   onRetry,
+  onRequestReload,
 }: {
+  onRequestReload?: WidgetFailureBoundaryProps['onRequestReload'];
   details: string;
+  isRetrying?: boolean;
   label: string;
   onCopy: () => Promise<void>;
-  onRetry: () => void;
+  onRetry: (event: MouseEvent<HTMLButtonElement>) => void;
 }) => {
   const { t } = useTranslation();
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -96,8 +182,15 @@ const WidgetFailureCard = ({
         </ScrollArea.Scrollbar>
         <ScrollArea.Corner />
       </ScrollArea.Root>
-      <Stack direction="row" gap="2">
-        <Button alignSelf="start" size="sm" variant="outline" onClick={onRetry}>
+      <Stack direction="row" flexWrap="wrap" gap="2">
+        <Button
+          aria-busy={isRetrying || undefined}
+          loading={isRetrying}
+          alignSelf="start"
+          size="sm"
+          variant="outline"
+          onClick={onRetry}
+        >
           {t('widgets.failure.retry')}
         </Button>
         <Button
@@ -109,30 +202,71 @@ const WidgetFailureCard = ({
         >
           {t('widgets.failure.copyError')}
         </Button>
+        {onRequestReload ? (
+          <WidgetReloadControl label={label} isBusy={isRetrying} onRequestReload={onRequestReload} />
+        ) : null}
       </Stack>
     </Stack>
   );
 };
 
-/** Status-bar scale: the strip is 24px tall, so the detail rides in the title tooltip. */
-const CompactWidgetFailure = ({ details, label, onRetry }: { details: string; label: string; onRetry: () => void }) => {
+/** Status-bar scale: the strip is 24px tall, so the detail is available through the keyboard-accessible tooltip. */
+export const CompactWidgetFailure = ({
+  message,
+  isRetrying,
+  label,
+  onRetry,
+  onRequestReload,
+}: {
+  onRequestReload?: WidgetFailureBoundaryProps['onRequestReload'];
+  message: string;
+  isRetrying?: boolean;
+  label: string;
+  onRetry: () => void;
+}) => {
   const { t } = useTranslation();
   const recipe = useRecipe({ recipe: chipRecipe });
 
+  const retry = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation();
+      const host = event.currentTarget.closest<HTMLElement>(
+        '[data-status-bar-widget], [data-floating-window], [data-focus-region]'
+      );
+      if (host) {
+        host.tabIndex = -1;
+        host.focus();
+      }
+      onRetry();
+    },
+    [onRetry]
+  );
   return (
-    <HStack
-      aria-label={t('widgets.failure.compactLabel', { label })}
-      color="fg.error"
-      css={recipe()}
-      role="status"
-      title={details}
-      onClick={onRetry}
-    >
-      <TriangleAlertIcon size={12} />
-      <Text data-widget-identity-label="" whiteSpace="nowrap">
-        {label}
-      </Text>
-    </HStack>
+    <Box display="contents">
+      {/* Full stacks stay in expanded recovery and diagnostic logs; a compact tooltip must fit the viewport. */}
+      <Tooltip content={message}>
+        <Button
+          aria-label={t('widgets.failure.compactLabel', { label })}
+          aria-busy={isRetrying || undefined}
+          loading={isRetrying}
+          color="fg.error"
+          css={recipe()}
+          maxH="6"
+          size="sm"
+          variant="ghost"
+          onClick={retry}
+          onKeyDown={stopRecoveryActivation}
+        >
+          <TriangleAlertIcon size={12} />
+          <Text data-widget-identity-label="" whiteSpace="nowrap">
+            {label}
+          </Text>
+        </Button>
+      </Tooltip>
+      {onRequestReload ? (
+        <WidgetReloadControl compact label={label} isBusy={isRetrying} onRequestReload={onRequestReload} />
+      ) : null}
+    </Box>
   );
 };
 
@@ -152,6 +286,9 @@ const WidgetFailureHeader = ({ label, region }: { label: string; region: WidgetV
 /** Match loading-frame geometry on failure so status cards do not overflow and panels retain resizing. */
 const WidgetFailureFallback = ({
   details,
+  message,
+  framed,
+  isRetrying,
   instance,
   presentation,
   region,
@@ -159,12 +296,35 @@ const WidgetFailureFallback = ({
   widgetId,
   onCopy,
   onRetry,
+  onRequestReload,
 }: WidgetFailureFallbackProps) => {
   const { t } = useTranslation();
+  const focus = useWorkbenchFocus();
+  const retryExpanded = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      event.currentTarget.closest<HTMLElement>('[data-widget-recovery-host]')?.focus();
+      onRetry();
+      // Side frames are replaced during loading; the focus owner waits for their recovered frame.
+      if (region === 'floating' && instance) {
+        focus.focusFloating(instance.id);
+      } else if (region && isWidgetRegion(region)) {
+        focus.focusRegion(region, instance?.typeId, instance?.id, widget?.implementation.load());
+      }
+    },
+    [focus, instance, onRetry, region, widget]
+  );
   const label = widget ? resolveWidgetInstanceLabel(instance ?? {}, widget.manifest, t) : widgetId;
 
   if (presentation === 'compact') {
-    return <CompactWidgetFailure details={details} label={label} onRetry={onRetry} />;
+    return (
+      <CompactWidgetFailure
+        isRetrying={isRetrying}
+        message={message}
+        label={label}
+        onRetry={onRetry}
+        onRequestReload={onRequestReload}
+      />
+    );
   }
 
   if (presentation === 'tooltip' && widget) {
@@ -174,7 +334,7 @@ const WidgetFailureFallback = ({
           {t('widgets.failure.title', { label })}
         </Text>
         <Text color="fg.muted" fontSize="xs">
-          {details}
+          {message}
         </Text>
       </WidgetTooltipFrame>
     );
@@ -182,22 +342,58 @@ const WidgetFailureFallback = ({
 
   const isPanel = region === 'left' || region === 'right' || region === 'bottom';
 
-  if (!isPanel && region !== 'center') {
-    return <WidgetFailureCard details={details} label={label} onCopy={onCopy} onRetry={onRetry} />;
+  if (framed === false || (!isPanel && region !== 'center')) {
+    const card = (
+      <WidgetFailureCard
+        isRetrying={isRetrying}
+        details={details}
+        label={label}
+        onCopy={onCopy}
+        onRetry={retryExpanded}
+        onRequestReload={onRequestReload}
+      />
+    );
+    return region === 'center' ? (
+      <Box p="2" pt="calc(var(--wb-center-chrome-inset, 0px) + var(--chakra-spacing-2))">
+        {card}
+      </Box>
+    ) : (
+      card
+    );
   }
 
-  const framed = (
+  const frameContent = (
     <>
-      {widget?.manifest.chrome?.header === 'hidden' ? null : <WidgetFailureHeader label={label} region={region} />}
-      <Box flex="1" minH="0" overflow="auto" p="2">
-        <WidgetFailureCard details={details} label={label} onCopy={onCopy} onRetry={onRetry} />
+      {isPanel && widget?.manifest.chrome?.header !== 'hidden' ? (
+        <WidgetFailureHeader label={label} region={region} />
+      ) : null}
+      <Box
+        flex="1"
+        minH="0"
+        overflow="auto"
+        p="2"
+        pt={region === 'center' ? 'calc(var(--wb-center-chrome-inset, 0px) + var(--chakra-spacing-2))' : undefined}
+      >
+        <WidgetFailureCard
+          isRetrying={isRetrying}
+          details={details}
+          label={label}
+          onCopy={onCopy}
+          onRetry={retryExpanded}
+          onRequestReload={onRequestReload}
+        />
       </Box>
     </>
   );
 
   return isPanel ? (
-    <WidgetPanelFrame instanceId={instance?.id} region={region} typeId={instance?.typeId}>
-      {framed}
+    <WidgetPanelFrame
+      instanceId={instance?.id}
+      label={t('widgets.failure.title', { label })}
+      region={region}
+      typeId={instance?.typeId}
+    >
+      {frameContent}
     </WidgetPanelFrame>
   ) : (
     <Flex
@@ -210,7 +406,7 @@ const WidgetFailureFallback = ({
       minH="0"
       w="full"
     >
-      {framed}
+      {frameContent}
     </Flex>
   );
 };
@@ -245,32 +441,54 @@ export class WidgetFailureBoundary extends Component<WidgetFailureBoundaryProps,
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    widgetFailureLogger.child({ projectId: this.props.projectId }).error({
-      context: {
-        componentStack: errorInfo.componentStack,
-        instanceId: this.props.instance?.id,
-        region: this.props.region,
-        widgetId: this.props.widgetId,
-      },
-      error,
-      message: `Widget ${this.props.widgetId} failed to render`,
-      name: 'widget.render-failed',
-    });
-    this.setState({ details: errorInfo.componentStack ?? error.stack ?? error.message });
+    const shouldLog = this.props.onFailure?.(error) ?? true;
+    if (shouldLog) {
+      widgetFailureLogger.child({ projectId: this.props.projectId }).error({
+        context: {
+          componentStack: errorInfo.componentStack,
+          instanceId: this.props.instance?.id,
+          region: this.props.region,
+          widgetId: this.props.widgetId,
+        },
+        error,
+        message: `Widget ${this.props.widgetId} failed to render`,
+        name: 'widget.render-failed',
+      });
+    }
+    this.setState({ details: [error.stack ?? error.message, errorInfo.componentStack].filter(Boolean).join('\n') });
+  }
+
+  componentDidMount() {
+    if (!this.state.error) {
+      this.props.onRecovered?.();
+    }
+  }
+
+  componentDidUpdate() {
+    if (!this.state.error) {
+      this.props.onRecovered?.();
+    }
   }
 
   render() {
-    const { children, instance, presentation, region, widget, widgetId } = this.props;
+    const { children, framed, isRetrying, instance, presentation, region, widget, widgetId, onRequestReload } =
+      this.props;
     const { details, error } = this.state;
 
     if (!error) {
       return children;
+    }
+    if (this.props.fallback !== undefined) {
+      return this.props.fallback;
     }
 
     return (
       <Box data-testid="widget-failure" display="contents">
         <WidgetFailureFallback
           details={details ?? error.message}
+          message={error.message}
+          framed={framed}
+          isRetrying={isRetrying}
           instance={instance}
           presentation={presentation}
           region={region}
@@ -278,6 +496,7 @@ export class WidgetFailureBoundary extends Component<WidgetFailureBoundaryProps,
           widgetId={widgetId}
           onCopy={this.handleCopyError}
           onRetry={this.handleRetry}
+          onRequestReload={onRequestReload}
         />
       </Box>
     );

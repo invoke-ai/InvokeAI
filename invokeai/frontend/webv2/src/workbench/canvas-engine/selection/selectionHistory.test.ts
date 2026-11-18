@@ -54,7 +54,7 @@ describe('withSelectionHistory', () => {
     await history.redo();
     expect(selection.bounds()).toEqual(rectBounds(10, 10, 40, 40));
     expect(selection.antsPaths()).toHaveLength(2);
-    expect(history.entries()).toEqual({ future: [], past: ['Select', 'Add to selection'] });
+    expect(history.entries()).toEqual({ evicted: 0, future: [], past: ['Select', 'Add to selection'] });
   });
 
   it('records nothing for a call that leaves the selection unchanged', () => {
@@ -129,6 +129,6 @@ describe('withSelectionHistory', () => {
     expect(selection.hasSelection()).toBe(false);
     finish();
     await replay;
-    expect(history.entries()).toEqual({ future: ['Slow step'], past: [] });
+    expect(history.entries()).toEqual({ evicted: 0, future: ['Slow step'], past: [] });
   });
 });

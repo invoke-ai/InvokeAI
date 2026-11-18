@@ -32,4 +32,40 @@ describe('custom node install log store', () => {
     expect(log.find((entry) => entry.id === first.id)?.status).toBe('installing');
     expect(log.find((entry) => entry.id === second.id)?.status).toBe('error');
   });
+
+  it('clears settled entries but keeps an install in flight so its outcome can still land', async () => {
+    const store = await import('./installLogStore');
+
+    const running = store.addCustomNodeInstallLogEntry({
+      name: 'running',
+      source: 'https://x/running.git',
+      status: 'installing',
+    });
+    store.addCustomNodeInstallLogEntry({ name: 'done', status: 'completed' });
+    store.addCustomNodeInstallLogEntry({ name: 'failed', status: 'error' });
+    store.addCustomNodeInstallLogEntry({ name: 'gone', status: 'uninstalled' });
+
+    store.clearFinishedCustomNodeInstalls();
+    store.updateCustomNodeInstallLogEntry(running.id, { name: 'running-pack', status: 'completed' });
+
+    expect(store.getCustomNodeInstallLogForTests()).toEqual([
+      expect.objectContaining({
+        id: running.id,
+        name: 'running-pack',
+        source: 'https://x/running.git',
+        status: 'completed',
+      }),
+    ]);
+  });
+
+  it('removes only the named entry', async () => {
+    const store = await import('./installLogStore');
+
+    const kept = store.addCustomNodeInstallLogEntry({ name: 'kept', status: 'completed' });
+    const removed = store.addCustomNodeInstallLogEntry({ name: 'removed', status: 'error' });
+
+    store.removeCustomNodeInstallLogEntry(removed.id);
+
+    expect(store.getCustomNodeInstallLogForTests().map((entry) => entry.id)).toEqual([kept.id]);
+  });
 });

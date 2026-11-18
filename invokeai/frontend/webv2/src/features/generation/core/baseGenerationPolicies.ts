@@ -15,10 +15,13 @@ import {
   SUPPORTED_GENERATE_BASES,
   type SupportedGenerateBase,
 } from '@features/generation/core/supportedBases';
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { SEED_MAX } from '@platform/core/seed';
 
 import type {
+  ExpandPromptSuggestion,
   ExternalGenerationMode,
+  GenerateLora,
   GenerateModelConfig,
   GenerateReferenceImage,
   GenerateReferenceImageAsset,
@@ -26,40 +29,51 @@ import type {
   GenerateSettings,
   MainModelConfig,
   PidMode,
+  VaeModelConfig,
 } from './types';
 
 import {
   getCompatibleDiffusersComponentSource,
   isBundledMainForBase,
   isAnimaInpaintAdapter,
+  isVisionTextLlm,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isClipVariant,
   isDiffusersMainForBase,
-  isFlux2DiffusersSourceForModel,
+  isBundledFlux2Main,
+  isFlux2EncoderSourceForModel,
+  isFlux2PipelineForModel,
+  KLEIN_TO_QWEN3_VARIANT,
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
+  isGgufQwen3Vl4bEncoder,
+  isGgufQwen3Vl8bEncoder,
+  isQwen3Vl4bVisionTower,
   isQwen3Vl8bEncoder,
+  isQwen3Vl8bVisionTower,
   isIdeogram4UnconditionalBranch,
-  isKrea2Qwen3VlEncoder,
   isMossImageQwen35Encoder,
+  isQwen3Vl4bEncoder,
   isSelfContainedSDNQFlux1Pipeline,
-  isSelfContainedSDNQPipeline,
   isVaeAcceptedByBase,
+  isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
 import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
-import { DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from './dynamicPrompts';
+import { DEFAULT_DYNAMIC_PROMPTS_SETTINGS } from './dynamicPrompts';
 import {
   getExternalAspectRatioSizes,
   getExternalReferenceImages,
   getExternalResolutionPresets,
   isSeedreamBatchModel,
+  resolveExternalCanvasRequestSize,
   resolveExternalImageSize,
   SEEDREAM_BATCH_MAX_TOTAL_IMAGES,
 } from './externalProvider';
+import { createUntranslatedGenerationIssue, type GenerationIssue, type GenerationIssueFix } from './generationIssues';
 import {
   DEFAULT_PID_STEPS,
   getIsPidActive,
@@ -102,11 +116,13 @@ import {
   IDEOGRAM4_MU_MIN,
   IDEOGRAM4_STEPS_MAX,
   IDEOGRAM4_STEPS_MIN,
+  isAspectRatioLocked,
+  isGenerateModelConfig,
   isGenerateSettings,
   isLoraCompatibleWithModel,
+  isSameInstalledModel,
   isValidKrea2RebalanceWeights,
   isValidMossImageSkipLayers,
-  isWanLoraTargetingMain,
   KREA2_REBALANCE_WEIGHT_COUNT,
   MAX_MOSS_IMAGE_SKIP_LAYER,
   normalizeGenerateSettings,
@@ -368,6 +384,98 @@ export const getPromptPolicy = (
   };
 };
 
+const HF_REPO_SOURCE = /^([A-Za-z0-9][\w.-]*\/[\w.-]+)(?::[\w.-]+)?$/;
+
+/**
+ * Whether an installed model's source is the Hugging Face repo `repoId`: the repo itself (also with a `:variant` or
+ * `::subfolder` suffix), a huggingface.co URL, or a local folder named like the repo. Matching is case-insensitive.
+ */
+export const isModelFromRepo = (source: string | null | undefined, repoId: string): boolean => {
+  if (!source) {
+    return false;
+  }
+  const wanted = repoId.toLowerCase();
+  const withoutSubfolder = source.split('::')[0]!.trim();
+  if (/^https?:\/\//i.test(withoutSubfolder)) {
+    const repo = /^https?:\/\/(?:www\.)?huggingface\.co\/([^/?#]+\/[^/?#]+)/i.exec(withoutSubfolder)?.[1];
+    return repo?.toLowerCase() === wanted;
+  }
+
+  const candidate = withoutSubfolder.replace(/[/\\]+$/, '');
+  const repo = HF_REPO_SOURCE.exec(candidate)?.[1];
+  if (repo !== undefined) {
+    return repo.toLowerCase() === wanted;
+  }
+  const folder = candidate.split(/[/\\]/).pop() ?? '';
+  return folder.toLowerCase() === wanted.split('/').pop();
+};
+
+/**
+ * Whether an installed model's source is the single file `fileName`: a Hugging Face file URL or a local path ending in
+ * it. Case-insensitive.
+ */
+const isModelFromFile = (source: string | null | undefined, fileName: string): boolean => {
+  const file = source?.split('::')[0]!.split(/[?#]/)[0]!.split(/[/\\]/).pop();
+  return Boolean(file) && file!.toLowerCase() === fileName.toLowerCase();
+};
+
+/** Whether an installed model's source is the model Expand Prompt suggests, in any of its builds. */
+export const isSuggestedExpandPromptModel = (
+  source: string | null | undefined,
+  suggestion: Pick<ExpandPromptSuggestion, 'modelFileNames' | 'modelSource'>
+): boolean =>
+  (suggestion.modelSource !== null && isModelFromRepo(source, suggestion.modelSource)) ||
+  (suggestion.modelFileNames ?? []).some((fileName) => isModelFromFile(source, fileName));
+
+/** A family's released prompt enhancer, which Expand Prompt preselects for a text-only rewrite. */
+interface ImagePromptEnhancer {
+  /** Starter source of the enhancer model; an installed text LLM with this source is preselected. */
+  modelSource: string;
+  /** Single-file builds of the same model, which Expand Prompt preselects too. */
+  modelFileNames?: readonly string[];
+  /** The starter model's name, for the hint shown when it is not installed. */
+  modelName: string;
+  /** Seeded public system prompt. */
+  systemPromptId: string;
+}
+
+const IMAGE_PROMPT_ENHANCERS: Partial<Record<string, ImagePromptEnhancer>> = {
+  // The OpenMOSS prompt-enhancer skill writes a layout draft the `moss_image_layout_prompt` node compiles.
+  'moss-image': {
+    modelName: 'Gemma 4 E4B (Prompt Enhancer)',
+    modelSource: 'google/gemma-4-E4B-it',
+    systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011',
+  },
+  // The text-only rewrite uses BFL's `t2i` system prompt; reference images and boxes only reach the upsampler node.
+  // The bf16 folder and ComfyUI's two single files (int8 convrot, bf16) are the same model.
+  flux3: {
+    modelFileNames: [
+      'qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors',
+      'qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors',
+    ],
+    modelName: 'FLUX.3 Prompt Upsampler',
+    modelSource: 'black-forest-labs/flux-3-image-klein-pup',
+    systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0012',
+  },
+};
+
+/** What Expand Prompt starts from for this image family, or null when the family ships no enhancer. */
+export const getImageExpandPromptSuggestion = (
+  model: GenerateModelConfig | undefined
+): ExpandPromptSuggestion | null => {
+  const enhancer = model?.type === 'main' ? IMAGE_PROMPT_ENHANCERS[model.base] : undefined;
+  return enhancer
+    ? {
+        image: null,
+        imageSystemPromptId: null,
+        modelFileNames: enhancer.modelFileNames,
+        modelName: enhancer.modelName,
+        modelSource: enhancer.modelSource,
+        systemPromptId: enhancer.systemPromptId,
+      }
+    : null;
+};
+
 export const getGenerationUiPolicy = (model: GenerateModelConfig | undefined) => {
   const config = getBaseGenerationConfig(model);
   const seedVisible = model?.type === 'external_image_generator' ? model.capabilities?.supports_seed === true : true;
@@ -467,11 +575,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     hiDiffusionWindowAttentionEnabled: true,
     hiDiffusionT1Ratio: DEFAULT_HIDIFFUSION_T1_RATIO,
     hiDiffusionT2Ratio: DEFAULT_HIDIFFUSION_T2_RATIO,
-    dynamicPromptsCombinatorial: true,
-    dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
-    dynamicPromptsSampleSeed: 0,
-    dynamicPromptsResample: true,
-    dynamicPromptsSeedBehaviour: 'per-iteration',
+    ...DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
     clipEmbedModel: null,
     clipGEmbedModel: null,
     clipLEmbedModel: null,
@@ -492,10 +596,13 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     qwen3EncoderModel: null,
     qwenVLEncoderModel: null,
     qwen3VLEncoderModel: null,
+    qwen3VLVisionTowerModel: null,
     qwen35EncoderModel: null,
     animaInpaintAdapterModel: null,
     animaInpaintAdapterEnabled: true,
     animaInpaintAdapterWeight: DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
+    flux3PromptUpsamplerEnabled: false,
+    flux3PromptUpsamplerModel: null,
     wanT5EncoderModel: null,
     ideogram4UnconditionalModel: null,
     wanLowNoiseModel: null,
@@ -570,9 +677,7 @@ export const getSettingsWithModelDefaults = (
     cfgScale: modelDefaults.cfgScale,
     colorCompensation: modelDefaults.colorCompensation,
     height: modelDefaults.height,
-    loras: settings.loras.map((lora) =>
-      isLoraCompatibleWithModel(lora.model, model) ? lora : { ...lora, isEnabled: false }
-    ),
+    // Concepts stay as they are: the model skips the ones it cannot load, and a compatible model runs them again.
     modelKey: model.key,
     scheduler: modelDefaults.scheduler,
     steps: modelDefaults.steps,
@@ -580,6 +685,67 @@ export const getSettingsWithModelDefaults = (
     width: modelDefaults.width,
   };
 };
+
+/** The VAE a model's defaults choose, classified; each context states what it does with `missing`. */
+export type ModelDefaultVae =
+  /** Sets none, or the "default" sentinel where the VAE is a required component with nothing bundled. */
+  | { kind: 'none' }
+  /**
+   * Names a VAE that is not installed or does not fit the model. `hasBundledVae` says whether the model and settings
+   * have a bundled VAE to fall back to (the VAE component is not required).
+   */
+  | { kind: 'missing'; hasBundledVae: boolean }
+  /** `null` is the bundled VAE, which the "default" sentinel asks for wherever there is one. */
+  | { kind: 'apply'; vae: VaeModelConfig | null };
+
+/** Whether the model and settings need a VAE component, having no bundled VAE (or component source) to use. */
+const isVaeComponentRequired = (model: MainModelConfig, settings: GenerateSettings): boolean => {
+  const vaeSlotPolicy = getComponentSectionPolicy(model, settings).slots.find((slotPolicy) => slotPolicy.key === 'vae');
+
+  return Boolean(vaeSlotPolicy?.required?.(getComponentPolicyContext(model, settings)));
+};
+
+/**
+ * The one classification of a model's default VAE. The Model Manager stores "default" when the VAE default is on with
+ * no VAE picked: that is the bundled VAE, which only a model whose VAE is a required component lacks. Requiredness
+ * follows the component policy, so it reads the settings (a component source can bundle one).
+ */
+export const resolveModelDefaultVae = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  vaeModels: readonly VaeModelConfig[]
+): ModelDefaultVae => {
+  const key = (model.default_settings as { vae?: unknown } | null | undefined)?.vae;
+
+  if (model.type !== 'main' || typeof key !== 'string') {
+    return { kind: 'none' };
+  }
+
+  const hasBundledVae = !isVaeComponentRequired(model, settings);
+
+  if (key === '' || key === 'default') {
+    return hasBundledVae ? { kind: 'apply', vae: null } : { kind: 'none' };
+  }
+
+  const vae = vaeModels.find(
+    (candidate) => candidate.key === key && isVaeCompatibleWithGenerateModel(model, candidate)
+  );
+
+  return vae ? { kind: 'apply', vae } : { kind: 'missing', hasBundledVae };
+};
+
+/**
+ * Recall's policy (a model switch from recalled parameters or an image, and graph export): the model's default VAE,
+ * else the bundled VAE when the default cannot apply, as recall always did, so an image made with the bundled VAE is
+ * reproduced. Only where the VAE is required and nothing is bundled does the current VAE stay (`undefined`), since
+ * clearing it would leave the form unable to run.
+ */
+export const getRecallDefaultVae = (defaultVae: ModelDefaultVae): VaeModelConfig | null | undefined =>
+  defaultVae.kind === 'apply'
+    ? defaultVae.vae
+    : defaultVae.kind === 'missing' && defaultVae.hasBundledVae
+      ? null
+      : undefined;
 
 export type GenerateComponentValueKey =
   | 't5EncoderModel'
@@ -590,8 +756,10 @@ export type GenerateComponentValueKey =
   | 'qwen3EncoderModel'
   | 'qwenVLEncoderModel'
   | 'qwen3VLEncoderModel'
+  | 'qwen3VLVisionTowerModel'
   | 'qwen35EncoderModel'
   | 'animaInpaintAdapterModel'
+  | 'flux3PromptUpsamplerModel'
   | 'wanT5EncoderModel'
   | 'wanLowNoiseModel'
   | 'ideogram4UnconditionalModel'
@@ -601,7 +769,14 @@ export type GenerateComponentValueKey =
   | 'vae';
 
 /** The settings component slot rules read beyond the selected components themselves. */
-export type ComponentPolicySettings = Pick<GenerateSettings, 'componentSourceModel' | 'pidMode'>;
+export type ComponentPolicySettings = Pick<
+  GenerateSettings,
+  | 'animaInpaintAdapterEnabled'
+  | 'componentSourceModel'
+  | 'flux3PromptUpsamplerEnabled'
+  | 'pidMode'
+  | 'qwen3VLEncoderModel'
+>;
 
 export interface ComponentPolicyContext {
   model: GenerateModelConfig;
@@ -615,10 +790,17 @@ export interface ComponentSlotPolicy {
   modelTypes: readonly ModelTaxonomyType[];
   valueKind: 'component' | 'vae' | 'main';
   helpText?: string;
+  /** Shown while the slot is empty and not required; a required slot always asks for a component. */
   placeholder?: string;
   defaultOpen?: boolean;
   filter?: (candidate: ModelConfig, ctx: ComponentPolicyContext) => boolean;
   required?: (ctx: ComponentPolicyContext) => boolean;
+  /**
+   * Whether a generation may load the selection. A slot behind a switch keeps its selection while the switch is off,
+   * and nothing loads it then, so a kept selection that is no longer installed does not block Invoke. Absent, a set
+   * selection is always in use.
+   */
+  inUse?: (ctx: ComponentPolicyContext) => boolean;
   missingMessage?: string;
   /**
    * Reported whenever the selected value fails `filter`, required or not, so a saved selection the graph cannot use
@@ -630,16 +812,47 @@ export interface ComponentSlotPolicy {
 export interface ComponentSectionPolicy {
   defaultOpen: boolean;
   slots: readonly ComponentSlotPolicy[];
-  validate: (ctx: ComponentPolicyContext) => string[];
+  /** Family rules beyond the slots; each slot reports its own through `getComponentSlotIssue`. */
+  rules?: (ctx: ComponentPolicyContext) => string[];
+}
+
+/**
+ * What a model switch does to one choice the user made. `turnedOff` keeps it and the new model just does not run it,
+ * so switching back runs it again; `adjusted` moves a value into the new model's range; `removed` clears a selection
+ * and `reset` returns a value to its default, both lost for good once the switch is kept.
+ */
+export type GenerateModelSwitchChangeKind = 'adjusted' | 'removed' | 'reset' | 'turnedOff';
+
+export type GenerateModelSwitchSubject =
+  | GenerateComponentValueKey
+  | 'cfgRescale'
+  | 'clipSkip'
+  | 'colorCompensation'
+  | 'concepts'
+  | 'guidance'
+  | 'hiDiffusion'
+  | 'referenceImages'
+  | 'seamless'
+  | 'vaePrecision';
+
+export interface GenerateModelSwitchChange {
+  kind: GenerateModelSwitchChangeKind;
+  subject: GenerateModelSwitchSubject;
+  /** How many items of a list (concepts, reference images) it affects. */
+  count?: number;
 }
 
 export interface GenerateModelSelectionResult {
   settings: GenerateSettings;
-  /** Settings the switch turns off or removes, which callers confirm or report. */
-  clearedLabels: readonly string[];
+  /** Choices the switch changes, which callers confirm or report. */
+  changes: readonly GenerateModelSwitchChange[];
   /** The size moved to the model's grid or provider sizes. Nothing is lost and it stays on screen, so it is reported. */
   dimensionsAdjusted: boolean;
 }
+
+/** A switch that removes or resets something cannot be taken back by switching back, so it is confirmed first. */
+export const isLossyModelSwitch = (result: Pick<GenerateModelSelectionResult, 'changes'>): boolean =>
+  result.changes.some((change) => change.kind === 'removed' || change.kind === 'reset');
 
 const TYPE_CLIP_EMBED: ModelTaxonomyType[] = ['clip_embed'];
 const TYPE_MAIN: ModelTaxonomyType[] = ['main'];
@@ -647,9 +860,11 @@ const TYPE_MISTRAL: ModelTaxonomyType[] = ['mistral_encoder'];
 const TYPE_QWEN3: ModelTaxonomyType[] = ['qwen3_encoder'];
 const TYPE_QWEN_VL: ModelTaxonomyType[] = ['qwen_vl_encoder'];
 const TYPE_QWEN3_VL: ModelTaxonomyType[] = ['qwen3_vl_encoder'];
+const TYPE_QWEN3_VL_VISION_TOWER: ModelTaxonomyType[] = ['qwen3_vl_vision_tower'];
 const TYPE_QWEN35: ModelTaxonomyType[] = ['qwen3_5_encoder'];
 const TYPE_WAN_T5: ModelTaxonomyType[] = ['wan_t5_encoder'];
 const TYPE_CONTROLNET: ModelTaxonomyType[] = ['controlnet'];
+const TYPE_TEXT_LLM: ModelTaxonomyType[] = ['text_llm'];
 const TYPE_PID_DECODER: ModelTaxonomyType[] = ['pid_decoder'];
 const TYPE_GEMMA2: ModelTaxonomyType[] = ['gemma2_encoder'];
 const TYPE_T5: ModelTaxonomyType[] = ['t5_encoder'];
@@ -713,6 +928,18 @@ const qwen3VlEncoderSlot = (helpText: string, filter: GenerateComponentFilter): 
     filter,
   });
 
+/** Optional; only a GGUF encoder needs it, so the slot appears with such an encoder alone. */
+const qwen3VlVisionTowerSlot = (helpText: string, filter: GenerateComponentFilter): ComponentSlotPolicy =>
+  slot({
+    key: 'qwen3VLVisionTowerModel',
+    label: 'Vision Tower',
+    modelTypes: TYPE_QWEN3_VL_VISION_TOWER,
+    valueKind: 'component',
+    helpText,
+    placeholder: 'None',
+    filter,
+  });
+
 const qwen35EncoderSlot = (helpText: string, filter: GenerateComponentFilter): ComponentSlotPolicy =>
   slot({
     key: 'qwen35EncoderModel',
@@ -733,7 +960,28 @@ const animaInpaintAdapterSlot = (): ComponentSlotPolicy =>
     helpText: 'Optional 4-channel ControlNet-LLLite adapter, used only when inpainting or outpainting on the Canvas.',
     placeholder: 'None',
     filter: wrapFilter(isAnimaInpaintAdapter),
+    inUse: (ctx) => ctx.settings.animaInpaintAdapterEnabled,
   });
+
+const isFlux3PromptUpsamplerOn = (ctx: ComponentPolicyContext): boolean => ctx.settings.flux3PromptUpsamplerEnabled;
+
+/** Exposed before the switch is on, like PiD's; required only while it is. The node reads images, so the model must see them. */
+const flux3PromptUpsamplerSlot = (): ComponentSlotPolicy =>
+  slot({
+    key: 'flux3PromptUpsamplerModel',
+    label: 'Prompt Upsampler',
+    modelTypes: TYPE_TEXT_LLM,
+    valueKind: 'component',
+    placeholder: 'None',
+    helpText:
+      'The FLUX.3 Prompt Upsampler starter model (bf16 or int8), used while Prompt upsampler is on. Other Text LLMs that read images run, but are not trained for its instructions.',
+    filter: (candidate) => isVisionTextLlm(candidate),
+    required: isFlux3PromptUpsamplerOn,
+    inUse: isFlux3PromptUpsamplerOn,
+    missingMessage: 'Generate needs a Prompt Upsampler model while Prompt upsampler is on.',
+  });
+
+const isPidOn = (ctx: ComponentPolicyContext): boolean => getIsPidActive(ctx.settings.pidMode, ctx.model.base);
 
 /** Expose PiD slots before enabling it; Z-Image uses FLUX's decoder. */
 const pidDecoderSlot = (): ComponentSlotPolicy =>
@@ -745,7 +993,8 @@ const pidDecoderSlot = (): ComponentSlotPolicy =>
     helpText: 'Required while PiD is on. Must match the main model’s base.',
     filter: (candidate, ctx) =>
       candidate.type === 'pid_decoder' && candidate.base === getPidDecoderBaseForMainBase(ctx.model.base),
-    required: (ctx) => getIsPidActive(ctx.settings.pidMode, ctx.model.base),
+    required: isPidOn,
+    inUse: isPidOn,
     missingMessage: 'Generate needs a PiD decoder while PiD is on.',
   });
 
@@ -757,7 +1006,8 @@ const gemma2EncoderSlot = (): ComponentSlotPolicy =>
     valueKind: 'component',
     helpText: 'Required while PiD is on. Shared by every PiD decoder.',
     filter: (candidate) => candidate.type === 'gemma2_encoder',
-    required: (ctx) => getIsPidActive(ctx.settings.pidMode, ctx.model.base),
+    required: isPidOn,
+    inUse: isPidOn,
     missingMessage: 'Generate needs a Gemma-2 encoder while PiD is on.',
   });
 
@@ -852,27 +1102,32 @@ type ComponentSourceCandidate = {
   variant?: unknown;
 };
 
-const isFlux2DiffusersSource = (source: ComponentSourceCandidate | null | undefined): source is MainModelConfig =>
-  Boolean(source && isBundledMainForBase('flux2')(source));
+const QWEN3_ENCODER_SIZE_LABELS: Partial<Record<string, string>> = { qwen3_4b: 'Qwen3 4B', qwen3_8b: 'Qwen3 8B' };
 
-const hasFlux2DiffusersVaeSource = (ctx: ComponentPolicyContext): boolean =>
-  ctx.model.type !== 'external_image_generator' &&
-  (isBundledMainForBase('flux2')(ctx.model) || isFlux2DiffusersSource(ctx.settings.componentSourceModel));
+const isFlux2SourceFor =
+  (model: GenerateModelConfig) =>
+  (source: ComponentSourceCandidate | null | undefined): source is MainModelConfig =>
+    Boolean(source && isFlux2PipelineForModel(model)(source));
 
-const hasFlux2DiffusersEncoderSource = (ctx: ComponentPolicyContext): boolean =>
+const hasFlux2VaeSource = (ctx: ComponentPolicyContext): boolean =>
   ctx.model.type !== 'external_image_generator' &&
-  (isBundledMainForBase('flux2')(ctx.model) ||
+  (isBundledFlux2Main(ctx.model) || isFlux2SourceFor(ctx.model)(ctx.settings.componentSourceModel));
+
+const hasFlux2EncoderSource = (ctx: ComponentPolicyContext): boolean =>
+  ctx.model.type !== 'external_image_generator' &&
+  (isBundledFlux2Main(ctx.model) ||
     Boolean(
-      ctx.settings.componentSourceModel && isFlux2DiffusersSourceForModel(ctx.model)(ctx.settings.componentSourceModel)
+      ctx.settings.componentSourceModel && isFlux2EncoderSourceForModel(ctx.model)(ctx.settings.componentSourceModel)
     ));
 
-export const getFlux2DiffusersComponentSource = (
+/** The saved component source the FLUX.2 loader can use: its VAE always, its encoder unless a standalone one is set. */
+export const getFlux2ComponentSource = (
   model: MainModelConfig,
   settings: GenerateSettings
 ): MainModelConfig | undefined => {
   const source = settings.componentSourceModel;
 
-  if (!isFlux2DiffusersSource(source)) {
+  if (!isFlux2SourceFor(model)(source)) {
     return undefined;
   }
 
@@ -882,7 +1137,7 @@ export const getFlux2DiffusersComponentSource = (
     return source;
   }
 
-  return isFlux2DiffusersSourceForModel(model)(source) ? source : undefined;
+  return isFlux2EncoderSourceForModel(model)(source) ? source : undefined;
 };
 
 export const getAutoFlux2ComponentSourceModel = (
@@ -896,18 +1151,20 @@ export const getAutoFlux2ComponentSourceModel = (
 
   const encoderModel = model.variant === 'dev' ? settings.mistralEncoderModel : settings.qwen3EncoderModel;
 
-  if (isBundledMainForBase('flux2')(model) || (encoderModel && settings.vae)) {
+  if (isBundledFlux2Main(model) || (encoderModel && settings.vae)) {
     return null;
   }
 
-  const diffusersModels = models.filter(isFlux2DiffusersSource);
-  const variantMatch = diffusersModels.find(isFlux2DiffusersSourceForModel(model));
+  const pipelines = models.filter(isFlux2SourceFor(model));
+  const encoderSource = pipelines.find(isFlux2EncoderSourceForModel(model));
 
   if (!encoderModel && settings.vae) {
-    return variantMatch ?? null;
+    return encoderSource ?? null;
   }
 
-  return variantMatch ?? diffusersModels[0] ?? null;
+  // No VAE is set here. A pipeline that cannot give the encoder still gives the VAE; the encoder slot then asks for a
+  // standalone one, if none is set yet.
+  return encoderSource ?? pipelines[0] ?? null;
 };
 
 // Split/quantized families can satisfy required encoder/VAE slots from a bundled Diffusers source.
@@ -915,34 +1172,35 @@ const isBundledOrDiffusersSourceSatisfied = (ctx: ComponentPolicyContext): boole
   ctx.model.type !== 'external_image_generator' &&
   (isBundledMainForBase(ctx.model.base)(ctx.model) || hasCompatibleComponentSource(ctx));
 
-// Slot validation is shared by invocation readiness and graph preflight so picker requirements cannot drift.
-const validateSlots = (policy: Pick<ComponentSectionPolicy, 'slots'>, ctx: ComponentPolicyContext): string[] =>
-  policy.slots.flatMap((slotPolicy) => {
-    const value = ctx.selectedComponents[slotPolicy.key];
-    const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
+/**
+ * What blocks Invoke on one slot, or null. Shared by the picker, invocation readiness and graph preflight so picker
+ * requirements cannot drift.
+ */
+export const getComponentSlotIssue = (slotPolicy: ComponentSlotPolicy, ctx: ComponentPolicyContext): string | null => {
+  const value = ctx.selectedComponents[slotPolicy.key];
+  const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
 
-    if (value && !isValid && slotPolicy.incompatibleMessage) {
-      return [slotPolicy.incompatibleMessage];
-    }
+  if (value && !isValid && slotPolicy.incompatibleMessage) {
+    return slotPolicy.incompatibleMessage;
+  }
 
-    if (!slotPolicy.required?.(ctx)) {
-      return [];
-    }
+  if (!slotPolicy.required?.(ctx)) {
+    return null;
+  }
 
-    return isValid ? [] : [slotPolicy.missingMessage ?? `Generate needs a ${slotPolicy.label} for this model.`];
-  });
+  return isValid ? null : (slotPolicy.missingMessage ?? `Generate needs a ${slotPolicy.label} for this model.`);
+};
 
 const createPolicy = (defaultOpen: boolean, slots: readonly ComponentSlotPolicy[]): ComponentSectionPolicy => ({
   defaultOpen,
   slots,
-  validate: (ctx) => validateSlots({ slots }, ctx),
 });
 
 const EMPTY_COMPONENT_POLICY: ComponentSectionPolicy = createPolicy(false, []);
 
 const getBaseComponentSectionPolicy = (
   model: GenerateModelConfig | undefined,
-  _settings: ComponentPolicySettings
+  settings: ComponentPolicySettings
 ): ComponentSectionPolicy => {
   if (!model || model.type === 'external_image_generator') {
     return EMPTY_COMPONENT_POLICY;
@@ -971,49 +1229,106 @@ const getBaseComponentSectionPolicy = (
             missingMessage: 'Generate needs a VAE for FLUX models.',
           },
         ]),
-        validate: (ctx) => [
-          ...(ctx.model.type !== 'external_image_generator' && ctx.model.variant === 'dev_fill'
+        rules: (ctx) =>
+          ctx.model.type !== 'external_image_generator' && ctx.model.variant === 'dev_fill'
             ? ['FLUX Fill models do not support text-to-image generation.']
-            : []),
-          ...validateSlots(getBaseComponentSectionPolicy(ctx.model, ctx.settings), ctx),
-        ],
+            : [],
       };
     case 'flux2': {
-      const encoderSlot: ComponentSlotPolicy =
-        model.variant === 'dev'
-          ? {
-              ...mistralEncoderSlot(
-                'Optional override; otherwise a compatible installed FLUX.2 [dev] Diffusers model is used.'
-              ),
-              required: (ctx) => !hasFlux2DiffusersEncoderSource(ctx),
-              missingMessage: 'Generate needs a Mistral Encoder for non-Diffusers FLUX.2 [dev] models.',
-            }
-          : {
-              ...qwen3EncoderSlot(
-                'Optional override; otherwise a compatible installed FLUX.2 Diffusers model is used.'
-              ),
-              filter: (candidate, ctx) =>
-                ctx.model.type !== 'external_image_generator' && isFlux2Qwen3EncoderForModel(ctx.model)(candidate),
-              required: (ctx) => !hasFlux2DiffusersEncoderSource(ctx),
-              missingMessage: 'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.',
-            };
+      const isDev = model.variant === 'dev';
+      // A Klein of unknown size takes either encoder, so its copy names none.
+      const kleinQwen3 =
+        typeof model.variant === 'string'
+          ? QWEN3_ENCODER_SIZE_LABELS[KLEIN_TO_QWEN3_VARIANT[model.variant] ?? '']
+          : undefined;
+      const encoderSlot: ComponentSlotPolicy = isDev
+        ? {
+            ...mistralEncoderSlot(
+              'Optional override; otherwise taken from an installed FLUX.2 [dev] Diffusers pipeline.'
+            ),
+            required: (ctx) => !hasFlux2EncoderSource(ctx),
+            missingMessage:
+              'Generate needs a Mistral Encoder or a FLUX.2 [dev] Diffusers pipeline for this FLUX.2 [dev] model.',
+          }
+        : {
+            ...qwen3EncoderSlot(
+              kleinQwen3
+                ? `Optional ${kleinQwen3} override; otherwise taken from an installed FLUX.2 Klein Diffusers or SDNQ pipeline of the same size.`
+                : 'Optional override; otherwise taken from an installed FLUX.2 Klein Diffusers or SDNQ pipeline.'
+            ),
+            filter: (candidate, ctx) =>
+              ctx.model.type !== 'external_image_generator' && isFlux2Qwen3EncoderForModel(ctx.model)(candidate),
+            required: (ctx) => !hasFlux2EncoderSource(ctx),
+            missingMessage: kleinQwen3
+              ? `Generate needs a ${kleinQwen3} Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.`
+              : 'Generate needs a Qwen3 Encoder or a FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+          };
 
-      return createPolicy(!isSelfContainedSDNQPipeline(model) && model.format !== 'diffusers', [
+      return createPolicy(!isBundledFlux2Main(model), [
         encoderSlot,
         {
-          ...vaeSlot('Optional override; otherwise an installed FLUX.2 Diffusers model is used.', isAcceptedVae),
-          required: (ctx) => !hasFlux2DiffusersVaeSource(ctx),
-          missingMessage: 'Generate needs a VAE for non-Diffusers FLUX.2 models.',
+          ...vaeSlot(
+            isDev
+              ? 'Optional override; otherwise taken from an installed FLUX.2 Diffusers pipeline.'
+              : 'Optional override; otherwise taken from an installed FLUX.2 Diffusers or SDNQ pipeline.',
+            isAcceptedVae
+          ),
+          required: (ctx) => !hasFlux2VaeSource(ctx),
+          missingMessage: isDev
+            ? 'Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers pipeline for this FLUX.2 [dev] model.'
+            : 'Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
         },
       ]);
     }
-    case 'sd-3':
-      return createPolicy(false, [
-        t5EncoderSlot('Optional override; the main model is used when omitted.'),
-        clipVariantSlot('clipLEmbedModel', 'CLIP L', 'large', 'Optional CLIP-L override.'),
-        clipVariantSlot('clipGEmbedModel', 'CLIP G', 'gigantic', 'Optional CLIP-G override.'),
-        vaeSlot('Optional VAE override.', isAcceptedVae),
+    case 'sd-3': {
+      // A Diffusers pipeline brings all four components; a GGUF transformer brings none of them.
+      const required = (ctx: ComponentPolicyContext) => ctx.model.format !== 'diffusers';
+      const isDiffusers = model.format === 'diffusers';
+
+      return createPolicy(!isDiffusers, [
+        {
+          ...t5EncoderSlot(
+            isDiffusers
+              ? 'Optional override; the main model is used when omitted.'
+              : 'Required: a T5-XXL encoder, such as a T5 starter model or a T5 GGUF.'
+          ),
+          required,
+          missingMessage: 'Generate needs a T5 Encoder for non-Diffusers SD3 models.',
+        },
+        {
+          ...clipVariantSlot(
+            'clipLEmbedModel',
+            'CLIP L',
+            'large',
+            isDiffusers ? 'Optional CLIP-L override.' : 'Required: a CLIP-L text encoder.'
+          ),
+          required,
+          missingMessage: 'Generate needs a CLIP L encoder for non-Diffusers SD3 models.',
+        },
+        {
+          ...clipVariantSlot(
+            'clipGEmbedModel',
+            'CLIP G',
+            'gigantic',
+            isDiffusers
+              ? 'Optional CLIP-G override.'
+              : 'Required: a CLIP-G text encoder that includes its text_projection, such as clip_g.safetensors.'
+          ),
+          required,
+          missingMessage: 'Generate needs a CLIP G encoder for non-Diffusers SD3 models.',
+        },
+        {
+          ...vaeSlot(
+            isDiffusers
+              ? 'Optional VAE override.'
+              : 'Required: an SD3 VAE. A single-file VAE is listed here once its name or folder says SD3, or its base is set to SD 3.x.',
+            isAcceptedVae
+          ),
+          required,
+          missingMessage: 'Generate needs a VAE for non-Diffusers SD3 models.',
+        },
       ]);
+    }
     case 'qwen-image':
       return createPolicy(model.format !== 'diffusers', [
         componentSourceSlot(
@@ -1060,6 +1375,27 @@ const getBaseComponentSectionPolicy = (
           missingMessage: 'Generate needs a VAE for Z-Image models.',
         },
       ]);
+    case 'flux3':
+      // A Diffusers FLUX.3 model bundles its VAE and encoder; single-file and GGUF models need both picked.
+      return createPolicy(model.format !== 'diffusers', [
+        {
+          ...vaeSlot(
+            'FLUX.3 decodes with the FLUX.2 VAE. Required for non-Diffusers FLUX.3 models; otherwise an optional override.',
+            isAcceptedVae
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a VAE for non-Diffusers FLUX.3 models.',
+        },
+        {
+          ...qwen3VlEncoderSlot(
+            'The Qwen3-VL 4B encoder. Required for non-Diffusers FLUX.3 models; otherwise an optional override.',
+            isQwen3Vl4bEncoder
+          ),
+          required: (ctx) => ctx.model.format !== 'diffusers',
+          missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers FLUX.3 models.',
+        },
+        flux3PromptUpsamplerSlot(),
+      ]);
     case 'krea-2':
       // Bundled Krea models supply components; standalone models need a separate encoder and VAE.
       return createPolicy(model.format !== 'diffusers', [
@@ -1072,10 +1408,21 @@ const getBaseComponentSectionPolicy = (
           missingMessage: 'Generate needs a VAE for non-Diffusers Krea-2 models.',
         },
         {
-          ...qwen3VlEncoderSlot('Required for non-Diffusers Krea-2 models.', isKrea2Qwen3VlEncoder),
+          ...qwen3VlEncoderSlot('Required for non-Diffusers Krea-2 models.', isQwen3Vl4bEncoder),
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL Encoder for non-Diffusers Krea-2 models.',
         },
+        // Same rule as Qwen-Image-2.1: the loader refuses a tower beside any other encoder. Style references skip it.
+        ...(settings.qwen3VLEncoderModel && isGgufQwen3Vl4bEncoder(settings.qwen3VLEncoderModel)
+          ? [
+              qwen3VlVisionTowerSlot(
+                'The mmproj file of the GGUF encoder (mmproj-Qwen3VL-4B-Instruct-F16.gguf, the "Qwen3-VL 4B Vision ' +
+                  'Tower" starter model). It lets the GGUF encoder read edit reference images; text-to-image and ' +
+                  'style references work without it. Install it from the Model Manager.',
+                isQwen3Vl4bVisionTower
+              ),
+            ]
+          : []),
       ]);
     case 'qwen-image-2-1':
       // A Diffusers pipeline brings its own VAE and encoder; single-file and GGUF transformers need both.
@@ -1091,13 +1438,24 @@ const getBaseComponentSectionPolicy = (
         {
           ...qwen3VlEncoderSlot(
             'Qwen-Image-2.1 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required for ' +
-              "non-Diffusers Qwen-Image-2.1 models. On a Diffusers model it replaces the model's own encoder, the " +
-              'only one that reads reference images.',
+              "non-Diffusers Qwen-Image-2.1 models. On a Diffusers model it replaces the model's own encoder. Reference " +
+              'images are read by its vision tower; a GGUF encoder needs the separate Vision Tower below for that.',
             isQwen3Vl8bEncoder
           ),
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Qwen-Image-2.1 models.',
         },
+        // The loader rejects a tower beside any other encoder, so the slot (and with it a stale pick) goes with it.
+        ...(settings.qwen3VLEncoderModel && isGgufQwen3Vl8bEncoder(settings.qwen3VLEncoderModel)
+          ? [
+              qwen3VlVisionTowerSlot(
+                'The mmproj file of the GGUF encoder (for example mmproj-Qwen3VL-8B-Instruct-F16.gguf from ' +
+                  'Qwen/Qwen3-VL-8B-Instruct-GGUF). It lets the GGUF encoder read reference images; ' +
+                  'text-to-image works without it. Install it from the Model Manager.',
+                isQwen3Vl8bVisionTower
+              ),
+            ]
+          : []),
       ]);
     case 'ernie-image':
       // Bundled ERNIE models supply components; standalone models need explicit components.
@@ -1225,7 +1583,7 @@ const getBaseComponentSectionPolicy = (
   }
 };
 
-/** Add and validate PiD slots; each base policy retains ownership of its other component validation. */
+/** Add the PiD slots; each base policy keeps its other slots and rules. */
 export const getComponentSectionPolicy = (
   model: GenerateModelConfig | undefined,
   settings: ComponentPolicySettings
@@ -1238,11 +1596,7 @@ export const getComponentSectionPolicy = (
 
   const slots = [...policy.slots, ...pidSlots()];
 
-  return {
-    defaultOpen: policy.defaultOpen,
-    slots,
-    validate: (ctx) => [...policy.validate(ctx), ...validateSlots({ slots: pidSlots() }, ctx)],
-  };
+  return { ...policy, slots };
 };
 
 export const getComponentPolicyContext = (
@@ -1260,8 +1614,10 @@ export const getComponentPolicyContext = (
     qwen3EncoderModel: settings.qwen3EncoderModel,
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
     qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
+    qwen3VLVisionTowerModel: settings.qwen3VLVisionTowerModel,
     qwen35EncoderModel: settings.qwen35EncoderModel,
     animaInpaintAdapterModel: settings.animaInpaintAdapterModel,
+    flux3PromptUpsamplerModel: settings.flux3PromptUpsamplerModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     ideogram4UnconditionalModel: settings.ideogram4UnconditionalModel,
@@ -1272,34 +1628,31 @@ export const getComponentPolicyContext = (
   },
 });
 
+/** English names, as `widgets.generate.switchSubjects` words them, for the issue text the locale nests them into. */
 const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   clipEmbedModel: 'CLIP Embed',
   clipGEmbedModel: 'CLIP G',
   clipLEmbedModel: 'CLIP L',
-  mistralEncoderModel: 'Mistral Encoder',
-  qwen3EncoderModel: 'Qwen3 Encoder',
-  qwenVLEncoderModel: 'Qwen VL Encoder',
-  qwen3VLEncoderModel: 'Qwen3-VL Encoder',
-  qwen35EncoderModel: 'Qwen3.5 Encoder',
-  animaInpaintAdapterModel: 'Inpaint Adapter',
-  wanT5EncoderModel: 'Wan T5 Encoder',
+  mistralEncoderModel: 'Mistral encoder',
+  qwen3EncoderModel: 'Qwen3 encoder',
+  qwenVLEncoderModel: 'Qwen VL encoder',
+  qwen3VLEncoderModel: 'Qwen3-VL encoder',
+  qwen3VLVisionTowerModel: 'Qwen3-VL vision tower',
+  qwen35EncoderModel: 'Qwen3.5 encoder',
+  animaInpaintAdapterModel: 'Inpaint adapter',
+  flux3PromptUpsamplerModel: 'Prompt upsampler',
+  wanT5EncoderModel: 'Wan T5 encoder',
   wanLowNoiseModel: 'Low-noise expert',
-  ideogram4UnconditionalModel: 'Transformer (Unconditional)',
-  t5EncoderModel: 'T5 Encoder',
-  pidDecoderModel: 'PiD Decoder',
-  gemma2EncoderModel: 'Gemma-2 Encoder',
+  ideogram4UnconditionalModel: 'Unconditional transformer',
+  t5EncoderModel: 'T5 encoder',
+  pidDecoderModel: 'PiD decoder',
+  gemma2EncoderModel: 'Gemma-2 encoder',
   vae: 'VAE',
   componentSourceModel: 'Component source',
 };
 
 /** Every settings key that holds a component model. */
 export const GENERATE_COMPONENT_VALUE_KEYS = Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[];
-
-const addClearedLabel = (labels: string[], label: string) => {
-  if (!labels.includes(label)) {
-    labels.push(label);
-  }
-};
 
 const isSelectedComponentCompatible = (
   slotPolicy: ComponentSlotPolicy | undefined,
@@ -1314,7 +1667,7 @@ const isSelectedComponentCompatible = (
   }
 
   if (key === 'componentSourceModel' && model.type !== 'external_image_generator' && model.base === 'flux2') {
-    return Boolean(getFlux2DiffusersComponentSource(model, settings));
+    return Boolean(getFlux2ComponentSource(model, settings));
   }
 
   if (!slotPolicy) {
@@ -1339,13 +1692,22 @@ export const isComponentCompatibleWithModel = (
 
 type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };
 
-const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
-  Boolean(
-    model &&
-    model.type !== 'external_image_generator' &&
-    model.base === 'flux' &&
-    model.name.toLowerCase().includes('kontext')
-  );
+// FLUX.1 Kontext starter sources from invokeai/backend/model_manager/starter_models/flux.py.
+const FLUX_KONTEXT_REPOS = [
+  'black-forest-labs/flux.1-kontext-dev',
+  'comfy-org/flux1-kontext-dev_comfyui',
+  'unsloth/flux.1-kontext-dev-gguf',
+];
+
+const isFluxMainModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
+  model?.type === 'main' && model.base === 'flux';
+
+const isKnownFluxKontextModel = ({ name, source }: MainModelConfig): boolean =>
+  name.toLowerCase().includes('kontext') ||
+  (typeof source === 'string' && FLUX_KONTEXT_REPOS.some((repo) => isModelFromRepo(source, repo)));
+
+const isBoundKontextReference = (model: MainModelConfig, config: GenerateReferenceImageConfig): boolean =>
+  config.type === 'flux_kontext_reference_image' && config.model !== null && isSameInstalledModel(model, config.model);
 
 /**
  * Families whose Generate graph loads LoRAs. The backend installs no LoRAs for the others, so their concept picker
@@ -1353,13 +1715,18 @@ const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is Ma
  */
 const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>([
   'anima',
+  'ernie-image',
   'flux',
   'flux2',
+  'flux3',
+  'ideogram-4',
   'krea-2',
+  'moss-image',
   'qwen-image',
   'qwen-image-2-1',
   'sd-1',
   'sd-2',
+  'sd-3',
   'sdxl',
   'wan',
   'z-image',
@@ -1368,8 +1735,35 @@ const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>
 export const isLoraSupported = (model: GenerateModelConfig | undefined): boolean =>
   Boolean(model && model.type !== 'external_image_generator' && LORA_SUPPORTED_BASES.has(model.base));
 
-/** Picker and validation must agree on compatibility, including required variants. */
-export const isReferenceImageSupported = (model: GenerateModelConfig | undefined): boolean => {
+/** The component picks that decide which vision tower reads the references; callers pass their settings or values. */
+export type ReferenceVisionComponents = Partial<
+  Pick<GenerateSettings, 'qwen3VLEncoderModel' | 'qwen3VLVisionTowerModel'>
+>;
+
+/**
+ * The encoder that reads the references is the selected Qwen3-VL 8B encoder when there is one, else the model's own.
+ * Only a Diffusers main brings its own. A GGUF encoder keeps no vision tower (llama.cpp splits it into an mmproj
+ * file), so it reads references only beside a separately selected 8B tower; a tower beside any other encoder is
+ * never sent. The 8B filters are Qwen-Image-2.1's, the only base with `reference_images_require_vision_tower`; a base
+ * that sets the flag with another encoder size needs its own filters here.
+ */
+const hasReferenceVisionTower = (
+  model: Exclude<GenerateModelConfig, { type: 'external_image_generator' }>,
+  { qwen3VLEncoderModel: encoder, qwen3VLVisionTowerModel: tower }: ReferenceVisionComponents
+): boolean => {
+  if (!encoder || !isQwen3Vl8bEncoder(encoder)) {
+    return model.format === 'diffusers';
+  }
+
+  return isGgufQwen3Vl8bEncoder(encoder) ? Boolean(tower && isQwen3Vl8bVisionTower(tower)) : true;
+};
+
+/**
+ * Whether the base and variant take references at all, whichever encoder reads them. Model switches and recall use
+ * this, so a change of encoder never deletes references: they stay and validation flags them while
+ * `isReferenceImageSupported` is false.
+ */
+export const takesReferenceImages = (model: GenerateModelConfig | undefined): boolean => {
   if (!model) {
     return false;
   }
@@ -1380,42 +1774,61 @@ export const isReferenceImageSupported = (model: GenerateModelConfig | undefined
 
   const features = getArchitectureFeatures(model.base);
 
-  if (!features || features.max_reference_images <= 0) {
-    return false;
-  }
-
-  // The backend declares which reference-image features require a specific variant or format.
+  // The backend declares which reference-image features require a specific variant.
   return (
-    (features.reference_images_require_variant === null ||
-      model.variant === features.reference_images_require_variant) &&
-    (features.reference_images_require_format === null || model.format === features.reference_images_require_format)
+    Boolean(features) &&
+    features!.max_reference_images > 0 &&
+    (features!.reference_images_require_variant === null ||
+      model.variant === features!.reference_images_require_variant)
   );
 };
 
 /**
- * The model format the selected base needs for reference images, when the model's format is all that keeps them
- * unavailable, so the UI can say what to switch to instead of hiding the section without a reason.
+ * Picker and validation must agree on compatibility, including required variants. `components` carries the selected
+ * Qwen3-VL encoder and vision tower; they matter only for bases whose references the encoder reads.
  */
-export const getMissingReferenceImageFormat = (model: GenerateModelConfig | undefined): string | null => {
-  if (!model || model.type === 'external_image_generator' || isReferenceImageSupported(model)) {
-    return null;
+export const isReferenceImageSupported = (
+  model: GenerateModelConfig | undefined,
+  components: ReferenceVisionComponents = {}
+): boolean => {
+  if (!model || !takesReferenceImages(model)) {
+    return false;
   }
 
-  const features = getArchitectureFeatures(model.base);
-
-  if (
-    !features ||
-    features.max_reference_images <= 0 ||
-    (features.reference_images_require_variant !== null && model.variant !== features.reference_images_require_variant)
-  ) {
-    return null;
+  if (model.type === 'external_image_generator') {
+    return true;
   }
 
-  return features.reference_images_require_format;
+  return (
+    !getArchitectureFeatures(model.base)?.reference_images_require_vision_tower ||
+    hasReferenceVisionTower(model, components)
+  );
 };
 
-export const getMaxReferenceImages = (model: GenerateModelConfig | undefined): number => {
-  if (!model || !isReferenceImageSupported(model)) {
+/**
+ * Why references are unavailable although the base takes them, so the UI can say what to change instead of hiding the
+ * section without a reason. Null when they are available or the base never takes them.
+ */
+export const getReferenceImageUnavailableReason = (
+  model: GenerateModelConfig | undefined,
+  components: ReferenceVisionComponents = {}
+): 'visionTower' | 'ggufVisionTower' | null => {
+  if (!model || model.type === 'external_image_generator' || isReferenceImageSupported(model, components)) {
+    return null;
+  }
+
+  if (!takesReferenceImages(model)) {
+    return null;
+  }
+
+  return components.qwen3VLEncoderModel && isGgufQwen3Vl8bEncoder(components.qwen3VLEncoderModel)
+    ? 'ggufVisionTower'
+    : 'visionTower';
+};
+
+/** The base's limit, whichever encoder reads the references. */
+export const getReferenceImageLimit = (model: GenerateModelConfig | undefined): number => {
+  if (!model || !takesReferenceImages(model)) {
     return 0;
   }
 
@@ -1425,6 +1838,11 @@ export const getMaxReferenceImages = (model: GenerateModelConfig | undefined): n
 
   return getArchitectureFeatures(model.base)?.max_reference_images ?? DEFAULT_REFERENCE_IMAGE_LIMIT;
 };
+
+export const getMaxReferenceImages = (
+  model: GenerateModelConfig | undefined,
+  components: ReferenceVisionComponents = {}
+): number => (isReferenceImageSupported(model, components) ? getReferenceImageLimit(model) : 0);
 
 const IP_ADAPTER_BASES: ReadonlySet<string> = new Set(['sd-1', 'sdxl', 'flux', 'anima']);
 
@@ -1478,7 +1896,8 @@ const getFamilyDefaultReferenceImageConfig = (
     return { image, type: 'external_reference_image' };
   }
 
-  if (modelBase === 'flux2') {
+  // FLUX.3 takes its references exactly as FLUX.2 does: plain images, VAE-encoded by the denoiser.
+  if (modelBase === 'flux2' || modelBase === 'flux3') {
     return { image, type: 'flux2_reference_image' };
   }
 
@@ -1488,10 +1907,6 @@ const getFamilyDefaultReferenceImageConfig = (
 
   if (modelBase === 'qwen-image-2-1') {
     return { image, type: 'qwen_image_2_1_reference_image' };
-  }
-
-  if (isFluxKontextModel(model)) {
-    return { image, model, type: 'flux_kontext_reference_image' };
   }
 
   const adapterModel =
@@ -1516,18 +1931,20 @@ const getReferenceImageConfigSupported = (
     case 'external_reference_image':
       return model.type === 'external_image_generator' && model.capabilities?.supports_reference_images === true;
     case 'flux2_reference_image':
-      return model.type !== 'external_image_generator' && model.base === 'flux2';
+      return model.type !== 'external_image_generator' && (model.base === 'flux2' || model.base === 'flux3');
     case 'qwen_image_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'qwen-image' && model.variant === 'edit';
     case 'krea2_edit_reference_image':
     case 'krea2_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'krea-2';
     case 'qwen_image_2_1_reference_image':
-      return (
-        model.type !== 'external_image_generator' && model.base === 'qwen-image-2-1' && isReferenceImageSupported(model)
-      );
+      // The encoder decides whether they run (see `isReferenceImageSupported`); the type fits the base alone.
+      return model.type !== 'external_image_generator' && model.base === 'qwen-image-2-1';
     case 'flux_kontext_reference_image':
-      return isFluxKontextModel(model);
+      return (
+        isFluxMainModel(model) &&
+        (isBoundKontextReference(model, referenceImage.config) || isKnownFluxKontextModel(model))
+      );
     case 'flux_redux':
       return model.type !== 'external_image_generator' && model.base === 'flux';
     case 'ip_adapter':
@@ -1574,6 +1991,13 @@ const getDefaultReferenceImageConfigs = (
   additions: readonly ReferenceImageAddition[],
   referenceImages: readonly GenerateReferenceImage[]
 ): GenerateReferenceImageConfig[] => {
+  if (
+    isFluxMainModel(model) &&
+    (isKnownFluxKontextModel(model) || referenceImages.some(({ config }) => isBoundKontextReference(model, config)))
+  ) {
+    return additions.map(({ image }) => ({ image, model, type: 'flux_kontext_reference_image' }));
+  }
+
   if (model?.type !== 'main' || model.base !== 'krea-2') {
     return additions.map(({ image }) => getFamilyDefaultReferenceImageConfig(model, models, image));
   }
@@ -1594,7 +2018,7 @@ const canRunWithEnabledReferenceImages = (
   enabled: readonly GenerateReferenceImage[],
   referenceImage: GenerateReferenceImage
 ): boolean => {
-  if (enabled.length >= getMaxReferenceImages(model)) {
+  if (enabled.length >= getReferenceImageLimit(model)) {
     return false;
   }
 
@@ -1699,7 +2123,7 @@ export const getCompatibleReferenceImages = (
     return referenceImages;
   }
 
-  if (!isReferenceImageSupported(model)) {
+  if (!takesReferenceImages(model)) {
     return [];
   }
 
@@ -1750,6 +2174,46 @@ export const getCompatibleReferenceImages = (
   });
 };
 
+/**
+ * References as a switch to `model` leaves them, for every path that puts references in front of a model they were
+ * not set up for (a model switch, an Undo that brings removed ones back). Incompatible ones are retargeted (see
+ * `getCompatibleReferenceImages`); enabled ones the family cannot run together are switched off rather than deleted,
+ * so Invoke is not left blocked, the first enabled ones keep running, and a model that takes the rest can turn them on
+ * again. A model without references keeps them as they are, all switched off, for the next model that takes them.
+ * `retargetedReferenceImages` is the list before the switch-off, for reporting what each step changed. No changes
+ * return the same array.
+ */
+export const reconcileReferenceImagesWithModel = (
+  referenceImages: GenerateReferenceImage[],
+  model: GenerateModelConfig,
+  models: readonly ReferenceModelCandidate[]
+): { referenceImages: GenerateReferenceImage[]; retargetedReferenceImages: GenerateReferenceImage[] } => {
+  const referencesSupported = takesReferenceImages(model);
+  const retargetedReferenceImages = referencesSupported
+    ? getCompatibleReferenceImages(referenceImages, model, models)
+    : referenceImages;
+  const enabledKept: GenerateReferenceImage[] = [];
+  let didSwitchOff = false;
+  const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
+    if (!isReferenceImageActive(referenceImage)) {
+      return referenceImage;
+    }
+
+    if (referencesSupported && canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
+      enabledKept.push(referenceImage);
+      return referenceImage;
+    }
+
+    didSwitchOff = true;
+    return { ...referenceImage, isEnabled: false };
+  });
+
+  return {
+    referenceImages: didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages,
+    retargetedReferenceImages,
+  };
+};
+
 const getSettingsWithCompatibleModelSelections = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
@@ -1757,8 +2221,9 @@ const getSettingsWithCompatibleModelSelections = (
   isCanvasFrame: boolean
 ): GenerateModelSelectionResult => {
   const nextSettings: GenerateSettings = { ...settings, modelKey: model.key };
-  const clearedLabels: string[] = [];
-  const compatibleLoras = settings.loras.filter((lora) => isLoraCompatibleWithModel(lora.model, model));
+  const changes: GenerateModelSwitchChange[] = [];
+  const change = (subject: GenerateModelSwitchSubject, kind: GenerateModelSwitchChangeKind, count?: number) =>
+    changes.push(count === undefined ? { kind, subject } : { count, kind, subject });
   const dimensions = getGenerationDimensions(model);
   const width = clampDimension(nextSettings.width, dimensions.grid);
   const height = clampDimension(nextSettings.height, dimensions.grid);
@@ -1804,34 +2269,65 @@ const getSettingsWithCompatibleModelSelections = (
     nextSettings.externalImageSize = resolveExternalImageSize(nextSettings, model);
   }
 
-  if (compatibleLoras.length !== settings.loras.length) {
-    nextSettings.loras = compatibleLoras;
-    addClearedLabel(clearedLabels, 'LoRAs');
+  // Concepts stay listed as they are: the graph loads only those the model can, the panel badges the rest, and a
+  // compatible model runs them again. Only the ones that ran before and stop now are reported.
+  const previousModel = models.find((candidate) => candidate.key === settings.modelKey);
+  const runsConcept = (candidate: GenerateModelConfig | undefined, lora: GenerateLora) =>
+    Boolean(candidate && isLoraSupported(candidate) && isLoraCompatibleWithModel(lora.model, candidate));
+  const stoppedConcepts = settings.loras.filter(
+    (lora) =>
+      lora.isEnabled &&
+      !runsConcept(model, lora) &&
+      (!previousModel || !isGenerateModelConfig(previousModel) || runsConcept(previousModel, lora))
+  ).length;
+
+  if (stoppedConcepts > 0) {
+    change('concepts', 'turnedOff', stoppedConcepts);
   }
 
-  // Enabled references the new family cannot run together are switched off rather than deleted: Invoke is not left
-  // blocked, the first enabled ones keep running, and switching back can turn the rest on again.
-  const retargetedReferenceImages = getCompatibleReferenceImages(settings.referenceImages, model, models);
-  const enabledKept: GenerateReferenceImage[] = [];
-  let didSwitchOff = false;
-  const keptOrSwitchedOff = retargetedReferenceImages.map((referenceImage) => {
-    if (!isReferenceImageActive(referenceImage)) {
-      return referenceImage;
-    }
-
-    if (canRunWithEnabledReferenceImages(model, enabledKept, referenceImage)) {
-      enabledKept.push(referenceImage);
-      return referenceImage;
-    }
-
-    didSwitchOff = true;
-    return { ...referenceImage, isEnabled: false };
-  });
-  const compatibleReferenceImages = didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages;
+  const { referenceImages: compatibleReferenceImages, retargetedReferenceImages } = reconcileReferenceImagesWithModel(
+    settings.referenceImages,
+    model,
+    models
+  );
 
   if (compatibleReferenceImages !== settings.referenceImages) {
     nextSettings.referenceImages = compatibleReferenceImages;
-    addClearedLabel(clearedLabels, 'Reference Images');
+    // A retargeted reference keeps its image; its adapter and weights take the new family's defaults. Only tuning
+    // the user chose is lost: a reference still at the previous family's defaults loses nothing.
+    const isPreviousDefault = (referenceImage: GenerateReferenceImage) => {
+      if (!previousModel || !isGenerateModelConfig(previousModel)) {
+        return false;
+      }
+
+      const [config] = getDefaultReferenceImageConfigs(
+        previousModel,
+        models,
+        [{ image: referenceImage.config.image, isEnabled: referenceImage.isEnabled }],
+        []
+      );
+
+      return config !== undefined && areJsonValuesStructurallyEqual(config, referenceImage.config);
+    };
+    const retargeted = settings.referenceImages.filter(
+      (referenceImage, index) => retargetedReferenceImages[index] !== referenceImage
+    );
+    const tunedRetargets = retargeted.filter((referenceImage) => !isPreviousDefault(referenceImage)).length;
+    const switchedOff = compatibleReferenceImages.filter(
+      (referenceImage, index) => referenceImage.isEnabled !== retargetedReferenceImages[index]?.isEnabled
+    ).length;
+
+    if (tunedRetargets > 0) {
+      change('referenceImages', 'reset', tunedRetargets);
+    }
+
+    if (retargeted.length > tunedRetargets) {
+      change('referenceImages', 'adjusted', retargeted.length - tunedRetargets);
+    }
+
+    if (switchedOff > 0) {
+      change('referenceImages', 'turnedOff', switchedOff);
+    }
   }
 
   const policy = getComponentSectionPolicy(model, nextSettings);
@@ -1849,7 +2345,7 @@ const getSettingsWithCompatibleModelSelections = (
 
     if (!isSelectedComponentCompatible(slotsByKey.get(key), model, nextSettings, key)) {
       nextSettings[key] = null;
-      addClearedLabel(clearedLabels, COMPONENT_SETTING_LABELS[key]);
+      change(key, 'removed');
     }
   }
 
@@ -1858,55 +2354,59 @@ const getSettingsWithCompatibleModelSelections = (
 
   if (clampedGuidance !== nextSettings.cfgScale) {
     nextSettings.cfgScale = clampedGuidance;
-    addClearedLabel(clearedLabels, uiPolicy.guidanceLabel);
+    change('guidance', 'adjusted');
   }
 
   if (!uiPolicy.clipSkipMax && nextSettings.clipSkip !== 0) {
     nextSettings.clipSkip = 0;
-    addClearedLabel(clearedLabels, 'CLIP skip');
+    change('clipSkip', 'reset');
   } else if (uiPolicy.clipSkipMax && nextSettings.clipSkip > uiPolicy.clipSkipMax) {
     nextSettings.clipSkip = uiPolicy.clipSkipMax;
-    addClearedLabel(clearedLabels, 'CLIP skip');
+    change('clipSkip', 'adjusted');
   }
 
   if (!uiPolicy.cfgRescaleVisible && nextSettings.cfgRescaleMultiplier !== 0) {
     nextSettings.cfgRescaleMultiplier = 0;
-    addClearedLabel(clearedLabels, 'CFG rescale');
+    change('cfgRescale', 'reset');
   }
 
   if (!uiPolicy.colorCompensationVisible && nextSettings.colorCompensation) {
     nextSettings.colorCompensation = false;
-    addClearedLabel(clearedLabels, 'Color compensation');
+    change('colorCompensation', 'reset');
   }
 
   if (!uiPolicy.hiDiffusionVisible && nextSettings.hiDiffusionEnabled) {
     nextSettings.hiDiffusionEnabled = false;
-    addClearedLabel(clearedLabels, 'HiDiffusion');
+    change('hiDiffusion', 'reset');
   }
 
-  // The refiner only ever follows an SDXL base; its tuning values stay for the next SDXL pick.
-  if (!uiPolicy.refinerVisible && nextSettings.refinerModel) {
-    nextSettings.refinerModel = null;
-    addClearedLabel(clearedLabels, 'Refiner');
-  }
-
+  // The refiner stays selected: it only runs after an SDXL base (`getActiveRefiner`), and the next SDXL pick uses it.
   if (!uiPolicy.seamlessVisible && (nextSettings.seamlessXAxis || nextSettings.seamlessYAxis)) {
     nextSettings.seamlessXAxis = false;
     nextSettings.seamlessYAxis = false;
-    addClearedLabel(clearedLabels, 'Seamless tiling');
+    change('seamless', 'reset');
   }
 
   if (!uiPolicy.vaePrecisionVisible) {
     const defaultVaePrecision = getGenerationDefaults(model).vaePrecision;
 
     if (nextSettings.vaePrecision !== defaultVaePrecision) {
+      // Only a precision the user picked is lost; moving from one family's default to the next is no choice undone.
+      const previousDefault =
+        previousModel && isGenerateModelConfig(previousModel)
+          ? getGenerationDefaults(previousModel).vaePrecision
+          : undefined;
+
+      if (nextSettings.vaePrecision !== previousDefault) {
+        change('vaePrecision', 'reset');
+      }
+
       nextSettings.vaePrecision = defaultVaePrecision;
-      addClearedLabel(clearedLabels, 'VAE precision');
     }
   }
 
   return {
-    clearedLabels,
+    changes,
     dimensionsAdjusted: nextSettings.width !== settings.width || nextSettings.height !== settings.height,
     settings: nextSettings,
   };
@@ -1944,165 +2444,483 @@ export const getGenerateModelSelectionResult = ({
 const hasModelKey = (models: readonly ModelConfig[], key: string, type?: string): boolean =>
   models.some((model) => model.key === key && (!type || model.type === type));
 
-export const getGenerationModelAvailabilityReasons = (
+const ISSUE_KEY = 'widgets.generate.issues';
+
+/** A translated issue; `message` must read exactly like the locale entry, which the issue tests check. */
+const issue = (
+  id: string,
+  key: string,
+  message: string,
+  target: GenerationIssue['target'],
+  values?: Record<string, number | string>,
+  fix?: GenerationIssueFix
+): GenerationIssue => ({
+  id,
+  message,
+  messageKey: `${ISSUE_KEY}.${key}`,
+  ...(values ? { messageValues: values } : {}),
+  target,
+  ...(fix ? { fix } : {}),
+});
+
+const MODEL_TARGET: GenerationIssue['target'] = { section: 'model' };
+
+/**
+ * How an issue names one reference: its own name, else its position. `describeGenerationIssue` turns the position
+ * into the localized default ("Reference image 2"), so the message reads as the reference's row does.
+ */
+const referenceNameValues = (
+  referenceImage: Pick<GenerateReferenceImage, 'name'>,
+  position: number
+): Record<string, number | string> => ({
+  index: position,
+  ...(referenceImage.name === undefined ? {} : { referenceName: referenceImage.name }),
+});
+const englishReferenceName = (referenceImage: Pick<GenerateReferenceImage, 'name'>, position: number): string =>
+  referenceImage.name ?? `Reference image ${position}`;
+/** The reference images as a group (their count, or a rule over all of them); the section lists it above the cards. */
+const REFERENCE_IMAGES_TARGET: GenerationIssue['target'] = { field: 'referenceImages', section: 'guidance' };
+/** One reference image: its card shows the issue. */
+const referenceImageTarget = (referenceImageId: string): GenerationIssue['target'] => ({
+  field: 'referenceImage',
+  referenceImageId,
+  section: 'guidance',
+});
+
+/**
+ * Installed-model checks: the main model, the components the generation can load, concepts and enabled references must
+ * all be installed.
+ */
+export const getGenerationModelAvailabilityIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
   models: readonly ModelConfig[]
-): string[] => {
-  const reasons: string[] = [];
+): GenerationIssue[] => {
+  const issues: GenerationIssue[] = [];
 
   if (!hasModelKey(models, model.key, model.type)) {
-    reasons.push(`Selected model "${model.name}" is no longer installed.`);
+    issues.push(
+      issue(
+        `model:notInstalled:${model.key}`,
+        'modelNotInstalled',
+        `${model.name} is not installed. Choose another model, or reinstall it.`,
+        MODEL_TARGET,
+        { name: model.name }
+      )
+    );
   }
+
+  const componentContext = getComponentPolicyContext(model, settings);
+  const slotsByKey = new Map(
+    getComponentSectionPolicy(model, settings).slots.map((slotPolicy) => [slotPolicy.key, slotPolicy])
+  );
 
   for (const key of GENERATE_COMPONENT_VALUE_KEYS) {
     const value = settings[key];
 
-    if (value && !hasModelKey(models, value.key, value.type)) {
-      reasons.push(`${COMPONENT_SETTING_LABELS[key]} "${value.name}" is no longer installed.`);
+    // A selection nothing loads (its switch is off) may stay uninstalled; turning the switch on asks for it again.
+    if (!value || slotsByKey.get(key)?.inUse?.(componentContext) === false) {
+      continue;
+    }
+
+    if (!hasModelKey(models, value.key, value.type)) {
+      issues.push(
+        issue(
+          `components:notInstalled:${key}`,
+          'componentNotInstalled',
+          `${COMPONENT_SETTING_LABELS[key]} "${value.name}" is not installed. Choose another, or clear it.`,
+          { section: 'components' },
+          // The locale nests its own name for the slot, keyed by `component`.
+          { component: key, name: value.name },
+          { key, kind: 'clearModel' }
+        )
+      );
     }
   }
 
   const refiner = getActiveRefiner(settings, model);
   if (refiner && !hasModelKey(models, refiner.key, 'main')) {
-    reasons.push(`Refiner "${refiner.name}" is no longer installed.`);
+    issues.push(
+      issue(
+        'refiner:notInstalled',
+        'refinerNotInstalled',
+        `Refiner "${refiner.name}" is not installed. Choose another, or clear it.`,
+        { section: 'refiner' },
+        { name: refiner.name },
+        { key: 'refinerModel', kind: 'clearModel' }
+      )
+    );
   }
 
+  // Only concepts the model would load need to be installed; the rest are set aside and skipped by the graph.
   for (const lora of settings.loras) {
-    if (!hasModelKey(models, lora.model.key, 'lora')) {
-      reasons.push(`LoRA "${lora.model.name}" is no longer installed.`);
+    if (
+      lora.isEnabled &&
+      isLoraSupported(model) &&
+      isLoraCompatibleWithModel(lora.model, model) &&
+      !hasModelKey(models, lora.model.key, 'lora')
+    ) {
+      issues.push(
+        issue(
+          `concepts:notInstalled:${lora.model.key}`,
+          'conceptNotInstalled',
+          `Concept "${lora.model.name}" is not installed. Remove it, or reinstall it.`,
+          { field: 'concepts', section: 'guidance' },
+          { name: lora.model.name },
+          { kind: 'removeConcept', modelKey: lora.model.key }
+        )
+      );
     }
   }
 
-  for (const referenceImage of settings.referenceImages) {
-    if (!referenceImage.isEnabled) {
-      continue;
-    }
-
+  settings.referenceImages.forEach((referenceImage, index) => {
     const config = referenceImage.config;
 
-    if ('model' in config && config.model && !hasModelKey(models, config.model.key, config.model.type)) {
-      reasons.push(`Reference Image model "${config.model.name}" is no longer installed.`);
+    if (
+      referenceImage.isEnabled &&
+      'model' in config &&
+      config.model &&
+      !hasModelKey(models, config.model.key, config.model.type)
+    ) {
+      issues.push(
+        issue(
+          `referenceImages:modelNotInstalled:${referenceImage.id}`,
+          'referenceModelNotInstalled',
+          `${englishReferenceName(referenceImage, index + 1)} uses "${config.model.name}", which is not installed. Turn it off, or choose another model for it.`,
+          referenceImageTarget(referenceImage.id),
+          { ...referenceNameValues(referenceImage, index + 1), name: config.model.name },
+          { kind: 'turnOffReferenceImages', referenceImageIds: [referenceImage.id] }
+        )
+      );
     }
-  }
+  });
 
-  return reasons;
+  return issues;
 };
 
-const getDimensionValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
-  const reasons: string[] = [];
+export const getGenerationModelAvailabilityReasons = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  models: readonly ModelConfig[]
+): string[] => getGenerationModelAvailabilityIssues(model, settings, models).map(({ message }) => message);
+
+const getDimensionValidationIssues = (model: GenerateModelConfig, settings: GenerateSettings): GenerationIssue[] => {
+  const issues: GenerationIssue[] = [];
   // Native target dimensions must be divisible by model grid × 4.
   const dimensions = getGenerationDimensions(model, settings.pidMode);
+  const toGrid = (value: number, round: (value: number) => number = Math.round) =>
+    Math.min(
+      dimensions.max,
+      Math.max(dimensions.min, round((Number.isFinite(value) ? value : 0) / dimensions.grid) * dimensions.grid)
+    );
+  // A size fix keeps a locked or preset ratio, deriving the height from the width; a free size records its new ratio.
+  const isRatioConstrained = isAspectRatioLocked(settings);
+  const ratio =
+    settings.aspectRatioValue > 0
+      ? settings.aspectRatioValue
+      : settings.height > 0
+        ? settings.width / settings.height
+        : 1;
+  const sizeFix = (width: number, height: number, round?: (value: number) => number): GenerationIssueFix => {
+    const fittedWidth = toGrid(width, round);
+    const fittedHeight = isRatioConstrained ? toGrid(fittedWidth / ratio, round) : toGrid(height, round);
 
-  if (!Number.isFinite(settings.width) || settings.width < dimensions.min || settings.width > dimensions.max) {
-    reasons.push(`Generate width must be between ${dimensions.min} and ${dimensions.max}.`);
-  } else if (settings.width % dimensions.grid !== 0) {
-    reasons.push(`Generate width must be a multiple of ${dimensions.grid}.`);
-  }
+    return {
+      height: fittedHeight,
+      kind: 'setDimensions',
+      width: fittedWidth,
+      ...(isRatioConstrained ? {} : { aspectRatioValue: fittedWidth / fittedHeight }),
+    };
+  };
+  const fittedSize = sizeFix(settings.width, settings.height);
+  const target: GenerationIssue['target'] = { section: 'dimensions' };
 
-  if (!Number.isFinite(settings.height) || settings.height < dimensions.min || settings.height > dimensions.max) {
-    reasons.push(`Generate height must be between ${dimensions.min} and ${dimensions.max}.`);
-  } else if (settings.height % dimensions.grid !== 0) {
-    reasons.push(`Generate height must be a multiple of ${dimensions.grid}.`);
+  for (const side of ['width', 'height'] as const) {
+    const value = settings[side];
+    const label = side === 'width' ? 'Width' : 'Height';
+
+    if (!Number.isFinite(value) || value < dimensions.min || value > dimensions.max) {
+      issues.push(
+        issue(
+          `dimensions:${side}Range`,
+          `${side}Range`,
+          `${label} must be between ${dimensions.min} and ${dimensions.max}.`,
+          target,
+          { max: dimensions.max, min: dimensions.min },
+          fittedSize
+        )
+      );
+    } else if (value % dimensions.grid !== 0) {
+      issues.push(
+        issue(
+          `dimensions:${side}Grid`,
+          `${side}Grid`,
+          `${label} must be a multiple of ${dimensions.grid}.`,
+          target,
+          { grid: dimensions.grid },
+          fittedSize
+        )
+      );
+    }
   }
 
   const maxSize = model.type === 'external_image_generator' ? model.capabilities?.max_image_size : null;
   if (maxSize && (settings.width > maxSize.width || settings.height > maxSize.height)) {
-    reasons.push(`${model.name} supports a maximum size of ${maxSize.width}×${maxSize.height}.`);
+    issues.push(
+      issue(
+        'dimensions:providerMax',
+        'providerMaxSize',
+        `${model.name} supports at most ${maxSize.width}×${maxSize.height}.`,
+        target,
+        { height: maxSize.height, name: model.name, width: maxSize.width },
+        // Scaled down to fit both bounds, then rounded down so the grid never pushes it back over.
+        (() => {
+          const scale = Math.min(maxSize.width / settings.width, maxSize.height / settings.height, 1);
+
+          return sizeFix(settings.width * scale, settings.height * scale, Math.floor);
+        })()
+      )
+    );
   }
 
-  return reasons;
+  return issues;
 };
 
 /** Reject unsupported PiD instead of silently using ordinary decode. */
-const getPidValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
+const getPidValidationIssues = (model: GenerateModelConfig, settings: GenerateSettings): GenerationIssue[] => {
   if (settings.pidMode === 'off') {
     return [];
   }
 
+  const target: GenerationIssue['target'] = { section: 'advanced' };
+
   if (!getIsPidSupportedBase(model.base)) {
-    return [`PiD is not supported for ${model.name}. Turn PiD off to generate with this model.`];
+    return [
+      issue(
+        'advanced:pidUnsupported',
+        'pidUnsupported',
+        `${model.name} does not support PiD. Turn PiD off to generate with it.`,
+        target,
+        { name: model.name },
+        { kind: 'turnOffPid' }
+      ),
+    ];
   }
 
-  const reasons: string[] = [];
-
-  if (settings.pidSteps < 1) {
-    reasons.push('PiD steps must be at least 1.');
-  }
-
-  return reasons;
+  return settings.pidSteps < 1 ? [issue('advanced:pidSteps', 'pidSteps', 'PiD steps must be at least 1.', target)] : [];
 };
 
-/** Only the encoder of a Qwen-Image-2.1 Diffusers model keeps the vision tower that reads references. */
-export const QWEN_IMAGE_21_STANDALONE_ENCODER_REASON =
-  "Reference images need the Qwen-Image-2.1 model's own encoder, the only one with a vision tower. " +
-  'Clear the Qwen3-VL Encoder component.';
+/** The vision tower that reads references comes with a Diffusers pipeline's encoder, a non-GGUF Qwen3-VL one, or a GGUF encoder's mmproj file. */
+export const QWEN_IMAGE_21_NO_VISION_TOWER_REASON =
+  'Reference images need a Qwen3-VL 8B encoder with a vision tower. Select one under Components, or use a Diffusers Qwen-Image-2.1 model.';
 
-const getReferenceImageValidationReasons = (model: GenerateModelConfig, settings: GenerateSettings): string[] => {
-  const reasons: string[] = [];
-  const enabled = settings.referenceImages.filter((referenceImage) => referenceImage.isEnabled);
+/** The same, for a selected GGUF 8B encoder, which only needs its mmproj file added. */
+export const QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON =
+  "Reference images need this encoder's Vision Tower (the mmproj file). Select it under Components.";
+
+const VISION_TOWER_CPU_ONLY_REASON =
+  'The Vision Tower and the encoder must have the same CPU Only setting. Change it in the Model Manager.';
+
+const KREA2_VISION_TOWER_TARGET = { field: 'qwen3VLVisionTowerModel', section: 'components' } as const;
+
+const KREA2_GGUF_VISION_TOWER_REASON =
+  "Edit references need this GGUF encoder's Vision Tower (the mmproj file). Select it under Components.";
+
+const getReferenceImageValidationIssues = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings
+): GenerationIssue[] => {
+  const issues: GenerationIssue[] = [];
   // Use the shared reference limit, but report unsupported images individually rather than a misleading maximum of
   // zero.
-  const maxReferenceImages = getMaxReferenceImages(model);
+  const maxReferenceImages = getReferenceImageLimit(model);
+  const active = settings.referenceImages.filter(isReferenceImageActive);
 
-  if (
-    isReferenceImageSupported(model) &&
-    settings.referenceImages.filter(isReferenceImageActive).length > maxReferenceImages
-  ) {
-    reasons.push(
-      `Generate supports at most ${maxReferenceImages} reference image${maxReferenceImages === 1 ? '' : 's'} for ${model.name}.`
+  if (takesReferenceImages(model) && active.length > maxReferenceImages) {
+    issues.push(
+      issue(
+        'referenceImages:limit',
+        'referenceImageLimit',
+        `${model.name} supports at most ${maxReferenceImages} reference image${maxReferenceImages === 1 ? '' : 's'}. Turn off or remove the extra ones.`,
+        REFERENCE_IMAGES_TARGET,
+        { count: maxReferenceImages, name: model.name },
+        {
+          kind: 'turnOffReferenceImages',
+          referenceImageIds: active.slice(maxReferenceImages).map((referenceImage) => referenceImage.id),
+        }
+      )
     );
   }
 
-  enabled.forEach((referenceImage, index) => {
-    const prefix = `Reference Image #${index + 1}`;
+  settings.referenceImages.forEach((referenceImage, position) => {
+    if (!referenceImage.isEnabled) {
+      return;
+    }
+
+    const index = position + 1;
+    const id = referenceImage.id;
+    const turnOff: GenerationIssueFix = { kind: 'turnOffReferenceImages', referenceImageIds: [id] };
 
     if (!getReferenceImageConfigSupported(model, referenceImage)) {
-      reasons.push(`${prefix} is not supported by ${model.base} model.`);
+      issues.push(
+        issue(
+          `referenceImages:unsupported:${id}`,
+          'referenceImageUnsupported',
+          `${model.name} cannot use ${englishReferenceName(referenceImage, index)}. Turn it off, or remove it.`,
+          referenceImageTarget(id),
+          { ...referenceNameValues(referenceImage, index), name: model.name },
+          turnOff
+        )
+      );
       return;
     }
 
     if (!referenceImage.config.image) {
-      reasons.push(`${prefix} needs an image.`);
+      issues.push(
+        issue(
+          `referenceImages:needsImage:${id}`,
+          'referenceImageNeedsImage',
+          `${englishReferenceName(referenceImage, index)} needs an image.`,
+          referenceImageTarget(id),
+          referenceNameValues(referenceImage, index),
+          turnOff
+        )
+      );
     }
 
     if (referenceImage.config.type === 'ip_adapter') {
       if (!referenceImage.config.model || referenceImage.config.model.base !== model.base) {
-        reasons.push(`${prefix} needs a compatible IP Adapter model.`);
+        issues.push(
+          issue(
+            `referenceImages:needsIpAdapter:${id}`,
+            'referenceImageNeedsIpAdapter',
+            `${englishReferenceName(referenceImage, index)} needs an IP Adapter model for ${model.name}.`,
+            referenceImageTarget(id),
+            { ...referenceNameValues(referenceImage, index), name: model.name },
+            turnOff
+          )
+        );
       }
 
       // A weight recalled from an SD reference can be negative; `anima_ip_adapter.strength` rejects it at enqueue.
       const { weight } = referenceImage.config;
       if (isStrengthOnlyIPAdapterBase(model.base) && !(weight >= 0 && weight <= 2)) {
-        reasons.push(`${prefix} strength must be between 0 and 2.`);
+        issues.push(
+          issue(
+            `referenceImages:strength:${id}`,
+            'referenceImageStrength',
+            `${englishReferenceName(referenceImage, index)} strength must be between 0 and 2.`,
+            referenceImageTarget(id),
+            referenceNameValues(referenceImage, index),
+            turnOff
+          )
+        );
       }
     }
 
-    if (referenceImage.config.type === 'flux_redux') {
-      if (!referenceImage.config.model || referenceImage.config.model.base !== model.base) {
-        reasons.push(`${prefix} needs a compatible FLUX Redux model.`);
-      }
+    if (
+      referenceImage.config.type === 'flux_redux' &&
+      (!referenceImage.config.model || referenceImage.config.model.base !== model.base)
+    ) {
+      issues.push(
+        issue(
+          `referenceImages:needsRedux:${id}`,
+          'referenceImageNeedsRedux',
+          `${englishReferenceName(referenceImage, index)} needs a FLUX Redux model for ${model.name}.`,
+          referenceImageTarget(id),
+          { ...referenceNameValues(referenceImage, index), name: model.name },
+          turnOff
+        )
+      );
     }
 
-    if (referenceImage.config.type === 'flux_kontext_reference_image') {
-      if (!referenceImage.config.model || referenceImage.config.model.key !== model.key) {
-        reasons.push(`${prefix} needs the selected FLUX Kontext model.`);
-      }
+    if (
+      referenceImage.config.type === 'flux_kontext_reference_image' &&
+      (!referenceImage.config.model || referenceImage.config.model.key !== model.key)
+    ) {
+      issues.push(
+        issue(
+          `referenceImages:needsKontext:${id}`,
+          'referenceImageNeedsKontext',
+          `${englishReferenceName(referenceImage, index)} needs the selected FLUX Kontext model.`,
+          referenceImageTarget(id),
+          referenceNameValues(referenceImage, index),
+          turnOff
+        )
+      );
     }
   });
 
-  // The encoder slot stays filled across models (Ideogram 4 and the GGUF builds share it), so a Diffusers model can
-  // inherit one that cannot read the references.
+  // A GGUF Qwen VL Encoder is the language model alone (llama.cpp ships the vision tower as a separate file), and the
+  // prompt node refuses reference images with it. A selected encoder replaces the bundled one, so it decides. One
+  // reason for all images: the fix is the same for each.
+  const qwenVLEncoder = settings.qwenVLEncoderModel;
   if (
-    model.base === 'qwen-image-2-1' &&
-    settings.qwen3VLEncoderModel &&
-    isQwen3Vl8bEncoder(settings.qwen3VLEncoderModel) &&
-    enabled.some((referenceImage) => referenceImage.config.type === 'qwen_image_2_1_reference_image')
+    qwenVLEncoder?.format === 'gguf_quantized' &&
+    settings.referenceImages.some(
+      (referenceImage) =>
+        referenceImage.isEnabled &&
+        referenceImage.config.type === 'qwen_image_reference_image' &&
+        getReferenceImageConfigSupported(model, referenceImage)
+    )
   ) {
-    reasons.push(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
+    issues.push(
+      createUntranslatedGenerationIssue(
+        `Qwen VL Encoder "${qwenVLEncoder.name}" is a GGUF build with no vision tower, so it cannot read reference ` +
+          'images. Select a safetensors or Diffusers Qwen VL Encoder, or turn the reference images off.',
+        REFERENCE_IMAGES_TARGET,
+        { key: 'qwenVLEncoderModel', kind: 'clearModel' }
+      )
+    );
   }
 
-  return reasons;
+  const hasQwen21References =
+    model.base === 'qwen-image-2-1' &&
+    settings.referenceImages.some(
+      (referenceImage) => referenceImage.isEnabled && referenceImage.config.type === 'qwen_image_2_1_reference_image'
+    );
+
+  // The encoder slot stays filled across models (Ideogram 4 and the GGUF builds share it), so a Diffusers model can
+  // inherit one that cannot read the references. Clearing it helps only where the model brings its own encoder.
+  if (hasQwen21References && !isReferenceImageSupported(model, settings)) {
+    issues.push(
+      // A GGUF 8B encoder is fixed by adding its tower, so the issue points at that slot. Otherwise a single-file main
+      // has to swap the encoder and the issue points at its slot; a Diffusers one clears it from the references.
+      createUntranslatedGenerationIssue(
+        getReferenceImageUnavailableReason(model, settings) === 'ggufVisionTower'
+          ? QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON
+          : QWEN_IMAGE_21_NO_VISION_TOWER_REASON,
+        settings.qwen3VLEncoderModel && isGgufQwen3Vl8bEncoder(settings.qwen3VLEncoderModel)
+          ? { field: 'qwen3VLVisionTowerModel', section: 'components' }
+          : model.format === 'diffusers'
+            ? REFERENCE_IMAGES_TARGET
+            : { field: 'qwen3VLEncoderModel', section: 'components' },
+        model.format === 'diffusers' ? { key: 'qwen3VLEncoderModel', kind: 'clearModel' } : undefined
+      )
+    );
+  }
+
+  // The tower runs beside the encoder in one forward pass, so a device split between them cannot read references.
+  const encoder = settings.qwen3VLEncoderModel;
+  const tower = settings.qwen3VLVisionTowerModel;
+
+  if (
+    hasQwen21References &&
+    encoder &&
+    tower &&
+    isGgufQwen3Vl8bEncoder(encoder) &&
+    isQwen3Vl8bVisionTower(tower) &&
+    (encoder.cpu_only === true) !== (tower.cpu_only === true)
+  ) {
+    issues.push(
+      createUntranslatedGenerationIssue(VISION_TOWER_CPU_ONLY_REASON, {
+        field: 'qwen3VLVisionTowerModel',
+        section: 'components',
+      })
+    );
+  }
+
+  return issues;
 };
 
 /** Validate guidance for writes bypassing model selection; return null or one error message. */
@@ -2125,44 +2943,57 @@ export const getGuidanceBoundReason = (
 
 /**
  * Combinations the backend refuses only after queueing. The encoder reads edit references with its vision tower, which
- * a GGUF Qwen3-VL encoder does not carry; a Diffusers main without an encoder override uses its bundled one. A
- * standalone encoder folder may lack the vision weights too, but its config does not say so, so the message names
- * what the encoder needs rather than a format that always has it.
+ * a GGUF Qwen3-VL encoder replaces with its mmproj Vision Tower; a Diffusers main without an encoder override uses its
+ * bundled one.
  */
-const getKrea2ReferenceValidationReasons = (settings: GenerateSettings): string[] => {
+const getKrea2ReferenceValidationReasons = (
+  settings: GenerateSettings
+): Array<{ reason: string; target: GenerationIssue['target'] }> => {
   const styleCount = settings.referenceImages.filter(
     (referenceImage) => isReferenceImageActive(referenceImage) && referenceImage.config.type === 'krea2_reference_image'
   ).length;
   const hasEditReferences = hasEnabledKrea2EditReferences(settings.referenceImages);
-  const reasons: string[] = [];
+  const reasons: Array<{ reason: string; target: GenerationIssue['target'] }> = [];
 
   if (styleCount > 1) {
-    reasons.push('Krea-2 uses one style reference at a time. Turn off all but one, or switch all of them to Edit.');
+    reasons.push({
+      reason: 'Krea-2 uses one style reference at a time. Turn off all but one, or switch all of them to Edit.',
+      target: REFERENCE_IMAGES_TARGET,
+    });
   }
 
   if (styleCount > 0 && hasEditReferences) {
-    reasons.push(
-      'Krea-2 cannot combine a style reference with edit references. Switch the style reference to Edit, or turn off one kind.'
-    );
+    reasons.push({
+      reason:
+        'Krea-2 cannot combine a style reference with edit references. Switch the style reference to Edit, or turn off one kind.',
+      target: REFERENCE_IMAGES_TARGET,
+    });
   }
 
   const encoder = settings.qwen3VLEncoderModel;
+  const tower = settings.qwen3VLVisionTowerModel;
 
-  if (hasEditReferences && encoder && isKrea2Qwen3VlEncoder(encoder) && encoder.format === 'gguf_quantized') {
-    reasons.push(
-      `Krea-2 edit references need a Qwen3-VL encoder with vision weights, which the GGUF encoder "${encoder.name}" does not have. Select a safetensors file or Diffusers folder that includes the vision weights.`
-    );
+  if (hasEditReferences && encoder && isGgufQwen3Vl4bEncoder(encoder)) {
+    if (!tower || !isQwen3Vl4bVisionTower(tower)) {
+      reasons.push({ reason: KREA2_GGUF_VISION_TOWER_REASON, target: KREA2_VISION_TOWER_TARGET });
+    } else if ((encoder.cpu_only === true) !== (tower.cpu_only === true)) {
+      reasons.push({ reason: VISION_TOWER_CPU_ONLY_REASON, target: KREA2_VISION_TOWER_TARGET });
+    }
   }
 
   return reasons;
 };
 
-/** Scalar/LoRA family rules are separate from component-slot validation. */
-const getModelFamilyValidationReasons = (model: MainModelConfig, settings: GenerateSettings): string[] => {
-  const reasons: string[] = [];
+/** Scalar family rules are separate from component-slot validation; their fields show the English inline. */
+const getModelFamilyValidationIssues = (model: MainModelConfig, settings: GenerateSettings): GenerationIssue[] => {
+  const issues: GenerationIssue[] = [];
 
   if (model.base === 'krea-2') {
-    reasons.push(...getKrea2ReferenceValidationReasons(settings));
+    issues.push(
+      ...getKrea2ReferenceValidationReasons(settings).map(({ reason, target }) =>
+        createUntranslatedGenerationIssue(reason, target)
+      )
+    );
   }
 
   // Parse raw rebalance strings before forwarding them to the backend.
@@ -2171,7 +3002,22 @@ const getModelFamilyValidationReasons = (model: MainModelConfig, settings: Gener
     settings.krea2RebalanceEnabled &&
     !isValidKrea2RebalanceWeights(settings.krea2RebalanceWeights)
   ) {
-    reasons.push(`Krea-2 rebalance weights must be ${KREA2_REBALANCE_WEIGHT_COUNT} comma-separated numbers.`);
+    issues.push(
+      createUntranslatedGenerationIssue(
+        `Krea-2 rebalance weights must be ${KREA2_REBALANCE_WEIGHT_COUNT} comma-separated numbers.`,
+        { field: 'krea2RebalanceWeights', section: 'render' }
+      )
+    );
+  }
+
+  // FLUX.3 Klein is a step-distilled flow map: it samples without CFG, and its denoise node refuses a scale above 1.
+  if (model.base === 'flux3' && model.variant === 'flux3_klein' && settings.cfgScale > 1) {
+    issues.push(
+      createUntranslatedGenerationIssue(
+        'FLUX.3 Klein samples without CFG. Set CFG Scale to 1, or use FLUX.3 Klein Base for CFG.',
+        { field: 'cfgScale', section: 'render' }
+      )
+    );
   }
 
   // The field commits only lists in range, but a persisted one can still name a block MOSS-Image lacks, which would fail
@@ -2182,7 +3028,12 @@ const getModelFamilyValidationReasons = (model: MainModelConfig, settings: Gener
     settings.cfgScale > 1 &&
     !isValidMossImageSkipLayers(settings.mossImageUncondSkipLayers)
   ) {
-    reasons.push(`MOSS-Image skip layers must be whole numbers from 0 to ${MAX_MOSS_IMAGE_SKIP_LAYER}.`);
+    issues.push(
+      createUntranslatedGenerationIssue(
+        `MOSS-Image skip layers must be whole numbers from 0 to ${MAX_MOSS_IMAGE_SKIP_LAYER}.`,
+        { field: 'mossImageUncondSkipLayers', section: 'render' }
+      )
+    );
   }
 
   // Finite persisted Ideogram overrides still need range validation.
@@ -2194,21 +3045,16 @@ const getModelFamilyValidationReasons = (model: MainModelConfig, settings: Gener
     ] as const) {
       // Null is "let the preset decide" and is omitted from the graph entirely.
       if (value !== null && (value < min || value > max)) {
-        reasons.push(`Ideogram 4 ${label} must be between ${min} and ${max}.`);
+        issues.push(
+          createUntranslatedGenerationIssue(`Ideogram 4 ${label} must be between ${min} and ${max}.`, {
+            section: 'render',
+          })
+        );
       }
     }
   }
 
-  // Report Wan LoRA family mismatches rather than silently drop selected LoRAs.
-  if (model.base === 'wan') {
-    for (const lora of settings.loras) {
-      if (lora.isEnabled && !isWanLoraTargetingMain(lora.model.variant, model.variant)) {
-        reasons.push(`${lora.model.name} targets a different Wan model family than ${model.name}.`);
-      }
-    }
-  }
-
-  return reasons;
+  return issues;
 };
 
 const EXTERNAL_MODE_LABELS: Record<ExternalGenerationMode, string> = {
@@ -2223,44 +3069,105 @@ export const getExternalModeReason = (model: GenerateModelConfig, mode: External
     ? `${model.name} does not support ${EXTERNAL_MODE_LABELS[mode]}.`
     : null;
 
+/** Reported when Generate has no model it can run with; also used by surfaces that cannot read the values at all. */
+export const NO_GENERATE_MODEL_ISSUE: GenerationIssue = issue(
+  'model:unsupported',
+  'noSupportedModel',
+  'Generate needs a supported model before it can be invoked.',
+  MODEL_TARGET
+);
+
+/** The Components section's issues: one per slot, which the slot shows itself, then the family's other rules. */
+const getComponentValidationIssues = (model: GenerateModelConfig, settings: GenerateSettings): GenerationIssue[] => {
+  const policy = getComponentSectionPolicy(model, settings);
+  const ctx = getComponentPolicyContext(model, settings);
+
+  return [
+    ...(policy.rules?.(ctx) ?? []).map((message) =>
+      createUntranslatedGenerationIssue(message, { section: 'components' })
+    ),
+    ...policy.slots.flatMap((slotPolicy) => {
+      const message = getComponentSlotIssue(slotPolicy, ctx);
+
+      return message
+        ? [createUntranslatedGenerationIssue(message, { field: slotPolicy.key, section: 'components' })]
+        : [];
+    }),
+  ];
+};
+
 /** `mode` is the external generation mode being compiled; local models are validated the same way for every mode. */
-export const getGenerationValidationReasons = (
+export const getGenerationValidationIssues = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
   mode: ExternalGenerationMode = 'txt2img'
-): string[] => {
+): GenerationIssue[] => {
   // All compilers share this validator; check capabilities before model-specific policy.
   if (!hasArchitectureCapabilities()) {
     // Keep core independent of the load-state store; failures direct callers to retry.
     return [
-      'Model capabilities are not available. Generation is blocked until they load; if this persists, retry from the Generate panel.',
+      issue(
+        'model:capabilitiesUnavailable',
+        'capabilitiesUnavailable',
+        'Model capabilities are not available. Generation is blocked until they load; if this persists, retry from the Generate panel.',
+        MODEL_TARGET
+      ),
     ];
   }
 
   if (!isSupportedGenerateModel(model)) {
-    return ['Generate needs a supported model before it can be invoked.'];
+    return [NO_GENERATE_MODEL_ISSUE];
   }
 
   // Reject supported bases missing from the loaded table rather than compile fallback policy.
   if (!isArchitectureDescribed(model)) {
-    return [`The backend does not describe the ${model.base} architecture, so it cannot be generated with.`];
+    return [
+      issue(
+        'model:architectureNotDescribed',
+        'architectureNotDescribed',
+        `The backend does not describe the ${model.base} architecture, so it cannot be generated with.`,
+        MODEL_TARGET,
+        { base: model.base }
+      ),
+    ];
   }
 
-  const reasons = [
-    ...getDimensionValidationReasons(model, settings),
-    ...getReferenceImageValidationReasons(model, settings),
-    ...getPidValidationReasons(model, settings),
+  const issues = [
+    ...getDimensionValidationIssues(model, settings),
+    ...getReferenceImageValidationIssues(model, settings),
+    ...getPidValidationIssues(model, settings),
   ];
+
+  if (
+    getGenerationUiPolicy(model).hiDiffusionVisible &&
+    settings.hiDiffusionEnabled &&
+    settings.hiDiffusionRauNetEnabled
+  ) {
+    const t1 = settings.hiDiffusionT1Ratio;
+    const t2 = settings.hiDiffusionT2Ratio;
+    if (t1 !== null && t2 !== null && t1 < t2) {
+      issues.push(
+        createUntranslatedGenerationIssue('HiDiffusion T1 ratio must be greater than or equal to T2.', {
+          section: 'advanced',
+        })
+      );
+    }
+  }
 
   if (model.type === 'external_image_generator') {
     const modeReason = getExternalModeReason(model, mode);
 
     if (modeReason) {
-      reasons.push(modeReason);
+      issues.push(createUntranslatedGenerationIssue(modeReason, MODEL_TARGET));
     }
 
     if (!getExternalProviderNodeType(model.provider_id)) {
-      reasons.push(`No invocation node registered for external provider '${model.provider_id ?? ''}'.`);
+      issues.push(
+        createUntranslatedGenerationIssue(
+          `No invocation node registered for external provider '${model.provider_id ?? ''}'.`,
+          MODEL_TARGET
+        )
+      );
     }
 
     // Every request emits one output, and the Canvas edit modes add the composite as one init image.
@@ -2268,25 +3175,72 @@ export const getGenerationValidationReasons = (
       const totalImages = getExternalReferenceImages(settings, model).length + (mode === 'txt2img' ? 0 : 1) + 1;
 
       if (totalImages > SEEDREAM_BATCH_MAX_TOTAL_IMAGES) {
-        reasons.push(
-          `${model.name} supports at most ${SEEDREAM_BATCH_MAX_TOTAL_IMAGES} images total (reference + init + output), got ${totalImages}.`
+        issues.push(
+          createUntranslatedGenerationIssue(
+            `${model.name} supports at most ${SEEDREAM_BATCH_MAX_TOTAL_IMAGES} images total (reference + init + output), got ${totalImages}.`,
+            REFERENCE_IMAGES_TARGET
+          )
         );
       }
     }
 
-    return reasons;
+    return issues;
   }
 
-  const componentPolicy = getComponentSectionPolicy(model, settings);
-  reasons.push(...componentPolicy.validate(getComponentPolicyContext(model, settings)));
+  issues.push(...getComponentValidationIssues(model, settings));
   const guidanceReason = getGuidanceBoundReason(model, settings.cfgScale);
 
   if (guidanceReason) {
-    reasons.push(guidanceReason);
+    issues.push(
+      createUntranslatedGenerationIssue(
+        guidanceReason,
+        { field: 'cfgScale', section: 'render' },
+        { kind: 'clampGuidance', value: clampGuidance(settings.cfgScale, getBaseGenerationConfig(model).guidance) }
+      )
+    );
   }
 
-  reasons.push(...getModelFamilyValidationReasons(model, settings));
-  reasons.push(...getRefinerValidationReasons(model, settings));
+  issues.push(...getModelFamilyValidationIssues(model, settings));
+  issues.push(
+    ...getRefinerValidationReasons(model, settings).map((reason) =>
+      createUntranslatedGenerationIssue(reason, { section: 'refiner' })
+    )
+  );
 
-  return reasons;
+  return issues;
+};
+
+/** English reasons for compilers and logs, which throw or list them without a translator. */
+export const getGenerationValidationReasons = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  mode: ExternalGenerationMode = 'txt2img'
+): string[] => getGenerationValidationIssues(model, settings, mode).map(({ message }) => message);
+
+/**
+ * What blocks Invoke for Generate's values, shared by the Invoke route and the Generate form so the two always agree.
+ * With a Canvas frame, a hosted provider is checked at the size it will be asked for (its own size nearest the frame),
+ * and one without text to image as the edit the Canvas will ask for. `models` adds the installed-model checks; leave it
+ * out while the catalog is unread, which would otherwise name every model as missing.
+ */
+export const getGenerateInvocationIssues = (
+  values: GenerateSettings & { model: GenerateModelConfig },
+  { canvasFrame, models }: { canvasFrame?: { height: number; width: number }; models?: readonly ModelConfig[] } = {}
+): GenerationIssue[] => {
+  const { model } = values;
+  const providerModes =
+    canvasFrame !== undefined && model.type === 'external_image_generator'
+      ? (model.capabilities?.modes ?? ['txt2img'])
+      : null;
+
+  return [
+    ...getGenerationValidationIssues(
+      model,
+      providerModes !== null && canvasFrame
+        ? { ...values, ...resolveExternalCanvasRequestSize(model, canvasFrame) }
+        : values,
+      providerModes !== null && !providerModes.includes('txt2img') ? 'img2img' : 'txt2img'
+    ),
+    ...(models ? getGenerationModelAvailabilityIssues(model, values, models) : []),
+  ];
 };

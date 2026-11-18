@@ -8,8 +8,11 @@ import type { TFunction } from 'i18next';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
+import { getActiveProjectGraph } from '@workbench/projectWorkflows';
+import { BUILT_IN_PROJECT_SETTINGS } from '@workbench/settings/projectSettings';
 import { canvasWidgetManifest } from '@workbench/widgets/canvas/manifest';
 import { generateWidgetManifest } from '@workbench/widgets/generate/manifest';
+import { videoWidgetManifest } from '@workbench/widgets/video/manifest';
 import { workflowWidgetManifest } from '@workbench/widgets/workflow/manifest';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { describe, expect, it, vi } from 'vitest';
@@ -71,8 +74,27 @@ const canvasSurface = createGraphBearingSurface(canvasWidgetManifest, 'center', 
 seedArchitectureCapabilities();
 
 describe('buildGraphPreviewSource', () => {
+  it('reports Gallery for Video while the top-bar route goes to Canvas', () => {
+    const source = buildGraphPreviewSource({
+      models,
+      project: { ...project, invocation: { ...project.invocation, destination: 'canvas' } },
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
+      surface: createGraphBearingSurface(videoWidgetManifest, 'left', 'Video')!,
+      t,
+      templates: idleTemplates,
+    });
+    expect(source.destinationLabel).toBe('Gallery');
+  });
+
   it('live-compiles the generate source and reports a seed notice when randomized', () => {
-    const source = buildGraphPreviewSource({ models, project, surface: generateSurface, t, templates: idleTemplates });
+    const source = buildGraphPreviewSource({
+      models,
+      project,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
+      surface: generateSurface,
+      t,
+      templates: idleTemplates,
+    });
 
     expect(source.isLive).toBe(true);
     expect(source.graph).not.toBeNull();
@@ -89,6 +111,7 @@ describe('buildGraphPreviewSource', () => {
     const source = buildGraphPreviewSource({
       models,
       project: invalidProject,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
       surface: generateSurface,
       t,
       templates: idleTemplates,
@@ -104,30 +127,40 @@ describe('buildGraphPreviewSource', () => {
       throw new Error('unsupported sampler combination');
     });
 
-    const source = buildGraphPreviewSource({ models, project, surface: generateSurface, t, templates: idleTemplates });
+    const source = buildGraphPreviewSource({
+      models,
+      project,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
+      surface: generateSurface,
+      t,
+      templates: idleTemplates,
+    });
 
     expect(source.graph).toBeNull();
     expect(source.invalidReasons).toEqual(['unsupported sampler combination']);
     expect(source.isLive).toBe(true);
   });
 
-  it('compiles the workflow source from the live document with position hints', () => {
+  it('compiles the workflow source from the live document, which it hands the preview to draw', () => {
     const source = buildGraphPreviewSource({
       models: undefined,
       project,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
       surface: workflowSurface,
       t,
       templates: loadedTemplates,
     });
 
     expect(source.isLive).toBe(true);
-    expect(source.positionHints).toBeDefined();
+    expect(source.graph).not.toBeNull();
+    expect(source.document).toBe(getActiveProjectGraph(project));
   });
 
   it('returns null graph for workflow when templates are not loaded', () => {
     const source = buildGraphPreviewSource({
       models: undefined,
       project,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
       surface: workflowSurface,
       t,
       templates: idleTemplates,
@@ -150,6 +183,7 @@ describe('buildGraphPreviewSource', () => {
     const source = buildGraphPreviewSource({
       models: undefined,
       project: canvasProject,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
       surface: canvasSurface,
       t,
       templates: idleTemplates,

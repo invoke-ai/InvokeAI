@@ -193,6 +193,30 @@ class UnionItemCollectionTestInvocation(BaseInvocation):
         return PromptCollectionTestInvocationOutput(collection=[])
 
 
+@invocation_output("test_type_form_collection_output")
+class TypeFormCollectionTestInvocationOutput(BaseInvocationOutput):
+    """Collections whose item annotations are unions or parameterized generics, as custom nodes may declare."""
+
+    union_items: list[int | str] = OutputField(default=[])
+    derived_union_items: list[Union[DerivedTestField, str]] = OutputField(default=[])
+    nested_items: list[list[int]] = OutputField(default=[])
+    optional_nested_items: list[Optional[list[int]]] = OutputField(default=[])
+    literal_items: list[Literal["a", "b"]] = OutputField(default=[])
+    mixed_literal_items: list[Literal["a", 1]] = OutputField(default=[])
+    true_literal_items: list[Literal[True]] = OutputField(default=[])
+
+
+@invocation("test_type_form_collection", version="1.0.0")
+class TypeFormCollectionTestInvocation(BaseInvocation):
+    union_items: list[int | str] = InputField(default=[])
+    nested_items: list[list[int]] = InputField(default=[])
+    wider_literal_items: list[Literal["a", "b", "c"]] = InputField(default=[])
+    narrower_literal_items: list[Literal["a"]] = InputField(default=[])
+
+    def invoke(self, context: InvocationContext) -> TypeFormCollectionTestInvocationOutput:
+        return TypeFormCollectionTestInvocationOutput()
+
+
 @invocation("test_pep604_union_item_collection", version="1.0.0")
 class Pep604UnionItemCollectionTestInvocation(BaseInvocation):
     value: list[BaseTestField | str] = InputField(default=[])

@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   getWorkflowTagCounts: vi.fn(),
   listLibraryWorkflows: vi.fn(),
   onLibraryWorkflowOpened: () => () => {},
+  onLibraryWorkflowRun: () => () => {},
 }));
 
 const templates = vi.hoisted(() => ({
@@ -112,7 +113,8 @@ describe('workflow library record freshness', () => {
     api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('a', 1)]));
     api.getLibraryWorkflowRecord.mockResolvedValue(buildRecord('a', 1));
 
-    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    await browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'updated' });
+    browse.setWorkflowLibraryVisibleDemand(['a']);
     await vi.waitFor(() => expect(enrichedNodeCount()).toBe(1));
 
     // Opening what the list shows reuses the record enrichment read.
@@ -150,7 +152,8 @@ describe('workflow library record freshness', () => {
       .mockResolvedValue(buildPage([buildItem('a', 2)]));
     api.getLibraryWorkflowRecord.mockResolvedValue(buildRecord('a', 2));
 
-    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    await browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'updated' });
+    browse.setWorkflowLibraryVisibleDemand(['a']);
     await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.revision).toBe(2));
     await vi.waitFor(() => expect(enrichedNodeCount()).toBe(2));
     // A caller still holding the old row is served the newer record without another report.
@@ -290,7 +293,8 @@ describe('workflow library invalidation fencing', () => {
       .mockReturnValueOnce(retry.promise)
       .mockResolvedValue(buildRecord('a', 1));
 
-    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    await browse.ensureWorkflowLibraryBrowseLoaded({ sort: 'updated' });
+    browse.setWorkflowLibraryVisibleDemand(['a']);
     await vi.waitFor(() => expect(api.getLibraryWorkflowRecord).toHaveBeenCalledTimes(1));
     // The refreshes these invalidations start never land, so nothing but the row's own read can enrich it.
     api.listLibraryWorkflows.mockReturnValue(createDeferred<WorkflowLibraryPage>().promise);

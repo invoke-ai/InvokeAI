@@ -4,8 +4,8 @@ import { BugIcon } from 'lucide-react';
 
 export const diagnosticsWidgetManifest: WidgetManifest = {
   allowMultiple: false,
-  allowedRegions: ['bottom', 'right'],
-  bottomPanel: 'expandable',
+  allowedRegions: ['right'],
+  chrome: { body: 'fill' },
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   icon: BugIcon,
   id: 'diagnostics',

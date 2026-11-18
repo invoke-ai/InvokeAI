@@ -1,0 +1,9 @@
+title: Clothing Mask
+author: VeyDlin
+repo: https://github.com/VeyDlin/clothing-mask-node
+summary: Mask clothing with a U2NET network trained to segment clothing items.
+categories: [masks]
+thumbnail: ./clothing-mask.webp
+images:
+  - src: https://raw.githubusercontent.com/VeyDlin/clothing-mask-node/master/.readme/node.png
+    alt: The Clothing Mask node

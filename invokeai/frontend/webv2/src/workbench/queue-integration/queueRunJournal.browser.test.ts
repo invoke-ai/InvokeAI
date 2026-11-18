@@ -228,7 +228,20 @@ describe('IndexedDB queue run journal', () => {
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
     const baseItem = createItem({ backendBatchId: 'batch-1', backendItemIds: [11], status: 'running' });
-    const item = { ...baseItem, snapshot: { ...baseItem.snapshot, prepend: true } };
+    const item = {
+      ...baseItem,
+      snapshot: {
+        ...baseItem.snapshot,
+        prepend: true,
+        backendSubmission: {
+          batchCount: 1,
+          graph: { edges: [], id: 'backend-graph-1', nodes: {} },
+          kind: 'workflow' as const,
+          projectWorkflowId: 'original-project-workflow',
+          libraryWorkflowSource: { libraryWorkflowId: 'original-template', ownerUserId: 'user-a' },
+        },
+      },
+    };
     await journal.record(projectId, item);
 
     const loaded = await journal.listForProject(projectId);
@@ -244,6 +257,7 @@ describe('IndexedDB queue run journal', () => {
         backendItemIds: [11],
         id: item.id,
         snapshot: expect.objectContaining({
+          backendSubmission: item.snapshot.backendSubmission,
           canvas: item.snapshot.canvas,
           graph: { id: 'graph-1', label: 'Graph' },
           prepend: true,
@@ -283,6 +297,87 @@ describe('IndexedDB queue run journal', () => {
     const restoredMalformed = restored.find((item) => item.id === malformed.id);
     expect(restoredMalformed).toMatchObject({ backendItemIds: [100], status: 'running' });
     expect(restoredMalformed).not.toHaveProperty('retriedBackendItemIds');
+  });
+
+  it('keeps the failed submission of a run not yet accepted, and drops a malformed or stale one without losing the run', async () => {
+    const { journal } = await createJournal();
+    const store = createWorkbenchStore();
+    const projectId = store.getState().activeProjectId;
+    const retry = {
+      failedAt: 12_000,
+      failureCount: 3,
+      message: 'graph validation crashed',
+      reason: 'server-error' as const,
+      serverErrorCount: 2,
+      serverErrorSince: 1_000,
+      status: 500,
+    };
+    const retrying = createItem({ submissionRetry: retry });
+    // A server error must be counted, and its window cannot start after the failure it ends with.
+    const miscounted = createItem({ id: 'queue-item-2', submissionRetry: { ...retry, serverErrorCount: 0 } });
+    const backwards = createItem({ id: 'queue-item-3', submissionRetry: { ...retry, serverErrorSince: 13_000 } });
+    // Every server error is a failed submission.
+    const undercounted = createItem({ id: 'queue-item-5', submissionRetry: { ...retry, failureCount: 1 } });
+    // A run the backend accepted has no submission left to retry.
+    const accepted = createItem({
+      backendItemIds: [11],
+      id: 'queue-item-4',
+      status: 'running',
+      submissionRetry: retry,
+    });
+    // A failure that is neither a server error nor a transport failure keeps its own reason.
+    const otherError = {
+      ...retry,
+      message: 'Invalid queue enqueue response',
+      reason: 'error' as const,
+      serverErrorCount: 0,
+      serverErrorSince: null,
+      status: null,
+    };
+    const unreadable = createItem({ id: 'queue-item-6', submissionRetry: otherError });
+    // A reason this build does not know, as a later build might write it.
+    const unknownReason = createItem({
+      id: 'queue-item-7',
+      submissionRetry: { ...otherError, reason: 'throttled' } as unknown as WorkbenchQueueItem['submissionRetry'],
+    });
+    // Written before messages were bounded: a whole HTML error page.
+    const page = `<html>${'x'.repeat(5_000)}</html>`;
+    const longMessage = createItem({ id: 'queue-item-8', submissionRetry: { ...retry, message: page } });
+    for (const item of [
+      retrying,
+      miscounted,
+      backwards,
+      undercounted,
+      accepted,
+      unreadable,
+      unknownReason,
+      longMessage,
+    ]) {
+      await journal.record(projectId, item);
+    }
+
+    const loaded = await journal.listForProject(projectId);
+    expect(loaded.kind).toBe('available');
+    store.commands.queue.restoreFromJournal({
+      items: loaded.kind === 'available' ? loaded.entries.map((entry) => entry.item) : [],
+      projectId,
+    });
+
+    const restored = store.getState().projects[0]?.queue.items ?? [];
+    expect(restored.find((item) => item.id === retrying.id)).toMatchObject({
+      status: 'pending',
+      submissionRetry: retry,
+    });
+    expect(restored.find((item) => item.id === unreadable.id)).toMatchObject({ submissionRetry: otherError });
+    expect(restored.find((item) => item.id === longMessage.id)?.submissionRetry).toEqual({
+      ...retry,
+      message: `${page.slice(0, 499)}…`,
+    });
+    for (const item of [miscounted, backwards, undercounted, accepted, unknownReason]) {
+      const restoredItem = restored.find((candidate) => candidate.id === item.id);
+      expect(restoredItem).toMatchObject({ status: item.status });
+      expect(restoredItem).not.toHaveProperty('submissionRetry');
+    }
   });
 
   it('restores newest-first submission order without moving a run when its status changes', async () => {

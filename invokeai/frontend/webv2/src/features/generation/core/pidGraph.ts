@@ -11,6 +11,8 @@ import { getIsPidActive, getPidGenerationSize } from './pid';
 export const PID_DECODE_NODE_TYPES = {
   flux: 'flux_pid_decode',
   flux2: 'flux2_pid_decode',
+  // FLUX.3 latents are FLUX.2 latents: same VAE, same PiD decoders.
+  flux3: 'flux2_pid_decode',
   // MOSS-Image denoises into the FLUX.2 latent layout and decodes with the FLUX.2 PiD decoder.
   'moss-image': 'flux2_pid_decode',
   'qwen-image': 'qwen_image_pid_decode',
@@ -29,8 +31,7 @@ export const isPidDecodeNodeType = (type: string | undefined): type is PidDecode
 /**
  * The decode node types that take a `vae` input. PiD takes the latent in the VAE's normalized space, and only
  * FLUX.2 stores it denormalized, so only its decode reads the VAE (BatchNorm statistics to normalize its latent).
- * The others take the stored latent as is, but the edge still records which VAE the graph decodes with:
- * `findVaeSource` reads it to give a Canvas img2img encode that same VAE, override and seamless wrapping included.
+ * The others take the stored latent as is, but the edge still records in the emitted graph which VAE it decodes with.
  */
 const PID_DECODE_NODES_WITH_VAE_INPUT: ReadonlySet<string> = new Set([
   'flux2_pid_decode',

@@ -9,16 +9,33 @@ import type {
   NewRasterLayerResult,
 } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import type * as LayerCommandsModule from '@workbench/widgets/layers/layerCommands';
 import type { TFunction } from 'i18next';
 
 import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
+import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
+import { deleteLayers, duplicateLayers, groupLayers, ungroupLayers } from '@workbench/widgets/layers/layerCommands';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+
+// The layer commands own their eligibility, labels and feedback (see layerCommands tests); here only routing counts.
+vi.mock('@workbench/widgets/layers/layerCommands', async (importOriginal) => ({
+  ...(await importOriginal<typeof LayerCommandsModule>()),
+  deleteLayers: vi.fn(() => 'committed'),
+  duplicateLayers: vi.fn(() => Promise.resolve('committed')),
+  groupLayers: vi.fn(() => 'committed'),
+  ungroupLayers: vi.fn(() => 'committed'),
+}));
 
 import { CANVAS_HEADER_HOTKEYS } from './canvasHeaderCommands';
 import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
-import { CANVAS_COMPANION_HOTKEYS, executeCanvasToolCommand, reportTransformRefusal } from './canvasToolCommands';
+import {
+  CANVAS_COMPANION_HOTKEYS,
+  executeCanvasToolCommand,
+  reportMergeDownRefusal,
+  reportTransformRefusal,
+} from './canvasToolCommands';
 
 const rasterLayer = (id: string, overrides: Partial<CanvasLayerContract> = {}): CanvasLayerContract =>
   ({
@@ -106,15 +123,14 @@ const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyCo
   cropAllLayers: vi.fn(),
   dispatch,
   reportLayerOperation: vi.fn(),
+  reportMergeDownRefusal: vi.fn(),
   reportTransformRefusal: vi.fn(),
   reportPreparedCommit: () => undefined,
   reportStructuralCommit: () => undefined,
   document: documentOf([rasterLayer('a'), rasterLayer('b')], 'a'),
   engine: createEngine(),
-  hasSelectedStagedCandidate: false,
-  hasStagingSlots: false,
-  isInteractionLocked: false,
-  notifyLayerDuplicateFailed: vi.fn(),
+  hasMultipleStagingSlots: false,
+  layerCommands: { engine: null, reportError: vi.fn(), t: ((key: string) => key) as TFunction },
   pasteFromClipboard,
   resetActiveColors: vi.fn(),
   selectedLayerIds: ['a'],
@@ -133,34 +149,86 @@ const run = (commandId: string, overrides: Partial<CanvasHotkeyContext> = {}) =>
 };
 
 beforeEach(() => {
+  vi.clearAllMocks();
   dispatch = vi.fn();
   copySelection = vi.fn();
   pasteFromClipboard = vi.fn();
 });
 
-describe('staging precedence', () => {
+describe('while results are staged', () => {
   it.each([
     ['canvas.prevEntity', -1],
-    ['canvas.nudgeLeft', -1],
     ['canvas.nextEntity', 1],
-    ['canvas.nudgeRight', 1],
-  ] as const)('%s cycles staged images while slots exist', (commandId, direction) => {
-    const engine = run(commandId, { hasStagingSlots: true });
-    expect(dispatch).toHaveBeenCalledWith({ direction, type: 'cycleStagedImage' } satisfies CanvasProjectMutation);
+  ] as const)('%s steps through the staged results, and only that', (commandId, direction) => {
+    const engine = run(commandId, { hasMultipleStagingSlots: true });
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith({
+      direction,
+      type: 'cycleStagedImage',
+    } satisfies CanvasProjectMutation);
     expect(engine.layers.nudgeSelectedLayer).not.toHaveBeenCalled();
   });
 
-  it('nudges instead of cycling when no staging slot exists', () => {
-    const engine = run('canvas.nudgeLeft');
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(engine.layers.nudgeSelectedLayer).toHaveBeenCalledWith(-1, 0);
+  it('walks the layers instead when only one result is staged or generating: there is nothing to step to', () => {
+    run('canvas.nextEntity', { hasMultipleStagingSlots: false });
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith({ id: 'b', type: 'setCanvasSelectedLayer' });
   });
 
-  it('delete discards the selected staged candidate before touching layers', () => {
-    const engine = run('canvas.deleteSelected', { hasSelectedStagedCandidate: true });
-    expect(dispatch).toHaveBeenCalledWith({ type: 'discardSelectedStagedImage' });
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
-    expect(engine.selection.eraseSelection).not.toHaveBeenCalled();
+  it.each([
+    ['canvas.nudgeLeft', 'brush', -1],
+    ['canvas.nudgeRight', 'brush', 1],
+    ['canvas.nudgeLeft', 'view', -1],
+    ['canvas.nudgeRight', 'lasso', 1],
+  ] as const)(
+    '%s with the %s tool steps through the results instead of nudging',
+    (commandId, activeTool, direction) => {
+      const engine = run(commandId, { engine: createEngine({ activeTool }), hasMultipleStagingSlots: true });
+      expect(dispatch).toHaveBeenCalledExactlyOnceWith({
+        direction,
+        type: 'cycleStagedImage',
+      } satisfies CanvasProjectMutation);
+      expect(engine.layers.nudgeSelectedLayer).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['canvas.nudgeLeft', 'move', -1, 0],
+    ['canvas.nudgeRight', 'transform', 1, 0],
+    ['canvas.nudgeUp', 'brush', 0, -1],
+    ['canvas.nudgeDown', 'brush', 0, 1],
+  ] as const)('%s with the %s tool nudges the selected layer', (commandId, activeTool, dx, dy) => {
+    const engine = run(commandId, { engine: createEngine({ activeTool }), hasMultipleStagingSlots: true });
+    expect(engine.layers.nudgeSelectedLayer).toHaveBeenCalledExactlyOnceWith(dx, dy);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('left and right nudge when only one result is staged or generating', () => {
+    const engine = run('canvas.nudgeRight', { hasMultipleStagingSlots: false });
+    expect(engine.layers.nudgeSelectedLayer).toHaveBeenCalledExactlyOnceWith(1, 0);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('Delete erases the pixel selection, or deletes the layer, instead of discarding a result', () => {
+    const erasing = run('canvas.deleteSelected', {
+      engine: createEngine({ hasSelection: true }),
+      hasMultipleStagingSlots: true,
+    });
+    expect(erasing.selection.eraseSelection).toHaveBeenCalledOnce();
+    expect(dispatch).not.toHaveBeenCalled();
+
+    run('canvas.deleteSelected', { hasMultipleStagingSlots: true });
+    expect(deleteLayers).toHaveBeenCalledOnce();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('locks nothing else: tools, history, selection and layer commands run as usual', () => {
+    expect(run('canvas.tool.brush', { hasMultipleStagingSlots: true }).tools.setTool).toHaveBeenCalledWith('brush');
+    expect(run('canvas.undo', { hasMultipleStagingSlots: true }).history.undo).toHaveBeenCalledOnce();
+    expect(run('canvas.selectAll', { hasMultipleStagingSlots: true }).selection.selectAll).toHaveBeenCalledOnce();
+    run('canvas.duplicateLayer', { hasMultipleStagingSlots: true });
+    expect(duplicateLayers).toHaveBeenCalledOnce();
+    const crop = contextOf({ hasMultipleStagingSlots: true });
+    executeCanvasHotkeyCommand('canvas.cropAllLayersToFrame', crop);
+    expect(crop.cropAllLayers).toHaveBeenCalledOnce();
   });
 });
 
@@ -214,9 +282,8 @@ describe('layer navigation without staging', () => {
     expect(dispatch).toHaveBeenLastCalledWith(select('d'));
   });
 
-  it('stays put on the only layer and while interaction is locked', () => {
+  it('stays put on the only layer', () => {
     run('canvas.nextEntity', { document: documentOf([rasterLayer('a')], 'a') });
-    run('canvas.prevEntity', { document: documentOf(layers, 'a'), isInteractionLocked: true });
     expect(dispatch).not.toHaveBeenCalled();
   });
 
@@ -245,37 +312,6 @@ describe('layer navigation without staging', () => {
   });
 });
 
-describe('interaction lock', () => {
-  it('allows only the view tool', () => {
-    const engine = run('canvas.tool.view', { isInteractionLocked: true });
-    expect(engine.tools.setTool).toHaveBeenCalledWith('view');
-  });
-
-  it.each([
-    'canvas.tool.brush',
-    'canvas.deleteSelected',
-    'canvas.undo',
-    'canvas.selectAll',
-    'canvas.nudgeLeft',
-    'canvas.layerToFront',
-    'canvas.duplicateLayer',
-    'canvas.mergeDown',
-  ])('blocks %s', (commandId) => {
-    const engine = run(commandId, { isInteractionLocked: true });
-    expect(engine.tools.setTool).not.toHaveBeenCalled();
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
-    expect(engine.layers.nudgeSelectedLayer).not.toHaveBeenCalled();
-    expect(engine.history.undo).not.toHaveBeenCalled();
-    expect(engine.selection.selectAll).not.toHaveBeenCalled();
-    expect(dispatch).not.toHaveBeenCalled();
-  });
-
-  it('still cycles staging while locked (staging is checked first)', () => {
-    run('canvas.nextEntity', { hasStagingSlots: true, isInteractionLocked: true });
-    expect(dispatch).toHaveBeenCalledWith({ direction: 1, type: 'cycleStagedImage' });
-  });
-});
-
 describe('nudge', () => {
   it.each([
     ['canvas.nudgeUp', 0, -1],
@@ -290,7 +326,7 @@ describe('nudge', () => {
   });
 
   it('large nudges are unaffected by staging slots', () => {
-    const engine = run('canvas.nudgeRightLarge', { hasStagingSlots: true });
+    const engine = run('canvas.nudgeRightLarge', { hasMultipleStagingSlots: true });
     expect(engine.layers.nudgeSelectedLayer).toHaveBeenCalledWith(10, 0);
     expect(dispatch).not.toHaveBeenCalled();
   });
@@ -352,93 +388,29 @@ describe('layer reorder', () => {
   });
 });
 
-describe('delete: pixels vs layer', () => {
-  it('erases the pixel selection when one exists', () => {
+describe('layer commands', () => {
+  it.each([
+    ['canvas.deleteSelected', deleteLayers],
+    ['canvas.duplicateLayer', duplicateLayers],
+    ['canvas.groupLayers', groupLayers],
+    ['canvas.ungroupLayers', ungroupLayers],
+  ])('%s runs the shared layer command on the Layers-panel selection', (commandId, command) => {
+    const ctx = contextOf({ selectedLayerIds: ['a', 'b'] });
+    executeCanvasHotkeyCommand(commandId, ctx);
+    expect(command).toHaveBeenCalledExactlyOnceWith(ctx.layerCommands, ['a', 'b']);
+  });
+
+  it('Delete erases a live pixel selection instead of deleting layers', () => {
     const engine = run('canvas.deleteSelected', { engine: createEngine({ hasSelection: true }) });
-    expect(engine.selection.eraseSelection).toHaveBeenCalled();
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
+    expect(engine.selection.eraseSelection).toHaveBeenCalledOnce();
+    expect(deleteLayers).not.toHaveBeenCalled();
   });
 
-  it('deletes the selected layer when there is no pixel selection', () => {
-    const engine = run('canvas.deleteSelected');
-    expect(engine.selection.eraseSelection).not.toHaveBeenCalled();
-    expect(engine.layers.commitPrepared).toHaveBeenCalledWith(
-      'widgets.canvas.commands.deleteLayer',
-      expect.objectContaining({ forward: { ids: ['a'], type: 'removeCanvasLayers' } })
-    );
-  });
-
-  it('deletes the full Layers-panel selection as one history edit', () => {
-    const layers = [rasterLayer('a'), rasterLayer('b'), rasterLayer('c')];
-    const engine = run('canvas.deleteSelected', { document: documentOf(layers, 'a'), selectedLayerIds: ['a', 'c'] });
-
-    expect(engine.layers.commitPrepared).toHaveBeenCalledWith(
-      'widgets.canvas.commands.deleteLayer',
-      expect.objectContaining({
-        forward: { ids: ['a', 'c'], type: 'removeCanvasLayers' },
-        inverse: expect.objectContaining({
-          add: [expect.objectContaining({ nodes: [layers[0]] }), expect.objectContaining({ nodes: [layers[2]] })],
-          selectedLayerId: 'a',
-        }),
-      })
-    );
-  });
-
-  it('does not delete when any selected layer is locked', () => {
-    const engine = run('canvas.deleteSelected', {
-      document: documentOf([rasterLayer('a'), rasterLayer('b', { isLocked: true })], 'a'),
-      selectedLayerIds: ['a', 'b'],
-    });
-
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
-  });
-
-  it('does nothing with neither a selection nor a selected layer', () => {
-    const engine = run('canvas.deleteSelected', { document: documentOf([rasterLayer('a')], null) });
-    expect(engine.selection.eraseSelection).not.toHaveBeenCalled();
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
-  });
-});
-
-describe('duplicate: lift vs whole layer', () => {
-  it('lifts the pixel selection into a new layer when one exists', () => {
+  it('mod+J lifts a live pixel selection into a new layer instead of duplicating layers', () => {
     const engine = run('canvas.duplicateLayer', { engine: createEngine({ hasSelection: true }) });
-    expect(engine.selection.liftSelectionToLayer).toHaveBeenCalled();
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
+    expect(engine.selection.liftSelectionToLayer).toHaveBeenCalledOnce();
+    expect(duplicateLayers).not.toHaveBeenCalled();
   });
-
-  it('duplicates the whole layer with no pixel selection', () => {
-    const engine = run('canvas.duplicateLayer');
-    expect(engine.layers.duplicateLayers).toHaveBeenCalledWith(['a']);
-  });
-
-  it('duplicates every selected layer as one engine operation', () => {
-    const engine = run('canvas.duplicateLayer', { selectedLayerIds: ['a', 'b'] });
-    expect(engine.layers.duplicateLayers).toHaveBeenCalledWith(['a', 'b']);
-  });
-
-  it('reports when whole-layer duplication throws', async () => {
-    const engine = createEngine();
-    engine.layers.duplicateLayers.mockImplementation(() => Promise.reject(new Error('rejected')));
-    const notifyLayerDuplicateFailed = vi.fn();
-
-    executeCanvasHotkeyCommand('canvas.duplicateLayer', contextOf({ engine, notifyLayerDuplicateFailed }));
-
-    await vi.waitFor(() => expect(notifyLayerDuplicateFailed).toHaveBeenCalledOnce());
-  });
-
-  it.each(['not-ready', 'over-budget', 'stale'] as const)(
-    'explains a %s whole-layer duplication refusal',
-    async (status) => {
-      const engine = createEngine();
-      engine.layers.duplicateLayers.mockImplementation(() => Promise.resolve({ status }));
-      const reportLayerOperation = vi.fn();
-
-      executeCanvasHotkeyCommand('canvas.duplicateLayer', contextOf({ engine, reportLayerOperation }));
-
-      await vi.waitFor(() => expect(reportLayerOperation).toHaveBeenCalledExactlyOnceWith(status));
-    }
-  );
 });
 
 describe('clipboard', () => {
@@ -459,14 +431,10 @@ describe('clipboard', () => {
 });
 
 describe('crop all layers to frame', () => {
-  it('runs the canvas menu action, but not while interaction is locked', () => {
-    const free = contextOf();
-    executeCanvasHotkeyCommand('canvas.cropAllLayersToFrame', free);
-    expect(free.cropAllLayers).toHaveBeenCalledOnce();
-
-    const locked = contextOf({ isInteractionLocked: true });
-    executeCanvasHotkeyCommand('canvas.cropAllLayersToFrame', locked);
-    expect(locked.cropAllLayers).not.toHaveBeenCalled();
+  it('runs the canvas menu action', () => {
+    const ctx = contextOf();
+    executeCanvasHotkeyCommand('canvas.cropAllLayersToFrame', ctx);
+    expect(ctx.cropAllLayers).toHaveBeenCalledOnce();
   });
 });
 
@@ -511,21 +479,33 @@ describe('tool selection', () => {
       expect(engine.tools.setTool).not.toHaveBeenCalled();
       return reportTransformRefusal.mock.calls;
     };
-    expect(report('locked')).toEqual([['locked']]);
-    expect(report('ineligible')).toEqual([['ineligible']]);
+    expect(report('locked')).toEqual([['locked', 'a']]);
+    expect(report('ineligible')).toEqual([['ineligible', 'a']]);
     expect(report('busy')).toEqual([]);
   });
 
-  it("gives an ineligible layer Transform's own reason and other refusals the shared layer notice", () => {
+  it("explains an ineligible layer as a notice naming it, with Transform's own reason; other refusals as failures", () => {
     const explain = (refusal: Exclude<BeginTransformResult, 'started'>) => {
-      const reportError = vi.fn();
-      reportTransformRefusal(refusal, reportError, ((key: string) => key) as unknown as TFunction);
-      return reportError.mock.calls;
+      const report = { error: vi.fn(), notice: vi.fn() };
+      const t = ((key: string, options?: { name?: string }) =>
+        options?.name === undefined ? key : `${key}:${options.name}`) as unknown as TFunction;
+      reportTransformRefusal(refusal, { id: 'a', name: 'Sky' }, report, t);
+      return { error: report.error.mock.calls, notice: report.notice.mock.calls };
     };
-    expect(explain('ineligible')).toEqual([
-      ['widgets.layers.actions.actionFailed', 'widgets.layers.actions.transformIneligible'],
-    ]);
-    expect(explain('locked')).toEqual([['widgets.layers.actions.actionFailed', 'widgets.layers.actions.locked']]);
+    expect(explain('ineligible')).toEqual({
+      error: [],
+      notice: [
+        [
+          'transform:ineligible:a',
+          'widgets.layers.actions.transformUnavailable:Sky',
+          'widgets.layers.actions.transformIneligible',
+        ],
+      ],
+    });
+    expect(explain('locked')).toEqual({
+      error: [['widgets.layers.actions.actionFailed', 'widgets.layers.actions.locked']],
+      notice: [],
+    });
   });
 
   it('lasso selects the tool when not already active', () => {
@@ -636,14 +616,80 @@ describe('mergeDown', () => {
     expect(engine.layers.mergeLayerDown).toHaveBeenCalledWith('a');
   });
 
-  it('refuses when the selected layer is bottom-most', () => {
-    const engine = run('canvas.mergeDown', { document: documentOf([rasterLayer('a'), rasterLayer('b')], 'b') });
+  /** What a refused merge down says, as `[key, title, message]`, through the same report the Canvas wires. */
+  const explainMergeDown = (document: CanvasDocumentContractV3): unknown[][] => {
+    const info = vi.fn();
+    const t = ((key: string, options?: { name?: string }) =>
+      options?.name === undefined ? key : `${key}:${options.name}`) as unknown as TFunction;
+    const engine = run('canvas.mergeDown', {
+      document,
+      reportMergeDownRefusal: (refusal) => reportMergeDownRefusal(document, refusal, info, t),
+    });
     expect(engine.layers.mergeLayerDown).not.toHaveBeenCalled();
+    return info.mock.calls;
+  };
+  const title = 'widgets.layers.actions.mergeDownRefused:b';
+  const shape = (id: string, overrides: Partial<CanvasLayerContract> = {}) =>
+    rasterLayer(id, {
+      source: { fill: '#fff', height: 4, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 4 },
+      ...overrides,
+    } as Partial<CanvasLayerContract>);
+
+  it.each<[string, CanvasNodeContract[], string, string]>([
+    ['the bottom-most layer', [rasterLayer('a'), rasterLayer('b')], 'no-layer-below', 'mergeDownNoLayerBelow:b'],
+    [
+      'the bottom layer of a group',
+      [groupContract('G', [rasterLayer('a'), rasterLayer('b')])],
+      'bottom-of-group',
+      'mergeDownBottomOfGroup:b',
+    ],
+    [
+      'a layer above a group',
+      [rasterLayer('b'), groupContract('Below', [rasterLayer('a')])],
+      'group-below',
+      'mergeDownGroupBelow:Below',
+    ],
+    ['a layer above a shape layer', [rasterLayer('b'), shape('a')], 'not-mergeable', 'mergeDownNotMergeable:a'],
+    [
+      'paint above a disabled shape layer, for its kind',
+      [rasterLayer('b'), shape('a', { isEnabled: false })],
+      'not-mergeable',
+      'mergeDownNotMergeable:a',
+    ],
+    [
+      'a layer above a hidden one',
+      [rasterLayer('b'), rasterLayer('a', { isEnabled: false })],
+      'disabled',
+      'mergeDownHidden:a',
+    ],
+    [
+      'a layer in a hidden group, naming the group',
+      [groupContract('Hidden', [rasterLayer('b'), rasterLayer('a')], { isEnabled: false })],
+      'disabled',
+      'mergeDownHidden:Hidden',
+    ],
+    [
+      'a layer above a locked one',
+      [rasterLayer('b'), rasterLayer('a', { isLocked: true })],
+      'locked',
+      'mergeDownLocked:a',
+    ],
+    [
+      'a mask, pointing to Merge masks',
+      [rasterLayer('b', { type: 'inpaint_mask' } as Partial<CanvasLayerContract>)],
+      'wrong-type',
+      'mergeDownMaskSelected',
+    ],
+    ['a group', [groupContract('b', [rasterLayer('a')]), rasterLayer('c')], 'wrong-type', 'mergeDownGroupSelected'],
+  ])('explains why %s cannot merge down, once per layer and reason', (_, nodes, reason, message) => {
+    const document = { ...documentOf([], 'b'), stacks: stacksFrom(nodes) };
+    expect(explainMergeDown(document)).toEqual([
+      [`merge-down:b:${reason}`, title, `widgets.layers.actions.${message}`],
+    ]);
   });
 
-  it('refuses with no selected layer', () => {
-    const engine = run('canvas.mergeDown', { document: documentOf([rasterLayer('a')], null) });
-    expect(engine.layers.mergeLayerDown).not.toHaveBeenCalled();
+  it('stays silent with no selected layer', () => {
+    expect(explainMergeDown(documentOf([rasterLayer('a')], null))).toEqual([]);
   });
 
   it('reports a merge the engine refused', async () => {
@@ -721,26 +767,13 @@ describe('group selection', () => {
   });
   const control = (id: string): CanvasLayerContract => createControlLayer({ id, name: id });
 
-  it('reorders, deletes and duplicates a selected group', () => {
+  it('reorders a selected group', () => {
     const document = nodeDocument([groupContract('g', [rasterLayer('a')]), rasterLayer('b')], 'g');
     const reorder = run('canvas.layerToBack', { document, selectedLayerIds: ['g'] });
     expect(reorder.layers.commitPrepared).toHaveBeenCalledWith(
       'widgets.canvas.commands.reorderLayer',
       expect.objectContaining({ forward: expect.objectContaining({ type: 'reorderCanvasSiblings' }) })
     );
-    const remove = run('canvas.deleteSelected', { document, selectedLayerIds: ['g'] });
-    expect(remove.layers.commitPrepared).toHaveBeenCalledWith(
-      'widgets.canvas.commands.deleteLayer',
-      expect.objectContaining({ forward: { ids: ['g'], type: 'removeCanvasLayers' } })
-    );
-    const duplicate = run('canvas.duplicateLayer', { document, selectedLayerIds: ['g'] });
-    expect(duplicate.layers.duplicateLayers).toHaveBeenCalledWith(['g']);
-  });
-
-  it('refuses to delete a leaf frozen by a locked group', () => {
-    const document = nodeDocument([groupContract('g', [rasterLayer('a')], { isLocked: true })], 'a');
-    const engine = run('canvas.deleteSelected', { document, selectedLayerIds: ['a'] });
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
   });
 
   it('shows overlays hidden behind a hidden group, and hides them again from the roots', () => {
@@ -765,62 +798,19 @@ describe('group selection', () => {
       })
     );
   });
-
-  it('groups and ungroups the selection', () => {
-    const grouped = run('canvas.groupLayers', {
-      document: nodeDocument([rasterLayer('a'), rasterLayer('b')], 'a'),
-      selectedLayerIds: ['a', 'b'],
-    });
-    expect(grouped.layers.commitPrepared).toHaveBeenCalledWith(
-      'widgets.canvas.commands.groupLayers',
-      expect.objectContaining({
-        forward: expect.objectContaining({
-          add: [expect.objectContaining({ nodes: [expect.objectContaining({ type: 'group' })] })],
-        }),
-      })
-    );
-    const ungrouped = run('canvas.ungroupLayers', {
-      document: nodeDocument([groupContract('g', [rasterLayer('a')])], 'g'),
-      selectedLayerIds: ['g'],
-    });
-    expect(ungrouped.layers.commitPrepared).toHaveBeenCalledWith(
-      'widgets.canvas.commands.ungroupLayers',
-      expect.objectContaining({ forward: expect.objectContaining({ removeIds: ['g'] }) })
-    );
-  });
-
-  it('ungroup on leaves of one group moves them out above it, and does nothing for a top-level leaf', () => {
-    const document = nodeDocument([groupContract('g', [rasterLayer('a'), rasterLayer('b')]), rasterLayer('c')], 'a');
-    const lifted = run('canvas.ungroupLayers', { document, selectedLayerIds: ['b', 'a'] });
-    expect(lifted.layers.commitPrepared).toHaveBeenCalledExactlyOnceWith(
-      'widgets.layers.actions.removeFromGroup',
-      expect.objectContaining({
-        forward: expect.objectContaining({
-          move: [{ anchor: expect.objectContaining({ beforeId: 'g', parentPath: [] }), ids: ['a', 'b'] }],
-        }),
-      })
-    );
-    const topLevel = run('canvas.ungroupLayers', {
-      document: { ...document, selectedLayerId: 'c' },
-      selectedLayerIds: ['c'],
-    });
-    expect(topLevel.layers.commitPrepared).not.toHaveBeenCalled();
-  });
 });
 
 describe('active color pair commands', () => {
-  it('routes X to swap and D to reset, even while interaction is locked', () => {
-    for (const isInteractionLocked of [false, true]) {
-      const swapCtx = contextOf({ isInteractionLocked });
-      executeCanvasHotkeyCommand('canvas.toggleFillColor', swapCtx);
-      expect(swapCtx.swapActiveColors).toHaveBeenCalledTimes(1);
-      expect(swapCtx.resetActiveColors).not.toHaveBeenCalled();
+  it('routes X to swap and D to reset', () => {
+    const swapCtx = contextOf();
+    executeCanvasHotkeyCommand('canvas.toggleFillColor', swapCtx);
+    expect(swapCtx.swapActiveColors).toHaveBeenCalledTimes(1);
+    expect(swapCtx.resetActiveColors).not.toHaveBeenCalled();
 
-      const resetCtx = contextOf({ isInteractionLocked });
-      executeCanvasHotkeyCommand('canvas.setFillColorsToDefault', resetCtx);
-      expect(resetCtx.resetActiveColors).toHaveBeenCalledTimes(1);
-      expect(resetCtx.dispatch).not.toHaveBeenCalled();
-    }
+    const resetCtx = contextOf();
+    executeCanvasHotkeyCommand('canvas.setFillColorsToDefault', resetCtx);
+    expect(resetCtx.resetActiveColors).toHaveBeenCalledTimes(1);
+    expect(resetCtx.dispatch).not.toHaveBeenCalled();
   });
 });
 
@@ -828,6 +818,39 @@ describe('registration tables', () => {
   // Everything the mounted Canvas registers: its own keys, the companion keys and the header's commands. The
   // companion widget registers a subset (history plus companion keys), so it is covered too.
   const allEntries = [...CANVAS_COMPANION_HOTKEYS, ...CANVAS_ONLY_HOTKEYS, ...CANVAS_HEADER_HOTKEYS];
+
+  // Hotkey settings list the catalog, so a Canvas binding shows (and can be rebound) before any Canvas mounts.
+  it('mirrors every registered key in the hotkey catalog with the same defaults, under Canvas', () => {
+    const catalogDefaults = Object.fromEntries(
+      firstPartyHotkeyCatalog
+        .filter((hotkey) => hotkey.category === 'canvas')
+        .map((hotkey) => [hotkey.id, hotkey.defaultKeys])
+    );
+    const registeredDefaults = Object.fromEntries(allEntries.map(([id, , keys]) => [id, [...keys]]));
+
+    expect(registeredDefaults).toEqual(catalogDefaults);
+  });
+
+  // The Canvas (and Layers) register every row with `allowInEditable: false` and no other flag, so a row that reads
+  // otherwise in Hotkeys settings or answers before the Canvas mounts would describe a different key.
+  it('mirrors the flags the Canvas registers its keys with', () => {
+    const catalogFlags = Object.fromEntries(
+      firstPartyHotkeyCatalog
+        .filter((hotkey) => hotkey.category === 'canvas')
+        .map(({ allowInEditable, allowInModal, id, preventDefault, targetSelector }) => [
+          id,
+          {
+            allowInEditable: allowInEditable === true,
+            allowInModal: allowInModal === true,
+            preventDefault: preventDefault !== false,
+            targetSelector: targetSelector ?? null,
+          },
+        ])
+    );
+    const registeredFlags = { allowInEditable: false, allowInModal: false, preventDefault: true, targetSelector: null };
+
+    expect(catalogFlags).toEqual(Object.fromEntries(allEntries.map(([id]) => [id, registeredFlags])));
+  });
 
   it('gives Transform Shift+T as its only default', () => {
     expect(CANVAS_COMPANION_HOTKEYS.find(([id]) => id === 'canvas.transformSelected')?.[2]).toEqual(['shift+t']);
@@ -846,7 +869,6 @@ describe('registration tables', () => {
     const engine = createEngine();
     const ctx = {
       engine,
-      isInteractionLocked: false,
       reportTransformRefusal: vi.fn(),
       resetActiveColors: vi.fn(),
       selectedLayerId: null,

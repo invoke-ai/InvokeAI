@@ -66,6 +66,7 @@ def create_stripped_model(model_path: Path, output_dir: Path):
         original_state_dict = stripped_mod.load_state_dict(component_path)
 
         stripped_state_dict = StrippedModelOnDisk.strip(original_state_dict)
+        # Per file: `stripped_mod` is the clone's directory, whose own metadata is always empty.
         metadata = stripped_mod.metadata(component_path)
         contents = {**stripped_state_dict, StrippedModelOnDisk.METADATA_KEY: metadata}
         component_path.write_text(json.dumps(contents, indent=2))

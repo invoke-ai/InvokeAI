@@ -46,6 +46,7 @@ import type {
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
+  TransformOptions,
   TransformSession,
 } from './engineStores';
 import type { RasterCompositeExportRequest, RasterCompositeExportResult } from './exportRasterComposite';
@@ -186,11 +187,16 @@ export interface CommitMaskImageResultOptions {
 }
 export type CommitMaskImageResult = { status: 'committed'; layerId: string } | { status: GuardedMutationRefusal };
 
+export type PsdExportStatus = 'idle' | 'preparing' | 'serializing' | 'downloading' | 'cancelling';
+
 export interface CanvasInteractionState {
+  psdExportStatus: PsdExportStatus;
   activeTool: ToolId;
   bboxGrid: number;
   bboxOptions: BboxToolOptions;
   bboxOverlay: boolean;
+  /** The generation frame as a Frame tool drag shows it, before it commits; null when no drag is under way. */
+  bboxPreview: Rect | null;
   brushOptions: BrushOptions;
   canRedo: boolean;
   canUndo: boolean;
@@ -222,8 +228,14 @@ export interface CanvasInteractionState {
   showBbox: boolean;
   showGrid: boolean;
   snapToGrid: boolean;
+  /**
+   * Whether a staged or progress preview, shown or toggled off with the staging bar's eye, hides control layers, masks
+   * and regions from the screen. An edit of one shows them meanwhile; that does not change this.
+   */
+  stagingHidesOverlays: boolean;
   textEditSession: TextEditSession | null;
   textOptions: TextToolOptions;
+  transformOptions: TransformOptions;
   transformSession: TransformSession | null;
   /**
    * The layer `layers.beginTransform` is waiting on: its session opens once the layer's fresh pixels are persisted.
@@ -257,6 +269,7 @@ export type CanvasWritableInteractionKey = Extract<
   | 'showGrid'
   | 'snapToGrid'
   | 'textOptions'
+  | 'transformOptions'
 >;
 
 export interface CanvasInteractionStateCapability {
@@ -334,6 +347,12 @@ export interface CanvasDocumentCapability {
   captureRestoreAnchor(nodeId: string): CanvasNodeInsertionAnchor | null;
   /** Swaps in a whole new document; the mirror treats it as a document swap and history clears. */
   replaceDocument(document: CanvasDocumentContractV3): boolean;
+  /**
+   * Restores one of the canvas's restore points, a document swap like `replaceDocument` (a Discard all point only
+   * re-stages its results). `keepCurrentAs` keeps the replaced canvas as a point in its place. False when nothing
+   * changed.
+   */
+  restoreSnapshot(snapshotId: string, keepCurrentAs?: { id: string; name: string; createdAt: string }): boolean;
   /** The pure model over the current document; the same instance until the document changes. */
   model(): CanvasDocumentModel | null;
 }
@@ -347,6 +366,7 @@ export interface CanvasDocumentSnapshot {
 export type PsdExportResult =
   | AdjustmentRefusal
   | LayerUnreadable
+  | 'busy'
   | 'exported'
   | 'nothing'
   | 'too-large'
@@ -354,6 +374,7 @@ export type PsdExportResult =
   | SubsetOf<CanvasTransactionOutcome, 'not-ready' | 'stale' | 'aborted'>;
 
 export interface CanvasPsdExportCapability {
+  cancelPsdExport(): void;
   exportRasterLayersToPsd(fileName: string): Promise<PsdExportResult>;
 }
 
@@ -376,6 +397,13 @@ export interface CanvasHistoryEntries {
   past: readonly string[];
   /** Undone steps, next-redo first. */
   future: readonly string[];
+  /** The oldest steps dropped to stay within the history's entry cap or memory budget since it was last cleared. */
+  evicted: number;
+  /**
+   * Present while nonzero: the steps this canvas's previous engine held when it was disposed, which this one could
+   * not take over. Cleared with the history (Clear history, a document swap).
+   */
+  dropped?: number;
 }
 
 /**
@@ -402,12 +430,52 @@ export interface CanvasHistoryCapability {
 export type ColorSamplePhase = 'preview' | 'commit' | 'cancel';
 
 /**
+ * An edit the selected layer cannot take, named so the notice can say which layer and why: it is hidden (disabled,
+ * itself or through a group), hidden on the canvas only (refused by edits that write pixels), locked, has its
+ * transparency locked against erasing, its pixels have not loaded yet (the engine has started loading them; the next
+ * press can edit), or it is a control layer whose empty shape has no pixels (`layer-unpaintable`).
+ * `erase-unsupported` names a selection the eraser cannot erase in place (a group, text, shape or gradient), where the
+ * brush would paint a new layer instead; `selection-erase-unsupported` the same for removing the selection's pixels
+ * (Erase, Delete, Cut); `gradient-unsupported` a mask or region, which the Gradient tool never adds a raster layer
+ * for; `transform-session` the layer whose open transform session selection Fill and Erase wait for.
+ */
+export interface CanvasLayerEditRefusal {
+  readonly status:
+    | 'layer-hidden'
+    | 'layer-display-hidden'
+    | 'layer-locked'
+    | 'layer-alpha-locked'
+    | 'layer-loading'
+    | 'layer-unpaintable'
+    | 'erase-unsupported'
+    | 'selection-erase-unsupported'
+    | 'gradient-unsupported'
+    | 'transform-session';
+  readonly layerId: string;
+  readonly layerName: string;
+  /** The brush would have painted this image layer in place; a new paint layer above it can take the stroke. */
+  readonly canPaintNewLayer?: boolean;
+}
+
+/**
+ * An erase found no layer selected to act on: an eraser stroke (`erase-no-target`), removing the selection's pixels
+ * (`selection-erase-no-target`), or a shape cut out with the mod key (`cutout-no-target`).
+ */
+export interface CanvasNoTargetRefusal {
+  readonly status: 'cutout-no-target' | 'erase-no-target' | 'selection-erase-no-target';
+}
+
+/**
  * Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). An
- * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting.
+ * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting;
+ * a `CanvasLayerEditRefusal` names a layer the active tool cannot edit; a `CanvasNoTargetRefusal` has no layer to
+ * name.
  */
 export type CanvasEditRefusal =
   | SubsetOf<CanvasTransactionOutcome, 'busy' | 'gesture-active' | 'not-ready' | 'over-budget'>
-  | AdjustmentRefusal;
+  | AdjustmentRefusal
+  | CanvasLayerEditRefusal
+  | CanvasNoTargetRefusal;
 
 export type LayerThumbnailRequestResult =
   | 'ready'
@@ -464,6 +532,11 @@ export type ExportBakedLayerBlobResult =
   | AdjustmentRefusal;
 
 export interface CanvasSelectionCapability {
+  /**
+   * Whether `eraseSelection` would remove the selection's pixels now; otherwise reports why through
+   * `tools.onEditRefused`, as the erase would. Cut asks before it writes the clipboard.
+   */
+  admitSelectionErase(): boolean;
   deselect(): void;
   eraseSelection(): void;
   fillSelection(): void;
@@ -704,7 +777,6 @@ export interface CanvasEngineToolCapability extends CanvasToolCapability {
    * router, preserving newer registrations.
    */
   setColorSampleRouter(router: (hex: string, phase: ColorSamplePhase) => boolean): () => void;
-  setInteractionLocked(locked: boolean): void;
 }
 
 /** Why `beginTransform` opened no session; refusals leave the selection and the active tool unchanged. */
@@ -756,7 +828,8 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
    */
   cropAllLayersToBbox(): Promise<CropAllLayersResult>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
-  duplicateLayers(layerIds: readonly string[]): Promise<DuplicateLayersResult>;
+  /** Copies the outermost of `layerIds` with their pixels as one undo step named `label`, selecting the copies. */
+  duplicateLayers(label: string, layerIds: readonly string[]): Promise<DuplicateLayersResult>;
   /** Unions the masks' coverage into one new inpaint mask above the topmost source, removing the sources. */
   mergeInpaintMasks(layerIds: readonly string[]): Promise<MergeInpaintMasksResult>;
   mergeLayerDown(upperLayerId: string): Promise<MergeDownResult>;
@@ -772,8 +845,7 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   updateTransformSession(transform: LayerTransform): void;
 }
 
-export interface CanvasEngineExportCapability extends CanvasExportCapability {
-  exportRasterLayersToPsd(fileName: string): Promise<PsdExportResult>;
+export interface CanvasEngineExportCapability extends CanvasExportCapability, CanvasPsdExportCapability {
   extractMaskedArea(maskLayerId: string): Promise<ExtractMaskedAreaResult>;
 }
 
@@ -781,7 +853,7 @@ export interface CanvasEngineExportCapability extends CanvasExportCapability {
 export type ControlLayerViewMode = 'original' | 'map' | 'overlay';
 
 /**
- * `missing`: no control layer with a kept original; `locked`: an operation or a generation holds the canvas;
+ * `missing`: no control layer with a kept original; `locked`: an operation holds the document;
  * `stale`: a newer request or an edit of the layer superseded it; `over-budget`: the original's pixels do not fit the
  * raster budget; `failed`: the original could not be decoded.
  */
@@ -803,10 +875,15 @@ export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
   ): Promise<'shown' | SubsetOf<CanvasCommandRefusal, 'missing'> | SubsetOf<CanvasTransactionOutcome, 'stale'>>;
   setStagedPreview(input: StagedPreviewInput | null): void;
   /**
+   * Overlay chrome only: outlines where each pending result (staged candidate or result still generating) will land,
+   * the selected one emphasized. Absolute document rects; an equal list repaints nothing.
+   */
+  setStagedRegions(regions: readonly StagedRegion[]): void;
+  /**
    * Display-only: shows a control layer as its kept original, the original under its map at half strength, or
-   * (`map`) as usual. One layer holds a view at a time; refused while the canvas is locked. Any edit or stroke on
-   * the layer, a selection change, a lock, a document replacement and the other resets in ARCHITECTURE.md return it
-   * to the map. Never recorded in history, persisted or exported.
+   * (`map`) as usual. One layer holds a view at a time; refused while an operation holds the document. Any edit or
+   * stroke on the layer, a selection change, an operation taking the document, a document replacement and the other
+   * resets in ARCHITECTURE.md return it to the map. Never recorded in history, persisted or exported.
    */
   setControlLayerView(layerId: string, view: ControlLayerViewMode): Promise<ControlLayerViewOutcome>;
 }
@@ -841,9 +918,21 @@ export type BooleanRasterOperation = 'intersect' | 'cutout' | 'cutaway' | 'exclu
 export interface StagedPreviewPlacement extends Rect {
   opacity: number;
 }
+/**
+ * A staged preview always lands at absolute document coordinates pinned at submission: a candidate at its placement,
+ * a progress frame (scaled to fill) at the rect its run was submitted with. Later bbox edits never move either.
+ * `hidden`: the user toggled the candidate off to compare it with the canvas under it. Nothing decodes or draws, but
+ * the screen keeps hiding control layers, masks, regions and the regenerate tint as the shown candidate does, so both
+ * sides of the comparison read alike.
+ */
 export type StagedPreviewInput =
-  | { imageName: string; placement?: StagedPreviewPlacement }
-  | { dataUrl: string; width: number; height: number };
+  | { imageName: string; placement: StagedPreviewPlacement; hidden?: boolean }
+  | { dataUrl: string; placement: StagedPreviewPlacement };
+/** One pending result's landing rect in document space, for the staged-region overlay. */
+export interface StagedRegion {
+  readonly rect: Rect;
+  readonly selected: boolean;
+}
 export type {
   BboxToolOptions,
   BrushOptions,
@@ -862,6 +951,7 @@ export type {
   ShapeToolTarget,
   TextEditSession,
   TextToolOptions,
+  TransformOptions,
   TransformSession,
 } from './engineStores';
 export {
@@ -907,10 +997,14 @@ export {
   type InpaintMaskMergeEligibility,
 } from './document/mergeVisible';
 export { documentToExportLocalSamPoint } from './samCoordinates';
-export { bboxEquals, constrainBboxToRatio, roundBbox } from './tools/bboxHitTest';
+export { bboxEquals, bboxMinSize, roundBbox } from './tools/bboxHitTest';
 export { isEmpty, union } from './math/rect';
 export { ZOOM_PRESETS } from './math/snapping';
-export { isLeafPixelEditEligible } from './editing/controlPixelEdit';
+export {
+  isLeafPixelEditEligible,
+  selectionPixelEditRefusal,
+  type SelectionPixelEditRefusal,
+} from './editing/controlPixelEdit';
 export {
   getSiblingOrder,
   haveSameStructure,
@@ -1001,3 +1095,4 @@ export {
   resolveLayerThumbnailImageRef,
   type LayerThumbnailFallbackStage,
 } from './render/thumbnail';
+export { HISTORY_MAX_ENTRIES } from './history/history';

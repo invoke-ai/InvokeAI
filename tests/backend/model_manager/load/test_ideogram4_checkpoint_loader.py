@@ -449,5 +449,5 @@ def test_a_file_mixing_int8_with_scaled_fp8_is_refused(monkeypatch, tmp_path) ->
     state_dict["final_layer.linear.weight"] = fp8.codes
     state_dict["final_layer.linear.weight_scale"] = fp8.scale
 
-    with pytest.raises(ValueError, match="mixing int8_tensorwise with scaled fp8"):
+    with pytest.raises(ValueError, match="mixing convrot layers with scaled fp8"):
         _load(monkeypatch, tmp_path, state_dict, keep_fp8=False, geometry=INT8_CONFIG)

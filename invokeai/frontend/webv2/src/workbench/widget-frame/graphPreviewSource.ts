@@ -8,6 +8,7 @@ import type {
 } from '@features/workflow/contracts';
 import type { InvocationTemplatesSnapshot } from '@features/workflow/react';
 import type { Project } from '@workbench/projectContracts';
+import type { EffectiveProjectSettings } from '@workbench/settings/contracts';
 import type { GraphBearingSurfaceContract } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
 
@@ -25,6 +26,8 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 export interface GraphPreviewSourceDeps {
   models: readonly ModelConfig[] | undefined;
   project: Project;
+  /** The project's settings with the user's defaults applied (`getEffectiveProjectSettings`). */
+  projectSettings: EffectiveProjectSettings;
   surface: GraphBearingSurfaceContract;
   t: TFunction;
   templates: InvocationTemplatesSnapshot;
@@ -61,20 +64,20 @@ const buildWorkflowSource = (
   project: Project,
   templates: InvocationTemplatesSnapshot
 ): GraphPreviewSourceWithoutDestination => {
-  if (templates.status !== 'loaded') {
-    return { ...EMPTY_SOURCE_BASE, graph: null, isLive: true };
-  }
-
   const document = getActiveProjectGraph(project);
-  const positionHints = Object.fromEntries(document.nodes.map((node) => [node.id, node.position]));
+
+  if (templates.status !== 'loaded') {
+    return { ...EMPTY_SOURCE_BASE, document, graph: null, isLive: true };
+  }
 
   try {
     const graph = compileProjectGraph(document, templates.templates);
 
-    return { ...EMPTY_SOURCE_BASE, graph, isLive: true, positionHints };
+    return { ...EMPTY_SOURCE_BASE, document, graph, isLive: true };
   } catch (error) {
     return {
       ...EMPTY_SOURCE_BASE,
+      document,
       graph: null,
       invalidReasons: [
         error instanceof ForLoopGraphValidationError
@@ -84,13 +87,13 @@ const buildWorkflowSource = (
             : String(error),
       ],
       isLive: true,
-      positionHints,
     };
   }
 };
 
 const buildGenerateSource = (
   project: Project,
+  projectSettings: EffectiveProjectSettings,
   models: readonly ModelConfig[] | undefined,
   t: TFunction
 ): GraphPreviewSourceWithoutDestination => {
@@ -101,7 +104,7 @@ const buildGenerateSource = (
     result = compileGeneratePreviewGraph({
       destination: project.invocation.destination,
       models: models ?? [],
-      projectSettings: project.settings,
+      projectSettings,
       storedValues: getProjectWidgetValues(project, 'generate'),
     });
   } catch (error) {
@@ -160,17 +163,20 @@ const buildWidgetGraphSource = (
 export const buildGraphPreviewSource = ({
   models,
   project,
+  projectSettings,
   surface,
   t,
   templates,
 }: GraphPreviewSourceDeps): GraphPreviewSourceState => {
-  const destinationLabel = getDestinationLabel(project.invocation.destination);
+  const destinationLabel = getDestinationLabel(
+    surface.sourceId === 'video' ? 'gallery' : project.invocation.destination
+  );
 
   switch (surface.sourceId) {
     case 'workflow':
       return { ...buildWorkflowSource(project, templates), destinationLabel };
     case 'generate':
-      return { ...buildGenerateSource(project, models, t), destinationLabel };
+      return { ...buildGenerateSource(project, projectSettings, models, t), destinationLabel };
     case 'upscale':
     case 'video':
     case 'canvas':

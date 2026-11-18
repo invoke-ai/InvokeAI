@@ -1,4 +1,4 @@
-import type { BackendGraphContract, GenerationProjectSettings } from '@features/generation/core/contracts';
+import type { BackendGraphContract } from '@features/generation/core/contracts';
 import type {
   ComponentModelConfig,
   GenerateModelConfig,
@@ -7,22 +7,37 @@ import type {
   VaeModelConfig,
 } from '@features/generation/core/types';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities.testing';
+import { withAddedReferenceImages } from '@features/generation/core/baseGenerationPolicies';
 import { getPidDecoderBaseForMainBase } from '@features/generation/core/pid';
 import { isPidDecodeNodeType } from '@features/generation/core/pidGraph';
+import { syncGenerateWidgetValuesWithModels } from '@features/generation/core/settings';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ControlLayerGraphInput } from './addControlLayers';
 import type { RegionalGuidanceInput } from './addRegionalGuidance';
-import type { CanvasCompileMode, CanvasCompositingSettings, CanvasScalingSettings, Rect } from './types';
+import type { Rect } from './types';
 
+import { areRegionalNegativesActive, getRegionalGuidanceSupport } from './addRegionalGuidance';
 import { compileCanvasGraph } from './compileCanvasGraph';
+import {
+  bbox,
+  compile,
+  COMPONENT_OVERRIDES,
+  COMPOSITING_FIXTURE,
+  PROJECT_SETTINGS,
+  qwen3Encoder,
+  qwenImageVae,
+  settingsFor,
+} from './compileCanvasGraph.testing';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
-const sd3Model: MainModelConfig = { base: 'sd-3', key: 'sd3-model', name: 'SD3', type: 'main' };
+const sd3Model: MainModelConfig = { base: 'sd-3', format: 'diffusers', key: 'sd3-model', name: 'SD3', type: 'main' };
 const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX dev', type: 'main' };
 const flux2Model: MainModelConfig = {
   base: 'flux2',
@@ -36,6 +51,14 @@ const flux2DevModel: MainModelConfig = {
   key: 'flux2-dev-model',
   name: 'FLUX.2 [dev]',
   variant: 'dev',
+};
+const flux3Model: MainModelConfig = {
+  base: 'flux3',
+  format: 'diffusers',
+  key: 'flux3-model',
+  name: 'FLUX.3 Klein',
+  type: 'main',
+  variant: 'flux3_klein',
 };
 const cogView4Model: MainModelConfig = { base: 'cogview4', key: 'cog-model', name: 'CogView4', type: 'main' };
 const qwenImageModel: MainModelConfig = {
@@ -74,6 +97,13 @@ const mossImageModel: MainModelConfig = {
   name: 'MOSS-Image',
   type: 'main',
 };
+const ideogram4Model: MainModelConfig = {
+  base: 'ideogram-4',
+  format: 'diffusers',
+  key: 'ideogram4-model',
+  name: 'Ideogram 4',
+  type: 'main',
+};
 const externalModel: GenerateModelConfig = {
   base: 'external',
   capabilities: { modes: ['txt2img'], supports_seed: true },
@@ -83,98 +113,6 @@ const externalModel: GenerateModelConfig = {
   provider_id: 'openai',
   type: 'external_image_generator',
 };
-
-const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
-const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name: 'Qwen VAE', type: 'vae' };
-const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
-const clipEmbed: ComponentModelConfig = {
-  base: 'any',
-  key: 'clip',
-  name: 'CLIP Embed',
-  type: 'clip_embed',
-  variant: 'large',
-};
-const qwen3Encoder: ComponentModelConfig = {
-  base: 'any',
-  key: 'qwen3',
-  name: 'Qwen3 Encoder',
-  type: 'qwen3_encoder',
-  variant: 'qwen3_06b',
-};
-
-const PROJECT_SETTINGS: GenerationProjectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
-
-const settingsFor = (model: GenerateModelConfig, overrides: Partial<GenerateSettings> = {}): GenerateSettings => ({
-  ...getDefaultGenerateSettings(model),
-  seed: 1,
-  seedMode: 'fixed',
-  ...overrides,
-});
-
-/** Per-base overrides needed to pass component validation. */
-const COMPONENT_OVERRIDES: Partial<Record<string, Partial<GenerateSettings>>> = {
-  flux: { clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae },
-  anima: { qwen3EncoderModel: qwen3Encoder, vae: qwenImageVae },
-};
-
-const bbox: Rect = { height: 1024, width: 768, x: 128, y: 64 };
-
-const COMPOSITING_FIXTURE: CanvasCompositingSettings = {
-  coherenceEdgeSize: 16,
-  coherenceMinDenoise: 0,
-  coherenceMode: 'Gaussian Blur',
-  infillColorValue: { a: 1, b: 0, g: 0, r: 0 },
-  infillMethod: 'lama',
-  infillPatchmatchDownscaleSize: 1,
-  infillTileSize: 32,
-  maskBlur: 16,
-  outputOnlyMaskedRegions: false,
-};
-
-const compile = (
-  model: GenerateModelConfig,
-  mode: CanvasCompileMode,
-  overrides: {
-    settings?: Partial<GenerateSettings>;
-    bbox?: Rect;
-    compositeImageName?: string | null;
-    maskImageName?: string | null;
-    noiseMaskImageName?: string | null;
-    compositing?: Partial<CanvasCompositingSettings>;
-    scaling?: CanvasScalingSettings;
-    strength?: number;
-    destination?: 'canvas' | 'gallery';
-    outputOnlyMaskedRegions?: boolean;
-    controlLayers?: readonly ControlLayerGraphInput[];
-    regionalGuidance?: readonly RegionalGuidanceInput[];
-    projectSettings?: Partial<GenerationProjectSettings>;
-  } = {}
-) =>
-  compileCanvasGraph({
-    bbox: overrides.bbox ?? bbox,
-    compositeImageName:
-      'compositeImageName' in overrides ? (overrides.compositeImageName ?? null) : 'canvas-composite.png',
-    compositing: {
-      ...COMPOSITING_FIXTURE,
-      outputOnlyMaskedRegions: overrides.outputOnlyMaskedRegions ?? false,
-      ...overrides.compositing,
-    },
-    controlLayers: overrides.controlLayers,
-    regionalGuidance: overrides.regionalGuidance,
-    scaling: overrides.scaling,
-    destination: overrides.destination ?? 'canvas',
-    maskImageName:
-      'maskImageName' in overrides ? overrides.maskImageName : mode === 'inpaint' ? 'canvas-mask.png' : null,
-    mode,
-    model,
-    noiseMaskImageName: overrides.noiseMaskImageName ?? null,
-    projectSettings: { ...PROJECT_SETTINGS, ...overrides.projectSettings },
-    settings: settingsFor(model, {
-      ...COMPONENT_OVERRIDES[model.base],
-      ...overrides.settings,
-    }),
-    strength: overrides.strength ?? 0.6,
-  });
 
 const getEdge = (graph: BackendGraphContract, targetNodeId: string, targetField: string) =>
   graph.edges.find((edge) => edge.destination.node_id === targetNodeId && edge.destination.field === targetField);
@@ -253,6 +191,15 @@ const BASE_CASES: BaseCase[] = [
     optimizedDenoising: true,
   },
   {
+    model: flux3Model,
+    encodeType: 'flux2_vae_encode',
+    outputType: 'flux2_vae_decode',
+    denoiseType: 'flux3_denoise',
+    txt2imgMode: 'flux3_txt2img',
+    img2imgMode: 'flux3_img2img',
+    optimizedDenoising: true,
+  },
+  {
     model: cogView4Model,
     encodeType: 'cogview4_i2l',
     outputType: 'cogview4_l2i',
@@ -311,6 +258,47 @@ const BASE_CASES: BaseCase[] = [
 seedArchitectureCapabilities();
 
 describe('compileCanvasGraph', () => {
+  it('uses a local Kontext reference added after a synced Canvas model is renamed', () => {
+    const installed = {
+      ...fluxModel,
+      hash: 'original-file',
+      name: 'FLUX.1 Kontext dev',
+      source: '/models/portrait.safetensors',
+      variant: 'dev',
+    };
+    const renamed = { ...installed, name: 'Portrait editor' };
+    const referenceImages = withAddedReferenceImages(
+      installed,
+      [],
+      [],
+      [{ id: 'reference', image: { original: { image: { height: 768, image_name: 'reference.png', width: 512 } } } }]
+    );
+    const settings = syncGenerateWidgetValuesWithModels(
+      { ...settingsFor(installed, { ...COMPONENT_OVERRIDES.flux, referenceImages }), model: installed },
+      [renamed]
+    );
+
+    const withSecondReference = withAddedReferenceImages(settings.model, [], settings.referenceImages, [
+      { id: 'second', image: { original: { image: { height: 768, image_name: 'second.png', width: 512 } } } },
+    ]);
+    const { backendGraph } = compile(settings.model, 'img2img', {
+      settings: { ...settings, referenceImages: withSecondReference },
+    });
+
+    expect(settings.model.name).toBe(renamed.name);
+    expect(backendGraph.edges).toContainEqual(
+      expect.objectContaining({
+        destination: { node_id: 'denoise_latents', field: 'kontext_conditioning' },
+      })
+    );
+    expect(Object.values(backendGraph.nodes).filter(({ type }) => type === 'flux_kontext')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ image: { image_name: 'reference.png' } }),
+        expect.objectContaining({ image: { image_name: 'second.png' } }),
+      ])
+    );
+  });
+
   describe('txt2img per base', () => {
     it.each(BASE_CASES)(
       'builds a $model.base txt2img graph sized to the bbox',
@@ -363,6 +351,18 @@ describe('compileCanvasGraph', () => {
     });
   });
 
+  describe.each(['img2img', 'inpaint', 'outpaint'] as const)('SDXL %s color compensation', (mode) => {
+    it.each([
+      { colorCompensation: true, expected: 'SDXL' },
+      { colorCompensation: false, expected: 'None' },
+    ])('sets $expected on the encoder when enabled=$colorCompensation', ({ colorCompensation, expected }) => {
+      const { backendGraph } = compile(sdxlModel, mode, { settings: { colorCompensation } });
+
+      expect(getNodeByType(backendGraph, 'i2l')).toMatchObject({ color_compensation: expected, fp32: true });
+      expect(getNodeByType(backendGraph, 'l2i')).not.toHaveProperty('color_compensation');
+    });
+  });
+
   describe('img2img per base', () => {
     it.each(BASE_CASES)(
       'grafts a $model.base image-to-latents encode node',
@@ -393,6 +393,45 @@ describe('compileCanvasGraph', () => {
       }
     );
 
+    it('records the SD 3 encoder overrides used for a Canvas image', () => {
+      const clipL: ComponentModelConfig = {
+        base: 'any',
+        key: 'clip-l',
+        name: 'CLIP L',
+        type: 'clip_embed',
+        variant: 'large',
+      };
+      const clipG = { ...clipL, key: 'clip-g', name: 'CLIP G', variant: 'gigantic' };
+      const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
+      const { backendGraph } = compile(sd3Model, 'img2img', {
+        settings: { clipGEmbedModel: clipG, clipLEmbedModel: clipL, t5EncoderModel: t5Encoder },
+      });
+
+      expect(backendGraph.nodes.model_loader).toMatchObject({
+        clip_g_model: clipG,
+        clip_l_model: clipL,
+        t5_encoder_model: t5Encoder,
+      });
+      const metadata = getNodeByType(backendGraph, 'core_metadata');
+      expect(metadata).toMatchObject({
+        clip_g_model: clipG,
+        clip_l_model: clipL,
+        generation_mode: 'sd3_img2img',
+        t5_encoder: t5Encoder,
+      });
+      expect(getEdge(backendGraph, 'canvas_output', 'metadata')?.source.node_id).toBe(metadata?.id);
+    });
+
+    it('leaves bundled SD 3 encoders unrecorded when no override was selected', () => {
+      const { backendGraph } = compile(sd3Model, 'img2img');
+      const metadata = getNodeByType(backendGraph, 'core_metadata');
+
+      expect(metadata).toBeDefined();
+      expect(metadata?.clip_g_model).toBeUndefined();
+      expect(metadata?.clip_l_model).toBeUndefined();
+      expect(metadata?.t5_encoder).toBeUndefined();
+    });
+
     it('feeds the encode node from the same VAE source as the decode node', () => {
       const { backendGraph } = compile(sd1Model, 'img2img');
       const encode = getNodeByType(backendGraph, 'i2l');
@@ -418,11 +457,16 @@ describe('compileCanvasGraph', () => {
       expect(getNodeByType(fp32.backendGraph, 'i2l')?.fp32).toBe(true);
     });
 
-    it('does not attach fp32 to non-SD encode nodes', () => {
-      const { backendGraph } = compile(fluxModel, 'img2img');
+    it.each(BASE_CASES.filter(({ encodeType }) => encodeType !== 'i2l'))(
+      'does not attach SD-only VAE settings to $model.base encode nodes',
+      ({ model, encodeType }) => {
+        const { backendGraph } = compile(model, 'img2img', { settings: { colorCompensation: true } });
+        const encode = getNodeByType(backendGraph, encodeType);
 
-      expect(getNodeByType(backendGraph, 'flux_vae_encode')?.fp32).toBeUndefined();
-    });
+        expect(encode).not.toHaveProperty('fp32');
+        expect(encode).not.toHaveProperty('color_compensation');
+      }
+    );
 
     it('threads the composite image name into the encode node', () => {
       const { backendGraph } = compile(sdxlModel, 'img2img', { compositeImageName: 'my-upload.png' });
@@ -1894,7 +1938,7 @@ describe('compileCanvasGraph — PiD decode', () => {
         .filter((edge) => edge.destination.node_id === targetNodeId)
         .map((edge) => [edge.destination.field, [graph.nodes[edge.source.node_id]?.type, edge.source.field]])
     );
-  const PID_BASES = [sdxlModel, sd3Model, fluxModel, flux2Model, qwenImageModel, zImageModel];
+  const PID_BASES = [sdxlModel, sd3Model, fluxModel, flux2Model, flux3Model, qwenImageModel, zImageModel];
   const sdxlVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
 
   it('lays MOSS-Image regions out at the PiD generation size, which is smaller than the canvas', () => {
@@ -2152,6 +2196,113 @@ describe('compileCanvasGraph — regional guidance', () => {
     expect(getEdge(backendGraph, 'neg_cond_collect', 'item')?.source.node_id).toBe('neg_cond');
   });
 
+  describe.each([
+    ['Z-Image', zImageModel, 'z_image_text_encoder', 'qwen3_encoder'],
+    ['Anima', animaModel, 'anima_text_encoder', 'qwen3_encoder'],
+    ['Krea-2', krea2Model, 'krea2_text_encoder', 'qwen3_vl_encoder'],
+  ] as const)('%s regional negatives', (_label, model, encoderType, encoderField) => {
+    it('collects masked negatives and inverted positives alongside the global negative', () => {
+      const { backendGraph: graph } = compile(model, 'txt2img', {
+        regionalGuidance: [
+          region('r1', { autoNegative: true, negativePrompt: 'blurry' }),
+          region('r2', { negativePrompt: 'text', positivePrompt: null }),
+        ],
+        settings: { cfgScale: 4 },
+      });
+
+      expect(graph.nodes.rg_neg_cond_r1).toMatchObject({ prompt: 'blurry', type: encoderType });
+      expect(graph.nodes.rg_neg_cond_r2).toMatchObject({ prompt: 'text', type: encoderType });
+      expect(graph.nodes.rg_pos_cond_r2).toBeUndefined();
+      expect(graph.nodes.rg_pos_cond_inverted_r1).toMatchObject({ prompt: 'a cat', type: encoderType });
+      expect(getEdge(graph, 'rg_neg_cond_r1', 'mask')?.source.node_id).toBe('rg_mask_to_tensor_r1');
+      expect(getEdge(graph, 'rg_neg_cond_r2', 'mask')?.source.node_id).toBe('rg_mask_to_tensor_r2');
+      expect(getEdge(graph, 'rg_invert_mask_r1', 'mask')?.source.node_id).toBe('rg_mask_to_tensor_r1');
+      expect(getEdge(graph, 'rg_pos_cond_inverted_r1', 'mask')?.source.node_id).toBe('rg_invert_mask_r1');
+      for (const nodeId of ['rg_neg_cond_r1', 'rg_neg_cond_r2', 'rg_pos_cond_inverted_r1']) {
+        expect(getEdge(graph, nodeId, encoderField)?.source.node_id).toBe('model_loader');
+      }
+      expect(
+        graph.edges.filter((edge) => edge.destination.node_id === 'neg_cond_collect').map((edge) => edge.source.node_id)
+      ).toEqual(['neg_cond', 'rg_neg_cond_r1', 'rg_pos_cond_inverted_r1', 'rg_neg_cond_r2']);
+      expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')?.source).toEqual({
+        field: 'collection',
+        node_id: 'neg_cond_collect',
+      });
+    });
+
+    it('does not encode regional negatives or auto-negatives while CFG is off', () => {
+      const { backendGraph: graph } = compile(model, 'txt2img', {
+        regionalGuidance: [region('r1', { autoNegative: true, negativePrompt: 'blurry' })],
+        settings: { cfgScale: 1 },
+      });
+
+      expect(graph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: encoderType });
+      expect(graph.nodes.rg_neg_cond_r1).toBeUndefined();
+      expect(graph.nodes.rg_pos_cond_inverted_r1).toBeUndefined();
+      expect(graph.nodes.rg_invert_mask_r1).toBeUndefined();
+      expect(graph.nodes.neg_cond_collect).toBeUndefined();
+      expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
+    });
+  });
+
+  // The canvas settings and the region collector decide from the support row which regional negatives a graph keeps,
+  // so the row has to agree with where each base graph actually has a negative collector.
+  const modelsByBase: Record<string, MainModelConfig> = Object.fromEntries(
+    [sd1Model, sd2Model, sdxlModel, zImageModel, animaModel, krea2Model].map((model) => [model.base, model])
+  );
+  // Collected before capabilities are seeded, so straight from the fixture the tests run against.
+  const negativeMaskBases = [
+    ...new Set(
+      architectureCapabilitiesFixture
+        .filter((row) => row.features.supports_regional_guidance && row.features.regional_negative)
+        .map((row) => row.base)
+    ),
+  ];
+
+  it('covers every mask base that reads regional negatives', () => {
+    expect(negativeMaskBases.length).toBeGreaterThan(0);
+    for (const base of negativeMaskBases) {
+      expect(modelsByBase[base], base).toBeDefined();
+    }
+  });
+
+  it.each(negativeMaskBases)('reads regional negatives on %s exactly at the CFG Scales its support names', (base) => {
+    const support = getRegionalGuidanceSupport(base);
+    expect(support).toMatchObject({ mode: 'masks', negativePrompt: true });
+    for (const cfgScale of [1, 1.5, 4]) {
+      const { backendGraph: graph } = compile(modelsByBase[base]!, 'txt2img', {
+        regionalGuidance: [region('r1', { negativePrompt: 'blurry' })],
+        settings: { cfgScale },
+      });
+
+      expect(graph.nodes.rg_neg_cond_r1 !== undefined, `cfg ${cfgScale}`).toBe(
+        areRegionalNegativesActive(support!, cfgScale)
+      );
+    }
+  });
+
+  it('copies both Anima-3.8B encoders to regional negatives and auto-negatives', () => {
+    const { backendGraph: graph } = compile({ ...animaModel, variant: 'anima_qwen35' }, 'txt2img', {
+      regionalGuidance: [region('r1', { autoNegative: true, negativePrompt: 'blurry' })],
+      settings: {
+        cfgScale: 4,
+        qwen35EncoderModel: {
+          base: 'any',
+          key: 'qwen35',
+          name: 'Qwen3.5 4B',
+          type: 'qwen3_5_encoder',
+          variant: 'qwen3_5_4b',
+        },
+      },
+    });
+
+    for (const nodeId of ['rg_pos_cond_r1', 'rg_neg_cond_r1', 'rg_pos_cond_inverted_r1']) {
+      for (const field of ['qwen3_encoder', 'qwen3_5_encoder']) {
+        expect(getEdge(graph, nodeId, field)?.source).toEqual({ field, node_id: 'model_loader' });
+      }
+    }
+  });
+
   it('coexists with control layers in one graph', () => {
     const control: ControlLayerGraphInput = {
       beginEndStepPct: [0, 0.75],
@@ -2176,6 +2327,56 @@ describe('compileCanvasGraph — regional guidance', () => {
     expect(backendGraph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'flux2_klein_text_encoder' });
     expect(getEdge(backendGraph, 'rg_pos_cond_r1', 'qwen3_encoder')?.source.node_id).toBe('model_loader');
     expect(getEdge(backendGraph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+  });
+
+  it('joins regional FLUX Redux references to the collector the builder feeds from the global ones', () => {
+    const reduxModel = { base: 'flux', key: 'redux', name: 'FLUX Redux', type: 'flux_redux' } as const;
+    const { backendGraph } = compile(fluxModel, 'txt2img', {
+      regionalGuidance: [
+        region('r1', {
+          referenceImages: [
+            {
+              id: 'regional',
+              imageName: 'regional-redux.png',
+              model: reduxModel,
+              settings: { downsampling_factor: 1, weight: 1 },
+              type: 'flux_redux',
+            },
+          ],
+        }),
+      ],
+      settings: {
+        referenceImages: [
+          {
+            config: {
+              image: { original: { image: { height: 512, image_name: 'global-redux.png', width: 512 } } },
+              imageInfluence: 'medium',
+              model: reduxModel,
+              type: 'flux_redux',
+            },
+            id: 'global',
+            isEnabled: true,
+          },
+        ],
+      },
+    });
+    const reduxInputs = backendGraph.edges.filter(
+      (edge) => edge.destination.node_id === 'denoise_latents' && edge.destination.field === 'redux_conditioning'
+    );
+
+    expect(reduxInputs).toHaveLength(1);
+    const builderCollector = reduxInputs[0]!.source.node_id;
+    expect(builderCollector).toMatch(/^flux_redux_collector_/);
+    expect(backendGraph.nodes.regional_flux_redux_collector).toBeUndefined();
+    expect(getEdge(backendGraph, builderCollector, 'item')).toBeDefined();
+    expect(
+      backendGraph.edges.some(
+        (edge) =>
+          edge.source.node_id === 'flux_redux_regional' &&
+          edge.source.field === 'redux_cond' &&
+          edge.destination.node_id === builderCollector
+      )
+    ).toBe(true);
   });
 
   it('grafts FLUX.2 [dev] regions through Mistral conditioning', () => {
@@ -2264,13 +2465,12 @@ describe('compileCanvasGraph — regional guidance', () => {
     ]);
   });
 
-  it('adds no layout node, even on a blank prompt, when no region can be placed', () => {
+  it('places no region, even on a blank prompt, when no region can be placed', () => {
     const { backendGraph } = compile(mossImageModel, 'txt2img', {
       regionalGuidance: [region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } })],
     });
 
-    expect(backendGraph.nodes.layout_prompt).toBeUndefined();
-    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual([]);
   });
 
   it('blocks MOSS-Image regions on a blank prompt unless a prompt template supplies one', () => {
@@ -2366,11 +2566,292 @@ describe('compileCanvasGraph — regional guidance', () => {
     );
   });
 
-  it('keeps a MOSS-Image canvas graph without regions on the plain prompt', () => {
+  it('routes a MOSS-Image canvas prompt without regions through the layout node at the denoise size', () => {
     const { backendGraph } = compile(mossImageModel, 'txt2img');
 
+    expect(backendGraph.nodes.layout_prompt).toMatchObject({ height: 1024, regions: [], width: 768 });
+    expect(getEdge(backendGraph, 'layout_prompt', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('layout_prompt');
+  });
+
+  it('places Ideogram 4 regions on the caption builder as boxes normalized to the 768×1024 bbox', () => {
+    const { backendGraph } = compile(ideogram4Model, 'txt2img', {
+      regionalGuidance: [
+        // 0..1000 of each side, [y_min, x_min, y_max, x_max]: x 100..400 of 768, y 10..510 of 1024.
+        region('rounded', { maskBounds: { height: 500, width: 300, x: 100, y: 10 }, positivePrompt: 'a red kite' }),
+        // Starts above the bbox and ends past its right edge.
+        region('edge', { maskBounds: { height: 100, width: 200, x: 700, y: -20 } }),
+        // Ideogram has no text elements: the stored role stays on the layer, the region is placed as an object.
+        region('stale-text', { layout: { kind: 'text' }, positivePrompt: 'a shop sign' }),
+        region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+        region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } }),
+        region('no-prompt', { positivePrompt: null }),
+        region('blank-prompt', { positivePrompt: ' ' }),
+      ],
+      settings: { positivePrompt: 'a beach at noon' },
+    });
+
+    expect(backendGraph.nodes.caption_builder?.regions).toEqual([
+      { bbox: [10, 130, 498, 521], prompt: 'a red kite' },
+      { bbox: [0, 911, 78, 1000], prompt: 'a cat' },
+      { bbox: [125, 83, 375, 333], prompt: 'a shop sign' },
+    ]);
+    // The global prompt still reaches the caption through the batchable prompt node; no mask is encoded.
+    expect(getEdge(backendGraph, 'caption_builder', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getNodeByType(backendGraph, 'alpha_mask_to_tensor')).toBeUndefined();
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(getEdge(backendGraph, metadata.id, 'ideogram4_caption')?.source.node_id).toBe('caption_builder');
+  });
+
+  it('leaves the Ideogram 4 graph unchanged when no region can be placed', () => {
+    // Pin the minted ids so the two graphs compare whole.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const settings = { positivePrompt: 'a beach at noon' };
+      const plain = compile(ideogram4Model, 'txt2img', { settings }).backendGraph;
+      const unplaceable = compile(ideogram4Model, 'txt2img', {
+        regionalGuidance: [region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } })],
+        settings,
+      }).backendGraph;
+
+      expect(plain.nodes.caption_builder).not.toHaveProperty('regions');
+      expect(unplaceable).toEqual(plain);
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+  });
+
+  it('blocks Ideogram 4 regions on a blank prompt', () => {
+    expect(() =>
+      compile(ideogram4Model, 'txt2img', { regionalGuidance: [region('r1')], settings: { positivePrompt: '' } })
+    ).toThrow(
+      'Ideogram 4 needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
+    );
+  });
+
+  it('writes the Ideogram 4 regional canvas graph the backend validates', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const model = { ...ideogram4Model, hash: 'blake3:ideogram4' };
+    // One box inside the 768×1024 frame and one that ends on its right and bottom edges.
+    const regions = [
+      region('kite', { maskBounds: { height: 256, width: 384, x: 192, y: 64 }, positivePrompt: 'a red kite' }),
+      region('dog', {
+        maskBounds: { height: 384, width: 256, x: 512, y: 640 },
+        positivePrompt: 'a dog digging in the sand',
+      }),
+    ];
+    let txt2img: BackendGraphContract;
+    try {
+      txt2img = compile(model, 'txt2img', {
+        regionalGuidance: regions,
+        settings: { positivePrompt: 'a beach at noon' },
+      }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Validated against the backend invocations by the Ideogram 4 regional graph tests.',
+      txt2img: { ...txt2img, id: 'ideogram4_regional_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/ideogram4RegionalCanvasGraphs.json'
+    );
+  });
+
+  /** FLUX.3 regions on the 768×1024 bbox; `FLUX3_ROWS` are the rows the first three become. */
+  const flux3Regions = () => [
+    // 0..1000 of each side, [y_min, x_min, y_max, x_max]: x 100..400 of 768, y 10..510 of 1024.
+    region('rounded', { maskBounds: { height: 500, width: 300, x: 100, y: 10 }, positivePrompt: 'a red kite' }),
+    // Starts above the bbox and ends past its right edge.
+    region('edge', { maskBounds: { height: 100, width: 200, x: 700, y: -20 } }),
+    // FLUX.3 places objects only: the stored role stays on the layer, the region is placed as an object.
+    region('stale-text', { layout: { kind: 'text' }, positivePrompt: 'a shop sign' }),
+    // One pixel in the corner rounds to [0, 0, 1, 1], which FLUX.3 reads as 0–1 fractions.
+    region('corner', { maskBounds: { height: 1, width: 1, x: 0, y: 0 } }),
+    region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+    region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } }),
+    region('no-prompt', { positivePrompt: null }),
+    region('blank-prompt', { positivePrompt: ' ' }),
+  ];
+  const FLUX3_ROWS = [
+    { bbox: [10, 130, 498, 521], desc: 'a red kite' },
+    { bbox: [0, 911, 78, 1000], desc: 'a cat' },
+    { bbox: [125, 83, 375, 333], desc: 'a shop sign' },
+  ];
+
+  it('fills the FLUX.3 layout prompt with boxes normalized to the 768×1024 bbox and records the caption', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: flux3Regions(),
+      settings: { positivePrompt: 'a beach at noon' },
+    });
+
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual(FLUX3_ROWS);
+    // Without reference images FLUX.3 does not edit, so the boxes stay object rows; no mask is encoded.
+    expect(backendGraph.nodes.layout_prompt).not.toHaveProperty('edit_targets');
+    expect(getNodeByType(backendGraph, 'alpha_mask_to_tensor')).toBeUndefined();
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(getEdge(backendGraph, metadata.id, 'flux3_caption')?.source).toEqual({
+      field: 'value',
+      node_id: 'layout_prompt',
+    });
+    // Recall restores the prompt the user typed.
+    expect(getEdge(backendGraph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
+  });
+
+  it('places FLUX.3 boxes on the bbox when the canvas generates at a scaled size', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: flux3Regions(),
+      scaling: { height: 768, method: 'manual', width: 576 },
+      settings: { positivePrompt: 'a beach at noon' },
+    });
+
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ height: 768, width: 576 });
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual(FLUX3_ROWS);
+  });
+
+  it('leaves the FLUX.3 graph unchanged when no region can be placed', () => {
+    // Pin the minted ids so the two graphs compare whole.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const settings = { positivePrompt: 'a beach at noon' };
+      const plain = compile(flux3Model, 'txt2img', { settings }).backendGraph;
+      const unplaceable = compile(flux3Model, 'txt2img', {
+        regionalGuidance: [
+          region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+          region('corner', { maskBounds: { height: 1, width: 1, x: 0, y: 0 } }),
+        ],
+        settings,
+      }).backendGraph;
+
+      expect(plain.nodes.layout_prompt).not.toHaveProperty('regions');
+      expect(getEdge(plain, getNodeByType(plain, 'core_metadata')!.id, 'flux3_caption')).toBeUndefined();
+      expect(unplaceable).toEqual(plain);
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+  });
+
+  const upsampler = {
+    base: 'any',
+    key: 'pup',
+    name: 'FLUX.3 Prompt Upsampler',
+    supports_images: true,
+    type: 'text_llm',
+  };
+  const upsamplerSettings = {
+    flux3PromptUpsamplerEnabled: true,
+    flux3PromptUpsamplerModel: upsampler,
+    positivePrompt: 'a beach at noon',
+  };
+
+  it('hands the FLUX.3 regions to the prompt upsampler and records its caption once', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: flux3Regions(),
+      settings: upsamplerSettings,
+    });
+
     expect(backendGraph.nodes.layout_prompt).toBeUndefined();
-    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(backendGraph.nodes.prompt_upsampler?.regions).toEqual(FLUX3_ROWS);
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(backendGraph.edges.filter((edge) => edge.destination.field === 'flux3_caption')).toEqual([
+      expect.objectContaining({ source: { field: 'value', node_id: 'prompt_upsampler' } }),
+    ]);
+    expect(getEdge(backendGraph, metadata.id, 'flux3_caption')).toBeDefined();
+    // The regions are recorded for recall as they are with the layout node.
+    expect(metadata.regions).toEqual(FLUX3_ROWS);
+  });
+
+  it('still upsamples the prompt when no FLUX.3 region can be placed', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: [region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } })],
+      settings: upsamplerSettings,
+    });
+
+    expect(backendGraph.nodes.prompt_upsampler).not.toHaveProperty('regions');
+    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('prompt_upsampler');
+    expect(backendGraph.edges.filter((edge) => edge.destination.field === 'flux3_caption')).toHaveLength(1);
+  });
+
+  it('writes the FLUX.3 layout canvas graphs the backend validates', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const model = { ...flux3Model, hash: 'blake3:flux3' };
+    // One box inside the 768×1024 frame and one that ends on its right and bottom edges; quotes and non-ASCII text
+    // travel inside the JSON the node writes.
+    const regions = [
+      region('kite', {
+        maskBounds: { height: 256, width: 384, x: 192, y: 64 },
+        positivePrompt: 'a red kite reading "Éole"',
+      }),
+      region('dog', {
+        maskBounds: { height: 384, width: 256, x: 512, y: 640 },
+        positivePrompt: 'a dog digging in the sand',
+      }),
+    ];
+    // With a reference image FLUX.3 edits, and the boxes say where new content goes in the output.
+    const reference = {
+      config: {
+        image: { original: { image: { height: 768, image_name: 'beach.png', width: 512 } } },
+        type: 'flux2_reference_image' as const,
+      },
+      id: 'beach',
+      isEnabled: true,
+    };
+    let txt2img: BackendGraphContract;
+    let inpaint: BackendGraphContract;
+    let edit: BackendGraphContract;
+    let upsampledTxt2img: BackendGraphContract;
+    let upsampledEdit: BackendGraphContract;
+    try {
+      const settings = { positivePrompt: 'a beach at noon' };
+      const upsampled = {
+        ...settings,
+        flux3PromptUpsamplerEnabled: true,
+        flux3PromptUpsamplerModel: {
+          base: 'any',
+          hash: 'blake3:pup',
+          key: 'pup',
+          name: 'FLUX.3 Prompt Upsampler',
+          supports_images: true,
+          type: 'text_llm',
+        },
+      };
+      upsampledTxt2img = compile(model, 'txt2img', { regionalGuidance: regions, settings: upsampled }).backendGraph;
+      upsampledEdit = compile(model, 'txt2img', {
+        regionalGuidance: regions,
+        settings: { ...upsampled, referenceImages: [reference] },
+      }).backendGraph;
+      txt2img = compile(model, 'txt2img', { regionalGuidance: regions, settings }).backendGraph;
+      inpaint = compile(model, 'inpaint', { regionalGuidance: regions, settings }).backendGraph;
+      edit = compile(model, 'txt2img', {
+        regionalGuidance: regions,
+        settings: { ...settings, referenceImages: [reference] },
+      }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Validated against the backend invocations by the FLUX.3 layout graph tests.',
+      edit: { ...edit, id: 'flux3_layout_canvas_edit' },
+      inpaint: { ...inpaint, id: 'flux3_layout_canvas_inpaint' },
+      txt2img: { ...txt2img, id: 'flux3_layout_canvas_txt2img' },
+      upsampled_edit: { ...upsampledEdit, id: 'flux3_upsampled_canvas_edit' },
+      upsampled_txt2img: { ...upsampledTxt2img, id: 'flux3_upsampled_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/flux3LayoutCanvasGraphs.json'
+    );
   });
 });
 

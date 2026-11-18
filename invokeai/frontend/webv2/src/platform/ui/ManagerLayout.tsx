@@ -1,18 +1,23 @@
-import type { FocusEvent, ReactNode } from 'react';
+import type { ChangeEvent, FocusEvent, ReactNode } from 'react';
 
-import { Box, Flex, HStack, Icon, Text, type SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Input, InputGroup, Kbd, Menu, Text, type SystemStyleObject } from '@chakra-ui/react';
+import { focusSearchOnSlash } from '@platform/browser/searchShortcut';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { ArrowLeftIcon, PlusIcon } from 'lucide-react';
+import { ArrowLeftIcon, PlusIcon, RotateCcwIcon, SearchIcon, SlidersHorizontalIcon, XIcon } from 'lucide-react';
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { Button, IconButton } from './Button';
-import { Tooltip } from './Tooltip';
+import { MenuActionItem } from './Menu';
+import { isModalPresent } from './modalPresence';
+import { Tooltip, useTooltipTriggerIds } from './Tooltip';
 
 /**
  * The list/detail shell shared by the Launchpad managers (models, nodes, fonts, preferences). Side by side when
  * both panes fit; below that one pane at a time, the library first, the detail behind a Back control in its header.
  * A footer (install queue, activity) stays visible under whichever pane shows. The column and the detail header
- * share one header height so their bottom borders line up.
+ * share one header height so their bottom borders line up. A bare `/` focuses the manager's search field (a
+ * {@link ManagerSearchField}, or any field marked `data-manager-search`) while it is in view.
  */
 
 /** The library takes 39% of the manager, between 20rem and 28rem. */
@@ -25,6 +30,7 @@ const LIBRARY_WIDTH = 'clamp(20rem, 39cqi, 28rem)';
 const SINGLE_PANE = '@container manager (width < 50rem)';
 const SINGLE_PANE_FLAG = '--manager-single-pane';
 const HEADER_MIN_HEIGHT = '2.75rem';
+const SEARCH_SELECTOR = '[data-manager-search]';
 /** Persistent popups whose closing hands focus back to a trigger the pane switch may have hidden. */
 const POPUP_SELECTOR = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 const TABBABLE_SELECTOR = [
@@ -324,6 +330,20 @@ export const ManagerLayout = ({
     };
   });
 
+  // Every manager the Launchpad keeps mounted listens; only the shown one has its search field in view. A modal
+  // suspends the key, as it does application shortcuts.
+  useMountEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (gridRef.current && !isModalPresent(event)) {
+        focusSearchOnSlash(event, gridRef.current, SEARCH_SELECTOR);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
+
   const handleFocus = useCallback((event: FocusEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
 
@@ -354,6 +374,150 @@ export const ManagerLayout = ({
         </Box>
       </Box>
     </ManagerBackContext.Provider>
+  );
+};
+
+const SEARCH_ICON = <Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />;
+const SEARCH_HINT = (
+  <Kbd aria-hidden pointerEvents="none" variant="outline">
+    /
+  </Kbd>
+);
+
+/**
+ * The library's search field, which `/` focuses; the key's hint shows while it is empty. With a `clearLabel`, a
+ * query puts a clear control in the hint's place.
+ */
+export const ManagerSearchField = ({
+  clearLabel,
+  label,
+  onChange,
+  placeholder,
+  size,
+  value,
+}: {
+  clearLabel?: string;
+  label: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  size?: 'md' | 'lg';
+  value: string;
+}) => {
+  const change = useCallback((event: ChangeEvent<HTMLInputElement>) => onChange(event.currentTarget.value), [onChange]);
+  const clear = useCallback(() => onChange(''), [onChange]);
+  const endElement = useMemo(() => {
+    if (!value) {
+      return SEARCH_HINT;
+    }
+
+    return clearLabel ? (
+      <IconButton aria-label={clearLabel} me="-2" size="sm" tooltip={clearLabel} variant="ghost" onClick={clear}>
+        <XIcon />
+      </IconButton>
+    ) : undefined;
+  }, [clear, clearLabel, value]);
+
+  return (
+    <InputGroup endElement={endElement} startElement={SEARCH_ICON}>
+      <Input
+        aria-keyshortcuts="/"
+        aria-label={label}
+        data-manager-search=""
+        placeholder={placeholder}
+        size={size}
+        value={value}
+        onChange={change}
+      />
+    </InputGroup>
+  );
+};
+
+/**
+ * Trimmed to the digits' cap height and baseline, the count's box is its ink, so the badge's flex centring centres the
+ * digits; untrimmed, the font's descender room lifts them off centre.
+ */
+const FILTER_COUNT_TEXT: SystemStyleObject = { textBox: 'trim-both cap alphabetic' };
+
+/**
+ * The manager toolbar's filter menu: an icon-only trigger, named and tooltipped by `label`, opening `children` (the
+ * menu's portalled positioner and content). It owns the menu root so the root and the trigger's tooltip share one
+ * trigger id. A count badge on the trigger's corner says how many filters narrow the list, so filtering shows with the
+ * menu closed; sort order is not a filter and is not counted. The name ends with the count, so the visible digits stay
+ * part of it (label in name; a parenthetical would not count).
+ */
+export const ManagerFilterMenu = ({
+  activeCount,
+  children,
+  label,
+  ...rootProps
+}: Omit<Menu.RootProps, 'children' | 'ids'> & {
+  activeCount: number;
+  children: ReactNode;
+  label: string;
+}) => {
+  const { t } = useTranslation();
+  const ids = useTooltipTriggerIds();
+  const isFiltered = activeCount > 0;
+  const name = isFiltered ? `${label}, ${t('common.activeFilterCount', { count: activeCount })}` : label;
+
+  return (
+    <Menu.Root ids={ids} {...rootProps}>
+      <Tooltip content={name} ids={ids}>
+        <Menu.Trigger asChild>
+          <IconButton aria-label={name} color="fg.muted" flexShrink={0} variant="outline">
+            <Icon as={SlidersHorizontalIcon} boxSize="4" />
+            {isFiltered ? (
+              <Box
+                aria-hidden
+                alignItems="center"
+                bg="accent.solid"
+                color="accent.contrast"
+                display="flex"
+                fontSize="xs"
+                fontWeight="semibold"
+                h="4"
+                justifyContent="center"
+                minW="4"
+                outline="2px solid"
+                outlineColor="bg"
+                pointerEvents="none"
+                position="absolute"
+                px="1"
+                right="-2.5"
+                rounded="full"
+                top="-2.5"
+              >
+                <Box as="span" css={FILTER_COUNT_TEXT}>
+                  {activeCount}
+                </Box>
+              </Box>
+            ) : null}
+          </IconButton>
+        </Menu.Trigger>
+      </Tooltip>
+      {children}
+    </Menu.Root>
+  );
+};
+
+/**
+ * The last row of a manager's filter menu, under a separator: clears the filters `ManagerFilterMenu` counts and
+ * leaves sort order and search alone. Disabled while none is active.
+ */
+export const ManagerFilterResetItem = ({ activeCount, onReset }: { activeCount: number; onReset: () => void }) => {
+  const { t } = useTranslation();
+
+  return (
+    <>
+      <Menu.Separator />
+      <MenuActionItem
+        disabled={activeCount === 0}
+        icon={RotateCcwIcon}
+        label={t('common.resetFilters')}
+        value="reset-filters"
+        onSelect={onReset}
+      />
+    </>
   );
 };
 

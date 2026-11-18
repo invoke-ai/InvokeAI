@@ -12,6 +12,7 @@ import type * as QueueDataStore from './queueDataStore';
 
 import { clearQueueConfirmation, getQueueConfirmation } from './queueConfirmationStore';
 import { QueueItemDetailActions } from './QueueItemDetailActions';
+import { createTestQueueUiAdapter } from './queueUiAdapter.testing';
 import { QueueUiProvider, type QueueUiAdapter } from './QueueUiContext';
 
 vi.mock('react-i18next', () => ({
@@ -33,19 +34,8 @@ vi.mock('./queueDataStore', async (importOriginal) => ({
 
 const item = { batchId: 'batch-7', id: 7, status: 'completed' } as QueueItemReadModel;
 const notify = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
-const adapter = (canManage: boolean): QueueUiAdapter => ({
-  ItemActions: () => null,
-  activeProjectId: null,
-  canManageInvocationCache: false,
-  canManageItem: () => canManage,
-  canManageProcessor: true,
-  canViewItemDetails: () => true,
-  isConnected: true,
-  isProjectOpen: () => true,
-  notify,
-  openQueue: () => undefined,
-  queueJobsScope: 'all',
-});
+const adapter = (canManage: boolean): QueueUiAdapter =>
+  createTestQueueUiAdapter({ canManageItem: () => canManage, notify });
 
 let host: HTMLDivElement;
 let root: Root;

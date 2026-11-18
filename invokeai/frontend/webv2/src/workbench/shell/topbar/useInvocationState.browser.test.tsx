@@ -17,6 +17,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const harness = vi.hoisted(() => ({
   project: null as unknown,
   submit: vi.fn((_args: Record<string, unknown>) => Promise.resolve()),
+  // Stands in for the backend: one prompt per `|` alternative when expansion is on and the prompt has braces.
+  useDynamicPrompts: vi.fn((prompt: string, config: { enabled: boolean } | null) => {
+    const isDynamic = config?.enabled === true && prompt.includes('{');
+
+    return {
+      count: isDynamic ? prompt.split('|').length : 1,
+      error: null,
+      isDynamic,
+      isError: false,
+      isLoading: false,
+      prompts: [],
+    };
+  }),
 }));
 
 // A controllable stand-in for the node-template store, so a test can decide which of the two stores
@@ -68,9 +81,7 @@ const preferences = vi.hoisted(() => {
   };
 });
 
-vi.mock('@features/generation/react', () => ({
-  useDynamicPrompts: () => ({ count: 1, error: null, isDynamic: false, isError: false, isLoading: false, prompts: [] }),
-}));
+vi.mock('@features/generation/react', () => ({ useDynamicPrompts: harness.useDynamicPrompts }));
 vi.mock('@features/models', () => ({
   ensureModelsLoaded: () => Promise.resolve(),
   // One snapshot object, as the real store hands out. A fresh `models` array per render would change
@@ -91,7 +102,10 @@ vi.mock('@workbench/settings/store', async (importOriginal) => {
   };
 });
 vi.mock('@workbench/activeInvocationSubmission', () => ({ submitActiveInvocation: harness.submit }));
-vi.mock('@workbench/invocationPreparation', () => ({ useIsInvocationPreparing: () => false }));
+vi.mock('@workbench/invocationPreparation', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useIsInvocationPreparing: () => false,
+}));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project as Project),
   useWorkbenchCommands: () => ({}),
@@ -136,15 +150,23 @@ const buildGenerateProject = (): Project => {
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-const Probe = (): ReactNode => {
-  const state = useInvocationState();
+const Probe = ({ sourceId }: { sourceId?: 'video' }): ReactNode => {
+  const state = useInvocationState({ sourceId });
 
   return (
     <>
-      <span data-batch-count={state.batchCount} data-testid="reasons">
+      <span
+        data-batch-count={state.batchCount}
+        data-destination={state.invocation.destination}
+        data-issue-targets={state.issues.map((issue) => issue.target.kind).join(' ')}
+        data-prompt-count={state.promptExpansion.count}
+        data-testid="reasons"
+      >
         {state.issues.map((issue) => issue.message).join(' | ')}
       </span>
-      <span data-testid="issue-layers">{state.issues.map((issue) => issue.layerId ?? '-').join(' | ')}</span>
+      <span data-testid="issue-layers">
+        {state.issues.map(({ target }) => (target.kind === 'layer' ? target.layerId : '-')).join(' | ')}
+      </span>
       <button data-testid="invoke-front" type="button" onClick={() => void state.invoke({ prepend: true })}>
         Invoke front
       </button>
@@ -155,13 +177,13 @@ const Probe = (): ReactNode => {
   );
 };
 
-const renderProbe = async (project: Project) => {
+const renderProbe = async (project: Project, sourceId?: 'video') => {
   harness.project = project;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
   await act(() => {
-    root?.render(<Probe />);
+    root?.render(<Probe sourceId={sourceId} />);
   });
 };
 
@@ -181,9 +203,8 @@ describe('useInvocationState and the architecture capability table', () => {
   it('stops blocking Invoke as soon as a retried load succeeds', async () => {
     await renderProbe(buildGenerateProject());
 
-    expect(blockingReasons()).toBe(
-      'Model capabilities are not available. Generation is blocked until they load; if this persists, retry from the Generate panel.'
-    );
+    // Worded from the locale, which this probe leaves untranslated.
+    expect(blockingReasons()).toBe('widgets.generate.issues.capabilitiesUnavailable');
 
     // Capability arrival alone must recompute the route after retry succeeds.
     await act(() => {
@@ -204,13 +225,13 @@ describe('useInvocationState and the workflow node templates', () => {
       )
     );
 
-    expect(blockingReasons()).toContain('Node definitions are still loading.');
+    expect(blockingReasons()).toContain('nodes.readiness.templatesLoading');
 
     await act(() => {
       templates.set({ error: null, status: 'loaded', templates: {} });
     });
 
-    expect(blockingReasons()).not.toContain('Node definitions are still loading.');
+    expect(blockingReasons()).not.toContain('nodes.readiness.templatesLoading');
   });
 
   it("reports the workflow widget's own iteration count for a workflow route", async () => {
@@ -275,5 +296,89 @@ describe('useInvocationState and the remembered control-model picks', () => {
     });
 
     expect(blockingReasons()).not.toContain('widgets.layers.control.invalidLayer');
+  });
+});
+
+describe('useInvocationState and Video dynamic prompts', () => {
+  it('fixes the Video dialog route to Gallery without offering a global destination fix', async () => {
+    const project = buildGenerateProject();
+    project.invocation = { sourceId: 'generate', sourceLocked: true, destination: 'canvas', destinationLocked: true };
+    await renderProbe(project, 'video');
+    expect(host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-destination')).toBe('gallery');
+    expect(host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-issue-targets')).not.toContain(
+      'destination'
+    );
+    expect(project.invocation.destination).toBe('canvas');
+  });
+
+  const renderVideo = async (videoValues: Record<string, unknown>) => {
+    setArchitectureCapabilities(architectureCapabilitiesFixture);
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      region: 'left',
+      type: 'toggleRegionWidget',
+      widgetId: 'video',
+    });
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { positivePrompt: 'a {cat|dog|bird}' },
+      widgetId: 'generate',
+    });
+    state = workbenchReducer(state, { type: 'patchWidgetValues', values: videoValues, widgetId: 'video' });
+    state = workbenchReducer(state, { sourceId: 'video', type: 'setInvocationSource' });
+    harness.useDynamicPrompts.mockClear();
+    await renderProbe(activeProject(state));
+
+    return host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-prompt-count');
+  };
+
+  it("counts the Video prompt's expansion with Video's settings, not Generate's prompt", async () => {
+    expect(await renderVideo({ positivePrompt: 'a {red|green} fox' })).toBe('2');
+    expect(harness.useDynamicPrompts).toHaveBeenLastCalledWith(
+      'a {red|green} fox',
+      expect.objectContaining({ enabled: true, maxPrompts: 10 })
+    );
+  });
+
+  it('counts a Video prompt saved before Video expanded prompts as typed', async () => {
+    // The prompt height marks a panel saved before; one without dynamic prompts settings runs its prompt as typed.
+    expect(
+      await renderVideo({
+        dynamicPromptsEnabled: undefined,
+        positivePrompt: 'a {red|green} fox',
+        positivePromptHeightPx: 96,
+      })
+    ).toBe('1');
+  });
+});
+
+describe('useInvocationState and Upscale dynamic prompts', () => {
+  const renderUpscale = async (upscaleValues: Record<string, unknown>) => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      sourceId: 'upscale',
+      type: 'patchProjectPromptDraft',
+      values: {
+        positivePrompt: 'a {cat|dog|bird}',
+        promptTemplate: { id: 'film', name: 'Film', negativePrompt: '', positivePrompt: '{prompt}, {grain|haze}' },
+      },
+    });
+    state = workbenchReducer(state, { type: 'patchWidgetValues', values: upscaleValues, widgetId: 'upscale' });
+    state = workbenchReducer(state, { sourceId: 'upscale', type: 'setInvocationSource' });
+    harness.useDynamicPrompts.mockClear();
+    await renderProbe(activeProject(state));
+
+    return host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-prompt-count');
+  };
+
+  it('counts the expansion of the prompt Refine shares with Generate, inside its template', async () => {
+    expect(await renderUpscale({ mode: 'refine' })).toBe('4');
+    expect(harness.useDynamicPrompts).toHaveBeenLastCalledWith(
+      'a {cat|dog|bird}, {grain|haze}',
+      expect.objectContaining({ enabled: true })
+    );
+  });
+
+  it('counts one prompt for Model only, which reads none', async () => {
+    expect(await renderUpscale({ mode: 'model-only' })).toBe('1');
+    expect(harness.useDynamicPrompts).toHaveBeenLastCalledWith(expect.any(String), null);
   });
 });

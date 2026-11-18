@@ -56,7 +56,6 @@ export interface RenderControllerOptions extends RenderSchedulerDeps {
   readonly onPageHide: () => void;
   readonly onWindowBlur: () => void;
   readonly onVisibilityChange: () => void;
-  readonly clearPreview: () => void;
   readonly applyCursor: (value: string) => void;
   readonly updateCursor: () => void;
   readonly updateAnimation: () => void;
@@ -164,7 +163,6 @@ export class RenderController {
       document.removeEventListener('visibilitychange', this.options.onVisibilityChange);
     }
     handlers.reset();
-    this.options.clearPreview();
     this.scheduler.pause();
     this.options.setViewportReady(false);
     this.screen = null;

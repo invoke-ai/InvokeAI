@@ -7,10 +7,11 @@ import { describe, expect, it } from 'vitest';
 
 import { createEmptyCanvasState } from './canvasMigration';
 import {
-  getCancelableCanvasStagingQueueItemId,
   getCanvasQueuePlaceholderSlots,
   getCanvasStagingCandidateFingerprint,
+  getCanvasStagingSlotRect,
   getCanvasStagingSlots,
+  hasPendingCanvasResults,
 } from './canvasStagingView';
 
 const createImage = (imageName: string, sourceQueueItemId: string): GeneratedImageContract => ({
@@ -108,6 +109,13 @@ const createQueueItem = ({
     status,
   }) as QueueItem;
 
+const placeholder = (queueItemId: string, itemIndex: number) => ({
+  id: `${queueItemId}:${itemIndex - 1}`,
+  itemIndex,
+  kind: 'placeholder' as const,
+  queueItemId,
+});
+
 describe('canvas staging view', () => {
   it('derives in-flight canvas placeholders from the submitted bbox without persisting fake images', () => {
     const canvas = createCanvas({ revision: 2 });
@@ -132,9 +140,9 @@ describe('canvas staging view', () => {
     ];
 
     expect(getCanvasQueuePlaceholderSlots(canvas, queueItems)).toEqual([
-      { height: 384, id: 'q-pending:0', itemIndex: 1, kind: 'placeholder', queueItemId: 'q-pending', width: 640 },
-      { height: 384, id: 'q-pending:1', itemIndex: 2, kind: 'placeholder', queueItemId: 'q-pending', width: 640 },
-      { height: 256, id: 'q-running:2', itemIndex: 3, kind: 'placeholder', queueItemId: 'q-running', width: 512 },
+      { ...placeholder('q-pending', 1), height: 384, width: 640, x: 8, y: 9 },
+      { ...placeholder('q-pending', 2), height: 384, width: 640, x: 8, y: 9 },
+      { ...placeholder('q-running', 3), height: 256, width: 512, x: 1, y: 2 },
     ]);
     expect(canvas.stagingArea.pendingImages).toEqual([]);
   });
@@ -174,7 +182,7 @@ describe('canvas staging view', () => {
         queueItemId: 'q-ready',
         width: 512,
       },
-      { height: 320, id: 'q-pending:0', itemIndex: 1, kind: 'placeholder', queueItemId: 'q-pending', width: 640 },
+      { ...placeholder('q-pending', 1), height: 320, width: 640, x: 10, y: 12 },
     ]);
   });
 
@@ -217,29 +225,62 @@ describe('canvas staging view', () => {
     ).toEqual(['candidate:q-first:1', 'placeholder:q-first:2', 'placeholder:q-second:1']);
   });
 
-  it('resolves a cancelable queue item only for placeholder slots', () => {
-    const candidate = createCandidate('ready.png', 'q-ready');
+  it('places a candidate at its placement and a placeholder at its submitted rect, wherever the bbox is now', () => {
+    const staged = createCandidate('ready.png', 'q-ready');
+    // The live bbox moved after both runs were submitted.
+    const canvas = createCanvas({
+      bbox: { height: 64, width: 64, x: 900, y: 900 },
+      revision: 2,
+      stagedImages: [staged],
+    });
+    const slots = getCanvasStagingSlots(canvas, [createQueueItem({ id: 'q-pending', revision: 2 })]);
 
+    expect(slots.map(getCanvasStagingSlotRect)).toEqual([
+      { height: 256, width: 256, x: 16, y: 24 },
+      { height: 320, width: 640, x: 10, y: 12 },
+    ]);
+  });
+});
+
+describe('pending canvas results', () => {
+  it('holds while a candidate is staged, whatever its run did', () => {
+    const canvas = createCanvas({ revision: 2, stagedImages: [createCandidate('ready.png', 'q-ready')] });
+
+    expect(hasPendingCanvasResults(canvas, [])).toBe(true);
     expect(
-      getCancelableCanvasStagingQueueItemId({
-        candidate,
-        height: 768,
-        id: 'candidate:q-ready:ready.png',
-        imageName: 'ready.png',
-        kind: 'candidate',
-        queueItemId: 'q-ready',
-        width: 512,
-      })
-    ).toBeNull();
-    expect(
-      getCancelableCanvasStagingQueueItemId({
-        height: 320,
-        id: 'q-pending:0',
-        itemIndex: 1,
-        kind: 'placeholder',
-        queueItemId: 'q-pending',
-        width: 640,
-      })
-    ).toBe('q-pending');
+      hasPendingCanvasResults(canvas, [createQueueItem({ id: 'q-ready', revision: 2, status: 'completed' })])
+    ).toBe(true);
+  });
+
+  it('holds for queued or running work on this revision, even with every slot spent', () => {
+    const canvas = createCanvas({ revision: 2 });
+
+    for (const status of ['pending', 'running'] as const) {
+      const spent = createQueueItem({
+        backendItemIds: [1],
+        completedBackendItemIds: [1],
+        id: `q-${status}`,
+        revision: 2,
+        status,
+      });
+      expect(hasPendingCanvasResults(canvas, [spent])).toBe(true);
+    }
+  });
+
+  it('does not hold for an empty canvas, terminal work, gallery work or an older revision', () => {
+    const canvas = createCanvas({ revision: 2 });
+
+    expect(hasPendingCanvasResults(canvas, [])).toBe(false);
+    for (const status of ['completed', 'failed', 'cancelled'] as const) {
+      expect(hasPendingCanvasResults(canvas, [createQueueItem({ id: `q-${status}`, revision: 2, status })])).toBe(
+        false
+      );
+    }
+    expect(hasPendingCanvasResults(canvas, [createQueueItem({ destination: 'gallery', id: 'q-g', revision: 2 })])).toBe(
+      false
+    );
+    expect(hasPendingCanvasResults(canvas, [createQueueItem({ id: 'q-old', revision: 1, status: 'running' })])).toBe(
+      false
+    );
   });
 });

@@ -152,3 +152,107 @@ describe('group-owned adjustment rows', () => {
     expect(navigateTree(expandedRows, 'g1', 'ArrowLeft')).toEqual({ expand: 'g1', expanded: false });
   });
 });
+
+describe('tree guides', () => {
+  const invert = (id: string): CanvasAdjustmentEntry => ({ id, isEnabled: true, type: 'invert' });
+  /** top[a1] · g1[ga1]{ m1[x1, x2], m3, g2{ deep } } · bottom */
+  const treeStacks = (expandedGroups: ReadonlySet<string>, filter?: string) =>
+    buildLayerStackRows(
+      documentFrom([
+        layerContract('top', 'raster', { adjustments: [invert('a1')] }),
+        groupContract(
+          'g1',
+          [
+            layerContract('m1', 'raster', { adjustments: [invert('x1'), invert('x2')] }),
+            layerContract('m3'),
+            groupContract('g2', [layerContract('deep')]),
+          ],
+          { adjustments: [invert('ga1')] }
+        ),
+        layerContract('bottom'),
+      ]).stacks,
+      expandedGroups,
+      filter
+    );
+  const guidesOf = (rows: readonly PanelRow[]) =>
+    Object.fromEntries(rows.flatMap((row) => (row.kind === 'header' ? [] : [[row.key, row.guides]])));
+
+  it('branches each visible child from its parent, ending the line at the last one', () => {
+    const rows = flattenPanelRows(treeStacks(new Set(['g1', 'g2'])), [], open, {
+      collapsedLayerIds: new Set(),
+      rowsFor: (row) => projectLayerChildRows(row.vm),
+    });
+    expect(guidesOf(rows)).toEqual({
+      bottom: '',
+      'child:g1:ga1': '├',
+      'child:m1:x1': '│├',
+      'child:m1:x2': '│└',
+      'child:top:a1': '└',
+      deep: ' └',
+      g1: '╷',
+      g2: '└╷',
+      m1: '├╷',
+      m3: '├',
+      top: '╷',
+    });
+    // Rows follow tree order, so every line runs unbroken from its stem to its last branch.
+    expect(keys(rows)).toEqual([
+      'header:raster',
+      'top',
+      'child:top:a1',
+      'g1',
+      'child:g1:ga1',
+      'm1',
+      'child:m1:x1',
+      'child:m1:x2',
+      'm3',
+      'g2',
+      'deep',
+      'bottom',
+    ]);
+  });
+
+  it('draws nothing for children a collapsed group or layer hides', () => {
+    const rows = flattenPanelRows(treeStacks(new Set(['g1'])), [], open, {
+      collapsedLayerIds: new Set(['m1', 'top']),
+      rowsFor: (row) => projectLayerChildRows(row.vm),
+    });
+    expect(guidesOf(rows)).toEqual({
+      bottom: '',
+      'child:g1:ga1': '├',
+      g1: '╷',
+      g2: '└',
+      m1: '├',
+      m3: '├',
+      top: '',
+    });
+  });
+
+  it('follows the rows a filter keeps: matches under their opened ancestors', () => {
+    expect(guidesOf(flattenPanelRows(treeStacks(new Set(), 'deep'), [], open))).toEqual({
+      deep: ' └',
+      g1: '╷',
+      g2: '└╷',
+    });
+    expect(guidesOf(flattenPanelRows(treeStacks(new Set(), 'm'), [], open))).toEqual({
+      bottom: '',
+      g1: '╷',
+      m1: '├',
+      m3: '└',
+    });
+  });
+
+  it('starts every stack afresh: top-level rows never branch from their stack header', () => {
+    const rows = flattenPanelRows(stacks(), [], open, {
+      collapsedLayerIds: new Set(),
+      rowsFor: (row) => projectLayerChildRows(row.vm),
+    });
+    expect(guidesOf(rows)).toEqual({
+      'child:rg1:ref1': '├',
+      'child:rg1:ref2': '└',
+      r1: '',
+      rg1: '╷',
+      rg2: '',
+    });
+  });
+});

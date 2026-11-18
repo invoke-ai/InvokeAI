@@ -8,7 +8,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 
-import type { ResultDestination } from './invocationContracts';
+import type { InvocationSourceId, ResultDestination } from './invocationContracts';
 import type { SubmitResolvedInvocationDeps } from './invocationSubmit';
 import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepareCanvasInvocation';
 import type { WorkbenchCommands, WorkbenchQueries } from './workbenchStore';
@@ -28,6 +28,13 @@ export interface ActiveInvocationSubmissionArgs {
   /** Invoke Front: the backend runs this batch ahead of the user's other pending work. */
   prepend?: boolean;
   queries: WorkbenchQueries;
+  /**
+   * Runs this source's route, its source fixed, as a graph preview of that source does, rather than the active route.
+   * Video uses Gallery; other sources keep the active route's destination.
+   */
+  sourceId?: InvocationSourceId;
+  /** Hears that the submission has started: it is valid and holds the project's preparation lease. */
+  onStarted?: () => void;
 }
 
 export interface ActiveInvocationSubmissionRuntime {
@@ -73,17 +80,23 @@ export const submitActiveInvocation = async (
     getModels,
     prepend,
     queries,
+    sourceId,
+    onStarted,
   }: ActiveInvocationSubmissionArgs,
   activeRuntime: ActiveInvocationSubmissionRuntime = runtime
 ): Promise<void> => {
   const owner = activeRuntime.capture();
   activeRuntime.flushDrafts();
   const snapshot = queries.getSnapshot();
-  const invocation = destinationOverride
-    ? { ...snapshot.activeProject.invocation, destination: destinationOverride }
-    : snapshot.activeProject.invocation;
+  const active = snapshot.activeProject.invocation;
+  const invocation = {
+    ...active,
+    ...(destinationOverride ? { destination: destinationOverride } : {}),
+    ...(sourceId ? { sourceId, sourceLocked: true } : {}),
+    ...(sourceId === 'video' ? { destination: 'gallery' as const } : {}),
+  };
   const models = getModels();
-  const route = resolveInvocationRoute(snapshot.activeProject, 'global', invocation, models);
+  const route = resolveInvocationRoute(snapshot.activeProject, sourceId ? 'dialog' : 'global', invocation, models);
 
   if (!isInvocationRouteValid(route) || snapshot.backendConnection.status !== 'connected') {
     return;
@@ -96,6 +109,8 @@ export const submitActiveInvocation = async (
   if (!preparationLease) {
     return;
   }
+
+  onStarted?.();
 
   try {
     const prepareCanvasInvocation = isCanvasSubmission
@@ -113,6 +128,7 @@ export const submitActiveInvocation = async (
       ...(prepend ? { prepend } : {}),
       project: snapshot.activeProject,
       route,
+      scopedDefaults: snapshot.scopedDefaults,
     });
   } catch (error) {
     if (!activeRuntime.isCurrent(owner)) {

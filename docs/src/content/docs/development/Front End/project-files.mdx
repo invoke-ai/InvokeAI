@@ -60,8 +60,9 @@ document or its source project requires.
 
 If another client raises the floor while a project is already open, the next save becomes a
 terminal per-project schema refusal instead of a generic network failure. The local document still
-writes through to the browser cache, repeated server retries stop, and the project Sync status asks
-the user to update Invoke. On reload, divergent cached bytes move into the raw refused-project
+writes through to the browser cache, repeated server retries stop, and the project conflict banner
+asks the user to update Invoke; the Autosave status lists the project as needing a newer version of
+Invoke. On reload, divergent cached bytes move into the raw refused-project
 recovery bucket before the ordinary cache is refreshed, so the server refusal cannot erase them.
 Project listings use the same metadata to label incompatible projects without issuing a document
 GET that is already known to fail.

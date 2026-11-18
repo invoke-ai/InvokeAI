@@ -4,7 +4,6 @@ import { Group } from '@platform/ui/Group';
 import { InvokeButton } from './InvokeButton';
 import { IterationsField } from './IterationsField';
 import { QueueCluster } from './QueueCluster';
-import { RoutingControl } from './RoutingControl';
 import { useInvocationState } from './useInvocationState';
 
 export const InvocationCluster = () => {
@@ -15,7 +14,6 @@ export const InvocationCluster = () => {
       <Group attached>
         <IterationsField />
         <InvokeButton state={state} />
-        <RoutingControl state={state} />
       </Group>
       <QueueCluster />
     </HStack>

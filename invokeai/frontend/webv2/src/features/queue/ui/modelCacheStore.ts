@@ -1,3 +1,4 @@
+import type { components } from '@api/schema';
 import type { TFunction } from 'i18next';
 
 import { formatBytes } from '@platform/i18n/languages';
@@ -13,7 +14,18 @@ import { apiFetchJson, getApiErrorMessage } from '@platform/transport/http';
 /** The backend sizes the model cache in binary gigabytes (GiB). */
 export const formatModelCacheBytes = (bytes: number | null | undefined): string => formatBytes(bytes, { binary: true });
 
-/** Cache statistics have no socket stream; refresh on mount, model load, and clear. */
+/** `used/total` sharing one unit when both sizes read in the same one ("6.2/12.0 GiB"), each with its own otherwise. */
+export const formatModelCacheRange = (used: number, total: number): string => {
+  const usedText = formatModelCacheBytes(used);
+  const totalText = formatModelCacheBytes(total);
+  const unitStart = usedText.lastIndexOf('\u00a0');
+
+  return unitStart >= 0 && totalText.endsWith(usedText.slice(unitStart))
+    ? `${usedText.slice(0, unitStart)}/${totalText}`
+    : `${usedText}/${totalText}`;
+};
+
+/** Cache statistics have no socket stream; they refresh while watched (on watch and model load) and after a clear. */
 
 export interface ModelCacheStats {
   hits: number;
@@ -30,12 +42,13 @@ export interface ModelCacheStats {
   loaded_model_sizes?: Record<string, number>;
 }
 
-export interface ModelCacheClearResult {
-  models_cleared: number;
-  bytes_freed: number;
-}
+export type ModelCacheClearResult = components['schemas']['EmptyModelCacheResponse'];
 
-const EMPTY_MODEL_CACHE_CLEAR_RESULT: ModelCacheClearResult = { bytes_freed: 0, models_cleared: 0 };
+const EMPTY_MODEL_CACHE_CLEAR_RESULT: ModelCacheClearResult = {
+  bytes_freed: 0,
+  models_cleared: 0,
+  vram_release_refused: false,
+};
 
 export const normalizeModelCacheClearResult = (result: ModelCacheClearResult | null): ModelCacheClearResult =>
   result ?? EMPTY_MODEL_CACHE_CLEAR_RESULT;
@@ -46,9 +59,17 @@ export const getModelCacheUsage = (stats: ModelCacheStats | null): { used: numbe
 });
 
 export const getModelCacheClearToast = (
-  { bytes_freed, models_cleared }: ModelCacheClearResult,
+  { bytes_freed, models_cleared, vram_release_refused }: ModelCacheClearResult,
   t: TFunction
-): { title: string; description: string; status: 'info' | 'success' } => {
+): { title: string; description: string; status: 'error' | 'info' | 'success' } => {
+  if (vram_release_refused) {
+    return {
+      description: t('widgets.queue.modelCache.vramNotReleasedDescription', { count: models_cleared }),
+      status: 'error',
+      title: t('widgets.queue.modelCache.vramNotReleased'),
+    };
+  }
+
   if (models_cleared === 0) {
     return {
       description: t('widgets.queue.modelCache.noModelsClearedDescription'),
@@ -121,6 +142,22 @@ export const refreshModelCacheStats = (): Promise<void> => {
   inflight = refresh;
   return inflight;
 };
+
+let watchers = 0;
+
+/** Marks the stats as on screen and reads them; returns the release. */
+export const watchModelCacheStats = (): (() => void) => {
+  watchers += 1;
+  void refreshModelCacheStats();
+
+  return () => {
+    watchers -= 1;
+  };
+};
+
+/** The realtime runtime's model-load hook: a reading nobody shows is not worth a request. */
+export const refreshWatchedModelCacheStats = (): Promise<void> =>
+  watchers > 0 ? refreshModelCacheStats() : Promise.resolve();
 
 export const clearModelCache = async (): Promise<ModelCacheClearResult> => {
   const owner = captureAccountScope();

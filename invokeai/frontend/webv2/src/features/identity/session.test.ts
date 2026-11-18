@@ -244,9 +244,13 @@ describe('identity account transitions', () => {
       'token.clear',
       `publish:signed-out:${snapshot.accountEpoch}`,
     ]);
-    expect(snapshot).toMatchObject({ sessionExpired: true, user: null });
+    // The expired account is remembered so its own sign-in can return where it was.
+    expect(snapshot).toMatchObject({ expiredUserId: user.user_id, sessionExpired: true, user: null });
     expect(testState.getToken()).toBeNull();
     unsubscribe();
+
+    await session.loginWithCredentials(user.email, 'password', true);
+    expect(session.getAuthSession()).toMatchObject({ expiredUserId: null, sessionExpired: false });
   });
 
   it('completes local logout without waiting for the best-effort server request', async () => {
@@ -576,11 +580,11 @@ describe('protected media cookie recovery', () => {
 });
 
 /** An unsigned token carrying the backend's `user_id` claim; only the claim matters to the client. */
-const tokenFor = (userId: string, nonce: string): string => {
+const tokenFor = (userId: string, nonce: string, exp?: number): string => {
   const encode = (value: object): string =>
     btoa(JSON.stringify(value)).replaceAll('=', '').replaceAll('+', '-').replaceAll('/', '_');
 
-  return `${encode({ alg: 'HS256' })}.${encode({ nonce, user_id: userId })}.signature`;
+  return `${encode({ alg: 'HS256' })}.${encode({ exp, nonce, user_id: userId })}.signature`;
 };
 
 describe('cross-tab credential reconciliation', () => {
@@ -635,6 +639,7 @@ describe('cross-tab credential reconciliation', () => {
     const unsubscribe = recordPublications();
 
     testState.otherTabStores(null);
+    expect(session.getAuthSession().expiredUserId).toBeNull();
 
     expect(testState.events).toEqual(['lifecycle.invalidate', 'cache.clear', 'publish:signed-out']);
     expect(session.getAuthSession()).toMatchObject({ sessionExpired: false, user: null });
@@ -661,11 +666,14 @@ describe('cross-tab credential reconciliation', () => {
     expect(scopeA.signal.aborted).toBe(true);
     expect(requestCredential).toEqual({ identity: lifecycle.capture(), token: tokenB });
     expect(lifecycle.capture().accountId).toBeNull();
+    // Signed out only in passing: the layout shows the switch instead of the sign-in screen.
+    expect(session.getAuthSession()).toMatchObject({ switchingAccount: true, user: null });
 
     principal.resolve(userB);
     await vi.waitFor(() => {
       expect(session.getAuthSession().user).toEqual(userB);
     });
+    expect(session.getAuthSession().switchingAccount).toBe(false);
 
     expect(testState.events).toEqual([
       'lifecycle.invalidate',
@@ -739,6 +747,8 @@ describe('cross-tab credential reconciliation', () => {
     });
 
     expect(session.getAuthSession().user).toBeNull();
+    // The rejected token was another tab's account: this page's way back must not hand it to that account.
+    expect(session.getAuthSession().expiredUserId).toBeNull();
     expect(testState.getToken()).toBeNull();
   });
 
@@ -854,5 +864,59 @@ describe('cross-tab credential reconciliation', () => {
 
     expect(session.getAuthSession()).toMatchObject({ accountEpoch, sessionExpired: false, user });
     expect(heldToken()).toBe('token-a-epoch-2');
+  });
+});
+
+describe('session expiry warning', () => {
+  const MINUTE = 60_000;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const signInWith = async (token: string): Promise<void> => {
+    api.login.mockResolvedValueOnce({ expires_in: 3600, token, user });
+    await resolveSignedOutMultiuserSession();
+    await session.loginWithCredentials(user.email, 'password', false);
+  };
+
+  it('warns once the held token is within the lead of its expiry, and withdraws the warning on renewal', async () => {
+    vi.useFakeTimers({ now: 0 });
+    await signInWith(tokenFor(user.user_id, 'a', 60));
+    const warnings: { expiresAt: number; signal: AbortSignal }[] = [];
+    const stop = session.watchSessionExpiry((warning) => warnings.push(warning), { leadMs: 10_000 });
+
+    vi.advanceTimersByTime(49_999);
+    expect(warnings).toEqual([]);
+    vi.advanceTimersByTime(1);
+    expect(warnings.map((warning) => warning.expiresAt)).toEqual([60_000]);
+
+    // A sliding renewal carries a later expiry: the old warning is moot and the next one waits for the new token.
+    session.identityTransportAuthAdapter.onRefreshedToken(
+      session.identityTransportAuthAdapter.capture(),
+      tokenFor(user.user_id, 'renewed', 60 * 60)
+    );
+    expect(warnings[0]!.signal.aborted).toBe(true);
+    vi.advanceTimersByTime(10 * MINUTE);
+    expect(warnings).toHaveLength(1);
+    stop();
+  });
+
+  it('never warns for a token without an expiry claim, and withdraws a warning when the session ends', async () => {
+    vi.useFakeTimers({ now: 0 });
+    await signInWith('opaque-token');
+    const warnings: { signal: AbortSignal }[] = [];
+    const stop = session.watchSessionExpiry((warning) => warnings.push(warning), { leadMs: 10_000 });
+    vi.advanceTimersByTime(7 * 24 * 60 * MINUTE);
+    expect(warnings).toEqual([]);
+    stop();
+
+    // Already inside the lead when it arrives: it warns at once.
+    await signInWith(tokenFor(user.user_id, 'b', Date.now() / 1000 + 5));
+    const stopNext = session.watchSessionExpiry((warning) => warnings.push(warning), { leadMs: 10_000 });
+    expect(warnings).toHaveLength(1);
+    rejectHeldCredential();
+    expect(warnings[0]!.signal.aborted).toBe(true);
+    stopNext();
   });
 });

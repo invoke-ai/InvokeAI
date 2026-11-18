@@ -141,7 +141,13 @@ const rebuildCanvas = (canvas: CanvasStateContractV3, urls: ProjectMediaUrlResol
   const document = rebuildCanvasDocument(canvas.document, urls);
   const snapshots = mapShared(canvas.snapshots, (snapshot) => {
     const snapshotDocument = rebuildCanvasDocument(snapshot.document, urls);
-    return snapshotDocument === snapshot.document ? snapshot : { ...snapshot, document: snapshotDocument };
+    // A restore point's staged results come back to staging, so their URLs follow this deployment too.
+    const stagedImages = snapshot.stagedImages
+      ? mapShared(snapshot.stagedImages, (image) => rebuildGeneratedImage(image, urls))
+      : undefined;
+    return snapshotDocument === snapshot.document && stagedImages === snapshot.stagedImages
+      ? snapshot
+      : { ...snapshot, document: snapshotDocument, ...(stagedImages ? { stagedImages } : {}) };
   });
   const pendingImages = mapShared(canvas.stagingArea.pendingImages, (image) => rebuildGeneratedImage(image, urls));
   return document === canvas.document &&

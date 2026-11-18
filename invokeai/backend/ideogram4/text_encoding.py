@@ -26,17 +26,23 @@ def encode_qwen3vl_prompt(
     text_encoder,
     *,
     max_text_tokens: int = MAX_TEXT_TOKENS,
+    device: torch.device | None = None,
 ) -> torch.Tensor:
     """Encode a single prompt into Ideogram 4 conditioning features.
 
-    Returns a ``(num_text_tokens, 53248)`` float32 tensor (on the encoder's device;
-    the caller is responsible for moving it to CPU for storage).
+    Returns a ``(num_text_tokens, 53248)`` float32 tensor (on ``device``; the caller is responsible
+    for moving it to CPU for storage).
+
+    ``device`` is where the encoder computes. Pass it for a model the cache may have loaded only in
+    part: its first parameter can then sit in RAM, and inputs placed next to it would run every
+    streamed layer on the CPU. Defaults to that first parameter's device.
     """
     # Importing here keeps module import cheap and tolerant of transformers versions
     # that lay out the masking utilities differently.
     from transformers.masking_utils import create_causal_mask
 
-    device = next(text_encoder.parameters()).device
+    if device is None:
+        device = next(text_encoder.parameters()).device
 
     # Chat-format and tokenize, matching Ideogram4Pipeline._tokenize.
     messages = [{"role": "user", "content": [{"type": "text", "text": prompt}]}]

@@ -77,7 +77,7 @@ export const IntermediatesManager = ({
   const deleteReasonId = useId();
   useMountEffect(() => {
     consumeIntermediatesFocus(focus);
-    return () => window.clearTimeout(searchTimerRef.current);
+    // The input owns this bounded debounce; Activity hide must not discard its pending query.
   });
   const [ownerFilter, setOwnerFilter] = useState<string | null>(() =>
     focus?.ownerId && canClearOthersIntermediates ? focus.ownerId : currentUserId

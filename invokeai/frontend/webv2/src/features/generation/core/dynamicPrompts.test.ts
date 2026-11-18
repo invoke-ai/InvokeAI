@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  expandsDynamicPrompts,
+  findDynamicPromptComment,
   getWildcardNameError,
   getWildcardValuesError,
   hasDynamicPromptSyntax,
@@ -18,6 +20,17 @@ describe('hasDynamicPromptSyntax', () => {
     expect(hasDynamicPromptSyntax('a {red|green} ball')).toBe(true);
     expect(hasDynamicPromptSyntax('{a}')).toBe(true);
     expect(hasDynamicPromptSyntax('multi\nline {a|b}')).toBe(true);
+  });
+
+  it('never treats a JSON prompt as dynamic, fenced or not', () => {
+    const draft =
+      '{"width":1024,"height":1536,"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"a #1 poster"},"items":[{"caption":"__colors__"}]}';
+    expect(hasDynamicPromptSyntax(draft)).toBe(false);
+    expect(hasDynamicPromptSyntax(`\`\`\`json\n${draft}\n\`\`\``)).toBe(false);
+    expect(hasDynamicPromptSyntax('[{"caption": "a {red|green} ball"}]')).toBe(false);
+    // Braces that do not form JSON are still variants.
+    expect(hasDynamicPromptSyntax('{"caption": a {red|green} ball}')).toBe(true);
+    expect(hasDynamicPromptSyntax('a poster {"caption": "x"}')).toBe(true);
   });
 
   it('detects a wildcard reference', () => {
@@ -91,6 +104,37 @@ describe('sanitizeMaxPrompts', () => {
   });
 });
 
+describe('expandsDynamicPrompts', () => {
+  it('expands dynamic syntax only while dynamic prompts are on', () => {
+    expect(expandsDynamicPrompts('a {red|green} ball', true)).toBe(true);
+    expect(expandsDynamicPrompts('a {red|green} ball', false)).toBe(false);
+    expect(expandsDynamicPrompts('wall painted #ff0000', false)).toBe(false);
+    expect(expandsDynamicPrompts('a red ball', true)).toBe(false);
+  });
+});
+
+describe('findDynamicPromptComment', () => {
+  it('finds a # anywhere, since # alone makes the prompt expand', () => {
+    expect(findDynamicPromptComment('wall painted #ff0000')).toBe('#');
+    expect(findDynamicPromptComment('first line\nsecond # note')).toBe('#');
+  });
+
+  it('finds // and block comments only in a prompt expanded for other syntax', () => {
+    expect(findDynamicPromptComment('see https://example.com')).toBeNull();
+    expect(findDynamicPromptComment('a {red|green} ball, see https://example.com')).toBe('//');
+    expect(findDynamicPromptComment('a /* draft */ {red|green} ball')).toBe('/*');
+    expect(findDynamicPromptComment('a /* unclosed {red|green} ball')).toBeNull();
+  });
+
+  it('names the comment that comes first', () => {
+    expect(findDynamicPromptComment('a {b|c} // later # last')).toBe('//');
+  });
+
+  it('finds nothing in a prompt without comments', () => {
+    expect(findDynamicPromptComment('a {red|green} ball')).toBeNull();
+  });
+});
+
 describe('sanitizeDynamicPromptsConfig', () => {
   it('returns null for non-object values', () => {
     expect(sanitizeDynamicPromptsConfig(null)).toBeNull();
@@ -100,6 +144,7 @@ describe('sanitizeDynamicPromptsConfig', () => {
   it('defaults every unusable field', () => {
     expect(sanitizeDynamicPromptsConfig({})).toEqual({
       combinatorial: true,
+      enabled: true,
       maxPrompts: 100,
       resample: true,
       sampleSeed: 0,
@@ -108,6 +153,7 @@ describe('sanitizeDynamicPromptsConfig', () => {
     expect(
       sanitizeDynamicPromptsConfig({
         combinatorial: false,
+        enabled: false,
         maxPrompts: 7,
         resample: false,
         sampleSeed: 42,
@@ -115,6 +161,7 @@ describe('sanitizeDynamicPromptsConfig', () => {
       })
     ).toEqual({
       combinatorial: false,
+      enabled: false,
       maxPrompts: 7,
       resample: false,
       sampleSeed: 42,
@@ -244,6 +291,7 @@ describe('getWildcardValuesError', () => {
 
 const source = (overrides: Partial<GenerateSubmissionSource> = {}): GenerateSubmissionSource => ({
   batchCount: 2,
+  dynamicPromptsEnabled: true,
   negativePrompt: 'blurry',
   negativePromptEnabled: true,
   positivePrompt: 'a cat',
@@ -273,6 +321,29 @@ describe('planGenerateSubmission', () => {
     expect(suppressed.effectivePrompts.negativePrompt).toBe('blurry, lowres');
   });
 
+  it('sends a JSON prompt whole and unexpanded under a template, with the negative side templated', () => {
+    const layout =
+      '{"bbox_coord_space":"abs_centralized","bbox_format":"yxyx","summary":{"caption":"a {red|green} cup"},"items":[]}';
+    const promptTemplate = {
+      id: 't',
+      name: 'Photo',
+      negativePrompt: '{prompt}, lowres',
+      positivePrompt: 'photo of {prompt}',
+    };
+    const plan = planGenerateSubmission(
+      source({ dynamicPromptsSeedBehaviour: 'per-image', positivePrompt: layout, promptTemplate }),
+      ['stale expansion']
+    );
+
+    expect(plan.submission).toEqual({
+      batchCount: 2,
+      negativePrompt: 'blurry, lowres',
+      positivePrompt: layout,
+      seed: 10,
+      seedStep: plan.seedPlan.step,
+    });
+  });
+
   it('sends an expansion and its seed behaviour only for a prompt with dynamic syntax', () => {
     const expansion = ['a red cat', 'a green cat'];
     const expanded = planGenerateSubmission(
@@ -300,6 +371,26 @@ describe('planGenerateSubmission', () => {
       seedStep: 1,
     });
     expect(plain.seedPlan.nextSeed).toBe(12);
+  });
+
+  it('sends a prompt with dynamic syntax as typed when dynamic prompts are off', () => {
+    const { seedPlan, submission } = planGenerateSubmission(
+      source({
+        dynamicPromptsEnabled: false,
+        dynamicPromptsSeedBehaviour: 'per-image',
+        positivePrompt: 'a {red|green} cat',
+      }),
+      ['a red cat', 'a green cat']
+    );
+
+    expect(submission).toEqual({
+      batchCount: 2,
+      negativePrompt: 'blurry',
+      positivePrompt: 'a {red|green} cat',
+      seed: 10,
+      seedStep: 1,
+    });
+    expect(seedPlan.nextSeed).toBe(12);
   });
 
   it('holds a fixed seed', () => {

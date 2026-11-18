@@ -1,3 +1,4 @@
+import type { AutoSwitchMode } from '@features/queue/contracts';
 import type { WorkbenchLanguage } from '@platform/i18n/languages';
 import type { LogLevel, LogNamespace } from '@platform/logging/contracts';
 import type { SettingsTarget } from '@platform/ui/settings/contracts';
@@ -5,27 +6,46 @@ import type { PromptFontSize } from '@theme/scale';
 import type { WorkbenchThemeId } from '@theme/themes';
 import type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
+/** Select Object starts with auto-update on until the person turns it off. */
+export const DEFAULT_SELECT_OBJECT_AUTO_UPDATE = true;
+
 export type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
 export type { WorkbenchLanguage } from '@platform/i18n/languages';
 
-/** What the workflow library's own templates are ordered by (dates newest first, names A to Z). */
-export type WorkflowLibrarySortId = 'updated' | 'opened' | 'created' | 'name';
+/** What the workflow library's own templates are ordered by. */
+export type WorkflowLibrarySortId = 'updated' | 'opened' | 'created' | 'name' | 'lastRun';
+
+/** The library order's direction; changing the key resets it to the key's natural one (dates newest first, names A to Z). */
+export type WorkflowLibrarySortDirection = 'asc' | 'desc';
+
+/** How large the workflow library's cards are. */
+export type WorkflowLibraryCardSize = 'small' | 'large';
+
+/** Whether the workflow library shows its workflows as a card grid or as list rows. */
+export type WorkflowLibraryLayout = 'grid' | 'list';
 
 /** How workflow thumbnails fill their 3:2 box: cropped to fill it, or letterboxed to fit whole. */
 export type WorkflowLibraryThumbnailFit = 'cover' | 'contain';
+
+/** What a launch of the app's bare URL opens: the Launchpad, or the most recent project. */
+export type StartupDestination = 'launchpad' | 'recentProject';
 
 /**
  * Export document generation settings with the project; personal editor choices belong in {@link
  * WorkbenchPreferences} so imports cannot overwrite them.
  */
 export interface ProjectSettings {
-  useCpuNoise: boolean;
+  /**
+   * The three generation flags are this project's pins: absent follows the user's default
+   * (`WorkbenchPreferences.scopedDefaults.generate`), then the built-in. Read them through
+   * `getEffectiveProjectSettings`.
+   */
+  useCpuNoise?: boolean;
   /** Blur images the NSFW checker flags before they are saved. */
-  useNsfwChecker: boolean;
+  useNsfwChecker?: boolean;
   /** Stamp an invisible watermark into every saved image. */
-  useWatermark: boolean;
-  antialiasProgressImages: boolean;
+  useWatermark?: boolean;
   /**
    * What the Preview switches to while work runs; the Preview owns this control, so it is not in Settings. Projects
    * saved before it existed read as `off`, so an upgrade never starts moving a selection the user had settled on.
@@ -33,11 +53,19 @@ export interface ProjectSettings {
   viewerAutoSwitch: ViewerAutoSwitchMode;
 }
 
+/** The Preview's Auto-switch: the shared policy's modes (`AutoSwitchMode`, rules in `@features/queue/contracts`). */
+export type ViewerAutoSwitchMode = AutoSwitchMode;
+
+/** {@link ProjectSettings} with every layered flag resolved: project pin, then the user's default, then built-in. */
+export type EffectiveProjectSettings = Required<ProjectSettings>;
+
 /**
- * `latest`: each finished result takes the selection. `progress`: the same, and live frames show while it runs.
- * `off`: results land in the Gallery only (one still takes an empty selection). The canvas staging bar's values.
+ * The user's defaults for per-project settings, keyed by owner: a widget type id (`gallery`, `canvas`, `preview`,
+ * `image-map`), and `generate` for the layered {@link ProjectSettings} flags the Generate widget's settings show (they
+ * layer over the project settings, never over the Generate widget's values). Each record holds only layerable keys
+ * the user chose (`getLayeredSettings`); owners normalize the values on read, as they do their widget values.
  */
-export type ViewerAutoSwitchMode = 'off' | 'latest' | 'progress';
+export type ScopedDefaults = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
 /**
  * Store the RebalancePreset shape locally to keep generation out of Launchpad's bundle. Generation owns and
@@ -48,6 +76,17 @@ export interface StoredRebalancePreset {
   label: string;
   weights: string;
   multiplier: number;
+}
+
+/**
+ * A user-named aspect ratio as it is persisted, kept local for the same bundle reason as {@link StoredRebalancePreset}.
+ * Generation owns the ratio rules and revalidates the terms on read.
+ */
+export interface StoredAspectRatioPreset {
+  id: string;
+  label: string;
+  width: number;
+  height: number;
 }
 
 /**
@@ -63,17 +102,21 @@ export interface StoredGeneratePreset {
 
 /** User-tunable appearance + behavior preferences surfaced in the Settings modal. */
 export interface WorkbenchPreferences {
-  /** The alpha-build notice was dismissed; shown once per account until then. */
-  alphaNoticeAcknowledged: boolean;
+  /** The beta-build notice was dismissed; shown once per account until then. */
+  betaNoticeAcknowledged: boolean;
   /** Server version whose What's New notes were last dismissed; a different version shows them once. */
   whatsNewSeenVersion: string | null;
   themeId: WorkbenchThemeId;
   reduceMotion: boolean;
   showFocusRegionHighlight: boolean;
   confirmImageDeletion: boolean;
+  /** The note that browsing a board no longer changes where new results go was shown; once per account. */
+  galleryDestinationNoticeShown: boolean;
   /** Auto-switch the Invoke source/destination to match the surface being edited; locks always win. */
   autoSwitchInvocationRoute: boolean;
   queueJobsScope: 'active-project' | 'all';
+  /** What opening the app's bare URL shows; deep links, reloads and later visits to Home are never redirected. */
+  startupDestination: StartupDestination;
   language: WorkbenchLanguage;
   enableInformationalPopovers: boolean;
   enableModelDescriptions: boolean;
@@ -109,12 +152,20 @@ export interface WorkbenchPreferences {
   workflowEdgesBehindNodes: boolean;
   /** Order of the workflow library's own templates. */
   workflowLibrarySort: WorkflowLibrarySortId;
+  workflowLibrarySortDirection: WorkflowLibrarySortDirection;
+  workflowLibraryCardSize: WorkflowLibraryCardSize;
+  /** The workflow library's and This project's layout; card size and thumbnail fit apply to the grid. */
+  workflowLibraryLayout: WorkflowLibraryLayout;
   /** How workflow library and project cards show their thumbnails. */
   workflowLibraryThumbnailFit: WorkflowLibraryThumbnailFit;
   /** Raise text and border contrast on every theme (a11y). */
   highContrast: boolean;
-  /** Select Object processes each prompt edit automatically; kept across sessions, Reset, and reloads. */
-  selectObjectAutoProcess: boolean;
+  /**
+   * Select Object updates its preview after each input change; kept across sessions, Reset, and reloads. Stored under
+   * a new name since auto-update became the default: the old `selectObjectAutoProcess` field was written as `false` by
+   * any settings save, so it cannot tell a choice from the old default, and normalization drops it.
+   */
+  selectObjectAutoUpdate: boolean;
   /** Account-bound overrides keyed by hotkey id (`app.invoke`, `gallery.galleryNavLeft`, etc.). */
   customHotkeys: Record<string, string[]>;
   /** Generate panel section open/closed overrides keyed by section id; absent = section default. */
@@ -125,15 +176,32 @@ export interface WorkbenchPreferences {
   launchpadProjectsSort: ProjectSortId;
   /** Projects pinned to the top of the library, oldest pin first. */
   launchpadPinnedProjectIds: string[];
+  /** User-named aspect ratios (ratios only, never sizes), in the order they were saved. */
+  aspectRatioPresets: StoredAspectRatioPreset[];
   /** User-saved Krea-2 conditioning rebalance curves, in the order they were saved. */
   krea2RebalancePresets: StoredRebalancePreset[];
   /** User-saved Generate settings snapshots ("recipes"), in the order they were saved. */
   generatePresets: StoredGeneratePreset[];
+  /** Whether a new Generate preset keeps the prompts too: the save dialog's last choice. Not shown in Settings. */
+  generatePresetsIncludePrompts: boolean;
   /**
    * The last control model picked per main-model base and control type (`${base}:${controlType}` → model key);
    * control layers left on automatic use it. Not shown in Settings.
    */
   controlModelMemory: Record<string, string>;
+  /**
+   * Canvas brush, eraser, shape and text options, restored whenever a canvas engine starts. Canvas owns its shape and
+   * normalizes it on every read (`canvas-operations/toolMemory.ts`); here it is only a plain object. Not shown in
+   * Settings.
+   */
+  canvasToolMemory: Readonly<Record<string, unknown>>;
+  /**
+   * Per-project settings' user defaults (see {@link ScopedDefaults}): a project without its own value for a setting
+   * follows these, then the built-in. Not shown as such in Settings.
+   */
+  scopedDefaults: ScopedDefaults;
+  /** Smooth the low-resolution live frames shown while an image generates. */
+  antialiasProgressImages: boolean;
 }
 
 export type SettingsSectionId = string;

@@ -127,14 +127,15 @@ def test_an_fp4_mixed_encoder_loads_packed_and_encodes_like_its_dense_weights(
     monkeypatch.setattr(z_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
     loader = object.__new__(Qwen3EncoderCheckpointLoader)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._torch_device, loader._logger = torch.device("cpu"), MagicMock()
     reserved_before_fold: list[bool] = []
-    fold = z_image._fold_comfy_scaled_weights
+    fold = z_image.dequantize_fp8_scaled
 
-    def recording_fold(sd: dict, dtype: torch.dtype) -> int:
+    def recording_fold(*args, **kwargs):
         reserved_before_fold.append(loader._ram_cache.make_room.called)
-        return fold(sd, dtype)
+        return fold(*args, **kwargs)
 
-    monkeypatch.setattr(z_image, "_fold_comfy_scaled_weights", recording_fold)
+    monkeypatch.setattr(z_image, "dequantize_fp8_scaled", recording_fold)
     config = Qwen3Encoder_Checkpoint_Config.model_construct(path=str(checkpoint), variant=Qwen3VariantType.Qwen3_4B)
 
     model = loader._load_from_singlefile(config)
@@ -215,11 +216,12 @@ def test_an_int8_convrot_encoder_stays_int8_resident_and_encodes_like_its_dense_
     monkeypatch.setattr(z_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
     loader = object.__new__(Qwen3EncoderCheckpointLoader)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._torch_device, loader._logger = torch.device("cpu"), MagicMock()
 
     def refuse(*_args, **_kwargs) -> int:
-        raise AssertionError("the scaled-fp8 fold must not see an int8 checkpoint")
+        raise AssertionError("the scaled-fp8 extraction must not see an int8 checkpoint")
 
-    monkeypatch.setattr(z_image, "_fold_comfy_scaled_weights", refuse)
+    monkeypatch.setattr(z_image, "extract_fp8_scaled_layers", refuse)
     config = Qwen3Encoder_Checkpoint_Config.model_construct(path=str(checkpoint), variant=Qwen3VariantType.Qwen3_8B)
 
     model = loader._load_from_singlefile(config)
@@ -259,7 +261,7 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
     """The degraded nvfp4 half-state, at this seam rather than at the detector.
 
     A packed uint8 weight with a block-scale grid and no `weight_scale_2` is the state a guard keyed
-    on `weight_scale_2` -- the key the decode keys on -- lets straight through. `_find_nvfp4_layers`
+    on `weight_scale_2` -- the key the decode keys on -- lets straight through. `find_nvfp4_layers`
     refuses it and `test_nvfp4.py` pins that; what only a seam can answer is whether this loader
     reaches the detector before it asks the cache for room. Asserted through the cache double this
     file already uses, in the same idiom as the cells above, because this loader reads its header
@@ -276,6 +278,7 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
     monkeypatch.setattr(z_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
     loader = object.__new__(Qwen3EncoderCheckpointLoader)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._torch_device, loader._logger = torch.device("cpu"), MagicMock()
     config = Qwen3Encoder_Checkpoint_Config.model_construct(path=str(checkpoint), variant=Qwen3VariantType.Qwen3_4B)
 
     with pytest.raises(ValueError, match="with a weight_scale but no weight_scale_2"):

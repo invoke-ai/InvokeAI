@@ -936,6 +936,7 @@ def _build_queue_item(invocation: BaseInvocation):
         {
             "item_id": 1,
             "session_id": "test-session",
+            "user_id": "system",
             "session": Session(),
         },
     )()
@@ -1402,6 +1403,7 @@ def test_run_node_does_not_swallow_sigint_in_subprocess() -> None:
             {
                 "item_id": 1,
                 "session_id": "test-session",
+                "user_id": "system",
                 "session": Session(),
             },
         )()

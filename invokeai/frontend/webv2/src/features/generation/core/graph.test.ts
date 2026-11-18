@@ -12,14 +12,29 @@ import type {
   VaeModelConfig,
 } from './types';
 
-import { getDefaultGenerateSettings, isSupportedGenerateModel } from './baseGenerationPolicies';
-import { compileGenerateGraph, resolveGenerateSeed } from './graph';
-import { generateGraphCases, satisfiedSettingsFor } from './graphCoverage.testing';
+import {
+  getDefaultGenerateSettings,
+  getGenerationValidationIssues,
+  isSupportedGenerateModel,
+  type SupportedGenerateBase,
+  withAddedReferenceImages,
+} from './baseGenerationPolicies';
+import { compileGenerateGraph, getFamilyGraphBuilder, GRAPH_BUILDERS, resolveGenerateSeed } from './graph';
+import {
+  fullyFilledSettingsFor,
+  generateGraphCases,
+  satisfiedSettingsFor,
+  tunedSettingsFor,
+} from './graphCoverage.testing';
+import { isPidDecodeNodeType } from './pidGraph';
+import { getReferenceImagePromptTags } from './referenceImage';
+import { REFINER_DENOISE_NODE_ID } from './sdxlRefinerGraph';
+import { syncGenerateWidgetValuesWithModels } from './settings';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
-const sd3Model: MainModelConfig = { base: 'sd-3', key: 'sd3-model', name: 'SD3', type: 'main' };
+const sd3Model: MainModelConfig = { base: 'sd-3', format: 'diffusers', key: 'sd3-model', name: 'SD3', type: 'main' };
 const fluxModel: MainModelConfig = { base: 'flux', key: 'flux-model', name: 'FLUX dev', type: 'main' };
 const flux2Model: MainModelConfig = {
   base: 'flux2',
@@ -207,7 +222,7 @@ describe('compileGenerateGraph', () => {
     expect(getEdge(graph, 'denoise_latents', 'unet')?.source.node_id).toBe('model_loader');
     expect(getEdge(graph, 'canvas_output', 'vae')?.source.node_id).toBe('model_loader');
     expect(graph.nodes.canvas_output?.fp32).toBe(true);
-    expect(graph.nodes.canvas_output?.color_compensation).toBe('None');
+    expect(graph.nodes.canvas_output).not.toHaveProperty('color_compensation');
   });
 
   it('records the accelerator supplied by the orchestration boundary in metadata', () => {
@@ -222,10 +237,11 @@ describe('compileGenerateGraph', () => {
     expect(getNodeByType(graph, 'core_metadata')?.rand_device).toBe('xpu');
   });
 
-  it('passes SDXL color compensation to the VAE decode node when enabled', () => {
-    const graph = compile(sdxlModel, { colorCompensation: true });
+  it.each([true, false])('omits encoder-only color compensation from SDXL txt2img when enabled=%s', (enabled) => {
+    const graph = compile(sdxlModel, { colorCompensation: enabled });
 
-    expect(graph.nodes.canvas_output?.color_compensation).toBe('SDXL');
+    expect(getNodeByType(graph, 'i2l')).toBeUndefined();
+    expect(graph.nodes.canvas_output).not.toHaveProperty('color_compensation');
   });
 
   it('coerces invalid SD schedulers before graph submission', () => {
@@ -267,6 +283,39 @@ describe('compileGenerateGraph', () => {
       hidiffusion_t2_ratio: 0.15,
       hidiffusion_window_attn: true,
     });
+  });
+
+  it.each([sd1Model, sdxlModel])('preserves automatic ratios and explicit zero for $base', (model) => {
+    const automatic = compile(model, { hiDiffusionEnabled: true, hiDiffusionManualRatios: { t1: 0.7, t2: 0.2 } });
+    expect(getNodeByType(automatic, 'denoise_latents')).toMatchObject({
+      hidiffusion_auto_ratios: true,
+      hidiffusion_t1_ratio: 0,
+      hidiffusion_t2_ratio: 0,
+    });
+    expect(getNodeByType(automatic, 'core_metadata')).toMatchObject({
+      hidiffusion_t1_ratio: null,
+      hidiffusion_t2_ratio: null,
+    });
+    const zero = compile(model, { hiDiffusionEnabled: true, hiDiffusionT1Ratio: 0, hiDiffusionT2Ratio: 0 });
+    expect(getNodeByType(zero, 'denoise_latents')).toMatchObject({ hidiffusion_t1_ratio: 0, hidiffusion_t2_ratio: 0 });
+    expect(() =>
+      compile(model, { hiDiffusionEnabled: true, hiDiffusionT1Ratio: 0.2, hiDiffusionT2Ratio: 0.4 })
+    ).toThrow('HiDiffusion T1');
+    expect(
+      getGenerationValidationIssues(model, {
+        ...getDefaultGenerateSettings(model),
+        hiDiffusionEnabled: true,
+        hiDiffusionT1Ratio: 0.2,
+        hiDiffusionT2Ratio: 0.4,
+      })
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: 'HiDiffusion T1 ratio must be greater than or equal to T2.',
+          target: { section: 'advanced' },
+        }),
+      ])
+    );
   });
 
   it('omits HiDiffusion ratios from denoise while disabled but records all metadata settings', () => {
@@ -441,6 +490,83 @@ describe('compileGenerateGraph', () => {
     expect(() => compile(fluxModel)).toThrow('Generate needs a T5 Encoder for FLUX models.');
   });
 
+  it('routes the SD3 transformer and both CLIP encoders through SD3 LoRAs, and T5 around them', () => {
+    const sd3Lora: LoraModelConfig = { base: 'sd-3', key: 'sd3-lora', name: 'SD3 LoRA', type: 'lora' };
+    // Same diffusers attention names, different family: it must not reach the SD3 loader.
+    const qwenLora: LoraModelConfig = { base: 'qwen-image', key: 'qwen-lora', name: 'Qwen LoRA', type: 'lora' };
+
+    const graph = compile(sd3Model, {
+      loras: [
+        { isEnabled: true, model: sd3Lora, weight: 0.6 },
+        { isEnabled: true, model: qwenLora, weight: 1 },
+      ],
+    });
+    const loraLoader = getNodeByType(graph, 'sd3_lora_collection_loader');
+
+    expect(loraLoader).toBeDefined();
+    for (const field of ['transformer', 'clip_l', 'clip_g']) {
+      expect(getEdge(graph, loraLoader?.id ?? '', field)?.source.node_id).toBe('model_loader');
+    }
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    for (const cond of ['pos_cond', 'neg_cond']) {
+      expect(getEdge(graph, cond, 'clip_l')?.source.node_id).toBe(loraLoader?.id);
+      expect(getEdge(graph, cond, 'clip_g')?.source.node_id).toBe(loraLoader?.id);
+      expect(getEdge(graph, cond, 't5_encoder')?.source.node_id).toBe('model_loader');
+    }
+    expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+      { model: { base: 'sd-3', key: 'sd3-lora', name: 'SD3 LoRA', type: 'lora' }, weight: 0.6 },
+    ]);
+  });
+
+  it('routes a GGUF SD3 transformer and its standalone CLIP encoders through the LoRAs that fit its size', () => {
+    const sd3Gguf: MainModelConfig = {
+      base: 'sd-3',
+      format: 'gguf_quantized',
+      key: 'sd3-gguf',
+      name: 'SD3.5 Medium GGUF',
+      type: 'main',
+      variant: 'sd3_medium',
+    };
+    const clipG: ComponentModelConfig = { ...clipEmbed, key: 'clip-g', name: 'CLIP G', variant: 'gigantic' };
+    const sd3Vae: VaeModelConfig = { base: 'sd-3', key: 'sd3-vae', name: 'SD3 VAE', type: 'vae' };
+    const lora = (key: string, variant: string): LoraModelConfig => ({
+      base: 'sd-3',
+      key,
+      name: key,
+      type: 'lora',
+      variant,
+    });
+
+    const graph = compile(sd3Gguf, {
+      clipGEmbedModel: clipG,
+      clipLEmbedModel: clipEmbed,
+      loras: [
+        { isEnabled: true, model: lora('medium-lora', 'sd3_medium'), weight: 0.6 },
+        { isEnabled: true, model: lora('large-lora', 'sd3_large'), weight: 1 },
+      ],
+      t5EncoderModel: t5Encoder,
+      vae: sd3Vae,
+    });
+    const loraLoader = getNodeByType(graph, 'sd3_lora_collection_loader');
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      clip_g_model: { key: 'clip-g' },
+      clip_l_model: { key: 'clip' },
+      t5_encoder_model: { key: 't5' },
+      vae_model: { key: 'sd3-vae' },
+    });
+    for (const field of ['transformer', 'clip_l', 'clip_g']) {
+      expect(getEdge(graph, loraLoader?.id ?? '', field)?.source.node_id).toBe('model_loader');
+    }
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    expect(getEdge(graph, 'pos_cond', 'clip_g')?.source.node_id).toBe(loraLoader?.id);
+    expect(getEdge(graph, 'pos_cond', 't5_encoder')?.source.node_id).toBe('model_loader');
+    // Only the LoRA trained for the GGUF's size reaches the graph.
+    expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+      { model: { base: 'sd-3', key: 'medium-lora', name: 'medium-lora', type: 'lora' }, weight: 0.6 },
+    ]);
+  });
+
   it('builds modern Diffusers-family graphs without separate component overrides', () => {
     expect(compile(sd3Model).nodes.model_loader?.type).toBe('sd3_model_loader');
     expect(compile(flux2Model).nodes.model_loader?.type).toBe('flux2_klein_model_loader');
@@ -531,6 +657,67 @@ describe('compileGenerateGraph', () => {
     expect(graph.nodes.model_loader?.vae_model).toBeUndefined();
   });
 
+  describe('FLUX.2 [dev] component sources', () => {
+    const sdnqKleinSource: MainModelConfig = {
+      ...flux2Klein9bModel,
+      format: 'sdnq_quantized',
+      key: 'flux2-klein-9b-sdnq-source',
+      submodels: completeSdnqPipeline,
+    };
+    const diffusersKleinSource: MainModelConfig = {
+      ...flux2Klein9bModel,
+      format: 'diffusers',
+      key: 'flux2-klein-9b-diffusers-source',
+    };
+
+    it('never sends an SDNQ pipeline as the Mistral source', () => {
+      expect(() =>
+        compile(flux2DevGgufModel, { componentSourceModel: sdnqKleinSource, mistralEncoderModel: mistralEncoder })
+      ).toThrow('Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers pipeline for this FLUX.2 [dev] model.');
+
+      const graph = compile(flux2DevGgufModel, {
+        componentSourceModel: sdnqKleinSource,
+        mistralEncoderModel: mistralEncoder,
+        vae: flux2Vae,
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({
+        mistral_encoder_model: mistralEncoder,
+        mistral_source_model: undefined,
+        vae_model: flux2Vae,
+      });
+    });
+
+    it('takes only the VAE from a Diffusers Klein pipeline', () => {
+      const graph = compile(flux2DevGgufModel, {
+        componentSourceModel: diffusersKleinSource,
+        mistralEncoderModel: mistralEncoder,
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({
+        mistral_encoder_model: mistralEncoder,
+        mistral_source_model: diffusersKleinSource,
+        type: 'flux2_dev_model_loader',
+        vae_model: undefined,
+      });
+    });
+
+    it('sends a self-contained SDNQ [dev] main its standalone encoder and VAE', () => {
+      const sdnqDev: MainModelConfig = { ...flux2DevModel, format: 'sdnq_quantized', submodels: completeSdnqPipeline };
+
+      expect(() => compile(sdnqDev)).toThrow(
+        'Generate needs a Mistral Encoder or a FLUX.2 [dev] Diffusers pipeline for this FLUX.2 [dev] model.'
+      );
+      expect(compile(sdnqDev, { mistralEncoderModel: mistralEncoder, vae: flux2Vae }).nodes.model_loader).toMatchObject(
+        {
+          mistral_encoder_model: mistralEncoder,
+          type: 'flux2_dev_model_loader',
+          vae_model: flux2Vae,
+        }
+      );
+    });
+  });
+
   it('uses a complete FLUX.2 SDNQ component source without standalone overrides', () => {
     const source: MainModelConfig = {
       ...flux2Klein9bModel,
@@ -556,7 +743,7 @@ describe('compileGenerateGraph', () => {
     };
 
     expect(() => compile(flux2Klein9bModel, { componentSourceModel: source })).toThrow(
-      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.'
     );
   });
 
@@ -577,12 +764,12 @@ describe('compileGenerateGraph', () => {
 
   it('rejects a stale incompatible FLUX.2 component source when Qwen3 is missing', () => {
     expect(() => compile(flux2Klein9bModel, { componentSourceModel: incompatibleFlux2Source, vae: flux2Vae })).toThrow(
-      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.'
     );
   });
 
   it('rejects dimensions that are not on the selected model family grid', () => {
-    expect(() => compile(flux2Model, { height: 888 })).toThrow('Generate height must be a multiple of 16.');
+    expect(() => compile(flux2Model, { height: 888 })).toThrow('Height must be a multiple of 16.');
   });
 
   it('builds an Anima graph with required components', () => {
@@ -718,7 +905,7 @@ describe('compileGenerateGraph', () => {
           referenceImages: [animaReference()],
           vae: qwenImageVae,
         })
-      ).toThrow('Reference Image #1 is not supported by anima model.');
+      ).toThrow('cannot use Reference image 1');
     });
   });
 
@@ -923,7 +1110,7 @@ describe('compileGenerateGraph', () => {
     expect(getEdge(graph, 'denoise_latents', 'ip_adapter')?.source.node_id).toContain('ip_adapter_collector');
   });
 
-  it('generates from the crop while serializing complete original and crop metadata', () => {
+  it('generates from the crop while serializing complete original and crop metadata, with the name', () => {
     const croppedReferenceImage = {
       crop: {
         box: { height: 256, width: 320, x: 40, y: 50 },
@@ -946,6 +1133,7 @@ describe('compileGenerateGraph', () => {
           },
           id: 'cropped-ref',
           isEnabled: true,
+          name: 'Hero pose',
         },
       ],
     });
@@ -957,6 +1145,8 @@ describe('compileGenerateGraph', () => {
         config: { image: croppedReferenceImage },
         id: 'cropped-ref',
         isEnabled: true,
+        // The user's label travels with the record so recall can restore it.
+        name: 'Hero pose',
       },
     ]);
   });
@@ -996,6 +1186,102 @@ describe('compileGenerateGraph', () => {
 
     expect(getNodeByType(graph, 'flux_kontext')).toBeDefined();
     expect(getEdge(graph, 'denoise_latents', 'kontext_conditioning')?.source.node_id).toContain('flux_kontext_collect');
+  });
+
+  it.each([
+    ['hf_repo_id', 'black-forest-labs/FLUX.1-Kontext-dev:fp16'],
+    ['url', 'https://www.huggingface.co/black-forest-labs/FLUX.1-Kontext-dev/tree/main'],
+    ['path', '/models/FLUX.1-Kontext-dev/'],
+    ['url', 'https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF/resolve/main/flux1-kontext-dev-Q4_K_M.gguf'],
+    [
+      'url',
+      'https://huggingface.co/Comfy-Org/flux1-kontext-dev_ComfyUI/resolve/main/split_files/diffusion_models/flux1-dev-kontext_fp8_scaled.safetensors',
+    ],
+  ])('creates a Kontext reference for a renamed model with %s source %s', (sourceType, source) => {
+    const renamed = { ...fluxKontextModel, name: 'Portrait editor', source, source_type: sourceType, variant: 'dev' };
+    const referenceImages = withAddedReferenceImages(renamed, [], [], [{ id: 'reference', image: refImage }]);
+
+    expect(referenceImages[0]?.config).toMatchObject({
+      model: { key: renamed.key },
+      type: 'flux_kontext_reference_image',
+    });
+    const graph = compile(renamed, {
+      clipEmbedModel: clipEmbed,
+      referenceImages,
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+    });
+    expect(getEdge(graph, 'denoise_latents', 'kontext_conditioning')).toBeDefined();
+  });
+
+  it.each([
+    ['url', 'https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev-preview/resolve/main/flux1-dev.safetensors'],
+    ['url', 'https://example.test/black-forest-labs/FLUX.1-Kontext-dev/resolve/main/flux1-dev.safetensors'],
+    ['path', '/models/kontext/flux1-dev.safetensors'],
+  ])('leaves an ordinary FLUX model with %s source %s on IP-Adapter', (sourceType, source) => {
+    const model = { ...fluxModel, source, source_type: sourceType };
+    const referenceImages = withAddedReferenceImages(model, [], [], [{ id: 'reference', image: refImage }]);
+
+    expect(referenceImages[0]?.config.type).toBe('ip_adapter');
+  });
+
+  it('preserves and adds local Kontext references after a display-only catalog rename', () => {
+    const installed = {
+      ...fluxKontextModel,
+      hash: 'original-file',
+      source: '/models/portrait.safetensors',
+      variant: 'dev',
+    };
+    const renamed = { ...installed, name: 'Portrait editor' };
+    const settings = {
+      ...createSettings(installed, {
+        clipEmbedModel: clipEmbed,
+        referenceImages: withAddedReferenceImages(installed, [], [], [{ id: 'reference', image: refImage }]),
+        t5EncoderModel: t5Encoder,
+        vae: fluxVae,
+      }),
+      model: installed,
+    };
+    const synced = syncGenerateWidgetValuesWithModels(settings, [renamed]);
+
+    expect(synced.model.name).toBe(renamed.name);
+    expect(synced.referenceImages[0]?.config).toMatchObject({
+      model: { key: renamed.key, name: renamed.name },
+      type: 'flux_kontext_reference_image',
+    });
+    const second = {
+      id: 'second-reference',
+      image: { original: { image: { ...refImage.original.image, image_name: 'second.png' } } },
+    };
+    const referenceImages = withAddedReferenceImages(synced.model, [], synced.referenceImages, [second]);
+    const graph = compile(synced.model, { ...synced, referenceImages });
+
+    expect(getEdge(graph, 'denoise_latents', 'kontext_conditioning')).toBeDefined();
+    expect(Object.values(graph.nodes).filter(({ type }) => type === 'flux_kontext')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ image: { image_name: 'reference.png' } }),
+        expect.objectContaining({ image: { image_name: 'second.png' } }),
+      ])
+    );
+
+    const anotherModel = { ...renamed, key: 'different-install', name: 'FLUX dev' };
+    expect(() => compile(anotherModel, synced)).toThrow(/cannot use reference image/i);
+    expect(withAddedReferenceImages(anotherModel, [], synced.referenceImages, [second])[1]?.config.type).toBe(
+      'ip_adapter'
+    );
+
+    const replacement = { ...renamed, hash: 'replacement-file', name: 'FLUX dev' };
+    const replaced = syncGenerateWidgetValuesWithModels(synced, [replacement]);
+    expect(() => compile(replaced.model, replaced)).toThrow(/cannot use reference image/i);
+    expect(withAddedReferenceImages(replaced.model, [], replaced.referenceImages, [second])[1]?.config.type).toBe(
+      'ip_adapter'
+    );
+
+    const otherVariant = { ...renamed, variant: 'schnell' };
+    const updated = syncGenerateWidgetValuesWithModels(synced, [otherVariant]);
+    expect(withAddedReferenceImages(updated.model, [], updated.referenceImages, [second])[1]?.config.type).toBe(
+      'ip_adapter'
+    );
   });
 
   it('wires FLUX.2 built-in reference images into denoise', () => {
@@ -1069,6 +1355,27 @@ describe('compileGenerateGraph', () => {
       expect(latentImages).toEqual(['a.png', 'b.png']);
     });
 
+    it('wires the references of a single-file model, whose standalone encoder reads them', () => {
+      const checkpoint: MainModelConfig = { ...qwenImage21Model, format: 'checkpoint', key: 'qwen21-int8' };
+      const encoder = {
+        base: 'any',
+        format: 'checkpoint',
+        key: 'qwen3-vl-8b',
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      };
+      const graph = compile(checkpoint, {
+        qwen3VLEncoderModel: encoder,
+        referenceImages: references('a.png', 'b.png'),
+        vae: { base: 'qwen-image-2-1', key: 'qwen21-vae', name: 'Qwen-Image-2.1 VAE', type: 'vae' },
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_encoder_model: { key: 'qwen3-vl-8b' } });
+      expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
+      expect(getEdge(graph, 'denoise_latents', 'reference_latents')).toBeDefined();
+    });
+
     it('applies LoRAs to the transformer through its own collection loader', () => {
       const lora: LoraModelConfig = { base: 'qwen-image-2-1', key: 'qwen21-lora', name: 'A LoRA', type: 'lora' };
       const graph = compile(qwenImage21Model, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });
@@ -1092,6 +1399,158 @@ describe('compileGenerateGraph', () => {
         ['denoise_latents', 'canvas_output'],
       ]);
     });
+  });
+});
+
+describe('getFamilyGraphBuilder', () => {
+  it('returns builders for supported bases only, never Object.prototype members', () => {
+    expect(getFamilyGraphBuilder('sdxl')).toBeTypeOf('function');
+    expect(getFamilyGraphBuilder('constructor')).toBeNull();
+    expect(getFamilyGraphBuilder('toString')).toBeNull();
+    expect(getFamilyGraphBuilder('__proto__')).toBeNull();
+  });
+});
+
+describe('family graph facts', () => {
+  const projectSettings = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
+  const build = (model: MainModelConfig, settings: GenerateSettings) =>
+    GRAPH_BUILDERS[model.base as SupportedGenerateBase](settings, model, false, projectSettings);
+  const buildWith = (model: MainModelConfig, overrides: Partial<GenerateSettings> = {}) =>
+    build(model, createSettings(model, overrides));
+
+  it('names the SD decode VAE, override and seamless wrapping included, and the UNet after LoRAs', () => {
+    expect(buildWith(sd1Model).latents?.vae).toMatchObject({ field: 'vae', node: { id: 'model_loader' } });
+    expect(buildWith(sd1Model, { vae }).latents?.vae.node.id).toBe('vae_loader');
+    expect(buildWith(sd1Model, { seamlessXAxis: true, vae }).latents).toMatchObject({
+      encodeType: 'i2l',
+      unet: { field: 'unet', node: { id: 'seamless' } },
+      vae: { field: 'vae', node: { id: 'seamless' } },
+    });
+
+    const withLora = buildWith(sd1Model, { loras: [{ isEnabled: true, model: sd1Lora, weight: 0.5 }] });
+    expect(withLora.latents?.unet).toMatchObject({ field: 'unet', node: { type: 'lora_collection_loader' } });
+    expect(buildWith(sd1Model, { vaePrecision: 'fp32' }).latents?.fp32).toBe(true);
+    expect(buildWith(sd1Model, { vaePrecision: 'fp16' }).latents?.fp32).toBe(false);
+  });
+
+  it('reports a quarter of the requested size as the native PiD denoise size', () => {
+    const family = buildWith(fluxModel, {
+      clipEmbedModel: clipEmbed,
+      gemma2EncoderModel: { base: 'any', key: 'gemma2', name: 'Gemma 2 2B', type: 'gemma2_encoder' },
+      height: 2048,
+      pidDecoderModel: { base: 'flux', key: 'pid-flux', name: 'PiD flux', type: 'pid_decoder' },
+      pidMode: 'native',
+      t5EncoderModel: t5Encoder,
+      vae: fluxVae,
+      width: 2048,
+    });
+
+    expect(family.denoiseSize).toEqual({ height: 512, width: 512 });
+    // The FLUX PiD decode takes no VAE, so the record names the loader the graph decodes with.
+    expect(family.latents?.vae).toMatchObject({ field: 'vae', node: { id: 'model_loader' } });
+  });
+
+  const recipes = { filled: fullyFilledSettingsFor, required: satisfiedSettingsFor, tuned: tunedSettingsFor };
+  const familyCases = generateGraphCases.flatMap((testCase) =>
+    (Object.keys(recipes) as (keyof typeof recipes)[]).map((recipe) => ({
+      ...testCase,
+      label: `${testCase.label} / ${recipe}`,
+      recipe,
+    }))
+  );
+
+  it.each(familyCases)('$label hands out the facts its emitted graph carries', ({ base, recipe, shape }) => {
+    const { model, settings } = recipes[recipe](base, shape);
+    const { conditioning, denoise, denoiseSize, graph, latents, layoutPrompt } = build(model, settings);
+    const sourceOf = (nodeId: string, field: string) => {
+      const edge = getEdge(graph, nodeId, field);
+      return edge ? { field: edge.source.field, nodeId: edge.source.node_id } : undefined;
+    };
+    const named = (output: { node: { id: string }; field: string } | undefined) =>
+      output ? { field: output.field, nodeId: output.node.id } : undefined;
+    const reaches = (fromId: string, toId: string): boolean => {
+      const seen = new Set([fromId]);
+      const queue = [fromId];
+      for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+        if (id === toId) {
+          return true;
+        }
+        for (const edge of graph.edges) {
+          if (edge.source.node_id === id && !seen.has(edge.destination.node_id)) {
+            seen.add(edge.destination.node_id);
+            queue.push(edge.destination.node_id);
+          }
+        }
+      }
+      return false;
+    };
+    const decode =
+      Object.values(graph.nodes).find((node) => isPidDecodeNodeType(node.type)) ?? graph.nodes.canvas_output!;
+
+    // The decode reads the base denoise, or the refiner stage that finishes it.
+    const decodeLatents = sourceOf(decode.id, 'latents');
+    expect(
+      decodeLatents?.nodeId === REFINER_DENOISE_NODE_ID
+        ? sourceOf(REFINER_DENOISE_NODE_ID, 'latents')?.nodeId
+        : decodeLatents?.nodeId
+    ).toBe(denoise.id);
+    expect(denoise).toBe(graph.nodes[denoise.id]);
+
+    const { height, width } = graph.nodes.noise ?? denoise;
+    expect(denoiseSize).toEqual({ height, width });
+
+    expect(latents === null).toBe(['ernie-image', 'ideogram-4'].includes(base));
+    if (latents) {
+      // The FLUX and SD-3 PiD decodes take no VAE; those graphs decode with the loader's.
+      expect(named(latents.vae)).toEqual(sourceOf(decode.id, 'vae') ?? { field: 'vae', nodeId: 'model_loader' });
+      expect(named(latents.unet)).toEqual(sourceOf(denoise.id, 'unet'));
+    }
+
+    expect(conditioning === null).toBe(
+      !['sd-1', 'sd-2', 'sdxl', 'flux', 'flux2', 'krea-2', 'z-image', 'anima'].includes(base)
+    );
+    if (conditioning) {
+      expect(reaches(conditioning.positive.id, conditioning.positiveCollector.id)).toBe(true);
+      expect(
+        graph.edges.some(
+          (edge) => edge.source.node_id === conditioning.positiveCollector.id && edge.destination.node_id === denoise.id
+        )
+      ).toBe(true);
+      if (conditioning.negative) {
+        expect(reaches(conditioning.negative.node.id, conditioning.negative.collector.id)).toBe(true);
+        expect(sourceOf(denoise.id, 'negative_conditioning')?.nodeId).toBe(conditioning.negative.collector.id);
+      }
+    }
+
+    expect(layoutPrompt === null).toBe(!['flux3', 'ideogram-4', 'moss-image'].includes(base));
+    if (layoutPrompt) {
+      expect(sourceOf(layoutPrompt.id, 'prompt')?.nodeId).toBe('positive_prompt');
+    }
+  });
+
+  it('hands out the reference-image collectors the builder feeds the denoise from', () => {
+    const sd = buildWith(sd1Model, {
+      referenceImages: [
+        {
+          config: {
+            beginEndStepPct: [0, 1] as [number, number],
+            clipVisionModel: 'ViT-H' as const,
+            image: refImage,
+            method: 'full' as const,
+            model: sd1IpAdapter,
+            type: 'ip_adapter' as const,
+            weight: 1,
+          },
+          id: 'ip',
+          isEnabled: true,
+        },
+      ],
+    });
+    const collector = sd.conditioning?.ipAdapterCollector;
+
+    expect(collector?.type).toBe('collect');
+    expect(getEdge(sd.graph, 'denoise_latents', 'ip_adapter')?.source.node_id).toBe(collector?.id);
+    expect(buildWith(sd1Model).conditioning?.ipAdapterCollector).toBeNull();
   });
 });
 
@@ -1192,14 +1651,26 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(graph.nodes.denoise_latents?.type).toBe('krea2_denoise');
   });
 
-  it('omits Krea-2 negative conditioning while CFG is disabled, and adds it when enabled', () => {
+  it('omits Krea-2 negative conditioning while CFG is disabled, and collects it when enabled', () => {
     // Krea-2-Turbo runs at cfg_scale 1 by default, where the model takes no negative input.
-    expect(compile(krea2Diffusers, { cfgScale: 1 }).nodes.neg_cond).toBeUndefined();
+    const withoutCfg = compile(krea2Diffusers, { cfgScale: 1 });
+    expect(withoutCfg.nodes.neg_cond).toBeUndefined();
+    expect(withoutCfg.nodes.neg_cond_collect).toBeUndefined();
+    expect(getEdge(withoutCfg, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
 
     const withCfg = compile(krea2Diffusers, { cfgScale: 4.5 });
 
     expect(withCfg.nodes.neg_cond?.type).toBe('krea2_text_encoder');
-    expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')).toBeDefined();
+    expect(withCfg.nodes.neg_cond_collect?.type).toBe('collect');
+    // Regional negatives join the global one through the collector.
+    expect(getEdge(withCfg, 'neg_cond_collect', 'item')?.source).toEqual({
+      field: 'conditioning',
+      node_id: 'neg_cond',
+    });
+    expect(getEdge(withCfg, 'denoise_latents', 'negative_conditioning')?.source).toEqual({
+      field: 'collection',
+      node_id: 'neg_cond_collect',
+    });
   });
 
   it('passes standalone Krea-2 submodels to the loader for a non-diffusers transformer', () => {
@@ -1209,6 +1680,40 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
       qwen3_vl_encoder_model: qwen3VlEncoder,
       vae_model: krea2Vae,
     });
+  });
+
+  it('sends the Krea-2 Vision Tower only beside a GGUF 4B encoder, and never a stale or 8B one', () => {
+    const ggufEncoder: ComponentModelConfig = { ...qwen3VlEncoder, format: 'gguf_quantized' };
+    const tower = (variant: 'qwen3_vl_4b' | 'qwen3_vl_8b'): ComponentModelConfig => ({
+      base: 'any',
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    });
+    const tower4b = tower('qwen3_vl_4b');
+    const nodes = (encoder: ComponentModelConfig, vision: ComponentModelConfig) => {
+      const graph = compile(krea2Checkpoint, {
+        qwen3VLEncoderModel: encoder,
+        qwen3VLVisionTowerModel: vision,
+        vae: krea2Vae,
+      });
+
+      return { loader: graph.nodes.model_loader, metadata: getNodeByType(graph, 'core_metadata') };
+    };
+
+    const sent = nodes(ggufEncoder, tower4b);
+
+    expect(sent.loader).toMatchObject({ qwen3_vl_vision_tower_model: tower4b });
+    expect(sent.metadata).toMatchObject({ qwen3_vl_vision_tower: tower4b });
+    expect(
+      (nodes(ggufEncoder, tower('qwen3_vl_8b')).loader as Record<string, unknown>)?.qwen3_vl_vision_tower_model
+    ).toBeUndefined();
+    expect(
+      (nodes(qwen3VlEncoder, tower4b).loader as Record<string, unknown>)?.qwen3_vl_vision_tower_model
+    ).toBeUndefined();
+    expect((nodes(qwen3VlEncoder, tower4b).metadata as Record<string, unknown>)?.qwen3_vl_vision_tower).toBeUndefined();
   });
 
   it('sends an anima-registered Qwen-Image VAE to the Krea-2 loader', () => {
@@ -1272,6 +1777,13 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
 
     expect(getEdge(graph, 'caption_builder', 'prompt')?.source.node_id).toBe('positive_prompt');
     expect(getEdge(graph, 'pos_cond', 'prompt')?.source.node_id).toBe('caption_builder');
+    // Metadata records the encoded caption next to the prompt the user typed, which recall restores.
+    const metadata = getNodeByType(graph, 'core_metadata')!;
+    expect(getEdge(graph, metadata.id, 'ideogram4_caption')?.source).toEqual({
+      field: 'value',
+      node_id: 'caption_builder',
+    });
+    expect(getEdge(graph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
     // Ideogram 4's denoise node has no negative conditioning input at all.
     expect(graph.nodes.neg_cond).toBeUndefined();
     expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
@@ -1324,6 +1836,49 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
       ideogram4_unconditional_model: ideogram4Unconditional,
       qwen3_vl_encoder: qwen3Vl8bEncoder,
     });
+  });
+
+  it('routes the Ideogram 4 transformer through its LoRAs and records only those it applied', () => {
+    const ideogramLora: LoraModelConfig = {
+      base: 'ideogram-4',
+      key: 'ideogram-lora',
+      name: 'Ideogram LoRA',
+      type: 'lora',
+    };
+    // Same `layers.N` container, different family: it must not reach the Ideogram 4 loader.
+    const zImageLora: LoraModelConfig = { base: 'z-image', key: 'z-image-lora', name: 'Z-Image LoRA', type: 'lora' };
+
+    for (const [model, extra] of [
+      [ideogram4Model, {}],
+      [
+        ideogram4Conditional,
+        {
+          ideogram4UnconditionalModel: ideogram4Unconditional,
+          qwen3VLEncoderModel: qwen3Vl8bEncoder,
+          vae: ideogram4Vae,
+        },
+      ],
+    ] as const) {
+      const graph = compile(model, {
+        ...extra,
+        loras: [
+          { isEnabled: true, model: ideogramLora, weight: 0.8 },
+          { isEnabled: true, model: zImageLora, weight: 1 },
+        ],
+      });
+      const loraLoader = getNodeByType(graph, 'ideogram4_lora_collection_loader');
+
+      expect(loraLoader).toBeDefined();
+      expect(getEdge(graph, loraLoader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+      expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+      // The node applies the 'Transformer' LoRAs to both branches; the second input stays a plain model.
+      if (model.format !== 'diffusers') {
+        expect(getEdge(graph, 'denoise_latents', 'unconditional_transformer')?.source.node_id).toBe('model_loader');
+      }
+      expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+        { model: { base: 'ideogram-4', key: 'ideogram-lora', name: 'Ideogram LoRA', type: 'lora' }, weight: 0.8 },
+      ]);
+    }
   });
 
   it('drops a component selection that does not suit the Ideogram 4 model about to run', () => {
@@ -1457,6 +2012,260 @@ describe('Qwen-Image-2.1 graphs', () => {
 
     expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_encoder_model: qwen3Vl8bEncoder, vae_model: qwen21Vae });
   });
+
+  describe('Vision Tower', () => {
+    const ggufEncoder: ComponentModelConfig = { ...qwen3Vl8bEncoder, format: 'gguf_quantized' };
+    const checkpointEncoder: ComponentModelConfig = { ...qwen3Vl8bEncoder, format: 'checkpoint' };
+    const tower = (variant: string): ComponentModelConfig => ({
+      base: 'any',
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    });
+    const referenceImages: GenerateReferenceImage[] = [
+      {
+        config: {
+          image: { original: { image: { height: 512, image_name: 'a.png', width: 512 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: 'a.png',
+        isEnabled: true,
+      },
+    ];
+
+    it('sends the tower with a GGUF 8B encoder, and the references ride on the unchanged encoder edge', () => {
+      const graph = compile(qwen21Gguf, {
+        qwen3VLEncoderModel: ggufEncoder,
+        qwen3VLVisionTowerModel: tower('qwen3_vl_8b'),
+        referenceImages,
+        vae: qwen21Vae,
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_vision_tower_model: { key: 'mmproj-qwen3_vl_8b' } });
+      expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
+      expect(getEdge(graph, 'pos_cond', 'qwen3_vl_encoder')?.source.node_id).toBe('model_loader');
+      expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+        qwen3_vl_vision_tower: { key: 'mmproj-qwen3_vl_8b' },
+      });
+    });
+
+    it('refuses references beside a GGUF encoder without a tower, and sends no 4B tower', () => {
+      expect(() => compile(qwen21Gguf, { qwen3VLEncoderModel: ggufEncoder, referenceImages, vae: qwen21Vae })).toThrow(
+        "Reference images need this encoder's Vision Tower"
+      );
+
+      const graph = compile(qwen21Gguf, {
+        qwen3VLEncoderModel: ggufEncoder,
+        qwen3VLVisionTowerModel: tower('qwen3_vl_4b'),
+        vae: qwen21Vae,
+      });
+
+      expect(graph.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
+    });
+
+    it('never sends a stale tower beside a non-GGUF encoder or a Diffusers main', () => {
+      const stale = tower('qwen3_vl_8b');
+      const withSafetensors = compile(qwen21Gguf, {
+        qwen3VLEncoderModel: checkpointEncoder,
+        qwen3VLVisionTowerModel: stale,
+        referenceImages,
+        vae: qwen21Vae,
+      });
+      const diffusers = compile(qwen21Diffusers, { qwen3VLVisionTowerModel: stale });
+
+      expect(withSafetensors.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
+      expect(getEdge(withSafetensors, 'pos_cond', 'reference_images')).toBeDefined();
+      expect(diffusers.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
+    });
+  });
+});
+
+describe('FLUX.3 graphs', () => {
+  const kleinModel: MainModelConfig = {
+    base: 'flux3',
+    format: 'diffusers',
+    key: 'flux3-klein',
+    name: 'FLUX.3 Klein',
+    type: 'main',
+    variant: 'flux3_klein',
+  };
+  const kleinBaseModel: MainModelConfig = {
+    ...kleinModel,
+    key: 'flux3-klein-base',
+    name: 'FLUX.3 Klein Base',
+    variant: 'flux3_klein_base',
+  };
+  const reference = (id: string, isEnabled = true): GenerateReferenceImage => ({
+    config: {
+      image: { original: { image: { height: 512, image_name: `${id}.png`, width: 512 } } },
+      type: 'flux2_reference_image',
+    },
+    id,
+    isEnabled,
+  });
+
+  /** The reference images in the order the denoiser receives them, walking the collect chain back from it. */
+  const denoiserReferenceOrder = (graph: ReturnType<typeof compile>): string[] => {
+    const names: string[] = [];
+    let collect = getEdge(graph, 'denoise_latents', 'kontext_conditioning')?.source.node_id;
+    while (collect) {
+      const kontextId = getEdge(graph, collect, 'item')?.source.node_id;
+      const kontext = kontextId ? graph.nodes[kontextId] : undefined;
+      names.unshift((kontext as { image?: { image_name: string } } | undefined)?.image?.image_name ?? '?');
+      collect = getEdge(graph, collect, 'collection')?.source.node_id;
+    }
+    return names;
+  };
+
+  it('hands the denoiser the references in the order their prompt tags number them', () => {
+    const referenceImages = [reference('a'), reference('off', false), reference('b')];
+
+    const graph = compile(kleinModel, { referenceImages });
+
+    expect(denoiserReferenceOrder(graph)).toEqual(['a.png', 'b.png']);
+    expect([...getReferenceImagePromptTags('flux3', referenceImages)]).toEqual([
+      ['a', '<ref_image_0>'],
+      ['b', '<ref_image_1>'],
+    ]);
+  });
+
+  it('compiles the negative branch only for Klein Base at its CFG default', () => {
+    const klein = compile(kleinModel);
+    const kleinBase = compile(kleinBaseModel);
+
+    expect(getEdge(klein, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
+    expect(getNodeByType(klein, 'flux3_denoise')).toMatchObject({ cfg_scale: 1, steps: 16 });
+    expect(getEdge(kleinBase, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
+    expect(getNodeByType(kleinBase, 'flux3_denoise')).toMatchObject({ cfg_scale: 3.5, steps: 50 });
+  });
+
+  it('wires a variant-less FLUX.3 LoRA on Klein to the transformer alone', () => {
+    // FLUX.3 LoRAs carry no variant: Klein and Klein Base share the transformer they change.
+    const lora: LoraModelConfig = { base: 'flux3', key: 'flux3-lora', name: 'A LoRA', type: 'lora' };
+    const graph = compile(kleinModel, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });
+
+    const loader = getNodeByType(graph, 'flux3_lora_collection_loader');
+    expect(loader).toBeDefined();
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+    expect(getEdge(graph, loader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'pos_cond', 'qwen3_vl_encoder')?.source.node_id).toBe('model_loader');
+  });
+
+  it('sends the prompt through the layout node, whose boxes become edit targets once references are wired', () => {
+    const plain = compile(kleinModel);
+    const withReference = compile(kleinModel, { referenceImages: [reference('a')] });
+    const withDisabledReference = compile(kleinModel, { referenceImages: [reference('off', false)] });
+
+    expect(getEdge(plain, 'layout_prompt', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(plain, 'pos_cond', 'prompt')?.source).toEqual({ field: 'value', node_id: 'layout_prompt' });
+    // Canvas regions fill the node; without them it passes the prompt through, and core metadata keeps only the
+    // prompt as typed.
+    expect(plain.nodes.layout_prompt).toMatchObject({ type: 'flux3_layout_prompt' });
+    expect(plain.nodes.layout_prompt).not.toHaveProperty('regions');
+    expect(getEdge(plain, getNodeByType(plain, 'core_metadata')!.id, 'flux3_caption')).toBeUndefined();
+    expect(plain.nodes.layout_prompt).not.toHaveProperty('edit_targets');
+    expect(withReference.nodes.layout_prompt?.edit_targets).toBe(true);
+    // A disabled reference wires nothing into the denoiser, so FLUX.3 does not edit.
+    expect(getEdge(withDisabledReference, 'denoise_latents', 'kontext_conditioning')).toBeUndefined();
+    expect(withDisabledReference.nodes.layout_prompt).not.toHaveProperty('edit_targets');
+  });
+
+  describe('with the prompt upsampler on', () => {
+    const upsampler = {
+      base: 'any',
+      key: 'pup',
+      name: 'FLUX.3 Prompt Upsampler',
+      supports_images: true,
+      type: 'text_llm',
+    };
+    const upsample = (model: MainModelConfig, overrides: Partial<GenerateSettings> = {}) =>
+      compile(model, { flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: upsampler, ...overrides });
+
+    it('replaces the layout node and sends the typed prompt through the upsampler to the encoder', () => {
+      const graph = upsample(kleinModel);
+      const metadata = getNodeByType(graph, 'core_metadata')!;
+
+      expect(graph.nodes.layout_prompt).toBeUndefined();
+      expect(graph.nodes.prompt_upsampler).toMatchObject({
+        type: 'flux3_prompt_upsampler',
+        upsampler_model: { key: 'pup', name: 'FLUX.3 Prompt Upsampler', type: 'text_llm' },
+      });
+      // The node derives edit targets from its reference images and keeps its default token budget.
+      expect(graph.nodes.prompt_upsampler).not.toHaveProperty('edit_targets');
+      expect(graph.nodes.prompt_upsampler).not.toHaveProperty('max_new_tokens');
+      expect(getEdge(graph, 'prompt_upsampler', 'prompt')?.source).toEqual({
+        field: 'value',
+        node_id: 'positive_prompt',
+      });
+      expect(getEdge(graph, 'pos_cond', 'prompt')?.source).toEqual({ field: 'value', node_id: 'prompt_upsampler' });
+      // Metadata records the caption encoded and the model that wrote it; the prompt as typed stays in
+      // `positive_prompt`, which recall restores.
+      expect(getEdge(graph, metadata.id, 'flux3_caption')?.source).toEqual({
+        field: 'value',
+        node_id: 'prompt_upsampler',
+      });
+      expect(getEdge(graph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
+      expect(metadata.flux3_prompt_upsampler).toMatchObject({ key: 'pup' });
+      expect(getEdge(graph, 'prompt_upsampler', 'reference_images')).toBeUndefined();
+    });
+
+    it('feeds the collect that reaches the denoiser to the upsampler as well', () => {
+      const graph = upsample(kleinModel, {
+        referenceImages: [reference('a'), reference('off', false), reference('b')],
+      });
+      const toDenoiser = getEdge(graph, 'denoise_latents', 'kontext_conditioning');
+
+      expect(toDenoiser).toBeDefined();
+      expect(getEdge(graph, 'prompt_upsampler', 'reference_images')?.source).toEqual(toDenoiser?.source);
+      expect(denoiserReferenceOrder(graph)).toEqual(['a.png', 'b.png']);
+    });
+
+    it('does not read a disabled reference', () => {
+      const graph = upsample(kleinModel, { referenceImages: [reference('off', false)] });
+
+      expect(getEdge(graph, 'prompt_upsampler', 'reference_images')).toBeUndefined();
+    });
+
+    it('upsamples only the positive prompt of Klein Base, whose negative branch is untouched', () => {
+      const graph = upsample(kleinBaseModel);
+
+      expect(getEdge(graph, 'neg_cond', 'prompt')?.source).toEqual({ field: 'value', node_id: 'negative_prompt' });
+      expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
+      expect(graph.edges.filter((edge) => edge.source.node_id === 'prompt_upsampler')).toHaveLength(2);
+    });
+
+    it('builds the layout graph while switched off, keeping the pick', () => {
+      // Pin the minted ids so the two graphs compare whole.
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      try {
+        const off = compile(kleinModel, { flux3PromptUpsamplerEnabled: false, flux3PromptUpsamplerModel: upsampler });
+
+        expect(off).toEqual(compile(kleinModel));
+      } finally {
+        clock.mockRestore();
+        random.mockRestore();
+      }
+    });
+
+    it('refuses to compile without a model that reads images', () => {
+      expect(() => upsample(kleinModel, { flux3PromptUpsamplerModel: null })).toThrow(/prompt upsampler/i);
+      expect(() =>
+        upsample(kleinModel, { flux3PromptUpsamplerModel: { ...upsampler, supports_images: false } })
+      ).toThrow(/prompt upsampler/i);
+    });
+
+    it('is not run for another family', () => {
+      const graph = compile({ ...kleinModel, base: 'flux2', key: 'k2', variant: 'klein_4b' } as MainModelConfig, {
+        flux3PromptUpsamplerEnabled: true,
+        flux3PromptUpsamplerModel: upsampler,
+      });
+
+      expect(getNodeByType(graph, 'flux3_prompt_upsampler')).toBeUndefined();
+    });
+  });
 });
 
 describe('ERNIE-Image graphs', () => {
@@ -1504,6 +2313,32 @@ describe('ERNIE-Image graphs', () => {
     expect(graph.nodes.model_loader?.text_encoder_model).toBeUndefined();
   });
 
+  it('routes the transformer through ERNIE-Image LoRAs and records only those it applied', () => {
+    const ernieLora: LoraModelConfig = { base: 'ernie-image', key: 'ernie-lora', name: 'ERNIE LoRA', type: 'lora' };
+    // Same `layers.N` container, different family: it must not reach the ERNIE-Image loader.
+    const zImageLora: LoraModelConfig = { base: 'z-image', key: 'z-image-lora', name: 'Z-Image LoRA', type: 'lora' };
+
+    const graph = compile(ernieModel, {
+      cfgScale: 4,
+      loras: [
+        { isEnabled: true, model: ernieLora, weight: 0.7 },
+        { isEnabled: true, model: zImageLora, weight: 1 },
+      ],
+    });
+    const loraLoader = getNodeByType(graph, 'ernie_image_lora_collection_loader');
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(loraLoader).toBeDefined();
+    expect(getEdge(graph, loraLoader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    // The Ministral encoder carries no LoRA layers, so both prompts keep reading it from the model loader.
+    expect(getEdge(graph, 'pos_cond', 'text_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'neg_cond', 'text_encoder')?.source.node_id).toBe('model_loader');
+    expect(metadata?.loras).toEqual([
+      { model: { base: 'ernie-image', key: 'ernie-lora', name: 'ERNIE LoRA', type: 'lora' }, weight: 0.7 },
+    ]);
+  });
+
   it('builds the rest of the graph out of the one bundled pipeline', () => {
     const graph = compile(ernieModel, { scheduler: 'dpmpp_2m' });
 
@@ -1534,6 +2369,32 @@ describe('MOSS-Image graphs', () => {
     variant,
   });
 
+  it('routes the transformer through MOSS-Image LoRAs and records only those it applied', () => {
+    const mossLora: LoraModelConfig = { base: 'moss-image', key: 'moss-lora', name: 'MOSS LoRA', type: 'lora' };
+    const zImageLora: LoraModelConfig = { base: 'z-image', key: 'z-image-lora', name: 'Z-Image LoRA', type: 'lora' };
+
+    const graph = compile(mossDiffusers, {
+      cfgScale: 4,
+      loras: [
+        { isEnabled: true, model: mossLora, weight: 0.6 },
+        { isEnabled: true, model: zImageLora, weight: 1 },
+      ],
+    });
+    const loraLoader = getNodeByType(graph, 'moss_image_lora_collection_loader');
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(loraLoader).toBeDefined();
+    expect(getEdge(graph, loraLoader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    // LoRAs train the transformer only: the VAE and both prompt encoders stay on the model loader.
+    expect(getEdge(graph, 'denoise_latents', 'vae')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'pos_cond', 'qwen3_5_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'neg_cond', 'qwen3_5_encoder')?.source.node_id).toBe('model_loader');
+    expect(metadata?.loras).toEqual([
+      { model: { base: 'moss-image', key: 'moss-lora', name: 'MOSS LoRA', type: 'lora' }, weight: 0.6 },
+    ]);
+  });
+
   it('builds a Diffusers pipeline graph that conditions without a collector and decodes as FLUX.2', () => {
     const graph = compile(mossDiffusers);
 
@@ -1562,6 +2423,24 @@ describe('MOSS-Image graphs', () => {
     expect(getEdge(graph, 'canvas_output', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
     expect(getEdge(graph, 'denoise_latents', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
     expect(getNodeByType(graph, 'core_metadata')?.generation_mode).toBe('moss_image_txt2img');
+  });
+
+  it('routes the positive prompt through the layout node, which compiles a layout draft at the denoise size', () => {
+    const graph = compile(mossDiffusers, { height: 768, width: 1280 });
+    const metadata = getNodeByType(graph, 'core_metadata')!;
+
+    expect(graph.nodes.layout_prompt).toMatchObject({
+      height: 768,
+      regions: [],
+      type: 'moss_image_layout_prompt',
+      width: 1280,
+    });
+    expect(getEdge(graph, 'layout_prompt', 'prompt')?.source).toEqual({ field: 'value', node_id: 'positive_prompt' });
+    expect(getEdge(graph, 'pos_cond', 'prompt')?.source).toEqual({ field: 'value', node_id: 'layout_prompt' });
+    expect(getEdge(graph, metadata.id, 'moss_image_layout_prompt')?.source).toEqual({
+      field: 'value',
+      node_id: 'layout_prompt',
+    });
   });
 
   it('encodes the negative prompt only while CFG runs the negative branch', () => {
@@ -1801,7 +2680,7 @@ describe('PiD decode', () => {
 
   it('refuses to compile PiD on an unsupported base rather than silently ignoring it', () => {
     // Reject unsupported PiD rather than silently use ordinary decode.
-    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/PiD is not supported/);
+    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/does not support PiD/);
   });
 
   it('requires both PiD models before compiling', () => {
@@ -1926,7 +2805,7 @@ describe('SDXL Refiner', () => {
     expect(getEdge(graph, 'refiner_denoise_latents', 'unet')?.source.node_id).toBe('refiner_seamless');
   });
 
-  it('runs the refiner pass with the base HiDiffusion settings and coerces its scheduler', () => {
+  it('keeps HiDiffusion off the refiner pass and coerces its scheduler', () => {
     const graph = compile(sdxlModel, {
       ...refinerSettings,
       hiDiffusionEnabled: true,
@@ -1935,10 +2814,9 @@ describe('SDXL Refiner', () => {
     });
 
     expect(graph.nodes.refiner_denoise_latents).toMatchObject({
-      hidiffusion: true,
-      hidiffusion_t1_ratio: 0.3,
       scheduler: 'euler_a',
     });
+    expect(graph.nodes.refiner_denoise_latents).not.toHaveProperty('hidiffusion');
     expect(getNodeByType(graph, 'core_metadata')?.refiner_scheduler).toBe('euler_a');
   });
 
@@ -2137,6 +3015,40 @@ describe('model-family tuning', () => {
     expect(quantized.nodes.pos_cond?.quantization).toBe('nf4');
     expect(quantized.nodes.neg_cond?.quantization).toBe('nf4');
     expect(getNodeByType(quantized, 'core_metadata')?.qwen_image_quantization).toBe('nf4');
+  });
+
+  describe('Qwen-Image LoRAs', () => {
+    const qwenLora: LoraModelConfig = { base: 'qwen-image', key: 'qwen-lora', name: 'A LoRA', type: 'lora' };
+    const loras = [{ isEnabled: true, model: qwenLora, weight: 0.7 }];
+
+    it('routes the Qwen2.5-VL encoder to both prompts through the LoRA collection loader', () => {
+      const graph = compile(qwenImageModel, { cfgScale: 4, loras });
+      const loader = getNodeByType(graph, 'qwen_image_lora_collection_loader');
+
+      expect(loader).toBeDefined();
+      expect(getEdge(graph, loader?.id ?? '', 'qwen_vl_encoder')?.source.node_id).toBe('model_loader');
+      expect(getEdge(graph, 'pos_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, 'neg_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+    });
+
+    it('takes the encoder straight from the model loader without an active LoRA', () => {
+      const graph = compile(qwenImageModel, { cfgScale: 4, loras: [{ ...loras[0]!, isEnabled: false }] });
+
+      expect(getNodeByType(graph, 'qwen_image_lora_collection_loader')).toBeUndefined();
+      expect(getEdge(graph, 'pos_cond', 'qwen_vl_encoder')?.source.node_id).toBe('model_loader');
+      expect(getEdge(graph, 'neg_cond', 'qwen_vl_encoder')?.source.node_id).toBe('model_loader');
+    });
+
+    it('keeps the encoder quantization on both prompts next to the LoRA edges', () => {
+      const graph = compile(qwenImageModel, { cfgScale: 4, loras, qwenImageEncoderQuantization: 'int8' });
+      const loader = getNodeByType(graph, 'qwen_image_lora_collection_loader');
+
+      expect(graph.nodes.pos_cond?.quantization).toBe('int8');
+      expect(graph.nodes.neg_cond?.quantization).toBe('int8');
+      expect(getEdge(graph, 'pos_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+      expect(getEdge(graph, 'neg_cond', 'qwen_vl_encoder')?.source.node_id).toBe(loader?.id);
+    });
   });
 
   it('encodes the enabled Krea-2 style reference at the denoise size and feeds it to the denoise node', () => {

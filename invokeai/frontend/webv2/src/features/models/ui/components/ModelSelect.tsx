@@ -14,6 +14,7 @@ import {
   Stack,
   Text,
   useFieldContext,
+  VisuallyHidden,
 } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelBaseLongLabel } from '@features/models/core/baseIdentity';
 import { getModelPickerGroups, hasModelPickerCandidates } from '@features/models/core/library';
@@ -21,12 +22,13 @@ import { getModelTypeLabel, getModelTypePluralLabel } from '@features/models/cor
 import { getModelImageUrl } from '@features/models/data/api';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models/data/modelsStore';
 import { useModelsUi } from '@features/models/ui/ModelsUiContext';
+import { openModelManager } from '@features/models/ui/openModelManager';
 import { setPickerBaseFilters, setPickerCompactView, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { formatBytes } from '@platform/i18n/languages';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, CloseButton, IconButton, PopoverContent, Tooltip } from '@platform/ui';
-import { useFieldLabelId } from '@platform/ui/Field';
+import { FieldInsideLabel, INSIDE_LABEL_INSET, useFieldLabelId, useInsideFieldLabel } from '@platform/ui/Field';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Picker } from '@platform/ui/Picker';
 import { Link } from '@tanstack/react-router';
@@ -35,6 +37,7 @@ import {
   BoxIcon,
   CheckIcon,
   ChevronDownIcon,
+  DownloadIcon,
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
   LinkIcon,
@@ -99,11 +102,13 @@ export const ModelSelect = ({
   excludeKeys,
   filter,
   id,
+  installAction = false,
   invalid,
   isClearable = false,
   modelTypes,
   onChange,
   placeholder,
+  relatedTo = null,
   scopeLabel: scopeLabelOverride,
   showManagerButton = true,
   size = 'md',
@@ -114,11 +119,18 @@ export const ModelSelect = ({
   excludeKeys?: ReadonlySet<string>;
   filter?: (model: ModelConfig) => boolean;
   id?: string;
+  /**
+   * With nothing of `modelTypes` installed, offer the way to install one under the picker: the Model Manager filtered
+   * to the first type, or, for users who cannot manage models, who to ask. For pickers a form cannot run without.
+   */
+  installAction?: boolean;
   invalid?: boolean;
   isClearable?: boolean;
   modelTypes: readonly ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
   placeholder?: string;
+  /** Key of the model whose links rank this picker: its related models come first and carry a link icon. */
+  relatedTo?: string | null;
   /** Plural noun for the offered models in empty/search copy; defaults to the model type's plural label. */
   scopeLabel?: string;
   showManagerButton?: boolean;
@@ -133,14 +145,11 @@ export const ModelSelect = ({
   const [isOpen, setIsOpen] = useState(false);
   // Like Select, an enclosing Field names the trigger and supplies its description, invalid and disabled states.
   const field = useFieldContext();
-  const fieldControlProps = field?.getInputProps();
-  const fieldLabelId = useFieldLabelId();
+  const insideLabel = useInsideFieldLabel();
+  const fieldLabelId = useFieldLabelId() ?? insideLabel?.id ?? null;
   const valueTextId = useId();
   const isDisabled = Boolean(disabled || field?.disabled);
   const isInvalid = Boolean(invalid || field?.invalid);
-  const describedBy =
-    [fieldControlProps?.['aria-describedby'], fieldControlProps?.['aria-errormessage']].filter(Boolean).join(' ') ||
-    undefined;
   const [lastDisabled, setLastDisabled] = useState(isDisabled);
 
   const pickerId = id ?? `models:${modelTypes.join('+')}`;
@@ -151,7 +160,10 @@ export const ModelSelect = ({
     (bases: ReadonlySet<string>) => setPickerBaseFilters(pickerId, [...bases]),
     [pickerId]
   );
-  const relatedKeyList = useLazyRelatedModelKeys(isOpen ? value : null);
+  const relatedKeyList = useLazyRelatedModelKeys(isOpen ? relatedTo : null);
+  const relatedToName = useModelsSelector((snapshot) =>
+    relatedTo === null ? null : (snapshot.modelsByKey.get(relatedTo)?.name ?? null)
+  );
   const relatedKeys = useMemo<ReadonlySet<string>>(
     () => (relatedKeyList ? new Set(relatedKeyList) : EMPTY_KEYS),
     [relatedKeyList]
@@ -243,12 +255,13 @@ export const ModelSelect = ({
       <ModelOptionContent
         enableDescription={enableModelDescriptions}
         isRelated={relatedKeys.has(model.key)}
+        relatedToName={relatedToName}
         model={model}
         showType={hasMixedTypes}
         state={state}
       />
     ),
-    [enableModelDescriptions, hasMixedTypes, relatedKeys]
+    [enableModelDescriptions, hasMixedTypes, relatedKeys, relatedToName]
   );
 
   return (
@@ -280,7 +293,7 @@ export const ModelSelect = ({
         <Box minW="0" position="relative" w="full">
           <Popover.Trigger asChild>
             <Button
-              aria-describedby={describedBy}
+              aria-describedby={field?.ariaDescribedby}
               aria-haspopup="listbox"
               aria-invalid={isInvalid || undefined}
               // As on Select's trigger: the field label names the control, and the current choice follows as its value.
@@ -288,11 +301,15 @@ export const ModelSelect = ({
               className={className}
               borderColor={isInvalid ? undefined : isOpen ? 'accent.solid' : 'border'}
               colorPalette={isInvalid ? 'red' : 'gray'}
+              // Opening it puts the caret in a search box, so it points like a combobox's input does.
+              cursor={isInert ? undefined : 'text'}
               disabled={isInert}
+              // Under an inside label the value reads at Select's and Combobox's regular weight; the label sets its own.
+              fontWeight={insideLabel ? 'normal' : undefined}
               justifyContent="space-between"
               minW="0"
               pe={canClear ? '7' : '2'}
-              ps="2"
+              ps={insideLabel ? INSIDE_LABEL_INSET : '2'}
               size={size}
               transitionDuration="fast"
               transitionProperty="border-color, background"
@@ -303,10 +320,19 @@ export const ModelSelect = ({
                 borderColor: isInvalid ? undefined : isOpen ? 'accent.solid' : 'border.emphasized',
               }}
             >
+              {insideLabel ? <FieldInsideLabel label={insideLabel} /> : null}
               {selectedModel ? (
-                <ModelButtonContent id={valueTextId} model={selectedModel} />
+                <ModelButtonContent id={valueTextId} isEndAligned={Boolean(insideLabel)} model={selectedModel} />
               ) : (
-                <Text as="span" id={valueTextId} color="fg.muted" minW="0" truncate>
+                <Text
+                  as="span"
+                  id={valueTextId}
+                  color="fg.muted"
+                  flex={insideLabel ? '1' : undefined}
+                  minW="0"
+                  textAlign={insideLabel ? 'end' : undefined}
+                  truncate
+                >
                   {isEmpty ? emptyMessage : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
                 </Text>
               )}
@@ -407,7 +433,40 @@ export const ModelSelect = ({
           </Popover.Positioner>
         </Portal>
       </Popover.Root>
+      {installAction && isEmpty && !isAllExcluded && loadStatus === 'loaded' && modelTypes[0] ? (
+        <ModelInstallAction modelType={modelTypes[0]} />
+      ) : null}
     </Box>
+  );
+};
+
+/** Whether any installed model fits a picker with these options; null until the library has loaded. */
+export const useHasModelPickerCandidates = (
+  options: Pick<Parameters<typeof hasModelPickerCandidates>[1], 'filter' | 'modelTypes'>
+): boolean | null =>
+  useModelsSelector((snapshot) =>
+    snapshot.status === 'loaded' ? hasModelPickerCandidates(snapshot.models, options) : null
+  );
+
+const ModelInstallAction = ({ modelType }: { modelType: ModelTaxonomyType }) => {
+  const { t } = useTranslation();
+  const { canManageModels, managerProjectId } = useModelsUi();
+
+  if (!canManageModels) {
+    return (
+      <Text color="fg.muted" fontSize="xs" mt="1.5">
+        {t('models.askAdminToInstall')}
+      </Text>
+    );
+  }
+
+  const openManager = () => openModelManager({ modelType, projectId: managerProjectId });
+
+  return (
+    <Button mt="1.5" size="sm" variant="outline" onClick={openManager}>
+      <Icon as={DownloadIcon} boxSize="3.5" />
+      {t('models.installAModel')}
+    </Button>
   );
 };
 
@@ -483,8 +542,8 @@ const BaseChip = ({
   </Badge>
 );
 
-const ModelButtonContent = ({ id, model }: { id: string; model: ModelConfig }) => (
-  <HStack as="span" id={id} flex="1" gap="2" minW="0">
+const ModelButtonContent = ({ id, isEndAligned, model }: { id: string; isEndAligned: boolean; model: ModelConfig }) => (
+  <HStack as="span" id={id} flex="1" gap="2" justify={isEndAligned ? 'flex-end' : undefined} minW="0">
     <MiddleTruncate as="span" minW="0" text={model.name} />
     <Badge colorPalette={getModelBaseColorPalette(model.base)} flexShrink={0} fontSize="xs" size="lg" variant="surface">
       {getModelBaseLabel(model.base)}
@@ -496,16 +555,20 @@ const ModelOptionContent = ({
   enableDescription,
   isRelated,
   model,
+  relatedToName,
   showType,
   state,
 }: {
   enableDescription: boolean;
   isRelated: boolean;
   model: ModelConfig;
+  relatedToName: string | null;
   showType: boolean;
   state: PickerOptionState;
 }) => {
   const { t } = useTranslation();
+  const linkedLabel =
+    relatedToName === null ? t('models.linkedModel') : t('models.linkedToModel', { name: relatedToName });
   const showDetail = !state.isCompact;
 
   return (
@@ -524,17 +587,14 @@ const ModelOptionContent = ({
       <Stack flex="1" gap="0" minW="0">
         <HStack gap="1.5" minW="0">
           {isRelated ? (
-            <Tooltip content={t('models.linkedToCurrentSelection')}>
-              <Icon
-                as={LinkIcon}
-                aria-label={t('models.linkedModel')}
-                boxSize="3"
-                color="accent.solid"
-                flexShrink={0}
-              />
+            <Tooltip content={linkedLabel}>
+              <Icon as={LinkIcon} aria-hidden boxSize="3" color="accent.solid" flexShrink={0} />
             </Tooltip>
           ) : null}
           <MiddleTruncate fontSize="md" minW="0" text={model.name} />
+          {/* Options take their accessible name from their text, and focus stays in the search field, so the tooltip
+              alone never reaches screen readers or keyboard users. */}
+          {isRelated ? <VisuallyHidden>{`, ${linkedLabel}`}</VisuallyHidden> : null}
           {showType ? (
             <Badge colorPalette="gray" flexShrink={0} fontSize="xs" variant="surface">
               {getModelTypeLabel(model.type)}

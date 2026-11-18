@@ -17,8 +17,10 @@ import type { GalleryStateView } from './galleryStateView';
 import type { GalleryWidgetContextValue } from './GalleryWidgetContext';
 
 import { GALLERY_PINNED_FOOTER_PX, GALLERY_STARRED_HEADER_HEIGHT_PX } from './galleryGridLayout';
+import { GalleryLayout } from './GalleryLayout';
 import { GalleryStackedLayout } from './GalleryStackedLayout';
 import { GalleryWideLayout } from './GalleryWideLayout';
+import { GalleryWidgetLabel } from './GalleryWidgetChrome';
 import { GalleryWidgetContext } from './GalleryWidgetContext';
 import { EMPTY_GALLERY_STARRED_STRIP } from './useGalleryStarredStrip';
 
@@ -27,11 +29,30 @@ vi.mock('@features/queue/react', () => ({
   useQueueItemProgressImage: () => null,
 }));
 
+// The header label lists boards itself; the shells read them from the widget context.
+vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  galleryBoardsOptions: () => ({
+    queryFn: () => Promise.resolve([board]),
+    queryKey: ['test-gallery-boards'],
+    staleTime: Infinity,
+  }),
+}));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { language: 'en' },
-    t: (key: string, values?: Record<string, unknown>) =>
-      key === 'widgets.gallery.selectionCount' ? `${String(values?.count)} selected` : key,
+    t: (key: string, values?: Record<string, unknown>) => {
+      if (key === 'widgets.gallery.selectionCount') {
+        return `${String(values?.count)} selected`;
+      }
+
+      if (key === 'widgets.gallery.filterAndSortMediaValue') {
+        return `${key}: ${String(values?.media)}, ${String(values?.order)}`;
+      }
+
+      return key;
+    },
   }),
 }));
 
@@ -123,7 +144,6 @@ const contextBase = {
   boardsState: READY,
   filter: { boardId: 'dogs', galleryView: 'images', searchTerm: '' },
   gallery,
-  isWindowTruncated: false,
   listing: READY,
   starredStrip: EMPTY_GALLERY_STARRED_STRIP,
   itemActions: {
@@ -157,17 +177,42 @@ let root: Root | null = null;
 let queryClient: QueryClient | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const renderLayout = async (Layout: typeof GalleryStackedLayout | typeof GalleryWideLayout) => {
+const renderLayout = async (
+  Layout: typeof GalleryStackedLayout | typeof GalleryWideLayout,
+  region: GalleryWidgetContextValue['region'] = 'center'
+) => {
   await act(() =>
     root?.render(
       <ChakraProvider value={system}>
         <QueryClientProvider client={queryClient!}>
           <GalleryUiProvider adapter={adapter}>
-            <GalleryWidgetContext value={createContextValue()}>
+            <GalleryWidgetContext value={{ ...createContextValue(), region }}>
               <DndContext>
                 <Layout />
               </DndContext>
             </GalleryWidgetContext>
+          </GalleryUiProvider>
+        </QueryClientProvider>
+      </ChakraProvider>
+    )
+  );
+};
+
+/** Header and body as the workbench places them: siblings under one Gallery UI host. */
+const renderBottomPlacement = async ({ withBody = true }: { withBody?: boolean } = {}) => {
+  await act(() =>
+    root?.render(
+      <ChakraProvider value={system}>
+        <QueryClientProvider client={queryClient!}>
+          <GalleryUiProvider adapter={adapter}>
+            <GalleryWidgetLabel region="bottom" />
+            {withBody ? (
+              <GalleryWidgetContext value={{ ...createContextValue(), region: 'bottom' }}>
+                <DndContext>
+                  <GalleryLayout region="bottom" />
+                </DndContext>
+              </GalleryWidgetContext>
+            ) : null}
           </GalleryUiProvider>
         </QueryClientProvider>
       </ChakraProvider>
@@ -423,9 +468,11 @@ describe('gallery layout shells', () => {
     }
   });
 
-  it('places the media filter between the starred filter and the sort menu in both shells, operable by keyboard', async () => {
+  it('offers one media filter and sort menu beside the separate starred toggle in both shells', async () => {
+    const updateSettings = contextBase.actions.updateSettings as ReturnType<typeof vi.fn>;
+
     for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
-      (contextBase.actions.updateSettings as ReturnType<typeof vi.fn>).mockClear();
+      updateSettings.mockClear();
       setGallery(createGallery());
       await renderLayout(Layout);
 
@@ -433,50 +480,79 @@ describe('gallery layout shells', () => {
       const starIndex = toolbarButtons.findIndex(
         (button) => button.getAttribute('aria-label') === 'widgets.gallery.starredOnly'
       );
-      const filter = host?.querySelector<HTMLButtonElement>('[data-gallery-media-filter-menu]');
-      const sortIndex = toolbarButtons.findIndex(
-        (button) => button.getAttribute('aria-label') === 'widgets.gallery.imageSortValue'
+      const trigger = toolbarButtons[starIndex + 1];
+
+      // The starred filter stays a toggle of its own; one menu trigger follows it, then upload.
+      expect(toolbarButtons[starIndex]?.getAttribute('aria-pressed')).toBe('false');
+      expect(trigger?.getAttribute('aria-label')).toBe(
+        'widgets.gallery.filterAndSortMediaValue: widgets.gallery.mediaFilterAll, widgets.gallery.newest'
+      );
+      expect(toolbarButtons[starIndex + 2]?.getAttribute('aria-label')).toMatch(/^widgets\.gallery\.upload/);
+
+      trigger?.focus();
+      await userEvent.keyboard('{Enter}');
+
+      const show = page.getByRole('group', { name: 'widgets.gallery.showMedia' });
+      const sort = page.getByRole('group', { name: 'widgets.gallery.sortBy' });
+      const videos = show.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterVideos' });
+      const oldest = sort.getByRole('menuitemradio', { name: 'widgets.gallery.oldest' });
+
+      await expect
+        .element(show.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterAll' }))
+        .toHaveAttribute('aria-checked', 'true');
+      await expect
+        .element(show.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterImages' }))
+        .toBeVisible();
+      await expect
+        .element(sort.getByRole('menuitemradio', { name: 'widgets.gallery.newest' }))
+        .toHaveAttribute('aria-checked', 'true');
+
+      await userEvent.click(videos);
+      expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'video' });
+
+      // The menu stays open, so the sort can be set in the same visit.
+      setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'video' } }));
+      await renderLayout(Layout);
+      await expect.element(videos).toHaveAttribute('aria-checked', 'true');
+
+      await userEvent.click(oldest);
+      expect(updateSettings).toHaveBeenCalledTimes(2);
+      expect(updateSettings).toHaveBeenLastCalledWith({ imageOrderDir: 'ASC' });
+
+      setGallery(
+        createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, imageOrderDir: 'ASC', mediaFilter: 'video' } })
+      );
+      await renderLayout(Layout);
+      await expect.element(oldest).toHaveAttribute('aria-checked', 'true');
+      expect(trigger?.getAttribute('aria-label')).toBe(
+        'widgets.gallery.filterAndSortMediaValue: widgets.gallery.mediaFilterVideos, widgets.gallery.oldest'
       );
 
-      expect(filter, 'media filter did not render in the toolbar').not.toBeNull();
-      expect(toolbarButtons.indexOf(filter!)).toBe(starIndex + 1);
-      expect(sortIndex).toBe(starIndex + 2);
-      expect(filter?.getAttribute('aria-label')).toBe('widgets.gallery.mediaFilterTrigger');
-
-      filter?.focus();
-      await userEvent.keyboard('{Enter}');
-      const videosOnly = page.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterVideos' });
-
-      await expect.element(videosOnly).toBeVisible();
-      await expect
-        .element(page.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterAll' }))
-        .toHaveAttribute('aria-checked', 'true');
-      await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}');
-
-      expect(contextBase.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'video' });
-      await expect.element(videosOnly).not.toBeInTheDocument();
+      await userEvent.keyboard('{Escape}');
+      await expect.element(videos).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(trigger);
     }
   });
 
-  it('shows a restricted media filter as an active control', async () => {
-    const triggerBackground = () =>
-      getComputedStyle(host!.querySelector<HTMLElement>('[data-gallery-media-filter-menu]')!).backgroundColor;
+  it('brightens the media menu trigger while a media kind is restricted, not for the sort order', async () => {
+    const triggerColor = () =>
+      getComputedStyle(
+        host!.querySelector<HTMLElement>('button[aria-label^="widgets.gallery.filterAndSortMediaValue"]')!
+      ).color;
 
     await renderLayout(GalleryWideLayout);
-    const inactiveBackground = triggerBackground();
+    const defaultColor = triggerColor();
+
+    setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, imageOrderDir: 'ASC' } }));
+    await renderLayout(GalleryWideLayout);
+    expect(triggerColor()).toBe(defaultColor);
 
     setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'image' } }));
     await renderLayout(GalleryWideLayout);
-
-    const trigger = host?.querySelector('[data-gallery-media-filter-menu]');
-
-    expect(trigger?.getAttribute('data-media-filter')).toBe('image');
-    expect(trigger?.hasAttribute('data-active')).toBe(true);
-    // The cue is visible, not just an attribute: a ghost trigger has no fill.
-    expect(triggerBackground()).not.toBe(inactiveBackground);
+    expect(triggerColor()).not.toBe(defaultColor);
   });
 
-  it('moves focus to the media filter when Show all media removes the empty state, in both shells', async () => {
+  it('moves focus to the media menu trigger when Show all media removes the empty state, in both shells', async () => {
     for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
       (contextBase.actions.updateSettings as ReturnType<typeof vi.fn>).mockClear();
       setGallery(createGallery({ items: [], settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'video' } }));
@@ -493,7 +569,7 @@ describe('gallery layout shells', () => {
       });
 
       expect(contextBase.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'all' });
-      expect(document.activeElement?.hasAttribute('data-gallery-media-filter-menu')).toBe(true);
+      expect(document.activeElement?.getAttribute('aria-label')).toMatch(/^widgets\.gallery\.filterAndSortMediaValue:/);
     }
   });
 
@@ -527,5 +603,71 @@ describe('gallery layout shells', () => {
       expect(host?.querySelector('[role="separator"]')).toBeNull();
       expect(host?.querySelector('[role="list"]'), 'the grid still renders').not.toBeNull();
     }
+  });
+});
+
+describe('wide shell board divider', () => {
+  const getDividerEdges = () => {
+    const divider = host!.querySelector<HTMLElement>('[role="separator"][aria-orientation="vertical"]')!;
+    const { bottom, top } = divider.getBoundingClientRect();
+    const frame = host!.getBoundingClientRect();
+    return { bottom: frame.bottom - bottom, top: top - frame.top };
+  };
+
+  it('runs from the header rule to the bottom edge of a docked body', async () => {
+    await renderLayout(GalleryWideLayout, 'bottom');
+
+    expect(getDividerEdges()).toEqual({ bottom: 0, top: 0 });
+    const boardSearch = host!.querySelector<HTMLElement>('input[aria-label="widgets.gallery.searchOrCreateBoards"]')!;
+    expect(boardSearch.getBoundingClientRect().top, 'the board panel keeps its inner padding').toBeGreaterThan(0);
+  });
+
+  it('stays below the floating chrome in the center', async () => {
+    host!.style.setProperty('--wb-center-chrome-inset', '48px');
+    await renderLayout(GalleryWideLayout, 'center');
+
+    const { bottom, top } = getDividerEdges();
+    expect(top).toBeGreaterThan(48);
+    expect(bottom).toBeGreaterThan(0);
+  });
+});
+
+describe('gallery header boards toggle', () => {
+  const getToggle = () => host!.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+  const getToggleIcon = () =>
+    getToggle().querySelector('svg.lucide-panel-left-close')
+      ? 'sidebar'
+      : getToggle().querySelector('svg.lucide-chevrons-down-up')
+        ? 'stacked'
+        : null;
+  const getBoardsSeparatorOrientation = () =>
+    host!.querySelector<HTMLElement>('[role="separator"]')?.getAttribute('aria-orientation');
+
+  it('follows the layout the bottom panel renders as it narrows and widens again', async () => {
+    await renderBottomPlacement();
+
+    // The wide shell divides boards from the grid with a column handle; the stacked one with a row handle.
+    await expect.poll(getBoardsSeparatorOrientation).toBe('vertical');
+    expect(getToggleIcon()).toBe('sidebar');
+
+    host!.style.width = '400px';
+    await expect.poll(getBoardsSeparatorOrientation).toBe('horizontal');
+    await expect.poll(getToggleIcon).toBe('stacked');
+    expect(getToggle().getAttribute('aria-expanded')).toBe('true');
+
+    host!.style.width = '900px';
+    await expect.poll(getBoardsSeparatorOrientation).toBe('vertical');
+    await expect.poll(getToggleIcon).toBe('sidebar');
+  });
+
+  it('returns the header to the placement default once the body unmounts', async () => {
+    host!.style.width = '400px';
+    await renderBottomPlacement();
+    await expect.poll(getToggleIcon).toBe('stacked');
+
+    await renderBottomPlacement({ withBody: false });
+
+    expect(getBoardsSeparatorOrientation()).toBeUndefined();
+    await expect.poll(getToggleIcon).toBe('sidebar');
   });
 });

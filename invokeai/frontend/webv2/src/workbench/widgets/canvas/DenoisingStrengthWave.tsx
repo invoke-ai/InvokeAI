@@ -27,7 +27,7 @@ export const getDenoisingStrengthWavePath = (
 const WAVE_WIDTH = 100;
 const WAVE_HEIGHT = 14;
 const WAVE_SEGMENTS = 5;
-/** Drawn at the badge text's line height so it sits inside a header badge. */
+/** Drawn at the summary text's line height so it sits in a section title row. */
 const WAVE_DISPLAY_HEIGHT = 10;
 
 /** A value-reactive wave whose amplitude shows the denoising strength. */
@@ -41,7 +41,7 @@ export const DenoisingStrengthWave = ({ value }: { value: number }) => {
       preserveAspectRatio="none"
       style={{ display: 'block', flexShrink: 0, pointerEvents: 'none' }}
       viewBox={`0 0 ${WAVE_WIDTH} ${WAVE_HEIGHT}`}
-      width={40}
+      width={30}
     >
       <path
         d={path}

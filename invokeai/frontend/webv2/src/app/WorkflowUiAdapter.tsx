@@ -4,31 +4,16 @@ import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 import type { ReactNode } from 'react';
 
-import { flushGenerateDrafts } from '@features/generation/react';
-import { getAuthSession, subscribeAuthSession } from '@features/identity';
-import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { getAuthSession, getCapabilities, subscribeAuthSession } from '@features/identity';
+import { ensureModelsLoaded, openModelManager } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
 import { hasPendingWorkflowQueueItem } from '@features/queue';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
-import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
-import { resolveAndSubmitGraphPreviewInvocation } from '@workbench/graphPreviewInvocation';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
-import {
-  createInvocationRouteInputSelector,
-  formatRoute,
-  isInvocationRouteValid,
-  resolveInvocationRouteInput,
-} from '@workbench/invocation';
-import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { getProjectSyncSnapshot, subscribeProjectSync } from '@workbench/projects/syncStore';
 import { getActiveProjectWorkflow, getProjectWorkflowHistory } from '@workbench/projectWorkflows';
@@ -39,19 +24,11 @@ import {
 } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { getProjectWidgetValues } from '@workbench/widgetState';
-import {
-  useActiveProjectSelector,
-  useWorkbenchCommands,
-  useWorkbenchInternalStore,
-  useWorkbenchQueries,
-} from '@workbench/WorkbenchContext';
+import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
+import { useWorkbenchCommands, useWorkbenchInternalStore, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
 
 import { WorkflowCommandShortcut } from './WorkflowCommandShortcut';
-
-const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
 const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
   reduceMotion: preferences.reduceMotion,
@@ -59,7 +36,10 @@ const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
   workflowEdgeStyle: preferences.workflowEdgeStyle,
   workflowEdgesBehindNodes: preferences.workflowEdgesBehindNodes,
   workflowGroupNodesByCategory: preferences.workflowGroupNodesByCategory,
+  workflowLibraryCardSize: preferences.workflowLibraryCardSize,
+  workflowLibraryLayout: preferences.workflowLibraryLayout,
   workflowLibrarySort: preferences.workflowLibrarySort,
+  workflowLibrarySortDirection: preferences.workflowLibrarySortDirection,
   workflowLibraryThumbnailFit: preferences.workflowLibraryThumbnailFit,
   workflowShowMinimap: preferences.workflowShowMinimap,
   workflowSnapToGrid: preferences.workflowSnapToGrid,
@@ -124,69 +104,14 @@ const createPairedSource = <A, B>(
 };
 
 const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode }) => {
-  const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
-  const models = useModelsSelector((snapshot) => snapshot.models);
-  const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
-  const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
   const commands = useWorkbenchCommands();
-  const queries = useWorkbenchQueries();
   const openWidget = useOpenWorkbenchWidget();
-  const { t } = useTranslation();
-  // The preview submits under the topbar's lease, so it is unavailable while that is held.
-  const isPreparing = useIsInvocationPreparing(routeInput.projectId);
 
   const adapter = useMemo<WorkflowGraphPreviewPort>(
     () => ({
       focusSource: (sourceId) => {
         if (sourceId) {
           openWidget(sourceId);
-        }
-      },
-      getRoute: (sourceId) => {
-        if (!sourceId) {
-          return null;
-        }
-
-        const route = resolveInvocationRouteInput(
-          routeInput,
-          'dialog',
-          { ...routeInput.invocation, sourceId, sourceLocked: true },
-          availabilityModels
-        );
-
-        return {
-          canInvoke: isInvocationRouteValid(route) && !isPreparing,
-          label: formatRoute(route),
-          validationMessage: isPreparing
-            ? t('topbar.invoke.preparing')
-            : typeof route.validationMessage === 'object' && 'controlLayerIssue' in route.validationMessage
-              ? describeControlLayerIssue(t, route.validationMessage.controlLayerIssue)
-              : route.validationMessage,
-        };
-      },
-      invoke: async (sourceId) => {
-        const owner = captureAccountScope();
-        flushGenerateDrafts();
-        try {
-          const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
-
-          assertAccountScopeCurrent(owner);
-          return resolveAndSubmitGraphPreviewInvocation({
-            commands,
-            formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
-            formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
-            models: availabilityModels,
-            owner,
-            prepareCanvasInvocation,
-            project: queries.getSnapshot().activeProject,
-            sourceId,
-          });
-        } catch (error) {
-          if (!isAccountScopeCurrent(owner)) {
-            return false;
-          }
-
-          throw error;
         }
       },
       openDocumentInNewProject: (document, label, source) => {
@@ -199,7 +124,7 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
         openWidget('workflow');
       },
     }),
-    [availabilityModels, commands, isPreparing, openWidget, queries, routeInput, t]
+    [commands, openWidget]
   );
 
   return <WorkflowGraphPreviewProvider adapter={adapter}>{children}</WorkflowGraphPreviewProvider>;
@@ -230,7 +155,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
             activeWorkflowId: activeWorkflow.document.id,
             canRedo: history.future.length > 0,
             canUndo: history.past.length > 0,
-            galleryValues: getProjectWidgetValues(snapshot.activeProject, 'gallery'),
+            galleryValues: getResolvedProjectWidgetValues(snapshot.activeProject, 'gallery', snapshot.scopedDefaults),
             id: snapshot.activeProject.id,
             isWorkflowRunning: hasPendingWorkflowQueueItem(snapshot.activeProject.queue.items),
             projectGraph: activeWorkflow.document,
@@ -264,7 +189,10 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
     () =>
       createProjectedExternalStore({
         source: { getSnapshot: getAuthSession, subscribe: subscribeAuthSession },
-        select: (session) => ({ canUseCache: !session.multiuserEnabled || session.user?.is_admin === true }),
+        select: (session) => ({
+          canManageNodes: getCapabilities(session).canManageNodes,
+          canUseCache: !session.multiuserEnabled || session.user?.is_admin === true,
+        }),
         isEqual: shallowEqual,
       }),
     []
@@ -300,12 +228,9 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         subscribeOrigin: nodeExecutionStore.subscribeOrigin,
       },
       notifications: { error: notify.error, info: notify.info, success: notify.success },
-      // Lazy-load manager filter state to preserve editor bundle boundaries; seed it before hash navigation.
-      openAddModels: (query) => {
-        void import('@features/models/launchpad').then(({ requestAddModelsSearch }) => {
-          requestAddModelsSearch(query);
-          window.location.hash = `#/models?project=${encodeURIComponent(queries.getSnapshot().activeProject.id)}`;
-        });
+      openAddModels: (query) => openModelManager({ projectId: queries.getSnapshot().activeProject.id, search: query }),
+      openNodesManager: () => {
+        window.location.hash = '#/nodes';
       },
       performance: {
         mark: (name, source) => markWorkbenchPerf(name, source),

@@ -11,13 +11,27 @@ import type { ListDensity } from './ListItem';
 import type { ListRow } from './listRows';
 
 import { IN_SLOT_DIVIDER_HIDING_CSS, ListDivider } from './ListDivider';
-import { LIST_ROW_GAP_PX as ROW_GAP_PX, LIST_ROW_INSET as INSET } from './listLayout';
+import { type ListInset, LIST_ROW_GAP_PX as ROW_GAP_PX, LIST_ROW_INSET } from './listLayout';
 import { LIST_SECTION_HEADER_HEIGHT_PX, ListSectionHeader } from './ListSectionHeader';
 import { extractRangeKeepingPinned, getPinnedHeaderShift, lastHeaderAtOrBefore } from './virtualSections';
 
 const ITEM_HEIGHT_PX: Record<ListDensity, number> = { comfortable: 52, compact: 28, regular: 40, snug: 48 };
+const getItemPitch = (density: ListDensity, estimatedRowHeight?: number) =>
+  (estimatedRowHeight ?? ITEM_HEIGHT_PX[density]) + ROW_GAP_PX;
+
+/**
+ * Total height of a fixed-height list's rows, for callers that size the list to its content up to a cap instead
+ * of giving it a fixed box.
+ */
+export const getListContentHeight = (rows: readonly Pick<ListRow<unknown>, 'kind'>[], density: ListDensity): number =>
+  rows.reduce(
+    (total, row) => total + (row.kind === 'header' ? LIST_SECTION_HEADER_HEIGHT_PX : getItemPitch(density)),
+    0
+  );
 const OVERSCAN_ROWS = 8;
 const PRIMARY_SELECTOR = '[data-list-primary]';
+// Set on the list root from `inset`; row and header wrappers pad by it and in-slot dividers offset from it.
+const INSET = 'var(--list-row-inset)';
 
 // Rows are fixed-height slots: content that outgrows its density clips instead of overlapping the next row.
 const ITEM_WRAPPER_STYLE: CSSProperties = {
@@ -55,6 +69,19 @@ const PINNED_HEADER_WRAPPER_STYLE: CSSProperties = {
   zIndex: 1,
 };
 
+/**
+ * The scroll area writes its overflow offsets as inherited custom properties on the viewport at every scroll event,
+ * which restyles every element below it. Rows use none of them; pinning them on the row container stops that restyle
+ * there, which otherwise costs each scroll frame a style pass over every mounted row.
+ */
+const ROW_CONTAINER_CSS = {
+  '--scroll-area-overflow-x-start': '0px',
+  '--scroll-area-overflow-x-end': '0px',
+  '--scroll-area-overflow-y-start': '0px',
+  '--scroll-area-overflow-y-end': '0px',
+};
+const ROW_CONTAINER_WITH_DIVIDERS_CSS = [ROW_CONTAINER_CSS, IN_SLOT_DIVIDER_HIDING_CSS];
+
 export type ListSurface = 'bg' | 'bg.subtle' | 'bg.panel';
 
 /**
@@ -79,6 +106,11 @@ export interface ListProps<T> {
   renderItem: (item: T, rowProps: ListRowProps) => ReactNode;
   /** Key of the row whose detail is open; it is the initial keyboard target. */
   activeKey?: string | null;
+  /**
+   * Keyboard target while no row has been focused and none is active, such as the first row that can be used when
+   * earlier ones are disabled; without it, the first row.
+   */
+  defaultFocusKey?: string | null;
   /** Row pitch; fixed for the list's lifetime, so change it with a keyed remount. */
   density?: ListDensity;
   /**
@@ -99,6 +131,8 @@ export interface ListProps<T> {
   surface?: ListSurface;
   /** Hairlines between rows of a section, inset from the edges. */
   dividers?: boolean;
+  /** `none` runs rows and section headers to the list's edges, for a container that already pads them. */
+  inset?: ListInset;
   initialScrollOffset?: number;
   /**
    * Without an initial offset, open with the active row at the top: for lists reopened after a selection was made
@@ -107,6 +141,17 @@ export interface ListProps<T> {
   revealActiveOnMount?: boolean;
   /** Receives the final scroll offset on unmount; must be referentially stable. */
   onScrollOffsetPersist?: (offset: number) => void;
+  /**
+   * Receives the visible row-index range (headers and items share the index space) on mount and whenever it changes,
+   * never per scrolled pixel; rows within the overscan around it are mounted too. For callers that load rows on
+   * demand, such as a server-windowed collection. Must be referentially stable.
+   */
+  onRangeChange?: (range: ListRange) => void;
+}
+
+export interface ListRange {
+  startIndex: number;
+  endIndex: number;
 }
 
 const findItemIndex = <T,>(rows: readonly ListRow<T>[], from: number, step: 1 | -1): number => {
@@ -126,14 +171,32 @@ const primaryOf = (viewport: HTMLElement, key: string): HTMLElement | null =>
  * Virtualized list with pinned section headers and a roving tabindex. Headers and items share one flat index
  * space; the header at the top of the visible range renders in flow as a sticky element, pushed out by the next.
  */
+/** Inputs whose arrows, Home and End do nothing of their own: a row's selection checkbox and button-like inputs. */
+const KEYLESS_INPUT_TYPES = new Set(['button', 'checkbox', 'color', 'file', 'image', 'reset', 'submit']);
+
+/**
+ * Whether a focused control uses ArrowUp, ArrowDown, Home and End itself: a field in a row (a title editor moves its
+ * caret), a select, or a radio or range input. The List leaves those keys to it and moves between rows from anything
+ * else, the selection checkbox included.
+ */
+const usesNavigationKeys = (target: HTMLElement): boolean => {
+  if (target.isContentEditable || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+    return true;
+  }
+
+  return target instanceof HTMLInputElement && !KEYLESS_INPUT_TYPES.has(target.type);
+};
+
 export const List = <T,>({
   activeKey = null,
+  defaultFocusKey = null,
   density = 'regular',
   dividers = false,
   emptyState,
   errorState,
   estimatedRowHeight,
   initialScrollOffset,
+  inset = 'row',
   isBusy = false,
   label,
   renderItem,
@@ -142,6 +205,7 @@ export const List = <T,>({
   rows,
   status = 'ready',
   surface = 'bg',
+  onRangeChange,
   onScrollOffsetPersist,
 }: ListProps<T>) => {
   const { t } = useTranslation();
@@ -151,9 +215,7 @@ export const List = <T,>({
   const listOwnsFocus = useRef(false);
   const lastScrollOffset = useRef(initialScrollOffset ?? 0);
   const [focusKey, setFocusKey] = useState<string | null>(null);
-  const itemPitch =
-    (rowHeight === 'measured' && estimatedRowHeight !== undefined ? estimatedRowHeight : ITEM_HEIGHT_PX[density]) +
-    ROW_GAP_PX;
+  const itemPitch = getItemPitch(density, rowHeight === 'measured' ? estimatedRowHeight : undefined);
 
   const layout = useMemo(() => {
     const headerIndexes: number[] = [];
@@ -182,14 +244,16 @@ export const List = <T,>({
   const isMeasured = rowHeight === 'measured';
   const hasHeaders = headerIndexes.length > 0;
 
-  // The roving target survives filtering: fall back to the active row, then the first item.
+  // The roving target survives filtering: fall back to the active row, then the default one, then the first item.
   const focusKeyIsStale = focusKey !== null && !indexByKey.has(focusKey);
   const resolvedFocusKey =
     !focusKeyIsStale && focusKey !== null
       ? focusKey
       : activeKey !== null && indexByKey.has(activeKey)
         ? activeKey
-        : firstItemKey;
+        : defaultFocusKey !== null && indexByKey.has(defaultFocusKey)
+          ? defaultFocusKey
+          : firstItemKey;
   const focusIndex = resolvedFocusKey === null ? -1 : (indexByKey.get(resolvedFocusKey) ?? -1);
 
   // Keep the pinned header and the focused row mounted whatever the scroll position: focus must never fall off
@@ -214,6 +278,22 @@ export const List = <T,>({
     return Math.max(0, offset - (hasHeaders ? LIST_SECTION_HEADER_HEIGHT_PX : 0));
   }, [activeIndex, estimateSize, hasHeaders]);
   const getScrollElement = useCallback(() => viewportRef.current, []);
+  const reportedRange = useRef<ListRange | null>(null);
+  // The virtualizer also notifies for scroll start and stop and for measurements; report only a moved range.
+  const handleVirtualizerChange = useCallback(
+    (instance: { range: { startIndex: number; endIndex: number } | null }) => {
+      const range = instance.range;
+      const last = reportedRange.current;
+
+      if (!onRangeChange || !range || (last?.startIndex === range.startIndex && last.endIndex === range.endIndex)) {
+        return;
+      }
+
+      reportedRange.current = { endIndex: range.endIndex, startIndex: range.startIndex };
+      onRangeChange(reportedRange.current);
+    },
+    [onRangeChange]
+  );
   // A viewport that unmounts (empty or loading state) takes no blur with it; forget ownership so a later remount
   // cannot pull focus away from wherever the user went meanwhile.
   const attachViewport = useCallback((element: HTMLDivElement | null) => {
@@ -229,11 +309,12 @@ export const List = <T,>({
     getItemKey,
     getScrollElement,
     initialOffset: initialScrollOffset ?? getActiveRowOffset,
+    onChange: onRangeChange ? handleVirtualizerChange : undefined,
     overscan: OVERSCAN_ROWS,
     rangeExtractor,
     scrollPaddingStart: hasHeaders ? LIST_SECTION_HEADER_HEIGHT_PX : 0,
-    // Scrollable's phantom-scrollbar heal dispatches a scroll event from a mount effect, where flushSync is a
-    // React error; useSyncExternalStore already commits scroll snapshots synchronously.
+    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error
+    // for any scroll event dispatched while React is rendering or flushing effects.
     useFlushSync: false,
   });
   const { scrollToIndex, virtualItems } = virtualizer;
@@ -304,7 +385,9 @@ export const List = <T,>({
   );
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.defaultPrevented || !(event.target as HTMLElement).closest('[data-list-row]')) {
+      const target = event.target as HTMLElement;
+
+      if (event.defaultPrevented || !target.closest('[data-list-row]') || usesNavigationKeys(target)) {
         return;
       }
 
@@ -364,7 +447,10 @@ export const List = <T,>({
 
   useMountEffect(() => () => onScrollOffsetPersist?.(lastScrollOffset.current));
 
-  const rootCss = useMemo(() => ({ '--list-surface': `colors.${surface}` }), [surface]);
+  const rootCss = useMemo(
+    () => ({ '--list-row-inset': inset === 'none' ? '0px' : LIST_ROW_INSET, '--list-surface': `colors.${surface}` }),
+    [inset, surface]
+  );
   const containerStyle = useMemo<CSSProperties>(
     () => ({ height: virtualizer.totalSize, position: 'relative', width: '100%' }),
     [virtualizer.totalSize]
@@ -396,7 +482,7 @@ export const List = <T,>({
         <Box
           aria-busy={isBusy || undefined}
           aria-label={label}
-          css={dividers ? IN_SLOT_DIVIDER_HIDING_CSS : undefined}
+          css={dividers ? ROW_CONTAINER_WITH_DIVIDERS_CSS : ROW_CONTAINER_CSS}
           role="list"
           style={containerStyle}
         >

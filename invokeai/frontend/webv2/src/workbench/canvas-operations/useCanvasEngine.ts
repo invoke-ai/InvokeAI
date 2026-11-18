@@ -5,7 +5,11 @@ import { galleryImageUrls } from '@features/gallery/utility';
 import { CanvasImageMissingError } from '@workbench/canvas-engine/api';
 import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 import { publishLayerPanelSelection, readLayerPanelState } from '@workbench/layerPanelState';
-import { getWorkbenchPreferences } from '@workbench/settings/store';
+import {
+  getWorkbenchPreferences,
+  patchWorkbenchPreferences,
+  subscribeWorkbenchPreferences,
+} from '@workbench/settings/store';
 import { getSelectedModelBase } from '@workbench/widgets/layers/selectedModel';
 import {
   useActiveProjectId,
@@ -106,7 +110,15 @@ export const useCanvasEngine = (): CanvasEngineHandle | null => {
         imageResolver: createImageResolver(),
         fonts,
         mutationPort: createCanvasProjectMutationPort(store, projectId),
-        readSelectObjectAutoProcess: () => getWorkbenchPreferences().selectObjectAutoProcess,
+        readSelectObjectAutoUpdate: () => getWorkbenchPreferences().selectObjectAutoUpdate,
+        toolMemory: {
+          read: () => getWorkbenchPreferences().canvasToolMemory,
+          subscribe: (listener) => subscribeWorkbenchPreferences(() => listener()),
+          write: (changed) =>
+            void patchWorkbenchPreferences({
+              canvasToolMemory: { ...getWorkbenchPreferences().canvasToolMemory, ...changed },
+            }),
+        },
         reportError: notifications.reportError,
       }),
     [fonts, liveEngines, notifications.reportError, persistence, projectId, store]

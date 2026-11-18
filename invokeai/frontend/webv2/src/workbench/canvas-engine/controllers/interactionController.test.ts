@@ -16,14 +16,12 @@ const createHarness = () => {
   const cancelGesture = vi.fn(() => order.push('cancelGesture'));
   vi.mocked(view.onDeactivate!).mockImplementation(() => order.push('view:deactivate'));
   const stepBrushSize = vi.fn();
-  let locked = false;
   const controller = new InteractionController({
     beforeSwitch,
     cancelGesture,
     getTool: (id) => tools[id as keyof typeof tools],
     getToolContext: () => ({}) as never,
     invalidateOverlay,
-    isLocked: () => locked,
     publishActiveTool,
     stepBrushSize,
     updateCursor,
@@ -35,7 +33,6 @@ const createHarness = () => {
     order,
     controller,
     invalidateOverlay,
-    lock: () => (locked = true),
     publishActiveTool,
     stepBrushSize,
     updateCursor,
@@ -68,17 +65,15 @@ describe('InteractionController', () => {
     expect(h.order).toEqual(['cancelGesture', 'beforeSwitch', 'view:deactivate']);
   });
 
-  it('blocks non-view transitions while locked and ignores commands after disposal', () => {
+  it('ignores commands after disposal', () => {
     const h = createHarness();
-    h.lock();
-    h.controller.setTool('brush');
-    expect(h.controller.getActiveToolId()).toBe('view');
-
     h.controller.tools.stepBrushSize(1);
     expect(h.stepBrushSize).toHaveBeenCalledWith(1);
     h.controller.dispose();
     h.controller.dispose();
     h.controller.tools.stepBrushSize(-1);
+    h.controller.setTool('brush');
     expect(h.stepBrushSize).toHaveBeenCalledOnce();
+    expect(h.controller.getActiveToolId()).toBe('view');
   });
 });

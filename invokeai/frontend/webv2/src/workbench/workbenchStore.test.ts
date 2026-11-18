@@ -10,7 +10,7 @@ import type { WorkbenchInternalStore, WorkbenchSnapshot } from './workbenchStore
 import { publishLayerPanelSelection, readLayerPanelState, toggleLayerStackCollapsed } from './layerPanelState';
 import { getActiveProjectGraph } from './projectWorkflows';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from './widgetPlacementMeta';
-import { getProjectWidgetValues } from './widgetState';
+import { getProjectWidgetValues, getResolvedProjectWidgetValues } from './widgetState';
 import { createInitialWorkbenchState } from './workbenchState';
 import { createWorkbenchStore } from './workbenchStore';
 
@@ -77,7 +77,9 @@ describe('createWorkbenchStore', () => {
     runningState.projects[0] = {
       ...source,
       queue: {
-        items: [{ backendItemIds: [11], id: 'run-1', status: 'running' } as (typeof source.queue.items)[number]],
+        items: [
+          { backendItemIds: [11], id: 'run-1', snapshot: {}, status: 'running' } as (typeof source.queue.items)[number],
+        ],
       },
     };
     const runningStore = createWorkbenchStore(runningState);
@@ -106,6 +108,7 @@ describe('createWorkbenchStore', () => {
                 {
                   backendItemIds: [11],
                   id: 'run-1',
+                  snapshot: {},
                   status,
                 } as (typeof source.queue.items)[number],
               ],
@@ -119,7 +122,9 @@ describe('createWorkbenchStore', () => {
     const pendingState = createInitialWorkbenchState();
     pendingState.projects[0] = {
       ...pendingState.projects[0]!,
-      queue: { items: [{ id: 'pending-1', status: 'pending' } as (typeof source.queue.items)[number]] },
+      queue: {
+        items: [{ id: 'pending-1', snapshot: {}, status: 'pending' } as (typeof source.queue.items)[number]],
+      },
     };
     const pendingStore = createWorkbenchStore(pendingState);
     const pendingSource = pendingState.projects[0]!;
@@ -144,6 +149,7 @@ describe('createWorkbenchStore', () => {
             backendItemIds: [11],
             cancellationPending: true,
             id: 'run-1',
+            snapshot: {},
             status: 'cancelled',
           } as (typeof source.queue.items)[number],
         ],
@@ -411,6 +417,32 @@ describe('createWorkbenchStore', () => {
     expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery').searchTerm).toBe('positional form');
   });
 
+  it('selects an item picked from another board within that board, leaving the Gallery on its own board', () => {
+    const store = createWorkbenchStore();
+    store.commands.gallery.selectBoard('board-a');
+
+    store.commands.gallery.selectItemInItsBoard({
+      boardId: 'board-b',
+      category: 'general',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      durationSeconds: 4,
+      fullUrl: '/full/clip.mp4',
+      height: 64,
+      isIntermediate: false,
+      kind: 'video',
+      name: 'clip.mp4',
+      starred: false,
+      thumbnailUrl: '/thumb/clip.mp4',
+      width: 64,
+    });
+
+    const values = getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery');
+    expect(values.selectedImageName).toBe('video:clip.mp4');
+    // Preview's next/previous step through this listing.
+    expect(values.selectedImageQuery).toMatchObject({ boardId: 'board-b', itemBoard: true, page: 0 });
+    expect(values.selectedBoardId).toBe('board-a');
+  });
+
   it('edits a preset default route through the layout capability', () => {
     const store = createWorkbenchStore();
 
@@ -661,6 +693,29 @@ describe('createWorkbenchStore', () => {
     expect(statusObjectWatcher.changeCount).toBe(1);
   });
 
+  it('resolves widget value selectors over the mirrored defaults without counting them as project edits', () => {
+    const store = createWorkbenchStore();
+    const revision = store.getPersistedRevision();
+    const gallery = (snapshot: WorkbenchSnapshot) =>
+      getResolvedProjectWidgetValues(snapshot.activeProject, 'gallery', snapshot.scopedDefaults);
+    const pinsBefore = gallery(store.getSnapshot());
+
+    store.internal.setScopedDefaults({ gallery: { thumbnailFit: 'aspect' } });
+
+    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('aspect');
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery')).toBe(pinsBefore);
+    expect(store.getPersistedRevision()).toBe(revision);
+
+    store.commands.widgets.patchInstanceValues('gallery', { thumbnailFit: 'square' });
+    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('square');
+
+    store.commands.widgets.clearInstanceValues('gallery', ['thumbnailFit'], 'another-project');
+    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('square');
+
+    store.commands.widgets.clearInstanceValues('gallery', ['thumbnailFit'], store.getSnapshot().activeProject.id);
+    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('aspect');
+  });
+
   it('keeps widget placement metadata stable across widget value updates', () => {
     const store = createWorkbenchStore();
     const placementWatcher = watchSelector(
@@ -744,7 +799,9 @@ describe('createWorkbenchStore', () => {
     store.subscribe(listener);
 
     store.commands.generation.setBatchCount(1);
-    store.commands.account.updateProjectPreferences({ useCpuNoise: true });
+    store.commands.account.updateProjectPreferences({
+      viewerAutoSwitch: store.getSnapshot().activeProject.settings.viewerAutoSwitch,
+    });
     store.commands.layout.setRegionCollapsed('left', false);
     store.commands.layout.setRegionSize('left', store.getSnapshot().activeProject.widgetRegions.left.sizePx);
     store.commands.widgets.patchValues('generate', {});
@@ -840,7 +897,7 @@ describe('createWorkbenchStore', () => {
     expect(store.getSnapshot().activeProject.queue.items[0]?.status).toBe('cancelled');
     expect(store.getSnapshot().notifications[0]).toMatchObject({
       kind: 'info',
-      title: 'Invocation cancellation requested',
+      titleKey: 'notifications.run.cancelRequested',
     });
 
     store.commands.queue.clearCompleted();
@@ -940,4 +997,38 @@ describe('createWorkbenchStore', () => {
 
     expect(placementWatcher.changeCount).toBe(0);
   });
+});
+
+it('owns recovery entries before rendering, preserves edits, and discards removed or previous-project entries', () => {
+  const initial = createInitialWorkbenchState();
+  const project = initial.projects[0]!;
+  const id = 'recovery-fixture';
+  project.widgetInstances[id] = { ...Object.values(project.widgetInstances)[0]!, id };
+  const store = createWorkbenchStore(initial);
+  const first = store.getSnapshot().activeProject;
+  const recovery = store.widgetRecovery.get(id!)!;
+  recovery.fail('actions', new Error('Old render'));
+  store.commands.widgets.patchInstanceValues(id!, { retained: true });
+  expect(store.widgetRecovery.get(id!)).toBe(recovery);
+  const removed = {
+    ...store.getState(),
+    projects: store.getState().projects.map((p) =>
+      p.id === first.id
+        ? {
+            ...p,
+            widgetInstances: Object.fromEntries(Object.entries(p.widgetInstances).filter(([key]) => key !== id)),
+          }
+        : p
+    ),
+  };
+  store.internal.persistence.hydrate(removed);
+  expect(store.widgetRecovery.has(id!)).toBe(false);
+  store.internal.persistence.hydrate({ ...removed, projects: [first] });
+  expect(store.widgetRecovery.get(id!)).not.toBe(recovery);
+  expect(store.widgetRecovery.get(id!)!.getSnapshot().errors).toEqual({});
+  const replacement = store.widgetRecovery.get(id!);
+  store.commands.projects.create();
+  store.commands.projects.switchTo(first.id);
+  expect(store.widgetRecovery.get(id!)).not.toBe(replacement);
+  expect(store.widgetRecovery.size).toBe(Object.keys(store.getSnapshot().activeProject.widgetInstances).length);
 });

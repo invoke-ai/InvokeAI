@@ -39,16 +39,16 @@ export const ImageMapHeaderActions = (_props: WidgetViewProps) => {
       <ToggleIconButton
         checked={showClusterLabels}
         icon={TagsIcon}
-        label="Toggle cluster labels"
-        tooltip={showClusterLabels ? 'Cluster labels shown' : 'Cluster labels hidden'}
+        label={t('widgets.imageMap.labelsToggle')}
+        tooltip={showClusterLabels ? t('widgets.imageMap.labelsShown') : t('widgets.imageMap.labelsHidden')}
         onCheckedChange={handleToggleLabels}
       />
       <ToggleIconButton
         checked={clickSelectsCluster}
         icon={GroupIcon}
-        label="Toggle cluster selection mode"
+        label={t('widgets.imageMap.selectionModeToggle')}
         tooltip={
-          clickSelectsCluster ? 'Click shows the whole cluster in the gallery' : 'Click reveals one item in the gallery'
+          clickSelectsCluster ? t('widgets.imageMap.selectionModeCluster') : t('widgets.imageMap.selectionModeItem')
         }
         onCheckedChange={handleToggleClusterMode}
       />

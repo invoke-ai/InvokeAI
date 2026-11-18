@@ -1,13 +1,18 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Flex, Icon, Stack, Text } from '@chakra-ui/react';
+import { isEventFromOwnDom } from '@platform/react/isEventFromOwnDom';
 import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { getDocumentIndex } from '@workbench/canvas-engine/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { setLayerPanelFilter, useLayerPanelState } from '@workbench/layerPanelState';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import {
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWidgetInstanceValuesSelector,
+} from '@workbench/WorkbenchContext';
 import { LayersIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -34,7 +39,6 @@ import {
 import { HistoryPane } from './panes/HistoryPane';
 import { LayerColorPane, LayerEditorPanes } from './panes/LayerEditorPanes';
 import { useCanvasCompanionHotkeys } from './useCanvasCompanionHotkeys';
-import { useLayerSelectionCommands } from './useLayerSelectionCommands';
 
 const TREE_TABS_ID_BASE = 'layer-tree';
 const TREE_TABS: ReadonlyArray<{ id: LayerTreeTabId; labelKey: string }> = [
@@ -61,31 +65,30 @@ export const LayersWidgetView = ({ runtime }: WidgetViewProps) => {
   const nodeCount = getDocumentIndex(document).nodes.length;
   const degraded = nodeCount > LAYER_PANEL_DEGRADE_THRESHOLD;
 
-  const selectionCommands = useLayerSelectionCommands(engine, projectId, panel.selectedIds, editingLocked);
   useCanvasCompanionHotkeys(runtime, engine);
   const handleFilter = useCallback(
     (filter: string) => setLayerPanelFilter(projectId, selectedLayerId, filter),
     [projectId, selectedLayerId]
   );
-  const paneLayout = useActiveProjectSelector(
-    (project) => readLayerEditorPaneLayout(project.widgetInstances[runtime.instanceId]?.state.values ?? {}),
+  const paneLayout = useWidgetInstanceValuesSelector(
+    runtime.instanceId,
+    readLayerEditorPaneLayout,
     areLayerEditorPaneLayoutsEqual
   );
   const handlePaneLayout = useCallback(
     (next: LayerEditorPaneLayout) => runtime.state.patch({ editorPanes: next }),
     [runtime.state]
   );
-  const colorPaneLayout = useActiveProjectSelector(
-    (project) => readColorPaneLayout(project.widgetInstances[runtime.instanceId]?.state.values ?? {}),
+  const colorPaneLayout = useWidgetInstanceValuesSelector(
+    runtime.instanceId,
+    readColorPaneLayout,
     areColorPaneLayoutsEqual
   );
   const handleColorPaneLayout = useCallback(
     (next: LayerColorPaneLayout) => runtime.state.patch({ colorPane: next }),
     [runtime.state]
   );
-  const treeTab = useActiveProjectSelector((project) =>
-    readLayerTreeTab(project.widgetInstances[runtime.instanceId]?.state.values ?? {})
-  );
+  const treeTab = useWidgetInstanceValuesSelector(runtime.instanceId, readLayerTreeTab);
   const handleTreeTab = useCallback((tab: LayerTreeTabId) => runtime.state.patch({ treeTab: tab }), [runtime.state]);
   const treeTabs = useMemo(() => TREE_TABS.map(({ id, labelKey }) => ({ id, label: t(labelKey) })), [t]);
   const addLayerButton = useMemo(() => <LayersHeaderActions />, []);
@@ -104,7 +107,12 @@ export const LayersWidgetView = ({ runtime }: WidgetViewProps) => {
   );
   const [addMenuAnchor, setAddMenuAnchor] = useState<LayerSurfaceAnchor | null>(null);
   const handleEmptyAreaContextMenu = useCallback((event: MouseEvent<HTMLElement>) => {
-    if (event.defaultPrevented || (event.target as HTMLElement).closest('[role="treeitem"]')) {
+    // Layer menus and their dialogs are portalled; a right-click in them is theirs.
+    if (
+      event.defaultPrevented ||
+      !isEventFromOwnDom(event) ||
+      (event.target as HTMLElement).closest('[role="treeitem"]')
+    ) {
       return;
     }
     event.preventDefault();
@@ -176,9 +184,11 @@ export const LayersWidgetView = ({ runtime }: WidgetViewProps) => {
               </Flex>
             )}
             <LayersPanelFooter
-              commands={selectionCommands}
               degraded={degraded}
+              editingLocked={editingLocked}
+              engine={engine}
               filter={panel.filter}
+              selectedIds={panel.selectedIds}
               onFilterChange={handleFilter}
             />
             {addMenuAnchor ? <AddLayerContextMenu anchor={addMenuAnchor} onClose={closeAddMenu} /> : null}

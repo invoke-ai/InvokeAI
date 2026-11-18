@@ -1,6 +1,8 @@
+import openapi from '@api/openapi.json';
 import { galleryItems } from '@features/gallery';
+import { configureLogging, getLoggingConfig, getLogSnapshot, resetLogging } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   apiFetchJson: vi.fn(),
@@ -21,6 +23,7 @@ import { ApiError } from '@platform/transport/http';
 
 import {
   ALL_READABLE_BOARDS_ID,
+  GALLERY_REQUEST_MAX_NAMES,
   addImagesToGalleryBoard,
   createGalleryBoard,
   galleryBoardExists,
@@ -955,6 +958,179 @@ describe('deleteGalleryImages partial failures', () => {
   it('skips the request entirely for an empty selection', async () => {
     await expect(deleteGalleryImages([])).resolves.toEqual({ deletedImageNames: [], failedImageNames: [] });
     expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+  });
+});
+
+type SchemaNode = { anyOf?: SchemaNode[]; maxItems?: number; properties?: Record<string, SchemaNode> };
+
+/** `maxItems` of every media-name list a request body carries, by schema and property. */
+const capsOnNameLists = (): Record<string, number> =>
+  Object.fromEntries(
+    Object.entries(openapi.components.schemas as Record<string, SchemaNode>).flatMap(([schema, { properties }]) =>
+      Object.entries(properties ?? {})
+        .filter(([property]) => property.endsWith('_names'))
+        .flatMap(([property, node]) =>
+          [node, ...(node.anyOf ?? [])]
+            .filter((variant) => variant.maxItems !== undefined)
+            .map((variant) => [`${schema}.${property}`, variant.maxItems!] as const)
+        )
+    )
+  );
+
+describe('name lists past the server’s per-request cap', () => {
+  it('batches by the cap the server publishes for every name list', () => {
+    const caps = capsOnNameLists();
+
+    // The star, delete, board, copy, download and lookup bodies, among others.
+    expect(Object.keys(caps).length).toBeGreaterThan(5);
+    expect(Object.entries(caps).filter(([, cap]) => cap !== GALLERY_REQUEST_MAX_NAMES)).toEqual([]);
+  });
+
+  const names = (count: number) => Array.from({ length: count }, (_, index) => `image-${index}.png`);
+  const sentNames = () =>
+    mocks.apiFetchJson.mock.calls.map(
+      ([, init]) => (JSON.parse(String(init.body)) as { image_names: string[] }).image_names
+    );
+  // Deletes what it is sent, except that it reports every name ending in 7 as failed.
+  const deleteServer = (_url: string, init: { body: string }) => {
+    const sent = (JSON.parse(init.body) as { image_names: string[] }).image_names;
+
+    if (sent.length > 1000) {
+      return Promise.reject(new ApiError('List should have at most 1000 items', 422));
+    }
+
+    return Promise.resolve({
+      affected_boards: [`board-${sent[0]}`],
+      deleted_images: sent.filter((name) => !name.endsWith('7.png')),
+      failed_images: sent.filter((name) => name.endsWith('7.png')),
+    });
+  };
+
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('sends 2,500 names as 1,000, 1,000 and 500, in order, and merges the answers', async () => {
+    mocks.apiFetchJson.mockImplementation(deleteServer);
+    const requested = names(2500);
+
+    const result = await deleteGalleryImages(requested);
+
+    expect(sentNames()).toEqual([requested.slice(0, 1000), requested.slice(1000, 2000), requested.slice(2000)]);
+    expect(result).toEqual({
+      deletedImageNames: requested.filter((name) => !name.endsWith('7.png')),
+      failedImageNames: requested.filter((name) => name.endsWith('7.png')),
+    });
+  });
+
+  it('sends exactly 1,000 names as one request', async () => {
+    mocks.apiFetchJson.mockImplementation(deleteServer);
+
+    await deleteGalleryImages(names(1000));
+
+    expect(sentNames()).toEqual([names(1000)]);
+  });
+
+  it('reports the earlier batches’ successes when a later batch fails, and the rest as failed', async () => {
+    configureLogging({ ...getLoggingConfig(), level: 'debug' });
+    onTestFinished(resetLogging);
+    mocks.apiFetchJson
+      .mockImplementationOnce(deleteServer)
+      .mockRejectedValueOnce(new ApiError('{"detail":"Server error"}', 500));
+    const requested = names(2500);
+
+    const result = await deleteGalleryImages(requested);
+
+    // The third batch is never sent, and the cause is kept in the log.
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+    expect(getLogSnapshot().entries).toContainEqual(
+      expect.objectContaining({ level: 'debug', name: 'gallery.batch-request-failed' })
+    );
+    expect(result).toEqual({
+      deletedImageNames: requested.slice(0, 1000).filter((name) => !name.endsWith('7.png')),
+      failedImageNames: [
+        ...requested.slice(0, 1000).filter((name) => name.endsWith('7.png')),
+        ...requested.slice(1000),
+      ],
+    });
+  });
+
+  it('rejects as one request would when the first batch fails', async () => {
+    const failure = new ApiError('{"detail":"Server error"}', 500);
+    mocks.apiFetchJson.mockRejectedValueOnce(failure);
+
+    await expect(deleteGalleryImages(names(2500))).rejects.toBe(failure);
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects as one request would when the caller aborts during the first batch', async () => {
+    const controller = new AbortController();
+    mocks.apiFetchJson.mockImplementationOnce((url: string, init: { body: string }) => {
+      controller.abort();
+      return deleteServer(url, init);
+    });
+
+    await expect(starGalleryImages(names(2500), controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports what earlier batches did when the caller aborts later, and sends nothing after', async () => {
+    const controller = new AbortController();
+    const requested = names(2500);
+    mocks.apiFetchJson.mockImplementation((url: string, init: { body: string }) => {
+      if (mocks.apiFetchJson.mock.calls.length === 2) {
+        controller.abort();
+      }
+      return deleteServer(url, init);
+    });
+
+    const result = await deleteGalleryImages(requested, controller.signal);
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
+    // The aborted batch's answer is never read, so its names are unconfirmed.
+    expect(result).toEqual({
+      deletedImageNames: requested.slice(0, 1000).filter((name) => !name.endsWith('7.png')),
+      failedImageNames: [
+        ...requested.slice(0, 1000).filter((name) => name.endsWith('7.png')),
+        ...requested.slice(1000),
+      ],
+    });
+  });
+
+  it('sends no further batch once the account changes', async () => {
+    mocks.apiFetchJson.mockImplementationOnce(() => {
+      accountLifecycle.invalidate();
+      accountLifecycle.activate('user-b');
+      return Promise.resolve({ affected_boards: [], removed_images: names(1000) });
+    });
+
+    await expect(removeImagesFromGalleryBoard(names(2500))).rejects.toThrow('no longer active');
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves 1,500 images by name in two requests, in the requested order', async () => {
+    const requested = names(1500);
+    mocks.apiFetchJson.mockImplementation((_url: string, init: { body: string }) =>
+      Promise.resolve(
+        (JSON.parse(init.body) as { image_names: string[] }).image_names.map((imageName) => ({
+          board_id: 'none',
+          created_at: '2026-07-09T12:00:00.000Z',
+          height: 512,
+          image_category: 'general',
+          image_name: imageName,
+          image_url: `/images/${imageName}`,
+          is_intermediate: false,
+          thumbnail_url: `/thumbnails/${imageName}`,
+          width: 512,
+        }))
+      )
+    );
+
+    const images = await getGalleryImagesByNames(requested);
+
+    expect(sentNames()).toEqual([requested.slice(0, 1000), requested.slice(1000)]);
+    expect(images.map((image) => image.imageName)).toEqual(requested);
   });
 });
 

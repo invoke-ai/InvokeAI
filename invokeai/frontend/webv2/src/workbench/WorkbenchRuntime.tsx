@@ -7,6 +7,7 @@ import {
   isAccountScopeCurrent,
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
+import i18next from 'i18next';
 import { useState } from 'react';
 
 import type { WorkbenchInternalStore } from './workbenchStore';
@@ -14,20 +15,42 @@ import type { WorkbenchInternalStore } from './workbenchStore';
 import { createCanvasDimsSync } from './canvasDimsSync';
 import { createWorkbenchFocusController, FocusRegionProvider } from './focusRegions';
 import { createShortcutHintSources, ShortcutHintSourcesProvider } from './hotkeys/hintSources';
-import { useWorkbenchInternalStore, useWorkbenchQueries, useWorkbenchSubscription } from './WorkbenchContext';
+import { subscribeWorkbenchPreferences } from './settings/store';
+import { startConnectionNotices } from './shell/notifications/connectionNotices';
+import {
+  useWorkbenchInternalStore,
+  useWorkbenchLiveCanvasEngines,
+  useWorkbenchQueries,
+  useWorkbenchSubscription,
+} from './WorkbenchContext';
 import { getProjectGalleryBoardReferences } from './workbenchState';
 
 /** Workbench-owned lifecycle adapter for aggregate-local synchronization. Cross-module adapters are constructed by App. */
 export const WorkbenchRuntime = () => {
   const store = useWorkbenchInternalStore();
+  const liveEngines = useWorkbenchLiveCanvasEngines();
 
   useMountEffect(() => {
-    const canvasDimsSync = createCanvasDimsSync(store);
+    // A frame resize Generate's size asks for joins canvas undo while the project's canvas engine is live.
+    const canvasDimsSync = createCanvasDimsSync(store, (projectId, from, to) =>
+      liveEngines.commitFrame(projectId, from, to, i18next.t('widgets.canvas.commands.resizeFrame'))
+    );
     const boardReferenceCheck = createGalleryBoardReferenceCheck(store);
+    const stopConnectionNotices = startConnectionNotices({
+      getStatus: () => store.getSnapshot().backendConnection.status,
+      notifications: store.commands.notifications,
+      subscribe: store.subscribe,
+    });
+    // Reads resolve project pins over the user's defaults from one snapshot; unchanged defaults keep their identity.
+    const stopScopedDefaults = subscribeWorkbenchPreferences((preferences) =>
+      store.internal.setScopedDefaults(preferences.scopedDefaults)
+    );
 
     return () => {
       canvasDimsSync.dispose();
       boardReferenceCheck.dispose();
+      stopConnectionNotices();
+      stopScopedDefaults();
     };
   });
 
@@ -118,7 +141,8 @@ export const createGalleryBoardReferenceCheck = (
 /**
  * Owns workbench focus for everything below it — the shell and the hotkey runtime read the same target. Focus is
  * transient: it is forgotten, along with any focus move still in flight, when the project on screen changes, the
- * account changes, or the workbench unmounts, and a window's focus is forgotten once it docks or closes.
+ * account changes, or the workbench unmounts, and a window's focus is forgotten once it docks or closes. The center
+ * holds focus whenever nothing else does, including on load.
  *
  * It lives in this module, beside the other workbench lifecycle adapter, because the editor's startup module set
  * is pinned by the architecture performance gate; a module of its own would have to be added to that baseline.

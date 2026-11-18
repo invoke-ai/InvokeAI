@@ -1,85 +1,90 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
-import type { VaeModelConfig } from '@features/generation/core/types';
-
-import { Icon } from '@chakra-ui/react';
+import { Icon, Menu, Portal } from '@chakra-ui/react';
 import { isSupportedGenerateModel } from '@features/generation/core/baseGenerationPolicies';
 import { normalizeGenerateSettings } from '@features/generation/core/settings';
-import { IconButton, Tooltip } from '@platform/ui';
+import { IconButton } from '@platform/ui/Button';
+import { createMenuPartLoader, MenuContent, MenuPartPlaceholder, useMenuPart } from '@platform/ui/Menu';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { RotateCcwIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { flushGenerateDrafts } from './generateDraftRegistry';
+import type { GenerateResetSelection } from './GenerateResetMenuItems';
+
 import { GeneratePresetsPopover } from './GeneratePresetsPopover';
 import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
-import {
-  getModelDefaultsPatch,
-  getModelDefaultSettings,
-  settingsMatchModelDefaults,
-} from './shared/modelDefaultSettings';
+import { GenerationSectionJumpMenu } from './shared/GenerationSectionJumpMenu';
 
-export const GenerateHeaderActions = () => {
+const RESET_MENU_POSITIONING = { placement: 'bottom-end' } as const;
+
+// The items' plan and wording load on demand, off the editor's startup; pointing at or focusing the button warms them.
+const resetMenuItems = createMenuPartLoader(() =>
+  import('./GenerateResetMenuItems').then((module) => module.GenerateResetMenuItems)
+);
+// Also on open: assistive technology can press the button without pointing at or focusing it first.
+const onResetMenuOpenChange = ({ open }: { open: boolean }) => {
+  if (open) {
+    resetMenuItems.load();
+  }
+};
+
+export const GenerateHeaderActions = ({ instance }: { instance?: { id: string } }) => {
   const { t } = useTranslation();
   const ui = useGenerationUi();
+  const resetMenuIds = useTooltipTriggerIds();
+  const items = useMenuPart(resetMenuItems);
   const models = ui.models.catalog;
-  const projectId = ui.project.activeProjectId;
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
-  const vaeModels = useMemo(
-    () => models.filter((model): model is ModelConfig & VaeModelConfig => model.type === 'vae'),
-    [models]
-  );
-  const resolveDefaults = (values: Record<string, unknown>) => {
+  const resolve = (values: Record<string, unknown>): GenerateResetSelection | null => {
     const settings = normalizeGenerateSettings(values);
     const selectedModel = settings && supportedModels.find((model) => model.key === settings.modelKey);
 
     return settings && selectedModel ? { selectedModel, settings } : null;
   };
-  // Select only what the button shows, so ordinary edits do not re-render the header.
-  const { hasSelectedModel, isAtModelDefaults } = useGenerateValues((values) => {
-    const resolved = resolveDefaults(values);
+  // The button needs only whether a model is selected; the menu's items read the rest while it shows.
+  const hasSelectedModel = useGenerateValues((values) => resolve(values) !== null);
 
-    return {
-      hasSelectedModel: resolved !== null,
-      isAtModelDefaults:
-        resolved !== null &&
-        settingsMatchModelDefaults(
-          resolved.settings,
-          getModelDefaultSettings(resolved.settings, resolved.selectedModel, vaeModels)
-        ),
-    };
-  });
-
-  const resetToModelDefaults = () => {
-    // Flush before reading so reset preserves pending prompt edits.
-    flushGenerateDrafts();
-    const resolved = resolveDefaults(ui.generateValues.getSnapshot());
-
-    if (resolved) {
-      ui.settings.patchGenerateSettings(
-        getModelDefaultsPatch(resolved.settings, resolved.selectedModel, vaeModels),
-        projectId
-      );
-    }
-  };
-
-  const resetLabel = t('widgets.generate.resetAllToModelDefaults');
+  const label = t('widgets.generate.resetSettings');
 
   return (
     <>
+      <GenerationSectionJumpMenu panelId={instance?.id} />
       <GeneratePresetsPopover />
-      <Tooltip content={resetLabel}>
-        <IconButton
-          aria-label={resetLabel}
-          color="fg.muted"
-          disabled={!hasSelectedModel || isAtModelDefaults}
-          size="sm"
-          variant="ghost"
-          onClick={resetToModelDefaults}
-        >
-          <Icon as={RotateCcwIcon} boxSize="3.5" />
-        </IconButton>
-      </Tooltip>
+      <Menu.Root
+        ids={resetMenuIds}
+        lazyMount
+        positioning={RESET_MENU_POSITIONING}
+        unmountOnExit
+        onOpenChange={onResetMenuOpenChange}
+      >
+        <Menu.Trigger asChild>
+          <Tooltip content={label} ids={resetMenuIds}>
+            <IconButton
+              aria-label={label}
+              color="fg.muted"
+              disabled={!hasSelectedModel}
+              size="sm"
+              variant="ghost"
+              // Capture: the Tooltip hands the menu trigger's `onFocus` to the button over its own.
+              onFocusCapture={resetMenuItems.load}
+              onPointerEnter={resetMenuItems.load}
+            >
+              <Icon as={RotateCcwIcon} boxSize="3.5" />
+            </IconButton>
+          </Tooltip>
+        </Menu.Trigger>
+        <Portal>
+          <Menu.Positioner>
+            <MenuContent aria-busy={items.status === 'loading'} maxW="20rem">
+              {items.status === 'loaded' ? (
+                <items.part resolve={resolve} />
+              ) : (
+                <MenuPartPlaceholder status={items.status} />
+              )}
+            </MenuContent>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
     </>
   );
 };

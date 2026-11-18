@@ -1,7 +1,6 @@
-import type { HTMLAttributes, PointerEvent, ReactElement, ReactNode } from 'react';
+import type { HTMLAttributes, PointerEvent, ReactElement, ReactNode, SyntheticEvent } from 'react';
 
 import {
-  Heading,
   HoverCard,
   HStack,
   Icon,
@@ -52,21 +51,24 @@ const HintCard = ({ hint, onDisable }: { hint: FeatureHintId; onDisable: (() => 
   // Padding belongs to the `hoverCard` content recipe, not here.
   return (
     <Stack gap="1.5">
-      <Heading fontSize="md" fontWeight="600">
-        {heading}
-      </Heading>
-      <Separator />
-      {paragraphs.map((paragraph) => (
-        <Text key={paragraph} color="fg.muted" fontSize="md" lineHeight="1.45">
-          {paragraph}
+      <Stack gap="1">
+        <Text fontSize="md" fontWeight="800" lineHeight="1rem">
+          {heading}
         </Text>
-      ))}
+        <Stack gap="1.5">
+          {paragraphs.map((paragraph) => (
+            <Text key={paragraph} color="fg.muted" fontSize="md" lineHeight="1.45">
+              {paragraph}
+            </Text>
+          ))}
+        </Stack>
+      </Stack>
       {(onDisable || href) && (
         <>
           <Separator />
           <HStack gap="2" minH="4">
             {onDisable && (
-              <Button color="fg.subtle" fontSize="xs" h="auto" px="1" size="sm" variant="plain" onClick={onDisable}>
+              <Button size="xs" variant="outline" onClick={onDisable}>
                 {t('common.dontShowMeThese')}
               </Button>
             )}
@@ -83,6 +85,27 @@ const HintCard = ({ hint, onDisable }: { hint: FeatureHintId; onDisable: (() => 
     </Stack>
   );
 };
+
+const stopPropagation = (event: SyntheticEvent) => event.stopPropagation();
+
+/**
+ * The card portals out of its label but stays inside it in the React tree, where its events would bubble on to the
+ * label's ancestors: a press on the card would open a Select whose trigger holds the label, the trigger's keydown would
+ * take Enter from the card's button and link, and a double-click in it would reset a ScrubberField. Stopping these
+ * types also stops their native event at the portal container, so non-capture document and window listeners miss them
+ * too: app hotkeys don't fire while focus is in the card. Capture-phase listeners, such as Zag's dismissal, still see
+ * them. Release events pass, so a drag or press tracked on the document still ends.
+ */
+const CARD_EVENT_BOUNDARY = {
+  onBlur: stopPropagation,
+  onClick: stopPropagation,
+  onContextMenu: stopPropagation,
+  onDoubleClick: stopPropagation,
+  onFocus: stopPropagation,
+  onKeyDown: stopPropagation,
+  onMouseDown: stopPropagation,
+  onPointerDown: stopPropagation,
+} satisfies HTMLAttributes<HTMLElement>;
 
 type ExclusionHandlers = Pick<HTMLAttributes<HTMLElement>, 'onPointerEnter' | 'onPointerLeave'>;
 
@@ -309,7 +332,7 @@ export const FeatureHint = ({ children, hint }: FeatureHintProps) => {
       </ExclusionProvider>
       <Portal>
         <HoverCard.Positioner>
-          <HoverCard.Content ref={setCard}>
+          <HoverCard.Content ref={setCard} {...CARD_EVENT_BOUNDARY}>
             <HoverCard.Arrow>
               <HoverCard.ArrowTip />
             </HoverCard.Arrow>

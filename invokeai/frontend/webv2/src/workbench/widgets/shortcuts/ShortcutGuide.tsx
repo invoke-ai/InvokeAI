@@ -5,6 +5,7 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Box, Flex, Icon, Popover, Stack, Text, usePopoverContext, VisuallyHidden } from '@chakra-ui/react';
 import { Button } from '@platform/ui';
+import { chipLabelStyles } from '@theme/recipes';
 import { useCurrentWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
 import { useExtensionHotkeyDefinitions } from '@workbench/hotkeys/extensionHotkeys';
@@ -20,7 +21,10 @@ import {
 import { getHotkeyTargetWidget, resolveHotkeyTarget } from '@workbench/hotkeys/targetWidget';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
-import { useCompactWidgetCapacity } from '@workbench/widget-frame/compactWidgetCapacity';
+import {
+  useCompactWidgetCapacity,
+  useCompactWidgetCapacityResource,
+} from '@workbench/widget-frame/compactWidgetCapacity';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { KeyboardIcon } from 'lucide-react';
@@ -48,6 +52,12 @@ const SURFACE_HINTS: Record<string, ShortcutHintSnapshot> = {
     titleKey: 'widgets.labels.workflow',
     hints: [
       { commandId: 'workflows.addNode', labelKey: 'workbench.shortcuts.actions.addNode' },
+      // The editor pans on a middle or right drag; a left drag selects.
+      {
+        labelKey: 'workbench.shortcuts.actions.pan',
+        parts: [],
+        pointerKey: 'workbench.shortcuts.pointer.middleOrRightDrag',
+      },
       { commandId: 'workflows.selectAll', labelKey: 'workbench.shortcuts.actions.selectNodes' },
     ],
   },
@@ -137,11 +147,11 @@ const Hint = ({ hint, compact = false }: { hint: ResolvedShortcutHint; compact?:
     >
       {hint.parts.length > 0 ? <ShortcutKeycaps parts={hint.parts} /> : null}
       {hint.pointerKey ? (
-        <Text as="span" fontSize="xs">
+        <Text as="span" css={compact ? chipLabelStyles : undefined} fontSize="xs">
           {t(hint.pointerKey)}
         </Text>
       ) : null}
-      <Text as="span" fontSize="xs">
+      <Text as="span" css={compact ? chipLabelStyles : undefined} fontSize="xs">
         {hint.labelKey ? t(hint.labelKey) : hint.title}
       </Text>
     </Flex>
@@ -169,6 +179,7 @@ export const ShortcutGuideContent = ({
   // The bottom-only manifest guarantees both presentations are hosted by the same Popover.Root.
   const popover = usePopoverContext();
   const capacity = useCompactWidgetCapacity();
+  const capacityResource = useCompactWidgetCapacityResource();
   const title = onCanvas ? t('workbench.shortcuts.onCanvas', { tool: t(titleKey) }) : t(titleKey);
   const measurementRoot = useRef<HTMLDivElement>(null);
   // Keycap/text changes need a pre-paint measurement; only this widget's own root is observed.
@@ -184,18 +195,20 @@ export const ShortcutGuideContent = ({
       if (!heading || !probe) {
         return;
       }
+      // Capacity is the chip's outer width, so its padding comes out of what the content may use.
+      const inset = capacityResource?.measureInset(root) ?? 0;
       const available = Math.max(24, Math.min(capacity, probe.getBoundingClientRect().width));
       const widths = items.map((item) => item.getBoundingClientRect().width + 8);
-      setCapacityWidth(available - 12);
-      setVisibleCount(getVisibleShortcutHintCount(available, heading.getBoundingClientRect().width + 12, widths));
+      setCapacityWidth(available - inset);
+      setVisibleCount(getVisibleShortcutHintCount(available, heading.getBoundingClientRect().width + inset, widths));
       const fallback = root.querySelector('[data-hint-fallback]');
-      setShowFallbackLabel((fallback?.getBoundingClientRect().width ?? 0) + 12 <= available);
+      setShowFallbackLabel((fallback?.getBoundingClientRect().width ?? 0) + inset <= available);
     };
     const observer = new ResizeObserver(measure);
     observer.observe(root);
     measure();
     return () => observer.disconnect();
-  }, [capacity, hints, title]);
+  }, [capacity, capacityResource, hints, title]);
   const stopKeyPropagation = useCallback((event: KeyboardEvent) => {
     if (isShortcutGuideSessionKey(event)) {
       event.stopPropagation();
@@ -254,13 +267,15 @@ export const ShortcutGuideContent = ({
         aria-hidden="true"
         data-hint-fallback
         align="center"
-        gap="1"
+        gap="2"
         position="absolute"
         visibility="hidden"
         w="max-content"
       >
         <Icon as={KeyboardIcon} boxSize="3" />
-        <Text fontSize="xs">{t('workbench.shortcuts.title')}</Text>
+        <Text css={chipLabelStyles} fontSize="xs" fontWeight="500">
+          {t('workbench.shortcuts.title')}
+        </Text>
       </Flex>
       <Flex
         aria-hidden="true"
@@ -271,7 +286,9 @@ export const ShortcutGuideContent = ({
         visibility="hidden"
         w="max-content"
       >
-        <Text fontSize="xs">{title}</Text>
+        <Text css={chipLabelStyles} fontSize="xs">
+          {title}
+        </Text>
         {hints.map((hint) => (
           <Hint key={hint.id} compact hint={hint} />
         ))}
@@ -283,13 +300,17 @@ export const ShortcutGuideContent = ({
           <VisuallyHidden>{t('workbench.shortcuts.title')}</VisuallyHidden>
         ) : null}
         {visibleCount > 0 ? (
-          <Text aria-hidden color="fg.muted" flexShrink={0} fontSize="xs">
+          <Text aria-hidden color="fg.muted" css={chipLabelStyles} flexShrink={0} fontSize="xs">
             {title}
           </Text>
         ) : (
-          <Flex align="center" gap="1">
+          <Flex align="center" gap="2">
             <Icon as={KeyboardIcon} boxSize="3" />
-            {showFallbackLabel ? <Text fontSize="xs">{t('workbench.shortcuts.title')}</Text> : null}
+            {showFallbackLabel ? (
+              <Text css={chipLabelStyles} fontSize="xs" fontWeight="500">
+                {t('workbench.shortcuts.title')}
+              </Text>
+            ) : null}
           </Flex>
         )}
         {hints.slice(0, visibleCount).map((hint) => (

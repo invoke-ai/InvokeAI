@@ -91,8 +91,8 @@ def test_an_int8_weight_with_no_marker_is_refused() -> None:
 
 def test_a_scaled_fp8_layer_is_untouched_by_the_check() -> None:
     """The population this fold exists for. The guard keys on the int8 dtype, so an fp8 layer never
-    reaches it -- asserted, because a guard that fired here would break every Wan and Qwen-Image
-    scaled-fp8 checkpoint."""
+    reaches it -- asserted, because a guard that fired here would break every Qwen2.5-VL
+    encoder scaled-fp8 checkpoint."""
     payload = quantize_scaled_fp8(torch.randn(8, 16))
     state_dict = {"lin.weight": payload.codes, "lin.weight_scale": payload.scale}
 
@@ -112,13 +112,13 @@ def test_the_other_scale_spelling_is_refused_too() -> None:
 
 
 def test_a_header_entry_is_not_taken_as_evidence_that_a_layer_is_safe() -> None:
-    """The safetensors header names formats too, but it cannot carry `convrot` or the group size --
-    which is why `flux.py` gives the per-tensor marker precedence. An earlier version of this guard
+    """The safetensors header names formats too, but Comfy-Org's header entries carry neither `convrot` nor
+    the group size -- which is why `flux.py` gives the per-tensor marker precedence. An earlier version of this guard
     let a header hint override the marker, so a header-named rotated build walked straight through
     into the unrotated fold. The guard reads the marker and nothing else; the header is simulated
     here by the only thing that could stand in for it, a marker of the wrong format.
     """
     state_dict, _ = _int8_layer({"format": "float8_e4m3fn"}, rotate=True)
 
-    with pytest.raises(ValueError, match="no int8_tensorwise marker"):
+    with pytest.raises(ValueError, match="marked 'float8_e4m3fn'"):
         _dequantize_comfyui_fp8(state_dict, torch.float32)

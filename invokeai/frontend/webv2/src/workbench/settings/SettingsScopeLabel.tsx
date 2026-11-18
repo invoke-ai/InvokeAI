@@ -8,10 +8,12 @@ import { useWorkbenchSettingsSelector } from './store';
 export const SettingsScopeLabel = ({ scope }: { scope: SettingDefinition['scope'] }) => {
   const { t } = useTranslation();
   const preferenceScope = useWorkbenchSettingsSelector((snapshot) => snapshot.scope);
-  if (scope === 'none') {
+  // Only where it is news: a server-wide setting, or a preference kept for this install while nobody is signed in.
+  const label =
+    scope === 'server' ? 'server' : scope === 'preference' && preferenceScope === 'global' ? 'install' : null;
+  if (!label) {
     return null;
   }
-  const label = scope === 'preference' && preferenceScope === 'global' ? 'install' : scope;
   return (
     <Text fontSize="xs" color="fg.muted">
       {t(`settingsDialog.scope.${label}`)}

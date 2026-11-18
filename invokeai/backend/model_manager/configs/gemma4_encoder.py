@@ -173,12 +173,12 @@ class Gemma4Encoder_Gemma4Encoder_LTX2_Config(Config_Base):
         return cls(**override_fields, subfolder=subfolder, weight_file=weight_file)
 
 
-def gguf_gemma4_text_config(metadata: Mapping[str, str]) -> dict[str, Any]:
+def gguf_gemma4_text_config(metadata: Mapping[str, Any]) -> dict[str, Any]:
     """The Gemma-4 text config a GGUF conversion embeds in its metadata, or ``NotAMatchError``."""
     for key in GGUF_CONFIG_KEYS:
         try:
             config = json.loads(metadata[key])
-        except (KeyError, ValueError):
+        except (KeyError, TypeError, ValueError):
             continue
         text_config = config.get("text_config", config) if isinstance(config, dict) else None
         if isinstance(text_config, dict) and {"hidden_size", "num_hidden_layers"} <= text_config.keys():

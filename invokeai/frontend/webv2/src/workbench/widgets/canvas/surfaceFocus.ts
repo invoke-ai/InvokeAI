@@ -3,6 +3,9 @@
  * another widget.
  */
 
+/** Marks the focusable canvas surface, for chrome that hands focus back to it once it unmounts. */
+export const CANVAS_SURFACE_ATTR = 'data-canvas-surface';
+
 /**
  * Elements that own their own focus/caret and must NOT be focus-stolen by the
  * surface: the text tool's contenteditable overlay and any inline input the
@@ -27,3 +30,9 @@ export const shouldFocusCanvasSurface = (
   }
   return true;
 };
+
+/** The focusable surface of one canvas widget instance, wherever its chrome renders; null while it is not mounted. */
+export const findCanvasSurface = (instanceId: string): HTMLElement | null =>
+  document.querySelector<HTMLElement>(
+    `[data-hotkey-widget-instance-id="${CSS.escape(instanceId)}"] [${CANVAS_SURFACE_ATTR}]`
+  );

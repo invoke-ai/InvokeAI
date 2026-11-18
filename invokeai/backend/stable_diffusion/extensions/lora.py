@@ -48,7 +48,7 @@ class LoRAExt(ExtensionBase):
         # believes is in RAM. That matters here despite `force_direct_patching`, for the fp8 reason
         # in the comment above.
         original_modules: dict[str, torch.nn.Module] = {}
-        patch_placements: dict[int, tuple[BaseLayerPatch, torch.device | None, torch.dtype | None]] = {}
+        patch_placements: dict[int, tuple[BaseLayerPatch, torch.device, torch.dtype]] = {}
 
         with lora_info.model_in_ram() as lora_model:
             LayerPatcher.apply_smart_model_patch(
@@ -70,5 +70,5 @@ class LoRAExt(ExtensionBase):
             finally:
                 for module in original_modules.values():
                     module.clear_patches()
-                for patch, patch_device, patch_dtype in patch_placements.values():
-                    patch.to(device=patch_device, dtype=patch_dtype)
+                for leaf, leaf_device, leaf_dtype in patch_placements.values():
+                    leaf.to(device=leaf_device, dtype=leaf_dtype)

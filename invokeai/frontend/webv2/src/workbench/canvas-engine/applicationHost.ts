@@ -63,7 +63,6 @@ export interface CanvasApplicationHost extends CanvasControlDerivationCapability
   getCompositeExecutorDeps(): CanvasCompositeExecutorDeps;
   getDocument(): CanvasDocumentContractV3 | null;
   isGuardCurrent(guard: LayerExportGuard): boolean;
-  isInteractionLocked(): boolean;
   isSamToolActive(): boolean;
   prepareSelectObjectStart(layerId: string): SelectObjectStartContext;
   publishFilterPreview(

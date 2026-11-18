@@ -1,8 +1,22 @@
 import type { GalleryItemRef, GalleryVideoItem } from '@features/gallery';
 import type { VideoWidgetValues } from '@features/video/core/types';
+import type { VideoSection } from '@features/video/core/videoPolicies';
 import type { ReactNode } from 'react';
 
 import { createContext, use, useMemo } from 'react';
+
+/** The persisted open state of each Video section, kept with Generate's under the same per-user preference. */
+export const VIDEO_SECTION_IDS = {
+  components: 'video-components',
+  concepts: 'video-concepts',
+  conditioningClip: 'video-conditioning-clip',
+  dimensions: 'video-dimensions',
+  frames: 'video-frames',
+  guidance: 'video-guidance',
+  references: 'video-references',
+  render: 'video-render',
+  source: 'video-source',
+} as const satisfies Record<VideoSection, string>;
 
 /** Workbench supplies this UI port because features cannot import workbench. */
 export interface VideoUiAdapter {
@@ -14,6 +28,11 @@ export interface VideoUiAdapter {
    * `none` is Uncategorized.
    */
   getUploadBoardId(): Promise<string>;
+  /** Notices about this project; `undoable` reports a change that already happened, with its Undo. */
+  notifications: {
+    info(title: string): void;
+    undoable(title: string, notice: { onUndo: () => void; supersedes: string }): void;
+  };
   /** Functional patches run synchronously against the originating project's latest normalized values. */
   patchValues(
     values: Partial<VideoWidgetValues> | ((current: VideoWidgetValues) => Partial<VideoWidgetValues>),
@@ -57,6 +76,7 @@ export type VideoUiActions = Pick<
   VideoUiAdapter,
   | 'findInGallery'
   | 'getUploadBoardId'
+  | 'notifications'
   | 'patchValues'
   | 'playVideoSpanInPreview'
   | 'readValues'
@@ -74,6 +94,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
   const {
     findInGallery,
     getUploadBoardId,
+    notifications,
     patchValues,
     playVideoSpanInPreview,
     readValues,
@@ -86,6 +107,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
     () => ({
       findInGallery,
       getUploadBoardId,
+      notifications,
       patchValues,
       playVideoSpanInPreview,
       readValues,
@@ -97,6 +119,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
     [
       findInGallery,
       getUploadBoardId,
+      notifications,
       patchValues,
       playVideoSpanInPreview,
       readValues,

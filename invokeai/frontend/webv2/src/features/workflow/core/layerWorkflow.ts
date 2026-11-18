@@ -11,6 +11,7 @@ import type {
 import { compileProjectGraph, getProjectGraphReadiness, type WorkflowSeedAssignment } from './buildGraph';
 import { getResolvedWorkflowEdgesIndexed } from './connectors';
 import { createWorkflowGraphIndex } from './graphIndex';
+import { formatWorkflowReadinessReason } from './readinessIssues';
 import { isInvocationNode } from './types';
 
 const READINESS_IMAGE_NAME = 'layer-action-readiness.png';
@@ -262,7 +263,7 @@ export const buildLayerWorkflowGraph = (options: BuildLayerWorkflowGraphOptions)
   const readiness = getProjectGraphReadiness(cloned, templatesSnapshot, { externallySatisfiedInputs });
 
   if (!readiness.canInvoke) {
-    throw new Error(`Workflow is not ready: ${readiness.reasons.join(' ')}`);
+    throw new Error(`Workflow is not ready: ${readiness.reasons.map(formatWorkflowReadinessReason).join(' ')}`);
   }
 
   // A layer runs exactly one graph; batch data has nowhere to go.

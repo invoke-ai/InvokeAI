@@ -43,6 +43,7 @@ const translation = {
   common: {
     cancel: 'Cancel',
     delete: 'Delete',
+    retry: 'Retry',
     edit: 'Edit',
     negative: 'Negative',
     prompt: 'Prompt',
@@ -95,6 +96,8 @@ const translation = {
         viewMerged: 'Show the merged prompt',
         editAuthored: 'Back to editing your prompt',
         loading: 'Loading templates…',
+        couldNotLoad: 'Templates could not be loaded.',
+        couldNotRefresh: 'Templates could not be refreshed. The list may be out of date.',
       },
     },
   },
@@ -143,12 +146,16 @@ const defaultTemplate: PromptTemplateRecord = {
 const createCatalog = (overrides: Partial<PromptTemplateCatalog> = {}): PromptTemplateCatalog => ({
   create: vi.fn(),
   defaultTemplates: [defaultTemplate],
+  errorDetail: null,
   exportCsv: vi.fn(),
   importFile: vi.fn(),
+  isError: false,
   isLoaded: true,
   isLoading: false,
+  isRetrying: false,
   personalTemplates: [userTemplate],
   remove: vi.fn(),
+  retry: vi.fn(),
   sharedTemplates: [sharedTemplate],
   templates: [userTemplate, sharedTemplate, defaultTemplate],
   update: vi.fn(),
@@ -233,6 +240,54 @@ describe('the prompt templates panel', () => {
     });
   });
 
+  it('says a failed read failed, with a retry, instead of showing an empty catalog', async () => {
+    const catalog = createCatalog({
+      defaultTemplates: [],
+      isError: true,
+      personalTemplates: [],
+      sharedTemplates: [],
+      templates: [],
+    });
+
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={null}
+        catalog={catalog}
+        isActiveTemplateMissing={false}
+        onApply={vi.fn()}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    expect(host!.textContent).toContain('Templates could not be loaded.');
+    expect(host!.textContent).not.toContain('No templates yet');
+
+    await act(async () => {
+      await userEvent.click(buttonWithText('Retry'));
+    });
+
+    expect(catalog.retry).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the templates it has when a refresh fails, and says the list may be stale', async () => {
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={null}
+        catalog={createCatalog({ isError: true })}
+        isActiveTemplateMissing={false}
+        onApply={vi.fn()}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    expect(host!.textContent).toContain('Templates could not be refreshed.');
+    expect(buttonWithText('Cinematic')).toBeTruthy();
+  });
+
   it('keeps management controls outside the inactive template row button', async () => {
     await render(
       <PromptTemplatesPanel
@@ -253,6 +308,39 @@ describe('the prompt templates panel', () => {
     expect(row.getAttribute('aria-current')).toBeNull();
     expect(row.contains(edit)).toBe(false);
     expect(row.contains(remove)).toBe(false);
+  });
+
+  it('ends long template names and prompts inside the row, before its actions', async () => {
+    const longTemplate: PromptTemplateRecord = {
+      ...userTemplate,
+      name: 'A very long template name that keeps going well past the width of the popover',
+      positivePrompt: `{prompt}, ${'cinematic still, 35mm film, shallow depth of field, '.repeat(6)}`,
+    };
+
+    await render(
+      <PromptTemplatesPanel
+        activeTemplate={null}
+        catalog={createCatalog({ personalTemplates: [longTemplate], templates: [longTemplate] })}
+        isActiveTemplateMissing={false}
+        onApply={vi.fn()}
+        onCreate={vi.fn()}
+        onDetach={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    const row = buttonWithText(longTemplate.name);
+    const edit = host!.querySelector<HTMLButtonElement>(`button[aria-label="Edit: ${longTemplate.name}"]`)!;
+    const [title, summary] = [...row.querySelectorAll('span')].filter(
+      (span) => span.textContent === longTemplate.name || span.textContent === longTemplate.positivePrompt
+    );
+    const rowBounds = row.getBoundingClientRect();
+
+    for (const span of [title!, summary!]) {
+      expect(span.scrollWidth).toBeGreaterThan(span.clientWidth);
+      expect(span.getBoundingClientRect().right).toBeLessThanOrEqual(rowBounds.right);
+    }
+    expect(edit.getBoundingClientRect().left).toBeGreaterThanOrEqual(summary!.getBoundingClientRect().right);
   });
 
   it('detaches rather than clears when the applied template is deleted', async () => {

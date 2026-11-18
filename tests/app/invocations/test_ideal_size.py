@@ -51,6 +51,7 @@ IDEAL_SIZE_AT_NODE_DEFAULTS: dict[BaseModelType, tuple[int, int]] = {
     BaseModelType.ErnieImage: (1360, 768),
     BaseModelType.Flux: (1360, 768),
     BaseModelType.Flux2: (1360, 768),
+    BaseModelType.Flux3: (1360, 768),
     BaseModelType.Ideogram4: (1360, 768),
     BaseModelType.Krea2: (1360, 768),
     # Declared 1248x704 (non-square, like H3): 878592 px at 1.7778 -> height sqrt(494208) = 703.0

@@ -1,0 +1,10 @@
+title: Remote Image
+author: fieldOfView
+repo: https://github.com/fieldOfView/InvokeAI-remote_image
+summary: Load images from, and post images to, websites and local servers.
+categories: [utility]
+nodes:
+  - name: Load Remote Image
+    description: Loads remote images, such as a live webcam image, an image of the day, or dynamically created images.
+  - name: Post Image to Remote Server
+    description: Uploads an image to a remote server with an HTTP POST request, for storage, display or further processing.

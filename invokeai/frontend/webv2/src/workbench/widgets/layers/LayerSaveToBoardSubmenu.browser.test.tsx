@@ -24,6 +24,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectName: () => 'Project',
   // No stored gallery values: the panel's default listing.
   useActiveProjectSelector: () => ({}),
+  useWidgetValuesSelector: () => ({}),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 

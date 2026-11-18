@@ -184,7 +184,10 @@
         "width": 640,
         "openai_quality": "auto",
         "openai_background": "auto",
-        "clip_skip": 0
+        "clip_skip": 0,
+        "control_layers": [],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "canvas_processing_output": {
         "is_intermediate": true,
@@ -451,7 +454,10 @@
         "width": 640,
         "openai_quality": "auto",
         "openai_background": "auto",
-        "clip_skip": 0
+        "clip_skip": 0,
+        "control_layers": [],
+        "controlnets": [],
+        "t2iAdapters": []
       },
       "canvas_resize_image_to_request": {
         "is_intermediate": true,

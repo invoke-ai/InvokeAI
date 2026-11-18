@@ -1,54 +1,81 @@
 import type { QueueGenerationMeta } from '@features/queue/contracts';
-import type { ImageRecallCapabilities, ImageRecallKind } from '@workbench/image-actions';
+import type { ImageRecallKind } from '@workbench/image-actions';
 
 import { createGenerateFormValuesSelector } from '@features/generation/react';
+import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { hasArchitectureCapabilities, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import {
-  EMPTY_IMAGE_RECALL_CAPABILITIES,
-  getCurrentGenerateValues,
-  getImageRecallTitle,
-} from '@workbench/image-actions';
+import { useExternalStoreSelector } from '@platform/state/selectors';
+import { EMPTY_IMAGE_RECALL_CAPABILITIES, getCurrentGenerateValues } from '@workbench/image-actions';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useWidgetValuesSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useWidgetValuesSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getQueueRecallCapabilities, getVideoQueueRecallCapabilities, planQueueRecall } from './queueRecall';
+import { executeQueueItemRecall } from './executeQueueItemRecall';
+import {
+  getQueueRecallAvailability,
+  getQueueRecallSource,
+  getQueueRecallTargetState,
+  type QueueRecallAvailability,
+} from './queueRecall';
 import { useLocalRecallSnapshot } from './useLocalRecallSnapshot';
 
-const selectGenerateRecallValues = createGenerateFormValuesSelector();
+export interface QueueItemRecall extends QueueRecallAvailability {
+  /** The durable snapshot lookup has not answered yet: everything is unavailable, with no reason to give. */
+  isPending: boolean;
+  recall: (kind: ImageRecallKind) => Promise<void>;
+}
+
+const selectGenerateValues = createGenerateFormValuesSelector();
+const NO_REASONS: QueueRecallAvailability['reasons'] = {};
 
 /**
- * Recall local submission snapshots or foreign session prompts/seed into the active project, then reveal the
- * destination panel.
+ * What an item's recall menus offer, and the recall itself. Mount it only for the item whose menu or details are
+ * open: it reads the durable snapshot and loads the model catalog.
  */
 export const useQueueItemRecall = (
   origin: string | null | undefined,
-  meta: QueueGenerationMeta
-): { capabilities: ImageRecallCapabilities; isPending: boolean; recall: (kind: ImageRecallKind) => void } => {
+  meta: QueueGenerationMeta,
+  /** The server names a workflow the item ran: without a snapshot, the only sign it holds no Generate settings. */
+  { isNonGenerateRun = false }: { isNonGenerateRun?: boolean } = {}
+): QueueItemRecall => {
   const { t } = useTranslation();
-  const { generation, widgets } = useWorkbenchCommands();
+  const commands = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
   const openWidget = useOpenWorkbenchWidget();
   const notify = useNotify();
   const snapshot = useLocalRecallSnapshot(origin);
   const isPending = snapshot === undefined;
-  const localGenerateValues = snapshot?.generateValues ?? null;
-  const videoSnapshot = snapshot?.videoValues ?? null;
-  const isVideoItem = snapshot?.sourceId === 'video';
-  const generateValues = useWidgetValuesSelector('generate', selectGenerateRecallValues);
   const models = useModelsSelector((state) => state.models);
+  const isCatalogSettled = useModelsSelector((state) => state.status === 'loaded' || state.status === 'error');
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
-  const capabilities = useMemo(
+  const generateValues = useWidgetValuesSelector('generate', selectGenerateValues);
+  // Read under the capability store: Generate values synthesized from architecture policy appear with its table.
+  const target = useExternalStoreSelector(
+    subscribeArchitectureCapabilities,
+    getArchitectureCapabilitiesSnapshot,
+    useCallback(
+      () =>
+        getQueueRecallTargetState({
+          hasCapabilityTable: hasArchitectureCapabilities(),
+          hasCurrentValues: getCurrentGenerateValues({ generateValues, supportedModels }) !== null,
+          isCatalogSettled,
+        }),
+      [generateValues, isCatalogSettled, supportedModels]
+    )
+  );
+  const source = getQueueRecallSource(snapshot?.sourceId ?? null, isNonGenerateRun);
+  const generateSnapshot = snapshot?.generateValues ?? null;
+  const videoSnapshot = snapshot?.videoValues ?? null;
+  const availability = useMemo<QueueRecallAvailability>(
     () =>
       isPending
-        ? EMPTY_IMAGE_RECALL_CAPABILITIES
-        : isVideoItem
-          ? getVideoQueueRecallCapabilities(videoSnapshot, meta)
-          : getQueueRecallCapabilities(localGenerateValues, meta),
-    [isPending, isVideoItem, localGenerateValues, meta, videoSnapshot]
+        ? { capabilities: EMPTY_IMAGE_RECALL_CAPABILITIES, reasons: NO_REASONS }
+        : getQueueRecallAvailability({ meta, snapshot: generateSnapshot, source, target, videoSnapshot }),
+    [generateSnapshot, isPending, meta, source, target, videoSnapshot]
   );
 
   useMountEffect(() => {
@@ -57,49 +84,20 @@ export const useQueueItemRecall = (
 
   const recall = useCallback(
     (kind: ImageRecallKind) => {
-      if (isPending) {
-        return;
+      if (snapshot === undefined) {
+        return Promise.resolve();
       }
-      const current = getCurrentGenerateValues({ generateValues, supportedModels });
-      const plan = planQueueRecall(kind, { current, isVideoItem, meta, snapshot: localGenerateValues, videoSnapshot });
-
-      if (!plan) {
-        // Use a generic unavailable reason: Video and missing capabilities are not missing Generate models.
-        const reason = isVideoItem
-          ? 'widgets.queue.recallUnavailableForItem'
-          : !current && !hasArchitectureCapabilities()
-            ? 'widgets.queue.recallUnavailableCapabilities'
-            : 'widgets.queue.recallUnavailable';
-        notify.info(getImageRecallTitle(kind), t(reason));
-        return;
-      }
-
-      if (plan.target === 'video') {
-        widgets.patchValues('video', plan.patch);
-        openWidget('video', { preferredRegions: ['left'] });
-        notify.success(getImageRecallTitle(kind), t('widgets.queue.settingsRecalledIntoVideoDescription'));
-        return;
-      }
-
-      generation.setSettings(plan.values);
-      openWidget('generate', { preferredRegions: ['left'] });
-      notify.success(getImageRecallTitle(kind), t('widgets.queue.settingsRecalledDescription'));
+      return executeQueueItemRecall({
+        context: { commands, notify, openWidget, queries, t },
+        isNonGenerateRun,
+        kind,
+        meta,
+        models,
+        snapshot,
+      });
     },
-    [
-      generateValues,
-      generation,
-      isPending,
-      isVideoItem,
-      localGenerateValues,
-      meta,
-      notify,
-      openWidget,
-      supportedModels,
-      t,
-      videoSnapshot,
-      widgets,
-    ]
+    [commands, isNonGenerateRun, meta, models, notify, openWidget, queries, snapshot, t]
   );
 
-  return { capabilities, isPending, recall };
+  return { ...availability, isPending, recall };
 };

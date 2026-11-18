@@ -31,9 +31,8 @@ export {
   type UserDTO,
   type UserUpdateRequest,
 } from './data/api';
-export { AccountMenu } from './ui/AccountMenu';
-export { AccountMenuSection, useHasAccountSection } from './ui/AccountMenuSection';
+export { AccountMenu, useHasAccountMenu } from './ui/AccountMenu';
 export { AuthUnavailableScreen } from './ui/AuthUnavailableScreen';
-export { LoginScreen } from './ui/LoginScreen';
+export { SessionExpiryNotice } from './ui/SessionExpiryNotice';
+export { LoginScreen, readLoginReturnPath } from './ui/LoginScreen';
 export { SetupScreen } from './ui/SetupScreen';
-export { UsersPage } from './ui/UsersPage';

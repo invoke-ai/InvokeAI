@@ -295,6 +295,28 @@
     },
     {
       "category": "PATHS",
+      "default": 52428800,
+      "description": "Maximum size in bytes of one managed file upload.",
+      "env_var": "INVOKEAI_MAX_FILE_UPLOAD_SIZE_BYTES",
+      "literal_values": [],
+      "name": "max_file_upload_size_bytes",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": 5368709120,
+      "description": "Maximum total size in bytes of all managed files.",
+      "env_var": "INVOKEAI_MAX_FILE_LIBRARY_BYTES",
+      "literal_values": [],
+      "name": "max_file_library_bytes",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
       "default": "flat",
       "description": "Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.",
       "env_var": "INVOKEAI_IMAGE_SUBFOLDER_STRATEGY",
@@ -327,6 +349,17 @@
       "env_var": "INVOKEAI_STYLE_PRESETS_DIR",
       "literal_values": [],
       "name": "style_presets_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "prompt_files",
+      "description": "Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.",
+      "env_var": "INVOKEAI_PROMPT_FILES_DIR",
+      "literal_values": [],
+      "name": "prompt_files_dir",
       "required": false,
       "type": "<class 'pathlib.Path'>",
       "validation": {}
@@ -772,7 +805,7 @@
     {
       "category": "GENERATION",
       "default": false,
-      "description": "Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs about 25 ms and 0.65 GB of transient VRAM on an RTX 4090; not recommended on CPU-only installs, where one takes about 2 s.",
+      "description": "Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs a few tens of ms and up to about 1.1 GB of transient VRAM on an RTX 4090 (image decoders 0.15-0.65 GB, Wan video windows up to 1.1 GB); a TAE that does not fit in VRAM next to the running model can instead run on the CPU (its `Decode previews on CPU` setting in the model manager): previews are capped at 512 px there and a frame takes about 0.3-0.4 s (TAESDXL, TAEF2), 0.8-1.1 s (TAEW2.1, one frame) or 1.0-1.9 s (Wan two-frame window) on a Ryzen 9 7900 with 8 threads in float32, so previews update less often.",
       "env_var": "INVOKEAI_TINY_AUTOENCODER_PREVIEWS",
       "literal_values": [],
       "name": "tiny_autoencoder_previews",
@@ -823,15 +856,19 @@
     {
       "category": "GENERATION",
       "default": "auto",
-      "description": "Attention kernel for the attention inside diffusion models. `auto` lets PyTorch choose among its exact SDPA kernels and never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA.",
+      "description": "Attention kernel for the attention inside diffusion models. `auto` uses PyTorch's exact SDPA kernels ranked flash, cuDNN, memory-efficient, math, taking the first one the GPU and build support for each call; it never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA. `cudnn`, `flash`, `efficient` and `math` rank that PyTorch kernel first for all attention on CUDA and ROCm GPUs, ahead of the `auto` order. That is never exclusive: a call the kernel cannot serve runs on the next kernel, and the log reports that once per node type and reason (not for the PiD decoder, whose attention is ranked the same but not reported). `math` materializes the full attention score matrix, so it is slow and needs much more memory, which the working-memory estimates of most model families do not reserve, so generations can run out of memory; it is meant for debugging. Images can differ slightly between kernels.",
       "env_var": "INVOKEAI_ATTENTION_BACKEND",
       "literal_values": [
         "auto",
-        "sage"
+        "sage",
+        "cudnn",
+        "flash",
+        "efficient",
+        "math"
       ],
       "name": "attention_backend",
       "required": false,
-      "type": "typing.Literal['auto', 'sage']",
+      "type": "typing.Literal['auto', 'sage', 'cudnn', 'flash', 'efficient', 'math']",
       "validation": {}
     },
     {

@@ -70,7 +70,7 @@ export interface ControlDetectionCoordinatorDeps {
   }): Promise<{ height: number; imageName: string; width: number }>;
   /** Adopts a result as canvas-owned pixels; called by the map commit once nothing refuses it. */
   makeDurable(imageName: string): Promise<void>;
-  /** Notifies when the edit lease, interaction lock or an editing session may have been released. */
+  /** Notifies when the edit lease or an editing session may have been released. */
   subscribeLockChanges(listener: () => void): () => void;
   readonly statuses?: ControlDetectionStatusStore;
   /** Account lifetime; the platform lifecycle by default. */

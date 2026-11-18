@@ -4,6 +4,8 @@ import type {
   BboxToolOptions,
   BrushOptions,
   CanvasCoreStoreCapability,
+  CanvasHistoryCapability,
+  CanvasHistoryEntries,
   CanvasInteractionState,
   EraserOptions,
   GradientToolOptions,
@@ -84,6 +86,21 @@ export const useCanvasEngineRead = <T extends boolean | number | string | null>(
   return useSyncExternalStore(subscribe, read, read);
 };
 
+/**
+ * A primitive read of the engine's document model, as `useCanvasEngineRead` but re-read only when the document
+ * changes: for answers pixels cannot change, such as command eligibility, so painting never re-runs them.
+ */
+export const useCanvasDocumentRead = <T extends boolean | number | string | null>(
+  engine: CanvasCoreStoreCapability | null,
+  read: () => T
+): T => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('documentEpoch', listener) ?? (() => undefined),
+    [engine]
+  );
+  return useSyncExternalStore(subscribe, read, read);
+};
+
 /** Subscribes to one layer's thumbnail request state; an absent key is idle. */
 export const useLayerThumbnailStatus = (
   engine: CanvasCoreStoreCapability | null,
@@ -111,6 +128,14 @@ export const useCanvasViewportReady = (engine: CanvasCoreStoreCapability): boole
 /** The control layer the canvas shows as its original (or original under map); null while every map shows. */
 export const useControlLayerView = (engine: CanvasCoreStoreCapability): CanvasInteractionState['controlLayerView'] =>
   useCanvasInteractionState(engine, 'controlLayerView');
+
+/** Whether a staged or progress preview, shown or toggled off, hides control layers, masks and regions. */
+export const useCanvasStagingHidesOverlays = (engine: CanvasCoreStoreCapability): boolean =>
+  useCanvasInteractionState(engine, 'stagingHidesOverlays');
+
+/** The generation frame while a Frame tool drag reshapes it; null when the committed frame is current. */
+export const useCanvasBboxPreview = (engine: CanvasCoreStoreCapability): CanvasInteractionState['bboxPreview'] =>
+  useCanvasInteractionState(engine, 'bboxPreview');
 
 /** The active tool id for `engine`. */
 export const useCanvasActiveTool = (engine: CanvasCoreStoreCapability): ToolId =>
@@ -169,6 +194,34 @@ export const useCanvasCanUndo = (engine: CanvasCoreStoreCapability): boolean =>
 /** Whether the engine-owned canvas history has an entry to redo (enables the header redo button). */
 export const useCanvasCanRedo = (engine: CanvasCoreStoreCapability): boolean =>
   useCanvasInteractionState(engine, 'canRedo');
+
+type CanvasHistoryLabelEngine = CanvasCoreStoreCapability & {
+  readonly history: Pick<CanvasHistoryCapability, 'getEntries'>;
+};
+
+const readUndoLabel = (entries: CanvasHistoryEntries): string | undefined => entries.past.at(-1);
+const readRedoLabel = (entries: CanvasHistoryEntries): string | undefined => entries.future[0];
+
+/** One history entry's label, re-read on every history-stack mutation; null when there is none. */
+const useCanvasHistoryLabel = (
+  engine: CanvasHistoryLabelEngine,
+  read: (entries: CanvasHistoryEntries) => string | undefined
+): string | null => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine.interaction.subscribe('historyEpoch', listener),
+    [engine]
+  );
+  const getSnapshot = useCallback(() => read(engine.history.getEntries()) ?? null, [engine, read]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};
+
+/** The label of the step `undo()` would revert, or null with nothing to undo. */
+export const useCanvasUndoLabel = (engine: CanvasHistoryLabelEngine): string | null =>
+  useCanvasHistoryLabel(engine, readUndoLabel);
+
+/** The label of the step `redo()` would replay, or null with nothing to redo. */
+export const useCanvasRedoLabel = (engine: CanvasHistoryLabelEngine): string | null =>
+  useCanvasHistoryLabel(engine, readRedoLabel);
 
 /** Bumped on every history-stack mutation; a history list re-reads the entries on change. */
 export const useCanvasHistoryEpoch = (engine: CanvasCoreStoreCapability): number =>
@@ -251,3 +304,18 @@ export const useTextOptions = (engine: CanvasCoreStoreCapability): TextToolOptio
 /** The active text-editing session (create/edit mode + live source + transform), or `null`. */
 export const useTextEditSession = (engine: CanvasCoreStoreCapability): TextEditSession | null =>
   useCanvasInteractionState(engine, 'textEditSession');
+
+export const useTransformOptions = (engine: CanvasCoreStoreCapability) =>
+  useCanvasInteractionState(engine, 'transformOptions');
+
+/** PSD preparation/worker/download lifecycle belongs to the engine, across widget remounts. */
+export const usePsdExportStatus = (
+  engine: CanvasCoreStoreCapability | null
+): CanvasInteractionState['psdExportStatus'] => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('psdExportStatus', listener) ?? (() => undefined),
+    [engine]
+  );
+  const getSnapshot = useCallback(() => engine?.interaction.get('psdExportStatus') ?? 'idle', [engine]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};

@@ -1,23 +1,25 @@
 import type { ReactNode, Ref } from 'react';
 
-import { Box, HStack, Icon, Kbd, ScrollArea, Spacer, Text, chakra } from '@chakra-ui/react';
+import { Box, Command, Icon, Kbd, Spacer, Text, VisuallyHidden, chakra } from '@chakra-ui/react';
+import { Scrollable } from '@platform/ui/Scrollable';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { dropdownGroupLabel } from '@theme/recipes';
 import { ShortcutKeyGlyph, ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
-import { CheckIcon } from 'lucide-react';
+import { CheckIcon, ExternalLinkIcon } from 'lucide-react';
 import { useCallback, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { PaletteEntry, PaletteRow } from './entries';
+import type { NavigablePaletteRow, PaletteEntry, PaletteRow } from './entries';
 
-const RESULT_LIST_ID = 'command-palette-results';
+export const COMMAND_PALETTE_RESULTS_ID = 'command-palette-results';
+/** Names the results listbox, which the combobox labels by its label id. */
+export const COMMAND_PALETTE_RESULTS_LABEL_ID = 'command-palette-results-label';
 const LABEL_ROW_HEIGHT_PX = 26;
 const ENTRY_ROW_HEIGHT_PX = 40;
 const VIRTUALIZER_INITIAL_RECT = { height: 384, width: 0 };
 
-export const getCommandPaletteRowDomId = (rowId: string): string => `${RESULT_LIST_ID}-${encodeURIComponent(rowId)}`;
-
-const preventFocusSteal = (event: { preventDefault: () => void }) => event.preventDefault();
+export const getCommandPaletteRowDomId = (rowId: string): string =>
+  `${COMMAND_PALETTE_RESULTS_ID}-${encodeURIComponent(rowId)}`;
 
 const renderTitle = (title: string, matchIndexes?: readonly number[]): ReactNode => {
   if (!matchIndexes || matchIndexes.length === 0) {
@@ -48,8 +50,9 @@ const renderTitle = (title: string, matchIndexes?: readonly number[]): ReactNode
   return segments;
 };
 
-// Rows stay out of the tab order for the combobox aria-activedescendant pattern.
-const rowButtonProps = {
+const rowStyleProps = {
+  alignItems: 'center',
+  display: 'flex',
   gap: '2.5',
   h: `${ENTRY_ROW_HEIGHT_PX}px`,
   px: '3',
@@ -58,38 +61,42 @@ const rowButtonProps = {
   w: 'full',
 } as const;
 
-const EntryRow = ({
-  domId,
-  entry,
+/** The combobox only marks chosen values selected, and the palette has none; the highlighted option is the selection. */
+const PaletteItem = ({
+  children,
   isActive,
-  matchIndexes,
-  onActive,
-  onRun,
+  row,
 }: {
-  domId: string;
-  entry: PaletteEntry;
+  children: ReactNode;
   isActive: boolean;
-  matchIndexes?: readonly number[];
-  onActive: () => void;
-  onRun: () => void;
+  row: NavigablePaletteRow;
 }) => {
+  const isError = row.kind === 'provider-error';
+
   return (
-    <HStack
-      {...rowButtonProps}
-      id={domId}
+    <Command.Item
+      {...rowStyleProps}
       aria-selected={isActive}
-      bg={isActive ? 'bg.hover' : undefined}
-      role="option"
-      onClick={onRun}
-      onMouseDown={preventFocusSteal}
-      onMouseMove={onActive}
+      bg={isActive ? (isError ? 'bg.error' : 'bg.hover') : undefined}
+      color={isError ? 'fg.error' : undefined}
+      item={row}
     >
+      {children}
+    </Command.Item>
+  );
+};
+
+const EntryRowContent = ({ entry, matchIndexes }: { entry: PaletteEntry; matchIndexes?: readonly number[] }) => {
+  const { t } = useTranslation();
+
+  return (
+    <>
       {entry.thumbnailUrl ? (
         <chakra.img alt="" boxSize="7" flexShrink={0} objectFit="cover" rounded="sm" src={entry.thumbnailUrl} />
       ) : null}
-      <Text fontSize="lg" truncate>
+      <Command.ItemText fontSize="lg" truncate>
         {renderTitle(entry.title, matchIndexes)}
-      </Text>
+      </Command.ItemText>
       {entry.isCurrent ? (
         <Icon as={CheckIcon} boxSize="3.5" color="fg.muted" flexShrink={0} />
       ) : entry.subtitle ? (
@@ -99,72 +106,15 @@ const EntryRow = ({
       ) : null}
       <Spacer />
       {entry.keys ? <ShortcutKeycaps parts={entry.keys} /> : null}
-    </HStack>
+      {entry.opensExternally ? (
+        <>
+          <Icon as={ExternalLinkIcon} boxSize="3.5" color="fg.muted" flexShrink={0} />
+          <VisuallyHidden>{t('commandPalette.opensInNewTab')}</VisuallyHidden>
+        </>
+      ) : null}
+    </>
   );
 };
-
-const ProviderErrorRow = ({
-  domId,
-  isActive,
-  label,
-  onActive,
-  onRun,
-}: {
-  domId: string;
-  isActive: boolean;
-  label: string;
-  onActive: () => void;
-  onRun: () => void;
-}) => (
-  <HStack
-    {...rowButtonProps}
-    id={domId}
-    aria-selected={isActive}
-    bg={isActive ? 'bg.error' : undefined}
-    color="fg.error"
-    role="option"
-    onClick={onRun}
-    onMouseDown={preventFocusSteal}
-    onMouseMove={onActive}
-  >
-    <Text fontSize="lg" truncate>
-      {label}
-    </Text>
-  </HStack>
-);
-
-const ScopeRow = ({
-  domId,
-  isActive,
-  label,
-  onActive,
-  onRun,
-}: {
-  domId: string;
-  isActive: boolean;
-  label: string;
-  onActive: () => void;
-  onRun: () => void;
-}) => (
-  <HStack
-    {...rowButtonProps}
-    id={domId}
-    aria-selected={isActive}
-    bg={isActive ? 'bg.hover' : undefined}
-    role="option"
-    onClick={onRun}
-    onMouseDown={preventFocusSteal}
-    onMouseMove={onActive}
-  >
-    <Text color="fg.muted" fontSize="lg" truncate>
-      {label}
-    </Text>
-    <Spacer />
-    <Kbd textTransform="lowercase">
-      <ShortcutKeyGlyph fallback="tab" part="tab" />
-    </Kbd>
-  </HStack>
-);
 
 const VirtualPaletteRow = ({
   activeRowId,
@@ -172,67 +122,53 @@ const VirtualPaletteRow = ({
   row,
   virtualIndex,
   virtualStart,
-  onActive,
-  onRun,
 }: {
   activeRowId: string | null;
   measureElement: (node: Element | null) => void;
   row: PaletteRow;
   virtualIndex: number;
   virtualStart: number;
-  onActive: (rowId: string) => void;
-  onRun: (row: PaletteRow) => void;
-}) => {
-  const handleActive = useCallback(() => onActive(row.id), [onActive, row.id]);
-  const handleRun = useCallback(() => onRun(row), [onRun, row]);
-  const isActive = row.id === activeRowId;
-
-  return (
-    <Box
-      ref={measureElement}
-      data-index={virtualIndex}
-      left="0"
-      position="absolute"
-      top="0"
-      transform={`translateY(${virtualStart}px)`}
-      w="full"
-    >
-      {row.kind === 'label' ? (
-        <Text css={dropdownGroupLabel} pb="1" pt="2" px="3" role="presentation">
-          {row.label}
-        </Text>
-      ) : row.kind === 'scope' ? (
-        <ScopeRow
-          domId={getCommandPaletteRowDomId(row.id)}
-          isActive={isActive}
-          label={row.label}
-          onActive={handleActive}
-          onRun={handleRun}
-        />
-      ) : row.kind === 'provider-error' ? (
-        <ProviderErrorRow
-          domId={getCommandPaletteRowDomId(row.id)}
-          isActive={isActive}
-          label={row.label}
-          onActive={handleActive}
-          onRun={handleRun}
-        />
-      ) : (
-        <EntryRow
-          domId={getCommandPaletteRowDomId(row.id)}
-          entry={row.entry}
-          isActive={isActive}
-          matchIndexes={row.matchIndexes}
-          onActive={handleActive}
-          onRun={handleRun}
-        />
-      )}
-    </Box>
-  );
-};
+}) => (
+  <Box
+    ref={measureElement}
+    data-index={virtualIndex}
+    left="0"
+    position="absolute"
+    top="0"
+    transform={`translateY(${virtualStart}px)`}
+    w="full"
+  >
+    {row.kind === 'label' ? (
+      <Text css={dropdownGroupLabel} pb="1" pt="2" px="3" role="presentation">
+        {row.label}
+      </Text>
+    ) : (
+      <PaletteItem isActive={row.id === activeRowId} row={row}>
+        {row.kind === 'entry' ? (
+          <EntryRowContent entry={row.entry} matchIndexes={row.matchIndexes} />
+        ) : (
+          <>
+            <Command.ItemText color={row.kind === 'scope' ? 'fg.muted' : undefined} fontSize="lg" truncate>
+              {row.label}
+            </Command.ItemText>
+            {row.kind === 'scope' ? (
+              <>
+                <Spacer />
+                <Kbd textTransform="lowercase">
+                  <ShortcutKeyGlyph fallback="tab" part="tab" />
+                </Kbd>
+              </>
+            ) : null}
+          </>
+        )}
+      </PaletteItem>
+    )}
+  </Box>
+);
 
 export interface CommandPaletteRowsHandle {
-  scrollToIndex: (index: number) => void;
+  /** Scrolls a row into view; the first actionable row scrolls to the top, bringing its leading labels along. */
+  scrollToRow: (rowId: string) => void;
 }
 
 export const CommandPaletteRows = ({
@@ -240,15 +176,11 @@ export const CommandPaletteRows = ({
   isBusy,
   ref,
   rows,
-  onActive,
-  onRun,
 }: {
   activeRowId: string | null;
   isBusy: boolean;
   ref?: Ref<CommandPaletteRowsHandle>;
   rows: PaletteRow[];
-  onActive: (rowId: string) => void;
-  onRun: (row: PaletteRow) => void;
 }) => {
   const { t } = useTranslation();
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
@@ -268,21 +200,36 @@ export const CommandPaletteRows = ({
     overscan: 8,
   });
 
-  useImperativeHandle(ref, () => ({ scrollToIndex: (index) => virtualizer.scrollToIndex(index, { align: 'auto' }) }), [
-    virtualizer,
-  ]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToRow: (rowId) => {
+        const index = rows.findIndex((row) => row.id === rowId);
+
+        if (index === -1) {
+          return;
+        }
+
+        const target = rows.slice(0, index).every((row) => row.kind === 'label') ? 0 : index;
+        const offset = virtualizer.getOffsetForIndex(target, 'auto')?.[0];
+
+        // A scroll starts a frame loop that re-renders the list; the combobox also asks when nothing needs to move.
+        if (offset !== undefined && offset !== (virtualizer.scrollOffset ?? 0)) {
+          virtualizer.scrollToIndex(target, { align: 'auto' });
+        }
+      },
+    }),
+    [rows, virtualizer]
+  );
 
   return (
-    <ScrollArea.Root maxH="min(400px, 55dvh)" variant="hover" w="full">
-      <ScrollArea.Viewport ref={setScrollElement} maxH="inherit" w="full">
-        <ScrollArea.Content
-          id={RESULT_LIST_ID}
-          aria-busy={isBusy}
-          aria-label={t('commandPalette.resultsLabel')}
-          pb="1.5"
-          role="listbox"
-          w="full"
-        >
+    <>
+      {/* Hidden from reading order; the listbox still takes its name from it. */}
+      <span hidden id={COMMAND_PALETTE_RESULTS_LABEL_ID}>
+        {t('commandPalette.resultsLabel')}
+      </span>
+      <Scrollable maxH="min(400px, 55dvh)" viewportRef={setScrollElement} w="full">
+        <Command.List aria-busy={isBusy} pb="1.5">
           <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const row = rows[virtualRow.index];
@@ -295,17 +242,12 @@ export const CommandPaletteRows = ({
                   row={row}
                   virtualIndex={virtualRow.index}
                   virtualStart={virtualRow.start}
-                  onActive={onActive}
-                  onRun={onRun}
                 />
               ) : null;
             })}
           </Box>
-        </ScrollArea.Content>
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar>
-        <ScrollArea.Thumb />
-      </ScrollArea.Scrollbar>
-    </ScrollArea.Root>
+        </Command.List>
+      </Scrollable>
+    </>
   );
 };

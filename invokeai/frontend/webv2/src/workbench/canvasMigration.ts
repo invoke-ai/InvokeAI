@@ -1,3 +1,4 @@
+import type { AutoSwitchMode } from '@features/queue/contracts';
 import type {
   CanvasDocumentContractV3,
   CanvasGroupContract,
@@ -8,6 +9,7 @@ import type {
   CanvasSnapshotContract,
   CanvasStackForests,
   CanvasStagingAreaContractV2,
+  CanvasStagingCandidateContract,
   CanvasStateContractV3,
   LayerStackKind,
 } from '@workbench/canvas-engine/api';
@@ -370,7 +372,11 @@ const createInitialInpaintMaskLayer = (): CanvasInpaintMaskLayerContract => ({
   type: 'inpaint_mask',
 });
 
-/** A fresh canvas state for a newly created project: an empty document with one selected empty inpaint mask. */
+/**
+ * A fresh canvas state for a newly created project: an empty document with one empty inpaint mask, ready for
+ * inpainting. Nothing is selected, so the first brush stroke lands on a new paint layer, as the empty Layers panel
+ * says; selecting the mask paints the area to inpaint.
+ */
 export const createNewCanvasState = (
   width = DEFAULT_CANVAS_DOCUMENT_WIDTH,
   height = DEFAULT_CANVAS_DOCUMENT_HEIGHT
@@ -379,7 +385,7 @@ export const createNewCanvasState = (
   const mask = createInitialInpaintMaskLayer();
   return {
     ...base,
-    document: { ...base.document, selectedLayerId: mask.id, stacks: { ...base.document.stacks, inpaint_mask: [mask] } },
+    document: { ...base.document, stacks: { ...base.document.stacks, inpaint_mask: [mask] } },
   };
 };
 
@@ -491,11 +497,21 @@ export const placementToTransform = (
   y: placement.y,
 });
 
-const AUTO_SWITCH_MODES: CanvasStagingAreaContractV2['autoSwitchMode'][] = ['off', 'latest', 'progress'];
+type StagingAutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
+type IsSameUnion<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
-const asAutoSwitchMode = (value: unknown): CanvasStagingAreaContractV2['autoSwitchMode'] =>
-  AUTO_SWITCH_MODES.includes(value as CanvasStagingAreaContractV2['autoSwitchMode'])
-    ? (value as CanvasStagingAreaContractV2['autoSwitchMode'])
+/**
+ * Every mode the persisted staging area stores, keyed by its own union. Its values are `true` only while that union is
+ * the shared policy's (`AutoSwitchMode`): a mode added to either alone fails to compile here, so neither drifts from
+ * the other and a stored value is never reset to `off` for being unknown.
+ */
+const STAGING_AUTO_SWITCH_MODES: Readonly<
+  Record<StagingAutoSwitchMode, IsSameUnion<StagingAutoSwitchMode, AutoSwitchMode>>
+> = { latest: true, off: true, progress: true };
+
+const asAutoSwitchMode = (value: unknown): StagingAutoSwitchMode =>
+  typeof value === 'string' && Object.hasOwn(STAGING_AUTO_SWITCH_MODES, value)
+    ? (value as StagingAutoSwitchMode)
     : 'off';
 
 /** Fills the known optional defaults of a staging area. */
@@ -770,6 +786,14 @@ const loadCanvasDocument = (
   };
 };
 
+const isStagedImageRecord = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value.imageName === 'string' &&
+  value.imageName.length > 0 &&
+  typeof value.sourceQueueItemId === 'string' &&
+  Number.isFinite(value.width) &&
+  Number.isFinite(value.height);
+
 const loadCanvasSnapshot = (value: unknown, path: string): LoadStep<CanvasSnapshotContract> => {
   if (!isRecord(value)) {
     return invalid('snapshot', [{ message: 'snapshot is not an object', path }]);
@@ -782,13 +806,27 @@ const loadCanvasSnapshot = (value: unknown, path: string): LoadStep<CanvasSnapsh
     );
   }
   const document = loadCanvasDocument(value.document, 'snapshot', `${path}.document`);
-  return document.status === 'loaded'
-    ? {
-        diagnostics: document.diagnostics,
-        status: 'loaded',
-        value: { ...value, document: document.value } as CanvasSnapshotContract,
-      }
-    : document;
+  if (document.status !== 'loaded') {
+    return document;
+  }
+  // Restore points from before kinds and staged results existed restore the document alone, as they always did.
+  const kind = value.kind === 'clear-canvas' || value.kind === 'discard-results' ? value.kind : undefined;
+  // Results the point keeps, minus any entry that could never be staged again (no image, size or source batch).
+  const stagedImages = Array.isArray(value.stagedImages)
+    ? (value.stagedImages.filter(isStagedImageRecord) as CanvasStagingCandidateContract[])
+    : undefined;
+  return {
+    diagnostics: document.diagnostics,
+    status: 'loaded',
+    value: {
+      createdAt: value.createdAt as string,
+      document: document.value,
+      id: value.id as string,
+      name: value.name as string,
+      ...(kind ? { kind } : {}),
+      ...(stagedImages && stagedImages.length > 0 ? { stagedImages } : {}),
+    },
+  };
 };
 
 const loadCanvasStateStep = (canvas: unknown): LoadStep<CanvasStateContractV3> => {

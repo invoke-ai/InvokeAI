@@ -62,7 +62,7 @@ Next, these jobs run and must pass. They are the same jobs that are run for ever
 
 - **`python-tests`**: runs `pytest` on matrix of platforms
 - **`python-checks`**: runs `ruff` (format and lint)
-- **`frontend-tests`**: runs webv2's `check:release`, including unit/browser tests, performance, project-file, and accessibility gates
+- **`frontend-tests`**: runs webv2's `check:release`, including unit/browser tests, performance, project-file, accessibility, and Chromium/Firefox/WebKit lifecycle gates
 - **`frontend-checks`**: runs webv2 formatting, Oxc lint, TypeScript, architecture checks, and its production build
 
 PRs also run **`openapi-checks`** and **`typegen-checks`** against the shared `invokeai/frontend/api` package to detect backend contract drift. Legacy webv1 lint/tests remain local commands.

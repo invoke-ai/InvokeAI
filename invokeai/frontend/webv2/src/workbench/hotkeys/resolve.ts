@@ -95,7 +95,7 @@ export const resolveHotkey = ({
 
   return (
     hotkeys
-      .filter((hotkey) => hotkey.implemented !== false && hotkey.keys.some((key) => toPlatformHotkey(key) === pressed))
+      .filter((hotkey) => hotkey.keys.some((key) => toPlatformHotkey(key) === pressed))
       .filter((hotkey) => hotkey.allowInEditable || !isOwnedByTarget)
       .filter((hotkey) => isClaimedTarget(hotkey, event.target))
       .filter((hotkey) => hotkey.allowInModal || !context.isModalPresent)

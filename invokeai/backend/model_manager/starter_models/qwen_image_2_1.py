@@ -58,3 +58,30 @@ qwen_image_2_1_gguf_q4_k_m = StarterModel(
     variant=QwenImage21VariantType.Base,
     dependencies=[qwen_image_2_1_vae, qwen3_vl_encoder_8b],
 )
+
+qwen_image_2_1_int8 = StarterModel(
+    name="Qwen-Image-2.1 (int8)",
+    base=BaseModelType.QwenImage21,
+    source="https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/aacf31a6d48e707f352ecba714cee0680da3479b/diffusion_models/qwen_image_2.1_int8_convrot.safetensors",
+    description="Qwen-Image-2.1 transformer in Comfy-Org's int8_convrot build; 40 steps. Its int8 layers stay int8 "
+    "on every supported GPU, about 7.3GB once loaded; int8 Compute can run them on NVIDIA int8 tensor cores. Ships "
+    f"only the transformer, so the VAE and the Qwen3-VL 8B encoder are installed as dependencies. {_LICENSE} ~7.3GB",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    variant=QwenImage21VariantType.Base,
+    dependencies=[qwen_image_2_1_vae, qwen3_vl_encoder_8b],
+)
+
+qwen_image_2_1_turbo_int8 = StarterModel(
+    name="Qwen-Image-2.1 Turbo (int8)",
+    base=BaseModelType.QwenImage21,
+    source="https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/aacf31a6d48e707f352ecba714cee0680da3479b/diffusion_models/qwen_image_2.1_turbo_int8_convrot.safetensors",
+    description="Qwen-Image-2.1 Turbo transformer in Comfy-Org's int8_convrot build; 8 steps. Its int8 layers stay "
+    "int8 on every supported GPU, about 7.3GB once loaded; int8 Compute can run them on NVIDIA int8 tensor cores. "
+    "Ships only the transformer, so the VAE and the Qwen3-VL 8B encoder are installed as dependencies. "
+    f"{_LICENSE} ~7.3GB",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    variant=QwenImage21VariantType.Turbo,
+    dependencies=[qwen_image_2_1_vae, qwen3_vl_encoder_8b],
+)

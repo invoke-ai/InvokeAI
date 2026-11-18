@@ -36,7 +36,7 @@ await i18n.use(initReactI18next).init({
             krea2RebalancePresetActions: 'Preset actions',
             krea2RebalancePresetCustom: 'Custom',
             krea2RebalancePresetDelete: 'Delete preset',
-            krea2RebalancePresetDeleteBody: 'Delete "{{name}}"?',
+            krea2RebalancePresetDeleted: 'Deleted preset {{name}}',
             krea2RebalancePresetName: 'Preset name',
             krea2RebalancePresetRename: 'Rename preset',
             krea2RebalancePresetSave: 'Save current as preset',
@@ -46,6 +46,8 @@ await i18n.use(initReactI18next).init({
             krea2RebalanceTapReadout: 'tap {{tap}} · {{value}}',
             krea2RebalanceWeights: 'Per-tap weights',
             krea2RebalanceWeightsInvalid: 'Enter exactly {{count}} comma-separated numbers.',
+            resetFieldNamed: '{{reset}}: {{field}}',
+            resetToDefault: 'Reset to default',
           },
         },
       },
@@ -62,15 +64,19 @@ const onCommitImmediate = vi.fn();
 const savePreset = vi.fn();
 const renamePreset = vi.fn();
 const removePreset = vi.fn();
+const restorePreset = vi.fn();
+const undoable = vi.fn();
 
 let customPresets: RebalancePreset[] = [];
 
 const buildAdapter = (): GenerationUiAdapter =>
   ({
+    notifications: { undoable },
     rebalancePresets: {
       presets: customPresets,
       remove: removePreset,
       rename: renamePreset,
+      restore: restorePreset,
       save: savePreset,
     },
   }) as unknown as GenerationUiAdapter;
@@ -160,6 +166,8 @@ beforeEach(() => {
   savePreset.mockClear();
   renamePreset.mockClear();
   removePreset.mockClear();
+  restorePreset.mockClear();
+  undoable.mockClear();
 });
 
 afterEach(async () => {
@@ -183,15 +191,23 @@ describe('GenerateConditioningRebalanceField', () => {
     expect(document.querySelector('svg[aria-hidden]')).not.toBeNull();
   });
 
-  it('turns the editor on from the collapsed row', async () => {
+  it('turns the editor on and off from the collapsed row label', async () => {
     await renderField({ krea2RebalanceEnabled: false });
 
-    const toggle = byLabel('Conditioning rebalance');
+    const label = () =>
+      [...document.querySelectorAll<HTMLElement>('[data-scope="switch"][data-part="label"]')].find(
+        (element) => element.textContent === 'Conditioning rebalance'
+      );
 
-    await interact(() => toggle?.click());
+    await interact(() => label()?.click());
 
     expect(onCommitImmediate).toHaveBeenCalledWith({ krea2RebalanceEnabled: true });
     expect(bars()).toHaveLength(12);
+
+    await interact(() => label()?.click());
+
+    expect(onCommitImmediate).toHaveBeenLastCalledWith({ krea2RebalanceEnabled: false });
+    expect(bars()).toHaveLength(0);
   });
 
   it('labels the axis by encoder depth rather than a frequency metaphor', async () => {
@@ -202,24 +218,63 @@ describe('GenerateConditioningRebalanceField', () => {
     expect(bars()[0]?.getAttribute('aria-label')).toBe('Tap 1, encoder layer 2');
   });
 
-  it('disables reset at the backend defaults and restores them once edited', async () => {
+  it('marks the preset with the reset dot once edited, and the dot restores the backend defaults', async () => {
     await renderField();
+    const dot = () => byLabel('Reset to default curve: Rebalance preset');
 
-    const reset = byLabel('Reset to default curve');
-
-    expect(reset?.getAttribute('disabled')).not.toBeNull();
+    // The dot replaced a separate reset button, and shows only off the defaults.
+    expect(document.querySelector('button[aria-label="Reset to default curve"]')).toBeNull();
+    expect(dot()).toBeNull();
 
     await interact(() => typeInto(weightsInput(), NEUTRAL_KREA2_REBALANCE_WEIGHTS));
+    expect(dot()).not.toBeNull();
 
-    expect(byLabel('Reset to default curve')?.getAttribute('disabled')).toBeNull();
-
-    await interact(() => byLabel('Reset to default curve')?.click());
+    await interact(() => dot()?.click());
 
     expect(onCommitImmediate).toHaveBeenLastCalledWith({
       krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER,
       krea2RebalanceWeights: DEFAULT_KREA2_REBALANCE_WEIGHTS,
     });
     expect(weightsInput().value).toBe(DEFAULT_KREA2_REBALANCE_WEIGHTS);
+    expect(dot()).toBeNull();
+    // Focus moves to the preset select rather than falling to the page with the dot.
+    await vi.waitFor(() =>
+      expect(document.activeElement?.matches('[data-scope="select"][data-part="trigger"]')).toBe(true)
+    );
+  });
+
+  describe('with only the gain changed', () => {
+    const presetDot = () => byLabel('Reset to default curve: Rebalance preset');
+    const gainDot = () => byLabel('Reset to default: Gain');
+    const changedGain = DEFAULT_KREA2_REBALANCE_MULTIPLIER + 0.5;
+
+    it('marks both the preset, now custom, and the gain; the gain dot resets the gain alone', async () => {
+      await renderField({ krea2RebalanceMultiplier: changedGain });
+
+      expect(presetDot()).not.toBeNull();
+      expect(gainDot()).not.toBeNull();
+
+      await interact(() => gainDot()?.click());
+
+      expect(onCommit).toHaveBeenLastCalledWith({ krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER });
+      expect(onCommitImmediate).not.toHaveBeenCalled();
+      // The weights were the default curve all along, so the preset is back at it too.
+      expect(gainDot()).toBeNull();
+      expect(presetDot()).toBeNull();
+    });
+
+    it('resets the whole curve, gain included, from the preset dot', async () => {
+      await renderField({ krea2RebalanceMultiplier: changedGain });
+
+      await interact(() => presetDot()?.click());
+
+      expect(onCommitImmediate).toHaveBeenLastCalledWith({
+        krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER,
+        krea2RebalanceWeights: DEFAULT_KREA2_REBALANCE_WEIGHTS,
+      });
+      expect(presetDot()).toBeNull();
+      expect(gainDot()).toBeNull();
+    });
   });
 
   it('commits a typed vector the backend would accept', async () => {
@@ -281,5 +336,27 @@ describe('GenerateConditioningRebalanceField', () => {
     await interact(() => nameInput.form?.requestSubmit());
 
     expect(savePreset).toHaveBeenCalledWith('Punchy', DEFAULT_KREA2_REBALANCE_WEIGHTS, 4);
+  });
+
+  const PUNCHY_WEIGHTS = '1,1,1,1,1,1,1,2.5,5,1.1,4,7';
+
+  it('deletes the selected saved preset at once and offers an Undo that restores it at its position', async () => {
+    const punchy: RebalancePreset = { id: 'punchy', label: 'Punchy', multiplier: 2, weights: PUNCHY_WEIGHTS };
+    customPresets = [{ id: 'soft', label: 'Soft', multiplier: 1, weights: DEFAULT_KREA2_REBALANCE_WEIGHTS }, punchy];
+    await renderField({ krea2RebalanceMultiplier: 2, krea2RebalanceWeights: PUNCHY_WEIGHTS });
+
+    await interact(() => byLabel('Preset actions')?.click());
+    const deleteItem = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) =>
+      item.textContent?.includes('Delete preset')
+    );
+    await interact(() => deleteItem?.click());
+
+    expect(document.querySelector('[role="alertdialog"], [role="dialog"]')).toBeNull();
+    expect(removePreset).toHaveBeenCalledExactlyOnceWith('punchy');
+    expect(undoable).toHaveBeenCalledExactlyOnceWith('Deleted preset Punchy', { onUndo: expect.any(Function) });
+
+    undoable.mock.calls[0]![1].onUndo();
+
+    expect(restorePreset).toHaveBeenCalledExactlyOnceWith(punchy, 1);
   });
 });

@@ -60,6 +60,7 @@ const findInGallery = vi.fn();
 const videoAdapter = {
   findInGallery,
   getUploadBoardId: () => Promise.resolve('none'),
+  notifications: { info: () => undefined, undoable: () => undefined },
   patchValues: vi.fn(),
   playVideoSpanInPreview: vi.fn(),
   reportError: vi.fn(),

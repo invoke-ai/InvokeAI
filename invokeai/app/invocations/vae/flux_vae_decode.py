@@ -148,7 +148,9 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        latents = context.tensors.load(self.latents.latents_name)
+        # The node returns the first image only, so decode only the first sample: the VAE and its working-memory
+        # estimate see a batch of one however many samples the latents carry.
+        latents = context.tensors.load(self.latents.latents_name)[:1]
         vae_info = context.models.load(self.vae.vae)
         context.util.signal_progress("Running VAE")
         image = self._vae_decode(context=context, vae_info=vae_info, latents=latents)

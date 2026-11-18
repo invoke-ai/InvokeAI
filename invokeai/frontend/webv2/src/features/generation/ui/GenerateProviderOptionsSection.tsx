@@ -1,7 +1,8 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Badge, createListCollection, Stack } from '@chakra-ui/react';
+import { createListCollection, Stack } from '@chakra-ui/react';
+import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import {
   DEFAULT_GEMINI_TEMPERATURE,
   GEMINI_TEMPERATURE_MAX,
@@ -95,33 +96,27 @@ export const GenerateProviderOptionsSection = ({
     return null;
   }
 
-  // Count decisions away from the provider defaults, as the Advanced section does.
-  const overrideCount = optionKeys.filter((key) => {
-    switch (key) {
-      case 'openaiQuality':
-      case 'openaiBackground':
-        return settings[key] !== 'auto';
-      case 'seedreamWatermark':
-      case 'seedreamOptimizePrompt':
-        return settings[key];
-      default:
-        return settings[key] !== null;
-    }
-  }).length;
+  // Count decisions away from the provider defaults (what the options hold while the provider decides), as the
+  // Advanced section does.
+  const defaults = getDefaultGenerateSettings(selectedModel);
+  const overrideCount = optionKeys.filter((key) => settings[key] !== defaults[key]).length;
+  const resetToProviderDefaults = () => onCommit(Object.fromEntries(optionKeys.map((key) => [key, defaults[key]])));
 
   return (
     <GenerateCollapsibleSection
       label={t('widgets.generate.providerOptions.title')}
       defaultOpen
-      badges={
-        overrideCount > 0 ? <Badge>{t('widgets.generate.overridesCount', { count: overrideCount })}</Badge> : null
-      }
+      isChanged={overrideCount > 0}
       sectionId="providerOptions"
+      summary={overrideCount > 0 ? [t('widgets.generate.overridesCount', { count: overrideCount })] : undefined}
+      resetLabel={t('widgets.generate.sectionMenu.resetProviderOptions')}
+      onReset={resetToProviderDefaults}
     >
-      <Stack gap="2" p="2">
+      <Stack gap="2.5">
         {optionKeys.includes('openaiQuality') ? (
           <Field
             label={t('widgets.generate.providerOptions.openaiQuality')}
+            labelPlacement="inside"
             helpText={t('widgets.generate.providerOptions.openaiQualityHelp')}
           >
             <Select
@@ -139,6 +134,7 @@ export const GenerateProviderOptionsSection = ({
         {optionKeys.includes('openaiBackground') ? (
           <Field
             label={t('widgets.generate.providerOptions.openaiBackground')}
+            labelPlacement="inside"
             helpText={t('widgets.generate.providerOptions.openaiBackgroundHelp')}
           >
             <Select
@@ -156,6 +152,7 @@ export const GenerateProviderOptionsSection = ({
         {optionKeys.includes('openaiInputFidelity') ? (
           <Field
             label={t('widgets.generate.providerOptions.openaiInputFidelity')}
+            labelPlacement="inside"
             helpText={t('widgets.generate.providerOptions.openaiInputFidelityHelp')}
           >
             <Select
@@ -175,19 +172,11 @@ export const GenerateProviderOptionsSection = ({
           </Field>
         ) : null}
         {optionKeys.includes('geminiTemperature') ? (
-          <Field
-            label={t('widgets.generate.providerOptions.geminiTemperature')}
+          <GenerateToggleSwitch
+            checked={settings.geminiTemperature !== null}
             helpText={t('widgets.generate.providerOptions.geminiTemperatureHelp')}
-            labelEnd={
-              <GenerateToggleSwitch
-                checked={settings.geminiTemperature !== null}
-                label={t('widgets.generate.override')}
-                labelVisible
-                onCheckedChange={(checked) =>
-                  onCommit({ geminiTemperature: checked ? DEFAULT_GEMINI_TEMPERATURE : null })
-                }
-              />
-            }
+            label={t('widgets.generate.providerOptions.geminiTemperature')}
+            onCheckedChange={(checked) => onCommit({ geminiTemperature: checked ? DEFAULT_GEMINI_TEMPERATURE : null })}
           >
             {settings.geminiTemperature === null ? null : (
               <ScrubberField
@@ -207,11 +196,12 @@ export const GenerateProviderOptionsSection = ({
                 }}
               />
             )}
-          </Field>
+          </GenerateToggleSwitch>
         ) : null}
         {optionKeys.includes('geminiThinkingLevel') ? (
           <Field
             label={t('widgets.generate.providerOptions.geminiThinkingLevel')}
+            labelPlacement="inside"
             helpText={t('widgets.generate.providerOptions.geminiThinkingLevelHelp')}
           >
             <Select
@@ -231,28 +221,20 @@ export const GenerateProviderOptionsSection = ({
           </Field>
         ) : null}
         {optionKeys.includes('seedreamWatermark') ? (
-          <Field
-            label={t('widgets.generate.providerOptions.seedreamWatermark')}
+          <GenerateToggleSwitch
+            checked={settings.seedreamWatermark}
             helpText={t('widgets.generate.providerOptions.seedreamWatermarkHelp')}
-          >
-            <GenerateToggleSwitch
-              checked={settings.seedreamWatermark}
-              label={t('widgets.generate.providerOptions.seedreamWatermark')}
-              onCheckedChange={(checked) => onCommit({ seedreamWatermark: checked })}
-            />
-          </Field>
+            label={t('widgets.generate.providerOptions.seedreamWatermark')}
+            onCheckedChange={(checked) => onCommit({ seedreamWatermark: checked })}
+          />
         ) : null}
         {optionKeys.includes('seedreamOptimizePrompt') ? (
-          <Field
-            label={t('widgets.generate.providerOptions.seedreamOptimizePrompt')}
+          <GenerateToggleSwitch
+            checked={settings.seedreamOptimizePrompt}
             helpText={t('widgets.generate.providerOptions.seedreamOptimizePromptHelp')}
-          >
-            <GenerateToggleSwitch
-              checked={settings.seedreamOptimizePrompt}
-              label={t('widgets.generate.providerOptions.seedreamOptimizePrompt')}
-              onCheckedChange={(checked) => onCommit({ seedreamOptimizePrompt: checked })}
-            />
-          </Field>
+            label={t('widgets.generate.providerOptions.seedreamOptimizePrompt')}
+            onCheckedChange={(checked) => onCommit({ seedreamOptimizePrompt: checked })}
+          />
         ) : null}
       </Stack>
     </GenerateCollapsibleSection>

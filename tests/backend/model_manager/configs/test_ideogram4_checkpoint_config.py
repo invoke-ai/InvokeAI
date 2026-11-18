@@ -168,6 +168,18 @@ class TestRefusals:
         with pytest.raises(NotAMatchError, match="Ideogram 4 transformer"):
             _identify(_mod(sd))
 
+    def test_rejects_torchao_tensors_its_loader_cannot_decode(self) -> None:
+        sd = _state_dict(
+            **{
+                "layers.0.attention.qkv._weight_qdata": torch.zeros(24, 8, dtype=torch.float8_e4m3fn),
+                "layers.0.attention.qkv._weight_scale": torch.ones(24, 1),
+            }
+        )
+        del sd["layers.0.attention.qkv.weight"]
+
+        with pytest.raises(InvalidMatchError, match="torchao"):
+            _identify(_mod(sd))
+
     def test_rejects_the_nvfp4_repack(self) -> None:
         # The released file keeps `input_proj` in fp8 and packs only the block linears, so the
         # refusal cannot key on one tensor's dtype -- and a packed nvfp4 weight is uint8, the same
@@ -195,13 +207,15 @@ class TestRefusals:
         assert config.branch == "unconditional"
 
     @pytest.mark.parametrize(
-        ("marker", "case"),
+        ("marker", "refusal"),
         [
-            (None, "no marker at all"),
-            ({"format": "int8_dynamic"}, "a scheme this loader cannot build"),
+            pytest.param(None, "no readable marker of a format it loads", id="no marker at all"),
+            pytest.param({"format": "int8_dynamic"}, "marked 'int8_dynamic'", id="a scheme this loader cannot build"),
         ],
     )
-    def test_rejects_int8_weights_with_no_readable_marker(self, tmp_path: Path, marker: dict | None, case: str) -> None:
+    def test_rejects_int8_weights_with_no_readable_marker(
+        self, tmp_path: Path, marker: dict | None, refusal: str
+    ) -> None:
         """The loader refuses these, so identification has to as well.
 
         A rotated weight loaded as if it were not one generates noise, which is why
@@ -210,7 +224,7 @@ class TestRefusals:
         """
         sd = _state_dict(**_int8_layer("layers.0.attention.qkv", marker=marker))
 
-        with pytest.raises(InvalidMatchError, match="no readable 'int8_tensorwise' marker"):
+        with pytest.raises(InvalidMatchError, match=refusal):
             _identify(_mod_on_disk(sd, tmp_path, name="ideogram4_int8.safetensors"))
 
     def test_accepts_the_scaled_fp8_release(self) -> None:

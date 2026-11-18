@@ -9,6 +9,7 @@ import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
+  GALLERY_REQUEST_MAX_NAMES: 1000,
   galleryImages: {
     metadata: vi.fn(),
     resolveMany: vi.fn(),
@@ -132,7 +133,7 @@ describe('createRecallParametersRuntime', () => {
     expect(promptOf(store, firstProjectId)).toBe('for the first project');
     expect(promptOf(store, secondProject.id)).toBeUndefined();
     expect(store.queries.getSnapshot().notifications.at(-1)).toEqual(
-      expect.objectContaining({ kind: 'success', title: 'Recalled parameters' })
+      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.recall.parameters.applied' })
     );
 
     runtime.dispose();

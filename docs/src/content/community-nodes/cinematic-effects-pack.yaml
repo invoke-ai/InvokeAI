@@ -1,0 +1,18 @@
+title: Cinematic Effects Pack
+author: JPPhoto
+repo: https://github.com/JPPhoto/cinematic-effects-pack
+summary: Anamorphic lens effects, depth-based bokeh, tone curves, color cast correction and film grain.
+description: >-
+  Replaces Anamorphic Tools (`anamorphic-tools`), Curves (`curves-node`), Film Grain (`film-grain-node`) and
+  Color Correction Nodes (`color-correction-nodes`). Remove the old packs from your `nodes` folder before installing
+  this pack; loading them together may register duplicate invocation IDs.
+categories: [image-effects]
+links:
+  - label: Replaced pack — Anamorphic Tools
+    url: https://github.com/JPPhoto/anamorphic-tools
+  - label: Replaced pack — Curves
+    url: https://github.com/JPPhoto/curves-node
+  - label: Replaced pack — Film Grain
+    url: https://github.com/JPPhoto/film-grain-node
+  - label: Replaced pack — Color Correction Nodes
+    url: https://github.com/JPPhoto/color-correction-nodes

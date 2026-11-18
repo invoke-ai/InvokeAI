@@ -1,91 +1,102 @@
-import type { MouseEvent } from 'react';
+import { VisuallyHidden } from '@chakra-ui/react';
+import { ToggleDot } from '@platform/ui/ToggleDot';
+import { useId } from 'react';
 
-import { Box } from '@chakra-ui/react';
-import { ToggleDot } from '@platform/ui';
+/** The same 24px hit target as the row's small ghost icon buttons, so the trailing columns share one rhythm. */
+export const LAYER_ACTIVE_DOT_SIZE = '6';
 
-export const ROW_SELECTION_FOCUS = { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '-2px' };
-
-/**
- * Tree rows keep a gap below their surface (`pb="0.5"`); the ring frames the surface, not the gap, so the row's
- * content stays centred inside it.
- */
-export const TREE_ROW_FOCUS = {
-  _after: {
-    borderRadius: 'sm',
-    bottom: '0.5',
-    boxShadow: 'inset 0 0 0 2px {colors.accent.solid}',
-    content: '""',
-    insetInline: '0',
-    pointerEvents: 'none',
-    position: 'absolute',
-    top: '0',
-  },
-  outline: 'none',
-};
-
+const DOT_TRANSITION = 'background var(--wb-motion-duration-fast), border-color var(--wb-motion-duration-fast)';
 const DOT_BASE = {
   borderRadius: 'full',
   borderWidth: '1px',
   content: '""',
   h: '3',
-  inset: '50% auto auto calc(50% + 1.5px)',
+  insetInlineStart: '50%',
   position: 'absolute',
+  top: '50%',
   transform: 'translate(-50%, -50%)',
-  transition: 'background var(--wb-motion-duration-fast), border-color var(--wb-motion-duration-fast)',
+  transition: DOT_TRANSITION,
   w: '3',
 };
 const DOT_CHECKED = { ...DOT_BASE, bg: 'accent.solid', borderColor: 'accent.solid' };
-/** Enabled on its own, but an ancestor keeps it out of the composite. */
-const DOT_GATED = { ...DOT_BASE, bg: 'transparent', borderColor: 'accent.solid' };
-const DOT_UNCHECKED = { ...DOT_BASE, bg: 'transparent', borderColor: 'border.emphasized' };
-const DOT_CHECKED_HOVER = { _before: { bg: 'accent.emphasized', borderColor: 'accent.emphasized' } };
-const DOT_UNCHECKED_HOVER = { _before: { borderColor: 'fg.muted' } };
+/**
+ * On by itself, but an ancestor keeps the node out: a dashed accent ring, so the state reads by shape as well as color
+ * against the solid grey ring of a dot that is off.
+ */
+const DOT_GATED = {
+  ...DOT_BASE,
+  bg: 'transparent',
+  borderColor: 'accent.solid',
+  borderStyle: 'dashed',
+  borderWidth: '1.5px',
+};
+// Off is the faintest state of an on/off control, so its ring keeps at least 3:1 against every row fill in every theme
+// (LayerActiveDot.browser.test.tsx measures it); grey and hollow, it still reads apart from the filled accent of on.
+const DOT_UNCHECKED = { ...DOT_BASE, bg: 'transparent', borderColor: 'fg.muted' };
+// The button fills like the ghost icon buttons beside it. A dot that is on keeps its accent under the pointer: the
+// darker hover accent of a plain ToggleDot sinks into that fill and reads as the dot switching off.
+const HOVER_FILL = 'gray.hoverTint/10';
+const HOVER_CHECKED = { bg: HOVER_FILL };
+const HOVER_GATED = { bg: HOVER_FILL };
+const HOVER_UNCHECKED = { _before: { borderColor: 'fg' }, bg: HOVER_FILL };
+// Read-only while editing is locked: the dot dims as disabled icon buttons do and takes no hover fill.
+const HOVER_NONE = {};
+const dimmed = (style: typeof DOT_BASE) => ({ ...style, opacity: 0.5 });
+
+const dotStyle = (checked: boolean, gated: boolean) => (checked ? (gated ? DOT_GATED : DOT_CHECKED) : DOT_UNCHECKED);
+const hoverStyle = (checked: boolean, gated: boolean) =>
+  checked ? (gated ? HOVER_GATED : HOVER_CHECKED) : HOVER_UNCHECKED;
 
 const stopPropagation = (event: { stopPropagation: () => void }): void => event.stopPropagation();
 
-/** Show contributing, ancestor-gated, and off states distinctly; keep toggle clicks/focus off the tree item. */
+/**
+ * A layer row's "takes part in generation" toggle, reading on, gated by an ancestor, and off distinctly. Pointer-only
+ * like every row control (the row's menu carries the same action), and it never starts a row drag.
+ */
 export const LayerActiveDot = ({
   checked,
   disabled,
-  gated,
+  gatedReason,
   label,
   onCheckedChange,
-  onKeepRowFocus,
   tooltip,
 }: {
   checked: boolean;
   disabled: boolean;
-  /** Checked, but an ancestor keeps the node out of the composite. */
-  gated: boolean;
+  /**
+   * Set when the dot is checked but an ancestor keeps the node out: why, shown as the tooltip and given to assistive
+   * tech as the dot's description, since `aria-pressed` alone would report the node as taking part.
+   */
+  gatedReason: string | null;
   label: string;
   onCheckedChange: (checked: boolean) => void;
-  onKeepRowFocus: (event: MouseEvent<HTMLElement>) => void;
-  tooltip?: string;
-}) => (
-  <Box
-    display="flex"
-    flexShrink="0"
-    onClick={stopPropagation}
-    onMouseDown={onKeepRowFocus}
-    onPointerDown={stopPropagation}
-  >
-    <ToggleDot
-      _before={checked ? (gated ? DOT_GATED : DOT_CHECKED) : DOT_UNCHECKED}
-      _focusVisible={ROW_SELECTION_FOCUS}
-      _hover={checked ? DOT_CHECKED_HOVER : DOT_UNCHECKED_HOVER}
-      bg="transparent"
-      borderWidth="0"
-      checked={checked}
-      cursor={disabled ? 'not-allowed' : undefined}
-      disabled={disabled}
-      h="6"
-      label={label}
-      position="relative"
-      tabIndex={-1}
-      tooltip={tooltip}
-      transition="none"
-      w="6"
-      onCheckedChange={onCheckedChange}
-    />
-  </Box>
-);
+  /** The action a click takes, while nothing above gates the dot. */
+  tooltip: string;
+}) => {
+  const descriptionId = useId();
+  const gated = checked && gatedReason !== null;
+  return (
+    <>
+      <ToggleDot
+        _before={disabled ? dimmed(dotStyle(checked, gated)) : dotStyle(checked, gated)}
+        _hover={disabled ? HOVER_NONE : hoverStyle(checked, gated)}
+        bg="transparent"
+        borderWidth="0"
+        aria-describedby={gated ? descriptionId : undefined}
+        checked={checked}
+        disabled={disabled}
+        h={LAYER_ACTIVE_DOT_SIZE}
+        label={label}
+        position="relative"
+        rounded="control"
+        tabIndex={-1}
+        tooltip={gated ? gatedReason : tooltip}
+        transition={DOT_TRANSITION}
+        w={LAYER_ACTIVE_DOT_SIZE}
+        onCheckedChange={onCheckedChange}
+        onPointerDown={stopPropagation}
+      />
+      {gated ? <VisuallyHidden id={descriptionId}>{gatedReason}</VisuallyHidden> : null}
+    </>
+  );
+};

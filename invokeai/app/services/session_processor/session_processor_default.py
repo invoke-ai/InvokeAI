@@ -10,7 +10,7 @@ from typing import Callable, Iterator, Literal, Optional
 import torch
 from starlette.concurrency import run_in_threadpool
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, services_for_queue_user
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import (
@@ -49,6 +49,8 @@ from invokeai.app.services.shared.graph import CollectInvocation, IterateInvocat
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import calibration_run_id
 from invokeai.app.util.profiler import Profiler
+from invokeai.app.util.startup_utils import log_attention_backends
+from invokeai.backend.util.attention import attention_caller
 from invokeai.backend.util.device_pool import (
     GENERATION_DEVICE_POOL,
     idle_device_borrowed,
@@ -395,6 +397,10 @@ class DefaultSessionRunner(SessionRunnerBase):
                     self._services.logger.warning(
                         f"Could not record the outcome of calibration item {queue_item.item_id}", exc_info=True
                     )
+            # `raised` and the exception's traceback (through this frame) would otherwise reference each other, so the
+            # failed node's frames and tensors would wait for the cyclic GC instead of being freed when the worker
+            # drops the exception, before its VRAM release.
+            raised = None
 
     def _run_calibration_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem, run_id: str) -> bool:
         """Run one node of a calibration item inside a probe scope and persist its windows, whether the node completed,
@@ -484,9 +490,11 @@ class DefaultSessionRunner(SessionRunnerBase):
                     execution_workflow_authorizer=workflow_authorizer,
                     execution_workflow_inputs=workflow_inputs,
                 )
+                # The context hands nodes these services too, so it must carry the same user-scoped cache.
+                node_services = services_for_queue_user(self._services, queue_item.user_id)
                 context = build_invocation_context(
                     data=data,
-                    services=self._services,
+                    services=node_services,
                     is_canceled=self._is_canceled,
                 )
 
@@ -498,10 +506,15 @@ class DefaultSessionRunner(SessionRunnerBase):
                     self.workflow_call_coordinator.begin_workflow_call_boundary(invocation, queue_item, workflow_record)
                     return
 
-                # Invoke the node, optionally on a borrowed idle GPU (text encoders only).
+                # Invoke the node, optionally on a borrowed idle GPU (text encoders only). Its attention calls are
+                # attributed to its type, which the pinned-kernel report (`attention_backend`) names.
                 # Leaving `invocation_resources` releases what the context held for the run, however it ended.
-                with self._maybe_offload_to_idle_gpu(invocation), data.invocation_resources:
-                    run_result = invocation.invoke_internal_with_effects(context=context, services=self._services)
+                with (
+                    self._maybe_offload_to_idle_gpu(invocation),
+                    attention_caller(invocation.get_type()),
+                    data.invocation_resources,
+                ):
+                    run_result = invocation.invoke_internal_with_effects(context=context, services=node_services)
                 output = run_result.output
                 control_collection = None
                 if self._on_after_run_node_callbacks and isinstance(invocation, (IterateInvocation, CollectInvocation)):
@@ -1211,37 +1224,67 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     self._poll_now()
                 return
 
-    def _release_vram_after_session(self, worker: _SessionWorker) -> None:
+    def _release_vram_after_session(self, worker: _SessionWorker, *, run_returned: bool) -> None:
         """Return this worker's unoccupied cached VRAM to the driver now that its session is over.
 
-        A canceled session aborts mid-node, orphaning the whole denoise working set in the
-        caching allocator; nothing downstream (a VAE decode, say) runs to release it, so the
-        GPU keeps reporting the memory as used. Ask for the release explicitly. On a multi-GPU
-        box with a peer mid-render the call is deferred (see `TorchDevice.empty_cache`) and the
-        peer performs it at its next step boundary. A session that ran to completion has
-        released its own working memory along the way, so it only flushes a release a peer
-        deferred onto it — a flag test when nothing is pending.
+        A session that ended early -- canceled, failed in a node, or aborted by an error escaping the runner
+        (`run_returned` False) -- never ran the nodes that would release its working memory (a VAE decode, say). A
+        canceled or failed node also leaves its own working set orphaned in the caching allocator, so the GPU keeps
+        reporting the memory as used. Ask for the release explicitly. After an out-of-memory failure this matters
+        most: those blocks were the card's only headroom, and the next session can fail on its first device operation
+        that needs memory from the driver rather than from torch's allocator. On a multi-GPU box with a peer
+        mid-render the call is deferred (see `TorchDevice.empty_cache`) and runs at the first flush that finds no
+        other device mid-session. A session that ran to completion has released its own working memory along the way,
+        so it only flushes a release a peer deferred onto it -- a flag test when nothing is pending.
 
         With `clear_vram_after_session`, every unlocked model on this worker's device also moves to
         RAM first (it stays cached there), and the release is forced past a busy peer: deferred, it
         would leave the freed memory with the allocator while this worker's next session budgets its
         first load, which then loads at minimum residency. Once per session, and the user opted in.
 
-        Both are best effort: the session's outcome is already recorded, and a free on a sick
-        device context must not fail the worker.
+        Best effort: the session's outcome is already recorded, and neither the offload nor the forced release (which
+        raises when the device refuses it) on a sick device context may fail the worker.
         """
         try:
             services = self._invoker.services
             if services.configuration.clear_vram_after_session and services.model_manager.load is not None:
                 services.model_manager.load.ram_cache.offload_models_from_vram_except(())
                 TorchDevice.empty_cache(force=True)
-            elif worker.cancel_event.is_set():
+            elif self._session_ended_early(worker, run_returned):
                 TorchDevice.empty_cache()
             else:
                 TorchDevice.flush_deferred_empty_cache()
         except Exception:
             self._invoker.services.logger.warning(
                 f"Could not release cached VRAM after the session on {worker.label}", exc_info=True
+            )
+
+    @staticmethod
+    def _session_ended_early(worker: _SessionWorker, run_returned: bool) -> bool:
+        """True when the session was stopped by the cancel event, recorded a node error, or the runner raised.
+
+        The runner records node errors on the in-memory session it was handed, which is `queue_item.session`. An
+        ending between nodes (the owner revoked before the status handler set the cancel event, a calibration whose
+        measurements were not saved) counts as finished: no node was interrupted.
+        """
+        if not run_returned or worker.cancel_event.is_set():
+            return True
+        queue_item = worker.queue_item
+        return queue_item is not None and queue_item.session.has_error()
+
+    def _log_attention_backends(self, worker: _SessionWorker) -> None:
+        """Log which SDPA kernels this worker's device has and the order they are tried in, once per device.
+
+        Asked for each item about to run, rather than at startup: the probe allocates, so on the boot path it would
+        create a CUDA context on an idle server, and so would an item that is skipped before it runs in single-device
+        mode. `log_attention_backends` remembers the device, so the probe runs on the first such item, before models are
+        resident; it ends with `empty_cache()`. A diagnostic: it must not fail the item.
+        """
+        try:
+            log_attention_backends(self._invoker.services.logger, worker.device or TorchDevice.choose_torch_device())
+        except Exception:
+            self._invoker.services.logger.debug(
+                f"Could not probe the attention backends on {worker.label}", exc_info=True
             )
 
     def _warn_if_vram_paged(self, worker: _SessionWorker) -> None:
@@ -1395,6 +1438,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 # goes on reporting that item as running for as long as it stays parked.
                 # `get_status` and `get_running_queue_item_owners` both read it.
                 worker.queue_item = None
+                session_started = False
+                processor_error = False
 
                 try:
                     # Any unhandled exception in this block is a nonfatal processor error and will be handled.
@@ -1496,6 +1541,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # allocation is well worth it.
                     gc.collect()
 
+                    self._log_attention_backends(worker)
+
                     self._invoker.services.logger.info(
                         f"Executing queue item {worker.queue_item.item_id}, session {worker.queue_item.session_id} "
                         f"on {worker.label}"
@@ -1510,11 +1557,12 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # workflow completion resumes the parent via the runner that owns this
                     # worker's cancel event.
                     GENERATION_DEVICE_POOL.acquire_session(worker.device)
+                    session_started = True
                     try:
                         worker.runner.workflow_call_queue_lifecycle.run_queue_item(worker.queue_item)
                     finally:
                         GENERATION_DEVICE_POOL.release_session(worker.device)
-                    self._release_vram_after_session(worker)
+                    self._release_vram_after_session(worker, run_returned=True)
                     self._warn_if_vram_paged(worker)
 
                 except Exception as e:
@@ -1527,9 +1575,15 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         error_message=error_message,
                         error_traceback=error_traceback,
                     )
+                    processor_error = True
+
+                if processor_error:
+                    # Outside the `except`: while the exception is in flight its traceback keeps the failed node's
+                    # frames, and the tensors in them, alive, so the release would not free what that node held.
+                    if session_started:
+                        self._release_vram_after_session(worker, run_returned=False)
                     # Wait for next polling interval or event to try again
                     worker.poll_now_event.wait(self._polling_interval)
-                    continue
         except Exception as e:
             # Fatal error in this worker, log and pass - we're done here
             error_type = e.__class__.__name__

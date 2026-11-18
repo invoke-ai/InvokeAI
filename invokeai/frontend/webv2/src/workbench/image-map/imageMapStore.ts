@@ -11,7 +11,7 @@ import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 import type { ImageMapClusterLabelInfo, ImageMapPoints } from './api';
 import type { ImageIndexCounts } from './indexProgress';
 
-import { fetchImageMapClusterLabels, fetchImageMapPoints, fetchImageMapStatus } from './api';
+import { fetchImageMapClusterLabels, fetchImageMapPoints, fetchImageMapStatus, requestImageMapRefresh } from './api';
 import { hasProgressed } from './indexProgress';
 
 /** Shared image-map read model with one in-flight fetch and refreshes from user actions and socket events. */
@@ -241,6 +241,18 @@ export const refreshImageMapPoints = (): Promise<void> => {
   inflight = refresh;
 
   return refresh;
+};
+
+/**
+ * A person asked for a fresh map: POST /refresh is what bypasses the backend's refit cooldown. Automatic callers stay
+ * on `refreshImageMapPoints`, since passing through here would bring the refit loop back.
+ */
+export const requestImageMapRecompute = (): Promise<void> => {
+  void requestImageMapRefresh().catch(() => {
+    // The refit is best effort; the points fetch below reports connectivity errors.
+  });
+
+  return refreshImageMapPoints();
 };
 
 let labelsSequence = 0;

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { MainModelConfig } from './types';
 
 import { getDefaultGenerateSettings, getPromptHistoryRecallPatch } from './baseGenerationPolicies';
+import { MAX_PROMPT_HISTORY, restorePromptHistoryItems } from './promptHistory';
 
 const createModel = (base: string): MainModelConfig => ({
   base,
@@ -39,5 +40,27 @@ describe('getPromptHistoryRecallPatch', () => {
         values,
       })
     ).toEqual({ positivePrompt: 'recalled prompt' });
+  });
+});
+
+describe('restorePromptHistoryItems', () => {
+  const item = (positivePrompt: string) => ({ negativePrompt: null, positivePrompt });
+
+  it('puts cleared entries back behind those added since, without listing one twice', () => {
+    expect(
+      restorePromptHistoryItems([item('newer'), item('b')], [item('a'), item('b'), item('c')]).map(
+        (entry) => entry.positivePrompt
+      )
+    ).toEqual(['newer', 'b', 'a', 'c']);
+  });
+
+  it('keeps the history within its cap', () => {
+    const cleared = Array.from({ length: MAX_PROMPT_HISTORY }, (_, index) => item(`old ${index}`));
+
+    const restored = restorePromptHistoryItems([item('newer')], cleared);
+
+    expect(restored).toHaveLength(MAX_PROMPT_HISTORY);
+    expect(restored[0]?.positivePrompt).toBe('newer');
+    expect(restored.at(-1)?.positivePrompt).toBe(`old ${MAX_PROMPT_HISTORY - 2}`);
   });
 });

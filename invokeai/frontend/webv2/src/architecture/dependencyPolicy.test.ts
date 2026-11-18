@@ -66,21 +66,25 @@ describe('dependency policy rules', () => {
     const violations = checkDependency('features/queue/runtime.ts', '@workbench/workbenchStore');
 
     expect(violations.map(formatViolation)).toEqual([
-      'feature-dependency-direction: features/queue/runtime.ts -> workbench/workbenchStore',
+      'feature-dependency-direction: features/queue/runtime.ts -> workbench/workbenchStore\n  Features cannot depend on App or Workbench. Inject the required capability at the App composition root.',
     ]);
   });
 
   it('rejects cross-feature implementation bypasses but permits public interfaces', () => {
-    expect(checkDependency('features/queue/ui/View.tsx', '@features/gallery/data/api')).toMatchObject([
-      { rule: 'feature-public-interface' },
-    ]);
+    const violations = checkDependency('features/queue/ui/View.tsx', '@features/gallery/data/api');
+    expect(violations).toMatchObject([{ rule: 'feature-public-interface' }]);
+    expect(violations.map(formatViolation).join('\n')).toContain(
+      'Use the feature public entry registered in src/architecture/featureInterfaces.ts'
+    );
     expect(checkDependency('features/queue/ui/View.tsx', '@features/gallery')).toEqual([]);
   });
 
   it('rejects private Canvas paths outside Canvas and permits its public API', () => {
-    expect(checkDependency('workbench/widgets/canvas/View.tsx', '@workbench/canvas-engine/engine')).toMatchObject([
-      { rule: 'canvas-private-interface' },
-    ]);
+    const violations = checkDependency('workbench/widgets/canvas/View.tsx', '@workbench/canvas-engine/engine');
+    expect(violations).toMatchObject([{ rule: 'canvas-private-interface' }]);
+    expect(violations.map(formatViolation).join('\n')).toContain(
+      'Use @workbench/canvas-engine/api or @workbench/canvas-operations/api'
+    );
     expect(checkDependency('workbench/widgets/canvas/View.tsx', '@workbench/canvas-engine/api')).toEqual([]);
     expect(checkDependency('workbench/widgets/canvas/View.tsx', '@workbench/canvas-operations/api')).toEqual([]);
     expect(checkDependency('workbench/widgets/canvas/View.tsx', '@workbench/canvas-operations/react')).toEqual([]);
@@ -226,6 +230,7 @@ describe('feature public-interface registry', () => {
     expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/workflow/paletteSearch')).toEqual([]);
     expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/gallery/paletteSearch')).toEqual([]);
     expect(checkDependency('workbench/settings/ImageStorageSettings.tsx', '@features/gallery/storage')).toEqual([]);
+    expect(checkDependency('workbench/image-actions/mediaUsageReport.ts', '@features/gallery/mediaUsage')).toEqual([]);
     expect(checkDependency('workbench/palette/paletteProviders.ts', '@features/queue/queries')).toEqual([]);
     expect(checkDependency('workbench/palette/WorkbenchCommandPaletteDialog.tsx', '@features/queue/queries')).toEqual(
       []

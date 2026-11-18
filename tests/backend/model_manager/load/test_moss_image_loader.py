@@ -16,26 +16,44 @@ from unittest.mock import MagicMock
 import accelerate
 import pytest
 import torch
-from safetensors.torch import save_file
+from safetensors.torch import load_file, save_file
 
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_MossImage_Config,
     Main_Diffusers_MossImage_Config,
+    Main_GGUF_MossImage_Config,
 )
 from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Flux2_Config
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    apply_custom_layers_to_model,
+)
 from invokeai.backend.model_manager.load.model_loaders import moss_image as loader_module
 from invokeai.backend.model_manager.load.model_loaders.moss_image import (
     MOSS_IMAGE_FP8_SKIP_PATTERNS,
     MossImageCheckpointModel,
     MossImageDiffusersModel,
+    MossImageGGUFModel,
     moss_image_component_shards,
     moss_image_transformer_config,
 )
 from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.moss_image.pipeline_moss_image import MOSSImageTransformer
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.qwen3_5.qwen3_5_encoder import Qwen35Encoder
+from tests.backend.model_manager.load.moss_image_fixtures import (
+    CONVROT_MARKER,
+    TINY_GEOMETRY,
+    forward,
+    fuse_qkv,
+    int8_convrot_state_dict,
+    tiny_reference,
+    with_state_dict,
+    write_moss_image_gguf,
+)
 from tests.backend.model_manager.load.state_dicts.moss_image_dit_keys import state_dict_keys as moss_dit_keys
 from tests.backend.model_manager.load.state_dicts.moss_image_vae_keys import state_dict_keys as moss_vae_keys
+from tests.fixtures.quantized_payloads import comfy_quant_marker
 
 # `OpenMOSS-Team/MOSS-Image-Base`'s `transformer/config.json` at 1ceede80badddd6a7812069619edaa5633587192, verbatim
 # but for `rope_base`, which no tensor records. A literal, so this fails when the detection drifts rather than agreeing
@@ -50,15 +68,7 @@ RELEASED_GEOMETRY = {
     "text_dim": 4096,
 }
 
-TINY_GEOMETRY = {
-    "dim": 64,
-    "ffn_dim": 96,
-    "num_heads": 2,
-    "num_layers": 3,
-    "text_dim": 24,
-    "freq_dim": 16,
-    "latent_channels": 8,
-}
+_TEXT_BLOCK_LINEARS = ("qkv", "proj", "ffn_gate", "ffn_up", "ffn_down")
 
 _SAFETENSORS_DTYPES = {"BF16": torch.bfloat16, "F32": torch.float32, "I64": torch.int64}
 
@@ -69,26 +79,8 @@ def _meta_state_dict(keys: dict[str, tuple[list[int], str]]) -> dict[str, torch.
     }
 
 
-def _tiny_reference() -> MOSSImageTransformer:
-    torch.manual_seed(0)
-    reference = MOSSImageTransformer(**TINY_GEOMETRY).eval()
-    # Non-trivial norms, so a weight that does not arrive shows.
-    for name, parameter in reference.named_parameters():
-        if "norm" in name:
-            torch.nn.init.normal_(parameter, mean=1.0, std=0.1)
-    return reference
-
-
 def _tiny_state_dict(reference: MOSSImageTransformer) -> dict[str, torch.Tensor]:
     return {key: value.clone().contiguous() for key, value in reference.state_dict().items()}
-
-
-def _forward(model: MOSSImageTransformer) -> torch.Tensor:
-    generator = torch.Generator().manual_seed(1)
-    latents = torch.randn(1, TINY_GEOMETRY["latent_channels"], 4, 4, generator=generator)
-    text = torch.randn(1, 5, TINY_GEOMETRY["text_dim"], generator=generator)
-    with torch.no_grad():
-        return model(latents, torch.tensor(500.0), text).sample
 
 
 def _loader(cls: type, monkeypatch: pytest.MonkeyPatch) -> MagicMock:
@@ -133,16 +125,11 @@ class TestRealLayout:
 
         assert (result.missing_keys, result.unexpected_keys) == ([], [])
 
-    def test_the_fp8_skip_patterns_name_real_modules(self) -> None:
-        """Every pattern matches a Linear of the released model, and only the ones the forward reads the dtype of."""
+    def test_the_skip_patterns_hit_the_same_layers_whichever_way_a_path_matches_them(self) -> None:
+        """FP8 Storage matches them with `re.search` on module names, the quantized paths with `in` on tensor keys.
+        Both must pick exactly the Linears whose dtype the forward reads, on the real module and key lists."""
         with accelerate.init_empty_weights():
             model = MOSSImageTransformer(**RELEASED_GEOMETRY)
-        skipped = {
-            name
-            for name, module in model.named_modules()
-            if isinstance(module, torch.nn.Linear) and any(re.search(p, name) for p in MOSS_IMAGE_FP8_SKIP_PATTERNS)
-        }
-
         expected = {
             "video_embedder",
             "time_embedding.0",
@@ -151,7 +138,25 @@ class TestRealLayout:
             "final_linear_video",
             "text_embedder.proj",
         } | {f"layers.{index}.proj.q" for index in range(42)}
-        assert skipped == expected
+        linears = [name for name, module in model.named_modules() if isinstance(module, torch.nn.Linear)]
+
+        by_regex = {name for name in linears if any(re.search(p, name) for p in MOSS_IMAGE_FP8_SKIP_PATTERNS)}
+        by_substring_of_the_module = {
+            name for name in linears if any(p in f"{name}.weight" for p in MOSS_IMAGE_FP8_SKIP_PATTERNS)
+        }
+        by_substring_of_real_keys = {
+            key.removesuffix(".weight")
+            for key in moss_dit_keys
+            if key.endswith(".weight") and any(p in key for p in MOSS_IMAGE_FP8_SKIP_PATTERNS)
+        }
+
+        assert by_regex == by_substring_of_the_module == expected
+        # The checkpoint's own key list, which also holds the norms and the biases' siblings: nothing else hits.
+        assert by_substring_of_real_keys == expected
+        # The near misses the patterns are written to leave quantizable.
+        for name in ("time_embedding.2", "text_embedder.blocks.0.proj", "layers.0.proj.k", "layers.0.proj.ffn_down"):
+            assert name in linears
+            assert name not in by_regex
 
     def test_the_vae_loads_whole_through_the_flux2_vae_checkpoint_loader(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """MOSS-Image's VAE (and its ComfyUI export) identifies as a FLUX.2 VAE with the small decoder. The loader that
@@ -203,7 +208,7 @@ class TestCheckpointLoader:
     def test_a_single_file_loads_into_the_model_it_describes(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, prefix: str, with_rope_bands: bool
     ) -> None:
-        reference = _tiny_reference()
+        reference = tiny_reference()
         sd = _tiny_state_dict(reference)
         if not with_rope_bands:
             del sd["rope.bands"]
@@ -221,12 +226,12 @@ class TestCheckpointLoader:
         # 16-byte `rope.bands` fall that way. Linux x86 CPU kernels take a different, equally exact accumulation order
         # for such operands, so identical weights there give results a few ULP apart from the reference's freshly
         # allocated ones.
-        torch.testing.assert_close(_forward(model), _forward(reference))
+        torch.testing.assert_close(forward(model), forward(reference))
         # Reserved once, before anything was cast or assigned.
         loader._ram_cache.make_room.assert_called_once()
 
     def test_a_quantization_side_channel_is_refused(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-        sd = _tiny_state_dict(_tiny_reference())
+        sd = _tiny_state_dict(tiny_reference())
         sd["layers.0.proj.k.weight_scale"] = torch.ones(())
         path = tmp_path / "moss-fp8.safetensors"
         save_file(sd, str(path))
@@ -287,7 +292,7 @@ class TestDiffusersLoader:
     def test_the_sharded_transformer_loads_what_its_index_names_at_its_declared_geometry(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
-        reference = _tiny_reference()
+        reference = tiny_reference()
         sd = _tiny_state_dict(reference)
         transformer_dir = self._transformer_dir(tmp_path)
         keys = sorted(sd)
@@ -311,7 +316,7 @@ class TestDiffusersLoader:
         loader._ram_cache.make_room.assert_called_once()
 
     def test_an_unsharded_transformer_needs_no_index(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-        reference = _tiny_reference()
+        reference = tiny_reference()
         transformer_dir = self._transformer_dir(tmp_path)
         save_file(_tiny_state_dict(reference), str(transformer_dir / "diffusion_pytorch_model.safetensors"))
         loader = _loader(MossImageDiffusersModel, monkeypatch)
@@ -422,7 +427,7 @@ class TestFp8Storage:
     ) -> torch.nn.Module:
         monkeypatch.setattr(loader_module, "MOSS_IMAGE_FP8_SKIP_PATTERNS", skip_patterns)
         path = tmp_path / "moss.safetensors"
-        save_file(_tiny_state_dict(_tiny_reference()), str(path))
+        save_file(_tiny_state_dict(tiny_reference()), str(path))
         loader = _loader(MossImageCheckpointModel, monkeypatch)
         loader._should_use_fp8 = lambda _config, _submodel=None: True
         config = Main_Checkpoint_MossImage_Config.model_construct(path=str(path), name="moss")
@@ -440,8 +445,8 @@ class TestFp8Storage:
         assert "layers.0.proj.q.weight" not in stored_fp8
         assert "video_embedder.weight" not in stored_fp8
 
-        output = _forward(model)
-        expected = _forward(_tiny_reference())
+        output = forward(model)
+        expected = forward(tiny_reference())
         assert torch.isfinite(output).all()
         # e4m3 keeps three mantissa bits: a few percent per weight, which a forward of three blocks keeps that order.
         relative_error = (output - expected).norm() / expected.norm()
@@ -454,4 +459,383 @@ class TestFp8Storage:
         )
 
         with pytest.raises(RuntimeError):
-            _forward(model)
+            forward(model)
+
+
+class TestFusedAndInt8Checkpoints:
+    """Comfy-Org's two single files, fused `proj.qkv` in both, on a tiny transformer."""
+
+    def _load(self, monkeypatch: pytest.MonkeyPatch, path: Path, *, fp8_storage: bool = False) -> tuple[Any, Any]:
+        loader = _loader(MossImageCheckpointModel, monkeypatch)
+        if fp8_storage:
+            loader._should_use_fp8 = lambda _config, _submodel=None: True
+        config = Main_Checkpoint_MossImage_Config.model_construct(path=str(path), name="moss")
+        return loader._load_model(config, SubModelType.Transformer), loader
+
+    @pytest.mark.parametrize("prefix", ["", "model.diffusion_model."])
+    def test_a_fused_bf16_file_loads_as_the_split_model(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, prefix: str
+    ) -> None:
+        reference = tiny_reference()
+        path = tmp_path / "moss_image_base_bf16.safetensors"
+        save_file({f"{prefix}{k}": v for k, v in fuse_qkv(_tiny_state_dict(reference)).items()}, str(path))
+
+        model, loader = self._load(monkeypatch, path)
+
+        _assert_loaded(model, reference)
+        torch.testing.assert_close(forward(model), forward(reference))
+        loader._ram_cache.make_room.assert_called_once()
+
+    def test_an_int8_convrot_file_keeps_its_projections_int8_and_each_part_its_own_scale(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        stored, meant = int8_convrot_state_dict(tiny_reference())
+        path = tmp_path / "moss_image_base_int8_convrot.safetensors"
+        save_file(stored, str(path))
+
+        model, loader = self._load(monkeypatch, path)
+
+        block = model.layers[1].proj
+        # `proj` is a ModuleDict: the swap has to land in it, not on a stray attribute.
+        for name in ("k", "v", "o", "ffn_up_gate", "ffn_down"):
+            assert isinstance(block[name], Int8ConvrotLinear), name
+        # What the forward reads the dtype of: dense, though the file holds it int8.
+        assert type(block["q"]) is torch.nn.Linear
+        assert block["q"].weight.dtype is torch.float32
+        # k's rows and scales are the middle third of the fused tensor, untouched.
+        assert torch.equal(block["k"].weight, stored["layers.1.proj.qkv.weight"][64:128])
+        assert torch.equal(block["k"].weight_scale, stored["layers.1.proj.qkv.weight_scale"][64:128])
+        assert torch.equal(block["v"].weight_scale, stored["layers.1.proj.qkv.weight_scale"][128:])
+        # The text refiner and the stem were never quantized.
+        assert type(model.text_embedder.blocks[0].qkv) is torch.nn.Linear
+        # The same function as a dense model holding the values the file decodes to.
+        torch.testing.assert_close(forward(model), forward(with_state_dict(meant)), rtol=1e-4, atol=1e-5)
+        loader._ram_cache.make_room.assert_called_once()
+
+    def test_an_int8_weight_without_its_marker_is_refused_not_cast_as_codes(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        stored, _ = int8_convrot_state_dict(tiny_reference())
+        del stored["layers.0.proj.o.comfy_quant"]
+        path = tmp_path / "moss-int8-unmarked.safetensors"
+        save_file(stored, str(path))
+
+        with pytest.raises(
+            ValueError, match=r"no readable int8_tensorwise marker, e\.g\. \['layers\.0\.proj\.o\.weight'\]"
+        ):
+            self._load(monkeypatch, path)
+
+    def test_fp8_storage_leaves_the_int8_layers_alone_and_still_runs(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        stored, meant = int8_convrot_state_dict(tiny_reference())
+        path = tmp_path / "moss_image_base_int8_convrot.safetensors"
+        save_file(stored, str(path))
+
+        model, _ = self._load(monkeypatch, path, fp8_storage=True)
+
+        assert all(isinstance(model.layers[0].proj[name], Int8ConvrotLinear) for name in ("k", "v", "o", "ffn_down"))
+        assert model.layers[0].proj["q"].weight.dtype is torch.float32
+        # The dense Linears nothing reads the dtype of are the ones that took the cast.
+        assert model.text_embedder.blocks[0].qkv.weight.dtype is torch.float8_e4m3fn
+        expected = forward(with_state_dict(meant))
+        assert (forward(model) - expected).norm() / expected.norm() < 0.1
+
+
+class TestTorchaoFp8Checkpoint:
+    """unsloth's fp8 build: the block projections as `<layer>._weight_qdata` (float8_e4m3fn) plus a `[out, 1]` float32
+    scale, everything else dense. Real tiny tensors through the loader; compute is float32 on the CPU."""
+
+    QUANTIZED = ("q", "k", "v", "o", "ffn_up_gate", "ffn_down")
+
+    def _file(self, tmp_path: Path, prefix: str = "") -> tuple[Path, dict[str, torch.Tensor], dict[str, Any]]:
+        """The written file, the dense weights it keeps, and what each quantized layer means: (codes, scale)."""
+        dense = _tiny_state_dict(tiny_reference())
+        stored = dict(dense)
+        generator = torch.Generator().manual_seed(7)
+        quantized: dict[str, Any] = {}
+        for index in range(TINY_GEOMETRY["num_layers"]):
+            for name in self.QUANTIZED:
+                layer = f"layers.{index}.proj.{name}"
+                weight = dense.pop(f"{layer}.weight")
+                del stored[f"{layer}.weight"]
+                # Per-row and far from uniform, so a scale applied to the wrong rows or dropped shows in a forward.
+                scale = torch.rand(weight.shape[0], 1, generator=generator) * 3 + 0.25
+                codes = (weight / scale).to(torch.float8_e4m3fn)
+                stored[f"{layer}._weight_qdata"] = codes
+                stored[f"{layer}._weight_scale"] = scale
+                quantized[layer] = (codes, scale)
+        path = tmp_path / "MOSS-Image-Base-FP8.safetensors"
+        save_file({f"{prefix}{key}": value for key, value in stored.items()}, str(path))
+        return path, dense, quantized
+
+    def _load(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        path: Path,
+        *,
+        keep_fp8: bool,
+        fp8_compute_only: bool = False,
+        dtype: torch.dtype = torch.float32,
+    ) -> tuple[Any, Any, dict[str, torch.Tensor]]:
+        """The model, its loader, and the tensors `load_file` returned for the real file.
+
+        `keep_fp8` is FP8 Storage on. `fp8_compute_only` keeps the file's fp8 layers for the fp8 matmul with FP8
+        Storage off."""
+        loaded: dict[str, torch.Tensor] = {}
+        real_load_file = loader_module.load_file
+
+        def recording_load_file(path: Any) -> dict[str, torch.Tensor]:
+            tensors = real_load_file(path)
+            loaded.update(tensors)
+            return tensors
+
+        monkeypatch.setattr(loader_module, "load_file", recording_load_file)
+        loader = _loader(MossImageCheckpointModel, monkeypatch)
+        monkeypatch.setattr(
+            loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _device: dtype)
+        )
+        loader._should_use_fp8 = lambda _config, _submodel=None: keep_fp8
+        if fp8_compute_only:
+            loader._keep_fp8_weights = lambda _config, _submodel=None: True
+        config = Main_Checkpoint_MossImage_Config.model_construct(path=str(path), name="moss")
+        return loader._load_model(config, SubModelType.Transformer), loader, loaded
+
+    @pytest.mark.parametrize("prefix", ["", "model.diffusion_model."])
+    def test_with_fp8_storage_the_file_keeps_its_fp8_layers_and_the_dense_remainder_stays_dense(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, prefix: str
+    ) -> None:
+        path, dense, quantized = self._file(tmp_path, prefix)
+
+        model, loader, _ = self._load(monkeypatch, path, keep_fp8=True)
+
+        for layer in ("layers.0.proj.k", "layers.2.proj.ffn_down"):
+            codes, scale = quantized[layer]
+            module = model.get_submodule(layer)
+            assert module.weight.dtype is torch.float8_e4m3fn, layer
+            assert torch.equal(module.weight.view(torch.uint8), codes.view(torch.uint8)), layer
+            # Flat per-row, the form the fp8 matmul reads.
+            assert module.weight_scale.shape == (codes.shape[0],), layer
+            assert torch.equal(module.weight_scale, scale.reshape(-1)), layer
+        # `.proj.q` is a skip pattern: the forward reads its dtype, so it is folded with its scale applied.
+        for index in range(TINY_GEOMETRY["num_layers"]):
+            codes, scale = quantized[f"layers.{index}.proj.q"]
+            q = model.layers[index].proj["q"]
+            assert torch.equal(q.weight, codes.float() * scale), index
+            assert not hasattr(q, "weight_scale")
+        # What the forward reads the dtype of stays dense, bit for bit: the skip patterns' layers.
+        for key in (
+            "video_embedder.weight",
+            "text_embedder.proj.weight",
+            "time_embedding.0.weight",
+            "shared_block_modulation.weight",
+            "video_head_modulation.weight",
+            "final_linear_video.weight",
+        ):
+            assert torch.equal(model.state_dict()[key], dense[key]), key
+        # The rest of the dense layers stay dense too, even with FP8 Storage on: re-encoded as unscaled fp8 they
+        # underflow (`time_embedding.2` lost most of its weights), and the build ships them dense on purpose.
+        for key in (
+            "time_embedding.2.weight",
+            "time_embedding.2.bias",
+            *(
+                f"text_embedder.blocks.{i}.{part}.{name}"
+                for i in range(2)
+                for part in _TEXT_BLOCK_LINEARS
+                for name in ("weight", "bias")
+            ),
+        ):
+            assert torch.equal(model.state_dict()[key], dense[key]), key
+        meant = dict(dense)
+        loader._ram_cache.make_room.assert_called_once()
+
+        # The kept layers dequantize with their own per-row scale in the forward, as the cache runs them. The scales
+        # are far from uniform, so a dropped one or one paired with the wrong rows moves the output.
+        for layer, (codes, scale) in quantized.items():
+            meant[f"{layer}.weight"] = codes.float() * scale
+        apply_custom_layers_to_model(model)
+        torch.testing.assert_close(forward(model), forward(with_state_dict(meant)), rtol=1e-4, atol=1e-5)
+
+    @pytest.mark.parametrize(
+        ("kwargs", "kept"),
+        [
+            pytest.param({"keep_fp8": True}, True, id="kept-for-fp8-storage"),
+            pytest.param({"keep_fp8": False, "fp8_compute_only": True}, True, id="kept-for-fp8-compute"),
+            pytest.param({"keep_fp8": False}, False, id="folded"),
+        ],
+    )
+    def test_the_reservation_is_the_resident_size_plus_the_scales_the_load_holds(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, kwargs: dict[str, Any], kept: bool
+    ) -> None:
+        """The reservation the load asks for, counted from the fixture's shapes: the fp8 layers a file keeps at one byte per
+        element, `.proj.q` (read by dtype, so widened) and everything dense at the compute dtype, plus the scales held
+        on the side while the load runs (also on the folded path, where they are consumed afterwards)."""
+        path, dense, quantized = self._file(tmp_path)
+        compute = torch.bfloat16
+
+        _, loader, _ = self._load(monkeypatch, path, dtype=compute, **kwargs)
+
+        expected = sum(tensor.numel() * compute.itemsize for tensor in dense.values())
+        for layer, (codes, scale) in quantized.items():
+            stays_fp8 = kept and not layer.endswith(".proj.q")
+            expected += codes.numel() * (1 if stays_fp8 else compute.itemsize) + scale.numel() * scale.element_size()
+        (reserved,), _ = loader._ram_cache.make_room.call_args
+        assert reserved == expected
+
+    def test_without_anything_asking_for_fp8_every_layer_is_folded_to_the_codes_times_the_scale(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        path, dense, quantized = self._file(tmp_path)
+
+        model, _, _ = self._load(monkeypatch, path, keep_fp8=False)
+
+        assert [name for name, p in model.named_parameters() if p.dtype is not torch.float32] == []
+        for layer, (codes, scale) in quantized.items():
+            assert torch.equal(model.get_submodule(layer).weight, codes.float() * scale), layer
+
+    def test_a_folded_load_does_not_leave_parameters_pinning_the_file_mapping(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """The dense tensors are stored in the compute dtype, so neither the fold nor the cast replaces them; assigned
+        as parameters they would be slices of the file's mapping, which the cache's size calculation cannot see."""
+        path, dense, _ = self._file(tmp_path)
+
+        model, _, loaded = self._load(monkeypatch, path, keep_fp8=False)
+
+        for name in ("video_embedder.weight", "layers.0.norm1.weight"):
+            parameter = model.get_parameter(name)
+            assert parameter.data_ptr() != loaded[name].data_ptr(), name
+            assert torch.equal(parameter, dense[name])
+
+    def test_a_kept_fp8_load_does_not_copy_the_codes(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        path, _, _ = self._file(tmp_path)
+
+        model, _, loaded = self._load(monkeypatch, path, keep_fp8=True)
+
+        codes = model.get_parameter("layers.0.proj.k.weight")
+        assert codes.data_ptr() == loaded["layers.0.proj.k._weight_qdata"].data_ptr()
+
+    def _refused(self, monkeypatch: pytest.MonkeyPatch, path: Path) -> Any:
+        loader = _loader(MossImageCheckpointModel, monkeypatch)
+        config = Main_Checkpoint_MossImage_Config.model_construct(path=str(path), name="moss")
+        with pytest.raises(ValueError, match="mixes torchao fp8 layers with other quantization keys") as raised:
+            loader._load_model(config, SubModelType.Transformer)
+        loader._ram_cache.make_room.assert_not_called()
+        return raised
+
+    def test_a_file_mixing_torchao_and_int8_layers_is_refused_before_anything_is_reserved(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """The installer's twin: an I8 weight with its scale and marker beside the torchao pairs."""
+        path, _, _ = self._file(tmp_path)
+        stored = load_file(path)
+        stored["text_embedder.blocks.0.qkv.weight"] = torch.zeros(192, 64, dtype=torch.int8)
+        stored["text_embedder.blocks.0.qkv.weight_scale"] = torch.ones(192, 1)
+        stored["text_embedder.blocks.0.qkv.comfy_quant"] = comfy_quant_marker(CONVROT_MARKER)
+        save_file(stored, str(path))
+
+        self._refused(monkeypatch, path)
+
+    def test_a_stray_scale_beside_a_torchao_pair_is_refused_not_overwritten(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        path, _, _ = self._file(tmp_path)
+        stored = load_file(path)
+        stored["layers.0.proj.k.weight_scale"] = torch.ones(64)
+        save_file(stored, str(path))
+
+        self._refused(monkeypatch, path)
+
+    def test_a_plain_fp8_weight_without_a_scale_inside_a_torchao_file_is_refused(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        path, _, _ = self._file(tmp_path)
+        stored = load_file(path)
+        stored["text_embedder.blocks.0.qkv.weight"] = torch.zeros(192, 64).to(torch.float8_e4m3fn)
+        save_file(stored, str(path))
+
+        self._refused(monkeypatch, path)
+
+    def test_a_comfyui_scaled_fp8_layer_inside_a_torchao_file_is_refused(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        path, _, _ = self._file(tmp_path)
+        stored = load_file(path)
+        stored["text_embedder.blocks.0.qkv.weight"] = torch.zeros(192, 64).to(torch.float8_e4m3fn)
+        stored["text_embedder.blocks.0.qkv.weight_scale"] = torch.ones(192)
+        save_file(stored, str(path))
+
+        self._refused(monkeypatch, path)
+
+
+class TestGGUFLoader:
+    """unsloth's split layout and leejet's fused, metadata-free one, as real tiny GGUF files."""
+
+    def _load(self, monkeypatch: pytest.MonkeyPatch, path: Path) -> tuple[Any, Any]:
+        loader = _loader(MossImageGGUFModel, monkeypatch)
+        config = Main_GGUF_MossImage_Config.model_construct(path=str(path), name="moss")
+        return loader._load_model(config, SubModelType.Transformer), loader
+
+    @pytest.mark.parametrize(
+        ("fused", "architecture"), [(False, "moss_image"), (True, None)], ids=["unsloth", "leejet"]
+    )
+    def test_the_gguf_computes_what_its_file_means(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fused: bool, architecture: str | None
+    ) -> None:
+        """Not bit-exact: torch's block kernels multiply codes by their fp16 scale in fp16, the reference reader in
+        float32. A wrong third of the fused rows, a dropped norm or a missing key is off by far more."""
+        path = tmp_path / "moss.gguf"
+        meant = write_moss_image_gguf(path, tiny_reference(), fused=fused, architecture=architecture)
+
+        model, loader = self._load(monkeypatch, path)
+        apply_custom_layers_to_model(model)
+
+        torch.testing.assert_close(forward(model), forward(with_state_dict(meant)), atol=1e-3, rtol=1e-3)
+        loader._ram_cache.make_room.assert_called_once()
+
+    @pytest.mark.parametrize("fused", [False, True], ids=["split", "fused"])
+    def test_only_the_projections_the_forward_never_reads_the_dtype_of_stay_packed(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fused: bool
+    ) -> None:
+        path = tmp_path / "moss.gguf"
+        write_moss_image_gguf(path, tiny_reference(), fused=fused, architecture=None if fused else "moss_image")
+
+        model, _ = self._load(monkeypatch, path)
+
+        block = model.layers[0].proj
+        # leejet quantizes only the fused qkv and keeps the rest BF16, which unpacks at load; unsloth quantizes more.
+        packed = ("k", "v") if fused else ("k", "v", "o", "ffn_up_gate", "ffn_down")
+        for name in packed:
+            assert isinstance(block[name].weight.data, GGMLTensor), name
+        if not fused:
+            assert isinstance(model.text_embedder.blocks[0].qkv.weight.data, GGMLTensor)
+            # Quantized in the file, but the forward reads their dtype: the skip patterns unpack them.
+            for module in (model.video_embedder, model.time_embedding[0], model.text_embedder.proj):
+                assert type(module.weight.data) is torch.Tensor
+        # `q` was quantized in the file (as part of the fused tensor, or on its own) and is dense here.
+        assert type(block["q"].weight.data) is torch.Tensor
+        assert block["q"].weight.dtype is torch.float32
+        # Read outside a matmul, or BF16 in the file: nothing to keep packed.
+        for module in (model.video_embedder, model.final_linear_video, model.shared_block_modulation):
+            assert type(module.weight.data) is torch.Tensor
+        assert type(model.layers[0].norm1.weight.data) is torch.Tensor
+
+    def test_a_comfyui_prefixed_gguf_loads_like_an_unprefixed_one(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "moss.gguf"
+        meant = write_moss_image_gguf(
+            path, tiny_reference(), fused=True, architecture=None, prefix="model.diffusion_model."
+        )
+
+        model, _ = self._load(monkeypatch, path)
+        apply_custom_layers_to_model(model)
+
+        torch.testing.assert_close(forward(model), forward(with_state_dict(meant)), atol=1e-3, rtol=1e-3)
+
+    def test_the_gguf_refuses_submodels_it_does_not_contain(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        loader = _loader(MossImageGGUFModel, monkeypatch)
+        config = Main_GGUF_MossImage_Config.model_construct(path="moss.gguf", name="moss")
+
+        with pytest.raises(ValueError, match="holds only the transformer"):
+            loader._load_model(config, SubModelType.VAE)

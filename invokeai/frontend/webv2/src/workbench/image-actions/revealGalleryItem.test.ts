@@ -40,7 +40,7 @@ vi.mock('@features/gallery/queries', () => ({
   galleryBoardsOptions: (query: unknown) => ({ kind: 'boards', query }),
 }));
 
-vi.mock('@workbench/widgetState', () => ({ getProjectWidgetValues: () => mocks.galleryValues }));
+vi.mock('@workbench/widgetState', () => ({ getResolvedProjectWidgetValues: () => mocks.galleryValues }));
 
 import { revealGalleryItem } from './revealGalleryItem';
 
@@ -256,5 +256,32 @@ describe('revealGalleryItem', () => {
     expect(mocks.fetchVerifiedPage).not.toHaveBeenCalled();
     expect(commands.gallery.selectBoard).not.toHaveBeenCalled();
     expect(commands.gallery.selectItem).not.toHaveBeenCalled();
+  });
+
+  it('reveals an upload in Assets, switching the view from Images', async () => {
+    const upload: GalleryItem = { ...item, category: 'user', name: 'upload.png' };
+    mocks.resolve.mockResolvedValue(upload);
+    mocks.galleryValues = { galleryView: 'images' };
+    const { commands, context } = createContext();
+
+    await revealGalleryItem(context, { kind: 'image', name: upload.name }, ticket());
+
+    expect(mocks.fetchVerifiedPage.mock.calls[0]?.[1]).toMatchObject({ galleryView: 'assets' });
+    expect(commands.gallery.setView).toHaveBeenCalledWith('assets');
+    expect(commands.gallery.selectItem).toHaveBeenCalledWith(upload, 'project-1', 2);
+  });
+
+  it('leaves the Gallery alone for a Canvas-owned item that no view lists', async () => {
+    const canvasAsset: GalleryItem = { ...item, category: 'other', name: 'layer.png' };
+    mocks.resolve.mockResolvedValue(canvasAsset);
+    const { commands, context } = createContext();
+
+    await revealGalleryItem(context, { kind: 'image', name: canvasAsset.name }, ticket());
+
+    expect(mocks.fetchVerifiedPage).not.toHaveBeenCalled();
+    expect(commands.gallery.setView).not.toHaveBeenCalled();
+    expect(commands.gallery.selectBoard).not.toHaveBeenCalled();
+    expect(commands.gallery.selectItem).not.toHaveBeenCalled();
+    expect(mocks.requestReveal).not.toHaveBeenCalled();
   });
 });

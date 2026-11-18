@@ -113,6 +113,17 @@ class BoardAccess:
         """Whether admin rights give the caller more than their own role does."""
         return self.is_admin and self.role is not BoardRole.Owner
 
+    def media_deleted_with_board(self, user_id: str) -> Optional[str]:
+        """Whose media the caller (`user_id`) deletes by deleting the board with its media: their own, or everyone's
+        (None).
+
+        An owner deleting their board, admin or not, only deletes their own contributions, so what other users put on
+        a shared board is preserved (it cascades to "uncategorized" via the FK on board_videos / board_images). Only an
+        admin overriding, deleting someone else's board, deletes everything on it; that is the case the DTO reports as
+        `admin_override`, so the client can warn before it.
+        """
+        return None if self.admin_override else user_id
+
     def allows(self, action: BoardAction) -> bool:
         return not (self.is_inbox and action in _MANAGED_BY_PROJECT) and self.role_allows(action)
 

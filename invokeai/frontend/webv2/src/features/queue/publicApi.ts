@@ -1,4 +1,5 @@
 import type { QueueFeatureCommands, QueueQueryScope, QueueReadModel } from './core/types';
+import type { QueueItemStatusChange } from './data/queries';
 import type { QueueItemProgressPort, QueueRealtimeRuntime } from './data/realtimeRuntime';
 import type {
   QueueHistoryPort,
@@ -13,6 +14,7 @@ import { queueBackend } from './data/httpRealtimeQueueBackend';
 import { queueItemDetailOptions, queueReadModelOptions } from './data/queries';
 import { createQueueRealtimeRuntime } from './data/realtimeRuntime';
 import { createQueueRuntime } from './runtime';
+import { queueCancelRequests } from './runtime/cancelRequests';
 import { createQueueReceiptAcknowledgements, type QueueReceiptStorePort } from './runtime/receiptAcknowledgements';
 
 export const createProductionQueueReceiptAcknowledgements = (store: QueueReceiptStorePort, isActive: () => boolean) =>
@@ -24,10 +26,7 @@ export const createProductionQueueReceiptAcknowledgements = (store: QueueReceipt
 
 export const queueCommands: QueueFeatureCommands = {
   cancelBatch: queueBackend.cancelBatch,
-  cancelCurrentItem: queueBackend.cancelCurrentItem,
-  cancelItem: async (itemId) => {
-    await queueBackend.cancelItem(itemId);
-  },
+  cancelItem: queueBackend.cancelItem,
   cancelScopedItems: queueBackend.cancelScopedItems,
   clearFailedItems: queueBackend.clearFailedItems,
   clearFinishedItems: queueBackend.clearFinishedItems,
@@ -47,17 +46,26 @@ export const getQueueReadModelOptions = (scope: QueueQueryScope, onRead?: (model
   queueReadModelOptions(queueBackend, scope, onRead);
 
 export const createProductionQueueRealtimeRuntime = ({
+  applyStatusChange,
   coalesceMs,
   invalidate,
   progress,
   refreshModelCache,
 }: {
+  applyStatusChange: (change: QueueItemStatusChange) => void;
   coalesceMs?: number;
   invalidate: () => void | Promise<void>;
   progress: QueueItemProgressPort;
   refreshModelCache: () => void | Promise<void>;
 }): QueueRealtimeRuntime =>
-  createQueueRealtimeRuntime({ backend: queueBackend, coalesceMs, invalidate, progress, refreshModelCache });
+  createQueueRealtimeRuntime({
+    applyStatusChange,
+    backend: queueBackend,
+    coalesceMs,
+    invalidate,
+    progress,
+    refreshModelCache,
+  });
 
 export const createProductionQueueRuntime = ({
   destinations,
@@ -82,6 +90,7 @@ export const createProductionQueueRuntime = ({
 }): QueueRuntime =>
   createQueueRuntime({
     backend: queueBackend,
+    cancelRequests: queueCancelRequests,
     destinations,
     ensureProjectPersisted,
     ensureTemplatesLoaded,

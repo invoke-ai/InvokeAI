@@ -10,7 +10,6 @@ import {
   BrushCleaningIcon,
   Code2Icon,
   DatabaseIcon,
-  FolderIcon,
   InfoIcon,
   KeyboardIcon,
   PaletteIcon,
@@ -27,7 +26,7 @@ export interface SettingsEntry {
 export interface SettingsSection {
   id: string;
   label: SettingsText;
-  group: 'application' | 'project' | 'widgets' | 'system';
+  group: 'application' | 'widgets' | 'system';
   icon: WidgetIconComponent;
   widgetId?: string;
   entries: readonly SettingsEntry[];
@@ -37,14 +36,13 @@ const sectionPresentation = {
   appearance: { group: 'application', icon: PaletteIcon },
   behavior: { group: 'application', icon: SlidersHorizontalIcon },
   hotkeys: { group: 'application', icon: KeyboardIcon },
-  project: { group: 'project', icon: FolderIcon },
   developer: { group: 'system', icon: Code2Icon },
   server: { group: 'system', icon: ServerIcon },
   workspace: { group: 'system', icon: DatabaseIcon },
   intermediates: { group: 'system', icon: BrushCleaningIcon },
   about: { group: 'system', icon: InfoIcon },
 } as const;
-const groupOrder = ['application', 'project', 'widgets', 'system'];
+const groupOrder = ['application', 'widgets', 'system'];
 
 /** Pure composition and validation; constructing a catalog never invokes a loader. */
 export const buildSettingsCatalog = (
@@ -126,33 +124,16 @@ export const searchSettings = (
 
 export interface SettingsAvailability {
   canManageAppConfig: boolean;
-  /** Widget types in the open project, or `null` where no project is open (the Launchpad). */
-  widgetTypeIds: ReadonlySet<string> | null;
 }
 
-/** Only settings that can be edited here: project settings need a project, widget settings need that widget. */
+/**
+ * The settings this account can edit. Everything else is editable everywhere: a per-project setting edits the open
+ * project's pin, or the user's default where there is no project or widget to pin it to.
+ */
 export const getAvailableSettings = (
   sections: readonly SettingsSection[],
-  { canManageAppConfig, widgetTypeIds }: SettingsAvailability
-): SettingsSection[] =>
-  sections.flatMap((section) => {
-    if (section.id === 'server' && !canManageAppConfig) {
-      return [];
-    }
-    const entries = section.entries.filter(({ field }) => {
-      if (field.scope === 'project') {
-        return widgetTypeIds !== null;
-      }
-      if (field.scope === 'instance') {
-        return Boolean(section.widgetId && widgetTypeIds?.has(section.widgetId));
-      }
-      return true;
-    });
-    if (!entries.length) {
-      return [];
-    }
-    return [entries.length === section.entries.length ? section : { ...section, entries }];
-  });
+  { canManageAppConfig }: SettingsAvailability
+): SettingsSection[] => sections.filter((section) => section.id !== 'server' || canManageAppConfig);
 
 export interface SettingsBrowseState {
   activeId: string;
@@ -163,7 +144,10 @@ export interface SettingsBrowseState {
 
 export const isSettingsQuery = (query: string): boolean => query.trim().length > 0;
 
-/** What a settings surface shows for its section and search state; `sections` is never empty (Appearance is always available). */
+/**
+ * What a settings surface shows for its section and search state; `sections` is never empty (Appearance is always
+ * available).
+ */
 export const browseSettings = (
   sections: readonly SettingsSection[],
   { activeId, query, searchSection }: SettingsBrowseState,

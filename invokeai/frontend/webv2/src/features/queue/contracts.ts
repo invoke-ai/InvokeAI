@@ -5,7 +5,9 @@
 export type {
   QueueHistoryItemStatus,
   QueueItem,
+  QueueRunErrorCode,
   QueueState,
+  QueueSubmissionRetry,
   QueueSubmissionSnapshot,
   RunRecord,
 } from './core/historyTypes';
@@ -56,7 +58,14 @@ export {
   isBackendSubmittableSourceId,
   shouldSubmitPendingQueueItem,
 } from './core/submissionRules';
-export { extractGenerationMeta, getResultImageName, type QueueGenerationMeta } from './core/generationMeta';
+export {
+  extractGenerationMeta,
+  extractNamedGenerationMeta,
+  getResultImageName,
+  type QueueGenerationMeta,
+} from './core/generationMeta';
+export { getQueueItemSnapshotLabel } from './core/itemLabels';
+export { getQueueActivity, type QueueActivity } from './core/queueActivity';
 export {
   planGenerateSubmissionBatch,
   type GeneratePromptBatchPlan,
@@ -80,10 +89,15 @@ export {
 } from './data/events';
 
 export {
-  getFollowedProgressSession,
+  getAutoSwitchFollowedLive,
   getQueueActiveSessions,
   getQueueProgressSessions,
+  isAutoSwitchPinHeld,
   isGalleryProgressItem,
+  pickAutoSwitch,
+  selectsLandedResult,
+  type AutoSwitchLiveSlot,
+  type AutoSwitchMode,
   type QueueActiveSession,
   type QueueProgressSession,
 } from './core/activeSessions';

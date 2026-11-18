@@ -6,6 +6,7 @@ import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchSt
 
 import { galleryItems, toGalleryItemKey } from '@features/gallery';
 import {
+  getGalleryItemView,
   getGallerySettings,
   isGalleryNavigationCurrent,
   requestGalleryItemReveal,
@@ -13,7 +14,7 @@ import {
 } from '@features/gallery/contracts';
 import { fetchVerifiedGalleryItemPage, GALLERY_PAGE_SIZE, galleryBoardsOptions } from '@features/gallery/queries';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
 
 /** Inject workbench dependencies so reveal loads on demand without adding gallery transfer code to editor boot. */
 export interface GalleryRevealContext {
@@ -73,9 +74,18 @@ export const revealGalleryItem = (
       return;
     }
 
-    const getGalleryValues = () => getProjectWidgetValues(queries.getSnapshot().activeProject, 'gallery');
+    const targetView = getGalleryItemView(image);
+
+    // A Canvas-owned (`other`) item is in no view's listing, so there is nowhere to reveal it.
+    if (targetView === null) {
+      return;
+    }
+
+    const getGalleryValues = () => {
+      const snapshot = queries.getSnapshot();
+      return getResolvedProjectWidgetValues(snapshot.activeProject, 'gallery', snapshot.scopedDefaults);
+    };
     const settings = getGallerySettings(getGalleryValues());
-    const targetView: GalleryView = image.category === 'general' ? 'images' : 'assets';
     // Match the post-reveal listing filters and starred partition so prefetched pages enter the gallery's cache.
     const wantsStarredOnly = image.starred === true;
     // A media filter that hides the item's kind is reset to both, like the other filters; one that shows it stays.

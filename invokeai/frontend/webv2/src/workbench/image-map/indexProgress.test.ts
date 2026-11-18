@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import i18n from 'i18next';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
   describeIndexProgress,
@@ -10,6 +11,21 @@ import {
   STALE_AFTER_MS,
   type ImageIndexCounts,
 } from './indexProgress';
+
+const englishCatalog = Object.values(
+  import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
+)[0] as Record<string, unknown>;
+const instance = i18n.createInstance();
+const t = (key: string, values?: Record<string, unknown>) => instance.t(key, values);
+
+beforeAll(async () => {
+  await instance.init({
+    initAsync: false,
+    interpolation: { escapeValue: false },
+    lng: 'en',
+    resources: { en: { translation: englishCatalog } },
+  });
+});
 
 const counts = (overrides: Partial<ImageIndexCounts> = {}): ImageIndexCounts => ({
   embedded: 25,
@@ -36,7 +52,7 @@ describe('index progress arithmetic', () => {
 
   it('agrees with the counts line it is shown beside', () => {
     // Derive completed counts and percent from pending so labels and progress agree.
-    const description = describeIndexProgress(counts({ embedded: 300, failed: 600, pending: 100, total: 1000 }));
+    const description = describeIndexProgress(counts({ embedded: 300, failed: 600, pending: 100, total: 1000 }), t);
 
     expect(description.counts).toBe('900 of 1,000 images');
     expect(description.percent).toBe(90);
@@ -105,7 +121,7 @@ describe('formatDuration', () => {
 
 describe('describeIndexProgress', () => {
   it('spells out the counts and the share', () => {
-    const description = describeIndexProgress(counts({ embedded: 1204, pending: 3108, total: 4312 }));
+    const description = describeIndexProgress(counts({ embedded: 1204, pending: 3108, total: 4312 }), t);
 
     expect(description.counts).toBe(`${(1204).toLocaleString()} of ${(4312).toLocaleString()} images`);
     expect(description.compact).toBe(`${(1204).toLocaleString()}/${(4312).toLocaleString()}`);
@@ -113,11 +129,11 @@ describe('describeIndexProgress', () => {
   });
 
   it('says nothing about staleness while reports are still arriving', () => {
-    expect(describeIndexProgress(counts(), STALE_AFTER_MS - 1).stale).toBeNull();
+    expect(describeIndexProgress(counts(), t, STALE_AFTER_MS - 1).stale).toBeNull();
   });
 
   it('states how long the index has stood still, and claims nothing more', () => {
-    const stale = describeIndexProgress(counts(), STALE_AFTER_MS);
+    const stale = describeIndexProgress(counts(), t, STALE_AFTER_MS);
 
     // Not "paused while the queue is busy": the indexer waiting out a
     // generation and the indexer having died look identical from here, and
@@ -126,10 +142,10 @@ describe('describeIndexProgress', () => {
   });
 
   it('keeps the note honest over long waits', () => {
-    expect(describeIndexProgress(counts(), 3_600_000).stale).toBe('No progress reported for 1h 00m');
+    expect(describeIndexProgress(counts(), t, 3_600_000).stale).toBe('No progress reported for 1h 00m');
   });
 
   it('explains images that were given up on', () => {
-    expect(describeIndexProgress(counts({ failed: 3 })).skipped).toBe('3 skipped after repeated failures');
+    expect(describeIndexProgress(counts({ failed: 3 }), t).skipped).toBe('3 skipped after repeated failures');
   });
 });

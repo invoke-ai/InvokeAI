@@ -13,33 +13,13 @@ from typing import Any
 
 import torch
 
-from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.gguf.row_ops import split_rows
 
 GATE_UP = ".img_mlp.gate_up."
 """ComfyUI's fused gated-MLP projection; diffusers splits it into `gate_layer` (first half) and `proj`."""
 
 # Sidecars that describe the whole tensor and so belong to both halves unchanged.
 _SHARED_SIDECARS = ("input_scale", "scale_input", "comfy_quant")
-
-
-def _split_rows(value: Any, rows: int) -> tuple[Any, Any]:
-    """Split a tensor's leading (output) dimension in two at `rows`.
-
-    GGML blocks run along a row, never across rows, so a GGML tensor splits by its quantized rows
-    without dequantizing.
-    """
-    if isinstance(value, GGMLTensor):
-        total, cols = value.tensor_shape
-        data = value.quantized_data
-        if data.shape[0] != total:
-            raise ValueError(f"GGML tensor of shape {tuple(value.tensor_shape)} is not stored one row per output")
-        halves = (data[:rows].clone(), data[rows:].clone())
-        shapes = (torch.Size((rows, cols)), torch.Size((total - rows, cols)))
-        return tuple(  # type: ignore[return-value]
-            GGMLTensor(part, value._ggml_quantization_type, shape, value.compute_dtype)
-            for part, shape in zip(halves, shapes, strict=True)
-        )
-    return value[:rows], value[rows:]
 
 
 def split_fused_gate_up(sd: dict[str, Any]) -> dict[str, Any]:
@@ -61,7 +41,7 @@ def split_fused_gate_up(sd: dict[str, Any]) -> dict[str, Any]:
         if rows % 2:
             raise ValueError(f"{key} has {rows} rows, which do not split into gate and up halves")
         halves_by_stem[stem] = rows // 2
-        gate, up = _split_rows(sd[key], rows // 2)
+        gate, up = split_rows(sd[key], rows // 2)
         out[f"{stem.replace(GATE_UP[:-1], '.img_mlp.gate_layer')}.weight"] = gate
         out[f"{stem.replace(GATE_UP[:-1], '.img_mlp.proj')}.weight"] = up
     for key in fused - weights:
@@ -78,7 +58,7 @@ def split_fused_gate_up(sd: dict[str, Any]) -> dict[str, Any]:
             and value.shape[0] == 2 * halves_by_stem[stem]
         )
         if per_row:
-            out[gate_key], out[proj_key] = _split_rows(value, halves_by_stem[stem])
+            out[gate_key], out[proj_key] = split_rows(value, halves_by_stem[stem])
         else:
             out[gate_key], out[proj_key] = value, value
     return out

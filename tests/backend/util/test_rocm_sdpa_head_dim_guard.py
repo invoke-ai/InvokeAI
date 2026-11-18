@@ -150,7 +150,7 @@ class TestGuard:
         assert F.scaled_dot_product_attention is original
         assert any("NOT installed" in r.message for r in caplog.records)
 
-    def test_apply_monkeypatches_installs_the_guard(self, monkeypatch):
+    def test_apply_monkeypatches_installs_the_guard(self, monkeypatch, preserve_sdpa_priority_order):
         from invokeai.app.util.startup_utils import apply_monkeypatches
 
         original = F.scaled_dot_product_attention
@@ -192,7 +192,7 @@ def _install_chunking(
     monkeypatch.setattr(attention, "_rocm_cuda", lambda device_type: True)
     monkeypatch.setattr(attention, "SDPA_MATH_CHUNK_BYTES", budget)
     if materializes is not None:
-        monkeypatch.setattr(attention, "_materializes", lambda *args: materializes)
+        monkeypatch.setattr(attention, "sdpa_runs_fused", lambda *args, **kwargs: not materializes)
     install_rocm_sdpa_guard()
     shapes.clear()  # the install probe's own math call
     return shapes
@@ -508,6 +508,9 @@ class TestClassicVaeEstimators:
 
         vae = MagicMock(spec=spec)
         vae.parameters.side_effect = lambda: iter([torch.zeros(1, dtype=torch.bfloat16)])
+        # The stock geometry a tiled estimate snaps its tile with: an 8x downsample, the 0.25 overlap.
+        vae.config.block_out_channels = (128, 256, 512, 512)
+        vae.tile_overlap_factor = 0.25
         return vae
 
     @staticmethod

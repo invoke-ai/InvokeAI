@@ -12,7 +12,7 @@ import type { ListRow } from './listRows';
 import { List, type ListRowProps } from './List';
 import { ListItem } from './ListItem';
 import { LIST_ROW_GAP_PX } from './listLayout';
-import { listRowsFromSections } from './listRows';
+import { listRowsFromItems, listRowsFromSections } from './listRows';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -68,12 +68,14 @@ afterEach(async () => {
 
 const Harness = ({
   activeKey = null,
+  inset,
   rows,
   onCheckedChange,
   onContextMenu,
   onPress,
 }: {
   activeKey?: string | null;
+  inset?: 'row' | 'none';
   rows: ListRow<Item>[];
   onCheckedChange?: (item: Item, checked: boolean) => void;
   onContextMenu?: (item: Item, anchor: ListContextMenuAnchor) => void;
@@ -84,6 +86,7 @@ const Harness = ({
       activeKey={activeKey}
       density="comfortable"
       emptyState={<span>nothing</span>}
+      inset={inset}
       label="subjects"
       renderItem={(item: Item, rowProps: ListRowProps) => (
         <ListItem
@@ -410,6 +413,65 @@ describe('List scroll offset persistence', () => {
   });
 });
 
+describe('List range reporting', () => {
+  it('reports the visible range on mount and when a scroll moves it, not on every scroll event', async () => {
+    const onRangeChange = vi.fn();
+    // No section headers, so every index is a row slot.
+    const rows = listRowsFromItems(section('main', 'Main', 200).items, (item) => item.id);
+    const element = (
+      <ChakraProvider value={system}>
+        <List
+          density="comfortable"
+          label="subjects"
+          renderItem={(item: Item, rowProps: ListRowProps) => <ListItem {...rowProps} title={item.name} />}
+          rows={rows}
+          onRangeChange={onRangeChange}
+        />
+      </ChakraProvider>
+    );
+
+    await render(element);
+    // The rows the viewport actually shows, read from the rendered slots.
+    const shownRange = () => {
+      const bounds = viewport().getBoundingClientRect();
+      const shown = [...host.querySelectorAll<HTMLElement>('[data-index]')]
+        .filter((slot) => {
+          const box = slot.getBoundingClientRect();
+          return box.bottom > bounds.top + 0.5 && box.top < bounds.bottom - 0.5;
+        })
+        .map((slot) => Number(slot.dataset.index));
+      return { endIndex: Math.max(...shown), startIndex: Math.min(...shown) };
+    };
+    expect(onRangeChange).toHaveBeenCalledTimes(1);
+    expect(onRangeChange).toHaveBeenLastCalledWith(shownRange());
+
+    // Thirty scroll events over 90px cross only a few row boundaries; each report is a new range.
+    for (let step = 1; step <= 30; step += 1) {
+      await scrollTo(ROW_PX * 50 + step * 3);
+    }
+    const reports = onRangeChange.mock.calls.map((call) => call[0] as { endIndex: number; startIndex: number });
+    expect(reports.length).toBeGreaterThan(1);
+    expect(reports.length).toBeLessThan(8);
+    reports.slice(1).forEach((range, index) => expect(range).not.toEqual(reports[index]));
+    expect(reports.at(-1)).toEqual(shownRange());
+  });
+});
+
+describe('List scrolling cost', () => {
+  it('pins the scroll area’s overflow properties above the rows, so scrolling restyles none of them', async () => {
+    await render(<Harness rows={listRowsFromItems(section('main', 'Main', 60).items, (item) => item.id)} />);
+    await scrollTo(400);
+
+    // Whatever custom properties the scroll area writes on its viewport, none may reach the rows changing.
+    const viewportProperties = () => [...viewport().style].filter((name) => name.startsWith('--'));
+    await vi.waitFor(() => expect(viewportProperties().length).toBeGreaterThan(0));
+    const style = getComputedStyle(host.querySelector('[data-list-row]')!);
+    for (const name of viewportProperties()) {
+      expect(['', '0px'], name).toContain(style.getPropertyValue(name).trim());
+    }
+  });
+});
+
 describe('ListItem checkbox', () => {
   it('names the checkbox after the row and reports toggles without pressing the row', async () => {
     const onCheckedChange = vi.fn();
@@ -529,11 +591,117 @@ describe('List measured rows', () => {
   });
 });
 
+describe('List inset', () => {
+  const edgeOffsets = () => {
+    const list = viewport().getBoundingClientRect();
+    const row = host.querySelector<HTMLElement>('[data-list-row="a-0"]')!.getBoundingClientRect();
+    const header = pinnedHeader()!.firstElementChild!.getBoundingClientRect();
+
+    return { header: header.left - list.left, rowEnd: list.right - row.right, rowStart: row.left - list.left };
+  };
+
+  it('insets rows and headers from the list edges by default and runs them edge to edge with none', async () => {
+    const rows = rowsOf(section('a', 'Alpha', 3));
+
+    await render(<Harness rows={rows} />);
+    // LIST_ROW_INSET is 0.75rem.
+    expect(edgeOffsets()).toEqual({ header: 12, rowEnd: 12, rowStart: 12 });
+
+    await render(<Harness inset="none" rows={rows} />);
+    expect(edgeOffsets()).toEqual({ header: 0, rowEnd: 0, rowStart: 0 });
+  });
+});
+
 describe('List states', () => {
   it('renders the caller-owned empty state when no item rows remain', async () => {
     await render(<Harness rows={[]} />);
 
     expect(host.textContent).toContain('nothing');
     expect(host.querySelector('[role="list"]')).toBeNull();
+  });
+});
+
+describe('a row editing its title inside a List', () => {
+  const EditingHarness = ({ editingKey }: { editingKey: string | null }) => (
+    <ChakraProvider value={system}>
+      <button type="button">Before the list</button>
+      <List
+        density="comfortable"
+        emptyState={<span>nothing</span>}
+        label="subjects"
+        renderItem={(item: Item, rowProps: ListRowProps) => (
+          <ListItem
+            {...rowProps}
+            title={item.name}
+            titleEditor={item.id === editingKey ? <input aria-label="Rename" defaultValue={item.name} /> : undefined}
+            onPress={() => undefined}
+          />
+        )}
+        rows={rowsOf(section('main', 'Main', 5))}
+      />
+    </ChakraProvider>
+  );
+
+  it('leaves the field its own Home, End and arrows, and gives the row its tab stop back after', async () => {
+    await render(<EditingHarness editingKey={null} />);
+    // The List's tab stop is on the second row, as after using it.
+    await act(() => primaryButtons()[1]!.focus());
+
+    await render(<EditingHarness editingKey="main-1" />);
+    const field = host.querySelector<HTMLInputElement>('input[aria-label="Rename"]')!;
+    await act(() => field.focus());
+    field.setSelectionRange(2, 2);
+
+    await act(() => userEvent.keyboard('{End}'));
+    expect(field.selectionStart).toBe(field.value.length);
+    await act(() => userEvent.keyboard('{Home}'));
+    expect(field.selectionStart).toBe(0);
+    await act(() => userEvent.keyboard('{ArrowDown}{ArrowUp}'));
+    await settleFrame();
+    expect(document.activeElement).toBe(field);
+
+    // Editing done, the row's button is back and is the List's one tab stop.
+    await render(<EditingHarness editingKey={null} />);
+    const stops = primaryButtons().filter((button) => button.tabIndex === 0);
+    expect(stops).toHaveLength(1);
+    expect(stops[0]?.textContent).toContain('Main 1');
+
+    await act(() => host.querySelector<HTMLButtonElement>('button:not([data-list-primary])')!.focus());
+    await act(() => userEvent.tab());
+    expect(document.activeElement).toBe(stops[0]);
+  });
+});
+
+describe('keys from a row selection checkbox', () => {
+  it('still move between rows: arrows, Home and End', async () => {
+    const onCheckedChange = vi.fn();
+    await render(<Harness rows={rowsOf(section('main', 'Main', 5))} onCheckedChange={onCheckedChange} />);
+    const checkbox = (index: number) =>
+      host
+        .querySelectorAll<HTMLElement>('[role="listitem"]')
+        [index]!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+
+    await act(() => checkbox(0).focus());
+    await act(() => userEvent.keyboard(' '));
+    expect(onCheckedChange).toHaveBeenCalledOnce();
+
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await settleFrame();
+    expect(document.activeElement).toBe(primaryButtons()[1]);
+
+    await act(() => checkbox(1).focus());
+    await act(() => userEvent.keyboard('{End}'));
+    await settleFrame();
+    expect(document.activeElement?.textContent).toContain('Main 4');
+
+    await act(() => checkbox(4).focus());
+    await act(() => userEvent.keyboard('{ArrowUp}'));
+    await settleFrame();
+    expect(document.activeElement?.textContent).toContain('Main 3');
+
+    await act(() => checkbox(3).focus());
+    await act(() => userEvent.keyboard('{Home}'));
+    await settleFrame();
+    expect(document.activeElement).toBe(primaryButtons()[0]);
   });
 });

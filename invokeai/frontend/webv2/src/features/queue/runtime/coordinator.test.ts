@@ -24,6 +24,7 @@ import {
   createQueueCoordinator,
   QueueEnqueueNotAcceptedError,
   QueueItemCancelledError,
+  QueueItemFailedError,
   type QueueCoordinator,
   type QueueCoordinatorBackendPort,
   type QueueCoordinatorCallbacks,
@@ -188,6 +189,7 @@ const workflowRequest: QueueEnqueueWorkflowRequest = {
 interface Harness {
   activeProgressTarget: {
     clear: ReturnType<typeof vi.fn>;
+    markFramed: ReturnType<typeof vi.fn>;
     set: ReturnType<typeof vi.fn>;
     settle: ReturnType<typeof vi.fn>;
   };
@@ -267,7 +269,12 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
     started: vi.fn(),
   };
   const progressImage = { bindSwapImages: vi.fn(), clear: vi.fn(), clearHeld: vi.fn(), hold: vi.fn(), set: vi.fn() };
-  const activeProgressTarget = { clear: vi.fn(), set: vi.fn(), settle: vi.fn() } satisfies ActiveProgressTargetSink;
+  const activeProgressTarget = {
+    clear: vi.fn(),
+    markFramed: vi.fn(),
+    set: vi.fn(),
+    settle: vi.fn(),
+  } satisfies ActiveProgressTargetSink;
   const hub = createSocketHub({ createSocket: () => socket });
 
   hub.connect();
@@ -349,18 +356,74 @@ describe('queueCoordinator', () => {
     expect(harness.api.getItem).not.toHaveBeenCalled();
   });
 
-  it('rejects with the backend error message when a run fails', async () => {
+  it('rejects with the backend error message and the item that failed when a run fails', async () => {
+    harness.api.enqueueGenerate.mockResolvedValue({ batchId: 'batch-1', enqueued: 2, itemIds: [1, 2], requested: 2 });
     harness.coordinator.connect();
 
     await harness.coordinator.submitGenerate('local-1', generateRequest);
     const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
 
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
     harness.socket.fire(
       'queue_item_status_changed',
-      createStatusEvent({ error_message: 'CUDA out of memory', item_id: 1, status: 'failed' })
+      createStatusEvent({ error_message: 'CUDA out of memory', item_id: 2, status: 'failed' })
     );
 
-    await expect(resultsPromise).rejects.toThrow('CUDA out of memory');
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(QueueItemFailedError);
+    expect(failure).toMatchObject({ failedBackendItemIds: [2], failure: 'reported', message: 'CUDA out of memory' });
+  });
+
+  it('names every failed item of a run so all of them can be retried', async () => {
+    harness.api.enqueueGenerate.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 4,
+      itemIds: [1, 2, 3, 4],
+      requested: 4,
+    });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    for (const itemId of [1, 2, 3, 4]) {
+      harness.socket.fire(
+        'queue_item_status_changed',
+        createStatusEvent({ error_message: `failure ${itemId}`, item_id: itemId, status: 'failed' })
+      );
+    }
+
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toMatchObject({ failedBackendItemIds: [1, 2, 3, 4], failure: 'reported', message: 'failure 1' });
+  });
+
+  it('lets a completed sibling finish routing its results before a run fails', async () => {
+    const routing = deferred<void>();
+    harness.callbacks.onBackendItemComplete = vi.fn(() => routing.promise);
+    harness.api.enqueueGenerate.mockResolvedValue({ batchId: 'batch-1', enqueued: 2, itemIds: [1, 2], requested: 2 });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    let settled = false;
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z').finally(() => {
+      settled = true;
+    });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+    harness.socket.fire(
+      'queue_item_status_changed',
+      createStatusEvent({ error_message: 'CUDA out of memory', item_id: 2, status: 'failed' })
+    );
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    // The failed status would end routing; item 1's results must land first.
+    expect(settled).toBe(false);
+
+    routing.resolve();
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toMatchObject({ failedBackendItemIds: [2], failure: 'reported' });
   });
 
   it('rejects with QueueItemCancelledError when the backend cancels a run', async () => {
@@ -524,51 +587,6 @@ describe('queueCoordinator', () => {
     });
   });
 
-  it('coalesces gallery refreshes across a burst of completions', async () => {
-    vi.useFakeTimers();
-    harness = createHarness({ galleryRefreshCoalesceMs: 400 });
-    harness.api.enqueueGenerate.mockResolvedValue({
-      batchId: 'batch-1',
-      enqueued: 10,
-      itemIds: Array.from({ length: 10 }, (_, index) => index + 1),
-      requested: 10,
-    });
-    harness.coordinator.connect();
-    await harness.coordinator.submitGenerate('local-1', generateRequest);
-    await vi.advanceTimersByTimeAsync(500); // flush the on-connect refresh
-    harness.callbacks.onGalleryRefresh.mockClear();
-
-    for (let itemId = 1; itemId <= 10; itemId += 1) {
-      harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: itemId }));
-    }
-
-    await vi.advanceTimersByTimeAsync(500);
-
-    expect(harness.callbacks.onGalleryRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not refresh the gallery for failed or canceled items', async () => {
-    vi.useFakeTimers();
-    harness = createHarness({ galleryRefreshCoalesceMs: 400 });
-    harness.api.enqueueGenerate.mockResolvedValue({
-      batchId: 'batch-1',
-      enqueued: 2,
-      itemIds: [1, 2],
-      requested: 2,
-    });
-    harness.coordinator.connect();
-    await harness.coordinator.submitGenerate('local-1', generateRequest);
-    await vi.advanceTimersByTimeAsync(500); // flush the on-connect refresh
-    harness.callbacks.onGalleryRefresh.mockClear();
-
-    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1, status: 'failed' }));
-    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 2, status: 'canceled' }));
-
-    await vi.advanceTimersByTimeAsync(500);
-
-    expect(harness.callbacks.onGalleryRefresh).not.toHaveBeenCalled();
-  });
-
   it('routes progress events to the tracked item and clears them on completion', async () => {
     harness.coordinator.connect();
 
@@ -631,6 +649,74 @@ describe('queueCoordinator', () => {
 
     expect(harness.activeProgressTarget.set).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
     expect(harness.progressImage.set).not.toHaveBeenCalled();
+    expect(harness.activeProgressTarget.markFramed).not.toHaveBeenCalled();
+  });
+
+  it("signals each slot's first frame of its own once, after the frame is stored", async () => {
+    harness.callbacks.onFirstProgressFrame = vi.fn(() => {
+      // Live surfaces follow the slot from here; its frame must already be there to show.
+      expect(harness.progressImage.set).toHaveBeenCalled();
+    });
+    harness.coordinator.connect();
+    harness.api.enqueueGenerate.mockResolvedValueOnce({
+      batchId: 'batch-1',
+      enqueued: 2,
+      itemIds: [1, 2],
+      requested: 2,
+    });
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const frame = (itemId: number, revision: number) => ({
+      ...createStatusEvent({ item_id: itemId }),
+      image: { dataURL: `data:image/png;base64,${itemId}-${revision}`, height: 32, width: 64 },
+      message: 'Denoising',
+      percentage: 0.5,
+      revision,
+    });
+
+    // Model loading and text encoding report progress without a frame.
+    harness.socket.fire('invocation_progress', {
+      ...createStatusEvent({ item_id: 1 }),
+      message: 'Loading',
+      percentage: null,
+    });
+    expect(harness.callbacks.onFirstProgressFrame).not.toHaveBeenCalled();
+
+    harness.socket.fire('invocation_progress', frame(1, 1));
+    harness.socket.fire('invocation_progress', frame(1, 2));
+    harness.socket.fire('invocation_progress', frame(2, 1));
+
+    expect(harness.callbacks.onFirstProgressFrame).toHaveBeenCalledTimes(2);
+    expect(harness.callbacks.onFirstProgressFrame).toHaveBeenNthCalledWith(1, { itemIndex: 1, queueItemId: 'local-1' });
+    expect(harness.callbacks.onFirstProgressFrame).toHaveBeenNthCalledWith(2, { itemIndex: 2, queueItemId: 'local-1' });
+    expect(harness.activeProgressTarget.markFramed.mock.calls).toEqual([
+      [{ itemIndex: 1, queueItemId: 'local-1' }],
+      [{ itemIndex: 2, queueItemId: 'local-1' }],
+    ]);
+  });
+
+  it('signals a first frame again for a slot sent back to the queue, whose frames start a new leg', async () => {
+    harness.callbacks.onFirstProgressFrame = vi.fn();
+    harness.coordinator.connect();
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const frame = (session: string) => ({
+      ...createStatusEvent({ item_id: 1, session_id: session }),
+      image: { dataURL: `data:image/png;base64,${session}`, height: 32, width: 64 },
+      message: 'Denoising',
+      percentage: 0.5,
+      revision: 1,
+    });
+
+    harness.socket.fire('invocation_progress', frame('first-leg'));
+    // Requeued (a server restart puts it back): the slot is cleared and shows nothing of its own until its next frame.
+    harness.socket.fire(
+      'queue_item_status_changed',
+      createStatusEvent({ item_id: 1, status: 'pending', status_sequence: 2 })
+    );
+    expect(harness.activeProgressTarget.clear).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: 'local-1' });
+    harness.socket.fire('invocation_progress', frame('second-leg'));
+
+    expect(harness.callbacks.onFirstProgressFrame).toHaveBeenCalledTimes(2);
+    expect(harness.activeProgressTarget.markFramed).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the followed slot and its last frame across a connection drop', async () => {
@@ -2352,7 +2438,62 @@ describe('queueCoordinator', () => {
     harness.api.getItem.mockRejectedValue(new ApiError('not found', 404));
     harness.socket.fire('connect', undefined);
 
-    await expect(resultsPromise).rejects.toThrow('no longer on the backend queue');
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(QueueItemFailedError);
+    // Vanished, not failed: nothing is left to show or retry, and a clear this tab asked for explains it.
+    expect(failure).toMatchObject({
+      failedBackendItemIds: [],
+      failure: 'removed',
+      message: expect.stringContaining('no longer on the backend'),
+    });
+  });
+
+  it('reports the item that failed over one that vanished beside it', async () => {
+    harness.api.enqueueGenerate.mockResolvedValue({ batchId: 'batch-1', enqueued: 2, itemIds: [1, 2], requested: 2 });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.api.getItem.mockImplementation((itemId: number) =>
+      // Item 2 never answers the sweep; its own status event settles it.
+      itemId === 1 ? Promise.reject(new ApiError('not found', 404)) : new Promise<never>(() => {})
+    );
+    harness.socket.fire('connect', undefined);
+    harness.socket.fire(
+      'queue_item_status_changed',
+      createStatusEvent({ error_message: 'CUDA out of memory', item_id: 2, status: 'failed' })
+    );
+
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toMatchObject({ failedBackendItemIds: [2], failure: 'reported', message: 'CUDA out of memory' });
+  });
+
+  it('names only the items that failed when another item of the run vanished between them', async () => {
+    harness.api.enqueueGenerate.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 3,
+      itemIds: [1, 2, 3],
+      requested: 3,
+    });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.api.getItem.mockImplementation((itemId: number) =>
+      itemId === 2 ? Promise.reject(new ApiError('not found', 404)) : new Promise<never>(() => {})
+    );
+    harness.socket.fire('connect', undefined);
+    for (const itemId of [1, 3]) {
+      harness.socket.fire(
+        'queue_item_status_changed',
+        createStatusEvent({ error_message: 'CUDA out of memory', item_id: itemId, status: 'failed' })
+      );
+    }
+
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toMatchObject({ failedBackendItemIds: [1, 3], failure: 'reported' });
   });
 
   it('prefers one batch cancellation request, falling back to item ids', async () => {

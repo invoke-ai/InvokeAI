@@ -17,14 +17,15 @@ class MossImageLayoutPromptInvocation(BaseInvocation):
     """Places regions on a MOSS-Image prompt as a JSON layout, at generation time.
 
     The layout is built here rather than by the graph builder so the prompt that dynamic prompts and batching vary is
-    the one laid out. Without regions the prompt passes through unchanged; a prompt that already is a layout gets the
-    regions appended to its items.
+    the one laid out. A layout draft with absolute pixel boxes (what Expand Prompt's MOSS-Image Prompt Enhancer writes)
+    is compiled at this width and height, regions following its items. Otherwise, without regions the prompt passes
+    through unchanged, and a prompt that already is a compiled layout gets the regions appended to its items.
     """
 
     prompt: str = InputField(
         default="",
         description="The image prompt: plain text becomes the layout's summary caption, a compiled layout gets the "
-        "regions appended.",
+        "regions appended, and a layout draft with absolute pixel boxes is compiled at this width and height.",
         ui_component=UIComponent.Textarea,
     )
     regions: list[MossImageLayoutRegion] = InputField(

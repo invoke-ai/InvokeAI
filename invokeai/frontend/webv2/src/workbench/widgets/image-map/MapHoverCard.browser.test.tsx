@@ -1,7 +1,9 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import i18next from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ getImageLabels: vi.fn() }));
@@ -9,6 +11,13 @@ const mocks = vi.hoisted(() => ({ getImageLabels: vi.fn() }));
 vi.mock('@workbench/image-map/imageLabelCache', () => ({ getImageLabels: mocks.getImageLabels }));
 
 import { MapHoverCard } from './MapHoverCard';
+
+// The components read the global instance; give it the English catalog.
+await i18next.use(initReactI18next).init({
+  interpolation: { escapeValue: false },
+  lng: 'en',
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
+});
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

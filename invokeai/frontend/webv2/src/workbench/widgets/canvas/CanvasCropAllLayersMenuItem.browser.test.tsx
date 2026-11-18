@@ -46,7 +46,7 @@ afterEach(async () => {
 });
 
 /** Opens a menu holding only the item, over a project whose canvas holds `nodes`. */
-const renderItem = async (nodes: CanvasNodeContract[], interactionLocked: boolean) => {
+const renderItem = async (nodes: CanvasNodeContract[], documentEditingLocked: boolean) => {
   const base = createInitialWorkbenchState().projects[0]!;
   harness.project = {
     ...base,
@@ -64,7 +64,7 @@ const renderItem = async (nodes: CanvasNodeContract[], interactionLocked: boolea
             <Menu.Trigger>Canvas</Menu.Trigger>
             <Menu.Positioner>
               <Menu.Content>
-                <CanvasCropAllLayersMenuItem interactionLocked={interactionLocked} layers={layers} />
+                <CanvasCropAllLayersMenuItem documentEditingLocked={documentEditingLocked} layers={layers} />
               </Menu.Content>
             </Menu.Positioner>
           </Menu.Root>
@@ -94,13 +94,13 @@ describe('Crop all layers menu item', () => {
       'Every layer is locked. Unlock a layer to crop it.',
     ],
     [
-      'the canvas is busy',
+      'Filter or Select Object holds the document',
       [layerContract('free', 'raster')],
       true,
-      'Unavailable while the canvas is generating, has staged results, or is applying an edit.',
+      'Unavailable while Filter or Select Object is running on the canvas.',
     ],
-  ])('stays reachable and says why it cannot run when %s', async (_case, nodes, interactionLocked, reason) => {
-    const { item, layers } = await renderItem(nodes, interactionLocked);
+  ])('stays reachable and says why it cannot run when %s', async (_case, nodes, documentEditingLocked, reason) => {
+    const { item, layers } = await renderItem(nodes, documentEditingLocked);
 
     expect(item).toHaveAttribute('aria-disabled', 'true');
     expect(reasonOf(item)).toBe(reason);

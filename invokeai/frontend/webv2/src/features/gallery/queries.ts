@@ -1,12 +1,15 @@
 export {
   canonicalizeGalleryItemsFilter,
+  fetchGalleryImageMetadata,
   fetchGalleryItemsPage,
+  fetchGalleryVideoMetadata,
   fetchVerifiedGalleryItemPage,
   flattenGalleryItemsData,
   GALLERY_MAX_INFINITE_PAGES,
   GALLERY_MAX_ROWS,
   GALLERY_PAGE_SIZE,
   galleryBoardsOptions,
+  galleryImageMetadataOptions,
   galleryItemLocationOptions,
   galleryItemNamesOptions,
   galleryItemsPageOptions,
@@ -14,12 +17,18 @@ export {
   galleryItemsInfiniteOptions,
   galleryKeys,
   galleryStarredStripOptions,
+  galleryVideoMetadataOptions,
   isDateBoardId,
   getGalleryListingBoardsQuery,
   imageIndexAvailabilityOptions,
 } from './data/queries';
 export { abortGalleryLocatorRequests, createGalleryLocatorRequest } from './core/selection';
-export { canAddToCachedGalleryBoard, ensureGalleryBoardDestinations, getCachedGalleryBoard } from './data/queryCache';
+export {
+  canAddToCachedGalleryBoard,
+  ensureGalleryBoardDestinations,
+  getCachedGalleryBoard,
+  getGalleryBoardDestinationIds,
+} from './data/queryCache';
 export type {
   CanonicalGalleryItemsFilter,
   GalleryBoardsQuery,
@@ -45,4 +54,5 @@ export {
 } from './data/queryCache';
 export type { GalleryItemCachePatch } from './data/queryCache';
 export { createGalleryRealtimeRuntime } from './data/realtimeRuntime';
+export { resolveGalleryUploadBoardId } from './data/uploadDestination';
 export { galleryBoardExists } from './data/backend';

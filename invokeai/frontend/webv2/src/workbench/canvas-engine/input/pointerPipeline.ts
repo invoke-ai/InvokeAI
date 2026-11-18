@@ -60,6 +60,11 @@ export interface PointerPipelineDeps {
   maybeCommitModalSession?(): boolean;
   /** True while an undo/redo replays; primary presses start no gesture then (panning stays available). */
   isReplaying(): boolean;
+  /**
+   * A primary gesture began (before the tool sees its press) or ended (released, cancelled or reset). Middle-button
+   * pans are not gestures.
+   */
+  onGestureChange?(active: boolean): void;
 }
 
 /** The pipeline handle: DOM handlers plus lifecycle reset. */
@@ -282,6 +287,13 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     return owner !== null && (hovered || owner === 'surface') ? owner : null;
   };
 
+  const setGestureActive = (active: boolean): void => {
+    if (gestureActive !== active) {
+      gestureActive = active;
+      deps.onGestureChange?.(active);
+    }
+  };
+
   const releaseCapture = (pointerId: number): void => {
     deps.getInputElement()?.releasePointerCapture?.(pointerId);
   };
@@ -290,7 +302,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     if (!gestureActive) {
       return;
     }
-    gestureActive = false;
+    setGestureActive(false);
     if (activePointerId !== null) {
       releaseCapture(activePointerId);
       cancelledPointerId = activePointerId;
@@ -540,7 +552,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       markBboxHold();
       el?.setPointerCapture?.(event.pointerId);
       activePointerId = event.pointerId;
-      gestureActive = true;
+      setGestureActive(true);
       event.preventDefault();
       deps.getActiveTool()?.onPointerDown?.(deps.getToolContext(), buildPointerInput(event));
       deps.updateCursor();
@@ -606,7 +618,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       if (!gestureActive) {
         return;
       }
-      gestureActive = false;
+      setGestureActive(false);
       activePointerId = null;
       deps.getActiveTool()?.onPointerUp?.(deps.getToolContext(), buildPointerInput(event));
       deps.updateCursor();

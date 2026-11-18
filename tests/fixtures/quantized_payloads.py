@@ -29,6 +29,9 @@ FP8_E4M3_MAX = 448.0
 # unused, so a scale derived from 128 is off by one level on every weight.
 INT8_LEVELS = 127.0
 
+# int4 likewise: symmetric against 7, leaving -8 unused.
+INT4_LEVELS = 7
+
 # The two nvfp4 codes worth +1.0 and -1.0 in E2M1. Paired with a block scale and a global scale they
 # give a weight whose exact value is known without depending on the rest of the E2M1 table.
 NVFP4_CODE_PLUS_ONE = 2
@@ -81,6 +84,61 @@ def quantize_convrot(weight: torch.Tensor, *, group_size: int = CONVROT_GROUP_SI
     return Int8ConvrotPayload(codes, scale.to(torch.float32), restored.view(out_features, in_features))
 
 
+class Int4ConvrotPayload(NamedTuple):
+    """What a packed int4 + convrot layer stores -- ``convrot_w4a4``, ``int4_tensorwise`` and ComfyUI-GGUF's
+    ``Q4_CR`` all store the same bytes -- and the round trip it must come back as."""
+
+    packed: torch.Tensor
+    scale: torch.Tensor
+    dequantized: torch.Tensor
+
+
+def quantize_convrot_int4(weight: torch.Tensor, *, group_size: int = CONVROT_GROUP_SIZE) -> Int4ConvrotPayload:
+    """Mirror of comfy-kitchen's eager ``quantize_convrot_w4a4_weight``: the int8 recipe's rotation, then per-row
+    symmetric int4 against 7 levels, two codes per byte with element ``2j`` in the LOW nibble.
+
+    The packing is written out in unsigned arithmetic rather than shared with any decoder, so a decoder that reads
+    the nibbles in nvfp4's order -- high first -- disagrees with it instead of agreeing by construction.
+    """
+    out_features, in_features = weight.shape
+    hadamard = build_regular_hadamard(group_size, dtype=torch.float32)
+    grouped = weight.float().view(out_features, in_features // group_size, group_size)
+    rotated = (grouped @ hadamard.T).view(out_features, in_features)
+
+    scale = rotated.abs().amax(dim=1, keepdim=True).clamp(min=1e-10) / INT4_LEVELS
+    codes = torch.clamp(torch.round(rotated / scale), -INT4_LEVELS, INT4_LEVELS).to(torch.int8)
+    nibbles = codes.view(torch.uint8) & 0x0F
+    packed = (nibbles[:, 0::2] | (nibbles[:, 1::2] << 4)).view(torch.int8)
+
+    restored = (codes.float() * scale).view(out_features, in_features // group_size, group_size) @ hadamard
+    return Int4ConvrotPayload(packed, scale, restored.view(out_features, in_features))
+
+
+def convrot_w4a4_marker(*, group_size: int = CONVROT_GROUP_SIZE) -> dict[str, Any]:
+    """comfy-kitchen's released int4 layout as the Starnodes converter names it: always rotated, so no ``convrot``
+    flag, and the kernel's activation group size beside it."""
+    return {"format": "convrot_w4a4", "convrot_groupsize": group_size, "quant_group_size": 64}
+
+
+def int4_tensorwise_marker(*, group_size: int = CONVROT_GROUP_SIZE, convrot: bool = True) -> dict[str, Any]:
+    """The same bytes under comfy-kitchen's unreleased ``int4_tensorwise`` name (comfy-quants' int4 exporter)."""
+    return {"format": "int4_tensorwise", "convrot": convrot, "convrot_groupsize": group_size}
+
+
+def q4_cr_marker(rows: int, columns: int, *, group_size: int = CONVROT_GROUP_SIZE, **overrides: Any) -> dict[str, Any]:
+    """The JSON ComfyUI-GGUF's converter stores per ``Q4_CR`` weight (``Q4_CR_W4A4`` in its ``tools/convert.py``):
+    the packed codes are written as ``I8`` ``[rows, columns / 2]``, so the unpacked shape travels in the JSON."""
+    return {
+        "format": "int4_cr",
+        "backing": "w4a4",
+        "convrot_groupsize": group_size,
+        "quant_group_size": 64,
+        "sym": True,
+        "orig_shape": [rows, columns],
+        **overrides,
+    }
+
+
 class ScaledFp8Payload(NamedTuple):
     """What a per-tensor scaled-fp8 layer stores, and the weight it decodes back to.
 
@@ -103,6 +161,17 @@ def quantize_scaled_fp8(weight: torch.Tensor) -> ScaledFp8Payload:
     scale = (weight.abs().max() / FP8_E4M3_MAX).to(torch.float32)
     codes = (weight / scale).to(torch.float8_e4m3fn)
     return ScaledFp8Payload(codes, scale, codes.float() * scale)
+
+
+def quantize_per_row_fp8(weight: torch.Tensor) -> ScaledFp8Payload:
+    """Mirror of Black Forest Labs' ``fp8r`` export: e4m3 codes and one float32 scale per output row, ``[out]``.
+
+    The export's manifest states the convention, ``weight.float() * weight_scale[:, None]``. A 1-D scale broadcast
+    the default way scales the input columns instead, which a square layer does not reveal by its shape.
+    """
+    scale = (weight.abs().amax(dim=1) / FP8_E4M3_MAX).to(torch.float32)
+    codes = (weight / scale[:, None]).to(torch.float8_e4m3fn)
+    return ScaledFp8Payload(codes, scale, codes.float() * scale[:, None])
 
 
 def nvfp4_codes(positive: torch.Tensor) -> torch.Tensor:
@@ -147,6 +216,30 @@ def nvfp4_signed_tensors(path: str, positive: torch.Tensor) -> tuple[dict[str, t
     return tensors, torch.where(positive, 0.5, -0.5)
 
 
+def nvfp4_modelopt_tensors(
+    path: str, codes: torch.Tensor, *, grid: torch.Tensor, global_scale: float
+) -> dict[str, torch.Tensor]:
+    """One nvfp4 layer as NVIDIA ModelOpt writes it: Black Forest Labs' FLUX.3 ``variants/nvfp4`` file.
+
+    The tensors and names of :func:`nvfp4_tensors`, laid out the other way on both counts that matter: element ``2j``
+    is the *lower* nibble, and the block-scale grid is row-major, ``grid[m, k]`` scaling elements ``16k`` to
+    ``16k + 15`` of row ``m``. Both were read off BFL's file against Comfy-Org's repack of it. Since nothing here is
+    tiled, :func:`nvfp4_weight` states what such a layer means without restating any permutation.
+    """
+    return {
+        f"{path}.weight": (codes[:, 1::2] << 4) | codes[:, 0::2],
+        f"{path}.weight_scale": grid.to(torch.float8_e4m3fn),
+        f"{path}.weight_scale_2": torch.tensor(global_scale),
+    }
+
+
+def nvfp4_weight(positive: torch.Tensor, grid: torch.Tensor, global_scale: float) -> torch.Tensor:
+    """What a layer of :func:`nvfp4_codes` means under a row-major ``grid``: +-1 times its block's scale times the
+    global scale. Exact in float32 when the scales are powers of two. For ComfyUI's layout, store the grid as
+    ``stored_layout(grid)``."""
+    return torch.where(positive, 1.0, -1.0) * grid.repeat_interleave(16, dim=1) * global_scale
+
+
 def stored_layout(grid: torch.Tensor) -> torch.Tensor:
     """Lay a row-major grid out the way checkpoints store it.
 
@@ -156,10 +249,11 @@ def stored_layout(grid: torch.Tensor) -> torch.Tensor:
     """
     rows, blocks = grid.shape
     flat = torch.full((rows * blocks,), float("nan"), dtype=grid.dtype)
-    for m in range(rows):
-        for k in range(blocks):
-            position = ((((m // 128) * (blocks // 4) + k // 4) * 32 + m % 32) * 4 + (m % 128) // 32) * 4 + k % 4
-            flat[position] = grid[m, k]
+    # The formula over every (m, k) at once rather than in a Python loop, which a model-sized fixture would wait on.
+    m = torch.arange(rows).unsqueeze(1)
+    k = torch.arange(blocks).unsqueeze(0)
+    position = ((((m // 128) * (blocks // 4) + k // 4) * 32 + m % 32) * 4 + (m % 128) // 32) * 4 + k % 4
+    flat[position.flatten()] = grid.flatten()
     return flat.reshape(rows, blocks)
 
 

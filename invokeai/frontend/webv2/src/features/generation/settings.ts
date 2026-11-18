@@ -11,10 +11,12 @@ export {
   deriveAspectRatioId,
   GENERATE_UI_STATE_KEYS,
   getDefaultLoraWeight,
-  getModelDefaultVae,
-  hasModelDefaultVae,
+  getDynamicPromptsConfig,
+  getDynamicPromptsSettingsPatch,
+  getGenerateValuesRevertPatch,
   isAspectRatioLocked,
   isFluxDypePreset,
+  isIdeogram4SamplerPreset,
   isGenerateModelConfig,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
@@ -37,9 +39,11 @@ export {
   MIN_POSITIVE_PROMPT_HEIGHT_PX,
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  normalizeDynamicPromptsSettings,
   normalizeGenerateSettings,
   normalizeMossImageSkipLayers,
   normalizeGenerateWidgetValues,
+  normalizeReferenceImageName,
   normalizeReferenceImages,
   syncGenerateWidgetValuesWithModels,
 } from './core/settings';
@@ -53,21 +57,38 @@ export {
   isComponentCompatibleWithModel,
   getDimensionGrid,
   getGenerationDimensions,
+  getGenerateInvocationIssues,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
-  getGenerationValidationReasons,
   getMaxReferenceImages,
   getPromptHistoryRecallPatch,
+  getReferenceImageLimit,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
   isArchitectureDescribed,
   isGenerateModelSelectable,
   isKnownScheduler,
+  isLossyModelSwitch,
   isReferenceImageSupported,
   isSupportedGenerateModel,
+  takesReferenceImages,
+  NO_GENERATE_MODEL_ISSUE,
   SCHEDULER_OPTIONS,
   type GenerateModelSelectionResult,
+  type GenerateModelSwitchChange,
+  type GenerateModelSwitchChangeKind,
+  type GenerateModelSwitchSubject,
 } from './core/baseGenerationPolicies';
+export {
+  describeGenerationIssue,
+  describeGenerationIssueFix,
+  getGenerationIssueFixPatch,
+  type GenerateSectionId,
+  type GenerationIssue,
+  type GenerationIssueFix,
+} from './core/generationIssues';
 export { hasArchitectureCapabilities } from './core/architectureCapabilities';
 export {
   describeExternalCanvasRefusal,
@@ -91,21 +112,29 @@ export {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isDiffusersMainForBase,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
-  isKrea2Qwen3VlEncoder,
+  isMossImageQwen35Encoder,
+  isQwen3Vl4bEncoder,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
 } from './core/componentCompatibility';
+export {
+  getLockedAspectRatioSettings,
+  MAX_ASPECT_RATIO_PRESETS,
+  normalizeAspectRatioPresets,
+} from './core/aspectRatioPresets';
 export {
   isValidKrea2RebalanceWeights,
   normalizeRebalancePresets,
   type RebalancePreset,
 } from './core/conditioningRebalance';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
+export { clampPidSteps, isPidMode } from './core/pid';
 export {
   getActiveRefiner,
   isRefinerModel,
@@ -119,10 +148,12 @@ export {
 } from './core/sdxlRefiner';
 export {
   createDynamicPromptsSampleSeed,
+  DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
+  describeDynamicPromptsFailure,
   DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MIN_PROMPTS,
-  hasDynamicPromptSyntax,
+  expandsDynamicPrompts,
   isDynamicPromptsSeedBehaviour,
   planGenerateSubmission,
   sanitizeDynamicPromptsConfig,
@@ -130,13 +161,19 @@ export {
   sanitizeSampleSeed,
   type DynamicPromptsConfig,
   type DynamicPromptsSeedBehaviour,
+  type GenerateSubmissionSource,
 } from './core/dynamicPrompts';
-export { getEffectivePrompts } from './core/promptTemplates';
+export {
+  flattenPromptTemplateExpansion,
+  getEffectivePrompts,
+  type PromptTemplateSnapshot,
+} from './core/promptTemplates';
 export {
   addPromptHistoryItem,
   getPromptHistoryItemFromGenerateSettings,
   MAX_PROMPT_HISTORY,
   removePromptHistoryItem,
+  restorePromptHistoryItems,
 } from './core/promptHistory';
 export {
   applyProjectPromptDraft,

@@ -8,7 +8,7 @@ export const imageMapSettingsContribution: SettingsContribution = {
       id: 'showClusterLabels',
       kind: 'boolean',
       label: (t) => t('settingsDialog.fields.showClusterLabels'),
-      scope: 'instance',
+      scope: 'project',
       keywords: 'tags text display',
     },
     {
@@ -16,16 +16,18 @@ export const imageMapSettingsContribution: SettingsContribution = {
       kind: 'custom',
       label: (t) => t('settingsDialog.fields.clusterStrength'),
       description: (t) => t('settingsDialog.fields.clusterStrengthHint'),
-      scope: 'instance',
+      scope: 'project',
       keywords: 'dbscan eps clustering density granularity',
     },
     {
       id: 'clickSelectsCluster',
       kind: 'boolean',
       label: (t) => t('settingsDialog.fields.clickSelectsCluster'),
-      scope: 'instance',
+      scope: 'project',
       keywords: 'click gallery selection',
     },
   ],
+  // The vocabulary joins this section from the application contributions; it stays in the dialog.
+  quick: ['showClusterLabels', 'clusterEps', 'clickSelectsCluster'],
   load: () => import('./settingsBindings'),
 };

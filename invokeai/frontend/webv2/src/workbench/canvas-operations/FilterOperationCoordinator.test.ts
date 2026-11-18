@@ -18,12 +18,10 @@ const layer = {
 } as const;
 
 const createSession = (): FilterOperationSession => ({
-  blockCommit: vi.fn(),
   cancel: vi.fn(),
   commit: vi.fn(() => Promise.resolve('committed' as const)),
   dispose: vi.fn(),
   getSnapshot: vi.fn(() => ({ layerId: layer.id, status: 'ready' }) as never),
-  interruptProcessing: vi.fn(),
   process: vi.fn(() => Promise.resolve('published' as const)),
   reset: vi.fn(),
   setAutoProcess: vi.fn(),
@@ -49,7 +47,6 @@ const createHarness = () => {
     })),
     getInitialDraft: vi.fn(() => ({ settings: {}, type: 'canny' })),
     getSessionDeps: vi.fn(() => ({})),
-    isInteractionLocked: vi.fn(() => false),
     selectLayer: vi.fn(),
     setViewTool: vi.fn(),
     stores,
@@ -111,8 +108,6 @@ describe('FilterOperationCoordinator', () => {
       stacks: stacksFrom([{ ...layer, isLocked: true } as unknown as CanvasLayerContract]),
       selectedLayerId: null,
     });
-    expect(coordinator.start(layer.id)).toBe('locked');
-    deps.isInteractionLocked.mockReturnValueOnce(true);
     expect(coordinator.start(layer.id)).toBe('locked');
   });
 });

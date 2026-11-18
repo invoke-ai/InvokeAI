@@ -174,6 +174,11 @@ class ModelsList(BaseModel):
 class EmptyModelCacheResponse(BaseModel):
     models_cleared: int
     bytes_freed: int
+    vram_release_refused: bool = Field(
+        description="The device refused to return its cached memory to the driver after the models were dropped (for "
+        "example an earlier error left it in a bad state). The models were still dropped; the memory stays reserved "
+        "by this process."
+    )
 
 
 class CacheType(str, Enum):
@@ -238,7 +243,6 @@ example_model_config = {
     "variant": "normal",
     "prediction_type": "epsilon",
     "repo_variant": "fp16",
-    "upcast_attention": False,
 }
 
 example_model_input = {
@@ -635,7 +639,7 @@ def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfi
         },
         400: {"description": "Bad request"},
         404: {"description": "The model could not be found"},
-        409: {"description": "There is already a model corresponding to the new name"},
+        409: {"description": "The change cannot be applied to this model"},
     },
     status_code=200,
 )
@@ -1488,7 +1492,7 @@ def get_is_installed(
 
     for model in installed_models:
         # Check if source matches exactly
-        if model.source == starter_model.source:
+        if model.source == starter_model.source or model.source in starter_model.previous_sources:
             return True
         # Check if name (or previous names), base and type match
         if (
@@ -1611,11 +1615,15 @@ def empty_model_cache(current_admin: AdminUserOrDefault) -> EmptyModelCacheRespo
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
     models_cleared = 0
     bytes_freed = 0
+    vram_release_refused = False
     for cache in distinct_caches(ApiDependencies.invoker.services.model_manager.load.ram_caches.values()):
         result = cache.make_room(1000 * 2**30)
         models_cleared += result.models_cleared
         bytes_freed += result.bytes_freed
-    return EmptyModelCacheResponse(models_cleared=models_cleared, bytes_freed=bytes_freed)
+        vram_release_refused = vram_release_refused or result.vram_release_refused
+    return EmptyModelCacheResponse(
+        models_cleared=models_cleared, bytes_freed=bytes_freed, vram_release_refused=vram_release_refused
+    )
 
 
 class HFTokenStatus(str, Enum):

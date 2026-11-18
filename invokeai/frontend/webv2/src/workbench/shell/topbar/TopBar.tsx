@@ -1,5 +1,7 @@
 import { Grid, HStack } from '@chakra-ui/react';
+import { PaletteButton } from '@workbench/palette/PaletteButton';
 import { SettingsDialogHost } from '@workbench/settings/SettingsDialogHost';
+import { WidgetsDialog } from '@workbench/shell/WidgetsDialog';
 
 import { AppMenu } from './AppMenu';
 import { InvocationCluster } from './InvocationCluster';
@@ -36,6 +38,8 @@ export const TopBar = () => (
       <HStack gap="0.5" minW="0">
         <AppMenu />
         <ProjectSwitcher />
+        {/* The palette's own button, beside the project, so its shortcut is not the only way in. */}
+        <PaletteButton />
       </HStack>
 
       <LayoutPresetStrip />
@@ -50,5 +54,6 @@ export const TopBar = () => (
     <LayoutPresetManagerDialog />
     <LayoutPresetAdminDialogs />
     <SettingsDialogHost />
+    <WidgetsDialog />
   </>
 );

@@ -29,7 +29,7 @@ def test_resources_held_during_an_invocation_are_released_when_it_ends(
     session.indegree[invocation.id] = 0
 
     services = SimpleNamespace(
-        configuration=SimpleNamespace(node_cache_size=0),
+        configuration=SimpleNamespace(node_cache_size=0, multiuser=False),
         progress_previews=MemoryProgressPreviews(),
         events=Mock(),
         logger=Mock(),

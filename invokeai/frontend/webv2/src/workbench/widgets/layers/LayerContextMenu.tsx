@@ -39,10 +39,9 @@ import { getCanvasOperations } from '@workbench/canvas-operations/api';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
-import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
+import { useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
-import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
-import { reportTransformRefusal } from '@workbench/widgets/canvas/canvasToolCommands';
+import { reportTransformRefusal, showCanvasRefusalNotice } from '@workbench/widgets/canvas/canvasToolCommands';
 import {
   useCanvasDocumentEditingLocked,
   useCanvasEngineRead,
@@ -81,7 +80,16 @@ import type {
 import type { LayerMenuDialogKind, LayerMenuDialogState } from './layerMenuState';
 
 import {
+  deleteLayers,
+  duplicateLayers,
+  groupLayers,
+  ungroupLayers,
+  useLayerCommandAvailability,
+  useLayerCommandDeps,
+} from './layerCommands';
+import {
   actionTargets,
+  enabledToggleLabel,
   getLayerContextActions,
   type LayerConfigPatchKind,
   type LayerContextAction,
@@ -98,7 +106,6 @@ import {
   getLayerContextMenuRenderEntries,
 } from './layerContextMenuLayout';
 import { copyLayerToClipboard, saveLayerToBoard } from './layerExportActions';
-import { canGroupSelection, canRemoveFromGroup, groupLayers, removeFromGroup } from './layerGroupCommands';
 import { resolveMenuTargetForRender } from './layerMenuState';
 import {
   DEFAULT_INPAINT_MASK_FILL,
@@ -244,7 +251,6 @@ const LayerMenu = ({
   const base = useSelectedModelBase();
   const workflowAvailability = useLayerWorkflowAvailability();
   const canvas = useActiveProjectSelector((project) => project.canvas);
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const { document } = canvas;
   const { bbox } = document;
   const documentRect = useMemo(
@@ -253,7 +259,6 @@ const LayerMenu = ({
   );
   const documentEditingLocked = useCanvasDocumentEditingLocked(engine);
   const { selectedIds } = useLayerPanelState(projectId, document.selectedLayerId);
-  const interactionLocked = isCanvasInteractionLocked(canvas, queueItems) || documentEditingLocked;
   const hasLiveContent = useCanvasEngineRead(
     engine,
     () => engine?.exports.hasExportableLayerContent(layer.id) ?? false
@@ -293,7 +298,8 @@ const LayerMenu = ({
   );
 
   const targets = actionTargets({ layer, selectedIds });
-  const canGroup = useCanvasEngineRead(engine, () => canGroupSelection(engine?.document.model() ?? null, targets));
+  const commandDeps = useLayerCommandDeps(engine);
+  const available = useLayerCommandAvailability(engine, targets);
   const canMerge = useCanvasEngineRead(engine, () => {
     const model = engine?.document.model() ?? null;
     return (
@@ -313,22 +319,17 @@ const LayerMenu = ({
         )
       : 'ineligible';
   });
-  const canRemoveTargetsFromGroup = useCanvasEngineRead(engine, () =>
-    canRemoveFromGroup(engine?.document.model() ?? null, targets)
-  );
-  const canDeleteSelection = useCanvasEngineRead(
-    engine,
-    () => engine?.document.model()?.refusalFor({ ids: targets, type: 'remove' }) === null
-  );
   const hiddenByAncestor =
     (lookupDocumentNodeState(document, layer.id)?.documentHidden ?? false) && !isNodeHidden(layer);
   const isQuickSwitchBookmark = useLayerQuickSwitch(engine).bookmarkedLayerId === layer.id;
   const actionState = useMemo<LayerContextActionState>(
     () => ({
-      canDeleteSelection,
-      canGroupSelection: canGroup,
+      canDeleteSelection: available.delete,
+      canDuplicateSelection: available.duplicate,
+      canGroupSelection: available.group,
       canMergeSelection: canMerge,
-      canRemoveFromGroup: canRemoveTargetsFromGroup,
+      // The item shows only for leaves of one group, where ungroup is exactly that lift.
+      canRemoveFromGroup: available.ungroup,
       hiddenByAncestor,
       isQuickSwitchBookmark,
       canRunWorkflow: workflowAvailability.canRunWorkflow,
@@ -336,7 +337,8 @@ const LayerMenu = ({
       hasEngine: engine !== null,
       hasSupportedContent,
       hasWorkflowBindings: workflowAvailability.hasWorkflowBindings,
-      interactionLocked,
+      // Generation and staged results never lock layer actions; only an operation holding the document does.
+      operationLocked: documentEditingLocked,
       layer,
       mergeMasksEligibility,
       modelBase: base,
@@ -346,14 +348,12 @@ const LayerMenu = ({
       base,
       hiddenByAncestor,
       isQuickSwitchBookmark,
-      canDeleteSelection,
-      canGroup,
+      available,
       canMerge,
-      canRemoveTargetsFromGroup,
       document,
       engine,
       hasSupportedContent,
-      interactionLocked,
+      documentEditingLocked,
       layer,
       mergeMasksEligibility,
       selectedIds,
@@ -378,57 +378,10 @@ const LayerMenu = ({
     [t]
   );
 
-  const handleDuplicate = useCallback(async () => {
-    if (engine) {
-      const panelSelection = readLayerPanelState(projectId, document.selectedLayerId);
-      const sourceIds = panelSelection.selectedIds.includes(layer.id) ? panelSelection.selectedIds : [layer.id];
-      try {
-        const result = await engine.layers.duplicateLayers(sourceIds);
-        if (result.status === 'duplicated') {
-          publishLayerPanelSelection({
-            primaryId: result.selectedLayerId,
-            projectId,
-            selectedIds: result.duplicateIds,
-          });
-          return;
-        }
-        if (result.status === 'busy') {
-          return;
-        }
-        if (result.status !== 'nothing') {
-          reportLayerOperation(result.status === 'unreadable' ? result : result.status, notify.error, t);
-          return;
-        }
-      } catch {
-        // Report rejected transactions in the menu; the document remains unchanged.
-      }
-      notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.copyFailed'));
-      return;
-    }
-    commitPrepared(t('widgets.layers.actions.duplicate'), (model) =>
-      model.prepare({ createId: createLayerId, ids: [layer.id], type: 'duplicate' })
-    );
-  }, [commitPrepared, document.selectedLayerId, engine, layer.id, notify, projectId, t]);
-
-  const handleDelete = useCallback(() => {
-    const ids = actionTargets({ layer, selectedIds });
-    commitPrepared(getActionLabel('delete'), (model) => model.prepare({ ids, type: 'remove' }));
-  }, [commitPrepared, getActionLabel, layer, selectedIds]);
-
-  const handleGroup = useCallback(() => {
-    const ids = actionTargets({ layer, selectedIds });
-    const outcome = groupLayers(engine, projectId, ids, t('widgets.layers.actions.group'));
-    if (outcome.status === 'refused') {
-      throw makeStatusError(outcome.refusal.status === 'locked' ? 'locked' : 'unsupported');
-    }
-  }, [engine, layer, makeStatusError, projectId, selectedIds, t]);
-
-  const handleRemoveFromGroup = useCallback(() => {
-    const outcome = removeFromGroup(engine, actionTargets({ layer, selectedIds }), getActionLabel('remove-from-group'));
-    if (outcome.status === 'refused') {
-      throw makeStatusError(outcome.refusal.status === 'locked' ? 'locked' : 'unsupported');
-    }
-  }, [engine, getActionLabel, layer, makeStatusError, selectedIds]);
+  const handleDuplicate = useCallback(() => duplicateLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleDelete = useCallback(() => deleteLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleGroup = useCallback(() => groupLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleRemoveFromGroup = useCallback(() => ungroupLayers(commandDeps, targets), [commandDeps, targets]);
 
   const handleMergeMasks = useCallback(async () => {
     if (!engine) {
@@ -538,17 +491,12 @@ const LayerMenu = ({
 
   const handleToggleVisibility = useCallback(() => {
     const targets = actionTargets({ layer, selectedIds });
-    if (targets.length > 1) {
-      const index = getDocumentIndex(document);
-      const isEnabled = !targets.every((id) => index.byId.get(id)?.node.isEnabled ?? true);
-      commitPrepared(
-        t(isEnabled ? 'widgets.layers.actions.enableSelected' : 'widgets.layers.actions.disableSelected'),
-        (model) => model.prepare({ type: 'set-enabled', updates: targets.map((id) => ({ id, isEnabled })) })
-      );
-      return;
-    }
-    patchBase(t('widgets.layers.actions.toggleVisibility'), { isEnabled: !layer.isEnabled });
-  }, [commitPrepared, document, layer, patchBase, selectedIds, t]);
+    const index = getDocumentIndex(document);
+    const isEnabled = !targets.every((id) => index.byId.get(id)?.node.isEnabled ?? true);
+    commitPrepared(t(enabledToggleLabel(document, targets, !isEnabled).key), (model) =>
+      model.prepare({ type: 'set-enabled', updates: targets.map((id) => ({ id, isEnabled })) })
+    );
+  }, [commitPrepared, document, layer, selectedIds, t]);
 
   const handleToggleHidden = useCallback(() => {
     const targets = actionTargets({ layer, selectedIds });
@@ -566,13 +514,15 @@ const LayerMenu = ({
       });
       const isHidden = !nodes.every((node) => isNodeHidden(node));
       commitPrepared(
-        t(isHidden ? 'widgets.layers.actions.hideSelectedLayers' : 'widgets.layers.actions.showSelectedLayers'),
+        t(isHidden ? 'widgets.layers.actions.hideSelectedOnCanvas' : 'widgets.layers.actions.showSelectedOnCanvas'),
         (model) => model.prepare({ type: 'set-hidden', updates: nodes.map((node) => ({ id: node.id, isHidden })) })
       );
       return;
     }
-    commitPrepared(t('widgets.layers.actions.toggleHidden'), (model) =>
-      model.prepare({ type: 'set-hidden', updates: [{ id: layer.id, isHidden: !isNodeHidden(layer) }] })
+    const isHidden = !isNodeHidden(layer);
+    commitPrepared(
+      t(isHidden ? 'widgets.layers.actions.hideOnCanvas' : 'widgets.layers.actions.showOnCanvas'),
+      (model) => model.prepare({ type: 'set-hidden', updates: [{ id: layer.id, isHidden }] })
     );
   }, [commitPrepared, document, layer, selectedIds, t]);
 
@@ -649,9 +599,14 @@ const LayerMenu = ({
     }
     const result = engine.layers.beginTransform(layer.id);
     if (result !== 'started') {
-      reportTransformRefusal(result, notify.error, t);
+      reportTransformRefusal(
+        result,
+        { id: layer.id, name: layer.name },
+        { error: notify.error, notice: showCanvasRefusalNotice },
+        t
+      );
     }
-  }, [engine, layer.id, makeStatusError, notify, t]);
+  }, [engine, layer.id, layer.name, makeStatusError, notify, t]);
 
   const handleFitToBbox = useCallback(() => {
     const transform = fitLayerTransformToBbox(layer, bbox, documentRect);
@@ -1104,8 +1059,6 @@ const LayerMenu = ({
         onExitComplete={onDialogExitComplete}
         onSubmit={submitRename}
       />
-      {/* Mounted before it opens, like the rename dialog: a dialog that mounts open while the menu is closing is
-          dismissed as nested above the menu's departing layer. */}
       <RunLayerWorkflowDialog
         key={runWorkflowGeneration}
         availability={workflowAvailability}

@@ -3,7 +3,7 @@ import type { NodePackInfo } from '@features/nodes/core/catalog';
 import type { ListRowProps } from '@platform/ui/list/List';
 import type { ListContextMenuAnchor } from '@platform/ui/list/ListItem';
 
-import { Badge, Flex, Icon, Input, InputGroup, Stack } from '@chakra-ui/react';
+import { Badge, Flex, Icon, Stack } from '@chakra-ui/react';
 import { filterNodePacks, isProblemPack, type NodePackFilters } from '@features/nodes/core/library';
 import { refreshCustomNodePacks } from '@features/nodes/data/nodesStore';
 import { openNodesManagerTab } from '@features/nodes/ui/nodesUiStore';
@@ -12,6 +12,7 @@ import { EmptyState } from '@platform/ui/EmptyState';
 import { List } from '@platform/ui/list/List';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { listRowsFromItems } from '@platform/ui/list/listRows';
+import { ManagerSearchField } from '@platform/ui/ManagerLayout';
 import { ArrowRightIcon, BlocksIcon, PackageOpenIcon, SearchIcon, TriangleAlertIcon } from 'lucide-react';
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -86,14 +87,12 @@ export const NodePackList = ({
   return (
     <Stack flex="1" gap="2" minH="0" pt="3">
       <Flex gap="1.5" px="3">
-        <InputGroup startElement={<Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />}>
-          <Input
-            aria-label={t('nodes.searchPacks')}
-            placeholder={t('nodes.searchPacksPlaceholder')}
-            value={filters.searchTerm}
-            onChange={(event) => onFiltersChange({ ...filters, searchTerm: event.currentTarget.value })}
-          />
-        </InputGroup>
+        <ManagerSearchField
+          label={t('nodes.searchPacks')}
+          placeholder={t('nodes.searchPacksPlaceholder')}
+          value={filters.searchTerm}
+          onChange={(searchTerm) => onFiltersChange({ ...filters, searchTerm })}
+        />
         <NodePackFilterMenu filters={filters} onChange={onFiltersChange} />
       </Flex>
       <List

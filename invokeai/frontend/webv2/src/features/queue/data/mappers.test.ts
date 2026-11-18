@@ -34,6 +34,7 @@ describe('queue transport mappers', () => {
         user_display_name: 'Ada',
         user_email: 'ada@example.com',
         user_id: 'user-1',
+        workflow: { name: 'Portrait upscale', nodes: [] },
       })
     ).toEqual({
       batchId: 'batch-1',
@@ -59,6 +60,7 @@ describe('queue transport mappers', () => {
       userDisplayName: 'Ada',
       userEmail: 'ada@example.com',
       userId: 'user-1',
+      workflowName: 'Portrait upscale',
     });
   });
 

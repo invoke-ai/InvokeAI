@@ -1,7 +1,9 @@
+import i18next from 'i18next';
+
 /**
- * Compact "Edited 5 minutes ago" timestamps for the Home grid and the Open
- * Project dialog. Expects ISO timestamps (the project library normalizes the
- * backend's SQLite format at its boundary).
+ * Compact "Edited 5 minutes ago" timestamps for the Home grid, the Open Project dialog and the notification list, in
+ * the active language. Expects ISO timestamps (the project library normalizes the backend's SQLite format at its
+ * boundary).
  */
 
 const DIVISIONS: { amount: number; unit: Intl.RelativeTimeFormatUnit }[] = [
@@ -14,7 +16,18 @@ const DIVISIONS: { amount: number; unit: Intl.RelativeTimeFormatUnit }[] = [
   { amount: Number.POSITIVE_INFINITY, unit: 'year' },
 ];
 
-const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+const formatters = new Map<string, Intl.RelativeTimeFormat>();
+
+const getFormatter = (locale: string): Intl.RelativeTimeFormat => {
+  let formatter = formatters.get(locale);
+
+  if (!formatter) {
+    formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+    formatters.set(locale, formatter);
+  }
+
+  return formatter;
+};
 
 export const formatRelativeTime = (timestamp: string): string => {
   const date = new Date(timestamp);
@@ -23,6 +36,7 @@ export const formatRelativeTime = (timestamp: string): string => {
     return '';
   }
 
+  const formatter = getFormatter(i18next.resolvedLanguage ?? 'en');
   let duration = (date.getTime() - Date.now()) / 1000;
 
   for (const division of DIVISIONS) {

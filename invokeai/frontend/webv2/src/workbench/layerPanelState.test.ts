@@ -274,7 +274,7 @@ describe('focus and filter', () => {
     expect(reconcileLayerPanelState(readLayerPanelState('p1', 'a'), 'p1', index, 'a').focusId).toBe('b');
   });
 
-  it('carries the filter across primary changes and clears it on a project switch', () => {
+  it('carries the filter across primary changes and never into another project', () => {
     setLayerPanelFilter('p1', 'a', 'sky');
     expect(readLayerPanelState('p1', 'b')).toMatchObject({ filter: 'sky', primaryId: 'b' });
     const index = indexStacks(stacksFrom([layerContract('x')]));

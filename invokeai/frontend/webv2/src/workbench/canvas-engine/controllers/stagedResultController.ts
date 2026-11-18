@@ -33,6 +33,12 @@ export interface StagedResultControllerOptions {
   readonly createEventId: () => string;
   readonly getCanvasState: () => CanvasStateContractV3 | null;
   readonly now: () => string;
+  /**
+   * Lands a live floating selection and applies an open transform session, each as its own step, so neither is lost
+   * when the accept moves the selection; false when one is still open (its landing was refused), which makes the
+   * accept `busy`.
+   */
+  readonly settleEditSessions: () => boolean;
 }
 
 const createLayer = (
@@ -74,20 +80,30 @@ export class StagedResultController {
     if (this.disposed) {
       return { status: 'missing' };
     }
+    const candidateFingerprint = getCanvasStagingCandidateFingerprint(options.candidate);
+    const readCanvasWithCandidate = (): CanvasStateContractV3 | null => {
+      const state = o.getCanvasState();
+      return state?.stagingArea.pendingImages.some(
+        (pending) => getCanvasStagingCandidateFingerprint(pending) === candidateFingerprint
+      )
+        ? state
+        : null;
+    };
+    // A held document, a gesture or a candidate already gone refuses before anything lands, so a refused accept never
+    // ends a session.
     const permit = o.ctx.capturePermit(owner);
     if (!permit || o.ctx.isGestureActive()) {
       return { status: 'busy' };
     }
-    const canvas = o.getCanvasState();
-    if (!canvas) {
+    if (!readCanvasWithCandidate()) {
       return { status: 'missing' };
     }
-    const candidateFingerprint = getCanvasStagingCandidateFingerprint(options.candidate);
-    if (
-      !canvas.stagingArea.pendingImages.some(
-        (pending) => getCanvasStagingCandidateFingerprint(pending) === candidateFingerprint
-      )
-    ) {
+    if (!o.settleEditSessions()) {
+      return { status: 'busy' };
+    }
+    // Landing the sessions dispatched steps of their own, so the canvas is read again.
+    const canvas = readCanvasWithCandidate();
+    if (!canvas) {
       return { status: 'missing' };
     }
     if (!o.ctx.isPermitCurrent(permit) || o.ctx.isGestureActive()) {

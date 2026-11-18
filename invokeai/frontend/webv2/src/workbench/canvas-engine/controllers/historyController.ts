@@ -10,6 +10,8 @@ export const INACTIVE_HISTORY_BYTE_BUDGET = 64 * 1024 * 1024;
 export interface HistoryControllerOptions {
   readonly activeByteBudget?: number;
   readonly inactiveByteBudget?: number;
+  /** Steps the canvas's previous engine dropped; the history reports them until it is next cleared. */
+  readonly droppedSteps?: number;
   readonly canEdit?: () => boolean;
   readonly isGestureActive?: () => boolean;
   /** Puts back unrecorded live state (a floating selection, a structural preview) before a replay lands over it. */
@@ -33,7 +35,10 @@ export class HistoryController {
 
   constructor(private readonly options: HistoryControllerOptions = {}) {
     this.inactiveByteBudget = options.inactiveByteBudget ?? INACTIVE_HISTORY_BYTE_BUDGET;
-    this.history = createHistory({ byteBudget: options.activeByteBudget ?? HISTORY_BYTE_BUDGET });
+    this.history = createHistory({
+      byteBudget: options.activeByteBudget ?? HISTORY_BYTE_BUDGET,
+      dropped: options.droppedSteps ?? 0,
+    });
     this.canEdit = options.canEdit ?? (() => true);
     this.isGestureActive = options.isGestureActive ?? (() => false);
     const syncStores = (): void => {

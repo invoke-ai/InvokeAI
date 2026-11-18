@@ -345,7 +345,9 @@ class DiskVideoFileStorage(VideoFileStorageBase):
         if video_path.exists():
             try:
                 value = read_mp4_tags(video_path, keys=(key,)).get(key)
-            except OSError as e:
+            except FileNotFoundError as e:
+                # Deleted between exists() and open(). Other OSErrors (EIO, EACCES) are faults on a
+                # file that is there; reporting them as missing would let clients cache "no workflow".
                 raise VideoFileNotFoundException from e
             if value is not None:
                 return value

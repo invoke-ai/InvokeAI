@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   beginAuthTransition,
+  beginPasswordChange,
   captureAuthGeneration,
   createMediaAuthLock,
   markTokenRefreshAccepted,
@@ -9,26 +10,27 @@ import {
   shouldAcceptRefreshedToken,
   shouldEndSessionForUnauthorized,
   shouldThrottleRefreshedToken,
+  waitForPasswordChange,
 } from './authTokenRefresh';
 
 const tokenFor = (userId: string, nonce: number, epoch: number) =>
   `header.${btoa(JSON.stringify({ user_id: userId, nonce, token_epoch: epoch }))}.signature`;
 
-describe('refreshed token acceptance', () => {
-  beforeAll(() => {
-    const values = new Map<string, string>();
-    vi.stubGlobal('localStorage', {
-      clear: () => values.clear(),
-      getItem: (key: string) => values.get(key) ?? null,
-      key: (index: number) => [...values.keys()][index] ?? null,
-      get length() {
-        return values.size;
-      },
-      setItem: (key: string, value: string) => values.set(key, value),
-      removeItem: (key: string) => values.delete(key),
-    });
+beforeAll(() => {
+  const values = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    clear: () => values.clear(),
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
   });
+});
 
+describe('refreshed token acceptance', () => {
   beforeEach(() => {
     localStorage.clear();
   });
@@ -236,5 +238,199 @@ describe('ending a session over a 401', () => {
     expect(shouldEndSessionForUnauthorized(null)).toBe(false);
     localStorage.setItem('auth_token', '');
     expect(shouldEndSessionForUnauthorized('')).toBe(false);
+  });
+
+  it('waits for a password change published through shared storage, then rechecks the live token', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+    try {
+      const oldToken = tokenFor('user', 1, 0);
+      const replacement = tokenFor('user', 2, 1);
+      localStorage.setItem('auth_token', oldToken);
+      const finishInOtherTab = beginPasswordChange(oldToken);
+      const pending = waitForPasswordChange(oldToken, captureAuthGeneration());
+      let settled = false;
+      void pending.then(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+      expect(settled).toBe(false);
+      localStorage.setItem('auth_token', replacement);
+      finishInOtherTab();
+      await vi.advanceTimersByTimeAsync(100);
+
+      await pending;
+      expect(shouldEndSessionForUnauthorized(oldToken)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('announces a legacy password change using the default frontend rotation protocol', () => {
+    const finish = beginPasswordChange(tokenFor('user', 1, 0));
+    try {
+      const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index));
+      const key = keys.find((value) => value?.startsWith('auth_token_rotation:'));
+      expect(key).toBeDefined();
+      expect(JSON.parse(localStorage.getItem(key!)!)).toEqual({ at: expect.any(Number), userId: 'user' });
+    } finally {
+      finish();
+    }
+  });
+
+  it('waits for a default-frontend rotation without depending on the legacy auth generation', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+    try {
+      vi.setSystemTime(100_000);
+      const oldToken = tokenFor('user', 1, 0);
+      localStorage.setItem('auth_token', oldToken);
+      localStorage.setItem('auth_generation', '7');
+      localStorage.setItem('auth_token_rotation:webv2-tab', JSON.stringify({ at: 100_000, userId: 'user' }));
+      let settled = false;
+      const pending = waitForPasswordChange(oldToken, captureAuthGeneration()).then(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+      expect(settled).toBe(false);
+      localStorage.setItem('auth_token', tokenFor('user', 2, 1));
+      localStorage.removeItem('auth_token_rotation:webv2-tab');
+      await vi.advanceTimersByTimeAsync(100);
+      await pending;
+      expect(shouldEndSessionForUnauthorized(oldToken)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('withdraws only its own rotation when concurrent tabs are changing the same password', () => {
+    const otherKey = 'auth_token_rotation:webv2-tab';
+    const otherMarker = JSON.stringify({ at: Date.now(), userId: 'user' });
+    localStorage.setItem(otherKey, otherMarker);
+    const finish = beginPasswordChange(tokenFor('user', 1, 0));
+    expect(localStorage.length).toBe(2);
+    finish();
+    expect(localStorage.length).toBe(1);
+    expect(localStorage.getItem(otherKey)).toBe(otherMarker);
+  });
+
+  it.each([100_000, 1_000_000])(
+    'bounds a default-frontend rotation with timestamp %s to thirty seconds',
+    async (at) => {
+      vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+      try {
+        vi.setSystemTime(100_000);
+        const oldToken = tokenFor('user', 1, 0);
+        localStorage.setItem('auth_token', oldToken);
+        localStorage.setItem('auth_token_rotation:abandoned', JSON.stringify({ at, userId: 'user' }));
+        let settled = false;
+        const pending = waitForPasswordChange(oldToken, captureAuthGeneration()).then(() => {
+          settled = true;
+        });
+        await vi.advanceTimersByTimeAsync(29_900);
+        expect(settled).toBe(false);
+        await vi.advanceTimersByTimeAsync(100);
+        await pending;
+        expect(shouldEndSessionForUnauthorized(oldToken)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it('keeps the rotation wait bounded when the system clock moves backwards', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+    try {
+      vi.setSystemTime(100_000);
+      const oldToken = tokenFor('user', 1, 0);
+      localStorage.setItem('auth_token', oldToken);
+      localStorage.setItem('auth_token_rotation:abandoned', JSON.stringify({ at: Date.now(), userId: 'user' }));
+      let settled = false;
+      const pending = waitForPasswordChange(oldToken, captureAuthGeneration()).then(() => {
+        settled = true;
+      });
+      await vi.advanceTimersByTimeAsync(15_000);
+      vi.setSystemTime(55_000);
+      await vi.advanceTimersByTimeAsync(14_900);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(settled).toBe(true);
+      await pending;
+      expect(shouldEndSessionForUnauthorized(oldToken)).toBe(true);
+    } finally {
+      localStorage.clear();
+      await vi.advanceTimersByTimeAsync(100);
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    JSON.stringify({ at: 69_999, userId: 'user' }),
+    JSON.stringify({ at: 100_000, userId: 'someone-else' }),
+    JSON.stringify({ at: '100000', userId: 'user' }),
+    'null',
+    'broken',
+  ])('does not defer session expiry for an unrelated, stale or malformed rotation: %s', async (marker) => {
+    vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+    try {
+      vi.setSystemTime(100_000);
+      const token = tokenFor('user', 1, 0);
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('auth_token_rotation:ignored', marker);
+      await waitForPasswordChange(token, captureAuthGeneration());
+      expect(shouldEndSessionForUnauthorized(token)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops waiting for an abandoned transition when its marker expires', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+    try {
+      vi.setSystemTime(100_000);
+      const oldToken = tokenFor('user', 1, 0);
+      localStorage.setItem('auth_token', oldToken);
+      const finish = beginPasswordChange(oldToken);
+      const pending = waitForPasswordChange(oldToken, captureAuthGeneration());
+
+      vi.setSystemTime(130_001);
+      await vi.advanceTimersByTimeAsync(100);
+      await pending;
+      expect(shouldEndSessionForUnauthorized(oldToken)).toBe(true);
+      finish();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not wait for a transition belonging to a different login', async () => {
+    const otherToken = tokenFor('other-user', 1, 0);
+    const currentToken = tokenFor('user', 1, 0);
+    const finishOther = beginPasswordChange(otherToken);
+    localStorage.setItem('auth_token', currentToken);
+
+    await waitForPasswordChange(currentToken, captureAuthGeneration());
+    expect(shouldEndSessionForUnauthorized(currentToken)).toBe(true);
+    finishOther();
+  });
+
+  it('stops waiting on explicit logout and rejects a late password-change token', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'performance', 'setTimeout', 'clearTimeout'] });
+    try {
+      const oldToken = tokenFor('user', 1, 0);
+      localStorage.setItem('auth_token', oldToken);
+      const generation = captureAuthGeneration();
+      const finish = beginPasswordChange(oldToken);
+      const pending = waitForPasswordChange(oldToken, generation);
+
+      beginAuthTransition();
+      localStorage.removeItem('auth_token');
+      await vi.advanceTimersByTimeAsync(100);
+      await pending;
+      expect(shouldAcceptRefreshedToken(oldToken, generation, tokenFor('user', 2, 1))).toBe(false);
+      finish();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

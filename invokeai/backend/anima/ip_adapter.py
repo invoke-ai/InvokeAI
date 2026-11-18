@@ -16,7 +16,7 @@ per adapter; with one image this is exactly its computation.
 
 import re
 from functools import partial
-from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, Optional, Sequence
 
 import accelerate
 import torch
@@ -91,13 +91,13 @@ def encode_image_tokens(encoder: "SiglipVisionModel", pixel_values: torch.Tensor
     return outputs.last_hidden_state
 
 
-def validate_anima_ip_adapter(keys: Iterable[str], metadata: Optional[Mapping[str, str]]) -> None:
+def validate_anima_ip_adapter(keys: Iterable[str], metadata: Optional[Mapping[str, Any]]) -> None:
     """Raise `ValueError` for a checkpoint of a reference variant `AnimaIPAdapter` does not compute.
 
     Shared by model identification and the loader, so such a file is refused at install rather than at generation.
     """
     for flag in _UNSUPPORTED_METADATA_FLAGS:
-        if (metadata or {}).get(flag, "False").lower() == "true":
+        if str((metadata or {}).get(flag, "False")).lower() == "true":
             raise ValueError(f"Unsupported Anima IP-Adapter: it was trained with `{flag}`, which is not supported.")
     unsupported = [key for key in keys if not _IP_KEY_RE.match(key) and not key.startswith(_LORA_KEY_PREFIX)]
     if unsupported:

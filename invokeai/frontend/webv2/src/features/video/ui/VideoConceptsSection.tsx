@@ -19,6 +19,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { areVideoLorasEquivalent, areVideoModelsEquivalent } from './videoComparators';
+import { VIDEO_SECTION_IDS } from './VideoUiContext';
 
 /** Graph compilation routes LoRAs to experts from their probed tags; the UI supplies no target override. */
 
@@ -71,14 +72,15 @@ export const VideoConceptsSection = memo(
     );
 
     return (
-      <GenerationSettingsSection label={t('widgets.video.concepts')} sectionId="video-concepts" defaultOpen>
-        <Stack gap="2" p="2">
+      <GenerationSettingsSection label={t('widgets.video.concepts')} sectionId={VIDEO_SECTION_IDS.concepts} defaultOpen>
+        <Stack gap="2.5">
           <ModelSelect
             disabled={!model}
             excludeKeys={selectedLoraKeys}
             filter={loraFilter}
             modelTypes={LORA_MODEL_TYPES}
             placeholder={t('widgets.video.addLora')}
+            relatedTo={model?.key ?? null}
             scopeLabel={t('models.scopeConcepts')}
             value={null}
             onChange={addLora}
@@ -92,6 +94,8 @@ export const VideoConceptsSection = memo(
               {loras.map((lora) => (
                 <ConceptRow
                   key={lora.model.key}
+                  // As in Generate: a concept the model cannot load stays listed, badged and off, for the next model.
+                  isCompatible={Boolean(model && isLoraCompatibleWithModel(lora.model, model))}
                   models={conceptModels}
                   lora={lora}
                   onRemove={removeLora}

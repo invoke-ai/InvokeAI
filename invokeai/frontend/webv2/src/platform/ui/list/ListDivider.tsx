@@ -1,6 +1,6 @@
 import { chakra } from '@chakra-ui/react';
 
-import { LIST_DIVIDER_INSET, LIST_ROW_GAP_PX, LIST_ROW_INSET } from './listLayout';
+import { LIST_DIVIDER_INSET, LIST_ROW_GAP_PX } from './listLayout';
 
 const HAIRLINE_PX = 1;
 /** Softer than a section border: it separates rows, it does not frame them. */
@@ -24,11 +24,11 @@ const IN_FLOW_CSS = {
   my: HALF_GAP,
 } as const;
 
-/** For virtualized rows: drawn inside the row slot's bottom gap, clear of the row's own inset. */
+/** For virtualized rows: drawn inside the row slot's bottom gap, clear of the row inset the owning List sets. */
 const IN_SLOT_CSS = {
   ...HAIRLINE,
   bottom: HALF_GAP,
-  insetInline: `calc(${LIST_ROW_INSET} + ${LIST_DIVIDER_INSET})`,
+  insetInline: `calc(var(--list-row-inset) + ${LIST_DIVIDER_INSET})`,
   pointerEvents: 'none',
   position: 'absolute',
 } as const;
@@ -36,7 +36,7 @@ const IN_SLOT_CSS = {
 // A row shows its pointed fill while hovered or while its context menu is open; the hairlines either side of it hide
 // so that fill reads as one surface rather than a band between lines. `:has()` cannot nest, so a row wrapped by its
 // caller (menu state on a descendant) is matched as "a sibling containing it" instead.
-const POINTED = '[data-list-surface]:not([data-static]):is(:hover, [data-menu-open])';
+const POINTED = '[data-list-surface]:not([data-static], [data-disabled]):is(:hover, [data-menu-open])';
 const HIDDEN = { opacity: 0 } as const;
 
 /** For a container of in-flow rows and dividers (`ListStack`); rows may be wrapped by their caller. */

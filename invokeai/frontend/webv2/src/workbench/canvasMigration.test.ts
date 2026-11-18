@@ -570,6 +570,36 @@ describe('loadCanvasState', () => {
     }
   });
 
+  it('keeps a restore point’s kind and staged results, and reads an unknown kind as a plain restore point', () => {
+    const state = createEmptyCanvasState();
+    const staged = {
+      height: 8,
+      imageName: 'staged.png',
+      imageUrl: '',
+      placement: { height: 8, opacity: 1, width: 8, x: 0, y: 0 },
+      queuedAt: 'now',
+      sourceQueueItemId: 'queue-1',
+      thumbnailUrl: '',
+      width: 8,
+    };
+    const point = { createdAt: 'now', document: state.document, id: 'p', name: 'Point' };
+    const base = withNodes([createEmptyPaintLayer('Live', 'live')]);
+    const loaded = load({
+      ...base,
+      snapshots: [
+        { ...point, kind: 'discard-results', stagedImages: [staged] },
+        { ...point, id: 'q', kind: 'archived', stagedImages: 'none', stray: true },
+        // Entries that could never be staged again (no image name, size or source batch) are dropped.
+        { ...point, id: 'r', stagedImages: [staged, { imageName: '' }, { ...staged, width: 'wide' }, null] },
+      ],
+    });
+    expect(loaded.snapshots).toEqual([
+      { ...point, kind: 'discard-results', stagedImages: [staged] },
+      { ...point, id: 'q' },
+      { ...point, id: 'r', stagedImages: [staged] },
+    ]);
+  });
+
   it.each([
     ['missing discriminant and base fields', { id: 'broken' }],
     ['unknown layer type', { ...createEmptyPaintLayer('Mystery', 'mystery'), type: 'mystery' }],
@@ -1194,14 +1224,14 @@ describe('createEmptyCanvasState', () => {
 });
 
 describe('createNewCanvasState', () => {
-  it('seeds exactly one empty inpaint mask, selected, matching the layers-panel factory', () => {
+  it('seeds exactly one empty inpaint mask, left unselected so a first stroke paints a new layer', () => {
     const state = createNewCanvasState();
     const mask = state.document.stacks.inpaint_mask[0];
 
     expect(state.document.stacks.inpaint_mask).toHaveLength(1);
     expect(state.document.stacks.raster).toEqual([]);
     expect(mask).toEqual(createInpaintMaskLayer(nextInpaintMaskName([]), mask?.id ?? ''));
-    expect(state.document.selectedLayerId).toBe(mask?.id);
+    expect(state.document.selectedLayerId).toBeNull();
   });
 
   it('honors a custom document size while staying otherwise identical to an empty canvas', () => {

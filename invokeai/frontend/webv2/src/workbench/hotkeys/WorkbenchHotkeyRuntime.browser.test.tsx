@@ -37,6 +37,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useOptionalWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchInternalStore: () => runtimeMocks.store,
+  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
+  useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => runtimeMocks.store.queries,
   useWorkbenchSubscription: () => runtimeMocks.store.subscribe,
 }));
@@ -302,6 +304,50 @@ describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
     await pressKey('s', host!.querySelector('[data-testid="window"]')!);
 
     expect(ran).toEqual(['gallery.remix', 'viewer.remix']);
+  });
+});
+
+describe('WorkbenchHotkeyRuntime and catalog rows a widget also contributes', () => {
+  // The catalog lists Canvas's keys for settings; the mounted Canvas registers the same ids. Its own registration
+  // decides how the key behaves, so a widget flag the catalog row lacks is not overridden by the row.
+  it('lets the widget registration of a catalog id answer, with its own flags', async () => {
+    const canvas = document.createElement('div');
+    canvas.dataset.hotkeyWidgetInstanceId = 'canvas';
+    canvas.dataset.hotkeyWidgetRegion = 'center';
+    canvas.dataset.hotkeyWidgetTypeId = 'canvas';
+    host!.append(canvas);
+    const source: WidgetContributionSource = {
+      instanceId: 'canvas',
+      projectId: projectId(),
+      region: 'center',
+      typeId: 'canvas',
+    };
+
+    await act(() => {
+      runtimeMocks.extensions.commands.register({
+        handler: () => ran.push('canvas.tool.brush'),
+        id: 'canvas.tool.brush',
+        source,
+        title: 'Brush',
+      });
+      runtimeMocks.extensions.hotkeys.register({
+        commandId: 'canvas.tool.brush',
+        defaultKeys: ['b'],
+        id: 'canvas.tool.brush',
+        preventDefault: false,
+        source,
+        title: 'Brush',
+      });
+    });
+    const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'KeyB', key: 'b' });
+
+    await act(async () => {
+      canvas.dispatchEvent(event);
+      await Promise.resolve();
+    });
+
+    expect(ran).toEqual(['canvas.tool.brush']);
+    expect(event.defaultPrevented).toBe(false);
   });
 });
 
@@ -579,5 +625,41 @@ describe('WorkbenchHotkeyRuntime and a focused segmented control', () => {
     // Outside the radio group the same press is Gallery's.
     await pressKey('ArrowRight', host!.querySelector('[data-testid="right"]')!);
     expect(ran).toEqual(['gallery.galleryNavRight']);
+  });
+});
+
+describe('WorkbenchHotkeyRuntime and a held key', () => {
+  const pressCancel = (repeat: boolean) =>
+    act(async () => {
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          code: 'KeyX',
+          key: 'X',
+          repeat,
+          shiftKey: true,
+        })
+      );
+      await Promise.resolve();
+    });
+
+  it('runs a once-per-press command once while its key is held, and again on the next press', async () => {
+    await act(() => {
+      runtimeMocks.extensions.commands.register({
+        handler: () => ran.push('app.cancelQueueItem'),
+        id: 'app.cancelQueueItem',
+        title: 'Cancel current or next queue item',
+      });
+    });
+
+    await pressCancel(false);
+    // The browser's auto-repeat while Shift+X stays down.
+    await pressCancel(true);
+    await pressCancel(true);
+    expect(ran).toEqual(['app.cancelQueueItem']);
+
+    await pressCancel(false);
+    expect(ran).toEqual(['app.cancelQueueItem', 'app.cancelQueueItem']);
   });
 });

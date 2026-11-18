@@ -32,7 +32,6 @@ import { runLayerFilter } from './layerFilterRunner';
 export interface FilterOperationCoordinatorDeps {
   readonly stores: CanvasApplicationOperationStores;
   readonly controller: CanvasOperationController;
-  isInteractionLocked(): boolean;
   getDocument(): CanvasDocumentContractV3 | null;
   captureGuard(layerId: string): LayerExportGuard | null;
   selectLayer(layerId: string): void;
@@ -51,7 +50,7 @@ export interface FilterOperationCoordinatorDeps {
     layerId: string
   ): Omit<
     CreateFilterSessionOptions['deps'],
-    'canCommit' | 'clearPreview' | 'controller' | 'isDraftValid' | 'makeDurable' | 'runFilter'
+    'clearPreview' | 'controller' | 'isDraftValid' | 'makeDurable' | 'runFilter'
   >;
 }
 
@@ -66,7 +65,6 @@ export interface FilterOperationCoordinator {
     makeImageDurable: (imageName: string) => Promise<void>
   ): Promise<FilterCommitOperationResult>;
   cancel(): void;
-  interruptAndBlock(): void;
   isActive(): boolean;
   dispose(): void;
 }
@@ -91,9 +89,6 @@ export const createFilterOperationCoordinator = (deps: FilterOperationCoordinato
   };
 
   const start = (layerId: string): StartFilterOperationResult => {
-    if (deps.isInteractionLocked()) {
-      return 'locked';
-    }
     const document = deps.getDocument();
     const leaf = lookupDocumentLeaf(document, layerId);
     const layer = leaf?.layer;
@@ -131,7 +126,6 @@ export const createFilterOperationCoordinator = (deps: FilterOperationCoordinato
     session = createSession({
       deps: {
         ...deps.getSessionDeps(layer.id),
-        canCommit: () => !deps.isInteractionLocked(),
         clearPreview: () => deps.clearPreview(layer.id),
         controller: deps.controller,
         isDraftValid: (next) => isFilterConfigValid(next.type, next.settings),
@@ -170,9 +164,6 @@ export const createFilterOperationCoordinator = (deps: FilterOperationCoordinato
   return {
     cancel: clear,
     commit: async (target, makeImageDurable) => {
-      if (deps.isInteractionLocked()) {
-        return 'blocked';
-      }
       const owned = session;
       if (!owned) {
         return 'stale';
@@ -185,15 +176,8 @@ export const createFilterOperationCoordinator = (deps: FilterOperationCoordinato
       return result;
     },
     dispose: clear,
-    interruptAndBlock: () => {
-      session?.interruptProcessing();
-      session?.blockCommit();
-    },
     isActive: () => session !== null,
     process: async () => {
-      if (deps.isInteractionLocked()) {
-        return 'blocked';
-      }
       if (!session) {
         return 'stale';
       }
@@ -201,9 +185,6 @@ export const createFilterOperationCoordinator = (deps: FilterOperationCoordinato
       return result === 'published' ? 'completed' : 'stale';
     },
     reset: (settings) => {
-      if (deps.isInteractionLocked()) {
-        return 'blocked';
-      }
       if (!session) {
         return 'stale';
       }
@@ -211,9 +192,6 @@ export const createFilterOperationCoordinator = (deps: FilterOperationCoordinato
       return 'updated';
     },
     setAutoProcess: (value) => {
-      if (deps.isInteractionLocked()) {
-        return 'blocked';
-      }
       if (!session) {
         return 'stale';
       }
@@ -222,9 +200,6 @@ export const createFilterOperationCoordinator = (deps: FilterOperationCoordinato
     },
     start,
     updateDraft: (draft) => {
-      if (deps.isInteractionLocked()) {
-        return 'blocked';
-      }
       if (!session) {
         return 'stale';
       }

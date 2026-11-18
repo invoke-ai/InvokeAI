@@ -17,13 +17,11 @@ Key differences from Z-Image denoise:
 """
 
 import math
-import sys
 from contextlib import ExitStack
 from typing import Callable, Iterator, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
-from torch.nn.attention import SDPBackend
 from torchvision.transforms.functional import resize as tv_resize
 from torchvision.transforms.functional import to_tensor
 from tqdm import tqdm
@@ -44,7 +42,10 @@ from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.anima.anima_transformer import IPAdapterBlockFn
-from invokeai.backend.anima.anima_transformer_patch import patch_anima_for_regional_prompting
+from invokeai.backend.anima.anima_transformer_patch import (
+    AnimaRegionalPromptingState,
+    patch_anima_for_regional_prompting,
+)
 from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
 from invokeai.backend.anima.control_net_lllite import (
     AnimaControlNetLLLite,
@@ -74,7 +75,6 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, Range
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.sdpa_scope import sdpa_policy
 
 # Anima uses 8x spatial compression (VAE downsamples by 2^3)
 ANIMA_LATENT_SCALE_FACTOR = 8
@@ -611,7 +611,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
             image_masks.append(tc.mask)
             cur_len += context_2d.shape[0]
 
-        concatenated_context = torch.cat(context_embeds_list, dim=0)
+        concatenated_context = (
+            context_embeds_list[0] if len(context_embeds_list) == 1 else torch.cat(context_embeds_list, dim=0)
+        )
 
         return AnimaRegionalTextConditioning(
             context_embeds=concatenated_context,
@@ -666,7 +668,6 @@ class AnimaDenoiseInvocation(BaseInvocation):
             dtype=inference_dtype,
             device=device,
         )
-        has_regional = len(pos_text_conditionings) > 1 or any(tc.mask is not None for tc in pos_text_conditionings)
 
         # Load negative conditioning if CFG is enabled
         do_cfg = not math.isclose(self.guidance_scale, 1.0) and self.negative_conditioning is not None
@@ -767,29 +768,6 @@ class AnimaDenoiseInvocation(BaseInvocation):
             )
 
         with ExitStack() as exit_stack:
-            # On Windows + CUDA, opt into cuDNN's flash-attention kernel. torch on
-            # Windows does not ship the native flash-attention backend, so SDPA falls
-            # back to the slower memory-efficient kernel; cuDNN's kernel is ~1.7x faster
-            # for Anima's attention shapes (~6% per denoising step at 1024x1024). The
-            # cuDNN SDP backend sits low in torch's default priority and is never
-            # selected, so we opt in explicitly.
-            #
-            # This is a priority *list*, not a forced kernel: torch picks the first
-            # eligible backend per call, and MATH is always eligible, so it degrades
-            # safely on any GPU/dtype where cuDNN is unavailable. Scoped to Windows +
-            # CUDA — elsewhere torch's default backend is already fast.
-            if device.type == "cuda" and sys.platform == "win32":
-                exit_stack.enter_context(
-                    sdpa_policy(
-                        [
-                            SDPBackend.CUDNN_ATTENTION,
-                            SDPBackend.FLASH_ATTENTION,
-                            SDPBackend.EFFICIENT_ATTENTION,
-                            SDPBackend.MATH,
-                        ],
-                        set_priority=True,
-                    )
-                )
             # A GGUF or int8_tensorwise build dequantizes each quantized Linear per forward, a transient its
             # resident size does not cover. Passed alone because this node has no activation estimate, so the
             # cache floors it at `device_working_mem_gb`; zero for other builds. Read from the unlocked model.
@@ -865,7 +843,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
             def build_contexts(
                 sigma: float | None,
-            ) -> tuple[torch.Tensor, torch.Tensor | None, AnimaRegionalTextConditioning | None]:
+            ) -> tuple[AnimaRegionalTextConditioning, AnimaRegionalTextConditioning | None]:
                 # float32, as the reference passes it: the connector's timestep embedding scales sigma by
                 # 1000, where bf16's rounding of sigma would move its high frequencies by radians.
                 timesteps = (
@@ -873,47 +851,44 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     if sigma is not None
                     else None
                 )
-                # Must run with the transformer on device since it uses the adapter weights.
-                if has_regional:
-                    pos_regional = self._run_llm_adapter_for_regions(
-                        transformer, pos_text_conditionings, inference_dtype, timesteps
-                    )
-                    pos = pos_regional.context_embeds.unsqueeze(0)  # (1, total_ctx_len, 1024)
-                    # For negative, concatenate all regions without masking (matches Z-Image behavior)
-                    neg = None
-                    if do_cfg and neg_text_conditionings is not None:
-                        neg_regional = self._run_llm_adapter_for_regions(
-                            transformer, neg_text_conditionings, inference_dtype, timesteps
-                        )
-                        neg = neg_regional.context_embeds.unsqueeze(0)
-                    return pos, neg, pos_regional
-                pos = self._run_llm_adapter(transformer, pos_text_conditionings[0], inference_dtype, timesteps)
-                neg = None
-                if do_cfg and neg_text_conditionings is not None:
-                    neg = self._run_llm_adapter(transformer, neg_text_conditionings[0], inference_dtype, timesteps)
-                return pos, neg, None
+                # Both polarities may have regions, independently of the other pass's masks and token count.
+                pos = self._run_llm_adapter_for_regions(transformer, pos_text_conditionings, inference_dtype, timesteps)
+                neg = (
+                    self._run_llm_adapter_for_regions(transformer, neg_text_conditionings, inference_dtype, timesteps)
+                    if neg_text_conditionings is not None
+                    else None
+                )
+                return pos, neg
 
             first_sigma = sigmas[0] if uses_connector else None
-            pos_context, neg_context, pos_regional = build_contexts(first_sigma)
+            pos_regional, neg_regional = build_contexts(first_sigma)
             context_sigma = first_sigma
 
             def contexts_at(sigma: float) -> tuple[torch.Tensor, torch.Tensor | None]:
-                nonlocal pos_context, neg_context, context_sigma
+                nonlocal pos_regional, neg_regional, context_sigma
                 if uses_connector and sigma != context_sigma:
-                    pos_context, neg_context, _ = build_contexts(sigma)
+                    pos_regional, neg_regional = build_contexts(sigma)
                     context_sigma = sigma
-                return pos_context, neg_context
+                return (
+                    pos_regional.context_embeds.unsqueeze(0),
+                    neg_regional.context_embeds.unsqueeze(0) if neg_regional is not None else None,
+                )
 
-            # The regional cross-attention mask depends only on how many context tokens each region
-            # contributes (512 each), not on their values, so it is built once.
-            regional_extension = (
-                AnimaRegionalPromptingExtension.from_regional_conditioning(pos_regional, img_seq_len)
-                if pos_regional is not None
+            # Token counts are fixed across timesteps, even when the semantic connector rebuilds their values.
+            pos_mask = AnimaRegionalPromptingExtension.from_regional_conditioning(
+                pos_regional, img_seq_len
+            ).cross_attn_mask
+            neg_mask = (
+                # The global negative stays image-wide; only the positive pass's unmasked prompt yields to regions.
+                AnimaRegionalPromptingExtension.from_regional_conditioning(
+                    neg_regional, img_seq_len, unmasked_covers_whole_image=True
+                ).cross_attn_mask
+                if neg_regional is not None
                 else None
             )
-
-            # Apply regional prompting patch if we have regional masks
-            exit_stack.enter_context(patch_anima_for_regional_prompting(transformer, regional_extension))
+            regional_state = AnimaRegionalPromptingState()
+            if pos_mask is not None or neg_mask is not None:
+                exit_stack.enter_context(patch_anima_for_regional_prompting(transformer, regional_state))
 
             # The positive pass alone gets the reference image: the reference's default CFG mode gives the negative
             # pass null tokens, which its gate turns into no IP term at all.
@@ -958,7 +933,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
                 x: torch.Tensor,
                 t: torch.Tensor,
                 ip_adapter_blocks: Optional[list[Optional[IPAdapterBlockFn]]],
+                regional_mask: torch.Tensor | None,
             ) -> torch.Tensor:
+                regional_state.cross_attn_mask = regional_mask
                 return transformer(
                     x=x.to(transformer.dtype if hasattr(transformer, "dtype") else inference_dtype),
                     timesteps=t,
@@ -991,11 +968,13 @@ class AnimaDenoiseInvocation(BaseInvocation):
                         step_pos_context, step_neg_context = contexts_at(it.sigma_curr)
 
                         noise_pred_cond = _run_transformer(
-                            step_pos_context, latents, timestep, ip_adapter_blocks_at(user_step)
+                            step_pos_context, latents, timestep, ip_adapter_blocks_at(user_step), pos_mask
                         ).float()
 
                         if do_cfg and step_neg_context is not None:
-                            noise_pred_uncond = _run_transformer(step_neg_context, latents, timestep, None).float()
+                            noise_pred_uncond = _run_transformer(
+                                step_neg_context, latents, timestep, None, neg_mask
+                            ).float()
                             noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
                         else:
                             noise_pred = noise_pred_cond
@@ -1050,11 +1029,13 @@ class AnimaDenoiseInvocation(BaseInvocation):
                         step_pos_context, step_neg_context = contexts_at(sigma_curr)
 
                         noise_pred_cond = _run_transformer(
-                            step_pos_context, latents, timestep, ip_adapter_blocks_at(step_idx)
+                            step_pos_context, latents, timestep, ip_adapter_blocks_at(step_idx), pos_mask
                         ).float()
 
                         if do_cfg and step_neg_context is not None:
-                            noise_pred_uncond = _run_transformer(step_neg_context, latents, timestep, None).float()
+                            noise_pred_uncond = _run_transformer(
+                                step_neg_context, latents, timestep, None, neg_mask
+                            ).float()
                             noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
                         else:
                             noise_pred = noise_pred_cond

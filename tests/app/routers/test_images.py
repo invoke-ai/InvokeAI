@@ -4,14 +4,17 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, status
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from invokeai.app.api.auth_dependencies import get_current_user_or_default
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE
+from invokeai.app.api.routers._limits import MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api_app import app
+from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.auth.token_service import TokenData
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_records.image_records_common import ImageNamesResult, ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
@@ -49,6 +52,15 @@ def test_download_images_from_board_id_empty_image_name_list(
     prepare_download_images_test(monkeypatch, mock_invoker)
 
     response = client.post("/api/v1/images/download", json={"board_id": "test"})
+    json_response = response.json()
+    assert response.status_code == 202
+    assert json_response["bulk_download_item_name"] == "test.zip"
+
+
+def test_download_uncategorized_board(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    prepare_download_images_test(monkeypatch, mock_invoker)
+
+    response = client.post("/api/v1/images/download", json={"board_id": "none"})
     json_response = response.json()
     assert response.status_code == 202
     assert json_response["bulk_download_item_name"] == "test.zip"
@@ -837,6 +849,7 @@ def test_every_image_names_body_is_bounded(client: TestClient) -> None:
     assert sorted(checked) == [
         "/api/v1/board_images/batch",
         "/api/v1/board_images/batch/delete",
+        "/api/v1/gallery/usage",
         "/api/v1/images/copy",
         "/api/v1/images/delete",
         "/api/v1/images/download",
@@ -872,3 +885,67 @@ def test_list_image_dtos_allows_count_only_query(monkeypatch: Any, mock_invoker:
 
     assert response.status_code == 200
     assert response.json()["total"] == 7
+
+
+def prepare_image_read_test(monkeypatch: Any, mock_invoker: Invoker) -> None:
+    prepare_image_maintenance_test(monkeypatch, mock_invoker)
+    mock_invoker.services.image_moves.is_maintenance_active.return_value = False
+
+
+@pytest.mark.parametrize(
+    ("path", "service_method"),
+    [("/api/v1/images/i/test.png/metadata", "get_metadata"), ("/api/v1/images/i/test.png/workflow", "get_workflow")],
+)
+def test_unreadable_storage_does_not_read_as_missing_image_metadata(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str, service_method: str
+) -> None:
+    """Clients cache a metadata/workflow 404 as "nothing recorded", so a busy database must not answer it."""
+    import sqlite3
+
+    prepare_image_read_test(monkeypatch, mock_invoker)
+    monkeypatch.setattr(
+        mock_invoker.services.images,
+        service_method,
+        MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+    )
+
+    response = TestClient(client.app, raise_server_exceptions=False).get(path)
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+def test_invalid_stored_metadata_answers_500(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    """Stored metadata that no longer validates is a server fault, not an image without metadata."""
+    try:
+        MetadataField.model_validate("not a metadata object")
+    except ValidationError as error:
+        validation_error = error
+
+    prepare_image_read_test(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.images, "get_metadata", MagicMock(side_effect=validation_error))
+
+    response = TestClient(client.app, raise_server_exceptions=False).get("/api/v1/images/i/test.png/metadata")
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+@pytest.mark.parametrize(
+    ("path", "service_method"),
+    [("/api/v1/images/i/test.png/metadata", "get_metadata"), ("/api/v1/images/i/test.png/workflow", "get_workflow")],
+)
+def test_image_deleted_mid_request_answers_metadata_404(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str, service_method: str
+) -> None:
+    prepare_image_read_test(monkeypatch, mock_invoker)
+    monkeypatch.setattr(
+        mock_invoker.services.images, service_method, MagicMock(side_effect=ImageRecordNotFoundException)
+    )
+
+    assert client.get(path).status_code == 404
+
+
+def test_image_workflow_file_missing_answers_404(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    prepare_image_read_test(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.images, "get_workflow", MagicMock(side_effect=ImageFileNotFoundException))
+
+    assert client.get("/api/v1/images/i/test.png/workflow").status_code == 404

@@ -1,19 +1,8 @@
-import type { QueueGenerationMeta, QueueReadModel } from '@features/queue/contracts';
 import type { CanvasCandidateSlot } from '@workbench/canvasStagingView';
-import type { ImageRecallKind } from '@workbench/image-actions';
 
 import { Menu, Portal } from '@chakra-ui/react';
-import {
-  buildProjectQueueItemOriginPrefix,
-  buildQueueItemOrigin,
-  extractGenerationMeta,
-} from '@features/queue/contracts';
-import { getQueueReadModelOptions } from '@features/queue/queries';
-import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
-import { useQuery } from '@tanstack/react-query';
-import { getImageRecallVerb, IMAGE_RECALL_KINDS } from '@workbench/image-actions';
-import { useQueueItemRecall } from '@workbench/queue-integration/useQueueItemRecall';
-import { useActiveProjectId } from '@workbench/WorkbenchContext';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { createMenuPartLoader, MenuActionItem, MenuContent, MenuPartPlaceholder, useMenuPart } from '@platform/ui/Menu';
 import { CheckIcon, SaveIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,21 +13,12 @@ export interface StagingItemContextMenuTarget {
   y: number;
 }
 
-/** A staged result carries no executed field values; the local submission snapshot is the source. */
-const NO_META: QueueGenerationMeta = {};
-
-/** Read executed prompts and seed from queue metadata; randomized seeds are unavailable from authored settings. */
-const useStagedCandidateMeta = (projectId: string, backendItemId: number | undefined): QueueGenerationMeta => {
-  const scope = useMemo(() => ({ originPrefix: buildProjectQueueItemOriginPrefix(projectId) }), [projectId]);
-  const select = useCallback(
-    (model: QueueReadModel): QueueGenerationMeta => {
-      const item = model.items.find((candidate) => candidate.id === backendItemId);
-      return item ? extractGenerationMeta(item) : NO_META;
-    },
-    [backendItemId]
-  );
-  return useQuery({ ...getQueueReadModelOptions(scope), enabled: backendItemId !== undefined, select }).data ?? NO_META;
-};
+// The recall verbs and the queue item read behind them load on demand, off the Canvas's startup (the queue rows' and
+// details' menus load them too). Pointing at or focusing a staged result warms them; the menu loads them as it opens.
+const stagingItemRecall = createMenuPartLoader(() =>
+  import('./StagingItemRecallGroup').then((module) => module.StagingItemRecallGroup)
+);
+export const loadStagingItemRecall = stagingItemRecall.load;
 
 export const StagingItemContextMenu = ({
   canAccept,
@@ -56,9 +36,9 @@ export const StagingItemContextMenu = ({
   target: StagingItemContextMenuTarget;
 }) => {
   const { t } = useTranslation();
-  const projectId = useActiveProjectId();
-  const meta = useStagedCandidateMeta(projectId, target.slot.candidate.sourceBackendItemId);
-  const { capabilities, recall } = useQueueItemRecall(buildQueueItemOrigin(target.slot.queueItemId, projectId), meta);
+  const recall = useMenuPart(stagingItemRecall);
+  // Mounted only while open, so mounting is the open: whoever opens the menu, its verbs load.
+  useMountEffect(stagingItemRecall.load);
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => ({ height: 1, width: 1, x: target.x, y: target.y }),
@@ -79,13 +59,13 @@ export const StagingItemContextMenu = ({
     <Menu.Root lazyMount open positioning={positioning} unmountOnExit onOpenChange={onOpenChange}>
       <Portal>
         <Menu.Positioner>
-          <MenuContent minW="13rem" py="1">
-            <Menu.ItemGroup>
-              <Menu.ItemGroupLabel>{t('widgets.canvas.staging.recall')}</Menu.ItemGroupLabel>
-              {IMAGE_RECALL_KINDS.map((kind) => (
-                <RecallItem key={kind} disabled={!capabilities[kind]} kind={kind} onRecall={recall} />
-              ))}
-            </Menu.ItemGroup>
+          <MenuContent aria-busy={recall.status === 'loading'} minW="13rem" py="1">
+            {/* The menu opens at once, so its other items, Escape and an outside press work while the verbs load. */}
+            {recall.status === 'loaded' ? (
+              <recall.part slot={target.slot} />
+            ) : (
+              <MenuPartPlaceholder status={recall.status} />
+            )}
             <Menu.Separator borderColor="border.subtle" />
             <MenuActionItem
               icon={SaveIcon}
@@ -106,18 +86,4 @@ export const StagingItemContextMenu = ({
       </Portal>
     </Menu.Root>
   );
-};
-
-const RecallItem = ({
-  disabled,
-  kind,
-  onRecall,
-}: {
-  disabled: boolean;
-  kind: ImageRecallKind;
-  onRecall: (kind: ImageRecallKind) => void;
-}) => {
-  const verb = getImageRecallVerb(kind);
-  const onSelect = useCallback(() => onRecall(kind), [kind, onRecall]);
-  return <MenuActionItem disabled={disabled} icon={verb.icon} label={verb.label} value={kind} onSelect={onSelect} />;
 };

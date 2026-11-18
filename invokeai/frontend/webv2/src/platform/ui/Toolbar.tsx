@@ -1,11 +1,10 @@
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 
 import { Icon, Separator, Stack, type StackProps } from '@chakra-ui/react';
 
 import { IconButton } from './Button';
-import { Tooltip } from './Tooltip';
 
-const TOOLBAR_TOOLTIP_POSITIONING = { placement: 'right' } as const;
+const TOOLBAR_TOOLTIP_PLACEMENT = 'right';
 
 export const Toolbar = ({ children, direction = 'column', ...stackProps }: StackProps) => (
   <Stack
@@ -29,18 +28,26 @@ export const ToolbarButton = ({
   icon,
   isActive,
   label,
+  tooltip,
   ...buttonProps
 }: {
   icon: React.ElementType;
   /** Sticky-tool styling; omit for one-shot action buttons. */
   isActive?: boolean;
   label: string;
-} & Omit<ComponentProps<typeof IconButton>, 'aria-label' | 'aria-labelledby'>) => (
-  <Tooltip content={label} positioning={TOOLBAR_TOOLTIP_POSITIONING}>
-    <IconButton aria-label={label} aria-pressed={isActive} variant={isActive ? 'solid' : 'ghost'} {...buttonProps}>
-      <Icon as={icon} boxSize="3.5" />
-    </IconButton>
-  </Tooltip>
+  /** Richer tooltip content (a shortcut, a help line); the label alone by default. */
+  tooltip?: ReactNode;
+} & Omit<ComponentProps<typeof IconButton>, 'aria-label' | 'aria-labelledby' | 'tooltip' | 'tooltipPlacement'>) => (
+  <IconButton
+    aria-label={label}
+    aria-pressed={isActive}
+    tooltip={tooltip ?? label}
+    tooltipPlacement={TOOLBAR_TOOLTIP_PLACEMENT}
+    variant={isActive ? 'solid' : 'ghost'}
+    {...buttonProps}
+  >
+    <Icon as={icon} boxSize="3.5" />
+  </IconButton>
 );
 
 export const ToolbarSeparator = ({ direction = 'column' }: { direction?: 'column' | 'row' }) => (

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { clearWorkspaceData, consumeWorkspaceClearFailure, rememberWorkspaceClearFailure } from './clearWorkspaceData';
+import {
+  clearWorkspaceData,
+  consumeWorkspaceClearFailure,
+  describeWorkspaceClearFailure,
+  rememberWorkspaceClearFailure,
+} from './clearWorkspaceData';
 
 describe('clearWorkspaceData', () => {
   it('waits for both cleanup paths and reports partial failures', async () => {
@@ -33,5 +38,13 @@ describe('clearWorkspaceData', () => {
 
     expect(consumeWorkspaceClearFailure(storage)).toBe('partially cleared');
     expect(consumeWorkspaceClearFailure(storage)).toBeNull();
+  });
+});
+
+describe('describeWorkspaceClearFailure', () => {
+  it('names projects left behind before settings that were not cleared', () => {
+    expect(describeWorkspaceClearFailure(['projects'])).toBe('settings.clearData.projectsFailed');
+    expect(describeWorkspaceClearFailure(['settings', 'projects'])).toBe('settings.clearData.projectsFailed');
+    expect(describeWorkspaceClearFailure(['settings'])).toBe('settings.clearData.settingsFailed');
   });
 });

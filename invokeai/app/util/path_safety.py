@@ -1,5 +1,5 @@
 import os
-from pathlib import PureWindowsPath
+from pathlib import Path, PureWindowsPath
 
 # Read at call time by `is_contained_filename`, so tests can exercise both platforms' rules on either.
 _ON_WINDOWS = os.name == "nt"
@@ -87,3 +87,54 @@ def is_contained_filename(name: str) -> bool:
     if _ON_WINDOWS:
         return is_plain_filename(name)
     return bool(name) and not _CONTROL_CHARS.intersection(name) and "/" not in name and name not in (".", "..")
+
+
+def resolve_contained_path(root: Path, candidate: str) -> Path:
+    r"""Resolves a client-supplied relative path strictly inside `root`.
+
+    `is_plain_filename` and `is_contained_filename` gate a *single* name. This gates a whole
+    relative path - `exports/2026`, `lists/fantasy.txt` - for the case where a node or route lets
+    the caller address a file under a directory the operator has designated. The caller never gets
+    to name the root, only a path beneath it.
+
+    Containment is checked twice, because the two checks catch different things:
+
+    - Each component must pass `is_contained_filename`, which rejects `.`, `..`, separators,
+      control characters and (on Windows) drive letters, colons and device names. This is the
+      textual check, and it refuses the payload before it ever touches the filesystem.
+      `is_contained_filename` rather than `is_plain_filename`: these paths address files that are
+      *already on disk*, placed there by an operator, so a prompt list that a posix admin named
+      `aux.txt` or `notes:1.txt` must stay readable. Windows containment is identical either way.
+    - The joined path is then `resolve()`d and required to sit under the resolved root. This is
+      what catches a symlink inside the root pointing out of it, which no amount of string
+      inspection can see.
+
+    `PureWindowsPath` parses the input so that backslash-separated and drive-shaped payloads are
+    split and rejected on posix too, instead of passing here and only escaping on Windows.
+
+    Raises:
+        ValueError: if the path is absolute, drive-qualified, empty, or escapes `root`.
+    """
+    if not candidate:
+        raise ValueError("A path is required.")
+
+    raw = PureWindowsPath(candidate)
+    if raw.is_absolute() or raw.drive or raw.root:
+        raise ValueError(
+            f"Absolute paths are not allowed: {candidate!r}. Use a path relative to the permitted directory."
+        )
+
+    # `.` and `./` carry no components and address the root itself, which is contained by definition.
+    # `""` is refused above instead: an empty input is a missing value, not a reference to the root.
+    parts = raw.parts
+    if not parts:
+        return root.resolve()
+    for part in parts:
+        if not is_contained_filename(part):
+            raise ValueError(f"Path component {part!r} is not allowed in {candidate!r}.")
+
+    resolved = (root / Path(*parts)).resolve()
+    root_resolved = root.resolve()
+    if resolved != root_resolved and root_resolved not in resolved.parents:
+        raise ValueError(f"Path must stay within the permitted directory: {candidate!r}")
+    return resolved

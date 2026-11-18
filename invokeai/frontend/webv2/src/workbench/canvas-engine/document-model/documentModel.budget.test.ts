@@ -402,7 +402,6 @@ describe('reducer → mirror value edits at the 10,000-node limit', () => {
         onDocumentReplaced: () => undefined,
         onLayerOrderChanged: () => undefined,
         onLayersChanged,
-        onStagingChanged: () => undefined,
       }
     );
     const depth = getDocumentIndex(project.canvas.document).byId.get('l0')!.path.length;
@@ -427,7 +426,7 @@ describe('reducer → mirror value edits at the 10,000-node limit', () => {
 describe('eligibility without materialization', () => {
   beforeEach(resetCounters);
 
-  it('answers reparent, group, ungroup and remove eligibility without building an edit', () => {
+  it('answers reparent, group, ungroup, remove and duplicate eligibility without building an edit', () => {
     const document = createLargeTreeDocument(NODE_COUNT);
     const model = createDocumentModel(document, context);
     const index = getDocumentIndex(document);
@@ -441,6 +440,7 @@ describe('eligibility without materialization', () => {
     expect(model.refusalFor({ groupId: '\0probe', ids: ['l0', 'l1'], name: '', type: 'group' })).toBeDefined();
     expect(model.refusalFor({ ids: [groupId], type: 'ungroup' })).toBeNull();
     expect(model.refusalFor({ ids: ['l0'], type: 'remove' })).toBeNull();
+    expect(model.refusalFor({ createId: () => '\0copy', ids: [groupId, 'l0'], type: 'duplicate' })).toBeNull();
     expect(counters().editsMaterialized).toBe(0);
     expect(model.prepare({ ids: ['l0'], type: 'remove' }).status).toBe('prepared');
     expect(counters().editsMaterialized).toBe(1);

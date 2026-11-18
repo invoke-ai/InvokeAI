@@ -9,10 +9,9 @@ import { getDominantCluster } from '@workbench/image-map/imageMapTraces';
 import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { XIcon } from 'lucide-react';
 import { useCallback, useMemo, type MouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useClearClusterSelection } from './useSelectMapImage';
-
-export const CLEAR_CLUSTER_SELECTION_LABEL = 'Clear cluster selection';
 
 /** The registry key of the gallery's cluster listing, or null when it shows anything else. */
 export const selectClusterSelectionId = (values: Record<string, unknown>): string | null => {
@@ -26,6 +25,7 @@ export const selectClusterSelectionId = (values: Record<string, unknown>): strin
  * without it a dimmed map reads as a rendering fault, and the only clear lived in the Gallery's search field.
  */
 export const ClusterSelectionChip = () => {
+  const { t } = useTranslation();
   const clusterId = useWidgetValuesSelector('gallery', selectClusterSelectionId);
   const clearClusterSelection = useClearClusterSelection();
   const handleClear = useCallback(
@@ -59,7 +59,7 @@ export const ClusterSelectionChip = () => {
 
   return (
     <HStack
-      aria-label="Selected cluster"
+      aria-label={t('widgets.imageMap.selectedCluster')}
       bg="bg.panel"
       borderColor="border.subtle"
       borderRadius="full"
@@ -87,9 +87,9 @@ export const ClusterSelectionChip = () => {
       <Text color={label ? 'fg.muted' : 'fg'} flexShrink={0} fontVariantNumeric="tabular-nums">
         {label ? `· ${size}` : size}
       </Text>
-      <Tooltip content={`${CLEAR_CLUSTER_SELECTION_LABEL} (Esc)`}>
+      <Tooltip content={t('widgets.imageMap.clearClusterSelectionHint')}>
         <IconButton
-          aria-label={CLEAR_CLUSTER_SELECTION_LABEL}
+          aria-label={t('widgets.imageMap.clearClusterSelection')}
           borderRadius="full"
           flexShrink={0}
           size="sm"

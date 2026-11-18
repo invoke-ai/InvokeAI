@@ -1,26 +1,19 @@
-import type { WorkbenchNotificationKind } from '@workbench/projectContracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Badge, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { Scrollable } from '@platform/ui/Scrollable';
+import { Box, Flex, HStack, Spinner } from '@chakra-ui/react';
+import { ListSectionHeader } from '@platform/ui/list/ListSectionHeader';
 import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
-import { BellIcon, CircleCheckIcon, CircleXIcon, InfoIcon, TriangleAlertIcon, type LucideIcon } from 'lucide-react';
+import { BellIcon, TriangleAlertIcon } from 'lucide-react';
+import { lazy, Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { NotificationsHeaderActions } from './NotificationsHeaderActions';
 
-const kindColorPalette: Record<WorkbenchNotificationKind, string> = {
-  error: 'red',
-  info: 'blue',
-  success: 'green',
-};
-
-const kindIcon = {
-  error: CircleXIcon,
-  info: InfoIcon,
-  success: CircleCheckIcon,
-} satisfies Record<WorkbenchNotificationKind, LucideIcon>;
+/** The list loads when it is first shown: the editor boots with the status-bar chip alone. */
+const NotificationsList = lazy(() =>
+  import('./NotificationsList').then((module) => ({ default: module.NotificationsList }))
+);
 
 export const NotificationsWidgetView = ({ presentation, region }: WidgetViewProps) => {
   const { t } = useTranslation();
@@ -39,76 +32,44 @@ export const NotificationsWidgetView = ({ presentation, region }: WidgetViewProp
     return <StatusWidgetChip icon={icon}>{t('notifications.labelWithCount', { label })}</StatusWidgetChip>;
   }
 
-  // The popover renders the view bare (no widget-frame header), so the header
-  // actions that frame would have mounted live here instead.
+  const list = (
+    <Suspense fallback={LIST_PENDING}>
+      <NotificationsList />
+    </Suspense>
+  );
+
+  // The popover renders the view bare (no widget-frame header), so the header actions that frame would have mounted
+  // live here instead, styled as the list's section header and lined up with its rows.
   if (region === 'popover') {
     return (
-      <Stack flex="1" gap="0" minH="0">
-        <HStack borderBottomWidth="1px" borderColor="border.subtle" justify="space-between" px="2" py="1.5">
-          <Text color="fg.subtle" fontSize="xs" fontWeight="700" textTransform="uppercase">
-            {t('widgets.labels.notifications')}
-          </Text>
+      <Box display="flex" flex="1" flexDirection="column" minH="0">
+        <HStack
+          borderBottomWidth="1px"
+          borderColor="border.subtle"
+          flexShrink={0}
+          justify="space-between"
+          pe="2.5"
+          ps="1.5"
+        >
+          <ListSectionHeader count={totalCount} label={t('widgets.labels.notifications')} placement="bar" />
           <NotificationsHeaderActions />
         </HStack>
-        <Scrollable minH="0">
-          <NotificationsPanel />
-        </Scrollable>
-      </Stack>
+        {list}
+      </Box>
     );
   }
 
-  return <NotificationsPanel />;
+  return list;
 };
 
-const NotificationsPanel = () => {
+const NotificationsListPending = () => {
   const { t } = useTranslation();
-  const notifications = useWorkbenchSelector((snapshot) => snapshot.notifications);
 
   return (
-    <Stack flex="1" gap="3" minH="0" p="2">
-      {notifications.length === 0 ? (
-        <Text color="fg.subtle" fontSize="xs">
-          {t('notifications.empty')}
-        </Text>
-      ) : (
-        <Stack gap="2">
-          {notifications.map((notification) => {
-            const IconComponent = kindIcon[notification.kind];
-
-            return (
-              <Stack
-                key={notification.id}
-                bg={notification.isRead ? 'bg.subtle' : 'bg.muted'}
-                borderWidth="1px"
-                borderColor={notification.isRead ? 'border.subtle' : 'border.emphasized'}
-                gap="1"
-                p="2"
-                rounded="md"
-              >
-                <HStack align="start" justify="space-between">
-                  <HStack gap="2" minW="0">
-                    <Icon as={IconComponent} color={`${kindColorPalette[notification.kind]}.300`} boxSize="3.5" />
-                    <Text fontSize="xs" fontWeight="700">
-                      {notification.titleKey ? t(notification.titleKey) : notification.title}
-                    </Text>
-                  </HStack>
-                  <Badge colorPalette={kindColorPalette[notification.kind]}>
-                    {t(`notifications.kind.${notification.kind}`)}
-                  </Badge>
-                </HStack>
-                {notification.message || notification.messageKey ? (
-                  <Text color="fg.subtle" fontSize="xs">
-                    {notification.messageKey ? t(notification.messageKey) : notification.message}
-                  </Text>
-                ) : null}
-                <Text color="fg.subtle" fontSize="xs">
-                  {notification.createdAt}
-                </Text>
-              </Stack>
-            );
-          })}
-        </Stack>
-      )}
-    </Stack>
+    <Flex align="center" aria-label={t('common.loading')} flex="1" justify="center" py="6" role="status">
+      <Spinner color="fg.subtle" size="md" />
+    </Flex>
   );
 };
+
+const LIST_PENDING = <NotificationsListPending />;

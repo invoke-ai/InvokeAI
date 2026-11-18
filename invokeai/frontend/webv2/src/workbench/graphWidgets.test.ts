@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  describeRoute,
   getNaturalDestination,
   getPlacedWidgetTypeIds,
   getSourceIdForWidgetTypeId,
@@ -67,39 +66,5 @@ describe('graph widget sources', () => {
     expect(getNaturalDestination('canvas')).toBe('canvas');
     expect(getNaturalDestination('generate')).toBe('gallery');
     expect(getNaturalDestination('workflow')).toBe('gallery');
-  });
-
-  // The indicator is icon-only, so the whole route — including whether it is
-  // pinned — has to live in its accessible name.
-  it('describes the whole route for assistive technology', () => {
-    expect(
-      describeRoute({
-        destination: 'gallery',
-        destinationLocked: false,
-        hasSource: true,
-        sourceId: 'generate',
-        sourceLocked: false,
-      })
-    ).toBe('Invoke from generate, output to gallery, following edits');
-
-    expect(
-      describeRoute({
-        destination: 'canvas',
-        destinationLocked: true,
-        hasSource: true,
-        sourceId: 'workflow',
-        sourceLocked: true,
-      })
-    ).toBe('Invoke from workflow, output to canvas, source locked, destination locked');
-
-    expect(
-      describeRoute({
-        destination: 'gallery',
-        destinationLocked: false,
-        hasSource: false,
-        sourceId: 'generate',
-        sourceLocked: false,
-      })
-    ).toBe('No source widget open, output to gallery, following edits');
   });
 });

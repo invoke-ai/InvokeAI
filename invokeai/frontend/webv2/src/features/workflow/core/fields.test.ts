@@ -7,6 +7,7 @@ import {
   getEffectiveWorkflowFieldDescription,
   getFieldRecordId,
   getWorkflowFieldInvalidReason,
+  getWorkflowFieldIssue,
   isDirectInputField,
   isLoraFieldCollectionEntry,
   isLoraFieldWeightValid,
@@ -92,6 +93,22 @@ describe('workflow field validation', () => {
     expect(
       getWorkflowFieldInvalidReason({ isConnected: false, template: input({ input: 'connection' }), value: 'value' })
     ).toBe('Required connection.');
+  });
+
+  it('names what a blocking field lacks, so callers can say what to do about it', () => {
+    const integer = input({ minimum: 1, type: single('IntegerField') });
+
+    expect(getWorkflowFieldIssue({ isConnected: false, template: integer, value: undefined })?.kind).toBe(
+      'missingValue'
+    );
+    expect(getWorkflowFieldIssue({ isConnected: false, template: integer, value: 0 })).toEqual({
+      kind: 'invalidValue',
+      reason: 'Invalid value.',
+    });
+    expect(
+      getWorkflowFieldIssue({ isConnected: false, template: input({ input: 'connection' }), value: undefined })?.kind
+    ).toBe('missingConnection');
+    expect(getWorkflowFieldIssue({ isConnected: false, template: integer, value: 3 })).toBeNull();
   });
 
   it('accepts persisted values for unsupported direct controls', () => {
@@ -186,6 +203,19 @@ describe('workflow field validation', () => {
     expect(isWorkflowFieldValueValid(input({ type: single('VideoField') }), { video_name: 'clip.mp4' })).toBe(true);
     expect(isWorkflowFieldValueValid(input({ type: single('VideoField') }), { video_name: '' })).toBe(false);
     expect(isWorkflowFieldValueValid(input({ type: single('VideoField') }), {})).toBe(false);
+  });
+
+  it('treats a managed file as a direct input addressed by its file id', () => {
+    const file = input({ type: single('FileField') });
+
+    expect(isDirectInputField(file)).toBe(true);
+    expect(isWorkflowFieldValueValid(file, { file_id: 'file-1' })).toBe(true);
+    expect(isWorkflowFieldValueValid(file, {})).toBe(false);
+    expect(isWorkflowFieldValueValid(file, { file_id: '' })).toBe(false);
+    expect(getWorkflowFieldInvalidReason({ isConnected: false, template: file, value: undefined })).toBe(
+      'Required value.'
+    );
+    expect(getWorkflowFieldInvalidReason({ isConnected: false, template: file, value: {} })).toBe('Invalid value.');
   });
 
   it('validates image collections as lists of image refs and keeps video collections on the non-null check', () => {

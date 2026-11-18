@@ -16,7 +16,11 @@ import {
   imageIndexAvailabilityOptions,
   type GalleryItemsFilter,
 } from '@features/gallery/data/queries';
+import { isEventFromOwnDom } from '@platform/react/isEventFromOwnDom';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, DropZone } from '@platform/ui';
+import { LoadError, RetryButton } from '@platform/ui/LoadError';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
 import {
@@ -59,7 +63,7 @@ import {
   getGalleryStarredLayout,
   getGalleryStarredStripItems,
 } from './galleryGridLayout';
-import { focusVisibleOperable, GalleryLoadErrorState, GalleryLoadNotice, GalleryRetryButton } from './GalleryLoadError';
+import { focusVisibleOperable, GalleryLoadNotice } from './GalleryLoadError';
 import { GalleryProgressSection } from './GalleryProgressSection';
 import { getGallerySelectedImageQuery, isGallerySelectionInScope } from './galleryStateView';
 import { GALLERY_TAB_STOP_SELECTOR, GalleryThumbnailCell } from './GalleryThumbnail';
@@ -87,7 +91,10 @@ const EMPTY_GALLERY_ITEMS: GalleryItem[] = [];
 // Module-scoped so a grid remount cannot replay an already-followed reveal.
 let lastPageFollowedRevealToken = 0;
 
-const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
+// React also bubbles drags over portalled content the grid opens, such as a tile's context menu; those are not over
+// the grid, so it neither counts nor takes them.
+const isFileDragOnGrid = (event: DragEvent): boolean =>
+  isEventFromOwnDom(event) && Array.from(event.dataTransfer.types).includes('Files');
 
 const GalleryPageError = ({
   onFocusLost,
@@ -119,11 +126,12 @@ const GalleryPageError = ({
         <VisuallyHidden>
           {message} {pageState.error?.message}
         </VisuallyHidden>
-        <GalleryRetryButton
+        <RetryButton
           aria-label={t(isMoreError ? 'widgets.gallery.retryLoadingMoreItems' : 'widgets.gallery.retryLoadingItems')}
           color="fg"
           flagsFailure
-          read={read}
+          isRetrying={read.isRetrying}
+          onRetry={read.retry}
           size="xs"
           variant="ghost"
           onFocusLost={onFocusLost}
@@ -137,11 +145,12 @@ const GalleryPageError = ({
       <Text color="fg.muted" fontSize="xs" lineClamp={2} textAlign="center">
         {message}
       </Text>
-      <GalleryRetryButton
+      <RetryButton
         aria-label={t(isMoreError ? 'widgets.gallery.retryLoadingMoreItems' : 'widgets.gallery.retryLoadingItems')}
         color="fg"
         flagsFailure
-        read={read}
+        isRetrying={read.isRetrying}
+        onRetry={read.retry}
         size="sm"
         variant="ghost"
         onFocusLost={onFocusLost}
@@ -263,11 +272,12 @@ const GalleryStarredSectionHeader = ({
       </chakra.button>
       {state.status === 'stale-error' ? (
         // The strip keeps its earlier cells; the header carries the failed refresh and its recovery.
-        <GalleryRetryButton
+        <RetryButton
           aria-label={t('widgets.gallery.retryRefreshingStarredItems')}
           color="fg.error"
           flagsFailure
-          read={state}
+          isRetrying={state.isRetrying}
+          onRetry={state.retry}
           size="xs"
           variant="ghost"
           onFocusLost={onFocusLost}
@@ -400,6 +410,37 @@ const focusVisibleGridContent = (viewport: HTMLElement | null, edge: 'first' | '
   }
 };
 
+const GALLERY_EXIT_COMPARE_COMMAND = 'gallery.exitCompare';
+
+/**
+ * Esc ends a comparison from the Gallery, where its second image is picked: one waiting for that image, or one open in
+ * Preview. Mounted only meanwhile, so Esc keeps its other meanings the rest of the time; the grid keys it by project and
+ * language, which its registration's source and title follow.
+ */
+const GalleryExitCompareHotkey = () => {
+  const { t } = useTranslation();
+  const { actions, runtime } = useGalleryWidget();
+
+  // The host's compare command clears the open project's comparison, the same for the mount's lifetime.
+  useMountEffect(() => {
+    const exitCompare = () => actions.setCompareItem(null);
+    const title = t('widgets.preview.commands.exitCompare');
+    const disposers = [
+      runtime.commands.register({ handler: exitCompare, id: GALLERY_EXIT_COMPARE_COMMAND, title }),
+      runtime.hotkeys.register({
+        commandId: GALLERY_EXIT_COMPARE_COMMAND,
+        defaultKeys: ['esc'],
+        id: GALLERY_EXIT_COMPARE_COMMAND,
+        title,
+      }),
+    ];
+
+    return () => disposers.forEach((dispose) => dispose());
+  });
+
+  return null;
+};
+
 /** Measure viewport width for columns so both layouts share the same grid. */
 export const GalleryImageGrid = ({
   mediaFilterTriggerRef,
@@ -407,15 +448,15 @@ export const GalleryImageGrid = ({
   /** The layout's media filter trigger, which takes focus when "Show all media" removes itself. */
   mediaFilterTriggerRef?: RefObject<HTMLButtonElement | null>;
 } = {}) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const {
     actions,
     filter,
     gallery,
-    isWindowTruncated,
     itemActions,
     listing,
     pinRevealIndex,
+    projectId,
     region,
     setVisibleRange,
     sparseListing,
@@ -461,6 +502,21 @@ export const GalleryImageGrid = ({
     (item: GalleryItem) => sparseSelectionPages.get(toGalleryItemKey(item)),
     [sparseSelectionPages]
   );
+  // The right-clicked thumbnail, or, once a deletion removed it, the grid's tab stop.
+  const getItemReturnFocus = useCallback(
+    (item: GalleryItem) => () => {
+      const viewport = viewportRef.current;
+      const selector = `button[data-gallery-item-key="${CSS.escape(toGalleryItemKey(item))}"]`;
+
+      return (
+        viewport?.querySelector<HTMLElement>(selector) ??
+        viewport?.querySelector<HTMLElement>(GALLERY_TAB_STOP_SELECTOR) ??
+        viewport ??
+        null
+      );
+    },
+    []
+  );
 
   const {
     actionSelectionRefs,
@@ -475,7 +531,7 @@ export const GalleryImageGrid = ({
     shouldStarSelection,
     syncRangeInteractionContext,
     toggleItem,
-  } = useGalleryGridSelection({ getSelectionPage });
+  } = useGalleryGridSelection({ getItemReturnFocus, getSelectionPage });
 
   const columnCount = getGalleryColumnCount({ imageDensityPercent, widthPx: viewportWidth });
   const sparseRecentItems = usesSparseListing ? sparseListing.recentItems : EMPTY_GALLERY_ITEMS;
@@ -490,6 +546,8 @@ export const GalleryImageGrid = ({
     : 0;
   const isFollowingLive = followedProgressSessionId !== null;
   const isComparisonActive = gallery.isComparisonActive && !isFollowingLive;
+  // Not hidden while live frames show: the waiting image stays marked where the second image is picked.
+  const isCompareArmed = gallery.isCompareArmed;
   const selectedBoard = gallery.boards.find((board) => board.id === gallery.selectedBoardId);
   const selectedBoardName = selectedBoard
     ? getGalleryBoardLabel(selectedBoard, t)
@@ -1587,7 +1645,7 @@ export const GalleryImageGrid = ({
   }, [actions, lastVisibleRowIndex, paginationMode, rowCount, usesSparseListing]);
 
   const handleDragEnter = useCallback((event: DragEvent) => {
-    if (!dragEventContainsFiles(event)) {
+    if (!isFileDragOnGrid(event)) {
       return;
     }
 
@@ -1597,7 +1655,7 @@ export const GalleryImageGrid = ({
   }, []);
 
   const handleDragLeave = useCallback((event: DragEvent) => {
-    if (!dragEventContainsFiles(event)) {
+    if (!isFileDragOnGrid(event)) {
       return;
     }
 
@@ -1609,13 +1667,16 @@ export const GalleryImageGrid = ({
   }, []);
 
   const handleDragOver = useCallback((event: DragEvent) => {
-    if (dragEventContainsFiles(event)) {
+    if (isFileDragOnGrid(event)) {
       event.preventDefault();
     }
   }, []);
 
   const handleDrop = useCallback(
     (event: DragEvent) => {
+      if (!isEventFromOwnDom(event)) {
+        return;
+      }
       event.preventDefault();
       dragDepthRef.current = 0;
       setIsDropActive(false);
@@ -1690,7 +1751,8 @@ export const GalleryImageGrid = ({
           compareRole={
             isComparisonActive && itemKey === gallery.selectedItemKey
               ? t('widgets.preview.viewing')
-              : isComparisonActive && itemKey === gallery.compareImageKey
+              : // Waiting for the second image, the base already carries the side it will take.
+                (isComparisonActive || isCompareArmed) && itemKey === gallery.compareImageKey
                 ? t('widgets.preview.compare')
                 : null
           }
@@ -1721,6 +1783,7 @@ export const GalleryImageGrid = ({
       handleThumbnailClick,
       handleThumbnailContextMenu,
       handleToggleStarred,
+      isCompareArmed,
       isComparisonActive,
       isFollowingLive,
       middleClickOpensInNewTab,
@@ -1738,6 +1801,7 @@ export const GalleryImageGrid = ({
   const sparseErrorPageOffset = [...(sparseListing?.pageStates ?? [])].find(([, pageState]) => pageState.error)?.[0];
   return (
     <Stack flex="1" gap="0" h="full" minH="0" minW="0" w="full">
+      {isComparisonActive || isCompareArmed ? <GalleryExitCompareHotkey key={`${projectId}:${i18n.language}`} /> : null}
       {listing.status === 'stale-error' &&
       (!usesSparseListing || (Boolean(sparseListing?.pageStates.get(0)?.error) && !sparsePageStatusOffsets.has(0))) ? (
         <GalleryLoadNotice
@@ -1861,11 +1925,16 @@ export const GalleryImageGrid = ({
                   flex="1"
                   minH="8rem"
                 >
-                  <GalleryLoadErrorState
-                    read={listing}
+                  <LoadError
+                    detail={listing.error ? getApiErrorMessage(listing.error, '') : null}
+                    flex="1"
+                    isRetrying={listing.isRetrying}
+                    layout="state"
+                    message={t('widgets.gallery.listingLoadFailed')}
+                    py="6"
                     retryLabel={t('widgets.gallery.retryLoadingItems')}
-                    title={t('widgets.gallery.listingLoadFailed')}
                     onFocusLost={focusGridContent}
+                    onRetry={listing.retry}
                   />
                 </Flex>
               ) : isEmpty && isStarredFailedEmpty && listing.status !== 'loading' ? (
@@ -2068,21 +2137,6 @@ export const GalleryImageGrid = ({
                       <Spinner color="fg.subtle" />
                     </Flex>
                   ) : null}
-                  {!usesSparseListing &&
-                    paginationMode === 'infinite' &&
-                    !listing.isFetchingMore &&
-                    isWindowTruncated && (
-                      <Flex align="center" justify="center" py="3">
-                        <Text color="fg.subtle" fontSize="md" textAlign="center">
-                          {gallery.anchoredWindowPage > 0
-                            ? t('widgets.gallery.windowLimitFrom', {
-                                count: gallery.items.length,
-                                index: anchoredWindowFirstItem,
-                              })
-                            : t('widgets.gallery.windowLimit', { count: gallery.items.length })}
-                        </Text>
-                      </Flex>
-                    )}
                 </>
               )}
             </ScrollArea.Content>

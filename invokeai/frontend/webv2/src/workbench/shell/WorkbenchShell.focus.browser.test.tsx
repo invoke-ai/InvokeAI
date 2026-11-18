@@ -126,13 +126,14 @@ vi.mock('@workbench/widgetRegistry', () => ({
 vi.mock('./BottomPanel', () => ({ BottomPanel: () => null }));
 vi.mock('./CenterArea', () => ({ CenterArea: () => null }));
 vi.mock('./DocumentTitleProgress', () => ({ DocumentTitleProgress: () => null }));
+vi.mock('./LayoutUndoNotices', () => ({ LayoutUndoNotices: () => null }));
 vi.mock('./notifications', () => ({ WorkbenchNotificationToaster: () => null }));
 vi.mock('./Panels', () => ({ LeftPanel: () => null, RightPanel: () => null }));
 vi.mock('./PasteMediaRuntime', () => ({ PasteMediaRuntime: () => null }));
 vi.mock('./ProjectConflictBanner', () => ({ ProjectConflictBanner: () => null }));
 vi.mock('./QueueRecoveryBanner', () => ({ QueueRecoveryBanner: () => null }));
 vi.mock('./StatusBar', () => ({ StatusBar: () => null }));
-vi.mock('./topbar', () => ({ TopBar: () => null }));
+vi.mock('./topbar', () => ({ GraphPreviewInvokeScope: () => null, TopBar: () => null }));
 
 import { WorkbenchShell } from './WorkbenchShell';
 

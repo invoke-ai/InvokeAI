@@ -1,18 +1,23 @@
 import type { DynamicPromptsExpansion } from '@features/generation/react';
 import type { GraphWidgetSource } from '@workbench/graphWidgets';
-import type { InvocationRoute, ResultDestination } from '@workbench/invocationContracts';
+import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 import { useDynamicPrompts } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import {
+  describeDynamicPromptsFailure,
+  describeGenerationIssue,
+  getDynamicPromptsConfig,
   getEffectivePrompts,
+  getPromptDraftFromValues,
   normalizeGenerateSettings,
   sanitizeBatchCount,
   sanitizeDynamicPromptsConfig,
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
-import { isUpscaleBatchCountFixed } from '@features/upscale';
+import { isUpscaleBatchCountFixed, readsUpscalePrompt } from '@features/upscale';
+import { normalizeVideoWidgetValues } from '@features/video';
 import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
@@ -35,6 +40,10 @@ import {
 } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { getInvocationIssueTarget, type InvocationIssue } from './invokeIssueTargets';
+
+export type { InvocationIssue, InvocationIssueTarget } from './invokeIssueTargets';
 
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
@@ -82,6 +91,7 @@ const areTypeIdSetsEqual = (left: ReadonlySet<WidgetTypeId>, right: ReadonlySet<
 
 const readDynamicPromptsConfig = (values: Record<string, unknown>) => ({
   combinatorial: values.dynamicPromptsCombinatorial,
+  enabled: values.dynamicPromptsEnabled,
   maxPrompts: values.dynamicPromptsMaxPrompts,
   resample: values.dynamicPromptsResample,
   sampleSeed: values.dynamicPromptsSampleSeed,
@@ -99,12 +109,6 @@ export const isBatchCountFixed = (sourceId: InvocationRoute['sourceId'], values:
 
 export const getBatchCount = (sourceId: InvocationRoute['sourceId'], values: Record<string, unknown>): number =>
   isBatchCountFixed(sourceId, values) ? 1 : sanitizeBatchCount(values.batchCount);
-
-/** Why Invoke cannot run, worded for the user; `layerId` names the canvas layer to show for it. */
-export interface InvocationIssue {
-  message: string;
-  layerId: string | null;
-}
 
 export interface InvocationState {
   batchCount: number;
@@ -127,9 +131,15 @@ export interface InvokeOptions {
   destinationOverride?: ResultDestination;
   /** Queue ahead of the user's other pending work, as Invoke Front does. */
   prepend?: boolean;
+  /** Hears that the run has started (valid, and holding the project's preparation lease). */
+  onStarted?: () => void;
 }
 
-export const useInvocationState = (): InvocationState => {
+/**
+ * Invoke's state for the active route; given a `sourceId`, for that source's route instead, its source fixed (a graph
+ * preview's Invoke), with the active route's destination. Video's fixed route always uses Gallery.
+ */
+export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId } = {}): InvocationState => {
   const { t } = useTranslation();
   const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
   const visibleTypeIds = useActiveProjectSelector(getVisibleWidgetTypeIds, areTypeIdSetsEqual);
@@ -140,7 +150,18 @@ export const useInvocationState = (): InvocationState => {
   const models = useModelsSelector((snapshot) => snapshot.models);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
-  const { invocation } = routeInput;
+  const invocation = useMemo(
+    () =>
+      sourceId
+        ? {
+            ...routeInput.invocation,
+            ...(sourceId === 'video' ? { destination: 'gallery' as const } : {}),
+            sourceId,
+            sourceLocked: true,
+          }
+        : routeInput.invocation,
+    [routeInput.invocation, sourceId]
+  );
   const isPreparing = useIsInvocationPreparing(routeInput.projectId);
 
   useMountEffect(() => {
@@ -153,8 +174,8 @@ export const useInvocationState = (): InvocationState => {
     subscribeRouteSources,
     getRouteSourcesSnapshot,
     useCallback(
-      () => resolveInvocationRouteInput(routeInput, 'global', invocation, availabilityModels),
-      [availabilityModels, invocation, routeInput]
+      () => resolveInvocationRouteInput(routeInput, sourceId ? 'dialog' : 'global', invocation, availabilityModels),
+      [availabilityModels, invocation, routeInput, sourceId]
     )
   );
   const isConnected = backendConnectionStatus === 'connected';
@@ -167,43 +188,74 @@ export const useInvocationState = (): InvocationState => {
           ? routeInput.workflowValues
           : routeInput.generateValues;
 
+  // Video reads its own normalized values, so the count follows what its submission expands. Upscale's Refine reads
+  // the draft it shares with Generate, as its submission does.
+  const videoValues = invocation.sourceId === 'video' ? normalizeVideoWidgetValues(routeInput.videoValues) : null;
+  const upscalePromptDraft =
+    invocation.sourceId === 'upscale' && readsUpscalePrompt(routeInput.upscaleValues)
+      ? getPromptDraftFromValues(routeInput.generateValues)
+      : null;
   const promptExpansion = useDynamicPrompts(
-    readEffectivePositivePrompt(routeInput.generateValues),
-    invocation.sourceId === 'generate' || invocation.sourceId === 'canvas'
-      ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
-      : null
+    videoValues
+      ? videoValues.positivePrompt
+      : upscalePromptDraft
+        ? getEffectivePrompts(upscalePromptDraft).positivePrompt
+        : readEffectivePositivePrompt(routeInput.generateValues),
+    videoValues
+      ? getDynamicPromptsConfig(videoValues)
+      : upscalePromptDraft
+        ? getDynamicPromptsConfig(upscalePromptDraft)
+        : invocation.sourceId === 'generate' || invocation.sourceId === 'canvas'
+          ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
+          : null
   );
   // Block unexpandable prompts rather than submitting literal dynamic syntax; hotkey submission enforces the same
-  // rule.
-  const expansionReason = promptExpansion.isError
-    ? 'The prompt could not be expanded.'
-    : (promptExpansion.error ?? null);
+  // rule. The prompt field offers the way out: retry, or turn dynamic prompts off and run the prompt as typed.
+  const expansionFailure = describeDynamicPromptsFailure(promptExpansion);
+  const expansionReason = expansionFailure ? describeGenerationIssue(t, expansionFailure) : null;
 
   const issues = useMemo(
     (): InvocationIssue[] => [
-      ...(isConnected ? [] : [{ layerId: null, message: 'The backend is disconnected.' }]),
-      ...(expansionReason === null ? [] : [{ layerId: null, message: expansionReason }]),
+      ...(isConnected
+        ? []
+        : [{ message: t('topbar.invoke.serverDisconnected'), target: { kind: 'connection' } } as const]),
+      ...(expansionReason === null
+        ? []
+        : [
+            {
+              message: expansionReason,
+              target: {
+                kind: 'prompt',
+                widgetId:
+                  invocation.sourceId === 'video' || invocation.sourceId === 'upscale'
+                    ? invocation.sourceId
+                    : 'generate',
+              },
+            } as const,
+          ]),
       ...resolvedRoute.validationReasons.map((reason) => ({
-        layerId: typeof reason === 'object' && 'controlLayerIssue' in reason ? reason.controlLayerIssue.layerId : null,
         message: localizeInvocationValidationReason(reason, t),
+        target: getInvocationIssueTarget(reason, invocation.sourceId),
       })),
     ],
-    [expansionReason, isConnected, resolvedRoute.validationReasons, t]
+    [expansionReason, invocation.sourceId, isConnected, resolvedRoute.validationReasons, t]
   );
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected && expansionReason === null;
 
   const invoke = useCallback(
-    ({ destinationOverride, prepend }: InvokeOptions = {}) =>
+    ({ destinationOverride, onStarted, prepend }: InvokeOptions = {}) =>
       submitActiveInvocation({
         commands,
         destinationOverride,
+        onStarted,
         prepend,
+        sourceId,
         formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
         formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
         getModels: () => availabilityModels,
         queries,
       }),
-    [availabilityModels, commands, queries, t]
+    [availabilityModels, commands, queries, sourceId, t]
   );
 
   return {

@@ -14,8 +14,9 @@ import { useActiveProjectSelector, useWorkbenchSelector } from '@workbench/Workb
 import { useMemo } from 'react';
 
 /**
- * Share progress fills across hosts; callers own placement. Divide width among sessions, hide offline/idle, and
- * leave announcements to the queue's throttled live region.
+ * Share progress fills across hosts; callers own placement. Divide width among sessions, hide offline/idle (the queue
+ * button and status chip say the work is waiting on the connection), and leave announcements to the queue's throttled
+ * live region.
  */
 export const QueueProgressRail = ({ css }: { css: SystemStyleObject }) => {
   const queueItems = useActiveProjectSelector((project) => project.queue.items);

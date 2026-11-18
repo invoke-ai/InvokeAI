@@ -11,6 +11,7 @@ import { createQueueItemDTO, createQueueServer } from '@features/queue/data/queu
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { shallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
+import { getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { act } from 'react';
@@ -31,6 +32,7 @@ let root: Root;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock('@features/generation/react', () => ({
+  clearGenerateModelSwitchConfirmation: () => undefined,
   GenerationUiProvider: ({ adapter: next, children }: { adapter: GenerationUiAdapter; children: ReactNode }) => {
     adapter = next;
     return children;
@@ -323,5 +325,38 @@ describe('Generation adapter upload board', () => {
     await expect(adapter.gallery.getUploadBoardId()).resolves.toBe('inbox');
     // Both were judged from the cached listing: nothing was read for them.
     expect(server.requests).toEqual([]);
+  });
+});
+
+describe('Generation adapter presets', () => {
+  const preset = (id: string) => ({ id, label: id, values: { steps: 12 } });
+  const savedIds = () => getWorkbenchPreferences().generatePresets.map((saved) => saved.id);
+
+  afterEach(() => patchWorkbenchPreferences({ generatePresets: [] }));
+
+  it('restores a deleted preset at its old position, appends past the end, and ignores one still saved', async () => {
+    await patchWorkbenchPreferences({ generatePresets: [preset('a'), preset('c')] });
+    await render(null);
+
+    act(() => adapter.presets.restore(preset('b'), 1));
+    expect(savedIds()).toEqual(['a', 'b', 'c']);
+
+    // Still saved (an Undo after it came back another way): nothing moves or doubles.
+    act(() => adapter.presets.restore({ ...preset('b'), label: 'stale' }, 0));
+    expect(getWorkbenchPreferences().generatePresets.map((saved) => saved.label)).toEqual(['a', 'b', 'c']);
+
+    // Presets deleted since leave its old index past the end.
+    act(() => adapter.presets.restore(preset('d'), 9));
+    expect(savedIds()).toEqual(['a', 'b', 'c', 'd']);
+
+    // Labels are not keys: a preset saved since under the same name keeps it, and the deleted one comes back too.
+    act(() => adapter.presets.restore({ ...preset('e'), label: 'a' }, 1));
+    expect(getWorkbenchPreferences().generatePresets.map((saved) => `${saved.id}:${saved.label}`)).toEqual([
+      'a:a',
+      'e:a',
+      'b:b',
+      'c:c',
+      'd:d',
+    ]);
   });
 });

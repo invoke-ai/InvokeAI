@@ -1,4 +1,4 @@
-import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { ElementType, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 
 import { Badge, chakra, Flex, Grid, Icon, Stack, Switch, Text } from '@chakra-ui/react';
 import { SegmentedControl } from '@platform/ui/SegmentedControl';
@@ -45,12 +45,20 @@ export const PropertyControlRow = ({
   children,
   label,
   labelId,
+  labelWidth = '4.5rem',
 }: {
   children: ReactNode;
   label?: string;
   labelId?: string;
+  labelWidth?: string;
 }) => (
-  <Grid alignItems="center" columnGap="2" gridTemplateColumns="4.5rem minmax(0, 1fr) auto" minH="control.md" w="full">
+  <Grid
+    alignItems="center"
+    columnGap="2"
+    gridTemplateColumns={`${labelWidth} minmax(0, 1fr) auto`}
+    minH="control.md"
+    w="full"
+  >
     {label ? <PropertyRowLabel label={label} labelId={labelId} /> : <Text color="fg.muted" id={labelId} minW="0" />}
     {children}
   </Grid>
@@ -102,12 +110,14 @@ export const PropertyGroup = ({
   collapsible,
   id,
   label,
+  hideLabel = false,
 }: {
   children: ReactNode;
   /** Absent means always open with a plain header. */
   collapsible?: 'open' | 'collapsed';
   id: string;
   label: string;
+  hideLabel?: boolean;
 }) => {
   const collapsed = usePropertyGroupCollapsed(id, collapsible === 'collapsed');
   const onToggle = useCallback(() => setPropertyGroupCollapsed(id, !collapsed), [collapsed, id]);
@@ -139,7 +149,7 @@ export const PropertyGroup = ({
           </Text>
         </chakra.button>
       ) : (
-        <Text color="fg.muted" fontWeight="600">
+        <Text color="fg.muted" fontWeight="600" hidden={hideLabel}>
           {label}
         </Text>
       )}
@@ -148,18 +158,20 @@ export const PropertyGroup = ({
   );
 };
 
-/** A labelled choice row rendered as a full-width segmented control (≤5 options). */
+/** A labelled choice row rendered as a full-width segmented control: up to 5 text options, or more as icons. */
 export const PropertySegmentedRow = <Value extends string>({
+  describedBy,
   disabled,
   label,
   onValueChange,
   options,
   value,
 }: {
+  describedBy?: string;
   disabled?: boolean;
   label: string;
   onValueChange: (value: Value) => void;
-  options: readonly { value: Value; label: string }[];
+  options: readonly { value: Value; label: ReactNode; icon?: ElementType; disabled?: boolean }[];
   value: Value;
 }) => {
   const handleChange = useCallback(
@@ -173,6 +185,7 @@ export const PropertySegmentedRow = <Value extends string>({
   return (
     <PropertyControlRow label={label}>
       <SegmentedControl
+        aria-describedby={describedBy}
         ariaLabel={label}
         disabled={disabled}
         gridColumn="2 / -1"

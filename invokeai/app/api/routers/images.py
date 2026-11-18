@@ -31,10 +31,11 @@ from invokeai.app.api.routers._access import (
     item_action_for_changes,
     redact_project_ids,
 )
-from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
+from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE, MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.board_access.board_access_common import ItemAction
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageNamesResult,
@@ -61,16 +62,6 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
 
-# Every name in a batch body costs at least one DB lookup, so an unbounded list lets an
-# authenticated client pin a worker with a single request. Mirrors MAX_VIDEO_BATCH_SIZE
-# in the videos router.
-#
-# "At least one" is doing real work in that sentence. The authorization helpers in _access.py
-# short-circuit for an admin (no query) and a direct owner (one), but a user acting on someone
-# else's item on a board they share costs three indexed reads per name: the item's owner, its
-# board, and that board's access facts. That is the case the bound has to hold, and it is why no
-# route gets a laxer one: the oversized selections this cap rejects are split client-side instead.
-MAX_IMAGE_BATCH_SIZE = 1000
 # Names are UUID-derived filenames; the bound only exists to keep a hostile body from
 # turning into megabytes of SQL parameters.
 ImageName = Annotated[str, StringConstraints(max_length=255)]
@@ -123,8 +114,11 @@ async def upload_image(
     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
     resize_to: Optional[str] = Body(
         default=None,
-        description=f"Dimensions to resize the image to, must be stringified tuple of 2 integers. Max total pixel count: {ResizeToDimensions.MAX_SIZE}",
-        examples=['"[1024,1024]"'],
+        description=(
+            "Dimensions to resize the image to, as a stringified JSON object with positive integer width and height."
+            f" Max total pixel count: {ResizeToDimensions.MAX_SIZE}"
+        ),
+        examples=['{"width": 1024, "height": 1024}'],
     ),
     metadata: Optional[str] = Body(
         default=None,
@@ -362,7 +356,7 @@ def get_image_dto(
         # 404s, so nothing else may wear that answer: a board lookup against an unreadable
         # database, or a URL service failure, would otherwise clear a live image out of the
         # workflows using it. Narrowed here rather than everywhere, because this is the 404
-        # that is acted on destructively — the media, metadata and workflow routes keep theirs.
+        # that is acted on destructively — the media routes keep theirs.
         raise HTTPException(status_code=404)
     redact_project_ids([image_dto], current_user)
     return image_dto
@@ -382,7 +376,10 @@ def get_image_metadata(
 
     try:
         return ApiDependencies.invoker.services.images.get_metadata(image_name)
-    except Exception:
+    except ImageRecordNotFoundException:
+        # Clients cache a 404 here as "this image has no metadata" for good, so only a missing
+        # record earns it. A busy database must surface as a retryable 500; so does stored
+        # metadata that no longer validates — a server fault to log, not an image without metadata.
         raise HTTPException(status_code=404)
 
 
@@ -410,7 +407,8 @@ def get_image_workflow(
         graph = ApiDependencies.invoker.services.images.get_graph(image_name)
         resolved_inputs = ApiDependencies.invoker.services.images.get_resolved_inputs(image_name)
         return WorkflowAndGraphResponse(workflow=workflow, graph=graph, resolved_inputs=resolved_inputs)
-    except Exception:
+    except (ImageRecordNotFoundException, ImageFileNotFoundException):
+        # See get_image_metadata: only a missing record or file is "not found".
         raise HTTPException(status_code=404)
 
 
@@ -900,7 +898,7 @@ def download_images_from_list(
     # Validate that the caller can read every image they are requesting.
     # For a board_id request, check board visibility; for explicit image names,
     # check each image individually.
-    if board_id:
+    if board_id is not None and board_id != "none":
         _assert_board_read_access(board_id, current_user)
     if image_names:
         for name in image_names:
@@ -916,6 +914,7 @@ def download_images_from_list(
         board_id,
         bulk_download_item_id,
         current_user.user_id,
+        uncategorized_owner_id=None if current_user.is_admin else current_user.user_id,
     )
     return ImagesDownloaded(bulk_download_item_name=bulk_download_item_id + ".zip")
 

@@ -8,6 +8,7 @@ worker recording `queue_item` (so the status-changed handler can't set the worke
 from types import SimpleNamespace
 
 import pytest
+import torch
 
 from invokeai.app.services.session_processor.session_processor_default import DefaultSessionProcessor
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItemNotFoundError
@@ -51,16 +52,18 @@ def test_is_queue_item_terminal_treats_missing_as_terminal():
     assert processor._is_queue_item_terminal(1) is True
 
 
-def _run_guard_scenario(statuses: list[str], set_cancel_event: bool, set_stop_on_claim: bool = False):
+def _run_guard_scenario(
+    statuses: list[str], set_cancel_event: bool, set_stop_on_claim: bool = False, device: torch.device | None = None
+):
     """Drives one _process claim through the post-dequeue guard.
 
     `statuses` is the sequence of statuses returned by successive get_queue_item calls for the
     claimed row (the last value repeats). `set_cancel_event` simulates the delayed handler for the
-    PREVIOUS item firing between cancel_event.clear() and the guard. Returns
-    (canceled_ids, run_items, worker).
+    PREVIOUS item firing between cancel_event.clear() and the guard. `device` makes it a multi-GPU
+    worker on that device; there is no real GPU behind it. Returns (canceled_ids, run_items, worker).
     """
     from threading import BoundedSemaphore, Event
-    from unittest.mock import MagicMock
+    from unittest.mock import MagicMock, patch
 
     from invokeai.app.services.session_processor.session_processor_default import _SessionWorker
 
@@ -71,7 +74,7 @@ def _run_guard_scenario(statuses: list[str], set_cancel_event: bool, set_stop_on
     run_items: list[int] = []
     runner = MagicMock()
     runner.workflow_call_queue_lifecycle.run_queue_item.side_effect = lambda item: run_items.append(item.item_id)
-    worker = _SessionWorker(device=None, runner=runner)
+    worker = _SessionWorker(device=device, runner=runner)
     canceled: list[int] = []
     claimed = SimpleNamespace(item_id=42, session_id="sess", queue_id="default")
 
@@ -116,7 +119,8 @@ def _run_guard_scenario(statuses: list[str], set_cancel_event: bool, set_stop_on
     processor._polling_interval = 0.001
     processor._thread_semaphore = BoundedSemaphore(1)
 
-    processor._process(worker=worker, stop_event=stop_event, resume_event=resume_event)
+    with patch("invokeai.app.services.session_processor.session_processor_default.torch.cuda.set_device"):
+        processor._process(worker=worker, stop_event=stop_event, resume_event=resume_event)
     return canceled, run_items, worker
 
 
@@ -271,3 +275,48 @@ def test_cuda_device_pin_is_deferred_until_first_claim_and_runs_once():
 
     assert events == ["dequeue:empty", "dequeue:1", "pin:cuda:1", "run:1", "dequeue:2", "run:2"]
     mock_set_device.assert_called_once_with(torch.device("cuda:1"))
+
+
+def _record_attention_logs(monkeypatch) -> list[object]:
+    """Replace the conftest's no-op stub with a recorder of the device each call asks about."""
+    import invokeai.app.services.session_processor.session_processor_default as processor_module
+
+    devices: list[object] = []
+    monkeypatch.setattr(processor_module, "log_attention_backends", lambda logger, device: devices.append(device))
+    return devices
+
+
+def test_an_item_about_to_run_logs_the_attention_backends_of_the_workers_own_device(monkeypatch):
+    """On a multi-GPU box each worker reports its own GPU, not the configured default device."""
+    devices = _record_attention_logs(monkeypatch)
+
+    _canceled, run_items, _worker = _run_guard_scenario(
+        statuses=["in_progress"], set_cancel_event=False, device=torch.device("cuda", 1)
+    )
+
+    assert run_items == [42]
+    assert devices == [torch.device("cuda", 1)]
+
+
+def test_an_item_skipped_before_it_runs_does_not_probe(monkeypatch):
+    """The probe allocates, and in single-device mode resolving the device creates a CUDA context: an
+    item canceled before it started must not pay that."""
+    devices = _record_attention_logs(monkeypatch)
+
+    _canceled, run_items, _worker = _run_guard_scenario(statuses=["canceled"], set_cancel_event=False)
+
+    assert run_items == []
+    assert devices == []
+
+
+def test_a_probe_that_raises_does_not_fail_the_item(monkeypatch):
+    import invokeai.app.services.session_processor.session_processor_default as processor_module
+
+    def broken(logger, device):
+        raise RuntimeError("CUDA driver gone")
+
+    monkeypatch.setattr(processor_module, "log_attention_backends", broken)
+
+    _canceled, run_items, _worker = _run_guard_scenario(statuses=["in_progress"], set_cancel_event=False)
+
+    assert run_items == [42]

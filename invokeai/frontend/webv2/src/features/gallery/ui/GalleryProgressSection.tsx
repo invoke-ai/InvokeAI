@@ -1,12 +1,14 @@
 import type { GalleryThumbnailFit } from '@features/gallery/core/settings';
-import type { QueueProgressSession } from '@features/queue/contracts';
+import type { QueueProgressSession, QueueSourceId } from '@features/queue/contracts';
 
-import { Box, chakra, Icon, ProgressCircle, Skeleton, Text } from '@chakra-ui/react';
+import { Box, chakra, Icon, Skeleton, Text } from '@chakra-ui/react';
 import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useItemProgress, useQueueItemProgressImage } from '@features/queue/react';
+import { ProgressBadge } from '@platform/ui/ProgressBadge';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
-import { CheckIcon, ChevronRightIcon, HourglassIcon } from 'lucide-react';
+import { Tooltip } from '@platform/ui/Tooltip';
+import { ChevronRightIcon, HourglassIcon } from 'lucide-react';
 import { useCallback, useEffectEvent, useId, useLayoutEffect, useRef } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import type { GalleryProgressLayout } from './galleryGridLayout';
 
 import { GALLERY_TAB_STOP_SELECTOR } from './GalleryThumbnail';
-import { SELECTED_TILE_CSS } from './GalleryTileFrame';
+import { GalleryTileMedia, getGalleryTileMediaRatio } from './GalleryTileFrame';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -180,6 +182,26 @@ const GalleryProgressGrid = ({
   );
 };
 
+/**
+ * Like a completed thumbnail: hover tints the square cell, while the border, selection and focus ring wrap the media
+ * box sized to the job's target ratio, so the finished item takes the same rect. The progress badge stays on the cell.
+ */
+const PROGRESS_CELL_CSS = {
+  _focusVisible: { outline: 'none' },
+  // Queued and settling tiles are inert; only a followable one answers hover.
+  '&:not([aria-disabled=true]):hover': { bg: 'bg.hover' },
+  '&:focus-visible [data-gallery-tile-media]': {
+    outline: '2px solid {colors.accent.solid}',
+    outlineOffset: '-2px',
+  },
+} as const;
+
+/**
+ * Sources whose snapshot records the size they will output. Workflows take Generate's size, which their graph need
+ * not use, so their tiles stay square and letterbox the live image.
+ */
+const SIZED_PROGRESS_SOURCES: ReadonlySet<QueueSourceId> = new Set(['canvas', 'generate', 'upscale', 'video']);
+
 const GalleryProgressTile = ({
   session,
   size,
@@ -236,60 +258,55 @@ const GalleryProgressTile = ({
   );
 
   const isShownSelected = selected && session.state !== 'queued';
+  const mediaRatio = SIZED_PROGRESS_SOURCES.has(session.sourceId) ? getGalleryTileMediaRatio(session, fit) : null;
 
   return (
-    <chakra.button
-      ref={buttonRef}
-      type="button"
-      focusVisibleRing="inside"
-      aria-label={`${label} · ${status}`}
-      aria-pressed={isShownSelected}
-      aria-disabled={session.state !== 'running'}
-      data-gallery-session-id={session.id}
-      tabIndex={session.state === 'running' ? 0 : -1}
-      borderColor={isShownSelected ? 'accent.solid' : 'border.subtle'}
-      borderWidth="2px"
-      css={isShownSelected ? SELECTED_TILE_CSS : undefined}
-      flexShrink={0}
-      minW="0"
-      overflow="hidden"
-      rounded="md"
-      textAlign="start"
-      title={`${label} · ${status}`}
-      position="relative"
-      w={`${size}px`}
-      onClick={follow}
-    >
-      <StreamingImageFrame
+    <Tooltip content={`${label} · ${status}`}>
+      <chakra.button
+        ref={buttonRef}
+        type="button"
+        aria-label={`${label} · ${status}`}
+        aria-pressed={isShownSelected}
+        aria-disabled={session.state !== 'running'}
+        data-gallery-session-id={session.id}
+        tabIndex={session.state === 'running' ? 0 : -1}
+        alignItems="center"
         aspectRatio={1}
-        fit={fit === 'aspect' ? 'contain' : 'cover'}
-        liveImage={progressImageToStreamingSource(image)}
-        shouldAntialiasLiveImage={antialiasProgressImages}
-        w="full"
-      >
-        {session.state === 'queued' ? <Box bg="bg.subtle" h="full" w="full" /> : <Skeleton h="full" w="full" />}
-      </StreamingImageFrame>
-      <Box
-        position="absolute"
-        bottom="1"
-        right="1"
-        pointerEvents="none"
-        bg="bg/85"
-        rounded="full"
-        p="0.5"
+        css={PROGRESS_CELL_CSS}
         display="flex"
+        flexShrink={0}
+        justifyContent="center"
+        minW="0"
+        rounded="md"
+        textAlign="start"
+        position="relative"
+        transition="background-color var(--wb-motion-duration-fast) ease"
+        w={`${size}px`}
+        onClick={follow}
       >
-        {session.state === 'running' ? (
-          <ProgressCircle.Root aria-label={status} value={percentage}>
-            <ProgressCircle.Circle>
-              <ProgressCircle.Track />
-              <ProgressCircle.Range />
-            </ProgressCircle.Circle>
-          </ProgressCircle.Root>
-        ) : (
-          <Icon as={session.state === 'queued' ? HourglassIcon : CheckIcon} boxSize="4" aria-label={status} />
-        )}
-      </Box>
-    </chakra.button>
+        <GalleryTileMedia
+          fit={mediaRatio === null ? 'square' : fit}
+          height={session.height}
+          isSelected={isShownSelected}
+          width={session.width}
+        >
+          <StreamingImageFrame
+            // A box sized to the target ratio is filled exactly; an unsized aspect fit letterboxes in the square.
+            fit={fit === 'aspect' && mediaRatio === null ? 'contain' : 'cover'}
+            h="full"
+            liveImage={progressImageToStreamingSource(image)}
+            shouldAntialiasLiveImage={antialiasProgressImages}
+            w="full"
+          >
+            {session.state === 'queued' ? <Box bg="bg.subtle" h="full" w="full" /> : <Skeleton h="full" w="full" />}
+          </StreamingImageFrame>
+        </GalleryTileMedia>
+        <ProgressBadge
+          label={status}
+          percentage={percentage}
+          state={session.state === 'settling' ? 'completed' : session.state}
+        />
+      </chakra.button>
+    </Tooltip>
   );
 };

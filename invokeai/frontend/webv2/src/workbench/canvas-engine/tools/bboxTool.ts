@@ -113,6 +113,8 @@ export const createBboxTool = (): Tool => {
       return target ? CURSOR_FOR_TARGET[target] : 'default';
     },
     id: 'bbox',
+    // Alt bypasses grid snapping for the drag, so holding it first must not switch to the color picker.
+    usesAltKey: true,
     onDeactivate: (ctx) => {
       state = null;
       hoverTarget = null;

@@ -1,6 +1,7 @@
 import type { GalleryBoard } from './types';
 
 import { canOnBoard, isOtherUsersGalleryBoard, isOwnGalleryBoard, isSharedGalleryBoard } from './boardAccess';
+import { ALL_READABLE_BOARDS_ID } from './items';
 
 export type GalleryBoardTranslate = (key: string) => string;
 
@@ -107,4 +108,41 @@ export const getGalleryBoardDestinationGroups = ({
   ];
 
   return groups.filter((group) => group.boards.length > 0);
+};
+
+/**
+ * Where a set of items can be moved, shared by the selection bar and the item menus: stored boards that are not
+ * archived (date and Uncategorized entries are not boards), less the one board every item is already on. Removing
+ * from a board is offered only while some item may be on one. Items no loaded page holds sit on the listing's board;
+ * where that is unknown (no listing named, or a search of every board) they could be on any board.
+ */
+export const getGalleryMoveTargets = (
+  boards: readonly GalleryBoard[],
+  {
+    itemBoardIds,
+    listingBoardId = null,
+    unloadedCount = 0,
+  }: {
+    /** The board of each item a loaded page holds. */
+    itemBoardIds: readonly string[];
+    /** The board the listing the items were selected in reads. */
+    listingBoardId?: string | null;
+    /** Selected items no loaded page holds. */
+    unloadedCount?: number;
+  }
+): { boards: GalleryBoard[]; canRemoveFromBoard: boolean } => {
+  const sources = new Set(itemBoardIds);
+  const isUnloadedBoardKnown = listingBoardId !== null && listingBoardId !== ALL_READABLE_BOARDS_ID;
+
+  if (unloadedCount > 0 && isUnloadedBoardKnown) {
+    sources.add(listingBoardId);
+  }
+
+  const isAnyBoardUnknown = unloadedCount > 0 && !isUnloadedBoardKnown;
+  const sharedSource = !isAnyBoardUnknown && sources.size === 1 ? [...sources][0] : undefined;
+
+  return {
+    boards: boards.filter((board) => board.kind === 'board' && !board.archived && board.id !== sharedSource),
+    canRemoveFromBoard: isAnyBoardUnknown || [...sources].some((boardId) => boardId !== 'none'),
+  };
 };

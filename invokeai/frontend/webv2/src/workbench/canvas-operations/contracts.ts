@@ -1,3 +1,4 @@
+import type { UtilityGraphExecutionStatus } from '@features/queue/utility';
 import type {
   CommitGeneratedImageResult,
   LayerExportGuard,
@@ -41,9 +42,9 @@ export type StartSelectObjectSessionResult =
   | 'unsupported'
   | 'not-ready';
 export type StartFilterOperationResult = 'started' | 'missing' | 'disabled' | 'locked' | 'unsupported' | 'not-ready';
-export type CanvasOperationActionResult = 'completed' | 'blocked' | 'stale';
+export type CanvasOperationActionResult = 'completed' | 'stale';
 export type FilterCommitOperationResult = 'committed' | 'blocked' | 'stale';
-export type CanvasOperationMutationResult = 'updated' | 'blocked' | 'stale';
+export type CanvasOperationMutationResult = 'updated' | 'stale';
 export type SelectObjectSaveTarget = 'selection' | 'raster' | 'control' | MaskImageResultTarget;
 export type SaveSelectObjectSessionResult =
   | CommitGeneratedImageResult
@@ -51,6 +52,8 @@ export type SaveSelectObjectSessionResult =
   | ReplaceSelectionFromImageResult;
 export interface SelectObjectSessionUpdate {
   input?: SamInput;
+  /** Switch between visual and prompt input; each type keeps its last input until Reset. */
+  inputType?: SamInput['type'];
   pointLabel?: 'include' | 'exclude';
   model?: SamModel;
   invert?: boolean;
@@ -151,7 +154,6 @@ export interface CanvasApplicationOperationStores {
 export interface CanvasFilterCoordinatorDeps {
   readonly stores: CanvasApplicationOperationStores;
   readonly controller: CanvasOperationController;
-  isInteractionLocked(): boolean;
   getDocument(): CanvasDocumentContractV3 | null;
   captureGuard(layerId: string): LayerExportGuard | null;
   selectLayer(layerId: string): void;
@@ -170,7 +172,7 @@ export interface CanvasFilterCoordinatorDeps {
     layerId: string
   ): Omit<
     CreateFilterSessionOptions['deps'],
-    'canCommit' | 'clearPreview' | 'controller' | 'isDraftValid' | 'makeDurable' | 'runFilter'
+    'clearPreview' | 'controller' | 'isDraftValid' | 'makeDurable' | 'runFilter'
   >;
 }
 
@@ -185,7 +187,6 @@ export interface CanvasFilterOperationCoordinator {
     makeImageDurable: (imageName: string) => Promise<void>
   ): Promise<FilterCommitOperationResult>;
   cancel(): void;
-  interruptAndBlock(): void;
   isActive(): boolean;
   dispose(): void;
 }
@@ -205,9 +206,8 @@ export interface CanvasSelectObjectCoordinatorDeps {
   readonly stores: CanvasApplicationOperationStores;
   readonly controller: CanvasOperationController;
   readonly projectId: string;
-  isInteractionLocked(): boolean;
-  /** Reads the account's Auto Process preference when a session starts; absent means off. */
-  readAutoProcessPreference?(): boolean;
+  /** Reads the account's auto-update preference when a session starts; absent starts from the account default. */
+  readAutoUpdatePreference?(): boolean;
   prepareStart(layerId: string): SelectObjectStartContext;
   selectLayer(layerId: string): void;
   clearOtherOperation(): void;
@@ -255,7 +255,6 @@ export interface CanvasSelectObjectOperationCoordinator {
   ): Promise<SaveSelectObjectSessionResult>;
   reset(): CanvasOperationMutationResult;
   cancel(): void;
-  interruptAndBlock(): void;
   isActive(): boolean;
   dispose(): void;
 }
@@ -266,10 +265,8 @@ export interface FilterOperationSession {
   updateDraft(draft: LayerFilterSettings): void;
   setAutoProcess(value: boolean): void;
   process(): Promise<CanvasOperationRunResult>;
-  interruptProcessing(): void;
   reset(settings: Record<string, unknown>): void;
   commit(target: FilterCommitTarget): Promise<'committed' | 'blocked' | 'stale'>;
-  blockCommit(): void;
   cancel(): void;
   dispose(): void;
 }
@@ -301,10 +298,12 @@ export interface SelectObjectSessionState<T> {
   isolatedPreview: boolean;
   status: SelectObjectSessionStatus;
   error: SamSessionError | null;
+  /** A run asked for after a failed run is still in flight. */
+  retrying: boolean;
   preview: SelectObjectSessionPreview<T> | null;
   sourceGuard: LayerExportGuard | null;
 }
-export type SelectObjectSessionProcessResult = CanvasOperationRunResult | 'blocked' | 'deduped' | 'invalid';
+export type SelectObjectSessionProcessResult = CanvasOperationRunResult | 'deduped' | 'invalid';
 export interface SelectObjectSession<T> {
   getSnapshot(): SelectObjectSessionState<T>;
   subscribe(listener: () => void): () => void;
@@ -314,10 +313,9 @@ export interface SelectObjectSession<T> {
         SelectObjectSessionState<T>,
         'applyPolygonRefinement' | 'autoProcess' | 'input' | 'invert' | 'isolatedPreview' | 'model'
       >
-    >
+    > & { inputType?: SamInput['type'] }
   ): void;
   process(): Promise<SelectObjectSessionProcessResult>;
-  interruptProcessing(): void;
   reportError(error: SamSessionError | string): void;
   reset(): void;
   cancel(): void;
@@ -356,7 +354,6 @@ export interface CreateFilterSessionOptions {
     isGuardCurrent(guard: LayerExportGuard): boolean;
     isDraftValid(draft: LayerFilterSettings): boolean;
     makeDurable(imageName: string): Promise<void>;
-    canCommit(): boolean;
     commit(options: {
       draft: LayerFilterSettings;
       guard: LayerExportGuard;
@@ -396,7 +393,7 @@ export interface CreateSelectObjectSessionOptions<T> {
     cleanupPreview(): void;
     isGuardCurrent(guard: LayerExportGuard): boolean;
   };
-  initialAutoProcess?: boolean;
+  initialAutoProcess: boolean;
   operation: CanvasOperationSession;
 }
 
@@ -409,6 +406,8 @@ export interface CanvasApplicationPort {
     isGuardCurrent(guard: LayerExportGuard): boolean;
   }): CanvasOperationController;
   runGraph(options: {
+    onStatus?: (status: UtilityGraphExecutionStatus) => void;
+    prepend?: boolean;
     graph: BackendGraphContract;
     outputNodeId?: string;
     signal?: AbortSignal;

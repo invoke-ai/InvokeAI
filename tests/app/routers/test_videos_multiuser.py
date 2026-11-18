@@ -41,6 +41,8 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.users.users_common import UserCreateRequest
+from invokeai.app.services.video_files.video_files_common import VideoFileNotFoundException
+from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.util.video_ingest import MediaProbe
 from tests.fixtures.sqlite_database import sqlite_cursor
@@ -349,10 +351,43 @@ def test_unreadable_storage_does_not_read_as_a_deleted_video(
 
     mock_invoker.services.videos.get_dto = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
 
-    # Uncaught in the route, so a 500 in production; the test client re-raises instead of
-    # rendering it. Either way it must not be the 404 that clears the user's reference.
-    with pytest.raises(sqlite3.OperationalError):
-        client.get("/api/v1/videos/i/unreadable.mp4", headers={"Authorization": f"Bearer {admin_token}"})
+    # Must be a retryable 500, not the 404 that clears the user's reference.
+    response = TestClient(client.app, raise_server_exceptions=False).get(
+        "/api/v1/videos/i/unreadable.mp4", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+@pytest.mark.parametrize(("route", "service_method"), [("metadata", "get_metadata"), ("workflow", "get_workflow")])
+def test_unreadable_storage_does_not_read_as_missing_video_metadata(
+    client: TestClient, mock_invoker: Invoker, admin_token: str, route: str, service_method: str
+):
+    """Clients cache a metadata/workflow 404 as "nothing recorded", so a busy database must not answer it."""
+    import sqlite3
+
+    setattr(
+        mock_invoker.services.videos,
+        service_method,
+        MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+    )
+
+    response = TestClient(client.app, raise_server_exceptions=False).get(
+        f"/api/v1/videos/i/unreadable.mp4/{route}", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+@pytest.mark.parametrize(("route", "service_method"), [("metadata", "get_metadata"), ("workflow", "get_workflow")])
+def test_video_deleted_mid_request_answers_metadata_404(
+    client: TestClient, mock_invoker: Invoker, admin_token: str, route: str, service_method: str
+):
+    setattr(mock_invoker.services.videos, service_method, MagicMock(side_effect=VideoRecordNotFoundException))
+
+    response = client.get(f"/api/v1/videos/i/gone.mp4/{route}", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_revoking_access_to_a_live_video_stays_a_denial(client: TestClient, mock_invoker: Invoker, user1_token: str):
@@ -1166,7 +1201,7 @@ def test_get_video_workflow_missing_video_returns_404(client: TestClient, mock_i
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     assert user1 is not None
     mock_invoker.services.video_records.get_user_id.return_value = user1.user_id
-    mock_invoker.services.videos.get_workflow.side_effect = Exception("video file not found")
+    mock_invoker.services.videos.get_workflow.side_effect = VideoFileNotFoundException()
 
     response = client.get(
         "/api/v1/videos/i/mine_a.mp4/workflow",

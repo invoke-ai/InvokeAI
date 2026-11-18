@@ -1,6 +1,12 @@
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 
-import type { GalleryImage, GalleryOrderDir, GeneratedImageContract, GeneratedVideoContract } from './types';
+import type {
+  GalleryImage,
+  GalleryOrderDir,
+  GalleryView,
+  GeneratedImageContract,
+  GeneratedVideoContract,
+} from './types';
 
 export type GalleryItemKind = 'image' | 'video';
 
@@ -60,6 +66,32 @@ export interface GalleryItemMutationResult {
 }
 
 export const toGalleryItemKey = ({ kind, name }: GalleryItemRef): GalleryItemKey => `${kind}:${name}`;
+
+/**
+ * The Gallery view that lists each category, mirroring the backend's `IMAGE_CATEGORIES` and `ASSETS_CATEGORIES`
+ * (`invokeai/app/services/image_records/image_records_common.py`). `other` is in neither: it marks pixels a Canvas
+ * layer owns, which the backend keeps durable but never lists or counts, so no view can show such an item.
+ */
+const galleryViewByCategory: Record<GalleryItemCategory, GalleryView | null> = {
+  control: 'assets',
+  general: 'images',
+  mask: 'assets',
+  other: null,
+  user: 'assets',
+};
+
+/**
+ * Which Gallery view lists an item, for images and videos alike; null for a Canvas-owned (`other`) item that no view
+ * lists. Callers must not open or navigate a view for a null item: the listing would never contain it.
+ */
+export const getGalleryItemView = ({ category }: Pick<GalleryItem, 'category'>): GalleryView | null =>
+  galleryViewByCategory[category];
+
+/** The categories a view's backend listing requests: the inverse of `getGalleryItemView`. */
+export const getGalleryViewCategories = (view: GalleryView): GalleryItemCategory[] =>
+  (Object.keys(galleryViewByCategory) as GalleryItemCategory[]).filter(
+    (category) => galleryViewByCategory[category] === view
+  );
 
 export const shouldStarSelection = (items: readonly GalleryItem[], refs: readonly GalleryItemRef[]): boolean => {
   if (refs.length === 0) {

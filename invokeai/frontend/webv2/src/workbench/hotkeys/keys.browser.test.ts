@@ -60,6 +60,18 @@ describe('isNativeControlKeyPress', () => {
     expect(press('<div data-target role="slider" tabindex="0"></div>', { key: 'ArrowLeft' })).toBe(true);
   });
 
+  // The workflow editor binds bare Space to Add node; on a focused node toggle or button, Space must still press it.
+  it('leaves the activating Space or Enter to a focused button, toggle, link or tab', () => {
+    expect(press('<button data-target type="button">x</button>', { key: ' ' })).toBe(true);
+    expect(press('<input data-target type="checkbox" />', { key: ' ' })).toBe(true);
+    expect(press('<div data-target role="switch" tabindex="0"></div>', { key: ' ' })).toBe(true);
+    expect(press('<a data-target href="#x">x</a>', { key: 'Enter' })).toBe(true);
+    expect(press('<div data-target role="tab" tabindex="0"></div>', { key: 'Enter' })).toBe(true);
+    // A focused canvas or graph node is no such control, and a chord is never the control's.
+    expect(press('<div data-target role="group" tabindex="0"></div>', { key: ' ' })).toBe(false);
+    expect(press('<button data-target type="button">x</button>', { ctrlKey: true, key: 'Enter' })).toBe(false);
+  });
+
   it('leaves other keys and chords to shortcuts', () => {
     expect(press('<input data-target type="radio" />', { key: 'a' })).toBe(false);
     expect(press('<input data-target type="radio" />', { ctrlKey: true, key: 'ArrowRight' })).toBe(false);

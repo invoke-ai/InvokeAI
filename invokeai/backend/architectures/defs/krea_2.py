@@ -38,6 +38,7 @@ register(
         # three edit references for ai-toolkit edit LoRAs; `krea2_denoise` refuses more than three.
         max_reference_images=3,
         supports_regional_guidance=True,
+        regional_negative=True,
     ),
     VaeFacet(
         frozenset(

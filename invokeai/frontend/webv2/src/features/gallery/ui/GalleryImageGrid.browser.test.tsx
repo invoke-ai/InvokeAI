@@ -29,17 +29,20 @@ import { invalidateGalleryItems, patchGalleryItemCaches } from '@features/galler
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { GALLERY_PINNED_FOOTER_PX } from '@features/gallery/ui/galleryGridLayout';
 import { isGalleryImageDragData } from '@features/gallery/utility';
-import { getFollowedProgressSession } from '@features/queue/contracts';
+import { getAutoSwitchFollowedLive } from '@features/queue/contracts';
+import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { getContrastRatio } from '@platform/ui/theme/contrastRatio.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { PrimaryMouseSensor } from '@workbench/shell/holdToDragSensor';
 import { workbenchAutoScroll } from '@workbench/widgetDnd';
 import { PreviewFilmstrip } from '@workbench/widgets/preview/PreviewFilmstrip';
 import { PreviewFrame } from '@workbench/widgets/preview/PreviewFrame';
 import { createInstance } from 'i18next';
 import { act, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -228,7 +231,6 @@ void i18n.use(initReactI18next).init({
             starredItems: 'Starred',
             unstarImage: 'Unstar {{name}}',
             uncategorized: 'Uncategorized',
-            windowLimit: 'Limited to {{count}}',
           },
           preview: {
             compare: 'Compare',
@@ -330,6 +332,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     compareImageKey: null,
     galleryView: 'images',
     isComparisonActive: false,
+    isCompareArmed: false,
     isSearchActive: false,
     items,
     listingBoardId: overrides.selectedBoardId ?? board.id,
@@ -425,21 +428,30 @@ type CanonicalContextTarget = {
   allStarred?: boolean;
   itemRefs?: GalleryItemRef[];
   items: GalleryItem[];
+  returnFocus?: () => HTMLElement | null;
   x: number;
   y: number;
 } | null;
 const ContextMenuProbe = ({ target }: { target: CanonicalContextTarget }) => (
-  <output data-testid="context-target">
-    {JSON.stringify(
-      target
-        ? {
-            itemRefs: target.itemRefs ?? null,
-            items: target.items.map(({ kind, name }) => ({ kind, name })),
-            ...(target.allStarred === undefined ? {} : { allStarred: target.allStarred }),
-          }
-        : null
-    )}
-  </output>
+  <>
+    <output data-testid="context-target">
+      {JSON.stringify(
+        target
+          ? {
+              itemRefs: target.itemRefs ?? null,
+              items: target.items.map(({ kind, name }) => ({ kind, name })),
+              ...(target.allStarred === undefined ? {} : { allStarred: target.allStarred }),
+            }
+          : null
+      )}
+    </output>
+    {/* Stands in for a dialog the menu opened, closing: focus goes where the target says. */}
+    <button data-testid="context-return-focus" type="button" onClick={() => target?.returnFocus?.()?.focus()}>
+      Close dialog
+    </button>
+    {/* The open menu's portalled layer: a React child of the grid, outside its DOM. */}
+    {target ? createPortal(<div data-testid="context-menu-layer">Menu</div>, document.body) : null}
+  </>
 );
 const NoopProvider = ({ children }: { children: ReactNode }) => children;
 
@@ -477,7 +489,16 @@ const createAdapter = (
     progressSessions,
     pinnedProgressSessionId,
     followedProgressSessionId: liveFollowEnabled
-      ? (getFollowedProgressSession(progressSessions, pinnedProgressSessionId)?.id ?? null)
+      ? // Every live session in these fixtures is running and has shown a frame of its own.
+        (getAutoSwitchFollowedLive(
+          'progress',
+          progressSessions.map((session) => ({
+            hasOwnFrame: true,
+            id: session.id,
+            state: session.state,
+          })),
+          pinnedProgressSessionId
+        )?.id ?? null)
       : null,
     followProgressSession,
     notifications: { add: noop, reportError: noop },
@@ -509,6 +530,8 @@ const READY_LISTING: GalleryListingState = {
 };
 let currentListing = READY_LISTING;
 let onDragStart = vi.fn();
+/** The shell's primary-button mouse sensor instead of the pointer sensor most tests drive. */
+let withShellMouseSensor = false;
 
 /** The strip the next renders show; `total` defaults to the item count. */
 const setStrip = (items: GalleryItem[], total = items.length) => {
@@ -540,7 +563,7 @@ const Harness = ({
   progressSessions: QueueProgressSession[];
 }) => {
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(withShellMouseSensor ? PrimaryMouseSensor : PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const contextValue: GalleryWidgetContextValue = {
@@ -549,7 +572,6 @@ const Harness = ({
     filter: getStableFilter(gallery),
     gallery,
     itemActions: imageActionMocks,
-    isWindowTruncated: false,
     listing: currentListing,
     loadedItems: mergeGalleryLoadedItems(currentStrip.items, gallery.items),
     projectName: 'Project',
@@ -635,7 +657,6 @@ const QueryBackedGalleryHarness = ({
     filter: sparseData.filter,
     gallery,
     itemActions: imageActionMocks,
-    isWindowTruncated: false,
     listing: sparseData.listing,
     loadedItems: mergeGalleryLoadedItems(currentStrip.items, sparseData.items ?? []),
     projectName: 'Project',
@@ -777,6 +798,7 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   onDragStart = vi.fn();
+  withShellMouseSensor = false;
 });
 
 afterEach(async () => {
@@ -1289,6 +1311,49 @@ describe('GalleryImageGrid mixed item cells', () => {
     );
   });
 
+  it('starts a thumbnail drag through the shell mouse sensor', async () => {
+    withShellMouseSensor = true;
+    await renderGallery(createGallery({ items: [createItem('image', 'a.png'), createItem('image', 'b.png')] }));
+
+    await dragWithMouse(getButton('Select a.png for preview'), getButton('Select b.png for preview'));
+
+    expect(onDragStart).toHaveBeenCalledWith(expect.objectContaining({ id: 'gallery-grid#right:image:a.png' }));
+    // Let dnd-kit's post-drag click guard expire before the next test.
+    await interact(noop, 300);
+  });
+
+  it('selects and focuses a tile from a click beside its image, so Enter opens that tile', async () => {
+    const first = createItem('image', 'a.png', { height: 192, width: 96 });
+    const second = createItem('image', 'b.png', { height: 192, width: 96 });
+    const gallery = createGallery({ items: [first, second], selectedItemKey: null, selectedItemKeys: [] });
+    await renderGallery({ ...gallery, settings: { ...gallery.settings, thumbnailFit: 'aspect' } });
+    const firstButton = getButton('Select a.png for preview');
+    const secondButton = getButton('Select b.png for preview');
+    const secondCell = secondButton.closest<HTMLElement>('[role="listitem"]')!;
+
+    await act(() => userEvent.click(firstButton));
+    // The portrait image is half the cell's width, centred: its left edge is beside the image.
+    await act(() => userEvent.click(secondCell, { position: { x: 3, y: secondCell.clientHeight / 2 } }));
+
+    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(second);
+    expect(document.activeElement).toBe(secondButton);
+    expect([firstButton.tabIndex, secondButton.tabIndex]).toEqual([-1, 0]);
+
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(imageActionMocks.openItemInPreview).toHaveBeenCalledExactlyOnceWith(second);
+  });
+
+  it("keeps the star toggle's middle click from opening the item in a new tab", async () => {
+    const gallery = createGallery();
+    await renderGallery({ ...gallery, settings: { ...gallery.settings, middleClickOpensInNewTab: true } });
+
+    await act(() => userEvent.click(getButton('Star first.png'), { button: 'middle' }));
+
+    expect(imageActionMocks.openItemInNewTab).not.toHaveBeenCalled();
+    expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
+  });
+
   it('toggles the star on each click of a double-click without selecting or opening the item', async () => {
     await renderGallery();
     await act(() => userEvent.dblClick(getButton('Star first.png')));
@@ -1380,6 +1445,54 @@ describe('GalleryImageGrid mixed item cells', () => {
     });
   });
 
+  it('marks the image Select for compare waits with as the comparison, and only it', async () => {
+    const tileText = (name: string) =>
+      getButton(`Select ${name} for preview`).closest('[role="listitem"]')?.textContent ?? '';
+    await renderGallery(
+      createGallery({
+        compareImageKey: 'image:first.png',
+        isCompareArmed: true,
+        items: [createItem('image', 'first.png'), createItem('image', 'second.png')],
+        selectedItemKey: 'image:first.png',
+        selectedItemKeys: ['image:first.png'],
+      })
+    );
+
+    expect(tileText('first.png')).toContain('Compare');
+    expect(tileText('second.png')).not.toContain('Compare');
+    expect(host!.textContent).not.toContain('Viewing');
+
+    // Esc calls it off from the Gallery too, where the second image is picked.
+    registeredCommands.get('gallery.exitCompare')?.();
+    expect(actionMocks.setCompareItem).toHaveBeenLastCalledWith(null);
+
+    // Live frames on screen do not hide it here: the next click would still pick the second image.
+    currentProgressSessions = [
+      {
+        backendItemId: 10,
+        height: 768,
+        id: 'run:1',
+        itemCount: 1,
+        itemIndex: 1,
+        label: 'Workflow A',
+        queueItemId: 'run',
+        sourceId: 'workflow',
+        state: 'running',
+        width: 512,
+      },
+    ];
+    currentLiveFollowEnabled = true;
+    await renderGallery();
+    expect(tileText('first.png')).toContain('Compare');
+    expect(registeredCommands.has('gallery.exitCompare')).toBe(true);
+  });
+
+  it('leaves Esc unclaimed while nothing is compared', async () => {
+    await renderGallery(createGallery({ items: [createItem('image', 'first.png')] }));
+
+    expect(registeredCommands.has('gallery.exitCompare')).toBe(false);
+  });
+
   it('keeps Alt comparison image-only and forms a one-video context target outside selection', async () => {
     const image = createItem('image', 'first.png');
     const video = createItem('video', 'clip.mp4', { durationSeconds: 2 });
@@ -1414,6 +1527,34 @@ describe('GalleryImageGrid mixed item cells', () => {
     );
   });
 
+  it('returns focus from a dialog its context menu opens to the right-clicked thumbnail, or the grid once it is gone', async () => {
+    const first = createItem('image', 'first.png');
+    const second = createItem('image', 'second.png');
+    await renderGallery(createGallery({ items: [first, second], selectedItemKey: null, selectedItemKeys: [] }));
+    const secondButton = getButton('Select second.png for preview');
+
+    await interact(() =>
+      secondButton.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 23, clientY: 41 })
+      )
+    );
+
+    const closeDialog = host!.querySelector<HTMLButtonElement>('[data-testid="context-return-focus"]')!;
+
+    await interact(() => closeDialog.click());
+    expect(document.activeElement).toBe(secondButton);
+
+    // Resolved as the dialog closes: a deletion that removed the thumbnail leaves focus in the grid, not on the page.
+    secondButton.remove();
+    await interact(() => closeDialog.click());
+    // The removed thumbnail held the tab stop, so focus lands on the grid's scroll viewport, which keeps it in the grid.
+    const gridViewport = getButton('Select first.png for preview').closest<HTMLElement>(
+      '[data-scope="scroll-area"][data-part="viewport"]'
+    );
+    expect(gridViewport).not.toBeNull();
+    expect(document.activeElement).toBe(gridViewport);
+  });
+
   it('retains an unloaded video ref when opening the context menu inside a mixed selection', async () => {
     const image = createItem('image', 'loaded.png');
     await renderGallery(
@@ -1443,6 +1584,43 @@ describe('GalleryImageGrid mixed item cells', () => {
     );
   });
 
+  it('says a hotkey deletion reaches an item off screen when a selected member is on no loaded page', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'loaded.png')],
+        selectedItemKey: 'image:loaded.png',
+        selectedItemKeys: ['image:loaded.png', 'video:unloaded.mp4'],
+      })
+    );
+
+    registeredCommands.get('gallery.deleteSelection')?.();
+
+    expect(imageActionMocks.deleteItems).toHaveBeenCalledWith(
+      [
+        { kind: 'image', name: 'loaded.png' },
+        { kind: 'video', name: 'unloaded.mp4' },
+      ],
+      expect.objectContaining({ targetsOffScreen: true })
+    );
+  });
+
+  it('leaves a primary item no listed page holds out of the hotkeys', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'listed.png')],
+        primarySelectedItemKey: 'image:elsewhere.png',
+        selectedItemKey: null,
+        selectedItemKeys: [],
+      })
+    );
+
+    registeredCommands.get('gallery.deleteSelection')?.();
+    registeredCommands.get('gallery.starImage')?.();
+
+    expect(imageActionMocks.deleteItems).not.toHaveBeenCalled();
+    expect(imageActionMocks.setItemsStarred).not.toHaveBeenCalled();
+  });
+
   it('select-all and common hotkeys target ordered same-name mixed refs independently', async () => {
     const items = [createItem('image', 'shared'), createItem('video', 'shared')];
     await renderGallery(
@@ -1470,7 +1648,7 @@ describe('GalleryImageGrid mixed item cells', () => {
         { kind: 'image', name: 'shared' },
         { kind: 'video', name: 'shared' },
       ],
-      { returnFocus: undefined }
+      { returnFocus: undefined, targetsOffScreen: false }
     );
     expect(imageActionMocks.setItemsStarred).toHaveBeenCalledWith(
       [
@@ -1498,7 +1676,7 @@ describe('GalleryImageGrid mixed item cells', () => {
 
 describe('GalleryImageGrid image-map labels', () => {
   const getTile = (name: string): HTMLElement => {
-    const tile = getButton(`Select ${name} for preview`).parentElement;
+    const tile = getButton(`Select ${name} for preview`).closest<HTMLElement>('[role="listitem"]');
 
     if (!tile) {
       throw new Error(`Expected tile for ${name}`);
@@ -1728,6 +1906,35 @@ describe('GalleryImageGrid upload drop zone', () => {
     await interact(() => gridRoot?.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer })));
 
     expect(host?.textContent).toContain('Drop media to Uncategorized');
+  });
+
+  it('takes no files dragged over a context menu it opened, and shows no drop zone after passing through it', async () => {
+    await renderGallery(createGallery({ items: [createItem('image', 'menu.png')] }));
+    await interact(() =>
+      getButton('Select menu.png for preview').dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 23, clientY: 41 })
+      )
+    );
+    const menu = document.querySelector('[data-testid="context-menu-layer"]')!;
+    const gridRoot = host!.querySelector('[role="list"]')!.closest('[data-scope="scroll-area"]')!.parentElement!;
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(new File(['image'], 'image.png', { type: 'image/png' }));
+    const send = async (type: string, target: Element, relatedTarget: Element | null = null) => {
+      const event = new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer, relatedTarget });
+      await interact(() => target.dispatchEvent(event));
+      return event;
+    };
+    const dropZoneShown = () => host!.textContent!.includes('Drop media to');
+
+    await send('dragenter', gridRoot);
+    expect(dropZoneShown()).toBe(true);
+    // Onto the menu: React bubbles its drag events to the grid, which neither counts nor takes them.
+    await send('dragenter', menu, gridRoot);
+    await send('dragleave', gridRoot, menu);
+    expect(dropZoneShown()).toBe(false);
+    expect((await send('dragover', menu)).defaultPrevented).toBe(false);
+    expect((await send('drop', menu)).defaultPrevented).toBe(false);
+    expect(actionMocks.uploadFiles).not.toHaveBeenCalled();
   });
 
   it('turns a true-empty, non-searching, non-virtual board into a click/drop upload target', async () => {
@@ -3755,9 +3962,9 @@ describe('shared gallery progress section', () => {
     for (const [boardState, status] of cases) {
       currentListing = { ...READY_LISTING, status };
       await renderGallery(createGallery(boardState));
-      expect(host?.querySelector('button[title^="Workflow A ·"]')).not.toBeNull();
+      expect(host?.querySelector('button[aria-label^="Workflow A ·"]')).not.toBeNull();
     }
-    await click(host!.querySelector<HTMLButtonElement>('button[title^="Workflow A ·"]')!);
+    await click(host!.querySelector<HTMLButtonElement>('button[aria-label^="Workflow A ·"]')!);
     expect(followProgressSession).toHaveBeenCalledWith('run:1', { revealPreview: true });
     expect(host?.querySelectorAll('[role="listitem"]')).toHaveLength(currentGallery.items.length);
   });
@@ -3901,18 +4108,18 @@ describe('shared gallery progress section', () => {
       label: `Slot ${index + 1}`,
     }));
     await renderGallery();
-    const tile = host!.querySelector<HTMLButtonElement>('button[title^="Slot 4 ·"]')!;
+    const tile = host!.querySelector<HTMLButtonElement>('button[aria-label^="Slot 4 ·"]')!;
     const image = tile.querySelector('img');
     expect(image).not.toBeNull();
     tile.focus();
     host!.style.width = '520px';
     await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, imageDensityPercent: 100 } }));
-    expect(host!.querySelector('button[title^="Slot 4 ·"]')).toBe(tile);
+    expect(host!.querySelector('button[aria-label^="Slot 4 ·"]')).toBe(tile);
     expect(tile.querySelector('img')).toBe(image);
     expect(document.activeElement).toBe(tile);
     currentProgressSessions = currentProgressSessions.slice(1);
     await renderGallery();
-    expect(host!.querySelector('button[title^="Slot 4 ·"]')).toBe(tile);
+    expect(host!.querySelector('button[aria-label^="Slot 4 ·"]')).toBe(tile);
     expect(tile.querySelector('img')).toBe(image);
     expect(document.activeElement).toBe(tile);
   });
@@ -3933,6 +4140,45 @@ describe('shared gallery progress section', () => {
     await click(finishing);
     expect(followProgressSession).not.toHaveBeenCalled();
     expect(finishing.getAttribute('aria-disabled')).toBe('true');
+  });
+  it('shows the spinner, not an indeterminate ring, until progress is known', async () => {
+    currentProgressSessions = [session];
+    await renderGallery();
+    const indicator = host!.querySelector('[aria-label="In progress"] [role="progressbar"]');
+    expect(indicator?.classList.contains('chakra-spinner')).toBe(true);
+    expect(indicator?.getAttribute('aria-label')).toBe('Preparing');
+  });
+  it('sizes placeholders to the output aspect only in aspect thumbnail mode and for sized sources', async () => {
+    currentProgressSessions = [
+      { ...session, sourceId: 'generate', width: 1024, height: 512, state: 'queued' },
+      { ...session, id: 'run:2', sourceId: 'upscale', width: 512, height: 1024 },
+      { ...session, id: 'run:3', sourceId: 'generate', width: 0, height: 1024, state: 'queued' },
+      // A workflow's recorded size is Generate's, not necessarily its output's.
+      { ...session, id: 'run:4', width: 1024, height: 512 },
+    ];
+    const placeholderRatios = () =>
+      [...host!.querySelectorAll<HTMLElement>('[aria-label="In progress"] button[aria-pressed]')].map((tile) => {
+        // The tile is the square cell; the bordered media box inside it takes the output's ratio.
+        const cell = tile.getBoundingClientRect();
+        const placeholder = tile.querySelector('[data-gallery-tile-media]')!.getBoundingClientRect();
+        return [placeholder.width / cell.width, placeholder.height / cell.height].map((ratio) => ratio.toFixed(2));
+      });
+
+    await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, thumbnailFit: 'aspect' } }));
+    expect(placeholderRatios()).toEqual([
+      ['1.00', '0.50'],
+      ['0.50', '1.00'],
+      ['1.00', '1.00'],
+      ['1.00', '1.00'],
+    ]);
+
+    await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, thumbnailFit: 'square' } }));
+    expect(placeholderRatios()).toEqual([
+      ['1.00', '1.00'],
+      ['1.00', '1.00'],
+      ['1.00', '1.00'],
+      ['1.00', '1.00'],
+    ]);
   });
   it('updates tile spacing when density changes without changing the batch', async () => {
     currentProgressSessions = [session, { ...session, id: 'run:2', itemIndex: 2 }];
@@ -3969,7 +4215,7 @@ describe('shared gallery progress section', () => {
     setStrip([createItem('image', 'starred.png', { starred: true })]);
     const gallery = createGallery({ selectedItemKey: 'image:last.png', selectedItemKeys: ['image:last.png'] });
     await renderGallery(gallery);
-    host!.querySelector<HTMLButtonElement>('button[title^="Workflow A ·"]')!.focus();
+    host!.querySelector<HTMLButtonElement>('button[aria-label^="Workflow A ·"]')!.focus();
     currentProgressSessions = [];
     await renderGallery(gallery);
     const current = host!.querySelector('button[aria-current="true"]');
@@ -4003,7 +4249,7 @@ describe('shared gallery progress section', () => {
     await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, progressSectionCollapsed: true } }));
     expect(host?.querySelector('[data-progress-disclosure]')?.getAttribute('aria-expanded')).toBe('false');
     await renderGallery(createGallery());
-    host!.querySelector<HTMLButtonElement>('button[title^="Workflow A ·"]')!.focus();
+    host!.querySelector<HTMLButtonElement>('button[aria-label^="Workflow A ·"]')!.focus();
     currentProgressSessions = [];
     mocks.progressFrame = null;
     await renderGallery();

@@ -1,0 +1,160 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+import Download from '@lucide/astro/icons/download';
+import Search from 'virtual:starlight/components/Search';
+
+import { socialConfig } from '../../config/social';
+import { localizedHref, withBase } from '../base-path';
+import { isLocalizablePage } from '../docs-page';
+import LanguageMenu from './LanguageMenu.astro';
+import MainNav from './MainNav.astro';
+import VersionMenu from './VersionMenu.astro';
+
+const base = import.meta.env.BASE_URL;
+// Without a sidebar drawer, the main navigation stays in the header on phones.
+const { entry, hasSidebar, locale } = Astro.locals.starlightRoute;
+const { t } = Astro.locals;
+// Matches the language menu's own condition (`LanguageMenu.astro`).
+const hasLanguageMenu = await isLocalizablePage(entry.id);
+// YouTube is in the footer.
+const headerSocial = (socialConfig ?? []).filter(({ icon }) => icon === 'github' || icon === 'discord');
+---
+
+<div
+  class:list={[
+    'docs-header',
+    { 'docs-header--nav-on-phones': !hasSidebar, 'docs-header--has-language-menu': hasLanguageMenu },
+  ]}
+>
+  <a href={localizedHref('/', { locale, base })} class="home" aria-label={t('nav.home')}>
+    <svg class="logomark" width="22" height="22" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+      <path d="M29.1951 10.6667H42V2H2V10.6667H14.8049L29.1951 33.3333H42V42H2V33.3333H14.8049" stroke-width="3.6"
+      ></path>
+    </svg>
+    <span class="wordmark">Invoke</span>
+  </a>
+
+  <MainNav placement="header" />
+
+  <div class="search print:hidden">
+    <Search />
+  </div>
+
+  <div class="actions print:hidden">
+    <LanguageMenu placement="header" />
+    <div class="version">
+      <VersionMenu />
+    </div>
+    {
+      headerSocial.map(({ label, href, icon }) => (
+        <a class="social docs-button docs-button--ghost docs-button--icon docs-button--lg" href={href} aria-label={label} title={label}>
+          <Icon name={icon} size="18px" />
+        </a>
+      ))
+    }
+    <a class="download docs-button docs-button--primary docs-button--lg" href={withBase('/download/', base)}>
+      <Download size={14} />
+      <span class="download__label">{t('nav.download')}</span>
+    </a>
+  </div>
+</div>
+
+<style>
+  .docs-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 100%;
+    font-size: var(--sl-text-xs);
+  }
+
+  .home {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.625rem;
+    color: var(--docs-text-strong);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-decoration: none;
+  }
+
+  .logomark path {
+    stroke: var(--docs-brand);
+  }
+
+  .search {
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    min-width: 0;
+
+    /* Starlight's `print:hidden` loses to this rule's display, so hide it in print here. */
+    @media print {
+      display: none;
+    }
+  }
+
+  .actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.375rem;
+
+    @media print {
+      display: none;
+    }
+  }
+
+  /* The social links show from `md` up; on phones they are in the sidebar's footer. */
+  .social {
+    display: none;
+  }
+
+  .version {
+    display: contents;
+  }
+
+  /*
+   * Phones: the logomark, search, version and an icon-only download link fit beside the menu button, whose drawer
+   * holds the language menu. Pages without one keep the main navigation in the header, which needs the wordmark's
+   * room, and the version menu's too where an icon-only language menu shows.
+   */
+  @media (max-width: 29.99rem) {
+    .docs-header--nav-on-phones .wordmark,
+    .docs-header--nav-on-phones.docs-header--has-language-menu .version {
+      display: none;
+    }
+
+    /* An icon-only button here. */
+    .download {
+      width: var(--docs-button-height);
+      padding: 0;
+    }
+    .download__label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+  @media (min-width: 50rem) {
+    .docs-header {
+      gap: 0.75rem;
+    }
+
+    /* Centre the search field between the logo and the actions. */
+    .search {
+      flex: 0 1 26.25rem;
+      margin-inline: auto;
+    }
+
+    .social {
+      display: inline-flex;
+    }
+  }
+</style>

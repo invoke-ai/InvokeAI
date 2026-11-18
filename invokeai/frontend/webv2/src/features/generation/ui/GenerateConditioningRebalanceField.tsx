@@ -2,7 +2,7 @@
 import type { RebalancePreset } from '@features/generation/core/conditioningRebalance';
 import type { GenerateSettings } from '@features/generation/core/types';
 
-import { createListCollection, HStack, Icon, Input, Menu, Portal, Stack, Switch, Text } from '@chakra-ui/react';
+import { Box, createListCollection, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import {
   BUILTIN_REBALANCE_PRESETS,
   DEFAULT_KREA2_REBALANCE_MULTIPLIER,
@@ -15,21 +15,21 @@ import {
 } from '@features/generation/core/conditioningRebalance';
 // Use subpath imports to stay within the direct-importer budget.
 import { IconButton } from '@platform/ui/Button';
-import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
 import { MenuContent } from '@platform/ui/Menu';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Select } from '@platform/ui/Select';
-import { Tooltip } from '@platform/ui/Tooltip';
-import { MoreHorizontalIcon, RotateCcwIcon } from 'lucide-react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { MoreHorizontalIcon } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useGenerationUi } from './GenerationUiContext';
 import { ConditioningRebalanceBars } from './shared/ConditioningRebalanceBars';
 import { ConditioningRebalanceSparkline } from './shared/ConditioningRebalanceSparkline';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
+import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 
 /** The gain slider's practical range. Typed values may go to the legacy schema's bound. */
 const GAIN_SLIDER_MAX = 10;
@@ -64,16 +64,13 @@ export const GenerateConditioningRebalanceField = ({
   settings,
 }: GenerateConditioningRebalanceFieldProps) => {
   const { t } = useTranslation();
-  const { rebalancePresets } = useGenerationUi();
-  // Give sibling switches explicit IDs inside a shared Field.
-  const switchInputId = useId();
-
+  const presetActionsIds = useTooltipTriggerIds();
+  const { notifications, rebalancePresets } = useGenerationUi();
   const [previewWeights, setPreviewWeights] = useState<number[] | null>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   /** Non-null while the text field is being typed into, so a half-typed vector survives. */
   const [weightsDraft, setWeightsDraft] = useState<string | null>(null);
   const [presetDialog, setPresetDialog] = useState<PresetDialog | null>(null);
-  const [presetPendingDelete, setPresetPendingDelete] = useState<RebalancePreset | null>(null);
 
   const committedWeights = useMemo(
     () => parseRebalanceWeights(settings.krea2RebalanceWeights) ?? DEFAULT_WEIGHT_VECTOR,
@@ -104,6 +101,7 @@ export const GenerateConditioningRebalanceField = ({
   const isCustomPreset =
     activePreset !== null && !BUILTIN_REBALANCE_PRESETS.some((preset) => preset.id === activePreset.id);
   const isAtDefault = activePresetId === REBALANCE_PRESET_DEFAULT_ID;
+  const presetLabel = activePreset?.label ?? t('widgets.generate.krea2RebalancePresetCustom');
 
   const applyWeights = useCallback(
     (nextWeights: string, multiplier?: number) => {
@@ -167,11 +165,20 @@ export const GenerateConditioningRebalanceField = ({
     [presetDialog, rebalancePresets, settings.krea2RebalanceMultiplier, settings.krea2RebalanceWeights]
   );
 
-  const handleConfirmDelete = useCallback(() => {
-    if (presetPendingDelete) {
-      rebalancePresets.remove(presetPendingDelete.id);
-    }
-  }, [presetPendingDelete, rebalancePresets]);
+  // Deleting is undoable, so it asks nothing. The curve stays applied (shown as Custom); Undo brings the preset back,
+  // and with it the selection while the curve still matches.
+  const deletePreset = useCallback(
+    (preset: RebalancePreset) => {
+      const index = rebalancePresets.presets.findIndex((candidate) => candidate.id === preset.id);
+      const { restore } = rebalancePresets;
+
+      rebalancePresets.remove(preset.id);
+      notifications.undoable(t('widgets.generate.krea2RebalancePresetDeleted', { name: preset.label }), {
+        onUndo: () => restore(preset, index),
+      });
+    },
+    [notifications, rebalancePresets, t]
+  );
 
   const tapLabel = useCallback(
     (tap: number, layer: number) => t('widgets.generate.krea2RebalanceTapLabel', { layer, tap }),
@@ -183,61 +190,47 @@ export const GenerateConditioningRebalanceField = ({
 
   return (
     <>
-      <Field
+      <GenerateToggleSwitch
+        checked={isEnabled}
         helpText={isEnabled ? undefined : t('widgets.generate.krea2RebalanceHelp')}
         hint="conditioningRebalance"
         label={t('widgets.generate.krea2Rebalance')}
-        labelEnd={
-          <HStack gap="2">
-            <ConditioningRebalanceSparkline muted={!isEnabled} weights={committedWeights} />
-            <Switch.Root
-              checked={isEnabled}
-              ids={{ hiddenInput: switchInputId, label: `${switchInputId}-label` }}
-              onCheckedChange={({ checked }) => onCommitImmediate({ krea2RebalanceEnabled: checked })}
-            >
-              <Switch.HiddenInput aria-label={t('widgets.generate.krea2Rebalance')} />
-              <Switch.Control _checked={{ bg: 'accent.solid' }}>
-                <Switch.Thumb />
-              </Switch.Control>
-            </Switch.Root>
-          </HStack>
-        }
+        preview={<ConditioningRebalanceSparkline muted={!isEnabled} weights={committedWeights} />}
+        onCheckedChange={(checked) => onCommitImmediate({ krea2RebalanceEnabled: checked })}
       >
         {isEnabled ? (
           <Stack gap="2" w="full">
             <HStack gap="1">
-              <Select
-                aria-label={t('widgets.generate.krea2RebalancePreset')}
-                collection={presetCollection}
-                contentProps={SELECT_CONTENT_PROPS}
-                flex="1"
-                minW="0"
-                value={activePresetId === null ? [] : [activePresetId]}
-                valueText={activePreset?.label ?? t('widgets.generate.krea2RebalancePresetCustom')}
-                onValueChange={({ value }) => handlePresetChange(value)}
-              />
-              <Tooltip content={t('widgets.generate.krea2RebalanceReset')}>
-                <IconButton
-                  aria-label={t('widgets.generate.krea2RebalanceReset')}
-                  color="fg.muted"
-                  disabled={isAtDefault}
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleReset}
+              <Box flex="1" minW="0">
+                <GenerateFieldContextMenu
+                  fieldLabel={t('widgets.generate.krea2RebalancePreset')}
+                  copyValue={() => presetLabel}
+                  isAtDefault={isAtDefault}
+                  resetLabel={t('widgets.generate.krea2RebalanceReset')}
+                  onReset={handleReset}
                 >
-                  <Icon as={RotateCcwIcon} boxSize="3" />
-                </IconButton>
-              </Tooltip>
-              <Menu.Root lazyMount unmountOnExit>
+                  <Select
+                    aria-label={t('widgets.generate.krea2RebalancePreset')}
+                    collection={presetCollection}
+                    contentProps={SELECT_CONTENT_PROPS}
+                    value={activePresetId === null ? [] : [activePresetId]}
+                    valueText={presetLabel}
+                    onValueChange={({ value }) => handlePresetChange(value)}
+                  />
+                </GenerateFieldContextMenu>
+              </Box>
+              <Menu.Root ids={presetActionsIds} lazyMount unmountOnExit>
                 <Menu.Trigger asChild>
-                  <IconButton
-                    aria-label={t('widgets.generate.krea2RebalancePresetActions')}
-                    color="fg.muted"
-                    size="sm"
-                    variant="ghost"
-                  >
-                    <Icon as={MoreHorizontalIcon} boxSize="3" />
-                  </IconButton>
+                  <Tooltip content={t('widgets.generate.krea2RebalancePresetActions')} ids={presetActionsIds}>
+                    <IconButton
+                      aria-label={t('widgets.generate.krea2RebalancePresetActions')}
+                      color="fg.muted"
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <Icon as={MoreHorizontalIcon} boxSize="3" />
+                    </IconButton>
+                  </Tooltip>
                 </Menu.Trigger>
                 <Portal>
                   <Menu.Positioner>
@@ -261,7 +254,7 @@ export const GenerateConditioningRebalanceField = ({
                         data-danger=""
                         disabled={!isCustomPreset}
                         value="delete"
-                        onClick={() => activePreset && setPresetPendingDelete(activePreset)}
+                        onClick={() => activePreset && deletePreset(activePreset)}
                       >
                         <Menu.ItemText>{t('widgets.generate.krea2RebalancePresetDelete')}</Menu.ItemText>
                       </Menu.Item>
@@ -297,6 +290,7 @@ export const GenerateConditioningRebalanceField = ({
             </Stack>
 
             <GenerateFieldContextMenu
+              fieldLabel={t('widgets.generate.krea2RebalanceGain')}
               copyValue={() => String(settings.krea2RebalanceMultiplier)}
               isAtDefault={settings.krea2RebalanceMultiplier === DEFAULT_KREA2_REBALANCE_MULTIPLIER}
               onReset={() => onCommit({ krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER })}
@@ -336,7 +330,7 @@ export const GenerateConditioningRebalanceField = ({
             </Field>
           </Stack>
         ) : null}
-      </Field>
+      </GenerateToggleSwitch>
 
       <RenameDialog
         initialName={presetDialog?.mode === 'rename' ? presetDialog.preset.label : ''}
@@ -354,14 +348,6 @@ export const GenerateConditioningRebalanceField = ({
         }
         onClose={() => setPresetDialog(null)}
         onSubmit={handlePresetDialogSubmit}
-      />
-      <ConfirmDialog
-        body={t('widgets.generate.krea2RebalancePresetDeleteBody', { name: presetPendingDelete?.label ?? '' })}
-        confirmLabel={t('widgets.generate.krea2RebalancePresetDelete')}
-        isOpen={presetPendingDelete !== null}
-        title={t('widgets.generate.krea2RebalancePresetDelete')}
-        onClose={() => setPresetPendingDelete(null)}
-        onConfirm={handleConfirmDelete}
       />
     </>
   );

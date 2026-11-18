@@ -491,8 +491,23 @@ test('video DTO, Details, poster, full media, HEAD, and Range routes use the che
     assert.equal(dto.height, 64);
 
     assert.deepEqual(await getJson(backend, `/api/v1/videos/i/${encodedName}/metadata`), {
-      codec: 'h264',
-      prompt: 'wan fixture',
+      cfg_scale: 5,
+      fps: 16,
+      generation_mode: 'wan_t2v',
+      height: 480,
+      model: {
+        base: 'wan',
+        hash: 'blake3:fixture-wan-2-2-t2v-a14b',
+        key: 'fixture-wan-t2v-a14b',
+        name: 'Wan 2.2 T2V A14B',
+        type: 'main',
+      },
+      negative_prompt: 'blurry, low quality, static frame',
+      num_frames: 81,
+      positive_prompt: 'wan fixture',
+      seed: 1234567,
+      steps: 30,
+      width: 832,
     });
     assert.deepEqual(await getJson(backend, `/api/v1/videos/i/${encodedName}/workflow`), {
       graph: '{"nodes":[{"id":"fixture-video-output","type":"wan_l2v"}]}',
@@ -1167,14 +1182,57 @@ test('the workflow list orders as the server does: names ignoring case, dates wi
     assert.deepEqual(await names('ASC'), ['alpha', 'Bravo', 'charlie', 'Delta']);
     assert.deepEqual(await names('DESC'), ['Delta', 'charlie', 'Bravo', 'alpha']);
 
-    const opened = (
-      await getJson(backend, '/api/v1/workflows/?categories=user&order_by=opened_at&direction=DESC&per_page=100')
-    ).items.map((item) => item.opened_at);
-    const firstNever = opened.indexOf(null);
+    for (const direction of ['ASC', 'DESC']) {
+      const opened = (
+        await getJson(
+          backend,
+          `/api/v1/workflows/?categories=user&order_by=opened_at&direction=${direction}&per_page=100`
+        )
+      ).items.map((item) => item.opened_at);
+      const firstNever = opened.indexOf(null);
+      const ascending = opened.slice(0, firstNever).sort();
 
-    assert.ok(firstNever > 0);
-    assert.ok(opened.slice(firstNever).every((value) => value === null));
-    assert.deepEqual(opened.slice(0, firstNever), opened.slice(0, firstNever).sort().reverse());
+      assert.ok(firstNever > 0);
+      assert.ok(opened.slice(firstNever).every((value) => value === null));
+      assert.deepEqual(opened.slice(0, firstNever), direction === 'ASC' ? ascending : ascending.reverse());
+    }
+  });
+});
+
+test('workflow runs order the list by last run, and has_been_opened narrows lists and tag counts', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    // Run against id order, so only the run times can put them in the expected order.
+    const ranFirst = 'fixture-workflow-003';
+    const ranLast = 'fixture-workflow-002';
+    for (const ran of [ranFirst, ranLast]) {
+      await getJson(backend, `/api/v1/workflows/i/${ran}/last_run_at`, { method: 'PUT' });
+    }
+    const ids = async (direction) =>
+      (
+        await getJson(
+          backend,
+          `/api/v1/workflows/?categories=user&order_by=last_run_at&direction=${direction}&per_page=100`
+        )
+      ).items.map((item) => item.workflow_id);
+
+    // Workflows never run come after the runs either way.
+    assert.deepEqual((await ids('DESC')).slice(0, 2), [ranLast, ranFirst]);
+    assert.deepEqual((await ids('ASC')).slice(0, 2), [ranFirst, ranLast]);
+
+    const listed = async (opened) =>
+      (await getJson(backend, `/api/v1/workflows/?categories=user&has_been_opened=${opened}&per_page=100`)).items;
+    const openedItems = await listed(true);
+    const neverOpened = await listed(false);
+
+    assert.ok(openedItems.length > 0 && neverOpened.length > 0);
+    assert.ok(openedItems.every((item) => item.opened_at !== null));
+    assert.ok(neverOpened.every((item) => !item.opened_at));
+
+    const counts = await getJson(
+      backend,
+      '/api/v1/workflows/counts_by_tag?categories=user&tags=fixture&has_been_opened=true'
+    );
+    assert.deepEqual(counts, { fixture: openedItems.length });
   });
 });
 
@@ -2385,6 +2443,95 @@ test('wildcards are stateful: create, rename, delete one, and delete a batch of 
 
     await call('/__reset?profile=empty', { method: 'POST' });
     assert.deepEqual(await getJson(backend, '/api/v1/wildcards/'), []);
+  } finally {
+    await backend.close();
+  }
+});
+
+test('settings read routes provide usable vocabulary and dependency information', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  try {
+    const vocabulary = await fetch(`${backend.origin}/api/v1/image_map/vocab`);
+    assert.equal(vocabulary.status, 200);
+    assert.deepEqual(await vocabulary.json(), {
+      terms: ['architectural study', 'watercolor'],
+      state: 'ready',
+      error: null,
+      max_terms: 500,
+      max_term_length: 64,
+    });
+    const dependencies = await fetch(`${backend.origin}/api/v1/app/app_deps`);
+    assert.equal(dependencies.status, 200);
+    const versions = await dependencies.json();
+    assert.equal(versions.CUDA, 'N/A');
+    const version = await fetch(`${backend.origin}/api/v1/app/version`).then((response) => response.json());
+    assert.equal(versions.invokeai, version.version, 'About dependency information must identify the served app');
+    assert.ok(Object.values(versions).every((value) => typeof value === 'string'));
+  } finally {
+    await backend.close();
+  }
+});
+
+test('image PATCH adopts an intermediate as hidden durable Canvas pixels on every read', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const form = new FormData();
+    form.append('file', new Blob(['paint'], { type: 'image/png' }), 'paint.png');
+    const response = await fetch(`${backend.origin}/api/v1/images/upload?image_category=general&is_intermediate=true`, {
+      method: 'POST',
+      body: form,
+    });
+    const temporary = await response.json();
+    assert.equal(temporary.is_intermediate, true);
+    const path = `/api/v1/images/i/${encodeURIComponent(temporary.image_name)}`;
+    const adopted = await getJson(backend, path, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ is_intermediate: false, image_category: 'other' }),
+    });
+    assert.deepEqual(adopted, { ...temporary, is_intermediate: false, image_category: 'other' });
+    assert.deepEqual(await getJson(backend, path), adopted);
+    assert.deepEqual(
+      await getJson(backend, '/api/v1/images/images_by_names', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image_names: [temporary.image_name] }),
+      }),
+      [adopted]
+    );
+    const missing = await fetch(`${backend.origin}/api/v1/images/i/missing.png`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ is_intermediate: false }),
+    });
+    assert.equal(missing.status, 404);
+  });
+});
+
+test('opt-in large library has pageable metadata, representative documents, retry and revision scenarios', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  try {
+    const seed = (scenario) =>
+      getJson(backend, '/__workflow-library', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ scenario }),
+      });
+    assert.equal((await seed('large')).count, 1000);
+    const first = await getJson(backend, '/api/v1/workflows/?page=0&per_page=20');
+    assert.equal(first.total, 1000);
+    assert.equal(first.pages, 50);
+    assert.equal(first.items.length, 20);
+    assert.equal('workflow' in first.items[0], false);
+    const id = first.items[0].workflow_id;
+    assert.equal((await getJson(backend, `/api/v1/workflows/i/${id}`)).workflow.nodes.length, 40);
+    await seed('failed-page');
+    const failedPath = '/api/v1/workflows/?page=2&per_page=20';
+    assert.equal((await fetch(`${backend.origin}${failedPath}`)).status, 503);
+    assert.equal((await getJson(backend, failedPath)).page, 2);
+    await seed('changed-revision');
+    assert.equal((await getJson(backend, `/api/v1/workflows/i/${id}`)).revision, 2);
+    await seed('empty');
+    assert.equal((await getJson(backend, '/api/v1/workflows/')).total, 0);
   } finally {
     await backend.close();
   }

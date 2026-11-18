@@ -14,8 +14,21 @@ import { useTranslation } from 'react-i18next';
 import { AuthFormAlert } from './AuthScreen';
 import { PasswordInput, PasswordStrengthMeter } from './PasswordInput';
 
-/** Account settings: display name and password change for the signed-in user. */
-export const ProfileDialog = ({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: UserDTO }) => {
+/**
+ * Account settings: display name and password change for the signed-in user. Openers from a menu name `finalFocusEl`,
+ * since the menu item that opened the dialog is gone by the time it closes.
+ */
+export const ProfileDialog = ({
+  finalFocusEl,
+  isOpen,
+  onClose,
+  user,
+}: {
+  finalFocusEl?: () => HTMLElement | null;
+  isOpen: boolean;
+  onClose: () => void;
+  user: UserDTO;
+}) => {
   const { t } = useTranslation();
   const handleOpenChange = useCallback(
     (event: Dialog.OpenChangeDetails) => {
@@ -28,6 +41,7 @@ export const ProfileDialog = ({ isOpen, onClose, user }: { isOpen: boolean; onCl
 
   return (
     <Dialog.Root
+      finalFocusEl={finalFocusEl}
       lazyMount
       open={isOpen}
       scrollBehavior="inside"

@@ -11,6 +11,11 @@ and scheduler, so `GenericDiffusersLoader` cannot resolve them. The transformer 
 
 The scheduler is never loaded: `moss_image_denoise` builds the schedule itself.
 
+A single-file transformer is bf16, ComfyUI's `int8_tensorwise` convrot export, unsloth's torchao fp8 export, or a GGUF. Comfy-Org's export and
+leejet's GGUFs fuse each block's `q`, `k` and `v` into `proj.qkv`; `split_fused_qkv` unfuses them before anything else
+reads the state dict. A few Linears stay dense (`MOSS_IMAGE_FP8_SKIP_PATTERNS`), whichever quantization
+the file uses, because the vendored forward reads their weight dtype.
+
 Both transformer paths build the model under `init_empty_weights` and assign the checkpoint's tensors, reserving RAM
 once first. A diffusers `from_pretrained` would load the same weights, but outside the cache's reservation, and it
 installs the RoPE frequencies at the weights' bf16 for the first forward to repair.
@@ -32,33 +37,61 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_MossImage_Config,
     Main_Diffusers_MossImage_Config,
+    Main_GGUF_MossImage_Config,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.qwen3_5_encoder import load_qwen3_5_text_encoder
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.moss_image.checkpoint_layout import drop_comfy_attention_config, split_fused_qkv
 from invokeai.backend.moss_image.pipeline_moss_image import MOSSImageTransformer
-from invokeai.backend.quantization.fp8_scaled import cast_state_dict, reject_quantized_side_channel
+from invokeai.backend.quantization.fp8_scaled import (
+    FP8_WEIGHT_DTYPES,
+    TORCHAO_QDATA_SUFFIX,
+    attach_fp8_scales,
+    cast_state_dict,
+    clone_unreplaced_tensors,
+    dequantize_fp8_scaled,
+    extract_fp8_scaled_layers,
+    is_scale_metadata_key,
+    reject_quantized_side_channel,
+    split_fp8_scaled_layers,
+    translate_torchao_fp8_layers,
+    warn_on_unattached_scales,
+)
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
+from invokeai.backend.quantization.int8_convrot import (
+    drop_unconsumed_quantization_sidecars,
+    extract_int8_convrot_markers,
+    install_int8_convrot_layers,
+    reject_unmarked_int8_weights,
+)
 from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.state_dict_loading import reject_incomplete_load
 
 MOSS_IMAGE_FP8_SKIP_PATTERNS: tuple[str, ...] = (
-    r"^video_embedder$",
-    r"^time_embedding\.0$",
-    r"^shared_block_modulation$",
-    r"^video_head_modulation$",
-    r"^final_linear_video$",
-    r"^text_embedder\.proj$",
-    r"^layers\.\d+\.proj\.q$",
+    "video_embedder",
+    "time_embedding.0",
+    "shared_block_modulation",
+    "video_head_modulation",
+    "final_linear_video",
+    "text_embedder.proj",
+    ".proj.q",
 )
-"""The Linears FP8 Storage must leave in the compute dtype.
+"""The Linears that stay in the compute dtype under FP8 Storage, int8 convrot and GGUF alike.
 
 The vendored forward reads each of these layers' `weight.dtype` *outside* the layer and casts the activation to it
 before the call. With an fp8 weight the activation becomes fp8 before the cast hook can widen the weight back, and the
-matmul fails ("mat1 and mat2 must have the same dtype"). A block reads `proj.q`'s dtype for the input of all of its
-projections, so `q` stays wide and `k`, `v`, `o` and the FFN are stored in fp8. Norms are not Linears, and
-`_FP8_DEFAULT_SKIP_PATTERNS` covers them anyway."""
+matmul fails ("mat1 and mat2 must have the same dtype"); an int8 buffer or a packed GGML weight reports an integer
+dtype and would turn the activations into integers. A block reads `proj.q`'s dtype for the input of all of its
+projections, so `q` stays wide and `k`, `v`, `o` and the FFN are quantized. Norms are not Linears, and
+`_FP8_DEFAULT_SKIP_PATTERNS` covers them anyway.
+
+Plain substrings, not anchored regexes: FP8 Storage matches them with `re.search` on module names, and every
+quantized path (`can_stay_quantized`, `_can_stay_int8`, `unpack_ggml_at_load`) tests `pattern in key` on tensor keys.
+Each hits exactly its own module under both: `time_embedding.0` leaves `time_embedding.2`, `text_embedder.proj`
+leaves `text_embedder.blocks.N.proj`, and `.proj.q` leaves `proj.k`, `proj.v` and `proj.o`."""
 
 _LAYER_INDEX = re.compile(r"^layers\.(\d+)\.")
 
@@ -141,14 +174,48 @@ def _read_component_state_dict(directory: Path) -> dict[str, torch.Tensor]:
     return sd
 
 
+def _reject_other_quantization_beside_torchao(sd: Mapping[str, Any], what: str) -> None:
+    """Refuse a torchao fp8 file that also carries any scale or `.comfy_quant` key, or a plain fp8 `.weight`.
+
+    torchao's own `._weight_scale` is not one of them. The loader applies one quantization per file, as the installer
+    enforces. Some of these files would load wrongly: a stray `X.weight_scale` beside a torchao pair is overwritten by
+    the translation, and int8 markers leave the translated scales behind. A ComfyUI scaled-fp8 layer would load
+    correctly, and is refused only to keep to one quantization. Runs before anything is reserved, for a record that
+    predates the installer's refusal.
+    """
+    if not any(isinstance(key, str) and key.endswith(TORCHAO_QDATA_SUFFIX) for key in sd):
+        return
+    other = sorted(
+        key
+        for key, tensor in sd.items()
+        if is_scale_metadata_key(key)
+        or (key.endswith(".weight") and getattr(tensor, "dtype", None) in FP8_WEIGHT_DTYPES)
+    )
+    if other:
+        raise ValueError(
+            f"{what} mixes torchao fp8 layers with other quantization keys ({len(other)}, e.g. {other[:3]}), and only "
+            "one quantization per file loads. Use another build of this model."
+        )
+
+
 class _MossImageTransformerLoading(ModelLoader):
     """The transformer load both MOSS-Image formats share, once each has a state dict and a geometry."""
 
     def _load_transformer(
-        self, config: AnyModelConfig, sd: dict[str, torch.Tensor], geometry: dict[str, Any], what: str
+        self,
+        config: AnyModelConfig,
+        sd: dict[str, torch.Tensor],
+        geometry: dict[str, Any],
+        what: str,
+        *,
+        torchao_fp8: bool = False,
     ) -> AnyModel:
-        # Strict below would name an orphaned scale key; this names the cause before anything is reserved.
-        reject_quantized_side_channel(sd, what)
+        """Build the transformer from `sd`. `torchao_fp8` says `translate_torchao_fp8_layers` renamed layers to
+        `.weight` + `.weight_scale`; that is the only source of fp8 scales accepted, any other is refused below."""
+        drop_comfy_attention_config(sd)
+        markers = extract_int8_convrot_markers(sd)
+        # Outside the int8 branch, so an int8 weight whose marker is missing or unreadable is refused, not cast as codes.
+        reject_unmarked_int8_weights(sd, markers, "MOSS-Image")
         dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
 
         with accelerate.init_empty_weights():
@@ -159,22 +226,78 @@ class _MossImageTransformerLoading(ModelLoader):
         sd.setdefault("rope.bands", model.rope.bands)
 
         skip_patterns = _model_declared_skip_patterns(model)
-        reserve_for_load(
-            self._ram_cache.make_room,
-            sd,
-            dtype,
-            keep_fp8=False,
-            model=model,
-            skip_patterns=skip_patterns,
-            fp8_layers={},
-            nvfp4_payloads={},
-        )
-        cast_state_dict(sd, dtype, keep_fp8=False, model=model, skip_patterns=skip_patterns)
+        fp8_layers: dict[str, Any] = {}
+        keep_fp8 = False
+        if markers:
+            # In place: a rebound dict would keep the originals alive and overshoot the reservation.
+            kept_sd = drop_unconsumed_quantization_sidecars(sd)
+            sd.clear()
+            sd.update(kept_sd)
+            del kept_sd
+            kept = install_int8_convrot_layers(
+                model,
+                sd,
+                markers,
+                dtype,
+                architecture="MOSS-Image",
+                reserve=self._ram_cache.make_room,
+                skip_patterns=skip_patterns,
+            )
+            self._logger.info(
+                f"{what}: kept {len(kept)} of {len(markers)} layer(s) in int8 (int8_tensorwise checkpoint, "
+                "dequantized per forward)"
+            )
+        else:
+            if torchao_fp8:
+                fp8_layers = extract_fp8_scaled_layers(sd, layer_hints={})
+                keep_fp8 = self._keep_fp8_weights(config, SubModelType.Transformer)
+            else:
+                # Strict below would name an orphaned scale key; this names the cause before anything is reserved.
+                reject_quantized_side_channel(sd, what)
+            reserve_for_load(
+                self._ram_cache.make_room,
+                sd,
+                dtype,
+                keep_fp8=keep_fp8,
+                model=model,
+                skip_patterns=skip_patterns,
+                fp8_layers=fp8_layers,
+                nvfp4_payloads={},
+            )
+            mapped = dict(sd) if fp8_layers and not keep_fp8 else None
+            if fp8_layers and not keep_fp8:
+                dequantize_fp8_scaled(sd, fp8_layers, dtype)
+                fp8_layers = {}
+            # Folds the layers a skip pattern holds dense (`.proj.q` among them) with their scale applied.
+            fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, dtype, model=model, skip_patterns=skip_patterns)
+            cast_state_dict(sd, dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+            if mapped is not None:
+                # Dense tensors the fold and cast left as they were are slices of the file mapping and would pin it,
+                # uncounted. The kept path skips this step altogether: copying its fp8 codes costs ~4.4 GB at load, and
+                # the mapping plus the copies are alive together for a moment.
+                clone_unreplaced_tensors(sd, mapped)
+                mapped.clear()
         model.load_state_dict(sd, strict=True, assign=True)
         # `assign=True` aliases every parameter to its state dict tensor; the dict would keep the whole model alive
         # through the cast below.
         sd.clear()
         reject_incomplete_load(model, what=what)
+        if fp8_layers:
+            attached = attach_fp8_scales(model, fp8_layers)
+            self._logger.info(
+                f"{what}: kept {attached} layer(s) in fp8 (torchao fp8 checkpoint, kept for {self._fp8_kept_reason()})"
+            )
+            warn_on_unattached_scales(self._logger, "MOSS-Image", attached, fp8_layers)
+            # The remainder stays dense on purpose: the build ships those layers in bf16, and re-encoding them as
+            # unscaled fp8 zeroes most of `time_embedding.2` and changed the image in a 4090 A/B. FP8 Storage on an
+            # fp8 file keeps the file's fp8 layers packed, nothing more (as Qwen-Image-2.1 and FLUX.3 do).
+            #
+            # Memory: the clone step above is skipped on this path. The kept codes and their scales, and every dense
+            # tensor already at the compute dtype, are views of the file mapping. On a bf16 device the folded `.proj.q`
+            # codes (~396 MB) leave `sd` but stay mapped and uncounted, because those views pin the mapping; on fp16
+            # the dense remainder is cast to new tensors and its bf16 bytes stay pinned and uncounted too. On Windows
+            # that is committed memory while the model is cached.
+            return model.eval()
         return self._apply_fp8_layerwise_casting(model.eval(), config, SubModelType.Transformer)
 
 
@@ -254,6 +377,59 @@ class MossImageCheckpointModel(_MossImageTransformerLoading):
         model_path = Path(config.path)
         sd = load_file(model_path)
         sd = CheckpointPrefix.detect(sd).strip(sd)
+        # unsloth's torchao fp8 build, renamed to the scaled-fp8 form. Before the split and the geometry read, which
+        # look for `.weight`.
+        _reject_other_quantization_beside_torchao(sd, f"MOSS-Image checkpoint {model_path.name}")
+        torchao_fp8 = translate_torchao_fp8_layers(sd) > 0
+        sd = split_fused_qkv(sd)
         return self._load_transformer(
-            config, sd, moss_image_transformer_config(sd), f"MOSS-Image checkpoint {model_path.name}"
+            config,
+            sd,
+            moss_image_transformer_config(sd),
+            f"MOSS-Image checkpoint {model_path.name}",
+            torchao_fp8=torchao_fp8,
         )
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.MossImage, type=ModelType.Main, format=ModelFormat.GGUFQuantized)
+class MossImageGGUFModel(ModelLoader):
+    """Loads a MOSS-Image transformer from a GGUF file, in unsloth's split or leejet's fused-qkv layout.
+
+    The Linear weights stay packed and dequantize per forward; what the vendored forward reads outside a matmul
+    (`MOSS_IMAGE_FP8_SKIP_PATTERNS`, the norms) and what is not actually quantized is unpacked at load (see
+    `unpack_ggml_at_load`). Its text encoder and VAE are separate models, chosen on the loader node.
+
+    No `fp8_storage` declaration: FP8 Storage is refused for every quantized format by rule.
+    """
+
+    def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
+        if not isinstance(config, Main_GGUF_MossImage_Config):
+            raise ValueError(f"Expected Main_GGUF_MossImage_Config, got {type(config).__name__}.")
+        if submodel_type is not None and submodel_type is not SubModelType.Transformer:
+            raise ValueError(
+                f"A single-file MOSS-Image GGUF holds only the transformer, not {submodel_type.value}. "
+                "Select a standalone Qwen3.5 9B encoder and FLUX.2 VAE on the MOSS-Image model loader."
+            )
+        model_path = Path(config.path)
+        what = f"MOSS-Image GGUF {model_path.name}"
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+
+        sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype)
+        # As identification does: ComfyUI-style exports may carry a `model.diffusion_model.` prefix.
+        sd = CheckpointPrefix.detect(sd).strip(sd)
+        sd = split_fused_qkv(sd)
+        with accelerate.init_empty_weights():
+            model = MOSSImageTransformer(**moss_image_transformer_config(sd))
+        model._skip_layerwise_casting_patterns = list(MOSS_IMAGE_FP8_SKIP_PATTERNS)
+        # The released GGUFs hold it; a re-export that leaves it out is still complete.
+        sd.setdefault("rope.bands", model.rope.bands)
+
+        unpacked = unpack_ggml_at_load(sd, model, _model_declared_skip_patterns(model), self._ram_cache.make_room)
+        model.load_state_dict(sd, strict=True, assign=True)
+        sd.clear()
+        reject_incomplete_load(model, what=what)
+        self._logger.info(
+            f"{what}: {unpacked} unquantized or non-Linear tensor(s) dequantized at load, the remaining Linear "
+            "weights kept packed"
+        )
+        return model.eval()

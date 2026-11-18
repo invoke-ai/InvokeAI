@@ -1,0 +1,42 @@
+# Crowdin's GitHub integration reads this file from main, uploads the English sources and opens a pull request with
+# the translations. The credentials are only for running the Crowdin CLI locally. docs/README.md has the runbook.
+project_id_env: CROWDIN_PROJECT_ID
+api_token_env: CROWDIN_PERSONAL_TOKEN
+preserve_hierarchy: true
+
+# Only the user-facing docs trees. development/ and contributing/ stay English and show as fallbacks in every locale.
+# A translation lands at docs/src/content/docs/<locale>/<the English path>; the site builds the locales that
+# docs/src/config/locales.mjs lists. MDX pages use the MDX v2 parser; .md pages are plain Markdown, where braces are
+# text. A tree has an .md entry only while it has .md pages: the Crowdin CLI fails on a pattern that matches nothing.
+files:
+  - source: '/docs/src/content/docs/index.mdx'
+    translation: '/docs/src/content/docs/%two_letters_code%/%original_file_name%'
+    type: mdx_v2
+
+  - source: '/docs/src/content/docs/start-here/**/*.mdx'
+    translation: '/docs/src/content/docs/%two_letters_code%/start-here/**/%original_file_name%'
+    type: mdx_v2
+    ignore: ['/docs/src/content/docs/**/assets/**']
+
+  - source: '/docs/src/content/docs/Users Guide/**/*.mdx'
+    translation: '/docs/src/content/docs/%two_letters_code%/Users Guide/**/%original_file_name%'
+    type: mdx_v2
+    ignore: ['/docs/src/content/docs/**/assets/**']
+  - source: '/docs/src/content/docs/Users Guide/**/*.md'
+    translation: '/docs/src/content/docs/%two_letters_code%/Users Guide/**/%original_file_name%'
+    ignore: ['/docs/src/content/docs/**/assets/**']
+
+  - source: '/docs/src/content/docs/configuration/**/*.mdx'
+    translation: '/docs/src/content/docs/%two_letters_code%/configuration/**/%original_file_name%'
+    type: mdx_v2
+    ignore: ['/docs/src/content/docs/**/assets/**']
+
+  - source: '/docs/src/content/docs/troubleshooting/**/*.mdx'
+    translation: '/docs/src/content/docs/%two_letters_code%/troubleshooting/**/%original_file_name%'
+    type: mdx_v2
+    ignore: ['/docs/src/content/docs/**/assets/**']
+
+  # The site's UI strings. `_one`/`_other` keys are i18next plural forms; Crowdin exports each language's own.
+  - source: '/docs/src/content/i18n/en.json'
+    translation: '/docs/src/content/i18n/%two_letters_code%.json'
+    type: i18next_json

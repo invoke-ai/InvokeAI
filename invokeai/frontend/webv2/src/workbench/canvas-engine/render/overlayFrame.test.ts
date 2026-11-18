@@ -64,6 +64,7 @@ const makeHarness = (): Harness => {
       getSamPulseTime: () => state.pulseTime,
       getFloatingSelection: () => float.value,
       getOverlayCursor: () => state.cursor,
+      getStagedRegions: () => [],
       selection: selection as unknown as CreateOverlayFrameDeps['selection'],
       stores,
       transformOverrides: overrides,

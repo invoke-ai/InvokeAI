@@ -65,7 +65,7 @@ export const GalleryPickerBoards = ({
   onExitTop: () => void;
   onSelect: (boardId: string) => void;
 }) => {
-  const viewportProps = useMemo(() => ({ id }), [id]);
+  const scrollAreaIds = useMemo(() => ({ viewport: id }), [id]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -94,7 +94,7 @@ export const GalleryPickerBoards = ({
   );
 
   return (
-    <Scrollable flex="1" label={label} minH="0" viewportProps={viewportProps}>
+    <Scrollable flex="1" ids={scrollAreaIds} label={label} minH="0">
       <Box px="1" py="1" onKeyDown={handleKeyDown}>
         {groups.length === 0 ? (
           <Text color="fg.muted" fontSize="xs" px="2" py="3" textAlign="center">

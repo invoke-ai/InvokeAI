@@ -1,8 +1,8 @@
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-jsx-as-prop */
+/* oxlint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop */
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Badge, Stack } from '@chakra-ui/react';
+import { Stack } from '@chakra-ui/react';
 import { getGenerationUiPolicy, getSchedulerOptions } from '@features/generation/core/baseGenerationPolicies';
 import {
   DEFAULT_REFINER_CFG_SCALE,
@@ -32,6 +32,7 @@ import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
+import { GenerateIssueNotes } from './shared/GenerateIssues';
 
 /** Practical track ranges; typed values may exceed them up to the legacy input limits. */
 const STEPS_SLIDER_MAX = 100;
@@ -116,6 +117,7 @@ export const GenerateRefinerSection = ({
     step: number;
   }) => (
     <GenerateFieldContextMenu
+      fieldLabel={label}
       copyValue={() => String(settings[key])}
       isAtDefault={(key === 'refinerStart' ? !refiner : !isActive) || settings[key] === defaultValue}
       onReset={() => onCommit({ [key]: defaultValue })}
@@ -139,10 +141,11 @@ export const GenerateRefinerSection = ({
     <GenerateCollapsibleSection
       label={t('widgets.generate.refiner')}
       defaultOpen={false}
-      badges={refiner ? <Badge>{isActive ? refiner.name : t('commandPalette.settings.off')}</Badge> : null}
+      summary={refiner ? [isActive ? refiner.name : t('commandPalette.settings.off')] : undefined}
       sectionId="refiner"
     >
-      <Stack gap="2" p="2">
+      <Stack gap="2.5">
+        <GenerateIssueNotes section="refiner" />
         <Field hint="refinerModel" label={t('widgets.generate.refinerModel')}>
           {/* The picker owns the loading and empty states, so no refiner installed reads as one message. */}
           <ModelSelect
@@ -176,6 +179,7 @@ export const GenerateRefinerSection = ({
           step: 0.5,
         })}
         <GenerateFieldContextMenu
+          fieldLabel={t('widgets.generate.refinerScheduler')}
           copyValue={() => settings.refinerScheduler}
           isAtDefault={!isActive || settings.refinerScheduler === DEFAULT_REFINER_SCHEDULER}
           onReset={() => onCommitImmediate({ refinerScheduler: DEFAULT_REFINER_SCHEDULER })}

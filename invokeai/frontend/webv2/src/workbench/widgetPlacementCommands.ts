@@ -1,4 +1,5 @@
 import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
+import type { Project } from '@workbench/projectContracts';
 import type {
   OpenWorkbenchWidgetOptions,
   RegisteredWidget,
@@ -176,6 +177,62 @@ export const revealWidgetPlacement = ({
   widgets.select({ projectId: project.projectId, region, widgetId: instanceId });
 
   return { ok: true, region };
+};
+
+const PANEL_OPEN_KEYS = { bottom: 'isBottomOpen', left: 'isLeftOpen', right: 'isRightOpen' } as const;
+
+/** Rails before the center, so a widget docked beside the work surface is revealed there without replacing it. */
+const PLACED_REVEAL_ORDER: readonly WidgetRegion[] = ['right', 'left', 'bottom', 'center'];
+
+export type PlacedWidgetReveal =
+  | { kind: 'floating'; instanceId: WidgetInstanceId }
+  | { kind: 'docked'; region: WidgetRegion };
+
+/**
+ * Bring a widget type to the front where the layout already has it, never moving it: raise (and unshade) its floating
+ * window; leave it alone where it already shows; otherwise select its tab, expanding the region and opening its panel,
+ * in a region that already fronts it, else a rail before the center. Null when the layout has none, for the caller's
+ * own open.
+ */
+export const revealPlacedWidget = ({
+  project,
+  typeId,
+  widgets,
+}: {
+  project: Pick<Project, 'floatingWidgets' | 'id' | 'layout' | 'widgetInstances' | 'widgetRegions'>;
+  typeId: WidgetTypeId;
+  widgets: Pick<WorkbenchWidgetCommands, 'open' | 'revealFloating'>;
+}): PlacedWidgetReveal | null => {
+  const isTarget = (instanceId: string | null | undefined) =>
+    instanceId !== null && instanceId !== undefined && project.widgetInstances[instanceId]?.typeId === typeId;
+  const floating = Object.keys(project.floatingWidgets ?? {}).find(isTarget);
+
+  if (floating) {
+    widgets.revealFloating(floating);
+    return { instanceId: floating, kind: 'floating' };
+  }
+
+  const placed = PLACED_REVEAL_ORDER.filter((region) => project.widgetRegions[region].instanceIds.some(isTarget));
+  const fronting = placed.filter((region) => isTarget(project.widgetRegions[region].activeInstanceId));
+  const shown = fronting.find(
+    (region) =>
+      !project.widgetRegions[region].isCollapsed &&
+      (region === 'center' || project.layout.panels[PANEL_OPEN_KEYS[region]])
+  );
+
+  if (shown) {
+    return { kind: 'docked', region: shown };
+  }
+
+  const region = fronting[0] ?? placed[0];
+
+  if (!region) {
+    return null;
+  }
+
+  // Opening a type its region already holds activates that instance, expands the region and opens its panel.
+  widgets.open({ projectId: project.id, region, widgetId: typeId });
+  return { kind: 'docked', region };
 };
 
 /** Cycle docked panel views in their displayed order, leaving windows and toolbar/popover controls alone. */

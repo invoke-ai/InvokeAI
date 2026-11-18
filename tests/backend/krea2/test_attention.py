@@ -18,10 +18,10 @@ from invokeai.backend.krea2.style_reference import (
 
 @pytest.fixture(autouse=True)
 def _no_ambient_override(monkeypatch):
-    """These assert the default ranking, so they have to own the default rather than inherit it.
+    """These assert the default behaviour, so they have to own the default rather than inherit it.
 
-    Four of the six fail in a shell where `INVOKE_KREA2_SDPA_BACKEND` is exported -- which is the
-    shell the PR asks users and its own A/B workflow to run in.
+    A shell where `INVOKE_KREA2_SDPA_BACKEND` pins a backend -- which is the shell the docs ask
+    benchmarking runs to use -- changes the kernel they run on.
     """
     monkeypatch.delenv(krea2_attention.KREA2_SDPA_BACKEND_ENV_VAR, raising=False)
 
@@ -126,10 +126,10 @@ def test_processor_without_regional_state_ignores_the_shared_mask() -> None:
     ],
     ids=["efficient", "cudnn"],
 )
-def test_cuda_fused_sdpa_accepts_dense_regional_mask(monkeypatch: pytest.MonkeyPatch, backend, can_use) -> None:
+def test_cuda_fused_sdpa_accepts_dense_regional_mask(backend, can_use) -> None:
     """Both fused kernels that can serve this path, not just the one that used to.
 
-    Flash refuses the mask the regional blocks pass, so after the ranking change cuDNN is what
+    Flash refuses the mask the regional blocks pass, so under the process-wide order cuDNN is what
     actually serves them -- and on a build without flash it serves every block. Pinning only
     efficient here would guard a kernel the product no longer reaches first.
     """
@@ -140,7 +140,6 @@ def test_cuda_fused_sdpa_accepts_dense_regional_mask(monkeypatch: pytest.MonkeyP
         torch.ones(12, 12, device="cuda", dtype=torch.bool),
     )
     state = Krea2RegionalPromptingState(attention_mask=mask)
-    monkeypatch.setattr(krea2_attention, "_KREA2_SDPA_BACKENDS", [backend])
 
     head_dim = attn.hidden_size // attn.num_heads
     sdpa_tensor = torch.empty(1, attn.num_heads, 24, head_dim, device="cuda", dtype=torch.float16)
@@ -149,7 +148,11 @@ def test_cuda_fused_sdpa_accepts_dense_regional_mask(monkeypatch: pytest.MonkeyP
         pytest.skip(f"This CUDA device/build cannot serve a dense mask with {backend.name}")
 
     with torch.no_grad():
-        attn.set_processor(Krea2MemoryEfficientAttnProcessor(regional_prompting_state=state))
+        attn.set_processor(
+            Krea2MemoryEfficientAttnProcessor(
+                regional_prompting_state=state, sdpa_backends=krea2_attention.Krea2SdpaBackends(exclusive=backend)
+            )
+        )
         output = attn(hidden_states, attention_mask=None, image_rotary_emb=None)
 
     assert output.is_cuda
@@ -158,7 +161,7 @@ def test_cuda_fused_sdpa_accepts_dense_regional_mask(monkeypatch: pytest.MonkeyP
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="the fused kernels are the thing under test")
 def test_the_ranked_backends_agree_numerically() -> None:
-    """Every backend in the ranked list must produce the same image.
+    """Every backend in the process-wide order must produce the same image.
 
     Ranking cuDNN above the memory-efficient kernel changed which kernel serves a Krea-2 block on
     builds without flash -- i.e. every Windows CUDA build. Nothing pinned that the kernels agree, so
@@ -170,7 +173,7 @@ def test_the_ranked_backends_agree_numerically() -> None:
 
     def run(backend: SDPBackend) -> torch.Tensor:
         processor = Krea2MemoryEfficientAttnProcessor(
-            sdpa_backends=krea2_attention.Krea2SdpaBackends(backends=(backend,), set_priority=False)
+            sdpa_backends=krea2_attention.Krea2SdpaBackends(exclusive=backend)
         )
         attn.set_processor(processor)
         with torch.no_grad():

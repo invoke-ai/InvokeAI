@@ -1,5 +1,5 @@
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
-import type { SamPreviewState } from '@workbench/canvas-engine/controllers/previewStateController';
+import type { SamPreviewState, StagedRegionState } from '@workbench/canvas-engine/controllers/previewStateController';
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type {
   ColorLoupeOverlay,
@@ -48,6 +48,8 @@ export interface CreateOverlayFrameDeps {
   readonly getAntsPhase: () => number;
   /** The clock while the SAM pulse animates, `null` for the static opacity (reduced motion, no preview). */
   readonly getSamPulseTime: () => number | null;
+  /** Where pending results land, as the canvas widget last published them. */
+  readonly getStagedRegions: () => readonly StagedRegionState[];
 }
 
 export interface OverlayFrame {
@@ -171,6 +173,7 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
             }
           : null,
         shapePreview: stores.shapePreview.get(),
+        stagedRegions: deps.getStagedRegions(),
         // The passive bbox frame follows the setting, but always renders while
         // the bbox tool is active so its handles have a frame to attach to.
         showBbox: stores.showBbox.get() || activeTool === 'bbox',

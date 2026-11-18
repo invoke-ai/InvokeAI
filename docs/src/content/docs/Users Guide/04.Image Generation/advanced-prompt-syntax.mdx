@@ -1,7 +1,7 @@
 ---
 title: Advanced Prompt Syntax
 description: Fine control over prompts — attention weighting, blending and conjunctions for SD 1.5, SD 2.x and SDXL, and the advanced dynamic prompt syntax for multiple choices, weights, variables and comments.
-lastUpdated: 2026-10-15
+lastUpdated: 2026-10-28
 sidebar:
   order: 3
 ---
@@ -134,5 +134,15 @@ Each use varies on its own, like a group written out in full, so this gives all 
 
 ### Comments
 
-Everything after a `#` is treated as a comment and left out of the prompt. Avoid `#` in ordinary prompts, since the rest of the prompt after it is dropped.
+Dynamic prompts read three comment markers, and leave the comment out of the prompt:
+
+| Marker | Leaves out |
+|---|---|
+| `#` | The rest of its line |
+| `//` | The rest of its line |
+| `/* … */` | Everything between the markers |
+
+There is no way to escape these markers. `#` turns any prompt into a dynamic prompt, so `wall painted #ff0000` generates `wall painted`; `//` and `/* */` only act in a prompt that is dynamic for other reasons, such as one containing `{red|blue}`. When a marker will drop text, a warning appears under the prompt with a **Turn off dynamic prompts** button.
+
+To keep these characters as ordinary text, turn dynamic prompts off: switch off **Use dynamic prompts** at the top of the **Dynamic** popover. The prompt is then used exactly as typed, with braces, `__wildcards__` and comment markers left in. The setting belongs to the project, and **Dynamic** reads **Off** while it is off.
 

@@ -8,13 +8,15 @@
  * bake. Cancel restores the drag start; clicks/zero movement do nothing.
  */
 
+import type { CanvasLayerEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
-import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
+import { compileDocumentLeaves, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
-import { isLeafEditable } from '@workbench/canvas-engine/document/layerEligibility';
+import { leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
 import { snapMovedPoint } from '@workbench/canvas-engine/math/snapping';
 
 import type { Tool, ToolContext } from './tool';
@@ -26,6 +28,45 @@ const PRIMARY_BUTTON = 1;
 
 /** Screen-space distance (CSS px) the pointer must travel before a press becomes a drag. */
 export const MOVE_DRAG_THRESHOLD_PX = 3;
+
+/**
+ * What a press drags from the panel selection: every selected leaf, and every leaf beneath a selected group, with
+ * the primary one under the document selection; refused, naming the first leaf in the way, when any is locked or
+ * hidden. Pure, so a press can ask before it reports.
+ */
+type SelectedLayerDrag =
+  | { kind: 'drag'; layers: readonly CanvasLayerContract[]; primary: CanvasLayerContract }
+  | { kind: 'refused'; leaf: SemanticLeaf; status: CanvasLayerEditRefusal['status'] }
+  | { kind: 'none' };
+
+/** Target comes solely from document selection, regardless of press location. */
+const planSelectedLayerDrag = (ctx: ToolContext): SelectedLayerDrag => {
+  const doc = ctx.getDocument();
+  const selectedId = doc?.selectedLayerId;
+  if (!doc || !selectedId) {
+    return { kind: 'none' };
+  }
+  const requested = new Set(ctx.getSelectedLayerIds?.() ?? [selectedId]);
+  requested.add(selectedId);
+  const index = getDocumentIndex(doc);
+  if ([...requested].some((id) => !index.byId.has(id))) {
+    return { kind: 'none' };
+  }
+  // A selected group drags every leaf beneath it; a locked node anywhere in the set refuses the drag.
+  const leaves = compileDocumentLeaves(doc).filter(
+    (leaf) => requested.has(leaf.id) || leaf.parentIds.some((ancestor) => requested.has(ancestor))
+  );
+  for (const leaf of leaves) {
+    const status = leafEditRefusal(leaf);
+    if (status) {
+      return { kind: 'refused', leaf, status };
+    }
+  }
+  const primary = leaves.find((leaf) => leaf.id === selectedId || leaf.parentIds.includes(selectedId));
+  return primary
+    ? { kind: 'drag', layers: leaves.map((leaf) => leaf.layer), primary: primary.layer }
+    : { kind: 'none' };
+};
 
 /** Applies the shift-to-dominant-axis constraint to a document-space delta. */
 export const constrainDelta = (dx: number, dy: number, shift: boolean): Vec2 => {
@@ -70,32 +111,6 @@ export const createMoveTool = (): Tool => {
     state = null;
   };
 
-  /** Target comes solely from document selection, regardless of press location. */
-  const selectedDraggableLayers = (
-    ctx: ToolContext
-  ): { layers: readonly CanvasLayerContract[]; primaryId: string | null } => {
-    const doc = ctx.getDocument();
-    const selectedId = doc?.selectedLayerId;
-    if (!doc || !selectedId) {
-      return { layers: [], primaryId: null };
-    }
-    const requested = new Set(ctx.getSelectedLayerIds?.() ?? [selectedId]);
-    requested.add(selectedId);
-    const index = getDocumentIndex(doc);
-    if ([...requested].some((id) => !index.byId.has(id))) {
-      return { layers: [], primaryId: null };
-    }
-    // A selected group drags every leaf beneath it; a locked node anywhere in the set refuses the drag.
-    const leaves = compileDocumentLeaves(doc).filter(
-      (leaf) => requested.has(leaf.id) || leaf.parentIds.some((ancestor) => requested.has(ancestor))
-    );
-    if (leaves.length === 0 || !leaves.every(isLeafEditable)) {
-      return { layers: [], primaryId: null };
-    }
-    const primary = leaves.find((leaf) => leaf.id === selectedId || leaf.parentIds.includes(selectedId));
-    return { layers: leaves.map((leaf) => leaf.layer), primaryId: primary?.id ?? null };
-  };
-
   /**
    * Resolves what a press at `point` drags. Pixels win over the layer when a
    * float is already in flight, or when a live selection contains the press.
@@ -105,11 +120,15 @@ export const createMoveTool = (): Tool => {
     if (existing) {
       return { kind: 'float', layerId: existing.layerId, origin: { ...existing.transform } };
     }
-    const { layers, primaryId } = selectedDraggableLayers(ctx);
-    const primary = layers.find((layer) => layer.id === primaryId);
-    if (!primary) {
+    const plan = planSelectedLayerDrag(ctx);
+    if (plan.kind === 'refused') {
+      // Said once per press, naming the first layer in the way; nothing moves.
+      ctx.reportEditRefusal?.({ layerId: plan.leaf.id, layerName: plan.leaf.layer.name, status: plan.status });
+    }
+    if (plan.kind !== 'drag') {
       return { kind: 'none' };
     }
+    const { layers, primary } = plan;
     const layerDrag: LayerDrag = {
       kind: 'layer',
       targets: layers.map((layer) => ({
@@ -180,17 +199,26 @@ export const createMoveTool = (): Tool => {
   };
 
   return {
-    cursor: () => 'move',
+    // Not-allowed over a selected leaf that is locked or hidden: a press there moves nothing.
+    cursor: (ctx) => {
+      const doc = ctx.getDocument();
+      const leaf = doc?.selectedLayerId && !state ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
+      return leaf && leafEditRefusal(leaf) ? 'not-allowed' : 'move';
+    },
     id: 'move',
+    // Alt bypasses grid snapping for the drag, so holding it first must not switch to the color picker.
+    usesAltKey: true,
     onDeactivate: (ctx) => {
       clearOverride(ctx);
       endGesture();
     },
     onKeyCommand: (ctx, command) => {
       // Enter commits the float; engine Escape abandons it regardless of active tool.
-      if (command === 'apply' && !state) {
-        ctx.commitFloatingSelection?.();
+      if (command !== 'apply' || state || !ctx.getFloatingSelection?.()) {
+        return false;
       }
+      ctx.commitFloatingSelection?.();
+      return true;
     },
     onPointerCancel: (ctx) => {
       if (state?.mode.kind === 'float') {
@@ -226,6 +254,10 @@ export const createMoveTool = (): Tool => {
         state.moved = true;
         if (state.mode.kind === 'lift') {
           state.mode = liftOnDrag(ctx, state.mode);
+        }
+        // Only now does the gesture edit the selected layer in place; a click, a float or a refused drag never does.
+        if (state.mode.kind === 'layer') {
+          ctx.beginSelectedLayerEdit?.();
         }
       }
       applyDelta(ctx, state, input);

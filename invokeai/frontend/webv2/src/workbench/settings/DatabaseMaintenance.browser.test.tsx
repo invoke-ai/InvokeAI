@@ -25,13 +25,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@features/identity', async (importOriginal) => ({
   ...(await importOriginal<typeof IdentityModule>()),
   AccountMenu: () => null,
-  AccountMenuSection: () => null,
   useCapabilities: () => ({
     canManageAppConfig: mocks.canManageAppConfig,
     canManageModels: false,
     canManageNodes: false,
   }),
-  useHasAccountSection: () => false,
 }));
 vi.mock('@platform/transport/http', async (importOriginal) => ({
   ...(await importOriginal<typeof HttpModule>()),
@@ -55,7 +53,10 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 }));
 vi.mock('@workbench/palette/PaletteButton', () => ({ PaletteButton: () => null }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
-vi.mock('@workbench/shell/topbar/useTopbarShortcut', () => ({ useTopbarShortcut: () => null }));
+vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({
+  useShortcutBinding: () => null,
+  useShortcutLabel: () => null,
+}));
 vi.mock('./store', async (importOriginal) => ({
   ...(await importOriginal<typeof SettingsStoreModule>()),
   useWorkbenchSettingsSelector: (selector: (snapshot: never) => unknown) => selector({ scope: 'user' } as never),
@@ -145,7 +146,6 @@ describe('database maintenance in Data & workspace settings', () => {
     mocks.canManageAppConfig = false;
     await renderSettings();
     expect(getVacuumButton()).toBeUndefined();
-    expect(host.textContent).toContain('Clear saved data');
   });
 
   it('keeps maintenance out of both top-bar menus', async () => {

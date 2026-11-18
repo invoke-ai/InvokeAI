@@ -63,6 +63,9 @@ const getRightRail = (state: WorkbenchState): string[] => {
   }).placedItems.map((item) => (item.isFloating ? `${item.id}*` : item.id));
 };
 
+/** Drops the floating marker `getRightRail` appends, leaving the bare rail slot id. */
+const stripFloatingMarker = (id: string): string => (id.endsWith('*') ? id.slice(0, -1) : id);
+
 /** Video shows Preview only in the center; put it on the right rail too, then float it from there. */
 const floatVideoPreviewFromRail = (): WorkbenchState => {
   let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'video', type: 'applyPreset' });
@@ -351,7 +354,7 @@ describe('dockFloatingWidget', () => {
 
     state = workbenchReducer(state, { instanceId: first, type: 'dockFloatingWidget' });
     // The window still out keeps the slot the rail was already showing for it.
-    expect(getRightRail(state).map((id) => id.replace('*', ''))).toEqual(before);
+    expect(getRightRail(state).map(stripFloatingMarker)).toEqual(before);
 
     state = workbenchReducer(state, { instanceId: second, type: 'dockFloatingWidget' });
     expect(getActiveProject(state).widgetRegions.right.instanceIds).toEqual(before);
@@ -1061,7 +1064,7 @@ describe('interaction with presets and undo', () => {
     let state = workbenchReducer(createInitialWorkbenchState(), {
       region: 'right',
       type: 'toggleRegionWidget',
-      widgetId: 'project',
+      widgetId: 'diagnostics',
     });
     state = workbenchReducer(state, { instanceId: 'gallery', type: 'floatWidget' });
     state = workbenchReducer(state, { presetId: 'compose', type: 'saveLayoutPreset' });

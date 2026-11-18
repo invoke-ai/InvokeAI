@@ -1,0 +1,46 @@
+# Checks the pull request title and description against the repository conventions.
+#
+# The title must be a Conventional Commit (it becomes the squash-merge subject) and must not name the
+# frontend package. The description must keep the headings of .github/pull_request_template.md in order.
+# Rules live in scripts/check_pr_metadata.py.
+#
+# The job only runs for pull_request events, so a merge group reports the workflow as skipped and is not blocked.
+
+name: 'pr metadata checks'
+
+on:
+  pull_request:
+    types:
+      - 'opened'
+      - 'edited'
+      - 'reopened'
+      - 'synchronize'
+      - 'ready_for_review'
+  merge_group:
+
+permissions:
+  contents: read
+
+# One run per pull request: a new edit or push cancels the superseded run. Merge groups fall back to the run id.
+concurrency:
+  group: pr-metadata-checks-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  pr-metadata-checks:
+    # Bots (dependabot, release automation) do not follow the PR template.
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.user.type != 'Bot' }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 3 # expected run time: <30 s
+    steps:
+      - name: checkout
+        uses: useblacksmith/checkout@25227e61ff9dafe400e22fa487b673eac4e4409a # v1.8.1
+        with:
+          persist-credentials: false
+
+      - name: check pull request title and description
+        # Title and body are untrusted input: pass them through env, never interpolate them into the script.
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: python3 scripts/check_pr_metadata.py

@@ -103,6 +103,7 @@ const adapter: GalleryUiAdapter = {
   ImageContextMenu: () => null,
   antialiasProgressImages: false,
   exportProject: noop,
+  getBoardMediaUsage: vi.fn(),
   followedProgressSessionId: null,
   followProgressSession: noop,
   gallery: {
@@ -159,7 +160,6 @@ const createGalleryData = (deepItem: GalleryImageItem) => ({
   boardsState: { error: null, isFetchingMore: false, isRetrying: false, retry: noop, status: 'ready' },
   filter: { boardId: 'none' },
   isLoadingItems: false,
-  isWindowTruncated: false,
   items: [deepItem],
   listing: { error: null, isFetchingMore: false, isRetrying: false, retry: noop, status: 'ready' },
   loadMore: noop,
@@ -203,7 +203,6 @@ it('publishes whether boards can be shared to the board panel and menus', async 
     boardsState: { error: null, isFetchingMore: false, isRetrying: false, retry: noop, status: 'ready' },
     filter: { boardId: 'none' },
     isLoadingItems: false,
-    isWindowTruncated: false,
     items: [],
     listing: { error: null, isFetchingMore: false, isRetrying: false, retry: noop, status: 'ready' },
     loadMore: noop,

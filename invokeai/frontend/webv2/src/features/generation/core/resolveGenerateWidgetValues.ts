@@ -14,6 +14,7 @@ import {
 import { syncPromptTemplateWithCatalog } from './promptTemplates';
 import {
   isGenerateWidgetValues,
+  isSameModelFile,
   normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
   syncGenerateWidgetValuesWithModels,
@@ -38,13 +39,24 @@ export interface ResolvedGenerateWidgetValues {
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
 
+/**
+ * Fields newer than some saved projects whose absence already reads as their default, so loading such a project does
+ * not write them in: the project stays as saved until the user changes the setting.
+ */
+const DEFAULTS_READ_FROM_ABSENCE: Readonly<Partial<Record<keyof GenerateWidgetValues, unknown>>> = {
+  dynamicPromptsEnabled: true,
+};
+
 const hasSystemDifference = (storedValues: unknown, values: GenerateWidgetValues): boolean => {
   if (!isRecord(storedValues)) {
     return true;
   }
 
   return Object.entries(values).some(
-    ([key, value]) => key !== 'batchCount' && !areJsonValuesStructurallyEqual(storedValues[key], value)
+    ([key, value]) =>
+      key !== 'batchCount' &&
+      !(storedValues[key] === undefined && DEFAULTS_READ_FROM_ABSENCE[key as keyof GenerateWidgetValues] === value) &&
+      !areJsonValuesStructurallyEqual(storedValues[key], value)
   );
 };
 
@@ -74,9 +86,21 @@ export const resolveGenerateWidgetValues = ({
   }
 
   const normalizedSettings = normalizeGenerateSettings(storedValues);
-  const selectedModel =
-    supportedModels.find((model) => model.key === normalizedSettings?.modelKey) ?? supportedModels[0]!;
   const normalizedWidgetValues = normalizeGenerateWidgetValues(storedValues);
+  const storedModel = normalizedWidgetValues?.model;
+  // A chosen model that is no longer installed stays chosen: the model card names it and Invoke waits until the user
+  // picks another or it returns. Reinstalling gives it a new key but the same file hash, so it is found again by hash
+  // (and its type, base and variant).
+  // Only values with no runnable choice (first run, an unknown family) take the default.
+  const selectedModel =
+    supportedModels.find((model) => model.key === normalizedSettings?.modelKey) ??
+    (storedModel ? supportedModels.find((model) => isSameModelFile(model, storedModel)) : undefined) ??
+    (storedModel &&
+    storedModel.key === normalizedSettings?.modelKey &&
+    isGenerateModelSelectable(storedModel) &&
+    isArchitectureDescribed(storedModel)
+      ? storedModel
+      : supportedModels[0]!);
   const canReuseStoredValues =
     isGenerateWidgetValues(storedValues) && normalizedWidgetValues?.batchCount === storedValues.batchCount;
   const baseValues: GenerateWidgetValues = canReuseStoredValues

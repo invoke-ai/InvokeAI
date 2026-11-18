@@ -26,13 +26,17 @@ const selection = { candidate, selectedImageIndex: 0 } as const;
 interface HarnessOptions {
   readonly byteBudget?: number;
   readonly gestureActive?: boolean;
+  /** A floating selection or transform session stays open: its landing was refused. */
+  readonly sessionStuck?: boolean;
   readonly locked?: boolean;
   /** The reducer keeps the project unchanged, as when the candidate moved on. */
   readonly rejectDispatch?: boolean;
   /** Mirror refresh fails, so an accepted mutation can never be mirrored. */
   readonly mirrorBroken?: boolean;
   readonly staged?: boolean;
-  /** Overrides the initial project's selection (its default inpaint mask). */
+  /** Landing the open sessions also takes the candidate off staging. */
+  readonly unstagedBySettle?: boolean;
+  /** Overrides the initial selection: the new project's empty inpaint mask. */
   readonly selectedLayerId?: string | null;
 }
 
@@ -43,10 +47,13 @@ const createHarness = (options: HarnessOptions = {}) => {
     ...base,
     canvas: {
       ...base.canvas,
-      document:
-        options.selectedLayerId === undefined
-          ? base.canvas.document
-          : { ...base.canvas.document, selectedLayerId: options.selectedLayerId },
+      document: {
+        ...base.canvas.document,
+        selectedLayerId:
+          options.selectedLayerId === undefined
+            ? (getDocumentLeaves(base.canvas.document)[0]?.id ?? null)
+            : options.selectedLayerId,
+      },
       stagingArea: {
         ...base.canvas.stagingArea,
         isVisible: true,
@@ -101,11 +108,19 @@ const createHarness = (options: HarnessOptions = {}) => {
       return () => listeners.delete(listener);
     },
   });
+  const settleEditSessions = vi.fn(() => {
+    if (options.unstagedBySettle) {
+      const stagingArea = { ...project.canvas.stagingArea, pendingImageIds: [], pendingImages: [] };
+      project = { ...project, canvas: { ...project.canvas, stagingArea } };
+    }
+    return !options.sessionStuck;
+  });
   const controller = new StagedResultController({
     createEventId: () => 'event-1',
     ctx,
     getCanvasState: () => project.canvas,
     now: () => '2026-07-16T01:00:00.000Z',
+    settleEditSessions,
   });
   return {
     breakMirror: (broken: boolean) => {
@@ -115,6 +130,7 @@ const createHarness = (options: HarnessOptions = {}) => {
     dispatched,
     history,
     project: () => project,
+    settleEditSessions,
   };
 };
 
@@ -180,12 +196,30 @@ describe('StagedResultController', () => {
   it.each([
     { name: 'editing is locked', options: { locked: true } },
     { name: 'a gesture is active', options: { gestureActive: true } },
+    { name: 'an edit session cannot land', options: { sessionStuck: true } },
   ])('returns busy without mutation when $name', ({ options }) => {
     const h = createHarness(options);
 
     expect(h.controller.commit(selection)).toEqual({ status: 'busy' });
     expect(h.dispatched).toEqual([]);
     expect(h.history.canUndo()).toBe(false);
+  });
+
+  it('lands open edit sessions before the accepted result goes on top', () => {
+    const h = createHarness();
+
+    expect(h.controller.commit(selection).status).toBe('committed');
+    expect(h.settleEditSessions).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { name: 'mid-gesture', options: { gestureActive: true } },
+    { name: 'while an operation holds the document', options: { locked: true } },
+  ])('never lands a session $name, so a refused accept loses nothing', ({ options }) => {
+    const h = createHarness(options);
+
+    expect(h.controller.commit(selection)).toEqual({ status: 'busy' });
+    expect(h.settleEditSessions).not.toHaveBeenCalled();
   });
 
   it('refuses before mutating when history could never retain the step', () => {
@@ -233,11 +267,21 @@ describe('StagedResultController', () => {
     expect(h.history.canUndo()).toBe(false);
   });
 
-  it('returns missing without mutation when the candidate is no longer staged', () => {
+  it('returns missing without mutation, and lands no session, when the candidate is no longer staged', () => {
     const h = createHarness({ staged: false });
 
     expect(h.controller.commit(selection)).toEqual({ status: 'missing' });
     expect(h.dispatched).toEqual([]);
+    expect(h.settleEditSessions).not.toHaveBeenCalled();
+  });
+
+  it('returns missing when landing the open sessions takes the candidate off staging', () => {
+    const h = createHarness({ unstagedBySettle: true });
+
+    expect(h.controller.commit(selection)).toEqual({ status: 'missing' });
+    expect(h.settleEditSessions).toHaveBeenCalledOnce();
+    expect(h.dispatched).toEqual([]);
+    expect(h.history.canUndo()).toBe(false);
   });
 
   it('rejects retained commit capabilities after disposal', () => {

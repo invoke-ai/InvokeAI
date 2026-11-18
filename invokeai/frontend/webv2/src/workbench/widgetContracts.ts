@@ -19,7 +19,6 @@ export type FirstPartyWidgetTypeId =
   | 'layers'
   | 'notifications'
   | 'preview'
-  | 'project'
   | 'queue'
   | 'queue-status'
   | 'server-status'
@@ -134,10 +133,8 @@ export interface WidgetRuntimeApi<State extends Record<string, unknown> = Record
   diagnostics: WidgetDiagnosticsApi;
   commands: WidgetCommandApi;
   hotkeys: WidgetHotkeyApi;
-  menus: WidgetMenuApi;
   palette: WidgetCommandPaletteApi;
   search: WidgetSearchApi;
-  toolbars: WidgetToolbarApi;
   workbench: WidgetWorkbenchApi;
 }
 
@@ -146,9 +143,17 @@ export interface WidgetDiagnosticsApi {
   logger: (namespace: LogNamespace) => Logger;
 }
 
+/**
+ * The instance's values. Reads and writes are not symmetric: `getSnapshot` returns resolved values (the project's pins
+ * over the user's defaults), while `set` replaces the raw pins. `set({ ...getSnapshot(), x })` would therefore pin
+ * every default the user has; write with `patch`, which pins only the keys given.
+ */
 export interface WidgetRuntimeStateApi<State extends Record<string, unknown> = Record<string, unknown>> {
+  /** The values the widget reads with: pins over the user's defaults. */
   getSnapshot: () => Readonly<State>;
+  /** Pins `values`' keys, leaving the rest as they are. */
   patch: (values: Partial<State>) => void;
+  /** Replaces every pin with `values`; prefer `patch`. */
   set: (values: State) => void;
 }
 
@@ -192,16 +197,6 @@ export interface WidgetHotkeyContribution {
   allowInEditable?: boolean;
 }
 
-export interface WidgetMenuApi {
-  register: (menu: WidgetMenuContribution) => () => void;
-}
-
-export interface WidgetMenuContribution {
-  id: string;
-  items: Array<{ commandId: string; group?: string }>;
-  source?: WidgetContributionSource;
-}
-
 export interface WidgetCommandPaletteApi {
   register: (entry: WidgetCommandPaletteContribution) => () => void;
 }
@@ -238,21 +233,6 @@ export interface WidgetSearchResult {
   commandId?: string;
 }
 
-export interface WidgetToolbarApi {
-  register: (toolbar: WidgetToolbarContribution) => () => void;
-}
-
-export interface WidgetToolbarContribution {
-  id: string;
-  location: 'center.tabs.trailing' | 'status.left' | 'status.right';
-  items: Array<{
-    commandId: string;
-    icon?: WidgetIconComponent;
-    label?: string;
-  }>;
-  source?: WidgetContributionSource;
-}
-
 export interface OpenWorkbenchWidgetOptions {
   createNew?: boolean;
   preferredRegions?: ReadonlyArray<WidgetRegion>;
@@ -268,6 +248,12 @@ export interface WidgetWorkbenchApi {
   revealWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
   closeWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
 }
+
+/**
+ * How a docked widget's body is sized. `flow` (default): the body grows with the view and scrolls as a whole. `fill`:
+ * the view gets exactly the body's height, for views that scroll or resize their own regions (lists, trees, panes).
+ */
+export type WidgetBodySizing = 'fill' | 'flow';
 
 export interface WidgetManifest {
   /** Widget runtime API contract version. Defaults to 1 during registry normalization. */
@@ -292,6 +278,7 @@ export interface WidgetManifest {
   requiresAdmin?: boolean;
   chrome?: {
     header?: 'hidden' | 'visible';
+    body?: WidgetBodySizing;
   };
   /**
    * Literal dynamic loader for all render slots. The registry owns caching,

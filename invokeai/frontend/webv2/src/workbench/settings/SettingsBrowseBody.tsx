@@ -1,17 +1,17 @@
 import type { SettingsTarget } from '@platform/ui/settings/contracts';
-import type { ChangeEvent, Ref, UIEventHandler } from 'react';
+import type { Ref, UIEventHandler } from 'react';
 
-import { Box, HStack, Icon, Input, InputGroup, Kbd, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { Box, HStack, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
+import { ManagerSearchField } from '@platform/ui/ManagerLayout';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { resolveSettingsText } from '@platform/ui/settings/contracts';
-import { SearchIcon, XIcon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { SettingsSection } from './catalog';
 
-import { isFillSettingsEntry, SettingsEntryView } from './SettingsEntryView';
+import { isFillSettingsEntry, SettingsEntryView, useEditsDefaults } from './SettingsEntryView';
 import { SettingsScopeLabel } from './SettingsScopeLabel';
 import { patchWorkbenchPreferences, useWorkbenchSettingsSelector } from './store';
 
@@ -22,14 +22,7 @@ const BODY_CONTENT_PROPS = { px: CONTENT_PADDING, pb: '4' } as const;
 const retrySave = () => {
   void patchWorkbenchPreferences({});
 };
-const SEARCH_START_ELEMENT = <Icon as={SearchIcon} boxSize="3.5" color="fg.muted" />;
-/** The `/` shortcut its surface handles with `focusSettingsSearchOnSlash`. */
-const SEARCH_HOTKEY_HINT = (
-  <Kbd aria-hidden pointerEvents="none" variant="outline">
-    /
-  </Kbd>
-);
-
+/** The settings search; `/` focuses it through `ManagerLayout` on the Preferences page and the dialog's own handler. */
 export const SettingsSearchField = ({
   onChange,
   size,
@@ -40,31 +33,16 @@ export const SettingsSearchField = ({
   value: string;
 }) => {
   const { t } = useTranslation();
-  const change = useCallback((event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value), [onChange]);
-  const clear = useCallback(() => onChange(''), [onChange]);
-  // The end slot is a clear control while there is a query, and the `/` hint otherwise.
-  const endElement = useMemo(
-    () =>
-      value ? (
-        <Button aria-label={t('settingsDialog.clearSearch')} me="-2" size="sm" variant="ghost" onClick={clear}>
-          <XIcon />
-        </Button>
-      ) : (
-        SEARCH_HOTKEY_HINT
-      ),
-    [clear, t, value]
-  );
+
   return (
-    <InputGroup endElement={endElement} startElement={SEARCH_START_ELEMENT}>
-      <Input
-        data-settings-search
-        aria-label={t('settingsDialog.search')}
-        placeholder={t('settingsDialog.search')}
-        value={value}
-        size={size}
-        onChange={change}
-      />
-    </InputGroup>
+    <ManagerSearchField
+      clearLabel={t('settingsDialog.clearSearch')}
+      label={t('settingsDialog.search')}
+      placeholder={t('settingsDialog.search')}
+      size={size}
+      value={value}
+      onChange={onChange}
+    />
   );
 };
 
@@ -181,18 +159,27 @@ const SettingsSectionContent = ({
   onRevealed?: () => void;
 }) => {
   const { t } = useTranslation();
+  const editsDefaults = useEditsDefaults(section);
+  const defaultsNote =
+    editsDefaults && section.entries.some((entry) => entry.field.scope === 'project') ? (
+      <Text fontSize="md" color="fg.muted">
+        {t('settingsDialog.defaultsNote')}
+      </Text>
+    ) : null;
   return (
     <Box {...(fill ? FILL_SECTION_PROPS : undefined)}>
       {!search && section.entries[0] ? (
-        <Box pt="3">
+        <Stack gap="0.5" pt="3">
+          {defaultsNote}
           <SettingsScopeLabel scope={section.entries[0].field.scope} />
-        </Box>
+        </Stack>
       ) : null}
       {search ? (
         <Stack gap="0.5" pt="5">
           <Text as="h3" fontWeight="600" fontSize="lg">
             {resolveSettingsText(section.label, t)}
           </Text>
+          {defaultsNote}
           {section.entries[0] ? <SettingsScopeLabel scope={section.entries[0].field.scope} /> : null}
         </Stack>
       ) : null}

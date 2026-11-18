@@ -1,7 +1,14 @@
 import type { GalleryItem, GalleryItemKind, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
+import type { GalleryMediaUsageReport } from '@features/gallery/core/mediaUsage';
 import type { GallerySemanticQuery, GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
-import type { GalleryBoardOrderBy, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
+import type {
+  GalleryBoardOrderBy,
+  GalleryImageMetadata,
+  GalleryMediaMetadata,
+  GalleryOrderDir,
+  GalleryView,
+} from '@features/gallery/core/types';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
@@ -12,7 +19,12 @@ import {
   GALLERY_STARRED_STRIP_LIMIT,
 } from '@features/gallery/core/paging';
 import { toGallerySemanticQuery } from '@features/gallery/core/semanticImageQuery';
-import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import {
   hashKey,
   infiniteQueryOptions,
@@ -30,7 +42,9 @@ import {
   type GalleryItemLocation,
   type GalleryItemNames,
   fetchImageIndexAvailability,
+  getGalleryImageMetadata,
   getGalleryItemLocation,
+  getGalleryVideoMetadata,
   hydrateGalleryDateBoardItemPage,
   isDateBoardId,
   listGalleryBoards,
@@ -165,6 +179,33 @@ const getAccountKey = (owner: AccountScope): GalleryAccountKey => ({
   epoch: owner.epoch,
 });
 
+/**
+ * Where a board's media is still used, for one opening of its deletion dialog: a reopened dialog asks again, and
+ * nothing refetches it while open. `opening` is null while the dialog is closed, so a closing dialog leaves its
+ * opening's key, which stops a check still running there. Kept outside the `gallery` root so gallery invalidations
+ * never re-run a check the user is reading.
+ */
+export const galleryBoardMediaUsageQueryOptions = ({
+  boardId,
+  load,
+  opening,
+  owner,
+}: {
+  boardId: string;
+  load: (boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>;
+  opening: number | null;
+  owner: AccountScope;
+}) =>
+  queryOptions({
+    gcTime: 0,
+    queryFn: ({ signal }) => load(boardId, signal),
+    queryKey: ['galleryMediaUsage', 'board', getAccountKey(owner), boardId, opening] as const,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
 const normalizePageOffset = (offset: number): number =>
   Math.max(0, Math.floor(offset / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE);
 
@@ -207,10 +248,97 @@ export const galleryKeys = {
   itemNames: (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
     [...galleryKeys.itemNamesForAccount(owner), filter] as const,
   imageIndexAvailability: (owner: AccountScope) => [...galleryKeys.all, 'image-index', getAccountKey(owner)] as const,
-  /** What a video's context menu can offer (recall, embedded workflow), read from its record when opened. */
-  videoMenuCapabilities: (owner: AccountScope, videoName: string | null) =>
-    [...galleryKeys.itemsRoot(), 'menu-capabilities', getAccountKey(owner), videoName] as const,
+  /** An image's generation metadata: one entry shared by its menus, Preview Details, and recall commands. */
+  imageMetadata: (owner: AccountScope, imageName: string) =>
+    [...galleryKeys.itemsRoot(), 'image-metadata', getAccountKey(owner), imageName] as const,
+  /** Whether an image embeds a workflow, for listings that do not say. */
+  imageHasWorkflow: (owner: AccountScope, imageName: string) =>
+    [...galleryKeys.itemsRoot(), 'image-has-workflow', getAccountKey(owner), imageName] as const,
+  /** A video's generation metadata: one entry shared by its menu, Preview Details, and recall commands. */
+  videoMetadata: (owner: AccountScope, videoName: string) =>
+    [...galleryKeys.itemsRoot(), 'video-metadata', getAccountKey(owner), videoName] as const,
+  /** Whether a video embeds a workflow, for listings that do not say. */
+  videoHasWorkflow: (owner: AccountScope, videoName: string) =>
+    [...galleryKeys.itemsRoot(), 'video-has-workflow', getAccountKey(owner), videoName] as const,
 };
+
+/**
+ * Media generation metadata. Null when it records none or the server no longer has the item (404); any other failure
+ * rejects, so the errored entry holds no answer and is read again by its next consumer. Metadata never changes for an
+ * item, so an answer is never read again.
+ */
+const mediaMetadataOptions = <TKey extends QueryKey>(
+  owner: AccountScope,
+  queryKey: TKey,
+  readMetadata: (signal: AbortSignal) => Promise<GalleryMediaMetadata | null>
+) =>
+  queryOptions({
+    queryFn: async ({ signal }): Promise<GalleryMediaMetadata | null> => {
+      let metadata: GalleryMediaMetadata | null;
+
+      try {
+        metadata = await readMetadata(AbortSignal.any([signal, owner.signal]));
+      } catch (error: unknown) {
+        if (!(error instanceof ApiError && error.status === 404)) {
+          throw error;
+        }
+        metadata = null;
+      }
+
+      assertAccountScopeCurrent(owner);
+
+      return metadata;
+    },
+    queryKey,
+    // One policy whoever starts the read: a failure surfaces at once, and the next open or recall reads again.
+    retry: false,
+    staleTime: Infinity,
+  });
+
+/**
+ * Read a shared metadata entry outside React. A reader that unmounts mid-read cancels the fetch this call may have
+ * joined; the read then starts its own instead of failing. An explicit `cancelQueries` on the key is followed the same
+ * way while the account is current. An account change ends it.
+ */
+const fetchFollowingCancellation = async <TData>(owner: AccountScope, fetch: () => Promise<TData>): Promise<TData> => {
+  for (;;) {
+    try {
+      return await fetch();
+    } catch (error: unknown) {
+      if (!isCancelledError(error) || !isAccountScopeCurrent(owner)) {
+        throw error;
+      }
+    }
+  }
+};
+
+/** An image's generation metadata; see `mediaMetadataOptions`. */
+export const galleryImageMetadataOptions = (owner: AccountScope, imageName: string) =>
+  mediaMetadataOptions(owner, galleryKeys.imageMetadata(owner, imageName), (signal) =>
+    getGalleryImageMetadata(imageName, signal)
+  );
+
+/** Read an image's metadata through the shared entry outside React; see `fetchFollowingCancellation`. */
+export const fetchGalleryImageMetadata = (
+  client: QueryClient,
+  owner: AccountScope,
+  imageName: string
+): Promise<GalleryImageMetadata | null> =>
+  fetchFollowingCancellation(owner, () => client.fetchQuery(galleryImageMetadataOptions(owner, imageName)));
+
+/** A video's generation metadata; see `mediaMetadataOptions`. */
+export const galleryVideoMetadataOptions = (owner: AccountScope, videoName: string) =>
+  mediaMetadataOptions(owner, galleryKeys.videoMetadata(owner, videoName), (signal) =>
+    getGalleryVideoMetadata(videoName, signal)
+  );
+
+/** Read a video's metadata through the shared entry outside React; see `fetchFollowingCancellation`. */
+export const fetchGalleryVideoMetadata = (
+  client: QueryClient,
+  owner: AccountScope,
+  videoName: string
+): Promise<GalleryMediaMetadata | null> =>
+  fetchFollowingCancellation(owner, () => client.fetchQuery(galleryVideoMetadataOptions(owner, videoName)));
 
 const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
   queryOptions({

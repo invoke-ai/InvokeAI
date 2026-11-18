@@ -64,7 +64,8 @@ export const createPromptHistoryNavigation = (): PromptHistoryNavigation => {
         state = null;
       }
 
-      if (!isPositivePromptFocused() || promptHistory.length === 0) {
+      // Upscale's field edits the prompt it shares with Generate, which is what this steps through.
+      if (!(isPositivePromptFocused('generate') || isPositivePromptFocused('upscale')) || promptHistory.length === 0) {
         return;
       }
 

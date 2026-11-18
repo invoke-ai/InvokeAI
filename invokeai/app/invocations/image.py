@@ -25,6 +25,7 @@ from invokeai.app.invocations.primitives import ImageOutput, StringOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
+from invokeai.app.util.path_safety import is_plain_filename, resolve_contained_path
 from invokeai.backend.image_util.color_conversion import (
     linear_srgb_from_oklab,
     linear_srgb_from_oklch,
@@ -1162,36 +1163,36 @@ class SaveImageToFileInvocation(BaseInvocation, WithMetadata, WithBoard):
     )
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
-
-        image_dto = context.images.save(image=image)
-
-        uuid = Path(image_dto.image_name).stem
-
+        # Validate every path input before the gallery save, so a rejected path leaves no orphan image behind.
         outputs_path = context.config.get().outputs_path
         assert outputs_path is not None
 
         if not self.output_directory:
             target_dir = outputs_path
         else:
-            raw_str = self.output_directory
-            raw = Path(raw_str)
-            has_windows_drive = len(raw_str) >= 2 and raw_str[0].isalpha() and raw_str[1] == ":"
-            starts_with_sep = raw_str.startswith("/") or raw_str.startswith("\\")
-            if raw.is_absolute() or raw.drive or has_windows_drive or starts_with_sep:
-                raise ValueError(
-                    f"Absolute paths are not allowed in output_directory: {raw_str!r}. "
-                    "Use a path relative to the InvokeAI outputs folder."
-                )
-            candidate = (outputs_path / raw).resolve()
-            outputs_resolved = outputs_path.resolve()
-            if outputs_resolved != candidate and outputs_resolved not in candidate.parents:
-                raise ValueError(f"output_directory must stay within the outputs folder: {raw_str!r}")
-            target_dir = candidate
+            try:
+                target_dir = resolve_contained_path(outputs_path, self.output_directory)
+            except ValueError as e:
+                raise ValueError(f"Invalid output_directory {self.output_directory!r}: {e}") from e
 
+        # The real stem is the gallery uuid (hex and dashes), so a uuid-shaped placeholder checks the affixes
+        # exactly: a separator, drive or `..` in prefix/suffix would otherwise steer the write out of target_dir.
+        if not is_plain_filename(f"{self.prefix}00000000-0000-0000-0000-000000000000{self.suffix}.{self.file_format}"):
+            raise ValueError(
+                f"Invalid prefix {self.prefix!r} or suffix {self.suffix!r}: the exported filename must be a plain "
+                "filename without path separators, '..', drive letters or reserved characters."
+            )
+
+        # Before the gallery save too: a refusal here (output_directory names an existing file) leaves nothing behind.
         target_dir.mkdir(parents=True, exist_ok=True)
 
+        image = context.images.get_pil(self.image.image_name)
+
+        image_dto = context.images.save(image=image)
+
+        uuid = Path(image_dto.image_name).stem
         filename = f"{self.prefix}{uuid}{self.suffix}.{self.file_format}"
+
         target_path = target_dir / filename
 
         if self.file_format == "png":

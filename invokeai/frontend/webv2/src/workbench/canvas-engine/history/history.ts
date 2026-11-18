@@ -79,6 +79,8 @@ export interface CreateHistoryOptions {
   maxEntries?: number;
   /** Total-byte cap across both stacks (default {@link HISTORY_BYTE_BUDGET}). */
   byteBudget?: number;
+  /** Steps a previous history of the same canvas held and could not hand over; reported until the next clear. */
+  dropped?: number;
 }
 
 /** The imperative history handle. */
@@ -104,8 +106,11 @@ export interface History {
   /**
    * Labels of every retained step: `past` oldest-first (its last element is
    * what `undo()` reverts), `future` next-redo-first. Fresh arrays per call.
+   * `evicted` counts the oldest steps dropped to stay within the entry cap or
+   * byte budget since the stacks were last cleared; `dropped`, present while
+   * nonzero, the steps a previous history took with it, until the next clear.
    */
-  entries(): { past: readonly string[]; future: readonly string[] };
+  entries(): { past: readonly string[]; future: readonly string[]; evicted: number; dropped?: number };
   /** Union of media references retained by undo and redo entries. */
   heldAssetRefs(): HeldAssetRefs;
   /** Subscribes to every stack mutation (publish, undo, redo, clear, eviction). Returns an unsubscribe function. */
@@ -131,6 +136,8 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
   let redoBytes = 0;
   let admittedBytes = 0;
   let replaying = false;
+  let evicted = 0;
+  let dropped = Math.max(0, Math.floor(opts.dropped ?? 0));
 
   const disposeEntry = (entry: HistoryEntry): void => {
     try {
@@ -160,9 +167,10 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
 
   const evictOldest = (): void => {
     while (undoStack.length > maxEntries || (undoBytes + redoBytes > byteBudget && undoStack.length > 1)) {
-      const evicted = undoStack.shift()!;
-      undoBytes -= evicted.entry.bytes;
-      disposeEntry(evicted.entry);
+      const oldest = undoStack.shift()!;
+      undoBytes -= oldest.entry.bytes;
+      disposeEntry(oldest.entry);
+      evicted += 1;
     }
   };
 
@@ -261,8 +269,15 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
 
   const clear = (): void => {
     if (undoStack.length === 0 && redoStack.length === 0) {
+      if (evicted > 0 || dropped > 0) {
+        evicted = 0;
+        dropped = 0;
+        notify();
+      }
       return;
     }
+    evicted = 0;
+    dropped = 0;
     const discarded = [...undoStack, ...redoStack];
     undoStack.length = 0;
     redoStack.length = 0;
@@ -276,15 +291,17 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
     const budget = Math.max(0, budgetBytes);
     let changed = false;
     while (undoBytes + redoBytes > budget && undoStack.length > 0) {
-      const evicted = undoStack.shift()!;
-      undoBytes -= evicted.entry.bytes;
-      disposeEntry(evicted.entry);
+      const oldest = undoStack.shift()!;
+      undoBytes -= oldest.entry.bytes;
+      disposeEntry(oldest.entry);
+      evicted += 1;
       changed = true;
     }
     while (undoBytes + redoBytes > budget && redoStack.length > 0) {
-      const evicted = redoStack.shift()!;
-      redoBytes -= evicted.entry.bytes;
-      disposeEntry(evicted.entry);
+      const oldest = redoStack.shift()!;
+      redoBytes -= oldest.entry.bytes;
+      disposeEntry(oldest.entry);
+      evicted += 1;
       changed = true;
     }
     if (changed) {
@@ -320,6 +337,8 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
     canUndo: () => undoStack.length > 0,
     clear,
     entries: () => ({
+      ...(dropped > 0 ? { dropped } : {}),
+      evicted,
       future: redoStack.map(({ entry }) => entry.label).reverse(),
       past: undoStack.map(({ entry }) => entry.label),
     }),

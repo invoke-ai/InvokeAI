@@ -7,6 +7,7 @@ import type { MouseEvent } from 'react';
 
 import { Box, Portal, Stack, Text } from '@chakra-ui/react';
 import { groupPromptTriggerOptions } from '@features/generation/ui/promptFields/promptTriggerOptions';
+import { PROMPT_TRIGGER_AUTOCOMPLETE_SCROLL_PROPS } from '@features/generation/ui/promptFields/useDismissOnViewportChange';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -70,6 +71,7 @@ export const PromptTriggerAutocomplete = ({
   return (
     <Portal>
       <Box
+        {...PROMPT_TRIGGER_AUTOCOMPLETE_SCROLL_PROPS}
         aria-label={t('widgets.generate.completionSuggestions')}
         bg="bg.muted"
         borderColor="border.emphasized"

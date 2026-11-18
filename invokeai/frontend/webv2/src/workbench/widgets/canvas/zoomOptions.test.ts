@@ -23,10 +23,10 @@ describe('zoomMenuOptions', () => {
     expect(new Set(options.map((option) => option.value))).toEqual(new Set(ZOOM_PRESETS));
   });
 
-  it('is ordered from largest to smallest zoom', () => {
+  it('is ordered from smallest to largest zoom', () => {
     const values = zoomMenuOptions().map((option) => option.value);
-    expect(values).toEqual([...values].sort((a, b) => b - a));
-    expect(values[0]).toBe(Math.max(...ZOOM_PRESETS));
+    expect(values).toEqual([...values].sort((a, b) => a - b));
+    expect(values[0]).toBe(Math.min(...ZOOM_PRESETS));
   });
 
   it('pairs each value with its formatted label', () => {

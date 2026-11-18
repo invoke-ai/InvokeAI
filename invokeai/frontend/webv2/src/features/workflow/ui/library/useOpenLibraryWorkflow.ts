@@ -7,7 +7,7 @@ import { getLibraryWorkflowRecordCached, touchLibraryWorkflowOpenedAt } from '@f
 import { requestWorkflowFitView } from '@features/workflow/ui/editor/flowInstanceStore';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNotifications, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
-import { parseWorkflowJson } from '@features/workflow/utility';
+import { parseWorkflowJson, summarizeWorkflowLoadWarnings } from '@features/workflow/utility';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -138,8 +138,10 @@ export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflo
           });
         }
 
-        for (const warning of warnings) {
-          notify.info(t('workflowLibrary.loadWarning'), warning);
+        const warningSummary = summarizeWorkflowLoadWarnings(warnings);
+
+        if (warningSummary) {
+          notify.info(t('workflowLibrary.loadWarning'), warningSummary);
         }
 
         void touchLibraryWorkflowOpenedAt(item.workflow_id, owner.signal).catch(() => {

@@ -3,6 +3,7 @@
  * them to React without coupling the engine to UI.
  */
 
+import type { PsdExportStatus } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasLayerSourceContract,
   CanvasTextFontRef,
@@ -277,7 +278,16 @@ export interface ControlLayerView {
  * Transform sessions span gestures until Apply/Cancel. `startTransform` is the committed undo/cancel baseline;
  * `transform` drives preview and numeric controls.
  */
+export interface TransformOptions {
+  smoothing: boolean;
+  resampleMode: 'bilinear' | 'bicubic' | 'hamming' | 'lanczos';
+  fitMode: 'contain' | 'cover' | 'fill';
+}
+
 export interface TransformSession {
+  processing?: boolean;
+  processingPhase?: 'preparing' | 'queued' | 'resampling';
+  applyFailed?: boolean;
   layerId: string;
   startTransform: LayerTransform;
   transform: LayerTransform;
@@ -516,6 +526,8 @@ export interface EngineStores {
    * commit/cancel.
    */
   bboxPreview: ScalarStore<Rect | null>;
+  /** Transient transform preferences; not part of the persisted document. */
+  transformOptions: ScalarStore<TransformOptions>;
   /** Transform session supplies numeric controls, Apply/Cancel and live preview; null when closed. */
   transformSession: ScalarStore<TransformSession | null>;
   /** The layer a requested transform session waits on until its fresh pixels are persisted; null when none waits. */
@@ -539,10 +551,13 @@ export interface EngineStores {
   snapToGrid: ScalarStore<boolean>;
   /** Whether an engine-owned operation currently excludes ordinary document edits. */
   documentEditingLocked: ScalarStore<boolean>;
+  psdExportStatus: ScalarStore<PsdExportStatus>;
   /** The layer targeted by that operation, or null when no operation is active. */
   documentEditingLayerId: ScalarStore<string | null>;
   /** The control layer displayed as its original (or original under map); null displays every map. */
   controlLayerView: ScalarStore<ControlLayerView | null>;
+  /** Whether a staged or progress preview, shown or toggled off, hides the overlay stacks from the screen. */
+  stagingHidesOverlays: ScalarStore<boolean>;
 }
 
 const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
@@ -634,6 +649,9 @@ const transformSessionEqual = (a: TransformSession | null, b: TransformSession |
     return a === b;
   }
   return (
+    a.processing === b.processing &&
+    a.processingPhase === b.processingPhase &&
+    a.applyFailed === b.applyFailed &&
     a.layerId === b.layerId &&
     transformEqual(a.startTransform, b.startTransform) &&
     transformEqual(a.transform, b.transform)
@@ -713,6 +731,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
   documentEditingLayerId: createScalarStore<string | null>(null),
   documentEditingLocked: createScalarStore<boolean>(false),
+  psdExportStatus: createScalarStore<PsdExportStatus>('idle'),
   hasFloatingSelection: createScalarStore<boolean>(false),
   hasSelection: createScalarStore<boolean>(false),
   invertBrushSizeScroll: createScalarStore<boolean>(false),
@@ -738,11 +757,17 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   showBbox: createScalarStore<boolean>(true),
   showGrid: createScalarStore<boolean>(false),
   snapToGrid: createScalarStore<boolean>(true),
+  stagingHidesOverlays: createScalarStore<boolean>(false),
   textEditSession: createScalarStore<TextEditSession | null>(null, textEditSessionEqual),
   textOptions: createScalarStore<TextToolOptions>({ ...DEFAULT_TEXT_OPTIONS }, textOptionsEqual),
   thumbnailVersion: createKeyedVersionStore(),
   thumbnailStatus: createKeyedStatusStore<LayerThumbnailStatus>(),
   adjustmentStatus: createKeyedStatusStore<LayerAdjustmentStatus>(),
+  transformOptions: createScalarStore<TransformOptions>({
+    smoothing: false,
+    resampleMode: 'bicubic',
+    fitMode: 'contain',
+  }),
   transformSession: createScalarStore<TransformSession | null>(null, transformSessionEqual),
   pendingTransformLayerId: createScalarStore<string | null>(null),
   viewportReady: createScalarStore<boolean>(false),

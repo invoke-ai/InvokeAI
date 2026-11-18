@@ -23,7 +23,7 @@ export const getProgressRailModel = ({
   isConnected: boolean;
   sessionItemIds: readonly number[];
 }): ProgressRailModel => {
-  // Hide frozen progress offline; the server-status widget explains the connection state.
+  // Hide frozen progress offline; the queue button and status chip show the work waiting on the connection.
   if (!isConnected || !hasOpenWork) {
     return HIDDEN;
   }

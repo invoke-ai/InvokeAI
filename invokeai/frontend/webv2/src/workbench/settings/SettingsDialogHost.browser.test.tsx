@@ -38,7 +38,7 @@ vi.mock('./dialogResource', async () => {
         default: () => (
           <Dialog.Body>
             <Dialog.Title>Settings: Behavior</Dialog.Title>
-            <input aria-label="Search settings" data-settings-search />
+            <input aria-label="Search settings" data-manager-search />
             <button type="button">Reset all</button>
           </Dialog.Body>
         ),

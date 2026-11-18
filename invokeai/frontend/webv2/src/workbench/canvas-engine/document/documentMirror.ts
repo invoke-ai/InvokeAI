@@ -2,7 +2,6 @@ import type {
   CanvasDocumentContractV3,
   CanvasGroupContract,
   CanvasLayerContract,
-  CanvasStagingAreaContractV2,
   CanvasStateContractV3,
 } from '@workbench/canvas-engine/contracts';
 
@@ -42,8 +41,6 @@ export interface DocumentMirrorCallbacks {
   onDocumentReplaced(): void;
   /** The generation bounding box changed. */
   onBboxChanged(): void;
-  /** The staging area changed. */
-  onStagingChanged(): void;
   /**
    * Selection-only changes reuse stacks and bbox, requiring a separate callback for selection chrome and per-layer
    * session cleanup.
@@ -243,13 +240,11 @@ export const createDocumentMirror = (
 
   let lastDoc: CanvasDocumentContractV3 | null = selectCanvas()?.document ?? null;
   let lastRevision: number = selectCanvas()?.documentRevision ?? 0;
-  let lastStaging: CanvasStagingAreaContractV2 | null = selectCanvas()?.stagingArea ?? null;
 
   const handleChange = (): void => {
     const canvas = selectCanvas();
     const doc = canvas?.document ?? null;
     const revision = canvas?.documentRevision ?? 0;
-    const staging = canvas?.stagingArea ?? null;
 
     if (doc !== lastDoc) {
       const prevDoc = lastDoc;
@@ -294,11 +289,6 @@ export const createDocumentMirror = (
       } finally {
         callbacks.onDocumentChanged?.();
       }
-    }
-
-    if (staging !== lastStaging) {
-      lastStaging = staging;
-      callbacks.onStagingChanged();
     }
   };
 

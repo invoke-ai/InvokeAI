@@ -1,6 +1,6 @@
 import { SEED_MAX } from '@platform/core/seed';
 
-import type { FieldInputTemplate, FieldType, WorkflowFieldInstance } from './types';
+import type { FieldInputTemplate, FieldType, WorkflowFieldInstance, WorkflowInvocationNode } from './types';
 
 import {
   getWorkflowGeneratorInvalidReason,
@@ -22,6 +22,7 @@ const STATEFUL_FIELD_TYPE_NAMES = new Set([
   'BooleanField',
   'ColorField',
   'EnumField',
+  'FileField',
   'FloatField',
   'FloatGeneratorField',
   'ImageField',
@@ -443,6 +444,8 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
         value === 'none' ||
         hasNonEmptyStringProp(value, 'board_id')
       );
+    case 'FileField':
+      return hasNonEmptyStringProp(value, 'file_id');
     case 'ImageField':
       return hasNonEmptyStringProp(value, 'image_name');
     case 'VideoField':
@@ -462,7 +465,22 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
 
 const isEmptyOptionalValue = (value: unknown): boolean => value === undefined || value === null || value === '';
 
-export const getWorkflowFieldInvalidReason = ({
+/** What a field that blocks a run lacks: a value, a connection, or a value it accepts. */
+export type WorkflowFieldIssueKind = 'invalidValue' | 'missingConnection' | 'missingValue';
+
+export interface WorkflowFieldIssue {
+  kind: WorkflowFieldIssueKind;
+  /** The field's own wording of the problem. */
+  reason: string;
+}
+
+const MISSING_CONNECTION: WorkflowFieldIssue = { kind: 'missingConnection', reason: 'Required connection.' };
+const MISSING_VALUE: WorkflowFieldIssue = { kind: 'missingValue', reason: 'Required value.' };
+
+const toInvalidValueIssue = (reason: string | null): WorkflowFieldIssue | null =>
+  reason === null ? null : { kind: 'invalidValue', reason };
+
+export const getWorkflowFieldIssue = ({
   isConnected,
   template,
   value,
@@ -470,7 +488,7 @@ export const getWorkflowFieldInvalidReason = ({
   isConnected: boolean;
   template: FieldInputTemplate;
   value: unknown;
-}): string | null => {
+}): WorkflowFieldIssue | null => {
   if (isConnected) {
     return null;
   }
@@ -481,11 +499,11 @@ export const getWorkflowFieldInvalidReason = ({
 
   // An editable list reports which count or entry rule it breaks; the generic reasons cannot say.
   if (template.type.cardinality === 'COLLECTION' && Array.isArray(value) && isDirectInputField(template)) {
-    return getCollectionInvalidReason(template, value);
+    return toInvalidValueIssue(getCollectionInvalidReason(template, value));
   }
 
   if (template.type.name === 'LoRAField' && isDirectInputField(template) && !isEmptyOptionalValue(value)) {
-    return getLoraCollectionInvalidReason(toLoraFieldCollectionList(value));
+    return toInvalidValueIssue(getLoraCollectionInvalidReason(toLoraFieldCollectionList(value)));
   }
 
   if (
@@ -495,15 +513,17 @@ export const getWorkflowFieldInvalidReason = ({
   ) {
     const generator = parseWorkflowGeneratorValue(template.type.name, value);
 
-    return generator === null ? 'Invalid value.' : getWorkflowGeneratorInvalidReason(generator);
+    return toInvalidValueIssue(generator === null ? 'Invalid value.' : getWorkflowGeneratorInvalidReason(generator));
   }
 
   if (!template.required) {
-    return isDirectInputField(template) && !isWorkflowFieldValueValid(template, value) ? 'Invalid value.' : null;
+    return isDirectInputField(template) && !isWorkflowFieldValueValid(template, value)
+      ? toInvalidValueIssue('Invalid value.')
+      : null;
   }
 
   if (template.input === 'connection') {
-    return 'Required connection.';
+    return MISSING_CONNECTION;
   }
 
   if (isWorkflowFieldValueValid(template, value)) {
@@ -511,11 +531,14 @@ export const getWorkflowFieldInvalidReason = ({
   }
 
   if (!isDirectInputField(template)) {
-    return 'Required connection.';
+    return MISSING_CONNECTION;
   }
 
-  return isEmptyOptionalValue(value) ? 'Required value.' : 'Invalid value.';
+  return isEmptyOptionalValue(value) ? MISSING_VALUE : toInvalidValueIssue('Invalid value.');
 };
+
+export const getWorkflowFieldInvalidReason = (field: Parameters<typeof getWorkflowFieldIssue>[0]): string | null =>
+  getWorkflowFieldIssue(field)?.reason ?? null;
 
 // Raw hex (not Chakra tokens) because xyflow handles are styled inline.
 const FIELD_TYPE_COLORS: Record<string, string> = {
@@ -528,6 +551,7 @@ const FIELD_TYPE_COLORS: Record<string, string> = {
   ControlField: '#5eead4',
   DenoiseMaskField: '#93c5fd',
   EnumField: '#60a5fa',
+  FileField: '#22d3ee',
   FloatField: '#fb923c',
   ImageField: '#c4b5fd',
   IntegerField: '#f87171',
@@ -573,4 +597,88 @@ export const getFieldTypeLabel = (type: FieldType): string => {
   }
 
   return base;
+};
+
+export const isHiDiffusionNode = (type: string): boolean =>
+  type === 'denoise_latents' || type === 'denoise_latents_meta';
+
+/** Translate legacy nullable ratios before fresh template defaults can hide their manual intent. */
+export const normalizeHiDiffusionInputs = (
+  inputs: Record<string, WorkflowFieldInstance>,
+  original: Record<string, Pick<WorkflowFieldInstance, 'value'>> = inputs,
+  connectedFields: ReadonlySet<string> = new Set()
+): void => {
+  const automatic = original.hidiffusion_auto_ratios?.value;
+  const auto =
+    typeof automatic === 'boolean'
+      ? automatic
+      : original.hidiffusion_t1_ratio?.value === null &&
+        original.hidiffusion_t2_ratio?.value === null &&
+        !connectedFields.has('hidiffusion_t1_ratio') &&
+        !connectedFields.has('hidiffusion_t2_ratio');
+  inputs.hidiffusion_auto_ratios = { ...inputs.hidiffusion_auto_ratios, name: 'hidiffusion_auto_ratios', value: auto };
+  for (const name of ['hidiffusion_t1_ratio', 'hidiffusion_t2_ratio']) {
+    const value = original[name]?.value;
+    inputs[name] = {
+      ...inputs[name],
+      name,
+      value: value === null ? 0 : (value ?? inputs[name]?.value ?? (name === 'hidiffusion_t1_ratio' ? 0.4 : 0)),
+    };
+  }
+};
+
+export const isHiDiffusionRatioField = (name: string): boolean =>
+  name === 'hidiffusion_t1_ratio' || name === 'hidiffusion_t2_ratio';
+
+export const areHiDiffusionRatiosAutomatic = (node: WorkflowInvocationNode): boolean => {
+  const auto = node.data.inputs.hidiffusion_auto_ratios?.value;
+  return typeof auto === 'boolean'
+    ? auto
+    : node.data.inputs.hidiffusion_t1_ratio?.value === null && node.data.inputs.hidiffusion_t2_ratio?.value === null;
+};
+
+export const getHiDiffusionRatioOrderIssue = (
+  node: WorkflowInvocationNode,
+  connectedFields: ReadonlySet<string>
+): string | null => {
+  if (
+    !isHiDiffusionNode(node.data.type) ||
+    areHiDiffusionRatiosAutomatic(node) ||
+    node.data.inputs.hidiffusion?.value !== true ||
+    node.data.inputs.hidiffusion_raunet?.value === false ||
+    ['hidiffusion', 'hidiffusion_raunet', 'hidiffusion_t1_ratio', 'hidiffusion_t2_ratio'].some((name) =>
+      connectedFields.has(name)
+    )
+  ) {
+    return null;
+  }
+  const t1 = node.data.inputs.hidiffusion_t1_ratio?.value ?? 0;
+  const t2 = node.data.inputs.hidiffusion_t2_ratio?.value ?? 0;
+  return typeof t1 === 'number' && typeof t2 === 'number' && t2 > t1
+    ? 'HiDiffusion T2 ratio must be less than or equal to the T1 ratio.'
+    : null;
+};
+
+export const getHiDiffusionRatioTemplate = (
+  node: WorkflowInvocationNode,
+  template: FieldInputTemplate,
+  connectedFields: ReadonlySet<string>
+): FieldInputTemplate => {
+  if (
+    !isHiDiffusionNode(node.data.type) ||
+    !isHiDiffusionRatioField(template.name) ||
+    areHiDiffusionRatiosAutomatic(node) ||
+    node.data.inputs.hidiffusion?.value !== true ||
+    node.data.inputs.hidiffusion_raunet?.value === false
+  ) {
+    return template;
+  }
+  const companion = template.name === 'hidiffusion_t1_ratio' ? 'hidiffusion_t2_ratio' : 'hidiffusion_t1_ratio';
+  const value = node.data.inputs[companion]?.value;
+  if (connectedFields.has(companion) || typeof value !== 'number') {
+    return template;
+  }
+  return template.name === 'hidiffusion_t1_ratio'
+    ? { ...template, minimum: Math.max(template.minimum ?? 0, value) }
+    : { ...template, maximum: Math.min(template.maximum ?? 1, value) };
 };

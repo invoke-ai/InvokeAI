@@ -1,6 +1,7 @@
 import { Alert, Button, HStack, Stack } from '@chakra-ui/react';
 import { downloadText } from '@platform/browser/downloadBlob';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { serializeProjectDocumentV3Json } from '@workbench/projects/projectDocument';
 import { useProjectSyncSelector } from '@workbench/projects/syncStore';
 import {
@@ -40,6 +41,10 @@ export const ProjectConflictBanner = () => {
   const [recoverableDraftIndex, setRecoverableDraftIndex] = useState(0);
   const selectedRecoverableDraftIndex = Math.min(recoverableDraftIndex, Math.max(0, recoverableDrafts.length - 1));
   const recoverableDraft = recoverableDrafts[selectedRecoverableDraftIndex];
+  // The draft could not be opened, so its name comes from the library; a draft never saved there goes unnamed.
+  const recoverableDraftName = useProjectLibrarySelector(
+    (snapshot) => snapshot.summaries.find((summary) => summary.id === recoverableDraft?.projectId)?.name ?? null
+  );
 
   const run = useCallback(
     async (action: string, operation: () => Promise<void>) => {
@@ -206,7 +211,9 @@ export const ProjectConflictBanner = () => {
               <Stack gap="0.5">
                 <Alert.Title>{t('shell.projectConflict.recoverableDraftTitle')}</Alert.Title>
                 <Alert.Description>
-                  {t('shell.projectConflict.recoverableDraftDescription', { projectId: recoverableDraft.projectId })}
+                  {recoverableDraftName
+                    ? t('shell.projectConflict.recoverableDraftDescription', { project: recoverableDraftName })
+                    : t('shell.projectConflict.recoverableDraftDescriptionUnnamed')}
                   {recoverableDrafts.length > 1
                     ? ` ${t('shell.projectConflict.recoverableDraftPosition', {
                         count: recoverableDrafts.length,

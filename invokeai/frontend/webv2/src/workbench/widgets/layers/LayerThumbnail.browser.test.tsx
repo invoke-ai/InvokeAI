@@ -22,7 +22,7 @@ afterEach(async () => {
 
 const SIZE = 200;
 
-/** A real engine over a new project (its inpaint mask selected), attached to on-page canvases. */
+/** A real engine over a new project, its inpaint mask selected, attached to on-page canvases. */
 const setup = async () => {
   const store = createWorkbenchStore();
   const projectId = store.getState().activeProjectId;
@@ -48,9 +48,10 @@ const setup = async () => {
   engine.surface.attach(screen, overlay);
   engine.interaction.set('clipToBbox', false);
 
-  const document_ = store.getState().projects[0]!.canvas.document;
-  const mask = document_.stacks.inpaint_mask[0] as CanvasLayerContract;
-  expect(document_.selectedLayerId).toBe(mask.id);
+  const mask = store.getState().projects[0]!.canvas.document.stacks.inpaint_mask[0] as CanvasLayerContract;
+  // A new canvas selects nothing; strokes here are meant for its mask.
+  store.commands.canvas.apply(projectId, { id: mask.id, type: 'setCanvasSelectedLayer' });
+  expect(store.getState().projects[0]!.canvas.document.selectedLayerId).toBe(mask.id);
 
   const host = document.createElement('div');
   host.style.cssText = 'position:fixed;right:0;top:0;width:48px;height:48px';

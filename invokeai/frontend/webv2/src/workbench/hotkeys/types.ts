@@ -1,7 +1,7 @@
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { WidgetContributionSource, WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
-export type HotkeyCategory = 'app' | 'canvas' | 'gallery' | 'viewer' | 'workflows';
+export type HotkeyCategory = 'app' | 'canvas' | 'gallery' | 'queue' | 'viewer' | 'workflows';
 
 export type HotkeyScope =
   | { kind: 'global' }
@@ -25,10 +25,11 @@ export interface HotkeyDefinition {
   preventDefault?: boolean;
   allowInEditable?: boolean;
   allowInModal?: boolean;
+  /** A held key's auto-repeat does not run the command again: for commands that act once per press, such as a cancel. */
+  ignoreRepeat?: boolean;
   /** Claim the key only while the press targets an element matching this selector; elsewhere it keeps its meaning. */
   targetSelector?: string;
   unavailableReason?: string;
-  implemented?: boolean;
   source?: WidgetContributionSource;
 }
 

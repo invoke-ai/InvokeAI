@@ -18,6 +18,7 @@ import {
   resolveUpscaleSubmissionValues,
   getSpandrelNativeScale,
   getUpscaleOutputDimensions,
+  getUpscaleValidationIssues,
   getUpscaleValidationReasons,
   normalizeUpscaleWidgetValues,
   spandrelAutoscaleDimension,
@@ -160,6 +161,43 @@ describe('upscale settings', () => {
     const values = { ...defaults, inputImage: { height: 10, image_name: 'delete.png', width: 10 } };
 
     expect(clearDeletedUpscaleInput(values, new Set(['delete.png'])).inputImage).toBeNull();
+  });
+
+  it('places each issue in the panel section whose fields fix it', () => {
+    const installed = [model('main', 'main', 'sdxl'), model('spandrel', 'spandrel_image_to_image', 'any')];
+    const lora = { isEnabled: true, model: model('gone', 'lora', 'sdxl'), weight: 1 } as GenerateLora;
+    const values = {
+      ...createDefaultUpscaleWidgetValues(installed),
+      cfgScale: 0.5,
+      inputImage: null,
+      loras: [lora],
+      scale: 17,
+      tileSize: 1,
+    };
+
+    expect(getUpscaleValidationIssues(values, installed)).toEqual([
+      { message: 'Upscale needs an input image. Upload one or send one from Gallery.', section: 'source' },
+      { message: 'Upscale needs a Tile or Union ControlNet compatible with the main model.', section: 'advanced' },
+      { message: 'Scale must be between 1 and 16.', section: 'source' },
+      { message: expect.stringMatching(/^Tile size must be between/), section: 'advanced' },
+      { message: expect.stringMatching(/^CFG scale must be between/), section: 'generation' },
+      { message: 'gone is no longer installed.', section: 'generation' },
+    ]);
+    // Model only shows Source & treatment alone, and its issues land there.
+    expect(getUpscaleValidationIssues({ ...values, mode: 'model-only' }, [])).toEqual([
+      { message: 'Upscale needs an input image. Upload one or send one from Gallery.', section: 'source' },
+      { message: 'Scale must be between 1 and 16.', section: 'source' },
+      { message: 'spandrel is no longer installed.', section: 'source' },
+    ]);
+  });
+
+  it('places no issue in a section while the served table, which holds the whole form back, is missing', () => {
+    // Seeded again before the next test.
+    resetArchitectureCapabilities();
+
+    expect(getUpscaleValidationIssues(createDefaultUpscaleWidgetValues())).toEqual([
+      { message: expect.stringMatching(/^Model capabilities are not available/) },
+    ]);
   });
 });
 
@@ -483,6 +521,23 @@ describe('text encoder and VAE components', () => {
 
     expect(getUpscaleValidationReasons(ready([diffusers('klein_9b'), spandrel]))).toEqual([]);
     expect(getUpscaleValidationReasons(ready([diffusers('dev'), spandrel]))).toEqual([]);
+  });
+
+  it('lets a self-contained SDNQ Klein bring its own encoder and VAE, but not an SDNQ [dev]', () => {
+    const spandrel = model('spandrel', 'spandrel_image_to_image', 'any');
+    const sdnq = (variant: string) =>
+      ({
+        ...withVariant(model('f', 'main', 'flux2'), variant),
+        format: 'sdnq_quantized',
+        submodels: { text_encoder: {}, tokenizer: {}, transformer: {}, vae: {} },
+      }) as ModelConfig;
+
+    expect(getUpscaleValidationReasons(ready([sdnq('klein_9b'), spandrel]))).toEqual([]);
+    // The [dev] loader reads only a Diffusers install's own components.
+    expect(getUpscaleValidationReasons(ready([sdnq('dev'), spandrel]))).toEqual([
+      'Upscale needs a Mistral encoder for this main model.',
+      'Upscale needs a VAE for this main model.',
+    ]);
   });
 
   it('asks a GGUF Qwen Image for its Qwen VL encoder and a VAE, and a Diffusers one for neither', () => {

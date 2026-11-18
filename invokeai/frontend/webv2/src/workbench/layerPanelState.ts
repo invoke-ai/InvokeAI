@@ -25,7 +25,10 @@ export interface LayerPanelState {
   readonly filter: string;
 }
 
-/** Panel preferences that survive a primary change and a project switch. */
+/**
+ * Panel preferences that survive a primary change. Each open project keeps its own, so switching to another project
+ * and back finds them as they were; closing the project drops them.
+ */
 type LayerPanelCarry = Pick<
   LayerPanelState,
   'collapsedStacks' | 'expandedGroupIds' | 'collapsedChildLayerIds' | 'filter'
@@ -207,6 +210,7 @@ export const reconcileLayerPanelState = (
   const primary = primaryId ? index.byId.get(primaryId) : undefined;
   const validPrimaryId = primary ? primary.node.id : null;
   if (state.projectId !== projectId || state.primaryId !== validPrimaryId) {
+    // Another project's state is never carried over; this project's own lives under its id in the store.
     if (state.projectId !== projectId) {
       return createLayerPanelState(projectId, validPrimaryId, { expandedGroupIds: primary ? [...primary.path] : [] });
     }

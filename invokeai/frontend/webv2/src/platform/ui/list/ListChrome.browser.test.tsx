@@ -1,6 +1,8 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
+import { Button, IconButton } from '@platform/ui/Button';
 import { system } from '@theme/system';
+import { XIcon } from 'lucide-react';
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -104,6 +106,70 @@ describe('ListSelectionBar', () => {
     expect(host.querySelector<HTMLInputElement>('[aria-label="Select all"] input')!.disabled).toBe(true);
     expect(host.querySelector('[role="separator"]')).toBeNull();
   });
+
+  it('keeps the same height whether or not its sm actions are shown', async () => {
+    const barHeight = () =>
+      host.querySelector<HTMLElement>('[aria-label="Select all"]')!.parentElement!.getBoundingClientRect().height;
+
+    await render(<ListSelectionBar checked={false} label="Select all" onCheckedChange={vi.fn()} />);
+    const idle = barHeight();
+
+    await render(
+      <ListSelectionBar checked label="Select all" summary="2 selected" onCheckedChange={vi.fn()}>
+        <Button size="sm" variant="ghost">
+          Delete
+        </Button>
+        <IconButton aria-label="Clear selection" size="sm" variant="ghost">
+          <XIcon />
+        </IconButton>
+      </ListSelectionBar>
+    );
+
+    expect(buttonWithText('Delete').getBoundingClientRect().height).toBe(24);
+    expect(barHeight()).toBe(idle);
+  });
+
+  it.each(['row', 'none'] as const)(
+    'keeps its checkbox and actions in the row columns of a List with inset %s',
+    async (inset) => {
+      const ActionButton = ({ label }: { label: string }) => (
+        <IconButton aria-label={label} size="sm" variant="ghost">
+          <XIcon />
+        </IconButton>
+      );
+
+      await render(
+        <>
+          <ListSelectionBar checked={false} inset={inset} label="Select all" onCheckedChange={vi.fn()}>
+            <ActionButton label="Bar action" />
+          </ListSelectionBar>
+          <List
+            inset={inset}
+            label="subjects"
+            renderItem={(item: { id: string }, rowProps: ListRowProps) => (
+              <ListItem
+                {...rowProps}
+                actions={<ActionButton label={`${item.id} action`} />}
+                title={item.id}
+                onCheckedChange={vi.fn()}
+              />
+            )}
+            rows={listRowsFromItems([{ id: 'a' }], (item) => item.id)}
+          />
+        </>
+      );
+
+      const control = (scope: string) =>
+        host
+          .querySelector<HTMLElement>(`${scope} [data-scope="checkbox"][data-part="control"]`)!
+          .getBoundingClientRect();
+      const action = (label: string) =>
+        host.querySelector<HTMLElement>(`[aria-label="${label}"]`)!.getBoundingClientRect();
+
+      expect(control('[aria-label="Select all"]').left).toBeCloseTo(control('[data-list-row="a"]').left, 1);
+      expect(action('Bar action').right).toBeCloseTo(action('a action').right, 1);
+    }
+  );
 });
 
 describe('List busy state', () => {
@@ -235,6 +301,32 @@ describe('list dividers', () => {
     expect(row.querySelector('button')).toBeNull();
     expect(getComputedStyle(row).backgroundColor).toBe(background);
     expect(hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['1', '1']);
+  });
+
+  it('keeps a disabled row and its neighbouring dividers unchanged on hover', async () => {
+    // Transitions finish within a frame, so hidden hairlines would already read as hidden.
+    document.documentElement.dataset.reduceMotion = 'true';
+    try {
+      await render(
+        <ListStack dividers label="subjects">
+          <ListItem title="one" onPress={vi.fn()} />
+          <ListItem isDisabled title="two" onPress={vi.fn()} />
+          <ListItem title="three" onPress={vi.fn()} />
+        </ListStack>
+      );
+      const row = host.querySelectorAll<HTMLElement>('[data-list-surface]')[1]!;
+      const background = getComputedStyle(row).backgroundColor;
+
+      // Force past Playwright's actionability check: the row is aria-disabled on purpose.
+      await userEvent.hover(row.querySelector('button')!, { force: true });
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+      expect(getComputedStyle(row).backgroundColor).toBe(background);
+      expect(hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['1', '1']);
+    } finally {
+      delete document.documentElement.dataset.reduceMotion;
+    }
   });
 
   it('opens a menu-only row from keyboard, assistive-tech, and touch activation, but not a mouse click', async () => {

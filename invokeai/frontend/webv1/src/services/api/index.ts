@@ -8,9 +8,10 @@ import type {
 } from '@reduxjs/toolkit/query/react';
 import { buildCreateApi, coreModule, fetchBaseQuery, reactHooksModule } from '@reduxjs/toolkit/query/react';
 import { getDeploymentBaseUrl } from 'common/util/baseUrl';
-import { sessionExpiredLogout, tokenRefreshed } from 'features/auth/store/authSlice';
+import { getTokenUserId, sessionExpiredLogout, tokenRefreshed } from 'features/auth/store/authSlice';
 import {
   beginAuthTransition,
+  beginPasswordChange,
   captureAuthGeneration,
   markTokenRefreshAccepted,
   MEDIA_COOKIE_SYNC_TIMEOUT_MS,
@@ -18,6 +19,7 @@ import {
   shouldAcceptRefreshedToken,
   shouldEndSessionForUnauthorized,
   shouldThrottleRefreshedToken,
+  waitForPasswordChange,
 } from 'features/auth/store/authTokenRefresh';
 import queryString from 'query-string';
 import stableHash from 'stable-hash';
@@ -117,6 +119,22 @@ export const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBas
   }
   const requestGeneration = captureAuthGeneration();
   const changesMediaCookie = isAuthTransition || requestUrl.includes('/auth/media-cookie');
+  const requestBody = typeof args === 'string' ? null : args.body;
+  const currentUserId = getTokenUserId(token);
+  const isPasswordChange =
+    !!token &&
+    typeof args !== 'string' &&
+    args.method?.toUpperCase() === 'PATCH' &&
+    requestBody !== null &&
+    typeof requestBody === 'object' &&
+    ((requestUrl.endsWith('/auth/me') &&
+      'new_password' in requestBody &&
+      typeof requestBody.new_password === 'string') ||
+      (currentUserId !== null &&
+        requestUrl.endsWith(`/auth/users/${encodeURIComponent(currentUserId)}`) &&
+        'password' in requestBody &&
+        typeof requestBody.password === 'string'));
+  const finishPasswordChange = isPasswordChange && token ? beginPasswordChange(token) : null;
 
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
     baseUrl: getBaseUrl(),
@@ -136,28 +154,44 @@ export const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBas
 
   const rawBaseQuery = fetchBaseQuery(fetchBaseQueryArgs);
 
-  const execute = () => rawBaseQuery(args, api, extraOptions);
-  const result = changesMediaCookie ? await runWithMediaAuthLock(execute) : await execute();
+  try {
+    const execute = () => rawBaseQuery(args, api, extraOptions);
+    const result = changesMediaCookie ? await runWithMediaAuthLock(execute) : await execute();
 
-  // If we sent an auth token but got 401, the token is invalid/expired. Only trigger session
-  // expiry when we actually sent a token — unauthenticated requests (e.g. client_state queries
-  // during page load) should not cause logout — and only while that token is still the live one,
-  // so a slow request cannot log out the session that replaced its own. See
-  // `shouldEndSessionForUnauthorized`.
-  if (result.error && result.error.status === 401 && !isAuthEndpoint && shouldEndSessionForUnauthorized(token)) {
-    api.dispatch(sessionExpiredLogout());
-  }
-
-  // Sliding window token refresh: if the server returned a refreshed token,
-  // update localStorage so subsequent requests use the new expiry.
-  if (!result.error && result.meta?.response) {
-    const refreshedToken = result.meta.response.headers.get('X-Refreshed-Token');
-    if (refreshedToken && token) {
-      await acceptRefreshedToken(refreshedToken, token, requestGeneration, api.dispatch);
+    // If we sent an auth token but got 401, the token is invalid/expired. Only trigger session
+    // expiry when we actually sent a token — unauthenticated requests (e.g. client_state queries
+    // during page load) should not cause logout — and only while that token is still the live one,
+    // so a slow request cannot log out the session that replaced its own. See
+    // `shouldEndSessionForUnauthorized`.
+    if (result.error && result.error.status === 401 && !isAuthEndpoint && shouldEndSessionForUnauthorized(token)) {
+      if (isPasswordChange) {
+        // This request cannot supply a replacement after its own 401. Withdraw only its
+        // announcement so a concurrent tab's still-pending rotation can decide the rejection.
+        finishPasswordChange?.();
+      }
+      if (!isAuthTransition && token) {
+        // The server may have revoked this epoch while another request or tab is still
+        // committing the password-change replacement. Do not erase its only valid token.
+        await waitForPasswordChange(token, requestGeneration);
+      }
+      if (shouldEndSessionForUnauthorized(token)) {
+        api.dispatch(sessionExpiredLogout());
+      }
     }
-  }
 
-  return result;
+    // Sliding window token refresh: if the server returned a refreshed token,
+    // update localStorage so subsequent requests use the new expiry.
+    if (!result.error && result.meta?.response) {
+      const refreshedToken = result.meta.response.headers.get('X-Refreshed-Token');
+      if (refreshedToken && token) {
+        await acceptRefreshedToken(refreshedToken, token, requestGeneration, api.dispatch);
+      }
+    }
+
+    return result;
+  } finally {
+    finishPasswordChange?.();
+  }
 };
 
 /**

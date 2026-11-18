@@ -10,7 +10,7 @@ import {
   isLoraModelConfig,
   syncGenerateLorasWithModels,
 } from '@features/generation/core/settings';
-import { Field } from '@platform/ui';
+import { Field, FieldLabel } from '@platform/ui/Field';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -18,6 +18,7 @@ import type { GenerateSettingsUpdate } from './generateDebounce';
 
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
 import { ConceptList, ConceptRow } from './shared/ConceptRow';
+import { GenerateIssueButton } from './shared/GenerateIssues';
 
 interface GenerateConceptsContentProps {
   loraModels: LoraModelConfig[];
@@ -26,6 +27,13 @@ interface GenerateConceptsContentProps {
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (update: GenerateSettingsUpdate) => void;
 }
+
+/** Whether a concept is installed; until the catalog has loaded every concept counts as installed. */
+export const isConceptInstalled = (
+  lora: GenerateLora,
+  loraModels: readonly LoraModelConfig[],
+  catalogStatus: 'error' | 'idle' | 'loaded' | 'loading'
+): boolean => catalogStatus !== 'loaded' || loraModels.some((model) => model.key === lora.model.key);
 
 /** Whether the selected model's graph will load this concept: its family must take LoRAs and match the LoRA. */
 export const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateModelConfig | undefined): boolean =>
@@ -80,6 +88,13 @@ export const GenerateConceptsContent = ({
             <ConceptRow
               key={lora.model.key}
               isCompatible={isCompatibleLora(lora, selectedModel)}
+              isInstalled={isConceptInstalled(lora, loraModels, models.status)}
+              // Only a missing concept gets notes, so installed rows keep their memoized props.
+              issue={
+                isConceptInstalled(lora, loraModels, models.status) ? undefined : (
+                  <GenerateIssueButton conceptKey={lora.model.key} field="concepts" section="guidance" />
+                )
+              }
               lora={lora}
               models={models}
               onRemove={removeLora}
@@ -94,6 +109,7 @@ export const GenerateConceptsContent = ({
     // Rows left from another model stay listed, marked incompatible, so they can still be removed.
     return (
       <Stack gap="2">
+        <FieldLabel>{t('widgets.generate.concepts')}</FieldLabel>
         <Text color="fg.muted" fontSize="xs">
           {t('widgets.generate.conceptsUnsupported')}
         </Text>
@@ -106,7 +122,8 @@ export const GenerateConceptsContent = ({
     <Stack gap="2">
       <Field
         hint="concepts"
-        label={t('widgets.generate.addConcept')}
+        // Titles the concept list as a whole, as "Reference images" titles the list above it.
+        label={t('widgets.generate.concepts')}
         helpText={selectedModel ? undefined : t('widgets.generate.selectMainModelBeforeConcepts')}
       >
         <ModelSelect
@@ -119,6 +136,7 @@ export const GenerateConceptsContent = ({
           placeholder={
             selectedModel ? t('widgets.generate.searchCompatibleConcepts') : t('widgets.generate.selectModelFirst')
           }
+          relatedTo={selectedModel?.key ?? null}
           value={null}
           onChange={addLora}
         />

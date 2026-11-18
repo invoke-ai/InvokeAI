@@ -8,6 +8,7 @@ import type {
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { createControlLayer } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { CircleDotIcon, CircleIcon } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -78,9 +79,10 @@ const makeState = (
     isQuickSwitchBookmark: false,
     hasSupportedContent: true,
     hasWorkflowBindings: true,
-    interactionLocked: false,
+    operationLocked: false,
     canGroupSelection: true,
     canDeleteSelection: true,
+    canDuplicateSelection: true,
     mergeMasksEligibility: 'eligible',
     canMergeSelection: true,
     canRemoveFromGroup: true,
@@ -203,7 +205,7 @@ describe('layer context action registry', () => {
       'widgets.layers.actions.mergeMasksIneligible',
       'widgets.layers.actions.mergeMasksSettingsDiffer',
       'widgets.layers.actions.canvasNotReady',
-      'widgets.layers.actions.interactionLocked',
+      'widgets.layers.actions.operationLocked',
       'widgets.layers.actions.removeFromGroupLocked',
       'widgets.layers.actions.transformIneligible',
       'widgets.layers.rasterFilter.busy',
@@ -228,9 +230,7 @@ describe('layer context action registry', () => {
       'widgets.layers.selectObject.modelHuge',
       'widgets.layers.selectObject.modelSam2Large',
       'widgets.layers.selectObject.prompt',
-      'widgets.layers.selectObject.process',
       'widgets.layers.selectObject.refine',
-      'widgets.layers.selectObject.reset',
       'widgets.layers.selectObject.saveAs',
       'widgets.layers.selectObject.saveAs_control',
       'widgets.layers.selectObject.saveAs_inpaint_mask',
@@ -360,14 +360,20 @@ describe('getLayerContextActions', () => {
     expect(Boolean(action)).toBe(expected);
   });
 
+  it.each(['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const)(
+    'exposes transform for %s layers',
+    (type) => {
+      const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === 'transform');
+      expect(action).toBeDefined();
+    }
+  );
+
   it.each([
-    ['raster', true],
-    ['control', true],
-    ['inpaint_mask', false],
-    ['regional_guidance', false],
-  ] as const)('exposes transform only for engine-supported %s layers', (type, expected) => {
-    const action = getLayerContextActions(makeState(makeLayer(type))).find((item) => item.id === 'transform');
-    expect(Boolean(action)).toBe(expected);
+    ['an empty mask', makeLayer('inpaint_mask'), { hasSupportedContent: false }],
+    ['a disabled mask', { ...makeLayer('inpaint_mask'), isEnabled: false }, {}],
+  ] as const)('disables transform for %s, which has nothing to transform', (_, layer, state) => {
+    const action = getLayerContextActions(makeState(layer, state)).find((item) => item.id === 'transform');
+    expect(action?.isDisabled).toBe(true);
   });
 
   it.each([
@@ -410,7 +416,7 @@ describe('getLayerContextActions', () => {
     ['no runnable binding', { canRunWorkflow: false }],
     ['missing engine', { hasEngine: false }],
     ['locked layer', { layer: { ...rasterLayer, isLocked: true } }],
-    ['locked interaction', { interactionLocked: true }],
+    ['locked interaction', { operationLocked: true }],
   ] as const)('disables Run Workflow for %s', (_label, overrides) => {
     const layer = 'layer' in overrides ? overrides.layer : rasterLayer;
     expect(byId(getLayerContextActions(makeState(layer, overrides)), 'run-workflow').isDisabled).toBe(true);
@@ -418,7 +424,7 @@ describe('getLayerContextActions', () => {
 
   it.each([
     ['missing engine', { hasEngine: false }],
-    ['locked interaction', { interactionLocked: true }],
+    ['locked interaction', { operationLocked: true }],
   ] as const)('disables Select Object for %s', (_label, overrides) => {
     expect(byId(getLayerContextActions(makeState(rasterLayer, overrides)), 'select-object').isDisabled).toBe(true);
   });
@@ -434,8 +440,8 @@ describe('getLayerContextActions', () => {
   });
 
   it('disables mutating pixel actions while interaction is locked', () => {
-    const rasterActions = getLayerContextActions(makeState(rasterLayer, { interactionLocked: true }));
-    const controlActions = getLayerContextActions(makeState(nonEmptyControlLayer, { interactionLocked: true }));
+    const rasterActions = getLayerContextActions(makeState(rasterLayer, { operationLocked: true }));
+    const controlActions = getLayerContextActions(makeState(nonEmptyControlLayer, { operationLocked: true }));
     expect(byId(rasterActions, 'crop-to-bbox').isDisabled).toBe(true);
     expect(byId(rasterActions, 'filter').isDisabled).toBe(true);
     expect(byId(rasterActions, 'transform').isDisabled).toBe(true);
@@ -463,19 +469,19 @@ describe('getLayerContextActions', () => {
     const inpaint = createInpaintMaskLayer('Interaction mask', 'interaction-mask');
     const regional = createRegionalGuidanceLayer('Interaction region', 0, 'interaction-region');
     const contexts = [
-      makeState(raster, { document: rasterDocument, interactionLocked: true }),
+      makeState(raster, { document: rasterDocument, operationLocked: true }),
       // A multi-selection context so the selection-only verbs are visible.
       makeState(raster, {
         document: rasterDocument,
-        interactionLocked: true,
+        operationLocked: true,
         selectedIds: [raster.id, 'interaction-raster-b'],
       }),
-      makeState(nonEmptyControlLayer, { interactionLocked: true }),
-      makeState(inpaint, { interactionLocked: true }),
-      makeState(inpaint, { interactionLocked: true, selectedIds: [inpaint.id, 'interaction-mask-b'] }),
-      makeState(regional, { interactionLocked: true }),
-      makeState(text, { interactionLocked: true }),
-      makeState(raster, { document: makeDocument([groupContract('G', [raster])]), interactionLocked: true }),
+      makeState(nonEmptyControlLayer, { operationLocked: true }),
+      makeState(inpaint, { operationLocked: true }),
+      makeState(inpaint, { operationLocked: true, selectedIds: [inpaint.id, 'interaction-mask-b'] }),
+      makeState(regional, { operationLocked: true }),
+      makeState(text, { operationLocked: true }),
+      makeState(raster, { document: makeDocument([groupContract('G', [raster])]), operationLocked: true }),
     ];
     const actions = contexts.flatMap((context) => getLayerContextActions(context));
     const actionsById = new Map(actions.map((action) => [action.id, action]));
@@ -900,7 +906,7 @@ describe('getLayerContextActions', () => {
     expect(byId(getLayerContextActions(makeState(unlocked)), 'filter').isDisabled).toBe(false);
     expect(byId(getLayerContextActions(makeState(unlocked, { hasEngine: false })), 'filter').isDisabled).toBe(true);
     expect(byId(getLayerContextActions(makeState({ ...unlocked, isLocked: true })), 'filter').isDisabled).toBe(true);
-    expect(byId(getLayerContextActions(makeState(unlocked, { interactionLocked: true })), 'filter').isDisabled).toBe(
+    expect(byId(getLayerContextActions(makeState(unlocked, { operationLocked: true })), 'filter').isDisabled).toBe(
       true
     );
   });
@@ -941,15 +947,72 @@ describe('getLayerContextActions', () => {
   });
 });
 
+describe('toggle-visibility', () => {
+  const labelOf = (layer: CanvasLayerContract, overrides: Partial<LayerContextActionState> = {}) =>
+    getEnglishTranslation(byId(getLayerContextActions(makeState(layer, overrides)), 'toggle-visibility').labelKey);
+
+  it('hides and shows a raster layer, the one visibility that generation also follows', () => {
+    expect(labelOf(rasterLayer)).toBe('Hide layer');
+    expect(labelOf({ ...rasterLayer, isEnabled: false })).toBe('Show layer');
+  });
+
+  it.each(['control', 'inpaint_mask', 'regional_guidance'] as const)(
+    'names the flag for generation on a %s layer, whose canvas visibility is its own action',
+    (type) => {
+      const layer = makeLayer(type);
+      expect(labelOf(layer)).toBe('Exclude from generation');
+      expect(labelOf({ ...layer, isEnabled: false })).toBe('Use in generation');
+      // The row dot's shapes: a plain ring for off, a dot for on; the dashed ring belongs to a group leaving it out.
+      const iconOf = (target: CanvasLayerContract) =>
+        byId(getLayerContextActions(makeState(target)), 'toggle-visibility').icon;
+      expect(iconOf(layer)).toBe(CircleIcon);
+      expect(iconOf({ ...layer, isEnabled: false })).toBe(CircleDotIcon);
+    }
+  );
+
+  it('words a selection by the kinds it holds: overlays, raster layers, or both', () => {
+    const mask = createInpaintMaskLayer('Mask', 'mask');
+    const region = { ...createRegionalGuidanceLayer('Region', 0, 'region'), isEnabled: false };
+    const overlays = { document: makeDocument([mask, region]), selectedIds: ['mask', 'region'] };
+    expect(labelOf(mask, overlays)).toBe('Use selected in generation');
+    expect(labelOf(mask, { ...overlays, document: makeDocument([mask, { ...region, isEnabled: true }]) })).toBe(
+      'Exclude selected from generation'
+    );
+    const mixed = { document: makeDocument([mask, rasterLayer]), selectedIds: ['mask', 'raster'] };
+    // Both kinds: the flag hides the raster layer and leaves the overlay out, so it is turned off.
+    expect(labelOf(mask, mixed)).toBe('Turn off selected');
+    expect(
+      labelOf(rasterLayer, { ...mixed, document: makeDocument([{ ...mask, isEnabled: false }, rasterLayer]) })
+    ).toBe('Turn on selected');
+    const rasters = { document: makeDocument([rasterLayer, paintLayer('second')]), selectedIds: ['raster', 'second'] };
+    expect(labelOf(rasterLayer, rasters)).toBe('Hide selected');
+  });
+});
+
 describe('toggle-hidden', () => {
   it('offers hide-on-canvas to overlay layers only and yields to a hiding ancestor', () => {
     expect(idsFor(rasterLayer)).not.toContain('toggle-hidden');
     const control = getLayerContextActions(makeState(nonEmptyControlLayer));
     expect(byId(control, 'toggle-hidden').isDisabled).toBe(false);
-    expect(byId(control, 'toggle-hidden').labelKey).toBe('widgets.layers.actions.hideLayer');
-    expect(getEnglishTranslation('widgets.layers.actions.hideLayer')).toBe('Hide layer');
+    expect(getEnglishTranslation(byId(control, 'toggle-hidden').labelKey)).toBe('Hide on canvas');
     const hidden = getLayerContextActions(makeState({ ...nonEmptyControlLayer, isHidden: true }));
-    expect(byId(hidden, 'toggle-hidden').labelKey).toBe('widgets.layers.actions.showLayer');
+    expect(getEnglishTranslation(byId(hidden, 'toggle-hidden').labelKey)).toBe('Show on canvas');
+    const mask = createInpaintMaskLayer('Mask', 'mask');
+    const selection = (masks: CanvasLayerContract[]) =>
+      getLayerContextActions(
+        makeState(masks[0]!, {
+          document: makeDocument([...masks, rasterLayer]),
+          selectedIds: ['mask', 'other', 'raster'],
+        })
+      );
+    const other = { ...createInpaintMaskLayer('Other', 'other'), isHidden: true };
+    expect(getEnglishTranslation(byId(selection([mask, other]), 'toggle-hidden').labelKey)).toBe(
+      'Hide selected on canvas'
+    );
+    // The raster target has no canvas-only state, so it does not keep the selection from reading as hidden.
+    expect(getEnglishTranslation(byId(selection([{ ...mask, isHidden: true }, other]), 'toggle-hidden').labelKey)).toBe(
+      'Show selected on canvas'
+    );
     const gated = getLayerContextActions(makeState(nonEmptyControlLayer, { hiddenByAncestor: true }));
     expect(byId(gated, 'toggle-hidden').isDisabled).toBe(true);
     const runtime = makeRuntimeContext(nonEmptyControlLayer);
@@ -1014,7 +1077,7 @@ describe('remove-from-group', () => {
     // A lock on any group above the layer refuses the move just the same.
     const nested = [groupContract('Outer', [groupContract('G', [r1])], { isLocked: true })];
     expect(reason(r1, nested, refused)).toBe('widgets.layers.actions.removeFromGroupLocked');
-    expect(reason(r1, grouped, { interactionLocked: true })).toBe('widgets.layers.actions.interactionLocked');
+    expect(reason(r1, grouped, { operationLocked: true })).toBe('widgets.layers.actions.operationLocked');
   });
 });
 
@@ -1068,6 +1131,6 @@ describe('merge-masks', () => {
     expect(reason([m1, m2], { hasEngine: false, mergeMasksEligibility: 'ineligible' })).toBe(
       'widgets.layers.actions.canvasNotReady'
     );
-    expect(reason([m1, m2], { interactionLocked: true })).toBe('widgets.layers.actions.interactionLocked');
+    expect(reason([m1, m2], { operationLocked: true })).toBe('widgets.layers.actions.operationLocked');
   });
 });

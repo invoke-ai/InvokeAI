@@ -1,4 +1,5 @@
 import type { ComponentModelConfig, GenerateModelConfig, VaeModelConfig } from '@features/generation/contracts';
+import type { TFunction } from 'i18next';
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import {
@@ -7,7 +8,8 @@ import {
   isSupportedGenerateModel,
   isVaeModelConfig,
 } from '@features/generation/settings';
-import { describe, expect, it } from 'vitest';
+import i18n from 'i18next';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getCurrentGenerateValues } from './executeImageRecall';
 import {
@@ -152,6 +154,46 @@ describe('buildRecallParametersSettings', () => {
     expect(result.values.vae).toBeNull();
   });
 
+  describe("the new model's default VAE", () => {
+    const fluxVae = makeModel('flux-vae', 'flux', 'vae');
+    const sdxlNamingMissingVae = makeModel('sdxl-missing-vae', 'sdxl', 'main', { default_settings: { vae: 'gone' } });
+    // The Model Manager stores "default" when the VAE default is on with no VAE picked; FLUX bundles no VAE.
+    const fluxDefaultVae = makeModel('flux-default-vae', 'flux', 'main', { default_settings: { vae: 'default' } });
+    // A Diffusers pipeline: its VAE is an optional override. A GGUF SD3 transformer needs one, as FLUX does.
+    const sd3DefaultVae = makeModel('sd3-default-vae', 'sd-3', 'main', {
+      default_settings: { vae: 'default' },
+      format: 'diffusers',
+    });
+    const sd3Vae = makeModel('sd3-vae', 'sd-3', 'vae');
+    const catalog = [...models, fluxVae, sdxlNamingMissingVae, fluxDefaultVae, sd3DefaultVae, sd3Vae];
+    const buildWith = (currentValues: ReturnType<typeof currentFor>, parameters: Record<string, unknown>) =>
+      buildRecallParametersSettings({
+        currentValues,
+        models: catalog,
+        parameters,
+        supportedModels: catalog.filter(isSupportedGenerateModel) as GenerateModelConfig[],
+        vaeModels: catalog.filter(isVaeModelConfig) as VaeModelConfig[],
+      });
+
+    it('uses the bundled VAE when the default names one that is not installed, as recall always has', () => {
+      const result = buildWith(currentFor(sdxl, { vae: sdxlVae }), { model: sdxlNamingMissingVae.key });
+
+      expect(result.values.vae).toBeNull();
+    });
+
+    it("clears an optional VAE override for the 'default' sentinel", () => {
+      const result = buildWith(currentFor(sd3, { vae: sd3Vae }), { model: sd3DefaultVae.key });
+
+      expect(result.values.vae).toBeNull();
+    });
+
+    it("keeps a family's required VAE for the 'default' sentinel", () => {
+      const result = buildWith(currentFor(flux, { vae: fluxVae }), { model: fluxDefaultVae.key });
+
+      expect(result.values.vae?.key).toBe(fluxVae.key);
+    });
+  });
+
   it('reports an unknown model and a VAE from another family without changing the selection', () => {
     const current = currentFor(sdxl);
     const result = build(current, { model: 'not-installed', vae_model: sdxlVae.name });
@@ -273,8 +315,9 @@ describe('buildRecallParametersSettings', () => {
       { key: 'refiner_cfg_scale', reason: 'incompatible', detail: flux.name },
     ]);
 
+    // Leaving SDXL keeps the refiner selected but idle (it runs only after an SDXL base); the recalled one is skipped.
     const away = build(current, { model: flux.key, refiner_model: refiner.key, refiner_steps: 15 });
-    expect(away.values.refinerModel).toBeNull();
+    expect(away.values.refinerModel).toEqual(refiner);
     expect(away.values.refinerSteps).toBe(35);
     expect(away.skipped.map(({ key }) => key)).toEqual(['refiner_model', 'refiner_steps']);
   });
@@ -495,6 +538,38 @@ describe('buildRecallParametersSettings', () => {
     expect(untouched.values.referenceImages).toEqual(current.referenceImages);
   });
 
+  it('keeps recalled Qwen-Image-2.1 references whichever encoder is selected, leaving the tower check to validation', () => {
+    const qwen21 = makeModel('q21-main', 'qwen-image-2-1', 'main', { format: 'checkpoint' });
+    const q21Supported = [qwen21].filter(isSupportedGenerateModel) as GenerateModelConfig[];
+    const values = getCurrentGenerateValues({
+      generateValues: { modelKey: qwen21.key },
+      supportedModels: q21Supported,
+    });
+
+    if (!values) {
+      throw new Error('fixture model is not a supported Generate model');
+    }
+
+    const encoder = (format: string) => makeModel('enc', 'any', 'qwen3_vl_encoder', { format, variant: 'qwen3_vl_8b' });
+    const recall = (qwen3VLEncoderModel: ComponentModelConfig | null) =>
+      buildRecallParametersSettings({
+        currentValues: { ...values, qwen3VLEncoderModel },
+        models: [qwen21],
+        parameters: { reference_images: [{ image: image('edit.png') }] },
+        supportedModels: q21Supported,
+        vaeModels: [],
+      });
+
+    for (const selected of [encoder('checkpoint'), encoder('gguf_quantized'), null]) {
+      const result = recall(selected);
+
+      expect(result.values.referenceImages.map((reference) => reference.config.type)).toEqual([
+        'qwen_image_2_1_reference_image',
+      ]);
+      expect(result.skipped).toEqual([]);
+    }
+  });
+
   it('types recalled Krea-2 references as one set: a lone one is style, several or appended ones are edit', () => {
     const krea2 = makeModel('krea2-main', 'krea-2', 'main', { format: 'diffusers' });
     const krea2Supported = [krea2].filter(isSupportedGenerateModel) as GenerateModelConfig[];
@@ -583,7 +658,7 @@ describe('buildRecallParametersSettings', () => {
     expect(result.skipped).toEqual([{ detail: sd3.name, key: 'reference_images', reason: 'incompatible' }]);
   });
 
-  it('reports parameters the Generate panel has no home for, ignoring empty lists', () => {
+  it('leaves canvas parameters to the canvas owner, ignoring empty lists', () => {
     const result = build(currentFor(sdxl), {
       control_layers: [{ model_key: 'controlnet' }],
       denoise_strength: 0.5,
@@ -591,7 +666,7 @@ describe('buildRecallParametersSettings', () => {
     });
 
     expect(result.fields).toEqual(['prompts']);
-    expect(result.skipped.map((skip) => skip.key).sort()).toEqual(['control_layers', 'denoise_strength']);
+    expect(result.skipped).toEqual([]);
     expect(result.skipped.every((skip) => skip.reason === 'unsupported')).toBe(true);
 
     expect(build(currentFor(sdxl), { control_layers: [] }).skipped).toEqual([]);
@@ -621,13 +696,31 @@ describe('buildRecallParametersSettings', () => {
 });
 
 describe('getRecallParametersSkipMessage', () => {
+  const englishCatalog = Object.values(
+    import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
+  )[0] as Record<string, unknown>;
+  const instance = i18n.createInstance();
+  const t = ((key: string, values?: Record<string, unknown>) => instance.t(key, values)) as TFunction;
+
+  beforeAll(async () => {
+    await instance.init({
+      initAsync: false,
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: englishCatalog } },
+    });
+  });
+
   it('names every skipped parameter with its reason and detail', () => {
     expect(
-      getRecallParametersSkipMessage([
-        { detail: 'pixel-art', key: 'loras', reason: 'incompatible' },
-        { key: 'refiner_model', reason: 'unsupported' },
-        { detail: '5', key: 'reference_images', reason: 'limit' },
-      ])
+      getRecallParametersSkipMessage(
+        [
+          { detail: 'pixel-art', key: 'loras', reason: 'incompatible' },
+          { key: 'refiner_model', reason: 'unsupported' },
+          { detail: '5', key: 'reference_images', reason: 'limit' },
+        ],
+        t
+      )
     ).toBe(
       'loras: incompatible with the current model (pixel-art); refiner_model: not supported by the Generate panel; reference_images: over the reference image limit (5)'
     );

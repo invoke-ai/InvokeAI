@@ -5,6 +5,8 @@ import { createExternalStore } from '@platform/state/externalStore';
 
 export interface QueueConfirmation {
   body: ReactNode;
+  /** The way out, named for what it keeps ("Keep running"), so it never reads like the action it declines. */
+  cancelLabel: string;
   confirmLabel: string;
   onConfirm: () => Promise<void> | void;
   title: string;

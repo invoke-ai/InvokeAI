@@ -108,6 +108,6 @@ describe('HistoryController', () => {
     await expect(controller.undo()).resolves.toMatchObject({ status: 'failed' });
 
     expect(reportFailure).toHaveBeenCalledWith('Brush stroke', failure);
-    expect(controller.history.entries()).toEqual({ future: [], past: ['Brush stroke'] });
+    expect(controller.history.entries()).toEqual({ evicted: 0, future: [], past: ['Brush stroke'] });
   });
 });

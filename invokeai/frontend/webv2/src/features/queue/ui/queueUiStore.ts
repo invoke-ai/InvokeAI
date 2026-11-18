@@ -15,10 +15,14 @@ export const requestQueueItemReveal = (itemId: number): void => {
   queueRevealStore.setSnapshot({ pendingReveal: { itemId, requestId: ++nextRevealRequestId } });
 };
 
-export const clearPendingQueueItemReveal = (requestId: number): void => {
-  if (queueRevealStore.getSnapshot().pendingReveal?.requestId === requestId) {
-    queueRevealStore.setSnapshot({ pendingReveal: null });
+/** Settles the request once: false when it was already settled or replaced. */
+export const clearPendingQueueItemReveal = (requestId: number): boolean => {
+  if (queueRevealStore.getSnapshot().pendingReveal?.requestId !== requestId) {
+    return false;
   }
+
+  queueRevealStore.setSnapshot({ pendingReveal: null });
+  return true;
 };
 
 const resetQueueUi = (): void => {

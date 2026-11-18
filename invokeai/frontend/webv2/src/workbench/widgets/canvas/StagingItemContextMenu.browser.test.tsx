@@ -1,3 +1,4 @@
+import type * as MenuModule from '@platform/ui/Menu';
 import type { CanvasCandidateSlot } from '@workbench/canvasStagingView';
 import type { ImageRecallCapabilities, ImageRecallKind } from '@workbench/image-actions';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
@@ -7,10 +8,35 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 
-import { StagingItemContextMenu } from './StagingItemContextMenu';
+import { loadStagingItemRecall, StagingItemContextMenu } from './StagingItemContextMenu';
+
+// Each test starts with the verbs unloaded, as a page does: the loader the module creates is swapped for a fresh one.
+const menuParts = vi.hoisted(() => ({
+  loaders: [] as { getSnapshot: () => { status: string }; reset: () => void }[],
+}));
+vi.mock('@platform/ui/Menu', async (importOriginal) => {
+  const original = await importOriginal<typeof MenuModule>();
+
+  return {
+    ...original,
+    createMenuPartLoader: <Part,>(importPart: () => Promise<Part>) => {
+      let current = original.createMenuPartLoader(importPart);
+      const loader = {
+        getSnapshot: () => current.getSnapshot(),
+        load: () => current.load(),
+        reset: () => {
+          current = original.createMenuPartLoader(importPart);
+        },
+        subscribe: (listener: () => void) => current.subscribe(listener),
+      };
+      menuParts.loaders.push(loader);
+      return loader;
+    },
+  };
+});
 
 const mocks = vi.hoisted(() => ({
   capabilities: {
@@ -52,7 +78,7 @@ vi.mock('@workbench/queue-integration/useQueueItemRecall', () => ({
   useQueueItemRecall: (origin: string, meta: unknown) => {
     mocks.origin = origin;
     mocks.meta = meta;
-    return { capabilities: mocks.capabilities, isPending: false, recall: mocks.recall };
+    return { capabilities: mocks.capabilities, isPending: false, reasons: {}, recall: mocks.recall };
   },
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -136,6 +162,20 @@ const render = async (handlers: Partial<Parameters<typeof StagingItemContextMenu
   );
 };
 
+// The verbs' first load transforms their module graph, which can outlast `vi.waitFor`'s default second.
+const COLD_LOAD = { timeout: 10_000 };
+
+/** Warms the verbs as the staging bar does when a result is pointed at, and waits for them to load. */
+const loadRecall = async () => {
+  await act(() => loadStagingItemRecall());
+  await vi.waitFor(
+    () => expect(menuParts.loaders.map((loader) => loader.getSnapshot().status)).toEqual(['loaded']),
+    COLD_LOAD
+  );
+};
+
+beforeEach(() => menuParts.loaders.forEach((loader) => loader.reset()));
+
 afterEach(async () => {
   await act(() => root?.unmount());
   host?.remove();
@@ -146,21 +186,39 @@ afterEach(async () => {
 
 describe('StagingItemContextMenu', () => {
   it('recalls from the staged result’s own queue item and disables verbs its snapshot cannot back', async () => {
+    // Nothing warmed the verbs first: the menu loads them as it opens.
     await render();
 
-    expect(mocks.origin).toBe('webv2:p:project-1:q:local-queue-item');
+    await vi.waitFor(() => expect(mocks.origin).toBe('webv2:p:project-1:q:local-queue-item'), COLD_LOAD);
     // The executed prompt and seed come from the backend item that produced the result.
     await vi.waitFor(() => expect(mocks.meta).toEqual({ positivePrompt: 'a staged cat', seed: 4242 }));
-    expect(menuItem('Use Seed').getAttribute('aria-disabled')).toBe('true');
-    expect(menuItem('Use CLIP Skip').getAttribute('aria-disabled')).toBe('true');
-    expect(menuItem('Recall All').getAttribute('aria-disabled')).toBeNull();
+    expect(menuItem('widgets.gallery.itemActions.recall.verbs.seed').getAttribute('aria-disabled')).toBe('true');
+    expect(menuItem('widgets.gallery.itemActions.recall.verbs.clipSkip').getAttribute('aria-disabled')).toBe('true');
+    expect(menuItem('widgets.gallery.itemActions.recall.verbs.all').getAttribute('aria-disabled')).toBeNull();
 
-    await activate('Use Prompt');
+    await activate('widgets.gallery.itemActions.recall.verbs.prompts');
     expect(mocks.recall).toHaveBeenCalledWith('prompts');
 
     // A greyed verb must stay inert: the row is only visually disabled.
-    await activate('Use Seed');
+    await activate('widgets.gallery.itemActions.recall.verbs.seed');
     expect(mocks.recall).not.toHaveBeenCalledWith('seed');
+  });
+
+  it('opens on its recall verbs’ first frame once they have loaded', async () => {
+    await loadRecall();
+    // Records whether the placeholder ever mounts while the menu opens.
+    const placeholders: Node[] = [];
+    const observer = new MutationObserver(() =>
+      placeholders.push(...document.querySelectorAll('[data-value="menu-part-placeholder"]'))
+    );
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    await render();
+    observer.disconnect();
+
+    expect(placeholders).toEqual([]);
+    expect(menuItem('widgets.gallery.itemActions.recall.verbs.prompts')).toBeDefined();
+    expect(document.querySelector('[role="menu"]')?.getAttribute('aria-busy')).toBe('false');
   });
 
   it('keeps Accept inert while accepting is not allowed', async () => {

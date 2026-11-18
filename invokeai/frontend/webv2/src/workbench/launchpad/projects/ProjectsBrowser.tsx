@@ -1,10 +1,10 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
 
-import { Alert, Box, Flex, Icon, SimpleGrid, Skeleton, Text } from '@chakra-ui/react';
+import { Box, Flex, Icon, SimpleGrid, Skeleton, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { Scrollable } from '@platform/ui/Scrollable';
-import { refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
+import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { useOpenProjectsSelector } from '@workbench/projects/openProjects';
 import { FolderIcon, SearchXIcon } from 'lucide-react';
 import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef } from 'react';
@@ -18,6 +18,7 @@ import { ProjectCard } from './ProjectCard';
 import { PROJECT_COVER_ASPECT_RATIO } from './ProjectCover';
 import { buildProjectGroups, flattenProjectGroupsToRows } from './projectLibraryView';
 import { ProjectRow } from './ProjectRow';
+import { firstControlIn, ProjectsLoadError } from './ProjectsLoadError';
 import {
   getProjectsGridRowHeight,
   PROJECT_GROUP_HEADER_HEIGHT_PX,
@@ -77,7 +78,6 @@ export const ProjectsBrowser = ({
   view,
 }: ProjectsBrowserProps) => {
   const { t } = useTranslation();
-  const error = useProjectLibrarySelector((snapshot) => snapshot.error);
   const status = useProjectLibrarySelector((snapshot) => snapshot.status);
   const summaries = useProjectLibrarySelector((snapshot) => snapshot.summaries);
   const openProjectIds = useOpenProjectsSelector((snapshot) => snapshot.ids);
@@ -125,6 +125,7 @@ export const ProjectsBrowser = ({
     [rows]
   );
   const getScrollElement = useCallback(() => scrollRef.current, []);
+  const getRecoveryFocus = useCallback(() => firstControlIn(scrollRef.current), []);
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -132,6 +133,9 @@ export const ProjectsBrowser = ({
     getItemKey,
     getScrollElement,
     overscan: 4,
+    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error
+    // for any scroll event dispatched while React is rendering or flushing effects.
+    useFlushSync: false,
   });
 
   // The virtualizer caches measurements and will not re-read `estimateSize` on
@@ -145,7 +149,6 @@ export const ProjectsBrowser = ({
     measureVirtualizer();
   }, [itemRowHeight, view]);
 
-  const handleRetry = useCallback(() => void refreshProjectLibrary(), []);
   const isFirstLoad = summaries.length === 0 && (status === 'idle' || status === 'loading');
   const isSearching = searchTerm.trim().length > 0;
 
@@ -153,18 +156,15 @@ export const ProjectsBrowser = ({
     <Scrollable flex="1" h="full" label={t('launchpad.sections.projects')} minH="0" viewportRef={scrollRef}>
       <Box css={MEASURE_SX} pb="8" ref={measureRef}>
         {status === 'error' ? (
-          <Alert.Root borderRadius="md" mb="4" status="error">
-            <Alert.Indicator />
-            <Alert.Title flex="1" fontSize="md">
-              {error ?? t('projects.failedToLoad')}
-            </Alert.Title>
-            <Button size="sm" variant="outline" onClick={handleRetry}>
-              {t('common.retry')}
-            </Button>
-          </Alert.Root>
+          <ProjectsLoadError
+            getRecoveryFocus={getRecoveryFocus}
+            layout={summaries.length === 0 ? 'state' : 'inline'}
+            mb="4"
+          />
         ) : null}
 
-        {isFirstLoad ? (
+        {/* A failed listing is not an empty library: the alert above is the whole state until a retry lands. */}
+        {status === 'error' && summaries.length === 0 ? null : isFirstLoad ? (
           <SimpleGrid columns={SKELETON_GRID_COLUMNS} gap="4">
             <Skeleton minH="52" rounded="lg" />
             <Skeleton minH="52" rounded="lg" />

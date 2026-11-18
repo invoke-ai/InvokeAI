@@ -2,14 +2,15 @@
 import type { ModelLibraryFilters, ModelSortField } from '@features/models/core/library';
 import type { ModelTaxonomyType } from '@features/models/core/types';
 
-import { HStack, Icon, Input, InputGroup } from '@chakra-ui/react';
+import { HStack } from '@chakra-ui/react';
 import { FilterMenuItem, ModelFilterMenu, SORT_FIELD_OPTIONS } from '@features/models/ui/shared/ModelFilterMenu';
-import { SearchIcon } from 'lucide-react';
+import { ManagerSearchField } from '@platform/ui/ManagerLayout';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const isFiltering = (filters: ModelLibraryFilters): boolean =>
-  filters.typeFilter !== null || filters.baseFilter !== null || filters.missingOnly;
+// Missing files is a pseudo-type (choosing it clears the type), so it counts as the type filter.
+const countActiveFilters = (filters: ModelLibraryFilters): number =>
+  Number(filters.typeFilter !== null || filters.missingOnly) + Number(filters.baseFilter !== null);
 
 /** Offer taxonomy filters only for values present in the library. */
 export const ModelFilterBar = ({
@@ -38,6 +39,10 @@ export const ModelFilterBar = ({
     (baseFilter: string | null) => onChange({ ...filters, baseFilter }),
     [filters, onChange]
   );
+  const handleResetFilters = useCallback(
+    () => onChange({ ...filters, baseFilter: null, missingOnly: false, typeFilter: null }),
+    [filters, onChange]
+  );
   const handleSortChange = useCallback(
     (sortField: ModelSortField, sortDirection: 'asc' | 'desc') => onChange({ ...filters, sortDirection, sortField }),
     [filters, onChange]
@@ -60,21 +65,19 @@ export const ModelFilterBar = ({
   );
   return (
     <HStack gap="1.5" w="full" px="3" pt="3">
-      <InputGroup startElement={<Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />}>
-        <Input
-          aria-label={t('models.searchModels')}
-          placeholder={t('models.searchModelsPlaceholder')}
-          value={filters.searchTerm}
-          onChange={(event) => handleSearchChange(event.currentTarget.value)}
-        />
-      </InputGroup>
+      <ManagerSearchField
+        label={t('models.searchModels')}
+        placeholder={t('models.searchModelsPlaceholder')}
+        value={filters.searchTerm}
+        onChange={handleSearchChange}
+      />
       <ModelFilterMenu
+        activeFilterCount={countActiveFilters(filters)}
         ariaLabel={t('models.filterAndSort')}
         availableBases={availableBases}
         availableTypes={availableTypes}
         baseFilter={filters.baseFilter}
         extraTypeItems={extraTypeItems}
-        isActive={isFiltering(filters)}
         sortDirection={filters.sortDirection}
         sortField={filters.sortField}
         sortFields={SORT_FIELD_OPTIONS}
@@ -82,6 +85,7 @@ export const ModelFilterBar = ({
         typeFilter={filters.typeFilter}
         typeSummary={filters.missingOnly ? t('models.missingFilesCount', { count: missingCount }) : undefined}
         onBaseFilterChange={handleBaseFilterChange}
+        onResetFilters={handleResetFilters}
         onSortChange={handleSortChange}
         onTypeFilterChange={handleTypeFilterChange}
       />

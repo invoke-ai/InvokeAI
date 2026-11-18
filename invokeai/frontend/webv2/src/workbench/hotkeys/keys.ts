@@ -259,20 +259,44 @@ const NON_TEXT_INPUT_TYPES = new Set([
 
 /** What a focused radio group or slider does with a key itself: move its selection or value. */
 const NATIVE_CONTROL_KEYS = new Set(['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'End', 'Home']);
+const ACTIVATION_KEYS = new Set([' ', 'Enter']);
+/** Controls a bare Space or Enter activates natively: buttons, links, toggles, tabs, menu items, options. */
+const ACTIVATABLE_CONTROL_SELECTOR = [
+  'a[href]',
+  'button',
+  'input[type="button"]',
+  'input[type="checkbox"]',
+  'input[type="radio"]',
+  'input[type="reset"]',
+  'input[type="submit"]',
+  'summary',
+  '[role="button"]',
+  '[role="checkbox"]',
+  '[role="link"]',
+  '[role="menuitem"]',
+  '[role="menuitemcheckbox"]',
+  '[role="menuitemradio"]',
+  '[role="option"]',
+  '[role="switch"]',
+  '[role="tab"]',
+].join(', ');
 
 /**
- * Whether a press is the focused radio group's or slider's own navigation (arrows, Home, End without Ctrl, Meta or
- * Alt). These controls take no typed text, so {@link isEditableHotkeyTarget} lets chords through from them, but a
- * plain shortcut on the same key (Gallery's arrow navigation) would prevent the default and freeze the control.
+ * Whether a press is the focused control's own: a radio group's or slider's navigation (arrows, Home, End), or the
+ * Space or Enter that activates a focused button, link, toggle or tab, all without Ctrl, Meta or Alt. These controls
+ * take no typed text, so {@link isEditableHotkeyTarget} lets chords through from them, but a plain shortcut on the
+ * same key (Gallery's arrow navigation, the workflow editor's Space for Add node) would prevent the default and freeze
+ * or skip the control.
  */
 export const isNativeControlKeyPress = (event: KeyboardEvent): boolean =>
   !event.ctrlKey &&
   !event.metaKey &&
   !event.altKey &&
-  NATIVE_CONTROL_KEYS.has(event.key) &&
   typeof Element !== 'undefined' &&
   event.target instanceof Element &&
-  event.target.closest('input[type="radio"], input[type="range"], [role="radiogroup"], [role="slider"]') !== null;
+  ((NATIVE_CONTROL_KEYS.has(event.key) &&
+    event.target.closest('input[type="radio"], input[type="range"], [role="radiogroup"], [role="slider"]') !== null) ||
+    (ACTIVATION_KEYS.has(event.key) && event.target.matches(ACTIVATABLE_CONTROL_SELECTOR)));
 
 export const isEditableHotkeyTarget = (target: EventTarget | null): boolean => {
   if (typeof HTMLElement === 'undefined') {

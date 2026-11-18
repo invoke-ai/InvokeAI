@@ -6,6 +6,7 @@ import { PopoverContent } from '@platform/ui/Popover';
 import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 
 import type { GalleryPickerAccept, GalleryPickerSelection } from './galleryPicker';
+import type { GalleryPickerOpeningScope } from './useGalleryPickerScope';
 
 // Loaded on first open: every widget with an image slot mounts a trigger at
 // boot, and the view is most of the picker's weight.
@@ -27,22 +28,31 @@ const SINGLE_SELECTION: GalleryPickerSelection = { mode: 'single' };
 
 export interface GalleryPickerPopoverProps {
   accept: GalleryPickerAccept;
-  /** The trigger element; must accept a ref and a click handler. */
+  /** The trigger element; must accept a ref and a click handler. It takes `data-hover` while the picker is open. */
   children: ReactElement;
   /** Shared with a Tooltip wrapping an icon-only trigger (see `useTooltipTriggerIds`). */
   ids?: { trigger: string };
   /** The dialog's accessible name, e.g. "Choose image". */
   label: string;
+  /**
+   * The board and view each opening starts at, read once per opening: a host showing one item opens where that item
+   * lives. Absent, the picker opens at the Gallery widget's board and view.
+   */
+  openingScope?: GalleryPickerOpeningScope;
   selection?: GalleryPickerSelection;
   onPick: (item: GalleryItem) => void;
 }
 
-/** Mount on open and unmount on close so each opening starts from the Gallery widget's scope. */
+/**
+ * Mount on open and unmount on close so each opening starts fresh from `openingScope`, or the Gallery widget's scope
+ * without one; browsing inside the picker never carries over to the next opening.
+ */
 export const GalleryPickerPopover = ({
   accept,
   children,
   ids,
   label,
+  openingScope,
   selection = SINGLE_SELECTION,
   onPick,
 }: GalleryPickerPopoverProps) => {
@@ -64,7 +74,11 @@ export const GalleryPickerPopover = ({
       unmountOnExit
       onOpenChange={handleOpenChange}
     >
-      <Popover.Trigger asChild>{children}</Popover.Trigger>
+      {/* Pointed while its picker is open: `data-hover` is what the theme's hover styles (buttons, rows, drop zones)
+          already match, so each trigger keeps its own hover look rather than a new one. */}
+      <Popover.Trigger asChild data-hover={isOpen ? '' : undefined}>
+        {children}
+      </Popover.Trigger>
       <Portal>
         <Popover.Positioner>
           <PopoverContent
@@ -78,6 +92,7 @@ export const GalleryPickerPopover = ({
             <Suspense fallback={PICKER_FALLBACK}>
               <GalleryPickerView
                 accept={accept}
+                openingScope={openingScope}
                 searchInputRef={searchInputRef}
                 selection={selection}
                 onClose={close}

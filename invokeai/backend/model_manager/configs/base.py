@@ -102,9 +102,11 @@ class Config_Base(ABC, BaseModel):
     """Set of all non-abstract subclasses of Config_Base, for use during model probing. In other words, this is the set
     of all known model config types."""
 
-    DECODES_GGUF_Q8_CR: ClassVar[bool] = False
-    """Whether this config's loader decodes ComfyUI-GGUF ``Q8_CR`` (int8 convrot) layers. Off by default, so a GGUF
-    config refuses those files at install until its loader asks ``gguf_sd_loader`` to decode them."""
+    DECODES_GGUF_CONVROT: ClassVar[frozenset[str]] = frozenset()
+    """The marker formats this config's loader decodes from ComfyUI-GGUF's convrot layers, as
+    ``accepted_convrot_formats`` names them: ``Q8_CR`` arrives as ``int8_tensorwise`` and ``Q4_CR`` as
+    ``int4_tensorwise``. Empty by default, so a GGUF config refuses those files at install until its loader asks
+    ``gguf_sd_loader`` to decode them -- and the int4 ones until it also opts into int4."""
 
     model_config = ConfigDict(
         validate_assignment=True,

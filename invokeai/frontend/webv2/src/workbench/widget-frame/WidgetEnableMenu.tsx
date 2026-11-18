@@ -4,8 +4,10 @@ import type { RegisteredWidget, WidgetIconComponent, WidgetInstanceId, WidgetTyp
 import { Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
+import { openWidgetsDialogFrom } from '@workbench/shell/widgetsDialogStore';
+import { CheckIcon, LayoutGridIcon, MoreHorizontalIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -41,7 +43,8 @@ interface WidgetEnableMenuProps {
   onToggle: (item: WidgetEnableMenuItem) => void;
 }
 
-const TRIGGER_HOVER_PROPS = { bg: 'bg.muted' };
+/** The neighbouring rail slots' and status-bar chips' pointed fill, kept while the menu is open. */
+const TRIGGER_POINTED_PROPS = { bg: 'bg.hover', color: 'fg' };
 const MENU_ITEM_DISABLED_PROPS = { opacity: 0.4 };
 
 const getWidgetEnableMenuTriggerButton = (label: string, trigger: WidgetEnableMenuTrigger) => {
@@ -58,17 +61,18 @@ const getWidgetEnableMenuTriggerButton = (label: string, trigger: WidgetEnableMe
   return (
     <Flex
       align="center"
-      // Center the fixed-size trigger within full-width rail drop targets; fill the status bar inside its border.
+      // Center the fixed-size trigger within full-width rail drop targets; take the status-bar chips' inset height.
       alignSelf={isBottom ? 'stretch' : 'center'}
       aria-label={label}
       as="button"
       color="fg"
       h={isBottom ? undefined : '9'}
       justify="center"
-      rounded={isBottom ? 'sm' : 'md'}
+      rounded={isBottom ? 'control' : 'md'}
       transition="background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease"
       w={isBottom ? '6' : '9'}
-      _hover={TRIGGER_HOVER_PROPS}
+      _expanded={TRIGGER_POINTED_PROPS}
+      _hover={TRIGGER_POINTED_PROPS}
     >
       <Icon as={MoreHorizontalIcon} boxSize={isBottom ? '4' : '5'} />
     </Flex>
@@ -88,6 +92,12 @@ export const WidgetEnableMenu = ({
   triggerLabel,
 }: WidgetEnableMenuProps) => {
   const { t } = useTranslation();
+  const triggerIds = useTooltipTriggerIds();
+  // The dialog outlives this menu: closing it returns focus to the menu's trigger, which stays on the page.
+  const openAllWidgets = useCallback(
+    () => openWidgetsDialogFrom(() => document.getElementById(triggerIds.trigger)),
+    [triggerIds.trigger]
+  );
   const content = (
     <MenuContent minW="12rem">
       <Menu.ItemGroup>
@@ -101,6 +111,12 @@ export const WidgetEnableMenu = ({
           return <WidgetEnableMenuRow key={item.id} disabled={disabled} item={item} meta={meta} onToggle={onToggle} />;
         })}
       </Menu.ItemGroup>
+      <Menu.Separator />
+      {/* Every widget in one place, including those this region cannot hold. */}
+      <Menu.Item value="all-widgets" onClick={openAllWidgets}>
+        <Icon as={LayoutGridIcon} boxSize="3.5" />
+        <Menu.ItemText>{t('shell.widgets.menuItem')}</Menu.ItemText>
+      </Menu.Item>
     </MenuContent>
   );
 
@@ -120,10 +136,14 @@ export const WidgetEnableMenu = ({
     [onContextClose]
   );
 
+  const tooltipPositioning = useMemo(() => ({ placement: positioning.placement }), [positioning.placement]);
+
   return (
     <>
-      <Menu.Root positioning={positioning}>
-        <Menu.Trigger asChild>{getWidgetEnableMenuTriggerButton(triggerLabel, trigger)}</Menu.Trigger>
+      <Menu.Root ids={triggerIds} positioning={positioning}>
+        <Tooltip content={triggerLabel} ids={triggerIds} positioning={tooltipPositioning}>
+          <Menu.Trigger asChild>{getWidgetEnableMenuTriggerButton(triggerLabel, trigger)}</Menu.Trigger>
+        </Tooltip>
         <Portal>
           <Menu.Positioner>{content}</Menu.Positioner>
         </Portal>
@@ -168,7 +188,7 @@ const WidgetEnableMenuRow = ({
       {...intentPreloadProps}
       onClick={handleClick}
     >
-      <Icon as={CheckIcon} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
+      <Icon as={CheckIcon} boxSize="3" color="fg" opacity={item.isEnabled ? 1 : 0} />
       <WidgetIcon icon={item.icon} boxSize="3.5" />
       <Menu.ItemText>{item.label}</Menu.ItemText>
       {meta ? (

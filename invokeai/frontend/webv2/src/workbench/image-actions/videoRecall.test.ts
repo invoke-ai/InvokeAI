@@ -1,18 +1,30 @@
 import type { GenerationModelCatalogItem, MainModelConfig } from '@features/generation/contracts';
+import type { TFunction } from 'i18next';
 
-import { createDefaultVideoWidgetValues } from '@features/video';
+import {
+  createDefaultVideoWidgetValues,
+  getVideoDimensions,
+  getVideoValidationReasons,
+  type VideoWidgetValues,
+} from '@features/video';
 import { getVideoPromptPolicy } from '@features/video/core/videoPolicies';
-import { describe, expect, it } from 'vitest';
+import i18n from 'i18next';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
   buildVideoRecallSettings,
   deriveAcceleratorRecallState,
   EMPTY_VIDEO_RECALL_CAPABILITIES,
-  getRecallableMediaNames,
   getVideoRecallCapabilities,
-  getVideoSizeRecall,
-  isVideoGenerationMetadata,
+  getVideoRecallMessage,
+  getVideoSizeRecalls,
+  parseVideoRecallRecord,
+  resolveVideoSizeRecall,
+  settleMediaSizedRecall,
 } from './videoRecall';
+
+const isVideoGenerationMetadata = (metadata: unknown): boolean =>
+  parseVideoRecallRecord(metadata)?.isVideoGeneration ?? false;
 
 const wanModel = (variant: string, format = 'diffusers', key = `wan-${variant}-${format}`): MainModelConfig => ({
   base: 'wan',
@@ -60,8 +72,8 @@ const wanMetadata = (extra: Record<string, unknown> = {}): Record<string, unknow
   ...extra,
 });
 
-describe('isVideoGenerationMetadata', () => {
-  it('accepts only the video generation modes', () => {
+describe('parseVideoRecallRecord', () => {
+  it('marks only the video generation modes as video generation', () => {
     expect(isVideoGenerationMetadata(wanMetadata())).toBe(true);
     expect(isVideoGenerationMetadata({ generation_mode: 'minimax_h3_flf2v' })).toBe(true);
     // Image metadata — including Wan still-image modes — is not video metadata.
@@ -80,47 +92,119 @@ describe('getVideoRecallCapabilities', () => {
   });
 
   it('derives per-verb availability from what the metadata contains', () => {
-    expect(getVideoRecallCapabilities(wanMetadata())).toEqual({ all: true, prompts: true, remix: true, seed: true });
+    expect(getVideoRecallCapabilities(wanMetadata())).toEqual({
+      all: true,
+      prompts: true,
+      remix: true,
+      seed: true,
+      size: true,
+    });
     expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', seed: 7 })).toEqual({
       all: true,
       prompts: false,
       remix: false,
       seed: true,
+      size: false,
     });
+    // A dimension alone, or a non-positive one, is no size to recall.
+    expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', width: 1280 }).size).toBe(false);
+    expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', height: 720, width: 0 }).size).toBe(false);
+  });
+
+  // Each record names one thing recall writes; the verbs it offers must be the ones that do something.
+  it.each([
+    ['fps', WAN_T2V, { fps: 16, generation_mode: 'wan_t2v' }, ['fps']],
+    ['size', WAN_T2V, { generation_mode: 'wan_t2v', height: 720, width: 1280 }, ['size']],
+    ['a switched-off negative prompt', WAN_T2V, { generation_mode: 'wan_t2v', negative_prompt: null }, ['prompts']],
+    [
+      'references',
+      h3Model(),
+      { generation_mode: 'minimax_h3_ref2v', minimax_h3_references: [{ image_name: 'ref.png', kind: 'image' }] },
+      ['media'],
+    ],
+    [
+      'a conditioning clip',
+      ltx2Model('ltx2_dev'),
+      {
+        generation_mode: 'ltx2_a2v',
+        ltx2_conditioning_role: 'audio',
+        ltx2_conditioning_video: { video_name: 'song.mp4' },
+      },
+      ['media'],
+    ],
+  ])('offers what recall applies for a record naming only %s', (_, model, metadata, fields) => {
+    const capabilities = getVideoRecallCapabilities(metadata);
+    const recall = (kind: 'prompts' | 'remix') =>
+      buildVideoRecallSettings({
+        currentValues: createDefaultVideoWidgetValues([model]),
+        kind,
+        metadata,
+        models: [model],
+      });
+
+    expect(capabilities.remix).toBe(true);
+    expect(capabilities.all).toBe(true);
+    expect(recall('remix')?.fields).toEqual(fields);
+    expect(capabilities.prompts).toBe(recall('prompts') !== null);
   });
 });
 
-describe('getRecallableMediaNames', () => {
+describe('parseVideoRecallRecord media', () => {
   it('suppresses the extracted first frame in extend mode', () => {
-    const names = getRecallableMediaNames({
+    const record = parseVideoRecallRecord({
       first_frame_image: { image_name: 'extracted.png' },
       generation_mode: 'wan_extend_video',
       last_frame_image: { image_name: 'destination.png' },
       source_video: { video_name: 'clip.mp4' },
     });
 
-    expect(names).toEqual({ firstFrameName: null, lastFrameName: 'destination.png', sourceVideoName: 'clip.mp4' });
+    expect(record?.media).toEqual({
+      firstFrameName: null,
+      lastFrameName: 'destination.png',
+      sourceVideoName: 'clip.mp4',
+    });
   });
 
   it('keeps user keyframes when no source video was recorded', () => {
     expect(
-      getRecallableMediaNames({ first_frame_image: { image_name: 'first.png' }, generation_mode: 'wan_i2v' })
+      parseVideoRecallRecord({ first_frame_image: { image_name: 'first.png' }, generation_mode: 'wan_i2v' })?.media
     ).toEqual({ firstFrameName: 'first.png', lastFrameName: null, sourceVideoName: null });
   });
 });
 
-describe('getVideoSizeRecall', () => {
-  it('inverts a preset-derived canvas exactly', () => {
-    expect(getVideoSizeRecall(WAN_T2V, 1280, 720)).toEqual({ aspectRatioId: '16:9', targetResolution: '720p' });
-    expect(getVideoSizeRecall(h3Model(), 1344, 768)).toEqual({
-      aspectRatioId: '16:9',
-      targetResolution: '768 highres',
+describe('getVideoRecallMessage', () => {
+  const englishCatalog = Object.values(
+    import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
+  )[0] as Record<string, unknown>;
+  const instance = i18n.createInstance();
+  const t = ((key: string, values?: Record<string, unknown>) => instance.t(key, values)) as TFunction;
+
+  beforeAll(async () => {
+    await instance.init({
+      initAsync: false,
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: englishCatalog } },
     });
+  });
+
+  it('names the applied fields as one locale-joined list', () => {
+    expect(getVideoRecallMessage(['model', 'cfg', 'media'], t)).toBe('Applied model, CFG, and conditioning media.');
+    expect(getVideoRecallMessage(['seed'], t)).toBe('Applied seed.');
+  });
+});
+
+describe('getVideoSizeRecalls', () => {
+  it('inverts a preset-derived canvas exactly', () => {
+    expect(getVideoSizeRecalls(WAN_T2V, 1280, 720)).toEqual([{ aspectRatioId: '16:9', targetResolution: '720p' }]);
+    expect(getVideoSizeRecalls(h3Model(), 1344, 768)).toEqual([
+      { aspectRatioId: '16:9', targetResolution: '768 highres' },
+    ]);
   });
 
   it('rejects sizes that came from conditioning media rather than a preset', () => {
     // 1920x1080-shaped media at some odd snap no preset reproduces.
-    expect(getVideoSizeRecall(WAN_T2V, 848, 464)).toBeNull();
+    expect(getVideoSizeRecalls(WAN_T2V, 848, 464)).toEqual([]);
   });
 });
 
@@ -202,6 +286,286 @@ describe('buildVideoRecallSettings', () => {
 
     expect(result?.fields).toEqual(['seed']);
     expect(result?.values).toMatchObject({ seed: 1234, seedMode: 'fixed' });
+  });
+
+  it('recalls only the size for the size verb, fitted to the panel model', () => {
+    const wanValues = createDefaultVideoWidgetValues([WAN_T2V]);
+    const metadata = wanMetadata({ height: 1280, model: { key: h3Model().key }, width: 720 });
+    const result = buildVideoRecallSettings({ currentValues: wanValues, kind: 'size', metadata, models: catalog });
+
+    expect(result?.fields).toEqual(['size']);
+    // The recorded model, prompts and seed stay out; only the preset pair changes.
+    expect(result?.values).toEqual({ ...wanValues, aspectRatioId: '9:16', targetResolution: '720p' });
+  });
+
+  it('recalls no size the panel model cannot reproduce, or without a model', () => {
+    const wanValues = createDefaultVideoWidgetValues([WAN_T2V]);
+    const recall = (values: typeof wanValues, width: number, height: number) =>
+      buildVideoRecallSettings({
+        currentValues: values,
+        kind: 'size',
+        metadata: wanMetadata({ height, width }),
+        models: catalog,
+      });
+
+    expect(recall(wanValues, 848, 464)).toBeNull();
+    expect(recall({ ...wanValues, model: null }, 1280, 720)).toBeNull();
+  });
+
+  describe('a size recall with media in the panel', () => {
+    const image = (width: number, height: number) => ({ height, image_name: 'held.png', width });
+    const recallSize = (values: VideoWidgetValues, width: number, height: number) =>
+      buildVideoRecallSettings({
+        currentValues: values,
+        kind: 'size',
+        metadata: wanMetadata({ height, width }),
+        models: catalog,
+      });
+    const wanValues = createDefaultVideoWidgetValues([WAN_T2V]);
+
+    it('writes nothing when the media would keep the frame from reaching the recorded size', () => {
+      const values = { ...wanValues, firstFrameImage: image(1280, 720) };
+
+      expect(recallSize(values, 720, 1280)).toBeNull();
+      expect(resolveVideoSizeRecall(values, 720, 1280)).toMatchObject({
+        effective: { height: 720, width: 1280 },
+        outcome: 'media-conflict',
+      });
+    });
+
+    it('applies when the media resolves to the recorded size, keeping the media', () => {
+      const values = { ...wanValues, firstFrameImage: image(1920, 1080), targetResolution: '480p' as const };
+
+      expect(recallSize(values, 1280, 720)?.values).toEqual({
+        ...values,
+        aspectRatioId: '16:9',
+        targetResolution: '720p',
+      });
+    });
+
+    it('lets only a video-role conditioning clip own the frame, not an audio-role one', () => {
+      const ltx2 = ltx2Model('ltx2_dev');
+      const ltx2Values = createDefaultVideoWidgetValues([ltx2]);
+      const { height, width } = getVideoDimensions(ltx2, { ...ltx2Values, aspectRatioId: '16:9' })!;
+      const portrait = { duration: 4, fps: 24, height: 1920, video_name: 'held.mp4', width: 1080 };
+      const withClip = (role: 'audio' | 'video') =>
+        ({ ...ltx2Values, conditioningClip: { clip: portrait, role } }) as unknown as VideoWidgetValues;
+
+      expect(resolveVideoSizeRecall(withClip('audio'), width, height).outcome).toBe('fits');
+      expect(resolveVideoSizeRecall(withClip('video'), width, height).outcome).toBe('media-conflict');
+    });
+
+    it("applies the target resolution at which the panel's media reach the recorded size, keeping their shape", () => {
+      // A 10:7 frame, a ratio no preset has. At 480p it scales by 480 / 700 to 685.7x480, snapped to 688x480 on the
+      // 16-pixel grid; at 720p and 1080p it gives 1024x720 and 1536x1088.
+      const values = { ...wanValues, aspectRatioId: '1:1' as const, firstFrameImage: image(1000, 700) };
+
+      expect(resolveVideoSizeRecall(values, 688, 480)).toEqual({
+        outcome: 'fits',
+        sizeRecall: { targetResolution: '480p' },
+      });
+      expect(recallSize(values, 688, 480)?.values).toEqual({ ...values, targetResolution: '480p' });
+    });
+
+    it('reports no size when the media reach it at no target resolution', () => {
+      // A 16:9 frame gives 848x480, 1280x720 or 1920x1088.
+      const values = { ...wanValues, firstFrameImage: image(1280, 720) };
+
+      expect(resolveVideoSizeRecall(values, 688, 480)).toEqual({ outcome: 'unavailable' });
+      expect(recallSize(values, 688, 480)).toBeNull();
+    });
+  });
+
+  describe('a size recall that would change whether the panel can run', () => {
+    const ltx2 = ltx2Model('ltx2_dev');
+    const ltx2Values = createDefaultVideoWidgetValues([ltx2]);
+    const audioClip = {
+      clip: { duration: 4, fps: 24, height: 1024, video_name: 'song.mp4', width: 1792 },
+      role: 'audio',
+    };
+    const metadata = wanMetadata({ height: 1024, width: 1792 });
+    const recall = (values: VideoWidgetValues) =>
+      buildVideoRecallSettings({ currentValues: values, kind: 'size', metadata, models: [ltx2] });
+
+    it('writes nothing when a two-stage preset would be refused alongside the conditioning clip', () => {
+      const values = {
+        ...ltx2Values,
+        conditioningClip: audioClip,
+        targetResolution: '720p',
+      } as unknown as VideoWidgetValues;
+
+      expect(recall(values)).toBeNull();
+      expect(resolveVideoSizeRecall(values, 1792, 1024)).toEqual({
+        outcome: 'invalid',
+        reason: expect.stringContaining('does not run a two-stage target resolution'),
+      });
+    });
+
+    it('writes nothing when a two-stage preset needs more steps than the panel has', () => {
+      const values = { ...ltx2Values, steps: 1, targetResolution: '720p' } as unknown as VideoWidgetValues;
+
+      expect(recall(values)).toBeNull();
+      expect(resolveVideoSizeRecall(values, 1792, 1024)).toEqual({
+        outcome: 'invalid',
+        reason: expect.stringContaining('two-stage target resolution needs at least'),
+      });
+    });
+
+    it('does not hold a reason the panel already had against the recall', () => {
+      const values = {
+        ...ltx2Values,
+        conditioningClip: audioClip,
+        steps: 0,
+        targetResolution: '1024p',
+      } as unknown as VideoWidgetValues;
+
+      expect(getVideoValidationReasons(ltx2, values)).not.toEqual([]);
+      expect(recall(values)?.fields).toEqual(['size']);
+    });
+
+    it('writes nothing when the resolution the held media need is a two-stage one the panel cannot run', () => {
+      // A 10:7 frame at 1024p: a 1024 short edge and a 1462.9 long one, snapped to 1472 on the two-stage 64-pixel
+      // grid. The other resolutions give 736x512, 992x704, 1088x768 and 2176x1536.
+      const values = { ...ltx2Values, firstFrameImage: { height: 700, image_name: 'held.png', width: 1000 }, steps: 1 };
+
+      expect(resolveVideoSizeRecall(values, 1472, 1024)).toEqual({
+        outcome: 'invalid',
+        reason: expect.stringContaining('two-stage target resolution needs at least'),
+      });
+      expect(
+        buildVideoRecallSettings({
+          currentValues: values,
+          kind: 'size',
+          metadata: wanMetadata({ height: 1024, width: 1472 }),
+          models: [ltx2],
+        })
+      ).toBeNull();
+    });
+  });
+
+  describe('a canvas the recorded media sized, settled against them once hydrated', () => {
+    const recallFirstFrame = (
+      currentValues: VideoWidgetValues,
+      record: Record<string, unknown>,
+      hydratedFrame: VideoWidgetValues['firstFrameImage']
+    ) => {
+      const result = buildVideoRecallSettings({ currentValues, kind: 'all', metadata: record, models: catalog })!;
+
+      // The pure recall restores no resolution for it: the recorded canvas lost the media's exact ratio to snapping.
+      expect(result.fields).not.toContain('size');
+
+      return settleMediaSizedRecall({ ...result, values: { ...result.values, firstFrameImage: hydratedFrame } });
+    };
+    const h3Values = { ...createDefaultVideoWidgetValues([h3Model()]), targetResolution: '768 lowres' as const };
+    // 1800x1000 at 768 highres: 1382.4x768 is over the area cap, scaled by 0.986 to 1363.1x757.3, snapped to 1376x768.
+    // Fed back, 1376x768 would give 1344x768; at 768 lowres the frame gives 768x416.
+    const h3Record = {
+      first_frame_image: { image_name: 'first.png' },
+      generation_mode: 'minimax_h3_i2v',
+      height: 768,
+      model: { key: h3Model().key },
+      width: 1376,
+    };
+    const wanValues = createDefaultVideoWidgetValues([WAN_I2V]);
+    // 1000x700 at 1080p: 1542.9x1080, snapped to 1536x1088. Fed back, 1536x1088 would give 1520x1088; 720p and 480p
+    // give the frame 1024x720 and 688x480.
+    const wanRecord = wanMetadata({
+      first_frame_image: { image_name: 'first.png' },
+      generation_mode: 'wan_i2v',
+      height: 1088,
+      model: { key: WAN_I2V.key },
+      width: 1536,
+    });
+    const frame = (width: number, height: number) => ({ height, image_name: 'first.png', width });
+
+    it.each([
+      ['an area-capped H3 canvas', h3Values, h3Record, frame(1800, 1000), '768 highres'],
+      ['a Wan 1080p canvas snapped off its short side', wanValues, wanRecord, frame(1000, 700), '1080p'],
+    ] as const)(
+      'restores the target resolution of %s from the hydrated media, leaving the aspect ratio to them',
+      (_, currentValues, record, hydratedFrame, targetResolution) => {
+        const settled = recallFirstFrame(currentValues, record, hydratedFrame);
+
+        expect(settled.values).toMatchObject({ aspectRatioId: currentValues.aspectRatioId, targetResolution });
+        expect(settled.fields).toContain('size');
+      }
+    );
+
+    it('leaves the target resolution and reports no size when the media are gone or reach the canvas nowhere', () => {
+      // 1000x700 at 480p is 688x480, a canvas that fed back would give itself: only the missing frame refuses it. A 16:9
+      // frame gives Wan 848x480, 1280x720 or 1920x1088, never 1536x1088.
+      const wan480Record = { ...wanRecord, height: 480, width: 688 };
+
+      for (const [record, hydratedFrame] of [
+        [wan480Record, null],
+        [wanRecord, frame(1280, 720)],
+      ] as const) {
+        const settled = recallFirstFrame(wanValues, record, hydratedFrame);
+
+        expect(settled.values.targetResolution).toBe(wanValues.targetResolution);
+        expect(settled.fields).not.toContain('size');
+      }
+    });
+
+    it('settles nothing for a canvas no medium sized', () => {
+      const result = buildVideoRecallSettings({
+        currentValues: wanValues,
+        kind: 'all',
+        metadata: wanMetadata({ height: 1088, model: { key: WAN_I2V.key }, width: 1536 }),
+        models: catalog,
+      })!;
+
+      expect(
+        settleMediaSizedRecall({ ...result, values: { ...result.values, firstFrameImage: frame(1000, 700) } })
+      ).toEqual({ fields: result.fields, values: { ...result.values, firstFrameImage: frame(1000, 700) } });
+    });
+  });
+
+  it('tells apart no preset from media with no usable frame on the model', () => {
+    const h3 = h3Model();
+    const h3Values = createDefaultVideoWidgetValues([h3]);
+    const narrowFrame = { height: 500, image_name: 'held.png', width: 100 };
+
+    expect(resolveVideoSizeRecall(h3Values, 1000, 1000).outcome).toBe('unavailable');
+    expect(resolveVideoSizeRecall({ ...h3Values, model: null }, 1344, 768).outcome).toBe('unavailable');
+    expect(resolveVideoSizeRecall({ ...h3Values, firstFrameImage: narrowFrame }, 1344, 768).outcome).toBe(
+      'media-unresolvable'
+    );
+  });
+
+  describe('a size more than one preset reproduces', () => {
+    const h3 = h3Model();
+    const h3Values = createDefaultVideoWidgetValues([h3]);
+    const withFrame = (width: number, height: number): VideoWidgetValues => ({
+      ...h3Values,
+      firstFrameImage: { height, image_name: 'held.png', width },
+    });
+
+    it('takes the preset that fits the held frame, not just the first match', () => {
+      const values = withFrame(1003, 1024);
+      const lowres = { aspectRatioId: '1:1', targetResolution: '768 lowres' };
+
+      expect(resolveVideoSizeRecall(values, 768, 768)).toEqual({ outcome: 'fits', sizeRecall: lowres });
+
+      const result = buildVideoRecallSettings({
+        currentValues: values,
+        kind: 'size',
+        metadata: wanMetadata({ height: 768, width: 768 }),
+        models: [h3],
+      });
+
+      expect(result?.values).toEqual({ ...values, ...lowres });
+      expect(getVideoDimensions(h3, result!.values)).toMatchObject({ height: 768, width: 768 });
+    });
+
+    it('reports the first preset when none fits the held frame', () => {
+      // 1920x1080 at 768 highres: 1365.3x768 exceeds the pixel cap, scales to 1354.6x762, snaps to 1344x768.
+      // 768 lowres would report 768x448.
+      expect(resolveVideoSizeRecall(withFrame(1920, 1080), 768, 768)).toMatchObject({
+        effective: { height: 768, width: 1344 },
+        outcome: 'media-conflict',
+      });
+    });
   });
 
   it('remix recalls everything except the seed', () => {
@@ -983,6 +1347,44 @@ describe('portable records (metadata_version 1.0.0)', () => {
     expect(aliased?.values.wanLowNoiseModel).toEqual(lowExpert);
   });
 
+  it('takes the first installed model when a portable identifier matches several', () => {
+    const twin = { ...WAN_T2V, key: 'wan-twin' };
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({ model: { base: 'wan', key: 'foreign-key', name: WAN_T2V.name, type: 'main' } }),
+      models: [WAN_T2V, twin, h3Model()],
+    });
+
+    expect(result?.fields).toContain('model');
+    expect(result?.values.model?.key).toBe(WAN_T2V.key);
+  });
+
+  it('reads a pre-identifier model record, which may omit the type', () => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({ model: { base_model: 'wan', model_name: WAN_T2V.name } }),
+      models: catalog,
+    });
+
+    expect(result?.values.model?.key).toBe(WAN_T2V.key);
+  });
+
+  it('fills a component slot only with a model of the type it holds', () => {
+    const vae = { base: 'wan', key: 'wan-vae', name: 'Wan 2.1 VAE', type: 'vae' };
+    const result = buildVideoRecallSettings({
+      currentValues: { ...createDefaultVideoWidgetValues([WAN_T2V]), vae: null },
+      kind: 'all',
+      // A typeless record whose name and base match the main model first.
+      metadata: wanMetadata({ vae: { base: 'wan', name: WAN_T2V.name } }),
+      models: [WAN_T2V, vae],
+    });
+
+    expect(result?.values.vae).toBeNull();
+    expect(result?.fields).not.toContain('components');
+  });
+
   it('does not advertise a recall for a model reference nothing can resolve', () => {
     expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', model: { name: 'only a name' } })).toEqual(
       EMPTY_VIDEO_RECALL_CAPABILITIES
@@ -1151,6 +1553,7 @@ describe('LTX-2 recall', () => {
         prompts: true,
         remix: true,
         seed: true,
+        size: true,
       });
     }
   });
@@ -1263,4 +1666,69 @@ describe('LTX-2 recall', () => {
     expect(result?.values.stgScale).toBeNull();
     expect(result?.values.modalityScale).toBeNull();
   });
+});
+
+it('reads the legacy Wan VAE slot', () => {
+  const vae = { key: 'legacy-vae', base: 'wan', name: 'Wan VAE', type: 'vae' };
+  expect(parseVideoRecallRecord({ generation_mode: 'wan_t2v', wan_vae_model: vae })?.components).toContainEqual({
+    modelType: 'vae',
+    valuesKey: 'vae',
+    ref: { key: vae.key, base: vae.base, name: vae.name, type: vae.type, hash: null },
+  });
+});
+
+describe('legacy H3 duration recall', () => {
+  const model = h3Model();
+  const currentValues = { ...createDefaultVideoWidgetValues([model]), numFrames: 175 };
+  const metadata = (duration: unknown, extra: Record<string, unknown> = {}) => ({
+    generation_mode: 'minimax_h3_t2v',
+    model: { key: model.key },
+    minimax_h3_duration_seconds: duration,
+    ...extra,
+  });
+
+  it.each([
+    [5, 124],
+    [6, 141],
+    [7, 175],
+    [8, 192],
+    [9, 209],
+    [10, 243],
+    [11, 260],
+    [12, 294],
+    [13, 311],
+    [14, 345],
+  ])('restores the emitted frame count for the legacy %is duration', (duration, expectedFrames) => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: metadata(duration),
+      models: [model],
+    });
+    expect(result?.fields).toContain('frames');
+    expect(result?.values).toMatchObject({ numFrames: expectedFrames, fps: 24 });
+  });
+
+  it('prefers an explicit frame count and keeps H3 at its fixed fps', () => {
+    const record = metadata(14, { num_frames: 260, fps: 12 });
+    const result = buildVideoRecallSettings({ currentValues, kind: 'remix', metadata: record, models: [model] });
+    expect(parseVideoRecallRecord(record)?.numFrames).toBe(260);
+    expect(result?.values).toMatchObject({ numFrames: 260, fps: 24 });
+    expect(parseVideoRecallRecord(metadata(11, { fps: 12 }))?.numFrames).toBe(260);
+  });
+
+  it.each([4, 15, 5.5, '11', null, NaN, Infinity])('ignores a malformed or unsupported duration: %s', (duration) => {
+    const record = metadata(duration);
+    const result = buildVideoRecallSettings({ currentValues, kind: 'all', metadata: record, models: [model] });
+    expect(parseVideoRecallRecord(record)?.numFrames).toBeNull();
+    expect(result?.fields).not.toContain('frames');
+    expect(result?.values.numFrames).toBe(175);
+  });
+
+  it.each([undefined, 'wan_t2v', 'sdxl_txt2img', 'minimax_h3_txt2img', 'minimax_h3_unknown'])(
+    'does not interpret duration as H3 video frames for mode %s',
+    (generation_mode) => {
+      expect(parseVideoRecallRecord(metadata(14, { generation_mode }))?.numFrames).toBeNull();
+    }
+  );
 });

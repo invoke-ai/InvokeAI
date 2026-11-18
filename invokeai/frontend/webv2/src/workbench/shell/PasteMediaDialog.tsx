@@ -1,5 +1,6 @@
 import type { GalleryImage, GalleryItem, GalleryItemKind } from '@features/gallery/contracts';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
+import type { LucideIcon } from 'lucide-react';
 
 import { Box, Flex, Image, Portal, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import {
@@ -21,13 +22,12 @@ import { Button, CloseButton } from '@platform/ui';
 import { Dialog } from '@platform/ui/Dialog';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  getGalleryCanvasImportMenuItems,
+  GALLERY_CANVAS_IMPORT_DESTINATIONS,
   useDeletionConfirmation,
   useImageActions,
   type ImageActions,
 } from '@workbench/image-actions';
-import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectId, useActiveProjectSelector, useWidgetValuesSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { FilmIcon, ImagePlusIcon, ImagesIcon } from 'lucide-react';
 import { useCallback, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -40,7 +40,6 @@ type PasteMediaChoice =
   | { kind: 'reference' };
 
 const selectGenerateValues = createGenerateFormValuesSelector();
-const CANVAS_ITEMS = getGalleryCanvasImportMenuItems(true);
 const PREVIEW_LIMIT = 6;
 
 /** Upload and follow-on actions report their own failures. */
@@ -76,10 +75,12 @@ const routePastedFiles = async (
 
 const CanvasDestinationButton = ({
   destination,
+  icon: DestinationIcon,
   label,
   onChoose,
 }: {
   destination: GalleryCanvasImportDestination;
+  icon: LucideIcon;
   label: string;
   onChoose: (destination: GalleryCanvasImportDestination) => void;
 }) => {
@@ -87,6 +88,7 @@ const CanvasDestinationButton = ({
 
   return (
     <Button justifyContent="flex-start" size="lg" variant="outline" onClick={handleClick}>
+      <DestinationIcon />
       {label}
     </Button>
   );
@@ -107,7 +109,7 @@ export const PasteMediaDialog = ({
 }) => {
   const { t } = useTranslation();
   const projectId = useActiveProjectId();
-  const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
+  const galleryValues = useWidgetValuesSelector('gallery', (values) => values);
   const generateValues = useWidgetValuesSelector('generate', selectGenerateValues);
   // The gallery's own boards query (same key, shared cache): the board the
   // person is looking at may be archived or a date bucket, which the default
@@ -284,10 +286,11 @@ export const PasteMediaDialog = ({
                           {t('shell.pasteMedia.canvasHeading')}
                         </Text>
                         <SimpleGrid aria-labelledby={canvasHeadingId} columns={2} gap="2" role="group">
-                          {CANVAS_ITEMS.map((item) => (
+                          {GALLERY_CANVAS_IMPORT_DESTINATIONS.map((item) => (
                             <CanvasDestinationButton
                               key={item.destination}
                               destination={item.destination}
+                              icon={item.icon}
                               label={t(item.label)}
                               onChoose={chooseCanvas}
                             />

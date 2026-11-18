@@ -3,6 +3,8 @@ import type { PromptTemplateCatalog } from '@features/generation/ui/usePromptTem
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { PromptTemplatesButton } from '@features/generation/ui/promptFields/PromptTemplatesButton';
+import { setPendingPromptTemplateDraft } from '@features/generation/ui/promptTemplateDraftStore';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { system } from '@theme/system';
 import i18next from 'i18next';
 import { act } from 'react';
@@ -14,12 +16,16 @@ import { userEvent } from 'vitest/browser';
 const catalog: PromptTemplateCatalog = {
   create: vi.fn(),
   defaultTemplates: [],
+  errorDetail: null,
   exportCsv: vi.fn(),
   importFile: vi.fn(),
+  isError: false,
   isLoaded: true,
   isLoading: false,
+  isRetrying: false,
   personalTemplates: [],
   remove: vi.fn(),
+  retry: vi.fn(),
   sharedTemplates: [],
   templates: [],
   update: vi.fn(),
@@ -43,6 +49,12 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
   }),
 }));
 
+// The editor's image slot is the gallery's; only which field opens the editor is under test.
+vi.mock('@features/gallery/mediaSlot', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  GalleryMediaSlot: () => null,
+}));
+
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -53,7 +65,7 @@ const applied: PromptTemplateSnapshot = {
   negativePrompt: '',
   positivePrompt: '{prompt}, cinematic',
 };
-const render = async (activeTemplate: PromptTemplateSnapshot | null) => {
+const render = async (activeTemplate: PromptTemplateSnapshot | null, { withOtherTooltip = false } = {}) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -62,6 +74,11 @@ const render = async (activeTemplate: PromptTemplateSnapshot | null) => {
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
+          {withOtherTooltip ? (
+            <Tooltip content="Other tip">
+              <button type="button">other</button>
+            </Tooltip>
+          ) : null}
           <PromptTemplatesButton activeTemplate={activeTemplate} showSyntaxHighlighting={false} onApply={vi.fn()} />
         </ChakraProvider>
       </I18nextProvider>
@@ -97,6 +114,51 @@ describe('the prompt templates button', () => {
     expect(document.querySelector('[data-scope="popover"][data-part="content"]')).not.toBeNull();
   });
 
+  it('keeps its tooltip shut while the panel is open, even when the pointer leaves and returns', async () => {
+    await render(null);
+    const trigger = host!.querySelector('button')!;
+    const openTooltip = () => document.querySelector('[data-scope="tooltip"][data-part="content"][data-state="open"]');
+
+    await userEvent.hover(trigger);
+    await expect.poll(openTooltip).not.toBeNull();
+
+    await act(async () => {
+      await userEvent.click(trigger);
+    });
+    await userEvent.unhover(trigger);
+    await userEvent.hover(trigger);
+    // Past the tooltip's 400ms open delay.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 700);
+    });
+
+    expect(document.querySelector('[data-scope="popover"][data-part="content"]')).not.toBeNull();
+    expect(openTooltip()).toBeNull();
+  });
+
+  it('keeps its tooltip shut while the panel is open when the pointer arrives from another tooltip', async () => {
+    await render(null, { withOtherTooltip: true });
+    const [other, trigger] = [...host!.querySelectorAll('button')];
+    const openTooltips = () =>
+      [...document.querySelectorAll('[data-scope="tooltip"][data-part="content"][data-state="open"]')].map(
+        (tooltip) => tooltip.textContent
+      );
+
+    await act(async () => {
+      await userEvent.click(trigger!);
+    });
+    expect(document.querySelector('[data-scope="popover"][data-part="content"]')).not.toBeNull();
+    await userEvent.hover(other!);
+    await expect.poll(openTooltips).toEqual(['Other tip']);
+
+    await userEvent.hover(trigger!);
+    // Past the tooltip's 400ms open delay.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 700);
+    });
+    expect(openTooltips()).toEqual([]);
+  });
+
   it('dims the name and says so when the applied template is gone', async () => {
     await render(applied);
 
@@ -125,6 +187,41 @@ describe('the prompt templates button', () => {
     expect(
       [...host!.querySelectorAll('span')].find((span) => span.textContent === 'widgets.generate.templatesButton')
     ).toBeUndefined();
+  });
+
+  it('leaves a template draft handed over from the gallery to the field that takes it', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    // Upscale's field (first, so it would be first to hear) shares Generate's template but leaves the handover to it.
+    await act(() => {
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <div data-testid="upscale">
+              <PromptTemplatesButton
+                activeTemplate={null}
+                showSyntaxHighlighting={false}
+                takesPendingDraft={false}
+                onApply={vi.fn()}
+              />
+            </div>
+            <div data-testid="generate">
+              <PromptTemplatesButton activeTemplate={null} showSyntaxHighlighting={false} onApply={vi.fn()} />
+            </div>
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+    });
+
+    await act(() => setPendingPromptTemplateDraft({ negativePrompt: '', positivePrompt: 'a lighthouse' }));
+
+    const triggerState = (testId: string) =>
+      host!.querySelector(`[data-testid="${testId}"] button`)?.getAttribute('aria-expanded');
+
+    expect(triggerState('upscale')).toBe('false');
+    expect(triggerState('generate')).toBe('true');
   });
 
   it('says nothing while the catalog is unread', async () => {

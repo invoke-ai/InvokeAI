@@ -9,6 +9,8 @@ import {
   getGalleryUploadAccept,
   formatGalleryVideoDuration,
   galleryImageItemToGalleryImage,
+  getGalleryItemView,
+  getGalleryViewCategories,
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   parseGalleryItemKey,
@@ -72,6 +74,28 @@ describe('gallery item keys', () => {
     expect(parseGalleryItemKey('image:')).toEqual({ kind: 'image', name: 'image:' });
     expect(parseGalleryItemKey('video:')).toEqual({ kind: 'image', name: 'video:' });
     expect(parseGalleryItemKey('bare.png')).toEqual({ kind: 'image', name: 'bare.png' });
+  });
+});
+
+describe('gallery view membership', () => {
+  // The backend's IMAGE_CATEGORIES and ASSETS_CATEGORIES; `other` (Canvas-owned pixels) is in neither listing.
+  it.each([
+    ['general', 'images'],
+    ['control', 'assets'],
+    ['mask', 'assets'],
+    ['user', 'assets'],
+    ['other', null],
+  ] as const)('lists %s images and videos in %s', (category, view) => {
+    const image = { ...galleryItem('item.png', false), category };
+    const video = { ...image, durationSeconds: 3, kind: 'video' as const };
+
+    expect(getGalleryItemView(image)).toBe(view);
+    expect(getGalleryItemView(video)).toBe(view);
+  });
+
+  it('requests exactly the categories each view lists', () => {
+    expect(getGalleryViewCategories('images')).toEqual(['general']);
+    expect(getGalleryViewCategories('assets')).toEqual(['control', 'mask', 'user']);
   });
 });
 

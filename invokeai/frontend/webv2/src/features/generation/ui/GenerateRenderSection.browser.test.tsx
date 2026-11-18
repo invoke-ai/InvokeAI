@@ -13,7 +13,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { CanvasDenoisingStrengthProps } from './GenerationUiContext';
 
@@ -32,11 +32,12 @@ vi.mock('./GenerationUiContext', () => ({
     // Stands in for the canvas's strength slot, which lays out the section around its badge and field.
     CanvasDenoisingStrength: ({ children }: CanvasDenoisingStrengthProps) =>
       children({
-        badges: <span data-testid="strength-badge">75%</span>,
+        summary: <span data-testid="strength-badge">75%</span>,
         field: <div data-testid="strength-field" />,
       }),
+    models: { getBaseLabel: (base: string) => ({ 'sd-1': 'SD 1.x', sdxl: 'SDXL' })[base] ?? base },
     project: { invocationSourceId: harness.invocationSourceId },
-    sectionPreferences: { sectionsOpen: { render: true }, setSectionOpen: vi.fn() },
+    sectionPreferences: { sectionsOpen: { render: true }, setSectionsOpen: vi.fn() },
   }),
 }));
 
@@ -73,7 +74,8 @@ void i18n.use(initReactI18next).init({
             ideogram4ColorPalette: 'Color palette',
             ideogram4GuidanceScale: 'Guidance',
             ideogram4Mu: 'Mu',
-            ideogram4MuHelp: 'Timestep shift. Higher values spend more of the schedule at high noise.',
+            ideogram4MuHelp:
+              'Timestep shift. Higher values spend more of the schedule at high noise. Set by the sampler preset unless overridden.',
             ideogram4PresetDerived: 'Set by the sampler preset unless overridden.',
             ideogram4SamplerPreset: 'Sampler preset',
             ideogram4Steps: 'Steps',
@@ -95,7 +97,6 @@ void i18n.use(initReactI18next).init({
             seedVarianceHelp: 'Perturbs conditioning so nearby seeds diverge more.',
             seedVarianceRandomize: 'Randomized channels',
             seedVarianceStrength: 'Variance strength',
-            override: 'Override',
             timestepShift: 'Shift',
             qwenImageShiftHelp: 'Auto derives the schedule shift from the image size; Lightning LoRAs expect 3.',
             timestepShiftHelp: 'Auto derives the schedule shift from the image size.',
@@ -103,6 +104,14 @@ void i18n.use(initReactI18next).init({
             render: 'Render',
             resetToDefault: 'Reset to default',
             scheduler: 'Scheduler',
+            sectionMenu: {
+              resetStepsAndGuidance: 'Reset steps and {{guidance}} to model defaults',
+              resetStepsAndGuidanceBase: 'Reset steps and {{guidance}} to {{base}} defaults',
+              resetStepsGuidanceAndScheduler: 'Reset steps, {{guidance}} and scheduler to model defaults',
+              resetStepsGuidanceAndSchedulerBase: 'Reset steps, {{guidance}} and scheduler to {{base}} defaults',
+              resetStepsGuidanceAndSchedulerMixed:
+                'Reset steps, {{guidance}} and scheduler to model and {{base}} defaults',
+            },
             seedSummary: '{{mode}} · {{seed}}',
             steps: 'Steps',
             useSeed: 'Use seed {{seed}}',
@@ -462,6 +471,14 @@ describe('GenerateRenderSection guidance field', () => {
       ['2', '100'],
     ]);
     expect(ranges('Mu')).toEqual([['-4', '4']]);
+
+    // Off hands Mu to the sampler preset, and its description says so.
+    const muInput = [...(host?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])].find(
+      (input) => document.getElementById(input.getAttribute('aria-labelledby') ?? '')?.textContent === 'Mu'
+    );
+    expect(document.getElementById(muInput?.getAttribute('aria-describedby') ?? '')?.textContent).toContain(
+      'Set by the sampler preset unless overridden.'
+    );
   });
 
   it('names the broken bound on the field, not only in the Invoke button tooltip', async () => {
@@ -535,7 +552,7 @@ describe('GenerateRenderSection model-family tuning', () => {
 
   it('offers the shift override to Z-Image and Qwen Image, and seed variance to Z-Image only', async () => {
     const onCommit = await render(zImageModel);
-    const override = switchNamed('Override');
+    const override = switchNamed('Shift');
 
     expect(override).not.toBeNull();
     expect(slidersNamed('Shift')).toHaveLength(0);
@@ -549,18 +566,34 @@ describe('GenerateRenderSection model-family tuning', () => {
     const onOverriddenCommit = await render(zImageModel, { zImageShift: 2.5 });
     expect(slidersNamed('Shift')[0]?.getAttribute('aria-valuenow')).toBe('2.5');
     // Turning the override off hands the shift back to the node, rather than leaving the last value in place.
-    await settle(() => switchNamed('Override')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    await settle(() => switchNamed('Shift')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
     expect(onOverriddenCommit).toHaveBeenCalledWith({ zImageShift: null });
 
     await settle(() => root?.unmount());
     const onQwenCommit = await render(qwenImageModel);
     expect(switchNamed('Seed variance')).toBeNull();
-    await settle(() => switchNamed('Override')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    await settle(() => switchNamed('Shift')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
     expect(onQwenCommit).toHaveBeenCalledWith({ qwenImageShift: 3 });
 
     await settle(() => root?.unmount());
     await render(sd1Model);
-    expect(switchNamed('Override')).toBeNull();
+    expect(switchNamed('Shift')).toBeNull();
+  });
+
+  it('toggles the shift override from its label without handing focus to the slider it pairs with', async () => {
+    const onCommit = await render(zImageModel, { zImageShift: 2.5 }, true);
+    const label = () => switchNamed('Shift')?.querySelector<HTMLElement>('[data-part="label"]');
+    const shiftInput = host?.querySelector<HTMLInputElement>('input[aria-label="Shift"]');
+
+    expect(shiftInput).not.toBeNull();
+    await act(() => userEvent.click(label()!));
+
+    expect(onCommit).toHaveBeenCalledWith({ zImageShift: null });
+    expect(document.activeElement).not.toBe(shiftInput);
+    expect(slidersNamed('Shift')).toHaveLength(0);
+
+    await act(() => userEvent.click(label()!));
+    expect(onCommit).toHaveBeenLastCalledWith({ zImageShift: 3 });
   });
 
   it('keeps the shift override while a typed value passes outside its bounds', async () => {
@@ -721,5 +754,87 @@ describe('GenerateRenderSection model-family tuning', () => {
 
     expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceStrength: expect.closeTo(0.15) });
     expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceRandomizePercent: 51 });
+  });
+});
+
+describe('GenerateRenderSection title defaults', () => {
+  // Scheduler visibility comes from the architecture capabilities.
+  seedArchitectureCapabilities();
+
+  const title = () => host!.querySelector<HTMLElement>('.generate-section > [data-part="trigger"]')!;
+  const isMarked = () => title().querySelector('[data-section-changed]') !== null;
+  const otherScheduler = (model: GenerateModelConfig) =>
+    getDefaultGenerateSettings(model).scheduler === 'ddim' ? 'euler' : 'ddim';
+  const openMenu = () =>
+    act(() => {
+      title().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+
+  it('marks steps, CFG and scheduler off the model defaults, and resets those three only', async () => {
+    const defaults = getDefaultGenerateSettings(sd1Model);
+    const onCommit = await render(sd1Model, { scheduler: otherScheduler(sd1Model), seed: 42, seedMode: 'fixed' }, true);
+
+    expect(host?.textContent).toContain('Scheduler');
+    expect(isMarked()).toBe(true);
+    await openMenu();
+    await act(() =>
+      userEvent.click(page.getByRole('menuitem', { name: 'Reset steps, CFG and scheduler to SD 1.x defaults' }))
+    );
+
+    expect(onCommit).toHaveBeenLastCalledWith({
+      cfgScale: defaults.cfgScale,
+      scheduler: defaults.scheduler,
+      steps: defaults.steps,
+    });
+    expect(draftStore?.getSnapshot()).toMatchObject({ seed: 42, seedMode: 'fixed' });
+    expect(isMarked()).toBe(false);
+  });
+
+  it('leaves a hidden scheduler out of the mark and the reset', async () => {
+    const defaults = getDefaultGenerateSettings(qwenImageModel);
+    const onCommit = await render(qwenImageModel, { scheduler: otherScheduler(qwenImageModel) }, true);
+
+    expect(isMarked()).toBe(false);
+
+    await settle(() => draftStore?.patchSnapshot({ steps: defaults.steps + 4 }));
+    expect(isMarked()).toBe(true);
+    await openMenu();
+    await act(() =>
+      userEvent.click(page.getByRole('menuitem', { name: 'Reset steps and CFG to qwen-image defaults' }))
+    );
+
+    expect(onCommit).toHaveBeenLastCalledWith({ cfgScale: defaults.cfgScale, steps: defaults.steps });
+  });
+
+  it('names the guidance field as the model labels it', async () => {
+    const defaults = getDefaultGenerateSettings(fluxDevModel);
+    const onCommit = await render(fluxDevModel, { steps: defaults.steps + 4 }, true);
+
+    await openMenu();
+    const reset = page.getByRole('menuitem', { name: /^Reset steps.* to flux defaults$/ });
+
+    expect(reset.element().textContent).toContain('Guidance');
+    expect(reset.element().textContent).not.toContain('CFG');
+    await act(() => userEvent.click(reset));
+
+    expect(onCommit).toHaveBeenLastCalledWith(expect.objectContaining({ steps: defaults.steps }));
+  });
+
+  it.each([
+    [{ steps: 20 }, 'Reset steps, CFG and scheduler to model and SD 1.x defaults'],
+    [{ cfg_scale: 5, scheduler: 'ddim', steps: 20 }, 'Reset steps, CFG and scheduler to model defaults'],
+  ])('names where the reset takes its values from when the model sets %o', async (defaultSettings, label) => {
+    const model: MainModelConfig = { ...sd1Model, default_settings: defaultSettings };
+    const onCommit = await render(model, { steps: 33 }, true);
+
+    await openMenu();
+    await act(() => userEvent.click(page.getByRole('menuitem', { name: label })));
+
+    // The values are what they were: the model's where it sets them, the base's otherwise.
+    expect(onCommit).toHaveBeenLastCalledWith({
+      cfgScale: getDefaultGenerateSettings(model).cfgScale,
+      scheduler: getDefaultGenerateSettings(model).scheduler,
+      steps: 20,
+    });
   });
 });

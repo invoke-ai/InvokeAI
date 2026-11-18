@@ -1,3 +1,5 @@
+import type { components } from '@api/schema';
+
 /**
  * Mirror snake_case backend model contracts with open unions so unknown architectures display generic labels
  * without a frontend release.
@@ -13,6 +15,7 @@ export type ModelBase =
   | 'sdxl-refiner'
   | 'flux'
   | 'flux2'
+  | 'flux3'
   | 'cogview4'
   | 'ernie-image'
   | 'qwen-image'
@@ -48,6 +51,7 @@ export type ModelTaxonomyType =
   | 'qwen3_encoder'
   | 'qwen_vl_encoder'
   | 'qwen3_vl_encoder'
+  | 'qwen3_vl_vision_tower'
   | 'qwen3_5_encoder'
   | 'wan_t5_encoder'
   | 'mistral_encoder'
@@ -178,7 +182,6 @@ export interface ModelConfig {
   format: ModelFileFormat;
   variant?: string | null;
   prediction_type?: PredictionType | null;
-  upcast_attention?: boolean;
   config_path?: string | null;
   cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;
@@ -212,7 +215,6 @@ export interface ModelRecordChanges {
   format?: ModelFileFormat;
   variant?: string | null;
   prediction_type?: PredictionType | null;
-  upcast_attention?: boolean;
   config_path?: string | null;
   cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;
@@ -305,6 +307,9 @@ export interface StarterModel {
   is_installed: boolean;
   dependencies?: Omit<StarterModel, 'dependencies'>[] | null;
   previous_names?: string[];
+  /** Other bases this model also serves, e.g. a preview decoder's bases sharing its latent space. */
+  compatible_bases?: ModelBase[];
+  previous_sources?: string[];
 }
 
 export interface StarterModelBundle {
@@ -336,6 +341,8 @@ export interface BulkReidentifyModelsResponse {
   succeeded: string[];
   failed: { key: string; error: string }[];
 }
+
+export type EmptyModelCacheResponse = components['schemas']['EmptyModelCacheResponse'];
 
 export interface DeleteOrphanedModelsResponse {
   deleted: string[];

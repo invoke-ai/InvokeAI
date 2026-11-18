@@ -40,6 +40,7 @@ describe('DonationMenuItem', () => {
     host.remove();
   });
 
+  // The app menu's usage: the link leads its own group.
   const render = () =>
     act(() =>
       root.render(
@@ -50,7 +51,7 @@ describe('DonationMenuItem', () => {
                 <Menu.Trigger>Open menu</Menu.Trigger>
                 <Menu.Positioner>
                   <Menu.Content>
-                    <DonationMenuItem />
+                    <DonationMenuItem separated />
                     <Menu.Item value="other">Other action</Menu.Item>
                   </Menu.Content>
                 </Menu.Positioner>
@@ -70,6 +71,7 @@ describe('DonationMenuItem', () => {
     await expect.element(link).toHaveAttribute('href', 'https://github.com/sponsors/invoke-ai');
     await expect.element(link).toHaveAttribute('target', '_blank');
     await expect.element(link).toHaveAttribute('rel', 'noreferrer');
+    expect(link.element().previousElementSibling?.getAttribute('role')).toBe('separator');
     await userEvent.keyboard('{Home}');
     await expect.element(page.getByRole('menu')).toHaveAttribute('aria-activedescendant', link.element().id);
     await expect.element(link).toHaveAttribute('data-highlighted');
@@ -96,6 +98,8 @@ describe('DonationMenuItem', () => {
         );
       }
       expect(document.querySelector('a[href="https://github.com/sponsors/invoke-ai"]')).toBeNull();
+      // A hidden link takes its separator with it, or the menu would show two in a row.
+      expect(document.querySelector('[role="separator"]')).toBeNull();
     }
   );
 });

@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 
 import { Tag } from '@chakra-ui/react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 
-import { Tooltip } from './Tooltip';
+import { ClippedTooltip, Tooltip } from './Tooltip';
 
 export interface RemovableTagProps {
   children: ReactNode;
@@ -16,20 +16,19 @@ export interface RemovableTagProps {
 /** A compact chip for an applied filter or value, with an icon-only remove control. */
 export const RemovableTag = ({ children, disabled, onRemove, removeLabel }: RemovableTagProps) => {
   const labelRef = useRef<HTMLSpanElement | null>(null);
-  const [isLabelTipOpen, setIsLabelTipOpen] = useState(false);
   // Only a truncated label needs its full text on hover.
-  const handleLabelTipChange = useCallback(({ open }: { open: boolean }) => {
+  const isLabelTruncated = useCallback(() => {
     const label = labelRef.current;
-    setIsLabelTipOpen(open && label !== null && label.scrollWidth > label.clientWidth);
+    return label !== null && label.scrollWidth > label.clientWidth;
   }, []);
 
   return (
     <Tag.Root flexShrink={0} maxW="full" minW="0" variant="surface">
-      <Tooltip content={children} open={isLabelTipOpen} onOpenChange={handleLabelTipChange}>
+      <ClippedTooltip content={children} isClipped={isLabelTruncated}>
         <Tag.Label ref={labelRef} truncate>
           {children}
         </Tag.Label>
-      </Tooltip>
+      </ClippedTooltip>
       <Tag.EndElement>
         <Tooltip content={removeLabel}>
           <Tag.CloseTrigger aria-label={removeLabel} disabled={disabled} onClick={onRemove} />

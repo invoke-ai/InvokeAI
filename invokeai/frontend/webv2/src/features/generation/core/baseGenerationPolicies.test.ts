@@ -6,10 +6,12 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
+import i18n from 'i18next';
 import { describe, expect, it } from 'vitest';
 
 import type {
   ComponentModelConfig,
+  GenerateReferenceImage,
   GenerateModelConfig,
   GenerateSettings,
   LoraModelConfig,
@@ -19,27 +21,44 @@ import type {
 
 import {
   coerceSchedulerForGraph,
+  getComponentPolicyContext,
   getComponentSectionPolicy,
   getAutoFlux2ComponentSourceModel,
   getDefaultGenerateSettings,
   getGenerateModelSelectionResult,
   getGenerationDimensions,
+  getGenerateInvocationIssues,
+  getGenerationModelAvailabilityIssues,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
+  getGenerationValidationIssues,
   getGenerationValidationReasons,
+  getImageExpandPromptSuggestion,
+  getCompatibleReferenceImages,
   getKrea2EditLoraState,
   getMaxReferenceImages,
-  getMissingReferenceImageFormat,
+  getReferenceImageUnavailableReason,
   getPromptPolicy,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
   isReferenceImageSupported,
+  isComponentCompatibleWithModel,
   isGenerateModelSelectable,
+  isLossyModelSwitch,
+  isModelFromRepo,
+  isSuggestedExpandPromptModel,
   isSupportedGenerateModel,
-  QWEN_IMAGE_21_STANDALONE_ENCODER_REASON,
+  QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON,
+  QWEN_IMAGE_21_NO_VISION_TOWER_REASON,
   withAddedReferenceImages,
 } from './baseGenerationPolicies';
+import { describeGenerationIssue, type GenerationIssue, getGenerationIssueFixPatch } from './generationIssues';
+import { collectGenerationIssueScenarios } from './generationIssues.testing';
+import { getActiveRefiner } from './sdxlRefiner';
 import { SUPPORTED_GENERATE_BASES } from './supportedBases';
+import { GENERATE_MODEL_SWITCH_SUBJECTS } from './switchSubjects.testing';
 
 const createModel = (base: string, overrides: Partial<MainModelConfig> = {}): MainModelConfig => ({
   base,
@@ -96,6 +115,7 @@ const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name
 const sdxlVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
 const sd1Lora: LoraModelConfig = { base: 'sd-1', key: 'sd1-lora', name: 'SD 1 LoRA', type: 'lora' };
 const sdxlLora: LoraModelConfig = { base: 'sdxl', key: 'sdxl-lora', name: 'SDXL LoRA', type: 'lora' };
+const fluxLora: LoraModelConfig = { base: 'flux', key: 'flux-lora', name: 'FLUX LoRA', type: 'lora' };
 const sd1IpAdapter: ComponentModelConfig = {
   base: 'sd-1',
   key: 'sd1-ip-adapter',
@@ -192,6 +212,149 @@ describe('architecture policy, read from the backend capability table', () => {
       'lcm',
     ]);
     expect(coerceSchedulerForGraph(zbase, 'lcm')).toBe('euler');
+  });
+
+  it('suggests the FLUX.3 prompt upsampler to Expand Prompt, whichever build is installed', () => {
+    const suggestion = getImageExpandPromptSuggestion(createModel('flux3'));
+
+    expect(suggestion).toMatchObject({
+      image: null,
+      imageSystemPromptId: null,
+      modelName: 'FLUX.3 Prompt Upsampler',
+      systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0012',
+    });
+    const isSuggested = (source: string) => isSuggestedExpandPromptModel(source, suggestion!);
+    const comfyFile = 'qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors';
+    const comfyRepo = 'https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve';
+
+    // The bf16 folder: its repo, or a local copy of it.
+    expect(isSuggested('black-forest-labs/flux-3-image-klein-pup')).toBe(true);
+    expect(isSuggested('/models/flux-3-image-klein-pup')).toBe(true);
+    // ComfyUI's int8 file: the pinned starter URL, or an in-place install of the downloaded file.
+    expect(isSuggested(`${comfyRepo}/feef60b0/text_encoders/${comfyFile}`)).toBe(true);
+    expect(isSuggested(`/models/${comfyFile}`)).toBe(true);
+    // An in-place install on Windows records a backslash path.
+    expect(isSuggested(`D:\\models\\${comfyFile}`)).toBe(true);
+    expect(isSuggested(`/models/${comfyFile.toUpperCase()}`)).toBe(true);
+    // ComfyUI's bf16 file is the same model.
+    expect(isSuggested(`${comfyRepo}/feef60b0/text_encoders/qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors`)).toBe(
+      true
+    );
+    expect(isSuggested(`D:\\models\\qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors`)).toBe(true);
+    // Other files of the same repositories are not the upsampler.
+    expect(isSuggested('black-forest-labs/flux-3-image-klein-comfy')).toBe(false);
+    expect(isSuggested(`${comfyRepo}/feef60b0/text_encoders/qwen3_vl_4b.safetensors`)).toBe(false);
+    expect(isSuggested('google/gemma-4-E4B-it')).toBe(false);
+    // MOSS-Image keeps matching by repository alone.
+    const moss = getImageExpandPromptSuggestion(createModel('moss-image'))!;
+
+    expect(isSuggestedExpandPromptModel('google/gemma-4-E4B-it', moss)).toBe(true);
+    expect(isSuggestedExpandPromptModel(`/models/${comfyFile}`, moss)).toBe(false);
+  });
+
+  describe('the FLUX.3 prompt upsampler component', () => {
+    const klein = createModel('flux3', { format: 'diffusers', variant: 'flux3_klein' });
+    const llm = (overrides: Record<string, unknown> = {}) => ({
+      base: 'any',
+      key: 'pup',
+      name: 'FLUX.3 Prompt Upsampler',
+      supports_images: true,
+      type: 'text_llm',
+      ...overrides,
+    });
+    const slotFor = (settings: GenerateSettings) =>
+      getComponentSectionPolicy(klein, settings).slots.find((slot) => slot.key === 'flux3PromptUpsamplerModel');
+    const issues = (settings: GenerateSettings) =>
+      getGenerationValidationIssues(klein, settings).filter(
+        (issue) => issue.target.field === 'flux3PromptUpsamplerModel'
+      );
+    const notInstalled = (settings: GenerateSettings, installed: readonly unknown[]) =>
+      getGenerationModelAvailabilityIssues(klein, settings, installed as never).filter(
+        (issue) => issue.id === 'components:notInstalled:flux3PromptUpsamplerModel'
+      );
+
+    it('always has a slot, required once the switch is on, and then only for a model that reads images', () => {
+      const off = createSettings(klein);
+
+      expect(slotFor(off)?.required?.(getComponentPolicyContext(klein, off))).toBe(false);
+      expect(issues(off)).toEqual([]);
+
+      const on = createSettings(klein, { flux3PromptUpsamplerEnabled: true });
+
+      expect(slotFor(on)?.required?.(getComponentPolicyContext(klein, on))).toBe(true);
+      expect(issues(on)).toEqual([
+        expect.objectContaining({
+          message: 'Generate needs a Prompt Upsampler model while Prompt upsampler is on.',
+          target: { field: 'flux3PromptUpsamplerModel', section: 'components' },
+        }),
+      ]);
+      expect(issues({ ...on, flux3PromptUpsamplerModel: llm() })).toEqual([]);
+      // A text-only LLM cannot read the reference images, so it does not satisfy the slot.
+      expect(issues({ ...on, flux3PromptUpsamplerModel: llm({ supports_images: false }) })).toHaveLength(1);
+      expect(issues({ ...on, flux3PromptUpsamplerModel: llm({ type: 'llava_onevision' }) })).toHaveLength(1);
+      // Off, the pick is kept but nothing is required of it.
+      expect(issues({ ...on, flux3PromptUpsamplerEnabled: false })).toEqual([]);
+    });
+
+    it('asks for an uninstalled pick only while the switch is on', () => {
+      const on = createSettings(klein, { flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: llm() });
+
+      expect(notInstalled(on, [klein])).toEqual([
+        expect.objectContaining({
+          fix: { key: 'flux3PromptUpsamplerModel', kind: 'clearModel' },
+          id: 'components:notInstalled:flux3PromptUpsamplerModel',
+          message: 'Prompt upsampler "FLUX.3 Prompt Upsampler" is not installed. Choose another, or clear it.',
+          target: { section: 'components' },
+        }),
+      ]);
+      expect(notInstalled(on, [klein, llm()])).toEqual([]);
+      // Off, nothing loads the pick, so it may stay uninstalled; turning the switch on asks for it again.
+      expect(notInstalled({ ...on, flux3PromptUpsamplerEnabled: false }, [klein])).toEqual([]);
+    });
+
+    it('lists only Text LLMs that read images', () => {
+      const on = createSettings(klein, { flux3PromptUpsamplerEnabled: true });
+      const slot = slotFor(on)!;
+      const ctx = getComponentPolicyContext(klein, on);
+
+      expect(slot.modelTypes).toEqual(['text_llm']);
+      expect(slot.filter?.(llm() as never, ctx)).toBe(true);
+      expect(slot.filter?.(llm({ supports_images: false }) as never, ctx)).toBe(false);
+      expect(slot.filter?.(llm({ supports_images: undefined }) as never, ctx)).toBe(false);
+    });
+
+    it('follows the standard component handling on a model switch, while the switch itself stays', () => {
+      const settings = createSettings(klein, {
+        flux3PromptUpsamplerEnabled: true,
+        flux3PromptUpsamplerModel: llm(),
+      });
+      const flux = createModel('flux');
+      const away = getGenerateModelSelectionResult({ currentValues: settings, model: flux, models: [] });
+
+      // A family without the slot clears the pick and reports it, like any other component, so a pick that is no
+      // longer installed cannot block another family.
+      expect(away.settings).toMatchObject({ flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: null });
+      expect(away.changes).toContainEqual({ kind: 'removed', subject: 'flux3PromptUpsamplerModel' });
+      // Within FLUX.3 the pick stays, with the switch off too.
+      const off = { ...settings, flux3PromptUpsamplerEnabled: false };
+
+      expect(
+        getGenerateModelSelectionResult({ currentValues: off, model: klein, models: [] }).settings
+          .flux3PromptUpsamplerModel
+      ).toEqual(llm());
+    });
+  });
+
+  it('suggests the MOSS-Image prompt enhancer to Expand Prompt and nothing for other image bases', () => {
+    expect(getImageExpandPromptSuggestion(createModel('moss-image'))).toEqual({
+      image: null,
+      imageSystemPromptId: null,
+      modelName: 'Gemma 4 E4B (Prompt Enhancer)',
+      modelSource: 'google/gemma-4-E4B-it',
+      systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011',
+    });
+    expect(getImageExpandPromptSuggestion(createModel('flux'))).toBeNull();
+    expect(getImageExpandPromptSuggestion(undefined)).toBeNull();
   });
 
   it('matches expected prompt policy per base', () => {
@@ -405,16 +568,38 @@ describe('component policies', () => {
     });
 
     expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
-      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.',
-      'Generate needs a VAE for non-Diffusers FLUX.2 models.',
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+      'Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
     ]);
     expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: source }))).toEqual([]);
     expect(
       getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: incompatibleSource }))
-    ).toEqual(['Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.']);
+    ).toEqual([
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+    ]);
     expect(
       getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3Encoder, vae: flux2Vae }))
     ).toEqual([]);
+  });
+
+  it('names the Qwen3 size a FLUX.2 Klein model needs, and none when its size is unknown', () => {
+    const missingEncoder = (variant: string | undefined, overrides: Partial<GenerateSettings> = {}) => {
+      const model = createModel('flux2', { format: 'gguf_quantized', variant });
+
+      return getGenerationValidationReasons(model, createSettings(model, { vae: flux2Vae, ...overrides }));
+    };
+    const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', variant: 'qwen3_4b' };
+
+    // A Klein 9B with only the 4B encoder installed learns which one to get.
+    expect(missingEncoder('klein_9b', { qwen3EncoderModel: qwen3_4b })).toEqual([
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+    ]);
+    expect(missingEncoder('klein_4b_base')).toEqual([
+      'Generate needs a Qwen3 4B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+    ]);
+    expect(missingEncoder(undefined)).toEqual([
+      'Generate needs a Qwen3 Encoder or a FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+    ]);
   });
 
   it('validates FLUX.2 [dev] Mistral and VAE requirements and allows bundled alternatives', () => {
@@ -427,12 +612,12 @@ describe('component policies', () => {
     });
 
     expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
-      'Generate needs a Mistral Encoder for non-Diffusers FLUX.2 [dev] models.',
-      'Generate needs a VAE for non-Diffusers FLUX.2 models.',
+      'Generate needs a Mistral Encoder or a FLUX.2 [dev] Diffusers pipeline for this FLUX.2 [dev] model.',
+      'Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers pipeline for this FLUX.2 [dev] model.',
     ]);
     expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: source }))).toEqual([]);
     expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: kleinSource }))).toEqual(
-      ['Generate needs a Mistral Encoder for non-Diffusers FLUX.2 [dev] models.']
+      ['Generate needs a Mistral Encoder or a FLUX.2 [dev] Diffusers pipeline for this FLUX.2 [dev] model.']
     );
     expect(
       getGenerationValidationReasons(
@@ -446,6 +631,67 @@ describe('component policies', () => {
       'pidDecoderModel',
       'gemma2EncoderModel',
     ]);
+  });
+
+  describe('FLUX.2 [dev] component sources', () => {
+    // `flux2_dev_model_loader` reads components only from Diffusers installs, unlike the Klein loader.
+    const model = createModel('flux2', { format: 'gguf_quantized', variant: 'dev' });
+    const completePipeline = { text_encoder: {}, tokenizer: {}, transformer: {}, vae: {} };
+    const sdnqKlein = createModel('flux2', {
+      format: 'sdnq_quantized',
+      key: 'flux2-klein-sdnq',
+      submodels: completePipeline,
+      variant: 'klein_9b',
+    });
+    const diffusersKlein = createModel('flux2', {
+      format: 'diffusers',
+      key: 'flux2-klein-diffusers',
+      variant: 'klein_9b',
+    });
+    const mistralMissing =
+      'Generate needs a Mistral Encoder or a FLUX.2 [dev] Diffusers pipeline for this FLUX.2 [dev] model.';
+    const vaeMissing = 'Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers pipeline for this FLUX.2 [dev] model.';
+    const selectDev = (currentValues: GenerateSettings, models: MainModelConfig[]) =>
+      getGenerateModelSelectionResult({ currentValues, model, models }).settings;
+
+    it('picks no SDNQ pipeline and names the VAE to install instead', () => {
+      const settings = selectDev(createSettings(model, { mistralEncoderModel: mistralEncoder }), [sdnqKlein]);
+
+      expect(settings.componentSourceModel).toBeNull();
+      expect(getGenerationValidationReasons(model, settings)).toEqual([vaeMissing]);
+    });
+
+    it('takes the VAE from a Diffusers Klein pipeline next to a standalone Mistral encoder', () => {
+      const settings = selectDev(createSettings(model, { mistralEncoderModel: mistralEncoder }), [
+        sdnqKlein,
+        diffusersKlein,
+      ]);
+
+      expect(settings.componentSourceModel).toBe(diffusersKlein);
+      expect(getGenerationValidationReasons(model, settings)).toEqual([]);
+    });
+
+    it('drops a saved or recalled SDNQ pipeline source', () => {
+      const settings = createSettings(model, { componentSourceModel: sdnqKlein, mistralEncoderModel: mistralEncoder });
+
+      expect(isComponentCompatibleWithModel(model, settings, 'componentSourceModel', sdnqKlein)).toBe(false);
+      expect(getGenerationValidationReasons(model, settings)).toEqual([vaeMissing]);
+      expect(selectDev(settings, [sdnqKlein]).componentSourceModel).toBeNull();
+    });
+
+    it('does not count a self-contained SDNQ [dev] main as bundled', () => {
+      const sdnqDev = createModel('flux2', { format: 'sdnq_quantized', submodels: completePipeline, variant: 'dev' });
+      const settings = createSettings(sdnqDev);
+
+      expect(getComponentSectionPolicy(sdnqDev, settings).defaultOpen).toBe(true);
+      expect(getGenerationValidationReasons(sdnqDev, settings)).toEqual([mistralMissing, vaeMissing]);
+      expect(
+        getGenerationValidationReasons(
+          sdnqDev,
+          createSettings(sdnqDev, { mistralEncoderModel: mistralEncoder, vae: flux2Vae })
+        )
+      ).toEqual([]);
+    });
   });
 
   it('keeps FLUX.2 component source hidden and auto-selects installed Diffusers sources', () => {
@@ -509,6 +755,63 @@ describe('component policies', () => {
     ).toEqual([]);
   });
 
+  describe('Qwen Image Edit with a GGUF Qwen VL Encoder', () => {
+    const model = createModel('qwen-image', { format: 'gguf_quantized', variant: 'edit' });
+    const ggufEncoder: ComponentModelConfig = {
+      ...qwenVlEncoder,
+      format: 'gguf_quantized',
+      key: 'qwen-vl-gguf',
+      name: 'Qwen VL Q4_K_M',
+    };
+    const reference = (id: string, isEnabled = true) => ({
+      config: { image: referenceImage, type: 'qwen_image_reference_image' as const },
+      id,
+      isEnabled,
+    });
+    const reasonsFor = (overrides: Partial<GenerateSettings>) =>
+      getGenerationValidationReasons(
+        model,
+        createSettings(model, { qwenVLEncoderModel: ggufEncoder, vae: qwenImageVae, ...overrides })
+      );
+
+    it('blocks Invoke once with the reason when reference images are on', () => {
+      expect(reasonsFor({ referenceImages: [reference('a'), reference('b')] })).toEqual([
+        'Qwen VL Encoder "Qwen VL Q4_K_M" is a GGUF build with no vision tower, so it cannot read reference images. ' +
+          'Select a safetensors or Diffusers Qwen VL Encoder, or turn the reference images off.',
+      ]);
+    });
+
+    it('leaves a text-to-image model to the reason that it takes no reference images', () => {
+      // The encoder is not what blocks this graph, so naming it would send the user after the wrong fix.
+      const generateModel = createModel('qwen-image', { format: 'gguf_quantized' });
+
+      expect(
+        getGenerationValidationReasons(
+          generateModel,
+          createSettings(generateModel, {
+            qwenVLEncoderModel: ggufEncoder,
+            referenceImages: [reference('a')],
+            vae: qwenImageVae,
+          })
+        )
+      ).toEqual(['qwen-image model cannot use Reference image 1. Turn it off, or remove it.']);
+    });
+
+    it('allows text-only prompts, which is what the GGUF encoder is for', () => {
+      expect(reasonsFor({ referenceImages: [] })).toEqual([]);
+      expect(reasonsFor({ referenceImages: [reference('a', false)] })).toEqual([]);
+    });
+
+    it('allows reference images with an encoder that carries the vision tower', () => {
+      expect(
+        reasonsFor({
+          qwenVLEncoderModel: { ...qwenVlEncoder, format: 'checkpoint' },
+          referenceImages: [reference('a')],
+        })
+      ).toEqual([]);
+    });
+  });
+
   describe('Z-Image Qwen3 encoder', () => {
     const model = createModel('z-image', { format: 'checkpoint' });
     const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', name: 'Qwen3 4B', variant: 'qwen3_4b' };
@@ -559,7 +862,7 @@ describe('component policies', () => {
       });
 
       expect(result.settings.qwen3EncoderModel).toBeNull();
-      expect(result.clearedLabels).toContain('Qwen3 Encoder');
+      expect(result.changes.map(({ subject }) => subject)).toContain('qwen3EncoderModel');
     });
   });
 
@@ -574,6 +877,47 @@ describe('component policies', () => {
 
     expect(clipFilter?.(clipEmbed as GenerateModelConfig, ctx)).toBe(true);
     expect(clipFilter?.(clipG as GenerateModelConfig, ctx)).toBe(false);
+  });
+
+  it('requires all four SD3 components for a GGUF transformer and none for a Diffusers pipeline', () => {
+    const gguf = createModel('sd-3', { format: 'gguf_quantized' });
+    const diffusers = createModel('sd-3', { format: 'diffusers' });
+    const clipG = { ...clipEmbed, key: 'clip-g', variant: 'gigantic' };
+    const sd3Vae: VaeModelConfig = { base: 'sd-3', key: 'sd3-vae', name: 'SD3 VAE', type: 'vae' };
+
+    expect(getGenerationValidationReasons(gguf, createSettings(gguf))).toEqual([
+      'Generate needs a T5 Encoder for non-Diffusers SD3 models.',
+      'Generate needs a CLIP L encoder for non-Diffusers SD3 models.',
+      'Generate needs a CLIP G encoder for non-Diffusers SD3 models.',
+      'Generate needs a VAE for non-Diffusers SD3 models.',
+    ]);
+    // What the pickers would not offer -- CLIP-G in the CLIP-L slot, a FLUX.1 VAE -- does not fill a slot either.
+    expect(
+      getGenerationValidationReasons(
+        gguf,
+        createSettings(gguf, {
+          clipGEmbedModel: clipG,
+          clipLEmbedModel: clipG,
+          t5EncoderModel: t5Encoder,
+          vae: fluxVae,
+        })
+      )
+    ).toEqual([
+      'Generate needs a CLIP L encoder for non-Diffusers SD3 models.',
+      'Generate needs a VAE for non-Diffusers SD3 models.',
+    ]);
+    expect(
+      getGenerationValidationReasons(
+        gguf,
+        createSettings(gguf, {
+          clipGEmbedModel: clipG,
+          clipLEmbedModel: clipEmbed,
+          t5EncoderModel: t5Encoder,
+          vae: sd3Vae,
+        })
+      )
+    ).toEqual([]);
+    expect(getGenerationValidationReasons(diffusers, createSettings(diffusers))).toEqual([]);
   });
 
   it('offers complete SDNQ Z-Image pipelines as component sources but rejects partial folders', () => {
@@ -614,13 +958,13 @@ describe('component policies', () => {
     const model = createModel('flux2');
 
     expect(getGenerationValidationReasons(model, createSettings(model, { width: 0 }))).toContain(
-      'Generate width must be between 64 and 4096.'
+      'Width must be between 64 and 4096.'
     );
     expect(getGenerationValidationReasons(model, createSettings(model, { height: 4104 }))).toContain(
-      'Generate height must be between 64 and 4096.'
+      'Height must be between 64 and 4096.'
     );
     expect(getGenerationValidationReasons(model, createSettings(model, { height: 888 }))).toContain(
-      'Generate height must be a multiple of 16.'
+      'Height must be a multiple of 16.'
     );
   });
 
@@ -672,7 +1016,7 @@ describe('component policies', () => {
       { width: 2048, height: 1537 },
     ]) {
       expect(getGenerationValidationReasons(model, createSettings(model, dimensions))).toContain(
-        'External Model supports a maximum size of 2048×1536.'
+        'External Model supports at most 2048×1536.'
       );
     }
   });
@@ -713,7 +1057,7 @@ describe('component policies', () => {
       settings,
       'img2img'
     );
-    expect(reasons).toContain('Reference Image #1 is not supported by external model.');
+    expect(reasons).toContain('External Model cannot use Reference image 1. Turn it off, or remove it.');
     expect(reasons.filter((reason) => reason.includes('images total'))).toEqual([]);
   });
 
@@ -739,7 +1083,25 @@ describe('component policies', () => {
     expect(getComponentSectionPolicy(model, createSettings(model)).slots).toEqual([]);
   });
 
-  it('clears incompatible selections when the selected model changes', () => {
+  it('asks for uninstalled PiD components only while PiD is on', () => {
+    const sdxl = createModel('sdxl');
+    const settings = createSettings(sdxl, {
+      gemma2EncoderModel: { base: 'any', key: 'gemma2', name: 'Gemma 2', type: 'gemma2_encoder' },
+      pidDecoderModel: { base: 'sdxl', key: 'pid', name: 'PiD SDXL', type: 'pid_decoder' },
+      pidMode: 'fit',
+    });
+    const ids = (values: GenerateSettings) =>
+      getGenerationModelAvailabilityIssues(sdxl, values, [sdxl as never]).map(({ id }) => id);
+
+    expect(ids(settings)).toEqual([
+      'components:notInstalled:pidDecoderModel',
+      'components:notInstalled:gemma2EncoderModel',
+    ]);
+    // Off, nothing loads the picks, so they may stay uninstalled until PiD is turned on again.
+    expect(ids({ ...settings, pidMode: 'off' })).toEqual([]);
+  });
+
+  it('keeps concepts but clears incompatible selections when the selected model changes', () => {
     const model = createModel('sdxl');
     const settings = createSettings(createModel('sd-1'), {
       cfgRescaleMultiplier: 0.5,
@@ -756,13 +1118,117 @@ describe('component policies', () => {
     const result = getGenerateModelSelectionResult({ currentValues: settings, model, models: [] });
 
     expect(result.settings.modelKey).toBe(model.key);
-    expect(result.settings.loras.map((lora) => lora.model.key)).toEqual(['sdxl-lora']);
+    // The SD 1 concept stays listed and on: the SDXL graph skips it, and an SD 1 model runs it again.
+    expect(result.settings.loras).toBe(settings.loras);
     expect(result.settings.vae).toEqual(sdxlVae);
     expect(result.settings.t5EncoderModel).toBeNull();
     expect(result.settings.clipSkip).toBe(0);
     expect(result.settings.cfgRescaleMultiplier).toBe(0);
     expect(result.settings.seamlessXAxis).toBe(true);
-    expect(result.clearedLabels).toEqual(['LoRAs', 'T5 Encoder', 'CLIP skip', 'CFG rescale']);
+    expect(result.changes).toEqual([
+      { count: 1, kind: 'turnedOff', subject: 'concepts' },
+      { kind: 'removed', subject: 't5EncoderModel' },
+      { kind: 'reset', subject: 'clipSkip' },
+      { kind: 'reset', subject: 'cfgRescale' },
+    ]);
+    expect(isLossyModelSwitch(result)).toBe(true);
+  });
+
+  it('offers the Qwen-Image-2.1 Vision Tower slot below a GGUF 8B encoder only, and drops a stale pick with it', () => {
+    const qwen21 = createModel('qwen-image-2-1', { format: 'checkpoint' });
+    const encoder = (format: string) =>
+      ({
+        base: 'any',
+        format,
+        key: `qwen3-vl-8b-${format}`,
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      }) as const;
+    const tower = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'mmproj-8b',
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant: 'qwen3_vl_8b',
+    } as const;
+    const slotKeys = (qwen3VLEncoderModel: ReturnType<typeof encoder> | null) =>
+      getComponentSectionPolicy(qwen21, createSettings(qwen21, { qwen3VLEncoderModel })).slots.map((slot) => slot.key);
+
+    expect(slotKeys(encoder('gguf_quantized'))).toEqual(['vae', 'qwen3VLEncoderModel', 'qwen3VLVisionTowerModel']);
+    expect(slotKeys(encoder('checkpoint'))).toEqual(['vae', 'qwen3VLEncoderModel']);
+    expect(slotKeys(null)).toEqual(['vae', 'qwen3VLEncoderModel']);
+
+    const withTower = createSettings(qwen21, {
+      qwen3VLEncoderModel: encoder('gguf_quantized'),
+      qwen3VLVisionTowerModel: tower,
+    });
+    const flux = createModel('flux');
+
+    expect(
+      getGenerateModelSelectionResult({ currentValues: withTower, model: qwen21, models: [] }).settings
+    ).toMatchObject({
+      qwen3VLVisionTowerModel: tower,
+    });
+    expect(
+      getGenerateModelSelectionResult({ currentValues: withTower, model: flux, models: [] }).settings
+    ).toMatchObject({
+      qwen3VLEncoderModel: null,
+      qwen3VLVisionTowerModel: null,
+    });
+    // A 4B tower fails the slot's filter, as a stale one from another encoder size would.
+    expect(
+      getGenerateModelSelectionResult({
+        currentValues: { ...withTower, qwen3VLVisionTowerModel: { ...tower, variant: 'qwen3_vl_4b' } },
+        model: qwen21,
+        models: [],
+      }).settings.qwen3VLVisionTowerModel
+    ).toBeNull();
+  });
+
+  it('keeps concepts and their weights through SDXL -> FLUX -> SDXL, reporting only the ones that stop', () => {
+    const sdxl = createModel('sdxl');
+    const flux = createModel('flux');
+    const loras = [
+      { isEnabled: true, model: sdxlLora, weight: 0.65 },
+      { isEnabled: false, model: { ...sdxlLora, key: 'sdxl-off' }, weight: 1.2 },
+      { isEnabled: true, model: sd1Lora, weight: 0.3 },
+    ];
+    const toFlux = getGenerateModelSelectionResult({
+      currentValues: createSettings(sdxl, { loras }),
+      model: flux,
+      models: [sdxl, flux],
+    });
+
+    // Only the SDXL concept that ran stops; the one switched off and the SD 1 one were not running anyway.
+    expect(toFlux.settings.loras).toBe(loras);
+    expect(toFlux.changes).toEqual([{ count: 1, kind: 'turnedOff', subject: 'concepts' }]);
+    expect(isLossyModelSwitch(toFlux)).toBe(false);
+
+    const back = getGenerateModelSelectionResult({ currentValues: toFlux.settings, model: sdxl, models: [sdxl, flux] });
+
+    expect(back.settings.loras).toBe(loras);
+    expect(back.changes).toEqual([]);
+  });
+
+  it('reports a VAE precision reset only when the user picked the precision', () => {
+    const flux = createModel('flux');
+    const select = (sdxl: MainModelConfig) =>
+      getGenerateModelSelectionResult({
+        currentValues: createSettings(sdxl, { vaePrecision: 'fp16' }),
+        model: flux,
+        models: [sdxl, flux],
+      });
+    // fp16 is this SDXL model's own default, so moving to FLUX's fp32 undoes no choice.
+    const atDefault = select(createModel('sdxl', { default_settings: { vae_precision: 'fp16' } }));
+    const picked = select(createModel('sdxl'));
+
+    expect(getGenerationUiPolicy(flux).vaePrecisionVisible).toBe(false);
+    expect(atDefault.settings.vaePrecision).toBe('fp32');
+    expect(atDefault.changes).toEqual([]);
+    expect(picked.settings.vaePrecision).toBe('fp32');
+    expect(picked.changes).toEqual([{ kind: 'reset', subject: 'vaePrecision' }]);
   });
 
   it('initializes a provider size on model changes while preserving supported and same-model dimensions', () => {
@@ -853,7 +1319,7 @@ describe('component policies', () => {
     });
 
     expect(result.settings.hiDiffusionEnabled).toBe(false);
-    expect(result.clearedLabels).toContain('HiDiffusion');
+    expect(result.changes.map(({ subject }) => subject)).toContain('hiDiffusion');
   });
 
   it('initializes empty and malformed values from the selected model defaults', () => {
@@ -869,7 +1335,7 @@ describe('component policies', () => {
         steps: 17,
         width: 1024,
       });
-      expect(result.clearedLabels).toEqual([]);
+      expect(result.changes).toEqual([]);
     }
   });
 
@@ -895,7 +1361,7 @@ describe('component policies', () => {
       seedMode: 'fixed',
       vae: sdxlVae,
     });
-    expect(result.clearedLabels).toEqual([]);
+    expect(result.changes).toEqual([]);
   });
 
   it('applies automatic FLUX.2 component sources as part of model selection', () => {
@@ -932,7 +1398,7 @@ describe('component policies', () => {
 
     expect(result.settings.width).toBe(512);
     expect(result.settings.height).toBe(512);
-    expect(result.clearedLabels).toEqual([]);
+    expect(result.changes).toEqual([]);
     expect(result.dimensionsAdjusted).toBe(true);
   });
 
@@ -957,7 +1423,7 @@ describe('component policies', () => {
     });
 
     expect(result.settings).toMatchObject({ height: 2048, width: 2048 });
-    expect(result.clearedLabels).toEqual([]);
+    expect(result.changes).toEqual([]);
     expect(result.dimensionsAdjusted).toBe(true);
   });
 
@@ -992,7 +1458,7 @@ describe('component policies', () => {
 
     expect(result.settings.width % 8).toBe(0);
     expect(result.settings.height).toBe(1024);
-    expect(result.clearedLabels).toEqual([]);
+    expect(result.changes).toEqual([]);
     expect(result.dimensionsAdjusted).toBe(true);
   });
 
@@ -1004,6 +1470,59 @@ describe('component policies', () => {
     });
 
     expect(result.dimensionsAdjusted).toBe(false);
+  });
+
+  it('leaves concepts as they are when applying the defaults of another family, as recall does', () => {
+    const loras = [{ isEnabled: true, model: sdxlLora, weight: 0.6 }];
+
+    expect(
+      getSettingsWithModelDefaults(createSettings(createModel('sdxl'), { loras }), createModel('flux')).loras
+    ).toBe(loras);
+  });
+
+  describe('a default VAE', () => {
+    const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
+    const resolve = (
+      base: string,
+      vae: string | null | undefined,
+      vaeModels: VaeModelConfig[] = [fluxVae],
+      format?: MainModelConfig['format']
+    ) => {
+      const model = createModel(base, { format, ...(vae === undefined ? {} : { default_settings: { vae } }) });
+
+      return resolveModelDefaultVae(model, createSettings(model), vaeModels);
+    };
+
+    it('applies one that is installed and fits, by shared VAE compatibility', () => {
+      // Cross-base by the shared rule: Z-Image takes the FLUX VAE.
+      expect(resolve('z-image', 'flux-vae')).toEqual({ kind: 'apply', vae: fluxVae });
+      expect(resolve('sdxl', undefined)).toEqual({ kind: 'none' });
+      expect(resolve('sdxl', null)).toEqual({ kind: 'none' });
+    });
+
+    // Bundled: SDXL has no VAE slot; a Diffusers SD3 pipeline's is an optional override. Required: FLUX.1's VAE and
+    // a GGUF SD3 transformer's VAE are components.
+    it.each([
+      ['sdxl', undefined, 'default', { kind: 'apply', vae: null }],
+      ['sd-3', 'diffusers', 'default', { kind: 'apply', vae: null }],
+      ['sd-3', 'gguf_quantized', 'default', { kind: 'none' }],
+      ['flux', undefined, 'default', { kind: 'none' }],
+      ['sdxl', undefined, 'gone', { hasBundledVae: true, kind: 'missing' }],
+      // Installed, but for another family.
+      ['sdxl', undefined, 'flux-vae', { hasBundledVae: true, kind: 'missing' }],
+      ['sd-3', 'diffusers', 'gone', { hasBundledVae: true, kind: 'missing' }],
+      ['sd-3', 'gguf_quantized', 'gone', { hasBundledVae: false, kind: 'missing' }],
+      ['flux', undefined, 'gone', { hasBundledVae: false, kind: 'missing' }],
+    ] as const)('classifies %s (%s) with %s by whether a VAE is bundled', (base, format, vae, expected) => {
+      expect(resolve(base, vae, [fluxVae], format)).toEqual(expected);
+    });
+
+    it('recalls the bundled VAE for one that cannot apply, and keeps the current VAE only where one is required', () => {
+      expect(getRecallDefaultVae({ kind: 'apply', vae: fluxVae })).toBe(fluxVae);
+      expect(getRecallDefaultVae({ hasBundledVae: true, kind: 'missing' })).toBeNull();
+      expect(getRecallDefaultVae({ hasBundledVae: false, kind: 'missing' })).toBeUndefined();
+      expect(getRecallDefaultVae({ kind: 'none' })).toBeUndefined();
+    });
   });
 
   it('keeps selected VAE when applying model defaults without a VAE override', () => {
@@ -1019,15 +1538,20 @@ describe('component policies', () => {
     const model = createModel('flux');
     const settings = createSettings(model, {
       clipEmbedModel: clipEmbed,
-      loras: [{ isEnabled: true, model: sd1Lora, weight: 1 }],
+      // Only a concept FLUX would load must be installed; one set aside or switched off is skipped.
+      loras: [
+        { isEnabled: true, model: fluxLora, weight: 1 },
+        { isEnabled: false, model: { ...fluxLora, key: 'flux-off' }, weight: 1 },
+        { isEnabled: true, model: sd1Lora, weight: 1 },
+      ],
       t5EncoderModel: t5Encoder,
       vae: fluxVae,
     });
 
     expect(getGenerationModelAvailabilityReasons(model, settings, [model as never, t5Encoder as never])).toEqual([
-      'CLIP Embed "CLIP Embed" is no longer installed.',
-      'VAE "FLUX VAE" is no longer installed.',
-      'LoRA "SD 1 LoRA" is no longer installed.',
+      'CLIP Embed "CLIP Embed" is not installed. Choose another, or clear it.',
+      'VAE "FLUX VAE" is not installed. Choose another, or clear it.',
+      'Concept "FLUX LoRA" is not installed. Remove it, or reinstall it.',
     ]);
   });
 
@@ -1049,7 +1573,7 @@ describe('component policies', () => {
 
     expect(result.settings.qwen3EncoderModel).toBeNull();
     expect(result.settings.vae).toEqual(flux2Vae);
-    expect(result.clearedLabels).toEqual(['Qwen3 Encoder']);
+    expect(result.changes).toEqual([{ kind: 'removed', subject: 'qwen3EncoderModel' }]);
   });
 
   it('clears Klein and dev encoders when switching FLUX.2 variants', () => {
@@ -1067,9 +1591,9 @@ describe('component policies', () => {
     });
 
     expect(toDev.settings.qwen3EncoderModel).toBeNull();
-    expect(toDev.clearedLabels).toContain('Qwen3 Encoder');
+    expect(toDev.changes.map(({ subject }) => subject)).toContain('qwen3EncoderModel');
     expect(toKlein.settings.mistralEncoderModel).toBeNull();
-    expect(toKlein.clearedLabels).toContain('Mistral Encoder');
+    expect(toKlein.changes.map(({ subject }) => subject)).toContain('mistralEncoderModel');
   });
 
   it('requires enabled IP Adapter reference images to have an image and compatible adapter model', () => {
@@ -1096,7 +1620,7 @@ describe('component policies', () => {
           ],
         })
       )
-    ).toContain('Reference Image #1 needs an image.');
+    ).toContain('Reference image 1 needs an image.');
 
     expect(
       getGenerationValidationReasons(
@@ -1119,10 +1643,10 @@ describe('component policies', () => {
           ],
         })
       )
-    ).toContain('Reference Image #1 needs a compatible IP Adapter model.');
+    ).toContain(`Reference image 1 needs an IP Adapter model for ${model.name}.`);
   });
 
-  it('clears reference images when switching to a model without reference image support', () => {
+  it('keeps reference images, switched off, when switching to a model without reference image support', () => {
     const settings = createSettings(createModel('sdxl'), {
       referenceImages: [
         {
@@ -1147,8 +1671,9 @@ describe('component policies', () => {
       models: [sdxlIpAdapter],
     });
 
-    expect(result.settings.referenceImages).toEqual([]);
-    expect(result.clearedLabels).toContain('Reference Images');
+    expect(result.settings.referenceImages).toEqual([{ ...settings.referenceImages[0], isEnabled: false }]);
+    expect(result.changes).toEqual([{ count: 1, kind: 'turnedOff', subject: 'referenceImages' }]);
+    expect(isLossyModelSwitch(result)).toBe(false);
   });
 
   it('re-targets reference image configs to the new model base, keeping the image and enabled state', () => {
@@ -1191,7 +1716,36 @@ describe('component policies', () => {
         },
       },
     ]);
-    expect(result.clearedLabels).toContain('Reference Images');
+    expect(result.changes.map(({ subject }) => subject)).toContain('referenceImages');
+  });
+
+  it('confirms a re-target that drops tuning, but only adjusts one still at the old family defaults', () => {
+    const sdxl = createModel('sdxl');
+    const sd1 = createModel('sd-1');
+    const ipAdapterReference = (weight: number) => ({
+      config: {
+        beginEndStepPct: [0, 1] as [number, number],
+        clipVisionModel: 'ViT-H' as const,
+        image: referenceImage,
+        method: 'full' as const,
+        model: sdxlIpAdapter,
+        type: 'ip_adapter' as const,
+        weight,
+      },
+      id: 'ref-1',
+      isEnabled: true,
+    });
+    const select = (weight: number) =>
+      getGenerateModelSelectionResult({
+        currentValues: createSettings(sdxl, { referenceImages: [ipAdapterReference(weight)] }),
+        model: sd1,
+        models: [sdxl, sd1IpAdapter, sdxlIpAdapter],
+      });
+
+    expect(select(1).changes).toEqual([{ count: 1, kind: 'adjusted', subject: 'referenceImages' }]);
+    expect(isLossyModelSwitch(select(1))).toBe(false);
+    expect(select(0.4).changes).toEqual([{ count: 1, kind: 'reset', subject: 'referenceImages' }]);
+    expect(isLossyModelSwitch(select(0.4))).toBe(true);
   });
 
   it('re-targets reference images across a flux2 -> sdxl -> flux2 round trip', () => {
@@ -1251,7 +1805,7 @@ describe('component policies', () => {
     });
 
     expect(result.settings.referenceImages).toBe(referenceImages);
-    expect(result.clearedLabels).not.toContain('Reference Images');
+    expect(result.changes.map(({ subject }) => subject)).not.toContain('referenceImages');
   });
 
   it('starts a Krea-2 reference list with a style reference and re-targets other kinds to it', () => {
@@ -1306,8 +1860,8 @@ describe('component policies', () => {
     });
 
     expect(getGenerationValidationReasons(krea2, styleSettings)).toEqual([]);
-    expect(getGenerationValidationReasons(createModel('sd-3'), styleSettings)).toEqual([
-      'Reference Image #1 is not supported by sd-3 model.',
+    expect(getGenerationValidationReasons(createModel('sd-3', { format: 'diffusers' }), styleSettings)).toEqual([
+      'sd-3 model cannot use Reference image 1. Turn it off, or remove it.',
     ]);
   });
 
@@ -1349,7 +1903,7 @@ describe('component policies', () => {
       { id: 'used', isEnabled: true, type: 'external_reference_image' },
       { id: 'extra', isEnabled: false, type: 'external_reference_image' },
     ]);
-    expect(result.clearedLabels).toContain('Reference Images');
+    expect(result.changes.map(({ subject }) => subject)).toContain('referenceImages');
     expect(
       getGenerationValidationReasons(singleReferenceModel, result.settings).filter((reason) =>
         reason.includes('reference')
@@ -1373,7 +1927,7 @@ describe('component policies', () => {
         singleReferenceModel,
         createSettings(singleReferenceModel, { referenceImages: [external('a'), external('b')] })
       )
-    ).toContain(`Generate supports at most 1 reference image for ${singleReferenceModel.name}.`);
+    ).toContain(`${singleReferenceModel.name} supports at most 1 reference image. Turn off or remove the extra ones.`);
   });
 
   describe('Krea-2 style and edit references', () => {
@@ -1398,7 +1952,22 @@ describe('component policies', () => {
       type: 'qwen3_vl_encoder',
       variant: 'qwen3_vl_4b',
     };
-    const ggufReason = `Krea-2 edit references need a Qwen3-VL encoder with vision weights, which the GGUF encoder "${ggufEncoder.name}" does not have. Select a safetensors file or Diffusers folder that includes the vision weights.`;
+    const towerReason =
+      "Edit references need this GGUF encoder's Vision Tower (the mmproj file). Select it under Components.";
+    const cpuReason =
+      'The Vision Tower and the encoder must have the same CPU Only setting. Change it in the Model Manager.';
+    const ggufTower = (
+      variant: 'qwen3_vl_4b' | 'qwen3_vl_8b' = 'qwen3_vl_4b',
+      cpuOnly?: boolean
+    ): ComponentModelConfig => ({
+      base: 'any',
+      cpu_only: cpuOnly,
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    });
 
     it('types a new Krea-2 reference as style only when it is the one running reference', () => {
       const typesAfterAdding = (count: number, referenceImages: GenerateSettings['referenceImages'] = []) =>
@@ -1493,7 +2062,7 @@ describe('component policies', () => {
       expect(reasonsFor(krea2, { referenceImages: [edit('a'), edit('b'), edit('c')] })).toEqual([]);
       expect(reasonsFor(krea2, { referenceImages: [edit('a'), edit('b'), edit('c'), edit('d', false)] })).toEqual([]);
       expect(reasonsFor(krea2, { referenceImages: [edit('a'), edit('b'), edit('c'), edit('d')] })).toContain(
-        `Generate supports at most 3 reference images for ${krea2.name}.`
+        `${krea2.name} supports at most 3 reference images. Turn off or remove the extra ones.`
       );
     });
 
@@ -1527,18 +2096,41 @@ describe('component policies', () => {
       );
     });
 
-    it('blocks edit references on a GGUF encoder, which has no vision tower, and only then', () => {
+    it('blocks edit references on a GGUF encoder without its 4B Vision Tower, and only then', () => {
       const checkpoint = createModel('krea-2', { format: 'checkpoint', key: 'krea2-checkpoint' });
       const vae: VaeModelConfig = { base: 'qwen-image', key: 'krea2-vae', name: 'Qwen VAE', type: 'vae' };
       const safetensorsEncoder: ComponentModelConfig = { ...ggufEncoder, format: 'checkpoint', key: 'qwen3-vl-st' };
+      const issuesFor = (model: MainModelConfig, overrides: Partial<GenerateSettings>) =>
+        getGenerationValidationIssues(model, createSettings(model, overrides)).filter(
+          (issue) => issue.message === towerReason
+        );
 
       expect(reasonsFor(checkpoint, { qwen3VLEncoderModel: ggufEncoder, referenceImages: [edit('a')], vae })).toEqual([
-        ggufReason,
+        towerReason,
       ]);
       // A Diffusers main reads with the GGUF override too, when one is selected.
       expect(reasonsFor(krea2, { qwen3VLEncoderModel: ggufEncoder, referenceImages: [edit('a')] })).toEqual([
-        ggufReason,
+        towerReason,
       ]);
+      // The issue points at the Vision Tower setting, where the fix is.
+      expect(issuesFor(krea2, { qwen3VLEncoderModel: ggufEncoder, referenceImages: [edit('a')] })).toEqual([
+        expect.objectContaining({ target: { field: 'qwen3VLVisionTowerModel', section: 'components' } }),
+      ]);
+      // An 8B tower does not fit the 4B encoder.
+      expect(
+        reasonsFor(krea2, {
+          qwen3VLEncoderModel: ggufEncoder,
+          qwen3VLVisionTowerModel: ggufTower('qwen3_vl_8b'),
+          referenceImages: [edit('a')],
+        })
+      ).toEqual([towerReason]);
+      expect(
+        reasonsFor(krea2, {
+          qwen3VLEncoderModel: ggufEncoder,
+          qwen3VLVisionTowerModel: ggufTower(),
+          referenceImages: [edit('a')],
+        })
+      ).toEqual([]);
       expect(reasonsFor(krea2, { referenceImages: [edit('a')] })).toEqual([]);
       expect(
         reasonsFor(checkpoint, { qwen3VLEncoderModel: safetensorsEncoder, referenceImages: [edit('a')], vae })
@@ -1551,6 +2143,43 @@ describe('component policies', () => {
           vae,
         })
       ).toEqual([]);
+    });
+
+    it('blocks edit references when the GGUF encoder and its Vision Tower differ in CPU Only', () => {
+      const withCpu = (encoderCpu: boolean | undefined, towerCpu: boolean | undefined, refs = [edit('a')]) =>
+        reasonsFor(krea2, {
+          qwen3VLEncoderModel: { ...ggufEncoder, cpu_only: encoderCpu },
+          qwen3VLVisionTowerModel: ggufTower('qwen3_vl_4b', towerCpu),
+          referenceImages: refs,
+        });
+
+      expect(withCpu(true, undefined)).toEqual([cpuReason]);
+      expect(withCpu(undefined, true)).toEqual([cpuReason]);
+      expect(withCpu(false, undefined)).toEqual([]);
+      expect(withCpu(true, true)).toEqual([]);
+      expect(withCpu(true, undefined, [style('s')] as never)).toEqual([]);
+    });
+
+    it('offers the Krea-2 Vision Tower slot below a GGUF 4B encoder only, and drops a stale 8B pick', () => {
+      const checkpoint = createModel('krea-2', { format: 'checkpoint', key: 'krea2-checkpoint' });
+      const slotKeys = (encoder: ComponentModelConfig | null) =>
+        getComponentSectionPolicy(checkpoint, createSettings(checkpoint, { qwen3VLEncoderModel: encoder })).slots.map(
+          (slot) => slot.key
+        );
+
+      expect(slotKeys(ggufEncoder)).toEqual(['vae', 'qwen3VLEncoderModel', 'qwen3VLVisionTowerModel']);
+      expect(slotKeys({ ...ggufEncoder, format: 'checkpoint' })).toEqual(['vae', 'qwen3VLEncoderModel']);
+      expect(slotKeys(null)).toEqual(['vae', 'qwen3VLEncoderModel']);
+
+      const select = (qwen3VLVisionTowerModel: ComponentModelConfig) =>
+        getGenerateModelSelectionResult({
+          currentValues: createSettings(checkpoint, { qwen3VLEncoderModel: ggufEncoder, qwen3VLVisionTowerModel }),
+          model: checkpoint,
+          models: [],
+        }).settings;
+
+      expect(select(ggufTower()).qwen3VLVisionTowerModel).toEqual(ggufTower());
+      expect(select(ggufTower('qwen3_vl_8b')).qwen3VLVisionTowerModel).toBeNull();
     });
 
     it('re-targets references into Krea-2 as one set and switches off the ones that cannot run together', () => {
@@ -1639,7 +2268,7 @@ describe('component policies', () => {
         ['s', true],
         ['e', false],
       ]);
-      expect(styleFirst.clearedLabels).toContain('Reference Images');
+      expect(styleFirst.changes.map(({ subject }) => subject)).toContain('referenceImages');
 
       // Leaving Krea-2 re-targets both kinds, keeping their images and enabled state.
       const toFlux2 = getGenerateModelSelectionResult({
@@ -1667,27 +2296,111 @@ describe('component policies', () => {
     expect(isReferenceImageSupported(undefined)).toBe(false);
   });
 
-  it('offers Qwen-Image-2.1 reference images only on its Diffusers pipeline, whose encoder reads images', () => {
-    const diffusers = createModel('qwen-image-2-1', { format: 'diffusers' });
+  describe('Qwen-Image-2.1 references follow the encoder that reads them', () => {
+    const encoderModel = (format: string) =>
+      ({
+        base: 'any',
+        format,
+        key: `qwen3-vl-8b-${format}`,
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      }) as const;
+    const encoder = (format: string) => ({ qwen3VLEncoderModel: encoderModel(format) });
+    const tower = (variant = 'qwen3_vl_8b') =>
+      ({
+        base: 'any',
+        format: 'gguf_quantized',
+        key: `mmproj-${variant}`,
+        name: 'mmproj',
+        type: 'qwen3_vl_vision_tower',
+        variant,
+      }) as const;
 
-    expect(isReferenceImageSupported(diffusers)).toBe(true);
-    expect(getMaxReferenceImages(diffusers)).toBe(4);
-    expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'gguf_quantized' }))).toBe(false);
-    expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'checkpoint' }))).toBe(false);
+    it('reads them with the standalone safetensors encoder of a single-file main', () => {
+      const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+      const gguf = createModel('qwen-image-2-1', { format: 'gguf_quantized' });
+
+      expect(isReferenceImageSupported(checkpoint, encoder('checkpoint'))).toBe(true);
+      expect(isReferenceImageSupported(gguf, encoder('checkpoint'))).toBe(true);
+      expect(isReferenceImageSupported(checkpoint, encoder('qwen3_vl_encoder'))).toBe(true);
+      expect(getMaxReferenceImages(checkpoint, encoder('checkpoint'))).toBe(4);
+      expect(getReferenceImageUnavailableReason(checkpoint, encoder('checkpoint'))).toBeNull();
+    });
+
+    it('has no tower without an encoder, or with a GGUF one, on a single-file main', () => {
+      const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+
+      expect(isReferenceImageSupported(checkpoint)).toBe(false);
+      expect(getMaxReferenceImages(checkpoint)).toBe(0);
+      expect(getReferenceImageUnavailableReason(checkpoint)).toBe('visionTower');
+      expect(isReferenceImageSupported(checkpoint, encoder('gguf_quantized'))).toBe(false);
+      expect(getReferenceImageUnavailableReason(checkpoint, encoder('gguf_quantized'))).toBe('ggufVisionTower');
+    });
+
+    it('uses a Diffusers main own encoder unless a GGUF one replaces it', () => {
+      const diffusers = createModel('qwen-image-2-1', { format: 'diffusers' });
+
+      expect(isReferenceImageSupported(diffusers)).toBe(true);
+      expect(getMaxReferenceImages(diffusers)).toBe(4);
+      expect(isReferenceImageSupported(diffusers, encoder('checkpoint'))).toBe(true);
+      expect(isReferenceImageSupported(diffusers, encoder('gguf_quantized'))).toBe(false);
+      expect(getReferenceImageUnavailableReason(diffusers, encoder('gguf_quantized'))).toBe('ggufVisionTower');
+    });
+
+    it('ignores an encoder of the wrong size, which the graph does not use either', () => {
+      const wrongSize = { qwen3VLEncoderModel: { ...encoderModel('gguf_quantized'), variant: 'qwen3_vl_4b' } };
+
+      expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'diffusers' }), wrongSize)).toBe(true);
+      expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'checkpoint' }), wrongSize)).toBe(false);
+    });
+
+    it('reads them with a GGUF 8B encoder once its 8B vision tower is selected', () => {
+      const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+      const diffusers = createModel('qwen-image-2-1', { format: 'diffusers' });
+      const ggufWithTower = { ...encoder('gguf_quantized'), qwen3VLVisionTowerModel: tower() };
+
+      expect(isReferenceImageSupported(checkpoint, ggufWithTower)).toBe(true);
+      expect(isReferenceImageSupported(diffusers, ggufWithTower)).toBe(true);
+      expect(getMaxReferenceImages(checkpoint, ggufWithTower)).toBe(4);
+      expect(getReferenceImageUnavailableReason(checkpoint, ggufWithTower)).toBeNull();
+      // The loader rejects a 4B tower, so it does not count.
+      const wrongTower = { ...encoder('gguf_quantized'), qwen3VLVisionTowerModel: tower('qwen3_vl_4b') };
+
+      expect(isReferenceImageSupported(checkpoint, wrongTower)).toBe(false);
+    });
+
+    it('ignores a stale vision tower beside an encoder that is not a GGUF 8B one', () => {
+      const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+
+      // No encoder at all: a single-file main still has no tower; a tower alone never makes one.
+      expect(isReferenceImageSupported(checkpoint, { qwen3VLVisionTowerModel: tower() })).toBe(false);
+      expect(
+        isReferenceImageSupported(checkpoint, { ...encoder('checkpoint'), qwen3VLVisionTowerModel: tower() })
+      ).toBe(true);
+    });
+
+    it('never lets an encoder change delete references on a model switch', () => {
+      const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+      const referenceImages = [
+        {
+          config: { image: referenceImage, type: 'qwen_image_2_1_reference_image' as const },
+          id: 'ref-1',
+          isEnabled: true,
+        },
+      ];
+
+      expect(getCompatibleReferenceImages(referenceImages, checkpoint, [])).toBe(referenceImages);
+    });
   });
 
-  // The UI names the missing format only when switching to it would enable references.
-  it('names the format a model lacks for reference images only when the format alone blocks them', () => {
-    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'gguf_quantized' }))).toBe(
-      'diffusers'
-    );
-    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'checkpoint' }))).toBe('diffusers');
-    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'diffusers' }))).toBeNull();
-    // Qwen-Image needs the Edit variant, not a format; CogView4 takes no references at all.
-    expect(getMissingReferenceImageFormat(createModel('qwen-image', { format: 'gguf_quantized' }))).toBeNull();
-    expect(getMissingReferenceImageFormat(createModel('cogview4', { format: 'gguf_quantized' }))).toBeNull();
-    expect(getMissingReferenceImageFormat(externalModel)).toBeNull();
-    expect(getMissingReferenceImageFormat(undefined)).toBeNull();
+  // The UI explains the missing tower only when an encoder alone blocks references.
+  it('explains unavailable references only where the base takes them', () => {
+    // Qwen-Image needs the Edit variant, not an encoder; CogView4 takes no references at all.
+    expect(getReferenceImageUnavailableReason(createModel('qwen-image', { format: 'gguf_quantized' }))).toBeNull();
+    expect(getReferenceImageUnavailableReason(createModel('cogview4', { format: 'gguf_quantized' }))).toBeNull();
+    expect(getReferenceImageUnavailableReason(externalModel)).toBeNull();
+    expect(getReferenceImageUnavailableReason(undefined)).toBeNull();
   });
 
   it('derives the reference image limit from external provider capabilities', () => {
@@ -1734,10 +2447,12 @@ describe('component policies', () => {
         createSettings(model, {
           referenceImages: Array.from({ length: count }, (_, index) => ipAdapterReference(index)),
         })
-      ).filter((reason) => reason.startsWith('Generate supports at most'));
+      ).filter((reason) => reason.includes('supports at most'));
 
     expect(countReasons(2)).toEqual([]);
-    expect(countReasons(3)).toEqual(['Generate supports at most 2 reference images for sdxl model.']);
+    expect(countReasons(3)).toEqual([
+      'sdxl model supports at most 2 reference images. Turn off or remove the extra ones.',
+    ]);
   });
 
   it('rejects unsupported reference image configs for the selected model', () => {
@@ -1752,16 +2467,25 @@ describe('component policies', () => {
           ],
         })
       )
-    ).toContain('Reference Image #1 is not supported by sd-3 model.');
+    ).toContain('sd-3 model cannot use Reference image 1. Turn it off, or remove it.');
   });
 
-  it('blocks Qwen-Image-2.1 references while a standalone encoder replaces the one that reads them', () => {
-    const model = createModel('qwen-image-2-1', { format: 'diffusers' });
-    const encoder = {
+  it('blocks Qwen-Image-2.1 references whose encoder has no vision tower', () => {
+    const encoder = (format: string) =>
+      ({
+        base: 'any',
+        format,
+        key: 'qwen3-vl-8b',
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      }) as const;
+    const tower = {
       base: 'any',
-      key: 'qwen3-vl-8b',
-      name: 'Qwen3-VL 8B',
-      type: 'qwen3_vl_encoder',
+      format: 'gguf_quantized',
+      key: 'mmproj-8b',
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
       variant: 'qwen3_vl_8b',
     } as const;
     const referenceImages = [
@@ -1771,13 +2495,102 @@ describe('component policies', () => {
         isEnabled: true,
       },
     ];
+    const reasons = (model: MainModelConfig, qwen3VLEncoderModel: ReturnType<typeof encoder> | null) =>
+      getGenerationValidationReasons(model, createSettings(model, { qwen3VLEncoderModel, referenceImages }));
+    const diffusers = createModel('qwen-image-2-1', { format: 'diffusers' });
+    const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
 
+    expect(reasons(diffusers, encoder('gguf_quantized'))).toContain(QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON);
+    expect(reasons(checkpoint, encoder('gguf_quantized'))).toContain(QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON);
+    expect(reasons(diffusers, encoder('checkpoint'))).not.toContain(QWEN_IMAGE_21_NO_VISION_TOWER_REASON);
+    expect(reasons(checkpoint, encoder('checkpoint'))).not.toContain(QWEN_IMAGE_21_NO_VISION_TOWER_REASON);
+    expect(reasons(diffusers, null)).not.toContain(QWEN_IMAGE_21_NO_VISION_TOWER_REASON);
+
+    const issueFor = (model: MainModelConfig) =>
+      getGenerationValidationIssues(
+        model,
+        createSettings(model, { qwen3VLEncoderModel: encoder('gguf_quantized'), referenceImages })
+      ).find((candidate) => candidate.message === QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON);
+
+    // A GGUF encoder is fixed by its Vision Tower, so the issue points there; a Diffusers main can also drop the encoder.
+    expect(issueFor(checkpoint)?.target).toEqual({ field: 'qwen3VLVisionTowerModel', section: 'components' });
+    expect(issueFor(checkpoint)?.fix).toBeUndefined();
+    expect(issueFor(diffusers)?.target).toEqual({ field: 'qwen3VLVisionTowerModel', section: 'components' });
+    expect(issueFor(diffusers)?.fix).toEqual({ key: 'qwen3VLEncoderModel', kind: 'clearModel' });
+
+    // The tower clears the issue; a stale one beside a safetensors encoder does not matter either way.
     expect(
-      getGenerationValidationReasons(model, createSettings(model, { qwen3VLEncoderModel: encoder, referenceImages }))
-    ).toContain(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
-    expect(getGenerationValidationReasons(model, createSettings(model, { referenceImages }))).not.toContain(
-      QWEN_IMAGE_21_STANDALONE_ENCODER_REASON
-    );
+      getGenerationValidationReasons(
+        checkpoint,
+        createSettings(checkpoint, {
+          qwen3VLEncoderModel: encoder('gguf_quantized'),
+          qwen3VLVisionTowerModel: tower,
+          referenceImages,
+        })
+      )
+    ).not.toContain(QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON);
+
+    // Without a GGUF encoder the issue keeps its old targets and fixes.
+    const noEncoderIssue = getGenerationValidationIssues(
+      checkpoint,
+      createSettings(checkpoint, { qwen3VLEncoderModel: null, referenceImages })
+    ).find((candidate) => candidate.message === QWEN_IMAGE_21_NO_VISION_TOWER_REASON);
+
+    expect(noEncoderIssue?.target).toEqual({ field: 'qwen3VLEncoderModel', section: 'components' });
+    expect(noEncoderIssue?.fix).toBeUndefined();
+  });
+
+  it('blocks Qwen-Image-2.1 references when the GGUF encoder and its Vision Tower differ in CPU Only', () => {
+    const checkpoint = createModel('qwen-image-2-1', { format: 'checkpoint' });
+    const encoder = (cpuOnly?: boolean) =>
+      ({
+        base: 'any',
+        cpu_only: cpuOnly,
+        format: 'gguf_quantized',
+        key: 'enc',
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      }) as const;
+    const tower = (cpuOnly?: boolean) =>
+      ({
+        base: 'any',
+        cpu_only: cpuOnly,
+        format: 'gguf_quantized',
+        key: 'mmproj',
+        name: 'mmproj',
+        type: 'qwen3_vl_vision_tower',
+        variant: 'qwen3_vl_8b',
+      }) as const;
+    const referenceImages = [
+      {
+        config: { image: referenceImage, type: 'qwen_image_2_1_reference_image' as const },
+        id: 'ref-1',
+        isEnabled: true,
+      },
+    ];
+    const issues = (encoderCpu: boolean | undefined, towerCpu: boolean | undefined, refs = referenceImages) =>
+      getGenerationValidationIssues(
+        checkpoint,
+        createSettings(checkpoint, {
+          qwen3VLEncoderModel: encoder(encoderCpu),
+          qwen3VLVisionTowerModel: tower(towerCpu),
+          referenceImages: refs,
+        })
+      ).filter((issue) => issue.message.includes('CPU Only'));
+
+    expect(issues(true, undefined)).toEqual([
+      expect.objectContaining({
+        message:
+          'The Vision Tower and the encoder must have the same CPU Only setting. Change it in the Model Manager.',
+        target: { field: 'qwen3VLVisionTowerModel', section: 'components' },
+      }),
+    ]);
+    expect(issues(undefined, true)).toHaveLength(1);
+    // Unset and false are the same setting, and matching settings or no references raise nothing.
+    expect(issues(false, undefined)).toEqual([]);
+    expect(issues(true, true)).toEqual([]);
+    expect(issues(true, undefined, [])).toEqual([]);
   });
 
   it('reports missing reference image model dependencies', () => {
@@ -1805,7 +2618,9 @@ describe('component policies', () => {
         }),
         [model as never]
       )
-    ).toContain('Reference Image model "SD 1 IP Adapter" is no longer installed.');
+    ).toContain(
+      'Reference image 1 uses "SD 1 IP Adapter", which is not installed. Turn it off, or choose another model for it.'
+    );
   });
 
   it('ignores missing reference image model dependencies when the reference image is disabled', () => {
@@ -1875,12 +2690,44 @@ describe('Anima inpaint adapter slot', () => {
     const result = getGenerateModelSelectionResult({ currentValues: settings, model: createModel('sdxl'), models: [] });
 
     expect(result.settings.animaInpaintAdapterModel).toBeNull();
-    expect(result.clearedLabels).toContain('Inpaint Adapter');
+    expect(result.changes.map(({ subject }) => subject)).toContain('animaInpaintAdapterModel');
     expect(result.settings.animaInpaintAdapterWeight).toBe(0.6);
     expect(
       getGenerateModelSelectionResult({ currentValues: settings, model: anima, models: [] }).settings
         .animaInpaintAdapterModel
     ).toBe(inpaintAdapter);
+  });
+});
+
+describe('Anima inpaint adapter availability', () => {
+  it('asks for an uninstalled adapter only while the adapter is enabled', () => {
+    const anima = createModel('anima');
+    const adapter: ComponentModelConfig = {
+      base: 'anima',
+      cond_in_channels: 4,
+      key: 'anima-inpaint',
+      name: 'Anima LLLite Inpainting',
+      type: 'controlnet',
+    };
+    const settings = createSettings(anima, { animaInpaintAdapterEnabled: true, animaInpaintAdapterModel: adapter });
+    const ids = (values: GenerateSettings) =>
+      getGenerationModelAvailabilityIssues(anima, values, [anima as never]).map(({ id }) => id);
+
+    expect(ids(settings)).toEqual(['components:notInstalled:animaInpaintAdapterModel']);
+    expect(ids({ ...settings, animaInpaintAdapterEnabled: false })).toEqual([]);
+  });
+});
+
+describe('FLUX.3 policies', () => {
+  const KLEIN_CFG_REASON = 'FLUX.3 Klein samples without CFG. Set CFG Scale to 1, or use FLUX.3 Klein Base for CFG.';
+
+  it('blocks CFG on the step-distilled Klein and allows it on Klein Base', () => {
+    const klein = createModel('flux3', { format: 'diffusers', variant: 'flux3_klein' });
+    const kleinBase = createModel('flux3', { format: 'diffusers', variant: 'flux3_klein_base' });
+
+    expect(getGenerationValidationReasons(klein, createSettings(klein))).toEqual([]);
+    expect(getGenerationValidationReasons(klein, createSettings(klein, { cfgScale: 2 }))).toContain(KLEIN_CFG_REASON);
+    expect(getGenerationValidationReasons(kleinBase, createSettings(kleinBase, { cfgScale: 3.5 }))).toEqual([]);
   });
 });
 
@@ -1936,7 +2783,7 @@ describe('the Qwen3.5 encoder slots of Anima-3.8B and MOSS-Image', () => {
     const result = getGenerateModelSelectionResult({ currentValues: settings, model: mossSingleFile, models: [] });
 
     expect(result.settings.qwen35EncoderModel).toBeNull();
-    expect(result.clearedLabels).toContain('Qwen3.5 Encoder');
+    expect(result.changes.map(({ subject }) => subject)).toContain('qwen35EncoderModel');
   });
 });
 
@@ -1981,7 +2828,7 @@ describe('Anima IP-Adapter references', () => {
       ).filter((reason) => reason.includes('reference') || reason.includes('Reference'));
 
     expect(reasons(4)).toEqual([]);
-    expect(reasons(5)).toEqual(['Generate supports at most 4 reference images for anima model.']);
+    expect(reasons(5)).toEqual(['anima model supports at most 4 reference images. Turn off or remove the extra ones.']);
   });
 
   it('rejects a strength outside the 0-2 range the Anima node accepts', () => {
@@ -1995,8 +2842,8 @@ describe('Anima IP-Adapter references', () => {
 
     expect(withWeight(0)).toEqual([]);
     expect(withWeight(2)).toEqual([]);
-    expect(withWeight(-0.5)).toEqual(['Reference Image #1 strength must be between 0 and 2.']);
-    expect(withWeight(2.5)).toEqual(['Reference Image #1 strength must be between 0 and 2.']);
+    expect(withWeight(-0.5)).toEqual(['Reference image 1 strength must be between 0 and 2.']);
+    expect(withWeight(2.5)).toEqual(['Reference image 1 strength must be between 0 and 2.']);
   });
 
   it('defaults a re-targeted reference to the first installed Anima IP-Adapter', () => {
@@ -2164,15 +3011,16 @@ describe('Anima IP-Adapter references', () => {
     ).toBe(referenceImages);
   });
 
-  it('clears the reference when switching to Anima-3.8B', () => {
+  it('keeps the reference, switched off, when switching to Anima-3.8B', () => {
+    const reference = animaReference('ref-1');
     const result = getGenerateModelSelectionResult({
-      currentValues: createSettings(animaQwen3, { referenceImages: [animaReference('ref-1')] }),
+      currentValues: createSettings(animaQwen3, { referenceImages: [reference] }),
       model: animaQwen35,
       models: [animaIpAdapter],
     });
 
-    expect(result.settings.referenceImages).toEqual([]);
-    expect(result.clearedLabels).toContain('Reference Images');
+    expect(result.settings.referenceImages).toEqual([{ ...reference, isEnabled: false }]);
+    expect(result.changes).toEqual([{ count: 1, kind: 'turnedOff', subject: 'referenceImages' }]);
   });
 });
 
@@ -2198,8 +3046,8 @@ describe('Krea-2, Ideogram 4 and Wan policies', () => {
     const model = createModel('ideogram-4');
     const reasons = getGenerationValidationReasons(model, createSettings(model, { height: 1020, width: 1000 }));
 
-    expect(reasons).toContain('Generate width must be a multiple of 16.');
-    expect(reasons).toContain('Generate height must be a multiple of 16.');
+    expect(reasons).toContain('Width must be a multiple of 16.');
+    expect(reasons).toContain('Height must be a multiple of 16.');
   });
 
   it('rejects Ideogram 4 step and mu overrides outside what its denoise node accepts', () => {
@@ -2338,7 +3186,7 @@ describe('Krea-2, Ideogram 4 and Wan policies', () => {
     expect(getGenerationValidationReasons(diffusers, createSettings(diffusers))).toEqual([]);
   });
 
-  it('reports an enabled Wan LoRA that targets the other family instead of dropping it silently', () => {
+  it('does not block on a Wan LoRA for the other family, which the graph skips and the panel badges', () => {
     const main = createModel('wan', { format: 'diffusers', variant: 'ti2v_5b' });
     const a14bLora: LoraModelConfig = {
       base: 'wan',
@@ -2352,7 +3200,7 @@ describe('Krea-2, Ideogram 4 and Wan policies', () => {
       createSettings(main, { loras: [{ isEnabled: true, model: a14bLora, weight: 1 }] })
     );
 
-    expect(reasons).toContain(`A14B LoRA targets a different Wan model family than ${main.name}.`);
+    expect(reasons).toEqual([]);
   });
 
   it('accepts a Wan LoRA whose family matches, across both A14B main variants', () => {
@@ -2497,7 +3345,7 @@ describe('the guidance range the architecture declares', () => {
     });
 
     expect(result.settings.cfgScale).toBe(20);
-    expect(result.clearedLabels).toContain('Guidance');
+    expect(result.changes.map(({ subject }) => subject)).toContain('guidance');
   });
 
   it('leaves a carried-over guidance the new model accepts untouched', () => {
@@ -2508,7 +3356,7 @@ describe('the guidance range the architecture declares', () => {
     });
 
     expect(result.settings.cfgScale).toBe(7);
-    expect(result.clearedLabels).not.toContain('Guidance');
+    expect(result.changes.map(({ subject }) => subject)).not.toContain('guidance');
   });
 
   it('enforces the served bound for every architecture in the table', () => {
@@ -2623,16 +3471,18 @@ describe('SDXL Refiner policy', () => {
     expect(isSupportedGenerateModel(refiner)).toBe(false);
   });
 
-  it('clears the refiner when leaving SDXL but keeps its tuning for the next SDXL pick', () => {
+  it('keeps the refiner and its tuning when leaving SDXL, idle until the next SDXL pick', () => {
+    const flux = createModel('flux');
     const result = getGenerateModelSelectionResult({
       currentValues: createSettings(createModel('sdxl'), { refinerModel: refiner, refinerStart: 0.6 }),
-      model: createModel('flux'),
+      model: flux,
       models: [],
     });
 
-    expect(result.settings.refinerModel).toBeNull();
+    expect(result.settings.refinerModel).toEqual(refiner);
     expect(result.settings.refinerStart).toBe(0.6);
-    expect(result.clearedLabels).toContain('Refiner');
+    expect(result.changes).toEqual([]);
+    expect(getActiveRefiner(result.settings, flux)).toBeNull();
 
     const kept = getGenerateModelSelectionResult({
       currentValues: createSettings(createModel('sdxl'), { refinerModel: refiner }),
@@ -2641,7 +3491,7 @@ describe('SDXL Refiner policy', () => {
     });
 
     expect(kept.settings.refinerModel).toEqual(refiner);
-    expect(kept.clearedLabels).toEqual([]);
+    expect(kept.changes).toEqual([]);
   });
 
   it('validates the refiner only on SDXL, rejecting PiD and out-of-range tuning', () => {
@@ -2693,7 +3543,7 @@ describe('SDXL Refiner policy', () => {
       'Refiner steps must be a whole number of at least 1.'
     );
     expect(getGenerationModelAvailabilityReasons(sdxl, reactivated, [sdxl as never])).toEqual([
-      'Refiner "SDXL Refiner" is no longer installed.',
+      'Refiner "SDXL Refiner" is not installed. Choose another, or clear it.',
     ]);
   });
 
@@ -2702,8 +3552,212 @@ describe('SDXL Refiner policy', () => {
     const settings = createSettings(sdxl, { refinerModel: refiner });
 
     expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never])).toEqual([
-      'Refiner "SDXL Refiner" is no longer installed.',
+      'Refiner "SDXL Refiner" is not installed. Choose another, or clear it.',
     ]);
     expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never, refiner as never])).toEqual([]);
+  });
+});
+
+describe('generation issues', () => {
+  const englishCatalog = Object.values(
+    import.meta.glob('../../../../public/locales/en.json', { eager: true, import: 'default' })
+  )[0] as Record<string, unknown>;
+  const ipAdapterReference = (id: string, overrides: Record<string, unknown> = {}): GenerateReferenceImage => ({
+    config: {
+      beginEndStepPct: [0, 1],
+      clipVisionModel: 'ViT-H',
+      image: referenceImage,
+      method: 'full',
+      model: sdxlIpAdapter,
+      type: 'ip_adapter',
+      weight: 1,
+      ...overrides,
+    } as GenerateReferenceImage['config'],
+    id,
+    isEnabled: true,
+  });
+  const sdxl = createModel('sdxl');
+
+  const withoutPluralSuffix = (key: string) => key.replace(/_(one|other)$/, '');
+  const localeGroup = (name: string) =>
+    (englishCatalog.widgets as Record<string, Record<string, Record<string, string>>>).generate![name]!;
+
+  it('words every translated issue in its locale entry exactly as its English, and the locale has no others', async () => {
+    const instance = i18n.createInstance();
+    await instance.init({
+      initAsync: false,
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: englishCatalog } },
+    });
+    const translated = collectGenerationIssueScenarios().filter((issue) => issue.messageKey);
+
+    expect(new Set(translated.map(({ messageKey }) => messageKey!.replace('widgets.generate.issues.', '')))).toEqual(
+      new Set(Object.keys(localeGroup('issues')).map(withoutPluralSuffix))
+    );
+
+    for (const issue of translated) {
+      expect(describeGenerationIssue((key, values) => instance.t(key, values), issue)).toBe(issue.message);
+    }
+  });
+
+  it('names a reference image in its issues as its row does: its own name, else its position', async () => {
+    const instance = i18n.createInstance();
+    await instance.init({
+      initAsync: false,
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: englishCatalog } },
+    });
+    const t = (key: string, values?: Record<string, unknown>) => instance.t(key, values);
+    const aboutOneReference = (issues: GenerationIssue[]) =>
+      issues.filter((issue) => issue.target.referenceImageId !== undefined);
+    const named = aboutOneReference(collectGenerationIssueScenarios({ namedReferences: true }));
+
+    // Every kind: a missing image, adapter, Redux or Kontext model, a strength, an unsupported kind, a model not
+    // installed. Unnamed references keep their positional default, which the test above words.
+    expect(new Set(named.map(({ messageKey }) => messageKey?.replace('widgets.generate.issues.', '')))).toEqual(
+      new Set([
+        'referenceImageNeedsImage',
+        'referenceImageNeedsIpAdapter',
+        'referenceImageNeedsKontext',
+        'referenceImageNeedsRedux',
+        'referenceImageStrength',
+        'referenceImageUnsupported',
+        'referenceModelNotInstalled',
+      ])
+    );
+
+    for (const issue of named) {
+      const name = `Name of ${issue.target.referenceImageId}`;
+
+      expect(issue.message).toContain(name);
+      expect(issue.message).not.toMatch(/reference image \d/i);
+      expect(describeGenerationIssue(t, issue)).toBe(issue.message);
+    }
+  });
+
+  it('names every subject a switch can report, and no others, in the locale', () => {
+    expect(new Set(Object.keys(localeGroup('switchSubjects')).map(withoutPluralSuffix))).toEqual(
+      new Set(GENERATE_MODEL_SWITCH_SUBJECTS)
+    );
+  });
+
+  it('names each issue the section that fixes it and keeps its id while the problem lasts', () => {
+    const settings = createSettings(sdxl, {
+      referenceImages: Array.from({ length: 7 }, (_, index) => ipAdapterReference(`ref-${index}`)),
+    });
+    const [limit] = getGenerationValidationIssues(sdxl, settings);
+
+    expect(limit).toMatchObject({
+      id: 'referenceImages:limit',
+      target: { field: 'referenceImages', section: 'guidance' },
+    });
+    expect(getGenerationValidationIssues(sdxl, { ...settings, steps: 12 })[0]?.id).toBe(limit?.id);
+  });
+
+  it('fixes the reference limit by turning off the extra running references, keeping them listed', () => {
+    const referenceImages = [
+      { ...ipAdapterReference('off'), isEnabled: false },
+      ...Array.from({ length: 7 }, (_, index) => ipAdapterReference(`ref-${index}`)),
+    ];
+    const settings = createSettings(sdxl, { referenceImages });
+    const [limit] = getGenerationValidationIssues(sdxl, settings);
+    const fixed = { ...settings, ...getGenerationIssueFixPatch(settings, limit!.fix!) };
+
+    expect(fixed.referenceImages.map(({ id, isEnabled }) => [id, isEnabled])).toEqual([
+      ['off', false],
+      ['ref-0', true],
+      ['ref-1', true],
+      ['ref-2', true],
+      ['ref-3', true],
+      ['ref-4', true],
+      ['ref-5', false],
+      ['ref-6', false],
+    ]);
+    expect(getGenerationValidationIssues(sdxl, fixed)).toEqual([]);
+  });
+
+  it('fixes an off-grid free size by snapping both sides, and recording the new ratio', () => {
+    const settings = createSettings(sdxl, { aspectRatioId: 'Free', height: 1001, width: 1024 });
+    const [grid] = getGenerationValidationIssues(sdxl, settings);
+
+    expect(grid).toMatchObject({
+      fix: { aspectRatioValue: 1024 / 1000, height: 1000, kind: 'setDimensions', width: 1024 },
+      target: { section: 'dimensions' },
+    });
+    expect(
+      getGenerationValidationIssues(sdxl, { ...settings, ...getGenerationIssueFixPatch(settings, grid!.fix!) })
+    ).toEqual([]);
+  });
+
+  it('fixes an off-grid size under a ratio lock by deriving the height from the width', () => {
+    const settings = createSettings(sdxl, {
+      aspectRatioId: '16:9',
+      aspectRatioValue: 16 / 9,
+      height: 577,
+      width: 1024,
+    });
+    const [grid] = getGenerationValidationIssues(sdxl, settings);
+
+    expect(grid?.fix).toEqual({ height: 576, kind: 'setDimensions', width: 1024 });
+  });
+
+  it('fits a provider maximum on the grid, keeping a locked ratio', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { max_image_size: { height: 1000, width: 1000 }, modes: ['txt2img'] },
+    };
+    const settings = createSettings(model, { aspectRatioId: '1:1', aspectRatioValue: 1, height: 1500, width: 1500 });
+    const fix = getGenerationValidationIssues(model, settings).find(({ id }) => id === 'dimensions:providerMax')?.fix;
+    const grid = getGenerationDimensions(model).grid;
+
+    expect(fix).toMatchObject({ kind: 'setDimensions' });
+    expect(fix?.kind === 'setDimensions' && fix.width).toBeLessThanOrEqual(1000);
+    expect(fix?.kind === 'setDimensions' && fix.width % grid).toBe(0);
+    expect(fix?.kind === 'setDimensions' && fix.height).toBe(fix?.kind === 'setDimensions' && fix.width);
+  });
+
+  it('checks a Canvas hosted provider at the size it is asked for, as the form and the route both do', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: {
+        aspect_ratio_sizes: { '1:1': { height: 1024, width: 1024 } },
+        max_image_size: { height: 1024, width: 1024 },
+        modes: ['txt2img'],
+      },
+    };
+    const values = { ...createSettings(model, { height: 3000, width: 3000 }), model };
+
+    expect(getGenerateInvocationIssues(values).map(({ id }) => id)).toContain('dimensions:providerMax');
+    expect(getGenerateInvocationIssues(values, { canvasFrame: { height: 3000, width: 3000 } })).toEqual([]);
+  });
+});
+
+const REPO = 'google/gemma-4-E4B-it';
+
+describe('isModelFromRepo', () => {
+  it('matches the repo in its Hugging Face forms', () => {
+    expect(isModelFromRepo('google/gemma-4-E4B-it', REPO)).toBe(true);
+    expect(isModelFromRepo('Google/Gemma-4-e4b-IT', REPO)).toBe(true);
+    expect(isModelFromRepo('google/gemma-4-E4B-it::text_encoder', REPO)).toBe(true);
+    expect(isModelFromRepo('google/gemma-4-E4B-it:fp16::text_encoder', REPO)).toBe(true);
+    expect(isModelFromRepo('https://huggingface.co/google/gemma-4-E4B-it/tree/main', REPO)).toBe(true);
+  });
+
+  it('matches a local folder named like the repo', () => {
+    expect(isModelFromRepo('E:/ModelStuffSSD/gemma-4-E4B-it', REPO)).toBe(true);
+    expect(isModelFromRepo('E:\\ModelStuffSSD\\GEMMA-4-E4B-IT\\', REPO)).toBe(true);
+    expect(isModelFromRepo('/models/gemma-4-E4B-it', REPO)).toBe(true);
+  });
+
+  it('refuses other repos, other folders and a missing source', () => {
+    expect(isModelFromRepo('google/gemma-4-E2B-it', REPO)).toBe(false);
+    expect(isModelFromRepo('someone/gemma-4-E4B-it', REPO)).toBe(false);
+    expect(isModelFromRepo('someone/gemma-4-E4B-it:fp16', REPO)).toBe(false);
+    expect(isModelFromRepo('https://example.test/google/gemma-4-E4B-it', REPO)).toBe(false);
+    expect(isModelFromRepo('E:/ModelStuffSSD/gemma-4-E4B-it-q4', REPO)).toBe(false);
+    expect(isModelFromRepo('E:/ModelStuffSSD/gemma-4-E4B-it/model.safetensors', REPO)).toBe(false);
+    expect(isModelFromRepo(null, REPO)).toBe(false);
   });
 });

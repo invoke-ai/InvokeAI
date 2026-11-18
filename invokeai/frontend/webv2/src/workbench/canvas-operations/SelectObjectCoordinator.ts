@@ -8,6 +8,8 @@ import type {
   SelectObjectSessionPreview,
 } from '@workbench/canvas-operations/contracts';
 
+import { DEFAULT_SELECT_OBJECT_AUTO_UPDATE } from '@workbench/settings/contracts';
+
 import { createSelectObjectSession } from './selectObjectSession';
 
 interface CommitOwner {
@@ -42,6 +44,7 @@ export const createSelectObjectOperationCoordinator = (
       autoProcess: state.autoProcess,
       error: state.error,
       hasPreview: state.preview !== null,
+      retrying: state.retrying,
       layerName: startContext.layerName,
       layerType: startContext.layerType,
       input:
@@ -163,7 +166,7 @@ export const createSelectObjectOperationCoordinator = (
       result.status === 'locked'
         ? { code: 'locked' }
         : {
-            code: 'unknown',
+            code: 'commit-failed',
             detail: result.status === 'failed' ? result.message : `Select Object commit is ${result.status}.`,
           }
     );
@@ -179,7 +182,7 @@ export const createSelectObjectOperationCoordinator = (
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (finishCommit(owner)) {
-        owner.session.reportError({ code: 'unknown', detail: message });
+        owner.session.reportError({ code: 'commit-failed', detail: message });
       }
       return { message, status: 'failed' };
     }
@@ -187,9 +190,6 @@ export const createSelectObjectOperationCoordinator = (
 
   return {
     start: (layerId) => {
-      if (deps.isInteractionLocked()) {
-        return 'locked';
-      }
       const prepared = deps.prepareStart(layerId);
       if (prepared.status !== 'ready') {
         return prepared.status;
@@ -224,7 +224,7 @@ export const createSelectObjectOperationCoordinator = (
           runGraph: deps.runGraph,
           uploadIntermediate: deps.uploadIntermediate,
         },
-        initialAutoProcess: deps.readAutoProcessPreference?.() ?? false,
+        initialAutoProcess: deps.readAutoUpdatePreference?.() ?? DEFAULT_SELECT_OBJECT_AUTO_UPDATE,
         operation,
       });
       const installed = session;
@@ -245,15 +245,11 @@ export const createSelectObjectOperationCoordinator = (
           }
         }
       });
-      installed.update({ input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' } });
       syncStore();
       deps.setSamTool();
       return 'started';
     },
     update: (changes) => {
-      if (deps.isInteractionLocked()) {
-        return 'blocked';
-      }
       if (!session) {
         return 'stale';
       }
@@ -261,6 +257,7 @@ export const createSelectObjectOperationCoordinator = (
       const state = session.getSnapshot();
       const processingChanged =
         ('input' in sessionChanges && sessionChanges.input !== state.input) ||
+        (sessionChanges.inputType !== undefined && sessionChanges.inputType !== state.input.type) ||
         ('model' in sessionChanges && sessionChanges.model !== state.model) ||
         ('invert' in sessionChanges && sessionChanges.invert !== state.invert) ||
         ('applyPolygonRefinement' in sessionChanges &&
@@ -276,16 +273,10 @@ export const createSelectObjectOperationCoordinator = (
       return 'updated';
     },
     process: () => {
-      if (deps.isInteractionLocked()) {
-        return Promise.resolve('blocked');
-      }
       invalidateCommit();
       return session?.process() ?? Promise.resolve('stale');
     },
     apply: async (durable): Promise<CommitGeneratedImageResult> => {
-      if (deps.isInteractionLocked()) {
-        return { status: 'locked' };
-      }
       const currentSession = session;
       const preview = currentPreview();
       if (!currentSession || !preview) {
@@ -304,11 +295,7 @@ export const createSelectObjectOperationCoordinator = (
         return durability;
       }
       if (!isOwnerCurrent(owner)) {
-        return deps.isInteractionLocked() ? { status: 'locked' } : { status: 'stale' };
-      }
-      if (deps.isInteractionLocked()) {
-        invalidateCommit();
-        return { status: 'locked' };
+        return { status: 'stale' };
       }
       let result: CommitGeneratedImageResult;
       try {
@@ -316,7 +303,7 @@ export const createSelectObjectOperationCoordinator = (
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (finishCommit(owner)) {
-          owner.session.reportError({ code: 'unknown', detail: message });
+          owner.session.reportError({ code: 'commit-failed', detail: message });
         }
         return { message, status: 'failed' };
       }
@@ -334,9 +321,6 @@ export const createSelectObjectOperationCoordinator = (
       return result;
     },
     save: async (target: SelectObjectSaveTarget, durable): Promise<SaveSelectObjectSessionResult> => {
-      if (deps.isInteractionLocked()) {
-        return { status: 'locked' };
-      }
       const currentSession = session;
       const preview = currentPreview();
       if (!currentSession || !preview) {
@@ -366,11 +350,7 @@ export const createSelectObjectOperationCoordinator = (
         return durability;
       }
       if (!isOwnerCurrent(owner)) {
-        return deps.isInteractionLocked() ? { status: 'locked' } : { status: 'stale' };
-      }
-      if (deps.isInteractionLocked()) {
-        invalidateCommit();
-        return { status: 'locked' };
+        return { status: 'stale' };
       }
       let result: SaveSelectObjectSessionResult;
       try {
@@ -384,7 +364,7 @@ export const createSelectObjectOperationCoordinator = (
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (finishCommit(owner)) {
-          owner.session.reportError({ code: 'unknown', detail: message });
+          owner.session.reportError({ code: 'commit-failed', detail: message });
         }
         return { message, status: 'failed' };
       }
@@ -399,9 +379,6 @@ export const createSelectObjectOperationCoordinator = (
       return result;
     },
     reset: () => {
-      if (deps.isInteractionLocked()) {
-        return 'blocked';
-      }
       const operation = deps.controller.getSnapshot();
       if (
         !session ||
@@ -418,7 +395,6 @@ export const createSelectObjectOperationCoordinator = (
       publishedGuard = null;
       pointLabel = 'include';
       session.reset();
-      session.update({ input: { bbox: null, excludePoints: [], includePoints: [], type: 'visual' } });
       syncStore();
       return 'updated';
     },
@@ -427,10 +403,6 @@ export const createSelectObjectOperationCoordinator = (
       if (deps.isSamToolActive()) {
         deps.setViewTool();
       }
-    },
-    interruptAndBlock: () => {
-      invalidateCommit();
-      session?.interruptProcessing();
     },
     isActive: () => session !== null,
     dispose: () => clear(),

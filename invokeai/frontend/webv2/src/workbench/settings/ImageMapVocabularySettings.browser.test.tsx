@@ -60,6 +60,7 @@ vi.mock('react-i18next', () => ({
         'settings.imageMapVocabulary.saveFailed': 'Could not save the vocabulary.',
         'settings.imageMapVocabulary.termTooLong': `Terms must be ${String(options?.max)} characters or fewer.`,
         'settings.imageMapVocabulary.tooManyTerms': `The list is limited to ${String(options?.max)} terms.`,
+        'widgets.imageMap.progress.counts': `${String(options?.processed)} of ${String(options?.total)} images`,
       })[key] ?? key,
   }),
 }));

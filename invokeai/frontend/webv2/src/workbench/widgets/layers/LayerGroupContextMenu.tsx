@@ -11,10 +11,9 @@ import type { ComponentProps } from 'react';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { MenuActionItem, MenuContent, RenameDialog } from '@platform/ui';
-import { collectSubtree, getDocumentIndex, isOverlayStack } from '@workbench/canvas-engine/api';
-import { publishLayerPanelSelection, useLayerPanelState } from '@workbench/layerPanelState';
-import { useNotify } from '@workbench/useNotify';
-import { reportLayerOperation, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { getDocumentIndex, isOverlayStack } from '@workbench/canvas-engine/api';
+import { useLayerPanelState } from '@workbench/layerPanelState';
+import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowDownIcon,
@@ -40,15 +39,24 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { COLOR_LABEL_ITEMS } from './colorLabels';
-import { ADJUSTMENT_ADD_ITEMS, adjustmentAddActionId } from './layerContextActions';
-import { canGroupSelection, groupLayers, ungroupLayers } from './layerGroupCommands';
+import {
+  deleteLayers,
+  duplicateLayers,
+  groupLayers,
+  layerCommandLabel,
+  layerCommandTargets,
+  ungroupLayers,
+  useLayerCommandAvailability,
+  useLayerCommandDeps,
+} from './layerCommands';
+import { ADJUSTMENT_ADD_ITEMS, adjustmentAddActionId, enabledToggleLabel } from './layerContextActions';
 import { createAdjustmentEntry } from './layerOps';
 
 const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
 
 const noop = (): void => undefined;
 
-export type LayerGroupContextMenuEngine = Pick<CanvasEngineHandle, 'document' | 'layers' | 'projectId'>;
+export type LayerGroupContextMenuEngine = Pick<CanvasEngineHandle, 'document' | 'interaction' | 'layers' | 'projectId'>;
 
 type MenuPositioning = ComponentProps<typeof Menu.Root>['positioning'];
 
@@ -80,7 +88,7 @@ export const LayerGroupContextMenu = ({
 }: LayerGroupContextMenuProps) => {
   const { t } = useTranslation();
   const commitPrepared = usePreparedCommit(engine);
-  const notify = useNotify();
+  const commandDeps = useLayerCommandDeps(engine);
   const projectId = useActiveProjectId();
   const document = useActiveProjectSelector((project) => project.canvas.document);
   const { selectedIds } = useLayerPanelState(projectId, document.selectedLayerId);
@@ -96,16 +104,12 @@ export const LayerGroupContextMenu = ({
     setMenuOpen(true);
   }
 
-  const selection = useCallback(
-    (): readonly string[] => (selectedIds.includes(group.id) ? selectedIds : [group.id]),
-    [group.id, selectedIds]
-  );
-  // What a locked ancestor or a locked descendant takes off the table, so no item leads to a refusal.
-  const entry = getDocumentIndex(document).byId.get(group.id);
-  const frozen = entry?.ancestorsLocked ?? false;
-  const holdsLocked =
-    frozen || group.isLocked || (entry ? collectSubtree(entry.node).some((node) => node.isLocked) : false);
-  const groupable = canGroupSelection(engine?.document.model() ?? null, selection());
+  const targets = layerCommandTargets(selectedIds, group.id);
+  const available = useLayerCommandAvailability(engine, targets);
+  const duplicateLabel = layerCommandLabel(document, 'duplicate', targets);
+  const deleteLabel = layerCommandLabel(document, 'delete', targets);
+  // What a locked ancestor takes off the table for arrangement and adjustments, so no item leads to a refusal.
+  const frozen = getDocumentIndex(document).byId.get(group.id)?.ancestorsLocked ?? false;
   const positioning = useMemo<MenuPositioning>(
     () => ({ getAnchorRect: () => anchor, placement: 'bottom-start' }),
     [anchor]
@@ -147,9 +151,11 @@ export const LayerGroupContextMenu = ({
       onClose();
     }
   }, [menuOpen, onClose]);
+  const hideable = isOverlayStack(stack);
+  const enabledLabel = enabledToggleLabel(document, [group.id], group.isEnabled);
   const handleToggleEnabled = useCallback(
-    () => patch(t('widgets.layers.actions.toggleVisibility'), { isEnabled: !group.isEnabled }),
-    [group.isEnabled, patch, t]
+    () => patch(t(enabledLabel.key), { isEnabled: !group.isEnabled }),
+    [enabledLabel.key, group.isEnabled, patch, t]
   );
   const handleToggleLock = useCallback(
     () => patch(t('widgets.layers.actions.toggleLock'), { isLocked: !group.isLocked }),
@@ -157,56 +163,23 @@ export const LayerGroupContextMenu = ({
   );
   const handleToggleHidden = useCallback(
     () =>
-      commitPrepared(t('widgets.layers.actions.toggleHidden'), (model) =>
-        model.prepare({ type: 'set-hidden', updates: [{ id: group.id, isHidden: group.isHidden !== true }] })
+      commitPrepared(
+        t(group.isHidden ? 'widgets.layers.actions.showGroupOnCanvas' : 'widgets.layers.actions.hideGroupOnCanvas'),
+        (model) => model.prepare({ type: 'set-hidden', updates: [{ id: group.id, isHidden: group.isHidden !== true }] })
       ),
     [commitPrepared, group.id, group.isHidden, t]
   );
-  const handleGroup = useCallback(
-    () => groupLayers(engine, projectId, selection(), t('widgets.layers.actions.group')),
-    [engine, projectId, selection, t]
-  );
-  const handleUngroup = useCallback(
-    () => ungroupLayers(engine, selection(), t('widgets.layers.actions.ungroup')),
-    [engine, selection, t]
-  );
-  const handleDuplicate = useCallback(async () => {
-    if (!engine) {
-      return;
-    }
-    try {
-      const result = await engine.layers.duplicateLayers(selection());
-      if (result.status === 'duplicated') {
-        publishLayerPanelSelection({ primaryId: result.selectedLayerId, projectId, selectedIds: result.duplicateIds });
-        return;
-      }
-      if (result.status === 'busy') {
-        return;
-      }
-      if (result.status !== 'nothing') {
-        reportLayerOperation(result.status === 'unreadable' ? result : result.status, notify.error, t);
-        return;
-      }
-    } catch {
-      // The engine leaves the document unchanged on a rejected transaction.
-    }
-    notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.copyFailed'));
-  }, [engine, notify, projectId, selection, t]);
-  const handleDelete = useCallback(
-    () =>
-      commitPrepared(t('widgets.layers.actions.delete'), (model) =>
-        model.prepare({ ids: selection(), type: 'remove' })
-      ),
-    [commitPrepared, selection, t]
-  );
+  const handleGroup = useCallback(() => groupLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleUngroup = useCallback(() => ungroupLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleDuplicate = useCallback(() => duplicateLayers(commandDeps, targets), [commandDeps, targets]);
+  const handleDelete = useCallback(() => deleteLayers(commandDeps, targets), [commandDeps, targets]);
   const handleArrange = useCallback(
     (kind: LayerStackMoveKind, label: string) => () =>
-      commitPrepared(label, (model) => model.prepare({ ids: selection(), kind, type: 'move' })),
-    [commitPrepared, selection]
+      commitPrepared(label, (model) => model.prepare({ ids: targets, kind, type: 'move' })),
+    [commitPrepared, targets]
   );
 
   const locked = editingLocked;
-  const hideable = isOverlayStack(stack);
   const adjustable = stack === 'raster';
 
   const handleAddAdjustment = useCallback(
@@ -254,21 +227,21 @@ export const LayerGroupContextMenu = ({
         onSelect={openRename}
       />
       <MenuActionItem
-        disabled={locked || !engine || frozen}
+        disabled={locked || !available.duplicate}
         icon={CopyIcon}
-        label={t('widgets.layers.actions.duplicate')}
+        label={t(duplicateLabel.key, { count: duplicateLabel.count })}
         value="duplicate"
         onSelect={handleDuplicate}
       />
       <MenuActionItem
-        disabled={locked || !groupable}
+        disabled={locked || !available.group}
         icon={FolderPlusIcon}
         label={t('widgets.layers.actions.group')}
         value="group"
         onSelect={handleGroup}
       />
       <MenuActionItem
-        disabled={locked || frozen || group.isLocked}
+        disabled={locked || !available.ungroup}
         icon={UngroupIcon}
         label={t('widgets.layers.actions.ungroup')}
         value="ungroup"
@@ -315,8 +288,8 @@ export const LayerGroupContextMenu = ({
       <Menu.Separator borderColor="border.subtle" />
       <MenuActionItem
         disabled={locked}
-        icon={group.isEnabled ? CircleOffIcon : CircleIcon}
-        label={t(group.isEnabled ? 'widgets.layers.actions.disableGroup' : 'widgets.layers.actions.enableGroup')}
+        icon={enabledLabel.icon}
+        label={t(enabledLabel.key)}
         value="enabled"
         onSelect={handleToggleEnabled}
       />
@@ -324,7 +297,9 @@ export const LayerGroupContextMenu = ({
         <MenuActionItem
           disabled={locked}
           icon={group.isHidden ? EyeIcon : EyeOffIcon}
-          label={t('widgets.layers.actions.toggleHidden')}
+          label={t(
+            group.isHidden ? 'widgets.layers.actions.showGroupOnCanvas' : 'widgets.layers.actions.hideGroupOnCanvas'
+          )}
           value="hidden"
           onSelect={handleToggleHidden}
         />
@@ -382,9 +357,9 @@ export const LayerGroupContextMenu = ({
       )}
       <Menu.Separator borderColor="border.subtle" />
       <MenuActionItem
-        disabled={locked || holdsLocked}
+        disabled={locked || !available.delete}
         icon={Trash2Icon}
-        label={t('widgets.layers.actions.delete')}
+        label={t(deleteLabel.key, { count: deleteLabel.count })}
         tone="danger"
         value="delete"
         onSelect={handleDelete}

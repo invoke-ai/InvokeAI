@@ -2,6 +2,7 @@
 // registration that replaced it (StrictMode's mount, unmount, mount).
 const presentModals = new Set<symbol>();
 const listeners = new Set<() => void>();
+let modalOpenGeneration = 0;
 
 export const subscribeModalPresence = (listener: () => void): (() => void) => {
   listeners.add(listener);
@@ -23,6 +24,7 @@ export const registerModalPresence = (): (() => void) => {
   if (presentModals.size === 0 && typeof window !== 'undefined') {
     window.addEventListener('keydown', rememberKeyDown, true);
   }
+  modalOpenGeneration += 1;
   presentModals.add(token);
   listeners.forEach((listener) => listener());
 
@@ -42,3 +44,6 @@ export const registerModalPresence = (): (() => void) => {
  */
 export const isModalPresent = (keyDown?: Event): boolean =>
   presentModals.size > 0 || (keyDown !== undefined && keyDownsUnderModal.has(keyDown));
+
+/** New modal ownership invalidates older focus moves; closing the requesting dialog does not. */
+export const getModalOpenGeneration = (): number => modalOpenGeneration;

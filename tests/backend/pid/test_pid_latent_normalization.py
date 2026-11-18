@@ -10,7 +10,8 @@ import torch
 from einops import rearrange
 from torch import nn
 
-from invokeai.backend.flux2.sampling_utils import get_flux2_bn_stats, unpack_flux2
+from invokeai.backend.flux2.latent_norm import read_vae_bn_stats
+from invokeai.backend.flux2.sampling_utils import unpack_flux2
 from invokeai.backend.pid.decode import pack_flux2_latent_for_pid
 
 
@@ -31,14 +32,14 @@ def test_pack_matches_upstream_flux2_tokenizer_encode() -> None:
     vae.bn.eval()
     expected = vae.bn(rearrange(raw, "... c (i pi) (j pj) -> ... (c pi pj) i j", pi=2, pj=2))
 
-    bn_stats = get_flux2_bn_stats(vae)
+    bn_stats = read_vae_bn_stats(vae)
     assert bn_stats is not None
     torch.testing.assert_close(pack_flux2_latent_for_pid(raw, *bn_stats), expected)
 
 
 def test_pack_recovers_the_latent_flux2_denoise_produced() -> None:
     """Round trip through flux2_denoise's output path: denoised (normalized, packed) -> stored -> PiD input."""
-    bn_mean, bn_std = get_flux2_bn_stats(_Flux2LikeVae())
+    bn_mean, bn_std = read_vae_bn_stats(_Flux2LikeVae())
     height, width = 192, 128
     packed_h, packed_w = height // 16, width // 16
     normalized = torch.randn(1, packed_h * packed_w, 128, generator=torch.Generator().manual_seed(2))
@@ -62,4 +63,4 @@ def test_pack_rejects_batchnorm_stats_of_another_vae() -> None:
 
 
 def test_bn_stats_absent_without_a_batchnorm_layer() -> None:
-    assert get_flux2_bn_stats(nn.Conv2d(4, 4, 1)) is None
+    assert read_vae_bn_stats(nn.Conv2d(4, 4, 1)) is None

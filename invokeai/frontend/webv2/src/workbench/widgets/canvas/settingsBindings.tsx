@@ -1,27 +1,36 @@
 import type { SettingFieldProps } from '@platform/ui/settings/contracts';
 
 import { SettingControl } from '@platform/ui/settings/SettingControl';
-import { useWidgetSettingsTarget } from '@workbench/settings/useWidgetSettingsTarget';
+import { useLayeredSetting } from '@workbench/settings/useLayeredSetting';
 import { useCallback } from 'react';
 
 import { CANVAS_SETTINGS, readCanvasBooleanSetting } from './canvasSettings';
 
 export const Field = ({ field, surface, target }: SettingFieldProps) => {
   const definition = CANVAS_SETTINGS.find((setting) => setting.key === field.id);
-  const { disabled, patch, value } = useWidgetSettingsTarget('canvas', target, (values) =>
-    definition ? readCanvasBooleanSetting(values, definition) : false
+  const read = useCallback(
+    (values: Readonly<Record<string, unknown>>) => (definition ? readCanvasBooleanSetting(values, definition) : false),
+    [definition]
+  );
+  const { disabled, layer, set, value } = useLayeredSetting(
+    'canvas',
+    field.id,
+    target,
+    read,
+    definition?.defaultValue ?? false,
+    field
   );
   const onChange = useCallback(
     (next: boolean | string | number) => {
       if (definition && typeof next === 'boolean') {
-        patch({ [definition.key]: next });
+        set(next);
       }
     },
-    [definition, patch]
+    [definition, set]
   );
   return (
     <SettingControl
-      isModified={definition !== undefined && value !== definition.defaultValue}
+      layer={layer}
       disabled={disabled}
       field={field}
       surface={surface}

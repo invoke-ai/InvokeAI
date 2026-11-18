@@ -15,7 +15,8 @@ import { GenerateGuidanceSection } from './GenerateGuidanceSection';
 
 vi.mock('./GenerationUiContext', () => ({
   useGenerationUi: () => ({
-    sectionPreferences: { sectionsOpen: { guidance: true }, setSectionOpen: vi.fn() },
+    models: { status: 'loaded' },
+    sectionPreferences: { sectionsOpen: { guidance: true }, setSectionsOpen: vi.fn() },
   }),
 }));
 // The lists have their own tests; this one covers the note the section shows between them.
@@ -25,6 +26,7 @@ vi.mock('./GenerateConceptsSection', async () => {
 
   return {
     GenerateConceptsContent: () => null,
+    isConceptInstalled: () => true,
     isCompatibleLora: (lora: { model: { base: string } }, model: { base: string }) =>
       isLoraCompatibleWithModel(lora.model, model),
   };

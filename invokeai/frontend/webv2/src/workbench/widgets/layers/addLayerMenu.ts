@@ -16,7 +16,7 @@ export type AddLayerItemId =
   | 'raster'
   | 'group';
 
-/** A single add-layer menu entry (label is an i18n key; the icon lives in the view). */
+/** A single add-layer menu entry (label is an i18n key; the icon comes from `LAYER_KIND_ICONS`). */
 export interface AddLayerMenuItem {
   id: AddLayerItemId;
   labelKey: string;

@@ -65,7 +65,7 @@ def strip_transformer_prefix(key: str) -> str:
     return key[len(TRANSFORMER_PREFIX) :] if key.startswith(TRANSFORMER_PREFIX) else key
 
 
-def header_config(metadata: Mapping[str, str] | None) -> dict[str, Any]:
+def header_config(metadata: Mapping[str, Any] | None) -> dict[str, Any]:
     """The ``config`` JSON the official files embed in their safetensors header, or ``{}``."""
     raw = (metadata or {}).get("config")
     if not isinstance(raw, str):
@@ -77,7 +77,7 @@ def header_config(metadata: Mapping[str, str] | None) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
-def header_model_version(metadata: Mapping[str, str] | None) -> str | None:
+def header_model_version(metadata: Mapping[str, Any] | None) -> str | None:
     """The ``model_version`` the official files embed (``"2.5.0"``), or None."""
     version = (metadata or {}).get("model_version")
     return version if isinstance(version, str) and version else None
@@ -94,7 +94,7 @@ def generation_from_version(version: str | None) -> str | None:
 
 
 def classify_roles(
-    state_dict: Mapping[str, Any] | Iterable[str], metadata: Mapping[str, str] | None = None
+    state_dict: Mapping[str, Any] | Iterable[str], metadata: Mapping[str, Any] | None = None
 ) -> set[str]:
     """Which components a file holds, from its key names.
 
