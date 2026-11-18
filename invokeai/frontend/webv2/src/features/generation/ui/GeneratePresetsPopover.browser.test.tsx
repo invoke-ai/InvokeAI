@@ -103,10 +103,14 @@ describe('GeneratePresetsPopover', () => {
   const model: MainModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
   const openPresets = () =>
     act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="widgets.generate.presets"]')!));
-  const clickPreset = (label: string) =>
-    act(() =>
-      [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === label)!.click()
-    );
+  const clickPreset = async (label: string) => {
+    const preset = await vi.waitFor(() => {
+      const button = [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === label);
+      expect(button).toBeDefined();
+      return button!;
+    });
+    await act(() => preset.click());
+  };
 
   it.each(['omitted', 'null'] as const)(
     'applies a preset with %s refiner at once and offers an Undo that brings the refiner back',
