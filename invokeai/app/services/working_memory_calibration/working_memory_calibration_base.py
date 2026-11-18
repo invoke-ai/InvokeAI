@@ -38,8 +38,10 @@ class WorkingMemoryCalibrationServiceBase(ABC):
         the item its lineage started from. Counts the retries in flight on the runs of the calibration items among
         them, in the store, so that a retry the store then fails to record keeps its attempt from feeding a fit. None
         when no item is a calibration's, which touches no store file. Raises `CalibrationAttemptBusyError` or
-        `CalibrationAttemptInterleavedError` when retrying would break attempt exclusivity, and `CalibrationStoreError`
-        when the store cannot be written: the queue then retries nothing."""
+        `CalibrationAttemptInterleavedError` when retrying one of the calibration items would break attempt exclusivity
+        (also an item of a run without an attempt, retried between another attempt's steps), and
+        `CalibrationStoreError` when the store cannot be written: the queue then retries nothing, the request's other
+        items included."""
 
     @abstractmethod
     def retries_committed(self, in_flight: RetriesInFlight, retried: Optional[Iterable[RetriedQueueItem]]) -> None:

@@ -5,7 +5,8 @@ import builtins
 import datetime
 import json
 import os
-from collections.abc import Iterator, Mapping
+import threading
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
@@ -822,11 +823,12 @@ def test_each_reset_forgets_what_the_service_kept_of_the_runs_it_removed(tmp_pat
 
 def test_every_judgement_of_item_outcomes_holds_the_lock_removals_hold(tmp_path: Path, started, monkeypatch) -> None:
     """A removal drops its runs' outcomes under the fits' lock, in the same hold as its store change. Every other
-    judgement of the store's items (the summary, a new attempt's check of an attempt between its steps, a reset's hold
-    reasons) reads the queue under it too: none can write back an outcome of a run a removal just dropped, or find
-    one dropped between checking and reading it."""
+    judgement of the store's items (the summary, a new attempt's check of an attempt between its steps, a retry's
+    check of it, a reset's hold reasons) reads the queue under it too: none can write back an outcome of a run a
+    removal just dropped, or find one dropped between checking and reading it."""
     service = started(tmp_path)
     queue = service._services.session_queue
+    script = _failed(service, None)
     settled = _create(service, attempt_id="settled", attempt_steps=1)
     request = WorkingMemoryCalibrationRequest(
         graph_models={}, graph=_add_graph(), attempt_id="between-steps", attempt_steps=2
@@ -848,11 +850,15 @@ def test_every_judgement_of_item_outcomes_holds_the_lock_removals_hold(tmp_path:
     service._item_outcomes.clear()
     with pytest.raises(CalibrationAttemptBusyError):
         _create(service, attempt_id="next", attempt_steps=1)
+    phase = "retry check"
+    service._item_outcomes.clear()
+    with pytest.raises(CalibrationAttemptBusyError):
+        queue.retry_items_by_id("default", script.item_ids)
     phase = "reset"
     service._item_outcomes.clear()
     service.reset_run(settled)
 
-    assert held == {"summary": [True], "attempt check": [True], "reset": [True]}
+    assert held == {"summary": [True], "attempt check": [True], "retry check": [True], "reset": [True]}
 
 
 def _renumber(tmp_path: Path, run_id: str, item_ids: list[int]) -> None:
@@ -1016,25 +1022,61 @@ def test_a_run_whose_items_were_never_recorded_aborts_its_attempt(
     assert _estimate() == _shipped()
 
 
-def test_a_retry_queued_between_the_two_queue_reads_holds_its_attempt_back(
+def _retry_held_after_its_check(
+    monkeypatch: pytest.MonkeyPatch, service: WorkingMemoryCalibrationService, item_ids: list[int], retried: list[int]
+) -> Callable[[], None]:
+    """Retry `item_ids` in another thread, held once the store checked and counted it (`retries_starting`), as a retry
+    whose commit is slow. The function returned lets it commit, the first time it is called, and waits for its end;
+    `retried` then holds the retries' ids."""
+    queue = service._services.session_queue
+    checked, release = threading.Event(), threading.Event()
+    starting = service.retries_starting
+
+    def checked_then_held(sources):
+        in_flight = starting(sources)
+        checked.set()
+        assert release.wait(10)
+        return in_flight
+
+    monkeypatch.setattr(service, "retries_starting", checked_then_held)
+    retrying = threading.Thread(
+        target=lambda: retried.extend(
+            item.item_id for item in queue.retry_items_by_id("default", item_ids).retried_items
+        )
+    )
+    retrying.start()
+    assert checked.wait(10)
+
+    def commit() -> None:
+        if not release.is_set():
+            release.set()
+            retrying.join(10)
+            assert not retrying.is_alive()
+
+    return commit
+
+
+def test_a_retry_committed_during_a_refresh_holds_its_attempt_back(
     tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The stopped step is retried after the read for running items and before the items are read by id: the refresh
-    judges the store it read, in which the step ended canceled, so the attempt feeds nothing; the next one finds the
-    retry running, and the attempt feeds once it completed."""
+    """The stopped step's retry was checked and counted before the refresh took the fits' lock, which the check takes
+    too, and commits after the refresh read the queue for running items. The refresh judges the store it read: the
+    count keeps the attempt out, so it feeds nothing, and no read by id can find the step ended canceled while its
+    retry is queued. The next refresh finds the retry running, and the attempt feeds once it completed."""
     service = started(tmp_path)
-    _, stopped = _queue_attempt(service, "retried-between-reads", 2)
+    _, stopped = _queue_attempt(service, "retried-during-a-refresh", 2)
     queue = service._services.session_queue
     queue.cancel_queue_item(stopped.item_ids[0])
-    read_by_id = queue.get_queue_item_summaries_by_ids
+    read_running = queue.get_unfinished_origins
     retries: list[int] = []
+    commit = _retry_held_after_its_check(monkeypatch, service, stopped.item_ids, retries)
 
-    def retry_then_read(*args, **kwargs):
-        if not retries:
-            retries.extend(item.item_id for item in queue.retry_items_by_id("default", stopped.item_ids).retried_items)
-        return read_by_id(*args, **kwargs)
+    def read_then_commit(*args, **kwargs):
+        origins = read_running(*args, **kwargs)
+        commit()
+        return origins
 
-    monkeypatch.setattr(queue, "get_queue_item_summaries_by_ids", retry_then_read)
+    monkeypatch.setattr(queue, "get_unfinished_origins", read_then_commit)
     service.refresh_user_fits()
 
     assert retries and _estimate() == _shipped()
@@ -1375,7 +1417,8 @@ def test_a_retry_queued_as_a_reset_takes_the_files_lock_still_stops_the_attempt(
     tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch, reset: str
 ) -> None:
     """The failed step's retry is queued by the time the reset reads the queue, under the file's lock: the reset finds
-    the attempt running and stops it for good. Resetting the model is what the UI does."""
+    the attempt running and stops it for good. Resetting the model is what the UI does. The retry was checked before
+    the reset took the fits' lock, which its check takes too, and commits while the reset holds it."""
     service = started(tmp_path)
     queue = service._services.session_queue
     _, failed = _queue_attempt(service, "retried-while-reset", 2)
@@ -1384,12 +1427,10 @@ def test_a_retry_queued_as_a_reset_takes_the_files_lock_still_stops_the_attempt(
     assert _estimate() == _user_bytes(1024)
     change = service._store.change
     retried: list[int] = []
+    commit = _retry_held_after_its_check(monkeypatch, service, failed.item_ids, retried)
 
     def retry_then_change(*args, **kwargs):
-        if not retried:
-            # Marked first: the retry's own changes of the file pass.
-            retried.append(-1)
-            retried.extend(item.item_id for item in queue.retry_items_by_id("default", failed.item_ids).retried_items)
+        commit()
         return change(*args, **kwargs)
 
     monkeypatch.setattr(service._store, "change", retry_then_change)
@@ -1762,6 +1803,79 @@ def test_a_retry_after_another_attempt_started_is_refused(tmp_path: Path, starte
     assert queue.get_queue_item_ids("default").item_ids == before
     failed_record = _stored_run(tmp_path, failed.run_id)
     assert failed_record.get("retries_in_flight", 0) == 0
+
+
+def _failed(
+    service: WorkingMemoryCalibrationService,
+    attempt_id: Optional[str],
+    owner: str = "system",
+    steps: int = 2,
+    *,
+    model_key: str = "model-a",
+):
+    """One run (a step of an attempt, or a run without one) whose item ran out of memory, as the runner saw it."""
+    request = WorkingMemoryCalibrationRequest(
+        graph_models={},
+        graph=_add_graph(),
+        attempt_id=attempt_id,
+        attempt_steps=steps if attempt_id is not None else None,
+    )
+    created = asyncio.run(service.create_run(model_key, request, owner))
+    _settle_as_the_runner(service, created.run_id, created.item_ids, "failed")
+    return created
+
+
+def _unchanged_by_a_refused_retry(tmp_path: Path, queue: SessionQueue, before: list[int], *runs) -> None:
+    assert queue.get_queue_item_ids("default").item_ids == before
+    for created in runs:
+        assert "retries_in_flight" not in _stored_run(tmp_path, created.run_id)
+
+
+@pytest.mark.parametrize("between", ["running", "between steps"])
+def test_a_retry_of_a_run_without_an_attempt_between_another_attempts_steps_is_refused(
+    tmp_path: Path, started, between: str
+) -> None:
+    """A script's run failed before A started. Retrying it while A runs, or is between its steps, would measure
+    between A's steps without cutting A off as a new run would: refused, also for A's own owner. Once A finished, the
+    retry is admitted."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    script = _failed(service, None)
+    first = asyncio.run(service.create_run("model-a", _steps("tab-a", 2), "system"))
+    if between == "between steps":
+        _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
+    before = queue.get_queue_item_ids("default").item_ids
+
+    with pytest.raises(CalibrationAttemptBusyError) as refused:
+        queue.retry_items_by_id("default", script.item_ids)
+
+    assert refused.value.code == "calibration_running"
+    _unchanged_by_a_refused_retry(tmp_path, queue, before, script, first)
+    if between == "running":
+        _settle_as_the_runner(service, first.run_id, first.item_ids, "completed")
+    _step(service, "tab-a")
+    assert [retry.source_item_id for retry in queue.retry_items_by_id("default", script.item_ids).retried_items] == (
+        script.item_ids
+    )
+
+
+@pytest.mark.parametrize("order", ["script first", "attempt first"])
+def test_a_bulk_retry_is_refused_when_any_of_its_runs_is_cut_off(tmp_path: Path, started, order: str) -> None:
+    """The script's run, before A, may be retried on its own; A's step was cut off by a later run. Retried together,
+    in either order, the queue retries neither."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    script = _failed(service, None)
+    cut_off = _failed(service, "tab-a")
+    _step(service, None)
+    item_ids = script.item_ids + cut_off.item_ids
+    before = queue.get_queue_item_ids("default").item_ids
+
+    with pytest.raises(CalibrationAttemptInterleavedError):
+        queue.retry_items_by_id("default", item_ids if order == "script first" else item_ids[::-1])
+
+    _unchanged_by_a_refused_retry(tmp_path, queue, before, script, cut_off)
+    assert len(queue.retry_items_by_id("default", script.item_ids).retried_items) == 1
 
 
 def test_another_attempt_waits_while_one_is_between_its_steps(tmp_path: Path, started, monkeypatch) -> None:

@@ -290,6 +290,31 @@ def test_a_retry_that_would_break_attempt_exclusivity_is_refused_with_a_coded_40
     assert queue.get_queue_item_ids("default").item_ids == before
 
 
+def test_a_retry_between_another_attempts_steps_is_refused_with_a_coded_409(
+    client: TestClient, admin_token: str, calibration
+) -> None:
+    """A script's run failed; then an attempt started and is between its steps. The script run's retry would measure
+    between them."""
+    queue, _ = calibration
+    [item_id] = _calibrate(client, admin_token).json()["item_ids"]
+    queue.dequeue()
+    queue.fail_queue_item(item_id, "OutOfMemoryError", "out of memory", "")
+    [step] = _calibrate(client, admin_token, {"graph": _graph(), "attempt_id": "tab", "attempt_steps": 2}).json()[
+        "item_ids"
+    ]
+    queue.dequeue()
+    queue.complete_queue_item(step)
+
+    response = client.put("/api/v1/queue/default/retry_items_by_id", json=[item_id], headers=_auth(admin_token))
+
+    assert response.status_code == 409, response.text
+    assert response.json()["detail"] == {
+        "code": "calibration_running",
+        "message": "Another calibration on this GPU is between its steps. Try again in a moment, or once it has "
+        "finished.",
+    }
+
+
 def test_the_retry_route_documents_its_coded_409() -> None:
     responses = app.openapi()["paths"]["/api/v1/queue/{queue_id}/retry_items_by_id"]["put"]["responses"]
     assert "calibration_running" in responses["409"]["description"]
