@@ -3530,7 +3530,10 @@ export type paths = {
          * @description Retries the given queue items. Users can only retry their own items unless they are an admin.
          *
          *     A calibration item's retry is recorded in the calibration store as it commits. When that store cannot be written,
-         *     the request retries nothing, also its items that are no calibration's (503); retry again once it can.
+         *     the request retries nothing, also its items that are no calibration's (503); retry again once it can. A calibration
+         *     item whose retry would measure between another calibration attempt's steps, or after another calibration cut its
+         *     own attempt off, refuses the whole request too, generations included (409 with a code). The web UI retries one
+         *     item per request; an API client that retries several at once should retry its calibration items on their own.
          */
         put: operations["retry_items_by_id"];
         post?: never;
@@ -67218,6 +67221,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["RetryItemsResult"];
                 };
+            };
+            /** @description The items include a working-memory calibration's whose retry would break attempt exclusivity on its GPU: no item is retried, the request's other items included. Carries a code, as `{"code": ..., "message": ...}` in `detail`: `calibration_running`, another calibration attempt still runs on that GPU or is between its steps (also for an item of a calibration without an attempt); `calibration_interleaved`, another calibration ran on that GPU since the item's attempt began */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

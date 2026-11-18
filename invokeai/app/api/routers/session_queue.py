@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
+from invokeai.app.api.routers.working_memory import coded_conflict
 from invokeai.app.invocations.fields import ImageField, VideoField
 from invokeai.app.services.progress_previews.progress_previews_common import ProgressPreviewDTO
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
@@ -43,6 +44,8 @@ from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import (
     CALIBRATION_ORIGIN_PREFIX,
+    CalibrationAttemptBusyError,
+    CalibrationAttemptInterleavedError,
     CalibrationStoreError,
     is_reserved_origin,
 )
@@ -625,6 +628,13 @@ def cancel_by_destination(
     operation_id="retry_items_by_id",
     responses={
         200: {"model": RetryItemsResult},
+        409: {
+            "description": "The items include a working-memory calibration's whose retry would break attempt "
+            "exclusivity on its GPU: no item is retried, the request's other items included. Carries a code, as "
+            '`{"code": ..., "message": ...}` in `detail`: `calibration_running`, another calibration attempt still '
+            "runs on that GPU or is between its steps (also for an item of a calibration without an attempt); "
+            "`calibration_interleaved`, another calibration ran on that GPU since the item's attempt began"
+        },
         503: {
             "description": "The items include a working-memory calibration's, and its store cannot be written now "
             "(unwritable root, lock timeout): no item is retried, the request's other items included"
@@ -639,7 +649,10 @@ def retry_items_by_id(
     """Retries the given queue items. Users can only retry their own items unless they are an admin.
 
     A calibration item's retry is recorded in the calibration store as it commits. When that store cannot be written,
-    the request retries nothing, also its items that are no calibration's (503); retry again once it can."""
+    the request retries nothing, also its items that are no calibration's (503); retry again once it can. A calibration
+    item whose retry would measure between another calibration attempt's steps, or after another calibration cut its
+    own attempt off, refuses the whole request too, generations included (409 with a code). The web UI retries one
+    item per request; an API client that retries several at once should retry its calibration items on their own."""
     try:
         # Check queue membership for all items and ownership for non-admins.
         valid_item_ids: list[int] = []
@@ -669,6 +682,8 @@ def retry_items_by_id(
         )
     except HTTPException:
         raise
+    except (CalibrationAttemptBusyError, CalibrationAttemptInterleavedError) as error:
+        raise coded_conflict(error) from error
     except CalibrationStoreError:
         # The error names the store's path on the server.
         raise HTTPException(
