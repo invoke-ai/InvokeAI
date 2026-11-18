@@ -110,6 +110,7 @@ const state = vi.hoisted(() => ({
 }));
 const patchValues = vi.hoisted(() => vi.fn());
 const openItemMenu = vi.hoisted(() => vi.fn());
+const setCompareItem = vi.hoisted(() => vi.fn());
 const itemActions = vi.hoisted(() => ({
   canUseAsConditioningClip: { audio: true, video: true },
   canUseAsReferenceImage: false,
@@ -187,6 +188,7 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
     select({ settings: { viewerAutoSwitch: state.viewerAutoSwitch } }),
   useWorkbenchCommands: () => ({
     account: { updateProjectPreferences },
+    gallery: { setCompareItem },
     generation: { setSource: vi.fn() },
     widgets: { patchValues },
   }),
@@ -248,6 +250,7 @@ beforeEach(() => {
   state.density = 'full';
   itemActions.selectForCompare.mockClear();
   openItemMenu.mockClear();
+  setCompareItem.mockClear();
   itemActions.canUseAsReferenceImage = false;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   imageMetadata.mockReset().mockResolvedValue({ seed: 1 });
@@ -702,7 +705,7 @@ describe('preview header Edit and Use', () => {
     expect(videoMetadata).not.toHaveBeenCalled();
   });
 
-  it('gives a video the Use menu and a housekeeping ⋮ down to compact, and minimal star and the full ⋮', async () => {
+  it('shows video compare at full density and retains the compact and minimal menus', async () => {
     const strip = () =>
       [...host!.querySelectorAll<HTMLButtonElement>('button')]
         .map((entry) => entry.getAttribute('aria-label'))
@@ -710,8 +713,10 @@ describe('preview header Edit and Use', () => {
     state.actionItem = VIDEO;
 
     await render();
-    expect(strip()).toEqual(['Use this video', 'Star video', 'Image actions']);
+    expect(strip()).toEqual(['Use this video', 'Select for Compare', 'Star video', 'Image actions']);
     expect(button('Use this video').textContent).toContain('Use');
+    await settle(() => button('Select for Compare').click());
+    expect(setCompareItem).toHaveBeenCalledExactlyOnceWith(VIDEO);
     await settle(() => button('Image actions').click());
     expect(openItemMenu).toHaveBeenLastCalledWith(expect.any(Number), expect.any(Number), 'housekeeping');
 
