@@ -78,6 +78,10 @@ const OPENAI_GPT_IMAGE_MODEL_IDS: readonly unknown[] = [
   'gpt-image-2',
 ];
 
+/** Microsoft MAI image models in Azure AI Foundry; mirrors `is_mai_model` in `providers/azure.py`. */
+const isAzureMaiModel = (model: GenerateModelConfig | undefined): boolean =>
+  typeof model?.provider_model_id === 'string' && model.provider_model_id.toLowerCase().startsWith('mai-image');
+
 const getCapabilities = (model: GenerateModelConfig | undefined): ExternalModelCapabilities | null =>
   model?.type === 'external_image_generator' ? (model.capabilities ?? null) : null;
 
@@ -107,6 +111,10 @@ export const getExternalProviderOptionKeys = (model: GenerateModelConfig | undef
         'openaiBackground',
         ...(acceptsImageInputs(capabilities) ? (['openaiInputFidelity'] as const) : []),
       ];
+    case 'azure':
+      // GPT Image deployments take quality and background; MAI models take background only (no quality). Input
+      // fidelity is not offered: GPT Image 2.5 deployments reject it. Mirrors `providers/azure.py`.
+      return isAzureMaiModel(model) ? ['openaiBackground'] : ['openaiQuality', 'openaiBackground'];
     case 'gemini':
       return ['geminiTemperature', 'geminiThinkingLevel'];
     case 'seedream':

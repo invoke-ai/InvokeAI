@@ -34,6 +34,7 @@ interface ProviderPresentation {
 const EXTERNAL_PROVIDER_PRESENTATION: Record<string, ProviderPresentation> = {
   alibabacloud: { icon: AlibabaCloudIcon, placeholder: 'sk-…', title: 'Alibaba Cloud (Qwen)' },
   atlascloud: { icon: CloudIcon, title: 'Atlas Cloud' },
+  azure: { icon: CloudIcon, title: 'Azure AI Foundry' },
   gemini: { icon: GoogleGeminiIcon, placeholder: 'AIza…', title: 'Google Gemini' },
   openai: { icon: BotIcon, placeholder: 'sk-…', title: 'OpenAI' },
   seedream: { icon: ByteDanceIcon, placeholderKey: 'models.bytePlusApiKeyPlaceholder', title: 'Seedream' },
