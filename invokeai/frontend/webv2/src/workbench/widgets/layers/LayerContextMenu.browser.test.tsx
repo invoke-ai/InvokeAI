@@ -367,8 +367,8 @@ describe('generation and canvas visibility in the layer menus', () => {
 
 describe('group menu commands follow the document model', () => {
   /** Opens the group menu on `groupId` over a real engine for `nodes`. */
-  const openGroupMenu = async (nodes: CanvasNodeContract[], groupId: string) => {
-    const harnessed = await renderMenu(nodes);
+  const openGroupMenu = async (nodes: CanvasNodeContract[], groupId: string, selectedIds: readonly string[] = []) => {
+    const harnessed = await renderMenu(nodes, selectedIds);
     const group = getDocumentIndex(harnessed.document()).byId.get(groupId)!.node as CanvasGroupContract;
     await act(() =>
       root!.render(
@@ -391,8 +391,8 @@ describe('group menu commands follow the document model', () => {
   };
   const disabled = (name: string) => item(name).element().getAttribute('aria-disabled') === 'true';
   const commandStates = () => ({
-    delete: disabled('Delete layer'),
-    duplicate: disabled('Duplicate layer'),
+    delete: disabled('Delete group'),
+    duplicate: disabled('Duplicate group'),
     ungroup: disabled('Ungroup'),
   });
 
@@ -408,8 +408,8 @@ describe('group menu commands follow the document model', () => {
     );
     expect(commandStates()).toEqual({ delete: true, duplicate: false, ungroup: true });
 
-    await act(() => item('Duplicate layer').click());
-    await vi.waitFor(() => expect(engine.history.getEntries().past).toEqual(['Duplicate layer']));
+    await act(() => item('Duplicate group').click());
+    await vi.waitFor(() => expect(engine.history.getEntries().past).toEqual(['Duplicate group']));
     expect(document().stacks.raster.map((node) => [node.name, node.isLocked])).toEqual([
       ['G copy', true],
       ['G', true],
@@ -419,5 +419,12 @@ describe('group menu commands follow the document model', () => {
   it('copies nothing into the locked group around a group', async () => {
     await openGroupMenu([groupContract('L', [groupContract('H', [imageLayer('child')])], { isLocked: true })], 'H');
     expect(commandStates()).toEqual({ delete: true, duplicate: true, ungroup: true });
+  });
+
+  it('names a group selected with its own child as the group, in the menu and in history', async () => {
+    const { engine } = await openGroupMenu([groupContract('G', [imageLayer('child')])], 'G', ['G', 'child']);
+
+    await act(() => item('Delete group').click());
+    await vi.waitFor(() => expect(engine.history.getEntries().past).toEqual(['Delete group']));
   });
 });

@@ -64,7 +64,7 @@ import {
 } from 'lucide-react';
 
 import { COLOR_LABEL_ITEMS } from './colorLabels';
-import { layerCommandTargets, removeFromGroupCommand } from './layerCommands';
+import { layerCommandLabel, layerCommandTargets, removeFromGroupCommand } from './layerCommands';
 import { canAddRegionalReferenceImage, canConvertRasterControl, canMergeLayerDown } from './layerOps';
 
 export type LayerContextActionId =
@@ -320,6 +320,8 @@ export const actionTargets = (context: Pick<LayerContextActionState, 'layer' | '
   layerCommandTargets(context.selectedIds, context.layer.id);
 
 const targetCount = (context: LayerContextActionState): number => actionTargets(context).length;
+const commandLabel = (context: LayerContextActionState, command: 'delete' | 'duplicate') =>
+  layerCommandLabel(context.document, command, actionTargets(context));
 const isMultiTarget = (context: LayerContextActionState): boolean => targetCount(context) > 1;
 const targetNodes = (context: LayerContextActionState) => {
   const index = getDocumentIndex(context.document);
@@ -560,10 +562,8 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   {
     defaultLabel: 'Duplicate',
-    getDefaultLabel: (context) => (isMultiTarget(context) ? `Duplicate ${targetCount(context)} layers` : 'Duplicate'),
-    getLabelCount: targetCount,
-    getLabelKey: (context) =>
-      isMultiTarget(context) ? 'widgets.layers.actions.duplicateCount' : 'widgets.layers.actions.duplicate',
+    getLabelCount: (context) => commandLabel(context, 'duplicate').count,
+    getLabelKey: (context) => commandLabel(context, 'duplicate').key,
     handler: ({ effects }) => effects.duplicate(),
     icon: CopyIcon,
     id: 'duplicate',
@@ -1181,10 +1181,8 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
   },
   {
     defaultLabel: 'Delete',
-    getDefaultLabel: (context) => (isMultiTarget(context) ? `Delete ${targetCount(context)} layers` : 'Delete'),
-    getLabelCount: targetCount,
-    getLabelKey: (context) =>
-      isMultiTarget(context) ? 'widgets.layers.actions.deleteCount' : 'widgets.layers.actions.delete',
+    getLabelCount: (context) => commandLabel(context, 'delete').count,
+    getLabelKey: (context) => commandLabel(context, 'delete').key,
     handler: ({ effects }) => effects.delete(),
     icon: Trash2Icon,
     id: 'delete',

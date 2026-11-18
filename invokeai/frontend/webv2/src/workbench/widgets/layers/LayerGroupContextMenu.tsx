@@ -43,6 +43,7 @@ import {
   deleteLayers,
   duplicateLayers,
   groupLayers,
+  layerCommandLabel,
   layerCommandTargets,
   ungroupLayers,
   useLayerCommandAvailability,
@@ -105,6 +106,8 @@ export const LayerGroupContextMenu = ({
 
   const targets = layerCommandTargets(selectedIds, group.id);
   const available = useLayerCommandAvailability(engine, targets);
+  const duplicateLabel = layerCommandLabel(document, 'duplicate', targets);
+  const deleteLabel = layerCommandLabel(document, 'delete', targets);
   // What a locked ancestor takes off the table for arrangement and adjustments, so no item leads to a refusal.
   const frozen = getDocumentIndex(document).byId.get(group.id)?.ancestorsLocked ?? false;
   const positioning = useMemo<MenuPositioning>(
@@ -226,7 +229,7 @@ export const LayerGroupContextMenu = ({
       <MenuActionItem
         disabled={locked || !available.duplicate}
         icon={CopyIcon}
-        label={t('widgets.layers.actions.duplicate')}
+        label={t(duplicateLabel.key, { count: duplicateLabel.count })}
         value="duplicate"
         onSelect={handleDuplicate}
       />
@@ -356,7 +359,7 @@ export const LayerGroupContextMenu = ({
       <MenuActionItem
         disabled={locked || !available.delete}
         icon={Trash2Icon}
-        label={t('widgets.layers.actions.delete')}
+        label={t(deleteLabel.key, { count: deleteLabel.count })}
         tone="danger"
         value="delete"
         onSelect={handleDelete}

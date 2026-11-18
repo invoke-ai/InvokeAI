@@ -174,7 +174,7 @@ describe('eligibility', () => {
     const lockedGroup = setup(tree({ G: true }));
     expect(lockedGroup.can('duplicate', ['G'])).toBe(true);
     expect(await lockedGroup.run('duplicate', ['G'])).toBe('committed');
-    expect([...lockedLayer.labels, ...lockedGroup.labels]).toEqual(['Duplicate layer', 'Duplicate layer']);
+    expect([...lockedLayer.labels, ...lockedGroup.labels]).toEqual(['Duplicate layer', 'Duplicate group']);
 
     expect(lockedGroup.can('duplicate', ['r2'])).toBe(false);
     expect(lockedGroup.can('duplicate', ['r1', 'r2'])).toBe(false);
@@ -213,7 +213,7 @@ describe('eligibility', () => {
 });
 
 describe('undo labels', () => {
-  it('names delete, duplicate and group by how many nodes they act on', async () => {
+  it('names delete, duplicate and group by how many nodes they act on, and a lone group as a group', async () => {
     const h = setup(tree());
 
     expect(await h.run('duplicate', ['r1'])).toBe('committed');
@@ -226,7 +226,7 @@ describe('undo labels', () => {
       'Duplicate layer',
       'Duplicate 2 layers',
       'Group 2 layers',
-      'Delete layer',
+      'Delete group',
       'Delete 2 layers',
     ]);
     expect(h.errors).toEqual([]);
@@ -239,7 +239,7 @@ describe('undo labels', () => {
     expect(h.run('group', ['r1', 'G', 'r2'])).toBe('committed');
     expect(h.run('delete', ['G', 'r2'])).toBe('committed');
 
-    expect(h.labels).toEqual(['Duplicate layer', 'Group 2 layers', 'Delete layer']);
+    expect(h.labels).toEqual(['Duplicate group', 'Group 2 layers', 'Delete group']);
   });
 
   it('ungroups a group, and lifts leaves of one group above it instead, each named for what it did', () => {

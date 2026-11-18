@@ -124,6 +124,37 @@ export const canRunLayerCommand = (
 const targetCount = (model: CanvasDocumentModel, ids: readonly string[]): number =>
   outermostNodes(getDocumentIndex(model.document), ids).length;
 
+const LABEL_KEYS = {
+  delete: { count: 'widgets.layers.actions.deleteCount', group: 'widgets.layers.actions.deleteGroup' },
+  duplicate: { count: 'widgets.layers.actions.duplicateCount', group: 'widgets.layers.actions.duplicateGroup' },
+} as const;
+
+/**
+ * The label a delete or duplicate of `ids` carries in menus and in history, so the two cannot drift: one group alone
+ * is named as a group, anything else by its outermost count.
+ */
+export const layerCommandLabel = (
+  document: CanvasDocumentContractV3,
+  command: 'delete' | 'duplicate',
+  ids: readonly string[]
+): { readonly count: number; readonly key: string } => {
+  const outer = outermostNodes(getDocumentIndex(document), ids);
+  const keys = LABEL_KEYS[command];
+  return outer.length === 1 && isGroupNode(outer[0]!.node)
+    ? { count: 1, key: keys.group }
+    : { count: outer.length, key: keys.count };
+};
+
+const translatedLabel = (
+  t: TFunction,
+  model: CanvasDocumentModel,
+  command: 'delete' | 'duplicate',
+  ids: readonly string[]
+): string => {
+  const { count, key } = layerCommandLabel(model.document, command, ids);
+  return t(key, { count });
+};
+
 /** Busy means another edit holds the canvas, which already shows; anything else that did not land is reported. */
 const settle = (deps: LayerCommandDeps, result: StructuralCommitResult): LayerCommandOutcome => {
   if (result.status === 'committed') {
@@ -173,7 +204,7 @@ const commitCommand = (
 export const deleteLayers = (deps: LayerCommandDeps, ids: readonly string[]): LayerCommandOutcome =>
   commitCommand(deps, 'delete', ids, (model) => ({
     command: { ids, type: 'remove' },
-    label: deps.t('widgets.layers.actions.deleteCount', { count: targetCount(model, ids) }),
+    label: translatedLabel(deps.t, model, 'delete', ids),
   }));
 
 /** Dissolves the groups among `ids`, or lifts leaves of one group out above it, as one undo step. */
@@ -226,8 +257,8 @@ export const groupLayers = (deps: LayerCommandDeps, ids: readonly string[]): Lay
 
 /**
  * Copies `ids` with their pixels as one undo step; the engine selects the copies in the panel as it publishes them.
- * The model is asked first (a locked group around a source, the node limit) because the engine's copy does not
- * consult it.
+ * The model is asked first so a refused duplicate stays a silent no-op, as a disabled control would; the engine asks
+ * again when it commits.
  */
 export const duplicateLayers = async (deps: LayerCommandDeps, ids: readonly string[]): Promise<LayerCommandOutcome> => {
   const { engine, reportError, t } = deps;
@@ -236,10 +267,7 @@ export const duplicateLayers = async (deps: LayerCommandDeps, ids: readonly stri
     return 'skipped';
   }
   try {
-    const result = await engine.layers.duplicateLayers(
-      t('widgets.layers.actions.duplicateCount', { count: targetCount(model, ids) }),
-      ids
-    );
+    const result = await engine.layers.duplicateLayers(translatedLabel(t, model, 'duplicate', ids), ids);
     switch (result.status) {
       case 'duplicated':
         return 'committed';
