@@ -734,6 +734,13 @@ class T5EncoderGGUFModel(_T5DtypeByDevice):
         return model
 
 
+def _without_duplicate_t5_embedding(names: dict[str, str]) -> dict[str, str]:
+    """What of a single-file T5 encoder is worth reading: not the `encoder.embed_tokens` copy of a `shared` embedding."""
+    if "shared.weight" not in names:
+        return names
+    return {key: value for key, value in names.items() if not key.startswith("encoder.embed_tokens.")}
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.Checkpoint)
 class T5EncoderSingleFileLoader(ModelLoader):
     """Load a T5 encoder from one safetensors file with transformers key names (ComfyUI's ``t5xxl_*``).
@@ -804,15 +811,13 @@ class T5EncoderSingleFileLoader(ModelLoader):
         model_path = Path(config.path)
         keep_fp8, model_dtype = self._storage_format(config, submodel_type)
 
-        sd = load_safetensors_checkpoint(model_path)
+        # The duplicate embedding is never read when `shared` is there to keep.
+        sd = load_safetensors_checkpoint(model_path, select=_without_duplicate_t5_embedding)
         # ComfyUI writes the token embedding twice, as `shared` and as the encoder's `embed_tokens`, which the
-        # model ties to one parameter. Dropping the copy before anything is cast or reserved saves its size; a file
-        # with only the encoder's copy has it renamed, with any scale beside it.
-        has_shared = "shared.weight" in sd
-        for key in [key for key in sd if key.startswith("encoder.embed_tokens.")]:
-            value = sd.pop(key)
-            if not has_shared:
-                sd["shared." + key.removeprefix("encoder.embed_tokens.")] = value
+        # model ties to one parameter. A file with only the encoder's copy has it renamed, with any scale beside it.
+        if "shared.weight" not in sd:
+            for key in [key for key in sd if key.startswith("encoder.embed_tokens.")]:
+                sd["shared." + key.removeprefix("encoder.embed_tokens.")] = sd.pop(key)
 
         layer_hints = {
             **extract_comfy_quant_hints(sd),
@@ -868,6 +873,18 @@ class T5EncoderSingleFileLoader(ModelLoader):
         return model
 
 
+#: Present in a FLUX.1 transformer's keys, under `model.diffusion_model.` when the file bundles other components.
+_FLUX_BUNDLE_MARKER_KEY = "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale"
+
+
+def _transformer_of_flux_bundle(names: dict[str, str]) -> dict[str, str]:
+    """What of a FLUX.1 checkpoint is worth reading: in an all-in-one bundle, only the transformer (as
+    `convert_bundle_to_flux_transformer_checkpoint` keeps it), not the VAE and text encoders beside it."""
+    if _FLUX_BUNDLE_MARKER_KEY not in names:
+        return names
+    return {key: value for key, value in names.items() if key.startswith("model.diffusion_model")}
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class FluxCheckpointModel(ModelLoader):
     """Class to load main models."""
@@ -916,8 +933,8 @@ class FluxCheckpointModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = Flux(get_flux_transformers_params(config.variant))
 
-        sd = load_safetensors_checkpoint(model_path)
-        if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
+        sd = load_safetensors_checkpoint(model_path, select=_transformer_of_flux_bundle)
+        if _FLUX_BUNDLE_MARKER_KEY in sd:
             sd = convert_bundle_to_flux_transformer_checkpoint(sd)
 
         # ComfyUI 'scaled fp8' (fp8 weight + .weight_scale/.scale_weight, optionally an input

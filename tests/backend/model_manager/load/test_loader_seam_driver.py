@@ -138,7 +138,7 @@ def test_a_seam_installs_no_stub_it_did_not_ask_for(monkeypatch: pytest.MonkeyPa
 
 
 #: A loader module that reads through the shared helper and holds no ``load_file`` of its own.
-_helper_module = SimpleNamespace(load_safetensors_checkpoint=lambda _path: {}, widen=_widen)
+_helper_module = SimpleNamespace(load_safetensors_checkpoint=lambda _path, **_: {}, widen=_widen)
 
 
 class _ReadsThroughTheHelper:

@@ -1,13 +1,12 @@
 from pathlib import Path
-from unittest import mock
 
 import pytest
-import safetensors.torch
 import torch
 from safetensors.torch import load_file, save_file
 
 from invokeai.backend.model_manager.model_on_disk import read_safetensors_header
 from invokeai.backend.quantization.fp8_scaled import load_safetensors_checkpoint, safetensors_backend
+from tests.fixtures.safetensors_files import record_reads
 
 FLOAT8 = [torch.float8_e4m3fn, torch.float8_e5m2]
 _NORM = torch.arange(65, dtype=torch.float32).to(torch.bfloat16)
@@ -29,16 +28,6 @@ def _fp8_checkpoint(path: Path, dtype: torch.dtype = torch.float8_e4m3fn) -> Pat
             "block.proj.weight_scale": torch.tensor(0.5),
         },
     )
-
-
-def _spy_backends() -> tuple[list[str], mock._patch]:
-    backends: list[str] = []
-
-    def spy(path, *args, **kwargs):
-        backends.append(kwargs.get("backend", "mmap"))
-        return load_file(path, *args, **kwargs)
-
-    return backends, mock.patch.object(safetensors.torch, "load_file", spy)
 
 
 def _tensors_share_one_mapping(sd: dict[str, torch.Tensor], header: dict, keys: list[str]) -> bool:
@@ -96,14 +85,15 @@ def test_the_mmap_path_pins_the_file_through_its_survivors(tmp_path: Path) -> No
     ],
     ids=["bf16", "fp16+fp32", "int8+fp32 scale", "nvfp4", "scaled_fp8 marker only"],
 )
-def test_a_file_without_a_float8_weight_keeps_the_mmap_load(tmp_path: Path, tensors: dict[str, torch.Tensor]) -> None:
+def test_a_file_without_a_float8_weight_keeps_the_mmap_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, tensors: dict[str, torch.Tensor]
+) -> None:
     path = _write(tmp_path / "plain.safetensors", tensors)
 
-    backends, patch = _spy_backends()
-    with patch:
-        sd = load_safetensors_checkpoint(path)
+    log = record_reads(monkeypatch)
+    sd = load_safetensors_checkpoint(path)
 
-    assert backends == ["mmap"]
+    assert log.backends == ["mmap"]
     assert _tensors_share_one_mapping(sd, read_safetensors_header(path), [k for k, v in sd.items() if v.numel()])
 
 
@@ -152,3 +142,55 @@ def test_both_paths_return_the_same_tensors(tmp_path: Path, dtype: torch.dtype) 
         assert owned[key].shape == tensor.shape
         # Compared as bytes: float8 has no equality on CPU.
         assert owned[key].reshape(-1).view(torch.uint8).equal(tensor.reshape(-1).view(torch.uint8))
+
+
+def test_tensors_the_selection_leaves_out_are_never_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Through ``pread`` a tensor that is read costs its size in process memory whether or not the loader keeps it, so
+    a bundled component is dropped by name, from the header."""
+    transformer = load_file(_fp8_checkpoint(tmp_path / "fp8.safetensors"))
+    path = _write(tmp_path / "bundle.safetensors", {"vae.decoder.weight": torch.ones(512, 512), **transformer})
+    log = record_reads(monkeypatch)
+
+    sd = load_safetensors_checkpoint(
+        path, select=lambda names: {k: v for k, v in names.items() if k.startswith("block.")}
+    )
+
+    assert set(sd) == set(transformer)
+    assert set(log.tensors) == set(transformer)
+    assert log.backends == ["pread"], "the file's float8 weight decides the backend, whatever is selected"
+
+
+def test_the_selection_sees_every_key_and_what_it_returns_names_the_keys_to_read(tmp_path: Path) -> None:
+    """A loader hands its own key rename and drop functions over: they return renamed keys, whose values still name
+    the file's tensors, and the result is keyed by the file's own names."""
+    path = _fp8_checkpoint(tmp_path / "fp8.safetensors")
+    offered: list[dict[str, str]] = []
+
+    def select(names: dict[str, str]) -> dict[str, str]:
+        offered.append(dict(names))
+        return {f"model.{key}": value for key, value in names.items() if key != "block.proj.bias"}
+
+    sd = load_safetensors_checkpoint(path, select=select)
+
+    assert offered == [{key: key for key in load_file(path)}]
+    assert sorted(sd) == sorted(key for key in load_file(path) if key != "block.proj.bias")
+
+
+def test_a_selection_naming_a_tensor_the_file_lacks_is_refused_by_name(tmp_path: Path) -> None:
+    path = _fp8_checkpoint(tmp_path / "fp8.safetensors")
+
+    with pytest.raises(ValueError, match=r"fp8\.safetensors has no tensor 'block\.missing'"):
+        load_safetensors_checkpoint(path, select=lambda names: {"x": "block.missing"})
+
+
+def test_an_owned_read_gives_a_file_without_float8_weights_storage_of_its_own(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A bf16 tower's cast to bf16 returns the tensor itself, so whatever it reads would stay a view of the file."""
+    path = _write(tmp_path / "bf16.safetensors", {"w": torch.ones(4, 4, dtype=torch.bfloat16), "b": _BIAS})
+    log = record_reads(monkeypatch)
+
+    sd = load_safetensors_checkpoint(path, owned=True)
+
+    assert log.backends == ["pread"]
+    assert not _tensors_share_one_mapping(sd, read_safetensors_header(path), ["w", "b"])

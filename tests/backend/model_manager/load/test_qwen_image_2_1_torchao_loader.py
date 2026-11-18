@@ -16,7 +16,11 @@ from invokeai.backend.model_manager.load.model_loaders import qwen_image_2_1
 from invokeai.backend.model_manager.load.model_loaders.qwen_image_2_1 import QwenImage21CheckpointModel
 from invokeai.backend.model_manager.taxonomy import SubModelType
 from tests.fixtures.loader_seams import Seam, prepare
-from tests.fixtures.safetensors_files import needs_mapping_that_shows_file_writes, tensors_reading_the_file
+from tests.fixtures.safetensors_files import (
+    needs_mapping_that_shows_file_writes,
+    record_reads,
+    tensors_reading_the_file,
+)
 
 FP8 = torch.float8_e4m3fn
 
@@ -46,8 +50,6 @@ SEAM = Seam(
     module=qwen_image_2_1,
     entry="_load_model",
     compute_dtype=torch.bfloat16,
-    # The loader imports `load_file` inside the method, so the name it resolves is the package's.
-    load_file_host=safetensors.torch,
     patches_device=True,
 )
 
@@ -84,19 +86,11 @@ def _checkpoint() -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor], dic
 def _load(
     monkeypatch: pytest.MonkeyPatch, tmp_path, *, keep_fp8: bool
 ) -> tuple[torch.nn.Module, dict[str, torch.Tensor]]:
-    """The model, and the tensors `load_file` returned for the real file the loader read."""
+    """The model, and the tensors the loader read from the real file."""
     state_dict, _, _ = _checkpoint()
     checkpoint = tmp_path / CHECKPOINT
     safetensors.torch.save_file(state_dict, checkpoint)
-    loaded: dict[str, torch.Tensor] = {}
-    real_load_file = safetensors.torch.load_file
-
-    def recording_load_file(path, **kwargs):
-        tensors = real_load_file(path, **kwargs)
-        loaded.update(tensors)
-        return tensors
-
-    monkeypatch.setattr(safetensors.torch, "load_file", recording_load_file)
+    loaded = record_reads(monkeypatch).tensors
     config = Main_Checkpoint_QwenImage21_Config.model_construct(
         path=str(checkpoint), name="qwen21", default_settings=MainModelDefaultSettings(fp8_storage=False)
     )

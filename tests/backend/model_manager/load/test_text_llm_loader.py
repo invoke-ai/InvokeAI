@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 from PIL import Image
+from safetensors.torch import save_file
 from transformers import (
     Gemma4Config,
     Gemma4ForConditionalGeneration,
@@ -39,6 +40,7 @@ from invokeai.backend.qwen3_5.qwen3_5_encoder import load_bundled_qwen3_5_tokeni
 from tests.backend.model_manager.load.state_dicts import flux3_pup_bf16_keys, flux3_pup_int8_convrot_keys
 from tests.fixtures.loader_seams import Seam, prepare
 from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot
+from tests.fixtures.safetensors_files import record_reads
 
 Keys = dict[str, tuple[list[int], str]]
 
@@ -258,6 +260,21 @@ class TestTheCheckpointLoader:
         assert expected_features.abs().max() > 0.1
         torch.testing.assert_close(_image_features(model), expected_features, rtol=1e-4, atol=1e-5)
         assert run.reserved == [_nbytes(model.state_dict())]
+
+    def test_the_multi_token_prediction_head_is_never_read(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """Generation never runs it; read through ``pread`` it would cost its size in process memory first."""
+        state_dict = _int8_checkpoint(_reference())
+        config = _config(tmp_path)
+        save_file({key: value.contiguous() for key, value in state_dict.items()}, config.path)
+        run = prepare(SEAM, monkeypatch, geometry=_tiny_geometry)
+        log = record_reads(monkeypatch)
+
+        run.load(config, None)
+
+        assert any(key.startswith("mtp.") for key in state_dict)
+        assert set(log.tensors) == {key for key in state_dict if not key.startswith("mtp.")}
 
     def test_the_model_generates_with_the_releases_end_of_turn_tokens_and_real_rope_buffers(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path

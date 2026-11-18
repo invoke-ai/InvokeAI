@@ -550,13 +550,15 @@ class Krea2CheckpointModel(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd = load_safetensors_checkpoint(model_path)
+        # Discard what the key conversion below would discard anyway, before anything is spent on
+        # it: not even read. One repack quantizes `last.up` with a blockwise scale grid this decode does not
+        # implement; refusing a tensor that is on its way to the bin would be an odd way to fail.
+        sd = load_safetensors_checkpoint(
+            model_path,
+            select=lambda names: _drop_discarded_native_final_layers(CheckpointPrefix.detect(names).strip(names)),
+        )
         metadata = read_safetensors_metadata(model_path, self._logger)
         sd = CheckpointPrefix.detect(sd).strip(sd)
-        # Discard what the key conversion below would discard anyway, before anything is spent on
-        # it. One repack quantizes `last.up` with a blockwise scale grid this decode does not
-        # implement; refusing a tensor that is on its way to the bin would be an odd way to fail.
-        sd = _drop_discarded_native_final_layers(sd)
 
         # Comfy's nvfp4 build names its layers in the header, natively. Take them out before either side-channel
         # format below reads a scale: both pair every `weight_scale` with its weight, and the key conversion would
@@ -1088,12 +1090,11 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd = load_safetensors_checkpoint(str(model_path))
-        # Ahead of every pass that reads tensors, so the tower is never dequantized, cast, copied or
-        # reserved for. (The file *header* is still read below for quantization metadata, which can
-        # therefore still name visual layers; those hints match no surviving key and are ignored.)
-        # The LM head goes with it: this model has none, and a packed one would name no module.
-        sd = drop_qwen3vl_unloaded_keys(sd)
+        # The tower is never read, so never dequantized, cast, copied or reserved for. (The file *header* is still
+        # read below for quantization metadata, which can therefore still name visual layers; those hints match no
+        # surviving key and are ignored.) The LM head goes with it: this model has none, and a packed one would
+        # name no module.
+        sd = load_safetensors_checkpoint(str(model_path), select=drop_qwen3vl_unloaded_keys)
         metadata = read_safetensors_metadata(model_path, self._logger)
 
         # Comfy's nvfp4 build packs every language-model projection and names the layers in `.comfy_quant`

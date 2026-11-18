@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.taxonomy import Krea2VariantType
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_signed_tensors
+from tests.fixtures.safetensors_files import served_checkpoint
 
 COMPUTE_DTYPE = torch.bfloat16
 
@@ -122,7 +123,8 @@ def loaded(request, monkeypatch: pytest.MonkeyPatch, tmp_path) -> SimpleNamespac
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyKrea2, raising=False)
     monkeypatch.setattr(
-        "invokeai.backend.model_manager.load.model_loaders.krea2.load_safetensors_checkpoint", lambda _path: state_dict
+        "invokeai.backend.model_manager.load.model_loaders.krea2.load_safetensors_checkpoint",
+        served_checkpoint(state_dict),
     )
     monkeypatch.setattr(
         krea2,

@@ -34,6 +34,7 @@ import pytest
 import torch
 
 from invokeai.backend.util.devices import TorchDevice
+from tests.fixtures.safetensors_files import served_checkpoint
 
 #: Distinguishes "do not touch `read_safetensors_metadata`" from "make it return nothing". Both are
 #: real cases: a loader can be tested against a file whose header it really reads, and against that
@@ -122,8 +123,8 @@ def prepare(
     run = SeamRun(seam=seam, loader=None)
     served: list[dict[str, torch.Tensor]] = []
 
-    def load_file(_path):
-        served.append(dict(state_dict or {}))
+    def load_file(_path, *, select=None, owned: bool = False):
+        served.append(served_checkpoint(dict(state_dict or {}))(_path, select=select, owned=owned))
         return served[-1]
 
     def make_room(reserve: int) -> None:

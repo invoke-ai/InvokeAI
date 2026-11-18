@@ -52,6 +52,7 @@ from tests.backend.model_manager.load.moss_image_fixtures import (
 )
 from tests.backend.model_manager.load.state_dicts.moss_image_dit_keys import state_dict_keys as moss_dit_keys
 from tests.backend.model_manager.load.state_dicts.moss_image_vae_keys import state_dict_keys as moss_vae_keys
+from tests.fixtures.safetensors_files import needs_mapping_that_shows_file_writes, tensors_reading_the_file
 
 # `OpenMOSS-Team/MOSS-Image-Base`'s `transformer/config.json` at 1ceede80badddd6a7812069619edaa5633587192, verbatim
 # but for `rope_base`, which no tensor records. A literal, so this fails when the detection drifts rather than agreeing
@@ -611,6 +612,7 @@ class TestGGUFLoader:
             loader._load_model(config, SubModelType.VAE)
 
 
+@needs_mapping_that_shows_file_writes
 def test_a_float8_shard_read_by_its_index_does_not_pin_the_file(tmp_path: Path) -> None:
     """The sharded read picks keys per shard; the bf16 norms beside a float8 weight would otherwise stay views of
     the whole shard."""
@@ -628,8 +630,7 @@ def test_a_float8_shard_read_by_its_index_does_not_pin_the_file(tmp_path: Path) 
     sd = loader_module._read_component_state_dict(tmp_path)
 
     assert list(sd) == ["blocks.0.norm.weight"]
-    shard.unlink()  # a mapped file cannot be deleted on Windows while a view of it lives
-    assert sd["blocks.0.norm.weight"].tolist() == list(range(65))
+    assert tensors_reading_the_file(sd, shard) == []
 
 
 def _float8_file(path: Path) -> Path:
@@ -644,15 +645,16 @@ def _float8_file(path: Path) -> Path:
     return path
 
 
+@needs_mapping_that_shows_file_writes
 def test_an_unsharded_float8_component_does_not_pin_the_file(tmp_path: Path) -> None:
     path = _float8_file(tmp_path / "diffusion_pytorch_model.safetensors")
 
     sd = loader_module._read_component_state_dict(tmp_path)
 
-    path.unlink()  # a mapped file cannot be deleted on Windows while a view of it lives
-    assert sd["blocks.0.norm.weight"].tolist() == list(range(65))
+    assert tensors_reading_the_file(sd, path) == []
 
 
+@needs_mapping_that_shows_file_writes
 def test_a_single_file_float8_checkpoint_does_not_pin_the_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     path = _float8_file(tmp_path / "moss-image-dit.safetensors")
     loader = _loader(MossImageCheckpointModel, monkeypatch)
@@ -664,5 +666,4 @@ def test_a_single_file_float8_checkpoint_does_not_pin_the_file(monkeypatch: pyte
 
     loader._load_model(config, SubModelType.Transformer)
 
-    path.unlink()  # a mapped file cannot be deleted on Windows while a view of it lives
-    assert read["blocks.0.norm.weight"].tolist() == list(range(65))
+    assert tensors_reading_the_file(read, path) == []

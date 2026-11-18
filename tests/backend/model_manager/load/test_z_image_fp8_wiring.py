@@ -15,6 +15,7 @@ import torch
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_ZImage_Config
 from invokeai.backend.model_manager.load.model_loaders.z_image import ZImageCheckpointModel
 from invokeai.backend.model_manager.taxonomy import SubModelType, ZImageVariantType
+from tests.fixtures.safetensors_files import served_checkpoint
 
 
 class _TinyZImageTransformer(torch.nn.Module):
@@ -34,7 +35,7 @@ def _prepare_loader(monkeypatch, tmp_path, state_dict: dict[str, torch.Tensor]):
     monkeypatch.setattr(diffusers, "ZImageTransformer2DModel", _TinyZImageTransformer, raising=False)
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.z_image.load_safetensors_checkpoint",
-        lambda _path: state_dict,
+        served_checkpoint(state_dict),
     )
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.z_image.TorchDevice.choose_torch_device",

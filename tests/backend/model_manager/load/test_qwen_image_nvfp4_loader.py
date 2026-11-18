@@ -31,6 +31,7 @@ from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 from tests.fixtures.loader_seams import Seam, prepare
 from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_signed_tensors, quantize_convrot
+from tests.fixtures.safetensors_files import served_checkpoint
 
 COMPUTE_DTYPE = torch.bfloat16
 
@@ -67,7 +68,7 @@ def _patch_common(monkeypatch: pytest.MonkeyPatch, state_dict: dict, metadata: d
 
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.qwen_image.load_safetensors_checkpoint",
-        lambda _path: state_dict,
+        served_checkpoint(state_dict),
     )
     monkeypatch.setattr(qwen_image, "read_safetensors_metadata", lambda _path, _logger: metadata)
     monkeypatch.setattr(qwen_image.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
