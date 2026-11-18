@@ -174,6 +174,11 @@ class ModelsList(BaseModel):
 class EmptyModelCacheResponse(BaseModel):
     models_cleared: int
     bytes_freed: int
+    vram_release_refused: bool = Field(
+        description="The device refused to return its cached memory to the driver after the models were dropped (for "
+        "example an earlier error left it in a bad state). The models were still dropped; the memory stays reserved "
+        "by this process."
+    )
 
 
 class CacheType(str, Enum):
@@ -1610,11 +1615,15 @@ def empty_model_cache(current_admin: AdminUserOrDefault) -> EmptyModelCacheRespo
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
     models_cleared = 0
     bytes_freed = 0
+    vram_release_refused = False
     for cache in distinct_caches(ApiDependencies.invoker.services.model_manager.load.ram_caches.values()):
         result = cache.make_room(1000 * 2**30)
         models_cleared += result.models_cleared
         bytes_freed += result.bytes_freed
-    return EmptyModelCacheResponse(models_cleared=models_cleared, bytes_freed=bytes_freed)
+        vram_release_refused = vram_release_refused or result.vram_release_refused
+    return EmptyModelCacheResponse(
+        models_cleared=models_cleared, bytes_freed=bytes_freed, vram_release_refused=vram_release_refused
+    )
 
 
 class HFTokenStatus(str, Enum):
