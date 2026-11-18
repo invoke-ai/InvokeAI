@@ -267,7 +267,12 @@ export const lookupLayerBelow = (document: DocumentView, id: string): CanvasLaye
   return below && !isGroupNode(below) ? below : null;
 };
 
-/** Merge-down joins a raster leaf with the raster leaf directly below it under the same parent. */
+/**
+ * Merge-down joins a raster leaf with the raster leaf directly below it under the same parent. A refusal says which:
+ * nothing below at the top level (`no-layer-below`) or in a group (`bottom-of-group`), a group below (`group-below`,
+ * naming it), a layer of either pair that is not paint or image pixels (`not-mergeable`), a lock (naming each locked
+ * node), or a disabled layer or ancestor group (`disabled`, naming it).
+ */
 export const mergeDownEligibility = (document: CanvasDocumentContractV3, upperId: string): MergeDownEligibility => {
   const index = getDocumentIndex(document);
   const upper = index.byId.get(upperId);
@@ -277,10 +282,18 @@ export const mergeDownEligibility = (document: CanvasDocumentContractV3, upperId
   if (isGroupNode(upper.node) || upper.stack !== 'raster') {
     return { actual: upper.node.type, expected: ['raster'], status: 'wrong-type' };
   }
-  const lower = lookupLayerBelow(document, upperId);
-  if (!lower) {
-    return { reason: 'no-layer-below', status: 'invalid-target', targetId: upperId };
+  const sibling = childrenAt(index, upper.stack, upper.parentId)?.[upper.siblingIndex + 1];
+  if (!sibling) {
+    return {
+      reason: upper.parentId === null ? 'no-layer-below' : 'bottom-of-group',
+      status: 'invalid-target',
+      targetId: upperId,
+    };
   }
+  if (isGroupNode(sibling)) {
+    return { reason: 'group-below', status: 'invalid-target', targetId: sibling.id };
+  }
+  const lower = sibling;
   const pair = [upper.node, lower];
   const unmergeable = pair.find((layer) => layer.type !== 'raster' || !isPixelBackedLayer(layer));
   if (unmergeable) {
@@ -293,9 +306,12 @@ export const mergeDownEligibility = (document: CanvasDocumentContractV3, upperId
   if (locked.length > 0) {
     return { ids: locked, status: 'locked' };
   }
-  const disabled = pair.find((layer) => !isLayerContributing(layer));
-  if (disabled || !upper.ancestorsEnabled) {
-    return { reason: 'not-mergeable', status: 'invalid-target', targetId: disabled?.id ?? upperId };
+  // Both share the upper layer's ancestors, so a disabled group gates the pair; name that group.
+  const disabledId =
+    upper.path.find((id) => !index.byId.get(id)!.node.isEnabled) ??
+    pair.find((layer) => !isLayerContributing(layer))?.id;
+  if (disabledId) {
+    return { reason: 'disabled', status: 'invalid-target', targetId: disabledId };
   }
   return { lowerId: lower.id, status: 'eligible', upperId };
 };
@@ -668,7 +684,13 @@ export const createDocumentModel = (
     );
   };
 
-  const prepareDuplicate = (command: Extract<DocumentCommand, { type: 'duplicate' }>): PrepareEditResult => {
+  /**
+   * Every refusal a duplicate can meet from the document, decided before an id is minted: asking is free of side
+   * effects and costs no copy. Only a `createId` that returns an id the document holds is refused later.
+   */
+  const checkDuplicate = (
+    command: Extract<DocumentCommand, { type: 'duplicate' }>
+  ): DocumentRefusal | { outer: CanvasNodeEntry[] } => {
     const ids = unique(command.ids);
     if (ids.length === 0) {
       return { operation: 'duplicate nothing', status: 'unsupported' };
@@ -678,11 +700,12 @@ export const createDocumentModel = (
       return found;
     }
     const outer = outermostNodes(index, ids);
-    const locked = unique(outer.flatMap((entry) => lockedWithin(index, entry)));
+    // A copy lands beside its source, so only a locked ancestor refuses it: copying a locked node (or one holding
+    // locked nodes) inserts nothing into a locked subtree, and the copy keeps its locks.
+    const locked = unique(outer.flatMap((entry) => lockedAlong(index, entry.path)));
     if (locked.length > 0) {
       return { ids: locked, status: 'locked' };
     }
-    // Every refusal is decided before an id is minted, so asking is free of side effects.
     let budgeted = 0;
     for (const entry of outer) {
       const refusal = limits([entry.node], entry.path.length, budgeted);
@@ -691,6 +714,16 @@ export const createDocumentModel = (
       }
       budgeted += collectSubtree(entry.node).length;
     }
+    return { outer };
+  };
+
+  // Production duplicates commit through the engine (pixel copies), which asks `refusalFor`; model tests use this edit.
+  const prepareDuplicate = (command: Extract<DocumentCommand, { type: 'duplicate' }>): PrepareEditResult => {
+    const checked = checkDuplicate(command);
+    if ('status' in checked) {
+      return checked;
+    }
+    const { outer } = checked;
     const add: CanvasNodeInsertion[] = [];
     const createdIds: string[] = [];
     const rootIds: string[] = [];
@@ -1566,7 +1599,9 @@ export const createDocumentModel = (
               ? checkUngroup(command)
               : command.type === 'remove'
                 ? checkRemove(command)
-                : null;
+                : command.type === 'duplicate'
+                  ? checkDuplicate(command)
+                  : null;
       if (checked) {
         return 'status' in checked && checked.status !== 'unchanged' ? (checked as DocumentRefusal) : null;
       }

@@ -189,6 +189,31 @@ describe('PreviewFrame image drag', () => {
     });
   });
 
+  it('still drags out once wheel zoom-out shows an enlarged image below fit, at 100%', async () => {
+    const onDrop = await renderHarness();
+    const image = host!.querySelector<HTMLImageElement>('img[alt="preview.png"]')!;
+    const frame = image.parentElement!;
+
+    // The 128px image fits larger than its own size, so zooming far out rests at 100%, under fit.
+    await interact(() =>
+      image.dispatchEvent(
+        new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: 140, clientY: 140, deltaY: 2000 })
+      )
+    );
+    expect(frame.style.transform).toMatch(/scale\(0\.\d+\)/);
+
+    const rect = image.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+
+    await interact(() => pointer('pointerdown', image, x, y));
+    await interact(() => pointer('pointermove', image.ownerDocument, x + 30, y));
+    await interact(() => pointer('pointermove', image.ownerDocument, 400, 120));
+    await interact(() => pointer('pointerup', image.ownerDocument, 400, 120));
+
+    expect(onDrop.mock.calls[0]?.[0]?.overId).toBe('test-image-drop');
+  });
+
   it('gives a second finger the pinch and abandons the drag it interrupted', async () => {
     // A second touch must cancel image dragging before taking over pinch, avoiding an unintended drop on release.
     const onDrop = await renderHarness();

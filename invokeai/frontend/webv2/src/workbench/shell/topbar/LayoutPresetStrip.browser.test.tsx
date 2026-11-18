@@ -20,6 +20,11 @@ vi.mock('react-i18next', () => ({
         'topbar.presets.moreAvailable': `More layout presets, ${options?.count} available`,
         // A translated default, as another language shows the Workflow preset.
         'topbar.presets.builtInLabels.automate': 'Arbeitsablauf',
+        'topbar.presets.builtInLabels.edit': 'Edit',
+        'topbar.presets.builtInDescriptions.automate': 'Build and run workflows',
+        'topbar.presets.builtInDescriptions.compose': 'Generate images from text',
+        'topbar.presets.builtInDescriptions.edit': 'Edit and refine images',
+        'topbar.presets.builtInDescriptions.video': 'Generate video',
         'topbar.presets.layoutPreset': 'Layout preset',
         'topbar.presets.reorderInstructions':
           'To reorder a layout preset, press Space. Use the Left and Right arrow keys to move it, then press Space to drop or Escape to cancel.',
@@ -64,7 +69,12 @@ vi.mock('@workbench/layoutPresetActivation', async (importOriginal) => {
   };
 });
 
-vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({ useShortcutLabel: () => null }));
+// Compose keeps its default key; Edit models one the user unbound, which no tip may advertise.
+const COMPOSE_SHORTCUT = { aria: 'Alt+1', display: 'Alt+1', parts: ['alt', '1'] };
+vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({
+  useShortcutBinding: (commandId: string) => (commandId === 'app.selectComposePreset' ? COMPOSE_SHORTCUT : null),
+  useShortcutLabel: () => null,
+}));
 
 import { LayoutPresetAdminDialogs } from './LayoutPresetAdminDialogs';
 import { LayoutPresetStrip } from './LayoutPresetStrip';
@@ -122,6 +132,28 @@ const settle = (ms = 200): Promise<void> =>
   });
 
 const POLL = { timeout: 5000 } as const;
+// The tip opens on focus without a delay and on hover after 400 ms; these waits are well past both.
+const QUIET_MS = 700;
+
+const openTooltip = () =>
+  [...document.querySelectorAll<HTMLElement>('[data-scope="tooltip"][data-part="content"]')].find(
+    (element) => element.dataset.state === 'open'
+  ) ?? null;
+
+// Either side of the width at which the tabs hide their labels.
+const WIDE_VIEWPORT = { height: 900, width: 1440 } as const;
+const NARROW_VIEWPORT = { height: 900, width: 1024 } as const;
+
+/** Runs the enclosing tests at `size`, then gives the next ones back the frame they started with. */
+const runAtViewport = (size: { height: number; width: number }) => {
+  let original = { height: 0, width: 0 };
+
+  beforeEach(async () => {
+    original = { height: globalThis.innerHeight, width: globalThis.innerWidth };
+    await page.viewport(size.width, size.height);
+  });
+  afterEach(() => page.viewport(original.width, original.height));
+};
 
 const openPresetMenuItem = async (presetId: string, item: string) => {
   const menuItem = () => document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${item}"]`);
@@ -528,10 +560,6 @@ describe('LayoutPresetStrip', () => {
 
   describe('unsaved arrangements', () => {
     const UNSAVED = 'Unsaved layout changes';
-    const openTooltip = () =>
-      [...document.querySelectorAll<HTMLElement>('[data-scope="tooltip"][data-part="content"]')].find(
-        (element) => element.dataset.state === 'open'
-      ) ?? null;
     const unsavedDot = (id: string) => presetTab(id)?.querySelector('[data-unsaved-dot]') ?? null;
     const label = (id: string) => presetTab(id)?.getAttribute('aria-label') ?? '';
     const activePresetId = () => store.getSnapshot().activeProject.layout.presetId;
@@ -591,24 +619,25 @@ describe('LayoutPresetStrip', () => {
       expect(unsavedDot('automate')).toBeNull();
     });
 
-    it('explains the dot on keyboard focus whichever tab focus came from, and stays quiet on a clean preset', async () => {
+    it('explains the dot on keyboard focus whichever tab focus came from, and says nothing of it on a clean preset', async () => {
       rearrange('video', 401);
       rearrange('compose', 433);
       await renderStrip();
 
-      // A clean tab under keyboard focus: focus opens a tip at once when there is one, so none here is not vacuous.
+      // A clean tab under keyboard focus shows its own tip, which must not borrow the unsaved line.
       presetTab('compose')!.focus();
       await act(() => userEvent.keyboard('{ArrowRight}'));
       await act(() => userEvent.keyboard('{ArrowRight}'));
       await waitForActivePreset('edit');
       expect(document.activeElement).toBe(presetTab('edit'));
-      expect(openTooltip()).toBeNull();
+      await expect.poll(() => openTooltip()?.textContent, POLL).toContain('Edit and refine images');
+      expect(openTooltip()?.textContent).not.toContain(UNSAVED);
 
       // Clean → unsaved by keyboard.
       await act(() => userEvent.keyboard('{ArrowRight}'));
       await waitForActivePreset('video');
       expect(document.activeElement).toBe(presetTab('video'));
-      await expect.poll(() => openTooltip()?.textContent, POLL).toBe(UNSAVED);
+      await expect.poll(() => openTooltip()?.textContent, POLL).toContain(UNSAVED);
       expect(label('video')).toContain(UNSAVED);
     });
 
@@ -620,70 +649,72 @@ describe('LayoutPresetStrip', () => {
       // Keyboard focus lands on the selected (unsaved) tab and its tip shows.
       await act(() => userEvent.tab());
       expect(document.activeElement).toBe(presetTab('video'));
-      await expect.poll(() => openTooltip()?.textContent, POLL).toBe(UNSAVED);
+      await expect.poll(() => openTooltip()?.textContent, POLL).toContain(UNSAVED);
 
       await act(() => userEvent.keyboard('{ArrowRight}'));
       await waitForActivePreset('automate');
       expect(document.activeElement).toBe(presetTab('automate'));
       expect(label('automate')).toContain(UNSAVED);
-      await expect.poll(() => openTooltip()?.textContent, POLL).toBe(UNSAVED);
+      // The tip now describes the arriving preset, not the one focus left.
+      await expect.poll(() => openTooltip()?.textContent, POLL).toBe(`ArbeitsablaufBuild and run workflows${UNSAVED}`);
       // Still open once the switch has settled, not closed by it.
       await act(() => settle(400));
-      expect(openTooltip()?.textContent).toBe(UNSAVED);
+      expect(openTooltip()?.textContent).toContain(UNSAVED);
     });
 
     describe('never opens the tip on a tab nobody is on', () => {
-      // The tip opens on focus without a delay and on hover after 400 ms; these waits are well past both.
-      const QUIET_MS = 700;
-      const unsavedTip = () => (openTooltip()?.textContent === UNSAVED ? openTooltip() : null);
-      const dirtyCompose = async (sizePx: number) => {
+      // Labels showing, a clean custom preset has no tip: it gains one only by becoming unsaved.
+      runAtViewport(WIDE_VIEWPORT);
+      beforeEach(() => store.commands.layout.applyPreset('custom-1'));
+      const unsavedTip = () => (openTooltip()?.textContent?.includes(UNSAVED) ? openTooltip() : null);
+      const dirtyCustom = async (sizePx: number) => {
         await act(() => store.commands.layout.setRegionSize('right', sizePx));
-        await expect.poll(() => label('compose'), POLL).toContain(UNSAVED);
+        await expect.poll(() => label('custom-1'), POLL).toContain(UNSAVED);
       };
 
       it('after keyboard focus left a clean tab that then became unsaved', async () => {
         await renderStrip();
         await act(() => userEvent.tab());
-        expect(document.activeElement).toBe(presetTab('compose'));
+        expect(document.activeElement).toBe(presetTab('custom-1'));
         await act(() => (document.activeElement as HTMLElement).blur());
 
-        await dirtyCompose(401);
+        await dirtyCustom(401);
         await act(() => settle(QUIET_MS));
-        expect(unsavedTip()).toBeNull();
+        expect(openTooltip()).toBeNull();
 
         // The tip itself works: focus brings it.
-        await act(() => presetTab('compose')!.focus());
+        await act(() => presetTab('custom-1')!.focus());
         await expect.poll(unsavedTip, POLL).not.toBeNull();
       });
 
       it('after a focused unsaved tab was reverted in place, left, and changed again', async () => {
         await renderStrip();
-        await dirtyCompose(401);
+        await dirtyCustom(401);
         await act(() => userEvent.tab());
         await expect.poll(unsavedTip, POLL).not.toBeNull();
 
         await act(() => store.commands.layout.reset());
-        await expect.poll(() => label('compose'), POLL).not.toContain(UNSAVED);
-        await expect.poll(unsavedTip, POLL).toBeNull();
+        await expect.poll(() => label('custom-1'), POLL).not.toContain(UNSAVED);
+        await expect.poll(openTooltip, POLL).toBeNull();
         await act(() => (document.activeElement as HTMLElement).blur());
 
-        await dirtyCompose(433);
+        await dirtyCustom(433);
         await act(() => settle(QUIET_MS));
-        expect(unsavedTip()).toBeNull();
+        expect(openTooltip()).toBeNull();
       });
 
       it('after the pointer left a clean tab that then became unsaved', async () => {
         await renderStrip();
-        await act(() => userEvent.hover(presetTab('compose')!));
+        await act(() => userEvent.hover(presetTab('custom-1')!));
         await act(() => settle(QUIET_MS));
-        expect(unsavedTip()).toBeNull();
-        await act(() => userEvent.unhover(presetTab('compose')!));
+        expect(openTooltip()).toBeNull();
+        await act(() => userEvent.unhover(presetTab('custom-1')!));
 
-        await dirtyCompose(401);
+        await dirtyCustom(401);
         await act(() => settle(QUIET_MS));
-        expect(unsavedTip()).toBeNull();
+        expect(openTooltip()).toBeNull();
 
-        await act(() => userEvent.hover(presetTab('compose')!));
+        await act(() => userEvent.hover(presetTab('custom-1')!));
         await expect.poll(unsavedTip, POLL).not.toBeNull();
       });
     });
@@ -694,7 +725,7 @@ describe('LayoutPresetStrip', () => {
       await renderStrip();
 
       await act(() => userEvent.hover(presetTab('compose')!));
-      await expect.poll(() => openTooltip()?.textContent, POLL).toBe(UNSAVED);
+      await expect.poll(() => openTooltip()?.textContent, POLL).toContain(UNSAVED);
       await act(() => userEvent.unhover(presetTab('compose')!));
       await expect.poll(openTooltip, POLL).toBeNull();
     });
@@ -738,6 +769,168 @@ describe('LayoutPresetStrip', () => {
       expect(store.getSnapshot().activeProject.widgetRegions.right.sizePx).toBe(401);
       expect(presetTab('compose')).toHaveAttribute('aria-selected', 'true');
       expect(label('compose')).toContain(UNSAVED);
+    });
+  });
+
+  describe('preset tips', () => {
+    const tipText = () => openTooltip()?.textContent ?? null;
+    const tipKeycap = () => openTooltip()?.querySelector('kbd') ?? null;
+
+    describe('with the labels hidden', () => {
+      runAtViewport(NARROW_VIEWPORT);
+
+      it('names the preset under the pointer, with what a built-in is for and its shortcut', async () => {
+        await renderStrip();
+
+        // Renamed (beforeEach calls Compose "Writing"): the shipped purpose may no longer hold, so only name and key.
+        await act(() => userEvent.hover(presetTab('compose')!));
+        await expect.poll(tipText, POLL).toContain('Writing');
+        expect(tipText()).not.toContain('Generate images from text');
+        expect(tipKeycap()?.textContent).toContain('1');
+        // The tip describes the tab; the tab keeps its name.
+        expect(presetTab('compose')).toHaveAttribute('aria-label', 'Writing');
+
+        // Still the built-in, but unbound: the purpose shows, no keycap.
+        await act(() => userEvent.hover(presetTab('edit')!));
+        await expect.poll(tipText, POLL).toBe('EditEdit and refine images');
+        expect(tipKeycap()).toBeNull();
+
+        // A custom preset has only its name to show, which is all an icon-only tab is missing.
+        await act(() => userEvent.hover(presetTab('custom-1')!));
+        await expect.poll(tipText, POLL).toBe('Custom');
+      });
+
+      it('shows on keyboard focus', async () => {
+        await renderStrip();
+
+        await act(() => userEvent.tab());
+        expect(document.activeElement).toBe(presetTab('compose'));
+        await expect.poll(tipText, POLL).toContain('Writing');
+      });
+
+      it('keeps quiet while a preset menu is open', async () => {
+        await renderStrip();
+        await act(() => userEvent.tab());
+        await expect.poll(openTooltip, POLL).not.toBeNull();
+
+        await act(() => userEvent.keyboard('{ArrowDown}'));
+        await expect.poll(() => document.querySelector('[role="menu"]'), POLL).not.toBeNull();
+        await expect.poll(openTooltip, POLL).toBeNull();
+
+        // Nor does pointing at another tab bring it while the menu stays open.
+        await act(() => userEvent.hover(presetTab('video')!));
+        await act(() => settle(QUIET_MS));
+        expect(document.querySelector('[role="menu"]')).not.toBeNull();
+        expect(openTooltip()).toBeNull();
+
+        await act(() => userEvent.keyboard('{Escape}'));
+        await expect.poll(() => document.querySelector('[role="menu"]'), POLL).toBeNull();
+        await act(() => userEvent.unhover(presetTab('video')!));
+        await act(() => userEvent.hover(presetTab('video')!));
+        await expect.poll(tipText, POLL).toContain('Generate video');
+      });
+
+      it('keeps quiet while a tab is dragged', async () => {
+        await renderStrip();
+        await act(() => userEvent.tab());
+        expect(document.activeElement).toBe(presetTab('compose'));
+        await expect.poll(openTooltip, POLL).not.toBeNull();
+
+        await act(() => userEvent.keyboard('{Space}'));
+        await expect.poll(openTooltip, POLL).toBeNull();
+        await act(() => userEvent.keyboard('{ArrowRight}'));
+        await act(() => settle(QUIET_MS));
+        expect(openTooltip()).toBeNull();
+
+        await act(() => userEvent.keyboard('{Space}'));
+        expect(store.getSnapshot().account.layoutPresetOrder).toEqual([
+          'custom-1',
+          'compose',
+          'edit',
+          'video',
+          'automate',
+        ]);
+      });
+    });
+
+    describe('with the labels showing', () => {
+      runAtViewport(WIDE_VIEWPORT);
+
+      it('shows only what the label does not already say', async () => {
+        store.commands.layout.applyPreset('custom-1');
+        await renderStrip();
+
+        // A clean custom preset's tip would only repeat its label.
+        await act(() => userEvent.hover(presetTab('custom-1')!));
+        await act(() => settle(QUIET_MS));
+        expect(openTooltip()).toBeNull();
+        await act(() => userEvent.unhover(presetTab('custom-1')!));
+
+        // A built-in's purpose and shortcut are not on the tab.
+        await act(() => userEvent.hover(presetTab('edit')!));
+        await expect.poll(tipText, POLL).toContain('Edit and refine images');
+        await act(() => userEvent.unhover(presetTab('edit')!));
+        await expect.poll(openTooltip, POLL).toBeNull();
+
+        // Unsaved changes are: the tip explains the dot.
+        await act(() => store.commands.layout.setRegionSize('right', 401));
+        await expect.poll(() => presetTab('custom-1')?.getAttribute('aria-label'), POLL).toContain('Unsaved');
+        await act(() => userEvent.hover(presetTab('custom-1')!));
+        await expect.poll(tipText, POLL).toBe('CustomUnsaved layout changes');
+      });
+
+      it('never shows a clean custom preset in a tip that focus hands over', async () => {
+        await renderStrip();
+        await act(() => userEvent.tab());
+        expect(document.activeElement).toBe(presetTab('compose'));
+        await expect.poll(tipText, POLL).toContain('Writing');
+
+        // Every frame, whatever any visible tip says, through the hand-over and the closing fade.
+        const seen = new Set<string>();
+        let isSampling = true;
+        const sample = () => {
+          for (const element of document.querySelectorAll<HTMLElement>('[data-scope="tooltip"][data-part="content"]')) {
+            if (element.checkVisibility()) {
+              seen.add(element.textContent ?? '');
+            }
+          }
+          if (isSampling) {
+            requestAnimationFrame(sample);
+          }
+        };
+        sample();
+
+        await act(() => userEvent.keyboard('{ArrowRight}'));
+        expect(document.activeElement).toBe(presetTab('custom-1'));
+        await act(() => settle(QUIET_MS));
+        isSampling = false;
+
+        expect([...seen].filter((text) => text.includes('Custom'))).toEqual([]);
+        expect(openTooltip()).toBeNull();
+      });
+    });
+
+    it('announces each preset’s bound key, and none for a preset without one', async () => {
+      await renderStrip();
+      const keyShortcuts = (id: string) => presetTab(id)?.getAttribute('aria-keyshortcuts') ?? null;
+
+      // The active tab's menu key comes first; Compose's binding follows.
+      expect(keyShortcuts('compose')).toBe('ArrowDown Alt+1');
+      // Edit is unbound, and a custom preset has no key to bind.
+      expect(keyShortcuts('edit')).toBeNull();
+      expect(keyShortcuts('custom-1')).toBeNull();
+
+      await act(() => userEvent.click(presetTab('edit')!));
+      await expect.poll(() => keyShortcuts('edit'), POLL).toBe('ArrowDown');
+      expect(keyShortcuts('compose')).toBe('Alt+1');
+    });
+
+    it('names the add button', async () => {
+      await renderStrip();
+      const addButton = document.querySelector<HTMLElement>('[aria-label="Save this layout as a new preset"]')!;
+
+      await act(() => userEvent.hover(addButton));
+      await expect.poll(tipText, POLL).toBe('Save this layout as a new preset');
     });
   });
 });

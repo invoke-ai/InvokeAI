@@ -406,6 +406,51 @@ describe('canvas record to recall', () => {
     }
   );
 
+  it('runs one Canvas recall at a time and says so to a press made meanwhile, without holding back other recalls', async () => {
+    const store = createWorkbenchStore();
+    const target = targetFor(store);
+    const notifications = vi.spyOn(store.commands.notifications, 'add');
+    let finishLookup: (() => void) | undefined;
+    api.metadata.mockResolvedValue({ canvas_v3_metadata: record(), positive_prompt: 'recalled' });
+    api.resolveMany.mockImplementationOnce(
+      (names: string[]) =>
+        new Promise((resolve) => {
+          finishLookup = () => resolve(names.map((imageName) => ({ imageName })));
+        })
+    );
+    const recall = (kind: 'all' | 'prompts') =>
+      executeImageRecall({
+        commands: store.commands,
+        canvasTarget: target,
+        getGenerateValues: () => getProjectWidgetValues(target.getProject()!, 'generate'),
+        image: { imageName: 'output.png', width: 768, height: 1024 } as GalleryImage,
+        kind,
+        models,
+        projectId: target.projectId,
+        queryClient: new QueryClient(),
+        t,
+      });
+
+    const first = recall('all');
+    await vi.waitFor(() => expect(finishLookup).toBeDefined());
+    await expect(recall('all')).resolves.toBe(false);
+    expect(notifications).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'info', message: 'widgets.gallery.itemActions.recall.recallInProgress' })
+    );
+    // A recall that leaves the Canvas alone runs meanwhile.
+    await expect(recall('prompts')).resolves.toBe(true);
+
+    finishLookup!();
+    await expect(first).resolves.toBe(true);
+    expect(notifications).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'widgets.gallery.itemActions.recall.partiallyRecalled' })
+    );
+    expect(target.getProject()!.canvas.snapshots).toHaveLength(1);
+    // Settled, so the next Canvas recall runs.
+    await expect(recall('all')).resolves.toBe(true);
+    expect(target.getProject()!.canvas.snapshots).toHaveLength(2);
+  });
+
   it.each(['all', 'remix', 'api'] as const)(
     'preserves the whole Canvas and recalls valid Generate fields when the %s asset lookup fails',
     async (surface) => {

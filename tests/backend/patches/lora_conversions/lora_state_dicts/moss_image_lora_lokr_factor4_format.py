@@ -1,0 +1,70 @@
+"""A MOSS-Image LoKr from ai-toolkit, a Civitai file (factor 4, BF16).
+
+Captured on 2026-11-14 with `scripts/capture_state_dict_fixture.py`,
+which reads the header only, from
+`mossloras/moss-image-lora-archive/2026-10-20/MOSS-Image/3011705_2000s-Emo-Art--MOSS-Image/3418056/moss_2000s_emo_art.safetensors`.
+
+Subsetting rule: blocks [0, 21, 23, 41] (first, last, and one next to a missing block where the file has a gap) of the 41 it names, plus every key outside a block. Values are `(shape, dtype)`.
+
+As `moss_image_lora_lokr_factor16_format`, with `lokr_w1` 4 x 4 and `lokr_w2` 2304 x 768 on the fused
+`proj.qkv`: a third of its rows is 3072, not a whole number of `lokr_w2`'s 2304.
+"""
+
+state_dict_keys: dict[str, tuple[list[int], str]] = {
+    "diffusion_model.layers.0.proj.ffn_down.alpha": ([], "BF16"),
+    "diffusion_model.layers.0.proj.ffn_down.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.0.proj.ffn_down.lokr_w2": ([768, 2048], "BF16"),
+    "diffusion_model.layers.0.proj.ffn_up_gate.alpha": ([], "BF16"),
+    "diffusion_model.layers.0.proj.ffn_up_gate.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.0.proj.ffn_up_gate.lokr_w2": ([4096, 768], "BF16"),
+    "diffusion_model.layers.0.proj.k.alpha": ([], "BF16"),
+    "diffusion_model.layers.0.proj.o.alpha": ([], "BF16"),
+    "diffusion_model.layers.0.proj.o.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.0.proj.o.lokr_w2": ([768, 768], "BF16"),
+    "diffusion_model.layers.0.proj.q.alpha": ([], "BF16"),
+    "diffusion_model.layers.0.proj.qkv.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.0.proj.qkv.lokr_w2": ([2304, 768], "BF16"),
+    "diffusion_model.layers.0.proj.v.alpha": ([], "BF16"),
+    "diffusion_model.layers.21.proj.ffn_down.alpha": ([], "BF16"),
+    "diffusion_model.layers.21.proj.ffn_down.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.21.proj.ffn_down.lokr_w2": ([768, 2048], "BF16"),
+    "diffusion_model.layers.21.proj.ffn_up_gate.alpha": ([], "BF16"),
+    "diffusion_model.layers.21.proj.ffn_up_gate.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.21.proj.ffn_up_gate.lokr_w2": ([4096, 768], "BF16"),
+    "diffusion_model.layers.21.proj.k.alpha": ([], "BF16"),
+    "diffusion_model.layers.21.proj.o.alpha": ([], "BF16"),
+    "diffusion_model.layers.21.proj.o.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.21.proj.o.lokr_w2": ([768, 768], "BF16"),
+    "diffusion_model.layers.21.proj.q.alpha": ([], "BF16"),
+    "diffusion_model.layers.21.proj.qkv.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.21.proj.qkv.lokr_w2": ([2304, 768], "BF16"),
+    "diffusion_model.layers.21.proj.v.alpha": ([], "BF16"),
+    "diffusion_model.layers.23.proj.ffn_down.alpha": ([], "BF16"),
+    "diffusion_model.layers.23.proj.ffn_down.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.23.proj.ffn_down.lokr_w2": ([768, 2048], "BF16"),
+    "diffusion_model.layers.23.proj.ffn_up_gate.alpha": ([], "BF16"),
+    "diffusion_model.layers.23.proj.ffn_up_gate.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.23.proj.ffn_up_gate.lokr_w2": ([4096, 768], "BF16"),
+    "diffusion_model.layers.23.proj.k.alpha": ([], "BF16"),
+    "diffusion_model.layers.23.proj.o.alpha": ([], "BF16"),
+    "diffusion_model.layers.23.proj.o.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.23.proj.o.lokr_w2": ([768, 768], "BF16"),
+    "diffusion_model.layers.23.proj.q.alpha": ([], "BF16"),
+    "diffusion_model.layers.23.proj.qkv.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.23.proj.qkv.lokr_w2": ([2304, 768], "BF16"),
+    "diffusion_model.layers.23.proj.v.alpha": ([], "BF16"),
+    "diffusion_model.layers.41.proj.ffn_down.alpha": ([], "BF16"),
+    "diffusion_model.layers.41.proj.ffn_down.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.41.proj.ffn_down.lokr_w2": ([768, 2048], "BF16"),
+    "diffusion_model.layers.41.proj.ffn_up_gate.alpha": ([], "BF16"),
+    "diffusion_model.layers.41.proj.ffn_up_gate.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.41.proj.ffn_up_gate.lokr_w2": ([4096, 768], "BF16"),
+    "diffusion_model.layers.41.proj.k.alpha": ([], "BF16"),
+    "diffusion_model.layers.41.proj.o.alpha": ([], "BF16"),
+    "diffusion_model.layers.41.proj.o.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.41.proj.o.lokr_w2": ([768, 768], "BF16"),
+    "diffusion_model.layers.41.proj.q.alpha": ([], "BF16"),
+    "diffusion_model.layers.41.proj.qkv.lokr_w1": ([4, 4], "BF16"),
+    "diffusion_model.layers.41.proj.qkv.lokr_w2": ([2304, 768], "BF16"),
+    "diffusion_model.layers.41.proj.v.alpha": ([], "BF16"),
+}

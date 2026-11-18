@@ -110,6 +110,8 @@ export interface ImageWithDims {
 export interface ExpandPromptSuggestion {
   /** Source of the family's released enhancer, preselected when an installed text LLM has it. */
   modelSource: string | null;
+  /** File names of single-file builds of the same model, matched against the end of an installed model's source. */
+  modelFileNames?: readonly string[];
   /** How the model is listed among the starter models, for the hint shown when it is not installed. */
   modelName: string | null;
   /** For a text-only rewrite. */
@@ -177,6 +179,11 @@ export type GenerateReferenceImageConfig =
 
 export interface GenerateReferenceImage {
   id: string;
+  /**
+   * The user's name for the reference: trimmed, at most MAX_REFERENCE_IMAGE_NAME_LENGTH characters, never empty.
+   * Absent shows the positional default ("Reference image 2"). A label only: prompt tags stay positional.
+   */
+  name?: string;
   isEnabled: boolean;
   config: GenerateReferenceImageConfig;
 }
@@ -283,6 +290,13 @@ export interface GenerateSettings {
   /** Off skips the adapter on the canvas and keeps the selected model and weight. */
   animaInpaintAdapterEnabled: boolean;
   animaInpaintAdapterWeight: number;
+  /**
+   * FLUX.3: rewrite the prompt into the detailed caption the model is trained on before every generation. Off skips
+   * the upsampler and keeps the selected model; other families never run it.
+   */
+  flux3PromptUpsamplerEnabled: boolean;
+  /** A Text LLM that can read images; required while `flux3PromptUpsamplerEnabled` is on. */
+  flux3PromptUpsamplerModel: ComponentModelConfig | null;
   /** Wan 2.2's UMT5-XXL text encoder. */
   wanT5EncoderModel: ComponentModelConfig | null;
   /** The low-noise expert is optional; the selected expert can span the full schedule. */

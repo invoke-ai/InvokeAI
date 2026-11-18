@@ -9,10 +9,15 @@ import { ActivityIcon, CheckIcon, GalleryHorizontalEndIcon, LocateOffIcon, type 
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/** The Preview's modes, which the Canvas staging bar shares. */
-type AutoSwitchMode = ViewerAutoSwitchMode;
+/** The menu's items in display order. */
+const AUTO_SWITCH_MODES = ['off', 'progress', 'latest'] as const satisfies readonly ViewerAutoSwitchMode[];
 
-const AUTO_SWITCH_MODES: readonly AutoSwitchMode[] = ['off', 'progress', 'latest'];
+/**
+ * The Preview's modes, which the Canvas staging bar shares. `never` while the menu leaves one out, so a mode added to
+ * the policy fails to compile until it is listed above.
+ */
+type AutoSwitchMode =
+  Exclude<ViewerAutoSwitchMode, (typeof AUTO_SWITCH_MODES)[number]> extends never ? ViewerAutoSwitchMode : never;
 
 /** Both widgets name the modes with the staging bar's keys, so existing translations carry over. */
 const MODE_LABEL_KEYS: Record<AutoSwitchMode, string> = {

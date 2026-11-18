@@ -1,7 +1,7 @@
 import type { GalleryItemRef } from '@features/gallery/contracts';
-import type { ForLoopValidationReason } from '@features/workflow/core/forLoops';
 import type { ProjectGraphState, ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
-import type { WorkflowLibrarySort } from '@features/workflow/data/libraryBrowseStore';
+import type { WorkflowLibrarySort, WorkflowLibrarySortDirection } from '@features/workflow/data/libraryBrowseStore';
+import type { WorkflowLibraryCardSize } from '@features/workflow/ui/library/workflowThumbnail';
 import type { WorkbenchThemeId } from '@theme/themes';
 import type { ComponentType, ReactNode } from 'react';
 
@@ -19,13 +19,19 @@ import type {
 /** How workflow thumbnails sit in their 3:2 box: cropped to fill it, or letterboxed whole. */
 export type WorkflowThumbnailFit = 'cover' | 'contain';
 
+/** Whether the library and This project show workflows as a card grid or as list rows. */
+export type WorkflowLibraryLayout = 'grid' | 'list';
+
 export interface WorkflowPreferences {
   reduceMotion: boolean;
   themeId: WorkbenchThemeId;
   workflowEdgeStyle: 'curved' | 'square';
   workflowEdgesBehindNodes: boolean;
   workflowGroupNodesByCategory: boolean;
+  workflowLibraryCardSize: WorkflowLibraryCardSize;
+  workflowLibraryLayout: WorkflowLibraryLayout;
   workflowLibrarySort: WorkflowLibrarySort;
+  workflowLibrarySortDirection: WorkflowLibrarySortDirection;
   workflowLibraryThumbnailFit: WorkflowThumbnailFit;
   workflowShowMinimap: boolean;
   workflowSnapToGrid: boolean;
@@ -70,10 +76,6 @@ export interface WorkflowReadPort<Snapshot> {
 }
 
 export interface WorkflowGraphPreviewPort {
-  getRoute(
-    sourceId?: WorkflowInvocationSourceId
-  ): { canInvoke: boolean; label: string; validationMessage?: string | ForLoopValidationReason } | null;
-  invoke(sourceId?: WorkflowInvocationSourceId): Promise<boolean>;
   focusSource(sourceId?: WorkflowInvocationSourceId): void; // reveal the source's widget (provenance links)
   openWorkflowEditor(): void; // reveal the workflow editor widget
   /** Forks a document into a fresh project; a library source travels with it so the copy can update its template. */
@@ -93,7 +95,16 @@ export interface WorkflowUiAdapter {
   getProjectGraph(): ProjectGraphState;
   /** Saves the library's account-bound display choices. */
   setLibraryPreferences(
-    patch: Partial<Pick<WorkflowPreferences, 'workflowLibrarySort' | 'workflowLibraryThumbnailFit'>>
+    patch: Partial<
+      Pick<
+        WorkflowPreferences,
+        | 'workflowLibraryCardSize'
+        | 'workflowLibraryLayout'
+        | 'workflowLibrarySort'
+        | 'workflowLibrarySortDirection'
+        | 'workflowLibraryThumbnailFit'
+      >
+    >
   ): void;
   notifications: {
     error(title: string, message?: string): void;

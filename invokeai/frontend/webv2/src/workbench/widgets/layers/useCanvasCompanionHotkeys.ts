@@ -8,7 +8,9 @@ import {
   CANVAS_MERGE_DOWN_HOTKEY,
   executeCanvasToolCommand,
   mergeSelectedLayerDown,
+  reportMergeDownRefusal,
   reportTransformRefusal,
+  showCanvasRefusalNotice,
   type CanvasToolCommandId,
 } from '@workbench/widgets/canvas/canvasToolCommands';
 import { useActiveColorCommands } from '@workbench/widgets/canvas/color-system/useActiveColors';
@@ -46,14 +48,25 @@ export const useCanvasCompanionHotkeys = (
     const model = engine?.document.model() ?? null;
     if (commandId === 'canvas.mergeDown') {
       if (model) {
-        mergeSelectedLayerDown(engine, model.document, (refusal) => reportLayerOperation(refusal, notify.error, t));
+        mergeSelectedLayerDown(
+          engine,
+          model.document,
+          (refusal) => reportLayerOperation(refusal, notify.error, t),
+          (refusal) => reportMergeDownRefusal(model.document, refusal, showCanvasRefusalNotice, t)
+        );
       }
       return;
     }
     const selectedId = model?.document.selectedLayerId ?? null;
     executeCanvasToolCommand(commandId, {
       engine,
-      reportTransformRefusal: (refusal) => reportTransformRefusal(refusal, notify.error, t),
+      reportTransformRefusal: (refusal, layerId) =>
+        reportTransformRefusal(
+          refusal,
+          { id: layerId, name: model?.getLayer(layerId)?.name ?? '' },
+          { error: notify.error, notice: showCanvasRefusalNotice },
+          t
+        ),
       resetActiveColors: colorCommands.resetPair,
       selectedLayerId: selectedId === null ? null : (model?.getLayer(selectedId)?.id ?? null),
       swapActiveColors: colorCommands.swapPair,

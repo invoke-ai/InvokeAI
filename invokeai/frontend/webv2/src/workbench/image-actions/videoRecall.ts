@@ -114,6 +114,12 @@ export type VideoRecalledField =
 export interface VideoRecallResult {
   fields: VideoRecalledField[];
   values: VideoWidgetValues;
+  /**
+   * The recorded canvas, when the run's media sized it rather than a preset. Snapping loses the media's exact ratio,
+   * so only the media themselves say which target resolution produced it: `settleMediaSizedRecall` decides once the
+   * executor has hydrated them.
+   */
+  mediaSizedCanvas?: { height: number; width: number };
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -422,9 +428,15 @@ interface VideoSizePreset {
   targetResolution: VideoTargetResolution;
 }
 
+/** What a size recall writes: a preset, or only its resolution where conditioning media keep the frame's shape. */
+type VideoSizeRecall = VideoSizePreset | Pick<VideoSizePreset, 'targetResolution'>;
+
 /**
- * Recall aspect/resolution presets only on exact dimension matches; other dimensions came from conditioning media
- * and remain media-controlled. Returns every match: presets that agree without media can differ under held media.
+ * The presets whose canvas is exactly the recorded size; a recall restores aspect ratio and resolution only on such a
+ * match. A canvas sized by conditioning media has the media's shape rather than a preset's: the media keep the aspect
+ * ratio, and only the target resolution at which they reproduce the canvas is recalled, judged against the media
+ * themselves (`settleMediaSizedRecall`, `resolveVideoSizeRecall`). Returns every match: presets that agree without
+ * media can differ under held media.
  */
 export const getVideoSizeRecalls = (
   model: MainModelConfig,
@@ -457,20 +469,47 @@ export const getVideoSizeRecalls = (
   return recalls;
 };
 
+/** The one target resolution at which `media` size the canvas to exactly `width` x `height`; null when none or several do. */
+const getMediaSizedResolution = (
+  model: MainModelConfig,
+  media: Pick<
+    VideoWidgetValues,
+    'aspectRatioId' | 'conditioningClip' | 'firstFrameImage' | 'lastFrameImage' | 'sourceVideo'
+  >,
+  width: number,
+  height: number
+): Pick<VideoSizePreset, 'targetResolution'> | null => {
+  const [match, ...others] = getVideoTargetResolutionOptions(model).filter((option) => {
+    const canvas = getVideoDimensions(model, { ...media, targetResolution: option.id });
+
+    return canvas?.width === width && canvas.height === height;
+  });
+
+  return match && others.length === 0 ? { targetResolution: match.id } : null;
+};
+
+/** Whether a frame, the source video or a clip's picture sized the recorded canvas, rather than a preset. */
+const isCanvasFromRecordedMedia = ({ conditioningClip, media }: VideoRecallRecord): boolean =>
+  isConditioningClipExcludingFrames(conditioningClip) ||
+  media.firstFrameName !== null ||
+  media.lastFrameName !== null ||
+  media.sourceVideoName !== null;
+
 export type VideoSizeRecallFit =
-  /** No model, or no preset of it reproduces the size. */
+  /** No model, or neither a preset nor the panel's media at one of its target resolutions reproduces the size. */
   | { outcome: 'unavailable' }
   /** A preset fits, but the panel's media has no usable frame on this model. */
   | { outcome: 'media-unresolvable' }
   /** The panel's media owns the frame, and the run would get this size instead. */
   | { outcome: 'media-conflict'; effective: { height: number; width: number } }
-  /** The preset would leave the panel unable to run, for this reason it did not already have. */
+  /** The size recall would leave the panel unable to run, for this reason it did not already have. */
   | { outcome: 'invalid'; reason: string }
-  | { outcome: 'fits'; sizeRecall: VideoSizePreset };
+  | { outcome: 'fits'; sizeRecall: VideoSizeRecall };
 
 /**
  * Whether a recorded size can be applied to the panel as it stands, shared by the recall and its failure notice. The
- * first preset that fits wins; if none does, the first preset's failure is reported.
+ * first preset that fits wins, then the one target resolution at which the panel's own media reach the size; if
+ * neither does, the first preset's failure is reported.
  */
 export const resolveVideoSizeRecall = (
   values: VideoWidgetValues,
@@ -484,7 +523,7 @@ export const resolveVideoSizeRecall = (
   }
 
   const existingReasons = new Set(getVideoValidationReasons(model, values));
-  const fits = getVideoSizeRecalls(model, width, height).map((sizeRecall): VideoSizeRecallFit => {
+  const fit = (sizeRecall: VideoSizeRecall): VideoSizeRecallFit => {
     const next = { ...values, ...sizeRecall };
     const effective = getVideoDimensions(model, next);
 
@@ -498,9 +537,21 @@ export const resolveVideoSizeRecall = (
     const reason = getVideoValidationReasons(model, next).find((candidate) => !existingReasons.has(candidate));
 
     return reason ? { outcome: 'invalid', reason } : { outcome: 'fits', sizeRecall };
-  });
+  };
+  const presetFits = getVideoSizeRecalls(model, width, height).map(fit);
+  const presetFit = presetFits.find((candidate) => candidate.outcome === 'fits');
 
-  return fits.find((fit) => fit.outcome === 'fits') ?? fits[0] ?? { outcome: 'unavailable' };
+  if (presetFit) {
+    return presetFit;
+  }
+
+  const panelCanvas = getVideoDimensions(model, values);
+  const mediaSized =
+    width !== null && height !== null && panelCanvas && panelCanvas.source !== 'aspect-ratio'
+      ? getMediaSizedResolution(model, values, width, height)
+      : null;
+
+  return (mediaSized ? fit(mediaSized) : presetFits[0]) ?? { outcome: 'unavailable' };
 };
 
 /**
@@ -799,7 +850,10 @@ export const buildVideoRecallSettings = ({
     fields.push('fps');
   }
 
-  const [sizeRecall] = getVideoSizeRecalls(model, record.width, record.height);
+  const { height, width } = record;
+  const [sizeRecall] = getVideoSizeRecalls(model, width, height);
+  const mediaSizedCanvas =
+    !sizeRecall && width !== null && height !== null && isCanvasFromRecordedMedia(record) ? { height, width } : null;
 
   if (sizeRecall) {
     values = { ...values, ...sizeRecall };
@@ -967,7 +1021,31 @@ export const buildVideoRecallSettings = ({
     fields.push('extendContext');
   }
 
-  return fields.length > 0 ? { fields, mediaNames, values: { ...values, ...promptPatch } } : null;
+  return fields.length > 0
+    ? { fields, mediaNames, ...(mediaSizedCanvas ? { mediaSizedCanvas } : {}), values: { ...values, ...promptPatch } }
+    : null;
+};
+
+/**
+ * A recall whose canvas its media sized, settled against those media as hydrated into the panel: the target
+ * resolution is restored only when they reproduce the recorded canvas at exactly one. Media that did not hydrate, or
+ * reach the canvas at no resolution, leave the panel's resolution, and the size goes unreported.
+ */
+export const settleMediaSizedRecall = ({
+  fields,
+  mediaSizedCanvas,
+  values,
+}: VideoRecallResult): Pick<VideoRecallResult, 'fields' | 'values'> => {
+  const { model } = values;
+  const panelCanvas = model ? getVideoDimensions(model, values) : null;
+  const sized =
+    model && mediaSizedCanvas && panelCanvas && panelCanvas.source !== 'aspect-ratio'
+      ? getMediaSizedResolution(model, values, mediaSizedCanvas.width, mediaSizedCanvas.height)
+      : null;
+
+  return sized
+    ? { fields: fields.includes('size') ? fields : [...fields, 'size'], values: { ...values, ...sized } }
+    : { fields, values };
 };
 
 export const getVideoRecallTitle = (kind: VideoRecallKind, t: TFunction): string =>

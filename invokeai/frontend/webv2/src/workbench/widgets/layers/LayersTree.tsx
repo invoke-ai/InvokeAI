@@ -46,6 +46,8 @@ import {
   type ProjectedChildRow,
 } from './layerChildRows';
 import { clearLayerChildSelection, selectLayerChild, useLayerChildSelection } from './layerChildSelection';
+import { deleteLayers, layerCommandTargets, useLayerCommandDeps } from './layerCommands';
+import { enabledToggleLabel } from './layerContextActions';
 import { copyLayerToClipboard } from './layerExportActions';
 import { createAdjustmentId, createNoiseSeed } from './layerOps';
 import {
@@ -62,7 +64,7 @@ import {
 } from './layerPanelRows';
 import { clearLayerPropertiesRequest, useCurrentLayerPropertiesRequest } from './layerPropertiesRequestStore';
 import { LayerDragGhost, LayerRow, type LayerRowDragState } from './LayerRow';
-import { anchorFromRect } from './layerRowCommands';
+import { anchorFromPoint } from './layerRowCommands';
 import { LayerStackHeader } from './LayerStackHeader';
 import { LayerSurfaceHost, type LayerSurfaceEngine, type LayerSurfaceRequest } from './LayerSurfaceHost';
 import { createLayerTreeAutoScroller, type LayerTreeAutoScroller } from './layerTreeAutoScroll';
@@ -145,10 +147,13 @@ const reparentCommandForTarget = (target: LayerDropTarget): ReparentCommand => (
 const isMenuKey = (event: KeyboardEvent<HTMLElement>): boolean =>
   event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey);
 
-/** The viewport box of a rendered item, the anchor a keyboard-opened menu uses. */
+/**
+ * A keyboard-opened menu anchors where a right-click would: a point, at the rendered item's bottom-left corner. A point
+ * keeps it a context menu, without the arrow a menu anchored to a box gets.
+ */
 const anchorOfItem = (host: HTMLElement | null, key: string): LayerSurfaceAnchor | null => {
-  const element = host?.querySelector<HTMLElement>(`[data-layer-row-id="${CSS.escape(key)}"]`);
-  return element ? anchorFromRect(element.getBoundingClientRect()) : null;
+  const rect = host?.querySelector<HTMLElement>(`[data-layer-row-id="${CSS.escape(key)}"]`)?.getBoundingClientRect();
+  return rect ? anchorFromPoint(rect.left, rect.bottom) : null;
 };
 
 /** One absolutely positioned slot of the virtual list; the style object is built once per offset. */
@@ -180,6 +185,7 @@ export const LayersTree = ({
 }: LayersTreeProps) => {
   const { t } = useTranslation();
   const commitPrepared = usePreparedCommit(engine);
+  const layerCommands = useLayerCommandDeps(engine);
   const propertiesRequest = useCurrentLayerPropertiesRequest();
   const operation = useCanvasOperation(engine);
   const operationLayerId = operation.status === 'active' ? operation.identity.layerId : null;
@@ -314,6 +320,7 @@ export const LayersTree = ({
     document,
     editingLocked,
     engine,
+    layerCommands,
     onRevealProperties,
     panel,
     panelRows,
@@ -331,6 +338,7 @@ export const LayersTree = ({
       document,
       editingLocked,
       engine,
+      layerCommands,
       onRevealProperties,
       panel,
       panelRows,
@@ -433,17 +441,12 @@ export const LayersTree = ({
   // After deletion, focus the nearest surviving row below, otherwise above.
   const removeRows = useCallback(
     (key: string) => {
-      const { document: currentDocument, engine: currentEngine, panel: current, visibleRowIds: rows } = latest.current;
+      const { document: currentDocument, layerCommands, panel: current, visibleRowIds: rows } = latest.current;
       const vm = lookupDocumentNodeState(currentDocument, key);
       if (!vm) {
         return;
       }
-      // The menu's rule: the selection when the row is part of it, else the row alone.
-      const ids = current.selectedIds.includes(key) ? current.selectedIds : [key];
-      // A stray key on a locked row is ignored, as the menu disables its Delete.
-      if (currentEngine?.document.model()?.refusalFor({ ids, type: 'remove' })) {
-        return;
-      }
+      const ids = layerCommandTargets(current.selectedIds, key);
       const removed = new Set(ids);
       const survives = (id: string): boolean => {
         const state = lookupDocumentNodeState(currentDocument, id);
@@ -451,15 +454,12 @@ export const LayersTree = ({
       };
       const index = rows.indexOf(key);
       const next = rows.slice(index + 1).find(survives) ?? rows.slice(0, Math.max(0, index)).reverse().find(survives);
-      const outcome = runStructural(
-        t(ids.length > 1 ? 'widgets.layers.actions.deleteSelected' : 'widgets.layers.actions.delete'),
-        { ids, type: 'remove' }
-      );
-      if (outcome.status === 'committed' && next) {
+      // A locked row's Delete is a quiet no-op, as the menu disables its Delete.
+      if (deleteLayers(layerCommands, ids) === 'committed' && next) {
         focusItem(next);
       }
     },
-    [focusItem, runStructural, t]
+    [focusItem]
   );
 
   const commands = useMemo<LayerRowCommands>(
@@ -669,7 +669,7 @@ export const LayersTree = ({
       setChildEnabled: (child, isEnabled) =>
         runChildStructural(t('widgets.layers.modifiers.toggleActive'), child, { isEnabled, type: 'set-enabled' }),
       setEnabled: (id, isEnabled) =>
-        runStructural(t('widgets.layers.actions.toggleActive'), {
+        runStructural(t(enabledToggleLabel(latest.current.document, [id], !isEnabled).key), {
           type: 'set-enabled',
           updates: [{ id, isEnabled }],
         }),

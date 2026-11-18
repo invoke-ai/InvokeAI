@@ -95,7 +95,7 @@ beforeEach(() => {
   server.invocationStatus.mockResolvedValue(invocationStatus());
   server.modelStats.mockResolvedValue(modelStats());
   server.clearInvocations.mockResolvedValue(null);
-  server.clearModels.mockResolvedValue({ bytes_freed: 2 * GIB, models_cleared: 2 });
+  server.clearModels.mockResolvedValue({ bytes_freed: 2 * GIB, models_cleared: 2, vram_release_refused: false });
   server.setInvocationsEnabled.mockResolvedValue(null);
   host = document.createElement('div');
   document.body.append(host);
@@ -157,7 +157,7 @@ describe('QueueHeaderActions', () => {
     const trigger = (await render())!;
 
     expect(host.querySelectorAll('button')).toHaveLength(1);
-    expect(trigger.getAttribute('aria-label')).toBe('widgets.queue.cache.title');
+    expect(trigger.textContent).toBe('widgets.queue.cache.title');
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
 
     await act(() => userEvent.click(trigger));

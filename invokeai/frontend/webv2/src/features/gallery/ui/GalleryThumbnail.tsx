@@ -26,7 +26,12 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { getGalleryItemDragData, getGalleryItemDragId } from './galleryDnd';
-import { GalleryTileFrame } from './GalleryTileFrame';
+import {
+  GALLERY_TILE_MEDIA_SELECTOR,
+  GalleryTileFrame,
+  GalleryTileMedia,
+  getGalleryTileMediaRatio,
+} from './GalleryTileFrame';
 import { useGalleryImageRecovery } from './useGalleryImageRecovery';
 
 /** Desaturate armed and active touch drags, including the portalled preview. */
@@ -42,6 +47,9 @@ const THUMBNAIL_ARMED_CSS = { '&[data-drag-armed=true]': { filter: 'saturate(0)'
  */
 const isModified = (event: KeyboardEvent | MouseEvent) =>
   event.ctrlKey || event.metaKey || event.altKey || event.shiftKey;
+
+/** Keeps the star's own double and middle clicks from reaching the cell's open handlers. */
+const stopPropagation = (event: MouseEvent) => event.stopPropagation();
 
 const PREVIEW_IMAGE_STYLE = {
   borderRadius: '0.375rem',
@@ -153,7 +161,10 @@ const GalleryThumbnail = ({
   const [dragOrigin, setDragOrigin] = useState<DOMRect | null>(null);
 
   useLayoutEffect(() => {
-    setDragOrigin(isDragging ? (tileRef.current?.getBoundingClientRect() ?? null) : null);
+    // The preview lifts the media's own rect, not the square cell around it.
+    const media = tileRef.current?.querySelector(GALLERY_TILE_MEDIA_SELECTOR) ?? tileRef.current;
+
+    setDragOrigin(isDragging ? (media?.getBoundingClientRect() ?? null) : null);
   }, [isDragging]);
 
   const itemKey = toGalleryItemKey(item);
@@ -197,6 +208,8 @@ const GalleryThumbnail = ({
     [dragOrigin, transform]
   );
 
+  // A media box sized to the item's ratio is filled exactly; without dimensions, aspect fit letterboxes in the square.
+  const letterbox = fit === 'aspect' && getGalleryTileMediaRatio(item, fit) === null;
   const imageStyle = useMemo(
     () =>
       ({
@@ -204,11 +217,11 @@ const GalleryThumbnail = ({
         height: '100%',
         inset: 0,
         maxWidth: 'none',
-        objectFit: fit === 'aspect' ? 'contain' : 'cover',
+        objectFit: letterbox ? 'contain' : 'cover',
         position: 'absolute',
         width: '100%',
       }) as const,
-    [fit]
+    [letterbox]
   );
 
   const handleContextMenu = useCallback(
@@ -226,7 +239,20 @@ const GalleryThumbnail = ({
     [isDragging, item, onContextMenu]
   );
 
-  const handleClick = useCallback((event: MouseEvent) => onClick(item, event), [item, onClick]);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const handleClick = useCallback(
+    (event: MouseEvent) => {
+      const button = buttonRef.current;
+
+      // A click beside the image takes focus to the tile like one on it, so the grid's focused tile, its Tab stop and
+      // Enter/Space follow the item just selected.
+      if (button && !button.contains(event.target as Node)) {
+        button.focus({ preventScroll: true });
+      }
+      onClick(item, event);
+    },
+    [item, onClick]
+  );
   // The clicks before it have already selected the item.
   const handleDoubleClick = useCallback(
     (event: MouseEvent) => {
@@ -237,18 +263,20 @@ const GalleryThumbnail = ({
     [item, onOpen]
   );
 
-  // Middle button only; the primary button's click/double-click stay selection and open. Its mousedown default
-  // (autoscroll on some platforms) is suppressed so the release reliably delivers the auxclick.
-  const handleMiddleMouseDown = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
+  // Composes with the drag sensor's own mousedown, which starts primary-button drags from the same cell. Middle
+  // button only: the primary button's click/double-click stay selection and open. Its mousedown default (autoscroll
+  // on some platforms) is suppressed so the release reliably delivers the auxclick.
+  const handleMouseDown = useCallback(
+    (event: MouseEvent) => {
       if (onOpenInNewTab && event.button === 1) {
         event.preventDefault();
       }
+      listeners?.onMouseDown?.(event);
     },
-    [onOpenInNewTab]
+    [listeners, onOpenInNewTab]
   );
   const handleAuxClick = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
+    (event: MouseEvent) => {
       if (onOpenInNewTab && event.button === 1) {
         event.preventDefault();
         event.stopPropagation();
@@ -301,47 +329,50 @@ const GalleryThumbnail = ({
       ref={setTileRef}
       {...dragListeners}
       alwaysShowDimensions={alwaysShowDimensions}
-      boxShadow={isCompared ? 'inset 0 0 0 1px {colors.accent.solid}' : undefined}
       css={isDragging ? THUMBNAIL_DRAG_CSS : THUMBNAIL_ARMED_CSS}
-      isSelected={isSelected || isCompared}
       item={item}
       opacity={isDragging ? 0.4 : undefined}
       role="listitem"
       // Allow touch panning; the hold sensor yields to scrolling and arms drag only after a sustained hold.
       touchAction="pan-y"
+      // Pointer handlers sit on the whole cell so its letterbox gutter selects and opens like the media; the button's
+      // own clicks (Space included) bubble here.
+      onAuxClick={handleAuxClick}
+      onClick={handleClick}
       onContextMenu={handleContextMenu}
+      onDoubleClick={handleDoubleClick}
       onFocus={handleRevealLabel}
+      onMouseDown={handleMouseDown}
       onPointerEnter={handleRevealLabel}
     >
-      <button
-        aria-current={isPrimary ? 'true' : undefined}
-        // Enter opens the item in Preview; Space keeps the button's own activation, which selects.
-        aria-keyshortcuts="Enter"
-        aria-label={
-          item.kind === 'video'
-            ? t('widgets.gallery.selectVideoForPreview', { duration, name: item.name })
-            : t('widgets.gallery.selectImageForPreview', { name: item.name })
-        }
-        aria-pressed={isSelected}
-        data-gallery-item-key={itemKey}
-        style={THUMBNAIL_BUTTON_STYLE}
-        tabIndex={isTabStop ? 0 : -1}
-        type="button"
-        onAuxClick={handleAuxClick}
-        onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
-        onKeyDown={handleActivationKeyDown}
-        onMouseDown={handleMiddleMouseDown}
-      >
-        <img
-          alt={item.name}
-          decoding={item.kind === 'video' ? 'async' : undefined}
-          draggable={false}
-          src={thumbnailUrl}
-          style={imageStyle}
-          onError={handleImageError}
-        />
-      </button>
+      <GalleryTileMedia fit={fit} height={item.height} isSelected={isSelected || isCompared} width={item.width}>
+        <button
+          aria-current={isPrimary ? 'true' : undefined}
+          // Enter opens the item in Preview; Space keeps the button's own activation, which selects.
+          aria-keyshortcuts="Enter"
+          aria-label={
+            item.kind === 'video'
+              ? t('widgets.gallery.selectVideoForPreview', { duration, name: item.name })
+              : t('widgets.gallery.selectImageForPreview', { name: item.name })
+          }
+          aria-pressed={isSelected}
+          data-gallery-item-key={itemKey}
+          ref={buttonRef}
+          style={THUMBNAIL_BUTTON_STYLE}
+          tabIndex={isTabStop ? 0 : -1}
+          type="button"
+          onKeyDown={handleActivationKeyDown}
+        >
+          <img
+            alt={item.name}
+            decoding={item.kind === 'video' ? 'async' : undefined}
+            draggable={false}
+            src={thumbnailUrl}
+            style={imageStyle}
+            onError={handleImageError}
+          />
+        </button>
+      </GalleryTileMedia>
       {/* The compare role owns this corner while comparing. */}
       {label && getItemLabel && !compareRole ? (
         <Badge
@@ -387,7 +418,9 @@ const GalleryThumbnail = ({
         transition="opacity var(--wb-motion-duration-medium) ease"
         variant="solid"
         zIndex="1"
+        onAuxClick={stopPropagation}
         onClick={handleToggleStarred}
+        onDoubleClick={stopPropagation}
       >
         <StarIcon fill={item.starred ? 'currentColor' : 'none'} />
       </IconButton>

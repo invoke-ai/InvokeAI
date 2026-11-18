@@ -24,10 +24,13 @@ const settingsFor = (main: GenerateModelConfig, overrides: Partial<GenerateSetti
   ...overrides,
 });
 const image = { original: { image: { height: 768, image_name: 'reference.png', width: 512 } } };
+/** Set while collecting named scenarios: every reference then carries `Name of <id>`. */
+let nameReferences = false;
 const reference = (id: string, config: Record<string, unknown>): GenerateReferenceImage => ({
   config: { image, ...config } as GenerateReferenceImage['config'],
   id,
   isEnabled: true,
+  ...(nameReferences ? { name: `Name of ${id}` } : {}),
 });
 const ipAdapter = (base: string) => ({
   base,
@@ -48,9 +51,11 @@ const ipAdapterReference = (id: string, overrides: Record<string, unknown> = {})
 
 /**
  * Scenarios that together raise every translated Generate issue, for tests that check each against the locale and
- * its renderer. Needs the capability table seeded; leaves it seeded.
+ * its renderer. `namedReferences` gives every reference image a name. Needs the capability table seeded; leaves it
+ * seeded.
  */
-export const collectGenerationIssueScenarios = (): GenerationIssue[] => {
+export const collectGenerationIssueScenarios = ({ namedReferences = false } = {}): GenerationIssue[] => {
+  nameReferences = namedReferences;
   const sdxl = model('sdxl');
   const flux = model('flux');
   const anima = model('anima', { format: 'checkpoint', variant: 'anima_qwen3' });
@@ -138,6 +143,8 @@ export const collectGenerationIssueScenarios = (): GenerationIssue[] => {
   resetArchitectureCapabilities();
   issues.push(...getGenerationValidationIssues(sdxl, sdxlSettings));
   seedArchitectureCapabilities();
+
+  nameReferences = false;
 
   return issues;
 };

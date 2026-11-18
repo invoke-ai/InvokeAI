@@ -368,17 +368,59 @@ describe('normalizeWorkbenchPreferences prompt editing', () => {
 });
 
 describe('normalizeWorkbenchPreferences workflow library', () => {
-  it('orders by last update and fills thumbnails unless a known choice is stored', () => {
-    expect(store.normalizeWorkbenchPreferences({})).toMatchObject({
-      workflowLibrarySort: 'updated',
-      workflowLibraryThumbnailFit: 'cover',
+  const DEFAULTS = {
+    workflowLibraryCardSize: 'small',
+    workflowLibraryLayout: 'grid',
+    workflowLibrarySort: 'updated',
+    workflowLibrarySortDirection: 'desc',
+    workflowLibraryThumbnailFit: 'cover',
+  };
+
+  it('lists most recently updated first in a grid of small filled cards unless a known choice is stored', () => {
+    expect(store.normalizeWorkbenchPreferences({})).toMatchObject(DEFAULTS);
+    expect(
+      store.normalizeWorkbenchPreferences({
+        workflowLibraryCardSize: 'huge',
+        workflowLibraryLayout: 'table',
+        workflowLibrarySort: 'size',
+        workflowLibrarySortDirection: 'DESC',
+        workflowLibraryThumbnailFit: 'stretch',
+      })
+    ).toMatchObject(DEFAULTS);
+    expect(
+      store.normalizeWorkbenchPreferences({
+        workflowLibraryCardSize: 'large',
+        workflowLibraryLayout: 'list',
+        workflowLibrarySort: 'lastRun',
+        workflowLibrarySortDirection: 'asc',
+        workflowLibraryThumbnailFit: 'contain',
+      })
+    ).toMatchObject({
+      workflowLibraryCardSize: 'large',
+      workflowLibraryLayout: 'list',
+      workflowLibrarySort: 'lastRun',
+      workflowLibrarySortDirection: 'asc',
+      workflowLibraryThumbnailFit: 'contain',
     });
+  });
+
+  it('gives a key stored before directions existed its natural direction', () => {
+    expect(store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'name' })).toMatchObject({
+      workflowLibrarySort: 'name',
+      workflowLibrarySortDirection: 'asc',
+    });
+    expect(store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'updated' })).toMatchObject({
+      workflowLibrarySort: 'updated',
+      workflowLibrarySortDirection: 'desc',
+    });
+    expect(store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'opened' })).toMatchObject({
+      workflowLibrarySort: 'opened',
+      workflowLibrarySortDirection: 'desc',
+    });
+    // A stored direction wins.
     expect(
-      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'size', workflowLibraryThumbnailFit: 'stretch' })
-    ).toMatchObject({ workflowLibrarySort: 'updated', workflowLibraryThumbnailFit: 'cover' });
-    expect(
-      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' })
-    ).toMatchObject({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' });
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'name', workflowLibrarySortDirection: 'desc' })
+    ).toMatchObject({ workflowLibrarySortDirection: 'desc' });
   });
 });
 
@@ -403,13 +445,31 @@ describe('normalizeWorkbenchPreferences appearance', () => {
   });
 });
 
-describe('normalizeWorkbenchPreferences canvas operations', () => {
-  it('keeps Select Object auto-process off unless it was stored as on', () => {
-    expect(store.normalizeWorkbenchPreferences({}).selectObjectAutoProcess).toBe(false);
+describe('Select Object auto-update preference', () => {
+  it('starts on for an account whose saves wrote the old auto-process field as false', async () => {
+    seedBackendPreferences({ selectObjectAutoProcess: false, themeId: 'osakaJade' });
+
+    expect((await store.loadWorkbenchSettings()).selectObjectAutoUpdate).toBe(true);
+    await store.patchWorkbenchPreferences({ reduceMotion: true });
+
+    expect(readBackendPreferences()).not.toHaveProperty('selectObjectAutoProcess');
+    expect(readBackendPreferences().selectObjectAutoUpdate).toBe(true);
+  });
+
+  it('keeps a choice made after the change across a reload', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchWorkbenchPreferences({ selectObjectAutoUpdate: false });
+
+    vi.resetModules();
+    store = await import('./store');
+
+    expect((await store.loadWorkbenchSettings()).selectObjectAutoUpdate).toBe(false);
+  });
+
+  it('ignores a stored value that is not a boolean', () => {
     expect(
-      store.normalizeWorkbenchPreferences({ selectObjectAutoProcess: 'true' as never }).selectObjectAutoProcess
-    ).toBe(false);
-    expect(store.normalizeWorkbenchPreferences({ selectObjectAutoProcess: true }).selectObjectAutoProcess).toBe(true);
+      store.normalizeWorkbenchPreferences({ selectObjectAutoUpdate: 'false' as never }).selectObjectAutoUpdate
+    ).toBe(true);
   });
 });
 
