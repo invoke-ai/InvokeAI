@@ -20566,6 +20566,7 @@ describe('layer quick-switch memory', () => {
       hasMultipleStagingSlots: false,
       copySelection: vi.fn(),
       cropAllLayers: vi.fn(),
+      addRasterLayer: vi.fn(),
       swapActiveColors: vi.fn(),
       resetActiveColors: vi.fn(),
       pasteFromClipboard: vi.fn(),

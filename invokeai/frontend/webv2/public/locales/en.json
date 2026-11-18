@@ -4428,6 +4428,7 @@
         "deleteSelected": "Delete selected canvas item",
         "deselect": "Deselect",
         "duplicateLayer": "Duplicate layer",
+        "newRasterLayer": "New raster layer",
         "fitBbox": "Fit generation frame",
         "increaseBrushSize": "Increase brush/eraser size",
         "invertSelection": "Invert selection",

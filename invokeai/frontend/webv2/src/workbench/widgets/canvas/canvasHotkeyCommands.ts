@@ -67,7 +67,8 @@ export const CANVAS_ONLY_HOTKEYS = [
   ['canvas.nudgeRightLarge', 'widgets.canvas.commands.nudgeRightLarge', ['shift+arrowright']],
   ['canvas.nudgeUpLarge', 'widgets.canvas.commands.nudgeUpLarge', ['shift+arrowup']],
   ['canvas.nudgeDownLarge', 'widgets.canvas.commands.nudgeDownLarge', ['shift+arrowdown']],
-  // Layer management.
+  // Layer management. No default for creation: mod+shift+n is reserved by browsers.
+  ['canvas.newRasterLayer', 'widgets.canvas.commands.newRasterLayer', []],
   ['canvas.duplicateLayer', 'widgets.canvas.commands.duplicateLayer', ['mod+j']],
   ['canvas.groupLayers', 'widgets.canvas.commands.groupLayers', ['mod+g']],
   ['canvas.ungroupLayers', 'widgets.canvas.commands.ungroupLayers', ['mod+shift+g']],
@@ -159,6 +160,8 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
   readonly copySelection: (cut: boolean) => void;
   /** Crops every unlocked layer to the frame and reports the outcome, as the canvas menu does. */
   readonly cropAllLayers: () => void;
+  /** Uses the same guarded, undoable insertion as the Layers add menu. */
+  readonly addRasterLayer: () => void;
   /** Delete, duplicate, group and ungroup run on `selectedLayerIds` through these, as every layer surface does. */
   readonly layerCommands: LayerCommandDeps;
   readonly pasteFromClipboard: () => void;
@@ -246,6 +249,8 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     ctx.copySelection(commandId === 'canvas.cutSelection');
   } else if (commandId === 'canvas.pasteImage') {
     ctx.pasteFromClipboard();
+  } else if (commandId === 'canvas.newRasterLayer') {
+    ctx.addRasterLayer();
   } else if (commandId === 'canvas.cropAllLayersToFrame') {
     ctx.cropAllLayers();
   } else if (commandId === 'canvas.toggleNonRasterLayers') {

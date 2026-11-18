@@ -60,6 +60,31 @@ describe('firstPartyHotkeyCatalog', () => {
     expect(reset).toMatchObject({ defaultKeys: ['d'] });
   });
 
+  it('keeps new raster layer unbound until remapped, and limits it to Canvas focus outside modals', () => {
+    const definition = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'canvas.newRasterLayer')!;
+    const context = {
+      activeInstanceId: 'canvas',
+      activeWidgetTypeId: 'canvas',
+      focusedRegion: 'center',
+      isModalPresent: false,
+      projectId: 'project-1',
+    } as const;
+    const resolve = (customHotkeys: Record<string, string[]>, overrides = {}) =>
+      resolveHotkey({
+        context: { ...context, ...overrides },
+        event: { target: null } as KeyboardEvent,
+        hotkeys: [applyCustomHotkeys(definition, customHotkeys)],
+        matchedKey: 'shift+n',
+      });
+
+    expect(definition.allowInEditable).toBe(false);
+    expect(resolve({})).toBeNull();
+    const custom = { 'canvas.newRasterLayer': ['shift+n'] };
+    expect(resolve(custom)?.commandId).toBe('canvas.newRasterLayer');
+    expect(resolve(custom, { activeWidgetTypeId: 'gallery' })).toBeNull();
+    expect(resolve(custom, { isModalPresent: true })).toBeNull();
+  });
+
   it('offers crop all layers to frame unbound, for a key the user chooses', () => {
     const cropAll = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'canvas.cropAllLayersToFrame');
 

@@ -20,6 +20,7 @@ import { useWorkbenchPreferenceSelector, useWorkbenchSettingsSelector } from '@w
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useNotify } from '@workbench/useNotify';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
+import { useAddLayer } from '@workbench/widgets/layers/useAddLayer';
 import { useDroppedFileUpload } from '@workbench/widgets/shared/useDroppedFileUpload';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
@@ -114,6 +115,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const canvasDispatch = useCanvasProjectMutationDispatch();
   const queries = useWorkbenchQueries();
   const engine = useCanvasEngine();
+  const addLayer = useAddLayer();
   const projectId = useActiveProjectId();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
@@ -471,6 +473,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const executeCanvasHotkey = useEffectEvent((commandId: string) => {
     const selectedLayerIds = readLayerPanelState(projectId, document.selectedLayerId).selectedIds;
     executeCanvasHotkeyCommand(commandId, {
+      addRasterLayer: () => addLayer('raster'),
       copySelection,
       cropAllLayers: () => {
         if (engine) {

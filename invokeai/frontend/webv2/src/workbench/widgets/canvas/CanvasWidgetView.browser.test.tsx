@@ -22,7 +22,11 @@ import { TINY_PNG_BASE64 } from '@platform/browser/nativeDrag.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createControlLayer } from '@workbench/canvas-engine/api';
-import { layerContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import {
+  groupContract,
+  layerContract,
+  stacksFrom,
+} from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { getCanvasOperations, uploadControlImageFile } from '@workbench/canvas-operations/api';
@@ -460,6 +464,52 @@ describe('CanvasWidgetView staged results can come back', () => {
     expect(staged(store)).toEqual(['right-eye.png']);
     // The accepted layer stays; undoing it is the canvas's own step.
     expect(store.getState().projects[0]!.canvas.document.stacks.raster).toHaveLength(1);
+  });
+});
+
+describe('CanvasWidgetView new raster layer command', () => {
+  it('inserts above a selected group child, selects the new layer, and supports undo and redo', async () => {
+    const selected = layerContract('paint', 'raster');
+    const { commandHandlers } = await renderView('completed', {
+      nodes: [groupContract('group', [selected])],
+      selectedLayer: selected,
+      staged: false,
+    });
+    const before = activeProject().canvas.document;
+
+    await act(() => commandHandlers.get('canvas.newRasterLayer')!());
+
+    const document = activeProject().canvas.document;
+    const group = document.stacks.raster[0]!;
+    expect(group.type).toBe('group');
+    if (group.type !== 'group') {
+      throw new Error('Expected the existing group');
+    }
+    expect(group.children).toHaveLength(2);
+    expect(group.children[0]).toMatchObject({ id: document.selectedLayerId, type: 'raster' });
+    expect(group.children[1]!.id).toBe('paint');
+    const addedId = document.selectedLayerId;
+
+    await act(() => harness.engine!.history.undo());
+    expect(activeProject().canvas.document).toEqual(before);
+    await act(() => harness.engine!.history.redo());
+    expect(activeProject().canvas.document.selectedLayerId).toBe(addedId);
+
+    await act(() => commandHandlers.get('canvas.newRasterLayer')!());
+    const updatedGroup = activeProject().canvas.document.stacks.raster[0]!;
+    expect(updatedGroup.type === 'group' && updatedGroup.children).toHaveLength(3);
+  });
+
+  it('creates a raster layer in an empty document without changing staged results', async () => {
+    const { commandHandlers } = await renderView('running');
+    const staged = activeProject().canvas.stagingArea;
+    await act(() => commandHandlers.get('canvas.newRasterLayer')!());
+    expect(activeProject().canvas.document.stacks.raster).toHaveLength(1);
+    expect(activeProject().canvas.document.stacks.raster[0]).toMatchObject({
+      id: activeProject().canvas.document.selectedLayerId,
+      type: 'raster',
+    });
+    expect(activeProject().canvas.stagingArea).toEqual(staged);
   });
 });
 

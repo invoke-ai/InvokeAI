@@ -121,6 +121,7 @@ let pasteFromClipboard: Mock<() => void>;
 const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyContext => ({
   copySelection,
   cropAllLayers: vi.fn(),
+  addRasterLayer: vi.fn(),
   dispatch,
   reportLayerOperation: vi.fn(),
   reportMergeDownRefusal: vi.fn(),

@@ -132,6 +132,7 @@ const setup = async (layers: readonly Parameters<typeof stacksFrom>[0][number][]
     executeCanvasHotkeyCommand(commandId, {
       copySelection: vi.fn(),
       cropAllLayers: vi.fn(),
+      addRasterLayer: vi.fn(),
       dispatch: () => true,
       document: doc(),
       engine,
