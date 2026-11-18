@@ -24,7 +24,7 @@ import { DEFAULT_PREFERENCES, patchWorkbenchPreferences } from '@workbench/setti
 import { HoldToDragSensor, PrimaryMouseSensor } from '@workbench/shell/holdToDragSensor';
 import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import i18next from 'i18next';
-import { act, Activity, useCallback, useSyncExternalStore } from 'react';
+import { act, Activity, Fragment, StrictMode, useCallback, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -566,7 +566,9 @@ await i18n.use(initReactI18next).init({
             framesPerSecond: '{{count}} fps',
             itemCount_one: '{{count}} item',
             itemCount_other: '{{count}} items',
+            compare: 'Compare',
             compareVideos: 'Video comparison',
+            viewing: 'Viewing',
             videoCompareDivider: 'Comparison divider',
             selectForCompare: 'Select for compare',
             videoCompareArmedHint: 'Pick another video to compare with this one',
@@ -705,36 +707,39 @@ const CenterRegion = ({ children }: Pick<DndContextProps, 'children'>) => (
   </section>
 );
 
-const renderTree = async (client: QueryClient, previewMode: 'hidden' | 'visible' = 'visible') => {
+const renderTree = async (client: QueryClient, previewMode: 'hidden' | 'visible' = 'visible', strictMode = false) => {
+  const Root = strictMode ? StrictMode : Fragment;
   await act(async () => {
     root?.render(
-      <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <QueryClientProvider client={client}>
-            <WorkbenchFocusProvider>
-              <WorkbenchHotkeyRuntime />
-              <ShellDndContext>
-                <LivePreviewFollowProvider>
-                  <FollowProbe />
-                  <HeaderPositionProbe />
-                  {showsHeaderMenuButton ? <HeaderMenuButton /> : null}
-                  <CenterRegion>
-                    <Activity mode={previewMode}>
-                      <PreviewWidgetView instance={instance} manifest={manifest} region="center" runtime={runtime} />
-                    </Activity>
-                  </CenterRegion>
-                </LivePreviewFollowProvider>
-              </ShellDndContext>
-            </WorkbenchFocusProvider>
-          </QueryClientProvider>
-        </ChakraProvider>
-      </I18nextProvider>
+      <Root>
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <QueryClientProvider client={client}>
+              <WorkbenchFocusProvider>
+                <WorkbenchHotkeyRuntime />
+                <ShellDndContext>
+                  <LivePreviewFollowProvider>
+                    <FollowProbe />
+                    <HeaderPositionProbe />
+                    {showsHeaderMenuButton ? <HeaderMenuButton /> : null}
+                    <CenterRegion>
+                      <Activity mode={previewMode}>
+                        <PreviewWidgetView instance={instance} manifest={manifest} region="center" runtime={runtime} />
+                      </Activity>
+                    </CenterRegion>
+                  </LivePreviewFollowProvider>
+                </ShellDndContext>
+              </WorkbenchFocusProvider>
+            </QueryClientProvider>
+          </ChakraProvider>
+        </I18nextProvider>
+      </Root>
     );
     await Promise.resolve();
   });
 };
 
-const render = async (client = new QueryClient()) => {
+const render = async (client = new QueryClient(), { strictMode = false } = {}) => {
   // A fresh mount replaces the last one: two mounted hotkey runtimes would each handle every key.
   await act(async () => {
     root?.unmount();
@@ -747,7 +752,7 @@ const render = async (client = new QueryClient()) => {
   root = createRoot(host);
 
   queryClient = client;
-  await renderTree(client);
+  await renderTree(client, 'visible', strictMode);
 };
 
 // Rerender with the same query client to preserve real cache behavior; supply fresh widget-value identities.
@@ -4615,6 +4620,8 @@ describe('preview video comparison', () => {
     ...createVideoItem('upscaled.mp4', '2026-07-30T12:00:00Z'),
     fps: 10,
     fullUrl: `${FIXTURE_VIDEO_URL}?comparison`,
+    height: 1440,
+    width: 2560,
   };
   const comparison = () => page.getByRole('group', { name: 'Video comparison' });
   const compareVideos = () => Array.from(comparison().element().querySelectorAll('video'));
@@ -4691,6 +4698,199 @@ describe('preview video comparison', () => {
     }
   });
 
+  it('steps both clips and preserves playback controls when swapping from the dock or Gallery', async () => {
+    setGalleryValues({ compareImage: source, selectedImage: result, selectedImageName: 'video:upscaled.mp4' });
+    mocks.galleryItemPages = [{ items: [result, source], total: 2 }];
+    mocks.commands.gallery.selectItem.mockImplementation(() =>
+      publishGalleryValues({ compareImage: result, selectedImage: source, selectedImageName: 'video:original.mp4' })
+    );
+    await render(undefined, { strictMode: true });
+    getBoundary().parentElement!.style.height = '300px';
+    try {
+      const nextFrame = comparison().getByRole('button', { name: 'Next frame', exact: true });
+      const previousFrame = comparison().getByRole('button', { name: 'Previous frame', exact: true });
+      const divider = comparison().getByRole('slider', { name: 'Comparison divider' });
+      await expect.element(nextFrame).toBeEnabled();
+      await expect.element(comparison().getByText('Frame 0 / 9')).toBeVisible();
+      await expect.element(comparison().getByText('Compare · 1920 × 1080')).toBeVisible();
+      await expect.element(comparison().getByText('Viewing · 2560 × 1440')).toBeVisible();
+      const [primary, follower] = compareVideos();
+
+      await act(() => userEvent.click(nextFrame));
+      await expect.poll(() => primary!.currentTime).toBeCloseTo(0.15, 2);
+      await expect.poll(() => follower!.currentTime).toBeCloseTo(0.15, 2);
+      await expect.element(comparison().getByText('Frame 1 / 9')).toBeVisible();
+      await act(() => userEvent.click(previousFrame));
+      await expect.poll(() => primary!.currentTime).toBeCloseTo(0.05, 2);
+
+      await pressKeyOn(nextFrame.element() as HTMLElement, '.');
+      await expect.poll(() => primary!.currentTime).toBeCloseTo(0.15, 2);
+      await pressKeyOn(nextFrame.element() as HTMLElement, ',');
+      await expect.poll(() => primary!.currentTime).toBeCloseTo(0.05, 2);
+      await pressKeyOn(nextFrame.element() as HTMLElement, '.');
+      await expect.poll(() => follower!.currentTime).toBeCloseTo(0.15, 2);
+      expect(primary!.paused && follower!.paused).toBe(true);
+
+      await act(async () => {
+        (divider.element() as HTMLElement).focus();
+        await userEvent.keyboard('{ArrowRight}');
+      });
+      await expect.element(divider).toHaveAttribute('aria-valuenow', '51');
+      const volume = comparison().getByRole('slider', { name: 'Volume', exact: true });
+      await act(async () => {
+        (volume.element() as HTMLElement).focus();
+        await userEvent.keyboard('{ArrowLeft}');
+      });
+      await expect.poll(() => primary!.volume).toBeLessThan(1);
+      const keptVolume = primary!.volume;
+      await act(() => userEvent.click(comparison().getByRole('button', { name: 'Mute', exact: true })));
+
+      const swap = page.getByRole('button', { name: 'common.swap', exact: true });
+      await act(() => userEvent.click(swap));
+      expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(source, undefined, expect.any(Number), true);
+      await expect.element(comparison().getByText('Compare · 2560 × 1440')).toBeVisible();
+      await expect.element(divider).toHaveAttribute('aria-valuenow', '51');
+      await expect.poll(() => compareVideos()[0]?.currentTime).toBeCloseTo(0.15, 2);
+      const [newPrimary, newFollower] = compareVideos();
+      expect(newPrimary?.src).toContain(result.fullUrl);
+      expect(newPrimary?.muted).toBe(true);
+      expect(newPrimary?.volume).toBe(keptVolume);
+      expect(newFollower?.muted).toBe(true);
+
+      await act(() =>
+        publishGalleryValues({ compareImage: source, selectedImage: result, selectedImageName: 'video:upscaled.mp4' })
+      );
+      await expect.element(comparison().getByText('Compare · 1920 × 1080')).toBeVisible();
+      await expect.element(divider).toHaveAttribute('aria-valuenow', '51');
+      await expect.poll(() => compareVideos()[0]?.currentTime).toBeCloseTo(0.15, 2);
+      expect(compareVideos()[0]?.volume).toBe(keptVolume);
+      expect(compareVideos()[0]?.muted).toBe(true);
+    } finally {
+      mocks.commands.gallery.selectItem.mockReset();
+    }
+  });
+
+  it('keeps its ready playback position when a swap is reversed before loading finishes', async () => {
+    const pendingVideo = URL.createObjectURL(new MediaSource());
+    try {
+      setGalleryValues({ compareImage: source, selectedImage: result, selectedImageName: 'video:upscaled.mp4' });
+      await render();
+      getBoundary().parentElement!.style.height = '300px';
+      const nextFrame = comparison().getByRole('button', { name: 'Next frame', exact: true });
+      await expect.element(nextFrame).toBeEnabled();
+      await act(() => userEvent.click(nextFrame));
+      await expect.poll(() => compareVideos()[0]?.currentTime).toBeCloseTo(0.15, 2);
+
+      await act(() =>
+        publishGalleryValues({
+          compareImage: { ...result, fullUrl: pendingVideo },
+          selectedImage: source,
+          selectedImageName: 'video:original.mp4',
+        })
+      );
+      await expect.element(comparison().getByRole('status')).toHaveTextContent('Loading…');
+      expect(compareVideos()[0]?.readyState).toBe(HTMLMediaElement.HAVE_NOTHING);
+
+      await act(() =>
+        publishGalleryValues({ compareImage: source, selectedImage: result, selectedImageName: 'video:upscaled.mp4' })
+      );
+      await expect.element(nextFrame).toBeEnabled();
+      await expect.poll(() => compareVideos().every((video) => Math.abs(video.currentTime - 0.15) < 0.01)).toBe(true);
+    } finally {
+      URL.revokeObjectURL(pendingVideo);
+    }
+  });
+
+  it('keeps the seek target inside the fitted frame for ultrawide media', async () => {
+    setGalleryValues({
+      compareImage: { ...source, width: 5760, height: 240 },
+      selectedImage: result,
+      selectedImageName: 'video:upscaled.mp4',
+    });
+    await render();
+    getBoundary().parentElement!.style.height = '300px';
+    const seek = comparison().getByRole('slider', { name: 'Seek' });
+    await expect.element(seek).toBeEnabled();
+    const frame = comparison().element().getBoundingClientRect();
+    const slider = seek.element().getBoundingClientRect();
+    expect(slider.top).toBeGreaterThan(frame.top);
+    expect(slider.bottom).toBeLessThan(frame.bottom);
+    await pressKeyOn(seek.element() as HTMLElement, 'ArrowRight');
+    await expect.poll(() => compareVideos()[0]?.currentTime).toBeCloseTo(0.1, 2);
+  });
+
+  it('shows the same frame on both clips for consecutive 60 fps steps, including the last frame', async () => {
+    const url = '/scripts/mock-assets/fixture-video-60fps.mp4';
+    setGalleryValues({
+      compareImage: { ...source, fps: 60, fullUrl: url },
+      selectedImage: { ...result, fps: 60, fullUrl: `${url}?comparison` },
+      selectedImageName: 'video:upscaled.mp4',
+    });
+    await render();
+    getBoundary().parentElement!.style.height = '300px';
+    const nextFrame = comparison().getByRole('button', { name: 'Next frame', exact: true });
+    const previousFrame = comparison().getByRole('button', { name: 'Previous frame', exact: true });
+    await expect.element(nextFrame).toBeEnabled();
+    const seek = comparison().getByRole('slider', { name: 'Seek' }).element() as HTMLElement;
+    const videos = compareVideos();
+    // Chromium can round a seek within the final decoded frame up to the clip's end.
+    const expectFrame = (frame: number) =>
+      expect
+        .poll(() =>
+          videos.map((video) => ({
+            frame: Math.min(59, Math.floor(video.currentTime * 60)),
+            paused: video.paused,
+            seeking: video.seeking,
+          }))
+        )
+        .toEqual([
+          { frame, paused: true, seeking: false },
+          { frame, paused: true, seeking: false },
+        ]);
+
+    await act(() => userEvent.click(nextFrame));
+    await expectFrame(1);
+    await act(() => userEvent.click(nextFrame));
+    await expectFrame(2);
+
+    await pressKeyOn(seek, 'End');
+    await expect.poll(() => videos[0]?.currentTime).toBeCloseTo(1, 3);
+    await act(() => userEvent.click(previousFrame));
+    await expectFrame(58);
+    await act(() => userEvent.click(nextFrame));
+    await expectFrame(59);
+  });
+
+  it('keeps the divider draggable through the playback scrim in a short preview', async () => {
+    setGalleryValues({ compareImage: source, selectedImage: result, selectedImageName: 'video:upscaled.mp4' });
+    await render();
+    getBoundary().parentElement!.style.height = '180px';
+    const nextFrame = comparison().getByRole('button', { name: 'Next frame', exact: true });
+    const divider = comparison().getByRole('slider', { name: 'Comparison divider' });
+    await expect.element(nextFrame).toBeEnabled();
+    await expect.element(divider).toBeVisible();
+    const groupBounds = comparison().element().getBoundingClientRect();
+    expect(groupBounds.width).toBeLessThan(310);
+    expect(nextFrame.element().getBoundingClientRect().right).toBeLessThan(groupBounds.right);
+    const seek = comparison().getByRole('slider', { name: 'Seek' }).element();
+    const seekRow = seek.closest('[data-scope="slider"][data-part="root"]')!.parentElement!;
+    const scrimTop = seekRow.parentElement!.getBoundingClientRect().top;
+    const y = (scrimTop + seekRow.getBoundingClientRect().top) / 2;
+    const bounds = divider.element().getBoundingClientRect();
+    const x = bounds.left + bounds.width / 2;
+    expect(document.elementFromPoint(x, y)?.closest('button')).toBe(divider.element());
+    await act(() =>
+      commands.mouseDragPath(
+        [
+          { x, y },
+          { x: x + 34, y },
+        ],
+        window.innerWidth
+      )
+    );
+    expect(Number(divider.element().getAttribute('aria-valuenow'))).toBeGreaterThan(50);
+  });
+
   it('shows the final paused seek when an earlier follower seek is still settling', async () => {
     setGalleryValues({ compareImage: source, selectedImage: result, selectedImageName: 'video:upscaled.mp4' });
     await render();
@@ -4761,10 +4961,13 @@ describe('preview video comparison', () => {
   it('reconnects its controls to the new pair after the kept Preview is hidden and shown', async () => {
     setGalleryValues({ compareImage: source, selectedImage: result, selectedImageName: 'video:upscaled.mp4' });
     await render();
+    getBoundary().parentElement!.style.height = '300px';
     const play = comparison().getByRole('button', { name: 'Play', exact: true });
     await expect.element(play).toBeEnabled();
     const firstPair = compareVideos();
     expect(firstPair).toHaveLength(2);
+    await act(() => userEvent.click(comparison().getByRole('button', { name: 'Next frame', exact: true })));
+    await expect.poll(() => firstPair[0]?.currentTime).toBeCloseTo(0.15, 2);
 
     await renderTree(queryClient!, 'hidden');
     expect(firstPair.every((video) => !video.isConnected && !video.hasAttribute('src'))).toBe(true);
@@ -4774,6 +4977,7 @@ describe('preview video comparison', () => {
     const secondPair = compareVideos();
     expect(secondPair).toHaveLength(2);
     expect(secondPair.every((video) => !firstPair.includes(video))).toBe(true);
+    await expect.poll(() => secondPair[0]?.currentTime).toBeCloseTo(0.15, 2);
     await act(() => userEvent.click(play));
     await expect.poll(() => secondPair.every((video) => !video.paused)).toBe(true);
   });
@@ -4816,12 +5020,44 @@ describe('preview video comparison', () => {
     const retry = alert.getByRole('button', { name: 'Retry', exact: true });
     const exit = page.getByRole('button', { name: 'widgets.preview.exitCompare', exact: true });
     await expect.element(retry).toBeEnabled();
-    await expect.element(comparison().getByRole('button', { name: 'Play', exact: true })).toBeDisabled();
+    await expect.element(comparison().getByRole('button', { name: 'Play', exact: true })).not.toBeInTheDocument();
+    await expect.element(comparison().getByRole('slider', { name: 'Seek' })).not.toBeInTheDocument();
     await expect.element(exit).toBeEnabled();
+
+    const frame = comparison().element() as HTMLElement;
+    const requestFullscreen = vi.spyOn(frame, 'requestFullscreen').mockResolvedValue(undefined);
+    try {
+      await pressKeyOn(frame, 'f');
+      expect(requestFullscreen).not.toHaveBeenCalled();
+    } finally {
+      requestFullscreen.mockRestore();
+    }
 
     const retryButton = retry.element() as HTMLElement;
     await pressKeyOn(retryButton, 'Enter');
     await expect.poll(() => retryButton.isConnected).toBe(false);
     await expect.element(exit).toHaveFocus();
+  });
+
+  it('resets playback settings on Retry after a ready clip reports an error', async () => {
+    setGalleryValues({ compareImage: source, selectedImage: result, selectedImageName: 'video:upscaled.mp4' });
+    await render();
+    getBoundary().parentElement!.style.height = '300px';
+    const nextFrame = comparison().getByRole('button', { name: 'Next frame', exact: true });
+    const divider = comparison().getByRole('slider', { name: 'Comparison divider' });
+    await expect.element(nextFrame).toBeEnabled();
+    await act(() => userEvent.click(nextFrame));
+    await expect.poll(() => compareVideos()[0]?.currentTime).toBeCloseTo(0.15, 2);
+    await pressKeyOn(divider.element() as HTMLElement, 'ArrowRight');
+    await expect.element(divider).toHaveAttribute('aria-valuenow', '51');
+    await act(() => userEvent.click(comparison().getByRole('button', { name: 'Mute', exact: true })));
+
+    await act(() => compareVideos()[1]?.dispatchEvent(new Event('error')));
+    const retry = comparison().getByRole('button', { name: 'Retry', exact: true });
+    await act(() => userEvent.click(retry));
+    await expect.element(nextFrame).toBeEnabled();
+    await expect.element(divider).toHaveAttribute('aria-valuenow', '50');
+    expect(compareVideos()[0]?.currentTime).toBe(0);
+    expect(compareVideos()[0]?.muted).toBe(false);
   });
 });

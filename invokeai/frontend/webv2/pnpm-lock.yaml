@@ -18,7 +18,7 @@ patchedDependencies:
     hash: a650424c322ec56178110e945f70d9e11d270c144f2c0df5527ba7d327ccb285
     path: patches/react-hook-tanstack-virtual.patch
   video-compare-player@0.1.4:
-    hash: 02b18c8f371f79b77427b352bae2c0c71ef38cc54cdf488f6bdfe93ffb3633ee
+    hash: 9504a11a752e42b736e580cc344ed7599095725e7d927391f898c913ec27b417
     path: patches/video-compare-player@0.1.4.patch
 
 importers:
@@ -111,7 +111,7 @@ importers:
         version: 1.7.0(react@19.3.1)
       video-compare-player:
         specifier: 0.1.4
-        version: 0.1.4(patch_hash=02b18c8f371f79b77427b352bae2c0c71ef38cc54cdf488f6bdfe93ffb3633ee)
+        version: 0.1.4(patch_hash=9504a11a752e42b736e580cc344ed7599095725e7d927391f898c913ec27b417)
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -4643,7 +4643,7 @@ snapshots:
     dependencies:
       react: 19.3.1
 
-  video-compare-player@0.1.4(patch_hash=02b18c8f371f79b77427b352bae2c0c71ef38cc54cdf488f6bdfe93ffb3633ee): {}
+  video-compare-player@0.1.4(patch_hash=9504a11a752e42b736e580cc344ed7599095725e7d927391f898c913ec27b417): {}
 
   vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(yaml@2.9.1):
     dependencies:

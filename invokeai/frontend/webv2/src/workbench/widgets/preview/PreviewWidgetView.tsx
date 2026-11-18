@@ -368,8 +368,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   // Remember the comparison item's original page for swap-back, but only within its original query and board. Item
   // moves can invalidate the page without changing query identity.
   const swappedOutRef = useRef<{ boardId: string; key: GalleryItemKey; page: number; queryKey: string } | null>(null);
-  const swapCompareImages = useCallback(() => {
-    if (selectedItem?.kind === 'image' && compareItem?.kind === 'image') {
+  const swapComparison = useCallback(() => {
+    if (selectedItem && compareItem?.kind === selectedItem.kind) {
       const swappedOut = swappedOutRef.current;
 
       swappedOutRef.current = {
@@ -389,7 +389,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       } else {
         selectPreviewItem(compareItem);
       }
-      gallery.setCompareItem(selectedItem);
+      // Selecting the anchor also swaps the video pair in the reducer.
+      if (selectedItem.kind === 'image') {
+        gallery.setCompareItem(selectedItem);
+      }
     }
   }, [
     compareItem,
@@ -642,7 +645,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   const executeViewerHotkey = useEffectEvent((commandId: string) => {
     if (commandId === 'viewer.swapImages' && selectedItem?.kind === 'image' && compareItem?.kind === 'image') {
-      swapCompareImages();
+      swapComparison();
       return;
     }
 
@@ -765,22 +768,17 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               runtime={runtime}
               onExit={exitCompare}
               onModeChange={setComparisonMode}
-              onSwap={swapCompareImages}
+              onSwap={swapComparison}
             />
           ) : isComparing && compareItem?.kind === 'video' && selectedItem.kind === 'video' ? (
             <Suspense fallback={VIDEO_COMPARE_LOADING}>
               <PreviewVideoCompare
-                key={JSON.stringify([
-                  projectId,
-                  compareItem.name,
-                  compareItem.fullUrl,
-                  selectedItem.name,
-                  selectedItem.fullUrl,
-                ])}
+                key={JSON.stringify([projectId, ...[compareItem.name, selectedItem.name].sort()])}
                 comparison={selectedItem}
                 density={density}
                 primary={compareItem}
                 onExit={exitCompare}
+                onSwap={swapComparison}
               />
             </Suspense>
           ) : selectedItem.kind === 'image' ? (
