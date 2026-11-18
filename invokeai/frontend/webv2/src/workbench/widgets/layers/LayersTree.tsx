@@ -46,6 +46,7 @@ import {
   type ProjectedChildRow,
 } from './layerChildRows';
 import { clearLayerChildSelection, selectLayerChild, useLayerChildSelection } from './layerChildSelection';
+import { deleteLayers, layerCommandTargets, useLayerCommandDeps } from './layerCommands';
 import { enabledToggleLabel } from './layerContextActions';
 import { copyLayerToClipboard } from './layerExportActions';
 import { createAdjustmentId, createNoiseSeed } from './layerOps';
@@ -184,6 +185,7 @@ export const LayersTree = ({
 }: LayersTreeProps) => {
   const { t } = useTranslation();
   const commitPrepared = usePreparedCommit(engine);
+  const layerCommands = useLayerCommandDeps(engine);
   const propertiesRequest = useCurrentLayerPropertiesRequest();
   const operation = useCanvasOperation(engine);
   const operationLayerId = operation.status === 'active' ? operation.identity.layerId : null;
@@ -318,6 +320,7 @@ export const LayersTree = ({
     document,
     editingLocked,
     engine,
+    layerCommands,
     onRevealProperties,
     panel,
     panelRows,
@@ -335,6 +338,7 @@ export const LayersTree = ({
       document,
       editingLocked,
       engine,
+      layerCommands,
       onRevealProperties,
       panel,
       panelRows,
@@ -437,17 +441,12 @@ export const LayersTree = ({
   // After deletion, focus the nearest surviving row below, otherwise above.
   const removeRows = useCallback(
     (key: string) => {
-      const { document: currentDocument, engine: currentEngine, panel: current, visibleRowIds: rows } = latest.current;
+      const { document: currentDocument, layerCommands, panel: current, visibleRowIds: rows } = latest.current;
       const vm = lookupDocumentNodeState(currentDocument, key);
       if (!vm) {
         return;
       }
-      // The menu's rule: the selection when the row is part of it, else the row alone.
-      const ids = current.selectedIds.includes(key) ? current.selectedIds : [key];
-      // A stray key on a locked row is ignored, as the menu disables its Delete.
-      if (currentEngine?.document.model()?.refusalFor({ ids, type: 'remove' })) {
-        return;
-      }
+      const ids = layerCommandTargets(current.selectedIds, key);
       const removed = new Set(ids);
       const survives = (id: string): boolean => {
         const state = lookupDocumentNodeState(currentDocument, id);
@@ -455,15 +454,12 @@ export const LayersTree = ({
       };
       const index = rows.indexOf(key);
       const next = rows.slice(index + 1).find(survives) ?? rows.slice(0, Math.max(0, index)).reverse().find(survives);
-      const outcome = runStructural(
-        t(ids.length > 1 ? 'widgets.layers.actions.deleteSelected' : 'widgets.layers.actions.delete'),
-        { ids, type: 'remove' }
-      );
-      if (outcome.status === 'committed' && next) {
+      // A locked row's Delete is a quiet no-op, as the menu disables its Delete.
+      if (deleteLayers(layerCommands, ids) === 'committed' && next) {
         focusItem(next);
       }
     },
-    [focusItem, runStructural, t]
+    [focusItem]
   );
 
   const commands = useMemo<LayerRowCommands>(
