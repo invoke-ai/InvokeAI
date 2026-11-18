@@ -24,6 +24,7 @@ import {
   addEdge,
   addNode,
   addOutputPostprocessors,
+  getRecordedVaePrecision,
   renameNode,
   replaceCanvasOutput,
   toGraphContract,
@@ -412,7 +413,7 @@ const addEncodeNode = (
     metadata.color_compensation = settings.colorCompensation;
   }
 
-  return addNode(graph, {
+  const encode = addNode(graph, {
     id: 'canvas_i2l',
     ...(imageName ? { image: { image_name: imageName } } : {}),
     type: latents.encodeType,
@@ -421,6 +422,13 @@ const addEncodeNode = (
       ? { color_compensation: hasColorCompensation && settings.colorCompensation ? 'SDXL' : 'None' }
       : {}),
   });
+
+  // The encode takes the precision even where the decode (PiD) does not.
+  if (metadata) {
+    Object.assign(metadata, getRecordedVaePrecision(graph));
+  }
+
+  return encode;
 };
 
 /** Encodes with the VAE the family decodes with and feeds the latents to its denoise. */
@@ -595,7 +603,7 @@ const graftMaskTail = (
   const gradientMask = addNode(graph, {
     coherence_mode: compositing.coherenceMode,
     edge_radius: compositing.coherenceEdgeSize,
-    fp32: latents.fp32 ?? false,
+    ...(latents.fp32 === undefined ? {} : { fp32: latents.fp32 }),
     id: 'create_gradient_mask',
     ...(args.gradientImageEdge ? {} : { image: { image_name: initialImageName } }),
     minimum_denoise: compositing.coherenceMinDenoise,

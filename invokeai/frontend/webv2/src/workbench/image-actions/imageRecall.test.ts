@@ -3387,3 +3387,98 @@ describe('FLUX.2 dev record whose source supplies only the VAE', () => {
     expect(result?.values.componentSourceModel?.key).toBe(vaeSource.key);
   });
 });
+
+describe('FLUX.2 dev record whose source supplies the encoder and the VAE', () => {
+  it('clears the standalone encoder and VAE a panel holds, so the recorded source supplies them again', () => {
+    const { model, otherModels, settings } = flux2DevSourceRecallCase();
+    const standaloneVae: VaeModelConfig = {
+      base: 'flux2',
+      key: 'flux2-standalone-vae',
+      name: 'FLUX.2 VAE',
+      type: 'vae',
+    };
+    const recorded = { ...settings, mistralEncoderModel: null, vae: null };
+    const record = compileGenerateGraph(recorded, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph.nodes;
+    const metadata = Object.values(record).find((node) => node.type === 'core_metadata');
+    const catalog = recallCatalogFor(model, recorded);
+    const result = buildImageRecallSettings({
+      currentValues: createValues({
+        ...recorded,
+        mistralEncoderModel: settings.mistralEncoderModel,
+        vae: standaloneVae,
+      }),
+      image,
+      kind: 'all',
+      metadata,
+      models: [...otherModels, ...catalog.models, settings.mistralEncoderModel!],
+      supportedModels: [model],
+      vaeModels: [standaloneVae],
+    });
+
+    expect(metadata).toMatchObject({ mistral_source: { key: settings.componentSourceModel!.key } });
+    expect(metadata).not.toHaveProperty('mistral_encoder');
+    expect(metadata).not.toHaveProperty('vae');
+    expect(result?.values.componentSourceModel?.key).toBe(settings.componentSourceModel!.key);
+    expect(result?.values.mistralEncoderModel).toBeNull();
+    expect(result?.values.vae).toBeNull();
+  });
+});
+
+describe('FLUX.2 dev record naming a source and a standalone component that is not installed', () => {
+  const setup = (recordedVae: VaeModelConfig | null) => {
+    const { model, otherModels, settings } = flux2DevSourceRecallCase();
+    const recorded = { ...settings, vae: recordedVae };
+    const record = compileGenerateGraph(recorded, model, 'gallery', {
+      useCpuNoise: true,
+      useNsfwChecker: false,
+      useWatermark: false,
+    }).backendGraph.nodes;
+    const metadata = Object.values(record).find((node) => node.type === 'core_metadata');
+    const uninstalled = new Set([settings.mistralEncoderModel!.key, recordedVae?.key]);
+    const installed = [...otherModels, ...recallCatalogFor(model, recorded).models].filter(
+      (candidate) => !uninstalled.has(candidate.key)
+    );
+
+    return { installed, metadata, model, recorded, settings };
+  };
+
+  it('keeps the panel encoder when the recorded standalone encoder is not installed', () => {
+    const { installed, metadata, model, recorded, settings } = setup(null);
+    const panelEncoder = { ...settings.mistralEncoderModel!, key: 'panel-mistral', name: 'Panel Mistral' };
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ ...recorded, mistralEncoderModel: panelEncoder }),
+      image,
+      kind: 'all',
+      metadata,
+      models: [...installed, panelEncoder],
+      supportedModels: [model],
+      vaeModels: [],
+    });
+
+    expect(metadata).toHaveProperty('mistral_encoder');
+    expect(metadata).toHaveProperty('mistral_source');
+    expect(result?.values.mistralEncoderModel?.key).toBe('panel-mistral');
+  });
+
+  it('keeps the panel VAE when the recorded VAE is not installed', () => {
+    const recordedVae: VaeModelConfig = { base: 'flux2', key: 'recorded-vae', name: 'Recorded VAE', type: 'vae' };
+    const panelVae: VaeModelConfig = { base: 'flux2', key: 'panel-vae', name: 'Panel VAE', type: 'vae' };
+    const { installed, metadata, model, recorded } = setup(recordedVae);
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ ...recorded, vae: panelVae }),
+      image,
+      kind: 'all',
+      metadata,
+      models: installed,
+      supportedModels: [model],
+      vaeModels: [panelVae],
+    });
+
+    expect(metadata).toHaveProperty('vae');
+    expect(result?.values.vae?.key).toBe('panel-vae');
+  });
+});

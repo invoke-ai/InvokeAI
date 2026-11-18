@@ -414,7 +414,6 @@
         "use_cache": true,
         "coherence_mode": "Gaussian Blur",
         "edge_radius": 16,
-        "fp32": false,
         "id": "create_gradient_mask",
         "image": {
           "image_name": "canvas-composite.png"
@@ -972,7 +971,6 @@
         "use_cache": true,
         "coherence_mode": "Gaussian Blur",
         "edge_radius": 16,
-        "fp32": false,
         "id": "create_gradient_mask",
         "image": {
           "image_name": "canvas-composite.png"
@@ -1593,7 +1591,6 @@
         "use_cache": true,
         "coherence_mode": "Gaussian Blur",
         "edge_radius": 16,
-        "fp32": false,
         "id": "create_gradient_mask",
         "image": {
           "image_name": "canvas-composite.png"

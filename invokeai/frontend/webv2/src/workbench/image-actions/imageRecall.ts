@@ -18,6 +18,7 @@ import {
   isIdeogram4SamplerPreset,
   deriveAspectRatioId,
   getCompatibleReferenceImages,
+  getComponentSlotsSuppliedBySource,
   getDimensionGrid,
   getExternalProviderOptionKeys,
   getExternalResolutionPresets,
@@ -395,27 +396,32 @@ const getMetadataMainModel = (
   models: readonly ComponentModelConfig[]
 ): MainModelConfig | null | undefined => getModelFromMetadata(metadata, key, models, isMainModelConfig);
 
+/** The key a record names its VAE under, whether or not the model resolves; older records use a base's own key. */
+const getRecordedVaeKey = (metadata: unknown, model: GenerateModelConfig): string | null => {
+  if (!isRecord(metadata)) {
+    return null;
+  }
+  const legacyKey = ({ 'qwen-image': 'qwen_image_vae', wan: 'wan_vae_model' } as Record<string, string>)[model.base];
+
+  return 'vae' in metadata ? 'vae' : legacyKey && legacyKey in metadata ? legacyKey : null;
+};
+
 const getMetadataVae = (
   metadata: unknown,
   model: GenerateModelConfig,
   vaeModels: VaeModelConfig[]
 ): VaeModelConfig | null | undefined => {
-  if (!isRecord(metadata)) {
-    return undefined;
-  }
-  const legacyKey = ({ 'qwen-image': 'qwen_image_vae', wan: 'wan_vae_model' } as Record<string, string>)[model.base];
-  if (!('vae' in metadata) && legacyKey && legacyKey in metadata) {
-    metadata = { ...metadata, vae: metadata[legacyKey] };
-  }
-  if (!isRecord(metadata) || !('vae' in metadata)) {
+  const key = getRecordedVaeKey(metadata, model);
+
+  if (!key || !isRecord(metadata)) {
     return undefined;
   }
 
-  if (metadata.vae === null) {
+  if (metadata[key] === null) {
     return null;
   }
 
-  const vae = resolveMetadataModel(metadata.vae, vaeModels);
+  const vae = resolveMetadataModel(metadata[key], vaeModels);
 
   return vae && isVaeCompatibleWithGenerateModel(model, vae) ? vae : undefined;
 };
@@ -1578,6 +1584,33 @@ export const buildImageRecallSettings = ({
       }
     }
 
+    // A record that names its source left out the slots the source supplied. Standalone picks left in the panel
+    // would take those slots over, so clear them to let the recorded source supply them again.
+    const recordedSource = fittingSettings.includes('componentSourceModel')
+      ? componentPatch.componentSourceModel
+      : null;
+    const suppliedBySource =
+      recordedSource && recordedSource.key !== effectiveModel.key && isMainModelConfig(recordedSource)
+        ? getComponentSlotsSuppliedBySource(effectiveModel, recordedSource, {
+            mistralEncoderModel: componentPatch.mistralEncoderModel ?? null,
+            qwen3EncoderModel: componentPatch.qwen3EncoderModel ?? null,
+          })
+        : [];
+    // A slot the record names stays with the record, resolved or not: an uninstalled component is not one the source
+    // supplied, so the panel's own pick stays.
+    const recordsComponent = (setting: RecalledComponentSetting): boolean =>
+      RECALLED_COMPONENTS.some(
+        (component) => component.setting === setting && isRecord(metadata) && component.metadataKey in metadata
+      );
+    const clearedSettings = suppliedBySource.filter(
+      (key): key is RecalledComponentSetting & typeof key =>
+        key !== 'vae' && !recordsComponent(key as RecalledComponentSetting)
+    );
+
+    for (const setting of clearedSettings) {
+      values = { ...values, [setting]: null };
+    }
+
     const rebalancePatch = getMetadataKrea2Rebalance(metadata, values.model);
 
     if (Object.keys(rebalancePatch).length > 0) {
@@ -1627,6 +1660,12 @@ export const buildImageRecallSettings = ({
     if (vae !== undefined) {
       values = { ...values, vae };
       fields.push('vae');
+    } else if (suppliedBySource.includes('vae') && getRecordedVaeKey(metadata, values.model) === null && values.vae) {
+      values = { ...values, vae: null };
+
+      if (currentValues.vae) {
+        fields.push('vae');
+      }
     }
 
     if (model || fittingSettings.length > 0) {
@@ -1655,7 +1694,9 @@ export const buildImageRecallSettings = ({
     // Judged after the transition, which can complete or undo a recorded pick. The adapter switch is a component
     // change too: a record can turn it off without touching the pick.
     if (
-      recordedSettings.some((setting) => values[setting]?.key !== currentValues[setting]?.key) ||
+      [...recordedSettings, ...clearedSettings].some(
+        (setting) => values[setting]?.key !== currentValues[setting]?.key
+      ) ||
       values.animaInpaintAdapterEnabled !== currentValues.animaInpaintAdapterEnabled ||
       values.flux3PromptUpsamplerEnabled !== currentValues.flux3PromptUpsamplerEnabled
     ) {

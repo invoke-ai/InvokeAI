@@ -481,7 +481,6 @@ const buildSDGraph = (
   });
 
   addMetadata(graph, output, settings, model, model.base === 'sdxl' ? 'sdxl_txt2img' : 'txt2img', projectSettings, {
-    vae_precision: settings.vaePrecision,
     ...(supportsHiDiffusion
       ? {
           hidiffusion: settings.hiDiffusionEnabled,

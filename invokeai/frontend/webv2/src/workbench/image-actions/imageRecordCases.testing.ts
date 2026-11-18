@@ -95,6 +95,12 @@ export const canvasRecordCases = (): CanvasRecordCase[] => {
         mode,
       }))
     ),
+    // Outpaint encodes through its own call, which carries the precision and the colour compensation.
+    {
+      ...sdxl,
+      label: `${sdxl.label} / canvas outpaint`,
+      mode: 'outpaint',
+    },
     {
       ...anima,
       label: `${anima.label} with inpaint adapter / canvas inpaint`,

@@ -1160,7 +1160,6 @@ const SOURCED_SLOTS: Partial<Record<string, readonly GenerateComponentValueKey[]
   'z-image': ['qwen3EncoderModel', 'vae'],
 };
 
-/** SD 3's loader takes any component left out from the main model itself. */
 /**
  * Where the loader looks first, after a standalone model, per base (invokeai/app/invocations):
  * - Z-Image (`z_image_model_loader.py`): the component source, then the main when it is a self-contained pipeline.
@@ -1170,6 +1169,7 @@ const SOURCED_SLOTS: Partial<Record<string, readonly GenerateComponentValueKey[]
  */
 const SOURCE_FIRST_BASES: ReadonlySet<string> = new Set(['z-image']);
 
+/** SD 3's loader takes any component left out from the main model itself, when that is a Diffusers pipeline. */
 const SD3_MAIN_SLOTS: readonly GenerateComponentValueKey[] = [
   'clipGEmbedModel',
   'clipLEmbedModel',
@@ -1219,7 +1219,7 @@ export const getEmptyComponentSupplier = (
   }
 
   if (model.base === 'sd-3') {
-    return SD3_MAIN_SLOTS.includes(key) ? model : null;
+    return SD3_MAIN_SLOTS.includes(key) && isBundledMainForBase(model.base)(model) ? model : null;
   }
 
   if (SOURCED_SLOTS[model.base]?.includes(key)) {
@@ -1239,6 +1239,29 @@ export const getEmptyComponentSupplier = (
 
   return null;
 };
+
+/** Every slot a component source can supply while it is empty: the sourced bases' slots and both FLUX.2 encoders. */
+const SOURCE_SUPPLIABLE_SLOTS: readonly GenerateComponentValueKey[] = [
+  ...new Set<GenerateComponentValueKey>([
+    'mistralEncoderModel',
+    'qwen3EncoderModel',
+    ...Object.values(SOURCED_SLOTS).flatMap((slots) => slots ?? []),
+  ]),
+];
+
+/**
+ * The slots `source` supplies to `model` when they are empty, given the standalone encoders in `components`: what a
+ * record that names the source leaves out of its own model fields. Asks `getEmptyComponentSupplier`, so it follows the
+ * loader order (a bundled main beats the source on most bases) without repeating it.
+ */
+export const getComponentSlotsSuppliedBySource = (
+  model: GenerateModelConfig,
+  source: MainModelConfig,
+  components: Partial<Pick<GenerateSettings, 'mistralEncoderModel' | 'qwen3EncoderModel'>>
+): GenerateComponentValueKey[] =>
+  SOURCE_SUPPLIABLE_SLOTS.filter(
+    (key) => getEmptyComponentSupplier(model, { ...components, componentSourceModel: source }, key)?.key === source.key
+  );
 
 export const getAutoFlux2ComponentSourceModel = (
   model: GenerateModelConfig | undefined,

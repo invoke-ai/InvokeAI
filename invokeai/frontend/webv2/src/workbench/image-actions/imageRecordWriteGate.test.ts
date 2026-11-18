@@ -112,6 +112,12 @@ type GateBase = SupportedGenerateBase | 'external';
 
 const EXCEPTIONS: readonly Exception[] = [];
 
+/**
+ * Settings the record holds only where the graph reads them. The VAE precision reaches the graph through an encode or
+ * a decode; PiD replaces the decode, so a PiD run with no input to encode never used it.
+ */
+const PHANTOM_RECORD_SETTINGS: readonly Setting[] = ['vaePrecision'];
+
 // ---------------------------------------------------------------------------------------------------------------
 // Graph and record normalization
 
@@ -739,6 +745,19 @@ describe('image record write gate', () => {
       base: Compiled,
       varied: Compiled
     ): boolean => {
+      // The converse for the settings a record may only hold while the run reads them: a record that moves with the
+      // setting although no node reads it names a value the run never had.
+      if (
+        PHANTOM_RECORD_SETTINGS.includes(setting) &&
+        areJsonValuesStructurallyEqual(base.graph, varied.graph) &&
+        !areJsonValuesStructurallyEqual(base.record, varied.record)
+      ) {
+        failures.push(
+          `\`${label}\`: ${setting} ${show(before)} -> ${show(after)} changes the record but no node the run reads`
+        );
+        return false;
+      }
+
       if (
         areJsonValuesStructurallyEqual(base.graph, varied.graph) ||
         !areJsonValuesStructurallyEqual(base.record, varied.record)

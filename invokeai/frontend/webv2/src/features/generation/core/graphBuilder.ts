@@ -233,6 +233,17 @@ export const getRecordedComponents = (graph: BackendGraphContract): Record<strin
   return components;
 };
 
+/**
+ * The VAE precision the graph ran with, read from the nodes that take one: an encode, a decode, or an SD gradient mask
+ * carry an `fp32` switch, and no other family's node does. A graph with none, such as a PiD decode with no encode,
+ * used no precision and records none.
+ */
+export const getRecordedVaePrecision = (graph: BackendGraphContract): { vae_precision?: 'fp16' | 'fp32' } => {
+  const switches = Object.values(graph.nodes).flatMap((node) => (typeof node.fp32 === 'boolean' ? [node.fp32] : []));
+
+  return switches.length > 0 ? { vae_precision: switches.includes(true) ? 'fp32' : 'fp16' } : {};
+};
+
 export const addMetadata = (
   graph: BackendGraphContract,
   outputNode: BackendInvocationContract,
@@ -260,6 +271,7 @@ export const addMetadata = (
     width: settings.width,
     ...extras,
     ...getRecordedComponents(graph),
+    ...getRecordedVaePrecision(graph),
     ...(loadedLoras.length ? { loras: loadedLoras } : {}),
     ...(model.base === 'sdxl' ? {} : { clip_skip: settings.clipSkip }),
   });

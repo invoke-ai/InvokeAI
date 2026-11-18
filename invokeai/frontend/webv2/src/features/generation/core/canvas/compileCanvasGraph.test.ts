@@ -1041,7 +1041,11 @@ describe('compileCanvasGraph — inpaint per base', () => {
       expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')?.source.node_id).toBe('create_gradient_mask');
 
       // fp32 only on the SD gradient mask (mirrors the SD i2l).
-      expect(gradient?.fp32).toBe(encodeType === 'i2l');
+      if (encodeType === 'i2l') {
+        expect(gradient?.fp32).toBe(true);
+      } else {
+        expect(gradient).not.toHaveProperty('fp32');
+      }
 
       // The base decode is demoted to an intermediate canvas_l2i; the blend is canvas_output.
       expect(backendGraph.nodes.canvas_l2i?.type).toBe(outputType);

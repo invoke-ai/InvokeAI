@@ -332,4 +332,15 @@ describe('empty component supplier', () => {
       )
     ).toBeNull();
   });
+
+  it.each([
+    ['gguf_quantized', null],
+    ['diffusers', 'sd3-main'],
+  ] as const)('names an SD 3 %s main as the supplier only when it is a Diffusers pipeline', (format, supplierKey) => {
+    const model = { base: 'sd-3', format, key: 'sd3-main', name: 'SD 3.5', type: 'main' } as MainModelConfig;
+
+    for (const key of ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel', 'vae'] as const) {
+      expect(getEmptyComponentSupplier(model, {}, key)?.key ?? null, key).toBe(supplierKey);
+    }
+  });
 });
