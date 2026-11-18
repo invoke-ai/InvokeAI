@@ -1,0 +1,204 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index e214372a539cd5322e6d086de03e3350b0ee47f7..284f1dae9f320487845c1fcb906551ca1e04297a 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -419,7 +419,7 @@ var VideoPairSynchronizer = class {
+       this.scheduleFollowerRetry();
+     };
+     this.handleMasterPause = () => {
+-      if (!this.isMasterActive() || !this.desiredPlaying || this.master.seeking || this.master.error)
++      if (!this.isMasterActive() || !this.desiredPlaying || this.master.seeking || this.master.error || (!this.loop && this.master.ended))
+         return;
+       this.follower.pause();
+       this.restorePlaybackRates();
+@@ -833,13 +833,19 @@ var VideoPairSynchronizer = class {
+   }
+   requestStart() {
+     var _a;
+-    if (this.destroyed || !this.desiredPlaying || !this.isMasterActive())
++    // A native pause precedes ended. Only an explicit play request should rewind at the end.
++    if (this.destroyed || !this.desiredPlaying || !this.isMasterActive() || (!this.loop && this.master.ended))
+       return;
+     this.startDriftCorrection();
+     if (this.master.seeking) {
+       this.setState("loading");
+       return;
+     }
++    if (this.enabled && this.hasFollowerMetadata() && !this.follower.error && !this.followerRecoveryFailed && this.isAtFollowerFinalFrame()) {
++      this.alignFollower("show-paused", this.followerHasPresentedFrame);
++      this.startMasterOnly();
++      return;
++    }
+     if (this.master.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+       this.setState("loading");
+       if (this.enabled && this.expectedFollowerUrl && this.isFollowerActive() && !this.follower.error && !this.followerRecoveryFailed) {
+@@ -982,14 +988,15 @@ var VideoPairSynchronizer = class {
+   }
+   alignFollower(action, keepVisible) {
+     if (this.destroyed || !this.enabled || !this.hasActiveMetadata()) return;
+-    if (this.master.seeking || this.follower.seeking || this.alignment || this.followerRecoveryFailed)
++    // A new master seek may supersede an in-flight follower seek.
++    if (this.master.seeking || this.alignment || this.followerRecoveryFailed)
+       return;
+-    const sourceDuration = this.follower.duration;
+     const requestedTime = this.master.currentTime;
+-    const targetTime = Number.isFinite(sourceDuration) && sourceDuration > 0 ? Math.max(
++    const finalFrameTime = this.followerFinalFrameTime();
++    const targetTime = Math.max(
+       0,
+-      Math.min(requestedTime, Math.max(0, sourceDuration - 0.03))
+-    ) : Math.max(0, requestedTime);
++      Math.min(requestedTime, finalFrameTime != null ? finalFrameTime : requestedTime)
++    );
+     const drift = Math.abs(this.follower.currentTime - targetTime);
+     this.cancelFrameConfirmation();
+     this.followerPlayToken += 1;
+@@ -1001,8 +1008,12 @@ var VideoPairSynchronizer = class {
+       generation: this.generation,
+       timeoutAttempts: 0
+     };
+-    if (!this.follower.ended && drift <= this.tuning.alignmentToleranceSeconds) {
+-      if (!this.hasFollowerData()) this.scheduleAlignmentTimeout();
++    // Some browsers report EOF after a seek to the final decodable frame.
++    const alreadyAligned = this.follower.ended
++      ? finalFrameTime !== null && requestedTime >= finalFrameTime
++      : drift <= this.tuning.alignmentToleranceSeconds;
++    if (alreadyAligned) {
++      if (this.follower.seeking || !this.hasFollowerData()) this.scheduleAlignmentTimeout();
+       this.finishAlignment();
+       return;
+     }
+@@ -1030,17 +1041,29 @@ var VideoPairSynchronizer = class {
+     }
+     const action = this.desiredPlaying && request.action === "show-paused" ? "resume-follower" : request.action;
+     this.clearAlignment();
+-    if (action === "show-paused") {
+-      this.setState("paused");
++    if (action === "show-paused" || this.isAtFollowerFinalFrame()) {
+       this.follower.pause();
+       this.restorePlaybackRates();
+       this.revealFollowerAfterFrame(true);
++      if (this.desiredPlaying) {
++        this.startMasterOnly();
++      } else {
++        this.setState("paused");
++      }
+     } else if (this.master.paused) {
+       this.requestStart();
+     } else {
+       this.resumeFollower();
+     }
+   }
++  followerFinalFrameTime() {
++    const { duration } = this.follower;
++    return Number.isFinite(duration) && duration > 0 ? Math.max(0, duration - 0.03) : null;
++  }
++  isAtFollowerFinalFrame() {
++    const finalFrameTime = this.followerFinalFrameTime();
++    return finalFrameTime !== null && this.master.currentTime >= finalFrameTime;
++  }
+   resumeFollower() {
+     this.startDriftCorrection();
+     if (this.destroyed || !this.enabled || !this.desiredPlaying || this.master.paused || this.masterWaiting || this.followerRecoveryFailed || !this.hasFollowerData()) {
+diff --git a/dist/index.js b/dist/index.js
+index cb3c5cb0dc09c8168968e3dc4c7089e036391281..9147cd5fd10a26634a5da08a6401850502541e6e 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -380,7 +380,7 @@ var VideoPairSynchronizer = class {
+       this.scheduleFollowerRetry();
+     };
+     this.handleMasterPause = () => {
+-      if (!this.isMasterActive() || !this.desiredPlaying || this.master.seeking || this.master.error)
++      if (!this.isMasterActive() || !this.desiredPlaying || this.master.seeking || this.master.error || (!this.loop && this.master.ended))
+         return;
+       this.follower.pause();
+       this.restorePlaybackRates();
+@@ -794,13 +794,19 @@ var VideoPairSynchronizer = class {
+   }
+   requestStart() {
+     var _a;
+-    if (this.destroyed || !this.desiredPlaying || !this.isMasterActive())
++    // A native pause precedes ended. Only an explicit play request should rewind at the end.
++    if (this.destroyed || !this.desiredPlaying || !this.isMasterActive() || (!this.loop && this.master.ended))
+       return;
+     this.startDriftCorrection();
+     if (this.master.seeking) {
+       this.setState("loading");
+       return;
+     }
++    if (this.enabled && this.hasFollowerMetadata() && !this.follower.error && !this.followerRecoveryFailed && this.isAtFollowerFinalFrame()) {
++      this.alignFollower("show-paused", this.followerHasPresentedFrame);
++      this.startMasterOnly();
++      return;
++    }
+     if (this.master.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
+       this.setState("loading");
+       if (this.enabled && this.expectedFollowerUrl && this.isFollowerActive() && !this.follower.error && !this.followerRecoveryFailed) {
+@@ -943,14 +949,15 @@ var VideoPairSynchronizer = class {
+   }
+   alignFollower(action, keepVisible) {
+     if (this.destroyed || !this.enabled || !this.hasActiveMetadata()) return;
+-    if (this.master.seeking || this.follower.seeking || this.alignment || this.followerRecoveryFailed)
++    // A new master seek may supersede an in-flight follower seek.
++    if (this.master.seeking || this.alignment || this.followerRecoveryFailed)
+       return;
+-    const sourceDuration = this.follower.duration;
+     const requestedTime = this.master.currentTime;
+-    const targetTime = Number.isFinite(sourceDuration) && sourceDuration > 0 ? Math.max(
++    const finalFrameTime = this.followerFinalFrameTime();
++    const targetTime = Math.max(
+       0,
+-      Math.min(requestedTime, Math.max(0, sourceDuration - 0.03))
+-    ) : Math.max(0, requestedTime);
++      Math.min(requestedTime, finalFrameTime != null ? finalFrameTime : requestedTime)
++    );
+     const drift = Math.abs(this.follower.currentTime - targetTime);
+     this.cancelFrameConfirmation();
+     this.followerPlayToken += 1;
+@@ -962,8 +969,12 @@ var VideoPairSynchronizer = class {
+       generation: this.generation,
+       timeoutAttempts: 0
+     };
+-    if (!this.follower.ended && drift <= this.tuning.alignmentToleranceSeconds) {
+-      if (!this.hasFollowerData()) this.scheduleAlignmentTimeout();
++    // Some browsers report EOF after a seek to the final decodable frame.
++    const alreadyAligned = this.follower.ended
++      ? finalFrameTime !== null && requestedTime >= finalFrameTime
++      : drift <= this.tuning.alignmentToleranceSeconds;
++    if (alreadyAligned) {
++      if (this.follower.seeking || !this.hasFollowerData()) this.scheduleAlignmentTimeout();
+       this.finishAlignment();
+       return;
+     }
+@@ -991,17 +1002,29 @@ var VideoPairSynchronizer = class {
+     }
+     const action = this.desiredPlaying && request.action === "show-paused" ? "resume-follower" : request.action;
+     this.clearAlignment();
+-    if (action === "show-paused") {
+-      this.setState("paused");
++    if (action === "show-paused" || this.isAtFollowerFinalFrame()) {
+       this.follower.pause();
+       this.restorePlaybackRates();
+       this.revealFollowerAfterFrame(true);
++      if (this.desiredPlaying) {
++        this.startMasterOnly();
++      } else {
++        this.setState("paused");
++      }
+     } else if (this.master.paused) {
+       this.requestStart();
+     } else {
+       this.resumeFollower();
+     }
+   }
++  followerFinalFrameTime() {
++    const { duration } = this.follower;
++    return Number.isFinite(duration) && duration > 0 ? Math.max(0, duration - 0.03) : null;
++  }
++  isAtFollowerFinalFrame() {
++    const finalFrameTime = this.followerFinalFrameTime();
++    return finalFrameTime !== null && this.master.currentTime >= finalFrameTime;
++  }
+   resumeFollower() {
+     this.startDriftCorrection();
+     if (this.destroyed || !this.enabled || !this.desiredPlaying || this.master.paused || this.masterWaiting || this.followerRecoveryFailed || !this.hasFollowerData()) {

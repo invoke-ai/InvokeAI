@@ -11,14 +11,16 @@ import {
   type GalleryItem,
   type GalleryItemKey,
   type GalleryItemRef,
+  type GalleryVideoItem,
 } from '@features/gallery';
 import {
-  getGalleryCompareImage,
+  getGalleryCompareItem,
   getGalleryPage,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
   getGalleryListingBoardId,
   getGallerySettings,
+  getPersistedSelectedGalleryItemKeys,
   getSelectedGalleryItemFromValues,
   getBoundedRecentImages,
   galleryImageItemToGalleryImage,
@@ -70,7 +72,18 @@ import {
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
 import { ImagesIcon, XIcon } from 'lucide-react';
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewLoupeControls } from './usePreviewLoupe';
@@ -117,6 +130,16 @@ export const getVideoFrameCopyNotice = (
   result.ok
     ? { kind: 'success', title: translate('widgets.preview.copyCurrentFrameSuccess') }
     : { kind: 'error', title: translate(VIDEO_FRAME_COPY_FAILURE_KEYS[result.reason]) };
+
+const PreviewVideoCompare = lazy(async () => ({
+  default: (await import('./PreviewVideoCompare')).PreviewVideoCompare,
+}));
+
+const VIDEO_COMPARE_LOADING = (
+  <Flex flex="1" align="center" justify="center">
+    <Spinner />
+  </Flex>
+);
 
 const EMPTY_BOARDS: GalleryBoard[] = [];
 
@@ -196,7 +219,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const recentImages = galleryValues.recentImages;
   const localItems = useMemo(() => getLocalGalleryItems({ recentImages }, queueItems), [queueItems, recentImages]);
   const selectedItem = useMemo(() => getSelectedItem(galleryValues, localItems), [galleryValues, localItems]);
-  const compareImage = getGalleryCompareImage(galleryValues);
+  const compareItem = getGalleryCompareItem(galleryValues);
   const comparisonMode = getPreviewComparisonMode(previewValues);
   const displayBoardId = selectedItem?.boardId ?? 'none';
   const hasSelectedItem = selectedItem !== null;
@@ -212,11 +235,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     livePreview.sessions.find((session) => session.id === livePreview.followedSessionId) ??
     (selectedItem === null ? livePreview.startingSession : null);
   const shouldFollowLive = activeGalleryPlaceholder !== null;
-  const compareImageKey = compareImage ? toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) : null;
-  const isComparing =
-    !shouldFollowLive && selectedItem?.kind === 'image' && compareImage !== null && compareImageKey !== selectedItemKey;
-  // Select for compare on the shown image: the comparison image is the selection itself until a second one is picked.
-  const isCompareArmed = !shouldFollowLive && selectedItem?.kind === 'image' && compareImageKey === selectedItemKey;
+  const compareItemKey = compareItem ? toGalleryItemKey(compareItem) : null;
+  const canCompareSelection = !shouldFollowLive && compareItem !== null && compareItem.kind === selectedItem?.kind;
+  const isComparing = canCompareSelection && compareItemKey !== selectedItemKey;
+  // The comparison item is the selection itself until a second one is picked.
+  const isCompareArmed = canCompareSelection && compareItemKey === selectedItemKey;
   // The session the stage says is starting: one shown before its first frame, or one the shown result waits on.
   const startingCueSession = activeGalleryPlaceholder
     ? activeGalleryPlaceholder.hasOwnFrame
@@ -333,12 +356,20 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     return boardItems.find((item) => toGalleryItemKey(item) === selectedItemKey) ?? selectedItem;
   }, [boardItems, selectedItem, selectedItemKey]);
   const exitCompare = useCallback(() => gallery.setCompareItem(null), [gallery]);
+  const canArmVideoCompare =
+    !shouldFollowLive &&
+    contextMenuItem?.kind === 'video' &&
+    getPersistedSelectedGalleryItemKeys(galleryValues).length <= 1;
+  const toggleVideoCompare = useCallback(() => {
+    if (canArmVideoCompare && contextMenuItem?.kind === 'video') {
+      gallery.setCompareItem(isCompareArmed ? null : contextMenuItem);
+    }
+  }, [canArmVideoCompare, contextMenuItem, gallery, isCompareArmed]);
   // Remember the comparison item's original page for swap-back, but only within its original query and board. Item
   // moves can invalidate the page without changing query identity.
   const swappedOutRef = useRef<{ boardId: string; key: GalleryItemKey; page: number; queryKey: string } | null>(null);
   const swapCompareImages = useCallback(() => {
-    if (selectedItem?.kind === 'image' && compareImage) {
-      const compareItem = legacyGeneratedImageToGalleryItem(compareImage);
+    if (selectedItem?.kind === 'image' && compareItem?.kind === 'image') {
       const swappedOut = swappedOutRef.current;
 
       swappedOutRef.current = {
@@ -361,7 +392,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       gallery.setCompareItem(selectedItem);
     }
   }, [
-    compareImage,
+    compareItem,
     gallery,
     getNavigatedPage,
     navigationQueryKey,
@@ -389,7 +420,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     setCopyAvailableItemKey((current) => (isAvailable ? itemKey : current === itemKey ? null : current));
   }, []);
   const isVideoFrameCopyAvailable =
-    contextMenuItem?.kind === 'video' && copyAvailableItemKey === toGalleryItemKey(contextMenuItem);
+    !isComparing && contextMenuItem?.kind === 'video' && copyAvailableItemKey === toGalleryItemKey(contextMenuItem);
   const copyCurrentVideoFrame = useCallback(() => {
     const run = async (): Promise<void> => {
       const controller = videoControllerRef.current;
@@ -418,13 +449,23 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     () =>
       contextMenuItem?.kind === 'video'
         ? {
+            isCompareArmed,
             isCopyCurrentFrameAvailable: isVideoFrameCopyAvailable,
             itemKey: toGalleryItemKey(contextMenuItem),
             onCopyCurrentFrame: copyCurrentVideoFrame,
             onOpenDetails: openVideoDetails,
+            ...(canArmVideoCompare ? { onToggleCompare: toggleVideoCompare } : {}),
           }
         : undefined,
-    [contextMenuItem, copyCurrentVideoFrame, isVideoFrameCopyAvailable, openVideoDetails]
+    [
+      canArmVideoCompare,
+      contextMenuItem,
+      copyCurrentVideoFrame,
+      isCompareArmed,
+      isVideoFrameCopyAvailable,
+      openVideoDetails,
+      toggleVideoCompare,
+    ]
   );
   const isFilmstripVisible = getPreviewFilmstripVisible(previewValues);
 
@@ -600,7 +641,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
 
   const executeViewerHotkey = useEffectEvent((commandId: string) => {
-    if (commandId === 'viewer.swapImages' && selectedItem?.kind === 'image' && compareImage) {
+    if (commandId === 'viewer.swapImages' && selectedItem?.kind === 'image' && compareItem?.kind === 'image') {
       swapCompareImages();
       return;
     }
@@ -696,7 +737,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             arrives, whatever the progress messages the hint shows meanwhile; the hints repeat it visually. */}
         <Text aria-live="polite" role="status" srOnly>
           {isCompareArmed
-            ? t('widgets.preview.compareArmedHint')
+            ? t(
+                selectedItem?.kind === 'video'
+                  ? 'widgets.preview.videoCompareArmedHint'
+                  : 'widgets.preview.compareArmedHint'
+              )
             : startingCueSession
               ? t('widgets.preview.startingAnnouncement')
               : ''}
@@ -712,16 +757,32 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             shouldAntialiasProgressImage={antialiasProgressImages}
           />
         ) : selectedItem ? (
-          isComparing && compareImage && selectedItem.kind === 'image' ? (
+          isComparing && compareItem?.kind === 'image' && selectedItem.kind === 'image' ? (
             <PreviewCompare
               baseImage={galleryImageItemToGalleryImage(selectedItem)}
-              compareImage={compareImage}
+              compareImage={galleryImageItemToGalleryImage(compareItem)}
               mode={comparisonMode}
               runtime={runtime}
               onExit={exitCompare}
               onModeChange={setComparisonMode}
               onSwap={swapCompareImages}
             />
+          ) : isComparing && compareItem?.kind === 'video' && selectedItem.kind === 'video' ? (
+            <Suspense fallback={VIDEO_COMPARE_LOADING}>
+              <PreviewVideoCompare
+                key={JSON.stringify([
+                  projectId,
+                  compareItem.name,
+                  compareItem.fullUrl,
+                  selectedItem.name,
+                  selectedItem.fullUrl,
+                ])}
+                comparison={selectedItem}
+                density={density}
+                primary={compareItem}
+                onExit={exitCompare}
+              />
+            </Suspense>
           ) : selectedItem.kind === 'image' ? (
             <SelectedImagePreview
               density={density}
@@ -745,6 +806,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               swipe={swipeNavigation}
               videoControllerRef={videoControllerRef}
               videoLoop={isVideoLooping}
+              onCancelCompare={isCompareArmed ? exitCompare : undefined}
               onContextMenu={openItemContextMenu}
               onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
               onVideoLoopChange={setVideoLoop}
@@ -823,10 +885,7 @@ const SelectedImagePreview = ({
   );
 };
 
-const SelectedVideoPreview = ({
-  item,
-  ...props
-}: SelectedMediaPreviewProps & { item: Extract<GalleryItem, { kind: 'video' }> }) => {
+const SelectedVideoPreview = ({ item, ...props }: SelectedMediaPreviewProps & { item: GalleryVideoItem }) => {
   const { t } = useTranslation();
   const source = useMemo<PreviewMediaSource>(
     () => ({
@@ -948,7 +1007,7 @@ const SelectedMediaPreview = ({
       />
       {swipe ? <PreviewNavButtons isVideo={item.kind === 'video'} navigation={swipe} /> : null}
       {onCancelCompare ? (
-        <PreviewCompareArmedHint density={density} onCancel={onCancelCompare} />
+        <PreviewCompareArmedHint density={density} kind={item.kind} onCancel={onCancelCompare} />
       ) : startingSession ? (
         <PreviewStartingCue density={density} session={startingSession} />
       ) : null}
@@ -966,7 +1025,15 @@ const COMPARE_HINT_MOTION_REDUCE = { animation: 'none' } as const;
  * the top of the stage, under the drop zones that cover it during a drag; the filmstrip below stays free to pick from.
  * Narrower Preview keeps the text, then only its icon: the status line beside the stage says it in full.
  */
-const PreviewCompareArmedHint = ({ density, onCancel }: { density: PreviewDensity; onCancel: () => void }) => {
+const PreviewCompareArmedHint = ({
+  density,
+  kind,
+  onCancel,
+}: {
+  density: PreviewDensity;
+  kind: GalleryItem['kind'];
+  onCancel: () => void;
+}) => {
   const { t } = useTranslation();
   const cancelLabel = t('widgets.preview.cancelCompare');
   // Cancel removes the hint and itself with it; Preview keeps the keys.
@@ -1007,7 +1074,7 @@ const PreviewCompareArmedHint = ({ density, onCancel }: { density: PreviewDensit
         {density === 'minimal' ? null : (
           // The status line announces it; read here too, it would be said twice.
           <Text aria-hidden="true" color="fg" fontSize="md" minW="0" truncate>
-            {t('widgets.preview.compareArmedHint')}
+            {t(kind === 'video' ? 'widgets.preview.videoCompareArmedHint' : 'widgets.preview.compareArmedHint')}
           </Text>
         )}
         {density === 'full' ? (

@@ -17,6 +17,9 @@ patchedDependencies:
   react-hook-tanstack-virtual:
     hash: a650424c322ec56178110e945f70d9e11d270c144f2c0df5527ba7d327ccb285
     path: patches/react-hook-tanstack-virtual.patch
+  video-compare-player@0.1.4:
+    hash: 02b18c8f371f79b77427b352bae2c0c71ef38cc54cdf488f6bdfe93ffb3633ee
+    path: patches/video-compare-player@0.1.4.patch
 
 importers:
 
@@ -106,6 +109,9 @@ importers:
       use-sync-external-store:
         specifier: ^1.7.0
         version: 1.7.0(react@19.3.1)
+      video-compare-player:
+        specifier: 0.1.4
+        version: 0.1.4(patch_hash=02b18c8f371f79b77427b352bae2c0c71ef38cc54cdf488f6bdfe93ffb3633ee)
       yaml:
         specifier: ^2.9.1
         version: 2.9.1
@@ -2238,6 +2244,9 @@ packages:
     resolution: {integrity: sha512-6L+EeigHMQhdaIPNIFUKwfWJSwWFQ8gJbJ2DLOs5sDIegTwR9fRxvnM3uciHKjIZhFz+KAv2emhWMRvDmMcY8A==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  video-compare-player@0.1.4:
+    resolution: {integrity: sha512-6rZwPbfgLXYX9lScv7HTBqzptW6r5quhcfp8ttYZFDGbo67lFhu+x/IBPFpL1ADPJyt+PCc+5mqGSTRvDB0n/g==}
 
   vite@8.3.5:
     resolution: {integrity: sha512-z1YpjieJ9g0ebTmQpLBv/oq9E3F9EIlOe+7LahW8SrE3LTiG3udBRUXQOlYXP9b+IC2q2phHeVxj9xGlw34OEQ==}
@@ -4633,6 +4642,8 @@ snapshots:
   use-sync-external-store@1.7.0(react@19.3.1):
     dependencies:
       react: 19.3.1
+
+  video-compare-player@0.1.4(patch_hash=02b18c8f371f79b77427b352bae2c0c71ef38cc54cdf488f6bdfe93ffb3633ee): {}
 
   vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(yaml@2.9.1):
     dependencies:

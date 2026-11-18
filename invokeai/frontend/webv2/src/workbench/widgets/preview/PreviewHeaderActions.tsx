@@ -2,7 +2,11 @@ import type { ViewerAutoSwitchMode } from '@workbench/settings/contracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Box, HStack } from '@chakra-ui/react';
-import { galleryImageItemToGalleryImage, isGalleryImageItem } from '@features/gallery/contracts';
+import {
+  galleryImageItemToGalleryImage,
+  getPersistedSelectedGalleryItemKeys,
+  isGalleryImageItem,
+} from '@features/gallery/contracts';
 import { AutoSwitchMenu } from '@workbench/widgets/shared/AutoSwitchMenu';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -45,7 +49,15 @@ export const PreviewHeaderActions = (_props: WidgetViewProps) => {
   const isDetailsOpen = useActiveProjectSelector((project) =>
     getPreviewMetadataOpen(getProjectWidgetValues(project, 'preview'))
   );
-  const { account, widgets } = useWorkbenchCommands();
+  const { account, gallery, widgets } = useWorkbenchCommands();
+  const singleSelection = useActiveProjectSelector(
+    (project) => getPersistedSelectedGalleryItemKeys(getProjectWidgetValues(project, 'gallery')).length <= 1
+  );
+  const selectVideoForCompare = useCallback(() => {
+    if (actionItem?.kind === 'video') {
+      gallery.setCompareItem(actionItem);
+    }
+  }, [actionItem, gallery]);
   // Compact until the view has measured; minimal chrome is too narrow for more.
   const controlDensity = density === 'full' ? 'full' : 'compact';
   // A chosen mode follows the newest work again, so a session pinned from a tile lets go.
@@ -76,6 +88,7 @@ export const PreviewHeaderActions = (_props: WidgetViewProps) => {
             onCancelCompare={cancelCompare ?? undefined}
             onCopyCurrentFrame={copyCurrentVideoFrame ?? undefined}
             onOpenMenu={openItemMenu}
+            onSelectVideoForCompare={actionItem.kind === 'video' && singleSelection ? selectVideoForCompare : undefined}
           />
           <Divider />
         </>

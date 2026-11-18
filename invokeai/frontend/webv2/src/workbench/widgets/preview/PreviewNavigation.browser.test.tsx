@@ -24,7 +24,7 @@ import { DEFAULT_PREFERENCES, patchWorkbenchPreferences } from '@workbench/setti
 import { HoldToDragSensor, PrimaryMouseSensor } from '@workbench/shell/holdToDragSensor';
 import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import i18next from 'i18next';
-import { act, useCallback, useSyncExternalStore } from 'react';
+import { act, Activity, useCallback, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -536,12 +536,15 @@ await i18n.use(initReactI18next).init({
           cancel: 'Cancel',
           countOfTotal: '{{count}} of {{total}}',
           generating: 'Generating',
+          loading: 'Loading…',
           videoPlayer: {
             frame: 'Frame {{frame}}',
             frameOfLast: 'Frame {{frame}}, last {{last}}',
             loop: 'Loop',
             mute: 'Mute',
             nextFrame: 'Next frame',
+            pause: 'Pause',
+            play: 'Play',
             previousFrame: 'Previous frame',
             seek: 'Seek',
             volume: 'Volume',
@@ -563,8 +566,14 @@ await i18n.use(initReactI18next).init({
             framesPerSecond: '{{count}} fps',
             itemCount_one: '{{count}} item',
             itemCount_other: '{{count}} items',
+            compareVideos: 'Video comparison',
+            videoCompareDivider: 'Comparison divider',
+            selectForCompare: 'Select for compare',
+            videoCompareArmedHint: 'Pick another video to compare with this one',
             videoDuration: 'Duration {{duration}}',
+            videoFailed: 'Video could not be loaded',
             videoLabel: 'Video {{name}}',
+            videoRetry: 'Retry',
           },
         },
       },
@@ -696,7 +705,7 @@ const CenterRegion = ({ children }: Pick<DndContextProps, 'children'>) => (
   </section>
 );
 
-const renderTree = async (client: QueryClient) => {
+const renderTree = async (client: QueryClient, previewMode: 'hidden' | 'visible' = 'visible') => {
   await act(async () => {
     root?.render(
       <I18nextProvider i18n={i18n}>
@@ -710,7 +719,9 @@ const renderTree = async (client: QueryClient) => {
                   <HeaderPositionProbe />
                   {showsHeaderMenuButton ? <HeaderMenuButton /> : null}
                   <CenterRegion>
-                    <PreviewWidgetView instance={instance} manifest={manifest} region="center" runtime={runtime} />
+                    <Activity mode={previewMode}>
+                      <PreviewWidgetView instance={instance} manifest={manifest} region="center" runtime={runtime} />
+                    </Activity>
                   </CenterRegion>
                 </LivePreviewFollowProvider>
               </ShellDndContext>
@@ -4357,7 +4368,7 @@ describe('preview item menu focus', () => {
 
       thumb.focus();
       await openMenuOn(thumb);
-      await chooseMenuItem('widgets.preview.selectForCompare');
+      await chooseMenuItem('Select for compare');
       await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
 
       expect(document.activeElement).toBe(elsewhere);
@@ -4591,5 +4602,226 @@ describe('preview select for compare', () => {
 
     expect(mocks.commands.gallery.setCompareItem).toHaveBeenCalledOnce();
     expect(press.defaultPrevented).toBe(false);
+  });
+});
+
+describe('preview video comparison', () => {
+  const source = {
+    ...createVideoItem('original.mp4', '2026-07-30T11:00:00Z'),
+    fps: 10,
+    fullUrl: FIXTURE_VIDEO_URL,
+  };
+  const result = {
+    ...createVideoItem('upscaled.mp4', '2026-07-30T12:00:00Z'),
+    fps: 10,
+    fullUrl: `${FIXTURE_VIDEO_URL}?comparison`,
+  };
+  const comparison = () => page.getByRole('group', { name: 'Video comparison' });
+  const compareVideos = () => Array.from(comparison().element().querySelectorAll('video'));
+
+  it('arms from Preview, follows the second Gallery selection, and plays and seeks both clips through one set of controls', async () => {
+    setGalleryValues({ selectedImage: source, selectedImageName: 'video:original.mp4' });
+    mocks.galleryItemPages = [{ items: [result, source], total: 2 }];
+    mocks.imageActions = createItemMenuActions({});
+    mocks.commands.gallery.setCompareItem.mockImplementation((item) => publishGalleryValues({ compareImage: item }));
+    await render();
+    try {
+      await act(() => headerOpenItemMenu?.(10, 10, 'full'));
+      await act(() => userEvent.click(page.getByRole('menuitem', { name: 'Select for compare' })));
+      await expect
+        .element(page.getByTestId('center-region').getByRole('status'))
+        .toHaveTextContent('Pick another video to compare with this one');
+
+      await act(() => publishGalleryValues({ selectedImage: result, selectedImageName: 'video:upscaled.mp4' }));
+      await expect.element(comparison()).toBeVisible();
+      // This harness has no sized center shell. Give its widget slot the actual kind of height bound the divider uses.
+      getBoundary().parentElement!.style.height = '300px';
+      const play = comparison().getByRole('button', { name: 'Play', exact: true });
+      await expect.element(play).toBeEnabled();
+      const [primary, follower] = compareVideos();
+      expect(primary?.src).toContain(source.fullUrl);
+      expect(follower?.src).toContain(result.fullUrl);
+      expect(primary?.muted).toBe(false);
+      expect(follower?.muted).toBe(true);
+
+      const divider = comparison().getByRole('slider', { name: 'Comparison divider' });
+      await expect.element(divider).toBeVisible();
+      await act(async () => {
+        (divider.element() as HTMLElement).focus();
+        await userEvent.keyboard('{ArrowRight}');
+      });
+      await expect.element(divider).toHaveAttribute('aria-valuenow', '51');
+
+      const seek = comparison().getByRole('slider', { name: 'Seek' });
+      await act(async () => {
+        (seek.element() as HTMLElement).focus();
+        await userEvent.keyboard('{ArrowRight}');
+      });
+      await expect.poll(() => primary!.currentTime).toBeCloseTo(0.1, 2);
+
+      const track = seek
+        .element()
+        .closest('[data-scope="slider"][data-part="root"]')!
+        .querySelector('[data-part="track"]')!;
+      const trackBox = track.getBoundingClientRect();
+      expect(trackBox.height).toBeGreaterThan(0);
+      const point = (fraction: number) => ({
+        x: trackBox.left + trackBox.width * fraction,
+        y: trackBox.top + trackBox.height / 2,
+      });
+      await act(() => commands.mouseDragPath([point(0.4), point(0.6)], window.innerWidth));
+      await expect.poll(() => primary!.currentTime).toBeGreaterThan(0.5);
+      await expect.poll(() => Math.abs(primary!.currentTime - follower!.currentTime)).toBeLessThan(0.04);
+
+      await act(() => userEvent.click(play));
+      await expect.poll(() => !primary!.paused && !follower!.paused).toBe(true);
+      await act(() => userEvent.click(comparison().getByRole('button', { name: 'Pause', exact: true })));
+      await expect.poll(() => primary!.paused && follower!.paused).toBe(true);
+      await expect.poll(() => Math.abs(primary!.currentTime - follower!.currentTime)).toBeLessThan(0.04);
+
+      await act(() => userEvent.unhover(play));
+      await expect.element(page.getByRole('tooltip')).not.toBeInTheDocument();
+      await pressKeyOn(play.element() as HTMLElement, 'Escape');
+      await expect.element(comparison()).not.toBeInTheDocument();
+      await expect.poll(() => document.activeElement).toBe(getBoundary());
+      expect(primary!.paused && follower!.paused).toBe(true);
+      expect(primary!.hasAttribute('src') || follower!.hasAttribute('src')).toBe(false);
+    } finally {
+      mocks.commands.gallery.setCompareItem.mockReset();
+    }
+  });
+
+  it('shows the final paused seek when an earlier follower seek is still settling', async () => {
+    setGalleryValues({ compareImage: source, selectedImage: result, selectedImageName: 'video:upscaled.mp4' });
+    await render();
+    getBoundary().parentElement!.style.height = '300px';
+    const play = comparison().getByRole('button', { name: 'Play', exact: true });
+    await expect.element(play).toBeEnabled();
+    const [primary, follower] = compareVideos();
+    const seek = comparison().getByRole('slider', { name: 'Seek' }).element() as HTMLElement;
+
+    // Keep the first real follower seek pending from the player's point of view until the master reaches the end.
+    const seeking = vi.spyOn(follower!, 'seeking', 'get');
+    const firstFollowerSeek = new Promise<void>((resolve) => {
+      follower!.addEventListener(
+        'seeked',
+        () => {
+          seeking.mockReturnValue(true);
+          resolve();
+        },
+        { capture: true, once: true }
+      );
+    });
+    try {
+      await pressKeyOn(seek, 'ArrowRight');
+      await firstFollowerSeek;
+      await pressKeyOn(seek, 'End');
+      await expect.poll(() => primary!.currentTime).toBe(primary!.duration);
+      await expect.poll(() => follower!.currentTime).toBeGreaterThan(follower!.duration - 0.1);
+    } finally {
+      seeking.mockRestore();
+    }
+    await act(() => {
+      follower!.dispatchEvent(new Event('seeked'));
+    });
+
+    await expect.poll(() => follower!.parentElement?.style.clipPath).toContain('calc(');
+    expect(primary!.paused && follower!.paused).toBe(true);
+  });
+
+  it('holds both clips at the end and restarts them together after pressing Play', async () => {
+    setGalleryValues({ compareImage: source, selectedImage: result, selectedImageName: 'video:upscaled.mp4' });
+    await render();
+    getBoundary().parentElement!.style.height = '300px';
+    const play = comparison().getByRole('button', { name: 'Play', exact: true });
+    const pause = comparison().getByRole('button', { name: 'Pause', exact: true });
+    await expect.element(play).toBeEnabled();
+    const [primary, follower] = compareVideos();
+    const ended = new Promise<Event>((resolve) => {
+      primary!.addEventListener('ended', resolve, { once: true });
+    });
+
+    await act(() => userEvent.click(play));
+    await expect.element(pause).toBeVisible();
+    await ended;
+
+    await expect.element(play).toBeEnabled();
+    expect(primary!.paused && follower!.paused).toBe(true);
+    expect(primary!.currentTime).toBe(primary!.duration);
+    await expect.poll(() => follower!.currentTime).toBeGreaterThan(follower!.duration - 0.1);
+    await expect.poll(() => follower!.parentElement?.style.clipPath).toContain('calc(');
+
+    await act(() => userEvent.click(play));
+    await expect.element(pause).toBeVisible();
+    await expect
+      .poll(() => !primary!.paused && !follower!.paused && primary!.currentTime < 0.5 && follower!.currentTime < 0.5)
+      .toBe(true);
+  });
+
+  it('reconnects its controls to the new pair after the kept Preview is hidden and shown', async () => {
+    setGalleryValues({ compareImage: source, selectedImage: result, selectedImageName: 'video:upscaled.mp4' });
+    await render();
+    const play = comparison().getByRole('button', { name: 'Play', exact: true });
+    await expect.element(play).toBeEnabled();
+    const firstPair = compareVideos();
+    expect(firstPair).toHaveLength(2);
+
+    await renderTree(queryClient!, 'hidden');
+    expect(firstPair.every((video) => !video.isConnected && !video.hasAttribute('src'))).toBe(true);
+
+    await renderTree(queryClient!, 'visible');
+    await expect.element(play).toBeEnabled();
+    const secondPair = compareVideos();
+    expect(secondPair).toHaveLength(2);
+    expect(secondPair.every((video) => !firstPair.includes(video))).toBe(true);
+    await act(() => userEvent.click(play));
+    await expect.poll(() => secondPair.every((video) => !video.paused)).toBe(true);
+  });
+
+  it('announces loading after the primary clip is ready while the second clip waits for metadata', async () => {
+    // A MediaSource without an appended segment deterministically waits for metadata.
+    const pendingVideo = URL.createObjectURL(new MediaSource());
+    try {
+      setGalleryValues({
+        compareImage: source,
+        selectedImage: { ...result, fullUrl: pendingVideo },
+        selectedImageName: 'video:upscaled.mp4',
+      });
+      await render();
+      await expect.element(comparison()).toBeVisible();
+      await expect.poll(() => compareVideos()[0]?.readyState).toBeGreaterThanOrEqual(HTMLMediaElement.HAVE_METADATA);
+      expect(compareVideos()[1]?.readyState).toBe(HTMLMediaElement.HAVE_NOTHING);
+      await expect.element(comparison().getByRole('status')).toHaveTextContent('Loading…');
+      const play = comparison().getByRole('button', { name: 'Play', exact: true });
+      await expect.element(play).toBeDisabled();
+
+      await act(() => publishGalleryValues({ selectedImage: result }));
+      await expect.element(play).toBeEnabled();
+      await expect.element(comparison().getByRole('status')).not.toBeInTheDocument();
+    } finally {
+      URL.revokeObjectURL(pendingVideo);
+    }
+  });
+
+  it('keeps Exit Compare available when the second clip cannot load', async () => {
+    setGalleryValues({
+      compareImage: source,
+      selectedImage: { ...result, fullUrl: 'data:video/mp4;base64,AAAA' },
+      selectedImageName: 'video:upscaled.mp4',
+    });
+    await render();
+
+    const alert = comparison().getByRole('alert');
+    await expect.element(alert.getByText('Video could not be loaded', { exact: true })).toBeVisible();
+    const retry = alert.getByRole('button', { name: 'Retry', exact: true });
+    const exit = page.getByRole('button', { name: 'widgets.preview.exitCompare', exact: true });
+    await expect.element(retry).toBeEnabled();
+    await expect.element(comparison().getByRole('button', { name: 'Play', exact: true })).toBeDisabled();
+    await expect.element(exit).toBeEnabled();
+
+    const retryButton = retry.element() as HTMLElement;
+    await pressKeyOn(retryButton, 'Enter');
+    await expect.poll(() => retryButton.isConnected).toBe(false);
+    await expect.element(exit).toHaveFocus();
   });
 });

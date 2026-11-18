@@ -73,10 +73,12 @@ export type ImageContextMenuVariant = 'full' | 'housekeeping';
  * contract and never gain a frame-copy item.
  */
 export interface PreviewVideoContextActions {
+  isCompareArmed?: boolean;
   isCopyCurrentFrameAvailable: boolean;
   itemKey: GalleryItemKey;
   onCopyCurrentFrame: () => void;
   onOpenDetails: () => void;
+  onToggleCompare?: () => void;
 }
 
 const isUsableGalleryImage = (value: unknown): value is GalleryImage =>
@@ -413,6 +415,18 @@ const SingleItemMenuItems = ({
       ) : null}
       {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (
         <>
+          {previewVideoActions.onToggleCompare ? (
+            <ContextMenuItem
+              icon={previewVideoActions.isCompareArmed ? XIcon : ImagesIcon}
+              label={t(
+                previewVideoActions.isCompareArmed
+                  ? 'widgets.preview.cancelCompare'
+                  : 'widgets.preview.selectForCompare'
+              )}
+              value="toggle-video-compare"
+              onClick={previewVideoActions.onToggleCompare}
+            />
+          ) : null}
           <ContextMenuItem
             // Without a clipboard (plain HTTP) the item says why; a frame still loading only disables it.
             disabled={!previewVideoActions.isCopyCurrentFrameAvailable}
