@@ -18,6 +18,7 @@ import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
 import {
   GALLERY_RECENT_IMAGE_LIMIT,
+  getGalleryCompareItem,
   getGallerySelectedImageQuery,
   legacyGeneratedImageToGalleryItem,
   registerImageCluster,
@@ -6540,6 +6541,62 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     // A comparison left behind would open again on whatever image is selected next.
     expect(values.compareImage).toBeNull();
     expect(values.selectedImageQuery).toBeDefined();
+  });
+
+  describe('video comparison', () => {
+    const source = createGalleryVideoItem('source.mp4');
+    const result = createGalleryVideoItem('result.mp4');
+    const selectedValues = (state: WorkbenchState) => getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    const openComparison = () => {
+      let state = workbenchReducer(createInitialWorkbenchState(), { item: source, type: 'selectGalleryItem' });
+      state = workbenchReducer(state, { image: source, type: 'setGalleryCompareImage' });
+
+      return workbenchReducer(state, { item: result, type: 'selectGalleryItem' });
+    };
+
+    it('retains the first video through a project round trip and clears the pair after selecting an image', () => {
+      const state = openComparison();
+      const reopened = normalizeWorkbenchProject(JSON.parse(JSON.stringify(getActiveProject(state))) as Project);
+      const values = getProjectWidgetValues(reopened, 'gallery');
+
+      expect(getGalleryCompareItem(values)).toMatchObject({ kind: 'video', name: 'source.mp4' });
+      expect(values.selectedImageName).toBe('video:result.mp4');
+
+      const image = workbenchReducer(
+        { ...state, projects: [reopened] },
+        {
+          item: createGalleryImageItem('unrelated.png'),
+          type: 'selectGalleryItem',
+        }
+      );
+
+      expect(getGalleryCompareItem(selectedValues(image))).toBeNull();
+    });
+
+    it.each(['source.mp4', 'result.mp4'])('closes the pair when %s is deleted', (name) => {
+      const state = openComparison();
+      const removed = workbenchReducer(state, {
+        itemKeys: [`video:${name}`],
+        keepComparisonForSuccessor: true,
+        projectId: getActiveProject(state).id,
+        type: 'removeGalleryItems',
+      });
+
+      expect(getGalleryCompareItem(selectedValues(removed))).toBeNull();
+    });
+
+    it('does not treat adding a second item to a multiselection as comparing it', () => {
+      const selected = workbenchReducer(createInitialWorkbenchState(), { item: source, type: 'selectGalleryItem' });
+      const armed = workbenchReducer(selected, { image: source, type: 'setGalleryCompareImage' });
+      const ranged = workbenchReducer(armed, {
+        itemKeys: ['video:source.mp4', 'video:result.mp4'],
+        primaryItem: result,
+        type: 'setGalleryMultiSelection',
+      });
+
+      expect(getGalleryCompareItem(selectedValues(ranged))).toBeNull();
+    });
   });
 
   describe('a comparison waiting for its second image', () => {

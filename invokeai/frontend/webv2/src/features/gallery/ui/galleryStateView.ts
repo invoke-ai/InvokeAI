@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next';
 
 import {
   ALL_READABLE_BOARDS_ID,
+  galleryImageItemToGalleryImage,
   isDateBoardId,
   parseGalleryItemKey,
   toGalleryItemKey,
@@ -13,7 +14,6 @@ import {
 } from '@features/gallery/core/items';
 import {
   getPersistedSelectedGalleryItemKeys,
-  getSelectedGalleryImageFromValues,
   getSelectedGalleryItemFromValues,
 } from '@features/gallery/core/selection';
 import {
@@ -89,9 +89,9 @@ export interface GalleryStateView {
   boards: GalleryBoard[];
   compareImageKey: GalleryItemKey | null;
   galleryView: GalleryView;
-  /** A compare image is set and differs from the visible image selection. */
+  /** A comparison item and the visible selection are distinct and of the same media kind. */
   isComparisonActive: boolean;
-  /** Select for compare is waiting for a second image: the compare image is the visible image selection itself. */
+  /** Select for compare is waiting for a second item: the comparison item is the visible selection itself. */
   isCompareArmed: boolean;
   /** A text, date or semantic search narrows the listing, so the search scope applies. */
   isSearchActive: boolean;
@@ -194,12 +194,12 @@ const movesPrimaryOntoComparison = (previous: Record<string, unknown>, next: Rec
     return false;
   }
 
-  const compareImage = getGalleryCompareImage(next);
+  const compareItem = getGalleryCompareItem(next);
   const primaryKey = getPrimaryGalleryItemKey(next);
 
   return (
-    compareImage !== null &&
-    primaryKey === toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) &&
+    compareItem !== null &&
+    primaryKey === toGalleryItemKey(compareItem) &&
     primaryKey !== getPrimaryGalleryItemKey(previous)
   );
 };
@@ -424,12 +424,19 @@ export const getGalleryTotalImages = (values: Record<string, unknown>): number |
 export const getGalleryProjectBoardId = (values: Record<string, unknown>): string | null =>
   typeof values.projectBoardId === 'string' ? values.projectBoardId : null;
 
-export const getGalleryCompareImage = (values: Record<string, unknown>): GalleryImage | null =>
-  getSelectedGalleryImageFromValues({
+/** The existing project field also accepts the canonical video item shape. */
+export const getGalleryCompareItem = (values: Record<string, unknown>): GalleryItem | null =>
+  getSelectedGalleryItemFromValues({
     selectedBoardId: values.selectedBoardId,
     selectedImage: values.compareImage,
     selectedImageName: null,
   });
+
+export const getGalleryCompareImage = (values: Record<string, unknown>): GalleryImage | null => {
+  const item = getGalleryCompareItem(values);
+
+  return item?.kind === 'image' ? galleryImageItemToGalleryImage(item) : null;
+};
 
 /** The infinite window's anchor page; 0 whenever the window covers the top of the listing. */
 export const getGalleryAnchoredWindowPage = (values: Record<string, unknown>): number => {
@@ -548,11 +555,11 @@ export const getGalleryStateView = (
   const selectedBoardId = getGallerySelectedBoardId(values, backendBoards);
   const searchScope = getGallerySearchScope(values);
   const listingBoardId = searchScope === 'all' ? ALL_READABLE_BOARDS_ID : selectedBoardId;
-  const compareImage = getGalleryCompareImage(values);
-  const compareImageKey = compareImage ? toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) : null;
+  const compareItem = getGalleryCompareItem(values);
+  const compareImageKey = compareItem ? toGalleryItemKey(compareItem) : null;
   const isComparisonActive =
-    visibleSelectedItemKey?.startsWith('image:') === true &&
-    compareImageKey !== null &&
+    compareItem !== null &&
+    visibleSelectedItemKey?.startsWith(`${compareItem.kind}:`) === true &&
     compareImageKey !== visibleSelectedItemKey;
   const isCompareArmed = compareImageKey !== null && compareImageKey === visibleSelectedItemKey;
   const semanticImageQuery = getGallerySemanticImageQuery(values);

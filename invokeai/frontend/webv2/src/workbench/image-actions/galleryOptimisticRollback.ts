@@ -11,7 +11,7 @@ import type { WidgetTypeId } from '@workbench/widgetContracts';
 import { legacyGeneratedImageToGalleryItem, toGalleryItemKey } from '@features/gallery';
 import {
   getBoundedRecentImages,
-  getGalleryCompareImage,
+  getGalleryCompareItem,
   getSelectedGalleryItemFromValues,
 } from '@features/gallery/contracts';
 import { isSlotUnclaimed, selectUnclaimedEntries } from '@platform/state/compareAndSwapRollback';
@@ -207,10 +207,10 @@ export const collectGalleryStoreKnownItemFields = (
       record(selectedItem);
     }
 
-    const compareImage = getGalleryCompareImage(values);
+    const compareItem = getGalleryCompareItem(values);
 
-    if (compareImage) {
-      record(legacyGeneratedImageToGalleryItem(compareImage));
+    if (compareItem) {
+      record(compareItem);
     }
   }
 
