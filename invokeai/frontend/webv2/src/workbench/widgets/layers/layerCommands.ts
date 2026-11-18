@@ -5,11 +5,13 @@ import type {
   CanvasDocumentModel,
   CanvasEngineLayerCapability,
   DocumentCommand,
+  PrepareEditResult,
   StructuralCommitResult,
 } from '@workbench/canvas-engine/api';
 import type { TFunction } from 'i18next';
 
 import { getDocumentIndex, isGroupNode, outermostNodes } from '@workbench/canvas-engine/api';
+import { nextLayerName } from '@workbench/canvasProjectMutations';
 import { publishLayerPanelSelection, readLayerPanelState, setLayerGroupExpanded } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
 import { useCanvasDocumentRead } from '@workbench/widgets/canvas/engineStoreHooks';
@@ -17,7 +19,18 @@ import { reportLayerOperation, reportStructuralCommit } from '@workbench/widgets
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { createLayerId, nextGroupName } from './layerOps';
+import { createEmptyPaintLayer, createLayerId, nextGroupName } from './layerOps';
+
+/** Insert an empty raster layer above the live selection, inside its group when a child is selected. */
+export const prepareNewRasterLayer = (model: CanvasDocumentModel): PrepareEditResult => {
+  const { document } = model;
+  const layerNames = getDocumentIndex(document).nodes.map(({ node }) => node.name);
+  return model.prepare({
+    aboveId: document.selectedLayerId,
+    nodes: [createEmptyPaintLayer(nextLayerName(layerNames))],
+    type: 'insert',
+  });
+};
 
 /**
  * The structural commands every layer surface offers: the Canvas hotkeys, the panel footer, the row and group menus,

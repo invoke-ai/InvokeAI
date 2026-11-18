@@ -35,6 +35,7 @@ import {
   deleteLayers,
   duplicateLayers,
   groupLayers,
+  prepareNewRasterLayer,
   ungroupLayers,
   type LayerCommandDeps,
 } from '@workbench/widgets/layers/layerCommands';
@@ -160,8 +161,6 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
   readonly copySelection: (cut: boolean) => void;
   /** Crops every unlocked layer to the frame and reports the outcome, as the canvas menu does. */
   readonly cropAllLayers: () => void;
-  /** Uses the same guarded, undoable insertion as the Layers add menu. */
-  readonly addRasterLayer: () => void;
   /** Delete, duplicate, group and ungroup run on `selectedLayerIds` through these, as every layer surface does. */
   readonly layerCommands: LayerCommandDeps;
   readonly pasteFromClipboard: () => void;
@@ -250,7 +249,9 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   } else if (commandId === 'canvas.pasteImage') {
     ctx.pasteFromClipboard();
   } else if (commandId === 'canvas.newRasterLayer') {
-    ctx.addRasterLayer();
+    ctx.reportPreparedCommit(
+      commitPreparedEdit(engine, t('widgets.layers.actions.addRasterLayer'), prepareNewRasterLayer)
+    );
   } else if (commandId === 'canvas.cropAllLayersToFrame') {
     ctx.cropAllLayers();
   } else if (commandId === 'canvas.toggleNonRasterLayers') {

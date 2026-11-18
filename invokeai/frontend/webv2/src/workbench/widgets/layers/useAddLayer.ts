@@ -10,15 +10,14 @@ import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { setLayerGroupExpanded } from '@workbench/layerPanelState';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { nextLayerName } from '@workbench/workbenchState';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { AddLayerItemId } from './addLayerMenu';
 
 import { isAddLayerItemAvailable } from './addLayerMenu';
+import { prepareNewRasterLayer } from './layerCommands';
 import {
-  createEmptyPaintLayer,
   createInpaintMaskLayer,
   createLayerId,
   createRegionalGuidanceLayer,
@@ -86,8 +85,7 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           return;
         }
         case 'raster': {
-          const layer = createEmptyPaintLayer(nextLayerName(layerNames));
-          add(t('widgets.layers.actions.addRasterLayer'), layer);
+          commitPrepared(t('widgets.layers.actions.addRasterLayer'), prepareNewRasterLayer);
           return;
         }
         case 'control': {

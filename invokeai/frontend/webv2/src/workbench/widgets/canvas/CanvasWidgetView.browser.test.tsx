@@ -476,8 +476,9 @@ describe('CanvasWidgetView new raster layer command', () => {
       staged: false,
     });
     const before = activeProject().canvas.document;
+    const addLayer = commandHandlers.get('canvas.newRasterLayer')!;
 
-    await act(() => commandHandlers.get('canvas.newRasterLayer')!());
+    await act(addLayer);
 
     const document = activeProject().canvas.document;
     const group = document.stacks.raster[0]!;
@@ -495,9 +496,17 @@ describe('CanvasWidgetView new raster layer command', () => {
     await act(() => harness.engine!.history.redo());
     expect(activeProject().canvas.document.selectedLayerId).toBe(addedId);
 
-    await act(() => commandHandlers.get('canvas.newRasterLayer')!());
+    await act(() => {
+      addLayer();
+      addLayer();
+    });
     const updatedGroup = activeProject().canvas.document.stacks.raster[0]!;
-    expect(updatedGroup.type === 'group' && updatedGroup.children).toHaveLength(3);
+    expect(updatedGroup.type === 'group' && updatedGroup.children.map((child) => child.name)).toEqual([
+      'Layer 3',
+      'Layer 2',
+      'Layer 1',
+      'paint',
+    ]);
   });
 
   it('creates a raster layer in an empty document without changing staged results', async () => {
