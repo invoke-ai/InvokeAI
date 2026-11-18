@@ -117,7 +117,7 @@ describe('updateConcept', () => {
     expect(updateConcept(list, 'chalk', { isEnabled: false, weight: 1.25 })).toBe(list);
   });
 
-  it('clears lowNoiseWeight when weight is edited (even to the same high-noise value) and preserves it on toggle', () => {
+  it('preserves target and lowNoiseWeight on weight edits, edits lowNoiseWeight independently, and clears on null', () => {
     const wanLora = lora('wan-dual', 'wan');
     const list: GenerateLora[] = [
       { isEnabled: true, lowNoiseWeight: 0.8, model: wanLora, target: 'both', weight: 0.4 },
@@ -126,12 +126,30 @@ describe('updateConcept', () => {
     const toggled = updateConcept(list, 'wan-dual', { isEnabled: false });
     expect(toggled).toEqual([{ isEnabled: false, lowNoiseWeight: 0.8, model: wanLora, target: 'both', weight: 0.4 }]);
 
-    const samePrimaryWeight = updateConcept(list, 'wan-dual', { weight: 0.4 });
-    expect(samePrimaryWeight).toEqual([{ isEnabled: true, model: wanLora, target: 'both', weight: 0.4 }]);
-    expect('lowNoiseWeight' in samePrimaryWeight[0]!).toBe(false);
+    // No-op when weight already matches; preserves array identity.
+    expect(updateConcept(list, 'wan-dual', { weight: 0.4 })).toBe(list);
+    expect(updateConcept(list, 'wan-dual', { lowNoiseWeight: 0.8 })).toBe(list);
 
-    const changedWeight = updateConcept(list, 'wan-dual', { weight: 0.9 });
-    expect(changedWeight).toEqual([{ isEnabled: true, model: wanLora, target: 'both', weight: 0.9 }]);
+    const editedPrimary = updateConcept(list, 'wan-dual', { weight: 0.9 });
+    expect(editedPrimary).toEqual([
+      { isEnabled: true, lowNoiseWeight: 0.8, model: wanLora, target: 'both', weight: 0.9 },
+    ]);
+
+    const editedLowNoise = updateConcept(editedPrimary, 'wan-dual', { lowNoiseWeight: 0.3 });
+    expect(editedLowNoise).toEqual([
+      { isEnabled: true, lowNoiseWeight: 0.3, model: wanLora, target: 'both', weight: 0.9 },
+    ]);
+
+    const unified = updateConcept(editedLowNoise, 'wan-dual', { lowNoiseWeight: null });
+    expect(unified).toEqual([{ isEnabled: true, model: wanLora, target: 'both', weight: 0.9 }]);
+    expect('lowNoiseWeight' in unified[0]!).toBe(false);
+    expect(updateConcept(unified, 'wan-dual', { lowNoiseWeight: null })).toBe(unified);
+
+    const cleared = updateConcept(editedLowNoise, 'wan-dual', { target: null });
+    expect(cleared).toEqual([{ isEnabled: true, model: wanLora, weight: 0.9 }]);
+    expect('target' in cleared[0]!).toBe(false);
+    expect('lowNoiseWeight' in cleared[0]!).toBe(false);
+    expect(updateConcept(cleared, 'wan-dual', { target: null })).toBe(cleared);
   });
 });
 

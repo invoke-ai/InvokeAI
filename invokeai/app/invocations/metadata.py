@@ -128,17 +128,37 @@ _WAN_TRANSFORMER_DICT_KEYS: frozenset[str] = frozenset(
     {"transformer", "transformer_low_noise", "loras", "loras_low_noise", "boundary_ratio"}
 )
 
+_PRESERVE_TRUTHY_FIELDS: tuple[str, ...] = ("loras", "loras_low_noise", "seamless_axes", "skipped_layers")
+_PRESERVE_NOT_NONE_FIELDS: tuple[str, ...] = (
+    "transformer_low_noise",
+    "boundary_ratio",
+    "variant",
+    "adaln_overlay",
+    "processor",
+    "connectors",
+    "vision_tower",
+    "freeu_config",
+)
+
 # (primary_key, allowed_keys, preserve_when_custom_keys)
 _WRAPPER_DICT_SPECS: tuple[tuple[str, frozenset[str], tuple[str, ...]], ...] = (
     (
         "text_encoder",
         frozenset({"tokenizer", "processor", "text_encoder", "vision_tower", "connectors", "loras", "skipped_layers"}),
-        ("loras",),
+        ("loras", "processor", "connectors", "vision_tower", "skipped_layers"),
     ),
-    ("clip", frozenset({"tokenizer", "clip", "loras", "skipped_layers"}), ("loras",)),
-    ("vae", frozenset({"vae", "seamless_axes"}), ()),
-    ("transformer", frozenset({"transformer", "loras", "variant", "adaln_overlay"}), ("loras",)),
-    ("unet", frozenset({"unet", "scheduler", "loras", "seamless_axes", "freeu_config"}), ("loras", "seamless_axes")),
+    ("clip", frozenset({"tokenizer", "clip", "loras", "skipped_layers"}), ("loras", "skipped_layers")),
+    ("vae", frozenset({"vae", "seamless_axes"}), ("seamless_axes",)),
+    (
+        "transformer",
+        frozenset({"transformer", "loras", "variant", "adaln_overlay"}),
+        ("loras", "variant", "adaln_overlay"),
+    ),
+    (
+        "unet",
+        frozenset({"unet", "scheduler", "loras", "seamless_axes", "freeu_config"}),
+        ("loras", "seamless_axes", "freeu_config"),
+    ),
     ("decoder", frozenset({"decoder"}), ()),
     ("vocoder", frozenset({"vocoder"}), ()),
     ("latent_upsampler", frozenset({"latent_upsampler"}), ()),
@@ -149,33 +169,58 @@ def _is_model_identifier_value(val: Any) -> bool:
     return isinstance(val, ModelIdentifierField) or (isinstance(val, dict) and "key" in val)
 
 
+def _has_preservable_wrapper_fields(val: Any, keys: Optional[Sequence[str]] = None) -> bool:
+    if isinstance(val, dict):
+        check_keys = keys if keys is not None else (*_PRESERVE_TRUTHY_FIELDS, *_PRESERVE_NOT_NONE_FIELDS)
+        for k in check_keys:
+            if k not in val:
+                continue
+            v = val[k]
+            if k in _PRESERVE_NOT_NONE_FIELDS:
+                if v is not None:
+                    return True
+            elif v:
+                return True
+        return False
+
+    for attr in _PRESERVE_TRUTHY_FIELDS:
+        if getattr(val, attr, None):
+            return True
+    for attr in _PRESERVE_NOT_NONE_FIELDS:
+        if getattr(val, attr, None) is not None:
+            return True
+    return False
+
+
 def unwrap_metadata_value(val: Any, label: Optional[str] = None) -> Any:
     """Unwrap model loader submodel fields (VAEField, encoder fields, UNetField, TransformerField, PiDDecoderField)
     into their inner ModelIdentifierField (or ModelIdentifierField-shaped dict) when stored in metadata.
 
     For core model labels (e.g. 'model', 'vae', 'clip_l_model'), wrappers are always unwrapped so gallery recall
     can find the top-level 'key'. For custom labels (e.g. user-named labels or CUSTOM_LABEL), outer wrappers with
-    LoRAs or custom configurations are preserved so user modifications are not discarded.
+    LoRAs or non-default submodel/routing/config fields are preserved so user modifications are not discarded.
     """
     is_custom = label not in CORE_MODEL_LABELS
     if isinstance(val, UNetField):
-        if is_custom and (val.loras or getattr(val, "seamless_axes", None)):
+        if is_custom and _has_preservable_wrapper_fields(val):
             return val
         return val.unet
     if isinstance(val, (TransformerField, WanTransformerField)):
-        if is_custom and (getattr(val, "loras", None) or getattr(val, "loras_low_noise", None)):
+        if is_custom and _has_preservable_wrapper_fields(val):
             return val
         if isinstance(val, WanTransformerField) and label == "wan_transformer_low_noise":
             return val.transformer_low_noise
         return val.transformer
     if isinstance(val, VAEField):
+        if is_custom and _has_preservable_wrapper_fields(val):
+            return val
         return val.vae
     if isinstance(val, PiDDecoderField):
         return val.decoder
     if isinstance(val, BaseModel) and not isinstance(val, ModelIdentifierField):
         for attr in ("text_encoder", "clip", "transformer", "unet", "vae", "decoder", "vocoder", "latent_upsampler"):
             if hasattr(val, attr):
-                if is_custom and (getattr(val, "loras", None) or getattr(val, "seamless_axes", None)):
+                if is_custom and _has_preservable_wrapper_fields(val):
                     return val
                 inner = getattr(val, attr)
                 if _is_model_identifier_value(inner):
@@ -183,7 +228,9 @@ def unwrap_metadata_value(val: Any, label: Optional[str] = None) -> Any:
     elif isinstance(val, dict) and "key" not in val and "image_name" not in val and "video_name" not in val:
         keys = set(val.keys())
         if keys.issubset(_WAN_TRANSFORMER_DICT_KEYS) and "transformer" in val:
-            if is_custom and (val.get("loras") or val.get("loras_low_noise")):
+            if is_custom and _has_preservable_wrapper_fields(
+                val, ("loras", "loras_low_noise", "transformer_low_noise", "boundary_ratio")
+            ):
                 return val
             if label == "wan_transformer_low_noise":
                 inner = val.get("transformer_low_noise")
@@ -197,7 +244,7 @@ def unwrap_metadata_value(val: Any, label: Optional[str] = None) -> Any:
                 return inner
         for primary_key, allowed_keys, preserve_keys in _WRAPPER_DICT_SPECS:
             if primary_key in val and keys.issubset(allowed_keys):
-                if is_custom and any(val.get(k) for k in preserve_keys):
+                if is_custom and _has_preservable_wrapper_fields(val, preserve_keys):
                     return val
                 inner = val[primary_key]
                 if _is_model_identifier_value(inner):
@@ -316,7 +363,6 @@ GENERATION_MODES = Literal[
     "z_image_inpaint",
     "z_image_outpaint",
     "ernie_image_txt2img",
-    "ernie_image_img2img",
     "ideogram4_txt2img",
     "qwen_image_txt2img",
     "qwen_image_img2img",

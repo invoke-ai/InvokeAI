@@ -104,6 +104,13 @@ const ideogram4Model: MainModelConfig = {
   name: 'Ideogram 4',
   type: 'main',
 };
+const ernieImageModel: MainModelConfig = {
+  base: 'ernie-image',
+  format: 'diffusers',
+  key: 'ernie-image-model',
+  name: 'ERNIE-Image',
+  type: 'main',
+};
 const externalModel: GenerateModelConfig = {
   base: 'external',
   capabilities: { modes: ['txt2img'], supports_seed: true },
@@ -489,6 +496,10 @@ describe('compileCanvasGraph', () => {
         expect(backendGraph.nodes.denoise_latents?.denoising_start).toBeCloseTo(1 - 0.75 ** 0.2, 10);
       }
     );
+
+    it.each([ernieImageModel, ideogram4Model])('rejects img2img for $base, which has no latent space', (model) => {
+      expect(() => compile(model, 'img2img')).toThrow(`Canvas generation is not supported for ${model.name}.`);
+    });
   });
 
   describe('external image generators', () => {

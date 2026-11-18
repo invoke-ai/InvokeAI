@@ -104,9 +104,7 @@ class ErnieImageDenoiseInvocation(BaseInvocation, WithMetadata):
 
     def _build_metadata(self) -> MetadataField:
         updates: dict[str, Any] = {
-            "generation_mode": (
-                "ernie_image_img2img" if getattr(self, "latents", None) is not None else "ernie_image_txt2img"
-            ),
+            "generation_mode": "ernie_image_txt2img",
             "width": self.width,
             "height": self.height,
             "steps": self.steps,

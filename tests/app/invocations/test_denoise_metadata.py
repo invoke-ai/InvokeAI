@@ -2582,11 +2582,12 @@ def test_unwrap_metadata_value_core_vs_custom_label() -> None:
     assert len(out_custom.metadata.root["my_custom_unet"].loras) == 1
 
 
-def test_ernie_image_denoise_img2img_generation_mode() -> None:
-    """Finding 6: ErnieImage denoise stamps ernie_image_img2img when latents connected."""
+def test_ernie_image_denoise_txt2img_only_generation_mode() -> None:
+    """JP-R5-1: ErnieImage is txt2img-only (even if latents are passed via Python/workflow)."""
     from invokeai.app.invocations.metadata import GENERATION_MODES
 
-    assert "ernie_image_img2img" in GENERATION_MODES.__args__
+    assert "ernie_image_txt2img" in GENERATION_MODES.__args__
+    assert "ernie_image_img2img" not in GENERATION_MODES.__args__
 
     tf_id = _make_model_id(key="ernie-tf", base=BaseModelType.ErnieImage)
     txt_node = ErnieImageDenoiseInvocation.model_construct(
@@ -2619,7 +2620,7 @@ def test_ernie_image_denoise_img2img_generation_mode() -> None:
         latents=LatentsField(latents_name="init_latents"),
         metadata=None,
     )
-    assert img_node._build_metadata().root["generation_mode"] == "ernie_image_img2img"
+    assert img_node._build_metadata().root["generation_mode"] == "ernie_image_txt2img"
 
 
 def test_metadata_to_adapters_warning_on_unresolvable_model() -> None:
@@ -3156,6 +3157,131 @@ def test_unwrap_metadata_value_wan_none_and_wrapper_dicts() -> None:
     upsampler_field = LTX2LatentUpsamplerField(latent_upsampler=upsampler_id)
     assert unwrap_metadata_value(upsampler_field, label="model") == upsampler_id
     assert unwrap_metadata_value(upsampler_field.model_dump(), label="model")["key"] == "ltx2-upsampler"
+
+
+def test_unwrap_metadata_value_preserves_non_lora_wrapper_fields_on_custom_labels() -> None:
+    """JP-R5-2: LoRA-free wrappers carrying non-LoRA submodel/routing/config fields preserve both
+    model instances and dicts on custom labels, while unwrapping cleanly on core labels."""
+    from invokeai.app.invocations.metadata import unwrap_metadata_value
+    from invokeai.app.invocations.model import (
+        CLIPField,
+        LTX2TextEncoderField,
+        MiniMaxH3TextEncoderField,
+        Qwen3VLEncoderField,
+    )
+
+    tok_id = _make_model_id(key="tok-key", submodel_type=SubModelType.Tokenizer)
+    sched_id = _make_model_id(key="sched-key", submodel_type=SubModelType.Scheduler)
+
+    # 1. WanTransformerField (transformer_low_noise + boundary_ratio, no LoRAs)
+    wan_high = _make_model_id(key="wan-high-r5", base=BaseModelType.Wan)
+    wan_low = _make_model_id(key="wan-low-r5", base=BaseModelType.Wan)
+    wan_wrap = WanTransformerField(
+        transformer=wan_high,
+        transformer_low_noise=wan_low,
+        loras=[],
+        loras_low_noise=[],
+        boundary_ratio=0.75,
+    )
+    assert unwrap_metadata_value(wan_wrap, label="model") == wan_high
+    assert unwrap_metadata_value(wan_wrap, label="wan_transformer_low_noise") == wan_low
+    assert unwrap_metadata_value(wan_wrap.model_dump(), label="model")["key"] == "wan-high-r5"
+    assert unwrap_metadata_value(wan_wrap.model_dump(), label="wan_transformer_low_noise")["key"] == "wan-low-r5"
+    kept_wan = unwrap_metadata_value(wan_wrap, label="my_wan_custom")
+    assert isinstance(kept_wan, WanTransformerField) and kept_wan.boundary_ratio == 0.75
+    kept_wan_dict = unwrap_metadata_value(wan_wrap.model_dump(), label="my_wan_custom")
+    assert isinstance(kept_wan_dict, dict) and kept_wan_dict["transformer_low_noise"]["key"] == "wan-low-r5"
+
+    # 2. MiniMaxH3TransformerField (variant + adaln_overlay, no LoRAs)
+    h3_tf = _make_model_id(key="h3-tf-r5", base=BaseModelType.MiniMaxH3)
+    h3_ov = _make_model_id(key="h3-ov-r5", base=BaseModelType.MiniMaxH3)
+    h3_tf_wrap = MiniMaxH3TransformerField(
+        transformer=h3_tf,
+        loras=[],
+        variant="fl2va",
+        adaln_overlay=MiniMaxH3AdaLNOverlayField(overlay=h3_ov, start_block=20, end_block=30, include_final_layer=True),
+    )
+    assert unwrap_metadata_value(h3_tf_wrap, label="minimax_h3_transformer_model") == h3_tf
+    assert unwrap_metadata_value(h3_tf_wrap.model_dump(), label="minimax_h3_transformer_model")["key"] == "h3-tf-r5"
+    assert isinstance(unwrap_metadata_value(h3_tf_wrap, label="my_h3_tf"), MiniMaxH3TransformerField)
+    assert unwrap_metadata_value(h3_tf_wrap.model_dump(), label="my_h3_tf")["variant"] == "fl2va"
+
+    # 3. LTX2TransformerField (variant, no LoRAs)
+    ltx_tf = _make_model_id(key="ltx-tf-r5", base=BaseModelType.LTX2)
+    ltx_tf_wrap = LTX2TransformerField(transformer=ltx_tf, loras=[], variant="ltx2_distilled")
+    assert unwrap_metadata_value(ltx_tf_wrap, label="model") == ltx_tf
+    assert unwrap_metadata_value(ltx_tf_wrap.model_dump(), label="model")["key"] == "ltx-tf-r5"
+    assert isinstance(unwrap_metadata_value(ltx_tf_wrap, label="my_ltx_tf"), LTX2TransformerField)
+    assert unwrap_metadata_value(ltx_tf_wrap.model_dump(), label="my_ltx_tf")["variant"] == "ltx2_distilled"
+
+    # 4. MiniMaxH3TextEncoderField (processor, no LoRAs)
+    h3_enc = _make_model_id(key="h3-enc-r5", base=BaseModelType.MiniMaxH3, submodel_type=SubModelType.TextEncoder)
+    h3_proc = _make_model_id(key="h3-proc-r5", base=BaseModelType.MiniMaxH3)
+    h3_enc_wrap = MiniMaxH3TextEncoderField(tokenizer=tok_id, processor=h3_proc, text_encoder=h3_enc)
+    assert unwrap_metadata_value(h3_enc_wrap, label="minimax_h3_text_encoder_model") == h3_enc
+    assert unwrap_metadata_value(h3_enc_wrap.model_dump(), label="minimax_h3_text_encoder_model")["key"] == "h3-enc-r5"
+    assert isinstance(unwrap_metadata_value(h3_enc_wrap, label="my_h3_enc"), MiniMaxH3TextEncoderField)
+    assert unwrap_metadata_value(h3_enc_wrap.model_dump(), label="my_h3_enc")["processor"]["key"] == "h3-proc-r5"
+
+    # 5. LTX2TextEncoderField (connectors, no LoRAs)
+    ltx_enc = _make_model_id(key="ltx-enc-r5", base=BaseModelType.LTX2, submodel_type=SubModelType.TextEncoder)
+    ltx_conn = _make_model_id(key="ltx-conn-r5", base=BaseModelType.LTX2)
+    ltx_enc_wrap = LTX2TextEncoderField(tokenizer=tok_id, text_encoder=ltx_enc, connectors=ltx_conn)
+    assert unwrap_metadata_value(ltx_enc_wrap, label="ltx2_text_encoder_model") == ltx_enc
+    assert unwrap_metadata_value(ltx_enc_wrap.model_dump(), label="ltx2_text_encoder_model")["key"] == "ltx-enc-r5"
+    assert isinstance(unwrap_metadata_value(ltx_enc_wrap, label="my_ltx_enc"), LTX2TextEncoderField)
+    assert unwrap_metadata_value(ltx_enc_wrap.model_dump(), label="my_ltx_enc")["connectors"]["key"] == "ltx-conn-r5"
+
+    # 6. Qwen3VLEncoderField (vision_tower, no LoRAs)
+    qvl_enc = _make_model_id(key="qvl-enc-r5", base=BaseModelType.Any, submodel_type=SubModelType.TextEncoder)
+    qvl_vt = _make_model_id(key="qvl-vt-r5", base=BaseModelType.Any, model_type=ModelType.Qwen3VLVisionTower)
+    qvl_wrap = Qwen3VLEncoderField(tokenizer=tok_id, text_encoder=qvl_enc, vision_tower=qvl_vt, loras=[])
+    assert unwrap_metadata_value(qvl_wrap, label="qwen3_vl_encoder") == qvl_enc
+    assert unwrap_metadata_value(qvl_wrap.model_dump(), label="qwen3_vl_encoder")["key"] == "qvl-enc-r5"
+    assert isinstance(unwrap_metadata_value(qvl_wrap, label="my_qvl"), Qwen3VLEncoderField)
+    assert unwrap_metadata_value(qvl_wrap.model_dump(), label="my_qvl")["vision_tower"]["key"] == "qvl-vt-r5"
+
+    # 7. UNetField (freeu_config, no LoRAs/seamless) vs plain UNetField
+    unet_id = _make_model_id(key="unet-r5", base=BaseModelType.StableDiffusionXL, submodel_type=SubModelType.UNet)
+    unet_freeu = UNetField(
+        unet=unet_id,
+        scheduler=sched_id,
+        loras=[],
+        seamless_axes=[],
+        freeu_config=FreeUConfig(s1=0.9, s2=0.2, b1=1.2, b2=1.4),
+    )
+    assert unwrap_metadata_value(unet_freeu, label="model") == unet_id
+    assert unwrap_metadata_value(unet_freeu.model_dump(), label="model")["key"] == "unet-r5"
+    assert isinstance(unwrap_metadata_value(unet_freeu, label="my_freeu_unet"), UNetField)
+    assert unwrap_metadata_value(unet_freeu.model_dump(), label="my_freeu_unet")["freeu_config"]["s1"] == 0.9
+
+    plain_unet = UNetField(unet=unet_id, scheduler=sched_id, loras=[], seamless_axes=[], freeu_config=None)
+    assert unwrap_metadata_value(plain_unet, label="my_clean_unet") == unet_id
+    assert unwrap_metadata_value(plain_unet.model_dump(), label="my_clean_unet")["key"] == "unet-r5"
+
+    # 8. VAEField (seamless_axes) vs plain VAEField
+    vae_id = _make_model_id(key="vae-r5", base=BaseModelType.StableDiffusionXL, model_type=ModelType.VAE)
+    vae_seamless = VAEField(vae=vae_id, seamless_axes=["x"])
+    assert unwrap_metadata_value(vae_seamless, label="vae") == vae_id
+    assert unwrap_metadata_value(vae_seamless.model_dump(), label="vae")["key"] == "vae-r5"
+    assert isinstance(unwrap_metadata_value(vae_seamless, label="my_seamless_vae"), VAEField)
+    assert unwrap_metadata_value(vae_seamless.model_dump(), label="my_seamless_vae")["seamless_axes"] == ["x"]
+
+    plain_vae = VAEField(vae=vae_id, seamless_axes=[])
+    assert unwrap_metadata_value(plain_vae, label="my_clean_vae") == vae_id
+    assert unwrap_metadata_value(plain_vae.model_dump(), label="my_clean_vae")["key"] == "vae-r5"
+
+    # 9. CLIPField (skipped_layers != 0, no LoRAs) vs skipped_layers == 0
+    clip_id = _make_model_id(key="clip-r5", base=BaseModelType.Any, model_type=ModelType.CLIPEmbed)
+    clip_skip = CLIPField(tokenizer=tok_id, text_encoder=clip_id, skipped_layers=2, loras=[])
+    assert unwrap_metadata_value(clip_skip, label="clip_embed_model") == clip_id
+    assert unwrap_metadata_value(clip_skip.model_dump(), label="clip_embed_model")["key"] == "clip-r5"
+    assert isinstance(unwrap_metadata_value(clip_skip, label="my_clip_skip"), CLIPField)
+    assert unwrap_metadata_value(clip_skip.model_dump(), label="my_clip_skip")["skipped_layers"] == 2
+
+    plain_clip = CLIPField(tokenizer=tok_id, text_encoder=clip_id, skipped_layers=0, loras=[])
+    assert unwrap_metadata_value(plain_clip, label="my_clean_clip") == clip_id
+    assert unwrap_metadata_value(plain_clip.model_dump(), label="my_clean_clip")["key"] == "clip-r5"
 
 
 def test_serialize_wan_lora_metadata_handles_raw_dict_lora_fields() -> None:

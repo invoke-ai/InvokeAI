@@ -452,3 +452,37 @@ def test_metadata_scalar_and_collection_extractors_handle_scalars_lists_and_bool
         .value
         is True
     )
+
+
+def test_unwrap_metadata_value_custom_label_preserves_extra_wrapper_fields_without_loras() -> None:
+    from invokeai.app.invocations.model import LTX2TransformerField, VAEField, WanTransformerField
+    from invokeai.backend.model_manager.taxonomy import SubModelType
+
+    wan_high = ModelIdentifierField(key="wh", hash="hh", name="wh", base=BaseModelType.Wan, type=ModelType.Main)
+    wan_low = ModelIdentifierField(key="wl", hash="hl", name="wl", base=BaseModelType.Wan, type=ModelType.Main)
+    wan_field = WanTransformerField(transformer=wan_high, transformer_low_noise=wan_low, boundary_ratio=0.8)
+    assert unwrap_metadata_value(wan_field, label="model") == wan_high
+    assert unwrap_metadata_value(wan_field, label="wan_transformer_low_noise") == wan_low
+    assert isinstance(unwrap_metadata_value(wan_field, label=CUSTOM_LABEL), WanTransformerField)
+    assert unwrap_metadata_value(wan_field.model_dump(), label=CUSTOM_LABEL)["boundary_ratio"] == 0.8
+
+    ltx_tf = ModelIdentifierField(
+        key="lt",
+        hash="hlt",
+        name="lt",
+        base=BaseModelType.LTX2,
+        type=ModelType.Main,
+        submodel_type=SubModelType.Transformer,
+    )
+    ltx_field = LTX2TransformerField(transformer=ltx_tf, loras=[], variant="ltx2_dev")
+    assert unwrap_metadata_value(ltx_field, label="model") == ltx_tf
+    assert isinstance(unwrap_metadata_value(ltx_field, label=CUSTOM_LABEL), LTX2TransformerField)
+    assert unwrap_metadata_value(ltx_field.model_dump(), label=CUSTOM_LABEL)["variant"] == "ltx2_dev"
+
+    vae_id = ModelIdentifierField(
+        key="vk", hash="hv", name="vk", base=BaseModelType.StableDiffusionXL, type=ModelType.VAE
+    )
+    vae_seamless = VAEField(vae=vae_id, seamless_axes=["x", "y"])
+    assert unwrap_metadata_value(vae_seamless, label="vae") == vae_id
+    assert isinstance(unwrap_metadata_value(vae_seamless, label=CUSTOM_LABEL), VAEField)
+    assert unwrap_metadata_value(vae_seamless.model_dump(), label=CUSTOM_LABEL)["seamless_axes"] == ["x", "y"]
