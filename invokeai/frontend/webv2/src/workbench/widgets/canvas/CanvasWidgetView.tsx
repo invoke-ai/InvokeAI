@@ -536,8 +536,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       document,
       engine,
       hasMultipleStagingSlots,
-      notifyLayerDuplicateFailed: () =>
-        notifications.add({ kind: 'error', title: t('widgets.layers.actions.copyFailed') }),
+      layerCommands: { engine, reportError: notify.error, t },
       pasteFromClipboard,
       reportLayerOperation: (refusal) => reportLayerOperation(refusal, notify.error, t),
       reportMergeDownRefusal: (refusal) => reportMergeDownRefusal(document, refusal, showCanvasRefusalNotice, t),

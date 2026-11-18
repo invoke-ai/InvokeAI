@@ -98,6 +98,21 @@ export const useCanvasEngineRead = <T extends boolean | number | string | null>(
   return useSyncExternalStore(subscribe, read, read);
 };
 
+/**
+ * A primitive read of the engine's document model, as `useCanvasEngineRead` but re-read only when the document
+ * changes: for answers pixels cannot change, such as command eligibility, so painting never re-runs them.
+ */
+export const useCanvasDocumentRead = <T extends boolean | number | string | null>(
+  engine: CanvasCoreStoreCapability | null,
+  read: () => T
+): T => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('documentEpoch', listener) ?? (() => undefined),
+    [engine]
+  );
+  return useSyncExternalStore(subscribe, read, read);
+};
+
 /** Subscribes to one layer's thumbnail request state; an absent key is idle. */
 export const useLayerThumbnailStatus = (
   engine: CanvasCoreStoreCapability | null,

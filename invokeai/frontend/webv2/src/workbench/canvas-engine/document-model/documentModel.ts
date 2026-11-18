@@ -684,7 +684,13 @@ export const createDocumentModel = (
     );
   };
 
-  const prepareDuplicate = (command: Extract<DocumentCommand, { type: 'duplicate' }>): PrepareEditResult => {
+  /**
+   * Every refusal a duplicate can meet from the document, decided before an id is minted: asking is free of side
+   * effects and costs no copy. Only a `createId` that returns an id the document holds is refused later.
+   */
+  const checkDuplicate = (
+    command: Extract<DocumentCommand, { type: 'duplicate' }>
+  ): DocumentRefusal | { outer: CanvasNodeEntry[] } => {
     const ids = unique(command.ids);
     if (ids.length === 0) {
       return { operation: 'duplicate nothing', status: 'unsupported' };
@@ -694,11 +700,12 @@ export const createDocumentModel = (
       return found;
     }
     const outer = outermostNodes(index, ids);
-    const locked = unique(outer.flatMap((entry) => lockedWithin(index, entry)));
+    // A copy lands beside its source, so only a locked ancestor refuses it: copying a locked node (or one holding
+    // locked nodes) inserts nothing into a locked subtree, and the copy keeps its locks.
+    const locked = unique(outer.flatMap((entry) => lockedAlong(index, entry.path)));
     if (locked.length > 0) {
       return { ids: locked, status: 'locked' };
     }
-    // Every refusal is decided before an id is minted, so asking is free of side effects.
     let budgeted = 0;
     for (const entry of outer) {
       const refusal = limits([entry.node], entry.path.length, budgeted);
@@ -707,6 +714,16 @@ export const createDocumentModel = (
       }
       budgeted += collectSubtree(entry.node).length;
     }
+    return { outer };
+  };
+
+  // Production duplicates commit through the engine (pixel copies), which asks `refusalFor`; model tests use this edit.
+  const prepareDuplicate = (command: Extract<DocumentCommand, { type: 'duplicate' }>): PrepareEditResult => {
+    const checked = checkDuplicate(command);
+    if ('status' in checked) {
+      return checked;
+    }
+    const { outer } = checked;
     const add: CanvasNodeInsertion[] = [];
     const createdIds: string[] = [];
     const rootIds: string[] = [];
@@ -1582,7 +1599,9 @@ export const createDocumentModel = (
               ? checkUngroup(command)
               : command.type === 'remove'
                 ? checkRemove(command)
-                : null;
+                : command.type === 'duplicate'
+                  ? checkDuplicate(command)
+                  : null;
       if (checked) {
         return 'status' in checked && checked.status !== 'unchanged' ? (checked as DocumentRefusal) : null;
       }
