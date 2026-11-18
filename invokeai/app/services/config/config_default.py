@@ -108,6 +108,7 @@ class InvokeAIAppConfig(BaseSettings):
         log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
         log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.
         log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
+        enable_server_output: Mirror the server's console output (Python stdout and stderr) so it can be read in the web UI's Server Output panel. In multi-user mode only administrators can read it; otherwise anyone who can reach the server can. Takes effect after restarting InvokeAI.
         use_memory_db: Use in-memory database. Useful for development.
         dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.
         profile_graphs: Enable graph profiling using `cProfile`.
@@ -235,6 +236,7 @@ class InvokeAIAppConfig(BaseSettings):
     log_level:                LOG_LEVEL = Field(default="info",             description="Emit logging messages at this level or higher.")
     log_sql:                       bool = Field(default=False,              description="Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.")
     log_level_network:        LOG_LEVEL = Field(default='warning',          description="Log level for network-related messages. 'info' and 'debug' are very verbose.")
+    enable_server_output:          bool = Field(default=True,               description="Mirror the server's console output (Python stdout and stderr) so it can be read in the web UI's Server Output panel. In multi-user mode only administrators can read it; otherwise anyone who can reach the server can. Takes effect after restarting InvokeAI.")
 
     # Development
     use_memory_db:                 bool = Field(default=False,              description="Use in-memory database. Useful for development.")

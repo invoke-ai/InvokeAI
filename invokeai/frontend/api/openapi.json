@@ -13288,6 +13288,63 @@
         ]
       }
     },
+    "/api/v1/app/server_output": {
+      "get": {
+        "tags": ["app"],
+        "summary": "Get Server Output",
+        "description": "Read the server's console output: a snapshot, or the changes since `cursor`.",
+        "operationId": "get_server_output",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The cursor from the previous read; omit it for a fresh snapshot",
+              "title": "Cursor"
+            },
+            "description": "The cursor from the previous read; omit it for a fresh snapshot"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServerOutputRead"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Admin privileges required"
+          },
+          "404": {
+            "description": "This server is not capturing its console output"
+          },
+          "422": {
+            "description": "The cursor is malformed or was not issued by this server"
+          }
+        }
+      }
+    },
     "/api/v1/app/version": {
       "get": {
         "tags": ["app"],
@@ -45844,10 +45901,15 @@
             "type": "boolean",
             "title": "Show Donation Link",
             "description": "Whether to show the Donate to InvokeAI menu link"
+          },
+          "can_view_server_output": {
+            "type": "boolean",
+            "title": "Can View Server Output",
+            "description": "Whether the current user may read the server's console output (GET /api/v1/app/server_output)"
           }
         },
         "type": "object",
-        "required": ["show_donation_link"],
+        "required": ["show_donation_link", "can_view_server_output"],
         "title": "FrontendConfig",
         "description": "Presentation settings any signed-in user may read; never include private runtime configuration here."
       },
@@ -65808,6 +65870,12 @@
             "title": "Log Level Network",
             "description": "Log level for network-related messages. 'info' and 'debug' are very verbose.",
             "default": "warning"
+          },
+          "enable_server_output": {
+            "type": "boolean",
+            "title": "Enable Server Output",
+            "description": "Mirror the server's console output (Python stdout and stderr) so it can be read in the web UI's Server Output panel. In multi-user mode only administrators can read it; otherwise anyone who can reach the server can. Takes effect after restarting InvokeAI.",
+            "default": true
           },
           "use_memory_db": {
             "type": "boolean",
@@ -113320,6 +113388,159 @@
         "output": {
           "$ref": "#/components/schemas/MaskOutput"
         }
+      },
+      "ServerOutputRead": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id",
+            "description": "Identifies this server process run"
+          },
+          "cursor": {
+            "type": "string",
+            "title": "Cursor",
+            "description": "Opaque position to pass to the next read"
+          },
+          "reset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["initial", "restarted", "expired"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reset",
+            "description": "Why `rows` is a replacement snapshot: the read had no cursor (initial), the cursor came from an earlier server run (restarted), or the cursor's history is gone or too far behind to replay (expired). Null when `rows` are changes to apply."
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ServerOutputRow"
+            },
+            "type": "array",
+            "title": "Rows",
+            "description": "Rows in display order"
+          },
+          "floor_id": {
+            "type": "integer",
+            "title": "Floor Id",
+            "description": "Rows with a lower ID are no longer part of the transcript"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More",
+            "description": "More changes are pending; read again with `cursor`"
+          },
+          "snapshot_truncated": {
+            "type": "boolean",
+            "title": "Snapshot Truncated",
+            "description": "Earlier output of this run exists or existed but is not in this snapshot"
+          }
+        },
+        "type": "object",
+        "required": ["run_id", "cursor", "reset", "rows", "floor_id", "has_more", "snapshot_truncated"],
+        "title": "ServerOutputRead",
+        "description": "One read of the server console transcript.\n\nWhen `reset` is set, the client replaces everything it holds with `rows`. Otherwise it applies `rows` as inserts\nor replacements by ID and drops held rows with an ID below `floor_id`. Either way it sends `cursor` with its next\nread, at once while `has_more` is true."
+      },
+      "ServerOutputRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "Stable row ID; IDs increase in display order"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "The row's text, without control sequences"
+          },
+          "styles": {
+            "items": {
+              "$ref": "#/components/schemas/ServerOutputStyleRun"
+            },
+            "type": "array",
+            "title": "Styles",
+            "description": "Styled spans in text order, non-overlapping"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "description": "Text past the server's row length limit was dropped"
+          }
+        },
+        "type": "object",
+        "required": ["id", "text", "styles", "truncated"],
+        "title": "ServerOutputRow",
+        "description": "One display row of server console output, at its latest value."
+      },
+      "ServerOutputStyleRun": {
+        "properties": {
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "Start of the span, in UTF-16 code units of the row's text"
+          },
+          "length": {
+            "type": "integer",
+            "title": "Length",
+            "description": "Length of the span, in UTF-16 code units"
+          },
+          "fg": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fg",
+            "description": "Foreground color: a palette index \"0\"..\"255\" (0-15 are ANSI colors) or \"#rrggbb\""
+          },
+          "bg": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bg",
+            "description": "Background color, in the same form as fg"
+          },
+          "bold": {
+            "type": "boolean",
+            "title": "Bold",
+            "default": false
+          },
+          "dim": {
+            "type": "boolean",
+            "title": "Dim",
+            "default": false
+          },
+          "italic": {
+            "type": "boolean",
+            "title": "Italic",
+            "default": false
+          },
+          "underline": {
+            "type": "boolean",
+            "title": "Underline",
+            "default": false
+          },
+          "inverse": {
+            "type": "boolean",
+            "title": "Inverse",
+            "description": "Swap foreground and background",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": ["offset", "length"],
+        "title": "ServerOutputStyleRun",
+        "description": "A styled span of a row's text. Text outside every run has the default style."
       },
       "SessionProcessorStatus": {
         "properties": {

@@ -90,6 +90,25 @@ show_donation_link: false
 
 The default is `true`. Restart InvokeAI and reload the browser after changing this setting. It can also be set with the `INVOKEAI_SHOW_DONATION_LINK` environment variable.
 
+#### Server Output
+
+The web UI's **Server Output** panel shows what the server prints to its console: log messages at the configured `log_level`, progress bars, `print` output from custom nodes, and tracebacks. It covers text written through Python's standard output and error streams. Output written straight to the file descriptors, by child processes, or only to `file` and `syslog` log handlers does not appear.
+
+Console output can contain prompts, file paths and other details of everyone's work. Who can read it:
+
+- **Multi-user mode:** administrators only. Every read checks the account's current role.
+- **Single-user mode:** anyone who can reach the server. With `host: 0.0.0.0`, that is everyone on your network. With `allow_origins: ["*"]`, any website a user visits can read it too, through their browser.
+
+To turn the panel off, add this to `invokeai.yaml` and restart InvokeAI:
+
+```yaml
+enable_server_output: false
+```
+
+The default is `true`. It can also be set with the `INVOKEAI_ENABLE_SERVER_OUTPUT` environment variable. The server keeps only recent output (about 2 MB), in memory, and never writes it to disk.
+
+The panel's own successful reads are kept out of the output it shows; refused reads are shown, so attempts to read it are visible. One exception: in multi-user mode with `log_level: debug` and `log_sql: true`, each read logs the database query that checks the reader's account, so an open panel keeps adding lines of its own.
+
 #### Model Marketplace API Keys
 
 Some model marketplaces require an API key to download models. You can provide a URL pattern and appropriate token in your `invokeai.yaml` file to provide that API key.
@@ -241,25 +260,6 @@ Available strategies:
 
 Changing this setting only affects newly-created images. Existing images remain in their current locations unless you run [Image Storage Maintenance](/users-guide/gallery/image-storage-maintenance/).
 
-#### Response Compression
-
-API responses (JSON, HTML, JS, CSS, SVG) are gzipped before being sent. Already-compressed responses — PNG, WebP, JPEG, MP4 — are passed through untouched, since compressing them costs CPU and returns a body no smaller than the original.
-
-Compression runs on the server's event loop, which means it blocks _everything else_ for its duration: no other request is served and no progress event is delivered while it runs. The `http_compression_level` setting controls that trade-off:
-
-```yaml
-http_compression_level: 9 # default value
-```
-
-| Value   | Behavior                                                                                  |
-| ------- | ----------------------------------------------------------------------------------------- |
-| `0`     | No compression. Responses are sent as-is and the compression middleware is not installed. |
-| `1`     | Fastest compression, slightly larger output.                                              |
-| `2`–`8` | Progressively slower, marginally smaller.                                                 |
-| `9`     | Smallest output, by far the slowest. This is the default.                                 |
-
-The setting can also be given as the `INVOKEAI_HTTP_COMPRESSION_LEVEL` environment variable.
-
 #### Reverse Proxies and Frontend Origins
 
 Live updates reach the browser over a Socket.IO connection at `<base path>/ws/socket.io`. It accepts a browser page from:
@@ -328,6 +328,25 @@ The app shows a red **Disconnected** badge in its header, and progress and queue
 1. The proxy passes the original `Host`, with its port.
 2. The proxy sends `X-Forwarded-Proto`, and its address is in `forwarded_allow_ips`. The address is the one InvokeAI sees, not the proxy's public address.
 3. Otherwise, add the origin from the log line to `allow_origins`.
+
+#### Response Compression
+
+API responses (JSON, HTML, JS, CSS, SVG) are gzipped before being sent. Already-compressed responses — PNG, WebP, JPEG, MP4 — are passed through untouched, since compressing them costs CPU and returns a body no smaller than the original.
+
+Compression runs on the server's event loop, which means it blocks _everything else_ for its duration: no other request is served and no progress event is delivered while it runs. The `http_compression_level` setting controls that trade-off:
+
+```yaml
+http_compression_level: 9 # default value
+```
+
+| Value   | Behavior                                                                                  |
+| ------- | ----------------------------------------------------------------------------------------- |
+| `0`     | No compression. Responses are sent as-is and the compression middleware is not installed. |
+| `1`     | Fastest compression, slightly larger output.                                              |
+| `2`–`8` | Progressively slower, marginally smaller.                                                 |
+| `9`     | Smallest output, by far the slowest. This is the default.                                 |
+
+The setting can also be given as the `INVOKEAI_HTTP_COMPRESSION_LEVEL` environment variable.
 
 If the UI feels sluggish while a large library is being browsed, lowering this is one of the cheapest wins available. Measured on the image-name list of a 200,000-image library (8.48 MB of JSON):
 

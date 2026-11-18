@@ -451,6 +451,17 @@
     },
     {
       "category": "LOGGING",
+      "default": true,
+      "description": "Mirror the server's console output (Python stdout and stderr) so it can be read in the web UI's Server Output panel. In multi-user mode only administrators can read it; otherwise anyone who can reach the server can. Takes effect after restarting InvokeAI.",
+      "env_var": "INVOKEAI_ENABLE_SERVER_OUTPUT",
+      "literal_values": [],
+      "name": "enable_server_output",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "LOGGING",
       "default": false,
       "description": "Use in-memory database. Useful for development.",
       "env_var": "INVOKEAI_USE_MEMORY_DB",

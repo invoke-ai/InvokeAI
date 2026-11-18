@@ -135,3 +135,37 @@ def test_the_server_starts_with_the_runtime_it_gives_the_calibration_scripts(
     run_app.apply_server_runtime(config, logging.getLogger(__name__))
 
     assert server == runtime_steps
+
+
+def test_the_server_trusts_forwarded_headers_from_the_configured_proxies_without_a_base_url(
+    runtime_steps: list[tuple], monkeypatch: pytest.MonkeyPatch, tmp_path
+):
+    import uvicorn
+
+    import invokeai.app.api_app  # noqa: F401  imported before `get_config` is patched: it reads the config at import
+    import invokeai.app.run_app as run_app
+    from invokeai.app.services.config import config_default
+    from invokeai.app.util import startup_utils
+    from invokeai.backend.util.devices import TorchDevice
+    from invokeai.frontend.cli.arg_parser import InvokeAIArgs
+
+    config = InvokeAIAppConfig(forwarded_allow_ips="10.0.0.5", enable_server_output=False)
+    config._root = tmp_path
+    assert config.base_url is None
+    server_settings: dict = {}
+
+    def server_config(**settings) -> None:
+        server_settings.update(settings)
+        raise _Started
+
+    monkeypatch.setattr(InvokeAIArgs, "parse_args", staticmethod(lambda: None))
+    monkeypatch.setattr(config_default, "get_config", lambda: config)
+    monkeypatch.setattr(TorchDevice, "get_generation_devices_summary", classmethod(lambda cls, devices: "a GPU"))
+    monkeypatch.setattr(startup_utils, "find_open_port", lambda port: port)
+    monkeypatch.setattr(invokeai.app.api_app.app.state, "server_output", None, raising=False)
+    monkeypatch.setattr(uvicorn, "Config", server_config)
+
+    with pytest.raises(_Started):
+        run_app.run_app()
+
+    assert server_settings["forwarded_allow_ips"] == "10.0.0.5"

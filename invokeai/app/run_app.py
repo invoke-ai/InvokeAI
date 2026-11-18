@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from invokeai.app.services.config.config_default import InvokeAIAppConfig
+    from invokeai.app.services.server_output.server_output_capture import ServerOutputCapture
 
 # Suppress the HuggingFace tokenizers fork-after-parallelism warning. The Rust
 # ``tokenizers`` library warms a thread pool the first time a tokenizer is used
@@ -110,24 +111,41 @@ def get_app():
 
 def run_app() -> None:
     """The main entrypoint for the app."""
-    import asyncio
-    import sys
-    import threading
-    import traceback
-
     from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
     # Parse the CLI arguments before doing anything else, which ensures CLI args correctly override settings from other
     # sources like `invokeai.yaml` or env vars.
     InvokeAIArgs.parse_args()
 
-    import uvicorn
-
     from invokeai.app.services.config.config_default import get_config
-    from invokeai.backend.util.logging import InvokeAILogger
 
     # Load config.
     app_config = get_config()
+
+    # Mirror console output for the web UI. Installed before the first console handler binds `sys.stderr`, and
+    # restored however the server ends, startup failures included.
+    capture: "ServerOutputCapture | None" = None
+    if app_config.enable_server_output:
+        from invokeai.app.services.server_output.server_output_capture import ServerOutputCapture
+
+        capture = ServerOutputCapture()
+        capture.install()
+    try:
+        _serve(app_config, capture)
+    finally:
+        if capture is not None:
+            capture.restore()
+
+
+def _serve(app_config: "InvokeAIAppConfig", capture: "ServerOutputCapture | None") -> None:
+    import asyncio
+    import sys
+    import threading
+    import traceback
+
+    import uvicorn
+
+    from invokeai.backend.util.logging import InvokeAILogger
 
     logger = InvokeAILogger.get_logger(config=app_config)
 
@@ -177,6 +195,8 @@ def run_app() -> None:
 
     # Initialize the app and event loop.
     app, loop = get_app()
+    # The lifespan hands the transcript to the services; without capture the reader reports it unavailable.
+    app.state.server_output = capture.store if capture is not None else None
 
     from invokeai.app.api.trusted_routes import TrustedRouteGuard, get_original_frontend, snapshot_core_routes
 
@@ -231,6 +251,14 @@ def run_app() -> None:
     uvicorn_logger.handlers.clear()
     for hdlr in logger.handlers:
         uvicorn_logger.addHandler(hdlr)
+
+    if capture is not None:
+        # uvicorn's own access handler (configured by `uvicorn.Config`) writes every request line to stdout; the
+        # transcript reader's polls go to the terminal only. The access log shows the path as received: with a
+        # preserving proxy it still carries `base_url`.
+        route = app.url_path_for("get_server_output")
+        paths = {route, f"{app_config.base_url}{route}"} if app_config.base_url else {route}
+        capture.keep_reads_off_the_transcript(logging.getLogger("uvicorn.access"), paths)
 
     try:
         loop.run_until_complete(server.serve())

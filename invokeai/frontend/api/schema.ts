@@ -2963,6 +2963,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/server_output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Server Output
+         * @description Read the server's console output: a snapshot, or the changes since `cursor`.
+         */
+        get: operations["get_server_output"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/version": {
         parameters: {
             query?: never;
@@ -18255,6 +18275,11 @@ export type components = {
              * @description Whether to show the Donate to InvokeAI menu link
              */
             show_donation_link: boolean;
+            /**
+             * Can View Server Output
+             * @description Whether the current user may read the server's console output (GET /api/v1/app/server_output)
+             */
+            can_view_server_output: boolean;
         };
         /**
          * GalleryItem
@@ -25069,6 +25094,7 @@ export type components = {
          *         log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
          *         log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.
          *         log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
+         *         enable_server_output: Mirror the server's console output (Python stdout and stderr) so it can be read in the web UI's Server Output panel. In multi-user mode only administrators can read it; otherwise anyone who can reach the server can. Takes effect after restarting InvokeAI.
          *         use_memory_db: Use in-memory database. Useful for development.
          *         dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.
          *         profile_graphs: Enable graph profiling using `cProfile`.
@@ -25398,6 +25424,12 @@ export type components = {
              * @enum {string}
              */
             log_level_network?: "debug" | "info" | "warning" | "error" | "critical";
+            /**
+             * Enable Server Output
+             * @description Mirror the server's console output (Python stdout and stderr) so it can be read in the web UI's Server Output panel. In multi-user mode only administrators can read it; otherwise anyone who can reach the server can. Takes effect after restarting InvokeAI.
+             * @default true
+             */
+            enable_server_output?: boolean;
             /**
              * Use Memory Db
              * @description Use in-memory database. Useful for development.
@@ -49589,6 +49621,129 @@ export type components = {
              */
             type: "segment_anything";
         };
+        /**
+         * ServerOutputRead
+         * @description One read of the server console transcript.
+         *
+         *     When `reset` is set, the client replaces everything it holds with `rows`. Otherwise it applies `rows` as inserts
+         *     or replacements by ID and drops held rows with an ID below `floor_id`. Either way it sends `cursor` with its next
+         *     read, at once while `has_more` is true.
+         */
+        ServerOutputRead: {
+            /**
+             * Run Id
+             * @description Identifies this server process run
+             */
+            run_id: string;
+            /**
+             * Cursor
+             * @description Opaque position to pass to the next read
+             */
+            cursor: string;
+            /**
+             * Reset
+             * @description Why `rows` is a replacement snapshot: the read had no cursor (initial), the cursor came from an earlier server run (restarted), or the cursor's history is gone or too far behind to replay (expired). Null when `rows` are changes to apply.
+             */
+            reset: ("initial" | "restarted" | "expired") | null;
+            /**
+             * Rows
+             * @description Rows in display order
+             */
+            rows: components["schemas"]["ServerOutputRow"][];
+            /**
+             * Floor Id
+             * @description Rows with a lower ID are no longer part of the transcript
+             */
+            floor_id: number;
+            /**
+             * Has More
+             * @description More changes are pending; read again with `cursor`
+             */
+            has_more: boolean;
+            /**
+             * Snapshot Truncated
+             * @description Earlier output of this run exists or existed but is not in this snapshot
+             */
+            snapshot_truncated: boolean;
+        };
+        /**
+         * ServerOutputRow
+         * @description One display row of server console output, at its latest value.
+         */
+        ServerOutputRow: {
+            /**
+             * Id
+             * @description Stable row ID; IDs increase in display order
+             */
+            id: number;
+            /**
+             * Text
+             * @description The row's text, without control sequences
+             */
+            text: string;
+            /**
+             * Styles
+             * @description Styled spans in text order, non-overlapping
+             */
+            styles: components["schemas"]["ServerOutputStyleRun"][];
+            /**
+             * Truncated
+             * @description Text past the server's row length limit was dropped
+             */
+            truncated: boolean;
+        };
+        /**
+         * ServerOutputStyleRun
+         * @description A styled span of a row's text. Text outside every run has the default style.
+         */
+        ServerOutputStyleRun: {
+            /**
+             * Offset
+             * @description Start of the span, in UTF-16 code units of the row's text
+             */
+            offset: number;
+            /**
+             * Length
+             * @description Length of the span, in UTF-16 code units
+             */
+            length: number;
+            /**
+             * Fg
+             * @description Foreground color: a palette index "0".."255" (0-15 are ANSI colors) or "#rrggbb"
+             */
+            fg?: string | null;
+            /**
+             * Bg
+             * @description Background color, in the same form as fg
+             */
+            bg?: string | null;
+            /**
+             * Bold
+             * @default false
+             */
+            bold?: boolean;
+            /**
+             * Dim
+             * @default false
+             */
+            dim?: boolean;
+            /**
+             * Italic
+             * @default false
+             */
+            italic?: boolean;
+            /**
+             * Underline
+             * @default false
+             */
+            underline?: boolean;
+            /**
+             * Inverse
+             * @description Swap foreground and background
+             * @default false
+             */
+            inverse?: boolean;
+        };
         /** SessionProcessorStatus */
         SessionProcessorStatus: {
             /**
@@ -66272,6 +66427,57 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FrontendConfig"];
                 };
+            };
+        };
+    };
+    get_server_output: {
+        parameters: {
+            query?: {
+                /** @description The cursor from the previous read; omit it for a fresh snapshot */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerOutputRead"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Admin privileges required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description This server is not capturing its console output */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The cursor is malformed or was not issued by this server */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

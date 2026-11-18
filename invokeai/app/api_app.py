@@ -70,8 +70,15 @@ loop = asyncio.new_event_loop()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Add startup event to load dependencies
-    ApiDependencies.initialize(config=app_config, event_handler_id=event_handler_id, loop=loop, logger=logger)
+    # Add startup event to load dependencies. The console transcript exists only when the entry point installed
+    # capture and put its store on `app.state` (`run_app`); a bare import of this module serves without one.
+    ApiDependencies.initialize(
+        config=app_config,
+        event_handler_id=event_handler_id,
+        loop=loop,
+        logger=logger,
+        server_output=getattr(app.state, "server_output", None),
+    )
 
     # Log the server address when it starts - in case the network log level is not high enough to see the startup log
     proto = "https" if app_config.ssl_certfile else "http"
