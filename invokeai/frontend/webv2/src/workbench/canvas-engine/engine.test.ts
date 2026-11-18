@@ -8234,6 +8234,25 @@ describe('mergeVisibleRasterLayers', () => {
     engine.lifecycle.dispose();
   });
 
+  it('refuses a duplicate whose parent group was locked while its source pixels loaded', async () => {
+    const base = twoPaintDoc();
+    const [upper, below] = getDocumentLeaves(base) as [CanvasLayerContract, CanvasLayerContract];
+    const { engine, store } = setup({ ...base, stacks: stacksFrom([groupContract('g', [upper]), below]) });
+
+    const duplicate = engine.layers.duplicateLayers('Duplicate', ['upper']);
+    store.dispatch({
+      enabledUpdates: [],
+      lockedUpdates: [{ id: 'g', isLocked: true }],
+      type: 'applyCanvasLayerStackMutation',
+    });
+    const locked = engine.document.getDocument();
+
+    expect(await duplicate).toEqual({ status: 'stale' });
+    expect(engine.document.getDocument()).toBe(locked);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.lifecycle.dispose();
+  });
+
   it('lands a selected merge past a preview of another layer opened while it exported', async () => {
     const { engine, raf, setPanelSelectedIds } = setup(selectedMergeDoc());
     raf.flush();

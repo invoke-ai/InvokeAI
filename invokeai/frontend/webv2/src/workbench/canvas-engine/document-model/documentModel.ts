@@ -717,6 +717,7 @@ export const createDocumentModel = (
     return { outer };
   };
 
+  // Production duplicates commit through the engine (pixel copies), which asks `refusalFor`; model tests use this edit.
   const prepareDuplicate = (command: Extract<DocumentCommand, { type: 'duplicate' }>): PrepareEditResult => {
     const checked = checkDuplicate(command);
     if ('status' in checked) {

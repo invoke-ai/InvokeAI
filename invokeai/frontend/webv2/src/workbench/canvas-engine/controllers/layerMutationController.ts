@@ -10,7 +10,7 @@ import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/ren
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
+import { createDocumentModel, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import {
   getDocumentIndex,
   getDocumentLayer,
@@ -87,6 +87,7 @@ export interface LayerMutationControllerOptions {
     | 'isGestureActive'
     | 'isPermitCurrent'
     | 'preparePixels'
+    | 'projectId'
     | 'reserveRaster'
   >;
   readonly backend: RasterBackend;
@@ -212,6 +213,15 @@ export class LayerMutationController {
     const roots = duplicateRoots(document, layerIds);
     if (!roots) {
       return { status: 'nothing' };
+    }
+    // Asked of the document being committed: callers check first, so a refusal here means a group was locked or the
+    // tree outgrew its limits while source pixels were prepared.
+    const refusal = createDocumentModel(document, {
+      editRevision: ctx.getEditRevision(),
+      projectId: ctx.projectId,
+    }).refusalFor({ createId: ctx.createLayerId, ids: layerIds, type: 'duplicate' });
+    if (refusal) {
+      return { status: 'stale' };
     }
     const sources = roots.flatMap((entry) => collectSubtreeLeaves(entry.node));
     const plans = sources.map((source) => o.getDuplicateRasterPlan(source, document));
