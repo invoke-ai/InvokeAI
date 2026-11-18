@@ -41,6 +41,8 @@ import {
   getPromptPolicy,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
   isReferenceImageSupported,
   isComponentCompatibleWithModel,
   isGenerateModelSelectable,
@@ -52,7 +54,7 @@ import {
   QWEN_IMAGE_21_NO_VISION_TOWER_REASON,
   withAddedReferenceImages,
 } from './baseGenerationPolicies';
-import { describeGenerationIssue, getGenerationIssueFixPatch } from './generationIssues';
+import { describeGenerationIssue, type GenerationIssue, getGenerationIssueFixPatch } from './generationIssues';
 import { collectGenerationIssueScenarios } from './generationIssues.testing';
 import { getActiveRefiner } from './sdxlRefiner';
 import { SUPPORTED_GENERATE_BASES } from './supportedBases';
@@ -792,7 +794,7 @@ describe('component policies', () => {
             vae: qwenImageVae,
           })
         )
-      ).toEqual(['qwen-image model cannot use reference image 1. Turn it off, or remove it.']);
+      ).toEqual(['qwen-image model cannot use Reference image 1. Turn it off, or remove it.']);
     });
 
     it('allows text-only prompts, which is what the GGUF encoder is for', () => {
@@ -875,6 +877,47 @@ describe('component policies', () => {
 
     expect(clipFilter?.(clipEmbed as GenerateModelConfig, ctx)).toBe(true);
     expect(clipFilter?.(clipG as GenerateModelConfig, ctx)).toBe(false);
+  });
+
+  it('requires all four SD3 components for a GGUF transformer and none for a Diffusers pipeline', () => {
+    const gguf = createModel('sd-3', { format: 'gguf_quantized' });
+    const diffusers = createModel('sd-3', { format: 'diffusers' });
+    const clipG = { ...clipEmbed, key: 'clip-g', variant: 'gigantic' };
+    const sd3Vae: VaeModelConfig = { base: 'sd-3', key: 'sd3-vae', name: 'SD3 VAE', type: 'vae' };
+
+    expect(getGenerationValidationReasons(gguf, createSettings(gguf))).toEqual([
+      'Generate needs a T5 Encoder for non-Diffusers SD3 models.',
+      'Generate needs a CLIP L encoder for non-Diffusers SD3 models.',
+      'Generate needs a CLIP G encoder for non-Diffusers SD3 models.',
+      'Generate needs a VAE for non-Diffusers SD3 models.',
+    ]);
+    // What the pickers would not offer -- CLIP-G in the CLIP-L slot, a FLUX.1 VAE -- does not fill a slot either.
+    expect(
+      getGenerationValidationReasons(
+        gguf,
+        createSettings(gguf, {
+          clipGEmbedModel: clipG,
+          clipLEmbedModel: clipG,
+          t5EncoderModel: t5Encoder,
+          vae: fluxVae,
+        })
+      )
+    ).toEqual([
+      'Generate needs a CLIP L encoder for non-Diffusers SD3 models.',
+      'Generate needs a VAE for non-Diffusers SD3 models.',
+    ]);
+    expect(
+      getGenerationValidationReasons(
+        gguf,
+        createSettings(gguf, {
+          clipGEmbedModel: clipG,
+          clipLEmbedModel: clipEmbed,
+          t5EncoderModel: t5Encoder,
+          vae: sd3Vae,
+        })
+      )
+    ).toEqual([]);
+    expect(getGenerationValidationReasons(diffusers, createSettings(diffusers))).toEqual([]);
   });
 
   it('offers complete SDNQ Z-Image pipelines as component sources but rejects partial folders', () => {
@@ -1014,7 +1057,7 @@ describe('component policies', () => {
       settings,
       'img2img'
     );
-    expect(reasons).toContain('External Model cannot use reference image 1. Turn it off, or remove it.');
+    expect(reasons).toContain('External Model cannot use Reference image 1. Turn it off, or remove it.');
     expect(reasons.filter((reason) => reason.includes('images total'))).toEqual([]);
   });
 
@@ -1437,6 +1480,51 @@ describe('component policies', () => {
     ).toBe(loras);
   });
 
+  describe('a default VAE', () => {
+    const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
+    const resolve = (
+      base: string,
+      vae: string | null | undefined,
+      vaeModels: VaeModelConfig[] = [fluxVae],
+      format?: MainModelConfig['format']
+    ) => {
+      const model = createModel(base, { format, ...(vae === undefined ? {} : { default_settings: { vae } }) });
+
+      return resolveModelDefaultVae(model, createSettings(model), vaeModels);
+    };
+
+    it('applies one that is installed and fits, by shared VAE compatibility', () => {
+      // Cross-base by the shared rule: Z-Image takes the FLUX VAE.
+      expect(resolve('z-image', 'flux-vae')).toEqual({ kind: 'apply', vae: fluxVae });
+      expect(resolve('sdxl', undefined)).toEqual({ kind: 'none' });
+      expect(resolve('sdxl', null)).toEqual({ kind: 'none' });
+    });
+
+    // Bundled: SDXL has no VAE slot; a Diffusers SD3 pipeline's is an optional override. Required: FLUX.1's VAE and
+    // a GGUF SD3 transformer's VAE are components.
+    it.each([
+      ['sdxl', undefined, 'default', { kind: 'apply', vae: null }],
+      ['sd-3', 'diffusers', 'default', { kind: 'apply', vae: null }],
+      ['sd-3', 'gguf_quantized', 'default', { kind: 'none' }],
+      ['flux', undefined, 'default', { kind: 'none' }],
+      ['sdxl', undefined, 'gone', { hasBundledVae: true, kind: 'missing' }],
+      // Installed, but for another family.
+      ['sdxl', undefined, 'flux-vae', { hasBundledVae: true, kind: 'missing' }],
+      ['sd-3', 'diffusers', 'gone', { hasBundledVae: true, kind: 'missing' }],
+      ['sd-3', 'gguf_quantized', 'gone', { hasBundledVae: false, kind: 'missing' }],
+      ['flux', undefined, 'gone', { hasBundledVae: false, kind: 'missing' }],
+    ] as const)('classifies %s (%s) with %s by whether a VAE is bundled', (base, format, vae, expected) => {
+      expect(resolve(base, vae, [fluxVae], format)).toEqual(expected);
+    });
+
+    it('recalls the bundled VAE for one that cannot apply, and keeps the current VAE only where one is required', () => {
+      expect(getRecallDefaultVae({ kind: 'apply', vae: fluxVae })).toBe(fluxVae);
+      expect(getRecallDefaultVae({ hasBundledVae: true, kind: 'missing' })).toBeNull();
+      expect(getRecallDefaultVae({ hasBundledVae: false, kind: 'missing' })).toBeUndefined();
+      expect(getRecallDefaultVae({ kind: 'none' })).toBeUndefined();
+    });
+  });
+
   it('keeps selected VAE when applying model defaults without a VAE override', () => {
     const model = createModel('sdxl', { default_settings: { steps: 12 } });
     const settings = createSettings(model, { vae: sdxlVae });
@@ -1772,8 +1860,8 @@ describe('component policies', () => {
     });
 
     expect(getGenerationValidationReasons(krea2, styleSettings)).toEqual([]);
-    expect(getGenerationValidationReasons(createModel('sd-3'), styleSettings)).toEqual([
-      'sd-3 model cannot use reference image 1. Turn it off, or remove it.',
+    expect(getGenerationValidationReasons(createModel('sd-3', { format: 'diffusers' }), styleSettings)).toEqual([
+      'sd-3 model cannot use Reference image 1. Turn it off, or remove it.',
     ]);
   });
 
@@ -2379,7 +2467,7 @@ describe('component policies', () => {
           ],
         })
       )
-    ).toContain('sd-3 model cannot use reference image 1. Turn it off, or remove it.');
+    ).toContain('sd-3 model cannot use Reference image 1. Turn it off, or remove it.');
   });
 
   it('blocks Qwen-Image-2.1 references whose encoder has no vision tower', () => {
@@ -3513,6 +3601,42 @@ describe('generation issues', () => {
     }
   });
 
+  it('names a reference image in its issues as its row does: its own name, else its position', async () => {
+    const instance = i18n.createInstance();
+    await instance.init({
+      initAsync: false,
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: englishCatalog } },
+    });
+    const t = (key: string, values?: Record<string, unknown>) => instance.t(key, values);
+    const aboutOneReference = (issues: GenerationIssue[]) =>
+      issues.filter((issue) => issue.target.referenceImageId !== undefined);
+    const named = aboutOneReference(collectGenerationIssueScenarios({ namedReferences: true }));
+
+    // Every kind: a missing image, adapter, Redux or Kontext model, a strength, an unsupported kind, a model not
+    // installed. Unnamed references keep their positional default, which the test above words.
+    expect(new Set(named.map(({ messageKey }) => messageKey?.replace('widgets.generate.issues.', '')))).toEqual(
+      new Set([
+        'referenceImageNeedsImage',
+        'referenceImageNeedsIpAdapter',
+        'referenceImageNeedsKontext',
+        'referenceImageNeedsRedux',
+        'referenceImageStrength',
+        'referenceImageUnsupported',
+        'referenceModelNotInstalled',
+      ])
+    );
+
+    for (const issue of named) {
+      const name = `Name of ${issue.target.referenceImageId}`;
+
+      expect(issue.message).toContain(name);
+      expect(issue.message).not.toMatch(/reference image \d/i);
+      expect(describeGenerationIssue(t, issue)).toBe(issue.message);
+    }
+  });
+
   it('names every subject a switch can report, and no others, in the locale', () => {
     expect(new Set(Object.keys(localeGroup('switchSubjects')).map(withoutPluralSuffix))).toEqual(
       new Set(GENERATE_MODEL_SWITCH_SUBJECTS)
@@ -3617,6 +3741,7 @@ describe('isModelFromRepo', () => {
     expect(isModelFromRepo('google/gemma-4-E4B-it', REPO)).toBe(true);
     expect(isModelFromRepo('Google/Gemma-4-e4b-IT', REPO)).toBe(true);
     expect(isModelFromRepo('google/gemma-4-E4B-it::text_encoder', REPO)).toBe(true);
+    expect(isModelFromRepo('google/gemma-4-E4B-it:fp16::text_encoder', REPO)).toBe(true);
     expect(isModelFromRepo('https://huggingface.co/google/gemma-4-E4B-it/tree/main', REPO)).toBe(true);
   });
 
@@ -3629,6 +3754,8 @@ describe('isModelFromRepo', () => {
   it('refuses other repos, other folders and a missing source', () => {
     expect(isModelFromRepo('google/gemma-4-E2B-it', REPO)).toBe(false);
     expect(isModelFromRepo('someone/gemma-4-E4B-it', REPO)).toBe(false);
+    expect(isModelFromRepo('someone/gemma-4-E4B-it:fp16', REPO)).toBe(false);
+    expect(isModelFromRepo('https://example.test/google/gemma-4-E4B-it', REPO)).toBe(false);
     expect(isModelFromRepo('E:/ModelStuffSSD/gemma-4-E4B-it-q4', REPO)).toBe(false);
     expect(isModelFromRepo('E:/ModelStuffSSD/gemma-4-E4B-it/model.safetensors', REPO)).toBe(false);
     expect(isModelFromRepo(null, REPO)).toBe(false);

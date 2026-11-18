@@ -68,7 +68,7 @@ and generation needs it. Its starter model (~4.8 GB) installs together with Anim
 only Qwen3.5 4B encoders: MOSS-Image's Qwen3.5 9B installs under the same type but does not work with Anima-3.8B. The connector
 runs once per denoising step, so Anima-3.8B is slower per step than Anima-2.9B (about 1.3 against 1.7
 iterations per second at 832×1216 on an RTX 4090), and its Qwen3.5 encoder adds memory while the prompt
-is encoded. **Reset all to model defaults** sets 40 steps at CFG 6, the settings of the author's reference
+is encoded. **Apply model defaults** sets 40 steps at CFG 6, the settings of the author's reference
 workflow.
 
 [FP8 Storage](/configuration/optimization/fp8-storage/) changes Anima-3.8B's images more than Anima's: at
@@ -186,8 +186,8 @@ multi-user mode only an administrator's generation does, and anyone else is aske
 from the Model Manager.
 
 To use it, select an Anima model and add a reference image in the **Guidance** section; the first installed
-Anima IP-Adapter is selected for it. The card has one main control, **Strength**, from 0 to 2 (default 1),
-and **Active steps** under **Advanced**. There is no **Mode** or CLIP Vision choice as there is for SD
+Anima IP-Adapter is selected for it. The reference's row has one main control, **Strength**, from 0 to 2
+(default 1), and the **Steps** range in its settings (the chevron beside **Strength**). There is no **Mode** or CLIP Vision choice as there is for SD
 IP-Adapters.
 
 - **Strength** scales how much of the reference the image carries. **0** turns the reference off, and the

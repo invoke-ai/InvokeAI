@@ -163,7 +163,7 @@ export const VideoPromptFields = memo(
     );
 
     return (
-      <Stack gap="2" p="2">
+      <Stack gap="2" px="2" pt="2" pb="3">
         <PositivePromptField
           batchCount={batchCount}
           dynamicPrompts={dynamicPromptsField}

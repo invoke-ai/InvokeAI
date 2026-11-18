@@ -17,6 +17,7 @@ from invokeai.backend.flux.controlnet.state_dict_utils import (
     is_state_dict_xlabs_controlnet,
 )
 from invokeai.backend.flux3.checkpoint_quantization import flux3_header_layers, reject_unloadable_quantization
+from invokeai.backend.flux3.conversion import FLUX3_NATIVE_FLOW_MAP_KEY, flux3_native_key_to_diffusers
 from invokeai.backend.ltx2 import checkpoint_layout as ltx2_layout
 from invokeai.backend.model_manager.checkpoint_prefix import COMFYUI_KEY_PREFIXES, CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import (
@@ -93,6 +94,7 @@ from invokeai.backend.quantization.int8_convrot import (
 )
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+from invokeai.backend.sd3.checkpoint_layout import is_sd3_mmdit, sd3_transformer_config
 
 
 class Main_Config_Base(ABC, BaseModel):
@@ -1336,6 +1338,50 @@ class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_
         return submodels
 
 
+class Main_GGUF_SD3_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized SD3 transformers (single-file).
+
+    Both GGUF families keep Stability's MMDiT layout: city96's builds hold the transformer alone under bare
+    keys, stable-diffusion.cpp's put it behind `model.diffusion_model.` beside a VAE and sometimes the text
+    encoders, of which only the transformer is read. Recognised by structure, since stable-diffusion.cpp writes
+    no metadata at all. Text encoders and VAE are separate models, chosen on the loader node. Like the Diffusers
+    config, it records the size (`variant`), from the transformer width its tensor shapes give, so the LoRAs that
+    fit are offered alike for both formats.
+    """
+
+    base: Literal[BaseModelType.StableDiffusion3] = Field(default=BaseModelType.StableDiffusion3)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    # Optional, so records installed before it existed stay valid; read from the tensor shapes at install.
+    variant: SD3VariantType | None = Field(default=None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        transformer = CheckpointPrefix.detect(state_dict).strip(state_dict, drop_foreign=True)
+
+        if not is_sd3_mmdit(transformer):
+            raise NotAMatchError("state dict does not look like an SD3 MMDiT transformer")
+
+        if not _has_ggml_tensors(transformer):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        # The loader builds the model from these shapes, so a file it cannot build is refused at install rather
+        # than at the first generation.
+        try:
+            transformer_config = sd3_transformer_config(transformer)
+        except ValueError as e:
+            raise InvalidMatchError(f"this SD3 GGUF transformer cannot be loaded: {e}") from None
+
+        variant = override_fields.pop("variant", None) or sd3_variant_from_width(
+            int(transformer_config["num_attention_heads"]) * int(transformer_config["attention_head_dim"])
+        )
+        return cls(**override_fields, variant=variant)
+
+
 class Main_Diffusers_CogView4_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
     base: Literal[BaseModelType.CogView4] = Field(BaseModelType.CogView4)
 
@@ -2374,27 +2420,44 @@ _FLUX3_LORA_SUFFIXES = (
 
 
 def _has_flux3_keys(state_dict: dict[str | int, Any]) -> bool:
-    """True for a FLUX.3 Image transformer in Black Forest Labs' native layout, False for its LoRAs.
+    """True for a FLUX.3 Image transformer, False for its LoRAs.
 
-    The per-mode stage before the joint blocks is unique to FLUX.3: `content_mode_blocks.<mode>.N` and
-    `early_stream_modulations`. FLUX.1 and FLUX.2 have `double_blocks`, Krea-2 `text_fusion`. ComfyUI's key
-    prefixes are tolerated; the BFL file and the ComfyUI repackage are byte-identical and carry none. torchao's
-    spelling of the modulation's weight is accepted too, so that such an export reaches its refusal rather than
-    installing as an unknown model.
+    Black Forest Labs' native layout is recognized by the per-mode stage before the joint blocks, which is unique to
+    FLUX.3: `content_mode_blocks.<mode>.N` and `early_stream_modulations`. FLUX.1 and FLUX.2 have `double_blocks`,
+    Krea-2 `text_fusion`. ComfyUI's key prefixes are tolerated; the BFL file and the ComfyUI repackage are
+    byte-identical and carry none. torchao's spelling of the modulation's weight is accepted too, so that an
+    export the loader cannot read reaches its refusal rather than installing as an unknown model.
+
+    unsloth's torchao FP8 build uses diffusers' names (`mode_blocks`, `early_stream_modulations.<mode>.linear`). That
+    layout is recognized only beside torchao payloads: no other single-file FLUX.3 build is saved that way, and the
+    loader reads it only on that route.
     """
     keys = [_strip_comfyui_key_prefix(key) for key in state_dict if isinstance(key, str)]
     if any(key.endswith(_FLUX3_LORA_SUFFIXES) for key in keys):
         return False
     key_set = set(keys)
-    return any(
+    if any(
         f"early_stream_modulations.image.lin.{parameter}" in key_set for parameter in ("weight", "_weight_qdata")
-    ) and any(key.startswith("content_mode_blocks.image.") for key in keys)
+    ) and any(key.startswith("content_mode_blocks.image.") for key in keys):
+        return True
+    return (
+        any(
+            f"early_stream_modulations.image.linear.{parameter}" in key_set for parameter in ("weight", "_weight_qdata")
+        )
+        and any(key.startswith("mode_blocks.image.") for key in keys)
+        and any(key.endswith(TORCHAO_QDATA_SUFFIX) for key in keys)
+    )
 
 
 def _get_flux3_variant(state_dict: dict[str | int, Any]) -> Flux3VariantType:
     """The step-distilled checkpoint has a second timestep embedder; the Base model does not."""
     keys = {_strip_comfyui_key_prefix(key) for key in state_dict if isinstance(key, str)}
-    return Flux3VariantType.Klein if "ref_time_in.in_layer.weight" in keys else Flux3VariantType.KleinBase
+    flow_map_weights = {FLUX3_NATIVE_FLOW_MAP_KEY, flux3_native_key_to_diffusers(FLUX3_NATIVE_FLOW_MAP_KEY)}
+    # torchao stores a quantized weight under `_weight_qdata`, in place of `.weight`.
+    flow_map_keys = flow_map_weights | {
+        f"{key.removesuffix('.weight')}{TORCHAO_QDATA_SUFFIX}" for key in flow_map_weights
+    }
+    return Flux3VariantType.Klein if keys & flow_map_keys else Flux3VariantType.KleinBase
 
 
 class Main_Diffusers_Flux3_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
@@ -2448,8 +2511,9 @@ class Main_Checkpoint_Flux3_Config(Checkpoint_Config_Base, Main_Config_Base, Con
     """Model config for FLUX.3 Image single-file transformers.
 
     BFL's `model.safetensors` and its quantized `variants/fp8r` (per-row scaled fp8) and `variants/nvfp4` (NVIDIA
-    ModelOpt layout), and Comfy-Org's bf16, `int8_convrot` and nvfp4 repackages. The record is the same for all of
-    them: the loader reads the scheme off the file.
+    ModelOpt layout), Comfy-Org's bf16, `int8_convrot` and nvfp4 repackages, and unsloth's torchao FP8 build (diffusers
+    key names, one scale per output row). The record is the same for all of them: the loader reads the scheme off the
+    file.
     """
 
     base: Literal[BaseModelType.Flux3] = Field(default=BaseModelType.Flux3)

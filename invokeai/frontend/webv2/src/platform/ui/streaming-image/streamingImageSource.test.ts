@@ -15,13 +15,6 @@ const liveImage: StreamingImageSource = {
   src: 'data:image/png;base64,live',
   width: 64,
 };
-const heldLiveImage: StreamingImageSource = {
-  alt: 'Held preview',
-  height: 32,
-  kind: 'live',
-  src: 'data:image/png;base64,held',
-  width: 64,
-};
 const finalImage: StreamingImageSource = {
   alt: 'Final image',
   height: 512,
@@ -39,15 +32,11 @@ const fallbackImage: StreamingImageSource = {
 
 describe('resolveStreamingImageSource', () => {
   it('prioritizes final images over live and fallback images', () => {
-    expect(resolveStreamingImageSource({ fallbackImage, finalImage, heldLiveImage, liveImage })).toBe(finalImage);
+    expect(resolveStreamingImageSource({ fallbackImage, finalImage, liveImage })).toBe(finalImage);
   });
 
-  it('uses the current live image before a held live image', () => {
-    expect(resolveStreamingImageSource({ fallbackImage, heldLiveImage, liveImage })).toBe(liveImage);
-  });
-
-  it('keeps the held live image while waiting for final image data', () => {
-    expect(resolveStreamingImageSource({ fallbackImage, heldLiveImage })).toBe(heldLiveImage);
+  it('uses the live image before the fallback', () => {
+    expect(resolveStreamingImageSource({ fallbackImage, liveImage })).toBe(liveImage);
   });
 
   it('falls back when no final or live image is available', () => {

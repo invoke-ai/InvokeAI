@@ -114,6 +114,14 @@ export const useCanvasViewportReady = (engine: CanvasCoreStoreCapability): boole
 export const useControlLayerView = (engine: CanvasCoreStoreCapability): CanvasInteractionState['controlLayerView'] =>
   useCanvasInteractionState(engine, 'controlLayerView');
 
+/** Whether a staged or progress preview, shown or toggled off, hides control layers, masks and regions. */
+export const useCanvasStagingHidesOverlays = (engine: CanvasCoreStoreCapability): boolean =>
+  useCanvasInteractionState(engine, 'stagingHidesOverlays');
+
+/** The generation frame while a Frame tool drag reshapes it; null when the committed frame is current. */
+export const useCanvasBboxPreview = (engine: CanvasCoreStoreCapability): CanvasInteractionState['bboxPreview'] =>
+  useCanvasInteractionState(engine, 'bboxPreview');
+
 /** The active tool id for `engine`. */
 export const useCanvasActiveTool = (engine: CanvasCoreStoreCapability): ToolId =>
   useCanvasInteractionState(engine, 'activeTool');
@@ -281,6 +289,9 @@ export const useTextOptions = (engine: CanvasCoreStoreCapability): TextToolOptio
 /** The active text-editing session (create/edit mode + live source + transform), or `null`. */
 export const useTextEditSession = (engine: CanvasCoreStoreCapability): TextEditSession | null =>
   useCanvasInteractionState(engine, 'textEditSession');
+
+export const useTransformOptions = (engine: CanvasCoreStoreCapability) =>
+  useCanvasInteractionState(engine, 'transformOptions');
 
 /** PSD preparation/worker/download lifecycle belongs to the engine, across widget remounts. */
 export const usePsdExportStatus = (

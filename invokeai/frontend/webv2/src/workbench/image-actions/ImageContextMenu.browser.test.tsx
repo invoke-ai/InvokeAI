@@ -36,6 +36,7 @@ vi.mock('@workbench/projects/library', () => ({
   useProjectLibrarySelector: (selector: (snapshot: { summaries: [] }) => unknown) => selector({ summaries: [] }),
 }));
 const commandsMock = vi.hoisted(() => ({
+  gallery: { setCompareItem: vi.fn() },
   generation: { setSource: vi.fn(), submitModelOnlyUpscale: vi.fn() },
   notifications: { add: vi.fn() },
   widgets: { patchValues: vi.fn() },
@@ -81,9 +82,13 @@ vi.mock('./modelOnlyUpscale', async (importOriginal) => {
         : original.queueModelOnlyUpscale(...args),
   };
 });
+// The open project's Gallery values, which the compare entry reads its state from.
+const galleryValuesMock = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
   useActiveProjectName: () => 'Project',
+  useWidgetValuesSelector: (_widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(galleryValuesMock.current),
   useWorkbenchCommands: () => commandsMock,
 }));
 // Keys stand in for copy; the one interpolated value a test reads, an upscale factor, is shown as the locale does.
@@ -308,6 +313,7 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  galleryValuesMock.current = {};
 });
 
 describe('ImageContextMenu deletion delegation', () => {
@@ -339,6 +345,21 @@ describe('ImageContextMenu deletion delegation', () => {
 
     expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'right-clicked.png' }], {
       returnFocus,
+    });
+  });
+});
+
+describe('ImageContextMenu placement', () => {
+  it('opens at the right-click with no arrow, and no arrow-sized gap below the pointer', async () => {
+    await renderMenu(createActions(vi.fn(() => Promise.resolve())), [image('single.png')]);
+    const menu = document.querySelector<HTMLElement>('[role="menu"][data-state="open"]')!;
+    const arrow = menu.parentElement!.querySelector<HTMLElement>('[data-part="arrow"]');
+
+    // The harness right-clicks at (20, 20): a 1px anchor, then the default 8px gutter, where an arrow would add 6.
+    await vi.waitFor(() => {
+      expect(menu.dataset.placement).toBe('bottom-start');
+      expect(arrow?.querySelector<HTMLElement>('[data-part="arrow-tip"]')?.offsetWidth ?? 0).toBe(0);
+      expect(menu.getBoundingClientRect().top).toBeCloseTo(20 + 1 + 8, 0);
     });
   });
 });
@@ -517,6 +538,42 @@ describe('ImageContextMenu canvas destinations', () => {
     expect(headings).toEqual(['widgets.gallery.itemMenu.continueWorking', 'widgets.gallery.itemMenu.useImageAs']);
     // A context menu holding every group stays single-line: the step hints belong to Preview's own menus.
     expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.editOnCanvasHint');
+  });
+
+  it('offers to cancel Select for compare on the image it waits with, and only there', async () => {
+    const waiting = image('waiting.png');
+    // Select for compare on the shown image: the comparison image is the selection itself.
+    galleryValuesMock.current = {
+      compareImage: waiting,
+      selectedImage: waiting,
+      selectedImageName: 'image:waiting.png',
+    };
+    const actions = createActions(vi.fn());
+    await renderMenu(actions, [waiting]);
+
+    expect(() => getMenuItem('widgets.preview.selectForCompare')).toThrow();
+    await pickItem('widgets.preview.cancelCompare');
+
+    expect(commandsMock.gallery.setCompareItem).toHaveBeenCalledExactlyOnceWith(null);
+    expect(actions.selectForCompare).not.toHaveBeenCalled();
+  });
+
+  it('selects another image for compare while one waits, comparing the two', async () => {
+    const waiting = image('waiting.png');
+    galleryValuesMock.current = {
+      compareImage: waiting,
+      selectedImage: waiting,
+      selectedImageName: 'image:waiting.png',
+    };
+    const actions = createActions(vi.fn());
+    const other = image('other.png');
+    await renderMenu(actions, [other]);
+
+    await pickItem('widgets.preview.selectForCompare');
+
+    expect(actions.selectForCompare).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ imageName: 'other.png' })
+    );
   });
 
   it('edits the image on the current canvas as a raster layer in one step', async () => {

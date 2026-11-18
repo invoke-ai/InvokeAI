@@ -1,14 +1,17 @@
-import { GridItem, Text } from '@chakra-ui/react';
+import { GridItem } from '@chakra-ui/react';
 import { useDroppable } from '@dnd-kit/core';
 import { DropZone } from '@platform/ui/DropZone';
+import { DropZoneLabel } from '@workbench/widgets/shared/DropZoneLabel';
 import { useTranslation } from 'react-i18next';
 
-import type { CanvasImageDropData } from './canvasImageDnd';
+import { CANVAS_IMAGE_DROP_DESTINATION_ATTRIBUTE, type CanvasImageDropData } from './canvasImageDnd';
 
 export interface CanvasImageDropZoneProps {
   colSpan: number;
   data: CanvasImageDropData;
   id: string;
+  /** A file dragged in from the desktop hovers this zone; dnd-kit reports its own drags. */
+  isFileOver?: boolean;
   labelKey:
     | 'widgets.canvas.import.dropControl'
     | 'widgets.canvas.import.dropInpaintMask'
@@ -18,12 +21,27 @@ export interface CanvasImageDropZoneProps {
   row: number;
 }
 
-export const CanvasImageDropZone = ({ colSpan, data, id, labelKey, row }: CanvasImageDropZoneProps) => {
+export const CanvasImageDropZone = ({
+  colSpan,
+  data,
+  id,
+  isFileOver = false,
+  labelKey,
+  row,
+}: CanvasImageDropZoneProps) => {
   const { t } = useTranslation();
-  const { isOver, setNodeRef } = useDroppable({ data, id });
+  const { isOver: isDragOver, setNodeRef } = useDroppable({ data, id });
+  const isOver = isDragOver || isFileOver;
 
   return (
-    <GridItem ref={setNodeRef} colSpan={colSpan} gridRow={row} position="relative">
+    <GridItem
+      ref={setNodeRef}
+      colSpan={colSpan}
+      gridRow={row}
+      data-over={isOver || undefined}
+      position="relative"
+      {...{ [CANVAS_IMAGE_DROP_DESTINATION_ATTRIBUTE]: data.destination }}
+    >
       <DropZone
         alignItems="center"
         display="flex"
@@ -34,9 +52,7 @@ export const CanvasImageDropZone = ({ colSpan, data, id, labelKey, row }: Canvas
         position="absolute"
         variant="overlay"
       >
-        <Text color="fg" fontSize="lg" fontWeight="700" textAlign="center">
-          {t(labelKey)}
-        </Text>
+        <DropZoneLabel>{t(labelKey)}</DropZoneLabel>
       </DropZone>
     </GridItem>
   );

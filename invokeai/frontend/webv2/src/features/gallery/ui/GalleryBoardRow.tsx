@@ -10,7 +10,7 @@ import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
 import { IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { LocateIcon, MoreVerticalIcon } from 'lucide-react';
+import { MoreVerticalIcon, SquareArrowDownIcon } from 'lucide-react';
 import { useCallback, useMemo, type MouseEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -280,7 +280,7 @@ export const GalleryBoardRow = ({
           >
             <Icon
               aria-label={t('widgets.gallery.autoAddTarget')}
-              as={LocateIcon}
+              as={SquareArrowDownIcon}
               boxSize="3.5"
               color={isSelected ? 'inherit' : 'accent.fg'}
               flexShrink={0}

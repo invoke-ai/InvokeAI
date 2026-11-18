@@ -25,8 +25,8 @@ import { getActualZoomLimits } from './previewHeaderStore';
 /**
  * Use the whole stage for wheel zoom, drag pan, fit/100% toggle, and touch pinch. Apply rAF-batched CSS transforms
  * outside React; publish rounded actual-pixel zoom and the exact fit, with scale 1 meaning fit, and re-render only when
- * zooming starts or ends. Zoom never goes below the smaller of fit and 100%, so an image the fit enlarges can still be
- * seen at its own size.
+ * the image grows past fit or returns to it. Zoom never goes below the smaller of fit and 100%, so an image the fit
+ * enlarges can still be seen at its own size.
  */
 
 /** Switch to pixelated rendering at/above this actual-pixel zoom. */
@@ -100,7 +100,8 @@ export const usePreviewLoupe = ({
   const lastSourceTokenRef = useRef<string | null | undefined>(undefined);
   /** Wheel zoom's snap memory, in actual zoom, with the fit ratio it was measured at; other zoom changes drop it. */
   const wheelSnapRef = useRef<{ fitRatio: number; snap: WheelZoomSnap } | null>(null);
-  const [isZoomed, setIsZoomed] = useState(false);
+  // Not `isZoomed`: below fit (an enlarged image at 100%) is zoomed but fits, so a drag still moves the image out.
+  const [isPannable, setIsPannable] = useState(false);
   const publishedRef = useRef<PreviewZoomState>(FIT_UNMEASURED);
   // Keep gesture/ref identity stable across images; callback cleanup must not cancel the frame clearing an old
   // transform.
@@ -139,7 +140,6 @@ export const usePreviewLoupe = ({
       }
 
       publishedRef.current = next;
-      setIsZoomed(next.isZoomed);
       onZoomChangeRef.current?.(next);
     },
     [measureFitRatio]
@@ -179,6 +179,7 @@ export const usePreviewLoupe = ({
       // reaches the img (whose own style leaves it unset while the loupe is
       // enabled).
       content.style.imageRendering = !isFit && actualZoom >= PIXELATED_ACTUAL_ZOOM ? 'pixelated' : '';
+      setIsPannable(transform.scale > 1);
       publish(transform.scale);
     });
   }, [getActualZoom, publish]);
@@ -608,7 +609,7 @@ export const usePreviewLoupe = ({
   if (!enabled) {
     return {
       contentRefCallback: null,
-      isZoomed: false,
+      isPannable: false,
       reset,
       stageProps: null,
       stageRefCallback: null,
@@ -618,7 +619,7 @@ export const usePreviewLoupe = ({
 
   return {
     contentRefCallback,
-    isZoomed,
+    isPannable,
     reset,
     stageProps: {
       onDoubleClick: handleDoubleClick,

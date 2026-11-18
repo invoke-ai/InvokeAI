@@ -549,6 +549,126 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
   );
 });
 
+describe('galleryItemOrganization past the server’s per-request name cap', () => {
+  // As the server answers: a body naming more than 1,000 items is refused whole, before any item is touched.
+  const SERVER_MAX_NAMES = 1000;
+  const fields: Record<string, string> = {
+    '/api/v1/board_images/batch': 'added_images',
+    '/api/v1/board_images/batch/delete': 'removed_images',
+    '/api/v1/images/delete': 'deleted_images',
+    '/api/v1/images/star': 'starred_images',
+    '/api/v1/images/unstar': 'unstarred_images',
+    '/api/v1/videos/delete': 'deleted_videos',
+    '/api/v1/videos/star': 'starred_videos',
+    '/api/v1/videos/unstar': 'unstarred_videos',
+  };
+  const serve = (url: string, init: { body: string }) => {
+    const body = JSON.parse(init.body) as { image_names?: string[]; video_names?: string[] };
+    const names = body.image_names ?? body.video_names ?? [];
+
+    if (names.length > SERVER_MAX_NAMES) {
+      return Promise.reject(new MockApiError('List should have at most 1000 items', 422));
+    }
+
+    return Promise.resolve({ affected_boards: ['board-1'], failed_videos: [], [fields[url]!]: names });
+  };
+  const refs = (kind: 'image' | 'video', count: number): GalleryItemRef[] =>
+    Array.from({ length: count }, (_, index) => ({ kind, name: `${kind}-${index}` }));
+  const names = (items: readonly GalleryItemRef[]) => items.map((item) => item.name);
+  /** The name lists sent to one endpoint, in the order sent. */
+  const sentTo = (endpoint: string): string[][] =>
+    mocks.apiFetchJson.mock.calls
+      .filter(([url]) => url === endpoint)
+      .map(([, init]) => Object.values(JSON.parse(String(init.body)) as Record<string, string[]>)[0]!);
+
+  beforeEach(() => {
+    accountLifecycle.activate('organization-test-user');
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockImplementation(serve);
+  });
+
+  it('deletes every item of a selection larger than one request may name', async () => {
+    const selection = [...refs('image', 1500), ...refs('video', 1200)];
+
+    const result = await galleryItemOrganization.delete(selection);
+
+    expect(result).toEqual({ affectedBoardIds: ['board-1'], failed: [], succeeded: selection });
+    expect(sentTo('/api/v1/images/delete')).toEqual([
+      names(refs('image', 1500).slice(0, 1000)),
+      names(refs('image', 1500).slice(1000)),
+    ]);
+    expect(sentTo('/api/v1/videos/delete')).toEqual([
+      names(refs('video', 1200).slice(0, 1000)),
+      names(refs('video', 1200).slice(1000)),
+    ]);
+  });
+
+  it('sends 1,000 items of a kind in one request and 1,001 in two', async () => {
+    await galleryItemOrganization.delete(refs('image', 1000));
+    await galleryItemOrganization.delete(refs('video', 1001));
+
+    expect(sentTo('/api/v1/images/delete').map((batch) => batch.length)).toEqual([1000]);
+    expect(sentTo('/api/v1/videos/delete').map((batch) => batch.length)).toEqual([1000, 1]);
+  });
+
+  it('sends a repeated item once, whichever batch it would fall in', async () => {
+    const selection = [...refs('image', 1200), ...refs('image', 1200)];
+
+    const result = await galleryItemOrganization.delete(selection);
+
+    expect(sentTo('/api/v1/images/delete').map((batch) => batch.length)).toEqual([1000, 200]);
+    expect(new Set(sentTo('/api/v1/images/delete').flat()).size).toBe(1200);
+    expect(result).toEqual({ affectedBoardIds: ['board-1'], failed: [], succeeded: refs('image', 1200) });
+  });
+
+  it('confirms what earlier batches deleted when a later one fails, for images and videos alike', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string, init: { body: string }) =>
+      sentTo(url).length === 2 ? Promise.reject(new MockApiError('Server error', 500)) : serve(url, init)
+    );
+    const images = refs('image', 2500);
+    const videos = refs('video', 2500);
+
+    const result = await galleryItemOrganization.delete([...images, ...videos]);
+
+    expect(result).toEqual({
+      affectedBoardIds: ['board-1'],
+      failed: [...images.slice(1000), ...videos.slice(1000)],
+      succeeded: [...images.slice(0, 1000), ...videos.slice(0, 1000)],
+    });
+    // Nothing is sent after a failed batch.
+    expect(sentTo('/api/v1/images/delete')).toHaveLength(2);
+    expect(sentTo('/api/v1/videos/delete')).toHaveLength(2);
+  });
+
+  it('stops and confirms nothing once the account changes mid-run', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string, init: { body: string }) => {
+      if (mocks.apiFetchJson.mock.calls.length === 1) {
+        accountLifecycle.activate('replacement-user');
+      }
+      return serve(url, init);
+    });
+    const images = refs('image', 2500);
+
+    const result = await galleryItemOrganization.delete(images);
+
+    expect(result).toEqual({ affectedBoardIds: [], failed: images, succeeded: [] });
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['star', () => galleryItemOrganization.setStarred(refs('image', 2500), true)],
+    ['unstar', () => galleryItemOrganization.setStarred(refs('image', 2500), false)],
+    ['move to a board', () => galleryItemOrganization.moveToBoard(refs('image', 2500), 'board-1')],
+    ['remove from its board', () => galleryItemOrganization.moveToBoard(refs('image', 2500), 'none')],
+  ])('confirms every image when asked to %s 2,500 at once', async (_operation, run) => {
+    const result = await run();
+
+    expect(result.failed).toEqual([]);
+    expect(result.succeeded).toEqual(refs('image', 2500));
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe('isGalleryBoardAttachable', () => {
   it.each(['by_date:2026-08-14', 'generated', 'assets', 'none'])('rejects the virtual destination %s', (boardId) => {
     expect(isGalleryBoardAttachable(boardId)).toBe(false);

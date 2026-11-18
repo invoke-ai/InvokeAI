@@ -9,6 +9,7 @@ import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
+  GALLERY_REQUEST_MAX_NAMES: 1000,
   galleryImages: {
     metadata: vi.fn(),
     resolveMany: vi.fn(),

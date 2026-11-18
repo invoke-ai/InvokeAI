@@ -16,7 +16,7 @@ export {
   requestGenerateModelSwitchConfirmation,
 } from './ui/modelSelectionNotice';
 export { adjustFocusedPromptAttention } from './ui/promptFields/promptAttentionHotkeys';
-export { focusPositivePrompt } from './ui/promptFields/promptFocus';
+export { focusPositivePrompt, revealPositivePrompt } from './ui/promptFields/promptFocus';
 export { revealGenerateIssue } from './ui/revealGenerateIssue';
 export { getGeneratePromptUndoKey } from './ui/generateUndo';
 export { promptHistoryNavigation } from './ui/promptFields/promptHistoryNavigation';
