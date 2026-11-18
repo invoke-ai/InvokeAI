@@ -346,7 +346,8 @@ export const addTransformerLoraCollectionLoader = (
 export const addWanLoraLoaders = (
   graph: BackendGraphContract,
   loras: GenerateLora[],
-  modelLoader: BackendInvocationContract
+  modelLoader: BackendInvocationContract,
+  model: Pick<MainModelConfig, 'variant'> | null | undefined
 ): BackendInvocationContract => {
   if (loras.every((lora) => lora.target === undefined && lora.lowNoiseWeight === undefined)) {
     return addTransformerLoraCollectionLoader(graph, loras, 'wan_lora_collection_loader', modelLoader, ['transformer']);
@@ -355,12 +356,12 @@ export const addWanLoraLoaders = (
   let source = modelLoader;
 
   for (const lora of loras) {
-    const model = toModelIdentifier(lora.model);
+    const loraModel = toModelIdentifier(lora.model);
 
-    if (hasDistinctWanLowNoiseWeight(lora)) {
+    if (hasDistinctWanLowNoiseWeight(lora, model)) {
       const highLoader = addNode(graph, {
         id: createId('wan_lora_loader'),
-        lora: model,
+        lora: loraModel,
         target: 'high',
         type: 'wan_lora_loader',
         weight: lora.weight,
@@ -369,7 +370,7 @@ export const addWanLoraLoaders = (
 
       const lowLoader = addNode(graph, {
         id: createId('wan_lora_loader'),
-        lora: model,
+        lora: loraModel,
         target: 'low',
         type: 'wan_lora_loader',
         weight: lora.lowNoiseWeight,
@@ -379,7 +380,7 @@ export const addWanLoraLoaders = (
     } else {
       const loader = addNode(graph, {
         id: createId('wan_lora_loader'),
-        lora: model,
+        lora: loraModel,
         target: lora.target ?? 'auto',
         type: 'wan_lora_loader',
         weight: lora.weight,
@@ -2163,7 +2164,7 @@ const buildWanGraph = (
     wan_t5_encoder_model: wanT5EncoderModel ?? undefined,
   });
   // Wan LoRAs patch only the transformer; the text encoder is untouched.
-  const loraSource = activeLoras.length ? addWanLoraLoaders(graph, activeLoras, modelLoader) : modelLoader;
+  const loraSource = activeLoras.length ? addWanLoraLoaders(graph, activeLoras, modelLoader, model) : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'wan_text_encoder' });
   const negCond = addNode(graph, { id: 'neg_cond', type: 'wan_text_encoder' });
   const denoise = addNode(graph, {

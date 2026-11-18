@@ -252,7 +252,7 @@ def unwrap_metadata_value(val: Any, label: Optional[str] = None) -> Any:
     return val
 
 
-@invocation("metadata_item", title="Metadata Item", tags=["metadata"], category="metadata", version="1.0.1")
+@invocation("metadata_item", title="Metadata Item", tags=["metadata"], category="metadata", version="1.1.0")
 class MetadataItemInvocation(BaseInvocation):
     """Used to create an arbitrary metadata item. Provide "label" and make a connection to "value" to store that data as the value."""
 
@@ -298,7 +298,7 @@ class LatentsMetaOutput(LatentsOutput, MetadataOutput):
         )
 
 
-@invocation("metadata", title="Metadata", tags=["metadata"], category="metadata", version="1.0.1")
+@invocation("metadata", title="Metadata", tags=["metadata"], category="metadata", version="1.1.0")
 class MetadataInvocation(BaseInvocation):
     """Takes a MetadataItem or collection of MetadataItems and outputs a MetadataDict."""
 

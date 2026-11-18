@@ -5,7 +5,7 @@ import type {
   GenerationProjectSettings,
 } from '@features/generation/core/contracts';
 
-import type { GenerateLora, GenerateModelConfig, GenerateSettings } from './types';
+import type { GenerateLora, GenerateModelConfig, GenerateSettings, MainModelConfig } from './types';
 
 import { coerceSchedulerForGraph } from './baseGenerationPolicies';
 import { isLoraCompatibleWithModel } from './settings';
@@ -128,16 +128,26 @@ export const toModelIdentifier = (
   ...(typeof model.submodel_type === 'string' ? { submodel_type: model.submodel_type } : {}),
 });
 
-export const hasDistinctWanLowNoiseWeight = (
-  lora: Pick<GenerateLora, 'lowNoiseWeight' | 'target' | 'weight'>
-): lora is Pick<GenerateLora, 'target' | 'weight'> & { lowNoiseWeight: number; target: 'both' } =>
-  lora.target === 'both' && lora.lowNoiseWeight !== undefined && lora.lowNoiseWeight !== lora.weight;
+const isSingleTransformerWanModel = (model: Pick<MainModelConfig, 'variant'> | null | undefined): boolean =>
+  model?.variant === 'ti2v_5b';
 
-export const toMetadataLora = (lora: Pick<GenerateLora, 'lowNoiseWeight' | 'model' | 'target' | 'weight'>) => ({
+export const hasDistinctWanLowNoiseWeight = (
+  lora: Pick<GenerateLora, 'lowNoiseWeight' | 'target' | 'weight'>,
+  model: Pick<MainModelConfig, 'variant'> | null | undefined
+): lora is Pick<GenerateLora, 'target' | 'weight'> & { lowNoiseWeight: number; target: 'both' } =>
+  !isSingleTransformerWanModel(model) &&
+  lora.target === 'both' &&
+  lora.lowNoiseWeight !== undefined &&
+  lora.lowNoiseWeight !== lora.weight;
+
+export const toMetadataLora = (
+  lora: Pick<GenerateLora, 'lowNoiseWeight' | 'model' | 'target' | 'weight'>,
+  model: Pick<MainModelConfig, 'variant'> | null | undefined
+) => ({
   model: toModelIdentifier(lora.model),
   weight: lora.weight,
   ...(lora.target ? { target: lora.target } : {}),
-  ...(hasDistinctWanLowNoiseWeight(lora) ? { low_noise_weight: lora.lowNoiseWeight } : {}),
+  ...(hasDistinctWanLowNoiseWeight(lora, model) ? { low_noise_weight: lora.lowNoiseWeight } : {}),
 });
 
 /**

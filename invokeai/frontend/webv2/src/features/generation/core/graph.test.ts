@@ -1949,10 +1949,18 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(getEdge(graph, 'pos_cond', 'wan_t5_encoder')?.source.node_id).toBe('model_loader');
   });
 
-  it('chains wan_lora_loader nodes for targeted Wan LoRAs and records target and low_noise_weight in metadata', () => {
-    const highLora: LoraModelConfig = { base: 'wan', key: 'wan-high', name: 'High', type: 'lora', variant: '5b' };
-    const dualLora: LoraModelConfig = { base: 'wan', key: 'wan-dual', name: 'Dual', type: 'lora', variant: '5b' };
-    const graph = compile(wanDiffusers, {
+  it('chains wan_lora_loader nodes for targeted Wan A14B LoRAs and records target and low_noise_weight in metadata', () => {
+    const wanA14b: MainModelConfig = {
+      base: 'wan',
+      format: 'diffusers',
+      key: 'wan-a14b',
+      name: 'Wan 2.2 A14B',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+    const highLora: LoraModelConfig = { base: 'wan', key: 'wan-high', name: 'High', type: 'lora', variant: 'a14b' };
+    const dualLora: LoraModelConfig = { base: 'wan', key: 'wan-dual', name: 'Dual', type: 'lora', variant: 'a14b' };
+    const graph = compile(wanA14b, {
       loras: [
         { isEnabled: true, model: highLora, target: 'high', weight: 0.9 },
         { isEnabled: true, lowNoiseWeight: 0.4, model: dualLora, target: 'both', weight: 0.8 },
@@ -1975,7 +1983,7 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
       { low_noise_weight: 0.4, model: expect.objectContaining({ key: 'wan-dual' }), target: 'both', weight: 0.8 },
     ]);
 
-    const equalLowNoiseGraph = compile(wanDiffusers, {
+    const equalLowNoiseGraph = compile(wanA14b, {
       loras: [{ isEnabled: true, lowNoiseWeight: 0.8, model: dualLora, target: 'both', weight: 0.8 }],
     });
     const equalLoaders = Object.values(equalLowNoiseGraph.nodes).filter((node) => node.type === 'wan_lora_loader');
@@ -1983,6 +1991,32 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(equalLoaders[0]).toMatchObject({ target: 'both', weight: 0.8 });
     expect(getNodeByType(equalLowNoiseGraph, 'core_metadata')?.loras).toEqual([
       { model: expect.objectContaining({ key: 'wan-dual' }), target: 'both', weight: 0.8 },
+    ]);
+  });
+
+  it('emits a single wan_lora_loader node and omits low_noise_weight on single-transformer TI2V-5B even with lowNoiseWeight set', () => {
+    const dualLora5b: LoraModelConfig = {
+      base: 'wan',
+      key: 'wan-5b-dual',
+      name: 'Dual 5B',
+      type: 'lora',
+      variant: '5b',
+    };
+    const graph = compile(wanDiffusers, {
+      loras: [{ isEnabled: true, lowNoiseWeight: 0.4, model: dualLora5b, target: 'both', weight: 0.8 }],
+    });
+    const loaders = Object.values(graph.nodes).filter((node) => node.type === 'wan_lora_loader');
+
+    expect(getNodeByType(graph, 'wan_lora_collection_loader')).toBeUndefined();
+    expect(loaders).toHaveLength(1);
+    expect(loaders[0]).toMatchObject({
+      lora: expect.objectContaining({ key: 'wan-5b-dual' }),
+      target: 'both',
+      weight: 0.8,
+    });
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loaders[0]?.id);
+    expect(getNodeByType(graph, 'core_metadata')?.loras).toEqual([
+      { model: expect.objectContaining({ key: 'wan-5b-dual' }), target: 'both', weight: 0.8 },
     ]);
   });
 });

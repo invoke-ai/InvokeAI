@@ -114,7 +114,7 @@ const buildCanvasSaveMetadata = (project: Project, rect: Rect): Record<string, u
     seamless_x: generateValues.seamlessXAxis,
     seamless_y: generateValues.seamlessYAxis,
     loras: generateValues.loras.map((lora) => ({
-      ...toMetadataLora(lora),
+      ...toMetadataLora(lora, generateValues.model),
       isEnabled: lora.isEnabled,
     })),
     ref_images: structuredClone(generateValues.referenceImages),

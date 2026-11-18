@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from typing import get_args
 from unittest.mock import MagicMock
 
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from invokeai.app.invocations.fields import ImageField, MetadataField, VideoField
 from invokeai.app.invocations.metadata import CORE_METADATA_VERSION, CoreMetadataInvocation, unwrap_metadata_value
@@ -11,8 +11,10 @@ from invokeai.app.invocations.metadata_constants import (
     CORE_LABELS_BOOL,
     CORE_LABELS_FLOAT,
     CORE_LABELS_INTEGER,
+    CORE_LABELS_MAIN_MODEL,
     CORE_LABELS_MODEL,
     CORE_LABELS_SCHEDULER,
+    CORE_LABELS_SDXL_MODEL,
     CORE_LABELS_STRING,
     CORE_LABELS_VAE,
     CORE_METADATA_REGISTRY,
@@ -81,9 +83,11 @@ def test_core_metadata_custom_label_at_index_zero_across_all_literals() -> None:
         CORE_LABELS_BOOL,
         CORE_LABELS_SCHEDULER,
         CORE_LABELS_MODEL,
+        CORE_LABELS_MAIN_MODEL,
+        CORE_LABELS_SDXL_MODEL,
         CORE_LABELS_VAE,
     )
-    assert len(all_literals) == 8
+    assert len(all_literals) == 10
     for lit in all_literals:
         args = get_args(lit)
         assert args[0] == CUSTOM_LABEL, f"CUSTOM_LABEL must be at index 0 in {lit}"
@@ -115,6 +119,8 @@ def test_core_metadata_schema_export_preserves_flat_enum_lists() -> None:
         CORE_LABELS_BOOL,
         CORE_LABELS_SCHEDULER,
         CORE_LABELS_MODEL,
+        CORE_LABELS_MAIN_MODEL,
+        CORE_LABELS_SDXL_MODEL,
         CORE_LABELS_VAE,
     ):
         ta_schema = TypeAdapter(lit).json_schema()
@@ -171,10 +177,13 @@ def test_unwrap_metadata_value_for_new_core_model_labels() -> None:
 
 
 def test_metadata_linked_and_extractors_support_new_core_keys() -> None:
+    import pytest
+
     from invokeai.app.invocations.metadata_linked import (
         MetadataItemLinkedInvocation,
         MetadataToFloatInvocation,
         MetadataToModelInvocation,
+        MetadataToSDXLModelInvocation,
     )
 
     ctx = SimpleNamespace()
@@ -194,7 +203,7 @@ def test_metadata_linked_and_extractors_support_new_core_keys() -> None:
     ).invoke(ctx)
     assert weight_extracted.value == 0.65
 
-    model_cases = (
+    component_cases = (
         ("anima_inpaint_adapter", "anima-adapter-key", "Anima Inpaint Adapter", BaseModelType.Anima, ModelType.Main),
         (
             "qwen3_vl_vision_tower",
@@ -210,9 +219,24 @@ def test_metadata_linked_and_extractors_support_new_core_keys() -> None:
             BaseModelType.Flux3,
             ModelType.PromptEnhancer,
         ),
+        (
+            "wan_t5_encoder_model",
+            "wan-t5-key",
+            "Wan UMT5-XXL",
+            BaseModelType.Any,
+            ModelType.T5Encoder,
+        ),
     )
 
-    for label, model_key, model_name, base, model_type in model_cases:
+    default_model = ModelIdentifierField(
+        key="default-key",
+        hash="hash-default",
+        name="Default",
+        base=BaseModelType.StableDiffusionXL,
+        type=ModelType.Main,
+    )
+
+    for label, model_key, model_name, base, model_type in component_cases:
         model_id = ModelIdentifierField(
             key=model_key,
             hash=f"hash-{model_key}",
@@ -234,35 +258,156 @@ def test_metadata_linked_and_extractors_support_new_core_keys() -> None:
         assert linked.metadata.root[label].key == model_key
 
         metadata = MetadataField.model_validate(linked.metadata.model_dump())
-        config = SimpleNamespace(
-            key=model_key,
-            hash=f"hash-{model_key}",
-            name=model_name,
-            base=base,
-            type=model_type,
-        )
-        configs = {model_key: config}
-        model_ctx = SimpleNamespace(
-            models=SimpleNamespace(
-                exists=lambda key, c=configs: key in c,
-                get_config=lambda key, c=configs: c[key],
+
+        # JP-R6-2: Component/encoder/adapter labels must NOT appear on MetadataToModel or MetadataToSDXLModel
+        with pytest.raises(ValidationError):
+            MetadataToModelInvocation(
+                id=f"extract-model-{label}",
+                label=label,  # type: ignore[arg-type]
+                default_value=default_model,
+                metadata=metadata,
             )
+        with pytest.raises(ValidationError):
+            MetadataToSDXLModelInvocation(
+                id=f"extract-sdxl-{label}",
+                label=label,  # type: ignore[arg-type]
+                default_value=default_model,
+                metadata=metadata,
+            )
+
+    # Main model labels still extract cleanly
+    main_id = ModelIdentifierField(
+        key="main-key",
+        hash="hash-main-key",
+        name="Main Model",
+        base=BaseModelType.StableDiffusionXL,
+        type=ModelType.Main,
+    )
+    main_cfg = SimpleNamespace(
+        key="main-key",
+        hash="hash-main-key",
+        name="Main Model",
+        base=BaseModelType.StableDiffusionXL,
+        type=ModelType.Main,
+    )
+    main_ctx = SimpleNamespace(
+        models=SimpleNamespace(
+            exists=lambda key: key == "main-key",
+            get_config=lambda key: main_cfg,
         )
-        default_model = ModelIdentifierField(
-            key="default-key",
-            hash="hash-default",
-            name="Default",
-            base=base,
-            type=ModelType.Main,
+    )
+    main_md = MetadataField.model_validate({"model": main_id.model_dump(), "refiner_model": main_id.model_dump()})
+    assert (
+        MetadataToModelInvocation(id="extract-main", label="model", default_value=default_model, metadata=main_md)
+        .invoke(main_ctx)
+        .model
+        == main_id
+    )
+    assert (
+        MetadataToModelInvocation(
+            id="extract-refiner", label="refiner_model", default_value=default_model, metadata=main_md
+        )
+        .invoke(main_ctx)
+        .model
+        == main_id
+    )
+    assert (
+        MetadataToSDXLModelInvocation(id="extract-sdxl", label="model", default_value=default_model, metadata=main_md)
+        .invoke(main_ctx)
+        .model
+        == main_id
+    )
+    with pytest.raises(ValidationError):
+        MetadataToSDXLModelInvocation(
+            id="extract-sdxl-refiner",
+            label="refiner_model",  # type: ignore[arg-type]
+            default_value=default_model,
+            metadata=main_md,
         )
 
-        extracted = MetadataToModelInvocation(
-            id=f"extract-{label}",
-            label=label,
-            default_value=default_model,
-            metadata=metadata,
-        ).invoke(model_ctx)
-        assert extracted.model == model_id
+
+def test_metadata_to_model_rejects_mismatched_component_model_type_via_custom_label() -> None:
+    """JP-R6-2: Passing wan_t5_encoder_model via CUSTOM_LABEL (both key-present and name-only)
+    into MetadataToModelInvocation / MetadataToSDXLModelInvocation must fall back to default_value
+    instead of returning a ModelType.T5Encoder model as ModelType.Main."""
+    from invokeai.app.invocations.metadata_linked import MetadataToModelInvocation, MetadataToSDXLModelInvocation
+
+    default_main = ModelIdentifierField(
+        key="default-main-key",
+        hash="hash-default-main",
+        name="Default Main",
+        base=BaseModelType.StableDiffusionXL,
+        type=ModelType.Main,
+    )
+    default_cfg = SimpleNamespace(
+        key=default_main.key,
+        hash=default_main.hash,
+        name=default_main.name,
+        base=default_main.base,
+        type=ModelType.Main,
+    )
+    t5_cfg = SimpleNamespace(
+        key="wan-t5-key",
+        hash="hash-wan-t5",
+        name="UMT5-XXL",
+        base=BaseModelType.Any,
+        type=ModelType.T5Encoder,
+    )
+    configs = {default_main.key: default_cfg, t5_cfg.key: t5_cfg}
+    mock_logger = MagicMock()
+    ctx = SimpleNamespace(
+        logger=mock_logger,
+        models=SimpleNamespace(
+            exists=lambda k: k in configs,
+            get_config=lambda k: configs[k],
+            search_by_attrs=lambda name=None, type=None: [
+                c for c in configs.values() if c.name == name and c.type == type
+            ],
+        ),
+    )
+
+    # 1. Key-present: points to an existing T5Encoder key -> warns and falls back to default_main
+    md_with_key = MetadataField.model_validate(
+        {"wan_t5_encoder_model": {"key": t5_cfg.key, "name": t5_cfg.name, "type": ModelType.T5Encoder.value}}
+    )
+    out_model_key = MetadataToModelInvocation(
+        id="to-model-key",
+        label=CUSTOM_LABEL,
+        custom_label="wan_t5_encoder_model",
+        default_value=default_main,
+        metadata=md_with_key,
+    ).invoke(ctx)
+    assert out_model_key.model == default_main
+    assert mock_logger.warning.called
+
+    out_sdxl_key = MetadataToSDXLModelInvocation(
+        id="to-sdxl-key",
+        label=CUSTOM_LABEL,
+        custom_label="wan_t5_encoder_model",
+        default_value=default_main,
+        metadata=md_with_key,
+    ).invoke(ctx)
+    assert out_sdxl_key.model == default_main
+
+    # 2. Name-only: searches with type=ModelType.Main -> finds nothing -> falls back to default_main
+    md_name_only = MetadataField.model_validate({"wan_t5_encoder_model": {"name": t5_cfg.name}})
+    out_model_name = MetadataToModelInvocation(
+        id="to-model-name",
+        label=CUSTOM_LABEL,
+        custom_label="wan_t5_encoder_model",
+        default_value=default_main,
+        metadata=md_name_only,
+    ).invoke(ctx)
+    assert out_model_name.model == default_main
+
+    out_sdxl_name = MetadataToSDXLModelInvocation(
+        id="to-sdxl-name",
+        label=CUSTOM_LABEL,
+        custom_label="wan_t5_encoder_model",
+        default_value=default_main,
+        metadata=md_name_only,
+    ).invoke(ctx)
+    assert out_sdxl_name.model == default_main
 
 
 def test_core_metadata_cfg_scale_schedule_and_hidiffusion_auto_ratios_parity() -> None:

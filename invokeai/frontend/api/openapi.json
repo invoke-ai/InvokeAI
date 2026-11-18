@@ -89808,7 +89808,7 @@
         "tags": ["metadata"],
         "title": "Metadata",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
@@ -89903,7 +89903,7 @@
         "tags": ["metadata"],
         "title": "Metadata Item",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/MetadataItemOutput"
         }
@@ -90143,7 +90143,7 @@
         "tags": ["metadata"],
         "title": "Metadata Item Linked",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
@@ -90313,7 +90313,7 @@
         "tags": ["metadata"],
         "title": "Metadata To Bool Collection",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/BooleanCollectionOutput"
         }
@@ -90437,7 +90437,7 @@
         "tags": ["metadata"],
         "title": "Metadata To Bool",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/BooleanOutput"
         }
@@ -90523,7 +90523,7 @@
         "tags": ["metadata"],
         "title": "Metadata To ControlNets",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/MDControlListOutput"
         }
@@ -90672,7 +90672,7 @@
         "tags": ["metadata"],
         "title": "Metadata To Float Collection",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/FloatCollectionOutput"
         }
@@ -90818,7 +90818,7 @@
         "tags": ["metadata"],
         "title": "Metadata To Float",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/FloatOutput"
         }
@@ -90905,7 +90905,7 @@
         "tags": ["metadata"],
         "title": "Metadata To IP-Adapters",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/MDIPAdapterListOutput"
         }
@@ -91042,7 +91042,7 @@
         "tags": ["metadata"],
         "title": "Metadata To Integer Collection",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/IntegerCollectionOutput"
         }
@@ -91176,7 +91176,7 @@
         "tags": ["metadata"],
         "title": "Metadata To Integer",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/IntegerOutput"
         }
@@ -91452,42 +91452,7 @@
           "label": {
             "default": "model",
             "description": "Label for this metadata item",
-            "enum": [
-              "* CUSTOM LABEL *",
-              "model",
-              "refiner_model",
-              "pid_decoder",
-              "gemma2_encoder",
-              "t5_encoder",
-              "t5_encoder_model",
-              "clip_embed_model",
-              "clip_l_model",
-              "clip_g_model",
-              "mistral_encoder",
-              "mistral_encoder_model",
-              "qwen3_encoder",
-              "qwen3_encoder_model",
-              "qwen3_source",
-              "qwen3_5_encoder",
-              "qwen3_vl_encoder",
-              "qwen3_vl_vision_tower",
-              "qwen_vl_encoder",
-              "glm_encoder",
-              "anima_inpaint_adapter",
-              "flux3_prompt_upsampler",
-              "ideogram4_unconditional_model",
-              "ltx2_component_source",
-              "ltx2_text_encoder_model",
-              "minimax_h3_component_source",
-              "minimax_h3_hybrid_base_model",
-              "minimax_h3_text_encoder_model",
-              "minimax_h3_transformer_model",
-              "qwen_image_component_source",
-              "qwen_image_qwen_vl_encoder",
-              "wan_component_source",
-              "wan_t5_encoder_model",
-              "wan_transformer_low_noise"
-            ],
+            "enum": ["* CUSTOM LABEL *", "model", "refiner_model"],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "model",
@@ -91540,7 +91505,7 @@
         "tags": ["metadata"],
         "title": "Metadata To Model",
         "type": "object",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/MetadataToModelOutput"
         }
@@ -91761,42 +91726,7 @@
           "label": {
             "default": "model",
             "description": "Label for this metadata item",
-            "enum": [
-              "* CUSTOM LABEL *",
-              "model",
-              "refiner_model",
-              "pid_decoder",
-              "gemma2_encoder",
-              "t5_encoder",
-              "t5_encoder_model",
-              "clip_embed_model",
-              "clip_l_model",
-              "clip_g_model",
-              "mistral_encoder",
-              "mistral_encoder_model",
-              "qwen3_encoder",
-              "qwen3_encoder_model",
-              "qwen3_source",
-              "qwen3_5_encoder",
-              "qwen3_vl_encoder",
-              "qwen3_vl_vision_tower",
-              "qwen_vl_encoder",
-              "glm_encoder",
-              "anima_inpaint_adapter",
-              "flux3_prompt_upsampler",
-              "ideogram4_unconditional_model",
-              "ltx2_component_source",
-              "ltx2_text_encoder_model",
-              "minimax_h3_component_source",
-              "minimax_h3_hybrid_base_model",
-              "minimax_h3_text_encoder_model",
-              "minimax_h3_transformer_model",
-              "qwen_image_component_source",
-              "qwen_image_qwen_vl_encoder",
-              "wan_component_source",
-              "wan_t5_encoder_model",
-              "wan_transformer_low_noise"
-            ],
+            "enum": ["* CUSTOM LABEL *", "model"],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "model",
@@ -91850,7 +91780,7 @@
         "tags": ["metadata"],
         "title": "Metadata To SDXL Model",
         "type": "object",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/MetadataToSDXLModelOutput"
         }
@@ -92044,7 +91974,7 @@
         "tags": ["metadata"],
         "title": "Metadata To Scheduler",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/SchedulerOutput"
         }
@@ -92180,7 +92110,7 @@
         "tags": ["metadata"],
         "title": "Metadata To String Collection",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/StringCollectionOutput"
         }
@@ -92313,7 +92243,7 @@
         "tags": ["metadata"],
         "title": "Metadata To String",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/StringOutput"
         }
@@ -92400,7 +92330,7 @@
         "tags": ["metadata"],
         "title": "Metadata To T2I-Adapters",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/MDT2IAdapterListOutput"
         }
@@ -92507,7 +92437,7 @@
         "tags": ["metadata"],
         "title": "Metadata To VAE",
         "type": "object",
-        "version": "1.2.1",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/VAEOutput"
         }

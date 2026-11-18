@@ -260,7 +260,7 @@ const addVideoMetadata = ({
           source_video_start_frame: settings.sourceVideo.startFrame,
         }
       : {}),
-    ...(activeLoras.length ? { loras: activeLoras.map(toMetadataLora) } : {}),
+    ...(activeLoras.length ? { loras: activeLoras.map((lora) => toMetadataLora(lora, model)) } : {}),
     ...extras,
   });
 
@@ -305,7 +305,7 @@ const buildWanVideoGraph = (settings: VideoSettings, model: MainModelConfig): Ba
   });
   // Wan LoRAs patch transformers; auto routing uses probed high/low tags to place accelerator pairs correctly.
   const activeLoras = getActiveCompatibleLoras(settings, model);
-  const loraSource = activeLoras.length ? addWanLoraLoaders(graph, activeLoras, modelLoader) : modelLoader;
+  const loraSource = activeLoras.length ? addWanLoraLoaders(graph, activeLoras, modelLoader, model) : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'wan_text_encoder' });
   const negCond = addNode(graph, { id: 'neg_cond', type: 'wan_text_encoder' });
   const denoise = addNode(graph, {

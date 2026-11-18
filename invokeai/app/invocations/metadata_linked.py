@@ -46,10 +46,16 @@ from invokeai.app.invocations.metadata_constants import (
     CORE_LABELS_INTEGER as CORE_LABELS_INTEGER,
 )
 from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_MAIN_MODEL as CORE_LABELS_MAIN_MODEL,
+)
+from invokeai.app.invocations.metadata_constants import (
     CORE_LABELS_MODEL as CORE_LABELS_MODEL,
 )
 from invokeai.app.invocations.metadata_constants import (
     CORE_LABELS_SCHEDULER as CORE_LABELS_SCHEDULER,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CORE_LABELS_SDXL_MODEL as CORE_LABELS_SDXL_MODEL,
 )
 from invokeai.app.invocations.metadata_constants import (
     CORE_LABELS_STRING as CORE_LABELS_STRING,
@@ -180,17 +186,34 @@ def extract_model_key(
     """
 
     if label in metadata and isinstance(metadata[label], dict):
-        if "key" in metadata[label]:
-            if context.models.exists(metadata[label]["key"]):
-                return metadata[label]["key"]
-        if "name" in metadata[label]:
-            search_model = context.models.search_by_attrs(name=metadata[label]["name"], type=model_type)
-            if len(search_model) > 0:
-                return search_model[0].key
-        if "model_name" in metadata[label]:
-            search_model = context.models.search_by_attrs(name=metadata[label]["model_name"], type=model_type)
-            if len(search_model) > 0:
-                return search_model[0].key
+        entry = metadata[label]
+        if "key" in entry:
+            key = entry["key"]
+            if key is not None and context.models.exists(key):
+                get_config = getattr(context.models, "get_config", None)
+                if callable(get_config):
+                    cfg = get_config(key)
+                    cfg_type = getattr(cfg, "type", None)
+                    if isinstance(cfg_type, (ModelType, str)) and cfg_type != model_type:
+                        _warn(
+                            context,
+                            f"Metadata label '{label}' references model '{key}' of type '{cfg_type}', "
+                            f"expected '{model_type}'; ignoring key.",
+                        )
+                    else:
+                        return key
+                else:
+                    return key
+        search_by_attrs = getattr(context.models, "search_by_attrs", None)
+        if callable(search_by_attrs):
+            if "name" in entry:
+                search_model = search_by_attrs(name=entry["name"], type=model_type)
+                if len(search_model) > 0:
+                    return search_model[0].key
+            if "model_name" in entry:
+                search_model = search_by_attrs(name=entry["model_name"], type=model_type)
+                if len(search_model) > 0:
+                    return search_model[0].key
 
     return default_key
 
@@ -221,7 +244,7 @@ def get_model(
     title="Metadata Item Linked",
     tags=["metadata"],
     category="metadata",
-    version="1.0.1",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
@@ -370,7 +393,7 @@ def _extract_collection_metadata(
     title="Metadata To String",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToStringInvocation(BaseInvocation, WithMetadata):
@@ -403,7 +426,7 @@ class MetadataToStringInvocation(BaseInvocation, WithMetadata):
     title="Metadata To Integer",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToIntegerInvocation(BaseInvocation, WithMetadata):
@@ -436,7 +459,7 @@ class MetadataToIntegerInvocation(BaseInvocation, WithMetadata):
     title="Metadata To Float",
     tags=["metadata"],
     category="metadata",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Beta,
 )
 class MetadataToFloatInvocation(BaseInvocation, WithMetadata):
@@ -469,7 +492,7 @@ class MetadataToFloatInvocation(BaseInvocation, WithMetadata):
     title="Metadata To Bool",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToBoolInvocation(BaseInvocation, WithMetadata):
@@ -502,7 +525,7 @@ class MetadataToBoolInvocation(BaseInvocation, WithMetadata):
     title="Metadata To Scheduler",
     tags=["metadata"],
     category="metadata",
-    version="1.0.1",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToSchedulerInvocation(BaseInvocation, WithMetadata):
@@ -567,13 +590,13 @@ class MetadataToSDXLModelOutput(BaseInvocationOutput):
     title="Metadata To Model",
     tags=["metadata"],
     category="metadata",
-    version="1.3.0",
+    version="1.4.0",
     classification=Classification.Beta,
 )
 class MetadataToModelInvocation(BaseInvocation, WithMetadata):
     """Extracts a Model value of a label from metadata"""
 
-    label: CORE_LABELS_MODEL = InputField(
+    label: CORE_LABELS_MAIN_MODEL = InputField(
         default="model",
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
@@ -621,13 +644,13 @@ class MetadataToModelInvocation(BaseInvocation, WithMetadata):
     title="Metadata To SDXL Model",
     tags=["metadata"],
     category="metadata",
-    version="1.3.0",
+    version="1.4.0",
     classification=Classification.Beta,
 )
 class MetadataToSDXLModelInvocation(BaseInvocation, WithMetadata):
     """Extracts a SDXL Model value of a label from metadata"""
 
-    label: CORE_LABELS_MODEL = InputField(
+    label: CORE_LABELS_SDXL_MODEL = InputField(
         default="model",
         description=FieldDescriptions.metadata_item_label,
         input=Input.Direct,
@@ -793,7 +816,7 @@ class AnimaDenoiseMetaInvocation(AnimaDenoiseInvocation):
     title="Metadata To VAE",
     tags=["metadata"],
     category="metadata",
-    version="1.2.1",
+    version="1.3.0",
     classification=Classification.Beta,
 )
 class MetadataToVAEInvocation(BaseInvocation, WithMetadata):
@@ -1430,7 +1453,7 @@ class MDControlListOutput(BaseInvocationOutput):
     title="Metadata To ControlNets",
     tags=["metadata"],
     category="metadata",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Beta,
 )
 class MetadataToControlnetsInvocation(BaseInvocation, WithMetadata):
@@ -1502,7 +1525,7 @@ class MDIPAdapterListOutput(BaseInvocationOutput):
     title="Metadata To IP-Adapters",
     tags=["metadata"],
     category="metadata",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Beta,
 )
 class MetadataToIPAdaptersInvocation(BaseInvocation, WithMetadata):
@@ -1582,7 +1605,7 @@ class MDT2IAdapterListOutput(BaseInvocationOutput):
     title="Metadata To T2I-Adapters",
     tags=["metadata"],
     category="metadata",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Beta,
 )
 class MetadataToT2IAdaptersInvocation(BaseInvocation, WithMetadata):
@@ -1642,7 +1665,7 @@ class MetadataToT2IAdaptersInvocation(BaseInvocation, WithMetadata):
     title="Metadata To String Collection",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToStringCollectionInvocation(BaseInvocation, WithMetadata):
@@ -1677,7 +1700,7 @@ class MetadataToStringCollectionInvocation(BaseInvocation, WithMetadata):
     title="Metadata To Integer Collection",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToIntegerCollectionInvocation(BaseInvocation, WithMetadata):
@@ -1710,7 +1733,7 @@ class MetadataToIntegerCollectionInvocation(BaseInvocation, WithMetadata):
     title="Metadata To Float Collection",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToFloatCollectionInvocation(BaseInvocation, WithMetadata):
@@ -1743,7 +1766,7 @@ class MetadataToFloatCollectionInvocation(BaseInvocation, WithMetadata):
     title="Metadata To Bool Collection",
     tags=["metadata"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Beta,
 )
 class MetadataToBoolCollectionInvocation(BaseInvocation, WithMetadata):

@@ -39085,7 +39085,7 @@ export type components = {
              * @default model
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "model" | "refiner_model" | "pid_decoder" | "gemma2_encoder" | "t5_encoder" | "t5_encoder_model" | "clip_embed_model" | "clip_l_model" | "clip_g_model" | "mistral_encoder" | "mistral_encoder_model" | "qwen3_encoder" | "qwen3_encoder_model" | "qwen3_source" | "qwen3_5_encoder" | "qwen3_vl_encoder" | "qwen3_vl_vision_tower" | "qwen_vl_encoder" | "glm_encoder" | "anima_inpaint_adapter" | "flux3_prompt_upsampler" | "ideogram4_unconditional_model" | "ltx2_component_source" | "ltx2_text_encoder_model" | "minimax_h3_component_source" | "minimax_h3_hybrid_base_model" | "minimax_h3_text_encoder_model" | "minimax_h3_transformer_model" | "qwen_image_component_source" | "qwen_image_qwen_vl_encoder" | "wan_component_source" | "wan_t5_encoder_model" | "wan_transformer_low_noise";
+            label?: "* CUSTOM LABEL *" | "model" | "refiner_model";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -39226,7 +39226,7 @@ export type components = {
              * @default model
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "model" | "refiner_model" | "pid_decoder" | "gemma2_encoder" | "t5_encoder" | "t5_encoder_model" | "clip_embed_model" | "clip_l_model" | "clip_g_model" | "mistral_encoder" | "mistral_encoder_model" | "qwen3_encoder" | "qwen3_encoder_model" | "qwen3_source" | "qwen3_5_encoder" | "qwen3_vl_encoder" | "qwen3_vl_vision_tower" | "qwen_vl_encoder" | "glm_encoder" | "anima_inpaint_adapter" | "flux3_prompt_upsampler" | "ideogram4_unconditional_model" | "ltx2_component_source" | "ltx2_text_encoder_model" | "minimax_h3_component_source" | "minimax_h3_hybrid_base_model" | "minimax_h3_text_encoder_model" | "minimax_h3_transformer_model" | "qwen_image_component_source" | "qwen_image_qwen_vl_encoder" | "wan_component_source" | "wan_t5_encoder_model" | "wan_transformer_low_noise";
+            label?: "* CUSTOM LABEL *" | "model";
             /**
              * Custom Label
              * @description Label for this metadata item

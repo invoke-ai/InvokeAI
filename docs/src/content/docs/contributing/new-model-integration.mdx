@@ -694,7 +694,7 @@ File: `invokeai/app/invocations/metadata.py`
    )
    ```
 
-   This automatically makes the parameter available in workflow metadata extraction nodes (`Metadata to Model`, `Metadata to Float`, etc.), guarantees `* CUSTOM LABEL *` remains at index 0, and ensures proper submodel unwrapping for frontend gallery recall.
+   This automatically adds the key to `Metadata Item Linked` (`CORE_LABELS`) and the matching typed extraction nodes (`Metadata to Float`, `Metadata to VAE`, etc.; `Metadata to Model` and `Metadata to SDXL Model` remain restricted to main-model labels via `CORE_LABELS_MAIN_MODEL` / `CORE_LABELS_SDXL_MODEL`), guarantees `* CUSTOM LABEL *` remains at index 0, and adds `T.MODEL` / `T.VAE` entries to `CORE_MODEL_LABELS` for submodel unwrapping during gallery recall.
 
 3. **Metadata fields (if needed).**
 

@@ -3417,3 +3417,72 @@ def test_all_denoise_build_metadata_keys_registered_in_core_registry() -> None:
                     emitted_keys.add(node.slice.value)
         unregistered = emitted_keys - registry_keys - non_registry_collection_keys
         assert not unregistered, f"{cls.get_type()}._build_metadata emits unregistered keys: {sorted(unregistered)}"
+
+
+def test_wan_lora_loader_ti2v_5b_single_vs_chained_target() -> None:
+    """JP-R6-1: On TI2V-5B, chaining target='high' + target='low' for the same LoRA key raises ValueError,
+    while a single WanLoRALoaderInvocation succeeds and populates output.transformer.loras."""
+    from unittest.mock import MagicMock
+
+    from invokeai.app.invocations.wan.wan_lora_loader import WanLoRALoaderInvocation
+    from invokeai.backend.model_manager.taxonomy import WanLoRAVariantType, WanVariantType
+
+    main_id = _make_model_id(key="wan-5b-main", base=BaseModelType.Wan)
+    lora_id = _make_model_id(key="wan-5b-lora", base=BaseModelType.Wan, model_type=ModelType.LoRA)
+    configs = {
+        main_id.key: SimpleNamespace(
+            key=main_id.key,
+            hash=main_id.hash,
+            name=main_id.name,
+            base=BaseModelType.Wan,
+            type=ModelType.Main,
+            variant=WanVariantType.TI2V_5B,
+        ),
+        lora_id.key: SimpleNamespace(
+            key=lora_id.key,
+            hash=lora_id.hash,
+            name=lora_id.name,
+            base=BaseModelType.Wan,
+            type=ModelType.LoRA,
+            expert=None,
+            variant=WanLoRAVariantType.Wan5B,
+        ),
+    }
+    ctx = SimpleNamespace(
+        logger=MagicMock(),
+        models=SimpleNamespace(
+            exists=lambda k: k in configs,
+            get_config=lambda ident: configs[ident.key if hasattr(ident, "key") else ident],
+        ),
+    )
+
+    transformer = WanTransformerField(transformer=main_id, transformer_low_noise=None, loras=[], loras_low_noise=[])
+
+    # Single invocation (e.g. target="both" or "high") succeeds and populates output.transformer.loras
+    single_out = WanLoRALoaderInvocation(
+        id="wan-lora-single",
+        lora=lora_id,
+        weight=0.75,
+        target="both",
+        transformer=transformer,
+    ).invoke(ctx)
+    assert single_out.transformer is not None
+    assert [(item.lora.key, item.weight) for item in single_out.transformer.loras] == [("wan-5b-lora", 0.75)]
+
+    # Chaining target="high" followed by target="low" for the same key on TI2V-5B raises ValueError
+    high_out = WanLoRALoaderInvocation(
+        id="wan-lora-high",
+        lora=lora_id,
+        weight=0.8,
+        target="high",
+        transformer=transformer,
+    ).invoke(ctx)
+    assert high_out.transformer is not None
+    with pytest.raises(ValueError, match="already applied to primary"):
+        WanLoRALoaderInvocation(
+            id="wan-lora-low",
+            lora=lora_id,
+            weight=0.4,
+            target="low",
+            transformer=high_out.transformer,
+        ).invoke(ctx)
