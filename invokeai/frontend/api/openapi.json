@@ -35462,10 +35462,15 @@
           "bytes_freed": {
             "type": "integer",
             "title": "Bytes Freed"
+          },
+          "vram_release_refused": {
+            "type": "boolean",
+            "title": "Vram Release Refused",
+            "description": "The device refused to return its cached memory to the driver after the models were dropped (for example an earlier error left it in a bad state). The models were still dropped; the memory stays reserved by this process."
           }
         },
         "type": "object",
-        "required": ["models_cleared", "bytes_freed"],
+        "required": ["models_cleared", "bytes_freed", "vram_release_refused"],
         "title": "EmptyModelCacheResponse"
       },
       "EnqueueBatchReceipt": {
