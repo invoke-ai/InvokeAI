@@ -91716,6 +91716,7 @@
               "moss_image_uncond_skip_layers",
               "qwen_image_2_1_prefix_kv_cache",
               "qwen_image_component_source",
+              "component_source",
               "qwen_image_quantization",
               "qwen_image_qwen_vl_encoder",
               "qwen_image_shift",
