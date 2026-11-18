@@ -7,8 +7,8 @@ import threading
 import uuid
 import weakref
 from bisect import bisect_left, bisect_right
-from collections.abc import AsyncIterator, Callable, Iterable, Mapping
-from contextlib import AbstractContextManager, ExitStack, asynccontextmanager
+from collections.abc import AsyncIterator, Callable, Iterable, Iterator, Mapping
+from contextlib import AbstractContextManager, ExitStack, asynccontextmanager, contextmanager
 from dataclasses import dataclass
 from functools import partial
 from itertools import chain
@@ -707,7 +707,8 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         """For a run of an attempt, hold the lock every attempt's creation takes, from the run's record through its
         enqueue to the record of its items, in every process serving the root: the next attempt's creation finds the
         items of the last one in the queue, and refuses while they run (`CalibrationAttemptBusyError`). The runs of one
-        attempt are posted one after the other, so they barely wait. A run without an attempt takes no lock."""
+        attempt are posted one after the other, so they barely wait. A run without an attempt takes no lock. A retry of
+        calibration items holds it too, from its checks through its commit (`retry_admission`)."""
         if request.attempt_id is None:
             yield
             return
@@ -1249,6 +1250,19 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
             ),
         )
 
+    @contextmanager
+    def retry_admission(self, sources: Mapping[int, tuple[Optional[str], int]]) -> Iterator[None]:
+        """While a retry of calibration items is checked (`retries_starting`) and committed, hold the lock every
+        attempt's creation holds from its checks through its enqueue (`_attempt_lock`), in every process serving the
+        root: a creation then finds the retry queued and refuses while it runs, or the retry finds the run created and
+        is refused as `retries_starting` says. A retry of generations alone takes no lock. Raises
+        `CalibrationStoreError` when the lock cannot be taken (an unwritable root, a timeout)."""
+        if not any(calibration_run_id(origin) is not None for origin, _ in sources.values()):
+            yield
+            return
+        with self._store.attempts_lock():
+            yield
+
     def retries_starting(self, sources: Mapping[int, tuple[Optional[str], int]]) -> Optional[RetriesInFlight]:
         """Count a retry in flight on each run one of whose items the queue is about to retry, before it commits the
         retries: the store then records every retry of a calibration item, or keeps its attempt out of every fit.
@@ -1258,7 +1272,7 @@ class WorkingMemoryCalibrationService(WorkingMemoryCalibrationServiceBase):
         (`CalibrationAttemptInterleavedError`), or another attempt holds the device class
         (`CalibrationAttemptBusyError`, `_attempt_blocks`), which also refuses the retry of a run without an attempt
         between another attempt's steps. A count left over in `retries_in_flight` refuses nothing: it would refuse for
-        good.
+        good. The queue calls this under `retry_admission`.
 
         A retry inherits its source's origin, which names the run: a recreated or restored database that gave a
         recorded id to an unrelated item cannot make that item's retry the run's, and a bulk retry of generations

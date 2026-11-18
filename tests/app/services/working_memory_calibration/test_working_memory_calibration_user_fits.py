@@ -1878,6 +1878,55 @@ def test_a_bulk_retry_is_refused_when_any_of_its_runs_is_cut_off(tmp_path: Path,
     assert len(queue.retry_items_by_id("default", script.item_ids).retried_items) == 1
 
 
+def test_no_attempt_starts_between_a_retrys_check_and_its_commit(
+    tmp_path: Path, started, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A's one-step attempt failed, and nothing runs: its retry passes the check. Before the queue commits it, another
+    administrator starts B, whose check would find nothing running yet. The retry holds the attempts' lock through its
+    commit: B waits for it, then finds A's retry queued and is refused."""
+    service = started(tmp_path)
+    queue = service._services.session_queue
+    failed = _failed(service, "tab-a", steps=1)
+    lock = service._file_lock
+    arrived = threading.Event()
+
+    @asynccontextmanager
+    async def watched(name: str, os_lock):
+        if name == _ATTEMPTS_LOCK:
+            arrived.set()
+        async with lock(name, os_lock):
+            yield
+
+    monkeypatch.setattr(service, "_file_lock", watched)
+    outcome: list = []
+
+    def start_b() -> None:
+        try:
+            outcome.append(asyncio.run(service.create_run("model-a", _steps("tab-b", 2), "other-admin")))
+        except Exception as error:
+            outcome.append(error)
+
+    other = threading.Thread(target=start_b)
+    checked = service.retries_starting
+
+    def checked_then_b_starts(sources):
+        in_flight = checked(sources)
+        other.start()
+        assert arrived.wait(10)
+        # Time for B to pass the retry, were nothing to hold it.
+        other.join(timeout=0.5)
+        return in_flight
+
+    monkeypatch.setattr(service, "retries_starting", checked_then_b_starts)
+    [retried] = queue.retry_items_by_id("default", failed.item_ids).retried_items
+    other.join(timeout=10)
+
+    [refused] = outcome
+    assert isinstance(refused, CalibrationAttemptBusyError), refused
+    assert sorted(queue.get_queue_item_ids("default").item_ids) == sorted(failed.item_ids + [retried.item_id])
+    assert [run.attempt_id for run in service.get_status().device_classes[0].runs] == ["tab-a"]
+
+
 def test_another_attempt_waits_while_one_is_between_its_steps(tmp_path: Path, started, monkeypatch) -> None:
     """A's first step finished a moment ago, and its client is about to post the next: B, another administrator's,
     is refused, A's next step is not, and once A finished B may start."""

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
+from contextlib import AbstractContextManager
 from typing import Optional
 
 from invokeai.app.services.session_queue.session_queue_common import RetriedQueueItem, SessionQueueItem
@@ -31,6 +32,13 @@ class WorkingMemoryCalibrationServiceBase(ABC):
     @abstractmethod
     def admit(self, queue_item: SessionQueueItem, run_id: str) -> Optional[str]:
         """Called by the session runner before a calibration item runs: None to run it, or why it must fail."""
+
+    @abstractmethod
+    def retry_admission(self, sources: Mapping[int, tuple[Optional[str], int]]) -> AbstractContextManager[None]:
+        """Held by the session queue from `retries_starting` through the commit of the retries, `sources` as there:
+        when an item is a calibration's, the lock every calibration attempt's creation holds from its checks through
+        its enqueue, so that no attempt is created between a retry's checks and its commit. A retry of generations
+        alone takes nothing. Raises `CalibrationStoreError` when the lock cannot be taken: the queue retries nothing."""
 
     @abstractmethod
     def retries_starting(self, sources: Mapping[int, tuple[Optional[str], int]]) -> Optional[RetriesInFlight]:
