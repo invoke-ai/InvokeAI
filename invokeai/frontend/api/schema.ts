@@ -7646,6 +7646,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -7734,6 +7739,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -7824,6 +7834,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Format
              * @default diffusers
              * @constant
@@ -7909,6 +7924,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Format
              * @default diffusers
@@ -8091,6 +8111,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Format
              * @default diffusers
@@ -10028,6 +10053,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             default_settings: components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
              * Base
@@ -10264,6 +10294,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -10347,6 +10382,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -10436,6 +10476,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -10528,6 +10573,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -10614,6 +10664,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -10693,6 +10748,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -10771,6 +10831,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -10861,6 +10926,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -10940,6 +11010,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Format
              * @default diffusers
              * @constant
@@ -11015,6 +11090,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Format
              * @default diffusers
@@ -11092,6 +11172,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Format
              * @default diffusers
              * @constant
@@ -11167,6 +11252,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Format
              * @default diffusers
@@ -13736,6 +13826,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Base
              * @default external
              * @constant
@@ -14205,6 +14300,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default flux_redux
@@ -18917,6 +19017,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Base
              * @default any
              * @constant
@@ -19006,6 +19111,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Base
              * @default any
              * @constant
@@ -19086,6 +19196,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -19172,6 +19287,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Base
              * @default ltx-2
@@ -19954,6 +20074,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default ip_adapter
              * @constant
@@ -20026,6 +20151,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default ip_adapter
@@ -20100,6 +20230,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default ip_adapter
              * @constant
@@ -20172,6 +20307,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default ip_adapter
@@ -20246,6 +20386,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default ip_adapter
              * @constant
@@ -20318,6 +20463,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default ip_adapter
@@ -20394,6 +20544,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default ip_adapter
              * @constant
@@ -20468,6 +20623,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default ip_adapter
@@ -27747,6 +27907,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default ltx2_duration_head
              * @constant
@@ -29428,6 +29593,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Format
              * @default diffusers
              * @constant
@@ -29748,6 +29918,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -29830,6 +30005,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default lora
@@ -29917,6 +30097,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -30001,6 +30186,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default lora
@@ -30087,6 +30277,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -30167,6 +30362,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -30246,6 +30446,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default lora
@@ -30332,6 +30537,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -30412,6 +30622,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default lora
@@ -30496,6 +30711,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -30579,6 +30799,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default lora
@@ -30668,6 +30893,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -30747,6 +30977,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default lora
@@ -30830,6 +31065,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default lora
@@ -30920,6 +31160,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -31008,6 +31253,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -31090,6 +31340,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default lora
@@ -31183,6 +31438,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -31275,6 +31535,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -31364,6 +31629,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -31448,6 +31718,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -31531,6 +31806,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -31611,6 +31891,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -31690,6 +31975,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default lora
@@ -31778,6 +32068,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -31858,6 +32153,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default lora
@@ -31950,6 +32250,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -32040,6 +32345,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -32121,6 +32431,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default lora
              * @constant
@@ -32200,6 +32515,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default lora
@@ -32599,6 +32919,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -32690,6 +33015,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -32785,6 +33115,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -32872,6 +33207,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -32961,6 +33301,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -33055,6 +33400,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -33154,6 +33504,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -33247,6 +33602,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -33342,6 +33702,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -33449,6 +33814,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -33549,6 +33919,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -33636,6 +34011,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -33732,6 +34112,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -33817,6 +34202,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -33905,6 +34295,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -33992,6 +34387,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -34078,6 +34478,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -34181,6 +34586,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -34277,6 +34687,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -34363,6 +34778,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -34447,6 +34867,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -34533,6 +34958,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -34618,6 +35048,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -34708,6 +35143,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -34800,6 +35240,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -34884,6 +35329,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -34983,6 +35433,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -35088,6 +35543,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -35183,6 +35643,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -35267,6 +35732,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -35354,6 +35824,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -35436,6 +35911,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -35521,6 +36001,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -35604,6 +36089,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -35695,6 +36185,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -35778,6 +36273,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -35869,6 +36369,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -35967,6 +36472,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -36057,6 +36567,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -36153,6 +36668,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -36240,6 +36760,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -36330,6 +36855,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -36418,6 +36948,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -36513,6 +37048,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -36606,6 +37146,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -36702,6 +37247,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -36802,6 +37352,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -36889,6 +37444,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -36978,6 +37538,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -37075,6 +37640,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -37167,6 +37737,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -37264,6 +37839,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -37352,6 +37932,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -37447,6 +38032,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -37539,6 +38129,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -37633,6 +38228,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -37722,6 +38322,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default main
              * @constant
@@ -37810,6 +38415,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default main
@@ -40403,6 +41013,12 @@ export type components = {
              */
             text_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
+             * Task Variant Override
+             * @description Override the detected transformer task variant for this invocation. The denoiser still validates conditioning against the selected variant.
+             * @default null
+             */
+            task_variant_override?: ("fl2va" | "ref2va") | null;
+            /**
              * type
              * @default minimax_h3_model_loader
              * @constant
@@ -40967,6 +41583,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -41070,6 +41691,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Base
              * @default any
              * @constant
@@ -41156,6 +41782,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -41217,7 +41848,7 @@ export type components = {
             name: string;
             /** @description The model's base model type */
             base: components["schemas"]["BaseModelType"];
-            /** @description The model's type */
+            /** @description The model's type, or a role it serves as (see its config's `roles`) when a node asks for it in that role */
             type: components["schemas"]["ModelType"];
             /**
              * @description The submodel to load, if this is a main model
@@ -41832,6 +42463,20 @@ export type components = {
          * @enum {string}
          */
         ModelRepoVariant: "" | "fp16" | "fp32" | "onnx" | "openvino" | "flax";
+        /**
+         * ModelRole
+         * @description Another model type a model's files serve as, beside the type its record is filed under. Set by identification.
+         */
+        ModelRole: {
+            type: components["schemas"]["ModelType"];
+            /** @description The format the model loads in for this role, when it differs from the record's format */
+            format: components["schemas"]["ModelFormat"] | null;
+            /**
+             * Variant
+             * @description The variant the model serves as in this role
+             */
+            variant: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["Flux3VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["WanVariantType"] | components["schemas"]["WanLoRAVariantType"] | components["schemas"]["SD3VariantType"] | components["schemas"]["Qwen3VariantType"] | components["schemas"]["Qwen3VLVariantType"] | components["schemas"]["Qwen35VariantType"] | components["schemas"]["AnimaVariantType"] | components["schemas"]["Krea2VariantType"] | components["schemas"]["QwenImage21VariantType"] | components["schemas"]["MiniMaxH3VariantType"] | components["schemas"]["LTX2VariantType"] | components["schemas"]["MistralVariantType"] | components["schemas"]["PiDDecoderVariantType"] | null;
+        };
         /**
          * ModelSourceType
          * @description Model source type.
@@ -43279,6 +43924,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -43361,6 +44011,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -43449,6 +44104,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -43532,6 +44192,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -43614,6 +44279,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -44714,6 +45384,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -44827,6 +45502,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -44914,6 +45594,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -45006,6 +45691,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Base
              * @default any
              * @constant
@@ -45088,6 +45778,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -45179,6 +45874,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Base
              * @default any
@@ -45289,6 +45989,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -45391,6 +46096,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -45489,6 +46199,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -45581,6 +46296,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Base
              * @default any
@@ -45681,6 +46401,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -47109,6 +47834,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -47205,6 +47935,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Base
              * @default any
              * @constant
@@ -47289,6 +48024,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -50197,6 +50937,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Format
              * @default diffusers
              * @constant
@@ -50403,6 +51148,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Base
              * @default any
@@ -51579,6 +52329,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Format
              * @default diffusers
              * @constant
@@ -51654,6 +52409,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Format
              * @default diffusers
@@ -51746,6 +52506,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Base
              * @default any
              * @constant
@@ -51829,6 +52594,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -51919,6 +52689,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -52018,6 +52793,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Base
              * @default any
              * @constant
@@ -52099,6 +52879,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Base
              * @default any
@@ -52189,6 +52974,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default embedding
              * @constant
@@ -52261,6 +53051,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default embedding
@@ -52335,6 +53130,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default embedding
              * @constant
@@ -52407,6 +53207,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default embedding
@@ -52481,6 +53286,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Type
              * @default embedding
              * @constant
@@ -52553,6 +53363,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Type
              * @default embedding
@@ -52716,8 +53531,8 @@ export type components = {
          *     The layout is transformers' own `Qwen3_5ForConditionalGeneration` state dict, as ComfyUI exports the FLUX.3
          *     prompt upsampler (bf16, or `int8_tensorwise` with a multi-token-prediction head the loader drops). The file
          *     carries weights only; the loader supplies config, tokenizer and processor from the vendored Qwen3.5 assets,
-         *     which exist for the 9B. Comfy-Org's MOSS-Image encoders have the same tensors and are
-         *     `Qwen35Encoder_Checkpoint_Config`'s; they are told apart by their install source.
+         *     which exist for the 9B. The same file is Comfy-Org's MOSS-Image text encoder, so it also serves as a Qwen3.5
+         *     encoder (role).
          */
         TextLLM_Checkpoint_Config: {
             /**
@@ -52772,6 +53587,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -52865,6 +53685,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Format
              * @default diffusers
@@ -53240,6 +54065,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -53327,6 +54157,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -53416,6 +54251,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -53503,6 +54343,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -53592,6 +54437,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -53680,6 +54530,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -53767,6 +54622,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -53858,6 +54718,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -54125,6 +54990,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Base
              * @default unknown
@@ -54486,6 +55356,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -54568,6 +55443,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -54655,6 +55535,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -54740,6 +55625,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -54827,6 +55717,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -54909,6 +55804,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -54993,6 +55893,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -55076,6 +55981,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -55158,6 +56068,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Config Path
              * @description Path to the config for this model, if any.
@@ -55248,6 +56163,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -55337,6 +56257,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Format
              * @default diffusers
              * @constant
@@ -55419,6 +56344,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Format
              * @default diffusers
@@ -55503,6 +56433,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Format
              * @default diffusers
              * @constant
@@ -55582,6 +56517,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Format
              * @default diffusers
@@ -55663,6 +56603,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Format
              * @default diffusers
              * @constant
@@ -55742,6 +56687,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Format
              * @default diffusers
@@ -55825,6 +56775,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Format
              * @default diffusers
@@ -57662,6 +58617,11 @@ export type components = {
              */
             cover_image: string | null;
             /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
+            /**
              * Config Path
              * @description Path to the config for this model, if any.
              */
@@ -57753,6 +58713,11 @@ export type components = {
              * @description Url for image to preview model
              */
             cover_image: string | null;
+            /**
+             * Roles
+             * @description Other model types this model serves as, besides `type`. Derived from its files at identification; re-identify to refresh.
+             */
+            roles: components["schemas"]["ModelRole"][];
             /**
              * Base
              * @default any

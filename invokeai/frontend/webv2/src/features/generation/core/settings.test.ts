@@ -1,4 +1,4 @@
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { getSeedSequenceLength, getSeedStep, planSeedSubmission, SEED_MAX, wrapSeed } from '@platform/core/seed';
 import { describe, expect, it } from 'vitest';
 

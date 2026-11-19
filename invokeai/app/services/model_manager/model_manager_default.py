@@ -86,8 +86,8 @@ class ModelManagerService(ModelManagerServiceBase):
         if encoder_id := getattr(config, "image_encoder_model_id", None):
             override_fields["image_encoder_model_id"] = encoder_id
         if isinstance(config, Qwen35Encoder_Checkpoint_Config):
-            # A Qwen3.5 encoder file can be the same tensors as a Text LLM (Comfy-Org's int8 MOSS-Image encoder against
-            # the FLUX.3 upsampler), and a local copy has no source to tell them apart: keep the type it was given.
+            # The weights cannot tell the MOSS-Image encoder from the FLUX.3 prompt upsampler (the same tensors), so a
+            # record installed as an encoder keeps that type; identification adds the Text LLM role.
             override_fields["type"] = config.type
         result = ModelConfigFactory.from_model_on_disk(mod, override_fields)
         if result.config is None:

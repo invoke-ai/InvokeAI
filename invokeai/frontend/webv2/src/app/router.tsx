@@ -55,6 +55,7 @@ import {
   useWorkbenchPreferenceSelector,
 } from '@workbench/settings/store';
 import { loadAppVersion } from '@workbench/shell/whatsNewStore';
+import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import i18next from 'i18next';
 import { Fragment, useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -96,7 +97,7 @@ const publishSchedulerPolicy = (next: SchedulerPolicyState): void => {
   schedulerPolicyChannel.notify();
 };
 
-/** Generation's rules arrive with the first Default settings section; the Launchpad does not load them at startup. */
+/** Generation's rules and Models' architecture table arrive with the first Default settings section, not at startup. */
 const schedulerPolicySource: SchedulerPolicySource = {
   getSnapshot: () => schedulerPolicyState,
   load: () => {
@@ -128,18 +129,22 @@ const NO_ACTIVE_PROJECT = () => false;
 export const AccountModelsUiProvider = ({ children }: { children: ReactNode }) => {
   const enableModelDescriptions = useWorkbenchPreferenceSelector((value) => value.enableModelDescriptions);
   const installInPlace = useWorkbenchPreferenceSelector((value) => value.installInPlace);
+  const galleryValues = useWorkbenchPreferenceSelector((value) =>
+    getResolvedProjectWidgetValues(undefined, 'gallery', value.scopedDefaults)
+  );
   const { canManageModels } = useCapabilities();
   const adapter = useMemo<ModelsUiAdapter>(
     () => ({
       canManageModels,
       enableModelDescriptions,
+      galleryValues,
       installInPlace,
       isProjectActive: NO_ACTIVE_PROJECT,
       managerProjectId: null,
       schedulerPolicy: schedulerPolicySource,
       setInstallInPlace,
     }),
-    [canManageModels, enableModelDescriptions, installInPlace]
+    [canManageModels, enableModelDescriptions, galleryValues, installInPlace]
   );
 
   return <ModelsUiProvider adapter={adapter}>{children}</ModelsUiProvider>;

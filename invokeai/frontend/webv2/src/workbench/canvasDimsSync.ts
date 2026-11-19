@@ -7,8 +7,8 @@ import type { AspectRatioId, CanvasScaleMethod, GenerateModelConfig, PidMode } f
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/api';
 import type { WorkbenchState } from '@workbench/projectContracts';
 
-import { subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { clampDimension, deriveAspectRatioId, getGenerationDimensions } from '@features/generation/settings';
+import { subscribeArchitectureCapabilities } from '@features/models/architecturesStore';
 
 import type { WorkbenchCommands } from './workbenchStore';
 

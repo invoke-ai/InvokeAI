@@ -419,17 +419,21 @@ export const normalizeGenerateLora = (value: unknown): GenerateLora | null => {
 
 export const DEFAULT_REFERENCE_IMAGE_LIMIT = 5;
 
-const REFERENCE_IMAGE_CONFIG_TYPES = new Set([
-  'external_reference_image',
-  'flux2_reference_image',
-  'flux_kontext_reference_image',
-  'flux_redux',
-  'ip_adapter',
-  'krea2_edit_reference_image',
-  'krea2_reference_image',
-  'qwen_image_reference_image',
-  'qwen_image_2_1_reference_image',
-]);
+// Keyed by kind, so a new kind fails to compile until the reader below handles it.
+const REFERENCE_IMAGE_CONFIG_TYPES: Record<GenerateReferenceImageConfig['type'], true> = {
+  external_reference_image: true,
+  flux2_reference_image: true,
+  flux_kontext_reference_image: true,
+  flux_redux: true,
+  ip_adapter: true,
+  krea2_edit_reference_image: true,
+  krea2_reference_image: true,
+  qwen_image_reference_image: true,
+  qwen_image_2_1_reference_image: true,
+};
+
+const isReferenceImageConfigType = (value: unknown): value is GenerateReferenceImageConfig['type'] =>
+  typeof value === 'string' && Object.hasOwn(REFERENCE_IMAGE_CONFIG_TYPES, value);
 
 const isClipVisionModel = (value: unknown): value is 'ViT-H' | 'ViT-G' | 'ViT-L' =>
   value === 'ViT-H' || value === 'ViT-G' || value === 'ViT-L';
@@ -450,7 +454,7 @@ const normalizeReferenceImageAsset = (value: unknown): GenerateReferenceImageAss
   value === null ? null : normalizeCroppableImage(value);
 
 const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageConfig | null => {
-  if (!isRecord(value) || typeof value.type !== 'string' || !REFERENCE_IMAGE_CONFIG_TYPES.has(value.type)) {
+  if (!isRecord(value) || !isReferenceImageConfigType(value.type)) {
     return null;
   }
 
@@ -504,8 +508,6 @@ const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageCo
         weight: hasFiniteNumber(value, 'weight') ? (value.weight as number) : 1,
       };
   }
-
-  return null;
 };
 
 /** Long enough for a descriptive label, short enough to stay one line in metadata and recall notices. */

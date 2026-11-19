@@ -353,6 +353,23 @@ describe('saveCanvasToGallery', () => {
     });
   });
 
+  it('records the compositing the user default resolves to when the project pins none', async () => {
+    const harness = createHarness();
+
+    await saveCanvasToGallery({
+      engine: harness.engine,
+      getProject: harness.getProject,
+      project: harness.project,
+      region: 'canvas',
+      scopedDefaults: { canvas: { outputOnlyMaskedRegions: false } },
+      uploadImage: harness.uploadImage,
+    });
+
+    expect(harness.uploadImage.mock.calls[0]?.[1]?.metadata).toMatchObject({
+      canvas_v3_metadata: { settings: { compositing: { outputOnlyMaskedRegions: false } } },
+    });
+  });
+
   it.each(['closed-project', 'mismatched-document', 'expired-account'] as const)(
     'does not upload a %s after pending paint uploads finish',
     async (reason) => {

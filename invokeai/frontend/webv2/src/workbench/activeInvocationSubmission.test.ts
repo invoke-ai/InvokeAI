@@ -7,8 +7,8 @@ import type {
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { galleryKeys } from '@features/gallery/queries';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { queryClient } from '@platform/query/client';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -42,7 +42,7 @@ const owner = { signal: new AbortController().signal } as AccountScope;
 const createArgs = (state = createInitialWorkbenchState()) => {
   return {
     commands: {} as WorkbenchCommands,
-    formatControlLayerError: ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`,
+    formatCanvasInvocationFailure: () => ({ message: 'canvas failure', title: 'canvas failure' }),
     formatUpscaleMetadataFailure: (name: string) => name,
     getModels: () => undefined,
     queries: {
@@ -329,7 +329,7 @@ describe('active invocation submission', () => {
  * former submission path and hold for this one.
  */
 describe('active invocation submission for a graph preview’s source', () => {
-  const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+  const formatCanvasInvocationFailure = () => ({ message: 'canvas failure', title: 'canvas failure' });
   const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
   const animaVae: VaeModelConfig = { base: 'qwen-image', key: 'anima-vae', name: 'Anima VAE', type: 'vae' };
   const qwen3Encoder: ComponentModelConfig = {
@@ -383,7 +383,7 @@ describe('active invocation submission for a graph preview’s source', () => {
     await submitActiveInvocation(
       {
         commands: store.commands,
-        formatControlLayerError,
+        formatCanvasInvocationFailure,
         formatUpscaleMetadataFailure: (name: string) => name,
         getModels: () => undefined,
         onStarted,

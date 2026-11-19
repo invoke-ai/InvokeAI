@@ -1,4 +1,4 @@
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -366,6 +366,21 @@ describe('compileGenerateGraph', () => {
     expect(zImage.nodes.model_loader).toMatchObject({ qwen3_encoder_model: undefined, vae_model: undefined });
   });
 
+  it('sends a standalone Z-Image transformer a Qwen3 4B Text LLM as its stored config', () => {
+    const zImageGguf: MainModelConfig = { ...zImageModel, format: 'gguf_quantized' };
+    const textLlm: ComponentModelConfig = {
+      base: 'any',
+      format: 'diffusers',
+      key: 'llm-4b',
+      name: 'Qwen3 4B',
+      roles: [{ type: 'qwen3_encoder', variant: 'qwen3_4b' }],
+      type: 'text_llm',
+    };
+    const graph = compile(zImageGguf, { qwen3EncoderModel: textLlm, vae: fluxVae });
+
+    expect(graph.nodes.model_loader?.qwen3_encoder_model).toEqual(textLlm);
+  });
+
   it('sends a standalone Z-Image transformer the Qwen3 4B encoder and refuses the 8B one', () => {
     const zImageGguf: MainModelConfig = { ...zImageModel, format: 'gguf_quantized' };
     const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', variant: 'qwen3_4b' };
@@ -552,6 +567,12 @@ describe('compileGenerateGraph', () => {
         openai_quality: 'low',
       });
     });
+  });
+
+  it('records an empty reference list when generating without references', () => {
+    const graph = compile(sd1Model, { referenceImages: [] });
+
+    expect(getNodeByType(graph, 'core_metadata')?.ref_images).toEqual([]);
   });
 
   it('wires SD IP Adapter reference images into denoise', () => {

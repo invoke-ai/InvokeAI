@@ -1,4 +1,4 @@
-import type { ArchitectureCapabilitiesRow } from '@features/generation/core/architectureCapabilities';
+import type { ArchitectureCapabilitiesRow } from '@features/models/core/architectureCapabilities';
 
 import { apiFetchJson } from '@platform/transport/http';
 

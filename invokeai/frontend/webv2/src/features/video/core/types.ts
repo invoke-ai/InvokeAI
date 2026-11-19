@@ -132,6 +132,8 @@ export interface VideoSettings extends DynamicPromptsSettings {
   ltx2DurationHeadModel: ModelIdentifierConfig | null;
   /** Healed against the head only, not the transient mode, or a source clip round trip would lose it. */
   autoDuration: boolean;
+  /** Explicit checkpoint task choice; absent follows the catalog classification. */
+  h3TaskOverride?: 'fl2va' | 'ref2va';
   /** Hybrid: FL2VA base weights with Ref2VA AdaLN from h3HybridStartBlock onward. */
   h3HybridBaseModel: MainModelConfig | null;
   /** First transformer block (0-49) whose AdaLN projection stays Ref2VA's under the hybrid. */

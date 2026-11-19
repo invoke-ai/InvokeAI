@@ -9,6 +9,7 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 import type { QueueProgressSession } from '@features/queue/contracts';
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 
 import { asSingleAccountBoards } from '@features/gallery/core/boardAccess';
 import { createKeyedTransientStore, type KeyedTransientStore } from '@platform/state/externalStore';
@@ -119,12 +120,12 @@ export interface GalleryUiAdapter {
   /** The server has more than one account. */
   boardSharing?: boolean;
   gallery: GalleryCommandsPort;
-  galleryValues: Record<string, unknown>;
+  galleryValues: ResolvedValues;
   generateValues: Record<string, unknown>;
   /** The host narrows the server's check with its projects' own scans; rejects when the check cannot run. */
   getBoardMediaUsage(boardId: string, signal: AbortSignal): Promise<GalleryMediaUsageReport>;
   /** Null once the project is closed. */
-  getProjectGalleryValues?(projectId: string): Record<string, unknown> | null;
+  getProjectGalleryValues?(projectId: string): ResolvedValues | null;
   /** The host may explain where new results still go. */
   noteBoardBrowsed?(boardId: string): void;
   getItemLabel(item: GalleryItemRef): Promise<string | null>;
@@ -225,7 +226,7 @@ export const useHostGalleryBoards = (boards: readonly GalleryBoard[] | undefined
 
 /** A host without a workbench (the Launchpad) supplies one with GalleryHostProvider. */
 export interface GalleryHost {
-  galleryValues: Record<string, unknown>;
+  galleryValues: ResolvedValues;
   notifications: GalleryNotificationsPort;
   projectId?: string;
   projectName: string;

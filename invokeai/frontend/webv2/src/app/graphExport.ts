@@ -6,17 +6,17 @@
  * format and supplies the Workbench defaults the widgets would.
  */
 
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
 import type { GeneratePromptBatchPlan } from '@features/queue/contracts';
 
 import {
   compileGraphExportCase,
-  withArchitectureCapabilities,
-  type ArchitectureCapabilitiesRow,
   type CompiledGraphExportCase,
   type GraphExportCase,
   type GraphExportEnvironment,
   type GraphExportMode,
 } from '@features/generation/graphExport';
+import { withArchitectureCapabilities } from '@features/models/architectures';
 import { planGenerateSubmissionBatch } from '@features/queue/contracts';
 import { resolveRandDeviceMetadata } from '@features/queue/devices';
 import { SEED_MAX } from '@platform/core/seed';

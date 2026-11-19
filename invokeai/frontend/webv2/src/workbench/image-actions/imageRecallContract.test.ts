@@ -17,7 +17,6 @@ import type {
 import type { CanvasCompileMode } from '@features/generation/core/canvas/types';
 import type { SpandrelModelConfig } from '@features/upscale/core/types';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { canvasModesFor, compile as compileCanvas } from '@features/generation/core/canvas/compileCanvasGraph.testing';
 import {
   externalRecallCases,
@@ -36,7 +35,10 @@ import {
   getGenerationUiPolicy,
   isSupportedGenerateModel,
   isVaeModelConfig,
+  normalizeReferenceImages,
+  takesReferenceImages,
 } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { compileModelOnlyUpscaleGraph, compileUpscaleGraph } from '@features/upscale/core/graph';
 import { CASES as UPSCALE_CASES, INSTALLED, valuesForCase } from '@features/upscale/core/upscaleGraphCoverage.testing';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
@@ -411,6 +413,17 @@ const baselineValues = (): GenerateWidgetValues => ({
   positivePrompt: 'the baseline prompt',
   promptTemplate: { id: 'template', name: 'Template', negativePrompt: 'lowres', positivePrompt: '{prompt}, detailed' },
   promptTemplateViewMode: true,
+  referenceImages: normalizeReferenceImages([
+    {
+      config: {
+        image: { height: 512, image_name: 'baseline-reference.png', width: 512 },
+        model: { base: 'sdxl', key: 'baseline-adapter', name: 'Baseline adapter', type: 'ip_adapter' },
+        type: 'ip_adapter',
+      },
+      id: 'baseline-reference',
+      isEnabled: true,
+    },
+  ]),
   seed: 123,
   seedMode: 'random',
 });
@@ -948,6 +961,16 @@ describe('image recall contract', () => {
     });
 
     expect(failures).toEqual([]);
+  });
+
+  it('records the reference list on every generation record of a family that takes references', () => {
+    // Recall reads a missing list as "none", so a builder that forgets to record its references would clear them.
+    const missing = getCases()
+      .filter(({ model, record }) => typeof record.generation_mode === 'string' && takesReferenceImages(model))
+      .filter(({ record }) => !Array.isArray(record.ref_images))
+      .map(({ label }) => label);
+
+    expect(missing).toEqual([]);
   });
 
   it('G8: restores the default a generation record implies for each key it lacks', () => {

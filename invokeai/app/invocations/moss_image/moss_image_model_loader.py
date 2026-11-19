@@ -112,7 +112,9 @@ class MossImageModelLoaderInvocation(BaseInvocation):
             vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
 
         if self.qwen3_5_encoder_model is not None:
-            encoder_config = context.models.get_config(self.qwen3_5_encoder_model)
+            # Asked for as an encoder: a Text LLM holding a whole Qwen3.5 9B checkpoint serves as one.
+            encoder = self.qwen3_5_encoder_model.model_copy(update={"type": ModelType.Qwen35Encoder})
+            encoder_config = context.models.get_config(encoder)
             # Two Qwen3.5 sizes install under this type, and only the 9B fits: MOSS-Image was trained on its 4096-wide
             # last hidden state. The 4B (Anima-3.8B's) would load and then fail on a shape error naming a tensor.
             if (
@@ -121,10 +123,10 @@ class MossImageModelLoaderInvocation(BaseInvocation):
             ):
                 raise ValueError(
                     f"'{encoder_config.name}' is not a Qwen3.5 9B encoder, which MOSS-Image conditions on (hidden "
-                    "size 4096). Select a Qwen3.5 9B encoder."
+                    "size 4096). Select a Qwen3.5 9B encoder or a Text LLM that serves as one."
                 )
-            tokenizer = self.qwen3_5_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
-            text_encoder = self.qwen3_5_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+            tokenizer = encoder.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+            text_encoder = encoder.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         else:
             tokenizer = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             text_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})

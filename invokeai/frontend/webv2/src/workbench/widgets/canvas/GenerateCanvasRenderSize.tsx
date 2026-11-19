@@ -7,8 +7,11 @@ import type { Project } from '@workbench/projectContracts';
 
 import { Box, createListCollection, HStack, NumberInput, Stack, Text } from '@chakra-ui/react';
 import { resolveCanvasProcessingSize } from '@features/generation/canvasProcessingSize';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { clampDimension, getGenerationDimensions, isGenerateModelConfig } from '@features/generation/settings';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Field, Select, Tooltip } from '@platform/ui';
 import {

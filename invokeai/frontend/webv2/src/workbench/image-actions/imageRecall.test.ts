@@ -7,17 +7,17 @@ import type {
   VaeModelConfig,
 } from '@features/generation/contracts';
 
-import {
-  resetArchitectureCapabilities,
-  setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import {
-  architectureCapabilitiesFixture,
-  seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
 import { satisfiedSettingsFor } from '@features/generation/core/graphCoverage.testing';
 import { compileGenerateGraph } from '@features/generation/graph';
 import { normalizeReferenceImages } from '@features/generation/settings';
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities.testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildImageRecallSettings, getImageRecallCapabilities, type ImageRecallKind } from './imageRecall';
@@ -864,6 +864,38 @@ describe('model-family tuning recall', () => {
       expect(recallOverChanged(record(qwenModel, { qwen_image_shift: null }), qwenModel)?.qwenImageShift).toBeNull();
     });
   });
+
+  it('keeps the current Krea-2 style reference for a legacy record that did not list its references', () => {
+    const styleReference = normalizeReferenceImages([
+      {
+        config: {
+          image: { original: { image: { height: 512, image_name: 'current.png', width: 512 } } },
+          styleStrength: 1,
+          type: 'krea2_reference_image',
+        },
+        id: 'current-style',
+        isEnabled: true,
+      },
+    ]);
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: krea2Model, modelKey: krea2Model.key, referenceImages: styleReference }),
+      image,
+      kind: 'all',
+      // The legacy UI recorded only the strength of the style reference it used.
+      metadata: {
+        app_version: '6.12.0',
+        generation_mode: 'krea2_txt2img',
+        krea2_style_strength: 0.6,
+        model: { key: krea2Model.key },
+      },
+      models: [],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages).toEqual(styleReference);
+    expect(result?.fields).not.toContain('referenceImages');
+  });
 });
 
 describe('recall offered for a single recallable delta', () => {
@@ -1310,6 +1342,116 @@ describe('legacy records', () => {
       );
 
       expect(result?.values.referenceImages).toEqual([]);
+    });
+
+    it('clears the current references when a generation record omits them', () => {
+      const result = recall(
+        { app_version: '6.0.0', generation_mode: 'txt2img', model: { key: sdxlModel.key }, positive_prompt: 'silent' },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual([]);
+      expect(result?.fields).toContain('referenceImages');
+    });
+
+    it('leaves the current references when the recorded list cannot be read', () => {
+      // v6.3–6.10 recorded Kontext references as a list nested inside `ref_images`.
+      const nested = [[{ config: { image: { image_name: 'kontext.png' }, type: 'flux_kontext' }, id: 'kontext' }]];
+      const result = recall(
+        {
+          app_version: '7.0.0',
+          generation_mode: 'txt2img',
+          model: { key: sdxlModel.key },
+          positive_prompt: 'nested',
+          ref_images: nested,
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references on a record that is not a generation record', () => {
+      // An upscale or hand-built workflow record names a model without saying what references ran.
+      const result = recall(
+        { app_version: '7.0.0', model: { key: sdxlModel.key }, positive_prompt: 'upscaled' },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('keeps the current references for a model that takes none', () => {
+      const zImageModel: MainModelConfig = { base: 'z-image', key: 'z-model', name: 'Z-Image', type: 'main' };
+      const result = recall(
+        {
+          app_version: '7.0.0',
+          generation_mode: 'z_image_txt2img',
+          model: { key: zImageModel.key },
+          positive_prompt: 'no references',
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel, zImageModel]
+      );
+
+      expect(result?.values.model.key).toBe(zImageModel.key);
+      expect(result?.values.referenceImages.map((reference) => reference.id)).toEqual(['current-reference']);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references for a v4.2 record that kept its IP-Adapters in control layers', () => {
+      const result = recall(
+        {
+          app_version: '6.0.0',
+          control_layers: { layers: [{ type: 'ip_adapter_layer' }], version: 2 },
+          generation_mode: 'txt2img',
+          model: { key: sdxlModel.key },
+          positive_prompt: 'v4.2',
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references on a v5 record, which may have dropped the ones it used', () => {
+      // v5 Canvas-staged images saved to the Gallery lost `canvas_v2_metadata`, and their references with it.
+      const result = recall(
+        {
+          app_version: '5.15.0',
+          generation_mode: 'sdxl_txt2img',
+          model: { key: sdxlModel.key },
+          positive_prompt: 'v5',
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
+    });
+
+    it('leaves the current references when the record names no recallable model', () => {
+      const result = recall(
+        {
+          app_version: '7.0.0',
+          generation_mode: 'txt2img',
+          model: { key: 'not-installed' },
+          positive_prompt: 'silent',
+        },
+        { referenceImages: currentReferenceImages },
+        [sdxlModel]
+      );
+
+      expect(result?.values.referenceImages).toEqual(currentReferenceImages);
+      expect(result?.fields).not.toContain('referenceImages');
     });
   });
 

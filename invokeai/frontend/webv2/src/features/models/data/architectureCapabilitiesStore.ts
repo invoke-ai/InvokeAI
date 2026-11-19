@@ -3,7 +3,7 @@ import {
   onArchitectureCapabilitiesChanged,
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+} from '@features/models/core/architectureCapabilities';
 import {
   captureAccountScope,
   isAccountScopeCurrent,
