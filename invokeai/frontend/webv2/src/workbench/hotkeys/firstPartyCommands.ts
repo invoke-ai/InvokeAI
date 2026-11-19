@@ -21,7 +21,6 @@ import {
 } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { useWorkbenchFocus, useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
@@ -37,6 +36,7 @@ import {
 } from '@workbench/widgetPlacementCommands';
 import { getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import { describeCanvasInvocationFailure } from '@workbench/widgets/canvas/invoke/canvasInvocationFailure';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { resolvePanelToggle } from '@workbench/workbenchState';
@@ -138,7 +138,7 @@ export const useRegisterFirstPartyCommands = () => {
     await submitActiveInvocation({
       commands,
       destinationOverride,
-      formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+      formatCanvasInvocationFailure: (failure) => describeCanvasInvocationFailure(t, failure),
       formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
       getModels: getAvailableModels,
       ...(prepend ? { prepend } : {}),
