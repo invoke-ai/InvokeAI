@@ -30,6 +30,7 @@ import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/reac
 import { isGalleryImageDragData } from '@features/gallery/utility';
 import { getAutoSwitchFollowedLive } from '@features/queue/contracts';
 import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -312,7 +313,7 @@ const getStableFilter = (gallery: GalleryStateView): GalleryItemsFilter => {
   return stableFilters.get(identity)!;
 };
 
-const DENSE_SETTINGS = { ...getGallerySettings({}), imageDensityPercent: 0 };
+const DENSE_SETTINGS = { ...getGallerySettings(resolvedValues({})), imageDensityPercent: 0 };
 
 const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateView => {
   const items = overrides.items ?? [
@@ -343,7 +344,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     selectionStarredOnly: false,
     semanticImageQuery: null,
     semanticSearchText: null,
-    settings: { ...getGallerySettings({ paginationMode: 'paginated' }), imageDensityPercent: 0 },
+    settings: { ...getGallerySettings(resolvedValues({ paginationMode: 'paginated' })), imageDensityPercent: 0 },
     starredOnly: false,
     ...overrides,
   };

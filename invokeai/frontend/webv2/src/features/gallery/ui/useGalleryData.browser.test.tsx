@@ -9,6 +9,7 @@ import {
   invalidateGallery,
   patchGalleryItemCaches,
 } from '@features/gallery/data/queryCache';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, useEffect } from 'react';
@@ -30,8 +31,8 @@ vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
 }));
 
 const TOTAL = 12_000;
-const settings = getGallerySettings({ paginationMode: 'infinite' });
-const paginatedSettings = getGallerySettings({ paginationMode: 'paginated' });
+const settings = getGallerySettings(resolvedValues({ paginationMode: 'infinite' }));
+const paginatedSettings = getGallerySettings(resolvedValues({ paginationMode: 'paginated' }));
 let latestData: GalleryData | null = null;
 
 const readRequests = () =>

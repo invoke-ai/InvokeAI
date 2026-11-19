@@ -1,5 +1,7 @@
 /** Per-project compositing policy; defaults mirror legacy infill/coherence/mask behavior. */
 
+import type { ResolvedValues } from '@platform/core/resolvedValues';
+
 /** The infill methods the outpaint graph can request (legacy `zInfillMethod`). */
 export type CanvasInfillMethod = 'patchmatch' | 'lama' | 'cv2' | 'color' | 'tile';
 
@@ -88,10 +90,8 @@ const readInfillColor = (value: unknown): CanvasInfillColor => {
 };
 
 /** Return complete compositing settings with legacy defaults for invalid/missing fields and valid-range clamping. */
-export const readCanvasCompositingSettings = (
-  values: Record<string, unknown> | undefined
-): CanvasCompositingSettings => {
-  const v = values ?? {};
+export const readCanvasCompositingSettings = (values: ResolvedValues | undefined): CanvasCompositingSettings => {
+  const v: Readonly<Record<string, unknown>> = values ?? {};
   const d = DEFAULT_CANVAS_COMPOSITING;
   const coherenceMode = v[CANVAS_COMPOSITING_KEYS.coherenceMode];
   const infillMethod = v[CANVAS_COMPOSITING_KEYS.infillMethod];

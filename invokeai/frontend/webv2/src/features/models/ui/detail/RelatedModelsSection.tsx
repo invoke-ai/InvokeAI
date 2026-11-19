@@ -24,7 +24,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface RelatedModelsSectionProps {
-  model: Pick<ModelConfig, 'base' | 'key' | 'type'>;
+  model: Pick<ModelConfig, 'base' | 'key' | 'roles' | 'type'>;
   onError: (message: string) => void;
 }
 
