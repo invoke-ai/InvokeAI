@@ -93,7 +93,6 @@ describe('unavailable menu items', () => {
     await act(() => userEvent.click(page.getByRole('button', { name: 'Actions' })));
     await vi.waitFor(() => expect(item('rename')).toBeVisible());
 
-    // Their name stays the label; the reason is their description, read without the tooltip, after the caller's own.
     for (const [value, name, description] of [
       ['copy-image', 'Copy image', REASON],
       ['copy-json', 'Copy JSON', REASON],
@@ -107,8 +106,6 @@ describe('unavailable menu items', () => {
       await expect.element(menuItem).toHaveAccessibleDescription(description);
     }
 
-    // Keyboard navigation does not skip them, and highlighting shows the reason without a pointer. The icon-only
-    // item shows its label beside the reason, since the tooltip is the only place its name appears.
     await highlight('copy-image');
     await vi.waitFor(() => expect(tooltipText()).toBe(`Copy image${REASON}`));
     await act(() => userEvent.keyboard('{Enter}'));
@@ -121,17 +118,14 @@ describe('unavailable menu items', () => {
     await highlight('copy-path');
     await vi.waitFor(() => expect(tooltipText()).toBe(REASON));
     await act(() => userEvent.keyboard('{Enter}'));
-    // A pointer click on an unavailable item does nothing either.
     await act(() => item('copy-path').click());
 
     expect(actions.copyImage).not.toHaveBeenCalled();
     expect(actions.copyJson).not.toHaveBeenCalled();
     expect(actions.copyPath).not.toHaveBeenCalled();
     expect(actions.rootSelect).not.toHaveBeenCalled();
-    // Selecting an unavailable item leaves the menu open, as a disabled one would.
     expect(item('rename')).toBeVisible();
 
-    // The control: an available item's selection reaches both its handler and the menu root.
     await act(() => userEvent.click(item('rename')));
     expect(actions.rename).toHaveBeenCalledOnce();
     expect(actions.rootSelect).toHaveBeenCalledWith({
@@ -174,13 +168,11 @@ describe('menu heading groups', () => {
     const heading = group.element().querySelector<HTMLElement>('[data-part="item-group-label"]')!;
     const groupLabel = document.querySelector<HTMLElement>('[data-testid="group-label"]')!;
     const headingRect = heading.getBoundingClientRect();
-    // The oversized title band this replaced stood a third taller than a group label.
     expect(headingRect.height).toBeLessThanOrEqual(groupLabel.getBoundingClientRect().height + 0.5);
 
     const nameHead = heading.querySelector<HTMLElement>('[data-full-text] > span')!;
     const state = Array.from(heading.children).at(-1) as HTMLElement;
     expect(state.textContent).toBe('Unsaved changes');
-    // The name gives way; the state keeps its whole width on the heading's row.
     expect(nameHead.clientWidth).toBeLessThan(nameHead.scrollWidth);
     expect(state.getBoundingClientRect().right).toBeLessThanOrEqual(headingRect.right);
     expect(state.getBoundingClientRect().top).toBeGreaterThanOrEqual(headingRect.top);
@@ -310,10 +302,7 @@ describe('submenus', () => {
     };
     submenu.addEventListener('animationstart', recordAnimation);
 
-    // Real pointer moves a pixel apart, from the trigger item's middle across its left edge to well inside the submenu,
-    // so the browser fires pointerleave on the item and pointerenter on the submenu as a hand's crossing does.
-    // `userEvent.hover` on an element jumps to its centre in one move. Forced, so Playwright does not wait out two frames
-    // of stability before each move, which would leave the pointer in each spot far longer than a hand does.
+    // Real pointer moves a pixel apart, as a hand crosses; `userEvent.hover` jumps, and force skips stability waits.
     const body = document.body.getBoundingClientRect();
     const from = trigger.getBoundingClientRect();
     const y = from.top + from.height / 2;
@@ -335,7 +324,6 @@ describe('submenus', () => {
     submenu.removeEventListener('animationstart', recordAnimation);
 
     expect(document.elementFromPoint(end, y)?.closest('[role="menu"]')).toBe(submenu);
-    // One assertion, so a failure shows every symptom together.
     expect({ animationStarts, changes, state: submenu.dataset.state }).toEqual({
       animationStarts: [],
       changes: [],
@@ -345,10 +333,6 @@ describe('submenus', () => {
   });
 });
 
-/**
- * A pointer-anchored context menu shaped as call sites build one, opened by buttons outside it: near the bottom edge,
- * where a bottom-start menu has no room and flips to the top, and near the top, where it does not.
- */
 const ContextMenuAt = () => {
   const { anchor, close, onRequestDismiss, open } = useContextMenu();
   const openLow = useCallback(() => open({ x: 120, y: window.innerHeight - 4 }), [open]);
@@ -417,8 +401,7 @@ describe('reopened menus', () => {
     await vi.waitFor(() => expect(content.dataset.state).toBe('closed'));
     await Promise.all(content.getAnimations().map((animation) => animation.finished));
 
-    // The root stays mounted between openings, and so does the placement its machine resolved last; the content
-    // element may be replaced, so watch for whichever one is current.
+    // The content element may be replaced, so watch whichever one is current.
     const currentContent = () => document.querySelector<HTMLElement>('[data-scope="menu"][data-part="content"]');
     const snapshots: string[] = [];
     const observer = new MutationObserver(() => {
@@ -444,7 +427,6 @@ describe('reopened menus', () => {
     await vi.waitFor(() => expect(currentContent()?.dataset.placement).toBe('bottom-start'));
     const reopened = currentContent()!;
     await Promise.all(reopened.getAnimations().map((animation) => animation.finished));
-    // Long enough for a restarted open animation to start.
     await new Promise((resolve) => {
       globalThis.setTimeout(resolve, 200);
     });
@@ -452,7 +434,6 @@ describe('reopened menus', () => {
     document.removeEventListener('animationstart', recordAnimation, true);
 
     expect(animationStarts.length).toBeGreaterThan(0);
-    // One assertion, so a failure shows every symptom together.
     expect({
       openOnFlippedSide: snapshots.filter((snapshot) => snapshot.startsWith('open top')),
       startedLater: animationStarts.filter(({ time }) => time !== animationStarts[0]!.time).map(({ name }) => name),
@@ -467,7 +448,6 @@ const ARROW_PLACEMENTS = {
   'left-start': { placement: 'left-start' },
 } as const;
 
-// Context menus open at the pointer, anchored to a 1px point; other measured anchors are boxes, such as a tab.
 const POINT_START = { height: 1, width: 1, x: 40, y: 200 };
 const POINT_END = { height: 1, width: 1, x: 300, y: 200 };
 const BOX = { height: 24, width: 40, x: 40, y: 200 };
@@ -536,7 +516,6 @@ describe('menu arrows', () => {
     await vi.waitFor(() => expect(menu.dataset.side).toBe(placement.split('-')[0]));
     await Promise.all([...menu.getAnimations(), ...arrow!.getAnimations()].map((animation) => animation.finished));
 
-    // Beside the content, whose scrolling would clip it, not inside it.
     expect(menu.contains(arrow!)).toBe(false);
     const content = menu.getBoundingClientRect();
     const tipBox = tip.getBoundingClientRect();
@@ -555,7 +534,6 @@ describe('menu arrows', () => {
       expect((tipBox.left + tipBox.right) / 2).toBeCloseTo((trigger.left + trigger.right) / 2, 0);
     }
 
-    // The tip reads as part of the content: its fill and border are the content's, not a transparent outline.
     const contentStyle = getComputedStyle(menu);
     const tipStyle = getComputedStyle(tip);
     expect(tipStyle.backgroundColor).toBe(contentStyle.backgroundColor);
@@ -580,7 +558,6 @@ describe('menu arrows', () => {
     await act(() => userEvent.keyboard('{ArrowDown}'));
     await vi.waitFor(() => expect(item('rename').hasAttribute('data-highlighted')).toBe(true));
 
-    // On the tip's outer half, above the content's edge.
     await clickAt((tipBox.left + tipBox.right) / 2, content.top - 3);
     await new Promise((resolve) => {
       globalThis.setTimeout(resolve, 100);
@@ -592,7 +569,6 @@ describe('menu arrows', () => {
       expect(page.getByRole('menuitem', { name: 'Move to' }).element()).toHaveAttribute('data-highlighted')
     );
 
-    // The arrow's transparent clearance beside the tip lets the click through, to the page outside the menu.
     const arrowBox = arrow!.getBoundingClientRect();
     const clearance = { x: tipBox.right + 2, y: content.top - 3 };
     expect(clearance.x).toBeLessThan(arrowBox.right);
@@ -637,16 +613,13 @@ describe('menu arrows', () => {
     const [arrow] = arrowsIn(menu.parentElement);
     const { getAnchorRect, placement } = ANCHORED[anchor];
     await vi.waitFor(() => expect(menu.dataset.placement).toBe(placement));
-    // A point anchor shrinks the arrow once placed; the menu is then placed again without the arrow's height.
     await vi.waitFor(() => {
       expect(arrow!.querySelector<HTMLElement>('[data-part="arrow-tip"]')!.offsetWidth).toBe(arrowSize);
       const rect = getAnchorRect();
       expect(menu.getBoundingClientRect().top - (rect.y + rect.height)).toBeCloseTo(gap, 0);
     });
     if (arrowSize === 0) {
-      // Nor does its tip leave a bordered dot, nor its box shift the menu sideways to centre on the pointer: the menu's
-      // aligned edge is at the pointer. Floating UI keeps even an arrow of no size its 4px padding from the corner, which
-      // moves the menu by up to that, as it did before menus had arrows.
+      // Floating UI keeps even a zero-size arrow 4px from the corner, which would shift the menu.
       expect(getComputedStyle(arrow!.querySelector('[data-part="arrow-tip"]')!).borderTopWidth).toBe('0px');
       const rect = getAnchorRect();
       const content = menu.getBoundingClientRect();
@@ -693,7 +666,6 @@ describe('menu arrows', () => {
     const content = menu.getBoundingClientRect();
     const radius = parseFloat(getComputedStyle(menu).borderTopRightRadius);
     const tip = arrowsIn(menu.parentElement)[0]!.querySelector('[data-part="arrow-tip"]')!.getBoundingClientRect();
-    // The diamond's widest extent is its base on the content's edge: it stays on the straight part of that edge.
     expect(radius).toBeGreaterThan(0);
     expect(tip.left).toBeGreaterThanOrEqual(content.left + radius);
     expect(tip.right).toBeLessThanOrEqual(content.right - radius);
@@ -714,7 +686,6 @@ describe('menu arrows', () => {
     const [arrow] = arrowsIn(menu.parentElement);
     const box = arrow!.getBoundingClientRect();
     const content = menu.getBoundingClientRect();
-    // Inside the item, which starts past the content's padding, and inside the arrow box's half over the content.
     const y = placement === 'bottom-start' ? content.top + 9 : content.bottom - 9;
     expect(y).toBeGreaterThan(box.top);
     expect(y).toBeLessThan(box.bottom);
@@ -756,7 +727,6 @@ describe('menu arrows', () => {
   });
 });
 
-/** Two sections kept alive by Activity, like the launchpad's pages, switched from outside them. */
 const MenuSections = () => {
   const [isOtherShown, setIsOtherShown] = useState(false);
   const showOther = useCallback(() => setIsOtherShown(true), []);
@@ -799,13 +769,11 @@ describe('menus in a hidden section', () => {
 
     await userEvent.click(page.getByRole('button', { name: 'Actions' }));
     await expect.poll(() => shownMenu()?.textContent).toBe('Rename');
-    // Escape closes the menu, and a switch hides its section before the fade ends.
     await act(() => userEvent.keyboard('{Escape}'));
     await act(() => userEvent.click(page.getByRole('button', { name: 'Other section' })));
     await act(() => userEvent.click(page.getByRole('button', { name: 'First section' })));
 
     await expect.poll(shownMenu).toBeUndefined();
-    // Fully usable again: the trigger opens it afresh.
     await userEvent.click(page.getByRole('button', { name: 'Actions' }));
     await expect.poll(() => shownMenu()?.textContent).toBe('Rename');
   });

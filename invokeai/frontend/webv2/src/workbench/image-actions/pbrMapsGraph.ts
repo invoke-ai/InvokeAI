@@ -3,8 +3,8 @@ import type { QueueBackendGraph } from '@features/queue/contracts';
 export const PBR_MAPS_NODE_ID = 'pbr_maps';
 
 /**
- * One `pbr_maps` node over a gallery image: whole-image tiles with no seam handling, saved to the board as the
- * normal, roughness and displacement maps. `boardId` null or `'none'` leaves them Uncategorized.
+ * One `pbr_maps` node over a gallery image: whole-image tiles with no seam handling, saved to the board as the normal,
+ * roughness and displacement maps. `boardId` null or `'none'` leaves them Uncategorized.
  */
 export const buildPbrMapsGraph = ({
   boardId,

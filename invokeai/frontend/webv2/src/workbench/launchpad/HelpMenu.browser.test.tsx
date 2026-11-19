@@ -83,7 +83,6 @@ describe.each([false, true])('HelpMenu donation link (compact=%s)', (compact) =>
     await expect.element(page.getByRole('menuitem', { name: 'GitHub' })).toBeVisible();
     expect(page.getByRole('menuitem', { name: 'Donate to InvokeAI' }).query()).toBeNull();
 
-    // The open menu keeps the item mounted, so recovery depends on the trigger asking again.
     vi.mocked(apiFetchJson).mockResolvedValue({ show_donation_link: true });
     await userEvent.keyboard('{Escape}');
     await expect.element(trigger()).toHaveFocus();

@@ -86,8 +86,7 @@ describe('useWorkflowLibraryMissingCounts', () => {
   const Harness = ({ entries }: { entries: readonly WorkflowLibraryEntry[] }) => {
     const result = useWorkflowLibraryMissingCounts(entries);
 
-    // Published after the commit, not during render, so the hook under test is
-    // the only thing this component does while rendering.
+    // Published after the commit, not during render, so the hook under test is all this component does while rendering.
     useEffect(() => {
       counts = result;
     });
@@ -95,8 +94,7 @@ describe('useWorkflowLibraryMissingCounts', () => {
     return null;
   };
 
-  // No StrictMode here: this suite counts resolver invocations, and the
-  // deliberate double-render would double every number it asserts.
+  // No StrictMode: this suite counts resolver calls, and its double render would double every number asserted.
   const render = async (entries: readonly WorkflowLibraryEntry[]) => {
     await act(() => {
       root.render(<Harness entries={entries} />);

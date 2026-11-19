@@ -48,13 +48,13 @@ export type ExternalGenerationRevealOutcome =
 const SETTLED: ExternalGenerationRevealOutcome = { kind: 'settled' };
 
 /**
- * Reveal another client's completed generation, as Find in Gallery would: select the board of its last saved image
- * or video, then the item, and announce it. It never takes the Gallery from the user. It stands down once a newer
- * completion arrives, while the user types in the focused window, while a run of their own in this project is open, while a
- * search or semantic query narrows the listing, while several items are selected, while another reveal is locating
- * its item, and once the user navigates the Gallery after arrival; all of these are dropped. A hidden tab only defers
- * it: the outcome asks to resume once the tab is visible. Every condition is checked again immediately before the
- * first Gallery change.
+ * Reveal another client's completed generation, as Find in Gallery would: select the board of its last saved image or
+ * video, then the item, and announce it. It never takes the Gallery from the user. It stands down once a newer
+ * completion arrives, while the user types in the focused window, while a run of their own in this project is open,
+ * while a search or semantic query narrows the listing, while several items are selected, while another reveal is
+ * locating its item, and once the user navigates the Gallery after arrival; all of these are dropped. A hidden tab only
+ * defers it: the outcome asks to resume once the tab is visible. Every condition is checked again immediately before
+ * the first Gallery change.
  *
  * `ownedSequence` is the latest navigation claim the reveal may treat as its own: the one at arrival, or on resuming
  * the one it claimed before the tab was hidden.

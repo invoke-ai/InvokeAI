@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Canvas evaluation of the backend's Clarity, Texture and Contrast Dehaze nodes (`invokeai/backend/image_util/`).
- * Each step equals the node run on the layer cropped to its alpha bounds: transparent padding never changes the
- * result, and pixels outside those bounds, hidden (alpha 0) pixels and alpha itself are never written.
+ * Canvas evaluation of the backend's Clarity, Texture and Contrast Dehaze nodes (`invokeai/backend/image_util/`). Each
+ * step equals the node run on the layer cropped to its alpha bounds: transparent padding never changes the result, and
+ * pixels outside those bounds, hidden (alpha 0) pixels and alpha itself are never written.
  */
 
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -97,8 +97,8 @@ const fillLabels = (
 };
 
 /**
- * Every per-pixel plane comes from one buffer sized by {@link SPATIAL_SCRATCH_BYTES_PER_PIXEL}, so the service's
- * memory reservation and the actual allocation cannot drift apart.
+ * Every per-pixel plane comes from one buffer sized by {@link SPATIAL_SCRATCH_BYTES_PER_PIXEL}, so the service's memory
+ * reservation and the actual allocation cannot drift apart.
  */
 const createWorkspace = (pixels: Uint8ClampedArray, stride: number, bounds: Rect): Workspace => {
   const count = bounds.width * bounds.height;

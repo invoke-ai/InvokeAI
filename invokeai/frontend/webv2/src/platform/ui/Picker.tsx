@@ -41,7 +41,6 @@ export interface PickerOptionState {
 export interface PickerStatus {
   message: string;
   isError?: boolean;
-  /** Offers a retry under a failure. */
   onRetry?: () => void;
 }
 
@@ -58,7 +57,6 @@ type PickerRow<T> =
       setSize: number;
     };
 
-/** Consecutive rendered rows: a header on its own, or the options of one group. */
 type RowRun<T> =
   | { item: VirtualItem; kind: 'header' }
   | { group: PickerGroup<T>; items: VirtualItem[]; kind: 'options' };
@@ -73,14 +71,12 @@ const HEADER_ESTIMATE_PX = 28;
 const OPTION_ESTIMATE_PX = 36;
 const COMPACT_OPTION_ESTIMATE_PX = 24;
 const OVERSCAN_ROWS = 8;
-// The list mounts as the popup opens, before its viewport is measured; assuming the 18rem cap renders a full page,
-// active option included, in that first commit.
+// Assuming the 18rem cap renders a full page, active option included, in the first commit.
 const INITIAL_RECT = { height: 288, width: 0 };
 const ROW_STYLE: CSSProperties = { left: 0, position: 'absolute', top: 0, width: '100%' };
 const PINNED_HEADER_STYLE: CSSProperties = { position: 'sticky', top: 0, zIndex: 1 };
 
-// Chakra's Input adopts an enclosing Field's id, description and invalid state. The search box belongs to the popup,
-// not to the field whose trigger opened it, so it renders the same recipe on a plain input.
+// Chakra's Input adopts an enclosing Field's id and state; the popup's search box must not, so it uses a plain input.
 const { withContext: withInputRecipe } = createRecipeContext({ key: 'input' });
 const SearchInput = withInputRecipe<HTMLInputElement, InputProps>('input');
 
@@ -117,11 +113,7 @@ const toRowRuns = <T,>(virtualItems: readonly VirtualItem[], rows: readonly Pick
   return runs;
 };
 
-/**
- * Searchable single-choice list for a popup: an editable combobox that keeps focus while the arrows move a
- * virtualized listbox's active option. The active option always stays mounted, so `aria-activedescendant` never
- * names a missing element. Mount it with the popup: each mount starts from an empty search.
- */
+/** The active option stays mounted so `aria-activedescendant` never names a missing node; mount with the popup. */
 export const Picker = <T,>({
   emptyMessage,
   getIsOptionDisabled,
@@ -151,7 +143,6 @@ export const Picker = <T,>({
   searchPlaceholder: string;
   searchSlot?: ReactNode;
   selectedId: string | null;
-  /** Replaces the list, e.g. while loading or after a failure. */
   status?: PickerStatus;
   toolbarSlot?: ReactNode;
   onSelect: (option: T) => void;
@@ -221,10 +212,7 @@ export const Picker = <T,>({
     };
   }, [getIsOptionDisabled, getOptionId, showHeaders, visibleGroups]);
 
-  // A new result set remounts the listbox, which opens scrolled to its active option (see PickerListbox). Callers
-  // rebuild groups on unrelated renders, so the set is compared by content: the search that produced it and its
-  // ordered row keys. Equal content keeps the mounted list, its scroll position and rows, and data-only changes
-  // re-render those rows in place. Built once per rows change; renders with unchanged rows compare one reference.
+  // Callers rebuild groups on unrelated renders, so result sets compare by content; equal content keeps the list.
   const resultKey = useMemo(() => `${deferredSearchTerm}\u0001${rowKeys}`, [deferredSearchTerm, rowKeys]);
   const [listMount, setListMount] = useState({ generation: 0, resultKey });
 
@@ -237,7 +225,6 @@ export const Picker = <T,>({
 
     return row?.kind === 'option' && !row.isDisabled;
   };
-  // If filtering removes the active row, highlight the selection or else the first remaining result.
   const resolvedActiveId = isSelectable(activeId)
     ? activeId
     : isSelectable(selectedId)
@@ -303,7 +290,6 @@ export const Picker = <T,>({
         <HStack gap="1">
           <InputGroup flex="1" minW="0" startElement={SEARCH_ICON}>
             <SearchInput
-              // The listbox always keeps its active option mounted (see extractRangeKeepingPinned).
               aria-activedescendant={
                 isListShown && resolvedActiveId ? getOptionDomId(listboxId, resolvedActiveId) : undefined
               }
@@ -366,11 +352,7 @@ export const Picker = <T,>({
   );
 };
 
-/**
- * One result set's virtualized listbox. It is keyed by the result set, so each mount opens with the active option
- * in view: the virtualizer's initial offset places it from estimates, as Platform List's `revealActiveOnMount` does,
- * and a pre-paint reveal corrects for measured row heights. Keyboard moves within the set scroll through the handle.
- */
+/** Keyed by result set so each mount opens with the active option in view; pre-paint reveal fixes measured rows. */
 const PickerListbox = <T,>({
   activeIndex,
   headerIndexes,
@@ -409,7 +391,6 @@ const PickerListbox = <T,>({
       rows[index]?.kind === 'header' ? HEADER_ESTIMATE_PX : isCompact ? COMPACT_OPTION_ESTIMATE_PX : OPTION_ESTIMATE_PX,
     [isCompact, rows]
   );
-  // Leave the list at the top when the active option already shows there; otherwise put it under the pinned header.
   const getInitialOffset = useCallback(() => {
     let start = LIST_PADDING_PX;
 
@@ -433,17 +414,13 @@ const PickerListbox = <T,>({
     paddingStart: LIST_PADDING_PX,
     rangeExtractor,
     scrollPaddingStart: headerHeight,
-    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error
-    // for any scroll event dispatched while React is rendering or flushing effects.
+    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add React errors.
     useFlushSync: false,
   });
   const { measureElement, scrollToIndex, virtualItems } = virtualizer;
-  // The option active when this result set mounted; later keyboard moves scroll through the handle.
   const [revealIndex] = useState(activeIndex);
 
-  // The initial offset comes from estimates, and the rows above, at or below the active option may measure taller or
-  // shorter, leaving it partly hidden. The first commit's rows are measured before layout effects run, so this nudges
-  // it fully into view before paint; the virtualizer then keeps the alignment exact while newly shown rows measure.
+  // Estimates can leave the active option partly hidden; nudge it into view before paint once the first rows measure.
   useLayoutEffect(() => {
     if (revealIndex >= 0) {
       scrollToIndex(revealIndex, { align: 'auto' });
@@ -547,10 +524,7 @@ const PickerListbox = <T,>({
 const getRailColor = (group: { colorPalette?: string }): string =>
   group.colorPalette ? `${group.colorPalette}.solid` : 'border.emphasized';
 
-/**
- * Visual only: the enclosing group carries the name for assistive technology. The pinned header stays in flow as
- * the list's only non-absolute row, so `sticky` holds it at the top until the next header pushes it out.
- */
+/** Visual only: the group names itself; the pinned header is the only in-flow row, so `sticky` holds it. */
 const PickerGroupHeader = <T,>({
   group,
   index,

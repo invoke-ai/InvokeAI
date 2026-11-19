@@ -65,14 +65,7 @@ export type SaveLayerToBoardResult =
   | LayerUnreadable
   | AdjustmentRefusal;
 
-/**
- * Owns the complete local-export → gallery-upload boundary: the baked layer is uploaded to `boardId` (`'none'` for
- * Uncategorized). A real board is judged first from the ensured listing of every readable board, as Gallery uploads
- * are: one listed without `add_media` reports `board-view-only` and one no longer listed `board-unavailable`, before
- * anything is baked, and the listings are read again so the picker stops offering it. Once the upload settles the
- * gallery reads again; a failed one also re-reads the listings (the board may have refused it) and rethrows. A stale
- * account reports `stale` instead of leaking an abort into the next account's UI.
- */
+/** Bakes and uploads to `boardId` (`'none'` is Uncategorized), judging access first; stale accounts get `stale`. */
 export const saveLayerToBoard = async (
   layerId: string,
   boardId: string,

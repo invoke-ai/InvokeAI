@@ -32,7 +32,6 @@ import {
 
 describe('scaleAndSnapWanDimensions', () => {
   it('scales the short side to the preset and snaps to the A14B grid of 16', () => {
-    // 1920x1080 at 720p is an exact fit.
     expect(scaleAndSnapWanDimensions(1920, 1080, '720p', WAN_A14B_PIXEL_MULTIPLE)).toEqual({
       height: 720,
       width: 1280,
@@ -122,7 +121,6 @@ describe('resolveMiniMaxH3Canvas', () => {
     expect(resolveMiniMaxH3Canvas(1, 5, '768 highres')).toBeNull();
     expect(resolveMiniMaxH3Canvas(0, 1, '768 highres')).toBeNull();
     expect(resolveMiniMaxH3Canvas(1, Number.NaN, '768 highres')).toBeNull();
-    // The bounds themselves are accepted.
     expect(resolveMiniMaxH3Canvas(4, 1, '768 highres')).not.toBeNull();
     expect(resolveMiniMaxH3Canvas(1, 4, '768 highres')).not.toBeNull();
   });
@@ -228,13 +226,12 @@ describe('LTX-2 canvas and frame grid', () => {
 });
 
 describe('resolveMiniMaxH3ReferenceImage', () => {
-  // Cross-checked against the backend's own `resolve_reference_image_short_edge` +
-  // `normalize_reference_image` (the graph encodes exactly these sizes).
+  // Cross-checked against the backend's own `resolve_reference_image_short_edge` + `normalize_reference_image` (the
+  // graph encodes exactly these sizes).
   const LANDSCAPE_AREA = 1344 * 768;
   const SQUARE_AREA = 768 * 768;
 
   it.each([
-    // source, detail, target area, normalized size, rows
     [1920, 1080, 'max', LANDSCAPE_AREA, 3648, 2048, 7296],
     [1920, 1080, 'match', LANDSCAPE_AREA, 1344, 768, 1008],
     [4032, 3024, 'max', LANDSCAPE_AREA, 2720, 2048, 5440],
@@ -282,7 +279,6 @@ describe('getVideoDurationSeconds', () => {
 
 describe('LTX-2 two-stage canvases', () => {
   it('puts a two-stage canvas where halving it stays on the VAE grid', () => {
-    // 32 is the VAE's grid; a two-stage preset resolves on 64 because the base pass runs at half.
     for (const [width, height] of [
       [1920, 1080],
       [1080, 1920],
@@ -300,7 +296,6 @@ describe('LTX-2 two-stage canvases', () => {
     const stages = getLtx2StageCanvases(1920, 1080, '1024p');
 
     expect(stages).toEqual({ base: { height: 512, width: 896 }, final: { height: 1024, width: 1792 } });
-    // The x2 upscaler doubles a latent grid exactly, so this relation has to be exact.
     expect(stages!.base.width * 2).toBe(stages!.final.width);
     expect(stages!.base.height * 2).toBe(stages!.final.height);
   });
@@ -325,11 +320,10 @@ describe('LTX-2 two-stage canvases', () => {
 });
 
 describe('ltx2ExtendJoinFitsInMemory', () => {
-  // `video_concat` buffers a crossfade at the FIRST input's native resolution and refuses over
-  // 512 MiB: `width * height * 3 * (transition_frames * 2 + 13)`. Pinned at the boundary rather
-  // than at comfortable sizes, because every way of getting the formula wrong -- dropping the
-  // blend's working frames, counting the crossfade's two sides once, misreading the budget --
-  // moves the threshold without changing the answer for a 1080p or a 4K source.
+  // `video_concat` buffers a crossfade at the FIRST input's native resolution and refuses over 512 MiB: `width * height
+  // * 3 * (transition_frames * 2 + 13)`. Pinned at the boundary rather than at comfortable sizes, because every way of
+  // getting the formula wrong -- dropping the blend's working frames, counting the crossfade's two sides once,
+  // misreading the budget -- moves the threshold without changing the answer for a 1080p or a 4K source.
   it('matches the backend budget exactly at the last size that fits', () => {
     expect(ltx2ExtendJoinFitsInMemory(3_807_595, 1, 17)).toBe(true);
     expect(ltx2ExtendJoinFitsInMemory(3_807_596, 1, 17)).toBe(false);
@@ -349,7 +343,6 @@ describe('ltx2ExtendJoinFitsInMemory', () => {
 
 describe('ltx2AutoDurationBounds', () => {
   it('caps the choice at the Frames value, converted at the rate the clip will play', () => {
-    // The Frames value is the ceiling the run's memory was sized for.
     expect(ltx2AutoDurationBounds(24, 9, 121)).toEqual({ maxSeconds: 121 / 24, minSeconds: 1 });
     expect(ltx2AutoDurationBounds(60, 9, 241)).toEqual({ maxSeconds: 241 / 60, minSeconds: 1 });
   });

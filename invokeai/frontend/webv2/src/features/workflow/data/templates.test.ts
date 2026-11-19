@@ -365,19 +365,18 @@ describe('parseOpenApiToTemplates', () => {
     // `Optional[list[int]]` keeps its limits inside the array branch of the union.
     expect(steps?.type).toEqual({ batch: false, cardinality: 'COLLECTION', name: 'IntegerField' });
     expect(steps).toMatchObject({ maxItems: 4, maximum: 100, minItems: 1, minimum: 1 });
-    // A required editable list starts empty; a connection-only or optional one keeps no default, and so does a
-    // required list with no editor (readiness must still demand its connection).
+    // A required editable list starts empty; a connection-only or optional one keeps no default, and so does a required
+    // list with no editor (readiness must still demand its connection).
     expect(steps?.default).toEqual([]);
     expect(denoise?.inputs.weights?.default).toBeUndefined();
     expect(denoise?.inputs.videos).toMatchObject({ default: undefined, minItems: 2, required: true });
     expect(denoise?.inputs.tags).toMatchObject({ default: ['a'], maxItems: null, maxLength: 8, minItems: null });
-    // Scalars never carry list bounds.
     expect(denoise?.inputs.scheduler).not.toHaveProperty('minItems');
   });
 
   it('parses the LoRA collection loader input as an inline-editable model collection', () => {
-    // `LoRAField | list[LoRAField] | None`: the null variant drops out, leaving the union the
-    // widget edits as a list. `default: null` must not become the field's value.
+    // `LoRAField | list[LoRAField] | None`: the null variant drops out, leaving the union the widget edits as a list.
+    // `default: null` must not become the field's value.
     const loras = templates.lora_collection_loader?.inputs.loras;
 
     expect(loras?.type).toEqual({ batch: false, cardinality: 'SINGLE_OR_COLLECTION', name: 'LoRAField' });

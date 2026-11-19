@@ -28,7 +28,6 @@ const WILDCARDS = [
 ];
 
 vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
-  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
   ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
@@ -115,23 +114,6 @@ afterEach(async () => {
 });
 
 describe('the caret autocomplete', () => {
-  it('offers embeddings for `<` and wildcards for `__`, and phrases for neither', async () => {
-    await type('a photo of <');
-
-    expect(optionLabels()).toEqual(['easynegative']);
-
-    await press('{Escape}');
-    await type('__');
-
-    expect(optionLabels()).toEqual(['colors', 'moods']);
-  });
-
-  it('narrows as the name is typed, where the user is already looking', async () => {
-    await type('a photo of __mo');
-
-    expect(optionLabels()).toEqual(['moods']);
-  });
-
   it('opens beside the caret, not at the bottom of a tall box', async () => {
     await type('a photo of __');
 

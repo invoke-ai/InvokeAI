@@ -5,10 +5,7 @@ export type HotkeyCategory = 'app' | 'canvas' | 'gallery' | 'queue' | 'viewer' |
 
 export type HotkeyScope =
   | { kind: 'global' }
-  /**
-   * Matches while a region holds focus: any region, one named docked region, or — for a contribution made by a
-   * floating widget, whose window is no region others share — that one floating instance.
-   */
+  /** Matches while a region holds focus: any, one named docked region, or one floating instance. */
   | { kind: 'focused-region'; region?: WidgetRegion; floatingInstanceId?: WidgetInstanceId }
   /** Matches while the key press is aimed at a widget of one of these types. */
   | { kind: 'widget'; typeIds: readonly WidgetTypeId[] }
@@ -35,10 +32,7 @@ export interface HotkeyDefinition {
 
 export interface RegisteredHotkey extends HotkeyDefinition {
   keys: string[];
-  /**
-   * `keys` are the user's own binding rather than `defaultKeys`. At equal scope priority a custom binding wins the
-   * key over a default one, so a saved binding does not go dead when a default later takes its key.
-   */
+  /** The user's own binding: at equal scope priority it beats a default on the same key. */
   customized?: boolean;
 }
 

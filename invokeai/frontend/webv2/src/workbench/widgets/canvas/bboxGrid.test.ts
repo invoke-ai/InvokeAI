@@ -29,7 +29,6 @@ describe('gridSizeForModelBase', () => {
   });
 
   it('reads the 32px grid Wan TI2V-5B declares, from the table the backend really serves', () => {
-    // Use the committed variant fixture: 1280x720 passes base grid 16 but fails TI2V-5B grid 32.
     expect(gridSizeForModelBase('wan', 'ti2v_5b')).toBe(32);
     expect(gridSizeForModelBase('wan')).toBe(16);
     expect(720 % gridSizeForModelBase('wan', 'ti2v_5b')).not.toBe(0);
@@ -50,11 +49,7 @@ describe('gridSizeForModelBase', () => {
 });
 
 describe('resolveModelGrid before the capability table arrives', () => {
-  // Leave capabilities absent to reproduce reopening before the table arrives.
-
   it('reports the grid as unknown rather than as 8', () => {
-    // The distinction a writer needs: 8 is a real answer for SDXL and a guess for Wan, and only
-    // one of the two may be persisted into a project file.
     expect(resolveModelGrid('wan')).toBeNull();
     expect(resolveModelGrid('cogview4')).toBeNull();
     expect(resolveModelGrid('sdxl')).toBeNull();
@@ -66,9 +61,6 @@ describe('resolveModelGrid before the capability table arrives', () => {
   });
 
   it('answers for an external generator too, which will never get a row to wait for', () => {
-    // A writer holds off on `null`, so answering it here would stop the bbox <-> dims sync for
-    // external providers for the whole session. Providers bucket to their own size tables, so the
-    // bbox is pixel-exact rather than snapped to a local model grid.
     expect(resolveModelGrid('external')).toBe(1);
     expect(gridSizeForModelBase('external')).toBe(1);
   });
@@ -79,8 +71,6 @@ describe('resolveModelGrid before the capability table arrives', () => {
 });
 
 describe('the grid a variant declares', () => {
-  // Override variant policy independently of fixtures: Wan grid depends on base plus variant, and 720 fails grid
-  // 32 despite passing 16.
   beforeEach(() => {
     setArchitectureCapabilities(
       architectureCapabilitiesFixture.map((row) =>

@@ -94,9 +94,9 @@ export class RasterExportController {
   constructor(private readonly options: RasterExportControllerOptions) {}
 
   /**
-   * An owned, layer-local adjusted copy of the leased pixels, releasing the lease. A spatial stack is evaluated
-   * exactly (reusing the display's copy when it is exact for these pixels) or refused; its job yields, so the lease's
-   * guard is checked again afterwards.
+   * An owned, layer-local adjusted copy of the leased pixels, releasing the lease. A spatial stack is evaluated exactly
+   * (reusing the display's copy when it is exact for these pixels) or refused; its job yields, so the lease's guard is
+   * checked again afterwards.
    */
   private async adjustLease(
     result: Extract<ExportLayerPixelsResult, { status: 'ok' }>,
@@ -285,10 +285,10 @@ export class RasterExportController {
       raw.release();
       return noReservedPixels({ status: 'empty' });
     }
-    // The layer's own stack applies to layer-local pixels before the transform resamples them, as the display does,
-    // so bakes keep the displayed grain, detail and color for scaled and rotated layers too. The display's exact
-    // adjusted copy of the leased live cache is drawn as is (before anything yields); otherwise a layer-local copy is
-    // reserved and adjusted, spatial entries included, or the bake refuses.
+    // The layer's own stack applies to layer-local pixels before the transform resamples them, as the display does, so
+    // bakes keep the displayed grain, detail and color for scaled and rotated layers too. The display's exact adjusted
+    // copy of the leased live cache is drawn as is (before anything yields); otherwise a layer-local copy is reserved
+    // and adjusted, spatial entries included, or the bake refuses.
     if (options.applyAdjustments !== false && layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments)) {
       const displayed = this.options.peekAdjustedCacheSurface?.(layer.id, raw.surface, layer.adjustments!) ?? null;
       const adjusted = displayed ? { ...raw, surface: displayed } : await this.adjustLease(raw, true, options.signal);

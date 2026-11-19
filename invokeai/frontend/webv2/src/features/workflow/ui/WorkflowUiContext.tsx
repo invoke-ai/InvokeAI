@@ -19,7 +19,6 @@ import type {
 /** How workflow thumbnails sit in their 3:2 box: cropped to fill it, or letterboxed whole. */
 export type WorkflowThumbnailFit = 'cover' | 'contain';
 
-/** Whether the library and This project show workflows as a card grid or as list rows. */
 export type WorkflowLibraryLayout = 'grid' | 'list';
 
 export interface WorkflowPreferences {

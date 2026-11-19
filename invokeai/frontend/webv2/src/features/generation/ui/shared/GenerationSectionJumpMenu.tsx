@@ -12,8 +12,8 @@ import { revealPanelSection, usePanelSections } from './sectionPanel';
 const JUMP_MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
 /**
- * A widget header's list of its panel's sections, in order. Choosing one opens it when folded, brings it to the top
- * of the panel and focuses its title. Hidden while the panel shows fewer than two sections.
+ * A widget header's list of its panel's sections, in order. Choosing one opens it when folded, brings it to the top of
+ * the panel and focuses its title. Hidden while the panel shows fewer than two sections.
  */
 export const GenerationSectionJumpMenu = ({ panelId }: { panelId: string | undefined }) => {
   const { t } = useTranslation();

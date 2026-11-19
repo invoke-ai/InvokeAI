@@ -1,5 +1,3 @@
-/** Real-canvas checks that rasterizing keeps a noisy layer's displayed grain. */
-
 import type { CanvasDocumentContractV3, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
@@ -50,7 +48,6 @@ describe('RasterizeLayerController with a position-dependent stack', () => {
       'shape',
       noisyLayer({ fill: '#808080', height: 30, kind: 'rect', stroke: null, strokeWidth: 0, type: 'shape', width: 40 }),
     ],
-    // Text resizes its scratch to measured bounds; this text fits its estimate, so nothing is clipped.
     [
       'text',
       noisyLayer({
@@ -84,7 +81,6 @@ describe('RasterizeLayerController with a position-dependent stack', () => {
     });
     const controller = new RasterizeLayerController({ backend, ctx: h.ctx, rasterizeDeps });
 
-    // The display: the layer's rasterized cache, adjusted by the display's cache, resampled through the transform.
     const rendered = await rasterizeSource(layer.source, rasterizeDeps());
     const displayCache = createLayerCacheStore(backend);
     const entry = displayCache.publishRasterized('layer', rendered.rect, rendered.surface);
@@ -162,7 +158,6 @@ describe('RasterizeLayerController with a spatial stack', () => {
         runSpatial: (request) => service.run(request),
       });
 
-      // The settled display: the layer's rasterized cache with its spatial result landed, through the transform.
       const rendered = await rasterizeSource(layer.source, rasterizeDeps());
       const displayCache = createLayerCacheStore(backend);
       const entry = displayCache.publishRasterized('layer', rendered.rect, rendered.surface);

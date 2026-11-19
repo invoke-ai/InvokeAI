@@ -5,13 +5,11 @@ import { describe, expect, it } from 'vitest';
 
 import { ColorSampleController } from './colorSampleController';
 
-/** The controller over a recorded tool; `heldPick` is a press the held tool ends when a request arrives. */
 const createHarness = (initialTool: ToolId = 'brush') => {
   const tool = { current: initialTool };
   const routed: [string, ColorSamplePhase][] = [];
   const heldPick = { active: false };
   const controller: ColorSampleController = new ColorSampleController({
-    // Ending a held picker cancels its pick, as the pointer pipeline does.
     endHeldTool: () => {
       if (heldPick.active) {
         heldPick.active = false;
@@ -73,7 +71,6 @@ describe('ColorSampleController', () => {
 
   it('sends a pick’s commit or cancel only to the sink that took its first preview', async () => {
     const h = createHarness('colorPicker');
-    // A standing pick is under way when a request arrives: ending the held picker cancels the router's pick, once.
     h.controller.route('#111111', 'preview');
     h.heldPick.active = true;
     const first = h.request();
@@ -86,7 +83,6 @@ describe('ColorSampleController', () => {
     await settled();
     expect(first.hex).toBe('#444444');
 
-    // A request settled by Escape mid-pick keeps that pick's cancel away from the router.
     const second = h.request();
     h.controller.route('#555555', 'preview');
     expect(h.controller.onEscape()).toBe(true);
@@ -95,7 +91,6 @@ describe('ColorSampleController', () => {
     expect(second.hex).toBeNull();
     expect(h.routed).toHaveLength(2);
 
-    // The other way round: a pick the router took keeps its commit when a request arms mid-pick.
     h.controller.route('#666666', 'preview');
     const third = h.request();
     h.controller.route('#666666', 'commit');
@@ -108,7 +103,6 @@ describe('ColorSampleController', () => {
     const h = createHarness();
     const remove = h.controller.setRouter(() => true);
     remove();
-    // The harness router was replaced, so removing the newer one leaves none.
     expect(h.controller.route('#111111', 'preview')).toBe(false);
   });
 
@@ -139,7 +133,6 @@ describe('ColorSampleController', () => {
     h.controller.onToolChange('move');
     await settled();
     expect(second.hex).toBeNull();
-    // The switch the caller requested wins; the controller restores nothing.
     expect(h.tool.current).toBe('colorPicker');
   });
 

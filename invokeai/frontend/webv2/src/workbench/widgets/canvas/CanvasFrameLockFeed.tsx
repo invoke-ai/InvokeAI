@@ -5,10 +5,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchQueries, useWorkbenchSubscription } from '@workbench/WorkbenchContext';
 
-/**
- * The Frame tool's aspect lock while the canvas drives Generate: Generate's own lock (`aspectRatioIsLocked`) and its
- * ratio. Null when the canvas does not drive Generate; the Frame tool's lock is then its own.
- */
+/** Generate's aspect lock while the canvas drives Generate; null otherwise, when the tool's lock is its own. */
 export const readCanvasFrameLock = (project: Project): { aspectLocked: boolean; aspectRatio: number } | null => {
   if (project.invocation.sourceId !== 'canvas') {
     return null;

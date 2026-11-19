@@ -1,10 +1,6 @@
 import { createLucideIcon } from 'lucide-react';
 
-/**
- * Fit frame to masks: the frame tool's viewfinder corners around a diamond, so it reads as the frame's own family and
- * stays distinct from the inpaint-mask type icon. The corners are Lucide `Scan` 1.46.0's four paths, inlined because
- * lucide-react exports no typed per-icon node; the icon inherits Lucide's sizing, stroke width and round joins.
- */
+/** Viewfinder corners around a diamond; the corners are Lucide `Scan` 1.46.0's paths, inlined. */
 export const FitFrameToMasksIcon = createLucideIcon({
   name: 'fit-frame-to-masks',
   node: [

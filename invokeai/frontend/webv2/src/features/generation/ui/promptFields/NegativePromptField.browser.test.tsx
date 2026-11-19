@@ -22,7 +22,6 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
 }));
 
 vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
-  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
   ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
@@ -87,7 +86,6 @@ describe('the negative prompt in template view mode', () => {
     expect(textarea.value).toBe('lowres, blurry');
   });
 
-  // Empty negative templates remain editable.
   it('stays editable when the template has none', async () => {
     const textarea = await render('');
 

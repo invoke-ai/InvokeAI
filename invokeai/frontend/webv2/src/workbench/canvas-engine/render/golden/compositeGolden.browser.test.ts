@@ -198,7 +198,6 @@ describe('compositor goldens', () => {
     const candidate = backend.createSurface(60, 50);
     solid('#4f8ff2')(candidate.ctx, { height: 50, width: 60, x: 0, y: 0 });
     const target = backend.createSurface(WIDTH, HEIGHT);
-    // While a gesture edits the mask the staging view keeps every overlay stack shown (no `showOverlayStacks`).
     compositeDocument(target, doc(layers), caches, identity(), {
       backend,
       checkerboardTile: createCheckerboardTile(backend),

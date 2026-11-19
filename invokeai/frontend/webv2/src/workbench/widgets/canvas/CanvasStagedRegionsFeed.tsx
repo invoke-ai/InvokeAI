@@ -15,10 +15,7 @@ export const readCanvasStagedRegions = (project: Pick<Project, 'canvas' | 'queue
   }));
 };
 
-/**
- * Feeds the engine's staged-region overlay, so the canvas shows where pending results will land while the user keeps
- * editing and moves the bbox elsewhere. Rereads only when staging, the revision or the queue changed.
- */
+/** Feeds the staged-region overlay; rereads only when staging, the revision or the queue changed. */
 export const CanvasStagedRegionsFeed = ({
   engine,
   projectId,

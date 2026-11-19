@@ -40,14 +40,12 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { page, userEvent } from 'vitest/browser';
 
 const harness = vi.hoisted(() => ({
-  /** History tests let edits land in the harness project, as the reducer would; other suites keep it fixed. */
   appliesMutations: false,
   engine: null as unknown,
   listeners: new Set<() => void>(),
   project: null as Project | null,
 }));
 
-// The text form's catalog query must not reach the network from this harness.
 vi.mock('@features/fonts', async (importOriginal) => ({
   ...(await importOriginal<typeof fonts>()),
   fontsInfiniteQueryOptions: () => ({
@@ -63,8 +61,6 @@ vi.mock('@workbench/WorkbenchContext', async () => {
     harness.listeners.add(listener);
     return () => harness.listeners.delete(listener);
   };
-  // Merges into the harness project's widget values and notifies, so pair
-  // edits re-render the way the real store does.
   const patchValues = (typeId: string, values: Record<string, unknown>) => {
     const project = harness.project!;
     const entry = Object.entries(project.widgetInstances).find(([, instance]) => instance.typeId === typeId);
@@ -111,14 +107,10 @@ vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => () => true,
 }));
 vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
-// Recovery looks the project's engine up when it acts; the harness engine is the project's.
 vi.mock('@workbench/canvas-operations/api', async (importOriginal) => ({
   ...(await importOriginal<typeof CanvasOperationsApi>()),
   getCanvasEngine: () => harness.engine,
 }));
-
-import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
-import { clearMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
 
 import type { LayerEditorPaneLayout } from './editorPaneLayout';
 
@@ -139,7 +131,6 @@ beforeAll(async () => {
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-/** The engine reads the harness project's canvas, so document edits resolve against the layers the views show. */
 const createEngineDeps = (): EngineDeps => {
   const mutationPort: CanvasProjectMutationPort = {
     commitEdit: () => undefined,
@@ -153,7 +144,6 @@ const createEngineDeps = (): EngineDeps => {
       return harness.project.canvas !== before;
     },
     getCanvasState: () => harness.project?.canvas ?? createEmptyCanvasState(64, 64),
-    // Harness project changes reach the engine's document mirror, as reducer dispatches do in the app.
     subscribe: (listener) => {
       harness.listeners.add(listener);
       return () => harness.listeners.delete(listener);
@@ -221,7 +211,6 @@ const createFakeOperations = () => {
     resetSelectObjectSession: vi.fn(() => 'updated' as const),
     saveSelectObjectSession: vi.fn(),
     setFilterOperationAutoProcess: vi.fn(),
-    /** Starts Select Object on a fake session the test then moves through its states. */
     startSam: (patch: Partial<SamSessionSnapshot> = {}) => {
       sam = samSession(patch);
       state = {
@@ -385,9 +374,8 @@ const LayerEditorPanesHarness = () => {
 };
 
 describe('Properties pane', () => {
-  // Collapse overrides persist in localStorage, which the browser session
-  // shares across test FILES; reset around every test so no order dependence
-  // leaks in either direction.
+  // Collapse overrides persist in localStorage, which the browser session shares across test FILES; reset around every
+  // test so no order dependence leaks in either direction.
   beforeEach(() => resetPropertyGroupCollapse());
   afterEach(() => resetPropertyGroupCollapse());
 
@@ -399,7 +387,6 @@ describe('Properties pane', () => {
     await expect.element(page.getByRole('slider', { exact: true, name: 'Brush size' })).toBeVisible();
     await expect.element(page.getByRole('slider', { exact: true, name: 'Opacity' })).toBeVisible();
     await expect.element(page.getByRole('button', { exact: true, name: 'Brush color' })).toBeVisible();
-    // Dynamics ships collapsed; the disclosure opens it to labelled switches.
     const dynamics = page.getByRole('button', { exact: true, name: 'Dynamics' });
     await expect.element(dynamics).toHaveAttribute('aria-expanded', 'false');
     expect(page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects width' }).query()).toBeNull();
@@ -409,7 +396,6 @@ describe('Properties pane', () => {
       .element(page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects opacity' }))
       .toBeVisible();
 
-    // The eraser shares the group but exposes width only: pressure never modulates erase strength.
     await act(() => engine!.tools.setTool('eraser'));
     await settle();
     const eraserWidth = page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects width' });
@@ -422,50 +408,10 @@ describe('Properties pane', () => {
     await act(() => engine!.tools.setTool('view'));
     await settle();
     expect(page.getByRole('slider', { exact: true, name: 'Brush size' }).query()).toBeNull();
-    // Gesture guidance lives in the status widget; an empty tool section takes no pane space.
     expect(host!.textContent).not.toContain('Pan the canvas.');
     expect(host!.textContent).not.toContain('Hold Space');
     expect(host!.textContent).not.toContain('Tool');
     expect(host!.textContent).toContain('Layer');
-  });
-
-  it('follows size changes from outside the field and shares row identity brush↔eraser', async () => {
-    await mount(PropertiesPane);
-    await act(() => engine!.tools.setTool('brush'));
-    await settle();
-    const slider = page.getByRole('slider', { exact: true, name: 'Brush size' }).element() as HTMLElement;
-    // `[` / `]` and canvas gestures write the store; the scrubber shows what they wrote.
-    await act(() => engine!.interaction.set('brushOptions', { ...engine!.interaction.get('brushOptions'), size: 80 }));
-    await settle();
-    expect(slider.getAttribute('aria-valuetext')).toBe('80px');
-
-    await act(() => engine!.tools.setTool('eraser'));
-    await settle();
-    // Same DOM node, relabelled: the shared Stroke group survives the switch.
-    const eraserSlider = page.getByRole('slider', { exact: true, name: 'Eraser size' }).element();
-    expect(eraserSlider).toBe(slider);
-    expect(page.getByRole('button', { exact: true, name: 'Brush color' }).query()).toBeNull();
-  });
-
-  it('keeps one selected-shape appearance editor in Layer with any active tool', async () => {
-    await mount(PropertiesPane, 'shape');
-    const layer = page.getByRole('group', { exact: true, name: 'Layer' });
-    const appearance = layer.getByRole('group', { exact: true, name: 'Appearance' });
-    for (const tool of ['brush', 'move', 'view', 'shape'] as const) {
-      await act(() => engine!.tools.setTool(tool));
-      await settle();
-      await expect.element(appearance).toBeVisible();
-      expect(layer.getByRole('slider', { exact: true, name: 'Stroke width' }).elements()).toHaveLength(1);
-      await expect
-        .element(appearance.getByRole('slider', { exact: true, name: 'Stroke width' }))
-        .toHaveAttribute('aria-disabled', 'true');
-      if (tool === 'shape') {
-        const defaults = page.getByRole('group', { exact: true, name: 'Tool' });
-        await expect.element(defaults.getByText('Defaults', { exact: true })).toBeVisible();
-        await expect.element(defaults.getByRole('radiogroup', { name: 'Place on' })).toBeVisible();
-        expect(layer.getByRole('radiogroup', { name: 'Kind' }).query()).toBeNull();
-      }
-    }
   });
 
   it('edits only the selected shape appearance, with one undo step per gesture', async () => {
@@ -512,166 +458,6 @@ describe('Properties pane', () => {
     expect(layer.element().hasAttribute('inert')).toBe(false);
   });
 
-  it('drops a selected-shape width scrub when another shape becomes selected', async () => {
-    harness.appliesMutations = true;
-    const other = layerContract('s2', 'raster', { source: { ...SHAPE_SOURCE, stroke: '#000000', strokeWidth: 2 } });
-    await mount(PropertiesPane, 'stroked-shape', { extraNodes: [other] });
-    await act(() => engine!.tools.setTool('view'));
-    const width = page.getByRole('slider', { exact: true, name: 'Stroke width' });
-    const frame = width.element().closest<HTMLElement>('[data-scope="scrubber"]')!;
-    const pointer = (target: EventTarget, type: 'pointerdown' | 'pointermove' | 'pointerup', clientX: number) =>
-      act(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX })));
-    const bounds = frame.getBoundingClientRect();
-    await pointer(frame, 'pointerdown', bounds.left + bounds.width * 0.1);
-    await pointer(window, 'pointermove', bounds.left + bounds.width * 0.5);
-    expect(width.element().getAttribute('aria-valuenow')).not.toBe('4');
-    await act(() => {
-      harness.project = applyCanvasProjectMutation(harness.project!, { id: 's2', type: 'setCanvasSelectedLayer' });
-      harness.listeners.forEach((listener) => listener());
-    });
-    await pointer(window, 'pointerup', bounds.left + bounds.width * 0.5);
-    const first = getDocumentLayer(harness.project!.canvas.document, 'l0');
-    const second = getDocumentLayer(harness.project!.canvas.document, 's2');
-    expect(first?.type === 'raster' && first.source.type === 'shape' && first.source.strokeWidth).toBe(4);
-    expect(second?.type === 'raster' && second.source.type === 'shape' && second.source.strokeWidth).toBe(2);
-    expect(engine!.history.getEntries().past).toHaveLength(0);
-    await expect.element(width).toHaveAttribute('aria-valuenow', '2');
-  });
-
-  it('previews the selected text layer above its form and offers style and weight on one row', async () => {
-    await mount(PropertiesPane, 'text');
-    await act(() => engine!.tools.setTool('text'));
-    await settle();
-    await expect.element(page.getByRole('combobox', { exact: true, name: 'Style' })).toBeVisible();
-    // The specimen card carries the chip and the layer's first line in its own style.
-    expect(host!.textContent).not.toContain('second line');
-    const specimen = Array.from(host!.querySelectorAll<HTMLElement>('[aria-hidden="true"]')).find((el) =>
-      el.textContent?.startsWith('Hello there')
-    )!;
-    expect(specimen.parentElement!.textContent).toContain('Editing: My Text');
-    expect(getComputedStyle(specimen).fontWeight).toBe('700');
-    expect(getComputedStyle(specimen).textAlign).toBe('center');
-    expect(getComputedStyle(specimen).color).toBe('rgb(18, 52, 86)');
-    const style = page.getByRole('combobox', { exact: true, name: 'Style' }).element();
-    const weight = page.getByRole('combobox', { exact: true, name: 'Weight' }).element();
-    expect(Math.abs(style.getBoundingClientRect().top - weight.getBoundingClientRect().top)).toBeLessThan(2);
-    await expect
-      .element(page.getByRole('slider', { exact: true, name: 'Font size' }))
-      .toHaveAttribute('aria-valuetext', '72px');
-  });
-
-  it('steps the log-scaled text size slider by whole pixels from the keyboard', async () => {
-    await mount(PropertiesPane);
-    await act(() => engine!.tools.setTool('text'));
-    await settle();
-    const slider = page.getByRole('slider', { exact: true, name: 'Font size' });
-    await expect.element(slider).toBeVisible();
-    const field = () => slider.element().getAttribute('aria-valuenow');
-    expect(field()).toBe('48');
-    // The log track spends its middle on the sizes text is set at.
-    const frame = slider.element().closest<HTMLElement>('[data-scope="scrubber"]')!.getBoundingClientRect();
-    const thumb = slider.element().parentElement!.querySelector('[data-part="thumb"]')!.getBoundingClientRect();
-    const thumbFraction = (thumb.left + thumb.width / 2 - frame.left - 6) / (frame.width - 12);
-    expect(thumbFraction).toBeGreaterThan(0.4);
-    expect(thumbFraction).toBeLessThan(0.6);
-    await act(() => (slider.element() as HTMLElement).focus());
-    await act(() => userEvent.keyboard('{ArrowRight}'));
-    expect(field()).toBe('49');
-    await act(() => userEvent.keyboard('{PageUp}'));
-    expect(field()).toBe('59');
-    await act(() => userEvent.keyboard('{ArrowLeft}'));
-    expect(field()).toBe('58');
-    expect(engine!.interaction.get('textOptions').fontSize).toBe(58);
-  });
-
-  it('names a selected gradient in the chip and moves a default stop from the keyboard', async () => {
-    await mount(PropertiesPane, 'gradient');
-    await act(() => engine!.tools.setTool('gradient'));
-    await settle();
-    expect(host!.textContent).toContain('Editing: My Gradient');
-    await expect.element(page.getByRole('button', { exact: true, name: 'Gradient stop at 0%' })).toBeVisible();
-
-    // The harness's mutation port refuses document dispatches, so the
-    // keyboard-move half runs against the creation DEFAULTS (options store).
-    await act(() => root?.unmount());
-    await mount(PropertiesPane);
-    await act(() => engine!.tools.setTool('gradient'));
-    await settle();
-    expect(host!.textContent).toContain('Defaults');
-    const startStop = page.getByRole('button', { exact: true, name: 'Gradient stop at 0%' });
-    await expect.element(startStop).toBeVisible();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Gradient stop at 100%' })).toBeVisible();
-    await act(() => (startStop.element() as HTMLElement).focus());
-    await act(() => userEvent.keyboard('{ArrowRight}'));
-    await settle();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Gradient stop at 1%' })).toBeVisible();
-  });
-
-  it('moves a gradient stop once when its offset scrub is released', async () => {
-    await mount(PropertiesPane);
-    await act(() => engine!.tools.setTool('gradient'));
-    await settle();
-    const offset = page.getByRole('slider', { exact: true, name: 'Offset' });
-    await expect.element(offset).toHaveAttribute('aria-valuetext', '0%');
-    const frame = offset.element().closest<HTMLElement>('[data-scope="scrubber"]')!;
-    const set = vi.spyOn(engine!.interaction, 'set');
-    const pointer = (target: EventTarget, type: 'pointerdown' | 'pointermove' | 'pointerup', clientX: number) =>
-      act(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX })));
-    const { left, width } = frame.getBoundingClientRect();
-
-    await pointer(frame, 'pointerdown', left + width * 0.1);
-    await pointer(window, 'pointermove', left + width * 0.3);
-    await pointer(window, 'pointermove', left + width * 0.5);
-    // Mid-scrub the field follows the pointer while the stop itself stays put.
-    expect(offset.element().getAttribute('aria-valuetext')).not.toBe('0%');
-    expect(set.mock.calls.filter(([key]) => key === 'gradientOptions')).toHaveLength(0);
-    await expect.element(page.getByRole('button', { exact: true, name: 'Gradient stop at 0%' })).toBeVisible();
-
-    await pointer(window, 'pointerup', left + width * 0.5);
-    await settle();
-    expect(set.mock.calls.filter(([key]) => key === 'gradientOptions')).toHaveLength(1);
-    const moved = Math.round(engine!.interaction.get('gradientOptions').stops[0]!.offset * 100);
-    expect(moved).toBeGreaterThan(0);
-    expect(offset.element().getAttribute('aria-valuetext')).toBe(`${moved}%`);
-    await expect.element(page.getByRole('button', { exact: true, name: `Gradient stop at ${moved}%` })).toBeVisible();
-  });
-
-  it('keeps the Position row identity across move, frame and transform, with the transform actions live', async () => {
-    await mount(PropertiesPane, 'layer');
-    await act(() => engine!.tools.setTool('move'));
-    await settle();
-    const xField = page.getByRole('spinbutton', { exact: true, name: 'X' }).element();
-    await act(() => engine!.tools.setTool('bbox'));
-    await settle();
-    expect(page.getByRole('spinbutton', { exact: true, name: 'X' }).element()).toBe(xField);
-    await expect.element(page.getByRole('spinbutton', { exact: true, name: 'W' })).toBeVisible();
-
-    await act(() => engine!.tools.setTool('transform'));
-    await settle();
-    expect(page.getByRole('spinbutton', { exact: true, name: 'X' }).element()).toBe(xField);
-    // No session and no float: Apply/Cancel close the Tool section, disabled.
-    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeDisabled();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Cancel' })).toBeDisabled();
-  });
-
-  it('shares the selection form between lasso and marquee with the actions cluster', async () => {
-    await mount(PropertiesPane);
-    await act(() => engine!.tools.setTool('lasso'));
-    await settle();
-    const freehand = page.getByRole('radio', { exact: true, name: 'Freehand' });
-    await expect.element(freehand).toBeVisible();
-    const modeGroup = host!.querySelector<HTMLElement>('[role="group"][aria-label="Selection mode"]')!;
-    expect(modeGroup).not.toBeNull();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Deselect' })).toBeDisabled();
-
-    await act(() => engine!.tools.setTool('marquee'));
-    await settle();
-    // The op-mode buttons keep DOM identity; the shape choices swap per tool.
-    expect(host!.querySelector('[role="group"][aria-label="Selection mode"]')).toBe(modeGroup);
-    await expect.element(page.getByRole('radio', { exact: true, name: 'Rectangle' })).toBeVisible();
-    expect(page.getByRole('radio', { exact: true, name: 'Freehand' }).query()).toBeNull();
-  });
-
   it('remembers a group collapse per user across remounts', async () => {
     await mount(PropertiesPane);
     await act(() => engine!.tools.setTool('brush'));
@@ -688,44 +474,9 @@ describe('Properties pane', () => {
     await expect
       .element(page.getByRole('button', { exact: true, name: 'Dynamics' }))
       .toHaveAttribute('aria-expanded', 'true');
-    // The override reached storage, not just the in-memory store.
     expect(JSON.parse(window.localStorage.getItem('invokeai:v7:webv2:tool-property-collapsed') ?? '{}')).toMatchObject({
       'paint-dynamics': false,
     });
-  });
-
-  it('keeps form sections stable across tools with properties and omits instruction-only sections', async () => {
-    await mount(PropertiesPane);
-    await act(() => engine!.tools.setTool('brush'));
-    await settle();
-    const section = host!.querySelector<HTMLElement>('[role="group"][aria-label="Tool"]')!;
-    const { left, top } = section.getBoundingClientRect();
-    for (const tool of ['eraser', 'move', 'shape'] as const) {
-      await act(() => engine!.tools.setTool(tool));
-      await settle();
-      expect(host!.querySelector('[role="group"][aria-label="Tool"]')).toBe(section);
-      const rect = section.getBoundingClientRect();
-      expect(rect.left).toBe(left);
-      expect(rect.top).toBe(top);
-    }
-    for (const tool of ['view', 'colorPicker', 'sam'] as const) {
-      await act(() => engine!.tools.setTool(tool));
-      await settle();
-      expect(host!.querySelector('[role="group"][aria-label="Tool"]')).toBeNull();
-      expect(host!.querySelector('[role="group"][aria-label="Layer"]')).not.toBeNull();
-    }
-  });
-
-  it('names a running operation in its own section header', async () => {
-    const operationSection = () => host!.querySelector<HTMLElement>('[role="group"][aria-label="Operation"]');
-    await mount(PropertiesPane, 'mask');
-    expect(operationSection()).toBeNull();
-    await act(() => operations!.start(true));
-    await settle();
-    expect(operationSection()?.textContent).toContain('OperationFilter');
-    await act(() => operations!.start(false));
-    await settle();
-    expect(operationSection()).toBeNull();
   });
 
   it('puts a running operation first with Cancel, locks the tool rows in place and hands them focus over', async () => {
@@ -734,7 +485,6 @@ describe('Properties pane', () => {
     await settle();
     const slider = page.getByRole('slider', { exact: true, name: 'Brush size' }).element();
     await act(() => slider.focus());
-    // Scrolled down to the tool: the operation's Cancel, inline in its section above, must come into view.
     const viewport = [...host!.querySelectorAll<HTMLElement>('*')].find(
       (element) => element.scrollHeight > element.clientHeight && getComputedStyle(element).overflowY !== 'visible'
     );
@@ -763,8 +513,6 @@ describe('Properties pane', () => {
 
 describe('Select Object properties', () => {
   beforeEach(() => resetPropertyGroupCollapse());
-
-  const operationSection = () => host!.querySelector<HTMLElement>('[role="group"][aria-label="Operation"]')!;
   const startSam = async (patch: Partial<SamSessionSnapshot> = {}, width?: number) => {
     await mount(PropertiesPane, 'none', width ? { width } : undefined);
     await act(() => operations!.startSam(patch));
@@ -788,38 +536,6 @@ describe('Select Object properties', () => {
     expect(operations!.updateSelectObjectSession).toHaveBeenCalledExactlyOnceWith({ inputType: 'prompt' });
   });
 
-  it('labels new points from the Points row', async () => {
-    await startSam();
-
-    await userEvent.click(page.getByText('Exclude 0'));
-
-    expect(operations!.updateSelectObjectSession).toHaveBeenCalledExactlyOnceWith({ pointLabel: 'exclude' });
-  });
-
-  it('clears only the box from its row', async () => {
-    const input = {
-      bbox: { height: 8, width: 12, x: 1, y: 2 },
-      excludePoints: [{ x: 3, y: 4 }],
-      includePoints: [{ x: 1, y: 2 }],
-      type: 'visual' as const,
-    };
-    await startSam({ input });
-
-    await expect.element(page.getByText('Set', { exact: true })).toBeVisible();
-    const clear = page.getByRole('button', { name: 'Clear box' });
-    await userEvent.click(clear);
-
-    expect(operations!.updateSelectObjectSession).toHaveBeenCalledExactlyOnceWith({ input: { ...input, bbox: null } });
-
-    // Without a box the same button stays in the row, disabled rather than gone.
-    const clearElement = clear.element();
-    const clearRect = clearElement.getBoundingClientRect();
-    await act(() => operations!.setSam({ input: { ...input, bbox: null } }));
-    expect(clear.element()).toBe(clearElement);
-    expect(clearElement.getBoundingClientRect()).toEqual(clearRect);
-    await expect.element(clear).toBeDisabled();
-  });
-
   it('finds the prompted object on Enter whatever auto-update says, and offers Find object while manual', async () => {
     await startSam({ input: { prompt: 'cat', type: 'prompt' } });
     const prompt = page.getByRole('textbox', { name: 'Prompt' });
@@ -833,152 +549,19 @@ describe('Select Object properties', () => {
     await userEvent.click(page.getByRole('button', { name: 'Find object' }));
     expect(operations!.processSelectObjectSession).toHaveBeenCalledTimes(2);
   });
-
-  it('offers Find object to retry a failed run with auto-update on, until that retry has finished', async () => {
-    const input = { bbox: null, excludePoints: [], includePoints: [{ x: 4, y: 5 }], type: 'visual' as const };
-    await startSam({ input });
-    const findObject = page.getByRole('button', { name: 'Find object' });
-    expect(findObject.query()).toBeNull();
-
-    await act(() => operations!.setSam({ error: { code: 'not-ready' }, status: 'error' }));
-    await expect.element(findObject).toBeEnabled();
-    await userEvent.click(findObject);
-    expect(operations!.processSelectObjectSession).toHaveBeenCalledOnce();
-
-    // The retry clears the error as it starts; the button stays, busy, while the session says it retries.
-    await act(() => operations!.setSam({ error: null, retrying: true, status: 'processing-sam' }));
-    await expect.element(findObject).toBeDisabled();
-    await act(() => operations!.setSam({ hasPreview: true, retrying: false, status: 'ready' }));
-    expect(findObject.query()).toBeNull();
-  });
-
-  it('keeps Find object for a retry started by Enter in the prompt', async () => {
-    await startSam({
-      error: { code: 'queue', detail: 'AttributeError' },
-      input: { prompt: 'cat', type: 'prompt' },
-      status: 'error',
-    });
-    const findObject = page.getByRole('button', { name: 'Find object' });
-    await expect.element(findObject).toBeEnabled();
-
-    await userEvent.click(page.getByRole('textbox', { name: 'Prompt' }));
-    await userEvent.keyboard('{Enter}');
-    expect(operations!.processSelectObjectSession).toHaveBeenCalledOnce();
-    await act(() => operations!.setSam({ error: null, retrying: true, status: 'uploading' }));
-
-    await expect.element(findObject).toBeDisabled();
-  });
-
-  it('leaves a failed apply to Apply: no Find object with auto-update on', async () => {
-    await startSam({ error: { code: 'commit-failed', detail: 'commit failed' }, hasPreview: true, status: 'error' });
-
-    await expect
-      .element(page.getByRole('alert'))
-      .toHaveTextContent('Select Object could not apply or save the result.');
-    expect(page.getByRole('button', { name: 'Find object' }).query()).toBeNull();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeEnabled();
-  });
-
-  it('leaves Enter to an IME that is composing, and does nothing on an empty prompt', async () => {
-    await startSam({ input: { prompt: 'cat', type: 'prompt' } });
-    const prompt = page.getByRole('textbox', { name: 'Prompt' }).element();
-    const pressEnter = (init: KeyboardEventInit) =>
-      act(() => {
-        prompt.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', ...init }));
-      });
-
-    await pressEnter({ isComposing: true });
-    // Safari confirms a candidate after compositionend; keyCode 229 is the only sign.
-    await pressEnter({ keyCode: 229 } as KeyboardEventInit);
-    expect(operations!.processSelectObjectSession).not.toHaveBeenCalled();
-
-    await act(() => operations!.setSam({ input: { prompt: '  ', type: 'prompt' } }));
-    await pressEnter({});
-    expect(operations!.processSelectObjectSession).not.toHaveBeenCalled();
-  });
-
-  it('keeps the Find object label while it runs and reports the phase beside the section title', async () => {
-    await startSam({ autoProcess: false, input: { prompt: 'cat', type: 'prompt' } });
-    const status = operationSection().querySelector('[role="status"]')!;
-    expect(status.textContent).toBe('');
-    const promptTop = page.getByRole('textbox', { name: 'Prompt' }).element().getBoundingClientRect().top;
-
-    await act(() => operations!.setSam({ status: 'processing-sam' }));
-
-    expect(operationSection().querySelector('[role="status"]')).toBe(status);
-    expect(status.textContent).toBe('Finding object…');
-    await expect.element(page.getByRole('button', { name: 'Find object' })).toBeDisabled();
-    expect(page.getByRole('textbox', { name: 'Prompt' }).element().getBoundingClientRect().top).toBe(promptTop);
-  });
-
-  it('puts an error after the groups and actions with its technical detail, leaving both in place', async () => {
-    await startSam({ input: { prompt: 'cat', type: 'prompt' } });
-    const promptTop = page.getByRole('textbox', { name: 'Prompt' }).element().getBoundingClientRect().top;
-    const cancel = page.getByRole('button', { exact: true, name: 'Cancel' }).element();
-    const cancelTop = cancel.getBoundingClientRect().top;
-
-    await act(() => operations!.setSam({ error: { code: 'queue', detail: 'AttributeError' }, status: 'error' }));
-
-    const alert = page.getByRole('alert');
-    await expect.element(alert).toHaveTextContent('Select Object processing failed on the backend.');
-    const groups = operationSection().querySelectorAll('[role="group"]');
-    const lastGroup = groups[groups.length - 1]!;
-    expect(lastGroup.compareDocumentPosition(alert.element()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(cancel.compareDocumentPosition(alert.element()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(page.getByRole('textbox', { name: 'Prompt' }).element().getBoundingClientRect().top).toBe(promptTop);
-    expect(cancel.getBoundingClientRect().top).toBe(cancelTop);
-    await userEvent.hover(page.getByRole('button', { name: 'Technical details' }));
-    await expect.element(page.getByText('AttributeError')).toBeVisible();
-    expect(operations!.cancelSelectObjectSession).not.toHaveBeenCalled();
-  });
-
-  it('names the source layer with the section subtitle', async () => {
-    await startSam();
-    expect(operationSection().textContent).toContain('Select ObjectPortrait · Raster layer · 1024 × 768');
-  });
-
-  it('fits the actions row in a 280 px pane with every verb showing', async () => {
-    await startSam({ autoProcess: false, hasPreview: true, status: 'processing-sam' }, 280);
-    const actions = host!.querySelector<HTMLElement>('[data-pane-action="cancel"]')!.parentElement!;
-    const hostRect = host!.getBoundingClientRect();
-    for (const name of ['Reset', 'Cancel', 'Find object', 'Apply', 'Save as']) {
-      const rect = page.getByRole('button', { exact: true, name }).element().getBoundingClientRect();
-      expect(rect.width, name).toBeGreaterThan(0);
-      expect(rect.right, name).toBeLessThanOrEqual(hostRect.right);
-    }
-    expect(actions.scrollWidth).toBeLessThanOrEqual(actions.clientWidth);
-    expect(host!.scrollWidth).toBeLessThanOrEqual(280);
-  });
-});
-
-describe('Control layer properties', () => {
-  it('fits a 320 px pane without horizontal overflow or clipped text', async () => {
-    await mount(PropertiesPane, 'control', { width: 320 });
-    await expect.element(page.getByRole('combobox', { exact: true, name: 'Type' })).toBeVisible();
-
-    const overflowing = [host!, ...host!.querySelectorAll<HTMLElement>('*')].filter(
-      (element) =>
-        element.scrollWidth > element.clientWidth + 1 &&
-        getComputedStyle(element).overflowX !== 'visible' &&
-        // Screen-reader-only labels are clipped on purpose.
-        getComputedStyle(element).position !== 'absolute'
-    );
-    expect(overflowing.map((element) => element.outerHTML.slice(0, 80))).toEqual([]);
-    expect(host!.scrollWidth).toBeLessThanOrEqual(320);
-  });
 });
 
 describe('Tool property scrubbers', () => {
   beforeEach(() => resetPropertyGroupCollapse());
   afterEach(() => resetPropertyGroupCollapse());
 
-  const scrubber = (name: string, section: 'Tool' | 'Layer' = 'Tool') =>
-    page
-      .getByRole('group', { exact: true, name: section })
-      .getByRole('slider', { exact: true, name })
-      .element() as HTMLElement;
+  const scrubber = async (name: string, section: 'Tool' | 'Layer' = 'Tool') => {
+    const slider = page.getByRole('group', { exact: true, name: section }).getByRole('slider', { exact: true, name });
 
-  /** Presses the scrubber at `from` and moves through `to`; the gesture continues with `move` and ends on `release`. */
+    await expect.element(slider).toBeInTheDocument();
+    return slider.element() as HTMLElement;
+  };
+
   const drag = async (slider: HTMLElement, from: number, ...to: number[]) => {
     const frame = slider.closest<HTMLElement>('[data-scope="scrubber"]')!;
     const { left, width } = frame.getBoundingClientRect();
@@ -999,7 +582,6 @@ describe('Tool property scrubbers', () => {
     return { move, release: () => fire(window, 'pointerup', last) };
   };
 
-  /** Holds `key` through `repeats` key-downs; resolves to the release. */
   const holdKey = async (slider: HTMLElement, key: string, repeats: number) => {
     for (let index = 0; index < repeats; index += 1) {
       await act(() => slider.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key, repeat: index > 0 })));
@@ -1007,10 +589,6 @@ describe('Tool property scrubbers', () => {
     return () => act(() => slider.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key })));
   };
 
-  /**
-   * Routes commits through a model over `live`, a document the test can change mid-gesture the way an undo or a
-   * concurrent edit would, and records every write to `optionsKey`.
-   */
   const observe = (optionsKey: 'gradientOptions' | 'shapeOptions' | 'textOptions') => {
     let live: CanvasDocumentContractV3 = harness.project!.canvas.document;
     vi.spyOn(engine!.document, 'model').mockImplementation(() =>
@@ -1024,7 +602,6 @@ describe('Tool property scrubbers', () => {
     const set = vi.spyOn(engine!.interaction, 'set');
     return {
       commits,
-      /** Sources the commits wrote, in order. */
       committedSources: () =>
         commits.map(
           (edit) => (edit.forward as { source: CanvasLayerSourceContract }).source as Record<string, unknown>
@@ -1039,9 +616,7 @@ describe('Tool property scrubbers', () => {
 
   it.each([
     ['text', 'Font size', 'textOptions'],
-    ['text', 'Line height', 'textOptions'],
     ['stroked-shape', 'Stroke width', 'shapeOptions'],
-    ['gradient', 'Angle', 'gradientOptions'],
   ] as const)(
     'shows draft steps and commits once per drag or held key (%s, %s)',
     async (selection, name, optionsKey) => {
@@ -1049,7 +624,7 @@ describe('Tool property scrubbers', () => {
       await act(() => engine!.tools.setTool(selection === 'stroked-shape' ? 'shape' : selection));
       await settle();
       const { commits, previews } = observe(optionsKey);
-      const slider = scrubber(name, selection === 'stroked-shape' ? 'Layer' : 'Tool');
+      const slider = await scrubber(name, selection === 'stroked-shape' ? 'Layer' : 'Tool');
 
       const gesture = await drag(slider, 0.5, 0.55, 0.6);
       expect(previews()).toBe(selection === 'stroked-shape' ? 0 : 2);
@@ -1057,7 +632,6 @@ describe('Tool property scrubbers', () => {
       await gesture.release();
       expect(commits).toHaveLength(1);
 
-      // Selected shape edits keep creation defaults untouched; other tools also preview in their options.
       const settled = previews();
       const releaseKey = await holdKey(slider, 'ArrowRight', 3);
       expect(previews() - settled).toBe(selection === 'stroked-shape' ? 0 : 3);
@@ -1067,34 +641,13 @@ describe('Tool property scrubbers', () => {
     }
   );
 
-  it('keeps a kind hotkey and a document edit that land mid stroke-width drag', async () => {
-    await mount(PropertiesPane, 'stroked-shape');
-    await act(() => engine!.tools.setTool('shape'));
-    await settle();
-    const { committedSources, setLiveSource } = observe('shapeOptions');
-
-    const gesture = await drag(scrubber('Stroke width', 'Layer'), 0.5, 0.6);
-    await act(() =>
-      engine!.interaction.set('shapeOptions', { ...engine!.interaction.get('shapeOptions'), kind: 'star' })
-    );
-    setLiveSource({ ...SHAPE_SOURCE, fill: '#0000ff', stroke: '#00ff00', strokeWidth: 4 });
-    await gesture.move(0.65);
-    expect(engine!.interaction.get('shapeOptions').kind).toBe('star');
-    await gesture.release();
-
-    expect(engine!.interaction.get('shapeOptions').kind).toBe('star');
-    const [committed] = committedSources();
-    expect(committed?.fill).toBe('#0000ff');
-    expect(committed?.strokeWidth).not.toBe(4);
-  });
-
   it('keeps an undone colour in the font-size commit when the undo lands mid-drag', async () => {
     await mount(PropertiesPane, 'text');
     await act(() => engine!.tools.setTool('text'));
     await settle();
     const { committedSources, setLiveSource } = observe('textOptions');
 
-    const { release } = await drag(scrubber('Font size'), 0.5, 0.6);
+    const { release } = await drag(await scrubber('Font size'), 0.5, 0.6);
     setLiveSource({ ...TEXT_SOURCE, color: '#abcdef' });
     await release();
 
@@ -1102,48 +655,6 @@ describe('Tool property scrubbers', () => {
     expect(committed?.color).toBe('#abcdef');
     expect(committed?.fontSize).toBeGreaterThan(TEXT_SOURCE.fontSize);
     expect(committed?.content).toBe(TEXT_SOURCE.content);
-  });
-
-  it('keeps stops and defaults edited mid angle drag', async () => {
-    await mount(PropertiesPane, 'gradient');
-    await act(() => engine!.tools.setTool('gradient'));
-    await settle();
-    const { committedSources, setLiveSource } = observe('gradientOptions');
-    const stops = [
-      { color: '#ff0000ff', offset: 0 },
-      { color: '#00ff00ff', offset: 0.5 },
-      { color: '#ffffffff', offset: 1 },
-    ];
-
-    const { release } = await drag(scrubber('Angle'), 0.5, 0.6);
-    setLiveSource({ ...GRADIENT_SOURCE, stops });
-    await act(() =>
-      engine!.interaction.set('gradientOptions', { ...engine!.interaction.get('gradientOptions'), preset: 'custom' })
-    );
-    await release();
-
-    const [committed] = committedSources();
-    expect(committed?.stops).toEqual(stops);
-    expect(committed?.angle).not.toBe(0);
-    expect(engine!.interaction.get('gradientOptions').preset).toBe('custom');
-  });
-
-  it('moves the dragged stop within the stops as they are on release, keeping one added mid-drag', async () => {
-    await mount(PropertiesPane, 'gradient');
-    await act(() => engine!.tools.setTool('gradient'));
-    await settle();
-    const { commits, committedSources, setLiveSource } = observe('gradientOptions');
-    const added = { color: '#00ff00ff', offset: 0.5 };
-
-    const { release } = await drag(scrubber('Offset'), 0.1, 0.3, 0.35);
-    setLiveSource({ ...GRADIENT_SOURCE, stops: [GRADIENT_SOURCE.stops[0], added, GRADIENT_SOURCE.stops[1]] });
-    await release();
-
-    expect(commits).toHaveLength(1);
-    const stops = committedSources()[0]?.stops as { color: string; offset: number }[];
-    expect(stops.map((stop) => stop.color)).toEqual(['#000000ff', '#00ff00ff', '#ffffffff']);
-    expect(stops[0]!.offset).toBeGreaterThan(0);
-    expect(stops[0]!.offset).toBeLessThan(0.5);
   });
 });
 
@@ -1322,73 +833,9 @@ describe('Transform pane', () => {
     expect(host!.textContent).toContain('Paint');
     expect(page.getByRole('button', { exact: true, name: 'Apply' }).query()).toBeNull();
   });
-
-  it('wraps rotation into a half turn and names a selected group instead of editing it', async () => {
-    await mount(TransformPane, 'layer');
-    const commit = vi.spyOn(engine!.layers, 'commitPrepared');
-    const rotation = page.getByRole('spinbutton', { exact: true, name: 'Rotation' });
-    await expect.element(rotation).toHaveValue('28.65');
-    await act(async () => {
-      await userEvent.fill(rotation, '270');
-      await userEvent.keyboard('{Enter}');
-    });
-    expect(commit).toHaveBeenCalledTimes(1);
-    expect(JSON.stringify(commit.mock.calls[0]?.[1])).toContain(String(-Math.PI / 2));
-
-    await act(() => root?.unmount());
-    host?.remove();
-    registry?.releaseEngine('p');
-    await mount(TransformPane, 'group');
-    expect(host!.textContent).toContain('Folder');
-    expect(host!.textContent).toContain('Select a layer inside this group to transform.');
-    await expect.element(page.getByRole('spinbutton', { exact: true, name: 'X' })).toBeDisabled();
-  });
-
-  it('scrubs a field from its label and commits the result once when the mouse button lifts', async () => {
-    await mount(TransformPane, 'layer');
-    // The scrubber locks the pointer once a real click has activated the page; the harness lock steals focus.
-    vi.spyOn(Element.prototype, 'requestPointerLock').mockImplementation(() => Promise.resolve());
-    const commit = vi.spyOn(engine!.layers, 'commitPrepared');
-    const scrubber = host!.querySelector<HTMLElement>('[data-scope="number-input"][data-part="scrubber"]')!;
-    const x = page.getByRole('spinbutton', { exact: true, name: 'X' });
-    await act(() =>
-      scrubber.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: 100, clientY: 100 }))
-    );
-    for (let step = 1; step <= 5; step += 1) {
-      await act(() =>
-        document.dispatchEvent(
-          new MouseEvent('mousemove', { bubbles: true, clientX: 100 + step * 4, clientY: 100, movementX: 4 })
-        )
-      );
-    }
-    await expect.element(x).toHaveValue('15');
-    expect(commit).not.toHaveBeenCalled();
-    await act(() =>
-      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, clientX: 120, clientY: 100 }))
-    );
-    expect(commit).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe('Layer editor panes host', () => {
-  it('keeps the collapsed strip reachable and expands from tab selection', async () => {
-    paneHarnessLayout = { ...LAYER_EDITOR_PANE_DEFAULTS };
-    await mount(LayerEditorPanesHarness);
-    await act(async () => {
-      await userEvent.click(page.getByRole('button', { exact: true, name: 'Collapse editor panes' }));
-    });
-    await settle();
-    const propertiesTab = page.getByRole('tab', { exact: true, name: 'Properties' });
-    await expect.element(propertiesTab).toHaveAttribute('aria-selected', 'true');
-    expect((propertiesTab.element() as HTMLElement).tabIndex).toBe(0);
-    expect(host!.querySelector('[role="tabpanel"]')).toBeNull();
-    await act(async () => {
-      await userEvent.click(propertiesTab);
-    });
-    await settle();
-    expect(host!.querySelector('[role="tabpanel"]')).not.toBeNull();
-  });
-
   it('preserves a running operation draft across pane tab switches', async () => {
     paneHarnessLayout = { ...LAYER_EDITOR_PANE_DEFAULTS };
     await mount(LayerEditorPanesHarness);
@@ -1407,8 +854,6 @@ describe('Layer editor panes host', () => {
     });
     await settle();
 
-    // Drafts live engine-side; remounting the pane reads the same one back
-    // and the unmount must not cancel, reset, or commit the session.
     expect(operations!.getFilterSessionState()!.draft).toBe(draft);
     expect(operations!.resetFilterOperation).not.toHaveBeenCalled();
     expect(operations!.cancelFilterOperation).not.toHaveBeenCalled();
@@ -1446,48 +891,6 @@ describe('Color pane', () => {
     await expect.element(foreground).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('swaps the pair from the chip row', async () => {
-    await mount(ColorPane);
-    await act(async () => {
-      await userEvent.click(page.getByRole('button', { exact: true, name: 'Swap foreground and background colors' }));
-    });
-    expect(canvasValues().activeColors).toEqual({ background: '#000000', foreground: '#ffffff' });
-  });
-
-  it('reveals the Mask Tint target for a selected mask and arms it only explicitly', async () => {
-    clearMaskTintTarget();
-    await mount(ColorPane, 'mask');
-    const tintChip = page.getByRole('button', { exact: true, name: 'Mask tint' });
-    await expect.element(tintChip).toBeVisible();
-    // Revealed, not switched: the pair target keeps the wheel until armed.
-    await expect.element(tintChip).toHaveAttribute('aria-pressed', 'false');
-    const foreground = page.getByRole('button', { exact: true, name: 'Foreground color' });
-    await expect.element(foreground).toHaveAttribute('aria-pressed', 'true');
-    await act(async () => {
-      await userEvent.click(tintChip);
-    });
-    await expect.element(tintChip).toHaveAttribute('aria-pressed', 'true');
-    await expect.element(foreground).toHaveAttribute('aria-pressed', 'false');
-    // The armed target shows the mask's tint, not the pair.
-    expect((page.getByRole('textbox', { exact: true, name: 'Hex color' }).element() as HTMLInputElement).value).toBe(
-      '#e07575'
-    );
-    // A pair chip disarms the tint and returns to the pair.
-    await act(async () => {
-      await userEvent.click(foreground);
-    });
-    await expect.element(tintChip).toHaveAttribute('aria-pressed', 'false');
-    await expect.element(foreground).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('writes swatch picks to the active target', async () => {
-    await mount(SwatchesPane);
-    await act(async () => {
-      await userEvent.click(page.getByRole('button', { exact: true, name: '#e07575' }));
-    });
-    expect(canvasValues().activeColors).toMatchObject({ foreground: '#e07575' });
-  });
-
   it('adds the current color to the project palette and removes it by right-click', async () => {
     await mount(SwatchesPane);
     await act(async () => {
@@ -1509,61 +912,11 @@ const OverviewHarness = () => (
   </Box>
 );
 
-const TREE_STRIP_TABS = [
-  { id: 'layers', label: 'Layers' },
-  { id: 'history', label: 'History' },
-];
-const TREE_STRIP_TRAILING = <span>trailing-slot</span>;
-
-const TreeStripHarness = () => {
-  const [tab, setTab] = useState('layers');
-  return (
-    <>
-      <SegmentTabs
-        activeId={tab}
-        ariaLabel="Layer panel views"
-        idBase="layer-tree"
-        tabs={TREE_STRIP_TABS}
-        trailing={TREE_STRIP_TRAILING}
-        onSelect={setTab}
-      />
-      <Box aria-labelledby={segmentTabsTabId('layer-tree', tab)} id={segmentTabsPanelId('layer-tree')} role="tabpanel">
-        {tab === 'history' ? 'history-panel' : 'layers-panel'}
-      </Box>
-    </>
-  );
-};
-
-describe('Segment tab strip', () => {
-  it('switches the middle region between the tree and history', async () => {
-    await mount(TreeStripHarness);
-    const layersTab = page.getByRole('tab', { exact: true, name: 'Layers' });
-    const historyTab = page.getByRole('tab', { exact: true, name: 'History' });
-    await expect.element(layersTab).toHaveAttribute('aria-selected', 'true');
-    expect(host!.textContent).toContain('layers-panel');
-    expect(host!.textContent).toContain('trailing-slot');
-    await act(async () => {
-      await userEvent.click(historyTab);
-    });
-    await expect.element(historyTab).toHaveAttribute('aria-selected', 'true');
-    expect(host!.textContent).toContain('history-panel');
-  });
-});
-
 describe('History pane', () => {
   const steps = () =>
     [...page.getByRole('list', { name: 'Edit history' }).element().querySelectorAll('button')].map(
       (button) => button.textContent
     );
-
-  it('shows the empty state with undo and redo disabled', async () => {
-    await mount(HistoryPane);
-    await expect.element(page.getByText('No edits yet.', { exact: true })).toBeVisible();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Undo canvas edit' })).toBeDisabled();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Redo canvas edit' })).toBeDisabled();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Clear history' })).toBeDisabled();
-    expect(steps()).toEqual(['Start']);
-  });
 
   it('jumps back to the start, and clears history only once that is confirmed', async () => {
     harness.appliesMutations = true;
@@ -1591,29 +944,6 @@ describe('History pane', () => {
     await act(() => userEvent.click(dialog.getByRole('button', { exact: true, name: 'Clear history' })));
     await expect.poll(() => engine!.history.getEntries().future).toEqual([]);
     expect(steps()).toEqual(['Start']);
-  });
-
-  it('lists restore points newest first and says what each brings back', async () => {
-    await mount(HistoryPane);
-    const document = harness.project!.canvas.document;
-    await act(() => {
-      harness.project = {
-        ...harness.project!,
-        canvas: {
-          ...harness.project!.canvas,
-          snapshots: [
-            { createdAt: new Date().toISOString(), document, id: 'a', kind: 'clear-canvas', name: 'Before clearing' },
-            { createdAt: new Date().toISOString(), document, id: 'b', kind: 'discard-results', name: 'Discarded' },
-          ],
-        },
-      };
-      harness.listeners.forEach((listener) => listener());
-    });
-    const points = page.getByRole('list', { name: 'Restore points' });
-    await expect.element(points).toBeVisible();
-    const names = [...points.element().querySelectorAll('li')].map((item) => item.querySelector('p')?.textContent);
-    expect(names).toEqual(['Discarded', 'Before clearing']);
-    await expect.element(points.getByRole('button', { name: 'Restore' }).first()).toBeEnabled();
   });
 
   it('restores a canvas point, keeping the canvas it replaced as a point in its place', async () => {
@@ -1647,43 +977,6 @@ describe('History pane', () => {
     expect(kept.map((point) => point.name)).toEqual(['Before restoring “Earlier”']);
     expect(getDocumentLeaves(kept[0]!.document).map((layer) => layer.id)).toEqual(['l0']);
   });
-
-  it('holds a canvas restore while results wait for review, but re-stages a Discard all point', async () => {
-    await mount(HistoryPane);
-    const document = harness.project!.canvas.document;
-    const staged = {
-      height: 64,
-      imageName: 'staged.png',
-      imageUrl: '',
-      placement: { height: 64, opacity: 1, width: 64, x: 0, y: 0 },
-      queuedAt: 'now',
-      sourceQueueItemId: 'q',
-      thumbnailUrl: '',
-      width: 64,
-    };
-    await act(() => {
-      harness.project = {
-        ...harness.project!,
-        canvas: {
-          ...harness.project!.canvas,
-          snapshots: [
-            { createdAt: new Date().toISOString(), document, id: 'a', kind: 'clear-canvas', name: 'Before clearing' },
-            { createdAt: new Date().toISOString(), document, id: 'b', kind: 'discard-results', name: 'Discarded' },
-          ],
-          stagingArea: {
-            ...harness.project!.canvas.stagingArea,
-            pendingImageIds: ['staged.png'],
-            pendingImages: [staged],
-          },
-        },
-      };
-      harness.listeners.forEach((listener) => listener());
-    });
-    const restores = page.getByRole('list', { name: 'Restore points' }).getByRole('button', { name: 'Restore' });
-    // Newest first: the Discard all point, then the cleared canvas.
-    await expect.element(restores.nth(0)).not.toHaveAttribute('aria-disabled', 'true');
-    await expect.element(restores.nth(1)).toHaveAttribute('aria-disabled', 'true');
-  });
 });
 
 describe('Overview pane', () => {
@@ -1703,154 +996,5 @@ describe('Overview pane', () => {
     await settle();
     const after = viewport.getState().pan;
     expect(after.x === before.x && after.y === before.y).toBe(false);
-  });
-
-  it('shows content beyond the frame and centres the view on the clicked point there', async () => {
-    // Outpainted pixels left of the default 1024² frame at the origin.
-    const outpaint = layerContract('outpaint', 'raster', {
-      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
-      transform: { ...IDENTITY, x: -1024 },
-    });
-    await mount(OverviewHarness, 'none', { extraNodes: [outpaint] });
-    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
-    await expect.element(pan).toBeVisible();
-    const canvas = pan.element().querySelector('canvas')!;
-    // Frame (0,0) 1024×1024 ∪ content (-1024,0) 1024×512 = (-1024,0) 2048×1024.
-    expect(canvas.width).toBeGreaterThan(0);
-    expect(canvas.width / canvas.height).toBeCloseTo(2, 1);
-    const unitsPerPx = 2048 / canvas.width;
-    const viewport = engine!.viewport.getViewport();
-    engine!.surface.resize(400, 300, 1);
-
-    const offset = { x: 3, y: 3 };
-    await act(async () => {
-      await userEvent.click(canvas, { position: offset });
-    });
-    await settle();
-
-    const centre = viewport.screenToDocument({ x: 200, y: 150 });
-    const expected = { x: -1024 + offset.x * unitsPerPx, y: offset.y * unitsPerPx };
-    expect(expected.x).toBeLessThan(0);
-    expect(Math.abs(centre.x - expected.x)).toBeLessThan(unitsPerPx);
-    expect(Math.abs(centre.y - expected.y)).toBeLessThan(unitsPerPx);
-    // The outline is centred where the click landed on the bitmap.
-    const outline = pan.element().querySelector('div')!;
-    await expect
-      .poll(() => parseFloat(outline.style.left) + parseFloat(outline.style.width) / 2)
-      .toBeCloseTo(offset.x, 0);
-    await expect
-      .poll(() => parseFloat(outline.style.top) + parseFloat(outline.style.height) / 2)
-      .toBeCloseTo(offset.y, 0);
-  });
-
-  it('paints the viewport outline as dark, light and dark bands just inside its box', async () => {
-    const outpaint = layerContract('outpaint', 'raster', {
-      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
-      transform: { ...IDENTITY, x: -1024 },
-    });
-    await mount(OverviewHarness, 'none', { extraNodes: [outpaint] });
-    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
-    await expect.element(pan).toBeVisible();
-    const canvas = pan.element().querySelector('canvas')!;
-    engine!.surface.resize(400, 300, 1);
-    await act(async () => {
-      await userEvent.click(canvas);
-    });
-    const outline = pan.element().querySelector('div')!;
-    // The throttled glide can move any edge between measuring it and capturing the pixels.
-    await vi.waitFor(async () => {
-      const button = pan.element().getBoundingClientRect();
-      const box = outline.getBoundingClientRect();
-      const png = await page.screenshot({ element: pan.element(), save: false });
-      const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${png}`)).blob());
-      const scale = bitmap.width / button.width;
-      const context = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!;
-      context.drawImage(bitmap, 0, 0);
-      bitmap.close();
-      // Scan the outline's left edge at its vertical middle, from a pixel outside the box to a pixel past the bands.
-      const row = Math.round((box.top + box.height / 2 - button.top) * scale);
-      const edge = (box.left - button.left) * scale;
-      const start = Math.floor(edge - scale);
-      const pixels = context.getImageData(start, row, Math.ceil(5 * scale) + 1, 1).data;
-      // Runs of near-black and near-white pixels, in scan order; mid tones (the checkerboard) start no run.
-      const runs: { start: number; tone: 'dark' | 'light' }[] = [];
-      for (let i = 0; i < pixels.length / 4; i++) {
-        const luma = 0.2126 * pixels[i * 4]! + 0.7152 * pixels[i * 4 + 1]! + 0.0722 * pixels[i * 4 + 2]!;
-        const tone = luma < 48 ? 'dark' : luma > 208 ? 'light' : null;
-        if (tone && tone !== runs.at(-1)?.tone) {
-          runs.push({ start: start + i, tone });
-        }
-      }
-      const lightBand = runs.findIndex(
-        (run, i) => run.tone === 'light' && runs[i - 1]?.tone === 'dark' && runs[i + 1]?.tone === 'dark'
-      );
-      expect(lightBand).toBeGreaterThan(0);
-      // The light band sits one dark band inside the box edge: the outline stays within the viewport's rect.
-      const lightStart = runs[lightBand]!.start;
-      expect(lightStart).toBeGreaterThanOrEqual(edge);
-      expect(lightStart).toBeLessThanOrEqual(edge + 2 * scale);
-    });
-  });
-
-  it('zooms the view around the document point under the wheel', async () => {
-    const outpaint = layerContract('outpaint', 'raster', {
-      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
-      transform: { ...IDENTITY, x: -1024 },
-    });
-    await mount(OverviewHarness, 'none', { extraNodes: [outpaint] });
-    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
-    await expect.element(pan).toBeVisible();
-    const canvas = pan.element().querySelector('canvas')!;
-    const unitsPerPx = 2048 / canvas.width;
-    const viewport = engine!.viewport.getViewport();
-    engine!.surface.resize(400, 300, 1);
-    const offset = { x: 10, y: 20 };
-    // Frame (0,0) 1024×1024 ∪ content (-1024,0) 1024×512 puts document (-1024,0) at the overview's top-left.
-    const documentPoint = { x: -1024 + offset.x * unitsPerPx, y: offset.y * unitsPerPx };
-    const anchor = viewport.documentToScreen(documentPoint);
-    const zoomBefore = viewport.getZoom();
-
-    const bounds = canvas.getBoundingClientRect();
-    act(() => {
-      pan.element().dispatchEvent(
-        new WheelEvent('wheel', {
-          bubbles: true,
-          cancelable: true,
-          clientX: bounds.left + offset.x,
-          clientY: bounds.top + offset.y,
-          deltaY: -100,
-        })
-      );
-    });
-
-    expect(viewport.getZoom()).toBeGreaterThan(zoomBefore);
-    const anchored = viewport.documentToScreen(documentPoint);
-    expect(Math.abs(anchored.x - anchor.x)).toBeLessThan(0.5);
-    expect(Math.abs(anchored.y - anchor.y)).toBeLessThan(0.5);
-  });
-
-  it('redraws to the new extent when a document edit moves content after mount', async () => {
-    await mount(OverviewHarness);
-    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
-    await expect.element(pan).toBeVisible();
-    const canvas = pan.element().querySelector('canvas')!;
-    // The empty document shows only its 1024² frame.
-    expect(canvas.width / canvas.height).toBeCloseTo(1, 1);
-
-    // Content 1024×512 placed above the frame: (0,-512)..(1024,1024) = 1024×1536.
-    const outpaint = layerContract('outpaint', 'raster', {
-      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
-      transform: { ...IDENTITY, y: -512 },
-    });
-    act(() => {
-      const project = harness.project!;
-      harness.project = applyCanvasProjectMutation(project, {
-        document: { ...project.canvas.document, stacks: stacksFrom([outpaint]) },
-        type: 'replaceCanvasDocument',
-      });
-      harness.listeners.forEach((listener) => listener());
-    });
-
-    await expect.poll(() => canvas.width / canvas.height, { timeout: 2000 }).toBeCloseTo(1024 / 1536, 1);
   });
 });

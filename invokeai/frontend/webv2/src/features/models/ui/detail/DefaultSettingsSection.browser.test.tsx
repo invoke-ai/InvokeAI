@@ -12,32 +12,21 @@ import type { DefaultSettingsModel } from './defaultSettingsFields';
 
 import { DefaultSettingsSection } from './DefaultSettingsSection';
 
-/**
- * The FP8 Storage row is shown only where the backend says the setting reaches the model.
- *
- * It used to be shown for every `main`, `controlnet` and `t2i_adapter` record, which offered it for 19
- * loader keys that ignore it -- a GGUF main model whose packed weights must never be re-encoded, a FLUX
- * ControlNet whose loader never casts. The answer now comes from the server, per `(base, type, format)`.
- */
-
 const api = vi.hoisted(() => ({
   getFp8StorageSupport: vi.fn(),
-  // The models store fetches on activation; stubbed so this test touches no network at all.
   getModelsDir: vi.fn(() => Promise.resolve('')),
   listMissingModels: vi.fn(() => Promise.resolve([])),
   listModels: vi.fn(() => Promise.resolve([])),
   updateModel: vi.fn(),
 }));
 
-// Spread over the real module rather than replacing it: the section pulls in the models store, which
-// imports the rest of this transport module, and a bare replacement drops those exports.
 vi.mock('@features/models/data/api', async (importOriginal) => ({
   ...(await importOriginal<typeof ModelsApi>()),
   ...api,
 }));
-// Interpolating rather than echoing the key: each row's switch is named
-// `models.customizeDefaultField` with the field in it, so without this every switch on the panel has
-// the same accessible name and none of them can be addressed by it.
+// Interpolating rather than echoing the key: each row's switch is named `models.customizeDefaultField` with the field
+// in it, so without this every switch on the panel has the same accessible name and none of them can be addressed by
+// it.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, string>) => (values ? `${key}:${Object.values(values).join(',')}` : key),
@@ -98,9 +87,6 @@ describe('DefaultSettingsSection FP8 Storage row', () => {
     api.getFp8StorageSupport.mockReset();
     api.updateModel.mockReset();
     accountLifecycle.activate('fp8-row-test', ':user:fp8-row-test');
-    // The store is a static import, so `resetModules` does not touch it -- only the account lifecycle
-    // clears it. Asserted rather than assumed: if that stopped working, the later cells would inherit
-    // the first one's table and pass for the wrong reason.
     expect(getFp8StorageSupportSnapshot()).toMatchObject({ byKey: null, status: 'idle' });
   });
 
@@ -132,7 +118,6 @@ describe('DefaultSettingsSection FP8 Storage row', () => {
       await Promise.resolve();
     });
 
-    // Same base as the supported row above: this is the case a per-architecture answer cannot express.
     expect(showsFp8Row(host)).toBe(false);
     expect(labels(host)).toContain(PREPROCESSOR_LABEL);
   });
@@ -157,8 +142,6 @@ describe('DefaultSettingsSection FP8 Storage row', () => {
 
     await render(settingsModel({}));
 
-    // In flight: hidden, because a control that turns out to be inert is the defect being removed and
-    // a control that appears a moment late is not.
     expect(showsFp8Row(host)).toBe(false);
 
     await act(async () => {
@@ -166,14 +149,10 @@ describe('DefaultSettingsSection FP8 Storage row', () => {
       await request.promise;
     });
 
-    // And it appears when the answer arrives, which is what the subscription is for.
     expect(showsFp8Row(host)).toBe(true);
   });
 
   it('saves the setting the row turns on', async () => {
-    // The other cells only prove the row is rendered. Without this one the `Switch` could be deleted
-    // from it and every assertion here would still pass, which is the same shape of defect as a
-    // control that renders and does nothing.
     api.getFp8StorageSupport.mockResolvedValue([row('flux', 'main', 'checkpoint', true)]);
     api.updateModel.mockResolvedValue({ ...settingsModel({}), default_settings: { fp8_storage: true } });
 

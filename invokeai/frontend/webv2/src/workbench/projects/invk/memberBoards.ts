@@ -6,10 +6,10 @@ import { createStagingBoard, getBoardProjectId, isRequestCancellation, placeBoar
 
 /**
  * A project's boards travel as a set, but only the inbox rides the project create: the server claims it in the same
- * transaction that writes the document. So every board is staged alike — a private Library board, made in source
- * order so creation order survives — media lands on it before the commit point, and the others are moved into the
- * project once it exists. An inbox is always staged, even for a source that lists no boards, so the create knows the
- * board id the creator's workspace opens on and carries both in one request.
+ * transaction that writes the document. So every board is staged alike — a private Library board, made in source order
+ * so creation order survives — media lands on it before the commit point, and the others are moved into the project
+ * once it exists. An inbox is always staged, even for a source that lists no boards, so the create knows the board id
+ * the creator's workspace opens on and carries both in one request.
  */
 
 export interface StagedBoard {

@@ -14,26 +14,16 @@ import { createCanvasMutationContext, type EditStepError } from './mutationConte
 import { StructuralLayerController } from './structuralLayerController';
 
 export interface StructuralEngineStubOptions {
-  /** Top-first nodes of the document; one paint layer `layer` named `Layer` by default. */
   layers?: readonly CanvasNodeContract[];
-  /** Defaults to the first layer. */
   selectedLayerId?: string | null;
-  /** A live flag lets a test lock edits mid-gesture. */
   locked?: boolean | { value: boolean };
   gestureActive?: boolean;
   schedulePreview?: (flush: () => void) => () => void;
-  /** Mirror refreshes only when asked, as when a store observer threw mid-notification. */
   mirrorLag?: boolean;
-  /** Makes mirror refresh fail so an accepted mutation can never be mirrored. */
   mirrorBroken?: boolean;
   now?: () => number;
 }
 
-/**
- * The structural half of a canvas engine over the real reducer: a project document, the mutation context, engine
- * history with its replay guards, and the structural controller wired the way the engine wires them. Widgets that
- * preview and commit structural edits can run against `engine` and observe the document they change.
- */
 export const createStructuralEngineStub = (options: StructuralEngineStubOptions = {}) => {
   const base = createInitialWorkbenchState().projects[0]!;
   const layers = options.layers ?? [layerContract('layer', 'raster', { name: 'Layer' })];
@@ -86,7 +76,6 @@ export const createStructuralEngineStub = (options: StructuralEngineStubOptions 
     isGuardCurrent: () => true,
     preparePixels: () => ({}) as never,
     refreshMirror,
-    // As the engine wires it: unrecoverable step failures are reported with the edit's label.
     report: (error: EditStepError, label: string) =>
       report(
         error.outcome === 'reverted-unmirrored'
@@ -107,7 +96,6 @@ export const createStructuralEngineStub = (options: StructuralEngineStubOptions 
     report,
     schedulePreview: options.schedulePreview,
   });
-  /** Every prepared edit that landed, through a session or directly, in order. */
   const commits: PreparedDocumentEdit[] = [];
   const engine = {
     document: {

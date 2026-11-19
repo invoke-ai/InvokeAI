@@ -77,8 +77,8 @@ export interface FilterOperationPreview {
   origin: { x: number; y: number };
 }
 /**
- * A refused apply, a source the filter cannot read (hidden, empty, over the raster budget), or an unexpected failure
- * to process or apply whose message is kept as `detail`.
+ * A refused apply, a source the filter cannot read (hidden, empty, over the raster budget), or an unexpected failure to
+ * process or apply whose message is kept as `detail`.
  */
 export type FilterSessionErrorCode =
   | GuardedMutationRefusal
@@ -123,8 +123,8 @@ export type ControlLayerIntent =
 /**
  * How an intent ended. `unchanged`: the layer already matched. `no-detection-input`: the layer's pixels are a map
  * without an original, so a detector cannot run until the image is replaced. `missing`: no such control layer.
- * `locked`: the layer or a group above it is locked. `blocked`: an operation, gesture or session holds the
- * document; try again once it ends. `over-budget` and `failed`: the engine could not apply the edit.
+ * `locked`: the layer or a group above it is locked. `blocked`: an operation, gesture or session holds the document;
+ * try again once it ends. `over-budget` and `failed`: the engine could not apply the edit.
  */
 export type ControlLayerIntentResult =
   | 'updated'

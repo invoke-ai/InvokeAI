@@ -31,7 +31,6 @@ export interface Project {
   settings: ProjectSettings;
   layout: ProjectLayoutState;
   invocation: InvocationControllerState;
-  /** The project's workflows and which one is active; the active document compiles to a `GraphContract` at invoke time. */
   workflows: ProjectWorkflowCollection;
   /** Session-only graph edit histories by workflow id; never persisted. */
   workflowHistories: ProjectWorkflowHistories;
@@ -39,16 +38,9 @@ export interface Project {
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
   /** Floating instances leave their region's instanceIds; absent in older projects means no floating windows. */
   floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
-  /**
-   * The last window geometry of instances that are not floating now. It is a convenience, not layout: presets,
-   * layout drift, and undo leave it out. Absent means nothing is remembered.
-   */
+  /** Convenience, not layout: presets, layout drift and undo leave it out. */
   lastFloatingGeometry?: Record<WidgetInstanceId, FloatingWidgetGeometry>;
-  /**
-   * This project's arrangement of each preset it switched away from while that arrangement differed from the saved
-   * one, oldest first, at most one per preset. Arrangement only (no widget state), and never the active preset: the
-   * live layout is its working copy. Absent means every inactive preset opens as saved.
-   */
+  /** Inactive presets' differing arrangements, oldest first, one per preset; never the active preset's. */
   presetWorkingLayouts?: LayoutPresetWorkingCopy[];
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
   canvas: CanvasStateContractV3;
@@ -58,10 +50,7 @@ export interface Project {
   events: ProjectEvent[];
 }
 
-/**
- * A persisted project document that was not loaded: written by a newer version, or structurally damaged. `raw` is
- * the untouched document, kept for recovery; nothing is written back over it.
- */
+/** `raw` is the untouched document, kept for recovery; nothing is written back over it. */
 export type ProjectDocumentLoadRefusal =
   | { raw: unknown; scope: 'project-document'; status: 'unsupported-version'; version: number }
   | { raw: unknown; scope: 'project-document'; status: 'malformed'; reason: string };
@@ -91,14 +80,8 @@ export interface WorkbenchState {
   autosave: AutosaveState;
   account: AccountState;
   widgetFailures: WidgetFailure[];
-  /** Mirror of the user's `WorkbenchPreferences.scopedDefaults`: reads resolve pins over defaults in one snapshot. */
   scopedDefaults: ScopedDefaults;
-  /**
-   * Canvas staging Auto-switch's follow state, by open project: the placeholders that have shown a frame of their own
-   * (the reducer hears each first frame once) and the generating slot the user picked, which Auto-switch keeps shown
-   * over newer slots (`pickAutoSwitch`). Transient, as Preview's follow state is: never persisted, synced across tabs
-   * or undone; entries go with their placeholders and with closed projects.
-   */
+  /** Transient: never persisted, synced across tabs or undone. */
   canvasStagingFollow?: Readonly<
     Record<string, { readonly framedSlotIds: readonly string[]; readonly pinnedSlotId: string | null }>
   >;
@@ -113,29 +96,15 @@ export interface BackendConnectionState {
 
 export type WorkbenchNotificationKind = 'error' | 'success' | 'info';
 
-/** Machine categories for toast policy. Absent category = always toast. */
-/** `run-outcome`: a queue item the user submitted failed or was cancelled. */
 export type WorkbenchNotificationCategory = 'enqueue' | 'run-outcome';
 
-/**
- * A follow-up a notification offers, as plain data: notifications live in workbench state, so they never hold a
- * closure. The notification toaster resolves each kind to a label and a handler (see
- * `shell/notifications/README.md`); a kind it cannot offer right now is left out.
- */
+/** Plain data, never a closure: notifications live in workbench state. */
 export type WorkbenchNotificationAction =
   | { kind: 'open-widget'; widgetId: WidgetTypeId }
-  /** Opens the queue at this backend item. */
   | { kind: 'reveal-queue-item'; itemId: number }
-  /**
-   * Re-runs these failed or canceled backend items of one run from their saved sessions, once, in one request.
-   * `canvasProjectId`: a Canvas run's project, whose rerun is staged only by a tab with it open.
-   */
+  /** `canvasProjectId`: a Canvas run's project, whose rerun is staged only by a tab with it open. */
   | { kind: 'retry-queue-item'; itemIds: readonly number[]; canvasProjectId?: string }
-  /**
-   * Runs the closure `useNotify().undoable` holds in its session-only registry, at most once. With `projectId`, only
-   * while that project is open. `label` replaces "Undo" when the button brings back something other than the
-   * reported action.
-   */
+  /** Runs `useNotify().undoable`'s session-only closure at most once; with `projectId`, only while it is open. */
   | { kind: 'undo'; undoId: string; projectId?: string; label?: string };
 
 export interface WorkbenchNotification {
@@ -143,7 +112,6 @@ export interface WorkbenchNotification {
   kind: WorkbenchNotificationKind;
   title: string;
   titleKey?: string;
-  /** Interpolation values for `titleKey`; `title` holds the same text in English. */
   titleValues?: Readonly<Record<string, string | number>>;
   message?: string;
   messageKey?: string;
@@ -153,11 +121,8 @@ export interface WorkbenchNotification {
   isRead: boolean;
   /** Machine category for toast policy; absent = always toast. */
   category?: WorkbenchNotificationCategory;
-  /** Coalesced repeat count (see addNotification); absent = 1. */
   occurrenceCount?: number;
-  /** Buttons its toast shows, primary first. */
   actions?: readonly WorkbenchNotificationAction[];
-  /** Its toast stays until dismissed, for failures the user must not miss. */
   persistent?: boolean;
 }
 
@@ -166,15 +131,8 @@ export interface PromptHistoryItem {
   negativePrompt: string | null;
 }
 
-/**
- * A layout change worth reporting with an Undo toast; the step that made it carries this (see
- * `shell/LayoutUndoNotices.tsx`). Steps without one, such as a resize or a route change, are undone only by the
- * layout undo command.
- */
 export type LayoutUndoNotice =
-  /** The active preset's saved arrangement was laid out again over unsaved changes. */
   | { kind: 'revert'; presetId: LayoutPresetId }
-  /** Another preset's unsaved arrangement in this project was dropped. */
   | { kind: 'discardCopy'; presetId: LayoutPresetId }
   | { kind: 'switchPreset'; presetId: LayoutPresetId }
   | { kind: 'removeWidget'; instanceId: WidgetInstanceId };
@@ -185,9 +143,7 @@ export interface UndoRedoEntry {
   label: string;
   project: ProjectUndoSnapshot;
   notice?: LayoutUndoNotice;
-  /** Edits that arrive as a stream (a dragged divider, a moved window) share a key so they fold into one step. */
   mergeKey?: string;
-  /** When the step last absorbed a same-key edit; the merge window runs from here. */
   mergedAt?: string;
 }
 
@@ -210,11 +166,7 @@ export interface UndoRedoHistory {
 }
 
 export interface AutosaveState {
-  /**
-   * `pending`: persisted content changed since the last acknowledged save and its save has not started yet, or a save
-   * that could not finish will retry. `attention`: the last save finished for every other project, but an open project
-   * awaits a user decision (a sync conflict or an unsupported schema); the project sync snapshot says which.
-   */
+  /** `attention`: every other project saved, but an open project awaits a user decision. */
   status: 'idle' | 'pending' | 'saving' | 'saved' | 'attention' | 'error';
   lastSavedAt?: string;
   error?: string;
@@ -223,12 +175,8 @@ export interface AutosaveState {
 export interface AccountState {
   activeLayoutPresetId: LayoutPresetId;
   customLayoutPresets?: LayoutPreset[];
-  /** One account-wide order shared by every layout-preset surface. */
   layoutPresetOrder?: LayoutPresetId[];
-  /** Saved name and icon edits for built-in presets. */
   layoutPresetMetadataOverrides?: LayoutPresetMetadataOverrides;
-  /** Saved edits to a built-in preset's arrangement; see {@link LayoutPresetOverrides}. */
   layoutPresetOverrides?: LayoutPresetOverrides;
-  /** Saved edits to built-in preset routes, kept separate from spatial layout drift. */
   layoutPresetRouteOverrides?: LayoutPresetRouteOverrides;
 }

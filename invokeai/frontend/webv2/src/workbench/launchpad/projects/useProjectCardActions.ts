@@ -62,12 +62,11 @@ export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActio
     async (boards?: DeleteProjectBoards) => {
       try {
         await deleteLibraryProject(summary.id, boards);
-        // Pins are persisted per account, so a deleted project would otherwise
-        // leave a dead id in preferences forever.
+        // Pins are persisted per account, so a deleted project would otherwise leave a dead id in preferences forever.
         dropProjectPin(summary.id);
-        // Its boards were released or deleted with it; any board list on screen is stale either way. Loaded here
-        // rather than at the top (the gallery data layer is not part of the Launchpad's initial graph), and never
-        // awaited: the project is gone, so a chunk that fails to load must not be reported as a failed delete.
+        // Its boards were released or deleted with it; any board list on screen is stale either way. Loaded here rather
+        // than at the top (the gallery data layer is not part of the Launchpad's initial graph), and never awaited: the
+        // project is gone, so a chunk that fails to load must not be reported as a failed delete.
         void import('@features/gallery/queries')
           .then((module) => module.invalidateGallery(queryClient))
           .catch(() => undefined);
