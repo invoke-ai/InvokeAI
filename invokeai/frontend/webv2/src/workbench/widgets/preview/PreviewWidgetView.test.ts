@@ -66,7 +66,6 @@ describe('getPreviewSelectedPage', () => {
 
     expect(pageFor(null, null)).toBe(3);
     expect(pageFor('video', 'video')).toBe(3);
-    // Another kind ranks another result set: the stamped page describes none of it.
     expect(pageFor(null, 'video')).toBe(0);
     expect(pageFor('video', null)).toBe(0);
     expect(pageFor('image', 'video')).toBe(0);
@@ -125,7 +124,6 @@ describe('mergePreviewBoardItems', () => {
   });
 
   it('preserves relevance order for a ranked list', () => {
-    // Preserve relevance order; ranked mode receives selection only, not local generations.
     const first = item('image', 'first', '2026-07-21T00:00:01.000Z');
     const second = item('image', 'second', '2026-07-21T00:00:03.000Z', true);
     const third = item('image', 'third', '2026-07-21T00:00:02.000Z');
@@ -136,9 +134,6 @@ describe('mergePreviewBoardItems', () => {
       second,
       third,
     ]);
-    // Without the flag the same input is re-sorted newest-first and the
-    // optimistic item is spliced in, so the ranked path really is what
-    // preserves the list.
     expect(mergePreviewBoardItems([first, second, third], [optimistic], 'DESC')).toEqual([
       optimistic,
       second,
@@ -148,18 +143,14 @@ describe('mergePreviewBoardItems', () => {
   });
 
   it('anchors a selection that the ranking does not contain, rather than losing the cursor', () => {
-    // Keep out-of-ranking selection at the head so navigation can enter the ranked list.
     const ranked = item('image', 'ranked', '2026-07-21T00:00:01.000Z');
     const outsider = item('image', 'outsider', '2026-07-21T00:00:09.000Z');
 
     expect(mergePreviewBoardItems([ranked], [outsider], 'DESC', { isRanked: true })).toEqual([outsider, ranked]);
-    // Already a member: kept once, in its ranked position.
     expect(mergePreviewBoardItems([ranked], [ranked], 'DESC', { isRanked: true })).toEqual([ranked]);
   });
 
   it('merges chronologically past starred items', () => {
-    // The listing is flat: navigation must walk the same order the grid
-    // shows, not lift starred items to the front.
     const starred = item('video', 'starred', '2026-07-21T00:00:01.000Z', true);
     const optimistic = item('image', 'optimistic', '2026-07-21T00:00:03.000Z');
     const existing = item('video', 'existing', '2026-07-21T00:00:02.000Z');

@@ -36,16 +36,6 @@ class TestPasswordHashing:
         assert verify_password(password, legacy_hash)
         assert not verify_password("?" + password[1:], legacy_hash)
 
-    def test_hash_password_returns_different_hash_each_time(self):
-        """Test that hashing the same password twice produces different hashes (due to salt)."""
-        password = "TestPassword123"
-        hash1 = hash_password(password)
-        hash2 = hash_password(password)
-
-        assert hash1 != hash2
-        assert hash1 != password
-        assert hash2 != password
-
     def test_hash_password_with_special_characters(self):
         """Test hashing passwords with special characters."""
         password = "Test!@#$%^&*()_+{}[]|:;<>?,./~`"

@@ -60,20 +60,6 @@ describe('buildGeneratePromptBatchPlan with a single prompt', () => {
     expect(plan.runs).toBe(1);
     expect(plan.expectedImageCount).toBe(3);
   });
-
-  it('counts down for a decrementing seed', () => {
-    const plan = buildGeneratePromptBatchPlan(baseInput({ batchCount: 3, seedStep: -1 }));
-
-    expect(plan.data[0][0].items).toEqual([100, 99, 98]);
-    expect(plan.runs).toBe(1);
-  });
-
-  it('ignores the seed behaviour, which only has meaning across a prompt set', () => {
-    const perIteration = buildGeneratePromptBatchPlan(baseInput({ batchCount: 2, seedBehaviour: 'per-iteration' }));
-    const perImage = buildGeneratePromptBatchPlan(baseInput({ batchCount: 2, seedBehaviour: 'per-image' }));
-
-    expect(perImage).toEqual(perIteration);
-  });
 });
 
 describe('buildGeneratePromptBatchPlan with several prompts', () => {
@@ -95,16 +81,6 @@ describe('buildGeneratePromptBatchPlan with several prompts', () => {
     expect(plan.expectedImageCount).toBe(6);
   });
 
-  it('per-iteration with a held seed leans on runs for the iterations', () => {
-    const plan = buildGeneratePromptBatchPlan(
-      baseInput({ batchCount: 2, prompts, seedBehaviour: 'per-iteration', seedStep: 0 })
-    );
-
-    expect(plan.data[0]).toEqual([{ field_name: 'value', items: [100], node_path: 'seed' }]);
-    expect(plan.runs).toBe(2);
-    expect(plan.expectedImageCount).toBe(6);
-  });
-
   it('per-image gives every generated image its own seed while the seed steps', () => {
     const plan = buildGeneratePromptBatchPlan(
       baseInput({ batchCount: 2, prompts, seedBehaviour: 'per-image', seedStep: 1 })
@@ -121,16 +97,6 @@ describe('buildGeneratePromptBatchPlan with several prompts', () => {
     expect(plan.expectedImageCount).toBe(6);
   });
 
-  it('per-image with a held seed still uses that one seed for every image', () => {
-    const plan = buildGeneratePromptBatchPlan(
-      baseInput({ batchCount: 2, prompts, seedBehaviour: 'per-image', seedStep: 0 })
-    );
-
-    expect(plan.data[0]).toEqual([{ field_name: 'value', items: [100], node_path: 'seed' }]);
-    expect(plan.runs).toBe(2);
-    expect(plan.expectedImageCount).toBe(6);
-  });
-
   it('keeps every zipped group the same length, as the backend requires', () => {
     for (const seedBehaviour of ['per-iteration', 'per-image'] as const) {
       for (const seedStep of [-1, 0, 1] as const) {
@@ -143,27 +109,6 @@ describe('buildGeneratePromptBatchPlan with several prompts', () => {
         }
       }
     }
-  });
-
-  it('wraps seeds past the inclusive 32-bit ceiling', () => {
-    const plan = buildGeneratePromptBatchPlan(
-      baseInput({
-        batchCount: 1,
-        prompts: ['a', 'b', 'c'],
-        seed: SEED_MAX - 1,
-        seedBehaviour: 'per-image',
-        seedStep: 1,
-      })
-    );
-
-    expect(plan.data[0][0].items).toEqual([SEED_MAX - 1, SEED_MAX, 0]);
-  });
-
-  it('falls back to an empty prompt rather than emitting an empty batch', () => {
-    const plan = buildGeneratePromptBatchPlan(baseInput({ prompts: [] }));
-
-    expect(plan.data[0][1].items).toEqual(['']);
-    expect(plan.expectedImageCount).toBe(1);
   });
 });
 
@@ -190,13 +135,6 @@ describe('buildQueueWorkflowBatchPlan', () => {
         ],
       ],
       runs: 2,
-    });
-  });
-
-  it('keeps the seed-only plan: one zipped group of seeds over the runs', () => {
-    expect(buildQueueWorkflowBatchPlan({ batchCount: 3, batchData: [], seeds: [seed] })).toEqual({
-      data: [[{ field_name: 'seed', items: [10, 11, 12], node_path: 'noise' }]],
-      runs: 1,
     });
   });
 

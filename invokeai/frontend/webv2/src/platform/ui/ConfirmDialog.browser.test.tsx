@@ -207,7 +207,8 @@ describe('ConfirmDialog', () => {
           color: style.color,
           fontSize: style.fontSize,
           fontWeight: style.fontWeight,
-          // Layout height: the content is still scaling in from 0.95 when it reports open, which the rect would include.
+          // Layout height: the content is still scaling in from 0.95 when it reports open, which the rect would
+          // include.
           height: paragraph.offsetHeight,
           letterSpacing: style.letterSpacing,
           lineHeight: style.lineHeight,

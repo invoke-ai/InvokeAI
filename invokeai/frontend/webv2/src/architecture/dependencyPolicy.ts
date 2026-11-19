@@ -10,23 +10,38 @@ export interface ImportReference {
 }
 
 export interface DependencyViolation {
-  rule: string;
+  rule: keyof typeof DEPENDENCY_REPAIRS;
   source: string;
   target: string;
 }
 
-export interface MigrationException {
-  /** Optional ISO date after which the exception is considered expired debt. */
-  expires?: string;
-  /** ISO date the exception was added. */
-  introduced: string;
-  owner: string;
-  reason: string;
-  removalTicket: string;
-  rule: string;
-  sourcePrefix: string;
-  targetPrefix: string;
-}
+const DEPENDENCY_REPAIRS = {
+  'app-composition-root': 'App composes dependencies. Pass the required capability into Workbench from App.',
+  'canvas-construction-private':
+    'Keep full engine construction in canvas-operations. Consumers use capabilities from @workbench/canvas-engine/api.',
+  'canvas-engine-independence':
+    'Keep application workflows outside the engine; compose them through @workbench/canvas-operations/api.',
+  'canvas-private-interface':
+    'Use @workbench/canvas-engine/api or @workbench/canvas-operations/api (react for React adapters); keep implementation imports inside their owner.',
+  'cross-owner-star-export':
+    'Expose an intentional named contract through the owning public interface; do not forward an entire foreign module.',
+  'document-model-purity':
+    'Keep the document model pure. Pass document facts through its contracts; leave engine, rendering and framework work in their owners.',
+  'feature-core-purity':
+    'Pass plain domain values into core. Keep transport in data and React/UI integration in the owning adapter, including type dependencies.',
+  'feature-dependency-direction':
+    'Features cannot depend on App or Workbench. Inject the required capability at the App composition root.',
+  'feature-private-interface':
+    'Use the feature public entry registered in src/architecture/featureInterfaces.ts; extend the owner contract only when the caller needs a new capability.',
+  'feature-public-interface':
+    'Use the feature public entry registered in src/architecture/featureInterfaces.ts; extend the owner contract only when the caller needs a new capability.',
+  'platform-independence':
+    'Platform owns domain-neutral mechanics. Move domain policy to its owner and pass the required values or callbacks into Platform.',
+  'retired-contract-hub':
+    'Import the contract from the owner of its invariants; see ARCHITECTURE.md#contract-ownership. Do not recreate the shared Workbench type hub.',
+  'test-support-isolation':
+    'Production must not import test support. Move reusable production behavior into its owner and have tests import it.',
+} as const;
 
 const ALIASES: ReadonlyArray<readonly [string, string]> = [
   ['@app', 'app'],
@@ -200,7 +215,7 @@ export const checkDependency = (source: string, specifier: string): DependencyVi
   const sourcePath = normalizePath(source).replace(/^src\//, '');
   const target = resolveImportPath(source, specifier);
   const violations: DependencyViolation[] = [];
-  const add = (rule: string, resolvedTarget = target ?? specifier): void => {
+  const add = (rule: DependencyViolation['rule'], resolvedTarget = target ?? specifier): void => {
     violations.push({ rule, source: sourcePath, target: resolvedTarget });
   };
 
@@ -300,9 +315,4 @@ export const checkSource = (sourcePath: string, source: string): DependencyViola
   });
 
 export const formatViolation = ({ rule, source, target }: DependencyViolation): string =>
-  `${rule}: ${source} -> ${target}`;
-
-export const isExcepted = (violation: DependencyViolation, exception: MigrationException): boolean =>
-  violation.rule === exception.rule &&
-  violation.source.startsWith(exception.sourcePrefix) &&
-  violation.target.startsWith(exception.targetPrefix);
+  `${rule}: ${source} -> ${target}\n  ${DEPENDENCY_REPAIRS[rule]}`;

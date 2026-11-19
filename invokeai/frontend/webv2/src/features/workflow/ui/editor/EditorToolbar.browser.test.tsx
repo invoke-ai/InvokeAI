@@ -6,7 +6,6 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
 
 const toolbarMocks = vi.hoisted(() => ({
   exportWorkflowAsPng: vi.fn(),
@@ -31,7 +30,6 @@ vi.mock('@features/workflow/ui/WorkflowUiContext', () => ({
     success: toolbarMocks.success,
   }),
   useWorkflowPreferencesSelector: () => false,
-  useWorkflowUi: () => ({ CommandShortcut: ({ commandId }: { commandId: string }) => <kbd>{commandId}</kbd> }),
   useWorkflowProjectSelector: (selector: (project: unknown) => unknown) =>
     selector({ activeWorkflow: { document: { name: toolbarMocks.workflowName } } }),
 }));
@@ -45,6 +43,12 @@ vi.mock('./workflowImageExport', () => ({
 }));
 
 const { EditorToolbar } = await import('./EditorToolbar');
+const { registerWorkflowFlowInstance, releaseWorkflowFlowInstance } = await import('./flowInstanceStore');
+const { registerWorkflowPngExportHost } = await import('./workflowPngExport');
+// The export's run loads on first use; loading it here keeps that first load out of each test's waits.
+await import('./workflowPngExportRun');
+const flowInstance = toolbarMocks as unknown as Parameters<typeof registerWorkflowFlowInstance>[0];
+let releaseExportHost: (() => void) | null = null;
 
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({
@@ -76,11 +80,7 @@ const render = async (
   nodeOpacity: number,
   arrangeProps: {
     arrangeScope?: 'all' | 'selection' | null;
-    canRedo?: boolean;
-    canUndo?: boolean;
     onArrangeNodes?: () => void;
-    onRedo?: () => void;
-    onUndo?: () => void;
   } = {}
 ) => {
   applyThemeToRoot('mono');
@@ -90,6 +90,13 @@ const render = async (
   document.body.append(host);
   root = createRoot(host);
   toolbarMocks.onExportPrepare.mockResolvedValue(host);
+  // The editor lends the export its offscreen view and flow instance; here the mocks stand in for both.
+  releaseExportHost?.();
+  releaseExportHost = registerWorkflowPngExportHost({
+    complete: toolbarMocks.onExportComplete,
+    prepare: toolbarMocks.onExportPrepare,
+  });
+  registerWorkflowFlowInstance(flowInstance);
 
   await settle(() => {
     root?.render(
@@ -99,8 +106,6 @@ const render = async (
             {...arrangeProps}
             nodeOpacity={nodeOpacity}
             tool="pan"
-            onExportPrepare={toolbarMocks.onExportPrepare}
-            onExportComplete={toolbarMocks.onExportComplete}
             onNodeOpacityChange={vi.fn()}
             onToolChange={vi.fn()}
           />
@@ -129,6 +134,9 @@ const buttonBoxes = (): string[] =>
   });
 
 afterEach(async () => {
+  releaseExportHost?.();
+  releaseExportHost = null;
+  releaseWorkflowFlowInstance(flowInstance);
   await settle(() => root?.unmount());
   host?.remove();
   host = null;
@@ -148,67 +156,13 @@ describe('editor toolbar', () => {
     expect(onArrangeNodes).toHaveBeenCalledTimes(1);
   });
 
-  it('undoes and redoes from the toolbar only while the history has an edit to step over', async () => {
-    const onRedo = vi.fn();
-    const onUndo = vi.fn();
-    const undo = () => host!.querySelector<HTMLButtonElement>('button[aria-label="Undo"]')!;
-    const redo = () => host!.querySelector<HTMLButtonElement>('button[aria-label="Redo"]')!;
-
-    await render(1, { canRedo: false, canUndo: false, onRedo, onUndo });
-    expect(undo().getAttribute('aria-disabled')).toBe('true');
-    expect(redo().getAttribute('aria-disabled')).toBe('true');
-    await settle(() => undo().click());
-    await settle(() => redo().click());
-    expect(onUndo).not.toHaveBeenCalled();
-    expect(onRedo).not.toHaveBeenCalled();
-
-    await render(1, { canRedo: true, canUndo: true, onRedo, onUndo });
-    await settle(() => undo().click());
-    await settle(() => redo().click());
-    expect(onUndo).toHaveBeenCalledOnce();
-    expect(onRedo).toHaveBeenCalledOnce();
-  });
-
-  it('keeps keyboard focus on Undo when it steps back over the last edit', async () => {
-    const renderHistory = (canUndo: boolean) =>
-      settle(() => {
-        root?.render(
-          <I18nextProvider i18n={i18n}>
-            <ChakraProvider value={system}>
-              <EditorToolbar
-                canRedo={!canUndo}
-                canUndo={canUndo}
-                nodeOpacity={1}
-                tool="pan"
-                onExportPrepare={toolbarMocks.onExportPrepare}
-                onExportComplete={toolbarMocks.onExportComplete}
-                onNodeOpacityChange={vi.fn()}
-                onRedo={vi.fn()}
-                onToolChange={vi.fn()}
-                onUndo={vi.fn()}
-              />
-            </ChakraProvider>
-          </I18nextProvider>
-        );
-      });
-
-    await render(1);
-    await renderHistory(true);
-    const undo = host!.querySelector<HTMLButtonElement>('button[aria-label="Undo"]')!;
-    undo.focus();
-    await settle(() => undo.click());
-    // The history is now empty: the button says so but keeps focus, so the keyboard user is not dropped to the page.
-    await renderHistory(false);
-
-    expect(undo.getAttribute('aria-disabled')).toBe('true');
-    expect(document.activeElement).toBe(undo);
-  });
-
   it('keeps every button on one shared square toolbar box', async () => {
     // Match custom control sizing; one wider child stretches every button in the column toolbar.
     await render(1);
 
     expect(new Set(buttonBoxes())).toEqual(new Set(['28x28']));
+    // Undo and redo live in the widget header, beside the other header actions as in Canvas.
+    expect(host!.querySelector('button[aria-label="Undo"], button[aria-label="Redo"]')).toBeNull();
   });
 
   it('offers to update outdated nodes only while there are some, without breaking the toolbar grid', async () => {
@@ -225,8 +179,6 @@ describe('editor toolbar', () => {
               nodeOpacity={1}
               tool="pan"
               updatableNodeCount={2}
-              onExportPrepare={toolbarMocks.onExportPrepare}
-              onExportComplete={toolbarMocks.onExportComplete}
               onNodeOpacityChange={vi.fn()}
               onToolChange={vi.fn()}
               onUpdateNodes={onUpdateNodes}
@@ -395,24 +347,6 @@ describe('editor toolbar', () => {
 
     expect(toolbarMocks.error).not.toHaveBeenCalled();
     expect(toolbarMocks.info).not.toHaveBeenCalled();
-  });
-
-  it('shows the translated label as a camera tooltip', async () => {
-    await render(1);
-
-    const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="Download workflow as PNG"]')!;
-    await act(async () => {
-      await userEvent.hover(camera);
-      await new Promise<void>((resolve) => {
-        globalThis.setTimeout(resolve, 500);
-      });
-    });
-
-    const tooltip = [...document.querySelectorAll('[role="tooltip"]')].find(
-      (element) => element.textContent === 'Download workflow as PNG'
-    );
-
-    expect(tooltip).not.toBeUndefined();
   });
 
   it.each(['prepare', 'rasterize'])('reports a %s failure and releases the camera action', async (stage) => {

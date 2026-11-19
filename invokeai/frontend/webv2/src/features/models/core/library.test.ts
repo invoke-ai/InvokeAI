@@ -101,7 +101,6 @@ describe('getModelPickerGroups', () => {
     expect(result.groups.map((group) => group.base)).toEqual(['sd-1', 'sdxl']);
   });
 
-  // Group by base alone so cross-type pickers do not repeat type headings.
   it('groups by base alone, in base display order', () => {
     const result = getModelPickerGroups(library, {
       modelTypes: ['main', 'lora', 'vae'],
@@ -152,7 +151,6 @@ describe('getModelPickerGroups', () => {
       modelTypes: ['main', 'lora', 'vae'],
     });
 
-    // Base display order, matching `availableBases`: sd-1, sdxl, flux, any.
     expect(all.groups.flatMap((group) => group.models.map((m) => m.key))).toEqual(['c', 'a', 'b', 'd']);
   });
 

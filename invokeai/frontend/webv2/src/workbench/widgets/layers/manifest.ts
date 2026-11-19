@@ -8,7 +8,7 @@ export const layersWidgetManifest: WidgetManifest = {
   allowMultiple: false,
   allowedRegions: ['right'],
   // The rail context menu still offers close/move; the panel body is the chrome.
-  chrome: { header: 'hidden' },
+  chrome: { body: 'fill', header: 'hidden' },
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   icon: LayersIcon,
   id: 'layers',

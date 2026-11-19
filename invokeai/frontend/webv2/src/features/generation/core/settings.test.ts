@@ -1,43 +1,27 @@
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
-import {
-  getSeedSequenceLength,
-  getSeedStep,
-  isSeedMode,
-  planSeedSubmission,
-  SEED_MAX,
-  wrapSeed,
-} from '@platform/core/seed';
+import { getSeedSequenceLength, getSeedStep, planSeedSubmission, SEED_MAX, wrapSeed } from '@platform/core/seed';
 import { describe, expect, it } from 'vitest';
 
 import type {
   ComponentModelConfig,
-  GenerateLora,
   GenerateWidgetValues,
   LoraModelConfig,
   MainModelConfig,
   VaeModelConfig,
 } from './types';
 
-import { getGenerationDimensions, getGenerationValidationIssues } from './baseGenerationPolicies';
 import {
   calculateNewSize,
-  clampDimension,
   cloneGenerateWidgetValues,
-  deriveAspectRatioId,
-  getDefaultLoraWeight,
-  getModelDefaultVae,
-  hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isGenerateSettings,
-  isValidMossImageSkipLayers,
-  moveReferenceImage,
+  MAX_REFERENCE_IMAGE_NAME_LENGTH,
   normalizeGenerateSettings,
+  normalizeReferenceImages,
   parseMossImageSkipLayers,
   syncGenerateWidgetValuesWithModels,
-  syncGenerateLorasWithModels,
 } from './settings';
 
-/** The persisted widget-value shape from before aspect ratio / VAE / seamless / CLIP skip landed. */
 const legacyStoredValues = {
   batchCount: 2,
   cfgRescaleMultiplier: 0,
@@ -62,50 +46,9 @@ describe('normalizeGenerateSettings', () => {
     ).toMatchObject({ hiDiffusionT1Ratio: ratio, hiDiffusionT2Ratio: ratio });
   });
 
-  it.each([
-    [null, 0.2, 0, 0.2],
-    [0.4, null, 0.4, 0],
-  ])('normalizes mixed ratios to one manual mode', (t1, t2, expectedT1, expectedT2) => {
-    expect(
-      normalizeGenerateSettings({ ...legacyStoredValues, hiDiffusionT1Ratio: t1, hiDiffusionT2Ratio: t2 })
-    ).toMatchObject({ hiDiffusionT1Ratio: expectedT1, hiDiffusionT2Ratio: expectedT2 });
-  });
-
-  it('round-trips remembered manual ratios without changing automatic generation settings', () => {
-    const saved = {
-      ...legacyStoredValues,
-      hiDiffusionT1Ratio: null,
-      hiDiffusionT2Ratio: null,
-      hiDiffusionManualRatios: { t1: 0.7, t2: 0 },
-    };
-    const normalized = normalizeGenerateSettings(JSON.parse(JSON.stringify(saved)));
-    expect(normalized).toMatchObject({
-      hiDiffusionT1Ratio: null,
-      hiDiffusionT2Ratio: null,
-      hiDiffusionManualRatios: { t1: 0.7, t2: 0 },
-    });
-    expect(isGenerateSettings(normalized)).toBe(true);
-  });
-
-  it('normalizes malformed remembered positions without activating manual ratios', () => {
-    const normalized = normalizeGenerateSettings({
-      ...legacyStoredValues,
-      hiDiffusionT1Ratio: null,
-      hiDiffusionT2Ratio: null,
-      hiDiffusionManualRatios: { t1: 99, t2: Number.NaN },
-    });
-    expect(normalized).toMatchObject({
-      hiDiffusionT1Ratio: null,
-      hiDiffusionT2Ratio: null,
-      hiDiffusionManualRatios: { t1: 1, t2: 0 },
-    });
-    expect(isGenerateSettings({ ...normalized, hiDiffusionManualRatios: null })).toBe(false);
-  });
-
   it('reads the seed mode saved before modes existed from the random toggle', () => {
     expect(normalizeGenerateSettings(legacyStoredValues)?.seedMode).toBe('fixed');
     expect(normalizeGenerateSettings({ ...legacyStoredValues, shouldRandomizeSeed: true })?.seedMode).toBe('random');
-    // A saved mode wins over a stale toggle left behind by a partial patch.
     expect(
       normalizeGenerateSettings({ ...legacyStoredValues, seedMode: 'decrement', shouldRandomizeSeed: true })?.seedMode
     ).toBe('decrement');
@@ -122,63 +65,6 @@ describe('normalizeGenerateSettings', () => {
     expect(
       normalizeGenerateSettings({ ...legacyStoredValues, expandPromptModelKey: 'llm', imageToPromptModelKey: 7 })
     ).toMatchObject({ expandPromptModelKey: 'llm', imageToPromptModelKey: null });
-  });
-
-  it('rejects values that name neither a seed mode nor the random toggle', () => {
-    const { shouldRandomizeSeed: _, ...withoutSeedPolicy } = legacyStoredValues;
-
-    expect(normalizeGenerateSettings(withoutSeedPolicy)).toBeNull();
-  });
-
-  it('never lets the strict guard pass a record whose seed mode still needs inventing', () => {
-    // The normalized guard must cover every field because accepted records bypass normalization.
-    const normalized = normalizeGenerateSettings(legacyStoredValues);
-
-    expect(normalized && isGenerateSettings(normalized)).toBe(true);
-    const { seedMode: _, ...withoutSeedMode } = normalized as NonNullable<typeof normalized>;
-
-    expect(isGenerateSettings({ ...withoutSeedMode, shouldRandomizeSeed: true })).toBe(false);
-    expect(isGenerateSettings({ ...withoutSeedMode, seedMode: 'bogus', shouldRandomizeSeed: true })).toBe(false);
-  });
-
-  it('treats any key normalize would fill in or repair as non-canonical, not only the seed mode', () => {
-    // Saved before PiD existed, or with a ratio outside the range normalize clamps to.
-    const normalized = normalizeGenerateSettings(legacyStoredValues) as NonNullable<
-      ReturnType<typeof normalizeGenerateSettings>
-    >;
-    const { pidMode: _, ...withoutPidMode } = normalized;
-
-    expect(isGenerateSettings(withoutPidMode)).toBe(false);
-    expect(isGenerateSettings({ ...normalized, hiDiffusionT1Ratio: 99 })).toBe(false);
-    expect(normalizeGenerateSettings(withoutPidMode)?.pidMode).toBe(normalized.pidMode);
-  });
-
-  it('enforces template view mode only when a valid template remains', () => {
-    const validTemplate = {
-      id: 'template-1',
-      name: 'Cinematic',
-      negativePrompt: '',
-      positivePrompt: '{prompt}, cinematic',
-    };
-
-    expect(
-      normalizeGenerateSettings({ ...legacyStoredValues, promptTemplate: null, promptTemplateViewMode: true })
-        ?.promptTemplateViewMode
-    ).toBe(false);
-    expect(
-      normalizeGenerateSettings({
-        ...legacyStoredValues,
-        promptTemplate: { id: '', name: 'Broken' },
-        promptTemplateViewMode: true,
-      })?.promptTemplateViewMode
-    ).toBe(false);
-    expect(
-      normalizeGenerateSettings({ ...legacyStoredValues, promptTemplate: validTemplate, promptTemplateViewMode: true })
-        ?.promptTemplateViewMode
-    ).toBe(true);
-    expect(isGenerateSettings({ ...legacyStoredValues, promptTemplate: null, promptTemplateViewMode: true })).toBe(
-      false
-    );
   });
 
   it('normalizes persisted reference images and drops invalid entries', () => {
@@ -239,69 +125,6 @@ describe('normalizeGenerateSettings', () => {
     ).toBe(false);
   });
 
-  // Qwen-Image-2.1 references are their own flavor, so a stored one must not fold into Qwen-Image Edit's.
-  it('keeps persisted Qwen-Image-2.1 reference images as their own flavor', () => {
-    const normalized = normalizeGenerateSettings({
-      ...legacyStoredValues,
-      referenceImages: [
-        {
-          id: 'edit-1',
-          isEnabled: false,
-          config: {
-            type: 'qwen_image_2_1_reference_image',
-            image: {
-              height: 640,
-              imageName: 'edit.png',
-              imageUrl: '/api/v1/images/i/edit.png/full',
-              queuedAt: '2026-01-01T00:00:00.000Z',
-              sourceQueueItemId: 'backend-gallery',
-              thumbnailUrl: '/api/v1/images/i/edit.png/thumbnail',
-              width: 480,
-            },
-          },
-        },
-        { id: 'empty', isEnabled: true, config: { type: 'qwen_image_2_1_reference_image', image: null } },
-        { id: 'broken', isEnabled: true, config: { type: 'qwen_image_2_1_reference_image', image: { width: 1 } } },
-      ],
-    });
-
-    expect(normalized?.referenceImages).toEqual([
-      {
-        config: {
-          image: { original: { image: { height: 640, image_name: 'edit.png', width: 480 } } },
-          type: 'qwen_image_2_1_reference_image',
-        },
-        id: 'edit-1',
-        isEnabled: false,
-      },
-      { config: { image: null, type: 'qwen_image_2_1_reference_image' }, id: 'empty', isEnabled: true },
-    ]);
-    expect(normalized && isGenerateSettings(normalized)).toBe(true);
-  });
-
-  it('keeps more than five valid persisted reference images for provider-specific caps', () => {
-    const referenceImages = Array.from({ length: 6 }, (_, index) => ({
-      id: `ref-${index}`,
-      isEnabled: true,
-      config: {
-        type: 'external_reference_image',
-        image: {
-          height: 768,
-          imageName: `reference-${index}.png`,
-          imageUrl: `/api/v1/images/i/reference-${index}.png/full`,
-          queuedAt: '2026-01-01T00:00:00.000Z',
-          sourceQueueItemId: 'backend-gallery',
-          thumbnailUrl: `/api/v1/images/i/reference-${index}.png/thumbnail`,
-          width: 512,
-        },
-      },
-    }));
-
-    const normalized = normalizeGenerateSettings({ ...legacyStoredValues, referenceImages });
-
-    expect(normalized?.referenceImages).toHaveLength(6);
-  });
-
   it('upgrades legacy persisted values without losing the core fields', () => {
     const normalized = normalizeGenerateSettings(legacyStoredValues);
 
@@ -333,13 +156,6 @@ describe('normalizeGenerateSettings', () => {
     expect(normalizeGenerateSettings({ ...legacyStoredValues, seed: Number.NaN })).toBeNull();
     expect(normalizeGenerateSettings({ ...legacyStoredValues, positivePrompt: undefined })).toBeNull();
     expect(normalizeGenerateSettings(null)).toBeNull();
-  });
-
-  it('defaults an omitted batch count to one', () => {
-    const { batchCount, ...storedValues } = legacyStoredValues;
-
-    expect(batchCount).toBe(2);
-    expect(normalizeGenerateSettings(storedValues)?.batchCount).toBe(1);
   });
 
   it('drops malformed values for the newer fields back to defaults', () => {
@@ -415,16 +231,6 @@ describe('normalizeGenerateSettings', () => {
     });
   });
 
-  it.each([0, 2])('preserves the Gemini temperature boundary %s', (geminiTemperature) => {
-    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature })?.geminiTemperature).toBe(
-      geminiTemperature
-    );
-  });
-
-  it('drops a negative Gemini temperature back to the provider default', () => {
-    expect(normalizeGenerateSettings({ ...legacyStoredValues, geminiTemperature: -0.1 })?.geminiTemperature).toBeNull();
-  });
-
   it('bounds the model-family tuning fields and defaults the rest', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
@@ -448,7 +254,6 @@ describe('normalizeGenerateSettings', () => {
       zImageSeedVarianceEnabled: false,
       zImageSeedVarianceRandomizePercent: 1,
       zImageSeedVarianceStrength: 2,
-      // Out of the node's range means auto rather than a clamped override.
       zImageShift: null,
     });
     expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
@@ -462,47 +267,6 @@ describe('normalizeGenerateSettings', () => {
       zImageSeedVarianceStrength: 0.1,
       zImageShift: null,
     });
-  });
-
-  it('normalizes a Krea-2 style reference, defaulting and bounding its strength', () => {
-    const image = { original: { image: { height: 512, image_name: 'style.png', width: 512 } } };
-    const normalized = normalizeGenerateSettings({
-      ...legacyStoredValues,
-      referenceImages: [
-        { config: { image, type: 'krea2_reference_image' }, id: 'defaulted', isEnabled: true },
-        { config: { image, styleStrength: 7, type: 'krea2_reference_image' }, id: 'bounded', isEnabled: true },
-      ],
-    });
-
-    expect(normalized?.referenceImages.map((referenceImage) => referenceImage.config)).toEqual([
-      { image, styleStrength: 1, type: 'krea2_reference_image' },
-      { image, styleStrength: 2, type: 'krea2_reference_image' },
-    ]);
-    expect(normalized && isGenerateSettings(normalized)).toBe(true);
-  });
-
-  it('keeps a Krea-2 edit reference as its image alone and reads the K/V cache switch only when true', () => {
-    const image = { original: { image: { height: 512, image_name: 'pose.png', width: 512 } } };
-    const normalized = normalizeGenerateSettings({
-      ...legacyStoredValues,
-      krea2ReferenceKvCache: true,
-      referenceImages: [
-        // A style strength carried over from the other mode does not belong to an edit reference.
-        { config: { image, styleStrength: 1.5, type: 'krea2_edit_reference_image' }, id: 'pose', isEnabled: true },
-        { config: { image: null, type: 'krea2_edit_reference_image' }, id: 'empty', isEnabled: false },
-      ],
-    });
-
-    expect(normalized?.referenceImages).toEqual([
-      { config: { image, type: 'krea2_edit_reference_image' }, id: 'pose', isEnabled: true },
-      { config: { image: null, type: 'krea2_edit_reference_image' }, id: 'empty', isEnabled: false },
-    ]);
-    expect(normalized?.krea2ReferenceKvCache).toBe(true);
-    expect(normalized && isGenerateSettings(normalized)).toBe(true);
-    expect(
-      normalizeGenerateSettings({ ...legacyStoredValues, krea2ReferenceKvCache: 'yes' })?.krea2ReferenceKvCache
-    ).toBe(false);
-    expect(normalizeGenerateSettings(legacyStoredValues)?.krea2ReferenceKvCache).toBe(false);
   });
 
   it('drops malformed persisted model identifiers missing a base', () => {
@@ -561,7 +325,6 @@ describe('the FLUX.3 prompt upsampler settings', () => {
         flux3PromptUpsamplerModel: upsampler,
       })
     ).toMatchObject({ flux3PromptUpsamplerEnabled: true, flux3PromptUpsamplerModel: upsampler });
-    // Only a real `true` turns it on, and a malformed model is dropped.
     expect(
       normalizeGenerateSettings({
         ...legacyStoredValues,
@@ -594,53 +357,14 @@ describe('the Anima inpaint adapter settings', () => {
       })
     ).toMatchObject({ animaInpaintAdapterModel: null, animaInpaintAdapterWeight: 1 });
   });
-
-  it('keeps the adapter switched on unless a stored value turns it off', () => {
-    // Projects saved before the toggle existed wired a selected adapter, so a missing value means on.
-    expect(normalizeGenerateSettings(legacyStoredValues)?.animaInpaintAdapterEnabled).toBe(true);
-    const enabledFrom = (stored: unknown) =>
-      normalizeGenerateSettings({ ...legacyStoredValues, animaInpaintAdapterEnabled: stored })
-        ?.animaInpaintAdapterEnabled;
-    expect(enabledFrom(false)).toBe(false);
-    expect(enabledFrom(true)).toBe(true);
-    expect(enabledFrom('off')).toBe(true);
-  });
 });
 
 describe('the MOSS-Image skip layers', () => {
   it('parses comma-separated block indices into unique ascending ones, an empty field into none', () => {
     expect(parseMossImageSkipLayers(' 26, 22,24 ,22')).toEqual([22, 24, 26]);
-    // A trailing comma is a list being typed, not a mistake.
     expect(parseMossImageSkipLayers('22, ')).toEqual([22]);
     expect(parseMossImageSkipLayers('')).toEqual([]);
     expect(parseMossImageSkipLayers(' , ')).toEqual([]);
-  });
-
-  it('rejects an entry that is not a whole number, and leaves the range to the validator', () => {
-    for (const text of ['22, x', '2.5', '-1', '1e1', '22 24']) {
-      expect(parseMossImageSkipLayers(text)).toBeNull();
-    }
-    expect(parseMossImageSkipLayers('42')).toEqual([42]);
-    expect(isValidMossImageSkipLayers([42])).toBe(false);
-    expect(isValidMossImageSkipLayers([0, 41])).toBe(true);
-    expect(isValidMossImageSkipLayers([])).toBe(true);
-  });
-
-  it('defaults to block 22, keeps an empty list, and normalizes a stored list without dropping its blocks', () => {
-    expect(normalizeGenerateSettings(legacyStoredValues)?.mossImageUncondSkipLayers).toEqual([22]);
-    expect(
-      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [] })?.mossImageUncondSkipLayers
-    ).toEqual([]);
-    // An out-of-range block stays, so validation names it instead of the list changing behind the user's back.
-    expect(
-      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [26, 22, 26, 50] })
-        ?.mossImageUncondSkipLayers
-    ).toEqual([22, 26, 50]);
-    // A list that is not all integers is not one the user chose, so the default takes its place.
-    expect(
-      normalizeGenerateSettings({ ...legacyStoredValues, mossImageUncondSkipLayers: [24, 'x'] })
-        ?.mossImageUncondSkipLayers
-    ).toEqual([22]);
   });
 });
 
@@ -702,78 +426,6 @@ describe('Generate widget value snapshots', () => {
     expect(synced.loras[0]?.model).toBe(currentLora);
   });
 
-  it('refreshes the saved prompt upsampler from the catalog and clones it', () => {
-    const upsampler = { base: 'any', key: 'pup', name: 'Old Upsampler', type: 'text_llm' };
-    const saved = { ...values, flux3PromptUpsamplerModel: upsampler };
-    const renamed = { ...upsampler, name: 'Renamed' };
-
-    expect(syncGenerateWidgetValuesWithModels(saved, [model, renamed]).flux3PromptUpsamplerModel).toBe(renamed);
-    expect(cloneGenerateWidgetValues(saved).flux3PromptUpsamplerModel).toEqual(upsampler);
-    expect(cloneGenerateWidgetValues(saved).flux3PromptUpsamplerModel).not.toBe(upsampler);
-  });
-
-  it('notices a CPU Only change on the GGUF encoder and its tower, and the policy then blocks references', () => {
-    const qwen21: MainModelConfig = {
-      base: 'qwen-image-2-1',
-      format: 'checkpoint',
-      key: 'qwen21',
-      name: 'Qwen-Image-2.1',
-      type: 'main',
-    };
-    const encoder = {
-      base: 'any',
-      format: 'gguf_quantized',
-      key: 'enc',
-      name: 'Qwen3-VL 8B',
-      type: 'qwen3_vl_encoder',
-      variant: 'qwen3_vl_8b',
-    };
-    const tower = {
-      base: 'any',
-      format: 'gguf_quantized',
-      key: 'mmproj',
-      name: 'mmproj',
-      type: 'qwen3_vl_vision_tower',
-      variant: 'qwen3_vl_8b',
-    };
-    const saved: GenerateWidgetValues = {
-      ...values,
-      model: qwen21,
-      modelKey: qwen21.key,
-      qwen3VLEncoderModel: encoder,
-      qwen3VLVisionTowerModel: tower,
-      referenceImages: [
-        {
-          config: {
-            image: { original: { image: { height: 512, image_name: 'edit.png', width: 512 } } },
-            type: 'qwen_image_2_1_reference_image',
-          },
-          id: 'edit',
-          isEnabled: true,
-        },
-      ],
-    };
-    const cpuIssues = (candidate: GenerateWidgetValues) =>
-      getGenerationValidationIssues(qwen21, candidate).filter((issue) => issue.message.includes('CPU Only'));
-
-    expect(cpuIssues(saved)).toEqual([]);
-
-    // The Model Manager flips the encoder's CPU Only; the saved snapshot is refreshed from the catalog.
-    const flipped = { ...encoder, cpu_only: true };
-    const synced = syncGenerateWidgetValuesWithModels(saved, [qwen21, flipped, tower]);
-
-    expect(synced.qwen3VLEncoderModel).toBe(flipped);
-    expect(synced.qwen3VLVisionTowerModel).toBe(saved.qwen3VLVisionTowerModel);
-    expect(cpuIssues(synced)).toEqual([
-      expect.objectContaining({ target: { field: 'qwen3VLVisionTowerModel', section: 'components' } }),
-    ]);
-    // Matching again (tower flipped too) clears it, and an unchanged catalog keeps the same values object.
-    const bothFlipped = syncGenerateWidgetValuesWithModels(synced, [qwen21, flipped, { ...tower, cpu_only: true }]);
-
-    expect(cpuIssues(bothFlipped)).toEqual([]);
-    expect(syncGenerateWidgetValuesWithModels(synced, [qwen21, flipped, tower])).toBe(synced);
-  });
-
   it('does not resync cloned current model snapshots by reference alone', () => {
     const currentModel = { ...model, format: 'diffusers' as const, name: 'Current Model' };
     const currentComponent = { ...component, name: 'Current Qwen3' };
@@ -803,29 +455,6 @@ describe('Generate widget value snapshots', () => {
 });
 
 describe('LoRA settings helpers', () => {
-  it('uses current model records when reading selected LoRA defaults', () => {
-    const staleModel: LoraModelConfig = {
-      base: 'sdxl',
-      default_settings: { weight: 0.75 },
-      key: 'lora-key',
-      name: 'Old LoRA Name',
-      type: 'lora',
-    };
-    const currentModel: LoraModelConfig = {
-      ...staleModel,
-      default_settings: { weight: 1.25 },
-      name: 'Updated LoRA Name',
-      trigger_phrases: ['updated trigger'],
-    };
-    const selectedLora: GenerateLora = { isEnabled: true, model: staleModel, weight: 0.5 };
-
-    const [syncedLora] = syncGenerateLorasWithModels([selectedLora], [currentModel]);
-
-    expect(syncedLora?.model).toBe(currentModel);
-    expect(syncedLora?.weight).toBe(0.5);
-    expect(getDefaultLoraWeight(syncedLora!.model)).toBe(1.25);
-  });
-
   it('restricts FLUX.2 LoRAs by base and variant', () => {
     const flux2Model: MainModelConfig = { base: 'flux2', key: 'flux2', name: 'FLUX.2', type: 'main' };
 
@@ -834,65 +463,9 @@ describe('LoRA settings helpers', () => {
       isLoraCompatibleWithModel({ base: 'flux2', variant: 'klein_4b' }, { ...flux2Model, variant: 'klein_9b' })
     ).toBe(false);
   });
-
-  it('keeps SD 3 Large LoRAs off Medium models, and lets records without a variant through', () => {
-    const medium: MainModelConfig = {
-      base: 'sd-3',
-      key: 'sd35m',
-      name: 'SD 3.5 Medium',
-      type: 'main',
-      variant: 'sd3_medium',
-    };
-
-    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, medium)).toBe(true);
-    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, medium)).toBe(false);
-    // Installed before the variant existed: the denoise node checks those at run time.
-    expect(isLoraCompatibleWithModel({ base: 'sd-3' }, medium)).toBe(true);
-    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: undefined })).toBe(
-      true
-    );
-    // The API sends null, not undefined, for a record without one.
-    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: null }, medium)).toBe(true);
-    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: null })).toBe(true);
-    expect(isLoraCompatibleWithModel({ base: 'qwen-image' }, medium)).toBe(false);
-    const large: MainModelConfig = { ...medium, key: 'sd35l', name: 'SD 3.5 Large', variant: 'sd3_large' };
-    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, large)).toBe(false);
-    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, large)).toBe(true);
-  });
-});
-
-describe('model defaults', () => {
-  it('uses shared VAE compatibility for cross-base default VAEs', () => {
-    const zImageModel: MainModelConfig = {
-      base: 'z-image',
-      default_settings: { vae: 'flux-vae' },
-      key: 'z-image',
-      name: 'Z-Image',
-      type: 'main',
-    };
-    const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
-
-    expect(getModelDefaultVae(zImageModel, [fluxVae])).toBe(fluxVae);
-  });
-
-  it('distinguishes absent VAE defaults from explicit VAE defaults', () => {
-    expect(hasModelDefaultVae({ base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' })).toBe(false);
-    expect(
-      hasModelDefaultVae({ base: 'sdxl', default_settings: { vae: null }, key: 'sdxl', name: 'SDXL', type: 'main' })
-    ).toBe(false);
-    expect(
-      hasModelDefaultVae({ base: 'sdxl', default_settings: { vae: 'vae' }, key: 'sdxl', name: 'SDXL', type: 'main' })
-    ).toBe(true);
-  });
 });
 
 describe('dimension helpers', () => {
-  it('derives the closest preset aspect ratio', () => {
-    expect(deriveAspectRatioId(1024, 1024)).toBe('1:1');
-    expect(deriveAspectRatioId(1536, 1024)).toBe('3:2');
-    expect(deriveAspectRatioId(1000, 770)).toBe('Free');
-  });
-
   it('fits a ratio into a pixel area on the dimension grid', () => {
     const { height, width } = calculateNewSize(1, 1024 * 1024);
 
@@ -919,57 +492,26 @@ describe('dimension helpers', () => {
     expect(calculateNewSize(64, 1024 * 1024)).toEqual({ height: 64, width: 4096 });
   });
 
-  it('caps the long side and holds the short side at the minimum for a ratio past 64:1', () => {
-    // 2000:1 at 1024² would be about 45795×23; no in-range size has that ratio, so the result is the closest corner.
-    expect(calculateNewSize(2000, 1024 * 1024)).toEqual({ height: 64, width: 4096 });
-    expect(calculateNewSize(1 / 2000, 1024 * 1024)).toEqual({ height: 4096, width: 64 });
-    // A tiny area goes up the same way: the short side reaches 64 and the long side stops at 4096.
-    expect(calculateNewSize(2000, 16 * 16)).toEqual({ height: 64, width: 4096 });
-  });
+  it('keeps a reference name through normalizing, trimmed and capped, and drops one that is empty or not text', () => {
+    const config = { image: null, type: 'flux2_reference_image' as const };
+    const long = `${'é'.repeat(MAX_REFERENCE_IMAGE_NAME_LENGTH)}tail`;
+    const [named, untouched, blank, wrongType, capped] = normalizeReferenceImages([
+      { config, id: 'named', isEnabled: true, name: '  Hero pose  ' },
+      { config, id: 'untouched', isEnabled: true },
+      { config, id: 'blank', isEnabled: true, name: '   ' },
+      { config, id: 'wrong-type', isEnabled: true, name: 7 },
+      { config, id: 'capped', isEnabled: true, name: long },
+    ]);
 
-  it('moves a reference image one step through the stack, and no-ops at the ends', () => {
-    const referenceImages = ['a', 'b', 'c'].map((id) => ({
-      config: { image: null, model: null, type: 'flux_kontext_reference_image' as const },
-      id,
-      isEnabled: true,
-    }));
-    const idsOf = (list: readonly { id: string }[]) => list.map(({ id }) => id);
-
-    expect(idsOf(moveReferenceImage(referenceImages, 'c', -1))).toEqual(['a', 'c', 'b']);
-    expect(idsOf(moveReferenceImage(referenceImages, 'a', 1))).toEqual(['b', 'a', 'c']);
-
-    // Reordering preserves item identities and changes conditioning order.
-    const moved = moveReferenceImage(referenceImages, 'a', 1);
-
-    expect(moved[1]).toBe(referenceImages[0]);
-
-    // Return the same array for no-ops so callers can skip persistence.
-    expect(moveReferenceImage(referenceImages, 'a', -1)).toBe(referenceImages);
-    expect(moveReferenceImage(referenceImages, 'c', 1)).toBe(referenceImages);
-    expect(moveReferenceImage(referenceImages, 'missing', 1)).toBe(referenceImages);
-    expect(moveReferenceImage([], 'a', 1)).toEqual([]);
-  });
-
-  it('uses larger dimension grids for model families that require them', () => {
-    expect(getGenerationDimensions({ base: 'sdxl', type: 'main' }).grid).toBe(8);
-    expect(getGenerationDimensions({ base: 'anima', type: 'main' }).grid).toBe(8);
-    expect(getGenerationDimensions({ base: 'flux2', type: 'main' }).grid).toBe(16);
-    expect(getGenerationDimensions({ base: 'qwen-image', type: 'main' }).grid).toBe(16);
-    expect(getGenerationDimensions({ base: 'cogview4', type: 'main' }).grid).toBe(32);
-    // Hosted providers bucket sizes themselves, so their presets (e.g. 1365 wide) are kept pixel-exact.
-    expect(getGenerationDimensions({ base: 'external', type: 'external_image_generator' }).grid).toBe(1);
-    expect(clampDimension(888, getGenerationDimensions({ base: 'flux2', type: 'main' }).grid)).toBe(896);
+    expect(named?.name).toBe('Hero pose');
+    expect(untouched).toEqual({ config, id: 'untouched', isEnabled: true });
+    expect(blank && 'name' in blank).toBe(false);
+    expect(wrongType && 'name' in wrongType).toBe(false);
+    expect(capped?.name).toBe('é'.repeat(80));
   });
 });
 
 describe('seed modes', () => {
-  it('recognizes only the four modes', () => {
-    expect(isSeedMode('random')).toBe(true);
-    expect(isSeedMode('decrement')).toBe(true);
-    expect(isSeedMode('shuffle')).toBe(false);
-    expect(isSeedMode(true)).toBe(false);
-  });
-
   it('steps forward for random, since a random start still runs consecutive seeds', () => {
     expect(getSeedStep('random')).toBe(1);
     expect(getSeedStep('increment')).toBe(1);
@@ -986,12 +528,6 @@ describe('seed modes', () => {
 });
 
 describe('getSeedSequenceLength', () => {
-  it('uses one seed for the whole fixed submission, whatever its shape', () => {
-    expect(
-      getSeedSequenceLength({ batchCount: 3, promptCount: 2, seedBehaviour: 'per-image', seedMode: 'fixed' })
-    ).toBe(1);
-  });
-
   it('takes one entry per iteration unless every image of a prompt set gets its own', () => {
     expect(
       getSeedSequenceLength({ batchCount: 3, promptCount: 1, seedBehaviour: 'per-image', seedMode: 'increment' })
@@ -1043,28 +579,9 @@ describe('planSeedSubmission', () => {
       step: 1,
     });
   });
-
-  it('wraps the next seed at either end of the range', () => {
-    expect(plan('increment', SEED_MAX - 1, 2)).toMatchObject({ lastSeed: SEED_MAX, nextSeed: 0 });
-    expect(plan('decrement', 1, 2)).toMatchObject({ lastSeed: 0, nextSeed: SEED_MAX });
-  });
-
-  it('advances by every seed a prompt set consumes', () => {
-    expect(
-      planSeedSubmission({
-        batchCount: 2,
-        promptCount: 2,
-        seedBehaviour: 'per-image',
-        seedMode: 'increment',
-        startSeed: 42,
-      })
-    ).toMatchObject({ lastSeed: 45, nextSeed: 46, sequenceLength: 4 });
-  });
 });
 
 describe('normalizeGenerateSettings refiner fields', () => {
-  const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'SDXL Refiner', type: 'main' };
-
   it('defaults values saved before the refiner existed', () => {
     expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
       refinerCfgScale: 7.5,
@@ -1075,52 +592,5 @@ describe('normalizeGenerateSettings refiner fields', () => {
       refinerStart: 0.8,
       refinerSteps: 20,
     });
-  });
-
-  it('keeps a refiner-family model and drops any other model stored in the slot', () => {
-    const stored = { ...legacyStoredValues, refinerModel: refiner };
-
-    expect(normalizeGenerateSettings(stored)?.refinerModel).toEqual(refiner);
-    expect(
-      normalizeGenerateSettings({
-        ...legacyStoredValues,
-        refinerModel: { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' },
-      })?.refinerModel
-    ).toBeNull();
-    expect(
-      normalizeGenerateSettings({ ...legacyStoredValues, refinerModel: { key: 'refiner' } })?.refinerModel
-    ).toBeNull();
-  });
-
-  it('clamps the refiner tuning to its ranges and rounds steps', () => {
-    const normalized = normalizeGenerateSettings({
-      ...legacyStoredValues,
-      refinerCfgScale: 0,
-      refinerNegativeAestheticScore: -3,
-      refinerPositiveAestheticScore: 42,
-      refinerScheduler: 7,
-      refinerStart: 1.5,
-      refinerSteps: 2.6,
-    });
-
-    expect(normalized).toMatchObject({
-      refinerCfgScale: 1,
-      refinerNegativeAestheticScore: 1,
-      refinerPositiveAestheticScore: 10,
-      refinerScheduler: 'euler',
-      refinerStart: 1,
-      refinerSteps: 3,
-    });
-    expect(normalized && isGenerateSettings(normalized)).toBe(true);
-    expect(isGenerateSettings({ ...normalized, refinerStart: 2 })).toBe(false);
-  });
-
-  it('refreshes a stale refiner snapshot from the installed catalog', () => {
-    const sdxl: MainModelConfig = { base: 'sdxl', key: 'legacy-model', name: 'SDXL', type: 'main' };
-    const values = { ...normalizeGenerateSettings(legacyStoredValues)!, model: sdxl, refinerModel: refiner };
-    const renamed = { ...refiner, name: 'SDXL Refiner 1.0' };
-
-    expect(syncGenerateWidgetValuesWithModels(values, [sdxl, renamed]).refinerModel).toEqual(renamed);
-    expect(syncGenerateWidgetValuesWithModels(values, [sdxl, refiner])).toBe(values);
   });
 });

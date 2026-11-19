@@ -32,8 +32,8 @@ const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 const THUMB_FOCUS_PROPS = { outline: '2px solid {colors.accent.solid}', outlineOffset: '2px' };
 
 /**
- * Both HSV thumbs support keyboard input; drags emit onChange and finish with onChangeEnd. Canvas shading uses the
- * same triangle math.
+ * Both HSV thumbs support keyboard input; drags emit onChange and finish with onChangeEnd. Canvas shading uses the same
+ * triangle math.
  */
 export const HsvWheelPicker = ({
   diameterPx = 192,

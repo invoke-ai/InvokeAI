@@ -19,10 +19,10 @@ interface QueueItemStatusChangedPayload {
 /**
  * External-client reveal contract. A batch enqueued with `POST /api/v1/queue/default/enqueue_batch` and
  * `batch.destination` set to this value, by the signed-in user (any user on a single-user server) and with an origin
- * that does not start with `webv2:`, asks for the last saved image of each completed item to be revealed, best
- * effort, in that user's open Gallery. Every other destination, `gallery` included (legacy web sends it on every
- * workflow and upscale run), only refreshes the Gallery. When the reveal happens, what it changes, and its limits
- * (workflow-call children among them) are documented in the Gallery README.
+ * that does not start with `webv2:`, asks for the last saved image of each completed item to be revealed, best effort,
+ * in that user's open Gallery. Every other destination, `gallery` included (legacy web sends it on every workflow and
+ * upscale run), only refreshes the Gallery. When the reveal happens, what it changes, and its limits (workflow-call
+ * children among them) are documented in the Gallery README.
  */
 const REVEAL_DESTINATION = 'gallery:reveal';
 
@@ -32,8 +32,8 @@ export interface GalleryRealtimeRuntime {
 }
 
 /**
- * Refresh uploads, all of the session user's completions, and reconnects at least minIntervalMs apart. Hidden
- * tabs retain one pending pass until visible. The Query invalidation owner serializes slow refetches.
+ * Refresh uploads, all of the session user's completions, and reconnects at least minIntervalMs apart. Hidden tabs
+ * retain one pending pass until visible. The Query invalidation owner serializes slow refetches.
  */
 export const createGalleryRealtimeRuntime = ({
   backend,
@@ -72,8 +72,7 @@ export const createGalleryRealtimeRuntime = ({
       return;
     }
 
-    // Use monotonic time so wall-clock corrections cannot extend the pending timer and delay all subsequent
-    // events.
+    // Use monotonic time so wall-clock corrections cannot extend the pending timer and delay all subsequent events.
     const delay = Math.max(coalesceMs, lastInvalidatedAt + minIntervalMs - performance.now());
 
     invalidationTimer = setTimeout(() => {

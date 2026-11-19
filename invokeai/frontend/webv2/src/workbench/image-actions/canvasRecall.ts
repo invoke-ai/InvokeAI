@@ -5,7 +5,7 @@ import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
-import { galleryDurability, galleryImages } from '@features/gallery';
+import { GALLERY_REQUEST_MAX_NAMES, galleryDurability, galleryImages } from '@features/gallery';
 import { galleryImageUrls } from '@features/gallery/utility';
 import {
   getRegionalGuidanceSupport,
@@ -25,9 +25,6 @@ import {
 import { readCanvasScaling, CANVAS_SCALING_KEYS } from '@workbench/widgets/canvas/invoke/canvasScaling';
 
 import { resolveRecordedModel, toRecordedModelRef } from './recordedModel';
-
-// Matches MAX_IMAGE_BATCH_SIZE in invokeai/app/api/routers/images.py.
-const IMAGE_LOOKUP_BATCH_SIZE = 1000;
 
 export interface CanvasRecallTarget {
   commands: Pick<WorkbenchCommands, 'canvas' | 'widgets'>;
@@ -133,7 +130,7 @@ const sourceNames = (layer: CanvasLayerContract): string[] => {
     if (layer.source.type === 'paint' && layer.source.bitmap) {
       names.push(layer.source.bitmap.imageName);
     }
-  } else if (layer.mask.bitmap) {
+  } else if ((layer.type === 'inpaint_mask' || layer.type === 'regional_guidance') && layer.mask.bitmap) {
     names.push(layer.mask.bitmap.imageName);
   }
   if (layer.type === 'control' && layer.original) {
@@ -195,10 +192,11 @@ export const prepareCanvasRecall = async ({
     }
     const missing = [...new Set(names)].filter((name) => !resolvedImages.has(name));
     assertAccountScopeCurrent(owner);
-    for (let offset = 0; offset < missing.length; offset += IMAGE_LOOKUP_BATCH_SIZE) {
+    // One lookup per request, so a canvas change between them stops the rest.
+    for (let offset = 0; offset < missing.length; offset += GALLERY_REQUEST_MAX_NAMES) {
       try {
         const images = await galleryImages.resolveMany(
-          missing.slice(offset, offset + IMAGE_LOOKUP_BATCH_SIZE),
+          missing.slice(offset, offset + GALLERY_REQUEST_MAX_NAMES),
           owner.signal
         );
         assertAccountScopeCurrent(owner);

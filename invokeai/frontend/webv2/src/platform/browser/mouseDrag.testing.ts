@@ -1,7 +1,7 @@
 /**
  * Drag between element centers the way a hand moves a mouse, for dnd-kit mouse sensors. Droppables that enable only
- * once a drag is active are measured on later moves, so a single-jump drag (`userEvent.dragAndDrop`) ends over
- * nothing. Call outside act: dnd-kit settles the drop in effects that act would hold back.
+ * once a drag is active are measured on later moves, so a single-jump drag (`userEvent.dragAndDrop`) ends over nothing.
+ * Call outside act: dnd-kit settles the drop in effects that act would hold back.
  */
 
 // The pointer arrives twice so the target, measured after the first arrival, sees a move over it.

@@ -162,7 +162,6 @@ const createCatalog = (overrides: Partial<PromptTemplateCatalog> = {}): PromptTe
   ...overrides,
 });
 
-// The editor's image slot needs the gallery UI port and a drag context.
 const galleryAdapter = {
   gallery: { selectBoard: vi.fn(), selectItem: vi.fn(), setView: vi.fn() },
   galleryValues: { galleryView: 'images', selectedBoardId: 'none' },

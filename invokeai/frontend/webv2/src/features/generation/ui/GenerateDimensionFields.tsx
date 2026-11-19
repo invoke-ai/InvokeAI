@@ -1,7 +1,7 @@
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { AspectRatioId, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Badge, Box, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import {
   formatAspectRatio,
   getLockedAspectRatioSettings,
@@ -14,6 +14,7 @@ import {
   calculateNewSize,
   clampDimension,
   deriveAspectRatioId,
+  getActiveAspectRatio,
   isAspectRatioLocked,
 } from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
@@ -37,6 +38,12 @@ import { ExternalSizeSelect } from './shared/ExternalSizeSelect';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 import { GenerateIssueNotes } from './shared/GenerateIssues';
+import {
+  doesModelSetDefault,
+  getDefaultSizePatch,
+  getDefaultSource,
+  getFieldResetLabel,
+} from './shared/modelDefaultSettings';
 
 interface GenerateDimensionFieldsProps {
   draft: GenerateDraft;
@@ -48,14 +55,6 @@ interface GenerateDimensionFieldsProps {
 }
 
 type Dimensions = Pick<GenerateSettings, 'height' | 'width'>;
-
-/** The ratio to enforce, preferring the stored value and falling back to the current dimensions. */
-const getActiveRatio = (settings: Pick<GenerateSettings, 'aspectRatioValue' | 'height' | 'width'>): number =>
-  settings.aspectRatioValue > 0
-    ? settings.aspectRatioValue
-    : settings.height > 0
-      ? settings.width / settings.height
-      : 1;
 
 const PREVIEW_STAGE_PX = 108;
 /** An 8px grip drawn inside a 16px target, so the corner is easy to catch without looking heavier. */
@@ -108,13 +107,6 @@ const PREVIEW_PAD_PX = 10;
 
 const clampToRange = (value: number): number => Math.min(MAX_DIMENSION, Math.max(MIN_DIMENSION, value));
 
-/** Whether the model sets a size of its own; otherwise its defaults are just the architecture's optimal size. */
-const hasModelDefaultSize = (model: GenerateModelConfig | undefined): boolean => {
-  const defaults = model?.default_settings;
-
-  return Number.isFinite(defaults?.width) || Number.isFinite(defaults?.height);
-};
-
 const RESET_SIZE_MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
 interface ResetSizeChoice {
@@ -128,8 +120,8 @@ interface ResetSizeChoice {
 
 /**
  * The ratio row's Reset size menu; each choice shows the size it sets. The choices are radio items, so the applied one
- * stays reachable and reads as checked, and an open menu always has an item to land on. Two choices can set the
- * same size; the first of them is the checked one.
+ * stays reachable and reads as checked, and an open menu always has an item to land on. Two choices can set the same
+ * size; the first of them is the checked one.
  */
 const ResetSizeMenu = ({ choices }: { choices: readonly ResetSizeChoice[] }) => {
   const { t } = useTranslation();
@@ -154,16 +146,17 @@ const ResetSizeMenu = ({ choices }: { choices: readonly ResetSizeChoice[] }) => 
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
-          <MenuContent minW="15rem">
+          <MenuContent minW="0">
             <Menu.RadioItemGroup value={current} onValueChange={onValueChange}>
               {choices.map((choice) => (
-                <Menu.RadioItem key={choice.value} value={choice.value}>
+                // The row draws its own check, so it drops the indent a radio item keeps for an indicator.
+                <Menu.RadioItem key={choice.value} ps="2" value={choice.value}>
                   <HStack gap="2" minW="0" w="full">
                     <Icon
                       as={CheckIcon}
                       aria-hidden
                       boxSize="3.5"
-                      color="fg.subtle"
+                      color="fg"
                       flexShrink={0}
                       opacity={choice.value === current ? 1 : 0}
                     />
@@ -379,7 +372,7 @@ export const GenerateDimensionFields = ({
   selectedModel,
 }: GenerateDimensionFieldsProps) => {
   const { i18n, t } = useTranslation();
-  const { aspectRatioPresets, CanvasRenderSize: CanvasRenderSizeSlot, project } = useGenerationUi();
+  const { aspectRatioPresets, CanvasRenderSize: CanvasRenderSizeSlot, models, project } = useGenerationUi();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectDimensionSettings);
   const secondsPerRun = useGenerationQueueInsights(selectSecondsPerRun);
   const [draftDimensions, setDraftDimensions] = useState<Dimensions | null>(null);
@@ -444,7 +437,7 @@ export const GenerateDimensionFields = ({
       return { ...displayDimensions, [key]: nextValue };
     }
 
-    const ratio = getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions });
+    const ratio = getActiveAspectRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions });
 
     return key === 'width'
       ? { height: shouldSnap ? clampDimension(nextValue / ratio, dimensionGrid) : nextValue / ratio, width: nextValue }
@@ -527,7 +520,7 @@ export const GenerateDimensionFields = ({
   const lockedRatio = isRatioConstrained
     ? settings.aspectRatioId !== 'Free'
       ? ASPECT_RATIO_MAP[settings.aspectRatioId].ratio
-      : getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
+      : getActiveAspectRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
     : null;
   // The model's pixel budget reshaped to the ratio the section holds.
   const optimalSize = calculateNewSize(
@@ -551,32 +544,31 @@ export const GenerateDimensionFields = ({
                 : formatAspectRatio(lockedRatio, i18n.resolvedLanguage),
         });
 
-  // The ratio follows the size: a lock stays on and holds the default size's ratio, an unlocked ratio stays unlocked.
   const resetToModelDefaults = () => {
-    if (!modelDefaults) {
-      return;
+    if (modelDefaults) {
+      resetSize(getDefaultSizePatch(settings, modelDefaults));
     }
-
-    const { height, width } = modelDefaults;
-    const ratio = height > 0 ? width / height : 1;
-
-    resetSize({
-      ...(isRatioConstrained
-        ? getLockedAspectRatioSettings(ratio)
-        : { aspectRatioId: 'Free', aspectRatioIsLocked: false, aspectRatioValue: ratio }),
-      height,
-      width,
-    });
   };
+  const modelSetsSize = selectedModel !== undefined && doesModelSetDefault(selectedModel, 'size');
   // Only a size the model sets itself is worth offering; otherwise its defaults are the native square.
   const modelDefaultSize =
-    modelDefaults && hasModelDefaultSize(selectedModel)
-      ? { height: modelDefaults.height, width: modelDefaults.width }
-      : null;
+    modelDefaults && modelSetsSize ? { height: modelDefaults.height, width: modelDefaults.width } : null;
+  const baseLabel = selectedModel?.type === 'main' ? models.getBaseLabel(selectedModel.base) : null;
+  const sizeSource = selectedModel ? getDefaultSource(selectedModel, ['size']) : 'base';
+  // An external model's fallback size belongs to no base, so it is a plain default. One side set by the model takes the
+  // other from the base.
+  const sizeSectionResetLabel =
+    sizeSource === 'model'
+      ? t('widgets.generate.sectionMenu.resetSize')
+      : baseLabel === null
+        ? t('widgets.generate.sectionMenu.reset')
+        : sizeSource === 'mixed'
+          ? t('widgets.generate.sectionMenu.resetSizeMixed', { base: baseLabel })
+          : t('widgets.generate.sectionMenu.resetSizeBase', { base: baseLabel });
 
   const resetSizeChoices: readonly ResetSizeChoice[] = [
-    // First, as the choice most reached for. A square ratio's optimal size is the native square, which the square choice
-    // below sets, so it is left out there.
+    // First, as the choice most reached for. A square ratio's optimal size is the native square, which the square
+    // choice below sets, so it is left out there.
     ...(optimalSize.width === nativeSide && optimalSize.height === nativeSide
       ? []
       : [
@@ -626,6 +618,9 @@ export const GenerateDimensionFields = ({
     dimensionGrid
   );
   const frameLabel = `${displayDimensions.width}×${displayDimensions.height}`;
+  const isAtModelDefaultSize =
+    modelDefaults === null ||
+    (displayDimensions.width === modelDefaults.width && displayDimensions.height === modelDefaults.height);
 
   // The optimal-side stop is scalar; recommended dimensions preserve the live ratio.
   const dimensionField = (key: 'height' | 'width') => (
@@ -669,31 +664,32 @@ export const GenerateDimensionFields = ({
     return (
       <GenerateCollapsibleSection
         label={t('widgets.generate.size')}
-        badges={
-          <>
-            <Badge>{isResized ? `${frameLabel} → ${renderSize.width}×${renderSize.height}` : frameLabel}</Badge>
-            {isRatioConstrained && (
-              <Badge>
-                <Icon as={LockIcon} boxSize="3" />
-              </Badge>
-            )}
-          </>
-        }
+        summary={[
+          isResized ? `${frameLabel} → ${renderSize.width}×${renderSize.height}` : frameLabel,
+          isRatioConstrained ? (
+            <>
+              <Icon as={LockIcon} aria-hidden boxSize="3" verticalAlign="-0.125em" />
+              <Text as="span" srOnly>
+                {t('widgets.generate.aspectRatioLocked')}
+              </Text>
+            </>
+          ) : null,
+        ]}
         defaultOpen
+        isChanged={!isAtModelDefaultSize}
         sectionId="dimensions"
+        resetLabel={sizeSectionResetLabel}
+        onReset={modelDefaults ? resetToModelDefaults : undefined}
       >
-        <Stack gap="2" p="2">
+        <Stack gap="2.5">
           <HStack alignItems="stretch" gap="2">
             <Stack flex="1" gap="2" minW="0">
               {/* The lock binds width to height, so it sits between the two values it couples. */}
               <GenerateFieldContextMenu
                 fieldLabel={t('widgets.generate.size')}
                 copyValue={() => `${displayDimensions.width}x${displayDimensions.height}`}
-                isAtDefault={
-                  modelDefaults !== null &&
-                  displayDimensions.width === modelDefaults.width &&
-                  displayDimensions.height === modelDefaults.height
-                }
+                isAtDefault={isAtModelDefaultSize}
+                resetLabel={getFieldResetLabel('size', selectedModel, models.getBaseLabel, t)}
                 onReset={modelDefaults ? resetToModelDefaults : undefined}
               >
                 <HStack alignItems="center" gap="1">
@@ -767,7 +763,7 @@ export const GenerateDimensionFields = ({
               isRatioConstrained={isRatioConstrained}
               ratio={
                 isRatioConstrained
-                  ? getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
+                  ? getActiveAspectRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
                   : dimensionRatio
               }
               onCancelDrag={() => setDraftDimensions(null)}
@@ -789,8 +785,8 @@ export const GenerateDimensionFields = ({
     );
   };
 
-  // Switching source remounts the section's subtree; that is deliberate, as its state lives in this component.
-  // A hosted provider is asked for the frame itself (it buckets to its own size table), so there is no render size.
+  // Switching source remounts the section's subtree; that is deliberate, as its state lives in this component. A hosted
+  // provider is asked for the frame itself (it buckets to its own size table), so there is no render size.
   return project.invocationSourceId === 'canvas' && selectedModel?.type !== 'external_image_generator' ? (
     <CanvasRenderSizeSlot frame={displayDimensions}>{renderSection}</CanvasRenderSizeSlot>
   ) : (

@@ -1,9 +1,4 @@
-/**
- * The registry-driven video case matrix: every supported base, variant, generation mode, model shape and multi-stage
- * preset, and the compile each case runs. Shared by `videoGraphCoverage.test.ts`, whose committed fixture records
- * what these cases emit, and the recall contract in `workbench/image-actions/videoRecallContract.test.ts`, which
- * recalls what they record.
- */
+/** The video case matrix, shared by `videoGraphCoverage.test.ts` and `videoRecallContract.test.ts`. */
 
 import type { GenerationModelCatalogItem as ModelConfig, MainModelConfig } from '@features/generation/contracts';
 import type { BackendGraphContract } from '@features/generation/core/contracts';
@@ -38,7 +33,6 @@ const CLIP: VideoSourceClip = {
 
 const { endFrame: _end, startFrame: _start, ...CLIP_REF } = CLIP;
 
-/** The conditioning each mode needs; `resolveVideoMode` infers the mode back from it. */
 const MODE_INPUTS: Record<VideoGenerationMode, Partial<VideoSettings>> = {
   'audio-to-video': { conditioningClip: { clip: CLIP_REF, fpsKnown: true, role: 'audio' } },
   extend: { sourceVideo: CLIP },
@@ -50,10 +44,7 @@ const MODE_INPUTS: Record<VideoGenerationMode, Partial<VideoSettings>> = {
   'video-to-audio': { conditioningClip: { clip: CLIP_REF, fpsKnown: true, role: 'video' } },
 };
 
-/**
- * Candidate components for the slot filters to choose from — a search over a pool rather than a
- * hand-written model per slot, so the test agrees with the policy rather than with itself.
- */
+/** A pool the slot filters choose from, so the test agrees with the policy rather than with itself. */
 const CANDIDATE_BASES = ['any', ...SUPPORTED_VIDEO_BASES] as const;
 const CANDIDATE_VARIANTS = [undefined, 'fl2va', 'ref2va', 't2v_a14b', 'i2v_a14b', 'ti2v_5b', 'ltx2_dev'] as const;
 const CANDIDATE_LATENT_CHANNELS = [undefined, 16, 48] as const;
@@ -67,8 +58,6 @@ export const candidatesForSlot = (slot: VideoComponentSlotPolicy): ModelConfig[]
         for (const latentChannels of type === 'vae' ? CANDIDATE_LATENT_CHANNELS : [undefined]) {
           candidates.push({
             base,
-            // A component source has to be a bundled install; every other slot takes a
-            // single file, and the H3/LTX-2 encoder slots do not care either way.
             format: slot.valueKind === 'main' ? 'diffusers' : 'checkpoint',
             key: `${base}-${type}-${variant ?? 'novariant'}${latentChannels ? `-${latentChannels}` : ''}`,
             name: `${base} ${type} ${variant ?? ''}`.trim(),
@@ -98,10 +87,7 @@ const buildContext = (
   return { model, selectedComponents, settings };
 };
 
-/**
- * Fill every required slot with something its own filter accepts. Iterated to a fixpoint because
- * slots are interdependent: picking a component source can make another slot stop being required.
- */
+/** Iterated to a fixpoint: picking a component source can make another slot stop being required. */
 const satisfyRequiredComponents = (
   model: MainModelConfig,
   initial: VideoSettings
@@ -141,9 +127,7 @@ export interface Case {
   variant: string;
   mode: VideoGenerationMode;
   format: 'diffusers' | 'checkpoint';
-  /** A preset to override the variant's default with; absent runs the default. */
   targetResolution?: VideoTargetResolution;
-  /** Fill the optional LTX-2 duration head slot and let it choose the length. */
   autoDuration?: true;
   label: string;
 }
@@ -158,19 +142,10 @@ export const createModel = (testCase: Case): MainModelConfig =>
     variant: testCase.variant,
   }) as MainModelConfig;
 
-/**
- * Both model shapes per variant: a bundled install supplies its own components, a single file
- * forces the component-source path, and the two produce different graphs. A shape the panel would
- * not let the user pick at all is dropped — which shapes those are is the policy's answer
- * (`isVideoModelSelectable`), not a list kept here: H3's Ref2VA folder install is supported state
- * but not runnable as the model, and hard-coding that would go stale.
- */
+/** Both model shapes per variant, minus those `isVideoModelSelectable` refuses. */
 export const cases: Case[] = SUPPORTED_VIDEO_BASES.flatMap((base) =>
   Object.entries(VIDEO_GENERATION[base].variants).flatMap(([variant, config]) => {
-    // A multi-stage preset builds a different graph -- more denoise passes, and the nodes between
-    // them -- so each one is its own case. Every one of them, not just the first: the fixture
-    // records the literal values written into each field as well as the node types, and the widest
-    // canvas is exactly the one a future bound on those fields would reject.
+    // Every multi-stage preset is its own case: the widest canvas is the one a future field bound would reject.
     const presets: (VideoTargetResolution | undefined)[] = [
       undefined,
       ...config.targetResolutions.filter((option) => option.stages !== undefined).map((option) => option.id),
@@ -179,8 +154,7 @@ export const cases: Case[] = SUPPORTED_VIDEO_BASES.flatMap((base) =>
     return config.modes.flatMap((mode) =>
       presets
         .filter((targetResolution) => {
-          // A mode the policy refuses to run two-stage is not an uncovered case, it is a
-          // combination that does not exist -- asked of the policy so the two cannot drift.
+          // Asked of the policy so the two cannot drift.
           const option = config.targetResolutions.find((entry) => entry.id === targetResolution);
 
           return option?.stages !== 2 || isTwoStageSupportedForMode(mode);
@@ -201,13 +175,7 @@ export const cases: Case[] = SUPPORTED_VIDEO_BASES.flatMap((base) =>
   })
 );
 
-/**
- * Auto duration is an optional slot plus a flag, so the matrix above -- which fills only *required*
- * slots -- never reaches the `ltx2_duration` node. Added here rather than as another dimension of
- * that matrix because it only affects one base. Every preset is kept, including the two-stage ones:
- * those build a second denoise with a `num_frames` of its own, so restricting this to the default
- * preset is exactly how a graph that dies after the base pass stays invisible.
- */
+/** Auto duration is an optional slot the required-only matrix never fills; every preset is kept. */
 export const DURATION_HEAD = {
   base: 'ltx-2',
   key: 'ltx2-duration-head',
@@ -218,7 +186,6 @@ export const DURATION_HEAD = {
 export const AUTO_DURATION_CASES: Case[] = cases
   .filter((testCase) => testCase.base === 'ltx-2')
   .filter((testCase) =>
-    // Asked of the policy, not of a list of modes kept here, so the two cannot drift.
     isAutoDurationActive({
       autoDuration: true,
       conditioningClip: null,
@@ -244,8 +211,7 @@ export const compileForCase = (testCase: Case): { filled: VideoComponentValueKey
     ...(testCase.autoDuration ? { autoDuration: true, ltx2DurationHeadModel: DURATION_HEAD as never } : {}),
   });
 
-  // Compiling an invalid selection throws only the first reason; asserting here reports every
-  // unmet requirement at once, and doubles as the check that the policy is satisfiable at all.
+  // Reports every unmet requirement at once, where compiling throws only the first.
   expect(getVideoValidationReasons(model, settings), `${testCase.label} is not satisfiable`).toEqual([]);
 
   return { filled, graph: compileVideoGraph(settings, model).backendGraph };

@@ -1,11 +1,17 @@
-import type { BrowserContext, Route } from 'playwright';
+import type { BrowserContext, CDPSession, Route } from 'playwright';
 import type { BrowserCommand } from 'vitest/node';
 
 import { playwright } from '@vitest/browser-playwright';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { mergeConfig } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 import viteConfig from './vite.config.mts';
+
+// Keep the initial Playwright page and Vitest iframe the same size before either can receive focus.
+const TEST_VIEWPORT = { width: 414, height: 896 };
 
 /** A previous test's pointer must not hover controls mounted by the next test. */
 const resetBrowserPointer: BrowserCommand<[]> = async ({ page }) => {
@@ -36,10 +42,7 @@ const imeCompose: BrowserCommand<[steps: readonly { kind: 'commit' | 'compose'; 
   }
 };
 
-/**
- * Drags with the real mouse through `points` (the test frame's viewport coordinates), so the browser hit-tests every
- * move and the release the way a user's drag is, which synthetic events dispatched at an element skip.
- */
+/** Real mouse moves, so the browser hit-tests each move and the release as for a user's drag. */
 const mouseDragPath: BrowserCommand<[points: readonly { x: number; y: number }[], frameWidth: number]> = async (
   { frame, page },
   points,
@@ -61,13 +64,142 @@ const mouseDragPath: BrowserCommand<[points: readonly { x: number; y: number }[]
       await page.mouse.move(point.x, point.y, { steps: 6 });
     }
   } finally {
-    // Never leave the button pressed for the next test.
     await page.mouse.up();
   }
 };
 
+/** A file for `nativeDrag`, written to disk so Chromium attaches it as the operating system would. */
+type NativeDragFile = { base64: string; name: string };
+
+/**
+ * Drags data in through Chromium's own drag input, whose per-listener microtask checkpoints synthetic events lack.
+ * It always drops: an open drag swallows the next enter, and `dragCancel` fires no page event. Files are deleted after.
+ */
+const nativeDrag: BrowserCommand<
+  [
+    options: {
+      files?: readonly NativeDragFile[];
+      frameWidth: number;
+      points: readonly { x: number; y: number }[];
+      text?: string;
+      uriList?: string;
+    },
+  ]
+> = async ({ context, frame, page }, { files = [], frameWidth, points, text, uriList }) => {
+  const box = await (await (await frame()).frameElement()).boundingBox();
+  if (!box || points.length === 0) {
+    throw new Error('nativeDrag needs a visible test frame and at least one point');
+  }
+  const scale = box.width / frameWidth;
+  const viewportPoints = points.map((point) => ({
+    x: Math.round(box.x + point.x * scale),
+    y: Math.round(box.y + point.y * scale),
+  }));
+  const directory = await mkdtemp(join(tmpdir(), 'native-drag-'));
+  const session = await context.newCDPSession(page);
+  // The page's next frame, so what a drag event rendered is on screen before the next one hit-tests it.
+  const nextFrame = () =>
+    page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          requestAnimationFrame(resolve);
+        })
+    );
+
+  try {
+    const paths = await Promise.all(
+      files.map(async (file) => {
+        const path = join(directory, file.name);
+        await writeFile(path, Buffer.from(file.base64, 'base64'));
+        return path;
+      })
+    );
+    const data = {
+      dragOperationsMask: 1,
+      files: paths,
+      items: [
+        ...(uriList === undefined ? [] : [{ data: uriList, mimeType: 'text/uri-list' }]),
+        ...(text === undefined ? [] : [{ data: text, mimeType: 'text/plain' }]),
+      ],
+    };
+    const drop = { data, type: 'drop', ...viewportPoints.at(-1)! } as const;
+    let isOpen = false;
+    try {
+      await session.send('Input.dispatchDragEvent', { data, type: 'dragEnter', ...viewportPoints[0]! });
+      isOpen = true;
+      for (const point of viewportPoints) {
+        // Twice per point: the first hover may render the zones the second one finds.
+        for (let hover = 0; hover < 2; hover++) {
+          await nextFrame();
+          await session.send('Input.dispatchDragEvent', { data, type: 'dragOver', ...point });
+        }
+      }
+      await nextFrame();
+      isOpen = false;
+      await session.send('Input.dispatchDragEvent', drop);
+    } finally {
+      if (isOpen) {
+        await session.send('Input.dispatchDragEvent', drop).catch(() => undefined);
+      }
+    }
+  } finally {
+    await session.detach();
+    await rm(directory, { force: true, recursive: true });
+  }
+};
+
+const devicePixelRatioSessions = new Map<string, CDPSession>();
+
+/** Chromium drops the override with the CDP session that set it, so the session stays open until restored. */
+const emulateDevicePixelRatio: BrowserCommand<[ratio: number | null]> = async ({ context, page, sessionId }, ratio) => {
+  const previous = devicePixelRatioSessions.get(sessionId);
+  devicePixelRatioSessions.delete(sessionId);
+  await previous?.detach();
+  if (ratio === null) {
+    return;
+  }
+  const session = await context.newCDPSession(page);
+  devicePixelRatioSessions.set(sessionId, session);
+  await session.send('Emulation.setDeviceMetricsOverride', {
+    deviceScaleFactor: ratio,
+    height: 0,
+    mobile: false,
+    width: 0,
+  });
+};
+
+/** Playwright's own screenshots restore its viewport emulation, ending `emulateDevicePixelRatio`'s. */
+const captureDevicePixels: BrowserCommand<
+  [rect: { height: number; width: number; x: number; y: number }, frameWidth: number]
+> = async ({ context, frame, page, sessionId }, rect, frameWidth) => {
+  const box = await (await (await frame()).frameElement()).boundingBox();
+  if (!box) {
+    throw new Error('captureDevicePixels needs a visible test frame');
+  }
+  const scale = box.width / frameWidth;
+  // Detaching any other session ends the emulation too, so capture through the one that set it.
+  const emulating = devicePixelRatioSessions.get(sessionId);
+  const session = emulating ?? (await context.newCDPSession(page));
+  try {
+    const { data } = await session.send('Page.captureScreenshot', {
+      clip: {
+        height: rect.height * scale,
+        scale: 1 / scale,
+        width: rect.width * scale,
+        x: box.x + rect.x * scale,
+        y: box.y + rect.y * scale,
+      },
+      format: 'png',
+    });
+    return data;
+  } finally {
+    if (!emulating) {
+      await session.detach();
+    }
+  }
+};
+
 type ThumbnailRouteState = {
-  /** Requests still to be answered with `failureStatus`. */
   failuresLeft: number;
   failureStatus: number;
   handler: (route: Route) => Promise<void>;
@@ -88,10 +220,7 @@ const stopThumbnailRoute = async (context: BrowserContext, sessionId: string) =>
   }
 };
 
-/**
- * Serves the images at `pathnames`, answering the first `failures` requests with `status` (default: one 404).
- * `endThumbnailRouteFailures` serves every later request.
- */
+/** The first `failures` requests answer `status` (default one 404). */
 const startThumbnailRoute: BrowserCommand<
   [pathnames: string | string[], options?: { failures?: number; status?: number }]
 > = async ({ context, sessionId }, pathnames, { failures = 1, status: failureStatus = 404 } = {}) => {
@@ -148,10 +277,7 @@ const stopThumbnailRouteCommand: BrowserCommand<[]> = async ({ context, sessionI
   await stopThumbnailRoute(context, sessionId);
 };
 
-/**
- * Without the dev proxy, `/api` requests fail the way they do in CI. Proxied to a developer's running backend, their
- * responses arrive late and change what tests render: a menu row inserted mid-click moves the clicked item.
- */
+/** Without the dev proxy `/api` fails as in CI; a proxied backend's late responses would change what tests render. */
 const { proxy: _devBackendProxy, ...server } = viteConfig.server ?? {};
 
 export default mergeConfig(
@@ -177,10 +303,13 @@ export default mergeConfig(
     test: {
       browser: {
         commands: {
+          captureDevicePixels,
+          emulateDevicePixelRatio,
           endThumbnailRouteFailures,
           getThumbnailRequests,
           imeCompose,
           mouseDragPath,
+          nativeDrag,
           resetBrowserPointer,
           startThumbnailRoute,
           stopThumbnailRoute: stopThumbnailRouteCommand,
@@ -188,7 +317,15 @@ export default mergeConfig(
         enabled: true,
         headless: true,
         instances: [{ browser: 'chromium' }],
-        provider: playwright(),
+        // Focus must not scroll the runner while its iframe and outer viewport resize independently.
+        orchestratorScripts: [
+          {
+            content: "document.head.insertAdjacentHTML('beforeend', '<style>body { overflow: clip }</style>')",
+            type: 'text/javascript',
+          },
+        ],
+        provider: playwright({ contextOptions: { viewport: TEST_VIEWPORT } }),
+        viewport: TEST_VIEWPORT,
       },
       include: ['src/**/*.browser.test.{ts,tsx}'],
       setupFiles: ['./scripts/browser-test-console.ts', './scripts/browser-test-pointer.ts'],

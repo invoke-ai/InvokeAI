@@ -3,8 +3,8 @@ import type { RefObject } from 'react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 
 /**
- * Zag can retain phantom overflow after zero-size/remounted content. Check live viewport nodes and dispatch one
- * no-op scroll to remeasure; listeners must tolerate it.
+ * Zag can retain phantom overflow after zero-size/remounted content. Check live viewport nodes and dispatch one no-op
+ * scroll to remeasure; listeners must tolerate it.
  */
 export const useScrollAreaPhantomHeal = (viewportRef: RefObject<HTMLElement | null>): void => {
   useMountEffect(() => {

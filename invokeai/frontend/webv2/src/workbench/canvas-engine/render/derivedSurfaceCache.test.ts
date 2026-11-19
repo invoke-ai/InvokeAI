@@ -56,7 +56,7 @@ describe('createDerivedSurfaceCache', () => {
 
     expect(cache.size()).toBe(1);
     expect(cache.byteSize()).toBe(4 * 4 * 4);
-    expect(create('b', 'mask-fill')).not.toBe(b); // different source identity is guarded
+    expect(create('b', 'mask-fill')).not.toBe(b);
   });
 
   it('evicts least-recently-used entries to a deterministic byte budget', () => {
@@ -78,7 +78,7 @@ describe('createDerivedSurfaceCache', () => {
 
     get('a');
     get('b');
-    get('a'); // a is now most recently used
+    get('a');
     expect(cache.evict(400, () => false)).toEqual(['b']);
     expect(cache.byteSize()).toBe(400);
   });

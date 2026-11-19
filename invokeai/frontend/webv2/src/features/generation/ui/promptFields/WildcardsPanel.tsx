@@ -110,7 +110,6 @@ export const WildcardsPanel = ({
     () => filtered.some((wildcard) => !selection.has(wildcard.id)),
     [filtered, selection]
   );
-  // Exclude the current wildcard from rename collision checks.
   const nameError = draft
     ? getWildcardNameError(draft.name, new Set(catalog.wildcards.filter((w) => w.id !== draft.id).map((w) => w.name)))
     : null;
@@ -150,7 +149,6 @@ export const WildcardsPanel = ({
       setDraft(null);
       setError(null);
     } catch (caught) {
-      // Unwrap raw ApiError bodies before display.
       setError(getApiErrorMessage(caught, t('widgets.generate.dynamicPrompts.couldNotSaveWildcard')));
     }
   }, [catalog, draft, t]);

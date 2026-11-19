@@ -55,7 +55,6 @@ describe('resolveHotkeyTarget', () => {
       gallery: { id: 'gallery', typeId: 'gallery' },
       map: { id: 'map', typeId: 'image-map' },
     },
-    // No `floating` entry exists here, so indexing the regions with a floating target would throw.
     widgetRegions: { bottom: region(''), center: region('canvas'), left: region(''), right: region('gallery') },
   };
 
@@ -82,8 +81,6 @@ describe('resolveHotkeyTarget', () => {
   });
 
   it('prefers the widget under the event target over whatever holds focus', () => {
-    // Focus was last recorded on a window, but the press landed in the center: the press decides both the widget
-    // and the region.
     expect(
       resolveHotkeyTarget({
         focusTarget: { instanceId: 'map', kind: 'floating' },
@@ -126,14 +123,11 @@ describe('resolveHotkeyTarget', () => {
   });
 
   it('does not aim at a view that floated out of the focused region, even though the region still points at it', () => {
-    // The center emptied when its last view floated; it keeps naming that view so docking can bring it back.
     const emptied: WidgetPlacementProject = {
       ...project,
       widgetRegions: { ...project.widgetRegions, center: region('map', []) },
     };
 
-    // The view answers as a window. As "the center's widget" it would get a `center` source, and the commands it
-    // registered under `floating` would not be found while the key was still swallowed.
     expect(
       resolveHotkeyTarget({ focusTarget: { kind: 'region', region: 'center' }, project: emptied, targetWidget: null })
     ).toEqual({

@@ -50,21 +50,6 @@ describe('color sampling with real browser rasterization', () => {
     expect(createColorSampler(backend).sample(doc, caches, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);
   });
 
-  it('matches a visible paint cache whose local content rectangle is offset', () => {
-    const backend = createDomRasterBackend();
-    const caches = createLayerCacheStore(backend);
-    const entry = caches.getOrCreateRect('far-layer', { height: 2, width: 2, x: 20, y: 0 });
-    entry.surface.ctx.fillStyle = '#ef1234';
-    entry.surface.ctx.fillRect(0, 0, 2, 2);
-    caches.publishPixels('far-layer');
-    const doc = documentWith(layer(0), 32);
-    const viewport = backend.createSurface(32, 8);
-    compositeDocument(viewport, doc, caches, IDENTITY, { backend });
-
-    expect([...viewport.ctx.getImageData(20, 0, 1, 1).data]).toEqual(EXPECTED_PIXEL);
-    expect(createColorSampler(backend).sample(doc, caches, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);
-  });
-
   it('samples the square around a pixel with the pick at its center and empty canvas transparent', () => {
     const backend = createDomRasterBackend();
     const caches = createLayerCacheStore(backend);

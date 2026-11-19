@@ -63,6 +63,10 @@ const selectStarterModels = (snapshot: {
   response: { starter_models: { source: string }[] } | null;
 }) => (snapshot.status === 'loaded' ? (snapshot.response?.starter_models ?? null) : null);
 
+/** `revision` is an argument: the React Compiler prunes a `void revision` dependency and would go stale. */
+const getCheckContext = (base: string | null, remembered: Record<string, string>, _capabilitiesRevision: number) =>
+  createControlLayerCheckContext(base, remembered);
+
 /** Read from the engine in place of a reason when the layer does not contribute: its ambient warning applies. */
 const AMBIENT = 'ambient';
 
@@ -77,17 +81,13 @@ interface ControlLayerSettingsProps {
   layer: CanvasControlLayerContract;
 }
 
-/**
- * The control layer Properties panel: Image · Type · Detection · Model, then Weight · Steps · Priority. The rows stay
- * put; only their values change. Type, detector and image edits go through the canvas operations, which detect the
- * map in the background; adapter values commit through canvas undo like any layer property.
- */
+/** Rows stay put and only values change; type, detector and image edits go through canvas operations. */
 export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const projectId = useActiveProjectId();
   const { canManageModels } = useCapabilities();
-  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const editingLocked = useCanvasDocumentEditingLocked(engine);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const mainModel = useSelectedMainModel();
@@ -111,10 +111,10 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
     getArchitectureCapabilitiesSnapshot,
     selectCapabilitiesRevision
   );
-  const checkContext = useMemo(() => {
-    void capabilitiesRevision;
-    return createControlLayerCheckContext(baseId, remembered);
-  }, [baseId, capabilitiesRevision, remembered]);
+  const checkContext = useMemo(
+    () => getCheckContext(baseId, remembered, capabilitiesRevision),
+    [baseId, capabilitiesRevision, remembered]
+  );
   const described = useMemo(
     () => describeControlLayer(layer, { ...checkContext, mainModel, models }),
     [checkContext, layer, mainModel, models]
@@ -252,7 +252,6 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
   );
   const adapterEditing = useMemo<ControlAdapterEditing>(
     () => ({
-      cancel: cancelPreview,
       commit: commitAdapter,
       preview: (patch) => {
         previewStructural({
@@ -262,7 +261,7 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
         });
       },
     }),
-    [cancelPreview, commitAdapter, layer.id, previewStructural]
+    [commitAdapter, layer.id, previewStructural]
   );
 
   const memoryKey = baseId && layer.controlType ? controlModelMemoryKey(baseId, layer.controlType) : null;
@@ -314,8 +313,8 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
     };
   }, []);
   const capabilitiesUnavailable = reason === 'capabilities_unavailable';
-  // The click flips the status to `loading` synchronously; keeping the failure surface mounted for the
-  // retry it started keeps the button, and the user's focus, in place.
+  // The click flips the status to `loading` synchronously; keeping the failure surface mounted for the retry it started
+  // keeps the button, and the user's focus, in place.
   const isRetryingCapabilities = hasRequestedCapabilitiesRetry && capabilitiesStatus === 'loading';
   const showCapabilitiesFailure = capabilitiesUnavailable && (capabilitiesStatus === 'error' || isRetryingCapabilities);
 

@@ -5,17 +5,7 @@ import type { UpscaleComponentField, UpscaleComponentSlot } from '@features/upsc
 import type { UpscaleMode, UpscaleWidgetValues } from '@features/upscale/core/types';
 import type { FeatureHintId } from '@platform/ui/hints/hintRegistry';
 
-import {
-  Badge,
-  Box,
-  createListCollection,
-  DataList,
-  SegmentGroup,
-  Separator,
-  SimpleGrid,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Badge, Box, createListCollection, DataList, SegmentGroup, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import {
   addConcept,
   CapabilitiesGate,
@@ -23,11 +13,14 @@ import {
   type ConceptModelPort,
   ConceptRow,
   type ConceptUpdate,
+  GenerationSectionIssuesProvider,
+  GenerationSectionPanel,
   GenerationSettingsSection,
   removeConcept,
   SeedField,
   updateConcept,
 } from '@features/generation/components';
+import { useDynamicPrompts } from '@features/generation/react';
 import {
   type ArchitectureCapabilitiesSnapshot,
   ensureArchitectureCapabilitiesLoaded,
@@ -35,6 +28,8 @@ import {
   subscribeArchitectureCapabilities,
 } from '@features/generation/runtime';
 import {
+  getDynamicPromptsConfig,
+  getEffectivePrompts,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
@@ -57,6 +52,7 @@ import {
   getModelOnlyUpscalePlan,
   getSpandrelNativeScale,
   getUpscaleOutputDimensions,
+  getUpscaleValidationIssues,
   isSpandrelModelConfig,
   isSupportedUpscaleMainModel,
   isTileControlNetCandidate,
@@ -94,7 +90,7 @@ import { useTranslation } from 'react-i18next';
 import { areInputImagesEquivalent, valuesAreEqual } from './upscaleComparators';
 import { UpscalePromptFields } from './UpscaleFormFields';
 import { UpscaleImageField } from './UpscaleImageField';
-import { useUpscaleUi, useUpscaleUiActions } from './UpscaleUiContext';
+import { UPSCALE_SECTION_IDS, useUpscaleUi, useUpscaleUiActions } from './UpscaleUiContext';
 
 /** Keep props stable across project patches so memoized form sections do not rerender for unrelated field edits. */
 
@@ -114,7 +110,6 @@ const LORA_MODEL_TYPES: readonly ModelTaxonomyType[] = ['lora'];
 const CONTROLNET_MODEL_TYPES: readonly ModelTaxonomyType[] = ['controlnet'];
 const VAE_MODEL_TYPES: readonly ModelTaxonomyType[] = ['vae'];
 
-/** How each encoder slot reads in the form; which slots show, and what fits them, is the core's call. */
 const COMPONENT_FIELD_UI: Record<
   UpscaleComponentField,
   {
@@ -231,7 +226,6 @@ const formatScale = (scale: number): string => `${scale}×`;
 const getRangeError = (label: string, value: number, min: number, max: number): string | undefined =>
   Number.isFinite(value) && value >= min && value <= max ? undefined : `${label} must be between ${min} and ${max}.`;
 
-/** The muted line under the preflight explaining how Model only reaches Scale with this upscaler. */
 const useModelOnlyPlanNote = (nativeScale: number | null, scale: number): string | null => {
   const { t } = useTranslation();
   const plan = getModelOnlyUpscalePlan(nativeScale, scale);
@@ -273,7 +267,7 @@ const UpscaleOutputPreflight = memo(
     const isLargeOutput = outputMegapixels >= LARGE_OUTPUT_MEGAPIXELS;
 
     return (
-      <Stack bg="bg.subtle" gap="2" px="2.5" py="2" rounded="md">
+      <Stack bg="bg.muted" gap="2" px="2.5" py="2" rounded="md">
         <DataList.Root gap="1.5" orientation="horizontal">
           <DataList.Item>
             <DataList.ItemLabel color="fg.subtle" fontSize="xs">
@@ -424,7 +418,54 @@ const UpscaleModelReconciler = ({
   return null;
 };
 
-export const UpscaleWidgetView = () => {
+/** The table revision is an argument: the React Compiler does not see a table read through a function call. */
+const getFieldErrors = (t: (key: string) => string, values: UpscaleWidgetValues, _capabilitiesRevision: number) => ({
+  cfgScale: getRangeError(t('widgets.upscale.cfgScale'), values.cfgScale, 1, upscaleMaxCfgScale(values.model)),
+  creativity: getRangeError(
+    t('widgets.upscale.creativity'),
+    values.creativity,
+    UPSCALE_CREATIVITY_MIN,
+    UPSCALE_CREATIVITY_MAX
+  ),
+  scale: getRangeError(t('widgets.upscale.scale'), values.scale, UPSCALE_SCALE_MIN, UPSCALE_SCALE_MAX),
+  seed: getRangeError(t('widgets.upscale.seed'), values.seed, 0, SEED_MAX),
+  steps: getRangeError(t('widgets.upscale.steps'), values.steps, upscaleMinSteps(values.model), 1000),
+  structure: getRangeError(
+    t('widgets.upscale.structure'),
+    values.structure,
+    UPSCALE_STRUCTURE_MIN,
+    UPSCALE_STRUCTURE_MAX
+  ),
+  tileOverlap: getRangeError(
+    t('widgets.upscale.tileOverlap'),
+    values.tileOverlap,
+    UPSCALE_TILE_OVERLAP_MIN,
+    UPSCALE_TILE_OVERLAP_MAX
+  ),
+  tileSize: getRangeError(t('widgets.upscale.tileSize'), values.tileSize, UPSCALE_TILE_SIZE_MIN, UPSCALE_TILE_SIZE_MAX),
+});
+
+/** All read from the served table; the revision is an argument for the reason `getFieldErrors` gives. */
+const getServedSamplingFields = (model: MainModelConfig | null, scheduler: string, _capabilitiesRevision: number) => ({
+  cfgScaleMax: upscaleMaxCfgScale(model),
+  scheduler: coerceUpscaleScheduler(model, scheduler),
+  schedulerOptions: upscaleSchedulerOptions(model),
+});
+
+/** The revision makes the memo re-run when the table arrives; without the table no section counts anything. */
+const getIssueSections = (
+  values: UpscaleWidgetValues,
+  models: readonly ModelConfig[] | undefined,
+  capabilitiesRevision: number
+): (string | undefined)[] =>
+  capabilitiesRevision === 0 && values.mode === 'refine'
+    ? []
+    : getUpscaleValidationIssues(values, models).map((issue) =>
+        issue.section ? UPSCALE_SECTION_IDS[issue.section] : undefined
+      );
+
+/** `instance` ties the sections to the header's jump menu; a view rendered outside a widget frame has none. */
+export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) => {
   const { t } = useTranslation();
   const openInModelManager = useOpenModelInManager();
   const conceptModels = useMemo<ConceptModelPort>(
@@ -444,9 +485,7 @@ export const UpscaleWidgetView = () => {
     getArchitectureCapabilitiesSnapshot,
     selectCapabilitiesRevision
   );
-  // The sync picks VAEs and a new model's CFG from the served table, and a default applied without it
-  // would stick: nothing re-applies one to a model already selected. So the sync waits for the table,
-  // and until then the gate holds back the form, its model picker included.
+  // A default applied without the served table would stick, so the sync and the form wait for it.
   const hasCapabilities = capabilitiesRevision > 0;
   const canSync = modelsStatus === 'loaded' && hasCapabilities;
   const { patchPromptDraft: patchDraft, patchValues, projectId, promptDraft, rawValues } = selection;
@@ -466,38 +505,11 @@ export const UpscaleWidgetView = () => {
         .join('|'),
     [models]
   );
-  const errors = useMemo(
-    () => ({
-      cfgScale: getRangeError(t('widgets.upscale.cfgScale'), values.cfgScale, 1, upscaleMaxCfgScale(values.model)),
-      creativity: getRangeError(
-        t('widgets.upscale.creativity'),
-        values.creativity,
-        UPSCALE_CREATIVITY_MIN,
-        UPSCALE_CREATIVITY_MAX
-      ),
-      scale: getRangeError(t('widgets.upscale.scale'), values.scale, UPSCALE_SCALE_MIN, UPSCALE_SCALE_MAX),
-      seed: getRangeError(t('widgets.upscale.seed'), values.seed, 0, SEED_MAX),
-      steps: getRangeError(t('widgets.upscale.steps'), values.steps, upscaleMinSteps(values.model), 1000),
-      structure: getRangeError(
-        t('widgets.upscale.structure'),
-        values.structure,
-        UPSCALE_STRUCTURE_MIN,
-        UPSCALE_STRUCTURE_MAX
-      ),
-      tileOverlap: getRangeError(
-        t('widgets.upscale.tileOverlap'),
-        values.tileOverlap,
-        UPSCALE_TILE_OVERLAP_MIN,
-        UPSCALE_TILE_OVERLAP_MAX
-      ),
-      tileSize: getRangeError(
-        t('widgets.upscale.tileSize'),
-        values.tileSize,
-        UPSCALE_TILE_SIZE_MIN,
-        UPSCALE_TILE_SIZE_MAX
-      ),
-    }),
-    [t, values]
+  const errors = useMemo(() => getFieldErrors(t, values, capabilitiesRevision), [capabilitiesRevision, t, values]);
+  // Installs are checked once models load, as Invoke checks them.
+  const issueSections = useMemo(
+    () => getIssueSections(values, modelsStatus === 'loaded' ? models : undefined, capabilitiesRevision),
+    [capabilitiesRevision, models, modelsStatus, values]
   );
   const patch = useCallback((next: Partial<UpscaleWidgetValues>) => patchValues(next), [patchValues]);
   const patchPromptDraft = useCallback((next: ProjectPromptDraftPatch) => patchDraft(next), [patchDraft]);
@@ -573,8 +585,6 @@ export const UpscaleWidgetView = () => {
   );
   const selectedLoraKeys = useMemo(() => new Set(values.loras.map((lora) => lora.model.key)), [values.loras]);
 
-  // A control with nothing to steer is worse than no control, so the widget follows the table
-  // rather than showing every field for every architecture.
   const architecture = upscaleArchitectureFor(values.model);
   const tileControlNet = architecture?.tileControlNet ?? null;
   // Structure scales the ControlNet's weights, so with an optional one left out it steers nothing.
@@ -586,8 +596,7 @@ export const UpscaleWidgetView = () => {
       PRESET_ENTRIES.find(
         ([, preset]) =>
           values.creativity === preset.creativity &&
-          // Structure is hidden where nothing consumes it, so a stale value must not keep every
-          // preset unhighlighted with nothing on screen to explain why.
+          // A stale hidden Structure must not keep every preset unhighlighted.
           (!showStructure || values.structure === preset.structure)
       )?.[0] ?? null,
     [showStructure, values.creativity, values.structure]
@@ -663,11 +672,11 @@ export const UpscaleWidgetView = () => {
   );
 
   const vaePrecisionValue = useMemo(() => [values.vaePrecision], [values.vaePrecision]);
-  // The architecture's own list, less the schedulers that would ignore Creativity, showing the one the
-  // graph will really run. Where one is left there is nothing to choose, and the field goes.
-  const schedulerOptions = useMemo(() => upscaleSchedulerOptions(values.model), [values.model]);
-  const scheduler = coerceUpscaleScheduler(values.model, values.scheduler);
-  const cfgScaleMax = upscaleMaxCfgScale(values.model);
+  // Schedulers that would ignore Creativity are dropped; with one left, the field goes.
+  const { cfgScaleMax, scheduler, schedulerOptions } = useMemo(
+    () => getServedSamplingFields(values.model, values.scheduler, capabilitiesRevision),
+    [capabilitiesRevision, values.model, values.scheduler]
+  );
   const gateLabels = useMemo(
     () => ({
       loadFailed: t('widgets.upscale.capabilitiesLoadFailed'),
@@ -677,7 +686,7 @@ export const UpscaleWidgetView = () => {
     [t]
   );
 
-  const sharedBadge = useMemo(() => <Badge fontFamily="mono">{t('widgets.upscale.shared')}</Badge>, [t]);
+  const sharedBadge = useMemo(() => <Badge>{t('widgets.upscale.shared')}</Badge>, [t]);
   const modeOptions = useMemo(
     () =>
       [
@@ -688,23 +697,37 @@ export const UpscaleWidgetView = () => {
   );
   // Model only keeps the Refine settings as they are, hidden, so switching back restores them.
   const isRefine = values.mode === 'refine';
-  // Model only can neither show nor plan the passes of an upscaler installed before Invoke recorded native scales;
-  // the field's description says so, and re-identifying it in the Model Manager records it.
+  // Folded, Detail guidance still summarizes the shared prompt's template and expansion count.
+  const promptExpansion = useDynamicPrompts(
+    getEffectivePrompts(promptDraft).positivePrompt,
+    isRefine ? getDynamicPromptsConfig(promptDraft) : null
+  );
+  const templateName = promptDraft.promptTemplate?.name;
+  const promptCount = promptExpansion.count;
+  const detailGuidanceSummary = useMemo(
+    () => [templateName, promptCount > 1 ? t('topbar.invoke.summary.promptCount', { count: promptCount }) : null],
+    [promptCount, t, templateName]
+  );
+  // Upscalers installed before native scales were recorded; re-identifying in the Model Manager fixes it.
   const isNativeScaleUnknown =
     values.mode === 'model-only' &&
     values.upscaleModel !== null &&
     getSpandrelNativeScale(values.upscaleModel) === null;
 
   const form = (
-    <Stack gap={1} minW={0}>
+    <Stack gap={0} minW={0}>
       <UpscaleModelReconciler
         key={`${projectId}:${modelsStatus}:${capabilitiesRevision}:${modelsFingerprint}`}
         rawValues={rawValues}
         values={values}
       />
 
-      <GenerationSettingsSection label={t('widgets.upscale.sourceAndTreatment')} defaultOpen>
-        <Stack gap="3" p="2">
+      <GenerationSettingsSection
+        defaultOpen
+        label={t('widgets.upscale.sourceAndTreatment')}
+        sectionId={UPSCALE_SECTION_IDS.source}
+      >
+        <Stack gap="2.5">
           <UpscaleImageField inputImage={values.inputImage} onChange={set.inputImage} />
           <UpscaleOutputPreflight
             inputImage={values.inputImage}
@@ -771,9 +794,8 @@ export const UpscaleWidgetView = () => {
                 )}`;
 
                 return (
-                  // The tooltip trigger merges onto the text, not the item: both
-                  // tooltip and segment item write `data-state`, and the tooltip's
-                  // open/closed would clobber the item's checked state.
+                  // The tooltip trigger merges onto the text, not the item: both tooltip and segment item write
+                  // `data-state`, and the tooltip's open/closed would clobber the item's checked state.
                   <SegmentGroup.Item key={id} flex="1" minW="0" value={id}>
                     <SegmentGroup.ItemHiddenInput />
                     <Tooltip content={tooltipContent}>
@@ -816,8 +838,15 @@ export const UpscaleWidgetView = () => {
       </GenerationSettingsSection>
 
       {isRefine ? (
-        <GenerationSettingsSection badges={sharedBadge} label={t('widgets.upscale.detailGuidance')}>
+        <GenerationSettingsSection
+          status={sharedBadge}
+          summary={detailGuidanceSummary}
+          label={t('widgets.upscale.detailGuidance')}
+          sectionId={UPSCALE_SECTION_IDS.detailGuidance}
+        >
           <UpscalePromptFields
+            batchCount={values.batchCount}
+            isSeedFixed={values.seedMode === 'fixed'}
             loras={values.loras}
             model={values.model}
             negativePromptHeightPx={values.negativePromptHeightPx}
@@ -832,8 +861,8 @@ export const UpscaleWidgetView = () => {
       ) : null}
 
       {isRefine ? (
-        <GenerationSettingsSection label={t('widgets.upscale.generation')}>
-          <Stack gap="3" p="2">
+        <GenerationSettingsSection label={t('widgets.upscale.generation')} sectionId={UPSCALE_SECTION_IDS.generation}>
+          <Stack gap="2.5">
             <Field
               error={
                 values.model
@@ -855,7 +884,6 @@ export const UpscaleWidgetView = () => {
                 onChange={selectMainModel}
               />
             </Field>
-            <Separator borderColor="border.subtle" />
             {/* Iterations live in the top bar's invoke cluster, which edits this widget's batch count directly. */}
             <ScrubberField
               error={errors.steps}
@@ -889,7 +917,6 @@ export const UpscaleWidgetView = () => {
                 />
               </Field>
             ) : null}
-            <Separator borderColor="border.subtle" />
             <SeedField
               batchCount={values.batchCount}
               error={errors.seed}
@@ -898,7 +925,6 @@ export const UpscaleWidgetView = () => {
               seedMode={values.seedMode}
               onCommit={patch}
             />
-            <Separator borderColor="border.subtle" />
             <Field hint="concepts" label={t('widgets.upscale.concepts')}>
               <ModelSelect
                 excludeKeys={selectedLoraKeys}
@@ -931,8 +957,8 @@ export const UpscaleWidgetView = () => {
       ) : null}
 
       {isRefine ? (
-        <GenerationSettingsSection label={t('widgets.upscale.advanced')}>
-          <Stack gap="3" p="2">
+        <GenerationSettingsSection label={t('widgets.upscale.advanced')} sectionId={UPSCALE_SECTION_IDS.advanced}>
+          <Stack gap="2.5">
             {tileControlNet?.required && (
               <Field
                 error={
@@ -1051,23 +1077,24 @@ export const UpscaleWidgetView = () => {
     </Stack>
   );
 
-  // The mode sits above the gate: Model only reads no main-model capabilities, so it stays reachable and usable while
-  // the table is loading or has failed, which holds back only Refine's form.
+  // The mode sits above the gate: Model only needs no served table, so it stays usable while it loads or fails.
   return (
-    <Stack gap={1} minW={0} p="1">
-      <Box px="2" pt="2">
-        <Field helpText={t('widgets.upscale.modeHelp')} label={t('widgets.upscale.mode')}>
-          <SegmentedControl
-            ariaLabel={t('widgets.upscale.mode')}
-            options={modeOptions}
-            value={values.mode}
-            onChange={set.mode}
-          />
-        </Field>
-      </Box>
-      <CapabilitiesGate isReady={hasCapabilities || !isRefine} labels={gateLabels}>
-        {form}
-      </CapabilitiesGate>
-    </Stack>
+    <GenerationSectionPanel id={instance?.id}>
+      <Stack gap={0} minW={0}>
+        <Box px="2" pt="3" pb="3">
+          <Field helpText={t('widgets.upscale.modeHelp')} label={t('widgets.upscale.mode')}>
+            <SegmentedControl
+              ariaLabel={t('widgets.upscale.mode')}
+              options={modeOptions}
+              value={values.mode}
+              onChange={set.mode}
+            />
+          </Field>
+        </Box>
+        <CapabilitiesGate isReady={hasCapabilities || !isRefine} labels={gateLabels}>
+          <GenerationSectionIssuesProvider issueSections={issueSections}>{form}</GenerationSectionIssuesProvider>
+        </CapabilitiesGate>
+      </Stack>
+    </GenerationSectionPanel>
   );
 };

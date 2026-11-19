@@ -95,8 +95,8 @@ export const registerFirstPartyWidgets = (): RegisteredWidget[] => registerWidge
 export const registeredWidgets = registerFirstPartyWidgets();
 
 /**
- * Admin widgets require a multi-user admin session; the route resolves session before mounting and remounts on
- * user changes.
+ * Admin widgets require a multi-user admin session; the route resolves session before mounting and remounts on user
+ * changes.
  */
 const isWidgetAvailable = (widget: RegisteredWidget): boolean => {
   if (!widget.manifest.requiresAdmin) {
@@ -134,8 +134,7 @@ export const warmWidgets = (typeIds: readonly WidgetTypeId[]): void => {
 };
 
 /**
- * Await implementations before making widgets visible to avoid Suspense fallback throttling even for downloaded
- * chunks.
+ * Await implementations before making widgets visible to avoid Suspense fallback throttling even for downloaded chunks.
  */
 export const loadWidgets = (typeIds: readonly WidgetTypeId[]): Promise<unknown> =>
   Promise.allSettled(

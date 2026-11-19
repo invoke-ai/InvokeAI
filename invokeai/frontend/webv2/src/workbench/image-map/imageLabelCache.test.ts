@@ -40,8 +40,7 @@ describe('image map image-label cache', () => {
   });
 
   it('keeps labels for a video apart from an image with the same name', async () => {
-    // The fixtures ship exactly this: a video named like an image. Keying the
-    // cache by name alone would serve one item's tags for the other.
+    // The fixtures ship exactly this, a video named like an image: keyed by name alone the cache would mix their tags.
     mocks.apiFetchJson.mockResolvedValueOnce({ alternates: [], label: 'photo' });
     mocks.apiFetchJson.mockResolvedValueOnce({ alternates: [], label: 'clip' });
 
@@ -61,8 +60,7 @@ describe('image map image-label cache', () => {
 
     await getImageLabels({ kind: 'video', name: 'clip.mp4' });
 
-    // Without the kind the backend would look the name up among images and
-    // answer 404, which the cache would then remember as "no labels".
+    // Without the kind the backend looks among images and 404s, which the cache would remember as "no labels".
     const [url] = mocks.apiFetchJson.mock.calls[0] as [string];
     expect(url).toContain('image_name=clip.mp4');
     expect(url).toContain('kind=video');
@@ -115,9 +113,8 @@ describe('image map image-label cache', () => {
       await expect(getImageLabels({ kind: 'image', name: 'b.png' })).resolves.toBeNull();
       expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
 
-      // The vocabulary is built lazily by the index worker: a 409 can simply
-      // mean "not ready yet", so the cooldown must expire rather than latch —
-      // and quickly, since a warm build lands within seconds.
+      // The vocabulary is built lazily by the index worker: a 409 can simply mean "not ready yet", so the cooldown must
+      // expire rather than latch — and quickly, since a warm build lands within seconds.
       vi.setSystemTime(Date.now() + 5_001);
       mocks.apiFetchJson.mockResolvedValue({ alternates: [], label: 'ship' });
       await expect(getImageLabels({ kind: 'image', name: 'c.png' })).resolves.toEqual({
@@ -272,8 +269,8 @@ describe('image map image-label cache', () => {
       );
       const stale = getImageLabels(pendingItem);
 
-      // Removal and reinstallation happened while the map was closed. Neither
-      // endpoint needs to return model_missing for the cached labels to be stale.
+      // Removal and reinstallation happened while the map was closed. Neither endpoint needs to return model_missing
+      // for the cached labels to be stale.
       const replacement = { ...response, model_id: 'encoder-b' };
       const labelRequest = vi.fn().mockResolvedValue({ alternates: [], label: 'encoder B label' });
       mocks.apiFetchJson.mockImplementation((url: string) => {
@@ -322,8 +319,7 @@ describe('image map image-label cache', () => {
     mocks.apiFetchJson.mockResolvedValue({ alternates: [], label: 'user-a-label' });
     await getImageLabels({ kind: 'image', name: 'a.png' });
 
-    // A request still in flight when the account switches must not seed the
-    // next account's cache.
+    // A request still in flight when the account switches must not seed the next account's cache.
     let resolveLate: (labels: { alternates: string[]; label: string }) => void = () => {};
     mocks.apiFetchJson.mockImplementation(
       () =>

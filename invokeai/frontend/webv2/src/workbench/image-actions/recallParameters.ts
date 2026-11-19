@@ -22,10 +22,8 @@ import {
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   getReferenceImageLimit,
-  getModelDefaultVae,
   getSettingsWithModelDefaults,
   hasArchitectureCapabilities,
-  hasModelDefaultVae,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
@@ -39,6 +37,8 @@ import {
   MIN_REFINER_CFG_SCALE,
   MIN_REFINER_START,
   MIN_REFINER_STEPS,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
   withAddedReferenceImages,
 } from '@features/generation/settings';
 
@@ -55,11 +55,10 @@ import {
 } from './imageRecall';
 
 /**
- * Wire payload of the backend's `recall_parameters_updated` socket event, emitted
- * by `POST /api/v1/recall/{queue_id}`. `parameters` carries the request body after
- * the backend resolved model names to keys and image names to `{ image_name,
- * width, height }`; in strict mode every omitted key is present as `null` (lists
- * as `[]`), and `append: true` rides along as a pseudo-parameter.
+ * Wire payload of the backend's `recall_parameters_updated` socket event, emitted by `POST /api/v1/recall/{queue_id}`.
+ * `parameters` carries the request body after the backend resolved model names to keys and image names to `{
+ * image_name, width, height }`; in strict mode every omitted key is present as `null` (lists as `[]`), and `append:
+ * true` rides along as a pseudo-parameter.
  */
 export interface RecallParametersUpdatedEvent {
   parameters: Record<string, unknown>;
@@ -183,8 +182,8 @@ const toReferenceImage = (config: GenerateReferenceImageConfig): GenerateReferen
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 /**
- * Apply present payload keys; strict nulls reset to effective-model defaults. Report unsupported fields and
- * unresolved models in skipped. The caller verifies reference availability and commits.
+ * Apply present payload keys; strict nulls reset to effective-model defaults. Report unsupported fields and unresolved
+ * models in skipped. The caller verifies reference availability and commits.
  */
 export const buildRecallParametersSettings = ({
   currentValues,
@@ -232,12 +231,8 @@ export const buildRecallParametersSettings = ({
         model,
         models,
       });
-      values = {
-        ...values,
-        ...settings,
-        model,
-        ...(hasModelDefaultVae(model) ? { vae: getModelDefaultVae(model, vaeModels) } : {}),
-      };
+      const vae = getRecallDefaultVae(resolveModelDefaultVae(model, settings, vaeModels));
+      values = { ...values, ...settings, model, ...(vae === undefined ? {} : { vae }) };
       fields.add('model');
     }
   }
@@ -261,7 +256,9 @@ export const buildRecallParametersSettings = ({
       fields.add('vae');
     }
   } else if (isReset('vae_model')) {
-    values = { ...values, vae: hasModelDefaultVae(values.model) ? getModelDefaultVae(values.model, vaeModels) : null };
+    // A strict null asks for the default, so anything the default cannot name is the bundled VAE, as before.
+    const defaultVae = resolveModelDefaultVae(values.model, values, vaeModels);
+    values = { ...values, vae: defaultVae.kind === 'apply' ? defaultVae.vae : null };
     fields.add('vae');
   }
 
@@ -460,8 +457,8 @@ export const buildRecallParametersSettings = ({
   );
 
   if (has('guidance') && parameters.guidance !== null) {
-    // Only meaningful for graphs that wire cfgScale to `guidance`; an explicit
-    // cfg_scale in the same request wins because it names the field directly.
+    // Only meaningful for graphs that wire cfgScale to `guidance`; an explicit cfg_scale in the same request wins
+    // because it names the field directly.
     if (!GUIDANCE_BASES.has(values.model.base)) {
       skip('guidance', 'incompatible', values.model.name);
     } else if (getCfgScale(parameters) !== null) {

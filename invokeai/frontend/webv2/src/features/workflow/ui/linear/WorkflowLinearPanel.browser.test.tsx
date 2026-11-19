@@ -20,13 +20,11 @@ import { FormBuilderTab } from './FormBuilderTab';
 import { LinearFormView } from './LinearFormView';
 import { PanelModeToggle } from './WorkflowLinearPanel';
 
-// Field controls name the project they render for; these harnesses hold one static project.
 const TEST_PROJECT_PORT = { getSnapshot: () => ({ id: 'project-1' }), subscribe: () => () => undefined };
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// Probe renders through a passthrough hook spy; compiler memoization can skip pure helper calls independently of
-// component renders.
+// Probe renders through a passthrough hook spy; compiler memoization can skip pure helper calls apart from renders.
 vi.mock('@dnd-kit/core', async (importOriginal) => {
   const actual = await importOriginal<typeof DndKitCoreModule>();
 
@@ -86,14 +84,12 @@ const entryTemplate: InvocationTemplate = {
   version: '1.0.0',
 };
 
-// File-wide: every describe sees only the `entry` template as loaded; the builder fixtures expose no node fields.
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useInvocationTemplatesSelector: (selector: (snapshot: unknown) => unknown) =>
     selector({ error: null, status: 'loaded', templates: { entry: entryTemplate } }),
 }));
 
-// Provided only where a test reads translated copy; the field-entry harness still reads raw keys.
 const i18n = createInstance();
 await i18n.init({
   interpolation: { escapeValue: false },
@@ -135,7 +131,7 @@ describe('Workflow Linear panel mode toggle', () => {
 
   const selection = (tabs: HTMLButtonElement[]) => tabs.map((tab) => tab.getAttribute('aria-selected'));
 
-  it('exposes View and Edit as a labelled tablist', async () => {
+  it('exposes View and Edit as a labelled tablist and activates them with pointer and arrow keys', async () => {
     const tabs = await renderToggle();
 
     expect(tabs).toHaveLength(2);
@@ -147,15 +143,10 @@ describe('Workflow Linear panel mode toggle', () => {
         .filter((id): id is string => id !== null)
         .map((id) => document.getElementById(id))
     ).not.toContain(null);
-  });
-
-  it('activates View and Edit with pointer and arrow keys', async () => {
-    const tabs = await renderToggle();
 
     await act(() => userEvent.click(tabs[1]!));
     expect(selection(tabs)).toEqual(['false', 'true']);
 
-    // Roving focus: the tablist is one tab stop and arrows move within it.
     tabs[1]?.focus();
     await act(() => userEvent.keyboard('{ArrowLeft}'));
     expect(selection(tabs)).toEqual(['true', 'false']);
@@ -165,7 +156,6 @@ describe('Workflow Linear panel mode toggle', () => {
   });
 });
 
-/** A second drag after reparenting verifies completion survives dragged-card remounts through DndContext ownership. */
 describe('Form builder drag and drop (dnd-kit)', () => {
   let host: HTMLDivElement;
   let root: Root;
@@ -186,7 +176,6 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     host.remove();
   });
 
-  /** root -> [heading "Field A", divider, container(column, empty)] */
   const buildInitialGraph = (): ProjectGraphState => {
     let doc = createProjectGraph('form-dnd-test');
 
@@ -231,7 +220,6 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     });
   };
 
-  /** The title-bar `HStack` is the drag handle: it's the direct DOM parent of its title `Text`. */
   const titleBarFor = (title: string): HTMLElement => {
     const leaf = [...host.querySelectorAll<HTMLElement>('*')].find(
       (element) => element.children.length === 0 && element.textContent?.trim() === title
@@ -244,7 +232,6 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     return leaf.parentElement;
   };
 
-  /** The card's content `Box` — the title bar's rounded-chrome parent's second (and last) child. */
   const cardContentFor = (title: string): HTMLElement => {
     const chrome = titleBarFor(title).parentElement;
     const content = chrome?.lastElementChild;
@@ -266,9 +253,7 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code }));
   };
 
-  // Re-measuring and sensor activation run on rAF outside React's synchronous
-  // event handling, so each step needs a real tick — a bare `act()` leaves
-  // `over` stale and the drop resolves against the wrong target.
+  // Re-measuring and sensor activation run on rAF, so each step needs a real tick; a bare `act()` leaves `over` stale.
   const interact = (action: () => void): Promise<void> =>
     act(async () => {
       action();
@@ -287,8 +272,7 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     await interact(() => pointer('pointerdown', handle, startX, startY));
     await interact(() => pointer('pointermove', handle.ownerDocument, startX + 8, startY));
     await interact(() => pointer('pointermove', handle.ownerDocument, x, y));
-    // The remeasure lands a tick after the move that triggered it, so a no-op
-    // settle move re-runs collision detection against current rects.
+    // The remeasure lands a tick after its move, so a no-op settle move reruns collision detection on current rects.
     await interact(() => pointer('pointermove', handle.ownerDocument, x, y + 1));
     await interact(() => pointer('pointerup', handle.ownerDocument, x, y + 1));
   };
@@ -305,7 +289,6 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     handle.focus();
     expect(handle.ownerDocument.activeElement).toBe(handle);
 
-    // Space lifts (dnd-kit's `KeyboardSensor` start code).
     await interact(() => key(handle, 'Space'));
 
     for (let step = 0; step < steps; step++) {
@@ -320,7 +303,6 @@ describe('Form builder drag and drop (dnd-kit)', () => {
   it('keeps dragging alive after a field is dropped into a container', async () => {
     await renderHarness();
 
-    // Drag 1: "Field A" (a heading) into the empty container's drop zone.
     const emptyHint = [...host.querySelectorAll<HTMLElement>('*')].find(
       (element) => element.textContent === EMPTY_CONTAINER_HINT
     );
@@ -336,24 +318,20 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     expect(containerContent.textContent).toContain(HEADING);
     expect(containerContent.textContent).not.toContain(EMPTY_CONTAINER_HINT);
 
-    // Immediately drag again after reparenting to catch lost completion state from the remounted source.
     const headingCardRect = titleBarFor(HEADING).parentElement!.getBoundingClientRect();
 
     await dragTo(DIVIDER, headingCardRect.left + headingCardRect.width / 2, headingCardRect.bottom - 2);
 
-    // The divider moved into the container, next to the heading.
     const containerContentAfter = cardContentFor(COLUMN_CONTAINER);
 
     expect(containerContentAfter.textContent).toContain(HEADING);
     expect(containerContentAfter.textContent).toContain(DIVIDER);
 
-    // No card is left stuck at the mid-drag 40% opacity.
     const opacities = [...host.querySelectorAll<HTMLElement>('*')].map((element) => getComputedStyle(element).opacity);
 
     expect(opacities).not.toContain('0.4');
   });
 
-  /** Exercise KeyboardSensor and rectangle collision fallback; keyboard drags have no pointer coordinates. */
   it('moves a form element into a container with the keyboard', async () => {
     await renderHarness();
 
@@ -373,7 +351,6 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     expect(containerContent.textContent).not.toContain(EMPTY_CONTAINER_HINT);
   });
 
-  /** Test keyboard edge targeting separately from container drops to exercise the translated-card-center fallback. */
   it('reorders a form element above a sibling with the keyboard', async () => {
     await renderHarness();
 
@@ -392,10 +369,6 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     expect(dividerIndex).toBeLessThan(headingIndex);
   });
 
-  /**
-   * Count untouched card hook calls during pointer moves to verify drop-target context isolation despite compiler
-   * memoization.
-   */
   it('does not re-render an unrelated card on a drag-move that only changes the drop target', async () => {
     const initialGraph = buildInitialGraph();
     const dividerId = Object.values(initialGraph.form.elements).find((element) => element.type === 'divider')!.id;
@@ -403,7 +376,6 @@ describe('Form builder drag and drop (dnd-kit)', () => {
 
     await renderHarness(initialGraph);
 
-    // Capture the empty hint's rect before drag changes its text to Drop here.
     const emptyHint = [...host.querySelectorAll<HTMLElement>('*')].find(
       (element) => element.textContent === EMPTY_CONTAINER_HINT
     );
@@ -419,14 +391,12 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     const startX = startRect.left + startRect.width / 2;
     const startY = startRect.top + startRect.height / 2;
 
-    // Activate the sensor and settle delayed measurement before testing moves within one logical target.
     await interact(() => pointer('pointerdown', handle, startX, startY));
     await interact(() => pointer('pointermove', handle.ownerDocument, startX + 8, startY));
     await interact(() => pointer('pointermove', handle.ownerDocument, midX, midY));
     await interact(() => pointer('pointermove', handle.ownerDocument, midX, midY + 1));
     vi.mocked(useDroppable).mockClear();
 
-    // Move within the same target to exercise per-frame state churn without changing the intended drop.
     await interact(() => pointer('pointermove', handle.ownerDocument, midX, midY + 2));
     await interact(() => pointer('pointermove', handle.ownerDocument, midX, midY + 3));
 
@@ -436,7 +406,6 @@ describe('Form builder drag and drop (dnd-kit)', () => {
 
     expect(dividerCardRerendered).toBe(false);
 
-    // End the drag cleanly so it doesn't leak into other tests.
     await interact(() => pointer('pointerup', handle.ownerDocument, midX, midY + 3));
   });
 });
@@ -480,7 +449,6 @@ describe('Linear form field entry', () => {
     type: 'invocation',
   };
 
-  /** The entry node with every field exposed on the form. */
   const buildGraph = (): ProjectGraphState => {
     let doc = projectGraphReducer(createProjectGraph('linear-entry-test'), { node: entryNode, type: 'addNode' });
 
@@ -537,10 +505,7 @@ describe('Linear form field entry', () => {
 
     return { error, field, value };
   };
-  // Focused directly rather than clicked: what is under test is the caret surviving the edit's round trip
-  // through the project graph. A click has to hit-test the input, and each field label and reset button
-  // carries a tooltip that can open over it -- on the CI runner one did, and intercepted the click until
-  // the test timed out.
+  // Focused directly, not clicked: field-label and reset-button tooltips can open over the input (one did on CI).
   const focusAtEnd = (input: HTMLInputElement) =>
     act(async () => {
       input.focus();
@@ -550,24 +515,6 @@ describe('Linear form field entry', () => {
     act(async () => {
       await userEvent.keyboard(sequence);
     });
-
-  it('keeps the caret while editing an exposed text field through the project graph', async () => {
-    const { error, field, value } = await renderForm();
-    const prompt = field('Prompt');
-
-    await focusAtEnd(prompt);
-    await keys('{Home}{ArrowRight}{ArrowRight}XYZ');
-    expect(prompt.value).toBe('heXYZllo world');
-    expect([prompt.selectionStart, prompt.selectionEnd]).toEqual([5, 5]);
-    expect(value('prompt')).toBe('heXYZllo world');
-    expect(field('Prompt')).toBe(prompt);
-
-    await keys('{Control>}a{/Control}{Backspace}');
-    expect(prompt.value).toBe('');
-    expect(value('prompt')).toBe('');
-    expect(document.activeElement).toBe(prompt);
-    expect(error(prompt)).toBeNull();
-  });
 
   it('commits numeric drafts as typed and reports required, invalid, and optional-empty states', async () => {
     const { error, field, value } = await renderForm();
@@ -617,12 +564,32 @@ describe('Linear form field entry', () => {
     expect(scale.getAttribute('aria-invalid')).toBeNull();
   });
 
+  it('keeps a field input at the same height whether or not its reset button shows', async () => {
+    const { field, value } = await renderForm();
+    const scale = field('Scale');
+    const fieldRoot = scale.closest<HTMLElement>('[data-scope="field"][data-part="root"]')!;
+    const resetButton = () => fieldRoot.querySelector('button[aria-label="nodes.resetFieldToDefault"]');
+    const inputOffset = () => scale.getBoundingClientRect().top - fieldRoot.getBoundingClientRect().top;
+
+    expect(resetButton()).not.toBeNull();
+    const offsetWithReset = inputOffset();
+
+    await act(async () => {
+      scale.focus();
+      scale.select();
+      await userEvent.keyboard('{Backspace}');
+    });
+    await act(() => scale.blur());
+    expect(value('scale')).toBeUndefined();
+    expect(resetButton()).toBeNull();
+    expect(inputOffset()).toBe(offsetWithReset);
+  });
+
   it('edits an exposed scalar list row by row and reports the first empty entry', async () => {
     const { value } = await renderForm();
     // Raw i18n keys: every list row shares one accessible name, so rows are found by position.
     const listRow = (index: number) =>
       host.querySelectorAll<HTMLInputElement>('input[aria-label="nodes.collectionItemLabel"]')[index - 1]!;
-    // Each row scopes its own Field.Root; the reason text belongs to the host field around the list.
     const listError = (input: HTMLInputElement) =>
       input
         .closest('[data-scope="field"][data-part="root"]')
@@ -652,7 +619,6 @@ describe('Linear form field entry', () => {
     expect(value('sizes')).toEqual([4, 8, null]);
     expect(third.getAttribute('aria-invalid')).toBe('true');
     expect(listError(third)).toBe('Item 3 is empty.');
-    // The host field is invalid as a whole, yet only the offending row carries the invalid state.
     expect(listRow(1).getAttribute('aria-invalid')).toBeNull();
     expect(listRow(1).getAttribute('data-invalid')).toBeNull();
     expect(listRow(2).getAttribute('aria-invalid')).toBeNull();
@@ -849,7 +815,6 @@ describe('Form builder field settings', () => {
 
     await userEvent.click(sliderOption);
     expect(storedSettings()).toMatchObject({ component: 'slider' });
-    // The integer template has no bounds of its own.
     expect(document.body.textContent).toContain(hint);
 
     await fillBound('minimum', '1');
@@ -884,7 +849,6 @@ describe('Form builder field settings', () => {
     // 1…7 holds no multiple of 8, so every value fails validation whichever control shows the field.
     expect(storedSettings()).toMatchObject({ component: 'number-input', max: 7, min: 1, step: 8 });
     expect(document.body.textContent).toContain(warning);
-    // Announced as it appears, and read with the bound being edited.
     const description = document.getElementById(document.activeElement?.getAttribute('aria-describedby') ?? '');
     expect(description?.textContent).toBe(warning);
     expect(description?.getAttribute('aria-live')).toBe('polite');

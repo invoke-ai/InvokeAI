@@ -3,6 +3,7 @@ import type { ProjectEvent } from '@workbench/projectEventContracts';
 import type {
   CanvasLayerRegionContract,
   CanvasAdjustmentsContract,
+  CanvasBezierPathContract,
   CanvasControlAdapterContract,
   CanvasControlLayerContract,
   CanvasDocumentContractV3,
@@ -46,6 +47,18 @@ export const LOCK_EXEMPT_PATCH_KEYS: readonly (keyof CanvasLayerBasePatch)[] = [
 ];
 
 export type CanvasLayerConfigPatch =
+  | {
+      layerType: 'vector';
+      paths?: CanvasBezierPathContract[];
+      guideColor?: string;
+      fillColor?: string;
+      strokeColor?: string;
+      strokeWidth?: number;
+      fillEnabled?: boolean;
+      strokeEnabled?: boolean;
+      traceTaperEnds?: boolean;
+      traceTaper?: number;
+    }
   | {
       layerType: 'raster';
       adjustments?: CanvasAdjustmentsContract;
@@ -108,8 +121,8 @@ export type CanvasProjectMutation =
   | {
       /**
        * Puts discarded candidates back (the Undo of a discard, or of the results an accept set aside) in the order
-       * `previous` held them, after any still staged; a candidate already staged is kept once. Ignored once the
-       * canvas was replaced (`documentRevision` moved on).
+       * `previous` held them, after any still staged; a candidate already staged is kept once. Ignored once the canvas
+       * was replaced (`documentRevision` moved on).
        */
       type: 'restoreStagedImages';
       images: readonly CanvasStagingCandidateContract[];
@@ -122,10 +135,9 @@ export type CanvasProjectMutation =
   | { type: 'addCanvasLayer'; layer: CanvasLayerContract; anchor: CanvasNodeInsertionAnchor }
   | {
       /**
-       * One atomic restructuring, applied as `add`, then `move`, then `removeIds`, then the flag
-       * and selection updates, so an anchor may name a node a later step moves or removes. The
-       * whole mutation is refused when any step is invalid or the result exceeds the depth or
-       * node limits.
+       * One atomic restructuring, applied as `add`, then `move`, then `removeIds`, then the flag and selection updates,
+       * so an anchor may name a node a later step moves or removes. The whole mutation is refused when any step is
+       * invalid or the result exceeds the depth or node limits.
        */
       type: 'applyCanvasLayerStackMutation';
       add?: readonly CanvasNodeInsertion[];

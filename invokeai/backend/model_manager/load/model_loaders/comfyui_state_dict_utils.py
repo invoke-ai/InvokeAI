@@ -6,8 +6,8 @@ an optional ``model.diffusion_model.`` key prefix, and optional fp8 weights
 paired with per-tensor scale factors. These helpers undo both so a state dict
 can be handed to a plain diffusers module.
 
-Originally written for the Qwen Image loader; shared so the Wan loader doesn't
-need a second copy.
+Now used by the Qwen2.5-VL encoder loader only; the transformer loaders read the same
+conventions through ``quantization/fp8_scaled.py``.
 """
 
 from typing import Any, Mapping
@@ -88,8 +88,8 @@ def _strip_quantization_metadata(sd: dict) -> None:
 
     Through the shared predicate rather than a second list of suffixes. The list that used to stand
     here was a clause-for-clause copy of it that had fallen one spelling behind: it dropped
-    ``.scale_input`` but not ``.input_scale``, which is the spelling Comfy actually writes, so on
-    the Wan path an ordinary scaled-fp8 checkpoint was rejected outright by
+    ``.scale_input`` but not ``.input_scale``, which is the spelling Comfy actually writes, so an
+    ordinary scaled-fp8 checkpoint was rejected outright by
     `_raise_for_incompatible_keys` as an unsupported variant. A copy that has to be kept in step by
     hand will fall behind again the next time a spelling is added.
     """

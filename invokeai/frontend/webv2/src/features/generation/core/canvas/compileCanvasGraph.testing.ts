@@ -52,15 +52,14 @@ export const settingsFor = (
   ...overrides,
 });
 
-/** Per-base overrides needed to pass component validation. */
-export const COMPONENT_OVERRIDES: Partial<Record<string, Partial<GenerateSettings>>> = {
+const COMPONENT_OVERRIDES: Partial<Record<string, Partial<GenerateSettings>>> = {
   flux: { clipEmbedModel: clipEmbed, t5EncoderModel: t5Encoder, vae: fluxVae },
   anima: { qwen3EncoderModel: qwen3Encoder, vae: qwenImageVae },
 };
 
 export const bbox: Rect = { height: 1024, width: 768, x: 128, y: 64 };
 
-export const COMPOSITING_FIXTURE: CanvasCompositingSettings = {
+const COMPOSITING_FIXTURE: CanvasCompositingSettings = {
   coherenceEdgeSize: 16,
   coherenceMinDenoise: 0,
   coherenceMode: 'Gaussian Blur',
@@ -72,7 +71,6 @@ export const COMPOSITING_FIXTURE: CanvasCompositingSettings = {
   outputOnlyMaskedRegions: false,
 };
 
-/** Compiles `mode` over the fixture frame; settings that name every key replace the defaults and overrides. */
 export const compile = (
   model: GenerateModelConfig,
   mode: CanvasCompileMode,
@@ -120,7 +118,6 @@ export const compile = (
     strength: overrides.strength ?? 0.6,
   });
 
-/** The modes a local model compiles on the canvas: the image modes encode through the family's VAE, if it has one. */
 export const canvasModesFor = (model: MainModelConfig, settings: GenerateSettings): CanvasCompileMode[] =>
   getFamilyGraphBuilder(model.base)?.(settings, model, false, PROJECT_SETTINGS).latents
     ? ['txt2img', 'img2img', 'inpaint']

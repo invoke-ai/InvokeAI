@@ -1,7 +1,4 @@
-/**
- * Persist foreground/background preferences in canvas widget values, outside document history; pair changes never
- * rewrite existing content.
- */
+/** Foreground/background in canvas widget values, outside history; pair changes never rewrite content. */
 
 import { formatHexColor, normalizeHex, parseHexColor } from '@platform/ui/color';
 
@@ -35,10 +32,7 @@ const toOpaqueHex = (value: unknown): string | null => {
 
 const readColor = (value: unknown, fallback: string): string => toOpaqueHex(value) ?? fallback;
 
-/**
- * The persisted widget values are untyped; anything malformed falls back per
- * field, and an existing pair is preserved verbatim (idempotent migration).
- */
+/** Untyped persisted values: malformed fields fall back, an existing pair is kept verbatim. */
 export const readActiveColorPair = (values: Record<string, unknown> | undefined): ActiveColorPair => {
   const raw = values?.[CANVAS_ACTIVE_COLORS_KEY];
   const pair = typeof raw === 'object' && raw !== null ? (raw as Partial<ActiveColorPair>) : {};

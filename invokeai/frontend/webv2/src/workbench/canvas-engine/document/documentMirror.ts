@@ -21,42 +21,36 @@ export interface DocumentMirrorStore {
   subscribe(listener: () => void): () => void;
 }
 
-/** Callbacks fired when the mirrored document changes. */
 export interface DocumentMirrorCallbacks {
   /**
    * Reports leaf or ancestor-effective changes in document order. `sourceChanged` contains added leaves and changed
-   * raster/control sources or mask bitmaps whose caches are stale. Property, transform and ancestor-flag changes
-   * retain cached pixels. `restructured` is false for value edits, which add, remove and move nothing.
+   * raster/control sources or mask bitmaps whose caches are stale. Property, transform and ancestor-flag changes retain
+   * cached pixels. `restructured` is false for value edits, which add, remove and move nothing.
    */
   onLayersChanged(changed: string[], sourceChanged: string[], restructured: boolean): void;
   /**
-   * Leaves changed ONLY by an ancestor group's adjustment stack: recomposite
-   * without `onLayersChanged`'s destructive reactions (float and pixel-edit
-   * cancellation).
+   * Leaves changed ONLY by an ancestor group's adjustment stack: recomposite without `onLayersChanged`'s destructive
+   * reactions (float and pixel-edit cancellation).
    */
   onLayersRecomposite?(ids: string[]): void;
   /** The forests were restructured without any leaf changing: recomposite with the new order. */
   onLayerOrderChanged(): void;
   /** The document was replaced wholesale (dims/background change, appear/disappear) — full invalidate. */
   onDocumentReplaced(): void;
-  /** The generation bounding box changed. */
   onBboxChanged(): void;
   /**
-   * Selection-only changes reuse stacks and bbox, requiring a separate callback for selection chrome and per-layer
-   * session cleanup.
+   * Selection-only changes reuse stacks and bbox, so selection chrome and per-layer session cleanup need this callback.
    */
   onSelectionChanged?(selectedLayerId: string | null): void;
   /** Any change to the mirrored document, after the callbacks above have reacted to it (even when one threw). */
   onDocumentChanged?(): void;
 }
 
-/** The imperative mirror handle. */
 export interface DocumentMirror {
   /** The current mirrored document, or `null` if the project is gone. */
   getDocument(): CanvasDocumentContractV3 | null;
   /** Synchronously reconciles from store state when ordinary notification was interrupted. */
   refresh(): void;
-  /** Removes the store subscription. */
   dispose(): void;
 }
 
@@ -66,11 +60,15 @@ const bboxEqual = (a: Bbox, b: Bbox): boolean =>
   a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 
 /**
- * Raster invalidation identity is raster/control `source` or mask `bitmap`. Property edits preserve it; mask fill
- * changes must preserve unflushed alpha-cache strokes.
+ * Content invalidation identity is raster/control `source`, mask `bitmap`, or vector `paths`. Property edits
+ * preserve it; mask fill changes must preserve unflushed alpha-cache strokes.
  */
-const rasterSourceRef = (layer: CanvasLayerContract): unknown =>
-  layer.type === 'raster' || layer.type === 'control' ? layer.source : layer.mask.bitmap;
+const rasterSourceRef = (layer: CanvasLayerContract): unknown => {
+  if (layer.type === 'vector') {
+    return layer.paths;
+  }
+  return layer.type === 'raster' || layer.type === 'control' ? layer.source : layer.mask.bitmap;
+};
 
 const effectiveKey = (entry: CanvasNodeEntry): string =>
   `${entry.ancestorsEnabled ? 1 : 0}${entry.ancestorsLocked ? 1 : 0}${entry.ancestorsHidden ? 1 : 0}`;
@@ -93,8 +91,8 @@ interface ForestDiff {
 }
 
 /**
- * Diffs leaf identity and ancestor-effective enabled, locked and hidden state, including unchanged leaves affected
- * by ancestors.
+ * Diffs leaf identity and ancestor-effective enabled, locked and hidden state, including unchanged leaves affected by
+ * ancestors.
  */
 const diffForests = (prev: CanvasDocumentIndex, next: CanvasDocumentIndex): ForestDiff => {
   diagnostics.forestDiffs += 1;
@@ -162,8 +160,8 @@ const groupFlagsChanged = (before: CanvasGroupContract, after: CanvasGroupContra
   (before.isHidden === true) !== (after.isHidden === true);
 
 /**
- * Diffs a value edit from its recorded node changes: changed leaves, the subtree leaves whose inherited flags
- * moved, and the subtree leaves of groups whose adjustments, opacity or blend changed. Structure is unchanged.
+ * Diffs a value edit from its recorded node changes: changed leaves, the subtree leaves whose inherited flags moved,
+ * and the subtree leaves of groups whose adjustments, opacity or blend changed. Structure is unchanged.
  */
 const diffValueEdit = (prev: CanvasDocumentIndex, next: CanvasDocumentIndex, edit: CanvasValueEdit): ForestDiff => {
   const changed = new Set<string>();
@@ -219,8 +217,8 @@ const diffValueEdit = (prev: CanvasDocumentIndex, next: CanvasDocumentIndex, edi
 };
 
 /**
- * Creates a document mirror bound to `projectId`. Subscribes immediately and seeds the last-seen
- * references from the current state, so no spurious callback fires on creation.
+ * Creates a document mirror bound to `projectId`. Subscribes immediately and seeds the last-seen references from the
+ * current state, so no spurious callback fires on creation.
  */
 export const createDocumentMirror = (
   store: DocumentMirrorStore,

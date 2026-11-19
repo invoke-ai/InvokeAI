@@ -52,31 +52,18 @@ import {
   type VideoRecallKind,
 } from './videoRecall';
 
-/*
- * The image menus' shared groups, by intent: what to continue working on with the image, and what to take from it.
- * The Gallery context menu and the Preview's Edit and Use menus all render them, so their items, labels, icons and
- * order cannot drift apart.
- */
+/* Shared by the Gallery context menu and Preview's Edit and Use menus, so their items and order cannot drift apart. */
 
-/**
- * `guided` explains each step: a hint under every item, the viewer's keycaps on the settings it can recall, and the
- * settings listed in full. It suits a menu of these groups alone, opened on the selected image (the one those keys act
- * on). `compact` keeps single-line rows and folds the settings into a submenu, for a context menu that holds every
- * other group too.
- */
+/** `guided` adds hints, keycaps and full settings for a menu of these groups alone; `compact` folds settings away. */
 export type ImageMenuPresentation = 'compact' | 'guided';
 
 interface GalleryCanvasImportDestinationOption {
   destination: GalleryCanvasImportDestination;
   icon: LucideIcon;
-  /** i18n key. */
   label: string;
 }
 
-/**
- * The canvas layers an image can be added to, in the order every host lists them. Icons are the add-layer menu's per
- * layer kind; a resized control layer is still a control layer, so it takes a resize glyph to tell the two apart.
- */
+/** A resized control layer is still a control layer, so it takes a resize glyph to tell the two apart. */
 export const GALLERY_CANVAS_IMPORT_DESTINATIONS: readonly GalleryCanvasImportDestinationOption[] = [
   { destination: 'raster', icon: LAYER_KIND_ICONS.raster, label: 'widgets.canvas.import.raster' },
   { destination: 'control', icon: LAYER_KIND_ICONS.control, label: 'widgets.canvas.import.control' },
@@ -94,7 +81,6 @@ export const GALLERY_CANVAS_IMPORT_DESTINATIONS: readonly GalleryCanvasImportDes
   { destination: 'control-resized', icon: ScalingIcon, label: 'widgets.canvas.import.resizedControl' },
 ];
 
-/** The canvas destinations as menu items, for the "Add to Canvas as…" submenu. */
 const GalleryCanvasImportMenuItems = ({
   onSelect,
 }: {
@@ -127,11 +113,7 @@ const GalleryCanvasImportMenuItem = ({
   );
 };
 
-/**
- * "Continue working": where the image goes next. Editing on the open project's canvas leads, then the single-image
- * hand-offs (Upscale, Video); the other canvas layer kinds and a separate project are the explicit alternatives. A
- * selection of several images keeps only the canvas items, which take them all.
- */
+/** A selection of several images keeps only the canvas items, which take them all. */
 export const ImageContinueGroup = ({
   actions,
   images,
@@ -199,8 +181,7 @@ const SingleImageHandOffItems = ({
   }, [generation, image.height, image.imageName, image.width, openWidget, widgets]);
   const handleSendToVideo = useCallback(() => {
     openWidget('video', { preferredRegions: ['left'] });
-    // The first frame, an initial video, and Ref2VA references all claim the same
-    // conditioning slot: sending a frame clears the rivals.
+    // A frame, an initial video and Ref2VA references claim one conditioning slot: a frame clears the rivals.
     widgets.patchValues('video', {
       firstFrameImage: { height: image.height, image_name: image.imageName, width: image.width },
       references: [],
@@ -232,7 +213,7 @@ const SingleImageHandOffItems = ({
 
 interface ReuseItem {
   capability: keyof ImageRecallCapabilities;
-  /** The viewer command that recalls the same, for its keycaps; none where the viewer has no key. */
+  /** None where the viewer has no key. */
   commandId?: string;
   hint?: string;
   icon: LucideIcon;
@@ -241,7 +222,7 @@ interface ReuseItem {
   value: string;
 }
 
-/** Remix leads: a new image like this one is the common ask; the full recall, which keeps the seed, follows. */
+/** Remix leads; the full recall, which keeps the seed, follows. */
 const REUSE_ITEMS: readonly ReuseItem[] = [
   {
     capability: 'remix',
@@ -294,7 +275,6 @@ const REUSE_ITEMS: readonly ReuseItem[] = [
   },
 ];
 
-/** "Use image as" and "Reuse from image": the image as an input, then its recorded settings. */
 export const ImageUseGroups = ({
   actions,
   capabilities,
@@ -345,7 +325,6 @@ export const ImageUseGroups = ({
           onSelect={handleUseAsControl}
         />
         <MenuActionItem
-          // Use the same availability signal as Use Prompt to disable empty recall upfront.
           disabled={isLoadingCapabilities || !capabilities.prompts}
           hint={guided ? t('widgets.gallery.itemMenu.useAsPromptTemplateHint') : undefined}
           icon={TypeIcon}
@@ -354,7 +333,7 @@ export const ImageUseGroups = ({
           onSelect={handleSavePromptAsTemplate}
         />
       </Menu.ItemGroup>
-      {/* Outside the "Use image as" group, so assistive technology does not announce it under that heading. */}
+      {/* Outside the group, so assistive technology does not announce it under that heading. */}
       {guided ? null : (
         <ContextSubMenu icon={AsteriskIcon} label={t('widgets.gallery.itemMenu.reuseFromImage')}>
           {reuseItems}
@@ -408,7 +387,6 @@ const ReuseMenuItem = ({
 
 interface VideoReuseItem {
   capability: keyof VideoRecallCapabilities;
-  /** The viewer command that recalls the same from the selected video, for its keycaps. */
   commandId: string;
   icon: LucideIcon;
   kind: VideoRecallKind;
@@ -416,7 +394,6 @@ interface VideoReuseItem {
   value: string;
 }
 
-/** In the image list's order: remix leads, the full recall follows, then the single settings. */
 const VIDEO_REUSE_ITEMS: readonly VideoReuseItem[] = [
   {
     capability: 'remix',
@@ -460,11 +437,7 @@ const VIDEO_REUSE_ITEMS: readonly VideoReuseItem[] = [
   },
 ];
 
-/**
- * "Use video as" and "Reuse from video": the video as a Video panel input, then its recorded settings. Reads the
- * video's metadata when it mounts, so hosts mount it with their open menu. The entry is the gallery's shared one,
- * which Preview Details and recall commands also read; a failed read holds no answer, so the next open reads it again.
- */
+/** Reads the shared metadata entry on mount, so hosts mount it with their open menu; failures retry next open. */
 export const VideoUseGroups = ({
   actions,
   item,
@@ -515,7 +488,7 @@ export const VideoUseGroups = ({
           <ConditioningClipMenuItem actions={actions} conditioningRole="video" item={item} />
         </ContextSubMenu>
       </Menu.ItemGroup>
-      {/* As for images: outside the "Use video as" group, so it is not announced under that heading. */}
+      {/* Outside the group, as for images. */}
       {presentation === 'guided' ? (
         <>
           <Menu.Separator borderColor="border.subtle" />
@@ -548,7 +521,7 @@ const ConditioningClipMenuItem = ({
 
   return (
     <MenuActionItem
-      // A wrapped audio upload's picture is a placeholder, so it has nothing to lend.
+      // A wrapped audio upload's picture is a placeholder.
       disabled={!actions.canUseAsConditioningClip[role] || (role === 'video' && item.mediaOrigin === 'audio_upload')}
       icon={role === 'audio' ? AudioLinesIcon : ImagePlayIcon}
       label={t(role === 'audio' ? 'widgets.video.conditioningRoleAudio' : 'widgets.video.conditioningRoleVideo')}
@@ -593,14 +566,13 @@ const VideoReuseMenuItem = ({
   );
 };
 
-/** The command's effective first binding, remaps included, as keycaps; nothing when it is unbound. */
 const CommandKeycaps = ({ commandId }: { commandId: string }) => {
   const binding = useShortcutBinding(commandId);
 
   return binding ? <ShortcutKeycaps parts={binding.parts} /> : null;
 };
 
-/** Every installed upscaler, by name; a shallow-equal list keeps the menu from rerendering on unrelated model edits. */
+/** A shallow-equal list keeps the menu from rerendering on unrelated model edits. */
 const selectInstalledUpscalers = (snapshot: ModelsSnapshot): SpandrelModelConfig[] =>
   snapshot.models
     .filter((model) => model.type === 'spandrel_image_to_image')
@@ -609,10 +581,7 @@ const selectInstalledUpscalers = (snapshot: ModelsSnapshot): SpandrelModelConfig
 
 const selectModelsStatus = (snapshot: ModelsSnapshot): ModelsSnapshot['status'] => snapshot.status;
 
-/**
- * Send to Upscale opens the widget on the image; the items below it upscale the image at once with one upscaler alone,
- * at a factor picked from its submenu, into the gallery, leaving the widget as it is.
- */
+/** The items below Send to Upscale upscale at once into the gallery, leaving the widget as it is. */
 const UpscaleSubMenu = ({
   guided,
   image,
@@ -643,7 +612,7 @@ const UpscaleSubMenu = ({
         onSelect={onSendToUpscale}
       />
       {upscalers.length === 0 ? (
-        // "None installed" only once the library has loaded; until then the list is merely not known yet.
+        // "None installed" only once the library has loaded.
         <MenuItem
           unavailableReason={
             modelsStatus === 'loaded'
@@ -670,11 +639,7 @@ const UpscaleSubMenu = ({
     </ContextSubMenu>
   );
 };
-/**
- * One upscaler's one-click targets: 1.5×, 2× and its native scale, as far as its plan reaches them. An upscaler whose
- * native scale was never recorded can still run once at it, but no other factor can be planned, so those say how to
- * record it.
- */
+/** One whose native scale was never recorded can still run once at it; other factors say how to record it. */
 const ModelOnlyUpscalerSubMenu = ({ image, upscaler }: { image: GalleryImage; upscaler: SpandrelModelConfig }) => {
   const { t } = useTranslation();
   const factors = getModelOnlyUpscaleFactors(upscaler);
@@ -730,7 +695,6 @@ const ModelOnlyUpscaleFactorItem = ({
 }: {
   image: GalleryImage;
   label: string;
-  /** `'native'` runs the upscaler once, whether or not its native scale is recorded. */
   scale: number | 'native';
   upscaler: SpandrelModelConfig;
 }) => {
@@ -738,10 +702,9 @@ const ModelOnlyUpscaleFactorItem = ({
   const commands = useWorkbenchCommands();
   const projectId = useActiveProjectId();
   const handleClick = useCallback(() => {
-    // The account the pick was made under, before the command loads.
     const owner = captureAccountScope();
 
-    // Loaded on pick, as Invoke's upscale submission loads it: the menu is part of the editor's startup graph.
+    // Loaded on pick: the menu is part of the editor's startup graph.
     void import('./modelOnlyUpscale')
       .then(({ queueModelOnlyUpscale }) =>
         queueModelOnlyUpscale({
@@ -754,8 +717,7 @@ const ModelOnlyUpscaleFactorItem = ({
           upscaleModel: upscaler,
         })
       )
-      // The command reports its own failures, so this is its chunk failing to load (a deploy replaced it, the
-      // connection dropped): the pick must not go unanswered.
+      // The command reports its own failures, so this is its chunk failing to load; the pick must not go unanswered.
       .catch(() => {
         if (isAccountScopeCurrent(owner)) {
           commands.notifications.add({ kind: 'error', title: t('widgets.gallery.itemActions.upscale.loadFailed') });

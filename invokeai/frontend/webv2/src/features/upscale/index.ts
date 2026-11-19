@@ -6,10 +6,12 @@ export {
   getModelOnlyUpscaleFactors,
   getSpandrelNativeScale,
   getUpscaleOutputDimensions,
+  getUpscaleSubmissionSource,
   getUpscaleValidationReasons,
   isUpscaleBatchCountFixed,
   isUpscaleSourceMetadataCurrent,
   normalizeUpscaleWidgetValues,
+  readsUpscalePrompt,
   resolveUpscaleSeed,
   resolveUpscaleSubmissionValues,
   syncUpscaleWidgetValuesWithModels,
@@ -20,4 +22,4 @@ export type {
   TileControlNetModelConfig,
   UpscaleWidgetValues,
 } from './core/types';
-export { UpscaleUiProvider, type UpscaleUiAdapter } from './ui/UpscaleUiContext';
+export { UPSCALE_SECTION_IDS, UpscaleUiProvider, type UpscaleUiAdapter } from './ui/UpscaleUiContext';

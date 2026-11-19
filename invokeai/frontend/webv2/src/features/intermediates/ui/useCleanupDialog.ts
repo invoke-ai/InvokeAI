@@ -106,8 +106,8 @@ export const useCleanupDialog = ({ onStarted }: { onStarted: () => void }) => {
         return;
       }
       if (error instanceof DOMException && error.name === 'TimeoutError') {
-        // The server may have accepted the start; if it is running, follow it as if the answer had arrived. A
-        // listing that fails too leaves that unknown, which is not the same as "nothing is running".
+        // The server may have accepted the start; if it is running, follow it as if the answer had arrived. A listing
+        // that fails too leaves that unknown, which is not the same as "nothing is running".
         let adopted: IntermediatesOperation | null = null;
         let listed = true;
         try {
@@ -139,8 +139,8 @@ export const useCleanupDialog = ({ onStarted }: { onStarted: () => void }) => {
         );
         return;
       }
-      // A 404 means the preview expired or was already confirmed; only a new preview can move forward, so offer
-      // that instead of a dead Confirm.
+      // A 404 means the preview expired or was already confirmed; only a new preview can move forward, so offer that
+      // instead of a dead Confirm.
       const previewGone = error instanceof ApiError && error.status === 404;
       setDialog((current) =>
         current

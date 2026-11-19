@@ -4,7 +4,7 @@ import type { GalleryNavigationEntry } from '@features/gallery/core/selection';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_PAGE_SIZE } from '@features/gallery/core/paging';
 
-/** Plans aligned pages intersecting a half-open item range. A null total means listing size is not known yet. */
+/** A null total means the listing size is not known yet. */
 export const planGalleryPageOffsets = ({
   endIndexExclusive,
   startIndex,
@@ -44,27 +44,24 @@ export const planGalleryPageOffsets = ({
 };
 
 export const GALLERY_GRID_GAP_PX = 4;
-/** The disclosure row of a pinned section (in progress, starred). */
 export const GALLERY_STARRED_HEADER_HEIGHT_PX = 24;
-/** The pinned block's hairline rule plus the margin that separates it from the listing. */
 export const GALLERY_PINNED_FOOTER_PX = 9;
 
 const GALLERY_MIN_COLUMN_COUNT = 2;
-/** Keep the column cap high enough that minimum cell size governs wide layouts at every density. */
+/** High enough that minimum cell size governs wide layouts at every density. */
 const GALLERY_MAX_COLUMN_COUNT = 48;
 
-/** Cell size the density slider interpolates between: 0% is largest, 100% smallest. */
+/** 0% density is largest, 100% smallest. */
 const GALLERY_MAX_CELL_PX = 192;
 const GALLERY_MIN_CELL_PX = 48;
 
-/** Density selects target cell size; measured width determines columns consistently across placements. */
 export const getGalleryTargetCellPx = (imageDensityPercent: number): number => {
   const percent = Math.min(100, Math.max(0, imageDensityPercent));
 
   return GALLERY_MAX_CELL_PX - ((GALLERY_MAX_CELL_PX - GALLERY_MIN_CELL_PX) * percent) / 100;
 };
 
-/** How many `targetCellPx` cells fit in `widthPx`, clamped; an unmeasured width yields `min`. */
+/** An unmeasured width yields `min`. */
 export const getGalleryColumnCountForCell = ({
   max,
   min,
@@ -91,7 +88,6 @@ export const getGalleryColumnCount = ({
     widthPx,
   });
 
-/** Falls back to a plausible square before the viewport has been measured. */
 export const getGalleryCellSizePx = ({ columnCount, widthPx }: { columnCount: number; widthPx: number }): number =>
   widthPx > 0 ? Math.max(1, (widthPx - GALLERY_GRID_GAP_PX * (columnCount - 1)) / columnCount) : 96;
 
@@ -99,16 +95,12 @@ export type GalleryGridSection = 'regular' | 'starred';
 
 export type GalleryGridRow = { cells: GalleryItem[]; key: string; kind: 'cells'; section: GalleryGridSection };
 
-/** The starred strip shows at most this many rows at the current column count. */
 const GALLERY_STARRED_STRIP_MAX_ROWS = 3;
 
 export const getGalleryStarredStripItems = (starredItems: readonly GalleryItem[], columnCount: number): GalleryItem[] =>
   starredItems.slice(0, GALLERY_STARRED_STRIP_MAX_ROWS * columnCount);
 
-/**
- * Every item the grid has on hand — strip first, then the listing. The two
- * refetch independently, so an item can sit on both sides for a moment.
- */
+/** Strip and listing refetch independently, so an item may briefly sit in both. */
 export const mergeGalleryLoadedItems = (
   starredItems: readonly GalleryItem[],
   items: readonly GalleryItem[]
@@ -122,7 +114,7 @@ export const mergeGalleryLoadedItems = (
   return [...starredItems, ...items.filter((item) => !seen.has(toGalleryItemKey(item)))];
 };
 
-/** Key rows by their first cell so changes above them preserve thumbnail DOM identity. */
+/** Keyed by first cell so changes above preserve thumbnail DOM identity. */
 export const chunkGalleryCellsIntoRows = (
   cells: readonly GalleryItem[],
   columnCount: number,
@@ -144,11 +136,10 @@ export const chunkGalleryCellsIntoRows = (
   return rows;
 };
 
-/** Only listing items form virtual rows; the starred strip remains pinned above them. */
 export const buildGalleryGridRows = (items: readonly GalleryItem[], columnCount: number): GalleryGridRow[] =>
   chunkGalleryCellsIntoRows(items, columnCount, 'regular');
 
-/** The listing row holding `itemKey`; -1 for an item the listing does not hold (a strip item). */
+/** -1 for an item the listing does not hold (a strip item). */
 export const getGalleryGridRowIndexForItemKey = (
   items: readonly GalleryItem[],
   itemKey: GalleryItemKey,
@@ -159,7 +150,7 @@ export const getGalleryGridRowIndexForItemKey = (
   return index < 0 ? -1 : Math.floor(index / columnCount);
 };
 
-/** Absolute backend slot to row; recent pseudo-rows are a separate prefix only for descending order. */
+/** Recent pseudo-rows are a prefix only for descending order. */
 export const getGallerySparseRowIndexForItemKey = (
   itemSlots: ReadonlyMap<number, GalleryItem>,
   itemKey: GalleryItemKey,
@@ -175,7 +166,6 @@ export const getGallerySparseRowIndexForItemKey = (
   return -1;
 };
 
-/** Resolves loaded sparse items to the backend page that owns their absolute ranking position. */
 export const getGallerySparseSelectionPages = ({
   itemSlots,
   pageOffset,
@@ -192,15 +182,10 @@ export const getGallerySparseSelectionPages = ({
   return pages;
 };
 
-/** Stable identities follow absolute listing positions while a page moves between loading, error, and ready. */
 export const getGallerySparseRowKey = (rowIndex: number): string => `listing-row:${rowIndex}`;
 export const getGallerySparseSlotKey = (itemIndex: number): string => `listing-slot:${itemIndex}`;
 
-/**
- * Include empty positions from active pages so arrow navigation retains real row and column geometry across
- * hydration gaps. Entries cover each contiguous run of subscribed pages plus a boundary row, so a page retained far
- * from the viewport (a reveal) adds its own run rather than every position between them.
- */
+/** Empty positions keep arrow-navigation geometry across hydration gaps; each subscribed run adds its own entries. */
 export const buildSparseGalleryNavigationEntries = ({
   columnCount = 1,
   includeUnloadedBoundaries = true,
@@ -213,7 +198,7 @@ export const buildSparseGalleryNavigationEntries = ({
   includeUnloadedBoundaries?: boolean;
   itemSlots: ReadonlyMap<number, GalleryItem>;
   pageOffsets: readonly number[];
-  /** Active pages still fetching: their empty positions wait for data instead of being skipped as gaps. */
+  /** Their empty positions wait for data instead of being skipped as gaps. */
   pendingPageOffsets?: ReadonlySet<number>;
   total: number | null;
 }): GalleryNavigationEntry[] => {
@@ -244,7 +229,6 @@ export const buildSparseGalleryNavigationEntries = ({
       includeUnloadedBoundaries && run.first > 0 ? Math.max(0, activeStartIndex - columnCount) : activeStartIndex;
     const activeEndIndex = Math.min(total ?? Number.POSITIVE_INFINITY, run.last + GALLERY_PAGE_SIZE);
     const isFollowedByRun = runIndex < runs.length - 1;
-    // Navigation chunks entries into rows, so a run followed by another must end on a whole row.
     const endIndex =
       includeUnloadedBoundaries && total !== null
         ? Math.min(total, Math.ceil(activeEndIndex / columnCount) * columnCount + columnCount)
@@ -252,7 +236,6 @@ export const buildSparseGalleryNavigationEntries = ({
           ? Math.ceil(activeEndIndex / columnCount) * columnCount
           : activeEndIndex;
 
-    // Runs whose boundary rows meet continue without repeating positions.
     for (let index = Math.max(startIndex, nextIndex); index < endIndex; index += 1) {
       const item = itemSlots.get(index);
       const pageOffset = Math.floor(index / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
@@ -302,10 +285,7 @@ export const getGalleryProgressLayout = ({
 };
 export type GalleryProgressLayout = ReturnType<typeof getGalleryProgressLayout>;
 
-/**
- * The pinned starred strip: its disclosure row plus, while open, its bounded rows. A strip that failed with
- * nothing to show keeps the header row alone, to report the failure in place of the cells.
- */
+/** A strip that failed with nothing to show keeps its header row to report the failure. */
 export const getGalleryStarredLayout = ({
   columns,
   tileSize,
@@ -334,6 +314,6 @@ export const getGalleryStarredLayout = ({
   };
 };
 
-/** The shared in-progress/starred block height defines the virtualizer's scroll margin. */
+/** Defines the virtualizer's scroll margin. */
 export const getGalleryPinnedHeightPx = (progressHeight: number, starredHeight: number): number =>
   progressHeight + starredHeight > 0 ? progressHeight + starredHeight + GALLERY_PINNED_FOOTER_PX : 0;
