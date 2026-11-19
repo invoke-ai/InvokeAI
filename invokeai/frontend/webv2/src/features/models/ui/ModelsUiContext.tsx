@@ -74,6 +74,8 @@ export type ModelDefaultsRulesState =
       /** Whether Generate accepts `candidate` as the VAE of `model`, which may be of another base (MOSS-Image takes FLUX.2's). */
       acceptsDefaultVae: (model: DefaultComponentSlotModel, candidate: ModelConfig) => boolean;
       pruneComponents: DefaultComponentPruner;
+      /** Whether Generate loads a VAE picked for `model`; a self-contained pipeline decodes with its own. */
+      usesDefaultVae: (model: DefaultComponentSlotModel) => boolean;
       read: SchedulerPolicyReader;
       readComponentSlots: DefaultComponentSlotReader;
       status: 'ready';

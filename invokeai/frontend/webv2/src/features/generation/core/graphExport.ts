@@ -20,6 +20,7 @@ import {
   coerceSchedulerForGraph,
   GENERATE_COMPONENT_VALUE_KEYS,
   getComponentPolicyContext,
+  getClosedComponentSettings,
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
   getGenerateModelSelectionResult,
@@ -275,7 +276,10 @@ const withComponentPicks = (
     resolveComponentPick(next, slotKey, modelKey, models);
   }
 
-  return next;
+  // Inherited picks whose slot a pick closed go too, as the model switch clears them: the graph never loads them.
+  const closed = getClosedComponentSettings(values.model, values, next);
+
+  return closed.length === 0 ? next : { ...next, ...Object.fromEntries(closed.map((key) => [key, null])) };
 };
 
 /** Pick the first installed model for the first required slot that is unfilled; null when none can be filled. */

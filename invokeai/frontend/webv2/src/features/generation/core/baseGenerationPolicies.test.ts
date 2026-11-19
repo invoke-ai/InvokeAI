@@ -3957,6 +3957,91 @@ describe("a main model's default components", () => {
     });
   });
 
+  describe('dependent slots are judged against the final settings', () => {
+    const gguf = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'encoder-gguf',
+      name: 'GGUF encoder',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    };
+    const checkpoint = { ...gguf, format: 'checkpoint', key: 'encoder-st', name: 'Checkpoint encoder' };
+    const tower = { ...gguf, key: 'mmproj', name: 'mmproj', type: 'qwen3_vl_vision_tower' };
+    const installed = [gguf, checkpoint, tower] as ComponentModelConfig[];
+
+    it.each([
+      ['tower before encoder', { qwen3_vl_vision_tower: tower.key, qwen3_vl_encoder: checkpoint.key }],
+      ['encoder before tower', { qwen3_vl_encoder: checkpoint.key, qwen3_vl_vision_tower: tower.key }],
+    ])('leaves no hidden tower whatever the stored order (%s)', (_name, components) => {
+      const model = withDefaults('qwen-image-2-1', components);
+      const current = createSettings(model, {
+        qwen3VLEncoderModel: gguf as ComponentModelConfig,
+        qwen3VLVisionTowerModel: tower as ComponentModelConfig,
+      });
+
+      expect(getModelDefaultComponents(model, current, installed, { replace: true })).toEqual({
+        qwen3VLEncoderModel: checkpoint,
+        qwen3VLVisionTowerModel: null,
+      });
+    });
+  });
+
+  describe('the Wan low-noise expert', () => {
+    const wan = (key: string, extra: Record<string, unknown> = {}) =>
+      createModel('wan', { format: 'gguf_quantized', key, name: key, variant: 't2v_a14b', ...extra } as never);
+    const high = wan('high');
+    const low = wan('low');
+    const offered = (model: GenerateModelConfig, models: unknown[]) =>
+      getDefaultComponentSlotPolicies(model, models as ComponentModelConfig[]).find(
+        (slot) => slot.persistenceKey === 'wan_transformer_low_noise'
+      );
+
+    it('accepts only a different single-file expert of the same variant for a single-file A14B model', () => {
+      const slot = offered(high, [high, low])!;
+
+      expect(slot.filter(low as never)).toBe(true);
+      expect(slot.filter(wan('low-st', { format: 'checkpoint' }) as never)).toBe(true);
+      expect(slot.filter(high as never)).toBe(false);
+      expect(slot.filter(wan('pipeline', { format: 'diffusers' }) as never)).toBe(false);
+      expect(slot.filter(wan('other-variant', { variant: 'i2v_a14b' }) as never)).toBe(false);
+    });
+
+    it('is no default of a Diffusers or TI2V-5B model, whose loader ignores or reads the pair itself', () => {
+      expect(offered(wan('pipeline', { format: 'diffusers' }), [low])).toBeUndefined();
+      expect(offered(wan('small', { variant: 'ti2v_5b' }), [low])).toBeUndefined();
+    });
+
+    it('offers no slot to a model whose loader never reads it, and a switch clears a stale pick', () => {
+      const pipeline = wan('pipeline', { format: 'diffusers' });
+      const slotKeys = (model: GenerateModelConfig) =>
+        getComponentSectionPolicy(model, createSettings(model)).slots.map((candidate) => candidate.key);
+
+      expect(slotKeys(high)).toContain('wanLowNoiseModel');
+      expect(slotKeys(pipeline)).not.toContain('wanLowNoiseModel');
+      expect(slotKeys(wan('small', { variant: 'ti2v_5b' }))).not.toContain('wanLowNoiseModel');
+
+      const current = createSettings(high, { wanLowNoiseModel: low });
+      const result = getGenerateModelSelectionResult({
+        currentValues: current,
+        model: pipeline,
+        models: [high, low, pipeline] as ComponentModelConfig[],
+      });
+
+      expect(result.settings.wanLowNoiseModel).toBeNull();
+    });
+
+    it('skips a stored default the loader would reject', () => {
+      const model = withDefaults('wan', { wan_transformer_low_noise: high.key }, {
+        format: 'gguf_quantized',
+        key: high.key,
+        variant: 't2v_a14b',
+      } as never);
+
+      expect(getModelDefaultComponents(model, createSettings(model), [model, low] as never)).toEqual({});
+    });
+  });
+
   describe('the default VAE', () => {
     it('fills an empty VAE of a family with a VAE slot', () => {
       const model = createModel('flux', { default_settings: { vae: fluxVae.key }, format: 'checkpoint' });
@@ -3999,6 +4084,20 @@ describe("a main model's default components", () => {
       } as never);
 
       expect(switchTo(model, [fluxVae]).settings.vae).toBeNull();
+    });
+
+    it('keeps an installed VAE that fits when the model defaults to the bundled one', () => {
+      const model = createModel('sdxl', { default_settings: { vae: 'default' } });
+      const chosen = createSettings(createModel('sdxl', { key: 'sdxl-other' }), { vae: sdxlVae });
+
+      expect(switchTo(model, [sdxlVae], chosen).settings.vae).toBe(sdxlVae);
+    });
+
+    it('clears a VAE that is gone when the model defaults to the bundled one', () => {
+      const model = createModel('sdxl', { default_settings: { vae: 'default' } });
+      const gone = createSettings(createModel('sdxl', { key: 'sdxl-other' }), { vae: sdxlVae });
+
+      expect(switchTo(model, [], gone).settings.vae).toBeNull();
     });
 
     it('fills the SD VAE picker, and leaves a VAE the user chose', () => {

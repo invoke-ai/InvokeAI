@@ -263,7 +263,7 @@ describe('GenerateHeaderActions', () => {
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Steps 30 → 8. Left as is, not set for this model: Size, CFG, Scheduler, and VAE precision. ' +
-          "The model's VAE is not installed or does not fit it, so your VAE stays."
+          'VAE is not installed or does not fit this model, so no default is applied for it.'
       );
   });
 
@@ -277,7 +277,7 @@ describe('GenerateHeaderActions', () => {
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Left as is, not set for this model: Size, Steps, CFG, Scheduler, and VAE precision ' +
-          'VAE only sets only a VAE, which is not installed or does not fit it, so your VAE stays.'
+          'VAE only sets only VAE, which is not installed or does not fit it, so nothing is applied.'
       );
   });
 
@@ -290,8 +290,7 @@ describe('GenerateHeaderActions', () => {
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Left as is, not set for this model: Size, CFG, Scheduler, and VAE precision ' +
-          "Already using Steps only's defaults, except its VAE, which is not installed or does not fit it, so your " +
-          'VAE stays.'
+          "Already using Steps only's defaults, except VAE, which is not installed or does not fit it."
       );
   });
 

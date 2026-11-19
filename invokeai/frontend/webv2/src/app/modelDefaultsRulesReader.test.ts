@@ -36,6 +36,25 @@ const readReadyState = (): Extract<ModelDefaultsRulesState, { status: 'ready' }>
   return state;
 };
 
+describe('whether Generate loads a default VAE', () => {
+  it('is no for a self-contained FLUX.1 SDNQ pipeline, whose own VAE always decodes, and yes for other models', () => {
+    const { usesDefaultVae } = readReadyState();
+    const pipeline = { text_encoder: {}, text_encoder_2: {}, tokenizer: {}, tokenizer_2: {}, transformer: {}, vae: {} };
+
+    expect(
+      usesDefaultVae({
+        base: 'flux',
+        format: 'sdnq_quantized',
+        key: 'flux',
+        name: 'flux',
+        submodels: pipeline,
+      } as never)
+    ).toBe(false);
+    expect(usesDefaultVae(model('flux'))).toBe(true);
+    expect(usesDefaultVae(model('sdxl'))).toBe(true);
+  });
+});
+
 describe('the default VAE rule the Model Manager reads', () => {
   it("follows the served architecture rows, so a model takes the other base's VAE its row accepts", () => {
     const { acceptsDefaultVae } = readReadyState();

@@ -57,8 +57,10 @@ import {
   isIdeogram4UnconditionalBranch,
   isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
+  hasWanLowNoiseSlot,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeAcceptedByBase,
+  isWanLowNoiseExpertFor,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
   type GenerateComponentFilter,
@@ -1049,7 +1051,9 @@ const wanLowNoiseSlot = (helpText: string): ComponentSlotPolicy =>
     modelTypes: TYPE_MAIN,
     valueKind: 'main',
     helpText,
-    filter: (candidate) => candidate.type === 'main' && candidate.base === 'wan',
+    // The loader pairs a single-file A14B model with a different single-file expert of its variant.
+    filter: (candidate, ctx) =>
+      ctx.model.type !== 'external_image_generator' && isWanLowNoiseExpertFor(ctx.model)(candidate),
   });
 
 /** Standalone Ideogram models require the second branch. */
@@ -1570,7 +1574,10 @@ const getBaseComponentSectionPolicy = (
           required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
           missingMessage: 'Generate needs a Wan T5 Encoder for Wan models.',
         },
-        wanLowNoiseSlot('Optional second A14B expert. Without it the high-noise expert runs the whole schedule.'),
+        // Only a single-file A14B model reads it; the loader ignores it for the others, so it is not offered there.
+        ...(hasWanLowNoiseSlot(model)
+          ? [wanLowNoiseSlot('Optional second A14B expert. Without it the high-noise expert runs the whole schedule.')]
+          : []),
       ]);
     case 'anima':
       return createPolicy(true, [
@@ -1732,6 +1739,50 @@ const isSlotLoaded = (model: GenerateModelConfig, settings: GenerateSettings, se
 };
 
 /**
+ * The default components the model stores for slots it offers whose model is no longer installed, judged beside the
+ * defaults that are installed (a vision tower is offered once its encoder default is).
+ */
+export const getMissingDefaultComponents = (
+  model: GenerateModelConfig,
+  models: readonly ModelConfig[]
+): DefaultComponentSlot['setting'][] => {
+  const stored = (model.default_settings as { components?: Record<string, string> | null } | null | undefined)
+    ?.components;
+  const defaults = getDefaultGenerateSettings(model);
+  const settings = { ...defaults, ...getModelDefaultComponents(model, defaults, models) };
+  const context = getComponentPolicyContext(model, settings);
+  const loaded = new Set(
+    getComponentSectionPolicy(model, settings)
+      .slots.filter((slotPolicy) => !slotPolicy.neverLoaded?.(context))
+      .map((slotPolicy) => slotPolicy.key)
+  );
+
+  return Object.entries(stored ?? {}).flatMap(([persistenceKey, modelKey]) => {
+    const slot = getDefaultComponentSlot(persistenceKey);
+
+    return slot && !isInstalled(models, { key: modelKey }) && loaded.has(slot.setting) ? [slot.setting] : [];
+  });
+};
+
+/** Whether a generation with `model` loads the VAE it is given, so a default VAE for it can take effect. */
+export const isDefaultVaeLoaded = (model: GenerateModelConfig): boolean => {
+  const settings = getDefaultGenerateSettings(model);
+  const vaeSlot = getComponentSectionPolicy(model, settings).slots.find((slotPolicy) => slotPolicy.key === 'vae');
+
+  return !vaeSlot?.neverLoaded?.(getComponentPolicyContext(model, settings));
+};
+
+/** The selections of `before` whose slot is offered there but not in `after`: they stay hidden and unloaded. */
+export const getClosedComponentSettings = (
+  model: GenerateModelConfig,
+  before: GenerateSettings,
+  after: GenerateSettings
+): GenerateComponentValueKey[] =>
+  GENERATE_COMPONENT_VALUE_KEYS.filter(
+    (setting) => before[setting] && isSlotOffered(model, before, setting) && !isSlotOffered(model, after, setting)
+  );
+
+/**
  * The model's default components that fill a slot of `settings`: one that is empty, or whose selection is not
  * installed or does not fit `model`. A selection that fits stays, unless `replace` (a reset to the model's defaults)
  * takes the default over it. Defaults naming an unknown slot, a model that is not installed or one the slot rejects are
@@ -1786,18 +1837,28 @@ export const getModelDefaultComponents = (
     });
   }
 
+  // A default taken beside a pick that a later default replaced (a tower before the encoder that closes it) is judged
+  // again in the final settings, so the order they are stored in cannot change the result.
+  for (let settled = false; !settled;) {
+    settled = true;
+
+    for (const setting of Object.keys(patch) as DefaultComponentSlot['setting'][]) {
+      if (
+        !isSlotLoaded(model, next, setting) ||
+        !isComponentCompatibleWithModel(model, next, setting, patch[setting]!)
+      ) {
+        delete patch[setting];
+        next = { ...next, [setting]: settings[setting] };
+        settled = false;
+      }
+    }
+  }
+
   const cleared: ModelDefaultComponents = {};
 
-  for (const { setting } of DEFAULT_COMPONENT_SLOTS) {
-    const current = settings[setting];
-
-    if (
-      current &&
-      !(setting in patch) &&
-      isSlotOffered(model, settings, setting) &&
-      !isSlotOffered(model, next, setting)
-    ) {
-      cleared[setting] = null;
+  for (const setting of getClosedComponentSettings(model, settings, next)) {
+    if (setting !== 'vae' && !(setting in patch)) {
+      cleared[setting as DefaultComponentSlot['setting']] = null;
     }
   }
 
@@ -1903,10 +1964,17 @@ export const getModelDefaultFills = (
   }
 
   const defaultVae = resolveModelDefaultVae(model, filled, models.filter(isVaeModelConfig));
-  // The bundled VAE (`null`) is what an empty slot already uses.
-  const vae = defaultVae.kind === 'apply' ? defaultVae.vae : null;
 
-  return vae && fitsVae(vae) ? { ...components, vae } : components;
+  if (defaultVae.kind !== 'apply') {
+    return components;
+  }
+
+  // The bundled VAE (`null`) is what an empty slot already uses, and what a pick that is gone gives way to.
+  if (defaultVae.vae === null) {
+    return settings.vae ? { ...components, vae: null } : components;
+  }
+
+  return fitsVae(defaultVae.vae) ? { ...components, vae: defaultVae.vae } : components;
 };
 
 type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };

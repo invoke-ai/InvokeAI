@@ -254,9 +254,15 @@ export const DefaultSettingsSection = ({
         : null,
     [defaultsRulesState, model]
   );
+  // A model whose graph loads no VAE of its own pick (a self-contained pipeline) has no default VAE to set.
+  const hidesVae =
+    model.type === 'main' && defaultsRulesState.status === 'ready' && !defaultsRulesState.usesDefaultVae(model);
   const fields = useMemo(
-    () => getFieldsForModel(model, fp8StorageSupported, schedulerRules),
-    [fp8StorageSupported, model, schedulerRules]
+    () =>
+      getFieldsForModel(model, fp8StorageSupported, schedulerRules).filter(
+        (field) => !(hidesVae && field.key === 'vae')
+      ),
+    [fp8StorageSupported, hidesVae, model, schedulerRules]
   );
   const saved = model.default_settings ?? EMPTY_SETTINGS;
   const draft = useModelDraft(model.key, selectDefaultsDraft);

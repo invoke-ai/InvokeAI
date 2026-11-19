@@ -1917,12 +1917,28 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
     expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
   });
 
-  it('passes the optional Wan low-noise expert through and leaves it unset otherwise', () => {
+  it('passes the optional Wan low-noise expert to a single-file A14B model, and to no other', () => {
+    const wanHigh: MainModelConfig = {
+      base: 'wan',
+      format: 'gguf_quantized',
+      key: 'wan-high',
+      name: 'Wan high noise',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+    const wanLow: MainModelConfig = { ...wanHigh, key: 'wan-low-gguf', name: 'Wan low noise' };
+    const source = { componentSourceModel: wanDiffusers };
+
     // Omit undefined optional fields instead of serializing null.
-    expect(compile(wanDiffusers).nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
-    expect(compile(wanDiffusers, { wanLowNoiseModel: wanLowNoise }).nodes.model_loader).toMatchObject({
-      transformer_low_noise_model: wanLowNoise,
+    expect(compile(wanHigh, source).nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
+    expect(compile(wanHigh, { ...source, wanLowNoiseModel: wanLow }).nodes.model_loader).toMatchObject({
+      transformer_low_noise_model: wanLow,
     });
+    // The loader ignores it for a Diffusers or TI2V-5B model, so a stale pick never reaches the graph.
+    const stale = compile(wanDiffusers, { wanLowNoiseModel: wanLowNoise });
+
+    expect(stale.nodes.model_loader?.transformer_low_noise_model).toBeUndefined();
+    expect(JSON.stringify(stale)).not.toContain('wan_transformer_low_noise');
   });
 
   it('omits the Wan low-noise guidance unless overridden, letting the backend reuse guidance_scale', () => {

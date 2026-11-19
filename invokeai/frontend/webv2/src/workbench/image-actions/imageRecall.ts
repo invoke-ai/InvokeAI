@@ -1515,11 +1515,14 @@ export const buildImageRecallSettings = ({
 
     if (model) {
       const valuesWithModelDefaults = getSettingsWithModelDefaults(values, model);
-      // The recorded components below override these, and the default VAE is chosen after them.
+      // The recorded components below override these, and the default VAE is chosen after them. A generation record
+      // names what ran, so it takes no saved default over a component it left out.
       values = {
         ...valuesWithModelDefaults,
         model,
-        ...getModelDefaultComponents(model, valuesWithModelDefaults, models, { replace: true }),
+        ...(isGenerationRecord(metadata)
+          ? {}
+          : getModelDefaultComponents(model, valuesWithModelDefaults, models, { replace: true })),
       };
       fields.push('model');
     }

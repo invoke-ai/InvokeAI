@@ -8,6 +8,7 @@ import {
   getComponentSectionPolicy,
   getGenerationDimensions,
   getGenerationUiPolicy,
+  getMissingDefaultComponents,
   getModelDefaultComponents,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
@@ -147,6 +148,8 @@ export interface ApplyModelDefaultsPlan {
   unset: readonly ModelDefaultSetting[];
   /** The model names a VAE that is not installed or does not fit; the user's VAE stays. */
   isVaeMissing: boolean;
+  /** Default components the model stores that are not installed; the user's picks stay. */
+  missingComponents: readonly ComponentSetting[];
 }
 
 /**
@@ -217,6 +220,7 @@ export const getApplyModelDefaultsPlan = (
     changed: getChangedSettings(settings, { ...settings, ...patch }, model),
     defined,
     isVaeMissing: defaultVae.kind === 'missing',
+    missingComponents: getMissingDefaultComponents(model, models),
     patch,
     unset,
   };
@@ -391,6 +395,22 @@ export const describeChanges = (
     ),
     locale,
     'unit'
+  );
+
+/** The defaults that cannot apply (a VAE or components) as one list, named as their fields are. */
+export const describeMissingComponents = (
+  missing: readonly (ComponentSetting | 'vae')[],
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  t: TFunction,
+  locale: string | undefined
+): string =>
+  formatList(
+    missing.map((setting) =>
+      setting === 'vae' ? getSettingLabel(setting, model, t) : getComponentLabel(setting, model, settings, t)
+    ),
+    locale,
+    'conjunction'
   );
 
 /** The settings Apply leaves as they are because the model sets no default, as one list; null for none. */

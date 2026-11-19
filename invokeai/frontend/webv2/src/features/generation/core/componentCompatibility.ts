@@ -43,6 +43,29 @@ const hasSubmodels = (model: GenerateComponentCandidate, required: readonly stri
 export const isSelfContainedSDNQPipeline = (model: GenerateComponentCandidate): boolean =>
   hasSubmodels(model, SDNQ_PIPELINE_COMPONENTS);
 
+const WAN_SINGLE_FILE_FORMATS: readonly (string | undefined)[] = ['gguf_quantized', 'checkpoint'];
+
+/** Whether the Wan loader reads a low-noise expert beside `model`: a single-file A14B model, not TI2V-5B. */
+export const hasWanLowNoiseSlot = (model: GenerateModelConfig): boolean =>
+  model.type === 'main' &&
+  model.base === 'wan' &&
+  WAN_SINGLE_FILE_FORMATS.includes(model.format) &&
+  model.variant !== 'ti2v_5b';
+
+/**
+ * What `wan_model_loader` accepts as the low-noise expert of `model`: another single-file Wan model of the same
+ * variant, never the main model itself, and no Diffusers pipeline.
+ */
+export const isWanLowNoiseExpertFor =
+  (model: GenerateModelConfig): GenerateComponentFilter =>
+  (candidate) =>
+    hasWanLowNoiseSlot(model) &&
+    candidate.type === 'main' &&
+    candidate.base === 'wan' &&
+    candidate.key !== (model as { key?: string }).key &&
+    WAN_SINGLE_FILE_FORMATS.includes(candidate.format) &&
+    (candidate.variant ?? null) === (model.variant ?? null);
+
 export const isSelfContainedSDNQFlux1Pipeline = (model: GenerateComponentCandidate): boolean =>
   hasSubmodels(model, SDNQ_FLUX1_COMPONENTS);
 

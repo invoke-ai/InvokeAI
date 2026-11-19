@@ -13,6 +13,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
   describeChanges,
+  describeMissingComponents,
   describeUnset,
   getApplyModelDefaultsPlan,
   getChangedSettings,
@@ -329,5 +330,42 @@ describe('default components', () => {
     expect(patch).toMatchObject({ qwen3VLEncoderModel: checkpoint, qwen3VLVisionTowerModel: null });
     expect(plan.patch).toEqual({ qwen3VLEncoderModel: checkpoint, qwen3VLVisionTowerModel: null });
     expect(plan.defined).toEqual(['qwen3VLEncoderModel']);
+  });
+
+  it('names a default component that is no longer installed instead of reporting no defaults', () => {
+    const model: MainModelConfig = { ...flux, default_settings: { components: { t5_encoder: 'uninstalled' } } };
+    const plan = getApplyModelDefaultsPlan(settings, model, catalog);
+
+    expect(plan.patch).toEqual({});
+    expect(plan.defined).toEqual([]);
+    expect(plan.missingComponents).toEqual(['t5EncoderModel']);
+    expect(describeMissingComponents(plan.missingComponents, model, settings, t, 'en')).toBe('T5 Encoder');
+    expect(getApplyModelDefaultsPlan(settings, flux, catalog).missingComponents).toEqual(['clipEmbedModel']);
+  });
+
+  it('names a missing vision tower beside its installed encoder, and lists a missing VAE with the components', () => {
+    const encoder: ComponentModelConfig = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'encoder-gguf',
+      name: 'GGUF encoder',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    };
+    const model: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      default_settings: { components: { qwen3_vl_encoder: encoder.key, qwen3_vl_vision_tower: 'gone' } },
+      format: 'gguf_quantized',
+      key: 'q21',
+      name: 'Qwen-Image-2.1',
+      type: 'main',
+    };
+    const current = getDefaultGenerateSettings(model);
+    const plan = getApplyModelDefaultsPlan(current, model, [encoder]);
+
+    expect(plan.missingComponents).toEqual(['qwen3VLVisionTowerModel']);
+    expect(
+      describeMissingComponents(['vae', ...plan.missingComponents], model, after(current, plan.patch), t, 'en')
+    ).toBe('VAE and Vision Tower');
   });
 });

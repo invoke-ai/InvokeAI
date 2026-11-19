@@ -54,6 +54,7 @@ export {
   getDefaultGenerateSettings,
   withAddedReferenceImages,
   getDefaultComponentSlotPolicies,
+  isDefaultVaeLoaded,
   pruneClosedDefaultComponents,
   getGenerateModelSelectionResult,
   getModelDefaultComponents,

@@ -17,6 +17,7 @@ import {
   isVaeCompatibleWithGenerateModel,
   getGenerationUiPolicy,
   getSchedulerOptions,
+  isDefaultVaeLoaded,
   pruneClosedDefaultComponents,
 } from '@features/generation/settings';
 
@@ -50,6 +51,8 @@ const toPolicyState = (snapshot: ArchitectureCapabilitiesSnapshot): ModelDefault
     return {
       acceptsDefaultVae: (model, candidate) =>
         isVaeCompatibleWithGenerateModel({ ...model, type: 'main' } as GenerateMainModel, candidate as never),
+      usesDefaultVae: (model) =>
+        isDefaultVaeLoaded({ ...model, default_settings: null, type: 'main' } as GenerateMainModel),
       pruneComponents: (model, components, catalog) => readPrunedDefaultComponents(model, components, catalog),
       read: (model, currentValue) => readSchedulerPolicy(model, currentValue),
       readComponentSlots: (model, components, catalog) => readDefaultComponentSlots(model, components, catalog),

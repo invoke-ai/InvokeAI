@@ -276,6 +276,7 @@ describe('DefaultSettingsSection default components', () => {
   const readyState: ModelDefaultsRulesState = {
     acceptsDefaultVae,
     pruneComponents,
+    usesDefaultVae: (model) => model.format !== 'sdnq_quantized',
     read: () => ({ appliesToGraph: false, defaultValue: 'euler', options: [] }),
     readComponentSlots,
     status: 'ready',
@@ -552,6 +553,13 @@ describe('DefaultSettingsSection default components', () => {
       await save();
 
       expect(savedDefaults().vae).toBe('default');
+    });
+
+    it('offers no default VAE for a model whose graph decodes with its own VAE', async () => {
+      await render(settingsModel({ base: 'flux', default_settings: { vae: 'flux2-vae' }, format: 'sdnq_quantized' }));
+
+      expect(labels(host)).not.toContain('models.defaultFields.vae');
+      expect(labels(host)).toContain('models.defaultFields.steps');
     });
 
     it('says a stored VAE that is no longer installed is missing, with its key', async () => {

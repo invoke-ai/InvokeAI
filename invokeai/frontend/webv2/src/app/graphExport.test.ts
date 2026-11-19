@@ -302,6 +302,28 @@ describe('graph export', () => {
     expect(errorOf(exportWith(towerFirst))).toMatch(/Unknown component slot .{1,4}qwen3VLVisionTowerModel/);
   });
 
+  it('drops an inherited Vision Tower whose slot an encoder override closes', () => {
+    const krea2Models = [
+      ...MODELS,
+      model('k2-gguf', 'krea-2', 'main', {
+        default_settings: { components: { qwen3_vl_encoder: 'k2-encoder-gguf', qwen3_vl_vision_tower: 'k2-mmproj' } },
+        format: 'gguf_quantized',
+        variant: 'krea2_base',
+      }),
+      model('k2-encoder-gguf', 'any', 'qwen3_vl_encoder', { format: 'gguf_quantized', variant: 'qwen3_vl_4b' }),
+      model('k2-encoder-st', 'any', 'qwen3_vl_encoder', { format: 'checkpoint', variant: 'qwen3_vl_4b' }),
+      model('k2-mmproj', 'any', 'qwen3_vl_vision_tower', { format: 'gguf_quantized', variant: 'qwen3_vl_4b' }),
+      model('k2-vae', 'qwen-image', 'vae', { format: 'checkpoint' }),
+    ];
+    const { batch, components } = exportOne(
+      sdxlCase('k2', { components: { qwen3VLEncoderModel: 'k2-encoder-st', vae: 'k2-vae' }, model_key: 'k2-gguf' }),
+      krea2Models
+    );
+
+    expect(components).toEqual({ qwen3VLEncoderModel: 'k2-encoder-st', vae: 'k2-vae' });
+    expect(batch.graph.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
+  });
+
   // The working-memory calibration planner (`default_vae`) restates this: it sizes each case for the VAE that decodes.
   it("decodes with the main model's default VAE, which a pick replaces where the model has a VAE slot", () => {
     const withDefaultVae = (key: string, vaeKey: string) => [

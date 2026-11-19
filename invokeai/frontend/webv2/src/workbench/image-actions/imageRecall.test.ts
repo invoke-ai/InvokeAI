@@ -3061,6 +3061,62 @@ describe('legacy records', () => {
         expect(result?.values.clipEmbedModel?.key).toBe(defaultClip.key);
       });
 
+      describe('on a generation record, which records what ran', () => {
+        const q21: MainModelConfig = {
+          base: 'qwen-image-2-1',
+          default_settings: { components: { qwen3_vl_encoder: 'q21-gguf-encoder' }, vae: 'q21-vae' },
+          format: 'diffusers',
+          key: 'q21-main',
+          name: 'Qwen-Image-2.1',
+          type: 'main',
+          variant: 'qwen_image_21_base',
+        };
+        const ggufEncoder: ComponentModelConfig = {
+          base: 'any',
+          format: 'gguf_quantized',
+          key: 'q21-gguf-encoder',
+          name: 'GGUF encoder',
+          type: 'qwen3_vl_encoder',
+          variant: 'qwen3_vl_8b',
+        };
+        const otherEncoder: ComponentModelConfig = {
+          ...ggufEncoder,
+          format: 'checkpoint',
+          key: 'q21-other-encoder',
+          name: 'Other encoder',
+        };
+        const vae: VaeModelConfig = { base: 'qwen-image-2-1', key: 'q21-vae', name: 'Q21 VAE', type: 'vae' };
+        const recallQ21 = (metadata: Record<string, unknown>, overrides: Partial<GenerateWidgetValues> = {}) =>
+          recall(
+            { model: { key: q21.key }, ...metadata },
+            { model: sdxlModel, modelKey: sdxlModel.key, ...overrides },
+            [sdxlModel, q21],
+            [q21, ggufEncoder, otherEncoder],
+            [vae]
+          );
+
+        it('applies no saved default component, and an unnamed slot keeps the current pick', () => {
+          const result = recallQ21({ generation_mode: 'txt2img' }, { qwen3VLEncoderModel: otherEncoder });
+          const empty = recallQ21({ generation_mode: 'txt2img' });
+
+          expect(result?.values.qwen3VLEncoderModel?.key).toBe(otherEncoder.key);
+          expect(empty?.values.qwen3VLEncoderModel).toBeNull();
+        });
+
+        it('still restores what the record names', () => {
+          const result = recallQ21({ generation_mode: 'txt2img', qwen3_vl_encoder: { ...ggufEncoder } });
+
+          expect(result?.values.qwen3VLEncoderModel?.key).toBe(ggufEncoder.key);
+        });
+
+        it('fills the defaults for a record that is no generation record, which says nothing of components', () => {
+          const result = recallQ21({});
+
+          expect(result?.values.qwen3VLEncoderModel?.key).toBe(ggufEncoder.key);
+          expect(result?.values.vae?.key).toBe(vae.key);
+        });
+      });
+
       it('keeps the current VAE when the image clears the component source whose bundled VAE the default took', () => {
         const pipeline: MainModelConfig = {
           base: 'z-image',
