@@ -178,6 +178,8 @@ export interface GenerationUiAdapter {
     remove(presetId: string): void;
     /** Undoes a remove: puts `preset` back at `index` (or last), unless a preset with its id is still there. */
     restore(preset: GeneratePresetRecord, index: number): void;
+    /** Replaces a preset's snapshot, keeping its id and label. */
+    update(presetId: string, values: Record<string, unknown>): void;
   };
   /**
    * Insights from the project's recent queue runs. Subscribing keeps the backing queue read observed, so only the
