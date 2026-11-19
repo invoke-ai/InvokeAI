@@ -40,10 +40,7 @@ const PLACEMENT_LABEL_KEYS = {
 /** A row's key: the instance it lists, or the widget type for a row offering to add one. */
 const getRowKey = (row: WidgetsListRow): string => row.instanceId ?? `type:${row.widget.manifest.id}`;
 
-/**
- * After a row's action replaces its buttons, focus lands on what the list offers now, never on the page: the same row
- * when it stays, else the first row of that widget type.
- */
+/** After a row's action, focus lands on what the list offers now, never on the page. */
 const focusRow = (row: WidgetsListRow) =>
   requestAnimationFrame(() => {
     const list = document.querySelector('[data-widgets-list]');
@@ -58,10 +55,6 @@ const focusRow = (row: WidgetsListRow) =>
     )?.focus();
   });
 
-/**
- * Every widget and where it is in this layout, with the way to bring it back: Show raises or opens it (and closes the
- * list), Add puts one in the layout, Dock returns a window to its panel, Remove takes it out (with an Undo toast).
- */
 export const WidgetsDialogBody = ({ isOpen, onExitComplete }: { isOpen: boolean; onExitComplete: () => void }) => {
   const { t } = useTranslation();
   const { widgets } = useWorkbenchCommands();

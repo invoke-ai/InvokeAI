@@ -9,6 +9,7 @@ import { invalidateWorkflowLibraryCache } from '@features/workflow/data/libraryC
 import { WorkflowUiProvider, WorkflowGraphPreviewProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { setWorkflowLibraryTab } from '@features/workflow/ui/workflowUiStore';
 import { createProjectGraph } from '@features/workflow/utility';
+import { settleAnimations } from '@platform/browser/settleAnimations.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -162,11 +163,9 @@ const PREFERENCES = {
   workflowLibrarySortDirection: 'desc',
   workflowLibraryThumbnailFit: 'cover',
 } as WorkflowPreferences;
-/** The layout each test opens the library in; set before `open`. */
 let layout: WorkflowPreferences['workflowLibraryLayout'] = 'grid';
 const LIST_PREFERENCES: WorkflowPreferences = { ...PREFERENCES, workflowLibraryLayout: 'list' };
 const preferenceListeners = new Set<() => void>();
-/** Switches the layout of an open library, as the view menu does through the account's preferences. */
 const switchLayout = (next: WorkflowPreferences['workflowLibraryLayout']) => {
   layout = next;
   for (const listener of preferenceListeners) {
@@ -196,7 +195,6 @@ const previewAdapter = {
 };
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// The project rail reads linked templates through Query; nothing here links one.
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 let root: Root;
 let host: HTMLDivElement;
@@ -221,7 +219,6 @@ const list = ({ page, perPage = 20 }: ListWorkflowsParams) =>
 const card = (index: number) => document.querySelector<HTMLElement>(`[data-workflow-card="wf-${index}"]`);
 const listRow = (index: number) =>
   document.getElementById(`workflow-library-card-wf-${index}`)?.closest<HTMLElement>('[data-list-row]') ?? null;
-/** A windowed list row by server position, whether its page is resident or not. */
 const positionRow = (index: number) =>
   document.querySelector<HTMLElement>(`[data-workflow-library-list] [data-list-row="position:${index}"]`);
 const listViewport = () => document.querySelector<HTMLElement>('[data-workflow-library-list] [data-list-viewport]');
@@ -230,7 +227,6 @@ const tagCheckbox = (tag: string) => document.querySelector<HTMLElement>(`[data-
 const viewport = () =>
   card(0)?.closest<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]') ??
   document.querySelector<HTMLElement>('[data-part="viewport"][aria-label="workflowLibrary.title"]');
-/** The grid's measured column count and row pitch, from its first mounted row. */
 const gridGeometry = (scroll: HTMLElement) => {
   const row = scroll.querySelector<HTMLElement>('[data-index]')!;
   return {
@@ -263,7 +259,12 @@ const open = async () => {
     );
   });
   await waitFor(() => expect(card(0) ?? listRow(0)).not.toBeNull());
+  // The dialog opens scaled; geometry read before its animation ends is shrunken, and a slow runner can outlast a
+  // fixed settle.
+  await act(() => settleAnimations(document.querySelector('[data-scope="dialog"][data-part="content"]')!));
 };
+let activeDeepScroll: { abort: AbortController; done: Promise<void> } | null = null;
+
 beforeEach(async () => {
   accountLifecycle.invalidate();
   count = 1000;
@@ -286,6 +287,12 @@ beforeEach(async () => {
   root = createRoot(host);
 });
 afterEach(async () => {
+  // A test timeout does not cancel its async body. End it before unmounting this root or starting the next test.
+  const active = activeDeepScroll;
+  if (active) {
+    active.abort.abort();
+    await active.done.catch(() => undefined);
+  }
   preferenceListeners.clear();
   await act(() => root.unmount());
   host.remove();
@@ -294,8 +301,7 @@ afterEach(async () => {
 
 it('shows middle-range failure and successful Retry inside the viewport with bounded cards', async () => {
   await open();
-  // The middle stays offline until Retry itself is pressed: a range read the grid repeats on its own in between (a
-  // loaded runner re-measures late) must keep failing, or the notice could clear before the click lands.
+  // Offline until Retry itself is pressed: the grid's own repeated range reads must keep failing until the click.
   let isMiddleOffline = true;
   transport.list.mockImplementation((params: ListWorkflowsParams) => {
     if (isMiddleOffline && params.page >= 20) {
@@ -352,7 +358,6 @@ it.each(['coalesced', 'superseded', 'canceled intent', 'wheel intent'])(
       await gate;
       return list(params);
     });
-    // Scroll to the last resident row, then focus its last menu control.
     const scroll = viewport()!;
     const { columns, rowHeight } = gridGeometry(scroll);
     await act(() => {
@@ -402,7 +407,6 @@ const previewButton = () =>
   Array.from(detail().querySelectorAll('button')).find(
     (button) => button.textContent === 'workflowLibrary.preview.action'
   )!;
-/** The rail counts nodes once the selected document has been read. */
 const isDocumentReady = () => /\d+ nodes/.test(detail().textContent ?? '');
 
 it('uses the newer selected metadata and document when the resident list arrives later', async () => {
@@ -445,7 +449,6 @@ it('uses the newer selected metadata and document when the resident list arrives
     expect(detail().textContent).toContain('Fresh description');
     expect(isDocumentReady()).toBe(true);
   });
-  // The preview draws the selected copy's document, not the older resident one.
   await act(() => userEvent.click(previewButton()));
   const stage = () => document.querySelector<HTMLElement>('[data-preview-stage]');
   await waitFor(() =>
@@ -508,17 +511,28 @@ const settle = () =>
         setTimeout(resolve, 250);
       })
   );
-const scrollTo = async (scroll: HTMLElement, top: number) => {
-  await act(() => {
+const scrollTo = async (scroll: HTMLElement, top: number, signal?: AbortSignal) => {
+  signal?.throwIfAborted();
+  await act(async () => {
     scroll.scrollTop = top;
     scroll.dispatchEvent(new Event('scroll'));
+    await new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        reject(signal?.reason);
+      };
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      }, 120);
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) {
+        onAbort();
+      }
+    });
   });
-  await act(
-    () =>
-      new Promise((resolve) => {
-        setTimeout(resolve, 120);
-      })
-  );
+  signal?.throwIfAborted();
 };
 it.each([
   [1280, 800, 4],
@@ -527,82 +541,107 @@ it.each([
 ])(
   'returns to the measured deep row at %ix%i (%i columns) through the real browse owner',
   async (width, height, columns) => {
-    // This case measures fresh cached restoration; real scrolling and layout timing remain independent.
-    const freshAt = Date.now();
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(freshAt);
-    onTestFinished(() => clock.mockRestore());
-    await open();
-    const scroll = viewport()!;
-    // Cross enough listing windows to exercise eviction without repeating every intermediate scroll.
-    for (let top = 0; top <= 43200; top += 3600) {
-      await scrollTo(scroll, top);
-      expect(document.querySelectorAll('[data-workflow-card]').length).toBeLessThan(48);
-      expect(browse.getWorkflowLibraryBrowseSnapshot().entries.length).toBeLessThanOrEqual(60);
-    }
-    await scrollTo(scroll, 39600);
-    await settle();
-    const listedPositions = new Set(
-      transport.list.mock.calls.flatMap(([{ page, perPage = 20 }]) =>
-        Array.from({ length: perPage }, (_, index) => page * perPage + index)
-      )
-    );
-    expect(listedPositions.size).toBeGreaterThan(540);
-    const before = firstVisibleRow(scroll);
-    expect(Number(before.id?.slice(3))).toBeGreaterThan(400);
-    expect(before.offset).toBeGreaterThan(10);
-    const requests = transport.list.mock.calls.length;
-    await act(() => userEvent.click(tagCheckbox('fixture1000')));
-    // Conditions, not elapsed time: under a loaded runner the tag view's listing and the resize's re-layout can take
-    // longer than any fixed wait.
-    await waitFor(() => {
-      expect(browse.getWorkflowLibraryBrowseSnapshot()).toMatchObject({ status: 'loaded', startIndex: 0 });
-      expect(browse.getWorkflowLibraryBrowseSnapshot().filter.tags).toEqual(['fixture1000']);
-      expect(card(0)).not.toBeNull();
-    });
-    await page.viewport(width!, height!);
-    await waitFor(() => expect(gridGeometry(viewport()!).columns).toBe(columns));
-    await settle();
-    // The wide rail clears with its Clear; the narrow layout (under a 56rem dialog) clears inside the Tags popover.
-    const isNarrow = width! < 960;
-    const modal = document.querySelector<HTMLElement>('[role=dialog]')!;
-    const outerOffset = modal.scrollTop;
-    if (isNarrow) {
-      const trigger = document.querySelector<HTMLElement>('[data-workflow-library-tags-trigger]')!;
-      await act(() => userEvent.click(trigger));
-      await waitFor(() => expect(document.querySelector('[data-workflow-library-tag-popover]')).not.toBeNull());
-      const popover = document.querySelector<HTMLElement>('[data-workflow-library-tag-popover]')!;
-      await act(() =>
-        userEvent.click(
-          [...popover.querySelectorAll('button')].find((button) => button.textContent === 'workflowLibrary.clearTags')!
+    const abort = new AbortController();
+    const done = (async () => {
+      const freshAt = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(freshAt);
+      onTestFinished(() => clock.mockRestore());
+      await open();
+      abort.signal.throwIfAborted();
+      const scroll = viewport()!;
+      for (let top = 0; top <= 43200; top += 3600) {
+        await scrollTo(scroll, top, abort.signal);
+        abort.signal.throwIfAborted();
+        expect(document.querySelectorAll('[data-workflow-card]').length).toBeLessThan(48);
+        expect(browse.getWorkflowLibraryBrowseSnapshot().entries.length).toBeLessThanOrEqual(60);
+      }
+      await scrollTo(scroll, 39600, abort.signal);
+      abort.signal.throwIfAborted();
+      await settle();
+      abort.signal.throwIfAborted();
+      const listedPositions = new Set(
+        transport.list.mock.calls.flatMap(([{ page, perPage = 20 }]) =>
+          Array.from({ length: perPage }, (_, index) => page * perPage + index)
         )
       );
-      await act(() => userEvent.keyboard('{Escape}'));
-    } else {
-      await act(() => userEvent.click(page.getByRole('button', { name: 'workflowLibrary.clearTags', exact: true })));
+      expect(listedPositions.size).toBeGreaterThan(540);
+      const before = firstVisibleRow(scroll);
+      expect(Number(before.id?.slice(3))).toBeGreaterThan(400);
+      expect(before.offset).toBeGreaterThan(10);
+      const requests = transport.list.mock.calls.length;
+      await act(() => userEvent.click(tagCheckbox('fixture1000')));
+      abort.signal.throwIfAborted();
+      // Conditions, not elapsed time: on a loaded runner the tag listing and resize re-layout can outlast any fixed wait.
+      await waitFor(() => {
+        expect(browse.getWorkflowLibraryBrowseSnapshot()).toMatchObject({ status: 'loaded', startIndex: 0 });
+        expect(browse.getWorkflowLibraryBrowseSnapshot().filter.tags).toEqual(['fixture1000']);
+        expect(card(0)).not.toBeNull();
+      });
+      abort.signal.throwIfAborted();
+      await page.viewport(width!, height!);
+      abort.signal.throwIfAborted();
+      await waitFor(() => expect(gridGeometry(viewport()!).columns).toBe(columns));
+      abort.signal.throwIfAborted();
+      await settle();
+      abort.signal.throwIfAborted();
+      const isNarrow = width! < 960;
+      const modal = document.querySelector<HTMLElement>('[role=dialog]')!;
+      const outerOffset = modal.scrollTop;
+      if (isNarrow) {
+        const trigger = document.querySelector<HTMLElement>('[data-workflow-library-tags-trigger]')!;
+        await act(() => userEvent.click(trigger));
+        abort.signal.throwIfAborted();
+        await waitFor(() => expect(document.querySelector('[data-workflow-library-tag-popover]')).not.toBeNull());
+        abort.signal.throwIfAborted();
+        const popover = document.querySelector<HTMLElement>('[data-workflow-library-tag-popover]')!;
+        await act(() =>
+          userEvent.click(
+            [...popover.querySelectorAll('button')].find(
+              (button) => button.textContent === 'workflowLibrary.clearTags'
+            )!
+          )
+        );
+        abort.signal.throwIfAborted();
+        await act(() => userEvent.keyboard('{Escape}'));
+        abort.signal.throwIfAborted();
+      } else {
+        await act(() => userEvent.click(page.getByRole('button', { name: 'workflowLibrary.clearTags', exact: true })));
+        abort.signal.throwIfAborted();
+      }
+      await settle();
+      abort.signal.throwIfAborted();
+      const restored = viewport()!;
+      const expectedIndex = Math.floor(Number(before.id?.slice(3)) / columns!) * columns!;
+      await waitFor(() => expect(firstVisibleRow(restored).id).toBe(`wf-${expectedIndex}`));
+      abort.signal.throwIfAborted();
+      expect(firstVisibleRow(restored).columns).toBe(columns);
+      expect(Math.abs(firstVisibleRow(restored).fraction - before.fraction)).toBeLessThan(0.01);
+      if (width === 1280) {
+        expect(Math.abs(firstVisibleRow(restored).offset - before.offset)).toBeLessThan(3);
+      }
+      expect(document.activeElement).toBe(
+        isNarrow
+          ? document.querySelector('[data-workflow-library-tags-trigger]')
+          : tagCheckbox('fixture1000').querySelector('input')
+      );
+      expect(modal.scrollTop).toBe(outerOffset);
+      expect(document.querySelectorAll('[data-workflow-card]').length).toBeLessThan(48);
+      expect(browse.getWorkflowLibraryBrowseRetention().metadataEntries).toBeLessThanOrEqual(540);
+      expect(transport.list.mock.calls.length - requests).toBe(1);
+      await scrollTo(restored, 0, abort.signal);
+      abort.signal.throwIfAborted();
+      await waitFor(() => expect(card(0)).not.toBeNull());
+      abort.signal.throwIfAborted();
+      expect(browse.getWorkflowLibraryBrowseSnapshot().startIndex).toBe(0);
+    })();
+    activeDeepScroll = { abort, done };
+    try {
+      await done;
+    } finally {
+      if (activeDeepScroll?.done === done) {
+        activeDeepScroll = null;
+      }
     }
-    await settle();
-    const restored = viewport()!;
-    const expectedIndex = Math.floor(Number(before.id?.slice(3)) / columns!) * columns!;
-    await waitFor(() => expect(firstVisibleRow(restored).id).toBe(`wf-${expectedIndex}`));
-    expect(firstVisibleRow(restored).columns).toBe(columns);
-    expect(Math.abs(firstVisibleRow(restored).fraction - before.fraction)).toBeLessThan(0.01);
-    if (width === 1280) {
-      expect(Math.abs(firstVisibleRow(restored).offset - before.offset)).toBeLessThan(3);
-    }
-    // Clear leaves with the last checked tag and hands focus to the first tag; closing the popover, to the Tags button.
-    expect(document.activeElement).toBe(
-      isNarrow
-        ? document.querySelector('[data-workflow-library-tags-trigger]')
-        : tagCheckbox('fixture1000').querySelector('input')
-    );
-    expect(modal.scrollTop).toBe(outerOffset);
-    expect(document.querySelectorAll('[data-workflow-card]').length).toBeLessThan(48);
-    expect(browse.getWorkflowLibraryBrowseRetention().metadataEntries).toBeLessThanOrEqual(540);
-    // Only the new tag view needs a listing; returning must not replace its cached deep window with page zero.
-    expect(transport.list.mock.calls.length - requests).toBe(1);
-    await scrollTo(restored, 0);
-    await waitFor(() => expect(card(0)).not.toBeNull());
-    expect(browse.getWorkflowLibraryBrowseSnapshot().startIndex).toBe(0);
   },
   30000
 );
@@ -613,16 +652,12 @@ it.each(['finish', 'retry', 'wheel', 'pointer', 'key', 'filter', 'rapid return',
     await open();
     const scroll = viewport()!;
     const { columns } = gridGeometry(scroll);
-    // The return window starts at the anchor's overscan rows.
     const overscan = getWorkflowLibraryGridBounds(columns).overscanRows * columns;
     await scrollTo(scroll, 39600);
     await settle();
     const before = firstVisibleRow(scroll);
     const anchorIndex = Number(before.id?.slice(3));
-    // Reads of the unfiltered view; how many pages the tag view's viewport needs depends on its column count.
     const returnCalls = () => transport.list.mock.calls.filter(([params]) => !params.tags?.length);
-    // A real position read may finish just as a user leaves. Retained metadata and the last visible anchor
-    // are independent; returning must wait for the anchor's window instead of restoring placeholder geometry.
     await act(async () => {
       await browse.loadWorkflowLibraryRange(700, 705);
       browse.setWorkflowLibraryBrowseFilter({ tags: ['fixture1000'] });
@@ -755,8 +790,7 @@ it('records fractional scroll without rendering the shell, the grid, the toolbar
   commits.shell = commits.toolbar = commits.detail = commits.grid = commits.gridRenders = 0;
   await scrollTo(scroll, start + 5);
   await settle();
-  // Scrolling within one row, start to settle, never renders the grid: it follows rows, not the offset. The one
-  // commit its Profiler may still record is the scroll area's own scrolling state, below the grid's render.
+  // Scrolling within one row never renders the grid; its Profiler may still record the scroll area's own commit.
   expect(commits.gridRenders).toBe(0);
   expect(commits.grid).toBeLessThanOrEqual(1);
   const after = browse.getWorkflowLibraryBrowseSnapshot();
@@ -851,13 +885,11 @@ it('keeps the selected card ready after its page leaves the window and returns',
   await open();
   const scroll = viewport()!;
   const readiness = () => card(0)?.querySelector('[data-workflow-readiness]');
-  // The first card is the rail's selection; its card and the rail both show it enriched.
   await waitFor(() => expect(readiness()).not.toBeNull());
   expect(document.querySelector('[data-workflow-detail="wf-0"]')).not.toBeNull();
 
   await scrollTo(scroll, 39600);
   await settle();
-  // Page 0 left the resident window; the selected copy alone keeps the workflow.
   expect(browse.getWorkflowLibraryBrowseSnapshot().entries.some((entry) => entry.item.workflow_id === 'wf-0')).toBe(
     false
   );
@@ -869,7 +901,6 @@ it('keeps the selected card ready after its page leaves the window and returns',
   const requests = transport.list.mock.calls.length;
   await settle();
 
-  // The returning list copy takes the selected enrichment: no placeholder, no second read, no request loop.
   expect(readiness()).not.toBeNull();
   expect(card(0)?.querySelector('[data-enrichment-placeholder]')).toBeNull();
   expect(transport.record.mock.calls.filter(([id]) => id === 'wf-0')).toHaveLength(reads);
@@ -930,16 +961,13 @@ describe('list layout', () => {
     expect(scroll.querySelector('[role="listitem"]')?.getAttribute('aria-setsize')).toBe('1000');
 
     await scrollTo(scroll, 500 * ROW_PX);
-    // Positions past the resident window show as busy placeholders until their pages arrive.
     await waitFor(() => expect(listRow(500)).not.toBeNull());
-    // Once the window settles every mounted row, overscan included, is resident.
     await waitFor(() => expect(scroll.querySelector('[data-workflow-list-placeholder]')).toBeNull());
     const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
     expect(snapshot.startIndex).toBeGreaterThan(400);
     expect(snapshot.startIndex).toBeLessThanOrEqual(500);
     expect(snapshot.entries.length).toBeLessThanOrEqual(60);
     expect(transport.list.mock.calls.some(([params]) => params.page === 25)).toBe(true);
-    // Enrichment follows the rows on screen.
     await waitFor(() => expect(transport.record.mock.calls.some(([id]) => id === 'wf-501')).toBe(true));
     await waitFor(() => expect(listRow(501)?.querySelector('[data-workflow-readiness]')).not.toBeNull());
     expect(scroll.querySelectorAll('[data-list-row]').length).toBeLessThan(48);
@@ -964,7 +992,6 @@ describe('list layout', () => {
     await waitFor(() => expect(positionRow(300)?.querySelector('[data-workflow-list-placeholder]')).not.toBeNull());
     const placeholder = positionRow(300)!;
     const button = placeholder.querySelector<HTMLElement>('[data-list-primary]')!;
-    // A busy row with its set position and a button that says it is loading, never an unnamed item.
     expect(placeholder.getAttribute('aria-posinset')).toBe('301');
     expect(placeholder.hasAttribute('data-busy')).toBe(true);
     expect(button.getAttribute('aria-disabled')).toBe('true');
@@ -972,7 +999,6 @@ describe('list layout', () => {
 
     release();
     await waitFor(() => expect(listRow(300)).not.toBeNull());
-    // The same row and button take the entry: nothing remounts under focus.
     expect(positionRow(300)).toBe(placeholder);
     expect(placeholder.querySelector('[data-list-primary]')).toBe(button);
     expect(button.hasAttribute('aria-label')).toBe(false);
@@ -992,7 +1018,6 @@ describe('list layout', () => {
     await act(() => userEvent.keyboard('{End}'));
     await waitFor(() => expect(listRow(999)).not.toBeNull());
     await settle();
-    // The row focused before its page arrived is the row that holds it: focus and scroll stay at the end.
     expect(document.activeElement).toBe(button(999));
     expect(document.activeElement).toBe(listRow(999)?.querySelector('[data-list-primary]'));
     expect(scroll.scrollTop).toBeGreaterThan(990 * ROW_PX - scroll.clientHeight);
@@ -1029,35 +1054,6 @@ describe('list layout', () => {
     expect(document.activeElement).toBe(stops[0]);
   });
 
-  it('keeps the selected row with its name while its page is evicted, and its facts once it returns', async () => {
-    layout = 'list';
-    await open();
-    const scroll = listViewport()!;
-    const primary = () => listRow(1)?.querySelector<HTMLElement>('[data-list-primary]');
-    await act(() => userEvent.click(primary()!));
-    await waitFor(() => expect(document.querySelector('[data-workflow-detail="wf-1"]')).not.toBeNull());
-    expect(primary()?.getAttribute('aria-current')).toBe('true');
-
-    await scrollTo(scroll, 600 * ROW_PX);
-    await waitFor(() => expect(listRow(600)).not.toBeNull());
-    expect(browse.getWorkflowLibraryBrowseSnapshot().entries.some((entry) => entry.item.workflow_id === 'wf-1')).toBe(
-      false
-    );
-    // Focused and selected, it stays mounted with its name, its facts waiting for its page.
-    expect(document.activeElement).toBe(primary());
-    expect(listRow(1)?.textContent).toContain('Workflow 1');
-
-    await scrollTo(scroll, 0);
-    await waitFor(() =>
-      expect(browse.getWorkflowLibraryBrowseSnapshot().entries.some((entry) => entry.item.workflow_id === 'wf-1')).toBe(
-        true
-      )
-    );
-    await waitFor(() => expect(listRow(1)?.querySelector('[data-workflow-readiness]')).not.toBeNull());
-    expect(primary()?.getAttribute('aria-current')).toBe('true');
-    expect(document.querySelector('[data-workflow-detail="wf-1"]')).not.toBeNull();
-  });
-
   it('marks no other workflow when the server moves the selection out of the window', async () => {
     layout = 'list';
     await open();
@@ -1083,7 +1079,6 @@ describe('list layout', () => {
     expect(positionRow(1)?.querySelector('[aria-current]')).toBeNull();
     expect(document.querySelectorAll('[data-workflow-library-list] [aria-current="true"]')).toHaveLength(0);
     expect(document.querySelector('[data-workflow-detail="wf-1"]')).not.toBeNull();
-    // The list still has its one roving tab stop.
     expect(document.querySelectorAll('[data-workflow-library-list] [data-list-primary][tabindex="0"]')).toHaveLength(1);
   });
 

@@ -9,8 +9,8 @@ import { usePreservedScrollOffset } from './usePreservedScrollOffset';
 const VIEWPORT_STYLE = { height: '100px', overflow: 'auto', width: '100px' } as const;
 
 /**
- * Use layout-dependent content so hiding changes its size; fixed-height virtualized content would not reproduce
- * lost browser restoration.
+ * Use layout-dependent content so hiding changes its size; fixed-height virtualized content would not reproduce lost
+ * browser restoration.
  */
 const Scroller = ({
   contentHeight,

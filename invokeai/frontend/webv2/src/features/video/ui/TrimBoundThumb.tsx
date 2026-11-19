@@ -3,8 +3,8 @@ import { FindInGalleryThumbnailButton } from '@features/gallery/mediaSlot';
 import { memo, useEffect, useRef } from 'react';
 
 /**
- * Seek to frame midpoints to avoid rounding into adjacent frames. Keep one video element per source to avoid a
- * range fetch on every drag tick.
+ * Seek to frame midpoints to avoid rounding into adjacent frames. Keep one video element per source to avoid a range
+ * fetch on every drag tick.
  */
 
 const PREVIEW_VIDEO_STYLE = {
@@ -45,8 +45,8 @@ export const TrimBoundThumb = memo(function TrimBoundThumb({
       element.currentTime = time;
     };
 
-    // Seeking before metadata arrives is ignored by some browsers; wait for it
-    // once, then seek directly on every later bound change.
+    // Seeking before metadata arrives is ignored by some browsers; wait for it once, then seek directly on every later
+    // bound change.
     if (element.readyState >= 1) {
       seek();
     } else {

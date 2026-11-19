@@ -27,7 +27,6 @@ const model = (key: string, type: string, base: string, name = key): ModelConfig
   source: key,
   source_type: 'path',
   type,
-  // Every installed CLIP Embed carries its variant; FLUX.1 takes only CLIP-L.
   ...(type === 'clip_embed' ? { variant: 'large' } : {}),
 });
 
@@ -304,7 +303,6 @@ const createZImageValues = (options: { tileControlNet?: boolean; cfgScale?: numb
     model('main', 'main', 'z-image'),
     model('spandrel', 'spandrel_image_to_image', 'any'),
     model('lora', 'lora', 'z-image'),
-    // Z-Image decodes with a FLUX VAE, and reads the 4B Qwen3, never Anima's 0.6B.
     model('fluxvae', 'vae', 'flux'),
     withVariant(model('qwen3-06b', 'qwen3_encoder', 'any'), 'qwen3_06b'),
     withVariant(model('qwen3-4b', 'qwen3_encoder', 'any'), 'qwen3_4b'),
@@ -346,7 +344,6 @@ const createKrea2Values = (variant: 'krea2_turbo' | 'krea2_base', format = 'gguf
     { ...withVariant(model('main', 'main', 'krea-2'), variant), format } as ModelConfig,
     model('spandrel', 'spandrel_image_to_image', 'any'),
     model('qwenvae', 'vae', 'qwen-image'),
-    // Ideogram 4's 8B is the same model type and sorts first; `krea2_model_loader` refuses it.
     withVariant(model('qwen3vl-8b', 'qwen3_vl_encoder', 'any'), 'qwen3_vl_8b'),
     withVariant(model('qwen3vl-4b', 'qwen3_vl_encoder', 'any'), 'qwen3_vl_4b'),
   ];
@@ -365,7 +362,6 @@ const createFlux2Values = (variant: string, format = 'checkpoint') => {
     model('spandrel', 'spandrel_image_to_image', 'any'),
     model('lora', 'lora', 'flux2'),
     model('flux2vae', 'vae', 'flux2'),
-    // The 8B and the Ministral sort ahead of the encoders Klein 4B and [dev] take.
     withVariant(model('qwen3-8b', 'qwen3_encoder', 'any'), 'qwen3_8b'),
     withVariant(model('qwen3-4b', 'qwen3_encoder', 'any'), 'qwen3_4b'),
     withVariant(model('ministral', 'mistral_encoder', 'any'), 'ministral3_3b'),
@@ -593,9 +589,7 @@ describe('tile control', () => {
 });
 
 describe('Creativity on index-clipping architectures', () => {
-  // Expected starts come from the backend's own schedules (`ZImageDenoiseInvocation._get_sigmas`
-  // with `Z_IMAGE_SHIFT_FIT`, `AnimaDenoiseInvocation._get_sigmas`) and the nodes' clipping line,
-  // `int(start * steps)`: each enters within one step of the sigma FLUX enters at, 1 - start.
+  // Expected starts come from the backend's own schedules and `int(start * steps)`: within a step of FLUX's 1 - start.
   const startFor = (values: UpscaleWidgetValues, creativity: number, inputSide: number) =>
     compileUpscaleGraph(
       { ...values, creativity, inputImage: { height: inputSide, image_name: 'in.png', width: inputSide }, scale: 2 },
@@ -624,8 +618,7 @@ describe('Creativity on index-clipping architectures', () => {
     expect(startFor(createAnimaValues(), creativity, 1024)).toBeCloseTo(expected, 6);
   });
 
-  // `krea2_denoise` rounds `start * steps` instead, so the start is the step itself. Expected steps were
-  // worked out from the node's schedule: `exp(mu) * t / (1 + (exp(mu) - 1) * t)` at `t = 1 - i / 30`.
+  // `krea2_denoise` rounds `start * steps`; steps from `exp(mu) * t / (1 + (exp(mu) - 1) * t)` at t = 1 - i / 30.
   it.each([
     ['Turbo', 'krea2_turbo', 1024, 0, 23 / 30],
     ['Turbo', 'krea2_turbo', 1024, 5, 15 / 30],
@@ -637,12 +630,10 @@ describe('Creativity on index-clipping architectures', () => {
     expect(startFor(createKrea2Values(variant), creativity, side)).toBeCloseTo(expected, 6);
   });
 
-  // `qwen_image_denoise` rounds as well. Its scheduler shifts by `exp(mu)`, mu = 0.5 + 0.4 * (tokens - 256) / 7936
-  // held at 0.9 past 8192 tokens, then stretches every sigma to `1 - (1 - s) / k`, `k = (1 - s(1/30)) / 0.98`, so
-  // the last step lands on 0.02. Expected steps were worked out by hand from that schedule at `t = 1 - i / 30`.
+  // `qwen_image_denoise`: mu = 0.5 + 0.4 * (tokens - 256) / 7936, held at 0.9, sigmas stretched by
+  // `k = (1 - s(1/30)) / 0.98` so the last lands on 0.02; steps worked out by hand at `t = 1 - i / 30`.
   it.each([
-    // 1024px result, 4096 tokens: mu 0.694, k 0.9545. Step 19 sits at 0.515 and step 20 at 0.476; unstretched
-    // they would be 0.537 and 0.500, and the pass would start a step later.
+    // 4096 tokens: mu 0.694, k 0.9545; step 19 at 0.515, step 20 at 0.476 (unstretched 0.537 and 0.500).
     [512, 19 / 30],
     // 4096px result: held at mu 0.9, k 0.9406. Step 20 sits at 0.523, step 21 at 0.482.
     [2048, 21 / 30],
@@ -652,7 +643,6 @@ describe('Creativity on index-clipping architectures', () => {
 
   it.each([
     ['FLUX.1', () => createFluxValues()],
-    // `flux2_denoise` clips by value too, then re-spaces the window to the requested steps.
     ['FLUX.2', () => createFlux2Values('klein_4b')],
   ] as const)('leaves the value-clipping %s pass on the legacy formula', (_label, create) => {
     expect(startFor(create(), 0, 1024)).toBeCloseTo(0.499, 6);
@@ -660,9 +650,6 @@ describe('Creativity on index-clipping architectures', () => {
 });
 
 describe('schedulers on the upscale pass', () => {
-  // A stored LCM on a flow model, or Heun on Anima -- left from SD, recalled, or picked before the
-  // list was narrowed -- would start the pass from pure noise, or on Anima below the blend. FLUX.2
-  // steps with Euler whenever the pass starts above pure noise.
   it.each([
     ['flux', () => createFluxValues(), 'lcm', 'euler'],
     ['flux', () => createFluxValues(), 'heun', 'heun'],
@@ -690,9 +677,6 @@ describe('upscale metadata', () => {
     ['flux2', () => createFlux2Values('klein_4b')],
     ['qwen-image', () => createQwenImageValues()],
   ] as const)('records the size of the image the %s pass encoded, which is the size of the result', (_base, create) => {
-    // Where a pass resizes Spandrel's frame, the result does not have Spandrel's size: a 1x
-    // restoration model leaves the frame unscaled, and its multiple of 8 is not FLUX's or Z-Image's
-    // 16. Recall restores the size recorded here.
     const { edges } = compileUpscaleGraph(create(), 'gallery', { useCpuNoise: true }).backendGraph;
     const sourceOf = (nodeId: string, field: string) =>
       edges.find((edge) => edge.destination.node_id === nodeId && edge.destination.field === field)?.source;

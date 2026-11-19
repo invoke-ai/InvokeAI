@@ -38,7 +38,6 @@ describe('a layer that is gone', () => {
     ['transform', { hasTransformSession: true }, 'cancelTransformSession'],
     ['text-edit', { hasTextEditSession: true }, 'cancelTextEditSession'],
   ])('tears down an open %s session belonging to it', (_label, session, field) => {
-    // Sessions outlive gestures; removing their layer must clear the retained id.
     expect(decide({ layer: undefined, ...session })).toMatchObject({ [field]: true });
   });
 
@@ -56,7 +55,6 @@ describe('a layer that is gone', () => {
 
 describe('a change that left the source alone', () => {
   it('never invalidates the cache', () => {
-    // Rerasterizing a null-bitmap paint source erases unflushed cache-only strokes.
     expect(decide().kind).toBe('appearance-only');
   });
 
@@ -75,8 +73,6 @@ describe('a change that left the source alone', () => {
   });
 
   it('tokens the first appearance change negative so it cannot collide with a cache version', () => {
-    // Cache versions are positive; a negative token can never be mistaken for
-    // one and suppress the redraw that follows the next publication.
     expect(decide({ currentThumbnailKey: 'stale-key' })).toMatchObject({
       thumbnailDisplay: { version: -1 },
     });
@@ -107,7 +103,6 @@ describe('a genuine source swap', () => {
   });
 
   it('does not invalidate the bitmap store’s own echo', () => {
-    // Self-echo pixels already match the cache; rerasterization risks flicker.
     expect(decide({ isSelfEcho: () => true, sourceChanged: true })).toMatchObject({ invalidateCache: false });
   });
 

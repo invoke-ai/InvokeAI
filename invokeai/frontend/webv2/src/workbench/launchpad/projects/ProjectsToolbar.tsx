@@ -30,10 +30,7 @@ const VIEW_ICON: Record<ProjectsViewId, typeof LayoutGridIcon> = {
   list: ListIcon,
 };
 
-/**
- * Attach the tooltip to the icon to preserve the item's checked data-state; drive it from hidden-radio focus for
- * keyboard access.
- */
+/** Tooltip on the icon so the item keeps its checked data-state; hidden-radio focus drives it. */
 const ViewSegment = ({ id }: { id: ProjectsViewId }) => {
   const { t } = useTranslation();
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);

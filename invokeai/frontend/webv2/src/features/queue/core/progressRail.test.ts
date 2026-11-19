@@ -77,58 +77,56 @@ describe('getDeterminateProgressFraction', () => {
 });
 
 describe('getProgressRailSegmentValue', () => {
-  it('passes a real percentage through', () => {
-    expect(getProgressRailSegmentValue({ isLoadingModels: false, percentage: 0.42 })).toBe(0.42);
-  });
-
-  it('treats a missing percentage as indeterminate', () => {
-    expect(getProgressRailSegmentValue({ isLoadingModels: false, percentage: null })).toBeNull();
-    expect(getProgressRailSegmentValue({ isLoadingModels: false, percentage: undefined })).toBeNull();
-  });
-
-  it('treats zero as indeterminate rather than as an empty bar', () => {
-    expect(getProgressRailSegmentValue({ isLoadingModels: false, percentage: 0 })).toBeNull();
-  });
-
-  it('stays indeterminate while models load, whatever the last percentage was', () => {
-    expect(getProgressRailSegmentValue({ isLoadingModels: true, percentage: 0.9 })).toBeNull();
+  it.each<[string, boolean, number | null | undefined, number | null]>([
+    ['passes a real percentage through', false, 0.42, 0.42],
+    ['treats a null percentage as indeterminate', false, null, null],
+    ['treats a missing percentage as indeterminate', false, undefined, null],
+    ['treats zero as indeterminate rather than as an empty bar', false, 0, null],
+    ['stays indeterminate while models load, whatever the last percentage was', true, 0.9, null],
+  ])('%s', (_label, isLoadingModels, percentage, expected) => {
+    expect(getProgressRailSegmentValue({ isLoadingModels, percentage })).toBe(expected);
   });
 });
 
 describe('selectProjectProgressItemIds', () => {
-  it('keeps only the ids this project enqueued', () => {
-    const items = [createQueueItem({ backendItemIds: [10, 11], id: 'batch-1', status: 'running' })];
-
-    expect(selectProjectProgressItemIds(items, [9, 10, 11, 12])).toEqual([10, 11]);
-  });
-
-  it('preserves ascending order so segments do not swap places between frames', () => {
-    const items = [
-      createQueueItem({ backendItemIds: [30], id: 'batch-2', status: 'running' }),
-      createQueueItem({ backendItemIds: [20], id: 'batch-1', status: 'running' }),
-    ];
-
-    expect(selectProjectProgressItemIds(items, [20, 30])).toEqual([20, 30]);
-  });
-
-  it('ignores items that are no longer open', () => {
-    const items = [
-      createQueueItem({ backendItemIds: [40], id: 'batch-1', status: 'completed' }),
-      createQueueItem({ backendItemIds: [41], id: 'batch-2', status: 'running' }),
-    ];
-
-    expect(selectProjectProgressItemIds(items, [40, 41])).toEqual([41]);
-  });
-
-  it('returns nothing when the store has no live sessions', () => {
-    const items = [createQueueItem({ backendItemIds: [50], id: 'batch-1', status: 'running' })];
-
-    expect(selectProjectProgressItemIds(items, [])).toEqual([]);
-  });
-
-  it('tolerates open items that have not been assigned backend ids yet', () => {
-    const items = [createQueueItem({ id: 'batch-1', status: 'pending' })];
-
-    expect(selectProjectProgressItemIds(items, [60])).toEqual([]);
+  it.each<[string, QueueItem[], number[], number[]]>([
+    [
+      'keeps only the ids this project enqueued',
+      [createQueueItem({ backendItemIds: [10, 11], id: 'batch-1', status: 'running' })],
+      [9, 10, 11, 12],
+      [10, 11],
+    ],
+    [
+      'preserves ascending order so segments do not swap places between frames',
+      [
+        createQueueItem({ backendItemIds: [30], id: 'batch-2', status: 'running' }),
+        createQueueItem({ backendItemIds: [20], id: 'batch-1', status: 'running' }),
+      ],
+      [20, 30],
+      [20, 30],
+    ],
+    [
+      'ignores items that are no longer open',
+      [
+        createQueueItem({ backendItemIds: [40], id: 'batch-1', status: 'completed' }),
+        createQueueItem({ backendItemIds: [41], id: 'batch-2', status: 'running' }),
+      ],
+      [40, 41],
+      [41],
+    ],
+    [
+      'returns nothing when the store has no live sessions',
+      [createQueueItem({ backendItemIds: [50], id: 'batch-1', status: 'running' })],
+      [],
+      [],
+    ],
+    [
+      'tolerates open items that have not been assigned backend ids yet',
+      [createQueueItem({ id: 'batch-1', status: 'pending' })],
+      [60],
+      [],
+    ],
+  ])('%s', (_label, items, sessionItemIds, expected) => {
+    expect(selectProjectProgressItemIds(items, sessionItemIds)).toEqual(expected);
   });
 });

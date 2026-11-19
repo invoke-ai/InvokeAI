@@ -13,7 +13,7 @@ import {
   type MediaUsageSyncBase,
 } from './mediaUsageReport';
 
-// The server and project reads are the external systems; the narrowing scan (`collectMediaUsage`) runs for real.
+// The narrowing scan (`collectMediaUsage`) runs for real.
 const mocks = vi.hoisted(() => ({
   check: vi.fn<(request: unknown, signal: AbortSignal) => Promise<unknown>>(),
   getProject: vi.fn<(projectId: string, maxBytes: number, signal: AbortSignal) => Promise<unknown>>(),
@@ -40,10 +40,7 @@ const widget = (typeId: string, values: Record<string, unknown>) => ({
   typeId,
 });
 
-/**
- * A project whose canvas raster layers hold `raster`; `selected` is only the Gallery's selection, `pinned` a name in a
- * widget the usage panel has no surface for.
- */
+/** `selected` is only the Gallery's selection; `pinned` is a name in a widget the panel has no surface for. */
 const project = (
   id: string,
   name: string,
@@ -107,7 +104,7 @@ const answer = (overrides: Partial<GalleryMediaUsage> = {}): GalleryMediaUsage =
   };
 };
 
-/** The server's copies of projects, by id, each at revision 4 of its content and 2 of the caller's workspace. */
+/** Each at revision 4 of its content and 2 of the caller's workspace. */
 const serveProjects = (projects: readonly TestProject[]) => {
   mocks.getProject.mockImplementation((projectId) => {
     const found = projects.find((candidate) => candidate.id === projectId);
@@ -118,17 +115,15 @@ const serveProjects = (projects: readonly TestProject[]) => {
   });
 };
 
-/** What the server's copies in `serveProjects` build on. */
 const SERVED: MediaUsageSyncBase = { revision: 4, workspaceRevision: 2 };
 
-/** A project entry as the server reads it at the revisions `serveProjects` serves. */
 const atServed = (entry: GalleryMediaUsageDocument): GalleryMediaUsageDocument => ({
   ...entry,
   revision: 4,
   workspaceRevision: 2,
 });
 
-/** This tab's projects, and by id the server revisions each copy builds on (unknown when absent). */
+/** Server revisions per copy; unknown when absent. */
 const host = (
   loaded: readonly TestProject[] = [],
   openProjectId: string | null = null,
@@ -168,7 +163,6 @@ describe('resolveMediaUsage', () => {
     expect(report).toEqual({
       checkedCount: 2,
       groups: [{ count: 1, kind: 'project', name: 'Atlas', surfaces: [{ count: 1, surface: 'canvasRaster' }] }],
-      // The server counted both; only one is used by work.
       inUseCount: 1,
       onlyImages: true,
       scope: 'items',
@@ -200,8 +194,7 @@ describe('resolveMediaUsage', () => {
   });
 
   it('counts the items asked about, as the dialog title does, even when the server could check fewer', async () => {
-    // Of three selected items on a shared board the caller owns one: the server checks only that one, without saying
-    // which, so the projects here are scanned for all three.
+    // The server checks only the caller's one of three items without saying which, so all three are scanned.
     mocks.check.mockResolvedValue(answer({ checkedImageCount: 1 }));
 
     const report = await resolveMediaUsage(
@@ -239,7 +232,6 @@ describe('resolveMediaUsage', () => {
         ],
       })
     );
-    // p-0 cannot be read; the others read fine but use nothing.
     serveProjects(readable.slice(1).map((id) => project(id, id)));
 
     const report = await resolveMediaUsage(items('a.png', 'b.png'), host());
@@ -250,7 +242,7 @@ describe('resolveMediaUsage', () => {
       { count: 1, kind: 'projectUnchecked', name: 'p-0' },
       { count: 1, kind: 'projectUnchecked', name: 'Late' },
     ]);
-    // The capped list's true count exceeds what was checked; the count never claims more than was asked about.
+    // Never claims more than was asked about.
     expect(report.inUseCount).toBe(2);
   });
 
@@ -259,13 +251,12 @@ describe('resolveMediaUsage', () => {
       answer({
         documents: [
           atServed(usageDocument('project', 'open', 'Open', ['a.png'])),
-          // What this copy builds on is unknown, but its scan reports every name the server found.
           usageDocument('project', 'tab-2', 'Second', ['b.png']),
         ],
       })
     );
     const loaded = [
-      // Saved with a.png; since then the layer was replaced by an unsaved b.png.
+      // Saved with a.png; since replaced by an unsaved b.png.
       project('open', 'Open', { raster: ['b.png'] }),
       // Saved with b.png; a.png added since, unsaved.
       project('tab-2', 'Second', { raster: ['a.png', 'b.png'] }),
@@ -282,7 +273,6 @@ describe('resolveMediaUsage', () => {
   });
 
   it('drops a loaded project the server names only for its Gallery selection, without reading it', async () => {
-    // The common deletion: the image the user is looking at, saved as the selection and nothing else.
     mocks.check.mockResolvedValue(
       answer({ documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png']))] })
     );
@@ -322,8 +312,7 @@ describe('resolveMediaUsage', () => {
   });
 
   it("does not keep the server's count for a name a scan dropped, even when the scan found a new one", async () => {
-    // The server saw a.png in the open project's recents; the project now uses c.png, not yet saved. Another account
-    // uses c.png too, so the count cannot be read off the names alone.
+    // Another account uses c.png too, so the count cannot be read off the names alone.
     mocks.check.mockResolvedValue(
       answer({
         documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png']))],
@@ -347,7 +336,7 @@ describe('resolveMediaUsage', () => {
   ] as const)(
     "reads the server's copy and keeps a use it holds when this tab's copy may be older: %s",
     async (_case, base) => {
-      // Another tab or device pinned a.png and saved; this tab's copy, unsaved since, uses only b.png.
+      // Another device pinned a.png and saved; this unsaved copy uses only b.png.
       mocks.check.mockResolvedValue(
         answer({ documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png', 'b.png']))] })
       );
@@ -399,7 +388,6 @@ describe('resolveMediaUsage', () => {
       host([project('open', 'Open', { raster: ['b.png'] })], 'open', { open: { revision: 3, workspaceRevision: 2 } })
     );
 
-    // The server's a.png stands beside the b.png found here.
     expect(report.groups).toEqual([
       { count: 2, kind: 'openProject', savedCopyUnchecked: true, surfaces: [{ count: 1, surface: 'canvasRaster' }] },
     ]);
@@ -415,7 +403,7 @@ describe('resolveMediaUsage', () => {
   ])(
     "reads and joins the server's copy of a project %s, whose reported revisions its copy does not build on",
     async (_case, decision) => {
-      // Saved from another device with a.png at the reported revisions; this tab shows a diverged draft without it.
+      // Saved elsewhere with a.png at the reported revisions; this tab shows a diverged draft without it.
       mocks.check.mockResolvedValue(
         answer({ documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png']))] })
       );
@@ -459,7 +447,7 @@ describe('resolveMediaUsage', () => {
         documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png', 'b.png']))],
       })
     );
-    // Saved elsewhere: a.png on a layer and pinned. Here, unsaved: the a.png layer replaced by b.png.
+    // Saved elsewhere: a.png on a layer and pinned. Here, unsaved: the layer replaced by b.png.
     serveProjects([project('open', 'Open', { pinned: 'a.png', raster: ['a.png'] })]);
 
     const report = await resolveMediaUsage(
@@ -475,7 +463,6 @@ describe('resolveMediaUsage', () => {
 
   it('reads no closed project past the size bound, listing it as the server counts it', async () => {
     mocks.check.mockResolvedValue(answer({ documents: [usageDocument('project', 'p-big', 'Big', ['a.png'])] }));
-    // What the transport answers for a record over the bound.
     mocks.getProject.mockResolvedValue(null);
 
     const report = await resolveMediaUsage(items('a.png'), host());
@@ -514,7 +501,6 @@ describe('resolveMediaUsage', () => {
           usageDocument('legacyEditor', 'legacy_editor', null, ['a.png']),
           usageDocument('quarantinedProject', 'q-1', 'Broken', ['b.png']),
           usageDocument('workflow', 'wf-1', 'Upscale pass', ['a.png', 'b.png']),
-          // A kind of saved document this build does not know.
           usageDocument('other', 'board-notes-1', 'Board notes', ['b.png']),
           usageDocument('other', 'unnamed-1', null, ['a.png']),
         ],
@@ -555,7 +541,6 @@ describe('resolveMediaUsage', () => {
       scope: 'items',
       serverCheck: 'unavailable',
     });
-    // A board's items are known only to the server.
     await expect(resolveMediaUsage({ boardId: 'board-1', kind: 'board' }, host())).rejects.toThrow();
   });
 
@@ -615,15 +600,12 @@ describe('resolveMediaUsage', () => {
 
     const report = await resolveMediaUsage(items(...names), host());
 
-    // Not read and narrowed to what the server happened to name: its other uses were never named.
     expect(mocks.getProject).not.toHaveBeenCalled();
     expect(report.groups).toEqual([{ count: 3, countAtLeast: true, kind: 'projectUnchecked', name: 'X' }]);
-    // The server's own exact total still stands.
     expect(report.inUseCount).toBe(503);
   });
 
   it('reads an open project’s saved copy when a batched check could not name all its uses, keeping the server’s total', async () => {
-    // As a batched check answers: the flag exists only because a batch left documents unlisted.
     const xEntry = { ...usageDocument('project', 'p-x', 'X', ['1001.png']), namesIncomplete: true as const };
     const listed = [
       xEntry,
@@ -634,7 +616,6 @@ describe('resolveMediaUsage', () => {
     mocks.check.mockResolvedValue(
       answer({ checkedImageCount: 2000, documents: listed, documentsTotal: 101, inUseImageCount: 503 })
     );
-    // The saved copy also uses an image the first batch left unnamed; the copy here does not.
     serveProjects([project('p-x', 'X', { raster: ['1001.png', '7.png'] })]);
     const names = Array.from({ length: 2000 }, (_, index) => `${index}.png`);
 
@@ -648,12 +629,10 @@ describe('resolveMediaUsage', () => {
       surfaces: [{ count: 2, surface: 'canvasRaster' }],
     });
     expect(report.groups.at(-1)).toEqual({ documentCount: 1, kind: 'moreDocuments' });
-    // The uses the server counted in unnamed documents count nowhere else: its total stands.
     expect(report.inUseCount).toBe(503);
   });
 
   it('keeps the server’s total when a scan narrows a project but other documents went unlisted', async () => {
-    // The open project names a.png only as its Gallery selection; an unlisted document uses b.png.
     mocks.check.mockResolvedValue(
       answer({
         documents: [atServed(usageDocument('project', 'open', 'Open', ['a.png']))],

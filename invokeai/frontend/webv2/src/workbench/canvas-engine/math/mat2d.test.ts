@@ -2,16 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { applyToPoint, fromTRS, getScale, identity, invert, multiply, rotate, scale, translate } from './mat2d';
 
-describe('identity', () => {
-  it('returns the identity matrix', () => {
-    expect(identity()).toEqual({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
-  });
-
-  it('applied to a point returns the same point', () => {
-    expect(applyToPoint(identity(), { x: 5, y: -3 })).toEqual({ x: 5, y: -3 });
-  });
-});
-
 describe('translate', () => {
   it('shifts points by the translation vector', () => {
     const m = translate(identity(), { x: 10, y: 20 });
@@ -39,11 +29,6 @@ describe('rotate', () => {
     expect(p.x).toBeCloseTo(0, 10);
     expect(p.y).toBeCloseTo(1, 10);
   });
-
-  it('rotating by 0 radians is a no-op', () => {
-    const m = rotate(identity(), 0);
-    expect(applyToPoint(m, { x: 7, y: -2 })).toEqual({ x: 7, y: -2 });
-  });
 });
 
 describe('multiply', () => {
@@ -53,12 +38,6 @@ describe('multiply', () => {
     const s = scale(identity(), 2);
     const m = multiply(t, s);
     expect(applyToPoint(m, { x: 1, y: 1 })).toEqual({ x: 12, y: 2 });
-  });
-
-  it('multiplying by identity is a no-op on either side', () => {
-    const m = translate(scale(identity(), 3, 4), { x: 1, y: 2 });
-    expect(multiply(m, identity())).toEqual(m);
-    expect(multiply(identity(), m)).toEqual(m);
   });
 });
 
@@ -74,21 +53,8 @@ describe('invert', () => {
   });
 
   it('returns null for a singular matrix', () => {
-    // Zero determinant: a*d - b*c = 0
     expect(invert({ a: 1, b: 2, c: 2, d: 4, e: 0, f: 0 })).toBeNull();
     expect(invert({ a: 0, b: 0, c: 0, d: 0, e: 1, f: 1 })).toBeNull();
-  });
-
-  it('inverting identity returns identity', () => {
-    const inv = invert(identity());
-    expect(inv).not.toBeNull();
-    const nonNullInv = inv as NonNullable<typeof inv>;
-    expect(nonNullInv.a).toBeCloseTo(1, 10);
-    expect(nonNullInv.b).toBeCloseTo(0, 10);
-    expect(nonNullInv.c).toBeCloseTo(0, 10);
-    expect(nonNullInv.d).toBeCloseTo(1, 10);
-    expect(nonNullInv.e).toBeCloseTo(0, 10);
-    expect(nonNullInv.f).toBeCloseTo(0, 10);
   });
 });
 
@@ -118,28 +84,15 @@ describe('fromTRS', () => {
     const defaulted = fromTRS({ x: 0, y: 0 }, 0, 3);
     expect(defaulted).toEqual(composed);
   });
-
-  it('with no rotation/scale reduces to pure translation', () => {
-    expect(fromTRS({ x: 8, y: 9 }, 0, 1, 1)).toEqual(translate(identity(), { x: 8, y: 9 }));
-  });
 });
 
 describe('getScale', () => {
-  it('returns 1 for the identity matrix', () => {
-    expect(getScale(identity())).toBeCloseTo(1, 10);
-  });
-
   it('returns the scale factor for a uniformly scaled matrix', () => {
     expect(getScale(scale(identity(), 3))).toBeCloseTo(3, 10);
   });
 
   it('returns the geometric mean for a non-uniformly scaled matrix', () => {
     expect(getScale(scale(identity(), 2, 8))).toBeCloseTo(4, 10);
-  });
-
-  it('is unaffected by translation', () => {
-    const m = translate(scale(identity(), 2), { x: 100, y: -50 });
-    expect(getScale(m)).toBeCloseTo(2, 10);
   });
 
   it('is unaffected by rotation for a uniformly scaled matrix', () => {

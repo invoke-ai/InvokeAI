@@ -10,8 +10,8 @@ export const generateWidgetManifest: WidgetManifest = {
   icon: Settings2Icon,
   id: 'generate',
   label: (t) => t('widgets.labels.generate'),
-  // The project's generation flags: they apply to every generation the project runs (Canvas and Upscale included),
-  // and live in the project settings rather than this widget's values (see `PROJECT_SETTINGS_OWNER`).
+  // The project's generation flags: they apply to every generation the project runs (Canvas and Upscale included), and
+  // live in the project settings rather than this widget's values (see `PROJECT_SETTINGS_OWNER`).
   settings: {
     id: 'generate',
     label: (t) => t('widgets.labels.generate'),

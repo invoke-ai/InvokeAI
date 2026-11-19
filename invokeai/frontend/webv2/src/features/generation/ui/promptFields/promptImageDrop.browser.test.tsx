@@ -39,7 +39,6 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
 }));
 
 vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
-  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
   ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),

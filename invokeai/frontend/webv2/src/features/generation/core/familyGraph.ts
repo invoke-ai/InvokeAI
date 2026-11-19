@@ -28,7 +28,6 @@ export interface FamilyGraph {
 }
 
 export interface FamilyLatentSpace {
-  /** The image-to-latents node type. */
   encodeType: string;
   /** The VAE the graph decodes with, override and seamless wrapping included; encodes and masks use the same one. */
   vae: GraphOutput;
@@ -51,16 +50,13 @@ export interface FamilyConditioning {
    */
   ipAdapterCollector: BackendInvocationContract | null;
   /**
-   * The collector the builder already feeds `denoise.redux_conditioning` from, when it wired FLUX Redux. Only read where
-   * regional references are FLUX Redux (FLUX).
+   * The collector the builder already feeds `denoise.redux_conditioning` from, when it wired FLUX Redux. Only read
+   * where regional references are FLUX Redux (FLUX).
    */
   fluxReduxCollector: BackendInvocationContract | null;
 }
 
-/**
- * The settings a family pipeline reads. Generate hands over its own settings; Upscale maps its widget fields onto
- * these, so widening this type fails Upscale's build until it decides what the new field is there.
- */
+/** The settings a pipeline reads; widening it fails Upscale's build until Upscale maps the new field. */
 export type FamilyPipelineSettings = Pick<
   GenerateSettings,
   | 'cfgRescaleMultiplier'
@@ -81,11 +77,7 @@ export type FamilyPipelineSettings = Pick<
   | 'vaePrecision'
 >;
 
-/**
- * What a family's image pipeline is asked to build: prompts and seed, model loader, LoRAs, text encoders, the denoise
- * and its decode. Nothing Generate adds on top (references, PiD, the refiner, enhancers, metadata) can be asked for
- * here; Generate passes those to its builders separately.
- */
+/** Prompts, seed, loader, LoRAs, encoders, denoise and decode; Generate-only additions cannot be asked for here. */
 export interface FamilyPipelineInput {
   model: MainModelConfig;
   settings: FamilyPipelineSettings;
@@ -93,25 +85,16 @@ export interface FamilyPipelineInput {
   denoiseSize: { width: number; height: number };
   /** Where the denoise enters its schedule, in the denoise node's own terms (see `getDenoisingStartClipping`). */
   denoisingStart: number;
-  /** SD's noise node runs on the CPU, so a seed gives the same image on any device. */
   useCpuNoise: boolean;
-  /** The decode node's id and whether its image is an intermediate. */
   output: { id: string; isIntermediate: boolean };
-  /**
-   * Tile the decode at this size where the family's decode node has the switch (`anima_l2i` tiles on its own); null
-   * decodes whole. The caller tiles its own encode.
-   */
+  /** Tiles the decode where the node has the switch; null decodes whole. The caller tiles its own encode. */
   vaeTileSize: number | null;
-  /**
-   * SD only: denoise in overlapping tiles (`tiled_multi_diffusion_denoise_latents`) instead of whole. The tiled node
-   * takes one conditioning per side, so the graph has no collectors and no `conditioning` to graft onto.
-   */
+  /** SD only: tiled multi-diffusion denoise, which takes one conditioning per side and so has no `conditioning`. */
   multiDiffusion: { tileSize: number; tileOverlap: number } | null;
 }
 
-/** A family's image pipeline: its graph, the facts callers compose over, and the node whose image is the result. */
+/** A family graph plus the decode node whose image is the result. */
 export interface FamilyPipeline extends FamilyGraph {
-  /** The decode node, `input.output.id`. */
   output: BackendInvocationContract;
   /** The VAE the graph loads over the main model's own; null where it decodes with the model's bundled VAE. */
   vaeModel: VaeModelConfig | null;

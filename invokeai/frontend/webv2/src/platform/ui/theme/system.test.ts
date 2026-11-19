@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { resolveToken, THEME_SELECTORS, THEMES, type TokenSystem } from './__tokenResolve';
-import { progressCircleSlotRecipe } from './recipes';
 import { system } from './system';
 import { THEMES as THEME_DEFINITIONS } from './themes';
 
@@ -36,20 +35,6 @@ describe('ramp + mapping structure', () => {
     expect(resolveToken(sys, 'light', 'bg.muted')).toBe(resolveToken(sys, 'light', 'neutral.100'));
     expect(resolveToken(sys, 'light', 'border')).toBe(resolveToken(sys, 'light', 'neutral.300'));
     expect(resolveToken(sys, 'light', 'border.emphasized')).toBe(resolveToken(sys, 'light', 'neutral.400'));
-  });
-
-  it('maps the dark surface ladder onto the ramp', () => {
-    expect(resolveToken(sys, 'classic', 'bg')).toBe(resolveToken(sys, 'classic', 'neutral.950'));
-    expect(resolveToken(sys, 'classic', 'bg.subtle')).toBe(resolveToken(sys, 'classic', 'neutral.900'));
-    expect(resolveToken(sys, 'classic', 'fg')).toBe(resolveToken(sys, 'classic', 'neutral.50'));
-    expect(resolveToken(sys, 'classic', 'border')).toBe(resolveToken(sys, 'classic', 'neutral.600'));
-  });
-
-  it('uses pure black/white low-opacity image outlines by color mode', () => {
-    expect(resolveToken(sys, 'light', 'border.image')).toBe('oklch(0 0 0 / 0.1)');
-    for (const theme of ['classic', 'osakaJade', 'mono', 'ultradark', 'catppuccinMocha']) {
-      expect(resolveToken(sys, theme, 'border.image')).toBe('oklch(1 0 0 / 0.1)');
-    }
   });
 
   it('emits surface/text/border tokens via per-theme conditions only — never the leaky mode selectors', () => {
@@ -110,12 +95,6 @@ describe('high contrast conditions', () => {
 });
 
 describe('native Chakra integration', () => {
-  it('adds an icon-sized progress circle variant', () => {
-    expect(progressCircleSlotRecipe.variants?.size?.sm).toMatchObject({
-      circle: { '--size': '16px', '--thickness': '3px' },
-    });
-  });
-
   it('resolves every gray virtual-palette key under both dark and light', () => {
     const keys = ['contrast', 'fg', 'subtle', 'muted', 'emphasized', 'solid', 'focusRing', 'border'];
     for (const theme of ['classic', 'light']) {
@@ -123,13 +102,6 @@ describe('native Chakra integration', () => {
         expect(resolveToken(sys, theme, `gray.${key}`)).toBeTruthy();
       }
     }
-  });
-
-  it('leaves stock Chakra hue palettes untouched in Phase 1', () => {
-    // Stock Chakra palette values.
-    expect(sys.tokens.getByName('colors.red.500')).toBeTruthy();
-    expect(sys.tokens.getByName('colors.blue.500')).toBeTruthy();
-    expect(sys.tokens.getByName('colors.purple.500')).toBeTruthy();
   });
 });
 

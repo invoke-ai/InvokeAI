@@ -36,11 +36,7 @@ export interface InvokeIssueAction {
 const isMissingModelIssue = (issue: GenerationIssue): boolean =>
   issue.id === 'model:unsupported' || issue.id.startsWith('model:notInstalled:');
 
-/**
- * The ways out of each Invoke issue: a one-step fix where Generate has one, then a jump to where the problem is fixed
- * (the Generate section, the canvas layer, the workflow node, the Model Manager, the widget). A lost connection has
- * none: it resolves itself on reconnect.
- */
+/** Each Invoke issue's ways out: a one-step fix where one exists, then a jump to where it is fixed. */
 export const useInvokeIssueActions = (): ((issue: InvocationIssue) => InvokeIssueAction[]) => {
   const { t } = useTranslation();
   const { generation, widgets } = useWorkbenchCommands();

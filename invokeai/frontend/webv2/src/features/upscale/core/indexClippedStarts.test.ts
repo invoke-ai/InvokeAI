@@ -13,8 +13,8 @@ import { UPSCALE_ARCHITECTURES } from './settings';
 
 const CREATIVITIES = [-10, -5, 0, 5, 8, 10];
 const STEP_COUNTS = [8, 30];
-// Z-Image's shift follows the frame up to one megapixel, Krea-2 Raw's up to 1280x1280 and Qwen Image's up to
-// 8192 tokens (about 1448x1448), each held above; Anima's and Krea-2 Turbo's are fixed.
+// Z-Image's shift follows the frame up to one megapixel, Krea-2 Raw's up to 1280x1280 and Qwen Image's up to 8192
+// tokens (about 1448x1448), each held above; Anima's and Krea-2 Turbo's are fixed.
 const MODELS: readonly { base: UpscaleBase; variant: string | null; sides: readonly number[] }[] = [
   { base: 'anima', sides: [1024], variant: null },
   { base: 'krea-2', sides: [1024], variant: 'krea2_turbo' },

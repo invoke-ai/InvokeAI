@@ -1,8 +1,8 @@
 import { MAX_WILDCARD_NAME_LENGTH } from '@features/generation/core/dynamicPrompts';
 
 /**
- * Which surface's positive prompt: Generate, Upscale and Video can be mounted side by side. Upscale shows the prompt
- * it shares with Generate in a field of its own, so a request names the field it means.
+ * Which surface's positive prompt: Generate, Upscale and Video can be mounted side by side. Upscale shows the prompt it
+ * shares with Generate in a field of its own, so a request names the field it means.
  */
 export type PositivePromptOwner = 'generate' | 'upscale' | 'video';
 
@@ -89,9 +89,9 @@ export const isOtherTextEntry = (element: Element | null, prompt: HTMLTextAreaEl
  * Replaces `range` (all of it by default) through the browser's own editing, so the change joins the textarea's undo
  * history (Ctrl+Z) and reaches the controlled field as an ordinary input event. The textarea takes focus, as typing
  * would. False when it cannot take the edit, and the caller then writes the value itself: the textarea is gone,
- * read-only or disabled; the browser has no `insertText`; the user is typing in another field (taking focus would
- * break their typing, an IME composition included); or focus cannot land on it (a hidden view, a modal's focus trap),
- * where `insertText` would type into whatever holds focus instead.
+ * read-only or disabled; the browser has no `insertText`; the user is typing in another field (taking focus would break
+ * their typing, an IME composition included); or focus cannot land on it (a hidden view, a modal's focus trap), where
+ * `insertText` would type into whatever holds focus instead.
  */
 export const editTextareaText = (
   textarea: HTMLTextAreaElement | null,

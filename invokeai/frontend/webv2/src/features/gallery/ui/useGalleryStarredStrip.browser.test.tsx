@@ -87,8 +87,8 @@ afterEach(async () => {
 describe('useGalleryStarredStrip', () => {
   it('reports the cached strip while enabled and empty the moment it is disabled', async () => {
     expect(await renderProbe(true)).toEqual({ names: ['starred.png'], total: 4 });
-    // A disabled query still holds its cached data; the section must vanish
-    // regardless (starred-only listing, ranked search, anchored window).
+    // A disabled query still holds its cached data; the section must vanish regardless (starred-only listing, ranked
+    // search, anchored window).
     expect(await renderProbe(false)).toEqual({ names: [], total: 0 });
     expect(await renderProbe(true)).toEqual({ names: ['starred.png'], total: 4 });
   });

@@ -70,7 +70,6 @@ describe('custom node packs store', () => {
     await store.refreshCustomNodePacks();
     await store.refreshCustomNodePacks();
 
-    // Retain loaded packs during refetch failure and expose the error in the snapshot.
     expect(store.getCustomNodesSnapshot()).toMatchObject({ error: 'outage', status: 'loaded' });
     expect(store.getCustomNodesSnapshot().nodePacks.map((candidate) => candidate.name)).toEqual(['pack-a']);
   });

@@ -20,8 +20,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 // The hotkey module reads the platform once, as it loads: this file runs the real runtime under a macOS identity.
-// tinykeys resolves `mod` from navigator.platform, so both platform reads must say macOS.
-// Neither fake is restored: browser test files are isolated, and both readers consult the platform only at load.
+// tinykeys resolves `mod` from navigator.platform, so both platform reads must say macOS. Neither fake is restored:
+// browser test files are isolated, and both readers consult the platform only at load.
 vi.hoisted(() => {
   Object.defineProperty(navigator, 'userAgentData', { configurable: true, value: { platform: 'macOS' } });
   Object.defineProperty(navigator, 'platform', { configurable: true, value: 'MacIntel' });
@@ -145,9 +145,7 @@ it('leaves Option+Shift+Arrow to the text field and Control+Option+Arrow to Voic
   try {
     await act(() => textarea.focus());
     await press('two words');
-    // Option+Shift+Left selects the word before the caret, as it does in every macOS text field.
     await press('{Alt>}{Shift>}{ArrowLeft}{/Shift}{/Alt}');
-    // VoiceOver's navigation chord (VO+Arrow) must stay with the screen reader.
     await press('{Control>}{Alt>}{ArrowRight}{/Alt}{/Control}');
     expect(claimed).toEqual([]);
     expect(document.activeElement).toBe(textarea);

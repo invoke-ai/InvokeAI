@@ -11,7 +11,6 @@ import { userEvent } from 'vitest/browser';
 
 import { ReferenceImageRow } from './ReferenceImageRow';
 
-// The real catalog, so a mistyped key shows up as the key and fails the label lookups below.
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
@@ -31,7 +30,6 @@ const STYLE_REFERENCE: GenerateReferenceImage = {
   isEnabled: true,
 };
 
-/** Mirrors the section: each patch lands back on the rendered reference. */
 const Row = ({ initial }: { initial: GenerateReferenceImage }) => {
   const [referenceImage, setReferenceImage] = useState(initial);
   const handlePatch = useCallback((id: string, patch: Partial<GenerateReferenceImage>) => {
@@ -82,7 +80,6 @@ const clickMode = async (label: 'Edit' | 'Style') => {
   });
 };
 const hasStrengthControl = () => host?.textContent?.includes('Style strength') ?? false;
-/** A Style reference keeps its mode under the row, with its strength on the row. */
 const openSettings = () =>
   act(() => host?.querySelector<HTMLButtonElement>('button[aria-label="Reference image 1 settings"]')?.click());
 
@@ -115,7 +112,6 @@ describe('Krea-2 reference mode switch', () => {
       config: { image, type: 'krea2_edit_reference_image' },
     });
     expect(modeRadio('Edit')?.checked).toBe(true);
-    // Edit references have no strength; the mode is the row's control.
     expect(hasStrengthControl()).toBe(false);
 
     await clickMode('Style');
@@ -124,7 +120,6 @@ describe('Krea-2 reference mode switch', () => {
       config: { image, styleStrength: 1, type: 'krea2_reference_image' },
     });
     expect(hasStrengthControl()).toBe(true);
-    // Back under the row, which stays open so the mode just chosen is still in view.
     expect(modeRadio('Style')?.checked).toBe(true);
   });
 

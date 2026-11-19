@@ -38,16 +38,9 @@ import {
 export const getUpscaleDenoisingStart = (creativity: number): number => ((creativity * -1 + 10) * 4.99) / 100;
 
 /**
- * The start an index-clipping node needs to enter where a value-clipping one would.
- *
- * Creativity is defined by where FLUX enters: `flux_denoise` clips the schedule by *value*, so a start
- * of 0.499 enters at sigma 0.501 whatever the shift or step count. Z-Image, Anima, Krea-2 and Qwen Image
- * clip by *index* instead, so the same number enters far noisier there -- 0.499 starts Z-Image at sigma
- * 0.78. Given the node's own `sigmas` (Generation's `getDenoisingStartClipping`), this picks the step `i` whose sigma is
- * nearest `1 - valueStart`. Z-Image and Anima begin at `i = int(start * steps)`, so the start aims at the
- * middle of that step, where float error in the node's product cannot floor it one step short. Krea-2 and
- * Qwen Image round instead, half to even, so their start is the step itself. This goes away when those
- * nodes clip by value; `test_upscale_index_clipped_starts.py` fails when they do.
+ * Creativity is defined by FLUX's value clipping; index-clipping nodes would enter far noisier at the same start.
+ * Floor nodes aim mid-step so float error cannot drop a step; rounding nodes take the step itself.
+ * Obsolete once those nodes clip by value; `test_upscale_index_clipped_starts.py` fails when they do.
  */
 export const getIndexClippedDenoisingStart = (
   valueStart: number,
@@ -91,11 +84,7 @@ export const getUpscaleControlNetValues = (structure: number) => {
   };
 };
 
-/**
- * Z-Image takes one control, not SD's pair. At Structure 0 it sits at the bottom of the adapter's
- * recommended 0.65-0.80 and lets go for the last quarter of the pass, where the detail is drawn;
- * the slider runs it from a light early nudge (0.3, first half) to holding the whole pass at 1.0.
- */
+/** Structure 0 sits at the adapter's recommended 0.65 and releases the last quarter; 1 holds the pass at 1.0. */
 export const getZImageTileControlValues = (structure: number) => ({
   beginStepPercent: 0,
   controlContextScale: 0.65 + structure * 0.035,
@@ -175,14 +164,7 @@ const addUpscaleMetadata = (
   addEdge(graph, metadata, 'metadata', output, 'metadata');
 };
 
-/**
- * Resize the enlarged frame to the size the pass denoises at.
- *
- * That size is computed from the scale, but Spandrel ignores the scale for a model that does not enlarge (a 1x
- * restoration model), and it rounds to a multiple of 8 where `flux_denoise` and `z_image_denoise` take multiples of 16.
- * Either way the latents would disagree with the denoise node's size, and the pass would fail, or run at the source
- * size, after the upscale has run.
- */
+/** Spandrel ignores scale for 1x models and rounds to 8 where nodes need 16; a mismatch fails after upscaling. */
 const fitFrameToDenoiseSize = (
   graph: BackendGraphContract,
   frame: BackendInvocationContract,
@@ -203,7 +185,6 @@ const fitFrameToDenoiseSize = (
 
 /** The widget's values in the pipeline's terms. Upscale has no component source, and leaves CFG rescale off. */
 const toPipelineSettings = (settings: UpscaleWidgetValues, model: MainModelConfig): FamilyPipelineSettings => {
-  // The encoders this main model reads. A field it has no slot for is null here, whatever the widget holds.
   const components = activeUpscaleComponents(settings);
 
   return {
@@ -240,11 +221,7 @@ const getUpscaleEntry = (
     : valueStart;
 };
 
-/**
- * Structure anchors the pass to the enlarged frame through a tile ControlNet. SD's multi-diffusion takes two, split
- * across the schedule; Z-Image takes one, which encodes the frame inside the denoise at the size `i2l` does, so it is
- * tiled the same way. Z-Image's is optional: a pass that runs whole has no seams to hold together.
- */
+/** Structure's tile ControlNet: SD's two split across the schedule, or Z-Image's one, tiled like `i2l`. */
 const addTileControl = (
   graph: BackendGraphContract,
   settings: UpscaleWidgetValues,
@@ -303,24 +280,15 @@ const addTileControl = (
 export interface ModelOnlyUpscaleRequest {
   image: ImageWithDims;
   upscaleModel: SpandrelModelConfig;
-  /**
-   * A Scale runs the upscaler until it reaches it; `'native'` runs the model once, at its own scale, sized as that Scale
-   * would be when it is recorded and left unsized when it is not.
-   */
+  /** `'native'` runs the model once at its own scale. */
   scale: number | 'native';
   destination: ResultDestination;
-  /** The source image's metadata, copied into the result's; null when the source has none. */
   sourceMetadata: Record<string, unknown> | null;
 }
 
 /**
- * The upscaler alone, with no main model or detail pass: the Upscale widget's Model only mode at its Scale, and the
- * image menu's one-click upscale at one of its factors or the model's native scale.
- *
- * The result carries the source image's metadata, so Recall and Remix restore how the source was made, plus what the
- * upscale did. It sits on the output node as a literal rather than in a `core_metadata` node, which would validate the
- * copied keys against today's fields (an older image's model record fails that) and stamp today's `metadata_version`
- * over the source's.
+ * The upscaler alone. Source metadata sits on the output node as a literal: a `core_metadata` node would
+ * validate old keys against today's fields and overwrite the source's `metadata_version`.
  */
 export const compileModelOnlyUpscaleGraph = ({
   destination,
@@ -356,8 +324,7 @@ export const compileModelOnlyUpscaleGraph = ({
     image_to_image_model: toModelIdentifier(upscaleModel),
     is_intermediate: destination === 'canvas',
     metadata,
-    // Matches the Refine graph's first pass, so both modes size a result alike. Only an upscaler of unknown native
-    // scale runs a plain pass: there is no factor to give the autoscale node.
+    // Matches the Refine graph's first pass; only an upscaler of unknown native scale runs a plain pass.
     ...(upscaleScale === null
       ? { type: 'spandrel_image_to_image' }
       : { fit_to_multiple_of_8: true, scale: upscaleScale, type: 'spandrel_image_to_image_autoscale' }),
@@ -375,10 +342,7 @@ export const compileModelOnlyUpscaleGraph = ({
   };
 };
 
-/**
- * `sourceMetadata` is read only in Model only mode: the input image's metadata, which that mode copies into the
- * result's.
- */
+/** `sourceMetadata` is read only in Model only mode. */
 export const compileUpscaleGraph = (
   settings: UpscaleWidgetValues,
   destination: ResultDestination,
@@ -448,8 +412,7 @@ export const compileUpscaleGraph = (
   addEdge(graph, spandrelAutoscale, 'image', unsharpMask, 'image');
 
   const frame = fitFrameToDenoiseSize(graph, unsharpMask, denoiseSize);
-  // The frame is the largest image in the graph, and an untiled encode of it does not fit on consumer hardware. Every
-  // family Upscale runs encodes with a tiling switch; the pipeline tiles the decode where its node has one.
+  // An untiled encode of the full frame does not fit consumer VRAM; the pipeline tiles the decode.
   const encode = addNode(graph, {
     ...(latents.fp32 === undefined ? {} : { fp32: latents.fp32 }),
     id: 'i2l',

@@ -16,7 +16,6 @@ const harness = vi.hoisted(() => ({
   ],
 }));
 
-// The frame barrel reaches the whole workbench context; the chip itself is the platform control.
 vi.mock('@workbench/widget-frame', async () => ({
   StatusWidgetChip: (await import('@platform/ui/StatusWidgetChip')).StatusWidgetChip,
 }));
@@ -69,7 +68,6 @@ describe('AutosaveStatusWidgetView', () => {
   it('names each open project awaiting a decision and why, instead of reporting an error', async () => {
     harness.autosave = { status: 'attention' };
     reportSync({
-      // A project no longer open is not listed: the user cannot switch to it to resolve it.
       closed: {
         conflict: { detectedAt: '2026-10-14T09:00:00.000Z', kind: 'deleted' },
         isPendingPush: true,

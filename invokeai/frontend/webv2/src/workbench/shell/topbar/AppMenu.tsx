@@ -74,7 +74,6 @@ export const AppMenu = () => {
   const openWidgets = useCallback(() => openWidgetsDialogFrom(getTrigger), [getTrigger]);
   const queryClient = useQueryClient();
   // Rendered only once loaded: a lazy() boundary would suspend on open and React delays its reveal, shifting rows.
-  // A chunk that fails to load (e.g. after an upgrade) leaves the optional link absent.
   const [DonationMenuItem, setDonationMenuItem] = useState<ComponentType<DonationMenuItemProps> | null>(null);
   const preloadDonationMenuItem = useCallback(() => {
     void loadDonationMenuItem().then(

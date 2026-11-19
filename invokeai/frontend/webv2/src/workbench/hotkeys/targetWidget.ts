@@ -35,13 +35,7 @@ export interface HotkeyTarget {
   source: WidgetContributionSource | null;
 }
 
-/**
- * What a key press is aimed at. The widget under the event target wins; outside any widget's DOM the press falls
- * back to whatever holds workbench focus — the active floating window, or the active instance of the focused
- * docked region. A floating target is never used to index `widgetRegions`. A region's active pointer counts only
- * while it names one of the region's members: an emptied center keeps pointing at the view that floated out of
- * it, and that view answers as a window, not as the center.
- */
+/** The widget under the target wins; otherwise the focused window or the focused region's active member. */
 export const resolveHotkeyTarget = ({
   focusTarget,
   project,

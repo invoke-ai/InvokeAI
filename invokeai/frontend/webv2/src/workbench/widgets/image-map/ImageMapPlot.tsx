@@ -78,10 +78,7 @@ const readRanges = (plot: PlotElement): AxisRanges | null => {
   return x && y ? { x: [x[0], x[1]], y: [y[0], y[1]] } : null;
 };
 
-/**
- * Fit the percentile box plus current marker once the container is measured, preserving equal axis scale so a
- * zero-size initial fit cannot become the permanent view.
- */
+/** Fits once the container is measured, at equal axis scale, so a zero-size first fit cannot stick. */
 const computeInitialFit = (
   points: ImageMapPoint[],
   selectedKey: GalleryItemKey | null,
@@ -121,8 +118,8 @@ const ImageMapPlot = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const points = imageMapStore.useSelector((snapshot) => snapshot.data?.points ?? null);
   const clusterLabels = imageMapStore.useSelector((snapshot) => snapshot.clusterLabels);
-  // Require matching clustering for hover tags: refresh may renumber ids even while stale annotations remain
-  // briefly visible.
+  // Require matching clustering for hover tags: refresh may renumber ids even while stale annotations remain briefly
+  // visible.
   const clusterLabelsMatchPoints = imageMapStore.useSelector(
     (snapshot) =>
       snapshot.clusterLabelsHash !== null &&
@@ -140,8 +137,8 @@ const ImageMapPlot = ({
     (values) => getPersistedSelectedGalleryItemKeys(values),
     shallowEqual
   );
-  // With a cluster filter active in the gallery, the whole cluster stays lit
-  // on a dimmed map — the gallery is showing exactly these images.
+  // With a cluster filter active in the gallery, the whole cluster stays lit on a dimmed map — the gallery is showing
+  // exactly these images.
   const clusterQueryItemKeys = useWidgetValuesSelector(
     'gallery',
     (values) => {
@@ -157,17 +154,15 @@ const ImageMapPlot = ({
     [clusterQueryItemKeys]
   );
   const { selectCluster, selectItem: selectMapItem } = useMapSelection();
-  // Bumped after every scene rebuild so the overlay effects (marker,
-  // highlight) re-apply onto the fresh, empty overlay traces.
+  // Bumped after every scene rebuild so the overlay effects (marker, highlight) re-apply onto the fresh, empty overlay
+  // traces.
   const [plotRevision, setPlotRevision] = useState(0);
   const lastPinchAtRef = useRef(0);
   const lastMapSelectionRef = useRef<{ name: string; at: number } | null>(null);
-  // The selection the marker effect last decluttered for. Seeded with the
-  // mounting selection so the initial scene, whose labels the effect below
-  // applies from scratch, does not also get a redundant pass here.
+  // The selection the marker effect last decluttered for.
   const lastDeclutteredSelectionRef = useRef(selectedKey);
-  // The points array `fullAnnotationsRef` was built from, so the marker effect
-  // can tell whether those annotations describe the embedding now on screen.
+  // The points array `fullAnnotationsRef` was built from, so the marker effect can tell whether those annotations
+  // describe the embedding now on screen.
   const annotationsPointsRef = useRef<ImageMapPoint[] | null>(null);
   // Coordinate scene and resize paths to perform whole-map fitting once, after real measurement.
   const initialFitDoneRef = useRef(false);
@@ -185,16 +180,14 @@ const ImageMapPlot = ({
   }, [clickSelectsCluster, clusterLabels, points, selectedKey]);
   // Keep full annotations in a ref so relayout can refilter visibility without React renders.
   const fullAnnotationsRef = useRef<ClusterAnnotation[]>([]);
-  // The base traces' own looks for the scene on screen, so dimming can be
-  // undone exactly; replaced with every rebuild, which also resets the dim.
+  // The base traces' own looks for the scene on screen, so dimming can be undone exactly; replaced with every rebuild,
+  // which also resets the dim.
   const baseAppearancesRef = useRef<PointAppearance[]>([]);
-  // Whether the base traces on screen are currently dimmed. A rebuild draws
-  // them undimmed, so it resets this too.
+  // Whether the base traces on screen are currently dimmed. A rebuild draws them undimmed, so it resets this too.
   const baseDimmedRef = useRef(false);
   const appliedAnnotationsKeyRef = useRef<string | null>(null);
 
-  // Declutter against the current view and skip unchanged visibility to avoid relayout feedback. Reserve space for
-  // the gold target beneath Plotly's annotation layer.
+  // Declutter against the current view and skip unchanged visibility to avoid relayout feedback.
   const applyDeclutteredAnnotations = useCallback((container: PlotElement) => {
     const ranges = readRanges(container);
     const selectedItemKey = selectedKeyRef.current;
@@ -221,8 +214,8 @@ const ImageMapPlot = ({
   }, []);
   const [pendingHoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Monotonic hover session: a resolution from a previous hover (even of the
-  // same point) must neither show early nor at stale coordinates.
+  // Monotonic hover session: a resolution from a previous hover (even of the same point) must neither show early nor at
+  // stale coordinates.
   const hoverSessionRef = useRef(0);
 
   const clearHover = () => {
@@ -241,19 +234,16 @@ const ImageMapPlot = ({
       return;
     }
 
-    // The base points come back as several traces, one per appearance; the
-    // overlays are found by name, so their position among them does not
-    // matter. That lookup is load-bearing now in a way it was not when the
-    // base was a single trace at a fixed index: it is safe because
-    // `Plotly.react` swaps `gd.data` synchronously, so the overlay effects
-    // that run straight after this one already see the new indices. Overlay traces (highlight, marker) start empty; the overlay
-    // effects below restyle them, so a selection change never rebuilds the
-    // scene.
+    // The base points come back as several traces, one per appearance; the overlays are found by name, so their
+    // position among them does not matter. That lookup is load-bearing now in a way it was not when the base was a
+    // single trace at a fixed index: it is safe because `Plotly.react` swaps `gd.data` synchronously, so the overlay
+    // effects that run straight after this one already see the new indices. Overlay traces (highlight, marker) start
+    // empty; the overlay effects below restyle them, so a selection change never rebuilds the scene.
     const baseTraces = buildAllPointsTraces(points);
     const traces = [
       ...baseTraces,
-      // Above the base points, below the hand-selection outline and the gold
-      // target, which both mark individual items within a lit cluster.
+      // Above the base points, below the hand-selection outline and the gold target, which both mark individual items
+      // within a lit cluster.
       ...buildClusterSelectionTraces(points, new Set()),
       buildHighlightedPointsTrace(points, new Set()),
       buildCurrentImageTrace(),
@@ -262,8 +252,8 @@ const ImageMapPlot = ({
     baseDimmedRef.current = false;
     let disposed = false;
 
-    // Preserve user ranges across refreshes, but use an aspect-corrected fit for the first measured render rather
-    // than retaining zero-size artifacts.
+    // Preserve user ranges across refreshes, but use an aspect-corrected fit for the first measured render rather than
+    // retaining zero-size artifacts.
     let initialRanges = readRanges(container as unknown as PlotElement) ?? computePercentileRanges(points);
 
     if (!initialFitDoneRef.current) {
@@ -275,8 +265,7 @@ const ImageMapPlot = ({
       }
     }
 
-    // Apply annotations via relayout, not scene reconstruction. Clear their applied key when rebuilding layout so
-    // identical labels are restored.
+    // Apply annotations via relayout, not scene reconstruction.
     appliedAnnotationsKeyRef.current = null;
     const layout = buildMapLayout(initialRanges);
 
@@ -297,26 +286,24 @@ const ImageMapPlot = ({
           }
 
           const customdata = event.points?.[0]?.customdata;
-          // Resolved against the points this scene was built from rather than
-          // parsed: customdata is this component's own key, so one that names
-          // no point is a stale event, not an item to go and fetch.
+          // Resolved against the points this scene was built from rather than parsed: customdata is this component's
+          // own key, so one that names no point is a stale event, not an item to go and fetch.
           const clicked = typeof customdata === 'string' ? points.find((point) => point.key === customdata) : undefined;
 
           if (!clicked) {
             return;
           }
 
-          // A selection made by clicking the map must not recenter the map
-          // under the user's cursor; the marker effect checks this. The
-          // stamp expires so a stale entry (failed hydrate, re-click of the
-          // current point) cannot suppress a legitimate future recenter.
+          // A selection made by clicking the map must not recenter the map under the user's cursor; the marker effect
+          // checks this. The stamp expires so a stale entry (failed hydrate, re-click of the current point) cannot
+          // suppress a legitimate future recenter.
           lastMapSelectionRef.current = { at: Date.now(), name: clicked.key };
 
           const clusterKeys = clusterModeRef.current ? collectClusterSelection(points, clicked.key) : null;
 
           if (clusterKeys) {
-            // Use the primary cluster phrase for filter chips, falling back to member count; alternates belong in
-            // hover cards.
+            // Use the primary cluster phrase for filter chips, falling back to member count; alternates belong in hover
+            // cards.
             const label =
               clusterLabelsRef.current?.[String(clicked.cluster)]?.label ?? formatClusterSize(clusterKeys.length);
 
@@ -341,11 +328,9 @@ const ImageMapPlot = ({
           const { clientX, clientY } = mouse;
           hoverTimerRef.current = setTimeout(() => {
             void getThumbnailUrl(hovered.item).then((thumbnail) => {
-              // Deliberately not gated on `disposed`: that belongs to this
-              // effect, which re-runs on every socket-driven refresh, so a
-              // refresh landing mid-dwell would drop the thumbnail — and no
-              // new `plotly_hover` fires while the pointer sits still.
-              // Unmount is covered by the session bump in the cleanup below.
+              // Deliberately not gated on `disposed`: that belongs to this effect, which re-runs on every socket-driven
+              // refresh, so a refresh landing mid-dwell would drop the thumbnail — and no new `plotly_hover` fires
+              // while the pointer sits still. Unmount is covered by the session bump in the cleanup below.
               if (thumbnail && hoverSessionRef.current === session) {
                 setHoverPreview({ clientX, clientY, key: hovered.key, thumbnail });
               }
@@ -358,9 +343,8 @@ const ImageMapPlot = ({
         });
         plot.removeAllListeners?.('plotly_relayout');
         plot.on('plotly_relayout', (event) => {
-          // Every zoom, pan, and resize changes which labels have room; the
-          // annotation-only relayouts this triggers carry no axis keys, so
-          // they fall through without recursing.
+          // Every zoom, pan, and resize changes which labels have room; the annotation-only relayouts this triggers
+          // carry no axis keys, so they fall through without recursing.
           const viewChanged = Object.keys(event ?? {}).some(
             (key) => key.startsWith('xaxis.') || key.startsWith('yaxis.') || key === 'autosize'
           );
@@ -373,8 +357,8 @@ const ImageMapPlot = ({
       })
       .catch(() => {
         if (disposed) {
-          // Symmetry with the .then above: a rejection arriving after unmount
-          // must not write a global error on behalf of a dead component.
+          // Symmetry with the .then above: a rejection arriving after unmount must not write a global error on behalf
+          // of a dead component.
           return;
         }
 
@@ -388,8 +372,6 @@ const ImageMapPlot = ({
   }, [applyDeclutteredAnnotations, points, selectCluster, selectMapItem]);
 
   // Cluster selection: the members redrawn at full colour over a dimmed map.
-  // Restyled in place like the other overlays; the base traces take one
-  // scalar per trace, so neither the click nor later zooms pay per point.
   useEffect(() => {
     const container = containerRef.current as PlotElement | null;
 
@@ -405,8 +387,8 @@ const ImageMapPlot = ({
     }
 
     const traces = buildClusterSelectionTraces(points, clusterKeys ?? new Set());
-    // A cluster none of whose members are on this map (all since deleted)
-    // lights nothing, so it must not grey everything out either.
+    // A cluster none of whose members are on this map (all since deleted) lights nothing, so it must not grey
+    // everything out either.
     const dimmed = traces.some((trace) => trace.x.length > 0);
     const baseIndices = (container.data ?? []).flatMap((trace, index) =>
       (trace as { name?: string }).name === ALL_POINTS_TRACE ? [index] : []
@@ -442,8 +424,7 @@ const ImageMapPlot = ({
   // Dispose the timer at component lifetime, not on every points update.
   useEffect(() => clearHover, []);
 
-  // Retire hover sessions when items leave; hiding alone could resurrect stale pointer coordinates. Recenter the
-  // live selected marker near view edges while preserving zoom.
+  // Retire hover sessions when items leave; hiding alone could resurrect stale pointer coordinates.
   useEffect(() => {
     const container = containerRef.current as PlotElement | null;
 
@@ -457,8 +438,8 @@ const ImageMapPlot = ({
       return;
     }
 
-    // Redeclutter selection moves only with annotations matching current points; refresh effects rebuild
-    // annotations separately, including batched selection/refresh commits.
+    // Redeclutter selection moves only with annotations matching current points; refresh effects rebuild annotations
+    // separately, including batched selection/refresh commits.
     const selectionChanged =
       lastDeclutteredSelectionRef.current !== selectedKey && annotationsPointsRef.current === points;
     lastDeclutteredSelectionRef.current = selectedKey;
@@ -468,8 +449,8 @@ const ImageMapPlot = ({
     const isSuppressionFresh = suppression !== null && Date.now() - suppression.at < MAP_CLICK_SUPPRESS_MS;
     const cameFromMapClick = isSuppressionFresh && suppression.name === selectedKey;
 
-    // Consume matching suppression tickets and expire abandoned ones before missing-point returns; unrelated
-    // selections must not consume a pending click's ticket.
+    // Consume matching suppression tickets and expire abandoned ones before missing-point returns; unrelated selections
+    // must not consume a pending click's ticket.
     if (suppression !== null && (cameFromMapClick || !isSuppressionFresh)) {
       lastMapSelectionRef.current = null;
     }
@@ -505,8 +486,8 @@ const ImageMapPlot = ({
     }
   }, [applyDeclutteredAnnotations, plotRevision, points, selectedKey]);
 
-  // Apply delayed labels via relayout so coordinate arrays and selection traces remain intact; hover cards receive
-  // full alternate-tag data separately.
+  // Apply delayed labels via relayout so coordinate arrays and selection traces remain intact; hover cards receive full
+  // alternate-tag data separately.
   const annotationLabels = useMemo(
     () =>
       clusterLabels === null
@@ -527,8 +508,8 @@ const ImageMapPlot = ({
     applyDeclutteredAnnotations(container);
   }, [annotationLabels, applyDeclutteredAnnotations, plotRevision, points, showClusterLabels]);
 
-  // Custom zoom handlers + container size tracking, attached once for the
-  // plot's lifetime; plotly does not observe its container.
+  // Custom zoom handlers + container size tracking, attached once for the plot's lifetime; plotly does not observe its
+  // container.
   useEffect(() => {
     const container = containerRef.current as PlotElement | null;
 
@@ -548,18 +529,16 @@ const ImageMapPlot = ({
 
     const observer = new ResizeObserver(() => {
       if (container.offsetWidth > 0 && container.offsetHeight > 0) {
-        // `@types/plotly.js` declares this `void`; plotly resolves a promise
-        // once the resize has actually been applied.
+        // `@types/plotly.js` declares this `void`; plotly resolves a promise once the resize has actually been applied.
         const resized = Plotly.Plots.resize(container) as unknown as Promise<unknown>;
 
-        // Chained, not fired alongside: the resize defers its own autosize
-        // relayout, so a fit applied immediately would be solved against the
-        // plot's previous dimensions — and with the axes scale-anchored, that
-        // re-solve crops one of them.
+        // Chained, not fired alongside: the resize defers its own autosize relayout, so a fit applied immediately would
+        // be solved against the plot's previous dimensions — and with the axes scale-anchored, that re-solve crops one
+        // of them.
         swallow(
           resized.then(() => {
-            // A plot first built while the container was unmeasured never got
-            // its whole-map fit; apply it on the first real layout.
+            // A plot first built while the container was unmeasured never got its whole-map fit; apply it on the first
+            // real layout.
             if (initialFitDoneRef.current) {
               return undefined;
             }
@@ -593,8 +572,7 @@ const ImageMapPlot = ({
     };
   }, []);
 
-  // Keep hover across refreshes only while its item remains in live points. Null points on account invalidation
-  // must also remove the old thumbnail.
+  // Keep hover across refreshes only while its item remains in live points.
   const hoverPreview =
     pendingHoverPreview && points?.some((point) => point.key === pendingHoverPreview.key) ? pendingHoverPreview : null;
 
