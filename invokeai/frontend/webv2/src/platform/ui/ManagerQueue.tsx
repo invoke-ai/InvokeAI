@@ -34,10 +34,7 @@ import { MiddleTruncate } from './MiddleTruncate';
 import { Scrollable } from './Scrollable';
 import { Tooltip } from './Tooltip';
 
-/**
- * Presentational frame for a manager's job queue docked under its panes: the footer bar, summary chips, and the job
- * table. Owners keep the job model, status vocabulary, and actions; these pieces only lay them out.
- */
+/** Presentational only: owners keep the job model, status vocabulary and actions. */
 
 const DOCKED_HEIGHT = 'min(30rem, 60dvh)';
 const TOGGLE_HOVER = { color: 'fg' } as const;
@@ -70,25 +67,18 @@ export interface ManagerQueueFooterProps {
   onMaximizedChange: (maximized: boolean) => void;
   maximizeTooltip: string;
   restoreTooltip: string;
-  /** Chips shown beside the title while expanded. */
   expandedSummary: ReactNode;
-  /** The featured job, or a summary line, while collapsed. */
   collapsedSummary: ReactNode;
-  /** Chips that follow the collapsed summary. */
   collapsedChips?: ReactNode;
-  /** Owner actions ahead of Clear finished while expanded. */
   expandedActions?: ReactNode;
-  /** Actions for the featured job while collapsed. */
   collapsedActions?: ReactNode;
   /** Settled jobs Clear finished would remove; the control disables (expanded) or hides (collapsed) at zero. */
   finishedCount: number;
   isClearingFinished?: boolean;
   onClearFinished: () => void;
-  /** The job table, shown while expanded. */
   children: ReactNode;
 }
 
-/** Queue docked to the bottom of a manager: a summary bar collapsed, a table expanded, or the whole pane maximized. */
 export const ManagerQueueFooter = ({
   children,
   collapsedActions,
@@ -146,7 +136,6 @@ export const ManagerQueueFooter = ({
             {expandedSummary}
           </HStack>
         ) : (
-          // Chips wrap under the featured job before anything overlaps in a narrow pane.
           <HStack flex="1 1 16rem" flexWrap="wrap" gap="2" minW="0">
             {collapsedSummary}
             <HStack flexShrink={0} gap="1">
@@ -236,7 +225,6 @@ export const ManagerQueueChip = ({
   );
 };
 
-/** Collapsed summary line when no job is featured. */
 export const ManagerQueueSummaryText = ({ children }: { children: string }) => (
   <Text color="fg.muted" flex="1 1 10rem" minW="0" truncate>
     {children}
@@ -260,7 +248,6 @@ export const ManagerQueueProgressBar = ({
   </Progress.Root>
 );
 
-/** The active job the collapsed bar leads with. */
 export const ManagerQueueFeatured = ({
   caption,
   name,
@@ -324,7 +311,6 @@ export const ManagerQueueRowAction = ({
   </IconButton>
 );
 
-/** A failure under the job name: the backend's reason code, when it has one, beside its message. */
 export const ManagerQueueErrorDetail = ({ message, reason }: { message: string; reason?: string | null }) => (
   <HStack align="baseline" flexWrap="wrap" gap="1.5" pt="0.5">
     {reason ? (
@@ -341,16 +327,12 @@ export const ManagerQueueErrorDetail = ({ message, reason }: { message: string; 
 export interface ManagerQueueRowProps extends Omit<Table.RowProps, 'children'> {
   glyph: ManagerQueueGlyph;
   name: string;
-  /** Settled successes recede so live and failed jobs stand out. */
   nameMuted?: boolean;
-  /** Mono source line under the name; omitted when null. */
   subtitle?: string | null;
-  /** Owner content under the name: errors, fixes, per-file problems. */
   details?: ReactNode;
   progressBar?: ReactNode;
   caption: string;
   status: { label: string; palette: string };
-  /** Beside the status badge, e.g. a stale-progress warning. */
   statusAdornment?: ReactNode;
   tone?: 'error' | 'warning';
   actions?: ReactNode;
@@ -424,16 +406,13 @@ export const ManagerQueueRow = ({
 );
 
 export interface ManagerQueueTableProps {
-  /** Accessible name of the scrolling job list. */
   label: string;
   isLoading?: boolean;
-  /** Replaces the table when the queue itself could not load. */
   loadError?: { title: string; description: string | null; onRetry: () => void } | null;
   isEmpty: boolean;
   emptyIcon: LucideIcon;
   emptyTitle: string;
   emptyDescription: string;
-  /** `ManagerQueueRow`s. */
   children: ReactNode;
 }
 

@@ -21,7 +21,6 @@ import { page, userEvent } from 'vitest/browser';
 import { galleryWidgetManifest } from './manifest';
 import { Field } from './settingsBindings';
 
-/** The workbench the binding sees; null is the Launchpad, where there is none. */
 const storeRef = vi.hoisted(() => ({ current: null as WorkbenchInternalStore | null }));
 const subscribeToNothing = () => () => {};
 const getNull = () => null;

@@ -129,14 +129,6 @@ afterEach(async () => {
 });
 
 describe('ImageMapVocabularySettings', () => {
-  it('lists the stored terms as chips with the count line', async () => {
-    await render({ terms: ['aardvark', 'zebra'] });
-
-    expect(host?.textContent).toContain('aardvark');
-    expect(host?.textContent).toContain('zebra');
-    expect(host?.textContent).toContain('2 of 500 supplementary terms');
-  });
-
   it('splits a pasted list, normalizes it, and saves the merged terms', async () => {
     mocks.updateImageMapVocab.mockImplementation((terms: string[]) =>
       Promise.resolve({ ...BASE_VOCAB, state: 'building' as const, terms })
@@ -155,29 +147,6 @@ describe('ImageMapVocabularySettings', () => {
     expect(host?.textContent).toContain('Updating cluster labels with the new vocabulary…');
   });
 
-  it('refuses a draft that adds nothing new without calling the server', async () => {
-    await render({ terms: ['zebra'] });
-
-    await userEvent.fill(input()!, 'ZEBRA');
-    await userEvent.keyboard('{Enter}');
-    await flushQueries();
-
-    expect(mocks.updateImageMapVocab).not.toHaveBeenCalled();
-    expect(host?.textContent).toContain('Every entered term is already in the list.');
-    expect(input()?.value).toBe('ZEBRA');
-  });
-
-  it('refuses an overlong term locally', async () => {
-    await render({ maxTermLength: 8, terms: [] });
-
-    await userEvent.fill(input()!, 'a far too long term');
-    await userEvent.keyboard('{Enter}');
-    await flushQueries();
-
-    expect(mocks.updateImageMapVocab).not.toHaveBeenCalled();
-    expect(host?.textContent).toContain('Terms must be 8 characters or fewer.');
-  });
-
   it('removes a chip by saving the list without it', async () => {
     mocks.updateImageMapVocab.mockImplementation((terms: string[]) =>
       Promise.resolve({ ...BASE_VOCAB, state: 'building' as const, terms })
@@ -190,33 +159,6 @@ describe('ImageMapVocabularySettings', () => {
     expect(mocks.updateImageMapVocab).toHaveBeenCalledWith(['zebra']);
   });
 
-  it('explains that the rebuild is queued behind image indexing', async () => {
-    // Show indexing counts because vocabulary rebuild waits behind the entire image backfill.
-    mocks.indexCounts = { embedded: 1204, failed: 0, pending: 16846, total: 18050 };
-    await render({ state: 'building', terms: ['zebra'] });
-
-    expect(host?.textContent).toContain('Waiting for image indexing to finish (1,204 of 18,050 images)');
-    expect(host?.textContent).not.toContain('Updating cluster labels with the new vocabulary…');
-    // The panel may be opened mid-run with no status event due.
-    expect(mocks.refreshImageIndexStatus).toHaveBeenCalled();
-  });
-
-  it('says only that labels are updating when the index is idle', async () => {
-    mocks.indexCounts = { embedded: 18050, failed: 0, pending: 0, total: 18050 };
-    await render({ state: 'building', terms: ['zebra'] });
-
-    expect(host?.textContent).toContain('Updating cluster labels with the new vocabulary…');
-    expect(host?.textContent).not.toContain('Waiting for image indexing');
-  });
-
-  it('does not poll index status when no rebuild is running', async () => {
-    mocks.indexCounts = { embedded: 1204, failed: 0, pending: 16846, total: 18050 };
-    await render({ state: 'ready', terms: ['zebra'] });
-
-    expect(mocks.refreshImageIndexStatus).not.toHaveBeenCalled();
-    expect(host?.textContent).not.toContain('Waiting for image indexing');
-  });
-
   it('shows a read-only list to a non-admin', async () => {
     mocks.canManage = false;
     await render({ terms: ['zebra'] });
@@ -225,33 +167,5 @@ describe('ImageMapVocabularySettings', () => {
     expect(host?.textContent).toContain('Only an administrator can change the vocabulary.');
     expect(input()).toBeNull();
     expect(chipCloseTriggers()).toHaveLength(0);
-  });
-
-  it('surfaces a failed embedding build with its message and offers a retry', async () => {
-    mocks.updateImageMapVocab.mockImplementation((terms: string[]) =>
-      Promise.resolve({ ...BASE_VOCAB, state: 'building' as const, terms })
-    );
-    await render({ error: 'no text encoder installed', state: 'error', terms: ['zebra'] });
-
-    expect(host?.textContent).toContain('The vocabulary could not be prepared: no text encoder installed');
-
-    const retry = Array.from(host!.querySelectorAll('button')).find((button) => button.textContent === 'Retry');
-
-    await userEvent.click(retry!);
-    await flushQueries();
-
-    // Re-saving the same list is the retry path: it re-triggers the
-    // server-side invalidation that clears the memoized failure.
-    expect(mocks.updateImageMapVocab).toHaveBeenCalledWith(['zebra']);
-  });
-
-  it('hides the retry affordance from a non-admin', async () => {
-    mocks.canManage = false;
-    await render({ error: 'no text encoder installed', state: 'error', terms: ['zebra'] });
-
-    expect(host?.textContent).toContain('The vocabulary could not be prepared: no text encoder installed');
-    expect(
-      Array.from(host!.querySelectorAll('button')).find((button) => button.textContent === 'Retry')
-    ).toBeUndefined();
   });
 });

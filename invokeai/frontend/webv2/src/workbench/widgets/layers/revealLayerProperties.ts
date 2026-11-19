@@ -5,10 +5,7 @@ import { useCallback } from 'react';
 
 import { requestLayerProperties } from './layerPropertiesRequestStore';
 
-/**
- * Brings a layer's Properties into view: the Canvas in the center view, the Layers widget open, and the layer revealed
- * there once its row renders. Focus stays with the caller, so a toolbar or menu that asked keeps its place.
- */
+/** Brings a layer's Properties into view; focus stays with the caller. */
 export const useRevealLayerProperties = (): ((layerId: string) => void) => {
   const { widgets } = useWorkbenchCommands();
   const registry = useOptionalWorkbenchWidgetRegistry();

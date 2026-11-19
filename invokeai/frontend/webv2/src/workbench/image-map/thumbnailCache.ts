@@ -9,23 +9,19 @@ import {
 } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 
-/**
- * Hover thumbnail and optional video duration derive from immutable item names and can be cached independently of
- * mutable DTOs.
- */
+/** Hover thumbnails and optional video durations derive from immutable item names: cacheable apart from DTOs. */
 export interface HoverThumbnail {
   url: string;
   /** Seconds, for videos only; images have no duration to show. */
   durationSeconds: number | null;
 }
 
-// A video's thumbnail is the frame the index embedded it by, so the hover
-// preview shows exactly what the map placed.
+// A video's thumbnail is the frame the index embedded it by, so the hover preview shows exactly what the map placed.
 const urls = new Map<string, HoverThumbnail | null>();
 const inflight = new Map<string, Promise<HoverThumbnail | null>>();
 
-// Thumbnail URLs are account-owned gallery data: drop them on login/logout so
-// one account's map hovers can never serve another account's thumbnails.
+// Thumbnail URLs are account-owned gallery data: drop them on login/logout so one account's map hovers can never serve
+// another account's thumbnails.
 registerAccountOwnedResource({
   clear: () => {
     urls.clear();
@@ -57,8 +53,7 @@ export const getThumbnailUrl = (item: GalleryItemRef): Promise<HoverThumbnail | 
         url: resolved.thumbnailUrl,
       };
 
-      // A resolution that raced an account switch must not seed the next
-      // account's cache.
+      // A resolution that raced an account switch must not seed the next account's cache.
       if (isAccountScopeCurrent(owner)) {
         urls.set(key, thumbnail);
       }
@@ -74,8 +69,7 @@ export const getThumbnailUrl = (item: GalleryItemRef): Promise<HoverThumbnail | 
       return null;
     })
     .finally(() => {
-      // Release only this request's claim; an account switch already cleared
-      // the in-flight map.
+      // Release only this request's claim; an account switch already cleared the in-flight map.
       if (inflight.get(key) === request) {
         inflight.delete(key);
       }

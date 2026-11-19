@@ -6,8 +6,8 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { useMemo, useState } from 'react';
 
 /**
- * What the grid and the list layouts share over one collection: duplicate-safe entries, the templates the project
- * holds copies of, and the server-window demand for the positions on screen.
+ * What the grid and the list layouts share over one collection: duplicate-safe entries, the templates the project holds
+ * copies of, and the server-window demand for the positions on screen.
  */
 
 const NO_LINKED_TEMPLATES: ReadonlySet<string> = new Set();
@@ -78,8 +78,8 @@ export const getWorkflowLibraryDemandIds = (
 let demandLease = 0;
 
 /**
- * Demands one window: key it by its range and identities, so each change remounts it. The newest mount owns the
- * visible demand; an unmount clears it only if no newer mount took over in the meantime.
+ * Demands one window: key it by its range and identities, so each change remounts it. The newest mount owns the visible
+ * demand; an unmount clears it only if no newer mount took over in the meantime.
  */
 export const WorkflowLibraryDemand = ({ ids, start, end }: { ids: readonly string[]; start: number; end: number }) => {
   useMountEffect(() => {
@@ -98,9 +98,9 @@ export const WorkflowLibraryDemand = ({ ids, start, end }: { ids: readonly strin
 };
 
 /**
- * A demand key that stops following its window while the collection is hidden under the preview stage: the demand
- * keeps the positions it showed, so a preview stepping elsewhere in the results does not pull the window back, and
- * showing the collection again demands its window afresh only if that window changed meanwhile.
+ * A demand key that stops following its window while the collection is hidden under the preview stage: the demand keeps
+ * the positions it showed, so a preview stepping elsewhere in the results does not pull the window back, and showing
+ * the collection again demands its window afresh only if that window changed meanwhile.
  */
 export const useFrozenWhileHidden = (key: string, isHidden: boolean): string => {
   const [frozenKey, setFrozenKey] = useState<string | null>(null);

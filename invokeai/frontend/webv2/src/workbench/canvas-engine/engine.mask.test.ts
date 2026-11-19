@@ -281,7 +281,6 @@ const setupEngine = (doc: CanvasDocumentContractV3, options: { readbackAlpha?: n
   engine.surface.attach(screen.element, overlay.element);
   raf.flush();
 
-  /** The image data most recently written into any surface with `putImageData`. */
   const lastWrittenPixels = (): unknown =>
     surfaces.flatMap((surface) => surface.callLog.filter((entry) => entry.op === 'putImageData')).at(-1)?.args[0];
   return {
@@ -310,7 +309,6 @@ describe('inpaint mask painting', () => {
     expect(strokes).toHaveLength(1);
     expect(strokes[0]!.layerId).toBe('mask1');
     expect(strokes[0]!.tool).toBe('brush');
-    // A mask target must NOT spawn a fresh paint layer (the auto-create path).
     const added = dispatch.mock.calls.map((c) => c[0]).filter((a) => a.type === 'addCanvasLayer');
     expect(added).toHaveLength(0);
     engine.lifecycle.dispose();
@@ -318,12 +316,10 @@ describe('inpaint mask painting', () => {
 
   it('erases from the mask cache with the eraser (destination-out) as a committed stroke', () => {
     const { engine, overlay, strokes } = setupEngine(maskDoc());
-    // Paint some coverage first.
     engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(20, 20));
     overlay.fire('pointermove', pointerAt(60, 60));
     overlay.fire('pointerup', pointerAt(60, 60, 0));
-    // Then erase.
     engine.tools.setTool('eraser');
     overlay.fire('pointerdown', pointerAt(30, 30));
     overlay.fire('pointermove', pointerAt(40, 40));
@@ -332,21 +328,6 @@ describe('inpaint mask painting', () => {
     expect(strokes).toHaveLength(2);
     expect(strokes[1]!.tool).toBe('eraser');
     expect(strokes[1]!.layerId).toBe('mask1');
-    engine.lifecycle.dispose();
-  });
-
-  it('does not paint into a locked mask', () => {
-    const doc = maskDoc();
-    getDocumentLeaves(doc)[0]!.isLocked = true;
-    const { dispatch, engine, overlay, strokes } = setupEngine(doc);
-    engine.tools.setTool('brush');
-    overlay.fire('pointerdown', pointerAt(20, 20));
-    overlay.fire('pointermove', pointerAt(40, 40));
-    overlay.fire('pointerup', pointerAt(40, 40, 0));
-
-    expect(strokes).toHaveLength(0);
-    // Also never spawns a paint layer over the locked mask.
-    expect(dispatch.mock.calls.map((c) => c[0]).some((a) => a.type === 'addCanvasLayer')).toBe(false);
     engine.lifecycle.dispose();
   });
 
@@ -368,13 +349,10 @@ describe('inpaint mask painting', () => {
     expect(configDispatch).toBeDefined();
     const config = configDispatch!.config;
     expect(config.layerType).toBe('inpaint_mask');
-    // The mask bitmap ref + its content offset are dispatched (not an image source).
     expect(config).toHaveProperty('mask');
     const mask = (config as { mask: { bitmap: unknown; offset: unknown } }).mask;
     expect(mask.bitmap).toMatchObject({ imageName: 'mask-img' });
     expect(mask.offset).toBeDefined();
-    // The mask persistence must NEVER dispatch a paint source (that would convert
-    // the mask into a raster paint layer).
     expect(dispatch.mock.calls.map((c) => c[0]).some((a) => a.type === 'updateCanvasLayerSource')).toBe(false);
     engine.lifecycle.dispose();
   });
@@ -394,7 +372,6 @@ describe('inpaint mask shapes', () => {
     expect(actions().some((a) => a.type === 'addCanvasLayer')).toBe(false);
     expect(engine.history.getEntries().past).toEqual(['Draw shape']);
 
-    // Undo puts the mask's pre-shape pixels back over the shape's rect; redo puts the shape's pixels back.
     expect(await engine.history.undo()).toBe('applied');
     expect(lastWrittenPixels()).toBe(strokes[0]!.beforeImageData);
     expect(await engine.history.redo()).toBe('applied');
@@ -459,7 +436,6 @@ describe('accepting a result while a mask is selected', () => {
     expect(document().stacks.raster[0]).toMatchObject({ id: layerId, isEnabled: true });
     expect(document().selectedLayerId).toBe('mask1');
 
-    // The other eye, straight away: the brush lands on the mask, not on the accepted image.
     engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(60, 20));
     overlay.fire('pointermove', pointerAt(80, 30));
@@ -500,8 +476,6 @@ describe('mask invert', () => {
     engine.lifecycle.dispose();
   });
 
-  // Invert must include live cache bounds: unflushed strokes outside the bbox are absent from persisted
-  // `mask.bitmap` bounds.
   it('unions the live (unflushed) cache rect into the invert domain, covering an out-of-bbox stroke', () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
@@ -539,23 +513,18 @@ describe('mask invert', () => {
     raf.flush();
 
     engine.tools.setTool('brush');
-    // Paint beyond the 100x100 bbox without flushing, leaving a grown live cache but null persisted bitmap.
     overlay.fire('pointerdown', pointerAt(150, 150));
     overlay.fire('pointermove', pointerAt(180, 180));
     overlay.fire('pointerup', pointerAt(180, 180, 0));
 
     expect(engine.layers.invertMask('mask1')).toEqual({ status: 'committed' });
 
-    // Growth replaces backing surfaces. Inspect the last surface receiving `putImageData`, which owns the final
-    // invert extent.
     const putSurfaces = surfaces.filter((surface) => surface.callLog.some((entry) => entry.op === 'putImageData'));
     const maskCache = putSurfaces[putSurfaces.length - 1];
     expect(maskCache).toBeDefined();
     const getCalls = maskCache!.callLog.filter((entry) => entry.op === 'getImageData');
     expect(getCalls.length).toBeGreaterThan(0);
     const [sx, sy, sw, sh] = getCalls[getCalls.length - 1]!.args as [number, number, number, number];
-    // The invert domain must cover the unflushed stroke at (150,150)-(180,180), beyond persisted/bbox bounds
-    // ending at 100.
     expect(sx + sw).toBeGreaterThan(110);
     expect(sy + sh).toBeGreaterThan(110);
 

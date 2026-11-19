@@ -27,8 +27,8 @@ export type SchedulerPolicyModel = Pick<ModelConfig, 'base' | 'format' | 'varian
 export type SchedulerPolicyReader = (model: SchedulerPolicyModel, currentValue: string | null) => ModelSchedulerPolicy;
 
 /**
- * Generate's scheduler rules: `loading` until the rules and the architecture table they read arrive, `unavailable`
- * when either failed, and `ready` with a reader that is replaced whenever the table changes.
+ * Generate's scheduler rules: `loading` until the rules and the architecture table they read arrive, `unavailable` when
+ * either failed, and `ready` with a reader that is replaced whenever the table changes.
  */
 export type SchedulerPolicyState =
   | { status: 'loading' }

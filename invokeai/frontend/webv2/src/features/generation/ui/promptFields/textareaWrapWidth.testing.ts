@@ -6,9 +6,7 @@
 export type HalfPixelWrapSide = 'fits' | 'wraps';
 
 export interface HalfPixelWrapEdge {
-  /** Index in `text` of the word that sits on the wrap edge. */
   edgeWordIndex: number;
-  /** The textarea's padding-box width to lay out at: whole pixels plus a half. */
   paddingBoxWidth: number;
   text: string;
 }
@@ -53,7 +51,6 @@ export const findHalfPixelWrapEdge = (
 
   for (let count = 2; count <= words.length; count += 1) {
     const text = words.slice(0, count).join(' ');
-    // The narrowest padding box that holds `text` on one line.
     const threshold = measureTextWidth(computed, text) + paddingInline;
     const fraction = threshold - Math.floor(threshold);
     // Stay clear of the edge itself so layout's 1/64 px steps cannot decide the case.

@@ -235,10 +235,7 @@ interface LayerContextActionDefinitionBase {
   getLabelCount?(context: LayerContextActionState): number;
 }
 
-/**
- * A picker action is its own submenu, so it cannot also sit in a static one: there it would render as a plain item
- * that runs without a board.
- */
+/** Its own submenu, never in a static one, where it would run as a plain item without a board. */
 export type LayerContextActionDefinition = LayerContextActionDefinitionBase &
   (
     | { picker?: never; submenu?: LayerContextSubmenuId }
@@ -343,9 +340,9 @@ const toggleLabel = (key: string, defaultLabel: string, icon: LucideIcon): Enabl
   icon,
   key: `widgets.layers.actions.${key}`,
 });
-// Overlays name the enabled flag for what it decides there, taking part in generation, since their canvas visibility
-// is its own action; raster layers show and hide; a selection holding both is turned off or on, which is true of each.
-// The overlay icons are the row dot's shapes: a plain ring for off, a dot for on (the dashed ring means a group above
+// Overlays name the enabled flag for what it decides there, taking part in generation, since their canvas visibility is
+// its own action; raster layers show and hide; a selection holding both is turned off or on, which is true of each. The
+// overlay icons are the row dot's shapes: a plain ring for off, a dot for on (the dashed ring means a group above
 // leaves the layer out, which no action sets).
 const OVERLAY_LAYER: EnabledToggleLabels = {
   off: toggleLabel('excludeFromGeneration', 'Exclude from generation', CircleIcon),
@@ -376,10 +373,7 @@ const MIXED_SELECTION: EnabledToggleLabels = {
   on: toggleLabel('turnOnSelected', 'Turn on selected', EyeIcon),
 };
 
-/**
- * How turning the enabled flag of `targets` off (`turnOff`) or on is named, wherever it is offered: the row's dot or
- * eye, the layer and group menus, and the undo step each records.
- */
+/** How toggling `targets` enabled is named in the dot, eye, menus and undo step. */
 export const enabledToggleLabel = (
   document: Pick<CanvasDocumentContractV3, 'stacks'>,
   targets: readonly string[],
@@ -465,8 +459,8 @@ const hasFilterableLayerContent = (context: LayerContextActionState): boolean =>
   }
   const { source } = context.layer;
   if (source.type === 'image' || source.type === 'paint') {
-    // `hasSupportedContent` distinguishes empty paint from live unpersisted
-    // cache pixels, which are intentionally filterable despite `bitmap: null`.
+    // `hasSupportedContent` distinguishes empty paint from live unpersisted cache pixels, which are intentionally
+    // filterable despite `bitmap: null`.
     return true;
   }
   if (context.layer.type !== 'raster') {
@@ -1060,8 +1054,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     section: 'output',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
-  // Raster layers have one axis: hiding takes a layer off the canvas and out of generation alike. Overlays name the
-  // same flag for generation (see enabledToggleLabel).
+  // Raster layers have one axis: hiding takes a layer off the canvas and out of generation alike.
   {
     defaultLabel: 'Show or hide layer',
     getDefaultLabel: (context) => enabledActionLabel(context).defaultLabel,

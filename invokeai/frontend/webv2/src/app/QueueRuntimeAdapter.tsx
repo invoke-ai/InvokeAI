@@ -77,8 +77,7 @@ export const QueueRuntimeAdapter = () => {
             assertAccountScopeCurrent(owner);
             const { galleryItemOrganization, isGalleryBoardAttachable } = await import('@features/gallery');
 
-            // Skip virtual destinations: attachment transport no-ops would otherwise be reported as video
-            // failures.
+            // Skip virtual destinations: attachment transport no-ops would otherwise be reported as video failures.
             if (!isGalleryBoardAttachable(boardId)) {
               return;
             }

@@ -28,8 +28,7 @@ describe('getGalleryCountForView', () => {
   });
 
   it('splits asset-category videos out of media and into assets', () => {
-    // 4 videos total, 1 uploaded (asset): media shows 50 images + 3 media videos,
-    // assets shows 3 asset images + 1 asset video.
+    // 4 videos, 1 uploaded (asset): media shows 50 images + 3 media videos, assets 3 asset images + 1 asset video.
     const board = createBoard({ assetVideoCount: 1 });
 
     expect(getGalleryCountForView(board, 'images')).toBe(53);

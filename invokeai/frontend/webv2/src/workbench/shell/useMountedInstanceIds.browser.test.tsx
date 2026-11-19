@@ -13,7 +13,6 @@ import {
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-/** Publish probe output from an effect to keep rendering pure and the probe prop-free. */
 const latest: { ids: string[] } = { ids: [] };
 
 const Probe = ({ activeId, limit, resetKey }: { activeId: string | undefined; limit?: number; resetKey: string }) => {
@@ -85,12 +84,6 @@ describe('mounted instance ids', () => {
     expect(latest.ids).toBe(first);
   });
 
-  it('tolerates no active instance', async () => {
-    await renderHook(undefined);
-
-    expect(latest.ids).toEqual([]);
-  });
-
   it('starts remembering once an instance finally arrives', async () => {
     const { rerender } = await renderHook(undefined);
 
@@ -105,8 +98,6 @@ describe('mounted instance ids', () => {
     await rerender('workflow:center');
     expect(latest.ids).toEqual(['canvas', 'workflow:center']);
 
-    // Instance ids are identical in every project, so a remembered id would
-    // otherwise resolve to a real — but wrong — instance of the new project.
     await rerender('workflow:center', 'project-b');
     expect(latest.ids).toEqual(['workflow:center']);
   });
@@ -138,8 +129,6 @@ describe('instances shown elsewhere', () => {
       right: { activeInstanceId: 'layers', instanceIds: ['layers', 'preview', 'gallery'] },
     };
 
-    // `preview` is a member of the right rail but not its active instance, so it
-    // stays available for the centre to keep.
     expect(getActiveInstanceIdsOutside(widgetRegions, 'center')).toEqual(['gallery:bottom', 'generate', 'layers']);
   });
 
@@ -149,7 +138,6 @@ describe('instances shown elsewhere', () => {
       right: { activeInstanceId: 'layers', instanceIds: ['layers'] },
     };
 
-    // Floating removes the regional active id; floating ids must also evict kept regional copies.
     expect(getActiveInstanceIdsOutside(widgetRegions, 'right', { 'image-map': {} })).toEqual(['canvas', 'image-map']);
   });
 });

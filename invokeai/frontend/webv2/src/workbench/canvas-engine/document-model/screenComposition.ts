@@ -32,9 +32,9 @@ export const isLeafIsolated = (leaf: SemanticLeaf, isolationLayerId: string | nu
   isolationLayerId !== null && (leaf.id === isolationLayerId || leaf.parentIds.includes(isolationLayerId));
 
 /**
- * Whether document visibility admits a leaf to the screen. Isolation deliberately overrides both
- * contribution and display visibility because isolated operations act on the named layer itself.
- * Frame-demand planning consumes this same predicate so allocation and composition cannot drift.
+ * Whether document visibility admits a leaf to the screen. Isolation deliberately overrides both contribution and
+ * display visibility because isolated operations act on the named layer itself. Frame-demand planning consumes this
+ * same predicate so allocation and composition cannot drift.
  */
 export const isLeafDrawableForScreen = (leaf: SemanticLeaf, isIsolated: boolean): boolean =>
   isIsolated || (leaf.contributionEnabled && !leaf.documentHidden);

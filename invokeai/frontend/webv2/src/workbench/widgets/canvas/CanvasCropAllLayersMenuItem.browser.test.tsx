@@ -45,7 +45,6 @@ afterEach(async () => {
   root = null;
 });
 
-/** Opens a menu holding only the item, over a project whose canvas holds `nodes`. */
 const renderItem = async (nodes: CanvasNodeContract[], documentEditingLocked: boolean) => {
   const base = createInitialWorkbenchState().projects[0]!;
   harness.project = {

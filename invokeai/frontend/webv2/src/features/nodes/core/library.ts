@@ -17,10 +17,7 @@ export const DEFAULT_NODE_PACK_FILTERS: NodePackFilters = {
   sortField: 'name',
 };
 
-/**
- * Zero nodes indicates failed import or pending reload/restart because counts come from the live invocation
- * registry.
- */
+/** Zero nodes means a failed import or a pending reload/restart: counts come from the live invocation registry. */
 export const isProblemPack = (pack: Pick<NodePackInfo, 'nodeCount'>): boolean => pack.nodeCount === 0;
 
 const compareBySortField = (a: NodePackInfo, b: NodePackInfo, field: NodePackSortField): number => {

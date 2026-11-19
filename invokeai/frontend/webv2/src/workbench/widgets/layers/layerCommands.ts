@@ -21,7 +21,6 @@ import { useTranslation } from 'react-i18next';
 
 import { createEmptyPaintLayer, createLayerId, nextGroupName } from './layerOps';
 
-/** Insert an empty raster layer above the live selection, inside its group when a child is selected. */
 export const prepareNewRasterLayer = (model: CanvasDocumentModel): PrepareEditResult => {
   const { document } = model;
   const layerNames = getDocumentIndex(document).nodes.map(({ node }) => node.name);

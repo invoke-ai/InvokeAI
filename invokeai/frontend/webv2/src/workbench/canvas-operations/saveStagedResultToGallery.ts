@@ -51,8 +51,8 @@ const assignBoard = async (
 /**
  * Promote a staged canvas result into the gallery with the same destination as a canvas save: a board the image is
  * already on stays; otherwise the project's auto-add board, else Uncategorized. The destination is read from the
- * `project` snapshot handed in, so switching projects mid-save cannot redirect it. A failed promotion throws;
- * a failed board assignment is reported as such, since the image is in the gallery either way.
+ * `project` snapshot handed in, so switching projects mid-save cannot redirect it. A failed promotion throws; a failed
+ * board assignment is reported as such, since the image is in the gallery either way.
  */
 export const saveStagedResultToGallery = async (
   { imageName, project, scopedDefaults }: { imageName: string; project: Project; scopedDefaults: ScopedDefaults },

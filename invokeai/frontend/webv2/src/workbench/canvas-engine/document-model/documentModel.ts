@@ -66,8 +66,8 @@ export interface DocumentModelContext {
 }
 
 /**
- * Pure document lookup, tree facts, semantic leaves and prepared edits. Indexes cache by forest identity; leaves
- * retain identity while layer and ancestor-effective state match. Returned sequences define ordering.
+ * Pure document lookup, tree facts, semantic leaves and prepared edits. Indexes cache by forest identity; leaves retain
+ * identity while layer and ancestor-effective state match. Returned sequences define ordering.
  */
 export interface CanvasDocumentModel {
   readonly document: CanvasDocumentContractV3;
@@ -319,8 +319,8 @@ export const mergeDownEligibility = (document: CanvasDocumentContractV3, upperId
 const unique = <T>(values: readonly T[]): T[] => [...new Set(values)];
 
 /**
- * Whether two patches name the same fields, descending only into the partial containers listed in
- * `containers` as dotted paths; every other value is compared as a whole.
+ * Whether two patches name the same fields, descending only into the partial containers listed in `containers` as
+ * dotted paths; every other value is compared as a whole.
  */
 const sameKeys = (
   left: Record<string, unknown>,
@@ -426,9 +426,9 @@ interface SiblingRun {
 }
 
 /**
- * Splits `entries` (outermost, document order) into maximal runs of adjacent siblings, each anchored
- * to the nearest siblings that are not among `entries`. Applying the runs top first puts every
- * node back exactly where it was, whether they are being restored after a removal or a move.
+ * Splits `entries` (outermost, document order) into maximal runs of adjacent siblings, each anchored to the nearest
+ * siblings that are not among `entries`. Applying the runs top first puts every node back exactly where it was, whether
+ * they are being restored after a removal or a move.
  */
 const captureRestoreRuns = (
   index: CanvasDocumentIndex,

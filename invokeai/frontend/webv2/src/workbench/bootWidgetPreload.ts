@@ -5,8 +5,8 @@ import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 import { getWidgetHosts, warmWidgets } from './widgetRegistry';
 
 /**
- * Remember widget types in a separate boot hint so chunk downloads overlap hydration. Unknown or disabled types
- * are ignored; stale or cross-account hints only preload unused chunks.
+ * Remember widget types in a separate boot hint so chunk downloads overlap hydration. Unknown or disabled types are
+ * ignored; stale or cross-account hints only preload unused chunks.
  */
 const BOOT_WIDGET_HINT_STORAGE_KEY = 'invokeai:v7:webv2:boot-widgets';
 

@@ -18,8 +18,7 @@ export const MaintenanceMenu = () => {
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
   const syncDialog = useExitPresence(isSyncDialogOpen);
   const [isEmptyCacheConfirmOpen, setIsEmptyCacheConfirmOpen] = useState(false);
-  // Separate instances: run ignores re-entry, and a slow cache emptying must
-  // not swallow a refresh (or vice versa).
+  // Separate instances: run ignores re-entry, and a slow cache emptying must not swallow a refresh (or vice versa).
   const { run: runEmptyCache } = useScopedAction();
   const { run: runRefresh } = useScopedAction();
 
@@ -45,9 +44,8 @@ export const MaintenanceMenu = () => {
         await refreshModels(owner);
 
         assertAccountScopeCurrent(owner);
-        // refreshModels records failures in the snapshot instead of
-        // rejecting (background refreshes stay silent by design); an
-        // explicit user refresh still deserves a failure toast.
+        // refreshModels records failures in the snapshot instead of rejecting (background refreshes stay silent by
+        // design); an explicit user refresh still deserves a failure toast.
         const { error } = getModelsSnapshot();
 
         if (error !== null) {

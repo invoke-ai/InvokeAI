@@ -7,17 +7,10 @@ import { useMemo } from 'react';
 
 import { LAYER_TREE_INDENT_PX } from './layerPanelRows';
 
-/**
- * Rows and stack headers end with this inset and space their trailing buttons by this gap, so the header eye and New
- * buttons share columns with the rows' eyes and locks. Nesting indents the start edge only.
- */
+/** Shared end inset and gap, so header and row trailing buttons line up in columns. */
 export const LAYER_PANEL_END_INSET = '1.5';
 export const LAYER_PANEL_CONTROL_GAP = '0.5';
-/**
- * Tree rows keep a gap below their surface (`pb="0.5"`) and indent it past the tree guides; the ring frames the
- * surface, not the gap or the guides, so it matches the selection fill and the row's content stays centred inside it.
- * It is the platform rows' own ring, moved from the focused tree item onto its surface.
- */
+/** The ring frames the surface, not the gap below it or the guides, matching the selection fill. */
 export const TREE_ROW_FOCUS = {
   '& > [data-layer-row-surface]': rowFocusRing,
   outline: 'none',

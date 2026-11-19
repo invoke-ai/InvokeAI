@@ -28,10 +28,8 @@ const settingByKey = (key: string) => {
 const DEFAULTS = {
   [CANVAS_BBOX_OVERLAY_KEY]: false,
   [CANVAS_CHECKERBOARD_KEY]: true,
-  // Off by default, matching legacy — strokes are unclipped until asked.
   [CANVAS_CLIP_TO_BBOX_KEY]: false,
   [CANVAS_INVERT_BRUSH_SCROLL_KEY]: false,
-  // Legacy default: keep the generation result transparent outside the mask.
   [CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY]: true,
   [CANVAS_RULE_OF_THIRDS_KEY]: false,
   [CANVAS_SHOW_BBOX_KEY]: true,
@@ -88,7 +86,6 @@ describe('canvasSettings persistence mapping', () => {
   it('gives every engine-backed store a distinct store id (other frontend-consumed settings have none)', () => {
     const stores = CANVAS_SETTINGS.map((s) => s.store).filter((s): s is NonNullable<typeof s> => s !== undefined);
     expect(new Set(stores).size).toBe(stores.length);
-    // These are consumed outside the engine and intentionally have no store.
     expect(settingByKey(CANVAS_SHOW_PROGRESS_KEY).store).toBeUndefined();
     expect(settingByKey(CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY).store).toBeUndefined();
   });

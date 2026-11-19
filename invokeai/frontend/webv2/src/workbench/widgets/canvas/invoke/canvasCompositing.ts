@@ -1,8 +1,4 @@
-/**
- * Persist canvas compositing policy per project. Generate owns numeric controls, Canvas settings owns masked-only
- * output, and prepareCanvasInvocation supplies defaulted/clamped values to compilation. Defaults mirror legacy
- * infill/coherence/mask behavior.
- */
+/** Per-project compositing policy; defaults mirror legacy infill/coherence/mask behavior. */
 
 /** The infill methods the outpaint graph can request (legacy `zInfillMethod`). */
 export type CanvasInfillMethod = 'patchmatch' | 'lama' | 'cv2' | 'color' | 'tile';

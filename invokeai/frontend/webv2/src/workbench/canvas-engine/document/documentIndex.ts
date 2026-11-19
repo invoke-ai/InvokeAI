@@ -76,8 +76,8 @@ const MAX_DERIVATION_DEPTH = 8;
 const MAX_OVERRIDE_RATIO = 0.25;
 
 /**
- * A map that reads through to the previous index's map for every entry a value edit did not touch.
- * Lookups cost one extra step per derivation; iteration substitutes overrides on the fly.
+ * A map that reads through to the previous index's map for every entry a value edit did not touch. Lookups cost one
+ * extra step per derivation; iteration substitutes overrides on the fly.
  */
 class LayeredEntryMap implements ReadonlyMap<string, CanvasNodeEntry> {
   readonly [Symbol.toStringTag] = 'LayeredEntryMap';
@@ -130,8 +130,8 @@ class LayeredEntryMap implements ReadonlyMap<string, CanvasNodeEntry> {
 }
 
 /**
- * Value-edit overlay index with predecessor read-through. Every ninth derivation flattens onto the plain root to
- * bound lookup depth and retention.
+ * Value-edit overlay index with predecessor read-through. Every ninth derivation flattens onto the plain root to bound
+ * lookup depth and retention.
  */
 class DerivedIndex implements CanvasDocumentIndex {
   readonly byId: ReadonlyMap<string, CanvasNodeEntry>;
@@ -285,9 +285,8 @@ const flagsChanged = (previous: CanvasNodeContract, next: CanvasNodeContract): b
     (previous.isHidden === true) !== (next.isHidden === true));
 
 /**
- * Derives an index after value-only edits, replacing changed nodes, ancestors and descendants affected by group
- * flags. Unchanged entries read through. Returns null without a prior index or when structure changed, deferring a
- * full build.
+ * Derives an index after value-only edits, replacing changed nodes, ancestors and descendants affected by group flags.
+ * Unchanged entries read through. Returns null without a prior index or when structure changed, deferring a full build.
  */
 const deriveIndexForValueEdit = (
   previousStacks: CanvasStackForests,
@@ -348,8 +347,8 @@ const deriveIndexForValueEdit = (
       node,
     });
   };
-  // Only the subtree under a group whose flags changed re-derives its ancestor-effective flags;
-  // a replaced node inside such a subtree is entered there once, with the new ancestors.
+  // Only the subtree under a group whose flags changed re-derives its ancestor-effective flags; a replaced node inside
+  // such a subtree is entered there once, with the new ancestors.
   for (const group of reflagged) {
     for (const member of collectSubtree(group)) {
       if (member.id !== group.id) {
@@ -392,8 +391,8 @@ const MIN_FOLDED_ENTRIES = 64;
 
 /**
  * The value edits that lead from `previous` to `next`, folded oldest first, or null when any step between them
- * restructured the forests or was not recorded, or when folding would touch more than a quarter of the nodes (a
- * forest diff is then cheaper).
+ * restructured the forests or was not recorded, or when folding would touch more than a quarter of the nodes (a forest
+ * diff is then cheaper).
  */
 export const valueEditBetween = (previous: CanvasStackForests, next: CanvasStackForests): CanvasValueEdit | null => {
   const steps: CanvasValueEdit[] = [];
@@ -428,9 +427,9 @@ export const valueEditBetween = (previous: CanvasStackForests, next: CanvasStack
 const rootKey = (stack: CanvasLayerStackKind): string => `\0${stack}`;
 
 /**
- * Rewrites named nodes in place of their old objects, locating them through the index. Only the sibling arrays on
- * each edited path are copied, so cost is the edited paths' sibling counts, not the forest. The next forests inherit
- * a derived index and record which nodes changed for incremental consumers. Returns `stacks` when nothing changed.
+ * Rewrites named nodes in place of their old objects, locating them through the index. Only the sibling arrays on each
+ * edited path are copied, so cost is the edited paths' sibling counts, not the forest. The next forests inherit a
+ * derived index and record which nodes changed for incremental consumers. Returns `stacks` when nothing changed.
  */
 export const updateNodeValues = (
   stacks: CanvasStackForests,

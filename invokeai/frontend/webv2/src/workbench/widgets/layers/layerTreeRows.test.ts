@@ -11,7 +11,6 @@ import { buildLayerStackRows } from './layerTreeRows';
 const layer = layerContract;
 const group = groupContract;
 
-/** raster: r1, G[r2, H[r3], r4], r5 · control: c1 */
 const document = () =>
   documentFrom([
     layer('c1', 'control'),
@@ -84,7 +83,6 @@ describe('projectLayerDrop', () => {
   const rows = () => buildLayerStackRows(document().stacks, new Set(['G', 'H'])).raster.rows;
 
   it('nests into a hovered group on the inside edge, including an empty one', () => {
-    // Into G, at its top, above its first rendered child.
     expect(
       projectLayerDrop({ activeIds: ['r5'], depthOffset: 0, edge: 'inside', overId: 'G', rows: rows() })
     ).toMatchObject({
@@ -94,7 +92,6 @@ describe('projectLayerDrop', () => {
       parentId: 'G',
       stack: 'raster',
     });
-    // An empty expanded group has no child rows; the inside edge is the way in.
     const withEmpty = documentFrom([layer('r1'), group('E', []), layer('r5')]);
     const emptyRows = buildLayerStackRows(withEmpty.stacks, new Set(['E'])).raster.rows;
     expect(
@@ -106,7 +103,6 @@ describe('projectLayerDrop', () => {
       parentId: 'E',
       stack: 'raster',
     });
-    // A COLLAPSED group with children drops at its top via the model child.
     const collapsedRows = buildLayerStackRows(document().stacks, new Set()).raster.rows;
     expect(
       projectLayerDrop({ activeIds: ['r5'], depthOffset: 0, edge: 'inside', overId: 'G', rows: collapsedRows })
@@ -117,7 +113,6 @@ describe('projectLayerDrop', () => {
       parentId: 'G',
       stack: 'raster',
     });
-    // The inside edge means nothing on a leaf.
     expect(
       projectLayerDrop({ activeIds: ['r5'], depthOffset: 0, edge: 'inside', overId: 'r1', rows: rows() })
     ).toBeNull();
@@ -184,7 +179,6 @@ describe('projectLayerDrop', () => {
   });
 
   it('clamps the depth to what the neighbours allow', () => {
-    // Between r2 and H the only legal depth is 1.
     expect(
       projectLayerDrop({ activeIds: ['r5'], depthOffset: 5, edge: 'below', overId: 'r2', rows: rows() })
     ).toMatchObject({ depth: 1, parentId: 'G' });

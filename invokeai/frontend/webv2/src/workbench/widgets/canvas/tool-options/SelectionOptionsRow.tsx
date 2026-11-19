@@ -59,10 +59,6 @@ const OpModeButton = ({
   );
 };
 
-/**
- * Share selection operation mode and empty-selection hints; each tool stores its mode, with transient Shift/Alt
- * overrides.
- */
 /** The four op-mode toggles alone; the form places them in a labelled row. */
 export const SelectionOpModeButtons = ({
   mode,
@@ -81,12 +77,7 @@ export const SelectionOpModeButtons = ({
   );
 };
 
-/**
- * A selection command; while unavailable, its tooltip says what is missing
- * instead of going quiet. The button is aria-disabled rather than natively
- * disabled so it still emits the pointer events the tooltip needs and stays
- * reachable by keyboard, where the reason reads as its description.
- */
+/** aria-disabled, not disabled, so the reason tooltip still gets pointer events and keyboard focus. */
 const SelectionAction = ({
   disabledReason,
   label,
@@ -116,10 +107,7 @@ const selectedLeafOrGroup = (document: CanvasDocumentContractV3) => {
   return node ? (lookupDocumentLeaf(document, node.id) ?? 'group') : null;
 };
 
-/**
- * Why Fill or Erase is unavailable, in the words of the notice the engine would give: what is wrong and what to do.
- * `layer` names the layer that refuses and whether it sits in an overlay stack.
- */
+/** Why Fill or Erase is unavailable, in the words of the notice the engine would give. */
 const describePixelRefusal = (
   status: Exclude<SelectionPixelEditRefusal, 'no-target' | 'unsupported'> | 'transform-session',
   layer: { id: string; name: string; overlay: boolean },
@@ -133,12 +121,7 @@ const describePixelRefusal = (
   return t('widgets.canvas.toolOptions.refusalReason', { message, title });
 };
 
-/**
- * Commands over the live selection. Select all always works; fill and erase
- * need a layer the brush and eraser would edit in place, refused the way they
- * are (the engine's own rule); lift needs an eligible paint or control layer;
- * invert and deselect need only a selection.
- */
+/** Commands over the live selection; fill and erase follow the engine's own brush and eraser rule. */
 export const SelectionActions = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const notify = useNotify();

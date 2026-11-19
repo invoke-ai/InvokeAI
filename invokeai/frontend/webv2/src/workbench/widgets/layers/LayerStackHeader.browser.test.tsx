@@ -151,7 +151,6 @@ describe('LayerStackHeader hint', () => {
     await wait(900);
     expect(hintCard()).toBeNull();
 
-    // Leaving the header straight from an action must not arm a late open.
     await act(() => userEvent.unhover(action));
     await wait(900);
     expect(hintCard()).toBeNull();
