@@ -6,6 +6,7 @@ config claiming the file shows up as a second match.
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -26,7 +27,7 @@ from invokeai.backend.model_manager.configs.main import (
 from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Flux2_Config
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from tests.backend.model_manager.load.moss_image_fixtures import fuse_qkv_keys, int8_convrot_keys
+from tests.backend.model_manager.load.moss_image_fixtures import CONVROT_MARKER, fuse_qkv_keys, int8_convrot_keys
 from tests.backend.model_manager.load.state_dicts import moss_image_dit_keys, moss_image_vae_keys
 from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
 from tests.fixtures.quantized_payloads import q8_cr_marker, quantize_convrot, write_gguf
@@ -179,6 +180,37 @@ def test_a_lora_for_the_transformer_is_a_moss_image_lora_not_a_main_model(tmp_pa
     assert isinstance(result.details[LoRA_LyCORIS_MossImage_Config.__name__], InvalidMatchError)
 
 
+def _torchao_fp8(
+    keys: Keys, *, scale_shape: list[int] | None = None, zero_point: bool = False, drop_scale_of: str | None = None
+) -> None:
+    """Store every block projection as unsloth's torchao build does: `_weight_qdata` plus a per-row `_weight_scale`
+    in place of `.weight`. `zero_point` makes the payload int8 with a zero point, as the INT8 build is."""
+    for key in [k for k in keys if re.fullmatch(r"layers\.\d+\.proj\.(q|k|v|o|ffn_up_gate|ffn_down)\.weight", k)]:
+        shape, _ = keys.pop(key)
+        layer = key.removesuffix(".weight")
+        keys[f"{layer}._weight_qdata"] = (shape, "I8" if zero_point else "F8_E4M3")
+        keys[f"{layer}._weight_scale"] = (scale_shape or [shape[0], 1], "F32")
+        if layer == drop_scale_of:
+            del keys[f"{layer}._weight_scale"]
+        if zero_point:
+            keys[f"{layer}._weight_zero_point"] = ([shape[0], 1], "I8")
+
+
+def test_unsloths_torchao_fp8_build_installs_with_fp8_storage_on(tmp_path: Path) -> None:
+    keys = _dit()
+    _torchao_fp8(keys)
+    # Header facts of MOSS-Image-Base-FP8.safetensors: 252 quantized layers, the embedders and heads dense bf16.
+    assert sum(k.endswith("._weight_qdata") for k in keys) == 252
+
+    result = _identify(write_header_only_safetensors(tmp_path / "MOSS-Image-Base-FP8.safetensors", keys))
+
+    assert type(result.config) is Main_Checkpoint_MossImage_Config
+    assert result.match_count == 1
+    # Identification turns FP8 Storage on for a float8 denoiser, and the loader keeps the file's fp8 layers for it.
+    assert result.config.default_settings is not None
+    assert result.config.default_settings.fp8_storage is True
+
+
 @pytest.mark.parametrize(
     ("quantize", "message"),
     [
@@ -189,8 +221,23 @@ def test_a_lora_for_the_transformer_is_a_moss_image_lora_not_a_main_model(tmp_pa
         ),
         pytest.param(
             lambda keys: keys.update({"layers.0.proj.q.weight": ([3072, 3072], "F8_E4M3")}),
-            "fp8-quantized MOSS-Image transformers are not supported yet",
+            "plain or ComfyUI scaled fp8 weight",
             id="raw-fp8",
+        ),
+        pytest.param(
+            lambda keys: keys.update(
+                {
+                    "layers.0.proj.q.weight": ([3072, 3072], "F8_E4M3"),
+                    "layers.0.proj.q.weight_scale": ([3072, 1], "F32"),
+                }
+            ),
+            "plain or ComfyUI scaled fp8 weight",
+            id="comfy-scaled-fp8",
+        ),
+        pytest.param(
+            lambda keys: (_torchao_fp8(keys), keys.update({"layers.0.proj.k.weight_scale": ([3072], "F32")})),
+            "side channel on a weight that is not int8",
+            id="torchao-with-stray-scale",
         ),
         pytest.param(
             lambda keys: keys.update({"layers.0.proj.q.comfy_quant": ([32], "U8")}),
@@ -210,9 +257,19 @@ def test_a_lora_for_the_transformer_is_a_moss_image_lora_not_a_main_model(tmp_pa
             id="packed-uint8-weights",
         ),
         pytest.param(
-            lambda keys: keys.update({"layers.0.proj.q._weight_qdata": ([3072, 3072], "F8_E4M3")}),
-            "torchao",
-            id="unsloth-fp8-torchao",
+            lambda keys: _torchao_fp8(keys, zero_point=True),
+            "carries a zero point",
+            id="unsloth-int8-torchao",
+        ),
+        pytest.param(
+            lambda keys: _torchao_fp8(keys, scale_shape=[3072, 24]),
+            "block-wise scales",
+            id="torchao-fp8-blockwise-scale",
+        ),
+        pytest.param(
+            lambda keys: _torchao_fp8(keys, drop_scale_of="layers.0.proj.q"),
+            "'layers.0.proj.q' has a quantized weight but no torchao scale",
+            id="torchao-half-pair",
         ),
         pytest.param(
             lambda keys: keys.update(
@@ -240,6 +297,45 @@ def test_an_unsupported_quantized_transformer_is_refused_not_registered(
     assert message in str(refusal)
 
 
+def test_a_prefixed_stray_scaled_fp8_marker_beside_torchao_layers_is_refused_like_an_unprefixed_one(
+    tmp_path: Path,
+) -> None:
+    """The loader judges keys after stripping the ComfyUI prefix, so the installer must not let the marker through."""
+    keys = _dit()
+    _torchao_fp8(keys)
+    keys = {f"model.diffusion_model.{key}": value for key, value in keys.items()}
+    keys["model.diffusion_model.scaled_fp8"] = ([0], "F8_E4M3")
+
+    result = ModelConfigFactory.from_model_on_disk(
+        write_header_only_safetensors(tmp_path / "moss-prefixed.safetensors", keys), allow_unknown=True
+    )
+
+    assert result.config is None
+    refusal = result.details[Main_Checkpoint_MossImage_Config.__name__]
+    assert isinstance(refusal, InvalidMatchError)
+    assert "side channel on a weight that is not int8" in str(refusal)
+
+
+def test_a_file_mixing_torchao_fp8_and_int8_convrot_layers_is_refused_at_install(tmp_path: Path) -> None:
+    """The loader takes the int8 path or the fp8 path, so the other half of such a file could never be applied."""
+    keys = _dit()
+    _torchao_fp8(keys)
+    keys["text_embedder.blocks.0.qkv.weight"] = ([192, 4096], "I8")
+    keys["text_embedder.blocks.0.qkv.weight_scale"] = ([192, 1], "F32")
+
+    result = ModelConfigFactory.from_model_on_disk(
+        write_header_only_safetensors(
+            tmp_path / "moss-mixed.safetensors", keys, {"text_embedder.blocks.0.qkv": dict(CONVROT_MARKER)}
+        ),
+        allow_unknown=True,
+    )
+
+    assert result.config is None
+    refusal = result.details[Main_Checkpoint_MossImage_Config.__name__]
+    assert isinstance(refusal, InvalidMatchError)
+    assert "mixes torchao fp8 layers with ComfyUI-quantized" in str(refusal)
+
+
 def test_a_w4a8_build_is_refused_naming_what_does_load(tmp_path: Path) -> None:
     """Comfy's W4A8 stores I8 codes beside a codebook and marks each layer `w4a8`: int8 weights, but not ours."""
     keys = _dit()
@@ -261,7 +357,7 @@ def test_a_w4a8_build_is_refused_naming_what_does_load(tmp_path: Path) -> None:
     assert result.config is None
     refusal = str(result.details[Main_Checkpoint_MossImage_Config.__name__])
     assert "'w4a8'" in refusal
-    assert "bf16 or Comfy-Org int8_convrot build, or a GGUF" in refusal
+    assert "bf16, unsloth torchao FP8 or Comfy-Org int8_convrot build, or a GGUF" in refusal
     assert "Only Comfy-Org" not in refusal
 
 
