@@ -32,10 +32,7 @@ interface InpaintMaskSettingsProps {
   layer: CanvasInpaintMaskLayerContract;
 }
 
-/**
- * Properties owns fill/style and invert; noise/denoise modifiers have tree-child editors. Fill uses undoable
- * config patches, invert uses engine pixels.
- */
+/** Fill uses undoable config patches, invert uses engine pixels; modifiers have tree-child editors. */
 export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps) => {
   const { t } = useTranslation();
   const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);

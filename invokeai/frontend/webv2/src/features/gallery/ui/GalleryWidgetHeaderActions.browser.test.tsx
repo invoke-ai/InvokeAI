@@ -129,7 +129,6 @@ describe('GalleryWidgetHeaderActions', () => {
     expect(accessibleName.indexOf('widgets.gallery.savingTo')).toBeLessThan(
       accessibleName.indexOf('widgets.gallery.inbox')
     );
-    // Closed, the menu renders nothing.
     expect(document.querySelector('[role="menuitemradio"]')).toBeNull();
   });
 

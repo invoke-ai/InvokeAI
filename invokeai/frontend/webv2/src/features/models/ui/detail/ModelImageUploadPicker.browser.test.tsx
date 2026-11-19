@@ -28,7 +28,6 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 const model = { cover_image: 'cover.png', key: 'model-a', name: 'Model A' };
 const NOOP = () => {};
 
-/** The real picker trigger on the Launchpad: no workbench, so the tile supplies its own gallery host. */
 describe('ModelImageUpload gallery picker', () => {
   let host: HTMLDivElement;
   let root: Root;
@@ -58,7 +57,6 @@ describe('ModelImageUpload gallery picker', () => {
     accountLifecycle.invalidate();
   });
 
-  // The slot button opens the picker; its name switches between choose and replace with the cover it shows.
   const tile = () => host.querySelector<HTMLElement>('button[aria-haspopup="dialog"]')!;
   const picker = () => document.querySelector('[role="dialog"][aria-label="widgets.gallery.picker.chooseImage"]');
 

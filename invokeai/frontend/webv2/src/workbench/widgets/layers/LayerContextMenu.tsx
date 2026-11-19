@@ -198,8 +198,7 @@ const hasPureExportableLayerContent = (layer: CanvasLayerContract, document: Can
 interface LayerMenuProps {
   engine: LayerContextMenuEngine | null;
   layer: CanvasLayerContract;
-  /** Where the menu opens: the panel anchors to its trigger; the canvas uses a
-   * virtual rect at the cursor. */
+  /** Where the menu opens: the panel anchors to its trigger; the canvas uses a virtual rect at the cursor. */
   positioning: MenuPositioning;
   /** Render the panel's ⋯ trigger button. Off in the canvas' controlled, anchored
    * mode, where there is no trigger DOM. */
@@ -209,11 +208,7 @@ interface LayerMenuProps {
   onOpenChange?: MenuOpenChange;
   lazyMount?: boolean;
   unmountOnExit?: boolean;
-  /**
-   * Controlled sibling-dialog state. When provided (canvas right-click), the
-   * parent owns it so dialogs survive the menu closing. Undefined means the menu
-   * keeps this state internally (panel).
-   */
+  /** Parent-owned when provided (canvas right-click) so dialogs survive the menu closing. */
   dialogKind?: LayerMenuDialogKind | null;
   onDialogKindChange?: (kind: LayerMenuDialogKind | null) => void;
   /** After a sibling dialog's close animation; a controlling parent may stop retaining its target here. */
@@ -224,10 +219,7 @@ interface LayerMenuProps {
   showGroupLabels?: boolean;
 }
 
-/**
- * Share per-layer actions across panel and canvas menus. Arrange within type groups; merge uses global adjacency.
- * Keep dialogs outside the closing menu portal.
- */
+/** Per-layer actions shared by panel and canvas menus; dialogs live outside the closing menu portal. */
 const LayerMenu = ({
   engine,
   layer,
@@ -480,8 +472,8 @@ const LayerMenu = ({
       if (!converted) {
         throw makeStatusError('unsupported');
       }
-      // Pass the immutable live object: the engine rejects stale menu actions
-      // by identity and clones the inverse contract internally.
+      // Pass the immutable live object: the engine rejects stale menu actions by identity and clones the inverse
+      // contract internally.
       if (!engine?.layers.commitLayerConversion(label, layer, converted)) {
         throw makeStatusError('not-ready');
       }
@@ -542,8 +534,8 @@ const LayerMenu = ({
 
   const handleSetColorLabel = useCallback(
     (label: CanvasColorLabel | null) => {
-      // `undefined` clears: the reducer writes the key as undefined and
-      // serialization drops it, so "no label" round-trips as absence.
+      // `undefined` clears: the reducer writes the key as undefined and serialization drops it, so "no label"
+      // round-trips as absence.
       patchBase(t('widgets.layers.menu.colorLabel'), { colorLabel: label ?? undefined });
     },
     [patchBase, t]
@@ -1082,17 +1074,13 @@ export const LayerContextMenu = (props: LayerRowMenuProps) => (
   <LayerMenu {...props} positioning={PANEL_POSITIONING} showGroupLabels withTrigger />
 );
 
-/** The layer + pointer position a canvas right-click resolved to. */
 export interface CanvasLayerContextMenuTarget {
   layerId: string;
   x: number;
   y: number;
 }
 
-/**
- * Anchor {@link LayerMenu} at the cursor for the supplied layer id, resolved against the live document. Keep a
- * sticky dialog target after menu closure so sibling dialogs survive; changing layer resets their state.
- */
+/** Keeps a sticky dialog target after the menu closes so sibling dialogs survive. */
 export const CanvasLayerContextMenu = ({
   beforeDangerItems,
   engine,
@@ -1106,11 +1094,9 @@ export const CanvasLayerContextMenu = ({
   showGroupLabels?: boolean;
   onClose: () => void;
 }) => {
-  // The layer a sibling dialog is anchored to. Captured while the live target
-  // still exists, then retained until the dialog has animated out.
+  // The layer a sibling dialog is anchored to.
   const [dialogState, setDialogState] = useState<(LayerMenuDialogState & { isOpen: boolean }) | null>(null);
   // A menu for another layer remounts LayerMenu, cutting the retained dialog short before it reports its exit.
-  // Drop that dialog, or it would resurface as a hidden menu for its layer once this one closes.
   if (target && dialogState && target.layerId !== dialogState.target.layerId) {
     setDialogState(null);
   }
@@ -1334,10 +1320,7 @@ const LayerMenuSubmenu = ({
 
 type LayerMenuTranslate = (key: string, options: { count?: number; defaultValue: string }) => string;
 
-/**
- * Why the item cannot run: the registry's reason for a disabled action, or, since copying a layer needs the clipboard,
- * which a plain-HTTP origin lacks, that. The item stays reachable by keyboard and says so instead of failing.
- */
+/** The registry's disabled reason, or the missing clipboard on a plain-HTTP origin for copy. */
 const getUnavailableReason = (action: LayerContextAction, t: LayerMenuTranslate): string | undefined =>
   action.id === 'copy-to-clipboard' && !canCopyImage()
     ? t('common.copyUnavailable', { defaultValue: 'Copying needs HTTPS or localhost' })

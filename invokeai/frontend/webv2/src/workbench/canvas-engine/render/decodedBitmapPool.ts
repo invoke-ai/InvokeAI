@@ -113,8 +113,8 @@ export const createDecodedBitmapPool = (
         reportBytes();
         return bitmap;
       });
-      // Every waiter observes this promise through its own chain; the pool's copy
-      // must not surface an unhandled rejection after all waiters have gone.
+      // Every waiter observes this promise through its own chain; the pool's copy must not surface an unhandled
+      // rejection after all waiters have gone.
       created.promise.catch(() => undefined);
       entry = created;
       entries.set(key, entry);

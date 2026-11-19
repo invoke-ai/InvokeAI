@@ -89,7 +89,6 @@ const buildSettings = (overrides: Partial<GenerateSettings> = {}): GenerateSetti
     ...overrides,
   }) as unknown as GenerateSettings;
 
-/** Mirrors the real form: commits land back on the rendered settings. */
 const Harness = ({ initial }: { initial: Partial<GenerateSettings> }) => {
   const [settings, setSettings] = useState(() => buildSettings(initial));
   const apply = (patch: Partial<GenerateSettings>) => setSettings((current) => ({ ...current, ...patch }));
@@ -132,7 +131,6 @@ const interact = async (run: () => void) => {
   });
 };
 
-/** Scoped by orientation: the Gain slider's thumb is a `role="slider"` too. */
 const bars = () => [...document.querySelectorAll('[role="slider"][aria-orientation="vertical"]')];
 
 const byLabel = (label: string): HTMLElement | null =>
@@ -187,7 +185,6 @@ describe('GenerateConditioningRebalanceField', () => {
     expect(document.body.textContent).toContain('Conditioning rebalance');
     expect(bars()).toHaveLength(0);
     expect(byLabel('Per-tap weights')).toBeNull();
-    // The collapsed row still previews the curve.
     expect(document.querySelector('svg[aria-hidden]')).not.toBeNull();
   });
 
@@ -222,7 +219,6 @@ describe('GenerateConditioningRebalanceField', () => {
     await renderField();
     const dot = () => byLabel('Reset to default curve: Rebalance preset');
 
-    // The dot replaced a separate reset button, and shows only off the defaults.
     expect(document.querySelector('button[aria-label="Reset to default curve"]')).toBeNull();
     expect(dot()).toBeNull();
 
@@ -237,7 +233,6 @@ describe('GenerateConditioningRebalanceField', () => {
     });
     expect(weightsInput().value).toBe(DEFAULT_KREA2_REBALANCE_WEIGHTS);
     expect(dot()).toBeNull();
-    // Focus moves to the preset select rather than falling to the page with the dot.
     await vi.waitFor(() =>
       expect(document.activeElement?.matches('[data-scope="select"][data-part="trigger"]')).toBe(true)
     );
@@ -258,7 +253,6 @@ describe('GenerateConditioningRebalanceField', () => {
 
       expect(onCommit).toHaveBeenLastCalledWith({ krea2RebalanceMultiplier: DEFAULT_KREA2_REBALANCE_MULTIPLIER });
       expect(onCommitImmediate).not.toHaveBeenCalled();
-      // The weights were the default curve all along, so the preset is back at it too.
       expect(gainDot()).toBeNull();
       expect(presetDot()).toBeNull();
     });
@@ -292,7 +286,6 @@ describe('GenerateConditioningRebalanceField', () => {
     await interact(() => typeInto(weightsInput(), '1,2,three'));
 
     expect(document.body.textContent).toContain('Enter exactly 12 comma-separated numbers.');
-    // The last valid vector still drives the editor.
     expect(bars()[8]?.getAttribute('aria-valuenow')).toBe('5');
     expect(onCommitImmediate).not.toHaveBeenCalled();
   });

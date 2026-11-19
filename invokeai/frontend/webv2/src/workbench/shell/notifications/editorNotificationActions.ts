@@ -33,10 +33,7 @@ export interface EditorNotificationActionSources {
   widgets: WorkbenchWidgetCommands;
 }
 
-/**
- * Retries already asked for from a notice, by the set of backend items it retries: a rerun is queued once however many
- * notices, toasts or clicks offer it. Session-only, per account.
- */
+/** Retries already asked for, keyed by the items retried, so a rerun queues once; session-only, per account. */
 const retryStates = new Map<string, 'done' | 'running'>();
 
 const toRetryKey = (itemIds: readonly number[]): string => [...itemIds].sort((a, b) => a - b).join(',');

@@ -17,7 +17,6 @@ const onCommit = vi.fn();
 const onPreview = vi.fn();
 
 const TAP_COUNT = 12;
-/** All weights at 1.0, so `getRebalanceBarScale` reports the nominal ceiling. */
 const FLAT_WEIGHTS = Array.from({ length: TAP_COUNT }, () => 1);
 const SCALE = 8;
 
@@ -56,7 +55,6 @@ const interact = async (run: () => void) => {
   });
 };
 
-/** Pointer coordinates that land on `index`'s column at `weight` on the track. */
 const pointAt = (track: HTMLElement, index: number, weight: number) => {
   const rect = track.getBoundingClientRect();
 
@@ -137,7 +135,6 @@ describe('ConditioningRebalanceBars', () => {
       track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...target }));
     });
 
-    // Assert value ranges independently of incidental padding/border pixel mapping.
     const previewed = lastPreview()[3] ?? 0;
 
     expect(previewed).toBeGreaterThan(REBALANCE_NEUTRAL_WEIGHT);
@@ -149,7 +146,6 @@ describe('ConditioningRebalanceBars', () => {
 
     expect(onPreview).toHaveBeenLastCalledWith(null);
     expect(onCommit).toHaveBeenCalledOnce();
-    // What matters is that the release commits exactly what was last previewed.
     expect(lastCommit()[3]).toBe(previewed);
   });
 
@@ -159,7 +155,6 @@ describe('ConditioningRebalanceBars', () => {
     await interact(() => {
       track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(track, 0, 0) }));
     });
-    // One large pointer move must interpolate unsampled columns.
     await interact(() => window.dispatchEvent(new PointerEvent('pointermove', pointAt(track, 11, 8))));
 
     const painted = lastPreview();

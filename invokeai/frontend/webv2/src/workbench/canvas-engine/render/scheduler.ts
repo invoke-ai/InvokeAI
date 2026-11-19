@@ -7,7 +7,6 @@ import type { FrameDamage, LayerDamage, RenderFlags } from '@workbench/canvas-en
 
 import { FULL_DAMAGE, NO_DAMAGE } from '@workbench/canvas-engine/types';
 
-/** The partial invalidation payload accepted by {@link RenderScheduler.invalidate}. */
 export interface InvalidatePayload {
   /** The viewport transform (pan/zoom) changed. */
   view?: true;
@@ -18,8 +17,8 @@ export interface InvalidatePayload {
   /** Force a full repaint next frame. */
   all?: true;
   /**
-   * Optional local damage is honored only for the sole named layer. View/all or unqualified layer invalidations
-   * force full repaint; omission is safe.
+   * Optional local damage is honored only for the sole named layer. View/all or unqualified layer invalidations force
+   * full repaint; omission is safe.
    */
   damage?: LayerDamage;
 }
@@ -34,20 +33,18 @@ export interface RenderSchedulerDeps {
   cancelFrame?: (handle: number) => void;
 }
 
-/** The imperative scheduler handle returned by {@link createRenderScheduler}. */
 export interface RenderScheduler {
   /** Merge a partial invalidation into the pending flags and schedule a frame. */
   invalidate(payload: InvalidatePayload): void;
   /**
-   * Runs `task` at the start of the next frame, before that frame's flags are taken, so its invalidations render
-   * in the same frame. Returns an idempotent cancel.
+   * Runs `task` at the start of the next frame, before that frame's flags are taken, so its invalidations render in the
+   * same frame. Returns an idempotent cancel.
    */
   beforeNextFrame(task: () => void): () => void;
   /** Suspend frame scheduling (e.g. widget detach); invalidations still accumulate. */
   pause(): void;
   /** Resume scheduling; flushes any invalidations accumulated while paused. */
   resume(): void;
-  /** True while paused. */
   readonly isPaused: boolean;
   /** Cancel any pending frame and stop accepting further work. */
   dispose(): void;
@@ -104,9 +101,8 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
     }
     frameHandle = null;
     if (!paused && !disposed && hasPending(pending)) {
-      // Snapshot then reset before invoking render, so invalidations made from
-      // within the render callback accumulate into a fresh frame rather than
-      // being wiped by the post-render reset.
+      // Snapshot then reset before invoking render, so invalidations made from within the render callback accumulate
+      // into a fresh frame rather than being wiped by the post-render reset.
       const flags = pending;
       pending = createEmptyFlags();
       deps.render(flags);
@@ -126,9 +122,8 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
     try {
       frameHandle = requestFrame(runFrame);
     } catch {
-      // Rendering is ancillary to the document mutation that requested it. A
-      // faulty host scheduler must not make that already-applied mutation look
-      // failed; retain the pending flags so a later invalidation can retry.
+      // Rendering is ancillary to the document mutation that requested it. A faulty host scheduler must not make that
+      // already-applied mutation look failed; retain the pending flags so a later invalidation can retry.
       frameHandle = null;
     }
   };
@@ -149,8 +144,7 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
       pending.damage = FULL_DAMAGE;
     }
     if (payload.overlay) {
-      // The overlay is its own canvas, redrawn whole every frame — it neither
-      // needs nor invalidates composite damage.
+      // The overlay is its own canvas, redrawn whole every frame — it neither needs nor invalidates composite damage.
       pending.overlay = true;
     }
     if (payload.layers) {

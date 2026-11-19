@@ -12,12 +12,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 type ActivatePreset = (presetId: LayoutPresetId) => Promise<LayoutPresetId | null>;
 
-// Freeze activation writes while reading the real store to verify acknowledgement precedes store completion.
 let store: WorkbenchInternalStore;
 
-// Rebuilt per render rather than read from a module slot at call time. The
-// strip dispatches activation from a `requestAnimationFrame`, so a frame that
-// outlives its test would otherwise reach into the *next* test's spy and
+// Rebuilt per render rather than read from a module slot at call time. The strip dispatches activation from a
+// `requestAnimationFrame`, so a frame that outlives its test would otherwise reach into the *next* test's spy and
 // satisfy its assertions with a stale call.
 const noop = () => undefined;
 let commands = { layout: { activatePreset: (() => Promise.resolve(null)) as ActivatePreset } };
@@ -105,8 +103,7 @@ const press = (element: Element, button = 0, pointerType = 'mouse'): Promise<voi
   });
 
 afterEach(async () => {
-  // Drained while the tree that queued it is still mounted, so no activation
-  // frame can leak into the next test.
+  // Drained while the tree that queued it is still mounted, so no activation frame can leak into the next test.
   await nextFrame();
   await act(() => root?.unmount());
   host?.remove();
@@ -116,10 +113,7 @@ afterEach(async () => {
 });
 
 describe('LayoutPresetStrip acknowledgment', () => {
-  // Assert the controlled selected/ARIA attributes also observed by performance checks so deferred writes cannot
-  // silently regress feedback.
   it('selects the pressed tab on pointerdown, before any store update', async () => {
-    // activatePreset never resolves: the store is deliberately frozen.
     const activate = vi.fn<ActivatePreset>(() => new Promise<LayoutPresetId | null>(() => {}));
 
     await render({ activatePreset: activate, activePresetId: 'compose' });
@@ -166,7 +160,6 @@ describe('LayoutPresetStrip acknowledgment', () => {
     expect(activate).not.toHaveBeenCalled();
   });
 
-  // Touch activates on click, preserving horizontal pan gestures that begin on inactive tabs.
   it('ignores a touch-pointer press', async () => {
     const activate = vi.fn<ActivatePreset>(() => Promise.resolve('edit'));
 
@@ -180,7 +173,6 @@ describe('LayoutPresetStrip acknowledgment', () => {
     expect(presetTab('compose').getAttribute('aria-selected')).toBe('true');
   });
 
-  // Right-click must not activate an inactive preset before its context menu opens.
   it('ignores a secondary-button press', async () => {
     const activate = vi.fn<ActivatePreset>(() => Promise.resolve('edit'));
 
@@ -194,12 +186,9 @@ describe('LayoutPresetStrip acknowledgment', () => {
     expect(presetTab('compose').getAttribute('aria-selected')).toBe('true');
   });
 
-  // Restore store selection when supersession, project switch, or replaced definitions drop an optimistic
-  // activation.
   it('gives the selection back to the store when the activation is dropped', async () => {
-    // Settled by hand inside `act` rather than pre-resolved: it pins the
-    // handoff to the moment the outcome is known, instead of to whichever
-    // microtask turn happens to win the race.
+    // Settled by hand inside `act` rather than pre-resolved: it pins the handoff to the moment the outcome is known,
+    // instead of to whichever microtask turn happens to win the race.
     let reportOutcome!: (appliedPresetId: LayoutPresetId | null) => void;
     const outcome = new Promise<LayoutPresetId | null>((resolve) => {
       reportOutcome = resolve;

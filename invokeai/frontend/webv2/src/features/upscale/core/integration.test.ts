@@ -27,7 +27,6 @@ const MODELS = [
   model('tile', 'controlnet', 'sdxl', 'SDXL Tile ControlNet'),
 ];
 
-// Upscale, like Generate, does not submit without the served architecture table.
 seedArchitectureCapabilities();
 
 describe('Upscale snapshot submission', () => {
@@ -105,7 +104,6 @@ const CINEMATIC = {
   positivePrompt: '{prompt}, film grain',
 };
 
-/** An Upscale ready to Refine, with the shared prompt draft patched as the Upscale widget would. */
 const prepareUpscale = (draft: Record<string, unknown>, values: Record<string, unknown> = {}): WorkbenchState => {
   let state = createInitialWorkbenchState();
 
@@ -126,7 +124,6 @@ const prepareUpscale = (draft: Record<string, unknown>, values: Record<string, u
 const activeProject = (state: WorkbenchState) =>
   state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
 
-/** Submits as `submitResolvedInvocation` does: with the expansion of what the project expands from, if anything. */
 const submitUpscale = (state: WorkbenchState, expansion?: { prompts: string[]; sampleSeed: number | null }) => {
   const source = getDynamicPromptsExpansionSource(activeProject(state), 'upscale');
 

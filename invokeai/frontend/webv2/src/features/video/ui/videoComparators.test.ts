@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 
 import { areVideoValuesEqual } from './videoComparators';
 
-/** Missing comparator fields suppress edits; cover each independently editable value. */
 describe('areVideoValuesEqual', () => {
   const fl2vaBase: MainModelConfig = {
     base: 'minimax-h3',

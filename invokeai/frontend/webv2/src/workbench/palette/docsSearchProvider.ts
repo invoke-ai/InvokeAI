@@ -6,15 +6,9 @@ import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
 import { getPaletteContributionKey } from './contributionKey';
 
-/**
- * Docs search for both palettes. A leaf on purpose: the Launchpad palette imports it, so it must not reach editor
- * modules, and the index loads as its own chunk on the first search.
- */
+/** Docs search for both palettes: a leaf (no editor imports), its index a separate chunk. */
 
-/**
- * Mirrors `AppSearchIndex` in `docs/src/lib/app-search.mjs`. `docsSearchIndex.json` is generated from the docs build
- * (`cd docs && pnpm build && pnpm run sync-app-search-index`); docs CI fails when it drifts.
- */
+/** Mirrors `AppSearchIndex` in `docs/src/lib/app-search.mjs`; docs CI fails when the JSON drifts. */
 interface DocsSearchIndex {
   /** User-facing topics in the docs' order. */
   topics: DocsSearchTopic[];
@@ -102,12 +96,7 @@ const loadIndex = (): Promise<LoadedDocsIndex> =>
     }
   ));
 
-/**
- * Lower is better; undefined is no match. Every term must match. A page whose title starts with the query or has every
- * term at a word start leads, as pages are the main destinations; then headings matched the same way; then any title
- * containing every term; then rows that need their page title or topic; last, pages matched only through their
- * description.
- */
+/** Lower is better; undefined is no match. */
 const rankRow = (row: DocsSearchRow, phrase: string, terms: readonly string[]): number | undefined => {
   const headingOffset = row.anchor === undefined ? 0 : 2;
 

@@ -22,8 +22,7 @@ type SliderNumberFieldProps = {
 };
 
 /**
- * Input bounds may exceed slider bounds. Callers own Field messaging and debouncing; parameter rows use
- * ScrubberField.
+ * Input bounds may exceed slider bounds. Callers own Field messaging and debouncing; parameter rows use ScrubberField.
  */
 export const SliderNumberField = memo(function SliderNumberField({
   ariaLabel,

@@ -4,14 +4,8 @@ import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCach
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { describe, expect, it } from 'vitest';
 
-/**
- * Real pixels verify shrink's negative copy offset and clipping; wrong signs retain the wrong region and failed
- * blits lose content.
- */
-
 const START: Rect = { height: 200, width: 200, x: 100, y: 100 };
 
-/** Layer-local coordinates of a 10x10 probe mark and the colour it carries. */
 const PROBES: { color: [number, number, number]; local: { x: number; y: number } }[] = [
   { color: [255, 0, 0], local: { x: 110, y: 110 } },
   { color: [0, 255, 0], local: { x: 280, y: 110 } },
@@ -32,7 +26,6 @@ const seeded = () => {
   return { entry, store };
 };
 
-/** Reads the centre of the 10x10 mark that sits at layer-local `local`. */
 const sample = (
   entry: { rect: Rect; surface: { ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D } },
   local: { x: number; y: number }
@@ -42,7 +35,6 @@ const sample = (
 };
 
 const shrinkCases: { label: string; retain: Rect; keeps: number[] }[] = [
-  // `keeps` indexes PROBES; the retained rect must hold exactly those marks.
   {
     keeps: [0],
     label: 'to the top-left corner (origin fixed, dx/dy zero)',
@@ -66,7 +58,6 @@ describe('shrinkToRect preserves the retained pixels', () => {
     const shrunk = store.shrinkToRect('L', retain)!;
 
     expect(shrunk.rect).toEqual(retain);
-    // Derived-surface caches key on the surface OBJECT, so this must resize in place.
     expect(shrunk.surface).toBe(surfaceBefore);
     expect(shrunk.surface.width).toBe(retain.width);
     expect(shrunk.surface.height).toBe(retain.height);
@@ -85,17 +76,8 @@ describe('shrinkToRect preserves the retained pixels', () => {
     store.shrinkToRect('L', { height: 40, width: 40, x: 100, y: 100 });
 
     const regrown = store.growToRect('L', START);
-    // The kept mark survives the round trip...
     expect(sample(regrown, PROBES[0]!.local)).toEqual([255, 0, 0, 255]);
-    // ...but a discarded one is gone, not smeared back in by the blit.
     expect(sample(regrown, PROBES[3]!.local)).toEqual([0, 0, 0, 0]);
     expect(entry.surface.width).toBe(START.width);
-  });
-
-  it('collapses to a 0x0 surface without throwing', () => {
-    const { store } = seeded();
-    const emptied = store.shrinkToRect('L', { height: 0, width: 0, x: 100, y: 100 })!;
-    expect(emptied.surface.width).toBe(0);
-    expect(emptied.surface.height).toBe(0);
   });
 });

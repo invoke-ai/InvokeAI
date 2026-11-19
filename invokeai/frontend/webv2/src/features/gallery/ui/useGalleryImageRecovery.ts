@@ -16,8 +16,8 @@ interface ImageRecoveryState {
 
 /**
  * The `src` for an image element showing the gallery image at `url`, and its `onError`. A failed image reloads once
- * when the shared probe sees the server serve images again (an image move answers 409 until it ends). The state
- * belongs to `url` alone: an element handed another image, as index-keyed slots are, starts from its plain URL.
+ * when the shared probe sees the server serve images again (an image move answers 409 until it ends). The state belongs
+ * to `url` alone: an element handed another image, as index-keyed slots are, starts from its plain URL.
  */
 export const useGalleryImageRecovery = (url: string): { onError: () => void; src: string } => {
   const recoveryRevision = useSyncExternalStore(

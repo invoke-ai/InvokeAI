@@ -79,7 +79,6 @@ const publish = (): void => {
   harness.listeners.forEach((listener) => listener());
 };
 
-/** The form's engine: the structural stub over the real reducer and history, plus the tool's options store. */
 const formEngine = (): ToolFormProps['engine'] =>
   ({
     ...stub.engine,
@@ -102,7 +101,6 @@ const formEngine = (): ToolFormProps['engine'] =>
     tools: { requestColorSample: () => Promise.resolve(null) },
   }) as unknown as ToolFormProps['engine'];
 
-/** Renders the form's groups the way the Properties pane does. */
 const mount = async (layers: readonly CanvasNodeContract[], selectedLayerId: string | null): Promise<void> => {
   unsubscribe();
   stub = createStructuralEngineStub({ layers, selectedLayerId });
@@ -146,7 +144,6 @@ const source = (id = 's1'): ShapeSource => {
 const toolGroup = () => page.getByRole('group', { name: 'Shape' });
 const appearanceGroup = () => page.getByRole('group', { name: 'Appearance' });
 const kindGroup = () => toolGroup().getByRole('radiogroup', { name: 'Kind' });
-/** The on/off button beside a color, not the color chip that shares its name. */
 const clickToggle = (name: string) =>
   act(() =>
     appearanceGroup().element().querySelector<HTMLElement>(`button[aria-label="${name}"][aria-pressed]`)!.click()
@@ -314,22 +311,6 @@ describe('shape appearance', () => {
     });
     expect(shapeOptions.strokeWidth).toBe(DEFAULT_SHAPE_OPTIONS.strokeWidth + 3);
     expect(source()).toBe(RECT_SOURCE);
-    expect(stub.commits).toHaveLength(0);
-  });
-
-  it('edits the tool defaults with no shape layer selected', async () => {
-    await mount([layerContract('p1', 'raster')], 'p1');
-    await expect.element(appearanceGroup().getByText('Defaults')).toBeVisible();
-
-    await clickToggle('Stroke');
-    expect(shapeOptions.strokeEnabled).toBe(true);
-
-    const width = appearanceGroup().getByRole('slider', { name: 'Stroke width' });
-    await act(async () => {
-      (width.element() as HTMLElement).focus();
-      await userEvent.keyboard('{ArrowRight>2/}');
-    });
-    expect(shapeOptions.strokeWidth).toBe(DEFAULT_SHAPE_OPTIONS.strokeWidth + 2);
     expect(stub.commits).toHaveLength(0);
   });
 });

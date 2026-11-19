@@ -25,7 +25,6 @@ describe('layerRowSummary', () => {
     const control = layerContract('c', 'control') as CanvasControlLayerContract;
     const image = { image: { height: 8, imageName: 'c.png', width: 8 }, type: 'image' } as const;
     expect(layerRowSummary({ ...control, source: image }, t)).toBe('widgets.layers.control.summary.noType');
-    // A legacy layer that picked its model keeps the adapter summary it always had.
     expect(
       layerRowSummary({ ...control, adapter: { ...control.adapter, model: 'sdxl-depth' }, source: image }, t)
     ).toBe('widgets.layers.control.kinds.controlnet · 1.00');

@@ -49,8 +49,8 @@ export const WidgetPanelFrame = ({
   const { layout } = useWorkbenchCommands();
   const isLeft = region === 'left';
   const isBottom = region === 'bottom';
-  // Clamped at render, not just on commit, so a persisted size from before a
-  // bounds change heals on screen immediately instead of on the next resize.
+  // Clamped at render, not just on commit, so a persisted size from before a bounds change heals on screen immediately
+  // instead of on the next resize.
   const displaySizePx = clampPanelSize(region, regionState.sizePx);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [measuredSizePx, setMeasuredSizePx] = useState<number | null>(null);
@@ -80,8 +80,7 @@ export const WidgetPanelFrame = ({
   const visibleSizePx = measuredSizePx === null ? displaySizePx : Math.min(measuredSizePx, displaySizePx);
   const { max: maxPanelSizePx, min: minPanelSizePx } = getPanelSizeBounds(region);
   const focusRegionProps = useFocusRegionProps(region);
-  // This panel's outline, or a side divider's center neighbour, is drawn over the divider. The bottom divider spans
-  // the side panels too, so only its own outline hides it.
+  // This panel's outline, or a side divider's center neighbour, is drawn over the divider.
   const highlightedRegion = useHighlightedRegion();
   const isDividerOutlined = highlightedRegion === region || (highlightedRegion === 'center' && !isBottom);
 
@@ -168,8 +167,8 @@ export const WidgetFloatButton = ({
   const { widgets } = useWorkbenchCommands();
   const { focusFloating } = useWorkbenchFocus();
   const dockableRegion = isWidgetRegion(region) && region !== 'center' ? region : undefined;
-  // Flush drafts before floating unmounts the docked view; preserve the clicked region as the multi-region
-  // instance's dock origin. Focus follows the widget into its window.
+  // Flush drafts before floating unmounts the docked view; preserve the clicked region as the multi-region instance's
+  // dock origin. Focus follows the widget into its window.
   const handleFloat = useCallback(() => {
     if (!dockableRegion) {
       return;
@@ -242,10 +241,7 @@ export const WidgetHeaderActionsGroup = ({
   );
 };
 
-/**
- * The header row is the inline-size container its label and actions query, so a widget can fit them to the row's
- * width, as Gallery does on narrow rails; the hoisted center chrome is a container of its own.
- */
+/** The header row is the inline-size container its label and actions query; hoisted center chrome is its own. */
 const WIDGET_HEADER_CSS = { containerType: 'inline-size' } as const;
 
 export const WidgetHeader = ({

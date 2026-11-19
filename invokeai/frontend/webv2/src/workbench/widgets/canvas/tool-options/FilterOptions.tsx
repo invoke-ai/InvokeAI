@@ -108,11 +108,7 @@ const FILTER_ERROR_FROM_RUN: Record<FilterSessionErrorCode, boolean> = {
   unsupported: true,
 };
 
-/**
- * Whether running the filter again is the error's retry: a run reported it (reading the source or filtering it).
- * Apply's own refusals and failures are retried by Apply. Codes both report count as run errors: a stale preview must
- * be filtered again, and the rest fail while reading the source, before any backend work.
- */
+/** Whether running again is the error's retry: a run reported it; Apply retries its own failures. */
 export const isFilterRunError = (code: FilterSessionErrorCode): boolean => FILTER_ERROR_FROM_RUN[code];
 
 const useFilterDraft = (engine: ToolFormProps['engine']) => {
@@ -208,7 +204,6 @@ const FilterChooseSettings = ({ engine }: ToolFormProps) => {
   );
 };
 
-/** The chosen filter's parameters. */
 const FilterParamsSettings = ({ engine }: ToolFormProps) => {
   const session = useFilterSession(engine);
   const { setSettings, setType } = useFilterDraft(engine);
@@ -245,10 +240,7 @@ const useFilterStatus = (engine: ToolFormProps['engine']): OperationStatus | nul
   };
 };
 
-/**
- * Process is the manual run while auto-update is off. With auto-update on it is the retry after a failed run, the only
- * way to run the same settings again, and stays for the run it started so the click shows its progress.
- */
+/** The manual run with auto-update off; with it on, the retry after a failed run, kept while its run goes. */
 const FilterActions = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useFilterSession(engine);

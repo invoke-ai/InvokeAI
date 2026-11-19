@@ -30,8 +30,8 @@ export interface GalleryPickerScope {
 export type GalleryPickerOpeningScope = Pick<GalleryPickerScope, 'boardId'> & { galleryView?: GalleryView };
 
 /**
- * Seed local scope on open without writing back: the given opening scope, else the Gallery host's board and view.
- * Clear search when switching panes because each pane interprets it differently.
+ * Seed local scope on open without writing back: the given opening scope, else the Gallery host's board and view. Clear
+ * search when switching panes because each pane interprets it differently.
  */
 export const useGalleryPickerScope = (openingScope?: GalleryPickerOpeningScope) => {
   const { galleryValues } = useGalleryHost();
@@ -52,8 +52,8 @@ export const useGalleryPickerScope = (openingScope?: GalleryPickerOpeningScope) 
     keepPreviousScope: true,
     page: 0,
     projectBoardId: getGalleryProjectBoardId(galleryValues),
-    // No recents overlay: `items` must stay null until the first page lands,
-    // so the loading, seeding and stale states have one unambiguous signal.
+    // No recents overlay: `items` must stay null until the first page lands, so the loading, seeding and stale states
+    // have one unambiguous signal.
     recentImages: NO_RECENT_IMAGES,
     searchTerm: scope.pane === 'items' ? deferredSearchTerm : '',
     selectedBoardId: scope.boardId,

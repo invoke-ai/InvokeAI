@@ -2,10 +2,7 @@ import type { ReactNode } from 'react';
 
 import { Text } from '@chakra-ui/react';
 
-/**
- * What a drop zone over Canvas or Preview does, for gallery and desktop drags alike. It sits on its own opaque backing,
- * so it stays legible over the zone's tint and whatever light or busy image shows beneath.
- */
+/** What a drop zone does, on an opaque backing so it stays legible over any image. */
 export const DropZoneLabel = ({ children }: { children: ReactNode }) => (
   <Text
     bg="bg.panel"

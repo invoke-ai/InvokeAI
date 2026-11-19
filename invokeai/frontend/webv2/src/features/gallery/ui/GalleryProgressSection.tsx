@@ -197,8 +197,8 @@ const PROGRESS_CELL_CSS = {
 } as const;
 
 /**
- * Sources whose snapshot records the size they will output. Workflows take Generate's size, which their graph need
- * not use, so their tiles stay square and letterbox the live image.
+ * Sources whose snapshot records the size they will output. Workflows take Generate's size, which their graph need not
+ * use, so their tiles stay square and letterbox the live image.
  */
 const SIZED_PROGRESS_SOURCES: ReadonlySet<QueueSourceId> = new Set(['canvas', 'generate', 'upscale', 'video']);
 

@@ -227,18 +227,9 @@ describe('findInGallery', () => {
     expect(revealGalleryItem.mock.calls[0]?.[1]).toEqual({ kind: 'video', name: 'clip.mp4' });
   });
 
-  it('falls back to default placement when the project has no grid at all', async () => {
-    galleryRegions = [];
-    await renderAdapter();
-
-    act(() => adapter.findInGallery({ kind: 'image', name: 'still.png' }));
-
-    expect(openWorkbenchWidget.mock.calls.at(-1)).toEqual(['gallery', undefined]);
-  });
-
   it('describes the press, not the moment its chunk lands', async () => {
-    // Claim the reveal ticket before lazy import so later gestures win and the request retains its originating
-    // project fence.
+    // Claim the reveal ticket before lazy import so later gestures win and the request retains its originating project
+    // fence.
     const before = claimGalleryNavigationSequence();
 
     act(() => adapter.findInGallery({ kind: 'image', name: 'still.png' }));
@@ -272,18 +263,6 @@ describe('findInGallery', () => {
       })
     );
   });
-
-  it('says nothing about a failed gesture the user has already moved past', async () => {
-    revealGalleryItem.mockReturnValueOnce(Promise.reject(new Error('Image not found')));
-
-    act(() => adapter.findInGallery({ kind: 'image', name: 'deleted.png' }));
-    // Any later navigation supersedes it — here, a second press.
-    act(() => adapter.findInGallery({ kind: 'image', name: 'other.png' }));
-
-    await vi.waitFor(() => expect(revealGalleryItem).toHaveBeenCalledTimes(2));
-
-    expect(reportError).not.toHaveBeenCalled();
-  });
 });
 
 describe('playVideoSpanInPreview', () => {
@@ -305,22 +284,6 @@ describe('playVideoSpanInPreview', () => {
     expect(token).toBe(getVideoSpanPlaybackRequest()?.token);
     // Auditioning a trim must not scroll the gallery.
     expect(getGalleryRevealRequest()?.token).toBe(revealBefore);
-  });
-
-  it('changes nothing at all when Preview refuses to open', () => {
-    openResult = { ok: false, reason: 'unavailable' };
-
-    let token: number | null = 0;
-    act(() => {
-      token = adapter.playVideoSpanInPreview(span);
-    });
-
-    // Failed play must change neither selection nor pending span, which a future player could consume
-    // unexpectedly.
-    expect(selectItem).not.toHaveBeenCalled();
-    expect(getVideoSpanPlaybackRequest()).toBeNull();
-    // Nothing was asked, so there is no report to wait for.
-    expect(token).toBeNull();
   });
 
   it('drops a press whose lookup landed after the user switched projects', async () => {

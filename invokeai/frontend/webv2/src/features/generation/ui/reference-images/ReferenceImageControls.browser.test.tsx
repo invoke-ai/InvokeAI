@@ -51,7 +51,6 @@ let host: HTMLDivElement;
 let root: Root;
 const onChange = vi.fn();
 
-/** Mirrors the real row: each commit lands back on the rendered config. */
 const Harness = () => {
   const [config, setConfig] = useState<IPAdapterConfig>(CONFIG);
   const handleChange = useCallback((next: GenerateReferenceImageConfig) => {

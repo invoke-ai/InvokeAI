@@ -6,8 +6,8 @@ import { useMemo } from 'react';
 type GroupProps = ComponentProps<typeof ChakraGroup>;
 
 /**
- * Use positional selectors because composite children may drop Chakra's data-first/between/last props. Match
- * upstream declarations and priority.
+ * Use positional selectors because composite children may drop Chakra's data-first/between/last props. Match upstream
+ * declarations and priority.
  */
 const attachedCss = {
   horizontal: {

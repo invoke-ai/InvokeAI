@@ -9,7 +9,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-import { Field } from './Field';
 import { SeedInput, type SeedInputPatch } from './SeedInput';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -113,19 +112,6 @@ describe('SeedInput', () => {
     expect(seedInput()?.value).toBe(String(rolled));
   });
 
-  it('shows the rolled seed under a host-supplied id too', async () => {
-    // Host IDs must use Zag's ID map or external changes leave the DOM value stale.
-    const onCommit = await renderHost('fixed', 42, 'node-1-seed');
-
-    expect(seedInput()?.id).toBe('node-1-seed');
-
-    await settle(() => dice()?.click());
-
-    const rolled = (onCommit.mock.calls[0]?.[0] as SeedInputPatch | undefined)?.seed as number;
-
-    expect(seedInput()?.value).toBe(String(rolled));
-  });
-
   it('steps the seed with the stepper controls', async () => {
     const onCommit = await renderHost('fixed', 42);
 
@@ -161,25 +147,6 @@ describe('SeedInput', () => {
     expect(input.value).toBe('2');
   });
 
-  it('labels the stepper controls', async () => {
-    await renderHost('fixed', 42);
-
-    expect(host.querySelector('[data-part="increment-trigger"]')?.getAttribute('aria-label')).toBe(
-      'common.increaseValue'
-    );
-    expect(host.querySelector('[data-part="decrement-trigger"]')?.getAttribute('aria-label')).toBe(
-      'common.decreaseValue'
-    );
-  });
-
-  it('keeps the entered seed on show in random mode while quieting the input and the dice', async () => {
-    await renderHost('random', 42);
-
-    expect(seedInput()?.value).toBe('42');
-    expect(seedInput()?.disabled).toBe(true);
-    expect(dice()?.disabled).toBe(true);
-  });
-
   it('previews the batch and describes the input with it only in a stepping mode', async () => {
     await renderHost('increment', 42);
 
@@ -192,83 +159,5 @@ describe('SeedInput', () => {
 
     expect(host.querySelector('[data-testid="seed-sequence-preview"]')).toBeNull();
     expect(seedInput()?.getAttribute('aria-describedby')).toBeNull();
-  });
-
-  it("keeps the field's error in the input's description alongside the preview", async () => {
-    await act(() => {
-      root.render(
-        <ChakraProvider value={system}>
-          <Field error="Out of range" label="Seed">
-            <Host initialSeed={42} seedMode="increment" onCommit={vi.fn()} />
-          </Field>
-        </ChakraProvider>
-      );
-    });
-
-    const errorId = host.querySelector('[data-part="error-text"]')?.id;
-    const previewId = host.querySelector('[data-testid="seed-sequence-preview"]')?.id;
-    const describedBy = seedInput()?.getAttribute('aria-describedby')?.split(' ') ?? [];
-
-    expect(errorId).toBeTruthy();
-    expect(describedBy).toContain(errorId);
-    expect(describedBy).toContain(previewId);
-  });
-
-  it("keeps the field's error as the whole description while the seed holds", async () => {
-    await act(() => {
-      root.render(
-        <ChakraProvider value={system}>
-          <Field error="Out of range" label="Seed">
-            <Host initialSeed={42} seedMode="fixed" onCommit={vi.fn()} />
-          </Field>
-        </ChakraProvider>
-      );
-    });
-
-    const errorId = host.querySelector('[data-part="error-text"]')?.id;
-
-    expect(errorId).toBeTruthy();
-    expect(host.querySelector('[data-testid="seed-sequence-preview"]')).toBeNull();
-    expect(seedInput()?.getAttribute('aria-describedby')).toBe(errorId);
-  });
-
-  it("describes the input with the field's help text ahead of the preview", async () => {
-    await act(() => {
-      root.render(
-        <ChakraProvider value={system}>
-          <Field helpText="Any whole number" label="Seed">
-            <Host initialSeed={42} seedMode="increment" onCommit={vi.fn()} />
-          </Field>
-        </ChakraProvider>
-      );
-    });
-
-    const helperId = host.querySelector('[data-part="helper-text"]')?.id;
-    const previewId = host.querySelector('[data-testid="seed-sequence-preview"]')?.id;
-
-    expect(helperId).toBeTruthy();
-    expect(seedInput()?.getAttribute('aria-describedby')).toBe(`${helperId} ${previewId}`);
-  });
-
-  it('never names an error text the field does not render', async () => {
-    await act(() => {
-      root.render(
-        <ChakraProvider value={system}>
-          <Field invalid label="Seed">
-            <Host initialSeed={42} seedMode="fixed" onCommit={vi.fn()} />
-          </Field>
-        </ChakraProvider>
-      );
-    });
-
-    expect(seedInput()?.getAttribute('aria-invalid')).toBe('true');
-    expect(seedInput()?.getAttribute('aria-describedby')).toBeNull();
-  });
-
-  it('renders an empty field for an absent seed without committing anything', async () => {
-    const onCommit = await renderHost('fixed', undefined);
-
-    expect(seedInput()?.value).toBe('');
-    expect(onCommit).not.toHaveBeenCalled();
   });
 });

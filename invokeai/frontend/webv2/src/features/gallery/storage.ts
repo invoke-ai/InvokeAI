@@ -1,6 +1,5 @@
 /**
- * Server image storage administration: the subfolder layout and the move/recovery job. Separate from `queries` so
- * the editor's gallery reads never load this admin-only transport.
+ * Server image storage admin (subfolder layout, move/recovery job), apart from `queries`: gallery reads never load it.
  */
 export {
   IMAGE_STORAGE_LAYOUTS,

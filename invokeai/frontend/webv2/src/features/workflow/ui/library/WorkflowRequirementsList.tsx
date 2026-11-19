@@ -23,16 +23,12 @@ const getRequirementKey = (requirement: WorkflowModelRequirement): string =>
 
 type ReadyEnrichment = Extract<WorkflowLibraryEntryEnrichment, { status: 'ready' }>;
 
-/**
- * Cache by enrichment identity and catalog dependencies to avoid quadratic row resolution as individual entries
- * finish parsing.
- */
+/** Cached by enrichment identity and catalog dependencies: no quadratic row resolution as entries finish parsing. */
 const resolutionCache = new WeakMap<
   ReadyEnrichment,
   { deps: ModelRequirementDeps; resolved: ResolvedModelRequirement[] }
 >();
 
-/** Resolves one entry's requirements, reusing the previous result when nothing it depends on changed. */
 export const resolveEntryRequirements = (
   enrichment: ReadyEnrichment,
   deps: ModelRequirementDeps
@@ -53,8 +49,8 @@ export const resolveEntryRequirements = (
 const nodePackCache = new WeakMap<ReadyEnrichment, { templates: InvocationTemplates; packs: readonly string[] }>();
 
 /**
- * The node packs a workflow uses that this server does not have: the packs of its invocation nodes whose type is
- * absent from the loaded templates. Cached by enrichment and templates identity, so a card computes it once.
+ * The node packs a workflow uses that this server does not have: the packs of its invocation nodes whose type is absent
+ * from the loaded templates. Cached by enrichment and templates identity, so a card computes it once.
  */
 export const getMissingNodePacks = (enrichment: ReadyEnrichment, templates: InvocationTemplates): readonly string[] => {
   const cached = nodePackCache.get(enrichment);

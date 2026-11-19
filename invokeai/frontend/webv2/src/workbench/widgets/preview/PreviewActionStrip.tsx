@@ -35,11 +35,7 @@ const STAR_LABEL_KEYS = {
   video: { off: 'widgets.preview.starVideo', on: 'widgets.preview.unstarVideo' },
 } as const;
 
-/**
- * The selection's actions in the Preview header. An image gets Edit (every way to continue working with it) and Use
- * (it as an input, or its settings); a video gets Use alone. ⋮ then keeps only housekeeping: labelled at full density,
- * icon-only at compact, where compare moves into ⋮ too. Minimal density keeps star and the full ⋮ alone.
- */
+/** Header actions: Edit and Use for an image, Use for a video; ⋮ keeps housekeeping by density. */
 export const PreviewActionStrip = ({
   actions,
   density,
@@ -165,10 +161,7 @@ export const PreviewActionStrip = ({
   );
 };
 
-/**
- * The item an open menu acts on, held from the moment it opens, as the ⋮ menu holds its target: a result that
- * Auto-switch brings in meanwhile must not take over the items, nor reload what they offer.
- */
+/** Held from opening, so a result Auto-switch brings in cannot take over or reload the items. */
 const useHeldWhileOpen = <T,>(item: T) => {
   const [heldItem, setHeldItem] = useState<T | null>(null);
   const handleOpenChange = useCallback(({ open }: { open: boolean }) => setHeldItem(open ? item : null), [item]);
@@ -244,10 +237,7 @@ const EditMenu = ({ actions, image, isIconOnly = false }: ItemMenuProps) => {
   );
 };
 
-/**
- * What to take from the item: it as an input, or its recorded settings; for an image, with the viewer keys that do
- * the same.
- */
+/** The item as an input, or its recorded settings. */
 const UseMenu = ({
   actions,
   isIconOnly = false,

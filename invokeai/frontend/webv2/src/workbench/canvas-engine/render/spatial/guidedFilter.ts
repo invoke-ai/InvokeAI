@@ -151,8 +151,8 @@ export const selfGuidedFilter = (
 };
 
 /**
- * Writes the detail between the inner- and outer-radius self-guided smooths of `signal` to `detail`. Inner radius
- * zero means the signal itself. Uses all of `scratch`; `detail` must not be one of its planes or `signal`.
+ * Writes the detail between the inner- and outer-radius self-guided smooths of `signal` to `detail`. Inner radius zero
+ * means the signal itself. Uses all of `scratch`; `detail` must not be one of its planes or `signal`.
  */
 export const edgeAwareBand = (
   signal: Float32Array,

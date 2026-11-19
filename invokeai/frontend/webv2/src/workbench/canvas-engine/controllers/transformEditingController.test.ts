@@ -20,10 +20,6 @@ import { TransformEditingController, type TransformResampler } from './transform
 
 const MOVED = { rotation: 0, scaleX: 1, scaleY: 1, x: 12, y: 4 };
 
-/**
- * The controller over a real reducer, mutation context and history. The first layer is selected and has a 4×4 cache;
- * `state` holds what the engine would otherwise decide (the tool, locks, a float, a gesture).
- */
 const createHarness = (
   layers: CanvasLayerContract | CanvasLayerContract[],
   options: { byteBudget?: number; commitStatus?: 'committed' | 'busy'; resample?: TransformResampler } = {}
@@ -327,7 +323,6 @@ describe('TransformEditingController', () => {
     const baked = h.layer() as CanvasControlLayerContract;
     expect(baked.transform).toEqual({ rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
     expect(baked).toMatchObject({ controlType: 'depth', detection: depth, original: detected.original });
-    // Re-detection and "None" both land the original where the applied transform put it.
     const placed = composeLayerTransforms(applied, originalTransform);
     expect(restoreControlOriginal(baked).transform).toEqual(placed);
     const map = { image: { height: 4, imageName: 'next-map', width: 4 }, rect: { height: 4, width: 4, x: 0, y: 0 } };
@@ -398,7 +393,6 @@ describe('TransformEditingController.request', () => {
     expect(h.controller.request('b')).toBe('started');
     expect(h.calls.setOverride).toHaveBeenCalledWith('a', null);
     expect(h.session()).toMatchObject({ layerId: 'b', transform: { scaleX: 1, x: 0, y: 0 } });
-    // The abandoned preview on `a` never landed.
     expect(getDocumentLayer(h.document(), 'a')?.transform.x).toBe(0);
   });
 
@@ -441,7 +435,6 @@ describe('TransformEditingController.request', () => {
 });
 
 describe('TransformEditingController pending transform', () => {
-  /** A paint layer whose only pixels are a stroke persistence has not acknowledged yet. */
   const unpersisted = layerContract('stroke', 'raster');
   const other = layerContract('other', 'raster', {
     source: { bitmap: { height: 4, imageName: 'other.png', width: 4 }, type: 'paint' },

@@ -38,10 +38,7 @@ export const createDefaultVideoWidgetValues = (models: readonly ModelConfig[] = 
   return { ...getDefaultVideoSettings(model ?? undefined, models), model };
 };
 
-/**
- * Resolve catalog references while preserving object identity when unchanged to avoid reconciliation write-back
- * loops.
- */
+/** Resolve catalog references, preserving object identity when unchanged to avoid reconciliation write-back loops. */
 export const syncVideoWidgetValuesWithModels = (
   values: VideoWidgetValues,
   models: readonly ModelConfig[]
@@ -159,10 +156,9 @@ export const syncVideoWidgetValuesWithModels = (
       };
     }
   } else if (acceleratorSync && acceleratorSync.outcome !== 'unchanged') {
-    // Every field the change result rewrites, not a hand-picked five. An accelerator that removes
-    // guidance also restores it when it goes away, and naming fields here meant the Concepts-list
-    // route honoured that while this one -- the LoRA leaving the catalog entirely -- dropped it,
-    // leaving a guided run with its audio, STG and modality guidance silently pinned at identity.
+    // Every field the change result rewrites, not a hand-picked few: an accelerator that removes guidance restores it
+    // when it goes away, and a partial copy here (the LoRA leaving the catalog) would leave a guided run with its
+    // audio, STG and modality guidance silently pinned at identity.
     accelerator = {
       acceleratorEnabled: acceleratorSync.settings.acceleratorEnabled,
       acceleratorLoraKeys: acceleratorSync.settings.acceleratorLoraKeys,
@@ -193,8 +189,8 @@ export const syncVideoWidgetValuesWithModels = (
     wanT5EncoderModel: syncComponent('wanT5EncoderModel', base.wanT5EncoderModel),
   };
 
-  // Auto duration belongs to the head it was turned on with: an uninstalled head takes it along, so
-  // reinstalling the head later does not silently switch it back on.
+  // Auto duration belongs to the head it was turned on with: an uninstalled head takes it along, so reinstalling the
+  // head later does not silently switch it back on.
   if (!next.ltx2DurationHeadModel) {
     next.autoDuration = false;
   }
@@ -253,10 +249,10 @@ export const getVideoWidgetValidationIssues = (
 };
 
 /**
- * The section of each issue Invoke lists for `validated` (the values Invoke checks), once for every section whose
- * shown control can fix it, so each section title counts what it can fix. `shown` is the controls the panel renders
- * (see `getVideoPanelFields`). An issue two sections can fix counts in both, so the counts can add up to more than
- * Invoke's total.
+ * The section of each issue Invoke lists for `validated` (the values Invoke checks), once for every section whose shown
+ * control can fix it, so each section title counts what it can fix. `shown` is the controls the panel renders (see
+ * `getVideoPanelFields`). An issue two sections can fix counts in both, so the counts can add up to more than Invoke's
+ * total.
  */
 export const getVideoPanelIssueSections = (
   validated: VideoWidgetValues | null,

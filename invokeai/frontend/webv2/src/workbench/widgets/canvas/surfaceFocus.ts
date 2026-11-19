@@ -1,22 +1,12 @@
-/**
- * Move pointer focus into the canvas subtree so nonfocusable canvas targets do not leave tool hotkeys routed to
- * another widget.
- */
+/** Pointer focus enters the canvas subtree so nonfocusable targets still route tool hotkeys here. */
 
 /** Marks the focusable canvas surface, for chrome that hands focus back to it once it unmounts. */
 export const CANVAS_SURFACE_ATTR = 'data-canvas-surface';
 
-/**
- * Elements that own their own focus/caret and must NOT be focus-stolen by the
- * surface: the text tool's contenteditable overlay and any inline input the
- * chrome overlays on the surface.
- */
+/** Elements owning their own caret that the surface must not steal focus from (text overlay, inline inputs). */
 export const INLINE_EDIT_SELECTOR = 'input, textarea, select, [contenteditable="true"], [role="textbox"]';
 
-/**
- * Preserve focus already inside the surface or inline editors. Refocusing during capture would blur-commit before
- * the engine can swallow click-away, creating a stray text session.
- */
+/** Keeps focus inside the surface: refocusing in capture would blur-commit before the engine swallows the click. */
 export const shouldFocusCanvasSurface = (
   container: HTMLElement,
   target: EventTarget | null,
