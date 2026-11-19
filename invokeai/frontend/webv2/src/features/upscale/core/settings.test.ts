@@ -1,7 +1,10 @@
 import type { GenerateLora, VaeModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 
-import { resetArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
@@ -16,6 +19,7 @@ import {
   isUpscaleBatchCountFixed,
   resolveUpscaleSubmissionValues,
   getUpscaleOutputDimensions,
+  getUpscaleValidationIssues,
   getUpscaleValidationReasons,
   normalizeUpscaleWidgetValues,
   spandrelAutoscaleDimension,
@@ -23,7 +27,6 @@ import {
   isTileControlNetCandidate,
   selectUpscaleMainModel,
   syncUpscaleWidgetValuesWithModels,
-  UPSCALE_ARCHITECTURES,
   UPSCALE_PRESETS,
   upscaleSchedulerOptions,
 } from './settings';
@@ -175,6 +178,40 @@ describe('architecture-driven validation', () => {
     expect(values.tileControlnetModel).toBeNull();
   });
 
+  it("refuses an architecture the backend does not describe, rather than guess its node's grid", () => {
+    const values = upscaleReady([
+      model('main', 'main', 'flux'),
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('t5', 't5_encoder', 'any'),
+      model('clip', 'clip_embed', 'any'),
+      model('fluxvae', 'vae', 'flux'),
+    ]);
+
+    setArchitectureCapabilities(architectureCapabilitiesFixture.filter((row) => row.base !== 'flux'));
+
+    expect(getUpscaleValidationIssues(values)).toContainEqual({
+      message: 'The backend does not describe the FLUX.1 architecture, so Upscale cannot run it.',
+      section: 'generation',
+    });
+  });
+
+  it('exempts a self-contained SDNQ pipeline, which ships its own parts, and asks one that lacks them for its encoders', () => {
+    const submodels = Object.fromEntries(
+      ['transformer', 'vae', 'text_encoder', 'tokenizer', 'text_encoder_2', 'tokenizer_2'].map((name) => [name, {}])
+    );
+    const complete = { ...model('main', 'main', 'flux'), format: 'sdnq_quantized', submodels } as ModelConfig;
+    const { text_encoder_2: _t5, ...withoutT5 } = submodels;
+    const partial = { ...complete, submodels: withoutT5 } as ModelConfig;
+    const spandrel = model('spandrel', 'spandrel_image_to_image', 'any');
+
+    expect(getUpscaleValidationReasons(upscaleReady([complete, spandrel]))).toEqual([]);
+    expect(getUpscaleValidationReasons(upscaleReady([partial, spandrel]))).toEqual([
+      'Upscale needs a T5 encoder for this main model.',
+      'Upscale needs a CLIP Embed model for this main model.',
+      'Upscale needs a VAE for this main model.',
+    ]);
+  });
+
   it('blocks the run when a required component has been uninstalled', () => {
     const installed = [
       model('main', 'main', 'flux'),
@@ -187,17 +224,6 @@ describe('architecture-driven validation', () => {
     const withoutT5 = installed.filter((candidate) => candidate.key !== 't5');
 
     expect(getUpscaleValidationReasons(values, withoutT5)).toContain('t5 is no longer installed.');
-  });
-});
-
-describe('the architecture table', () => {
-  it.each(Object.entries(UPSCALE_ARCHITECTURES))('agrees with the served %s capabilities', (base, architecture) => {
-    // The fixture is the response the backend serves, pinned by `test_capabilities_fixture.py`, so a grid or
-    // negative-prompt change on a denoise node fails here instead of at enqueue.
-    const served = architectureCapabilitiesFixture.find((row) => row.base === base && row.variant === null);
-
-    expect(served?.features.dimension_grid).toBe(architecture.denoiseGrid);
-    expect(served?.features.negative_prompt.usage).toBe(architecture.negativePrompt);
   });
 });
 

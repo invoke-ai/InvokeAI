@@ -2,10 +2,13 @@
 export {
   addLoraCollectionLoader,
   addTransformerLoraCollectionLoader,
+  buildImageToImagePipeline,
   compileGenerateGraph,
   FLUX_REDUX_INFLUENCE,
+  type ImageToImagePipelineBase,
   resolveGenerateSeed,
 } from './core/graph';
+export type { FamilyPipelineSettings } from './core/familyGraph';
 export {
   addEdge,
   addNode,

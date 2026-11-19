@@ -6,6 +6,7 @@ import type { FamilyGraph, FamilyLatentSpace } from '@features/generation/core/f
 import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import {
+  getDenoisingStartClipping,
   getGenerationValidationReasons,
   hasEnabledKrea2EditReferences,
 } from '@features/generation/core/baseGenerationPolicies';
@@ -55,17 +56,12 @@ import {
 import { type CanvasSize, resolveCanvasProcessingSize } from './canvasProcessingSize';
 import { isAnimaInpaintAdapterModel } from './controlValidation';
 
-/** SD-3, FLUX, FLUX.2, FLUX.3 and MOSS-Image start at 1 - strength^0.2; FLUX Fill at 0; others at 1 - strength. */
+/** Sigma-clipping families start at 1 - strength^0.2; FLUX Fill at 0; others at 1 - strength. */
 const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): number => {
   if (model.base === 'flux' && model.variant === 'dev_fill') {
     return 0;
   }
-  const usesOptimizedCurve =
-    model.base === 'sd-3' ||
-    model.base === 'flux' ||
-    model.base === 'flux2' ||
-    model.base === 'flux3' ||
-    model.base === 'moss-image';
+  const usesOptimizedCurve = getDenoisingStartClipping(model)?.kind === 'sigma';
   return 1 - strength ** (usesOptimizedCurve ? 0.2 : 1);
 };
 
