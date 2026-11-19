@@ -13,7 +13,7 @@ import type { ScopedDefaults } from '@workbench/settings/contracts';
 
 import { getGalleryAutoAddBoardId } from '@features/gallery/contracts';
 import { canAddToCachedGalleryBoard, ensureGalleryBoardDestinations } from '@features/gallery/queries';
-import { toModelIdentifier } from '@features/generation/graph';
+import { toMetadataLora, toModelIdentifier } from '@features/generation/graph';
 import {
   getEffectivePrompts,
   isSupportedGenerateModel,
@@ -115,8 +115,7 @@ const buildCanvasSaveMetadata = (project: Project, rect: Rect): Record<string, u
     seamless_x: generateValues.seamlessXAxis,
     seamless_y: generateValues.seamlessYAxis,
     loras: generateValues.loras.map((lora) => ({
-      model: toModelIdentifier(lora.model),
-      weight: lora.weight,
+      ...toMetadataLora(lora, generateValues.model),
       isEnabled: lora.isEnabled,
     })),
     ref_images: structuredClone(generateValues.referenceImages),

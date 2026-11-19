@@ -1,3 +1,7 @@
+import type { WanLoraTarget } from '@features/generation/contracts';
+
+import { isWanLoraTarget } from '@features/generation/settings';
+
 /** Every field optional on read; pre-identifier records name `{ model_name, base_model, model_type }`. */
 export interface RecordedModelRef {
   base: string | null;
@@ -75,4 +79,57 @@ export const resolveRecordedModel = <T extends ResolvableModel>(
         : [];
 
   return matches.length > 1 && policy.ambiguous === 'refuse' ? 'ambiguous' : (matches[0] ?? null);
+};
+
+export interface ParsedMetadataLoraTarget {
+  lowNoiseWeight?: number;
+  target?: WanLoraTarget;
+}
+
+/** Read optional Wan expert target and differing low-noise weight from a metadata `loras` entry. */
+export const readMetadataLoraTarget = (entry: Record<string, unknown>, weight: number): ParsedMetadataLoraTarget => {
+  const target = isWanLoraTarget(entry.target) ? entry.target : undefined;
+  const lowNoiseWeight =
+    target === 'both' &&
+    typeof entry.low_noise_weight === 'number' &&
+    Number.isFinite(entry.low_noise_weight) &&
+    entry.low_noise_weight !== weight
+      ? entry.low_noise_weight
+      : undefined;
+
+  return {
+    ...(target !== undefined ? { target } : {}),
+    ...(lowNoiseWeight !== undefined ? { lowNoiseWeight } : {}),
+  };
+};
+
+/**
+ * Fold opposing `'high'` and `'low'` entries for the same LoRA into one `'both'` entry, preserving `weight` for the
+ * high-noise expert and adding `lowNoiseWeight` when the low-noise expert differed.
+ */
+export const mergeOpposingWanLoraTargets = <
+  T extends { lowNoiseWeight?: number; target?: WanLoraTarget; weight: number },
+>(
+  existing: T,
+  incoming: { target?: WanLoraTarget; weight: number }
+): T | null => {
+  if (
+    !(
+      (existing.target === 'high' && incoming.target === 'low') ||
+      (existing.target === 'low' && incoming.target === 'high')
+    )
+  ) {
+    return null;
+  }
+
+  const highWeight = existing.target === 'high' ? existing.weight : incoming.weight;
+  const lowWeight = existing.target === 'low' ? existing.weight : incoming.weight;
+  const { lowNoiseWeight: _previousLow, ...rest } = existing;
+
+  return {
+    ...rest,
+    target: 'both',
+    weight: highWeight,
+    ...(lowWeight !== highWeight ? { lowNoiseWeight: lowWeight } : {}),
+  } as T;
 };
