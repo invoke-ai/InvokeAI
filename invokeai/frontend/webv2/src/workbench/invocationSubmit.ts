@@ -84,7 +84,7 @@ export interface SubmitResolvedInvocationDeps {
   prepend?: boolean;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   prepareCanvasInvocation: (args: PrepareCanvasInvocationArgs) => Promise<void> | void;
-  formatControlLayerError: PrepareCanvasInvocationArgs['formatControlLayerError'];
+  formatCanvasInvocationFailure: PrepareCanvasInvocationArgs['formatCanvasInvocationFailure'];
   formatUpscaleMetadataFailure: (imageName: string) => string;
 }
 
@@ -179,7 +179,7 @@ const resolveWorkflowGeneratorsForRoute = async (
 
 export const submitResolvedInvocation = async ({
   commands,
-  formatControlLayerError,
+  formatCanvasInvocationFailure,
   formatUpscaleMetadataFailure,
   models,
   owner,
@@ -250,7 +250,7 @@ export const submitResolvedInvocation = async ({
     await dispatchResolvedInvocation(
       {
         commands,
-        formatControlLayerError,
+        formatCanvasInvocationFailure,
         formatUpscaleMetadataFailure,
         models,
         owner,
@@ -274,7 +274,7 @@ export const submitResolvedInvocation = async ({
   await dispatchResolvedInvocation(
     {
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       models,
       owner,
@@ -296,7 +296,7 @@ export const submitResolvedInvocation = async ({
 const dispatchResolvedInvocation = async (
   {
     commands,
-    formatControlLayerError,
+    formatCanvasInvocationFailure,
     formatUpscaleMetadataFailure,
     models,
     owner,
@@ -345,7 +345,7 @@ const dispatchResolvedInvocation = async (
       compositing: readCanvasCompositingSettings(canvasValues),
       destination: route.destination,
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       generateValues: getProjectWidgetValues(project, 'generate'),
       models,
       owner,

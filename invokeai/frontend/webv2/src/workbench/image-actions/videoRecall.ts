@@ -17,6 +17,7 @@ import {
   findAcceleratorLorasIn,
   getAcceleratorToggleResult,
   getAcceleratorSteps,
+  getEffectiveVideoModel,
   getVideoAspectRatioOptions,
   getVideoDimensions,
   getVideoModelPolicy,
@@ -510,7 +511,7 @@ export const deriveAcceleratorRecallState = (
   steps: number,
   settings: VideoWidgetValues
 ): Pick<VideoWidgetValues, 'acceleratorEnabled' | 'acceleratorLoraKeys'> => {
-  // Promote legacy H3 transformer overrides before deriving accelerators: fl2va and ref2v use different sets and steps.
+  model = getEffectiveVideoModel(model, settings);
   const accelerator = getVideoModelPolicy(model, settings).ui.accelerator;
   const recalled = accelerator
     ? findAcceleratorLorasIn(
@@ -693,6 +694,22 @@ export const buildVideoRecallSettings = ({
   if (!model) {
     return fields.length > 0 ? { fields, mediaNames, values: { ...values, ...promptPatch } } : null;
   }
+
+  // The existing generation_mode records the effective H3 task, including an override.
+  // Restore an override only against the recorded, installed checkpoint.
+  const recordedMode = isRecord(metadata) ? getString(metadata, 'generation_mode') : null;
+  if (
+    model?.base === 'minimax-h3' &&
+    model.format === 'checkpoint' &&
+    recalledModel &&
+    recordedMode?.startsWith('minimax_h3_')
+  ) {
+    const task = recordedMode === 'minimax_h3_ref2v' ? 'ref2va' : 'fl2va';
+    const h3TaskOverride = task !== getEffectiveVideoModel(recalledModel, {}).variant ? task : undefined;
+    values = { ...values, model: recalledModel, h3TaskOverride };
+  }
+
+  model = getEffectiveVideoModel(model, values);
 
   const { numFrames } = record;
 
