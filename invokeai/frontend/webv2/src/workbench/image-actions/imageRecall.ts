@@ -78,7 +78,15 @@ const hasCanvasRecall = (metadata: unknown): boolean =>
     't2iAdapters' in metadata ||
     typeof (metadata.strength ?? metadata.denoise_strength) === 'number');
 
-export type ImageRecallKind = 'all' | 'remix' | 'prompts' | 'seed' | 'dimensions' | 'clipSkip';
+export type ImageRecallKind =
+  | 'all'
+  | 'remix'
+  | 'prompts'
+  | 'positivePrompt'
+  | 'negativePrompt'
+  | 'seed'
+  | 'dimensions'
+  | 'clipSkip';
 
 export interface ImageRecallCapabilities {
   all: boolean;
@@ -415,12 +423,13 @@ const getMetadataVae = (
 };
 
 const getPromptPatch = (
-  metadata: unknown
+  metadata: unknown,
+  kind: 'prompts' | 'positivePrompt' | 'negativePrompt' = 'prompts'
 ): Partial<
   Pick<GenerateWidgetValues, 'negativePrompt' | 'positivePrompt' | 'promptTemplate' | 'promptTemplateViewMode'>
 > => {
-  const positivePrompt = getString(metadata, 'positive_prompt');
-  const negativePrompt = getNullableString(metadata, 'negative_prompt');
+  const positivePrompt = kind === 'negativePrompt' ? null : getString(metadata, 'positive_prompt');
+  const negativePrompt = kind === 'positivePrompt' ? undefined : getNullableString(metadata, 'negative_prompt');
   // The recorded prompt already has any template baked in; clearing the active template stops a second wrap.
   const clearTemplate = positivePrompt !== null || negativePrompt !== undefined;
 
@@ -1343,7 +1352,12 @@ export const getSupportedClipSkip = (metadata: unknown, model: GenerateModelConf
 
 /** Require served policy before persisting model defaults; prompts and seed are intrinsic. */
 export const isImageRecallKindAvailable = (kind: ImageRecallKind): boolean =>
-  kind === 'prompts' || kind === 'seed' || kind === 'dimensions' || hasArchitectureCapabilities();
+  kind === 'prompts' ||
+  kind === 'positivePrompt' ||
+  kind === 'negativePrompt' ||
+  kind === 'seed' ||
+  kind === 'dimensions' ||
+  hasArchitectureCapabilities();
 
 export const getImageRecallCapabilities = ({
   currentValues,
@@ -1597,8 +1611,14 @@ export const buildImageRecallSettings = ({
     }
   }
 
-  if (kind === 'all' || kind === 'remix' || kind === 'prompts') {
-    const promptPatch = getPromptPatch(metadata);
+  if (
+    kind === 'all' ||
+    kind === 'remix' ||
+    kind === 'prompts' ||
+    kind === 'positivePrompt' ||
+    kind === 'negativePrompt'
+  ) {
+    const promptPatch = getPromptPatch(metadata, kind === 'all' || kind === 'remix' ? 'prompts' : kind);
 
     if (Object.keys(promptPatch).length > 0) {
       values = { ...values, ...promptPatch };

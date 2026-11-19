@@ -45,8 +45,8 @@ const ENTRY_RECALL_KINDS: Partial<
   Record<string, { capability: keyof ImageRecallCapabilities; kind: ImageRecallKind }>
 > = {
   clipSkip: { capability: 'clipSkip', kind: 'clipSkip' },
-  negativePrompt: { capability: 'prompts', kind: 'prompts' },
-  positivePrompt: { capability: 'prompts', kind: 'prompts' },
+  negativePrompt: { capability: 'prompts', kind: 'negativePrompt' },
+  positivePrompt: { capability: 'prompts', kind: 'positivePrompt' },
   seed: { capability: 'seed', kind: 'seed' },
   size: { capability: 'dimensions', kind: 'dimensions' },
 };
