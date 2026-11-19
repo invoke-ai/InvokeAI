@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 825939,
+        "brotliBytes": 827315,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 824908,
+        "gzipBytes": 826212,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2140669,
+        "initialRawBytes": 2143179,
         "largestAssetRawBytes": 770754,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 116630,
+        "ownedRawBytes": 116624,
         "requestCount": 34,
         "scriptRequestCount": 18,
         "sourceOwners": [
@@ -363,15 +363,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1297167,
+        "brotliBytes": 1300130,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1289769,
+        "gzipBytes": 1292688,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3598707,
+        "initialRawBytes": 3606888,
         "largestAssetRawBytes": 770754,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 174944,
+        "ownedRawBytes": 176508,
         "requestCount": 70,
         "scriptRequestCount": 54,
         "sourceOwners": [
@@ -575,6 +575,7 @@
           "source:src/features/generation/core/canvas/controlValidation.ts",
           "source:src/features/generation/core/catalogSearch.ts",
           "source:src/features/generation/core/componentCompatibility.ts",
+          "source:src/features/generation/core/componentDefaults.ts",
           "source:src/features/generation/core/conditioningRebalance.ts",
           "source:src/features/generation/core/dimensionLimits.ts",
           "source:src/features/generation/core/dynamicPrompts.ts",
@@ -1183,7 +1184,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-11-16",
+  "capturedAt": "2026-11-19",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
