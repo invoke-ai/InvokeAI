@@ -65,14 +65,19 @@ export const CONTROL_KIND_BASE: Readonly<Partial<Record<CanvasControlAdapterCont
   z_image_control: 'z-image',
 };
 
-/**
- * The adapter kind a new control layer starts with for a main-model base: a base's own kind, otherwise ControlNet. A
- * layer keeps its kind when the main model changes; validation reports a mismatch.
- */
-export const getDefaultControlAdapterKind = (base: string | null | undefined): CanvasControlAdapterContract['kind'] =>
+/** The kind a `controlnet` model runs as on `base`: the base's own kind, otherwise plain ControlNet. */
+const getControlNetKindForBase = (base: string | null | undefined): CanvasControlAdapterContract['kind'] =>
   (Object.keys(CONTROL_KIND_BASE) as CanvasControlAdapterContract['kind'][]).find(
     (kind) => CONTROL_KIND_BASE[kind] === base
   ) ?? 'controlnet';
+
+/**
+ * The adapter kind a new control layer starts with for a main-model base: a base's own kind, otherwise ControlNet,
+ * except on Krea-2, whose only control is the Control LoRA it shares with FLUX. A layer keeps its kind when the main
+ * model changes; validation reports a mismatch.
+ */
+export const getDefaultControlAdapterKind = (base: string | null | undefined): CanvasControlAdapterContract['kind'] =>
+  base === 'krea-2' ? 'control_lora' : getControlNetKindForBase(base);
 
 /**
  * The adapter kind a control model runs as on its own base: T2I-Adapter and Control LoRA by type, a `controlnet`
@@ -85,7 +90,7 @@ export const deriveControlKind = (model: {
   if (model.type === 't2i_adapter' || model.type === 'control_lora') {
     return model.type;
   }
-  return model.type === 'controlnet' ? getDefaultControlAdapterKind(model.base) : null;
+  return model.type === 'controlnet' ? getControlNetKindForBase(model.base) : null;
 };
 
 /** A fresh copy of the default adapter for `base`, carrying `model`. */
@@ -94,7 +99,13 @@ export const createDefaultControlAdapter = (
   model: string | null = null
 ): CanvasControlAdapterContract => {
   const defaults = CONTROL_ADAPTER_DEFAULTS[getDefaultControlAdapterKind(base)];
-  return { ...defaults, beginEndStepPct: [...defaults.beginEndStepPct], model };
+  return {
+    ...defaults,
+    beginEndStepPct: [...defaults.beginEndStepPct],
+    model,
+    // Krea-2's weight scales only the block LoRAs beside a trained input projection; the checkpoint trains at 1.
+    ...(base === 'krea-2' ? { weight: 1 } : {}),
+  };
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;

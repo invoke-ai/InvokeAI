@@ -308,6 +308,12 @@ describe('typed control layers', () => {
     ]);
   });
 
+  it('tells a Krea-2 layer without control models so, rather than to switch kind', () => {
+    expect(
+      getBlockingControlLayerIssues({ layers: [typed('depth')], mainModel: { base: 'krea-2' }, models: [] })
+    ).toMatchObject([{ code: 'no_control_models' }]);
+  });
+
   it('never blocks on an empty layer, though it still warns', () => {
     const empty = typed('empty', {}, { source: { bitmap: null, type: 'paint' } });
 

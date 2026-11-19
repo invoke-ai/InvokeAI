@@ -41,12 +41,21 @@ const layer = (overrides: Partial<ControlLayerGraphInput> = {}): ControlLayerGra
   ...overrides,
 });
 
+/** The options a case sets; the family facts only a Krea-2 Control LoRA reads default to a graph without a VAE. */
+type TestOptions = Omit<AddControlLayersOptions, 'denoise' | 'denoiseSize' | 'latents'> &
+  Partial<Pick<AddControlLayersOptions, 'denoiseSize' | 'latents'>>;
+
 // Cast: TestGraph is structurally the BackendGraphContract shape addControlLayers needs.
-const addTo = (graph: TestGraph, options: Omit<AddControlLayersOptions, 'denoise'>) =>
-  addControlLayers(graph as never, { ...options, denoise: graph.nodes.denoise_latents });
+const addTo = (graph: TestGraph, options: TestOptions) =>
+  addControlLayers(graph as never, {
+    denoiseSize: { height: 1024, width: 1024 },
+    latents: null,
+    ...options,
+    denoise: graph.nodes.denoise_latents,
+  });
 
 // Convenience to run addControlLayers against a fresh graph.
-const run = (options: Omit<AddControlLayersOptions, 'denoise'>) => {
+const run = (options: TestOptions) => {
   const graph = baseGraph();
   addTo(graph, options);
   return graph;
@@ -93,8 +102,10 @@ describe('isControlKindSupportedForBase', () => {
     expect(isControlKindSupportedForBase('flux2', 'qwen_image_control')).toBe(false);
   });
 
-  it('control_lora is supported on flux only', () => {
+  it('control_lora is supported on flux and krea-2 only', () => {
     expect(isControlKindSupportedForBase('flux', 'control_lora')).toBe(true);
+    expect(isControlKindSupportedForBase('krea-2', 'control_lora')).toBe(true);
+    expect(isControlKindSupportedForBase('krea-2', 'controlnet')).toBe(false);
     expect(isControlKindSupportedForBase('sd-1', 'control_lora')).toBe(false);
     expect(isControlKindSupportedForBase('sdxl', 'control_lora')).toBe(false);
     expect(isControlKindSupportedForBase('sd-2', 'control_lora')).toBe(false);
@@ -306,6 +317,55 @@ describe('addControlLayers — control_lora on flux', () => {
     expect(graph.nodes['control_net_collector']).toBeUndefined();
     expect(graph.nodes['t2i_adapter_collector']).toBeUndefined();
     expect(Object.values(graph.nodes).some((n) => n.type === 'collect')).toBe(false);
+  });
+});
+
+describe('addControlLayers — control_lora on krea-2', () => {
+  const krea2Graph = (): TestGraph => {
+    const graph = baseGraph();
+    graph.nodes.model_loader = { id: 'model_loader', type: 'krea2_model_loader' };
+    return graph;
+  };
+  const krea2Layer = layer({
+    id: 'K1',
+    imageName: 'depth.png',
+    kind: 'control_lora',
+    model: model('krea-2', 'control_lora'),
+    weight: 0.8,
+  });
+
+  it('encodes the control image at the denoise size with the graph VAE and feeds the Krea-2 Control LoRA node', () => {
+    const graph = krea2Graph();
+    addTo(graph, {
+      base: 'krea-2',
+      denoiseSize: { height: 1024, width: 768 },
+      latents: { encodeType: 'qwen_image_i2l', vae: { field: 'vae', node: graph.nodes.model_loader } },
+      layers: [krea2Layer],
+    });
+
+    expect(graph.nodes['control_lora_i2l_K1']).toMatchObject({
+      height: 1024,
+      image: { image_name: 'depth.png' },
+      type: 'qwen_image_i2l',
+      width: 768,
+    });
+    expect(graph.nodes['control_lora_i2l_K1']).not.toHaveProperty('reference');
+    expect(graph.nodes['control_lora_K1']).toMatchObject({
+      lora: krea2Layer.model,
+      type: 'krea2_control_lora',
+      weight: 0.8,
+    });
+    expect(graph.nodes['control_lora_K1']).not.toHaveProperty('image');
+    expect(edgesTo(graph, 'control_lora_i2l_K1', 'vae').map((e) => e.source)).toEqual([
+      { field: 'vae', node_id: 'model_loader' },
+    ]);
+    expect(edgesTo(graph, 'control_lora_K1', 'control_latents').map((e) => e.source)).toEqual([
+      { field: 'latents', node_id: 'control_lora_i2l_K1' },
+    ]);
+    expect(edgesTo(graph, 'denoise_latents', 'control_lora').map((e) => e.source)).toEqual([
+      { field: 'control_lora', node_id: 'control_lora_K1' },
+    ]);
+    expect(Object.values(graph.nodes).some((n) => n.type === 'flux_control_lora_loader')).toBe(false);
   });
 });
 
