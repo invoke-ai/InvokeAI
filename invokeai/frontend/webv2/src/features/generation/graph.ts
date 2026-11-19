@@ -4,6 +4,7 @@ export {
   addTransformerLoraCollectionLoader,
   buildImageToImagePipeline,
   compileGenerateGraph,
+  FLUX_REDUX_INFLUENCE,
   type ImageToImagePipelineBase,
   resolveGenerateSeed,
 } from './core/graph';

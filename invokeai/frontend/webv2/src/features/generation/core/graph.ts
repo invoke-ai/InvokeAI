@@ -98,27 +98,15 @@ const toImageField = (image: GenerateReferenceImageAsset) => ({
   image_name: getEffectiveReferenceImage(image).image_name,
 });
 
-const addReferenceImageMetadata = (
-  graph: BackendGraphContract,
-  outputNode: BackendInvocationContract,
-  settings: GenerateSettings
-) => {
-  const enabled = settings.referenceImages.filter(
-    (referenceImage) => referenceImage.isEnabled && referenceImage.config.image
-  );
-
-  if (enabled.length === 0) {
-    return;
-  }
-
+/** Recorded even when empty, on the `core_metadata` node `addMetadata` added: an empty list tells recall to clear. */
+const addReferenceImageMetadata = (graph: BackendGraphContract, settings: GenerateSettings) => {
   const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
 
   if (metadata) {
-    metadata.ref_images = enabled;
-    return;
+    metadata.ref_images = settings.referenceImages.filter(
+      (referenceImage) => referenceImage.isEnabled && referenceImage.config.image
+    );
   }
-
-  outputNode.ref_images = enabled;
 };
 
 const addIPAdapterReferenceImages = (
@@ -170,7 +158,7 @@ const addIPAdapterReferenceImages = (
   return collector;
 };
 
-const FLUX_REDUX_INFLUENCE = {
+export const FLUX_REDUX_INFLUENCE = {
   lowest: { downsampling_factor: 5, weight: 1 },
   low: { downsampling_factor: 4, weight: 1 },
   medium: { downsampling_factor: 3, weight: 1 },
@@ -748,7 +736,7 @@ const buildSDGraph: GenerateGraphBuilder = (settings, model, outputIsIntermediat
     ...(refiner ? getRefinerMetadata(settings, model, refiner) : {}),
     scheduler,
   });
-  addReferenceImageMetadata(graph, output, settings);
+  addReferenceImageMetadata(graph, settings);
 
   return {
     ...pipeline,
@@ -959,7 +947,7 @@ const buildFluxGraph: GenerateGraphBuilder = (settings, model, outputIsIntermedi
     vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
-  addReferenceImageMetadata(graph, output, settings);
+  addReferenceImageMetadata(graph, settings);
 
   return { ...pipeline, conditioning: { ...pipeline.conditioning, fluxReduxCollector, ipAdapterCollector } };
 };
@@ -1096,7 +1084,7 @@ const buildFlux2Graph: GenerateGraphBuilder = (settings, model, outputIsIntermed
     vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
-  addReferenceImageMetadata(graph, output, settings);
+  addReferenceImageMetadata(graph, settings);
 
   return pipeline;
 };
@@ -1375,7 +1363,7 @@ const buildQwenImageGraph: GenerateGraphBuilder = (settings, model, outputIsInte
     scheduler: undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
-  addReferenceImageMetadata(graph, output, settings);
+  addReferenceImageMetadata(graph, settings);
 
   return pipeline;
 };
@@ -1626,7 +1614,7 @@ const buildAnimaGraph: GenerateGraphBuilder = (settings, model, outputIsIntermed
     scheduler: coerceSchedulerForGraph(model, settings.scheduler),
     vae: vaeModel,
   });
-  addReferenceImageMetadata(graph, output, settings);
+  addReferenceImageMetadata(graph, settings);
 
   return { ...pipeline, conditioning: { ...pipeline.conditioning, ipAdapterCollector } };
 };
@@ -1841,7 +1829,7 @@ const buildKrea2Graph: GenerateGraphBuilder = (settings, model, outputIsIntermed
     qwen3_vl_vision_tower: components.qwen3VlVisionTowerModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
-  addReferenceImageMetadata(graph, output, settings);
+  addReferenceImageMetadata(graph, settings);
 
   return pipeline;
 };
@@ -1914,7 +1902,7 @@ const buildQwenImage21Graph = (
     vae: vaeModel ?? undefined,
   });
   addEdge(graph, denoise, 'metadata', output, 'metadata');
-  addReferenceImageMetadata(graph, output, settings);
+  addReferenceImageMetadata(graph, settings);
 
   return {
     conditioning: null,
@@ -2219,7 +2207,7 @@ const buildFlux3Graph = (
     // Metadata records the caption encoded, not the prompt typed (recall restores `positive_prompt`).
     addEdge(graph, layoutPrompt, 'value', metadata, 'flux3_caption');
   }
-  addReferenceImageMetadata(graph, output, settings);
+  addReferenceImageMetadata(graph, settings);
 
   return {
     conditioning: null,
@@ -2457,7 +2445,7 @@ export const buildExternalGraph = (
     scheduler: undefined,
     ...getExternalProviderMetadata(settings, model),
   });
-  addReferenceImageMetadata(graph, output, settings);
+  addReferenceImageMetadata(graph, settings);
 
   return graph;
 };

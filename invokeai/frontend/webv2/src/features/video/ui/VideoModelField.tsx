@@ -1,4 +1,4 @@
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop -- the React Compiler memoizes these handlers, as in GenerateModelCard. */
+/* oxlint-disable react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-jsx-as-prop -- the React Compiler memoizes these handlers and elements, as in GenerateModelCard. */
 import type { MainModelConfig } from '@features/generation/contracts';
 import type { ModelConfig, ModelTaxonomyType } from '@features/models';
 import type { VideoWidgetValues } from '@features/video/core/types';
@@ -8,13 +8,14 @@ import type {
   VideoModelSwitchLossKey,
 } from '@features/video/core/videoPolicies';
 
-import { Box, Text } from '@chakra-ui/react';
+import { Box, HStack, Text } from '@chakra-ui/react';
 import { isMainModelConfig } from '@features/generation/settings';
 import { ModelSelect, useHasModelPickerCandidates } from '@features/models/react';
 import { getVideoModelSelectionResult, isVideoModelSelectable } from '@features/video/core/videoPolicies';
 import { syncVideoWidgetValuesWithModels } from '@features/video/core/widgetValues';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { Field } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { toaster } from '@platform/ui/toaster';
 import { useRef, useState } from 'react';
@@ -82,7 +83,18 @@ export const VideoModelField = ({
   // The picker keeps its default id, which keys its remembered view and base filter; focus returns through this.
   const pickerRef = useRef<HTMLDivElement>(null);
   // Retain only the target and its project; the dialog previews, and confirmation applies, against live settings.
-  const [pendingSwitch, setPendingSwitch] = useState<{ modelKey: string; projectId: string } | null>(null);
+  const [loadMode, setLoadMode] = useState<'auto' | 'ref2va' | 'fl2va'>('auto');
+  const [pendingSwitch, setPendingSwitch] = useState<{
+    modelKey: string;
+    projectId: string;
+    mode: 'auto' | 'ref2va' | 'fl2va';
+  } | null>(null);
+  const hasH3Checkpoints = models.some(
+    (model) => isVideoModelSelectable(model) && model.base === 'minimax-h3' && model.format === 'checkpoint'
+  );
+  const pickerFilter = (model: ModelConfig) =>
+    isVideoModelSelectable(model) &&
+    (loadMode === 'auto' || model.base !== 'minimax-h3' || model.format === 'checkpoint');
   const pendingModel =
     pendingSwitch?.projectId === projectId ? findSelectableModel(models, pendingSwitch.modelKey) : null;
 
@@ -93,13 +105,16 @@ export const VideoModelField = ({
 
   // One transition for the preview, the decision, and the confirmed write, so they cannot disagree. The view shows
   // panel values reconciled with the catalog; stored values are judged the same way.
-  const getTransition = (current: VideoWidgetValues, model: MainModelConfig) =>
-    getVideoModelSelectionResult({
+  const getTransition = (current: VideoWidgetValues, model: MainModelConfig, mode: 'auto' | 'ref2va' | 'fl2va') => {
+    const h3TaskOverride = mode === 'auto' ? undefined : mode;
+    return getVideoModelSelectionResult({
       currentSettings: modelsLoaded ? syncVideoWidgetValuesWithModels(current, models) : current,
       model,
       models,
+      h3TaskOverride,
     });
-  const preview = pendingModel ? getTransition(values, pendingModel) : null;
+  };
+  const preview = pendingModel ? getTransition(values, pendingModel, pendingSwitch?.mode ?? 'auto') : null;
 
   const formatList = (labels: string[]) =>
     new Intl.ListFormat(i18n.resolvedLanguage, { style: 'long', type: 'conjunction' }).format(labels);
@@ -107,7 +122,7 @@ export const VideoModelField = ({
     formatList(adjustments.map((adjustment) => t(ADJUSTMENT_LABELS[adjustment].labelKey)));
 
   const selectModel = (candidate: ModelConfig | null) => {
-    if (!isMainModelConfig(candidate) || !isVideoModelSelectable(candidate)) {
+    if (!isMainModelConfig(candidate) || !pickerFilter(candidate)) {
       return;
     }
 
@@ -118,17 +133,23 @@ export const VideoModelField = ({
 
     // Decide and apply in one functional patch, against the latest stored values rather than this render's.
     patchValues((current) => {
-      result = getTransition(current, candidate);
+      result = getTransition(current, candidate, loadMode);
 
-      return result.losses.length > 0 ? {} : { ...result.settings, model: candidate };
+      return result.losses.length > 0
+        ? {}
+        : {
+            ...result.settings,
+            model: candidate,
+          };
     });
 
     if (!result) {
       return;
     }
 
+    setLoadMode('auto');
     if (result.losses.length > 0) {
-      setPendingSwitch({ modelKey: candidate.key, projectId });
+      setPendingSwitch({ modelKey: candidate.key, projectId, mode: loadMode });
     } else if (result.adjustments.length > 0) {
       toaster.create({
         description: t('widgets.video.settingsAdjustedDescription', { labels: formatAdjustments(result.adjustments) }),
@@ -147,7 +168,10 @@ export const VideoModelField = ({
     // Close before writing, so the dialog animates out showing the list that was confirmed, not the switched panel.
     setPendingSwitch(null);
     // Recompute against the settings as they stand now: they may have changed while the dialog was open.
-    patchValues((current) => ({ ...getTransition(current, pendingModel).settings, model: pendingModel }));
+    patchValues((current) => ({
+      ...getTransition(current, pendingModel, pendingSwitch?.mode ?? 'auto').settings,
+      model: pendingModel,
+    }));
   };
 
   return (
@@ -165,13 +189,39 @@ export const VideoModelField = ({
       >
         <Box ref={pickerRef} minW="0" w="full">
           <ModelSelect
-            filter={isVideoModelSelectable}
+            filter={pickerFilter}
             installAction
             invalid={!values.model}
             modelTypes={MAIN_MODEL_TYPES}
             placeholder={t('widgets.video.selectModel')}
             value={values.model?.key ?? null}
+            pickerHeader={
+              hasH3Checkpoints ? (
+                <Box px="2" pt="2" pb="1">
+                  <Text fontSize="xs" color="fg.muted">
+                    {t('widgets.video.h3LoadMode')}
+                  </Text>
+                  <HStack gap="1" mt="1">
+                    {(['auto', 'ref2va', 'fl2va'] as const).map((mode) => (
+                      <Button
+                        key={mode}
+                        size="sm"
+                        variant={loadMode === mode ? 'solid' : 'outline'}
+                        aria-pressed={loadMode === mode}
+                        onClick={() => setLoadMode(mode)}
+                      >
+                        {mode === 'auto' ? t('widgets.video.h3Detected') : mode === 'ref2va' ? 'Ref2VA' : 'FL2VA'}
+                      </Button>
+                    ))}
+                  </HStack>
+                  <Text fontSize="xs" color="fg.muted" mt="1">
+                    {t('widgets.video.h3OverrideHelp')}
+                  </Text>
+                </Box>
+              ) : undefined
+            }
             onChange={selectModel}
+            onPickerClose={() => setLoadMode('auto')}
           />
         </Box>
       </Field>
