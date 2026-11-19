@@ -743,21 +743,30 @@ describe('StagingBar keys', () => {
   it('leaves keys alone inside its menus: the accept options and a thumbnail menu neither discard nor step', async () => {
     const onCycle = vi.fn();
     const onDiscardSelected = vi.fn();
-    const { thumbnails } = await renderStagingBar(3, 0, noop, noop, noop, makeSlot, { onCycle, onDiscardSelected });
+    const onSelectImage = vi.fn();
+    const { thumbnails } = await renderStagingBar(3, 0, noop, noop, onSelectImage, makeSlot, {
+      onCycle,
+      onDiscardSelected,
+    });
 
     await page.getByRole('button', { name: 'More accept options' }).click();
     await expect.element(page.getByRole('menu')).toBeVisible();
     await act(() => userEvent.keyboard('{Delete}{ArrowRight}{Backspace}{ArrowLeft}'));
     await act(() => userEvent.keyboard('{Escape}'));
+    await expect.element(page.getByRole('menu')).not.toBeInTheDocument();
 
     await act(() => {
       thumbnails[0]!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     });
-    await expect.element(page.getByRole('menu')).toBeVisible();
+    await expect.element(page.getByTestId('staging-context-menu')).toBeVisible();
+    // Escape left focus on the accept options; the thumbnail's own keys are the ones its menu must hold.
+    await act(() => thumbnails[0]!.focus());
     await act(() => userEvent.keyboard('{Delete}{ArrowRight}{Backspace}{ArrowLeft}'));
 
     expect(onDiscardSelected).not.toHaveBeenCalled();
     expect(onCycle).not.toHaveBeenCalled();
+    // Only the right-click's own selection; no arrow moved it.
+    expect(onSelectImage.mock.calls).toEqual([[0]]);
   });
 
   it('lets modified presses and other keys through to the workbench', async () => {
