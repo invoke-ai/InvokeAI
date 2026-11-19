@@ -71,6 +71,7 @@ export {
   isKnownScheduler,
   isLossyModelSwitch,
   isSupportedGenerateModel,
+  takesReferenceImages,
   NO_GENERATE_MODEL_ISSUE,
   SCHEDULER_OPTIONS,
   type GenerateModelSelectionResult,
