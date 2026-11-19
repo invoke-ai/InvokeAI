@@ -478,6 +478,8 @@ const createState = (profile, clock) => {
     models,
     /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
     modelProbes: new Map(),
+    /** Why a model's file is recognised and refused as unusable; only `POST /__models` seeds entries. */
+    modelRefusals: new Map(),
     mutationClock: 0,
     nextBoardNumber: fixture.boards.length + 1,
     nextImageNumber: fixture.images.length + 1,
@@ -1392,10 +1394,13 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           ...(body.set === undefined ? [] : MODEL_SEED_SETS[body.set]),
           ...(Array.isArray(body.models) ? body.models.map((record) => ({ record })) : []),
         ];
-        for (const { probe, record } of entries) {
+        for (const { probe, record, refusal } of entries) {
           state.models.set(record.key, clone(record));
           if (probe) {
             state.modelProbes.set(record.key, clone(probe));
+          }
+          if (refusal) {
+            state.modelRefusals.set(record.key, refusal);
           }
         }
         return json(200, { keys: entries.map(({ record }) => record.key), ok: true });
@@ -2412,6 +2417,44 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         return json(200, []);
       }
 
+      // The preview of re-identification: the same probe, written nowhere. `changed` compares the four fields the
+      // backend compares.
+      const identify = (key) => {
+        const model = state.models.get(key);
+        if (!model) {
+          return undefined;
+        }
+        const refusal = state.modelRefusals.get(key) ?? null;
+        if (refusal) {
+          return { changed: false, proposed: null, refusal };
+        }
+        const proposed = { ...model, ...state.modelProbes.get(key) };
+        const changed = ['type', 'format', 'base', 'variant'].some(
+          (field) => (proposed[field] ?? null) !== (model[field] ?? null)
+        );
+        return { changed, proposed: clone(proposed), refusal: null };
+      };
+
+      const identificationMatch = /^\/api\/v2\/models\/i\/([^/]+)\/identification$/.exec(path);
+      if (method === 'GET' && identificationMatch) {
+        const preview = identify(decodeURIComponent(identificationMatch[1]));
+        return preview ? json(200, preview) : json(404, { detail: 'Model not found' });
+      }
+
+      if (method === 'POST' && path === '/api/v2/models/i/bulk_identification') {
+        const body = await readJsonBody(request);
+        const keys = Array.isArray(body.keys) ? [...new Set(body.keys)] : [];
+        if (keys.length > 100) {
+          return json(422, { detail: 'At most 100 keys per request' });
+        }
+        return json(200, {
+          results: keys.map((key) => {
+            const preview = identify(key);
+            return preview ? { key, preview } : { error: 'Model not found', key };
+          }),
+        });
+      }
+
       const reidentifyMatch = /^\/api\/v2\/models\/i\/([^/]+)\/reidentify$/.exec(path);
       if (method === 'POST' && reidentifyMatch) {
         // Like the backend's re-probe: fields recorded since the model was installed are filled in.
@@ -2419,6 +2462,9 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         const model = state.models.get(key);
         if (!model) {
           return json(404, { detail: 'Model not found' });
+        }
+        if (state.modelRefusals.has(key)) {
+          return json(400, { detail: `Unable to identify model format: ${state.modelRefusals.get(key)}` });
         }
         const identified = { ...model, ...state.modelProbes.get(key) };
         state.models.set(key, identified);

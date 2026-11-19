@@ -2075,6 +2075,48 @@ test('queue chain rules: prune keeps finished children of an active root, and ca
   });
 });
 
+test('the identification preview reports what re-identify would write without writing it', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const post = (path, body) =>
+      fetch(`${backend.origin}${path}`, {
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      });
+    await post('/__models', { set: 'identification' });
+    const preview = (key) => getJson(backend, `/api/v2/models/i/${key}/identification`);
+
+    const unknown = await preview('seed-ident-unknown-sdxl');
+    assert.deepEqual([unknown.changed, unknown.proposed.base, unknown.proposed.type], [true, 'sdxl', 'main']);
+    assert.equal((await preview('seed-ident-wrong-base')).proposed.base, 'sdxl');
+    assert.equal((await preview('seed-ident-fine')).changed, false);
+    assert.deepEqual(await preview('seed-ident-unknown-broken'), {
+      changed: false,
+      proposed: null,
+      refusal: 'Qwen3-VL encoder is missing its projection weights.',
+    });
+    assert.equal((await getJson(backend, '/api/v2/models/i/seed-ident-unknown-sdxl')).type, 'unknown');
+    assert.equal((await fetch(`${backend.origin}/api/v2/models/i/missing/identification`)).status, 404);
+
+    const bulk = await (
+      await post('/api/v2/models/i/bulk_identification', { keys: ['seed-ident-fine', 'missing', 'seed-ident-fine'] })
+    ).json();
+    assert.deepEqual(
+      bulk.results.map((result) => [result.key, result.preview?.changed ?? result.error]),
+      [
+        ['seed-ident-fine', false],
+        ['missing', 'Model not found'],
+      ]
+    );
+    assert.equal(
+      (await post('/api/v2/models/i/bulk_identification', { keys: Array.from({ length: 101 }, (_, i) => `k${i}`) }))
+        .status,
+      422
+    );
+    assert.equal((await post('/api/v2/models/i/seed-ident-unknown-broken/reidentify', {})).status, 400);
+  });
+});
+
 test('model seed sets are opt-in, and re-identify fills what the probe would record', async () => {
   await withRepresentativeBackend(async (backend) => {
     const listed = async () => (await getJson(backend, '/api/v2/models/')).models;

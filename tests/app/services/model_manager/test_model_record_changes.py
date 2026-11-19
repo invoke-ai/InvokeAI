@@ -33,8 +33,10 @@ from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Conf
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
 from invokeai.backend.model_manager.configs.spandrel import Spandrel_Checkpoint_Config
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config
+from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.load import LoadedModel, ModelCache, ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
@@ -645,3 +647,140 @@ def test_reidentify_of_files_no_config_accepts_raises_and_keeps_the_record(harne
 def test_reidentify_of_an_unknown_model_raises(harness: _Harness) -> None:
     with pytest.raises(UnknownModelException):
         harness.manager.reidentify_model(KEY)
+
+
+def _rich_sd1_record(**fields) -> Main_Checkpoint_SD1_Config:
+    return _sd1_record(
+        name="My model",
+        description="mine",
+        cover_image="cover.webp",
+        trigger_phrases={"a phrase"},
+        default_settings=MainModelDefaultSettings(cpu_only=True, fp8_storage=False, steps=12),
+        **fields,
+    )
+
+
+def test_identify_previews_exactly_what_reidentify_writes_and_writes_nothing(harness: _Harness) -> None:
+    """A record filed under the wrong base: the preview names the file's real class with the user's fields kept, the
+    stored record and the caches stay as they were, and reidentifying afterwards stores that same record."""
+    _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusionXL)
+    stored = _rich_sd1_record()
+    harness.store.add_model(stored)
+    harness.cache_model()
+
+    preview = harness.manager.identify_model(KEY)
+
+    assert isinstance(preview.proposed, Main_Checkpoint_SDXL_Config)
+    assert preview.changed is True
+    assert preview.refusal is None
+    assert harness.store.get_model(KEY) == stored
+    assert harness.is_cached()
+    # Re-identification hashes the files again; nothing else may differ from the preview.
+    assert harness.manager.reidentify_model(KEY).model_dump(exclude={"hash"}) == preview.proposed.model_dump(
+        exclude={"hash"}
+    )
+
+
+def test_identify_previews_a_recognised_file_stored_as_unknown(harness: _Harness) -> None:
+    path = _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusion1)
+    unknown = Unknown_Config(
+        key=KEY,
+        path=MODEL_PATH,
+        name="My model",
+        hash="hash",
+        file_size=1,
+        source="local-source",
+        source_type=ModelSourceType.Path,
+        description="mine",
+    )
+    harness.store.add_model(unknown)
+
+    preview = harness.manager.identify_model(KEY)
+
+    assert isinstance(preview.proposed, Main_Checkpoint_SD1_Config)
+    assert preview.changed is True
+    assert (preview.proposed.key, preview.proposed.name, preview.proposed.description) == (KEY, "My model", "mine")
+    assert harness.store.get_model(KEY) == unknown
+    # Re-identification hashes the files again; nothing else may differ from the preview.
+    assert harness.manager.reidentify_model(KEY).model_dump(exclude={"hash"}) == preview.proposed.model_dump(
+        exclude={"hash"}
+    )
+    assert path.exists()
+
+
+def test_identify_of_a_correctly_identified_record_reports_no_change(harness: _Harness) -> None:
+    path = _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusion1)
+    harness.store.add_model(_identify(path, key=KEY, path=MODEL_PATH, name="My model"))
+
+    preview = harness.manager.identify_model(KEY)
+
+    assert preview.changed is False
+    assert preview.proposed == harness.store.get_model(KEY)
+
+
+def test_identify_of_a_file_the_probes_refuse_gives_the_reason_and_no_proposal(harness: _Harness) -> None:
+    keys = dict(clip_g_comfy_keys.state_dict_keys)
+    del keys["text_projection.weight"]
+    (harness.models_path / MODEL_PATH).parent.mkdir(parents=True, exist_ok=True)
+    write_header_only_safetensors(harness.models_path / MODEL_PATH, keys)
+    harness.store.add_model(_sd1_record())
+
+    preview = harness.manager.identify_model(KEY)
+
+    assert preview.proposed is None
+    assert preview.changed is False
+    assert preview.refusal is not None and "text_projection" in preview.refusal
+
+
+def test_identify_of_missing_files_is_an_invalid_model_and_of_an_unknown_key_is_unknown(harness: _Harness) -> None:
+    harness.store.add_model(_sd1_record())
+
+    with pytest.raises(InvalidModelException):
+        harness.manager.identify_model(KEY)
+    with pytest.raises(UnknownModelException):
+        harness.manager.identify_model("no-such-key")
+
+
+def test_identify_never_hashes_the_files_but_reidentify_does(
+    harness: _Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hashing reads every byte, which a header-only preview of a safetensors file must not do."""
+    _write_sd_checkpoint(harness.models_path / MODEL_PATH, BaseModelType.StableDiffusionXL)
+    harness.store.add_model(_sd1_record(hash="stored-hash"))
+    hashed: list[Path] = []
+
+    def record_hash(self: ModelOnDisk) -> str:
+        hashed.append(self.path)
+        return "fresh-hash"
+
+    monkeypatch.setattr(ModelOnDisk, "hash", record_hash)
+
+    preview = harness.manager.identify_model(KEY)
+
+    assert hashed == []
+    assert preview.proposed is not None and preview.proposed.hash == "stored-hash"
+    assert harness.manager.reidentify_model(KEY).hash == "fresh-hash"
+    assert hashed != []
+
+
+def test_identify_of_an_unknown_record_whose_files_are_still_unidentifiable(harness: _Harness) -> None:
+    """Nothing recognises the file, so the probe files it as Unknown again: there is nothing to apply."""
+    path = harness.models_path / MODEL_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_header_only_safetensors(path, {"some.unrelated.weight": ([2, 2], "F32")})
+    unknown = Unknown_Config(
+        key=KEY,
+        path=MODEL_PATH,
+        name="My model",
+        hash="hash",
+        file_size=1,
+        source="local-source",
+        source_type=ModelSourceType.Path,
+    )
+    harness.store.add_model(unknown)
+
+    preview = harness.manager.identify_model(KEY)
+
+    assert isinstance(preview.proposed, Unknown_Config)
+    assert preview.changed is False
+    assert preview.refusal is None

@@ -17,6 +17,7 @@ from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBas
 from invokeai.app.services.model_load.model_load_common import distinct_caches
 from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
+from invokeai.app.services.model_manager.model_manager_common import ModelIdentificationPreview
 from invokeai.app.services.model_records.model_records_base import (
     InvalidModelException,
     ModelRecordChanges,
@@ -70,8 +71,37 @@ class ModelManagerService(ModelManagerServiceBase):
             key, lambda: self._store.update_model(key, changes=changes, allow_class_change=True)
         )
 
+    def identify_model(self, key: str) -> ModelIdentificationPreview:
+        config = self._store.get_model(key)
+        try:
+            identified, refusal = self._identify(config, rehash=False)
+        except (ValueError, OSError) as e:
+            # The files are gone, unreadable, or not shaped like a model at all.
+            raise InvalidModelException(f"Unable to read model files: {e}") from e
+        changed = identified is not None and any(
+            getattr(identified, field, None) != getattr(config, field, None)
+            for field in ("type", "format", "base", "variant")
+        )
+        return ModelIdentificationPreview(proposed=identified, changed=changed, refusal=refusal)
+
     def reidentify_model(self, key: str) -> AnyModelConfig:
         config = self._store.get_model(key)
+        identified, refusal = self._identify(config, rehash=True)
+        if identified is None:
+            # A model that was recognised and refused as unusable names its reason; the stored record stays as it is.
+            if refusal:
+                raise InvalidModelException(f"Unable to identify model format: {refusal}")
+            raise InvalidModelException("Unable to identify model format")
+
+        # The probe can change the config class or reset load-affecting settings.
+        return self._load.apply_record_change(config.key, lambda: self._store.replace_model(config.key, identified))
+
+    def _identify(self, config: AnyModelConfig, *, rehash: bool) -> tuple[Optional[AnyModelConfig], Optional[str]]:
+        """Probe `config`'s files and return the record re-identification would write (None if nothing identified
+        them) and the reason a model class rejected them as unusable, if one did. Writes nothing.
+
+        Re-identification hashes the files again. A preview keeps the stored hash instead: hashing reads every byte,
+        which would turn a header-only probe of a safetensors or GGUF file into a read of the whole file."""
         models_path = self._install.app_config.models_path
         if Path(config.path).is_relative_to(models_path):
             model_path = Path(config.path)
@@ -83,6 +113,8 @@ class ModelManagerService(ModelManagerServiceBase):
         # folder has also lost the folder it came from, so without the source a re-probe refiles it under
         # the default.
         override_fields = {"source": config.source, "source_type": config.source_type}
+        if not rehash:
+            override_fields["hash"] = config.hash
         if encoder_id := getattr(config, "image_encoder_model_id", None):
             override_fields["image_encoder_model_id"] = encoder_id
         if isinstance(config, Qwen35Encoder_Checkpoint_Config):
@@ -91,10 +123,8 @@ class ModelManagerService(ModelManagerServiceBase):
             override_fields["type"] = config.type
         result = ModelConfigFactory.from_model_on_disk(mod, override_fields)
         if result.config is None:
-            # A model that was recognised and refused as unusable names its reason; the stored record stays as it is.
-            if invalid := result.invalid_matches:
-                raise InvalidModelException(f"Unable to identify model format: {invalid[0]}")
-            raise InvalidModelException("Unable to identify model format")
+            invalid = result.invalid_matches
+            return None, str(invalid[0]) if invalid else None
 
         # Retain user-editable fields from the original config
         identified = result.config
@@ -118,9 +148,7 @@ class ModelManagerService(ModelManagerServiceBase):
             for field in ("cpu_only", "fp8_storage"):
                 if hasattr(previous_settings, field) and hasattr(updated_settings, field):
                     setattr(updated_settings, field, getattr(previous_settings, field))
-
-        # The probe can change the config class or reset load-affecting settings.
-        return self._load.apply_record_change(config.key, lambda: self._store.replace_model(config.key, identified))
+        return identified, None
 
     def start(self, invoker: Invoker) -> None:
         for service in [self._store, self._install, self._load]:

@@ -6,6 +6,7 @@ import { type ModelsUiAdapter, ModelsUiProvider, NO_SCHEDULER_POLICY } from '@fe
 import { getModelsUiSnapshotForTests, openModelDetail } from '@features/models/ui/uiStore';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -16,12 +17,14 @@ import { DetailPane } from './DetailPane';
 
 const api = vi.hoisted(() => ({
   deleteModel: vi.fn(() => Promise.resolve()),
+  getModelIdentification: vi.fn(() => Promise.resolve({ changed: false, proposed: null, refusal: null })),
   reidentifyModel: vi.fn<(key: string) => Promise<ModelConfig>>(),
 }));
 
 vi.mock('@features/models/data/api', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   deleteModel: api.deleteModel,
+  getModelIdentification: api.getModelIdentification,
   reidentifyModel: api.reidentifyModel,
 }));
 vi.mock('react-i18next', () => ({
@@ -158,9 +161,11 @@ describe('models DetailPane for a model installed before the probe recorded a fa
     await act(() =>
       root.render(
         <ChakraProvider value={system}>
-          <ModelsUiProvider adapter={adapter(canManageModels)}>
-            <DetailPane />
-          </ModelsUiProvider>
+          <QueryClientProvider client={new QueryClient()}>
+            <ModelsUiProvider adapter={adapter(canManageModels)}>
+              <DetailPane />
+            </ModelsUiProvider>
+          </QueryClientProvider>
         </ChakraProvider>
       )
     );

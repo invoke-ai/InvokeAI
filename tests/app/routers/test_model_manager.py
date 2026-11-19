@@ -546,6 +546,125 @@ def test_reidentify_model_answers_with_the_service_outcome(
     assert unknown.status_code == 404
 
 
+def _write_sd1_main_record(model_record_routes: Any, mm2_app_config: Any, key: str, base: Any) -> None:
+    """A stored SD-1 main record whose file is a checkpoint of `base`."""
+    import torch
+    from safetensors.torch import save_file
+
+    from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config
+
+    prefix, width = {
+        "sd-1": ("model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2", 768),
+        "sdxl": ("model.diffusion_model.input_blocks.4.1.transformer_blocks.0.attn2", 2048),
+    }[base]
+    save_file(
+        {
+            f"{prefix}.to_k.weight": torch.zeros(1, width),
+            "model.diffusion_model.input_blocks.0.0.weight": torch.zeros(1, 4, 1, 1),
+        },
+        mm2_app_config.models_path / f"{key}.safetensors",
+    )
+    model_record_routes.store.add_model(
+        Main_Checkpoint_SD1_Config(
+            key=key,
+            path=f"{key}.safetensors",
+            name=key,
+            hash="hash",
+            file_size=1,
+            source="local-source",
+            source_type=ModelSourceType.Path,
+            prediction_type="epsilon",
+            variant="normal",
+        )
+    )
+
+
+def test_get_model_identification_previews_without_writing(
+    client: TestClient, model_record_routes: Any, mm2_app_config: Any
+) -> None:
+    _write_sd1_main_record(model_record_routes, mm2_app_config, "wrong-base", "sdxl")
+    stored = model_record_routes.store.get_model("wrong-base")
+
+    preview = client.get("/api/v2/models/i/wrong-base/identification")
+    unknown = client.get("/api/v2/models/i/no-such-model/identification")
+
+    assert preview.status_code == 200
+    body = preview.json()
+    assert (body["changed"], body["refusal"]) == (True, None)
+    assert (body["proposed"]["base"], body["proposed"]["key"], body["proposed"]["name"]) == (
+        "sdxl",
+        "wrong-base",
+        "wrong-base",
+    )
+    assert model_record_routes.store.get_model("wrong-base") == stored
+    assert unknown.status_code == 404
+
+    # What the preview named is what reidentify then stores.
+    applied = client.post("/api/v2/models/i/wrong-base/reidentify")
+    assert applied.status_code == 200
+    assert applied.json()["base"] == body["proposed"]["base"]
+
+
+def test_get_model_identification_is_not_blocked_by_a_running_operation_on_the_key(
+    client: TestClient, model_record_routes: Any, mm2_app_config: Any
+) -> None:
+    from invokeai.app.api.routers.model_manager import _claim_model_key
+
+    _write_sd1_main_record(model_record_routes, mm2_app_config, "busy-key", "sd-1")
+    with _claim_model_key("busy-key"):
+        assert client.post("/api/v2/models/i/busy-key/reidentify").status_code == 409
+        assert client.get("/api/v2/models/i/busy-key/identification").status_code == 200
+
+
+def test_get_model_identification_of_missing_files_is_a_400(
+    client: TestClient, model_record_routes: Any, mm2_app_config: Any
+) -> None:
+    _write_sd1_main_record(model_record_routes, mm2_app_config, "gone", "sd-1")
+    (mm2_app_config.models_path / "gone.safetensors").unlink()
+
+    assert client.get("/api/v2/models/i/gone/identification").status_code == 400
+
+
+def test_bulk_model_identification_reports_per_key_and_deduplicates(
+    client: TestClient, model_record_routes: Any, mm2_app_config: Any
+) -> None:
+    _write_sd1_main_record(model_record_routes, mm2_app_config, "wrong-base", "sdxl")
+    _write_sd1_main_record(model_record_routes, mm2_app_config, "fine", "sd-1")
+    _write_sd1_main_record(model_record_routes, mm2_app_config, "gone", "sd-1")
+    (mm2_app_config.models_path / "gone.safetensors").unlink()
+
+    response = client.post(
+        "/api/v2/models/i/bulk_identification",
+        json={"keys": ["wrong-base", "no-such-model", "fine", "wrong-base", "gone"]},
+    )
+
+    assert response.status_code == 200
+    results = response.json()["results"]
+    assert [r["key"] for r in results] == ["wrong-base", "no-such-model", "fine", "gone"]
+    by_key = {r["key"]: r for r in results}
+    assert by_key["wrong-base"]["preview"]["changed"] is True
+    assert by_key["wrong-base"]["error"] is None
+    assert by_key["fine"]["preview"]["changed"] is False
+    assert by_key["no-such-model"]["preview"] is None and by_key["no-such-model"]["error"]
+    assert by_key["gone"]["preview"] is None and by_key["gone"]["error"]
+
+
+def test_bulk_model_identification_bounds_the_request(client: TestClient, model_record_routes: Any) -> None:
+    from invokeai.app.api.routers._limits import MAX_MODEL_IDENTIFICATION_BATCH_SIZE
+
+    at_limit = client.post(
+        "/api/v2/models/i/bulk_identification",
+        json={"keys": [f"k{i}" for i in range(MAX_MODEL_IDENTIFICATION_BATCH_SIZE)]},
+    )
+    over_limit = client.post(
+        "/api/v2/models/i/bulk_identification",
+        json={"keys": [f"k{i}" for i in range(MAX_MODEL_IDENTIFICATION_BATCH_SIZE + 1)]},
+    )
+
+    assert at_limit.status_code == 200
+    assert over_limit.status_code == 422
+
+
 def test_convert_model_rejects_a_second_conversion_while_one_is_running() -> None:
     """Conversions are serialized, and the loser is told so instead of being made to wait.
 
