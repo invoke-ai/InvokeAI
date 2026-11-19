@@ -554,6 +554,12 @@ describe('compileGenerateGraph', () => {
     });
   });
 
+  it('records an empty reference list when generating without references', () => {
+    const graph = compile(sd1Model, { referenceImages: [] });
+
+    expect(getNodeByType(graph, 'core_metadata')?.ref_images).toEqual([]);
+  });
+
   it('wires SD IP Adapter reference images into denoise', () => {
     const graph = compile(sd1Model, {
       referenceImages: [

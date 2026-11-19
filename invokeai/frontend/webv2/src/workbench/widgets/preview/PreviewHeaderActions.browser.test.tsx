@@ -1,4 +1,5 @@
 import '@fontsource/inter/index.css';
+import type { GalleryVideoItem } from '@features/gallery';
 import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type * as IdentityModule from '@features/identity';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
@@ -491,11 +492,20 @@ describe('preview header Edit and Use', () => {
   });
 
   it('arms video comparison from the header', async () => {
-    state.actionItem = VIDEO;
+    const video = {
+      ...STILL_IMAGE,
+      category: 'general',
+      durationSeconds: 1,
+      fps: 24,
+      fullUrl: '/videos/clip.mp4',
+      kind: 'video',
+      name: 'clip.mp4',
+    } satisfies GalleryVideoItem;
+    state.actionItem = video;
     await render();
 
     await settle(() => button('Select for Compare').click());
 
-    expect(setCompareItem).toHaveBeenCalledExactlyOnceWith(VIDEO);
+    expect(setCompareItem).toHaveBeenCalledExactlyOnceWith(video);
   });
 });

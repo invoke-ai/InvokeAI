@@ -3,6 +3,7 @@ export {
   addLoraCollectionLoader,
   addTransformerLoraCollectionLoader,
   compileGenerateGraph,
+  FLUX_REDUX_INFLUENCE,
   resolveGenerateSeed,
 } from './core/graph';
 export {

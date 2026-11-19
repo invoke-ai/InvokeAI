@@ -2366,9 +2366,10 @@ describe('preview video comparison', () => {
     mocks.galleryItemPages = [{ items: [result, source], total: 2 }];
     mocks.imageActions = createItemMenuActions({});
     mocks.commands.gallery.setCompareItem.mockImplementation((item) => publishGalleryValues({ compareImage: item }));
+    showsHeaderMenuButton = true;
     await render();
     try {
-      await act(() => headerOpenItemMenu?.(10, 10, 'full'));
+      await act(() => userEvent.click(page.getByRole('button', { name: 'Item actions', exact: true })));
       await act(() => userEvent.click(page.getByRole('menuitem', { name: 'Select for compare' })));
       await expect
         .element(page.getByTestId('center-region').getByRole('status'))
