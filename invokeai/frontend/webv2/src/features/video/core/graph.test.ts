@@ -108,6 +108,99 @@ describe('compileVideoGraph — Wan 2.2', () => {
     expect(hasEdge(backendGraph, 'negative_prompt', 'value', 'core_metadata', 'negative_prompt')).toBe(true);
   });
 
+  it('chains wan_lora_loader nodes with expert targets and preserves target/low_noise_weight in metadata', () => {
+    const model = wanModel('t2v_a14b');
+    const highLora = {
+      isEnabled: true,
+      model: { base: 'wan', key: 'lit-high', name: 'Wan High', type: 'lora' as const, variant: 'a14b' },
+      target: 'high' as const,
+      weight: 0.9,
+    };
+    const lowLora = {
+      isEnabled: true,
+      model: { base: 'wan', key: 'lit-low', name: 'Wan Low', type: 'lora' as const, variant: 'a14b' },
+      target: 'low' as const,
+      weight: 0.5,
+    };
+    const dualLora = {
+      isEnabled: true,
+      lowNoiseWeight: 0.3,
+      model: { base: 'wan', key: 'lit-dual', name: 'Wan Dual', type: 'lora' as const, variant: 'a14b' },
+      target: 'both' as const,
+      weight: 0.8,
+    };
+    const untargetedLora = {
+      isEnabled: true,
+      model: { base: 'wan', key: 'lit-auto', name: 'Wan Auto', type: 'lora' as const, variant: 'a14b' },
+      weight: 0.7,
+    };
+
+    const { backendGraph } = compileVideoGraph(
+      settingsFor(model, { loras: [highLora, lowLora, dualLora, untargetedLora] }),
+      model
+    );
+
+    expect(nodesOfType(backendGraph, 'wan_lora_collection_loader')).toHaveLength(0);
+    const loaders = nodesOfType(backendGraph, 'wan_lora_loader');
+    expect(loaders).toHaveLength(5);
+    expect(
+      loaders.map((node) => ({ key: (node.lora as { key: string }).key, target: node.target, weight: node.weight }))
+    ).toEqual([
+      { key: 'lit-high', target: 'high', weight: 0.9 },
+      { key: 'lit-low', target: 'low', weight: 0.5 },
+      { key: 'lit-dual', target: 'high', weight: 0.8 },
+      { key: 'lit-dual', target: 'low', weight: 0.3 },
+      { key: 'lit-auto', target: 'auto', weight: 0.7 },
+    ]);
+    expect(hasEdge(backendGraph, 'model_loader', 'transformer', loaders[0]!.id, 'transformer')).toBe(true);
+    expect(hasEdge(backendGraph, loaders[4]!.id, 'transformer', 'denoise_latents', 'transformer')).toBe(true);
+    expect(nodeOfType(backendGraph, 'core_metadata').loras).toEqual([
+      { model: expect.objectContaining({ key: 'lit-high' }), target: 'high', weight: 0.9 },
+      { model: expect.objectContaining({ key: 'lit-low' }), target: 'low', weight: 0.5 },
+      { low_noise_weight: 0.3, model: expect.objectContaining({ key: 'lit-dual' }), target: 'both', weight: 0.8 },
+      { model: expect.objectContaining({ key: 'lit-auto' }), weight: 0.7 },
+    ]);
+
+    const equalLowNoise = compileVideoGraph(
+      settingsFor(model, {
+        loras: [{ ...dualLora, lowNoiseWeight: 0.8, target: 'both', weight: 0.8 }],
+      }),
+      model
+    );
+    const equalLoaders = nodesOfType(equalLowNoise.backendGraph, 'wan_lora_loader');
+    expect(equalLoaders).toHaveLength(1);
+    expect(equalLoaders[0]).toMatchObject({ target: 'both', weight: 0.8 });
+    expect(nodeOfType(equalLowNoise.backendGraph, 'core_metadata').loras).toEqual([
+      { model: expect.objectContaining({ key: 'lit-dual' }), target: 'both', weight: 0.8 },
+    ]);
+  });
+
+  it('emits a single wan_lora_loader node and omits low_noise_weight on single-transformer TI2V-5B even with lowNoiseWeight set', () => {
+    const model = wanModel('ti2v_5b');
+    const dualLora5b = {
+      isEnabled: true,
+      lowNoiseWeight: 0.4,
+      model: { base: 'wan', key: 'lit-5b-dual', name: 'Wan 5B Dual', type: 'lora' as const, variant: '5b' },
+      target: 'both' as const,
+      weight: 0.8,
+    };
+    const { backendGraph } = compileVideoGraph(settingsFor(model, { loras: [dualLora5b] }), model);
+    const loaders = nodesOfType(backendGraph, 'wan_lora_loader');
+
+    expect(nodesOfType(backendGraph, 'wan_lora_collection_loader')).toHaveLength(0);
+    expect(loaders).toHaveLength(1);
+    expect(loaders[0]).toMatchObject({
+      lora: expect.objectContaining({ key: 'lit-5b-dual' }),
+      target: 'both',
+      weight: 0.8,
+    });
+    expect(hasEdge(backendGraph, 'model_loader', 'transformer', loaders[0]!.id, 'transformer')).toBe(true);
+    expect(hasEdge(backendGraph, loaders[0]!.id, 'transformer', 'denoise_latents', 'transformer')).toBe(true);
+    expect(nodeOfType(backendGraph, 'core_metadata').loras).toEqual([
+      { model: expect.objectContaining({ key: 'lit-5b-dual' }), target: 'both', weight: 0.8 },
+    ]);
+  });
+
   it('wires first-frame conditioning through wan_ref_image_encoder with matching canvas and frames', () => {
     const model = wanModel('i2v_a14b');
     const settings = settingsFor(model, { firstFrameImage: FIRST_FRAME, targetResolution: '480p' });
@@ -265,6 +358,15 @@ describe('compileVideoGraph — MiniMax H3 Ref2VA', () => {
     ],
   });
 
+  it('passes an explicit override only for an overridden job', () => {
+    const catalogModel = { ...model, variant: 'fl2va' };
+    const { backendGraph } = compileVideoGraph({ ...referenceSettings, h3TaskOverride: 'ref2va' }, catalogModel);
+    expect(nodeOfType(backendGraph, 'minimax_h3_model_loader').transformer_model).toMatchObject({ variant: 'fl2va' });
+    expect(nodeOfType(backendGraph, 'minimax_h3_model_loader').task_variant_override).toBe('ref2va');
+    const baseline = compileVideoGraph(referenceSettings, model);
+    expect(nodeOfType(baseline.backendGraph, 'minimax_h3_model_loader').task_variant_override).toBeUndefined();
+  });
+
   it('builds the reference graph: ordered chained collect into conditioning AND prompt, no frame conditioning', () => {
     const { backendGraph } = compileVideoGraph(referenceSettings, model);
 
@@ -314,53 +416,83 @@ describe('compileVideoGraph — MiniMax H3 Ref2VA', () => {
     ]);
   });
 
-  it('hybrid: loads the FL2VA base, overlays the Ref2VA main from the start block, and records both', () => {
-    const fl2vaBase: MainModelConfig = {
-      base: 'minimax-h3',
-      format: 'checkpoint',
-      key: 'h3-fl2va-ckpt',
-      name: 'MiniMax H3 FL2VA Transformer (int8, pruned)',
-      type: 'main',
-      variant: 'fl2va',
-    };
-    const turbo = {
-      base: 'minimax-h3',
-      key: 'ref2v-turbo',
-      name: 'MiniMax H3 Ref2V Turbo LoRA',
-      type: 'lora' as const,
-    };
+  it.each([undefined, 'ref2va'] as const)(
+    'hybrid: loads, overlays and records a Ref2VA main with override %s',
+    (h3TaskOverride) => {
+      const fl2vaBase: MainModelConfig = {
+        base: 'minimax-h3',
+        format: 'checkpoint',
+        key: 'h3-fl2va-ckpt',
+        name: 'MiniMax H3 FL2VA Transformer (int8, pruned)',
+        type: 'main',
+        variant: 'fl2va',
+      };
+      const turbo = {
+        base: 'minimax-h3',
+        key: 'ref2v-turbo',
+        name: 'MiniMax H3 Ref2V Turbo LoRA',
+        type: 'lora' as const,
+      };
+      const settings: VideoSettings = {
+        ...referenceSettings,
+        h3TaskOverride,
+        h3HybridBaseModel: fl2vaBase,
+        h3HybridStartBlock: 30,
+        loras: [{ isEnabled: true, model: turbo, weight: 1 }],
+      };
+      const { backendGraph } = compileVideoGraph(settings, model);
+
+      // The loader loads the FL2VA base; the selected Ref2VA main becomes the overlay.
+      expect(nodeOfType(backendGraph, 'minimax_h3_model_loader')).toMatchObject({
+        model: { key: componentSource.key },
+        transformer_model: { key: fl2vaBase.key },
+      });
+      expect(nodeOfType(backendGraph, 'minimax_h3_hybrid_overlay')).toMatchObject({
+        end_block: 49,
+        id: 'hybrid_overlay',
+        include_final_layer: false,
+        overlay_model: { key: model.key },
+        start_block: 30,
+      });
+      expect(hasEdge(backendGraph, 'model_loader', 'transformer', 'hybrid_overlay', 'transformer')).toBe(true);
+
+      // LoRAs apply on top of the hybrid, and the denoise reads the LoRA-patched hybrid.
+      const loraLoader = nodeOfType(backendGraph, 'minimax_h3_lora_collection_loader');
+
+      expect(hasEdge(backendGraph, 'hybrid_overlay', 'transformer', loraLoader.id, 'transformer')).toBe(true);
+      expect(hasEdge(backendGraph, loraLoader.id, 'transformer', 'denoise_latents', 'transformer')).toBe(true);
+      expect(hasEdge(backendGraph, 'model_loader', 'transformer', 'denoise_latents', 'transformer')).toBe(false);
+
+      // Metadata keeps the Ref2VA main as the model and records the hybrid for recall.
+      expect(nodeOfType(backendGraph, 'core_metadata')).toMatchObject({
+        minimax_h3_hybrid_base_model: { key: fl2vaBase.key },
+        minimax_h3_hybrid_start_block: 30,
+        model: { key: model.key },
+      });
+    }
+  );
+
+  it.each([
+    ['fl2va', undefined],
+    ['fl2va', 'ref2va'],
+    ['ref2va', 'fl2va'],
+  ] as const)('hybrid: ignores a stale quality base for catalog %s with override %s', (variant, h3TaskOverride) => {
+    const fl2vaMain: MainModelConfig = { ...h3Model('h3-fl2va-main'), format: 'checkpoint', variant };
     const settings: VideoSettings = {
-      ...referenceSettings,
-      h3HybridBaseModel: fl2vaBase,
-      h3HybridStartBlock: 30,
-      loras: [{ isEnabled: true, model: turbo, weight: 1 }],
+      ...settingsFor(fl2vaMain, { componentSourceModel: componentSource }),
+      h3TaskOverride,
+      references: h3TaskOverride === 'ref2va' ? referenceSettings.references : [],
+      h3HybridBaseModel: { ...h3Model('h3-other-fl2va'), format: 'checkpoint' },
+      h3HybridStartBlock: 10,
     };
-    const { backendGraph } = compileVideoGraph(settings, model);
+    const { backendGraph } = compileVideoGraph(settings, fl2vaMain);
 
+    expect(nodesOfType(backendGraph, 'minimax_h3_hybrid_overlay')).toHaveLength(0);
     expect(nodeOfType(backendGraph, 'minimax_h3_model_loader')).toMatchObject({
-      model: { key: componentSource.key },
-      transformer_model: { key: fl2vaBase.key },
+      transformer_model: { key: fl2vaMain.key },
     });
-    expect(nodeOfType(backendGraph, 'minimax_h3_hybrid_overlay')).toMatchObject({
-      end_block: 49,
-      id: 'hybrid_overlay',
-      include_final_layer: false,
-      overlay_model: { key: model.key },
-      start_block: 30,
-    });
-    expect(hasEdge(backendGraph, 'model_loader', 'transformer', 'hybrid_overlay', 'transformer')).toBe(true);
-
-    const loraLoader = nodeOfType(backendGraph, 'minimax_h3_lora_collection_loader');
-
-    expect(hasEdge(backendGraph, 'hybrid_overlay', 'transformer', loraLoader.id, 'transformer')).toBe(true);
-    expect(hasEdge(backendGraph, loraLoader.id, 'transformer', 'denoise_latents', 'transformer')).toBe(true);
-    expect(hasEdge(backendGraph, 'model_loader', 'transformer', 'denoise_latents', 'transformer')).toBe(false);
-
-    expect(nodeOfType(backendGraph, 'core_metadata')).toMatchObject({
-      minimax_h3_hybrid_base_model: { key: fl2vaBase.key },
-      minimax_h3_hybrid_start_block: 30,
-      model: { key: model.key },
-    });
+    expect(hasEdge(backendGraph, 'model_loader', 'transformer', 'denoise_latents', 'transformer')).toBe(true);
+    expect(nodeOfType(backendGraph, 'core_metadata').minimax_h3_hybrid_base_model).toBeUndefined();
   });
 
   it('reference-extend: appends the new clip to the initial video without frame conditioning', () => {

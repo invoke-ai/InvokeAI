@@ -3,13 +3,13 @@ import type { CanvasRenderSize } from '@features/generation/react';
 import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
+import { GenerateDimensionFields } from '@features/generation/ui/GenerateDimensionFields';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
-import { GenerateDimensionFields } from '@features/generation/ui/GenerateDimensionFields';
+} from '@features/models/core/architectureCapabilities';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { applyThemeToRoot } from '@theme/applyTheme';

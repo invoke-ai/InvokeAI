@@ -1,8 +1,8 @@
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/contracts';
 
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { generateGraphCases, satisfiedSettingsFor } from '@features/generation/core/graphCoverage.testing';
-import { withArchitectureCapabilities } from '@features/generation/graphExport';
+import { withArchitectureCapabilities } from '@features/models/architectures';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import { exportGraphs, GraphExportRequestError, type GraphExportCaseResult } from './graphExport';

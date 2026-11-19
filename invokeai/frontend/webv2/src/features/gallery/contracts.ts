@@ -62,6 +62,7 @@ export {
 } from './core/semanticImageQuery';
 export {
   DEFAULT_GALLERY_SETTINGS,
+  getGalleryChosenAutoAddBoardId,
   getGalleryMediaFilter,
   getGallerySettings,
   isLegacyFollowAutoAdd,

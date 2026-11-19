@@ -5,16 +5,13 @@ import type {
 } from '@features/generation/core/contracts';
 import type { BaseGenerationConfig, GuidanceLabel } from '@features/generation/core/generationConfig';
 
-import {
-  getArchitectureFeatures,
-  getArchitectureGenerationConfig,
-  hasArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+import { getArchitectureGenerationConfig } from '@features/generation/core/architectureGenerationConfig';
 import {
   isSupportedGenerateBase,
   SUPPORTED_GENERATE_BASES,
   type SupportedGenerateBase,
 } from '@features/generation/core/supportedBases';
+import { getArchitectureFeatures, hasArchitectureCapabilities } from '@features/models/architectures';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { SEED_MAX } from '@platform/core/seed';
 
@@ -60,6 +57,7 @@ import {
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
+  servesAsType,
   type GenerateComponentFilter,
 } from './componentCompatibility';
 import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
@@ -1008,8 +1006,8 @@ const qwen3EncoderSlot = (helpText: string, filter?: GenerateComponentFilter): C
     valueKind: 'component',
     helpText,
     filter: filter
-      ? (candidate) => candidate.type === 'qwen3_encoder' && filter(candidate)
-      : (candidate) => candidate.type === 'qwen3_encoder',
+      ? (candidate) => servesAsType(candidate, 'qwen3_encoder') && filter(candidate)
+      : (candidate) => servesAsType(candidate, 'qwen3_encoder'),
   });
 
 const mistralEncoderSlot = (
@@ -1732,11 +1730,13 @@ export const isReferenceImageSupported = (
   );
 };
 
+export type ReferenceImageUnavailableReason = 'ggufVisionTower' | 'visionTower';
+
 /** Why references are unavailable although the base takes them; null otherwise. */
 export const getReferenceImageUnavailableReason = (
   model: GenerateModelConfig | undefined,
   components: ReferenceVisionComponents = {}
-): 'visionTower' | 'ggufVisionTower' | null => {
+): ReferenceImageUnavailableReason | null => {
   if (!model || model.type === 'external_image_generator' || isReferenceImageSupported(model, components)) {
     return null;
   }
@@ -1750,7 +1750,7 @@ export const getReferenceImageUnavailableReason = (
     : 'visionTower';
 };
 
-export const getReferenceImageLimit = (model: GenerateModelConfig | undefined): number => {
+const getReferenceImageLimit = (model: GenerateModelConfig | undefined): number => {
   if (!model || !takesReferenceImages(model)) {
     return 0;
   }
@@ -1762,10 +1762,32 @@ export const getReferenceImageLimit = (model: GenerateModelConfig | undefined): 
   return getArchitectureFeatures(model.base)?.max_reference_images ?? DEFAULT_REFERENCE_IMAGE_LIMIT;
 };
 
-export const getMaxReferenceImages = (
+export type ReferenceImageRefusal = 'full' | 'unsupported' | ReferenceImageUnavailableReason;
+
+export interface ReferenceImageRoom {
+  free: number;
+  isSupported: boolean;
+  limit: number;
+  refusal: ReferenceImageRefusal | null;
+  unavailableReason: ReferenceImageUnavailableReason | null;
+}
+
+export const getReferenceImageRoom = (
   model: GenerateModelConfig | undefined,
-  components: ReferenceVisionComponents = {}
-): number => (isReferenceImageSupported(model, components) ? getReferenceImageLimit(model) : 0);
+  components: ReferenceVisionComponents,
+  referenceImages: readonly GenerateReferenceImage[]
+): ReferenceImageRoom => {
+  if (!isReferenceImageSupported(model, components)) {
+    const unavailableReason = getReferenceImageUnavailableReason(model, components);
+
+    return { free: 0, isSupported: false, limit: 0, refusal: unavailableReason ?? 'unsupported', unavailableReason };
+  }
+
+  const limit = getReferenceImageLimit(model);
+  const free = Math.max(0, limit - referenceImages.length);
+
+  return { free, isSupported: true, limit, refusal: free > 0 ? null : 'full', unavailableReason: null };
+};
 
 const IP_ADAPTER_BASES: ReadonlySet<string> = new Set(['sd-1', 'sdxl', 'flux', 'anima']);
 
@@ -1955,12 +1977,17 @@ const getLoneDefaultStyleReference = (
     : null;
 };
 
-/** Every way of adding a reference goes through here. A changed strength marks a lone Krea-2 reference as style. */
-export const withAddedReferenceImages = (
+export interface NewReferenceImage {
+  id: string;
+  image: GenerateReferenceImageAsset | null;
+}
+
+// A lone first Krea-2 reference starts as style; the next addition turns it into edit unless its strength was tuned.
+const withAddedReferenceImages = (
   model: GenerateModelConfig | undefined,
   models: readonly ReferenceModelCandidate[],
   referenceImages: GenerateReferenceImage[],
-  additions: readonly { id: string; image: GenerateReferenceImageAsset | null }[]
+  additions: readonly NewReferenceImage[]
 ): GenerateReferenceImage[] => {
   if (additions.length === 0) {
     return referenceImages;
@@ -2099,6 +2126,71 @@ export const reconcileReferenceImagesWithModel = (
   return {
     referenceImages: didSwitchOff ? keptOrSwitchedOff : retargetedReferenceImages,
     retargetedReferenceImages,
+  };
+};
+
+export type ReferenceImageAddRequest = {
+  model: GenerateModelConfig | undefined;
+  models: readonly ReferenceModelCandidate[];
+  referenceImages: GenerateReferenceImage[];
+  additions: readonly NewReferenceImage[];
+} & (
+  | { mode: 'strict'; components: ReferenceVisionComponents }
+  | { mode: 'keep'; recalled?: readonly GenerateReferenceImage[] }
+);
+
+export interface ReferenceImageAddResult {
+  referenceImages: GenerateReferenceImage[];
+  added: number;
+  dropped: number;
+  limit: number;
+  refusal: ReferenceImageRefusal | null;
+  unavailableReason: ReferenceImageUnavailableReason | null;
+}
+
+/** `strict`: a user add, gated on vision components. `keep`: a recall; validation flags a missing encoder. */
+export const addReferenceImages = (request: ReferenceImageAddRequest): ReferenceImageAddResult => {
+  const { additions, model, models, referenceImages } = request;
+
+  if (request.mode === 'strict') {
+    const { free, isSupported, limit, refusal, unavailableReason } = getReferenceImageRoom(
+      model,
+      request.components,
+      referenceImages
+    );
+
+    if (!isSupported) {
+      return { added: 0, dropped: 0, limit, referenceImages, refusal, unavailableReason };
+    }
+
+    const fitting = additions.slice(0, free);
+
+    return {
+      added: fitting.length,
+      dropped: additions.length - fitting.length,
+      limit,
+      referenceImages: withAddedReferenceImages(model, models, referenceImages, fitting),
+      refusal,
+      unavailableReason: null,
+    };
+  }
+
+  if (!model || !takesReferenceImages(model)) {
+    return { added: 0, dropped: 0, limit: 0, referenceImages, refusal: 'unsupported', unavailableReason: null };
+  }
+
+  const limit = getReferenceImageLimit(model);
+  const joined = getCompatibleReferenceImages([...referenceImages, ...(request.recalled ?? [])], model, models);
+  const fitting = additions.slice(0, Math.max(0, limit - joined.length));
+  const placed = withAddedReferenceImages(model, models, joined, fitting).slice(0, limit);
+
+  return {
+    added: fitting.length,
+    dropped: joined.length + additions.length - placed.length,
+    limit,
+    referenceImages: placed,
+    refusal: null,
+    unavailableReason: null,
   };
 };
 

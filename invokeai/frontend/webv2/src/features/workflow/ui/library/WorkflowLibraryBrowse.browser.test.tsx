@@ -10,6 +10,7 @@ import { WorkflowUiProvider, WorkflowGraphPreviewProvider } from '@features/work
 import { setWorkflowLibraryTab } from '@features/workflow/ui/workflowUiStore';
 import { createProjectGraph } from '@features/workflow/utility';
 import { settleAnimations } from '@platform/browser/settleAnimations.testing';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -187,7 +188,11 @@ const adapter = {
   notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
   openAddModels: vi.fn(),
 } as unknown as WorkflowUiAdapter;
-const galleryHost = { galleryValues: {}, notifications: { add: vi.fn(), reportError: vi.fn() }, projectName: '' };
+const galleryHost = {
+  galleryValues: resolvedValues(),
+  notifications: { add: vi.fn(), reportError: vi.fn() },
+  projectName: '',
+};
 const previewAdapter = {
   openDocumentInNewProject: vi.fn(),
   focusSource: vi.fn(),

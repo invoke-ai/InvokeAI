@@ -16,7 +16,6 @@ import {
   getDefaultGenerateSettings,
   getGenerationUiPolicy,
   getSchedulerOptions,
-  hasArchitectureCapabilities,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isBundledFlux2Main,
@@ -37,7 +36,9 @@ import {
   MIN_NEGATIVE_PROMPT_HEIGHT_PX,
   MIN_POSITIVE_PROMPT_HEIGHT_PX,
   sanitizeBatchCount,
+  servesAsType,
 } from '@features/generation/settings';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 import { isSeedMode, SEED_MAX } from '@platform/core/seed';
 
 import type { SpandrelModelConfig, TileControlNetModelConfig, UpscaleMode, UpscaleWidgetValues } from './types';
@@ -490,7 +491,7 @@ export const isSupportedUpscaleMainModel = (value: unknown): value is MainModelC
   isMainModelConfig(value) && isUpscaleBase(value.base);
 
 const isComponentModelOfType = (value: unknown, type: string): value is ComponentModelConfig =>
-  isRecord(value) && value.type === type && isModelIdentifierConfig(value);
+  isRecord(value) && isModelIdentifierConfig(value) && servesAsType(value, type);
 
 type UpscaleComponentValues = Record<UpscaleComponentField, ComponentModelConfig | null>;
 

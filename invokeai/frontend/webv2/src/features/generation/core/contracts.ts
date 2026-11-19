@@ -1,4 +1,5 @@
 /** Public, storage-independent contracts owned by Generation. */
+import type { ModelRole } from '@features/models';
 
 export type ResultDestination = 'canvas' | 'gallery';
 
@@ -92,6 +93,7 @@ export interface GenerationModelCatalogItem {
   type: string;
   format?: string;
   variant?: string | null;
+  roles?: readonly ModelRole[];
   hash?: string;
   submodel_type?: string;
   trigger_phrases?: string[] | null;

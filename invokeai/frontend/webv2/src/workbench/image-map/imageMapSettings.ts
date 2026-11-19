@@ -1,9 +1,9 @@
-export const getImageMapClickSelectsCluster = (values: Record<string, unknown>): boolean =>
-  values.clickSelectsCluster === true;
+import type { ResolvedValues } from '@platform/core/resolvedValues';
+
+export const getImageMapClickSelectsCluster = (values: ResolvedValues): boolean => values.clickSelectsCluster === true;
 
 /** Labels are drawn unless the user has turned them off. */
-export const getImageMapShowClusterLabels = (values: Record<string, unknown>): boolean =>
-  values.showClusterLabels !== false;
+export const getImageMapShowClusterLabels = (values: ResolvedValues): boolean => values.showClusterLabels !== false;
 
 /** Lowest eps the backend will cluster with; below it the server floors the value anyway. */
 export const MIN_CLUSTER_EPS = 0.01;
@@ -11,7 +11,7 @@ export const MIN_CLUSTER_EPS = 0.01;
 export const MAX_CLUSTER_EPS = 2;
 
 /** The user's DBSCAN eps, or null (the default, and the way back) while the server's adaptive heuristic chooses. */
-export const getImageMapClusterEps = (values: Record<string, unknown>): number | null => {
+export const getImageMapClusterEps = (values: ResolvedValues): number | null => {
   const raw = values.clusterEps;
 
   // Bounded at BOTH ends by the endpoint's range. A persisted value outside it (an imported project, a hand-edited

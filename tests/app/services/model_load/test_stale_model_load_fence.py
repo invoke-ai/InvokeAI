@@ -16,6 +16,8 @@ from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceSQL
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
+from invokeai.backend.model_manager.configs.roles import view_as
 from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
 from invokeai.backend.model_manager.load import (
     LoadedModel,
@@ -25,8 +27,9 @@ from invokeai.backend.model_manager.load import (
     StaleModelConfigError,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
-from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
+from invokeai.backend.model_manager.taxonomy import AnyModel, ModelType, SubModelType
 from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.model_roles import text_llm_file
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 KEY = "siglip-key"
@@ -743,3 +746,36 @@ def test_loader_built_directly_on_the_base_is_refused_before_it_can_cache(harnes
         service.load_model(store.get_model(KEY))
     assert not _is_cached(cache)
     assert events.log == [("started", "siglip"), ("complete", "siglip")]
+
+
+# A role view is compared with the stored record in the same role: its type and class never equal the record's.
+
+ROLE_KEY = "llm-key"
+
+
+def _role_view(store: ModelRecordServiceSQL) -> AnyModelConfig:
+    store.add_model(text_llm_file(ROLE_KEY))
+    return view_as(store.get_model(ROLE_KEY), ModelType.Qwen35Encoder)
+
+
+def test_a_role_view_of_an_unchanged_record_is_current_and_a_moved_one_is_not(harness):
+    service, store, _, _ = harness
+    view = _role_view(store)
+
+    assert service._config_is_current(view)
+    assert service._moved_record(view) is None
+
+    store.update_model(ROLE_KEY, ModelRecordChanges(path="llm/other"))
+
+    assert not service._config_is_current(view)
+    moved = service._moved_record(view)
+    assert isinstance(moved, Qwen35Encoder_Checkpoint_Config) and moved.path == "llm/other"
+
+
+def test_a_role_view_of_a_record_that_lost_the_role_is_not_current_and_has_no_moved_record(harness):
+    service, store, _, _ = harness
+    view = _role_view(store)
+    store.replace_model(ROLE_KEY, text_llm_file(ROLE_KEY, serves_encoder=None))
+
+    assert not service._config_is_current(view)
+    assert service._moved_record(view) is None

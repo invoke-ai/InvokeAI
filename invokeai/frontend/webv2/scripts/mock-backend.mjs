@@ -66,7 +66,7 @@ const FIXTURE_VIDEO = readFileSync(resolve(import.meta.dirname, 'mock-assets/fix
 const FIXTURE_VIDEO_POSTER = readFileSync(resolve(import.meta.dirname, 'mock-assets/fixture-video.webp'));
 const ARCHITECTURE_CAPABILITIES = JSON.parse(
   readFileSync(
-    resolve(import.meta.dirname, '../src/features/generation/core/__fixtures__/architectureCapabilities.json'),
+    resolve(import.meta.dirname, '../src/features/models/core/__fixtures__/architectureCapabilities.json'),
     'utf8'
   )
 );

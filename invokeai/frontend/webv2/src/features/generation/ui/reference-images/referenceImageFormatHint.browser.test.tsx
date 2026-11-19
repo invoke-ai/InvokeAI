@@ -3,8 +3,8 @@ import type { GenerateModelConfig, GenerateReferenceImage } from '@features/gene
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { type GenerationUiAdapter, GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { system } from '@theme/system';
 import i18next from 'i18next';
 import { act } from 'react';

@@ -6,6 +6,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { DEFAULT_GALLERY_SETTINGS, getGallerySettings } from '@features/gallery/core/settings';
 import { galleryBoardsOptions } from '@features/gallery/data/queries';
 import { GalleryUiProvider } from '@features/gallery/react';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -60,7 +61,7 @@ let queryClient: QueryClient;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const render = async (values: Record<string, unknown>) => {
-  const settings = getGallerySettings(values);
+  const settings = getGallerySettings(resolvedValues(values));
   queryClient.setQueryData(
     galleryBoardsOptions({
       includeArchived: settings.showArchivedBoards,
