@@ -29,8 +29,15 @@ from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import TorchDevice, device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
+
+
+def _resolve_keep_ram_copy_of_weights(configured: bool | None, device: torch.device) -> bool:
+    """Resolve automatic copy retention without changing explicit user choices."""
+    if configured is not None:
+        return configured
+    return not (device.type == "cuda" and torch.version.hip is None and device_is_integrated(device) is True)
 
 
 class ModelManagerService(ModelManagerServiceBase):
@@ -161,10 +168,11 @@ class ModelManagerService(ModelManagerServiceBase):
         shared_store = SharedCpuWeightsStore()
 
         def build_cache(device: torch.device) -> ModelCache:
+            keep_ram_copy = _resolve_keep_ram_copy_of_weights(app_config.keep_ram_copy_of_weights, device)
             return ModelCache(
                 execution_device_working_mem_gb=app_config.device_working_mem_gb,
                 enable_partial_loading=app_config.enable_partial_loading,
-                keep_ram_copy_of_weights=app_config.keep_ram_copy_of_weights,
+                keep_ram_copy_of_weights=keep_ram_copy,
                 max_ram_cache_size_gb=app_config.max_cache_ram_gb,
                 max_vram_cache_size_gb=app_config.max_cache_vram_gb,
                 reserve_vram_gb=app_config.reserve_vram_gb,

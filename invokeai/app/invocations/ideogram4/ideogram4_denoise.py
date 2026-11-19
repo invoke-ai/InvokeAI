@@ -282,7 +282,7 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
 
         Taking the maximum up front costs reading `LoadedModel.model` -- documented as returning the
         model unlocked, and it is already constructed by then -- and loading the second branch into
-        RAM before the first is locked. Under the default `keep_ram_copy_of_weights` that is not a
+        RAM before the first is locked. When `keep_ram_copy_of_weights` is enabled, that is not a
         new peak, since both branches hold their RAM copies through the loop anyway; with RAM copies
         off it is one cold load's worth, which the cache absorbs the same way it absorbs any
         overshoot. Neither branch can be evicted meanwhile: `LoadedModel` takes a first-use hold the

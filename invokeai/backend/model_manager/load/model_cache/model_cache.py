@@ -1088,8 +1088,8 @@ class ModelCache:
             or _is_integrated_cuda(effective_execution_device)
         )
 
-        # Integrated XPU drops the CPU copy because its device residency is system RAM. CUDA keeps
-        # the explicit user setting until Spark measurements prove a different default is safe.
+        # The model manager resolves the automatic topology policy before constructing this cache; integrated XPU
+        # still drops the CPU copy because its device residency is system RAM.
         keep_ram_copy = self._keep_ram_copy_of_weights and not _is_integrated_xpu(effective_execution_device)
 
         # Overriding a setting the user turned on is worth saying once, rather than leaving someone

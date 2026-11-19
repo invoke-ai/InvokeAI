@@ -583,13 +583,13 @@
     },
     {
       "category": "CACHE",
-      "default": true,
-      "description": "Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.",
+      "default": null,
+      "description": "Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. If unset, Invoke disables the duplicate copy on integrated CUDA and keeps it on other devices. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching.",
       "env_var": "INVOKEAI_KEEP_RAM_COPY_OF_WEIGHTS",
       "literal_values": [],
       "name": "keep_ram_copy_of_weights",
       "required": false,
-      "type": "<class 'bool'>",
+      "type": "typing.Optional[bool]",
       "validation": {}
     },
     {

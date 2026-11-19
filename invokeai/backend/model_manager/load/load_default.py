@@ -782,8 +782,8 @@ class ModelLoader(ModelLoaderBase):
         The exit puts back the *same tensors*, rather than re-quantizing to the storage dtype. Both
         end with a param of the storage dtype, and the difference is the whole point:
 
-        - `.to(storage_dtype)` allocates new storage. `CachedModelWithPartialLoad` keeps
-          `_cpu_state_dict = model.state_dict()` (the `keep_ram_copy_of_weights` default), so after
+        - `.to(storage_dtype)` allocates new storage. When `keep_ram_copy_of_weights` is enabled,
+          `CachedModelWithPartialLoad` keeps `_cpu_state_dict = model.state_dict()`, so after
           the first forward the param pointed at a private copy while that RAM copy pinned the
           original — both live, 2 bytes per element for every param still CPU-resident, against a
           budget snapshotted at `put()` that still said 1. It healed only when the model moved to
