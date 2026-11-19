@@ -23,10 +23,9 @@ const handleRefresh = () => {
 export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
   const { t } = useTranslation();
   const { data, indexCounts, indexUpdatedAt, loadState } = imageMapStore.useSnapshot();
-  // Before the early return, and keyed on the array the store swaps wholesale.
-  // The footer re-renders on every index-progress tick, and those patch other
-  // snapshot keys and leave `data` identity intact — so the count runs once per
-  // points refresh rather than once per tick, which matters at 170k points.
+  // Before the early return, and keyed on the array the store swaps wholesale. The footer re-renders on every
+  // index-progress tick, and those patch other snapshot keys and leave `data` identity intact — so the count runs once
+  // per points refresh rather than once per tick, which matters at 170k points.
   const points = data?.points ?? NO_POINTS;
   const clusterSummary = useMemo(() => describeClusters(summarizeClusters(points), t), [points, t]);
 
@@ -45,10 +44,9 @@ export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
         <Text whiteSpace="nowrap">
           {t('widgets.imageMap.pointCount', { count: data.pointCount, formatted: data.pointCount.toLocaleString() })}
         </Text>
-        {/* Every sibling in this row is nowrap, so this is the only segment
-            flex can shrink and it absorbs all of the row's overflow: below
-            roughly 500px the numbers are clipped off the page and the tooltip
-            is the only way left to read them. */}
+        {/* Every sibling in this row is nowrap, so this is the only segment flex can shrink and it absorbs all of the
+            row's overflow: below roughly 500px the numbers are clipped off the page and the tooltip is the only way
+            left to read them. */}
         <Tooltip content={clusterSummary}>
           <Text truncate>· {clusterSummary}</Text>
         </Tooltip>

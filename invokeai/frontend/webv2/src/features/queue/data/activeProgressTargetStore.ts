@@ -70,9 +70,8 @@ export const activeProgressTargetStore: ActiveProgressTargetSink = {
   set(target) {
     const { settlingTargets, targets } = store.getSnapshot();
 
-    // Progress frames arrive many times a second per session; re-appending an
-    // already-tracked target would publish a fresh array identity every frame and
-    // re-render every consumer.
+    // Progress frames arrive many times a second per session; re-appending an already-tracked target would publish a
+    // fresh array identity every frame and re-render every consumer.
     if (includes(targets, target)) {
       return;
     }
@@ -104,9 +103,8 @@ registerAccountOwnedResource({
 });
 
 /**
- * Running slots first: a settling slot is only worth following while nothing is
- * running, or a concurrent session's live stream would sit unseen behind a
- * static frame for the whole routing window.
+ * Running slots first: a settling slot is only worth following while nothing is running, or a concurrent session's live
+ * stream would sit unseen behind a static frame for the whole routing window.
  */
 const selectFollowedTargets = ({
   settlingTargets,
@@ -115,8 +113,8 @@ const selectFollowedTargets = ({
   settlingTargets.length === 0 ? targets : [...targets, ...settlingTargets];
 
 /**
- * Single-slot surfaces follow the oldest active or settling slot until its result lands, avoiding
- * concurrent-session flicker.
+ * Single-slot surfaces follow the oldest active or settling slot until its result lands, avoiding concurrent-session
+ * flicker.
  */
 export const useActiveProgressTarget = (): QueueItemProgressTarget | null =>
   store.useSelector((snapshot) => selectFollowedTargets(snapshot)[0] ?? null);

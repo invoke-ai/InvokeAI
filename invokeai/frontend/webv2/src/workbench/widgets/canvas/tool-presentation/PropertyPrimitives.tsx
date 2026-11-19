@@ -11,10 +11,7 @@ import { setPropertyGroupCollapsed, usePropertyGroupCollapsed } from './property
 
 const GROUP_HEADER_HOVER = { color: 'fg' } as const;
 
-/**
- * A row label that names itself in a tooltip while the pointer is on it and its column cuts it short. Only then is a
- * tooltip (and its portal) mounted, so the many rows of a Properties pane cost none at rest.
- */
+/** A row label with a tooltip only while hovered and truncated, so rows at rest mount no portal. */
 const PropertyRowLabel = ({ label, labelId }: { label: string; labelId?: string }) => {
   const [isTipShown, setIsTipShown] = useState(false);
   const showIfCut = useCallback((event: ReactPointerEvent<HTMLParagraphElement>) => {
@@ -36,11 +33,7 @@ const PropertyRowLabel = ({ label, labelId }: { label: string; labelId?: string 
   );
 };
 
-/**
- * Use fixed label/trailing columns around a flexible control so sliders and numbers never wrap; blank labels
- * preserve continuation alignment. `labelId` names the label so a control in the row can point
- * `aria-labelledby` at it.
- */
+/** Fixed label and trailing columns around a flexible control, so sliders and numbers never wrap. */
 export const PropertyControlRow = ({
   children,
   label,
@@ -100,11 +93,7 @@ export const PropertySwitchRow = ({
   );
 };
 
-/**
- * A named group of form rows. A collapsible group renders its label as a
- * disclosure button and remembers the user's choice per group id (an override
- * store; the declared default applies until the user touches it).
- */
+/** A named group of rows; collapsible ones remember the user's override per group id. */
 export const PropertyGroup = ({
   children,
   collapsible,

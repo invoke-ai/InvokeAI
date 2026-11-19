@@ -11,9 +11,9 @@ import type { WorkflowFlowEdge, WorkflowFlowNode } from './flowAdapters';
 export type WorkflowFlowInstance = ReactFlowInstance<WorkflowFlowNode, WorkflowFlowEdge>;
 
 /**
- * How far the editor toolbar reaches into the graph from the editor's left edge (its 8px inset, its 38px column, and
- * a gap). Graph content a view is fitted to, or a fresh view opens on, starts right of it, so the toolbar never
- * covers a node.
+ * How far the editor toolbar reaches into the graph from the editor's left edge (its 8px inset, its 38px column, and a
+ * gap). Graph content a view is fitted to, or a fresh view opens on, starts right of it, so the toolbar never covers a
+ * node.
  */
 export const WORKFLOW_TOOLBAR_CLEARANCE_PX = 56;
 

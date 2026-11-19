@@ -11,8 +11,8 @@ import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryCo
 import { useTranslation } from 'react-i18next';
 
 /**
- * App-owned composition: external `POST /api/v1/recall` updates land in the active project's Generate panel, and
- * `POST /api/v1/recall/video` updates in its Video panel; each brings its panel to the front.
+ * App-owned composition: external `POST /api/v1/recall` updates land in the active project's Generate panel, and `POST
+ * /api/v1/recall/video` updates in its Video panel; each brings its panel to the front.
  */
 export const RecallParametersRuntime = () => {
   const store = useWorkbenchInternalStore();

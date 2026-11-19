@@ -133,7 +133,6 @@ describe('validateImportData', () => {
 describe('partitionImportableFields', () => {
   it('applies fields the target config carries and skips the rest', () => {
     const target = model({ default_settings: null, description: null, trigger_phrases: null });
-    // cpu_only is absent from this main-model config entirely.
     const { body, skipped } = partitionImportableFields(
       { cpu_only: true, default_settings: { steps: 20 }, name: 'Renamed', trigger_phrases: ['x'] },
       target

@@ -19,9 +19,7 @@ import {
 const layer = layerContract;
 const group = groupContract;
 
-/**
- * raster: r1, g1[r2, g2[r3], r4], r5  ·  control: c1
- */
+/** raster: r1, g1[r2, g2[r3], r4], r5  ·  control: c1 */
 const stacks = (): CanvasStackForests =>
   stacksFrom([
     layer('r1'),

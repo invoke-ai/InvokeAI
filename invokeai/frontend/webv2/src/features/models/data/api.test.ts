@@ -16,7 +16,6 @@ vi.mock('./transport', () => ({
   } satisfies ModelsDataPort,
 }));
 
-// relationshipsApi bypasses the port and uses the platform client directly.
 vi.mock('@platform/transport/http', async (importOriginal) => ({
   ...((await importOriginal()) as Record<string, unknown>),
   apiFetch: mocks.request,

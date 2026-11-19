@@ -19,10 +19,7 @@ const DOT_BASE = {
   w: '3',
 };
 const DOT_CHECKED = { ...DOT_BASE, bg: 'accent.solid', borderColor: 'accent.solid' };
-/**
- * On by itself, but an ancestor keeps the node out: a dashed accent ring, so the state reads by shape as well as color
- * against the solid grey ring of a dot that is off.
- */
+/** Gated by an ancestor: a dashed accent ring, so it reads by shape against the solid ring of off. */
 const DOT_GATED = {
   ...DOT_BASE,
   bg: 'transparent',
@@ -33,8 +30,7 @@ const DOT_GATED = {
 // Off is the faintest state of an on/off control, so its ring keeps at least 3:1 against every row fill in every theme
 // (LayerActiveDot.browser.test.tsx measures it); grey and hollow, it still reads apart from the filled accent of on.
 const DOT_UNCHECKED = { ...DOT_BASE, bg: 'transparent', borderColor: 'fg.muted' };
-// The button fills like the ghost icon buttons beside it. A dot that is on keeps its accent under the pointer: the
-// darker hover accent of a plain ToggleDot sinks into that fill and reads as the dot switching off.
+// The button fills like the ghost icon buttons beside it.
 const HOVER_FILL = 'gray.hoverTint/10';
 const HOVER_CHECKED = { bg: HOVER_FILL };
 const HOVER_GATED = { bg: HOVER_FILL };
@@ -49,10 +45,7 @@ const hoverStyle = (checked: boolean, gated: boolean) =>
 
 const stopPropagation = (event: { stopPropagation: () => void }): void => event.stopPropagation();
 
-/**
- * A layer row's "takes part in generation" toggle, reading on, gated by an ancestor, and off distinctly. Pointer-only
- * like every row control (the row's menu carries the same action), and it never starts a row drag.
- */
+/** Pointer-only like every row control (the row menu has the same action), and never starts a drag. */
 export const LayerActiveDot = ({
   checked,
   disabled,
@@ -63,10 +56,7 @@ export const LayerActiveDot = ({
 }: {
   checked: boolean;
   disabled: boolean;
-  /**
-   * Set when the dot is checked but an ancestor keeps the node out: why, shown as the tooltip and given to assistive
-   * tech as the dot's description, since `aria-pressed` alone would report the node as taking part.
-   */
+  /** Why an ancestor gates the node, as tooltip and description, since `aria-pressed` alone would mislead. */
   gatedReason: string | null;
   label: string;
   onCheckedChange: (checked: boolean) => void;

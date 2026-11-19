@@ -41,8 +41,8 @@ export interface SocketCredentialSource {
   subscribe(listener: () => void): () => void;
 }
 
-// The backend reads the handshake `auth.token` first. A static Authorization header would outlive token
-// replacements, so none is sent.
+// The backend reads the handshake `auth.token` first. A static Authorization header would outlive token replacements,
+// so none is sent.
 const createDefaultSocket = (authenticate: SocketAuthenticator): BackendSocket =>
   // Narrow Socket.IO's generic off overload to the facade's supported calls.
   io(getBackendSocketUrl(), {

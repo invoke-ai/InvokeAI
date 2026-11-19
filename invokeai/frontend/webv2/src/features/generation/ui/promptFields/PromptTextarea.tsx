@@ -29,8 +29,8 @@ const PROMPT_TEXTAREA_HIGHLIGHTED_CSS = {
 
 /**
  * What the prompt does with Compel attention syntax. `edit` highlights it and lets the weighting keys rewrite it;
- * `highlight` only highlights it, for text not yet bound to a model; `none` leaves it plain because the model reads
- * the prompt as written.
+ * `highlight` only highlights it, for text not yet bound to a model; `none` leaves it plain because the model reads the
+ * prompt as written.
  */
 type PromptAttentionSyntax = 'edit' | 'highlight' | 'none';
 

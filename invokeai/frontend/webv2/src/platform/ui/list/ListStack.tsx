@@ -16,8 +16,8 @@ export interface ListStackProps extends Omit<StackProps, 'children' | 'gap' | 'r
 }
 
 /**
- * A short list rendered in full, for rows that are few or bounded; long or growing lists use `List`, which
- * virtualizes. Rows keep the family's spacing either way.
+ * A short list rendered in full, for rows that are few or bounded; long or growing lists use `List`, which virtualizes.
+ * Rows keep the family's spacing either way.
  */
 export const ListStack = ({ children, dividers = false, label, ...stackProps }: ListStackProps) => (
   <Stack

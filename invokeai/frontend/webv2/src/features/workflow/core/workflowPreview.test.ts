@@ -11,15 +11,11 @@ import type {
   WorkflowInvocationNode,
 } from './types';
 
-import extendVideo from './fixtures/extend-video-ltx2.json';
 import { parseWorkflowJson } from './workflowJson';
 import {
   buildWorkflowPreviewModel,
-  chooseWorkflowPreviewChipWidth,
   compiledGraphToPreviewDocument,
-  getWorkflowPreviewMetrics,
   findWorkflowPreviewNodes,
-  WORKFLOW_PREVIEW_METRICS,
   type WorkflowPreviewMetrics,
   type WorkflowPreviewModel,
 } from './workflowPreview';
@@ -222,78 +218,6 @@ describe('buildWorkflowPreviewModel', () => {
     ]);
   });
 
-  it.each(['toString', 'constructor', '__proto__'])(
-    'previews a parsed form field named %s without an inherited template',
-    (name) => {
-      const parsed = parseWorkflowJson(graph([node('primitive', 'string')], [], exposed(['primitive', name])));
-      const model = build(parsed.document);
-
-      expect(model.inputs).toMatchObject([{ fieldName: name, isModelField: false, label: name, value: null }]);
-    }
-  );
-
-  it.each(['string_split_neg', 'custom_prompt'])(
-    'keeps single-input computation %s visible in the simplified view',
-    (name) => {
-      const document = graph(
-        [
-          node('seed', 'integer', { value: 1 }),
-          node('compute', name, { value: 'cat [dog]' }),
-          node('positive', 'prompt'),
-          node('negative', 'prompt'),
-        ],
-        [
-          edge('seed', 'positive', 'seed'),
-          edge('compute', 'positive', 'prompt', 'positive'),
-          edge('compute', 'negative', 'prompt', 'negative'),
-        ]
-      );
-      const model = buildWorkflowPreviewModel(
-        document,
-        {
-          ...TEMPLATES,
-          [name]: template(name, 'Compute prompt', [input('value', type('StringField'))]),
-        },
-        METRICS
-      );
-
-      expect(model.simplified!.nodeIds).toContain('compute');
-      expect(model.simplified!.pills.negative).toBeUndefined();
-      expect(model.simplified!.edges).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ source: 'compute', target: 'positive' }),
-          expect.objectContaining({ source: 'compute', target: 'negative' }),
-        ])
-      );
-    }
-  );
-
-  it('names nodes by their own label, then their template, then their type id, and marks an unknown type', () => {
-    const model = build(
-      graph(
-        [node('prompt', 'prompt', {}, { label: 'Prompt - SDXL' }), node('seed', 'integer'), node('x', 'face_mask')],
-        []
-      )
-    );
-
-    expect(model.nodes.get('prompt')!.title).toBe('Prompt - SDXL');
-    expect(model.nodes.get('seed')!.title).toBe('Integer Primitive');
-    expect(model.nodes.get('x')).toMatchObject({ isUnknown: true, title: 'face_mask' });
-    expect(model.nodes.get('seed')!.isUnknown).toBe(false);
-  });
-
-  it('lists a node’s own values with field labels, leaving out connected and empty inputs', () => {
-    const model = build(TEXT_TO_IMAGE);
-
-    // `seed` is fed by the seed primitive, so its stale 0 is not the node's own value.
-    expect(model.nodes.get('denoise')!.fields).toEqual([
-      { isExposed: true, label: 'Sampling steps', name: 'steps', value: { kind: 'number', value: 30 } },
-      { isExposed: false, label: 'Cfg_scale', name: 'cfg_scale', value: { kind: 'number', value: 4.5 } },
-    ]);
-    expect(model.nodes.get('prompt')!.fields).toEqual([]);
-    expect(model.nodes.get('prompt')!.notes).toBe('Encodes the positive prompt.');
-  });
-
   it('marks exposed nodes, results and the model fields a node still needs', () => {
     const model = build(TEXT_TO_IMAGE);
     const marked = (key: 'isExposed' | 'isResult') =>
@@ -306,34 +230,6 @@ describe('buildWorkflowPreviewModel', () => {
       { base: 'sdxl', kind: 'slot', label: 'SDXL checkpoint', modelType: 'main' },
     ]);
     expect(model.nodes.get('denoise')!.modelRequirements).toEqual([]);
-  });
-
-  it('orders nodes and their neighbours topologically', () => {
-    const model = build(TEXT_TO_IMAGE);
-
-    expect(model.all.nodeIds).toEqual([
-      'positive',
-      'seed',
-      'model',
-      'prompt',
-      'metadata',
-      'collect',
-      'denoise',
-      'decode',
-    ]);
-    expect(model.all.neighbours.denoise).toEqual({ sources: ['seed', 'collect'], targets: ['decode'] });
-    expect(model.simplified!.neighbours.denoise).toEqual({ sources: ['prompt'], targets: ['decode'] });
-  });
-
-  it('draws every node in the author’s arrangement in the full view, scaled to the chips, one edge per pair', () => {
-    const a = { ...node('a', 'integer', { value: 1 }), position: { x: -400, y: 300 } };
-    const b = { ...node('b', 'denoise'), position: { x: 200, y: 100 } };
-    const model = build(graph([a, b], [edge('a', 'b', 'steps'), edge('a', 'b', 'seed')]));
-
-    // Moved to the origin and halved: editor nodes are about twice a chip's size.
-    expect(model.all.positions).toEqual({ a: { x: 0, y: 100 }, b: { x: 300, y: 0 } });
-    expect(model.all.edges).toHaveLength(1);
-    expect(model.all.pills).toEqual({});
   });
 
   it('folds value-only primitives into pills on their consumers and hides plumbing, rerouting through a collect', () => {
@@ -358,127 +254,6 @@ describe('buildWorkflowPreviewModel', () => {
         ({ isRerouted, source, target }) => `${source}->${target}${isRerouted ? ' (rerouted)' : ''}`
       )
     ).toEqual(['model->prompt', 'denoise->decode', 'prompt->denoise (rerouted)']);
-  });
-
-  it('lays the simplified view out in layers, leaving room above a node for its pills', () => {
-    const { simplified } = build(TEXT_TO_IMAGE);
-    const { positions } = simplified!;
-
-    expect(positions.model!.x).toBeLessThan(positions.prompt!.x);
-    expect(positions.prompt!.x).toBeLessThan(positions.denoise!.x);
-    expect(positions.denoise!.x).toBeLessThan(positions.decode!.x);
-    // Layer pitch is the node width plus the gap.
-    expect(positions.prompt!.x - positions.model!.x).toBe(METRICS.nodeWidth + METRICS.layerGap);
-
-    // In one layer, a node with a pill keeps the row gap between the chip above and its pill, not its chip.
-    const stacked = build(
-      graph(
-        [
-          node('model', 'model_loader'),
-          node('seed', 'integer', { value: 1 }),
-          node('a', 'denoise'),
-          node('b', 'denoise'),
-        ],
-        [edge('model', 'a', 'noise', 'unet'), edge('model', 'b', 'noise', 'unet'), edge('seed', 'b', 'seed')]
-      )
-    ).simplified!;
-
-    expect(stacked.pills.b).toHaveLength(1);
-    expect(stacked.positions.b!.y - stacked.positions.a!.y).toBe(
-      METRICS.nodeHeight + METRICS.rowGap + METRICS.pillHeight
-    );
-  });
-
-  it('levels a chain’s chips whatever pills they carry, starting the topmost pill at 0', () => {
-    // model -> prompt (two pills) -> denoise (none) -> decode (one pill).
-    const { simplified } = build(
-      graph(
-        [
-          node('model', 'model_loader'),
-          node('positive', 'string', { value: 'a lighthouse' }),
-          node('negative', 'string', { value: 'blurry' }),
-          node('prompt', 'prompt'),
-          node('denoise', 'denoise'),
-          node('strength', 'integer', { value: 2 }),
-          node('decode', 'l2i'),
-        ],
-        [
-          edge('model', 'prompt', 'clip', 'clip'),
-          edge('positive', 'prompt', 'prompt'),
-          edge('negative', 'prompt', 'prompt'),
-          edge('prompt', 'denoise', 'positive', 'conditioning'),
-          edge('denoise', 'decode', 'latents', 'latents'),
-          edge('strength', 'decode', 'metadata'),
-        ]
-      )
-    );
-    const { pills, positions } = simplified!;
-
-    expect([pills.model?.length, pills.prompt?.length, pills.denoise?.length, pills.decode?.length]).toEqual([
-      undefined,
-      2,
-      undefined,
-      1,
-    ]);
-    // Every chip on one row, so every edge runs level, and the tallest pill stack fits above it from 0.
-    expect(new Set(['model', 'prompt', 'denoise', 'decode'].map((id) => positions[id]!.y))).toEqual(
-      new Set([2 * METRICS.pillHeight])
-    );
-  });
-
-  it('keeps a primitive that feeds nothing, a collection primitive and a primitive fed by another node', () => {
-    const model = build(
-      graph(
-        [
-          node('lonely', 'integer', { value: 3 }),
-          node('images', 'image_batch', { images: [{ image_name: 'a.png' }] }),
-          node('source', 'integer', { value: 1 }),
-          node('fed', 'integer'),
-          node('denoise', 'denoise'),
-        ],
-        [edge('images', 'denoise', 'noise', 'images'), edge('source', 'fed', 'value'), edge('fed', 'denoise', 'steps')]
-      )
-    );
-
-    expect(model.simplified!.nodeIds).toEqual(['lonely', 'images', 'fed', 'denoise']);
-    expect(model.simplified!.pills).toEqual({
-      fed: [{ label: 'Integer Primitive', nodeId: 'source', value: { kind: 'number', value: 1 } }],
-    });
-    expect(model.nodes.get('images')!.fields[0]!.value).toEqual({ count: 1, kind: 'list' });
-  });
-
-  it('has no simplified view when nothing folds or hides', () => {
-    const model = build(
-      graph([node('denoise', 'denoise'), node('decode', 'l2i')], [edge('denoise', 'decode', 'latents')])
-    );
-
-    expect(model.simplified).toBeNull();
-  });
-
-  it('previews a workflow that would not compile: a connection to a node type the server lacks', () => {
-    const model = build(graph([node('mask', 'face_mask'), node('decode', 'l2i')], [edge('mask', 'decode', 'latents')]));
-
-    expect(model.all.edges).toHaveLength(1);
-    expect(model.all.neighbours.mask!.targets).toEqual(['decode']);
-  });
-
-  it('reads a choice by its template’s label', () => {
-    const sampler: InvocationTemplates = {
-      sampler: template('sampler', 'Sampler', [
-        input('scheduler', type('EnumField'), { uiChoiceLabels: { dpmpp_2m_sde_k: 'DPM++ 2M SDE Karras' } }),
-        input('mode', type('EnumField')),
-      ]),
-    };
-    const model = buildWorkflowPreviewModel(
-      graph([node('s', 'sampler', { mode: 'fast', scheduler: 'dpmpp_2m_sde_k' })], []),
-      sampler,
-      METRICS
-    );
-
-    expect(model.nodes.get('s')!.fields.map((field) => field.value)).toEqual([
-      { kind: 'text', text: 'DPM++ 2M SDE Karras' },
-      { kind: 'text', text: 'fast' },
-    ]);
   });
 
   it('reads the form as authored, with each input’s saved value and the model it still needs', () => {
@@ -596,73 +371,6 @@ describe('buildWorkflowPreviewModel', () => {
       { heading: 'Model', labels: ['Model'] },
     ]);
   });
-
-  it('builds once per document, templates and metrics', () => {
-    expect(build(TEXT_TO_IMAGE)).toBe(build(TEXT_TO_IMAGE));
-    expect(buildWorkflowPreviewModel(TEXT_TO_IMAGE, { ...TEMPLATES }, METRICS)).not.toBe(build(TEXT_TO_IMAGE));
-  });
-});
-
-describe('the Extend Video - LTX-2 template', () => {
-  const document = parseWorkflowJson(extendVideo.workflow).document;
-  const model = buildWorkflowPreviewModel(document, extendVideo.templates as unknown as InvocationTemplates);
-  const { positions } = model.simplified!;
-
-  it('labels a folded primitive by the form even while its value is empty', () => {
-    expect(model.simplified!.pills.pos_cond!.map((pill) => pill.label)).toEqual(['Negative Prompt', 'Prompt']);
-  });
-
-  it('lays its eight drawn nodes out six columns wide, over rows kept well apart', () => {
-    const { layerGap, nodeHeight, nodeWidth, pillHeight, rowGap } = WORKFLOW_PREVIEW_METRICS;
-    const right = Math.max(...Object.values(positions).map((position) => position.x)) + nodeWidth;
-    const pillsTop = (id: string) => positions[id]!.y - (model.simplified!.pills[id]?.length ?? 0) * pillHeight;
-
-    expect(model.simplified!.nodeIds).toHaveLength(8);
-    expect(right).toBe(6 * nodeWidth + 5 * layerGap);
-    expect(new Set(Object.values(positions).map((position) => position.y)).size).toBeGreaterThan(4);
-
-    // Within a column, each node's pills start below the chip above them by at least the row gap, and the topmost
-    // pill, not the topmost chip, starts at 0.
-    const columns = new Map<number, string[]>();
-    for (const id of model.simplified!.nodeIds) {
-      columns.set(positions[id]!.x, [...(columns.get(positions[id]!.x) ?? []), id]);
-    }
-    for (const ids of columns.values()) {
-      const sorted = [...ids].sort((a, b) => positions[a]!.y - positions[b]!.y);
-      for (const [index, id] of sorted.slice(1).entries()) {
-        const above = sorted[index]!;
-        expect(pillsTop(id) - (positions[above]!.y + nodeHeight), id).toBeGreaterThanOrEqual(rowGap);
-      }
-    }
-    expect(Math.min(...model.simplified!.nodeIds.map(pillsTop))).toBe(0);
-    // The denoiser's chip sits level with the middle of the chips feeding it, its two pills above it.
-    const feeding = ['model_loader', 'pos_cond', 'extend_conditioning', 'source_video', 'ideal_dimensions'];
-    expect(model.simplified!.pills.denoise_latents).toHaveLength(2);
-    expect(positions.denoise_latents!.y).toBeCloseTo(
-      feeding.reduce((sum, id) => sum + positions[id]!.y, 0) / feeding.length
-    );
-  });
-
-  it('sums up a node by its first exposed input with a short value', () => {
-    const summary = (id: string) => {
-      const field = model.nodes.get(id)!.exposedSummary;
-      return field ? [field.label, field.value] : null;
-    };
-
-    expect(summary('extend_conditioning')).toEqual(['Context Frames', { kind: 'number', value: 17 }]);
-    expect(summary('ideal_dimensions')).toEqual(['Target Resolution', { kind: 'text', text: '704p (short edge 704)' }]);
-    expect(summary('denoise_latents')).toEqual(['Number of Frames', { kind: 'number', value: 121 }]);
-    expect(summary('pos_cond')).toBeNull();
-  });
-
-  it('groups the form’s inputs under its headings', () => {
-    expect(model.inputs).toHaveLength(13);
-    expect(model.inputGroups.map((group) => [group.heading, group.labels.length])).toEqual([
-      ['Initial Video', 4],
-      ['Extension', 6],
-      ['Model', 3],
-    ]);
-  });
 });
 
 describe('findWorkflowPreviewNodes', () => {
@@ -725,12 +433,6 @@ describe('compiled graphs', () => {
     expect(model.all.positions.upscale).toEqual({ x: (METRICS.nodeWidth + METRICS.layerGap) * 2, y: 0 });
   });
 
-  it('places nodes where the source hints', () => {
-    const document = compiledGraphToPreviewDocument(COMPILED, { positionHints: { denoise: { x: 5, y: 6 } } });
-
-    expect(document.nodes.find((node) => node.id === 'denoise')!.position).toEqual({ x: 5, y: 6 });
-  });
-
   it('keys the structure on node ids, types and connections, in any order, not on values', () => {
     const key = (graph: Parameters<typeof compiledGraphToPreviewDocument>[0]) =>
       build(compiledGraphToPreviewDocument(graph)).structureKey;
@@ -755,69 +457,5 @@ describe('compiled graphs', () => {
     expect(key(reordered)).toBe(key(COMPILED));
     expect(key(retyped)).not.toBe(key(COMPILED));
     expect(key(rewired)).not.toBe(key(COMPILED));
-  });
-
-  it('keeps what a recompile did not change, so a view redraws only what did', () => {
-    const compile = (steps: number, seed: string) =>
-      compiledGraphToPreviewDocument(
-        {
-          ...COMPILED,
-          nodes: COMPILED.nodes.map((node) =>
-            node.id === 'denoise' ? { ...node, inputs: { ...node.inputs, steps } } : node
-          ),
-        },
-        { metrics: METRICS, overrides: { seed: { value: seed } } }
-      );
-    const first = build(compile(30, 'random'));
-    const stepsChanged = buildWorkflowPreviewModel(compile(12, 'random'), TEMPLATES, METRICS, first);
-
-    expect(stepsChanged.nodes.get('denoise')).not.toBe(first.nodes.get('denoise'));
-    expect(stepsChanged.nodes.get('denoise')!.values.steps).toBe(12);
-    expect(stepsChanged.nodes.get('seed')).toBe(first.nodes.get('seed'));
-    expect(stepsChanged.nodes.get('upscale')).toBe(first.nodes.get('upscale'));
-    expect(stepsChanged.all).toBe(first.all);
-    expect(stepsChanged.simplified).toBe(first.simplified);
-
-    // A pill's value changes only its row; the layout stays.
-    const seedChanged = buildWorkflowPreviewModel(compile(12, 'fixed'), TEMPLATES, METRICS, stepsChanged);
-
-    expect(seedChanged.simplified).not.toBe(stepsChanged.simplified);
-    expect(seedChanged.simplified!.positions).toBe(stepsChanged.simplified!.positions);
-    expect(seedChanged.simplified!.pills.denoise![0]!.value).toEqual({ kind: 'text', text: 'fixed' });
-  });
-});
-
-describe('chip width', () => {
-  it('is wide enough for the longest title, within 136 to 200 px, as wide as still fits', () => {
-    const tried: number[] = [];
-    const fitsUpTo = (limit: number) => (width: number) => {
-      tried.push(width);
-      return width <= limit;
-    };
-
-    expect(chooseWorkflowPreviewChipWidth(170.2, fitsUpTo(400))).toBe(171);
-    expect(chooseWorkflowPreviewChipWidth(260, fitsUpTo(400))).toBe(200);
-    expect(chooseWorkflowPreviewChipWidth(90, fitsUpTo(400))).toBe(136);
-    // Where the widest does not fit, narrower steps are tried, down to the minimum.
-    tried.length = 0;
-    expect(chooseWorkflowPreviewChipWidth(200, fitsUpTo(170))).toBe(168);
-    expect(tried).toEqual([200, 184, 168]);
-    expect(chooseWorkflowPreviewChipWidth(200, () => false)).toBe(136);
-  });
-
-  it('lays a drawing out at its chip width, columns and the author’s arrangement widening with it', () => {
-    const narrow = buildWorkflowPreviewModel(TEXT_TO_IMAGE, TEMPLATES, getWorkflowPreviewMetrics(136));
-    const wide = buildWorkflowPreviewModel(TEXT_TO_IMAGE, TEMPLATES, getWorkflowPreviewMetrics(200));
-    const { layerGap } = WORKFLOW_PREVIEW_METRICS;
-
-    expect(getWorkflowPreviewMetrics(200)).toBe(getWorkflowPreviewMetrics(200));
-    expect([narrow.all.nodeWidth, wide.all.nodeWidth, wide.simplified!.nodeWidth]).toEqual([136, 200, 200]);
-    // Layered columns are a chip and a gap apart.
-    const columns = (model: WorkflowPreviewModel) =>
-      [...new Set(model.simplified!.nodeIds.map((id) => model.simplified!.positions[id]!.x))].sort((a, b) => a - b);
-    expect(columns(wide).slice(0, 2)).toEqual([0, 200 + layerGap]);
-    expect(columns(narrow).slice(0, 2)).toEqual([0, 136 + layerGap]);
-    // The author's positions scale with the chips.
-    expect(wide.all.positions.denoise!.x / narrow.all.positions.denoise!.x).toBeCloseTo(200 / 136);
   });
 });

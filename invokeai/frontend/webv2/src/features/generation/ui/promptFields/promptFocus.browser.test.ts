@@ -81,7 +81,6 @@ describe('focusPositivePrompt', () => {
     const upscale = host.querySelector<HTMLTextAreaElement>('[data-owner="upscale"]')!;
 
     registerPositivePromptElement('generate', generate, null);
-    // Upscale mounts after Generate; the focus-prompt command still means Generate's.
     registerPositivePromptElement('upscale', upscale, null);
 
     try {

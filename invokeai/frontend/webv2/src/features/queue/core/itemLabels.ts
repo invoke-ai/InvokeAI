@@ -42,8 +42,8 @@ export const getQueueItemReadModelLabel = (item: QueueItemReadModel): string => 
 };
 
 /**
- * The same for a run this browser submitted, read from its submission snapshot. Read defensively, as the other
- * snapshot readers are: a run restored from an older journal may lack parts of it.
+ * The same for a run this browser submitted, read from its submission snapshot. Read defensively, as the other snapshot
+ * readers are: a run restored from an older journal may lack parts of it.
  */
 export const getQueueItemSnapshotLabel = (item: QueueItem): string => {
   const submission = (item.snapshot as Partial<QueueItem['snapshot']> | undefined)?.backendSubmission;

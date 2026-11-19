@@ -3,7 +3,6 @@ import type { QueueItemProgressTarget, QueueSourceId } from './types';
 
 import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from './historySnapshot';
 
-/** A running backend session, not a prediction of its output images or boards. */
 export interface QueueActiveSession extends QueueItemProgressTarget {
   id: string;
   backendItemId: number;
@@ -57,21 +56,11 @@ export const getQueueActiveSessions = (
 };
 
 /**
- * Auto-switch, one policy for every surface that shows generation results: Preview (`viewerAutoSwitch`) and Canvas
- * staging (`autoSwitchMode`). Each surface keeps its own selected result and adapts its own slots; these rules decide
- * what follows what.
- *
- * - `latest` (Newest) and `progress` (In progress) select each result as it lands; `off` selects one only while
- *   nothing else is selected (`selectsLandedResult`).
- * - Only `progress` shows generating slots, and only from their first frame of their own (`getAutoSwitchFollowedLive`):
- *   until then the previous result stays on screen.
- * - The user picking something to show steers it (`pickAutoSwitch`): a result pauses Auto-switch (Off) until the mode
- *   is set again or a generating slot is picked; a generating slot turns it to In progress and pins that slot while it
- *   runs.
+ * Shared by Preview and Canvas staging: `latest` and `progress` select each landed result; `off` only when none is.
+ * Only `progress` shows generating slots, from their own first frame; picking a result pauses it (Off).
  */
 export type AutoSwitchMode = 'latest' | 'off' | 'progress';
 
-/** A generating slot as Auto-switch sees it: waiting to start, running, or finished with its result still on its way. */
 export interface AutoSwitchLiveSlot {
   id: string;
   hasOwnFrame: boolean;
@@ -82,11 +71,7 @@ export interface AutoSwitchLiveSlot {
 export const isAutoSwitchPinHeld = (lives: readonly AutoSwitchLiveSlot[], pinnedId: string | null): boolean =>
   pinnedId !== null && lives.some((live) => live.id === pinnedId && live.state === 'running');
 
-/**
- * The generating slot Auto-switch shows, or null to show the selected result: under In progress only, the pinned slot
- * while it runs, else the newest running slot with a frame of its own, else the first settling one with a frame (so a
- * finished slot's last frame stays up while its result is on its way). `lives` are in the order they started.
- */
+/** In progress only: the pinned running slot, else the newest running one with a frame, else a settling one. */
 export const getAutoSwitchFollowedLive = <T extends AutoSwitchLiveSlot>(
   mode: AutoSwitchMode,
   lives: readonly T[],
@@ -104,13 +89,11 @@ export const getAutoSwitchFollowedLive = <T extends AutoSwitchLiveSlot>(
   );
 };
 
-/** What the user picking something to show does to Auto-switch. */
 export const pickAutoSwitch = (
   pick: { kind: 'live'; id: string } | { kind: 'result' }
 ): { mode: AutoSwitchMode; pinnedId: string | null } =>
   pick.kind === 'live' ? { mode: 'progress', pinnedId: pick.id } : { mode: 'off', pinnedId: null };
 
-/** Whether a result that just landed becomes the selected one. */
 export const selectsLandedResult = (mode: AutoSwitchMode, hasSelectedResult: boolean): boolean =>
   mode !== 'off' || !hasSelectedResult;
 

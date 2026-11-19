@@ -37,7 +37,6 @@ const makeDoc = (stacks: CanvasStackForests, selectedLayerId: string | null): Ca
   width: 100,
 });
 
-/** The created layer, narrowed to the raster variant the controller always makes. */
 const createdRaster = (document: CanvasDocumentContractV3 | null, id: string): CanvasRasterLayerContractV2 => {
   const layer = getDocumentLeaves(document).find((candidate) => candidate.id === id);
   if (!layer || layer.type !== 'raster') {
@@ -93,7 +92,6 @@ describe('NewRasterLayerController: insert', () => {
     });
 
     expect(h.insert()).toEqual({ layerId: 'new-1', status: 'created' });
-    // Index 0 is top-most, so "above bottom" is bottom's own index.
     expect(leafIds(h.document())).toEqual(['top', 'new-1', 'bottom']);
     expect(h.document().selectedLayerId).toBe('new-1');
     expect(h.layers.get('new-1')?.rect).toEqual(RECT);
@@ -240,8 +238,6 @@ describe('NewRasterLayerController: liftSelectionToLayer', () => {
   });
 
   it('bakes the source layer transform into the new layer placement', () => {
-    // The copy comes out layer-local; a new layer lives in document space, so a
-    // translated source must shift where the pixels land.
     const h = createHarness({ stacks: stacksFrom([paintLayer('a', { x: 10, y: 5 })]) });
     h.controller.liftSelectionToLayer('Selection', 'Layer via copy');
 

@@ -22,7 +22,6 @@ describe('getPidDecoderBaseForMainBase', () => {
   });
 
   it('maps Z-Image to the FLUX decoder, which it shares a VAE with', () => {
-    // Z-Image ships no PiD checkpoints of its own; it reuses FLUX's 16-channel decoder.
     expect(getPidDecoderBaseForMainBase('z-image')).toBe('flux');
   });
 
@@ -94,7 +93,6 @@ describe('getPidGenerationSize', () => {
 describe('getPidDimensionOverrides', () => {
   it('leaves the model rules alone when PiD is off or fitting', () => {
     expect(getPidDimensionOverrides('off', 'flux', 16, 1024)).toEqual({ grid: 16, optimalSide: 1024 });
-    // Fit generates at the requested size, so the model's own grid still applies.
     expect(getPidDimensionOverrides('fit', 'flux', 16, 1024)).toEqual({ grid: 16, optimalSide: 1024 });
   });
 
@@ -116,7 +114,6 @@ describe('getPidDimensionOverrides', () => {
       const overrides = getPidDimensionOverrides('native', base, grid, 1024);
 
       expect(overrides.optimalSide % overrides.grid).toBe(0);
-      // And the resulting generation size lands on the model's own grid.
       expect(
         getPidGenerationSize({ height: overrides.optimalSide, width: overrides.optimalSide }, 'native', grid)
       ).toEqual({ height: overrides.optimalSide / 4, width: overrides.optimalSide / 4 });
