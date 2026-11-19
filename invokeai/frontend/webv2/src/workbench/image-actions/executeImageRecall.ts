@@ -1,5 +1,6 @@
 import type { GalleryImage } from '@features/gallery';
 import type {
+  ComponentModelConfig,
   GenerateModelConfig,
   GenerateReferenceImage,
   GenerateWidgetValues,
@@ -16,6 +17,7 @@ import {
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getEffectiveReferenceImage,
+  getModelDefaultFills,
   hasArchitectureCapabilities,
   isSupportedGenerateModel,
   isVaeModelConfig,
@@ -264,9 +266,11 @@ export const getMissingGenerateValuesMessage = (t: TFunction): string =>
 
 export const getCurrentGenerateValues = ({
   generateValues,
+  models,
   supportedModels,
 }: {
   generateValues: Record<string, unknown>;
+  models: readonly ComponentModelConfig[];
   supportedModels: GenerateModelConfig[];
 }) => {
   const normalizedValues = normalizeGenerateWidgetValues(generateValues);
@@ -283,14 +287,20 @@ export const getCurrentGenerateValues = ({
   const fallbackModelKey = typeof generateValues.modelKey === 'string' ? generateValues.modelKey : null;
   const fallbackModel = supportedModels.find((model) => model.key === fallbackModelKey) ?? supportedModels[0];
 
-  return fallbackModel
-    ? ({
-        ...getDefaultGenerateSettings(fallbackModel),
-        ...generateValues,
-        model: fallbackModel,
-        modelKey: fallbackModel.key,
-      } as GenerateWidgetValues)
-    : null;
+  if (!fallbackModel) {
+    return null;
+  }
+
+  const initial = {
+    ...getDefaultGenerateSettings(fallbackModel),
+    ...generateValues,
+    model: fallbackModel,
+    modelKey: fallbackModel.key,
+  } as GenerateWidgetValues;
+
+  // The model's default components and VAE fill in as they do when Generate itself picks the first model: once the
+  // values persist with a model, nothing fills them again.
+  return { ...initial, ...getModelDefaultFills(fallbackModel, initial, models) };
 };
 
 let canvasRecallHolder: { owner: AccountScope } | null = null;
@@ -373,7 +383,8 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    const readGenerateValues = () => getCurrentGenerateValues({ generateValues: getGenerateValues(), supportedModels });
+    const readGenerateValues = () =>
+      getCurrentGenerateValues({ generateValues: getGenerateValues(), models, supportedModels });
     const missingValuesNotice = () =>
       commands.notifications.add({
         kind: 'info',

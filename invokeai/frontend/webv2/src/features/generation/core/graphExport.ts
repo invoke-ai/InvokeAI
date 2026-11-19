@@ -215,6 +215,38 @@ const toSlotValue = (slot: ComponentSlotPolicy, model: ModelConfig): ComponentMo
   }
 };
 
+/** The slot a pick of `slotKey` fills and the installed model it names, or the error that tells why it cannot. */
+const resolveComponentPick = (
+  values: GenerateWidgetValues,
+  slotKey: string,
+  modelKey: string,
+  models: readonly ModelConfig[]
+): { slot: ComponentSlotPolicy; value: ComponentModelConfig } => {
+  const { slots } = getComponentSectionPolicy(values.model, values);
+  const slot = slots.find((candidate) => candidate.key === slotKey);
+
+  if (!slot) {
+    const validSlots = listKeys(slots.map((candidate) => candidate.key));
+
+    throw new Error(`Unknown component slot "${slotKey}" for ${values.model.name}. Valid slots: ${validSlots}.`);
+  }
+
+  const ctx = getComponentPolicyContext(values.model, values);
+  const fitting = models.filter((candidate) => fitsSlot(slot, candidate, ctx));
+  const pick = fitting.find((candidate) => candidate.key === modelKey);
+  const value = pick ? toSlotValue(slot, pick) : null;
+
+  if (!value) {
+    const problem = models.some((candidate) => candidate.key === modelKey)
+      ? `"${modelKey}" cannot be the ${slot.label} of ${values.model.name}`
+      : `model key "${modelKey}" is not installed`;
+
+    throw new Error(`components.${slotKey}: ${problem}. Choices: ${listModelKeys(fitting)}.`);
+  }
+
+  return { slot, value };
+};
+
 const withComponentPicks = (
   values: GenerateWidgetValues,
   picks: GraphExportCase['components'],
@@ -232,28 +264,15 @@ const withComponentPicks = (
       pending.findIndex(([key]) => slots.some((candidate) => candidate.key === key))
     );
     const [slotKey, modelKey] = pending.splice(index, 1)[0]!;
-    const slot = slots.find((candidate) => candidate.key === slotKey);
-
-    if (!slot) {
-      const validSlots = listKeys(slots.map((candidate) => candidate.key));
-
-      throw new Error(`Unknown component slot "${slotKey}" for ${values.model.name}. Valid slots: ${validSlots}.`);
-    }
-
-    const ctx = getComponentPolicyContext(next.model, next);
-    const fitting = models.filter((candidate) => fitsSlot(slot, candidate, ctx));
-    const pick = fitting.find((candidate) => candidate.key === modelKey);
-    const value = pick ? toSlotValue(slot, pick) : null;
-
-    if (!value) {
-      const problem = models.some((candidate) => candidate.key === modelKey)
-        ? `"${modelKey}" cannot be the ${slot.label} of ${values.model.name}`
-        : `model key "${modelKey}" is not installed`;
-
-      throw new Error(`components.${slotKey}: ${problem}. Choices: ${listModelKeys(fitting)}.`);
-    }
+    const { slot, value } = resolveComponentPick(next, slotKey, modelKey, models);
 
     next = { ...next, [slot.key]: value };
+  }
+
+  // A later pick can close the slot of an earlier one (a safetensors encoder after the default GGUF encoder's tower),
+  // so the picks are judged together, in the settings they all lead to.
+  for (const [slotKey, modelKey] of Object.entries(picks)) {
+    resolveComponentPick(next, slotKey, modelKey, models);
   }
 
   return next;

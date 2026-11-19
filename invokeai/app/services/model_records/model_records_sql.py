@@ -49,6 +49,7 @@ from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.queries.models import MAX_KEY_LENGTH, MAX_PATH_LENGTH
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
+from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.factory import (
     SINGLE_FILE_MODEL_SUFFIXES,
     AnyModelConfig,
@@ -99,6 +100,25 @@ def _construct_config_for_type(fields: dict, target_type: ModelType) -> AnyModel
 def _check_path_length(path: str) -> None:
     if len(path) > MAX_PATH_LENGTH:
         raise ValueError(f"A model's path can be at most {MAX_PATH_LENGTH} characters long")
+
+
+def _changed_value(changes: ModelRecordChanges, field_name: str, record: AnyModelConfig) -> object:
+    """The value `changes` sets for `field_name`.
+
+    Main-model default settings that do not mention `components` leave the stored ones alone: a client that predates
+    the field posts the whole settings object back and would otherwise erase them. An explicit `null` or empty map
+    still clears them.
+    """
+    value = getattr(changes, field_name)
+    stored = getattr(record, field_name, None)
+    if (
+        field_name == "default_settings"
+        and isinstance(value, MainModelDefaultSettings)
+        and isinstance(stored, MainModelDefaultSettings)
+        and "components" not in value.model_fields_set
+    ):
+        return value.model_copy(update={"components": stored.components})
+    return value
 
 
 def _parse(config: str) -> AnyModelConfig:
@@ -173,7 +193,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
 
                 # 2. Apply the changes to the dict
                 for field_name in changes.model_fields_set:
-                    record_as_dict[field_name] = getattr(changes, field_name)
+                    record_as_dict[field_name] = _changed_value(changes, field_name, original)
 
                 # 3. Attempt to create a new model config from the updated dict.
                 #
@@ -210,7 +230,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 # We are not allowing the model config class to change, so we can just update the existing instance in
                 # place. If the changes are invalid for the existing class, an exception will be raised by pydantic.
                 for field_name in changes.model_fields_set:
-                    setattr(record, field_name, getattr(changes, field_name))
+                    setattr(record, field_name, _changed_value(changes, field_name, record))
 
             # If we get this far, the updated model config is valid, so we can save it to the database.
             if "path" in changes.model_fields_set:

@@ -47,8 +47,10 @@ class MainModelDefaultSettings(BaseModel):
         # even as null would be skipped by it.
         exclude_if=lambda value: value is None,
         description=(
-            "Default component models for this main model, keyed by component slot (the generation metadata name, "
-            "e.g. `t5_encoder`, `qwen3_encoder`); values are model keys. The default VAE lives in `vae`."
+            "Default component models for this main model, keyed by the component slot name Generate reads, "
+            "e.g. `t5_encoder`, `qwen3_encoder` or `component_source` (the component source of Qwen Image, Wan and "
+            "similar families, which graphs record under their own metadata names); values are model keys. The default "
+            "VAE lives in `vae`."
         ),
     )
 

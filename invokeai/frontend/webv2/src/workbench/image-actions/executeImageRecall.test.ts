@@ -487,6 +487,7 @@ describe('executeImageRecall', () => {
     // Initialised while the table is present, so only the recall itself is gated.
     const generateValues = getCurrentGenerateValues({
       generateValues: { modelKey: model.key },
+      models: [model as GenerateModelConfig],
       supportedModels: [model as GenerateModelConfig],
     });
 

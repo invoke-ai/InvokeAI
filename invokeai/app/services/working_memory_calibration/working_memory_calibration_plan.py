@@ -352,9 +352,26 @@ def _text_encoder_reason(main: ModelConfig, models: Sequence[ModelConfig]) -> st
     )
 
 
+def default_component_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[ModelConfig]:
+    """The Z-Image pipeline a main model's default components name as its `component_source`, which Generate fills the
+    slot with when the model is selected (`getModelDefaultComponents`): an installed pipeline that brings its own VAE
+    (`ships_its_vae`). A self-contained pipeline is offered the slot too, and the model loader node takes a source's
+    VAE over its own. FLUX.2 picks its source on its own (`vae_source`), so a stored one is not read."""
+    if not _is_main(model) or model.base != BaseModelType.ZImage:
+        return None
+    key = getattr(getattr(model, "default_settings", None), "components", None)
+    key = key.get("component_source") if isinstance(key, Mapping) else None
+    if not key:
+        return None
+    return next(
+        (source for source in models if source.key == key and source.base == model.base and ships_its_vae(source)), None
+    )
+
+
 def vae_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[ModelConfig]:
     """The pipeline whose own VAE decodes a main model's generations while its `vae` slot is empty: the model itself
-    (`ships_its_vae`), or for another FLUX.2 model the component source Generate then picks on its own and its graph
+    (`ships_its_vae`), the Z-Image pipeline its default components name (`default_component_source`), or for another
+    FLUX.2 model the component source Generate then picks on its own and its graph
     keeps, whose VAE the FLUX.2 model loader node takes: among the installed pipelines that loader takes components
     from (`_flux2_sources`), the first fitting one, else the first one (`getAutoFlux2ComponentSourceModel`), which the
     graph keeps only beside a standalone text encoder. Generate lists the models in the order the server does, which is
@@ -363,6 +380,8 @@ def vae_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[Mo
     (`_needs_gpu_vae`)."""
     if default_vae(model, models) is not None:
         return None
+    if (source := default_component_source(model, models)) is not None:
+        return source
     if ships_its_vae(model):
         return model
     if not _is_main(model) or model.base != BaseModelType.Flux2:

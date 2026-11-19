@@ -61,10 +61,10 @@ export const useQueueItemRecall = (
       () =>
         getQueueRecallTargetState({
           hasCapabilityTable: hasArchitectureCapabilities(),
-          hasCurrentValues: getCurrentGenerateValues({ generateValues, supportedModels }) !== null,
+          hasCurrentValues: getCurrentGenerateValues({ generateValues, models, supportedModels }) !== null,
           isCatalogSettled,
         }),
-      [generateValues, isCatalogSettled, supportedModels]
+      [generateValues, isCatalogSettled, models, supportedModels]
     )
   );
   const source = getQueueRecallSource(snapshot?.sourceId ?? null, isNonGenerateRun);

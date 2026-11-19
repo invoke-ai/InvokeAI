@@ -53,6 +53,16 @@ export type DefaultComponentSlotReader = (
 ) => readonly DefaultComponentSlotPolicy[];
 
 /**
+ * `components` less the keys whose slot an edit closed (the vision tower once its encoder is cleared or replaced by one
+ * that has none), so no hidden default is left behind. Keys of slots this client does not know stay.
+ */
+export type DefaultComponentPruner = (
+  model: DefaultComponentSlotModel,
+  components: Readonly<Record<string, string>>,
+  catalog: readonly ModelConfig[]
+) => Record<string, string>;
+
+/**
  * Generate's rules for a main model's defaults (the scheduler and the component slots): `loading` until the rules and
  * the architecture table they read arrive, `unavailable` when either failed, and `ready` with readers that are
  * replaced whenever the table changes.
@@ -63,6 +73,7 @@ export type ModelDefaultsRulesState =
   | {
       /** Whether Generate accepts `candidate` as the VAE of `model`, which may be of another base (MOSS-Image takes FLUX.2's). */
       acceptsDefaultVae: (model: DefaultComponentSlotModel, candidate: ModelConfig) => boolean;
+      pruneComponents: DefaultComponentPruner;
       read: SchedulerPolicyReader;
       readComponentSlots: DefaultComponentSlotReader;
       status: 'ready';

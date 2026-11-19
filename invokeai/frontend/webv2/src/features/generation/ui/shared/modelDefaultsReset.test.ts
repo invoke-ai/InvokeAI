@@ -300,4 +300,34 @@ describe('default components', () => {
     expect(patch).not.toHaveProperty('clipEmbedModel');
     expect(getChangedSettings(settings, after(settings, patch), flux)).toContain('t5EncoderModel');
   });
+
+  it('clears the vision tower when the reset encoder closes its slot, and does not count that as a default', () => {
+    const encoder = (key: string, format: string): ComponentModelConfig => ({
+      base: 'any',
+      format,
+      key,
+      name: key,
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    });
+    const gguf = encoder('encoder-gguf', 'gguf_quantized');
+    const checkpoint = encoder('encoder-st', 'checkpoint');
+    const tower: ComponentModelConfig = { ...gguf, key: 'mmproj', name: 'mmproj', type: 'qwen3_vl_vision_tower' };
+    const model: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      default_settings: { components: { qwen3_vl_encoder: checkpoint.key } },
+      format: 'gguf_quantized',
+      key: 'q21',
+      name: 'Qwen-Image-2.1',
+      type: 'main',
+    };
+    const current = { ...getDefaultGenerateSettings(model), qwen3VLEncoderModel: gguf, qwen3VLVisionTowerModel: tower };
+    const installed = [gguf, checkpoint, tower];
+    const patch = getModelDefaultsPatch(current, model, installed);
+    const plan = getApplyModelDefaultsPlan(current, model, installed);
+
+    expect(patch).toMatchObject({ qwen3VLEncoderModel: checkpoint, qwen3VLVisionTowerModel: null });
+    expect(plan.patch).toEqual({ qwen3VLEncoderModel: checkpoint, qwen3VLVisionTowerModel: null });
+    expect(plan.defined).toEqual(['qwen3VLEncoderModel']);
+  });
 });

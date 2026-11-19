@@ -173,8 +173,11 @@ export const getApplyModelDefaultsPlan = (
 
   for (const setting of DESCRIBED_SETTINGS) {
     if (isComponentSetting(setting)) {
+      // A cleared slot (`null`: the default encoder closed it) is no default of the model's, only a change.
       if (setting in components) {
-        defined.push(setting);
+        if (components[setting]) {
+          defined.push(setting);
+        }
 
         if (isSettingChanged(setting, settings, withComponents)) {
           Object.assign(patch, { [setting]: components[setting] });

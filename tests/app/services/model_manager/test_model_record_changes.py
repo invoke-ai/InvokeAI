@@ -745,3 +745,44 @@ def test_reidentify_of_files_no_config_accepts_raises_and_keeps_the_record(harne
 def test_reidentify_of_an_unknown_model_raises(harness: _Harness) -> None:
     with pytest.raises(UnknownModelException):
         harness.manager.reidentify_model(KEY)
+
+
+def test_a_save_of_a_client_that_does_not_know_components_keeps_the_stored_ones(harness: _Harness) -> None:
+    """A form that edits only the fields it knows posts the whole settings object back without `components`."""
+    harness.store.add_model(
+        _sd1_record(default_settings=MainModelDefaultSettings(steps=20, components={"t5_encoder": "t5-key"}))
+    )
+
+    harness.manager.update_model_record(
+        KEY, ModelRecordChanges.model_validate({"default_settings": {"steps": 30, "cfg_scale": 5}})
+    )
+
+    assert harness.store.get_model(KEY).default_settings == MainModelDefaultSettings(
+        steps=30, cfg_scale=5, components={"t5_encoder": "t5-key"}
+    )
+
+
+@pytest.mark.parametrize("cleared", [None, {}])
+def test_an_explicit_null_or_empty_components_still_clears_them(harness: _Harness, cleared: dict | None) -> None:
+    harness.store.add_model(_sd1_record(default_settings=MainModelDefaultSettings(components={"t5_encoder": "t5-key"})))
+
+    harness.manager.update_model_record(
+        KEY, ModelRecordChanges.model_validate({"default_settings": {"steps": 20, "components": cleared}})
+    )
+
+    default_settings = harness.store.get_model(KEY).default_settings
+    assert default_settings is not None and default_settings.components is None
+    assert default_settings.steps == 20
+
+
+def test_an_in_place_update_keeps_the_stored_components_too(harness: _Harness) -> None:
+    """The store's update without a class change takes the same rule as the manager's."""
+    harness.store.add_model(_sd1_record(default_settings=MainModelDefaultSettings(components={"t5_encoder": "t5-key"})))
+
+    harness.store.update_model(KEY, ModelRecordChanges.model_validate({"default_settings": {"steps": 30}}))
+    kept = harness.store.get_model(KEY).default_settings
+    assert kept is not None and kept.components == {"t5_encoder": "t5-key"}
+
+    harness.store.update_model(KEY, ModelRecordChanges.model_validate({"default_settings": {"components": None}}))
+    cleared = harness.store.get_model(KEY).default_settings
+    assert cleared is not None and cleared.components is None

@@ -726,6 +726,13 @@ export const resolveModelDefaultVae = (
     return { kind: 'none' };
   }
 
+  // A graph that loads no VAE pick (a self-contained pipeline's own decodes) takes no default either.
+  const vaeSlot = getComponentSectionPolicy(model, settings).slots.find((slotPolicy) => slotPolicy.key === 'vae');
+
+  if (vaeSlot?.neverLoaded?.(getComponentPolicyContext(model, settings))) {
+    return { kind: 'none' };
+  }
+
   const hasBundledVae = !isVaeComponentRequired(model, settings);
 
   if (key === '' || key === 'default') {
@@ -806,6 +813,11 @@ export interface ComponentSlotPolicy {
    * selection is always in use.
    */
   inUse?: (ctx: ComponentPolicyContext) => boolean;
+  /**
+   * The model's graph loads no pick for the slot whatever the switches (a self-contained pipeline takes its bundled
+   * components), so a default stored for it would do nothing and the Model Manager does not offer it.
+   */
+  neverLoaded?: (ctx: ComponentPolicyContext) => boolean;
   missingMessage?: string;
   /**
    * Reported whenever the selected value fails `filter`, required or not, so a saved selection the graph cannot use
@@ -1196,6 +1208,10 @@ export const getComponentSlotIssue = (slotPolicy: ComponentSlotPolicy, ctx: Comp
   return isValid ? null : (slotPolicy.missingMessage ?? `Generate needs a ${slotPolicy.label} for this model.`);
 };
 
+/** A self-contained SDNQ FLUX.1 pipeline always loads its own encoders and VAE (`buildFluxGraph` sends none). */
+const hasBundledFlux1Components = (ctx: ComponentPolicyContext): boolean =>
+  ctx.model.type !== 'external_image_generator' && isSelfContainedSDNQFlux1Pipeline(ctx.model);
+
 const createPolicy = (defaultOpen: boolean, slots: readonly ComponentSlotPolicy[]): ComponentSectionPolicy => ({
   defaultOpen,
   slots,
@@ -1220,17 +1236,20 @@ const getBaseComponentSectionPolicy = (
         ...createPolicy(!isSelfContainedSDNQFlux1Pipeline(model), [
           {
             ...t5EncoderSlot('Required for FLUX.1 models.'),
-            required: (ctx) => !isSelfContainedSDNQFlux1Pipeline(ctx.model),
+            neverLoaded: hasBundledFlux1Components,
+            required: (ctx) => !hasBundledFlux1Components(ctx),
             missingMessage: 'Generate needs a T5 Encoder for FLUX models.',
           },
           {
             ...clipEmbedSlot('Required for FLUX.1 models.'),
-            required: (ctx) => !isSelfContainedSDNQFlux1Pipeline(ctx.model),
+            neverLoaded: hasBundledFlux1Components,
+            required: (ctx) => !hasBundledFlux1Components(ctx),
             missingMessage: 'Generate needs a CLIP Embed model for FLUX models.',
           },
           {
             ...vaeSlot('Required for FLUX.1 models.', isAcceptedVae),
-            required: (ctx) => !isSelfContainedSDNQFlux1Pipeline(ctx.model),
+            neverLoaded: hasBundledFlux1Components,
+            required: (ctx) => !hasBundledFlux1Components(ctx),
             missingMessage: 'Generate needs a VAE for FLUX models.',
           },
         ]),
@@ -1697,12 +1716,28 @@ export const isComponentCompatibleWithModel = (
 
 export type ModelDefaultComponents = Partial<Pick<GenerateSettings, DefaultComponentSlot['setting']>>;
 
+const isInstalled = (models: readonly ModelConfig[], selected: { key: string }): boolean =>
+  models.some((installed) => installed.key === selected.key);
+
+const isSlotOffered = (model: GenerateModelConfig, settings: GenerateSettings, setting: GenerateComponentValueKey) =>
+  getComponentSectionPolicy(model, settings).slots.some((slotPolicy) => slotPolicy.key === setting);
+
+/** Whether a default for the slot can take effect: the family offers it and the graph loads what it holds. */
+const isSlotLoaded = (model: GenerateModelConfig, settings: GenerateSettings, setting: GenerateComponentValueKey) => {
+  const context = getComponentPolicyContext(model, settings);
+
+  return getComponentSectionPolicy(model, settings).slots.some(
+    (slotPolicy) => slotPolicy.key === setting && !slotPolicy.neverLoaded?.(context)
+  );
+};
+
 /**
- * The model's default components that fill a slot of `settings`: one that is empty, or whose selection does not fit
- * `model`. A selection that fits stays, unless `replace` (a reset to the model's defaults) takes the default over it.
- * Defaults naming an unknown slot, a model that is not installed or one the slot
- * rejects are skipped. A slot that depends on another (the vision tower follows a GGUF encoder) is judged beside the
- * defaults already taken, whatever order they are stored in.
+ * The model's default components that fill a slot of `settings`: one that is empty, or whose selection is not
+ * installed or does not fit `model`. A selection that fits stays, unless `replace` (a reset to the model's defaults)
+ * takes the default over it. Defaults naming an unknown slot, a model that is not installed or one the slot rejects are
+ * skipped. A slot that depends on another (the vision tower follows a GGUF encoder) is judged beside the defaults
+ * already taken, whatever order they are stored in, and a selection whose slot a taken default closes is cleared
+ * (`null`), so no hidden pick is left to block or leak into a later choice.
  */
 export const getModelDefaultComponents = (
   model: GenerateModelConfig,
@@ -1729,16 +1764,18 @@ export const getModelDefaultComponents = (
     pending = pending.filter(({ candidate, setting }) => {
       const current = next[setting];
 
-      if (!replace && current && isComponentCompatibleWithModel(model, next, setting, current)) {
+      if (
+        !replace &&
+        current &&
+        isInstalled(models, current) &&
+        isComponentCompatibleWithModel(model, next, setting, current)
+      ) {
         return false;
       }
 
       // Only a slot the family offers (the Model Manager lists the same ones); a dependent slot waits for the one it
       // hangs on.
-      if (
-        !getComponentSectionPolicy(model, next).slots.some((slotPolicy) => slotPolicy.key === setting) ||
-        !isComponentCompatibleWithModel(model, next, setting, candidate)
-      ) {
+      if (!isSlotLoaded(model, next, setting) || !isComponentCompatibleWithModel(model, next, setting, candidate)) {
         return true;
       }
 
@@ -1749,8 +1786,23 @@ export const getModelDefaultComponents = (
     });
   }
 
+  const cleared: ModelDefaultComponents = {};
+
+  for (const { setting } of DEFAULT_COMPONENT_SLOTS) {
+    const current = settings[setting];
+
+    if (
+      current &&
+      !(setting in patch) &&
+      isSlotOffered(model, settings, setting) &&
+      !isSlotOffered(model, next, setting)
+    ) {
+      cleared[setting] = null;
+    }
+  }
+
   // A slot that holds a main model only took a main model above.
-  return patch as ModelDefaultComponents;
+  return { ...cleared, ...patch } as ModelDefaultComponents;
 };
 
 /** A component slot Generate offers `model`, as the Model Manager lists it among the model's default components. */
@@ -1775,6 +1827,10 @@ export const getDefaultComponentSlotPolicies = (
   const context = getComponentPolicyContext(model, settings);
 
   return getComponentSectionPolicy(model, settings).slots.flatMap((slot) => {
+    if (slot.neverLoaded?.(context)) {
+      return [];
+    }
+
     const persistenceKey = DEFAULT_COMPONENT_SLOTS.find(({ setting }) => setting === slot.key)?.persistenceKey;
 
     return persistenceKey
@@ -1794,6 +1850,36 @@ export const getDefaultComponentSlotPolicies = (
 };
 
 /**
+ * The default components `model` stores, less the ones whose slot an edit closed: a dependent slot (the vision tower)
+ * goes with the pick it hangs on when that is cleared, or when the pick still installed no longer opens it (a
+ * safetensors encoder for a GGUF one). Keys this client has no slot for stay, as do the dependents of a pick that is
+ * no longer installed, which the user sees and clears first.
+ */
+export const pruneClosedDefaultComponents = (
+  model: GenerateModelConfig,
+  models: readonly ModelConfig[]
+): Record<string, string> => {
+  const stored = (model.default_settings as { components?: Record<string, string> | null } | null | undefined)
+    ?.components;
+  const components = { ...stored };
+  const offered = new Set(getDefaultComponentSlotPolicies(model, models).map((slot) => slot.persistenceKey));
+
+  for (const key of Object.keys(components)) {
+    const parent = getDefaultComponentSlot(key)?.dependsOn;
+    const parentKey = parent === undefined ? undefined : components[parent];
+
+    if (
+      parent !== undefined &&
+      (parentKey === undefined || (isInstalled(models, { key: parentKey }) && !offered.has(key)))
+    ) {
+      delete components[key];
+    }
+  }
+
+  return components;
+};
+
+/**
  * What a model's defaults fill into the slots of `settings` that are empty: its default components, and its default
  * VAE where the model has a VAE picker the VAE fits. A selection that fits stays.
  */
@@ -1803,23 +1889,24 @@ export const getModelDefaultFills = (
   models: readonly ModelConfig[]
 ): Partial<GenerateSettings> => {
   const components = getModelDefaultComponents(model, settings, models);
+  const filled = { ...settings, ...components };
+  const hasVaeSlot = isSlotOffered(model, filled, 'vae');
+  const fitsVae = (vae: VaeModelConfig) =>
+    hasVaeSlot
+      ? isComponentCompatibleWithModel(model, filled, 'vae', vae)
+      : getGenerationUiPolicy(model).sdVaeVisible && isVaeCompatibleWithGenerateModel(model, vae);
 
-  if (settings.vae) {
+  // A VAE that is installed and fits stays; one left over from another family (a fallback from an unsupported model)
+  // gives way to the default.
+  if (settings.vae && isInstalled(models, settings.vae) && fitsVae(settings.vae)) {
     return components;
   }
 
-  const filled = { ...settings, ...components };
   const defaultVae = resolveModelDefaultVae(model, filled, models.filter(isVaeModelConfig));
   // The bundled VAE (`null`) is what an empty slot already uses.
   const vae = defaultVae.kind === 'apply' ? defaultVae.vae : null;
-  const hasVaeSlot = getComponentSectionPolicy(model, filled).slots.some((slotPolicy) => slotPolicy.key === 'vae');
-  const fits =
-    vae &&
-    (hasVaeSlot
-      ? isComponentCompatibleWithModel(model, filled, 'vae', vae)
-      : getGenerationUiPolicy(model).sdVaeVisible);
 
-  return fits ? { ...components, vae } : components;
+  return vae && fitsVae(vae) ? { ...components, vae } : components;
 };
 
 type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };

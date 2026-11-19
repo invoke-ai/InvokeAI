@@ -1,6 +1,7 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
 import type {
+  DefaultComponentPruner,
   DefaultComponentSlotPolicy,
   DefaultComponentSlotReader,
   ModelDefaultsRulesSource,
@@ -263,12 +264,18 @@ describe('DefaultSettingsSection default components', () => {
   // only beside a Qwen3 encoder, and whose PiD decoder has no installed model.
   const readComponentSlots: DefaultComponentSlotReader = (_model, components) => [
     slot('t5_encoder', 'T5 Encoder', 't5_encoder'),
-    slot('qwen3_encoder', 'Qwen3 Encoder', 'qwen3_encoder'),
-    ...(components.qwen3_encoder ? [slot('qwen3_vl_vision_tower', 'Vision Tower', 'qwen3_vl_vision_tower')] : []),
+    slot('qwen3_vl_encoder', 'Qwen3 Encoder', 'qwen3_encoder'),
+    ...(components.qwen3_vl_encoder ? [slot('qwen3_vl_vision_tower', 'Vision Tower', 'qwen3_vl_vision_tower')] : []),
     slot('pid_decoder', 'PiD Decoder', 'pid_decoder'),
   ];
+  // The tower goes with the encoder it hangs on, as Generate's rules prune it.
+  const pruneComponents: DefaultComponentPruner = (_model, components) =>
+    Object.fromEntries(
+      Object.entries(components).filter(([key]) => key !== 'qwen3_vl_vision_tower' || components.qwen3_vl_encoder)
+    );
   const readyState: ModelDefaultsRulesState = {
     acceptsDefaultVae,
+    pruneComponents,
     read: () => ({ appliesToGraph: false, defaultValue: 'euler', options: [] }),
     readComponentSlots,
     status: 'ready',
@@ -406,12 +413,12 @@ describe('DefaultSettingsSection default components', () => {
   describe('clearing a slot', () => {
     it('removes it from the stored map and keeps the others', async () => {
       await render(
-        settingsModel({ default_settings: { components: { qwen3_encoder: 'qwen3-a', t5_encoder: 't5-a' } } })
+        settingsModel({ default_settings: { components: { qwen3_vl_encoder: 'qwen3-a', t5_encoder: 't5-a' } } })
       );
       await clear('T5 Encoder');
       await save();
 
-      expect(savedDefaults().components).toEqual({ qwen3_encoder: 'qwen3-a' });
+      expect(savedDefaults().components).toEqual({ qwen3_vl_encoder: 'qwen3-a' });
     });
 
     it('stores no map once the last slot is cleared', async () => {
@@ -422,10 +429,33 @@ describe('DefaultSettingsSection default components', () => {
       expect(savedDefaults().components).toBeNull();
     });
 
+    it('says a stored component that is no longer installed is missing, with its key, and clears it', async () => {
+      await render(settingsModel({ default_settings: { components: { t5_encoder: 'deleted-t5' } } }));
+
+      expect(host.textContent).toContain('models.missingModelKey:deleted-t5');
+
+      await clear('T5 Encoder');
+      await save();
+
+      expect(savedDefaults()).toHaveProperty('components', null);
+    });
+
+    it('takes the dependent slot of a missing encoder along when the encoder is cleared', async () => {
+      await render(
+        settingsModel({
+          default_settings: { components: { qwen3_vl_encoder: 'deleted-encoder', qwen3_vl_vision_tower: 'tower-a' } },
+        })
+      );
+      await clear('Qwen3 Encoder');
+      await save();
+
+      expect(savedDefaults()).toHaveProperty('components', null);
+    });
+
     it('takes a dependent slot along when the slot it hangs on is cleared', async () => {
       await render(
         settingsModel({
-          default_settings: { components: { qwen3_encoder: 'qwen3-a', qwen3_vl_vision_tower: 'tower-a' } },
+          default_settings: { components: { qwen3_vl_encoder: 'qwen3-a', qwen3_vl_vision_tower: 'tower-a' } },
         })
       );
       expect(labels(host)).toContain('Vision Tower');
@@ -512,12 +542,22 @@ describe('DefaultSettingsSection default components', () => {
       expect(offered).not.toContain('SDXL VAE');
     });
 
-    it("offers the model's own base only until the rules arrive", async () => {
-      await render(mossModel, unavailableAdapter);
-      const offered = (await offeredVaes()).join('|');
+    it('offers no replacement until the rules arrive, while the stored VAE stays visible and clearable', async () => {
+      await render(settingsModel({ base: 'moss-image', default_settings: { vae: 'moss-vae' } }), unavailableAdapter);
 
-      expect(offered).toContain('MOSS VAE');
-      expect(offered).not.toContain('FLUX.2 VAE');
+      expect(host.textContent).toContain('MOSS VAE');
+      expect((await offeredVaes()).join('|')).not.toContain('FLUX.2 VAE');
+      await act(() => document.body.click());
+      await clear('models.defaultFields.vae');
+      await save();
+
+      expect(savedDefaults().vae).toBe('default');
+    });
+
+    it('says a stored VAE that is no longer installed is missing, with its key', async () => {
+      await render(settingsModel({ base: 'moss-image', default_settings: { vae: 'deleted-vae' } }));
+
+      expect(host.textContent).toContain('models.missingModelKey:deleted-vae');
     });
 
     it('keeps a stored default VAE the rule no longer accepts, so it can be cleared', async () => {

@@ -105,6 +105,7 @@ export const ModelSelect = ({
   installAction = false,
   invalid,
   isClearable = false,
+  missingLabel,
   modelTypes,
   onChange,
   placeholder,
@@ -126,6 +127,11 @@ export const ModelSelect = ({
   installAction?: boolean;
   invalid?: boolean;
   isClearable?: boolean;
+  /**
+   * Shown instead of the placeholder when `value` names a model the library does not hold (deleted since it was
+   * saved), so a broken selection reads differently from an empty one; it stays clearable.
+   */
+  missingLabel?: string;
   modelTypes: readonly ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
   placeholder?: string;
@@ -249,6 +255,7 @@ export const ModelSelect = ({
     setIsOpen(false);
   };
   const canClear = isClearable && Boolean(value);
+  const missingText = value && loadStatus === 'loaded' && !selectedModel ? missingLabel : undefined;
 
   const renderOption = useCallback(
     (model: ModelConfig, state: PickerOptionState) => (
@@ -327,13 +334,15 @@ export const ModelSelect = ({
                 <Text
                   as="span"
                   id={valueTextId}
-                  color="fg.muted"
+                  color={missingText ? 'fg.warning' : 'fg.muted'}
                   flex={insideLabel ? '1' : undefined}
                   minW="0"
                   textAlign={insideLabel ? 'end' : undefined}
+                  title={missingText}
                   truncate
                 >
-                  {isEmpty ? emptyMessage : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
+                  {missingText ??
+                    (isEmpty ? emptyMessage : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel })))}
                 </Text>
               )}
               {canClear || isEmpty ? null : <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />}

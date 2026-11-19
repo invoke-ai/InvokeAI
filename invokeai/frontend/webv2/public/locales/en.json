@@ -1525,6 +1525,7 @@
     "defaultComponents": "Default Components",
     "defaultComponentsHelp": "Filled in when you switch to this model; a component that already fits stays. Apply model defaults and Reset everything to defaults use them over your picks.",
     "defaultComponentsNone": "No default",
+    "missingModelKey": "Missing model: {{key}}",
     "defaultSettings": "Default Settings",
     "defaultVae": "Default VAE",
     "defaultSettingsHelp": "Applied automatically when this model is selected. Off = use the app default.",

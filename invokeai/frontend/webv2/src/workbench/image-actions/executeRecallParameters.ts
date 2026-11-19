@@ -105,7 +105,7 @@ export const executeRecallParameters = async ({
       return false;
     }
 
-    const currentValues = getCurrentGenerateValues({ generateValues, supportedModels });
+    const currentValues = getCurrentGenerateValues({ generateValues, models, supportedModels });
 
     if (!currentValues) {
       commands.notifications.add({
@@ -168,7 +168,7 @@ export const executeRecallParameters = async ({
     if (latestRaw === null || (canvasTarget && !canvasTarget.getProject())) {
       return false;
     }
-    const latest = getCurrentGenerateValues({ generateValues: latestRaw, supportedModels });
+    const latest = getCurrentGenerateValues({ generateValues: latestRaw, models, supportedModels });
     if (!latest) {
       return false;
     }

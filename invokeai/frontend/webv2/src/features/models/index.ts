@@ -40,6 +40,7 @@ export {
   useModelsUi,
   useOpenAddModelsSearch,
   useOpenModelInManager,
+  type DefaultComponentPruner,
   type DefaultComponentSlotModel,
   type DefaultComponentSlotPolicy,
   type DefaultComponentSlotReader,

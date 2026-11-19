@@ -5,12 +5,15 @@ export interface DefaultComponentSlot {
   /** The settings key the picker fills. */
   setting: Exclude<GenerateComponentValueKey, 'vae'>;
   /**
-   * The slot's name in `default_settings.components` and the metadata key a generation records it under; one
-   * canonical name per slot, `^[a-z0-9_]+$` like the backend requires. The VAE has its own `default_settings.vae`.
+   * The slot's name in `default_settings.components`; one canonical name per slot, `^[a-z0-9_]+$` like the backend
+   * requires. Generation metadata records the slot under the same name, except the component source, which each
+   * family records under its own name. The VAE has its own `default_settings.vae`.
    */
   persistenceKey: string;
   /** The slot holds a main model (a component source or second transformer), not an encoder. */
   isMainModel?: true;
+  /** The slot only exists beside a pick of this slot (the vision tower follows a GGUF encoder); one without goes too. */
+  dependsOn?: string;
 }
 
 /**
@@ -31,7 +34,7 @@ export const DEFAULT_COMPONENT_SLOTS: readonly DefaultComponentSlot[] = [
   { persistenceKey: 'qwen3_5_encoder', setting: 'qwen35EncoderModel' },
   { persistenceKey: 'qwen3_encoder', setting: 'qwen3EncoderModel' },
   { persistenceKey: 'qwen3_vl_encoder', setting: 'qwen3VLEncoderModel' },
-  { persistenceKey: 'qwen3_vl_vision_tower', setting: 'qwen3VLVisionTowerModel' },
+  { dependsOn: 'qwen3_vl_encoder', persistenceKey: 'qwen3_vl_vision_tower', setting: 'qwen3VLVisionTowerModel' },
   { persistenceKey: 'qwen_image_qwen_vl_encoder', setting: 'qwenVLEncoderModel' },
   { persistenceKey: 't5_encoder', setting: 't5EncoderModel' },
   { isMainModel: true, persistenceKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },

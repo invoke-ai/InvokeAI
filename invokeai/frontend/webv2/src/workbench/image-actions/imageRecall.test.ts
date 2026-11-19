@@ -3061,6 +3061,35 @@ describe('legacy records', () => {
         expect(result?.values.clipEmbedModel?.key).toBe(defaultClip.key);
       });
 
+      it('keeps the current VAE when the image clears the component source whose bundled VAE the default took', () => {
+        const pipeline: MainModelConfig = {
+          base: 'z-image',
+          format: 'diffusers',
+          key: 'z-pipeline',
+          name: 'Z-Image pipeline',
+          type: 'main',
+        };
+        const zGguf: MainModelConfig = {
+          base: 'z-image',
+          default_settings: { components: { component_source: pipeline.key }, vae: 'default' },
+          format: 'gguf_quantized',
+          key: 'z-gguf',
+          name: 'Z-Image GGUF',
+          type: 'main',
+        };
+        const vae: VaeModelConfig = { base: 'flux', key: 'z-vae', name: 'FLUX VAE', type: 'vae' };
+        const result = recall(
+          { model: { key: zGguf.key }, qwen3_source: null },
+          { model: sdxlModel, modelKey: sdxlModel.key, vae },
+          [sdxlModel, zGguf],
+          [zGguf, pipeline],
+          [vae]
+        );
+
+        expect(result?.values.componentSourceModel).toBeNull();
+        expect(result?.values.vae).toEqual(vae);
+      });
+
       it('fills every slot of an image that recorded none', () => {
         const result = recall(
           { model: { key: withDefaults.key } },

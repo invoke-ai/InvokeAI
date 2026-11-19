@@ -56,8 +56,6 @@ interface FieldControlProps {
   control: DefaultSettingsControl;
   disabled: boolean;
   label: string;
-  /** Base of the model being edited, for same-base model pickers. */
-  modelBase: string;
   /** Key of the model being edited; its links rank the model pickers. */
   modelKey: string;
   setValue: (value: unknown) => void;
@@ -68,16 +66,7 @@ interface FieldControlProps {
 const buildCollection = (options: readonly string[]) =>
   createListCollection({ items: options.map((option) => ({ label: option, value: option })) });
 
-const FieldControl = ({
-  acceptsVae,
-  control,
-  disabled,
-  label,
-  modelBase,
-  modelKey,
-  setValue,
-  value,
-}: FieldControlProps) => {
+const FieldControl = ({ acceptsVae, control, disabled, label, modelKey, setValue, value }: FieldControlProps) => {
   const { t } = useTranslation();
   const selectCollection = useMemo(
     () => (control.kind === 'select' ? buildCollection(control.options) : null),
@@ -155,13 +144,20 @@ const FieldControl = ({
   }
 
   if (control.kind === 'model') {
+    const storedKey = typeof value === 'string' && value !== 'default' ? value : null;
+    const isRulesPending = control.generateVaeRule && !acceptsVae;
+
     return (
       <ModelSelect
-        disabled={disabled}
+        // Until Generate's rules arrive no replacement is offered, since the model's own base is not always the
+        // base its VAE must have: the picker is off, and a stored VAE stays visible and clearable.
+        disabled={disabled || (isRulesPending && storedKey === null)}
         filter={(candidate) =>
-          !control.generateVaeRule || (acceptsVae ? acceptsVae(candidate) : String(candidate.base) === modelBase)
+          !control.generateVaeRule ||
+          (acceptsVae ? acceptsVae(candidate) : storedKey === null || candidate.key === storedKey)
         }
         isClearable
+        missingLabel={storedKey ? t('models.missingModelKey', { key: storedKey }) : undefined}
         modelTypes={control.modelTypes}
         placeholder={t(control.placeholderKey)}
         relatedTo={modelKey}
@@ -169,7 +165,7 @@ const FieldControl = ({
         size="lg"
         // The 'default' sentinel renders as the placeholder: the toggle is on
         // but no specific model is pinned.
-        value={typeof value === 'string' && value !== 'default' ? value : null}
+        value={storedKey}
         onChange={(selected) => setValue(selected ? selected.key : 'default')}
       />
     );
@@ -316,20 +312,11 @@ export const DefaultSettingsSection = ({
       delete next[persistenceKey];
     }
 
-    // A slot this change closes (the vision tower once its encoder is cleared) leaves no hidden default behind. A key
-    // for a slot not offered before the change stays: another version or client may know slots this one does not.
-    const before = new Set(componentSlots?.map((slot) => slot.persistenceKey));
-    const after = new Set(
-      defaultsRulesState.readComponentSlots(model, next, catalog).map((slot) => slot.persistenceKey)
-    );
+    // A slot this change closes (the vision tower once its encoder is cleared, even a missing one) leaves no hidden
+    // default behind; a key for a slot this client does not know stays, since another version or client may.
+    const kept = defaultsRulesState.pruneComponents(model, next, catalog);
 
-    for (const key of Object.keys(next)) {
-      if (before.has(key) && !after.has(key)) {
-        delete next[key];
-      }
-    }
-
-    setFieldValue('components', Object.keys(next).length > 0 ? next : null);
+    setFieldValue('components', Object.keys(kept).length > 0 ? kept : null);
   };
 
   const handleReset = () => {
@@ -428,7 +415,6 @@ export const DefaultSettingsSection = ({
                   disabled={!isEnabled || field.pending !== undefined}
                   label={t(field.labelKey)}
                   acceptsVae={acceptsVae}
-                  modelBase={String(model.base)}
                   modelKey={model.key}
                   setValue={(nextValue) => setFieldValue(field.key, nextValue)}
                   value={isEnabled ? value : field.defaultValue}
@@ -483,6 +469,7 @@ export const DefaultSettingsSection = ({
                     filter={slot.filter}
                     id={`default-component-${slot.persistenceKey}`}
                     isClearable
+                    missingLabel={t('models.missingModelKey', { key: storedComponents[slot.persistenceKey] ?? '' })}
                     modelTypes={slot.modelTypes}
                     placeholder={t('models.defaultComponentsNone')}
                     relatedTo={model.key}

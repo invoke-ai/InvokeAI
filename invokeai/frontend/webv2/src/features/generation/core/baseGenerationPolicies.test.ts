@@ -38,6 +38,8 @@ import {
   getCompatibleReferenceImages,
   getKrea2EditLoraState,
   getModelDefaultComponents,
+  getModelDefaultFills,
+  pruneClosedDefaultComponents,
   getMaxReferenceImages,
   getReferenceImageUnavailableReason,
   getPromptPolicy,
@@ -3875,6 +3877,86 @@ describe("a main model's default components", () => {
     expect(offered({ qwen3_vl_encoder: encoder.key })).toContain('qwen3_vl_vision_tower');
   });
 
+  it('does not keep a selection that is no longer installed over the default of the new model', () => {
+    const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
+    const removed = createSettings(createModel('flux', { key: 'flux-other' }), { t5EncoderModel: otherT5 });
+
+    expect(switchTo(model, [t5Encoder], removed).settings.t5EncoderModel).toBe(t5Encoder);
+  });
+
+  it('clears a vision tower whose slot a reset to the default encoder closes', () => {
+    const gguf = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'encoder-gguf',
+      name: 'GGUF encoder',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    };
+    const checkpoint = { ...gguf, format: 'checkpoint', key: 'encoder-st', name: 'Checkpoint encoder' };
+    const tower = { ...gguf, key: 'mmproj', name: 'mmproj', type: 'qwen3_vl_vision_tower' };
+    const model = withDefaults('qwen-image-2-1', { qwen3_vl_encoder: checkpoint.key });
+    const current = createSettings(model, {
+      qwen3VLEncoderModel: gguf as ComponentModelConfig,
+      qwen3VLVisionTowerModel: tower as ComponentModelConfig,
+    });
+    const models = [gguf, checkpoint, tower] as ComponentModelConfig[];
+
+    expect(getModelDefaultComponents(model, current, models, { replace: true })).toEqual({
+      qwen3VLEncoderModel: checkpoint,
+      qwen3VLVisionTowerModel: null,
+    });
+    // A fitting selection that stays closes nothing.
+    expect(getModelDefaultComponents(model, current, models)).toEqual({});
+  });
+
+  it('offers and fills no encoder default for a self-contained FLUX.1 SDNQ pipeline, whose graph loads its own', () => {
+    const pipeline = { text_encoder: {}, text_encoder_2: {}, tokenizer: {}, tokenizer_2: {}, transformer: {}, vae: {} };
+    const components = { clip_embed_model: clipEmbed.key, t5_encoder: t5Encoder.key };
+    const sdnq = withDefaults('flux', components, { format: 'sdnq_quantized', submodels: pipeline } as never);
+    const standalone = withDefaults('flux', components);
+    const installed = [t5Encoder, clipEmbed] as ComponentModelConfig[];
+    const offered = (model: GenerateModelConfig) =>
+      getDefaultComponentSlotPolicies(model, installed).map((slot) => slot.persistenceKey);
+
+    expect(offered(standalone)).toEqual(expect.arrayContaining(['t5_encoder', 'clip_embed_model']));
+    expect(offered(sdnq)).not.toContain('t5_encoder');
+    expect(offered(sdnq)).not.toContain('clip_embed_model');
+    expect(getModelDefaultComponents(sdnq, createSettings(sdnq), installed)).toEqual({});
+  });
+
+  it('prunes a stored vision tower once the encoder it hangs on is gone, or no longer opens it', () => {
+    const gguf = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'encoder-gguf',
+      name: 'GGUF encoder',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    };
+    const checkpoint = { ...gguf, format: 'checkpoint', key: 'encoder-st', name: 'Checkpoint encoder' };
+    const tower = { ...gguf, key: 'mmproj', name: 'mmproj', type: 'qwen3_vl_vision_tower' };
+    const installed = [gguf, checkpoint, tower] as ComponentModelConfig[];
+    const prune = (components: Record<string, string>) =>
+      pruneClosedDefaultComponents(withDefaults('qwen-image-2-1', components), installed);
+
+    expect(prune({ qwen3_vl_encoder: gguf.key, qwen3_vl_vision_tower: tower.key })).toEqual({
+      qwen3_vl_encoder: gguf.key,
+      qwen3_vl_vision_tower: tower.key,
+    });
+    // Cleared encoder; replaced by one with no tower slot.
+    expect(prune({ qwen3_vl_vision_tower: tower.key })).toEqual({});
+    expect(prune({ qwen3_vl_encoder: checkpoint.key, qwen3_vl_vision_tower: tower.key })).toEqual({
+      qwen3_vl_encoder: checkpoint.key,
+    });
+    // An encoder that is no longer installed is the user's to see and clear first; keys of unknown slots stay.
+    expect(prune({ qwen3_vl_encoder: 'deleted', qwen3_vl_vision_tower: tower.key, unknown_slot: 'x' })).toEqual({
+      qwen3_vl_encoder: 'deleted',
+      qwen3_vl_vision_tower: tower.key,
+      unknown_slot: 'x',
+    });
+  });
+
   describe('the default VAE', () => {
     it('fills an empty VAE of a family with a VAE slot', () => {
       const model = createModel('flux', { default_settings: { vae: fluxVae.key }, format: 'checkpoint' });
@@ -3892,6 +3974,31 @@ describe("a main model's default components", () => {
         switchTo(createModel('moss-image', { default_settings: { vae: sdxlVae.key }, format: 'checkpoint' }), [sdxlVae])
           .settings.vae
       ).toBeNull();
+    });
+
+    it('replaces a VAE of another family, as left behind by a fallback from an unsupported model', () => {
+      const model = createModel('flux', { default_settings: { vae: fluxVae.key }, format: 'checkpoint' });
+      const stale = createSettings(createModel('sdxl'), { vae: sdxlVae });
+
+      expect(getModelDefaultFills(model, stale, [fluxVae, sdxlVae]).vae).toBe(fluxVae);
+    });
+
+    it('fills no VAE for a self-contained FLUX.1 SDNQ pipeline, whose graph decodes with its own', () => {
+      const pipeline = {
+        text_encoder: {},
+        text_encoder_2: {},
+        tokenizer: {},
+        tokenizer_2: {},
+        transformer: {},
+        vae: {},
+      };
+      const model = createModel('flux', {
+        default_settings: { vae: fluxVae.key },
+        format: 'sdnq_quantized',
+        submodels: pipeline,
+      } as never);
+
+      expect(switchTo(model, [fluxVae]).settings.vae).toBeNull();
     });
 
     it('fills the SD VAE picker, and leaves a VAE the user chose', () => {

@@ -1515,15 +1515,12 @@ export const buildImageRecallSettings = ({
 
     if (model) {
       const valuesWithModelDefaults = getSettingsWithModelDefaults(values, model);
-      // Components first: a default component source can bundle the VAE the default VAE then falls back to. The
-      // recorded components below override these.
-      const withComponents = {
+      // The recorded components below override these, and the default VAE is chosen after them.
+      values = {
         ...valuesWithModelDefaults,
         model,
         ...getModelDefaultComponents(model, valuesWithModelDefaults, models, { replace: true }),
       };
-      const vae = getRecallDefaultVae(resolveModelDefaultVae(model, withComponents, vaeModels));
-      values = { ...withComponents, ...(vae === undefined ? {} : { vae }) };
       fields.push('model');
     }
 
@@ -1541,6 +1538,13 @@ export const buildImageRecallSettings = ({
         values = { ...values, [setting]: component };
         fittingSettings.push(setting);
       }
+    }
+
+    if (model) {
+      // Judged beside the recorded components: a component source bundles the VAE the default VAE then falls back to,
+      // and an image that cleared that source has none.
+      const defaultVae = getRecallDefaultVae(resolveModelDefaultVae(model, values, vaeModels));
+      values = { ...values, ...(defaultVae === undefined ? {} : { vae: defaultVae }) };
     }
 
     const rebalancePatch = getMetadataKrea2Rebalance(metadata, values.model);

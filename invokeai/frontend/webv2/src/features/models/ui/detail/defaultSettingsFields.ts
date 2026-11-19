@@ -40,7 +40,7 @@ export type DefaultSettingsControl =
       modelTypes: readonly ModelTaxonomyType[];
       /**
        * Candidates are the VAEs Generate accepts for the edited model, which can be of another base. Until Generate's
-       * rules arrive, only VAEs of the model's own base are offered.
+       * rules arrive none is offered, though a stored one stays visible and clearable.
        */
       generateVaeRule: boolean;
       /** Placeholder shown for the backend's 'default' sentinel. */

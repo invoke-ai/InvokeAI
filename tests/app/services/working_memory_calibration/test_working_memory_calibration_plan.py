@@ -1018,3 +1018,43 @@ def test_the_service_tells_an_sdnq_quantized_vae_folder_where_the_loader_looks(t
 
     assert vaes.sdnq_quantized_vae(SimpleNamespace(path="flux-sdnq", submodels=None))
     assert not vaes.sdnq_quantized_vae(SimpleNamespace(path="flux-sdnq-plain", submodels=None))
+
+
+def _with_default_components(model: SimpleNamespace, **components: str) -> SimpleNamespace:
+    return SimpleNamespace(**{**vars(model), "default_settings": SimpleNamespace(vae=None, components=components)})
+
+
+def test_a_z_image_model_decodes_with_the_vae_of_its_default_component_source() -> None:
+    """Selecting the model fills its `component_source` slot (a Z-Image pipeline), whose own VAE the model loader node
+    then takes where no VAE is set: under `precision: float32` the pipeline's VAE loads in bf16 where a standalone FLUX
+    VAE stays fp32, and the case needs no VAE pick."""
+    gguf = _model("z-image-gguf", BaseModelType.ZImage, format="gguf_quantized")
+    pipeline = _model("z-image", BaseModelType.ZImage, format="diffusers")
+    flux_vae = _model("ae", BaseModelType.Flux, ModelType.VAE)
+    with_source = _with_default_components(gguf, component_source="z-image")
+
+    assert _lines_of(_plan(gguf, [pipeline, flux_vae], vae_dtypes=FP32_VAES)) == {("decode_fp32", ())}
+    assert _lines_of(_plan(with_source, [pipeline, flux_vae], vae_dtypes=FP32_VAES)) == {("decode_bf16", ())}
+    # A default VAE is set beside the source and wins, as the loader takes a picked VAE first.
+    with_vae = SimpleNamespace(
+        **{
+            **vars(with_source),
+            "default_settings": SimpleNamespace(vae="ae", components={"component_source": "z-image"}),
+        }
+    )
+    assert _lines_of(_plan(with_vae, [pipeline, flux_vae], vae_dtypes=FP32_VAES)) == {("decode_fp32", ())}
+    # A key that names no installed Z-Image pipeline leaves the model as it was.
+    assert _lines_of(
+        _plan(_with_default_components(gguf, component_source="missing"), [pipeline, flux_vae], vae_dtypes=FP32_VAES)
+    ) == {("decode_fp32", ())}
+
+
+def test_a_self_contained_z_image_pipeline_decodes_with_the_vae_of_its_default_component_source() -> None:
+    """The Z-Image loader takes a source's VAE over the self-contained pipeline's own, and the slot is offered for it."""
+    sdnq = _sdnq_pipeline("z-image-sdnq", BaseModelType.ZImage)
+    pipeline = _model("z-image", BaseModelType.ZImage, format="diffusers")
+
+    assert _lines_of(_plan(sdnq, [pipeline], vae_dtypes=FP32_VAES)) == {("decode_fp32", ())}
+    assert _lines_of(
+        _plan(_with_default_components(sdnq, component_source="z-image"), [pipeline], vae_dtypes=FP32_VAES)
+    ) == {("decode_bf16", ())}

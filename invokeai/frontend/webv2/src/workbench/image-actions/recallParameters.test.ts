@@ -53,7 +53,7 @@ const vaeModels = models.filter(isVaeModelConfig) as VaeModelConfig[];
 const image = (imageName: string) => ({ height: 512, image_name: imageName, width: 512 });
 
 const currentFor = (model: ComponentModelConfig, overrides: Record<string, unknown> = {}) => {
-  const values = getCurrentGenerateValues({ generateValues: { modelKey: model.key }, supportedModels });
+  const values = getCurrentGenerateValues({ generateValues: { modelKey: model.key }, models, supportedModels });
   if (!values) {
     throw new Error('fixture model is not a supported Generate model');
   }
@@ -64,6 +64,24 @@ const build = (currentValues: ReturnType<typeof currentFor>, parameters: Record<
   buildRecallParametersSettings({ currentValues, models, parameters, supportedModels, vaeModels });
 
 seedArchitectureCapabilities();
+
+describe('getCurrentGenerateValues', () => {
+  it("fills the first model's default components and VAE, as Generate does when it picks the first model", () => {
+    const t5 = makeModel('t5-default', 'any', 't5_encoder');
+    const withDefaults = makeModel('flux-with-defaults', 'flux', 'main', {
+      default_settings: { components: { t5_encoder: t5.key } },
+    });
+    const installed = [withDefaults, t5];
+    const initial = getCurrentGenerateValues({
+      generateValues: {},
+      models: installed,
+      supportedModels: installed.filter(isSupportedGenerateModel) as GenerateModelConfig[],
+    });
+
+    expect(initial?.model.key).toBe(withDefaults.key);
+    expect(initial?.t5EncoderModel?.key).toBe(t5.key);
+  });
+});
 
 describe('buildRecallParametersSettings', () => {
   it('applies prompts, seed, size and sampler parameters to the current values', () => {
@@ -543,6 +561,7 @@ describe('buildRecallParametersSettings', () => {
     const q21Supported = [qwen21].filter(isSupportedGenerateModel) as GenerateModelConfig[];
     const values = getCurrentGenerateValues({
       generateValues: { modelKey: qwen21.key },
+      models: q21Supported,
       supportedModels: q21Supported,
     });
 
@@ -575,6 +594,7 @@ describe('buildRecallParametersSettings', () => {
     const krea2Supported = [krea2].filter(isSupportedGenerateModel) as GenerateModelConfig[];
     const krea2Values = getCurrentGenerateValues({
       generateValues: { modelKey: krea2.key },
+      models: krea2Supported,
       supportedModels: krea2Supported,
     });
 
@@ -618,6 +638,7 @@ describe('buildRecallParametersSettings', () => {
     const krea2Supported = [krea2].filter(isSupportedGenerateModel) as GenerateModelConfig[];
     const krea2Values = getCurrentGenerateValues({
       generateValues: { modelKey: krea2.key },
+      models: krea2Supported,
       supportedModels: krea2Supported,
     });
 

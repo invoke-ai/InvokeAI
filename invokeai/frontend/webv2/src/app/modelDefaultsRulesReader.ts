@@ -1,5 +1,10 @@
 import type { ArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
-import type { DefaultComponentSlotReader, SchedulerPolicyReader, ModelDefaultsRulesState } from '@features/models';
+import type {
+  DefaultComponentPruner,
+  DefaultComponentSlotReader,
+  SchedulerPolicyReader,
+  ModelDefaultsRulesState,
+} from '@features/models';
 
 import {
   ensureArchitectureCapabilitiesLoaded,
@@ -12,6 +17,7 @@ import {
   isVaeCompatibleWithGenerateModel,
   getGenerationUiPolicy,
   getSchedulerOptions,
+  pruneClosedDefaultComponents,
 } from '@features/generation/settings';
 
 type GenerateMainModel = Parameters<typeof getDefaultGenerateSettings>[0] & { type: 'main' };
@@ -33,11 +39,18 @@ const readDefaultComponentSlots: DefaultComponentSlotReader = (model, components
     catalog
   );
 
+const readPrunedDefaultComponents: DefaultComponentPruner = (model, components, catalog) =>
+  pruneClosedDefaultComponents(
+    { ...model, default_settings: { components }, type: 'main' } as GenerateMainModel,
+    catalog
+  );
+
 const toPolicyState = (snapshot: ArchitectureCapabilitiesSnapshot): ModelDefaultsRulesState => {
   if (snapshot.status === 'loaded' && snapshot.revision > 0) {
     return {
       acceptsDefaultVae: (model, candidate) =>
         isVaeCompatibleWithGenerateModel({ ...model, type: 'main' } as GenerateMainModel, candidate as never),
+      pruneComponents: (model, components, catalog) => readPrunedDefaultComponents(model, components, catalog),
       read: (model, currentValue) => readSchedulerPolicy(model, currentValue),
       readComponentSlots: (model, components, catalog) => readDefaultComponentSlots(model, components, catalog),
       status: 'ready',
