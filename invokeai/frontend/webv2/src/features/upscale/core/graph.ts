@@ -110,10 +110,13 @@ const addUpscaleMetadata = (
   {
     frame,
     output,
+    vaeModel,
   }: {
     /** The image the pass encoded, which the result matches in size, so Recall restores the real one. */
     frame: BackendInvocationContract;
     output: BackendInvocationContract;
+    /** The VAE the pipeline loaded, which is not the widget's pick where the model bundles its own. */
+    vaeModel: UpscaleWidgetValues['vae'];
   },
   settings: UpscaleWidgetValues,
   randDevice: string
@@ -159,7 +162,7 @@ const addUpscaleMetadata = (
     },
     upscale_model: toModelIdentifier(settings.upscaleModel),
     upscale_scale: settings.scale,
-    vae: settings.vae ? toModelIdentifier(settings.vae) : undefined,
+    vae: vaeModel ? toModelIdentifier(vaeModel) : undefined,
   });
 
   addEdge(graph, graph.nodes.positive_prompt, 'value', metadata, 'positive_prompt');
@@ -415,7 +418,7 @@ export const compileUpscaleGraph = (
     height: upscaleDenoiseDimension(inputImage.height, settings.scale, grid),
     width: upscaleDenoiseDimension(inputImage.width, settings.scale, grid),
   };
-  const { denoise, graph, latents, output } = buildImageToImagePipeline({
+  const { denoise, graph, latents, output, vaeModel } = buildImageToImagePipeline({
     denoiseSize,
     denoisingStart: getUpscaleEntry(model, denoiseSize, settings),
     model,
@@ -461,7 +464,7 @@ export const compileUpscaleGraph = (
   if (architecture.tileControlNet) {
     addTileControl(graph, settings, architecture.tileControlNet.kind, { denoise, frame });
   }
-  addUpscaleMetadata(graph, { frame, output }, settings, randDevice);
+  addUpscaleMetadata(graph, { frame, output, vaeModel }, settings, randDevice);
 
   return {
     backendGraph: graph,

@@ -1,5 +1,5 @@
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
-import type { GenerateSettings, MainModelConfig } from '@features/generation/core/types';
+import type { GenerateSettings, MainModelConfig, VaeModelConfig } from '@features/generation/core/types';
 
 /** A node output that feeds an input: the node and its output field. */
 export interface GraphOutput {
@@ -113,4 +113,6 @@ export interface FamilyPipelineInput {
 export interface FamilyPipeline extends FamilyGraph {
   /** The decode node, `input.output.id`. */
   output: BackendInvocationContract;
+  /** The VAE the graph loads over the main model's own; null where it decodes with the model's bundled VAE. */
+  vaeModel: VaeModelConfig | null;
 }

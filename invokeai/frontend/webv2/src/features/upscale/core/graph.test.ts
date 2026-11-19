@@ -493,6 +493,23 @@ describe("the family pipeline Upscale runs Generation's way", () => {
     expect(nodes.core_metadata?.[metadataKey]).toMatchObject({ key });
   });
 
+  it('records the VAE the loader used, not one a self-contained SDNQ FLUX.1 ignores', () => {
+    const values = createFluxValues();
+    const submodels = Object.fromEntries(
+      ['transformer', 'vae', 'text_encoder', 'tokenizer', 'text_encoder_2', 'tokenizer_2'].map((name) => [name, {}])
+    );
+    const sdnq = { ...values.model, format: 'sdnq_quantized', submodels } as UpscaleWidgetValues['model'];
+    const separate = compileUpscaleGraph(values, 'gallery', { useCpuNoise: true }).backendGraph.nodes;
+    const bundled = compileUpscaleGraph({ ...values, model: sdnq }, 'gallery', { useCpuNoise: true }).backendGraph
+      .nodes;
+
+    expect(values.vae).toMatchObject({ key: 'fluxvae' });
+    expect(separate.model_loader?.vae_model).toMatchObject({ key: 'fluxvae' });
+    expect(separate.core_metadata?.vae).toMatchObject({ key: 'fluxvae' });
+    expect(bundled.model_loader?.vae_model).toBeUndefined();
+    expect(bundled.core_metadata?.vae).toBeUndefined();
+  });
+
   it('keeps an encoder the architecture does not read out of the graph and its metadata', () => {
     // A T5 picked while FLUX was selected stays in the widget for when FLUX comes back.
     const staleT5 = { base: 'any', key: 'stale-t5', name: 'stale-t5', type: 't5_encoder' } as never;

@@ -707,6 +707,7 @@ const buildSdPipeline = (input: FamilyPipelineInput, extras: SdPipelineExtras = 
     },
     layoutPrompt: null,
     output,
+    vaeModel: vaeOverride,
   };
 };
 
@@ -938,7 +939,7 @@ const buildFluxPipeline = (input: FamilyPipelineInput, extras: PipelineExtras = 
   addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
-    components: { clipEmbedModel, t5EncoderModel, vaeModel },
+    components: { clipEmbedModel, t5EncoderModel },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -952,6 +953,7 @@ const buildFluxPipeline = (input: FamilyPipelineInput, extras: PipelineExtras = 
     latents: { encodeType: 'flux_vae_encode', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
     output,
+    vaeModel,
   };
 };
 
@@ -961,7 +963,7 @@ const buildFluxGraph: GenerateGraphBuilder = (settings, model, outputIsIntermedi
     toGeneratePipelineInput(settings, model, outputIsIntermediate, projectSettings, getDenoiseSize(settings, model)),
     { decode: getGenerateDecode(settings, model, outputIsIntermediate), denoiseFields: dype }
   );
-  const { components, denoise, graph, output } = pipeline;
+  const { components, denoise, graph, output, vaeModel } = pipeline;
 
   // Generation validation has checked that the enabled Kontext references belong to this model.
   addFluxKontextReferenceImages(graph, settings, denoise, 'flux_kontext_reference_image');
@@ -975,7 +977,7 @@ const buildFluxGraph: GenerateGraphBuilder = (settings, model, outputIsIntermedi
     dype_preset: settings.fluxDypePreset,
     scheduler: coerceSchedulerForGraph(model, settings.scheduler),
     t5_encoder: components.t5EncoderModel ?? undefined,
-    vae: components.vaeModel ?? undefined,
+    vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
   addReferenceImageMetadata(graph, output, settings);
@@ -1081,7 +1083,7 @@ const buildFlux2Pipeline = (input: FamilyPipelineInput, extras: PipelineExtras =
   addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
-    components: { mistralEncoderModel, qwen3EncoderModel, sourceModel, vaeModel },
+    components: { mistralEncoderModel, qwen3EncoderModel, sourceModel },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -1095,6 +1097,7 @@ const buildFlux2Pipeline = (input: FamilyPipelineInput, extras: PipelineExtras =
     latents: { encodeType: FLUX2_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
     output,
+    vaeModel,
   };
 };
 
@@ -1103,7 +1106,7 @@ const buildFlux2Graph: GenerateGraphBuilder = (settings, model, outputIsIntermed
     toGeneratePipelineInput(settings, model, outputIsIntermediate, projectSettings, getDenoiseSize(settings, model)),
     { decode: getGenerateDecode(settings, model, outputIsIntermediate) }
   );
-  const { components, denoise, graph, output } = pipeline;
+  const { components, denoise, graph, output, vaeModel } = pipeline;
 
   addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
   addMetadata(graph, output, settings, model, 'flux2_txt2img', projectSettings, {
@@ -1111,7 +1114,7 @@ const buildFlux2Graph: GenerateGraphBuilder = (settings, model, outputIsIntermed
       ? { mistral_encoder: components.mistralEncoderModel ?? undefined }
       : { qwen3_encoder: components.qwen3EncoderModel ?? undefined, qwen3_source: components.sourceModel }),
     scheduler: coerceSchedulerForGraph(model, settings.scheduler),
-    vae: components.vaeModel ?? undefined,
+    vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
   addReferenceImageMetadata(graph, output, settings);
@@ -1314,7 +1317,7 @@ const buildQwenImagePipeline = (input: FamilyPipelineInput, extras: QwenImagePip
   addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
-    components: { sourceModel, vaeModel },
+    components: { sourceModel },
     conditioning: null,
     denoise,
     denoiseSize: input.denoiseSize,
@@ -1323,6 +1326,7 @@ const buildQwenImagePipeline = (input: FamilyPipelineInput, extras: QwenImagePip
     layoutPrompt: null,
     output,
     positiveEncoder: posCond,
+    vaeModel,
   };
 };
 
@@ -1338,7 +1342,7 @@ const buildQwenImageGraph: GenerateGraphBuilder = (settings, model, outputIsInte
         settings.qwenImageEncoderQuantization === 'none' ? {} : { quantization: settings.qwenImageEncoderQuantization },
     }
   );
-  const { components, denoise, graph, output, positiveEncoder: posCond } = pipeline;
+  const { components, denoise, graph, output, positiveEncoder: posCond, vaeModel } = pipeline;
   // The VAE the graph decodes with, which encodes the edit reference too.
   const vae = pipeline.latents.vae;
   const qwenReferenceImages =
@@ -1389,7 +1393,7 @@ const buildQwenImageGraph: GenerateGraphBuilder = (settings, model, outputIsInte
     qwen_image_quantization: settings.qwenImageEncoderQuantization,
     qwen_image_qwen_vl_encoder: settings.qwenVLEncoderModel ?? undefined,
     qwen_image_shift: settings.qwenImageShift ?? 'auto',
-    qwen_image_vae: components.vaeModel ?? undefined,
+    qwen_image_vae: vaeModel ?? undefined,
     scheduler: undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
@@ -1476,7 +1480,7 @@ const buildZImagePipeline = (input: FamilyPipelineInput, extras: ConditionedPipe
   addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
-    components: { qwen3EncoderModel, sourceModel, vaeModel },
+    components: { qwen3EncoderModel, sourceModel },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -1490,6 +1494,7 @@ const buildZImagePipeline = (input: FamilyPipelineInput, extras: ConditionedPipe
     latents: { encodeType: 'z_image_i2l', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
     output,
+    vaeModel,
   };
 };
 
@@ -1519,13 +1524,13 @@ const buildZImageGraph: GenerateGraphBuilder = (settings, model, outputIsInterme
           : undefined,
     }
   );
-  const { components, graph, output } = pipeline;
+  const { components, graph, output, vaeModel } = pipeline;
 
   addMetadata(graph, output, settings, model, 'z_image_txt2img', projectSettings, {
     qwen3_encoder: components.qwen3EncoderModel ?? undefined,
     qwen3_source: components.sourceModel,
     scheduler: coerceSchedulerForGraph(model, settings.scheduler),
-    vae: components.vaeModel ?? undefined,
+    vae: vaeModel ?? undefined,
     z_image_seed_variance_enabled: settings.zImageSeedVarianceEnabled,
     z_image_seed_variance_randomize_percent: settings.zImageSeedVarianceRandomizePercent,
     z_image_seed_variance_strength: settings.zImageSeedVarianceStrength,
@@ -1610,7 +1615,7 @@ const buildAnimaPipeline = (input: FamilyPipelineInput) => {
   addEdge(graph, denoise, 'latents', output, 'latents');
 
   return {
-    components: { qwen35EncoderModel, qwen3EncoderModel, vaeModel },
+    components: { qwen35EncoderModel, qwen3EncoderModel },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -1624,6 +1629,7 @@ const buildAnimaPipeline = (input: FamilyPipelineInput) => {
     latents: { encodeType: 'anima_i2l', vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
     output,
+    vaeModel,
   };
 };
 
@@ -1634,14 +1640,14 @@ const buildAnimaGraph: GenerateGraphBuilder = (settings, model, outputIsIntermed
       width: settings.width,
     })
   );
-  const { components, denoise, graph, output } = pipeline;
+  const { components, denoise, graph, output, vaeModel } = pipeline;
   const ipAdapterCollector = addIPAdapterReferenceImages(graph, settings, model, denoise);
 
   addMetadata(graph, output, settings, model, 'anima_txt2img', projectSettings, {
     qwen3_encoder: components.qwen3EncoderModel,
     ...(components.qwen35EncoderModel ? { qwen3_5_encoder: components.qwen35EncoderModel } : {}),
     scheduler: coerceSchedulerForGraph(model, settings.scheduler),
-    vae: components.vaeModel,
+    vae: vaeModel,
   });
   addReferenceImageMetadata(graph, output, settings);
 
@@ -1782,7 +1788,7 @@ const buildKrea2Pipeline = (input: FamilyPipelineInput, extras: Krea2PipelineExt
   addEdge(graph, denoise, 'latents', output, 'latents');
 
   return {
-    components: { loadsLoras: activeLoras.length > 0, qwen3VlEncoderModel, qwen3VlVisionTowerModel, vaeModel },
+    components: { loadsLoras: activeLoras.length > 0, qwen3VlEncoderModel, qwen3VlVisionTowerModel },
     conditioning: {
       fluxReduxCollector: null,
       ipAdapterCollector: null,
@@ -1796,6 +1802,7 @@ const buildKrea2Pipeline = (input: FamilyPipelineInput, extras: Krea2PipelineExt
     latents: { encodeType: QWEN_IMAGE_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null,
     output,
+    vaeModel,
   };
 };
 
@@ -1811,7 +1818,7 @@ const buildKrea2Graph: GenerateGraphBuilder = (settings, model, outputIsIntermed
       visionTower: settings.qwen3VLVisionTowerModel,
     }
   );
-  const { components, conditioning, denoise, graph, output } = pipeline;
+  const { components, conditioning, denoise, graph, output, vaeModel } = pipeline;
   // The VAE the graph decodes with, which encodes the references too.
   const vaeSource = pipeline.latents.vae.node;
   // Validation keeps edit and style references apart; the denoise refuses the two together.
@@ -1865,7 +1872,7 @@ const buildKrea2Graph: GenerateGraphBuilder = (settings, model, outputIsIntermed
     ...(referenceKvCache === undefined ? {} : { krea2_reference_kv_cache: referenceKvCache }),
     qwen3_vl_encoder: components.qwen3VlEncoderModel ?? undefined,
     qwen3_vl_vision_tower: components.qwen3VlVisionTowerModel ?? undefined,
-    vae: components.vaeModel ?? undefined,
+    vae: vaeModel ?? undefined,
   });
   addReferenceImageMetadata(graph, output, settings);
 
@@ -2093,7 +2100,7 @@ const buildMossImagePipeline = (input: FamilyPipelineInput, extras: MossImagePip
   addEdge(graph, seed, 'value', denoise, 'seed');
 
   return {
-    components: { qwen35EncoderModel, vaeModel },
+    components: { qwen35EncoderModel },
     conditioning: null,
     denoise,
     denoiseSize: input.denoiseSize,
@@ -2101,6 +2108,7 @@ const buildMossImagePipeline = (input: FamilyPipelineInput, extras: MossImagePip
     latents: { encodeType: FLUX2_ENCODE_TYPE, vae: { field: 'vae', node: modelLoader } },
     layoutPrompt: null as BackendInvocationContract | null,
     output,
+    vaeModel,
   };
 };
 
@@ -2129,12 +2137,12 @@ const buildMossImageGraph: GenerateGraphBuilder = (settings, model, outputIsInte
       },
     }
   );
-  const { components, graph, output } = pipeline;
+  const { components, graph, output, vaeModel } = pipeline;
 
   addMetadata(graph, output, settings, model, 'moss_image_txt2img', projectSettings, {
     moss_image_uncond_skip_layers: [...settings.mossImageUncondSkipLayers],
     qwen3_5_encoder: components.qwen35EncoderModel ?? undefined,
-    vae: components.vaeModel ?? undefined,
+    vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
   const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
