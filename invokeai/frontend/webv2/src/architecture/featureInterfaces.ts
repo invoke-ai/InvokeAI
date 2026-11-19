@@ -36,10 +36,16 @@ export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[
   ],
   identity: ['launchpad'],
   intermediates: ['holdLease', 'settingsContribution'],
-  models: ['launchpad', 'react'],
+  models: ['architectures', 'architecturesStore', 'launchpad', 'react'],
   nodes: [],
   queue: ['contracts', 'devices', 'launchpad', 'menu', 'queries', 'react', 'reveal', 'utility', 'widget'],
   upscale: ['sourceMetadata', 'widget'],
   video: ['widget'],
   workflow: ['contracts', 'generators', 'graph', 'paletteSearch', 'preview', 'queries', 'react', 'utility', 'widget'],
 };
+
+/**
+ * Public entries that pure cores may import. Each may reach only its own feature's `core/`, so a later re-export cannot
+ * pull data, transport, UI or React into the cores that read it.
+ */
+export const PURE_FEATURE_ENTRIES: readonly string[] = ['features/models/architectures'];

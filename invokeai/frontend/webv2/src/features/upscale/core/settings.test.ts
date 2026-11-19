@@ -1,12 +1,12 @@
 import type { GenerateLora, VaeModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 
-import { resetArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
+import { getSchedulerOptions } from '@features/generation/settings';
+import { resetArchitectureCapabilities } from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
-import { getSchedulerOptions } from '@features/generation/settings';
+} from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import {

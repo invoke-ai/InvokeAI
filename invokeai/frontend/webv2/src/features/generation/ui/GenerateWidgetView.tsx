@@ -6,8 +6,8 @@ import {
   isGenerateModelSelectable,
 } from '@features/generation/core/baseGenerationPolicies';
 import { isLoraModelConfig, normalizeGenerateSettings } from '@features/generation/core/settings';
-import { useArchitectureCapabilitiesSelector } from '@features/generation/data/architectureCapabilitiesStore';
 import { resolveGenerateWidgetValues } from '@features/generation/settings';
+import { useArchitectureCapabilitiesSelector } from '@features/models/architecturesStore';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

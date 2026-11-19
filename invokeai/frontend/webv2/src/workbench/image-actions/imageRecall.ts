@@ -25,7 +25,6 @@ import {
   getGenerationUiPolicy,
   isComponentCompatibleWithModel,
   getSettingsWithModelDefaults,
-  hasArchitectureCapabilities,
   isKnownScheduler,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
@@ -65,6 +64,7 @@ import {
   getRecallDefaultVae,
   resolveModelDefaultVae,
 } from '@features/generation/settings';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 import { SEED_MAX } from '@platform/core/seed';
 
 import { resolveRecordedModel, toRecordedModelRef, type RecordedModelPolicy } from './recordedModel';

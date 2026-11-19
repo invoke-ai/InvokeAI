@@ -7,9 +7,9 @@ import type {
 } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { flushGenerateDrafts } from '@features/generation/react';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

@@ -1,7 +1,4 @@
-import {
-  getArchitectureFeatures,
-  hasArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+import { getArchitectureFeatures, hasArchitectureCapabilities } from '@features/models/architectures';
 
 /** Every adapter kind a control layer can carry, in the order pickers list them. */
 export const CONTROL_ADAPTER_KINDS = [

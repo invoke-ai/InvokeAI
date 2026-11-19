@@ -8,7 +8,7 @@ import type {
   RegionalGuidanceReferenceImageAsset,
 } from '@workbench/canvas-engine/contracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { createInstance } from 'i18next';
 import { describe, expect, it } from 'vitest';
 

@@ -1,8 +1,9 @@
 import type { ModelRole } from '@features/models';
 
+import { architectureAcceptsVae } from '@features/models/architectures';
+
 import type { ComponentModelConfig, GenerateModelConfig, VaeModelConfig } from './types';
 
-import { getArchitectureCapabilityRow } from './architectureCapabilities';
 import { isAnimaInpaintAdapterModel } from './canvas/controlValidation';
 
 export type GenerateComponentCandidate = {
@@ -230,31 +231,9 @@ export const getCompatibleDiffusersComponentSource = <T extends GenerateComponen
 ): T | undefined =>
   source && isCompatibleDiffusersComponentSourceForModel(selectedModel, source) ? source : undefined;
 
-/** Backend rows own VAE compatibility; missing rows fail closed. */
-const acceptsVae = (base: string, model: GenerateComponentCandidate, variant?: unknown): boolean => {
-  if (model.type !== 'vae') {
-    return false;
-  }
-
-  // With the variant: Wan A14B and TI2V-5B decode with different VAEs, and only the variant row says so.
-  const row = getArchitectureCapabilityRow(base, variant);
-
-  if (!row) {
-    return false;
-  }
-
-  // A null `vae` block is the backend saying "its own base, no constraints" — what `accepts_vae` answers for an
-  // architecture that declares no facet. It is a declaration, not a missing one.
-  if (!row.vae) {
-    return model.base === base;
-  }
-
-  return row.vae.accepted.some(
-    (accepted) =>
-      accepted.base === model.base &&
-      (accepted.latent_channels === null || model.latent_channels === accepted.latent_channels)
-  );
-};
+/** Backend rows own VAE compatibility; missing rows fail closed. Related Models' VAE links ask the same question. */
+const acceptsVae = (base: string, model: GenerateComponentCandidate, variant?: unknown): boolean =>
+  model.type === 'vae' && architectureAcceptsVae({ base, variant }, model);
 
 export const isVaeAcceptedByBase =
   (base: string, variant?: unknown): GenerateComponentFilter =>
