@@ -33,7 +33,11 @@ const preferences = vi.hoisted(() => ({ controlModelMemory: {} as Record<string,
 
 /** A route reason as text: Generate issues carry their English beside the locale key. */
 const reasonText = (reason: InvocationValidationReason) =>
-  typeof reason === 'object' && 'generationIssue' in reason ? reason.generationIssue.message : reason;
+  typeof reason === 'object' && 'generationIssue' in reason
+    ? reason.generationIssue.message
+    : typeof reason === 'object' && 'canvasInputIssue' in reason
+      ? describeCanvasInputIssue((key) => key, reason.canvasInputIssue)
+      : reason;
 
 vi.mock('./settings/store', async (importOriginal) => {
   const actual = await importOriginal<typeof settingsStoreModule>();
@@ -48,6 +52,7 @@ vi.mock('./settings/store', async (importOriginal) => {
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 
+import { describeCanvasInputIssue } from './canvasGenerationInputs';
 import {
   areInvocationRouteInputsEqual,
   getInvocationRouteInput,
@@ -59,7 +64,7 @@ import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.
 import { createWorkbenchStore } from './workbenchStore';
 
 // Production words rejections from the locale; tests only need the structured rejection to reach the notice.
-const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+const formatCanvasInvocationFailure = () => ({ message: 'canvas failure', title: 'canvas failure' });
 const formatUpscaleMetadataFailure = (name: string) => `metadataFailed: ${name}`;
 
 const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
@@ -270,7 +275,7 @@ describe('resolveInvocationRoute — canvas source', () => {
         canvasInputFor({ generateValues: createGenerateValues(textOnly), rasterInFrame: true }),
         'global',
         canvasRoute
-      ).validationReasons
+      ).validationReasons.map(reasonText)
     ).toEqual([
       'Unknown External Provider cannot use image content in the generation frame. Hide or move raster content out of the frame to generate.',
     ]);
@@ -301,8 +306,9 @@ describe('resolveInvocationRoute — canvas source', () => {
     expect(route.sourceValid).toBe(false);
     // Kept structured so the shell words it from the locale.
     expect(route.validationReasons).toContainEqual({
-      controlLayerIssue: {
+      canvasInputIssue: {
         code: 'no_control_models',
+        kind: 'control_layer',
         layerId: expect.any(String),
         layerName: 'Control Layer 1',
       },
@@ -372,7 +378,7 @@ describe('resolveInvocationRoute — canvas source', () => {
         { ...inputFor(model, overrides, layers), mountedWidgetIds: ['canvas', 'generate'] as WidgetId[] },
         'global',
         canvasRoute
-      ).validationReasons;
+      ).validationReasons.map(reasonText);
     const blankPromptReason = (label: string) =>
       `${label} needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.`;
 
@@ -446,7 +452,7 @@ describe('submitResolvedInvocation', () => {
 
     submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: undefined,
@@ -482,7 +488,7 @@ describe('submitResolvedInvocation', () => {
 
     const submission = submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: undefined,
@@ -517,7 +523,7 @@ describe('submitResolvedInvocation', () => {
 
     submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: undefined,
@@ -544,7 +550,7 @@ describe('submitResolvedInvocation', () => {
 
     submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: undefined,
@@ -568,7 +574,7 @@ describe('submitResolvedInvocation', () => {
 
       submitResolvedInvocation({
         commands: store.commands,
-        formatControlLayerError,
+        formatCanvasInvocationFailure,
         formatUpscaleMetadataFailure,
         scopedDefaults: {},
         models: undefined,
@@ -609,7 +615,7 @@ describe('submitResolvedInvocation', () => {
     accountLifecycle.invalidate();
     submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: undefined,

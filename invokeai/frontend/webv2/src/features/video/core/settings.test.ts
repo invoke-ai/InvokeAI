@@ -49,6 +49,32 @@ const createSettings = (overrides: Partial<VideoSettings> = {}): VideoSettings =
   ...overrides,
 });
 
+describe('H3 task override normalization', () => {
+  it.each([undefined, 'fl2va', 'ref2va'] as const)(
+    'preserves explicit intent %s without rewriting the catalog model',
+    (h3TaskOverride) => {
+      const model = {
+        base: 'minimax-h3',
+        format: 'checkpoint',
+        type: 'main' as const,
+        key: 'h3',
+        name: 'H3',
+        variant: 'fl2va',
+      };
+      const values = { ...createSettings({ h3TaskOverride }), model };
+      expect(isVideoSettings(values)).toBe(true);
+      expect(normalizeVideoWidgetValues(values)).toMatchObject({ model, h3TaskOverride });
+      expect(normalizeVideoWidgetValues(values)?.model).toBe(model);
+    }
+  );
+
+  it('rejects invalid overrides as canonical and normalizes them to Detected', () => {
+    const values = { ...createSettings(), h3TaskOverride: 'unknown' };
+    expect(isVideoSettings(values)).toBe(false);
+    expect(normalizeVideoSettings(values)?.h3TaskOverride).toBeUndefined();
+  });
+});
+
 describe('resolveVideoMode', () => {
   it('infers the mode from which inputs are filled', () => {
     expect(resolveVideoMode(createSettings())).toBe('txt2vid');

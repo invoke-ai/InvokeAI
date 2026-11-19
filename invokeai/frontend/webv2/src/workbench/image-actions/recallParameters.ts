@@ -13,15 +13,14 @@ import type {
 import type { TFunction } from 'i18next';
 
 import {
+  addReferenceImages,
   cloneGenerateWidgetValues,
   createReferenceImageId,
   DEFAULT_LORA_WEIGHT_CONFIG,
-  getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getDefaultLoraWeight,
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
-  getReferenceImageLimit,
   getSettingsWithModelDefaults,
   hasArchitectureCapabilities,
   isLoraCompatibleWithModel,
@@ -29,7 +28,6 @@ import {
   isMainModelConfig,
   isRefinerModel,
   isRefinerSupported,
-  takesReferenceImages,
   isVaeCompatibleWithGenerateModel,
   MAX_REFINER_AESTHETIC_SCORE,
   MAX_REFINER_START,
@@ -39,7 +37,6 @@ import {
   MIN_REFINER_STEPS,
   getRecallDefaultVae,
   resolveModelDefaultVae,
-  withAddedReferenceImages,
 } from '@features/generation/settings';
 
 import {
@@ -601,10 +598,18 @@ export const buildRecallParametersSettings = ({
       recalledImages.push(image);
     }
 
-    // The base alone decides: an encoder without a vision tower is flagged by validation, not recalled away.
-    const isSupported = takesReferenceImages(values.model);
+    // Typed as one set, so a multi-image Krea-2 recall is an edit set.
+    const placed = addReferenceImages({
+      additions: recalledImages.map((image) => ({ id: createReferenceImageId(), image })),
+      mode: 'keep',
+      model: values.model,
+      models,
+      recalled,
+      referenceImages: append ? values.referenceImages : [],
+    });
+    const recalledCount = placed.refusal ? 0 : recalled.length + recalledImages.length;
 
-    if (recalled.length + recalledImages.length > 0 && !isSupported) {
+    if (placed.refusal && recalled.length + recalledImages.length > 0) {
       if (ipAdapters?.length) {
         skip('ip_adapters', 'incompatible', values.model.name);
       }
@@ -613,32 +618,12 @@ export const buildRecallParametersSettings = ({
       }
     }
 
-    const kept = append ? values.referenceImages : [];
-    // Adapters recorded for another family are re-targeted beside the list they join; the images are then added as any
-    // new reference is, typed beside both, so a Krea-2 recall of several images is an edit set.
-    const withAdapters = isSupported
-      ? getCompatibleReferenceImages([...kept, ...recalled], values.model, models)
-      : kept;
-    const addedImages = isSupported ? recalledImages : [];
-    const recalledCount = withAdapters.length + addedImages.length - kept.length;
-    const limit = getReferenceImageLimit(values.model);
-
-    if (withAdapters.length + addedImages.length > limit) {
-      skip('reference_images', 'limit', String(limit));
+    if (placed.dropped > 0) {
+      skip('reference_images', 'limit', String(placed.limit));
     }
 
-    // Images past the limit are cut before they are added, so one that never lands cannot turn a style card to Edit.
-    const next = withAddedReferenceImages(
-      values.model,
-      models,
-      withAdapters,
-      addedImages
-        .slice(0, Math.max(0, limit - withAdapters.length))
-        .map((image) => ({ id: createReferenceImageId(), image }))
-    ).slice(0, limit);
-
     if (!append || recalledCount > 0) {
-      values = { ...values, referenceImages: next };
+      values = { ...values, referenceImages: placed.referenceImages };
       fields.add('referenceImages');
     }
   }

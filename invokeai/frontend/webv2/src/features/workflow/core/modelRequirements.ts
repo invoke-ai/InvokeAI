@@ -1,3 +1,5 @@
+import type { ModelRole } from '@features/models';
+
 import type {
   FieldInputTemplate,
   InvocationTemplate,
@@ -352,6 +354,7 @@ export interface InstalledModelSummary {
   name: string;
   base: string;
   type: string;
+  roles?: readonly ModelRole[];
 }
 
 export interface StarterCatalogEntry {
@@ -410,14 +413,16 @@ const findInstalledForExact = (
   return null;
 };
 
+/** A model fills a slot of `modelType` through its primary type or any role (null = any type). */
+const servesType = (model: InstalledModelSummary, modelType: string | null): boolean =>
+  modelType === null || model.type === modelType || (model.roles ?? []).some((role) => role.type === modelType);
+
 const findInstalledForSlot = (
   base: string | null,
   modelType: string | null,
   installedModels: readonly InstalledModelSummary[]
 ): InstalledModelSummary | null =>
-  installedModels.find(
-    (model) => (base === null || model.base === base) && (modelType === null || model.type === modelType)
-  ) ?? null;
+  installedModels.find((model) => (base === null || model.base === base) && servesType(model, modelType)) ?? null;
 
 const matchesStarterName = (starter: StarterCatalogEntry, name: string): boolean => {
   const target = name.toLowerCase();

@@ -19,6 +19,7 @@ import type {
 } from './types';
 
 import {
+  addReferenceImages,
   coerceSchedulerForGraph,
   getComponentPolicyContext,
   getComponentSectionPolicy,
@@ -30,7 +31,7 @@ import {
   getGenerationValidationIssues,
   getGenerationValidationReasons,
   getCompatibleReferenceImages,
-  getMaxReferenceImages,
+  getReferenceImageRoom,
   getReferenceImageUnavailableReason,
   getPromptPolicy,
   getSchedulerOptions,
@@ -41,7 +42,8 @@ import {
   isLossyModelSwitch,
   isModelFromRepo,
   isSupportedGenerateModel,
-  withAddedReferenceImages,
+  type NewReferenceImage,
+  type ReferenceVisionComponents,
 } from './baseGenerationPolicies';
 import { getGenerationIssueFixPatch } from './generationIssues';
 import { SUPPORTED_GENERATE_BASES } from './supportedBases';
@@ -125,6 +127,13 @@ const externalModel: GenerateModelConfig = {
   provider_id: 'openai',
   type: 'external_image_generator',
 };
+
+const addTo = (
+  model: GenerateModelConfig,
+  models: readonly ComponentModelConfig[],
+  referenceImages: GenerateReferenceImage[],
+  additions: readonly NewReferenceImage[]
+) => addReferenceImages({ additions, components: {}, mode: 'strict', model, models, referenceImages }).referenceImages;
 
 seedArchitectureCapabilities();
 
@@ -922,7 +931,7 @@ describe('component policies', () => {
       getGenerationValidationReasons(model, createSettings(model, overrides));
     it('types a new Krea-2 reference as style only when it is the one running reference', () => {
       const typesAfterAdding = (count: number, referenceImages: GenerateSettings['referenceImages'] = []) =>
-        withAddedReferenceImages(
+        addTo(
           krea2,
           [],
           referenceImages,
@@ -994,7 +1003,7 @@ describe('component policies', () => {
       expect(isReferenceImageSupported(checkpoint, encoder('checkpoint'))).toBe(true);
       expect(isReferenceImageSupported(gguf, encoder('checkpoint'))).toBe(true);
       expect(isReferenceImageSupported(checkpoint, encoder('qwen3_vl_encoder'))).toBe(true);
-      expect(getMaxReferenceImages(checkpoint, encoder('checkpoint'))).toBe(4);
+      expect(getReferenceImageRoom(checkpoint, encoder('checkpoint'), []).limit).toBe(4);
       expect(getReferenceImageUnavailableReason(checkpoint, encoder('checkpoint'))).toBeNull();
     });
 
@@ -1013,19 +1022,24 @@ describe('component policies', () => {
   });
 
   it('derives the reference image limit from external provider capabilities', () => {
-    expect(getMaxReferenceImages(createModel('sdxl'))).toBe(5);
-    expect(getMaxReferenceImages(createModel('cogview4'))).toBe(0);
+    expect(getReferenceImageRoom(createModel('sdxl'), {}, []).limit).toBe(5);
+    expect(getReferenceImageRoom(createModel('cogview4'), {}, []).limit).toBe(0);
     expect(
-      getMaxReferenceImages({
-        ...externalModel,
-        capabilities: { ...externalModel.capabilities, max_reference_images: 14, supports_reference_images: true },
-      })
+      getReferenceImageRoom(
+        {
+          ...externalModel,
+          capabilities: { ...externalModel.capabilities, max_reference_images: 14, supports_reference_images: true },
+        },
+        {},
+        []
+      ).limit
     ).toBe(14);
     expect(
-      getMaxReferenceImages({
-        ...externalModel,
-        capabilities: { ...externalModel.capabilities, supports_reference_images: true },
-      })
+      getReferenceImageRoom(
+        { ...externalModel, capabilities: { ...externalModel.capabilities, supports_reference_images: true } },
+        {},
+        []
+      ).limit
     ).toBe(5);
   });
 
@@ -1072,6 +1086,133 @@ describe('component policies', () => {
     ).toContain(
       'Reference image 1 uses "SD 1 IP Adapter", which is not installed. Turn it off, or choose another model for it.'
     );
+  });
+});
+
+describe('adding reference images', () => {
+  const sdxl = createModel('sdxl');
+  const krea2 = createModel('krea-2', { format: 'diffusers' });
+  const qwen21 = createModel('qwen-image-2-1', { format: 'checkpoint' });
+  const images = (...ids: string[]): NewReferenceImage[] => ids.map((id) => ({ id, image: referenceImage }));
+  const adapter = (id: string, model: ComponentModelConfig = sdxlIpAdapter): GenerateReferenceImage => ({
+    config: {
+      beginEndStepPct: [0, 1],
+      clipVisionModel: 'ViT-H',
+      image: referenceImage,
+      method: 'full',
+      model,
+      type: 'ip_adapter',
+      weight: 1,
+    },
+    id,
+    isEnabled: true,
+  });
+  const style = (id: string): GenerateReferenceImage => ({
+    config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' },
+    id,
+    isEnabled: true,
+  });
+  const edit = (id: string, isEnabled = true): GenerateReferenceImage => ({
+    config: { image: referenceImage, type: 'krea2_edit_reference_image' },
+    id,
+    isEnabled,
+  });
+  const strict = (
+    model: GenerateModelConfig,
+    referenceImages: GenerateReferenceImage[],
+    additions: NewReferenceImage[],
+    components: ReferenceVisionComponents = {}
+  ) => addReferenceImages({ additions, components, mode: 'strict', model, models: [sdxlIpAdapter], referenceImages });
+  const keep = (
+    model: GenerateModelConfig,
+    referenceImages: GenerateReferenceImage[],
+    additions: NewReferenceImage[],
+    recalled: GenerateReferenceImage[] = []
+  ) => addReferenceImages({ additions, mode: 'keep', model, models: [sdxlIpAdapter], recalled, referenceImages });
+
+  it('places a user add in the free slots, or refuses it with a reason and leaves the list as it was', () => {
+    const four = ['a', 'b', 'c', 'd'].map((id) => adapter(id));
+    const partly = strict(sdxl, four, images('x', 'y', 'z'));
+
+    expect(partly).toMatchObject({ added: 1, dropped: 2, limit: 5, refusal: null });
+    expect(partly.referenceImages.map(({ id }) => id)).toEqual(['a', 'b', 'c', 'd', 'x']);
+
+    const full = [...four, adapter('e')];
+
+    expect(strict(sdxl, full, images('x'))).toEqual({
+      added: 0,
+      dropped: 1,
+      limit: 5,
+      referenceImages: full,
+      refusal: 'full',
+      unavailableReason: null,
+    });
+    expect(strict(createModel('cogview4'), [], images('x')).refusal).toBe('unsupported');
+    expect(strict(qwen21, [], images('x'))).toMatchObject({ refusal: 'visionTower', unavailableReason: 'visionTower' });
+    expect(
+      strict(qwen21, [], images('x'), {
+        qwen3VLEncoderModel: {
+          base: 'any',
+          format: 'gguf_quantized',
+          key: 'qwen3-vl-8b-gguf',
+          name: 'Qwen3-VL 8B',
+          type: 'qwen3_vl_encoder',
+          variant: 'qwen3_vl_8b',
+        },
+      })
+    ).toMatchObject({
+      added: 0,
+      referenceImages: [],
+      refusal: 'ggufVisionTower',
+      unavailableReason: 'ggufVisionTower',
+    });
+  });
+
+  it('keeps a recall whatever the encoder, retargets recalled adapters with the list, and cuts it to the limit', () => {
+    // Validation flags the missing tower; recall keeps the references.
+    expect(keep(qwen21, [], images('x'))).toMatchObject({
+      added: 1,
+      referenceImages: [{ config: { type: 'qwen_image_2_1_reference_image' }, id: 'x' }],
+      refusal: null,
+    });
+    // Left as is, with nothing counted as dropped.
+    const kept = [adapter('a')];
+
+    expect(keep(createModel('cogview4'), kept, images('x'))).toEqual({
+      added: 0,
+      dropped: 0,
+      limit: 0,
+      referenceImages: kept,
+      refusal: 'unsupported',
+      unavailableReason: null,
+    });
+
+    const fluxAdapter = adapter('flux', { base: 'flux', key: 'flux-ip-adapter', name: 'FLUX IP', type: 'ip_adapter' });
+    const recalled = keep(sdxl, [adapter('a'), adapter('b'), adapter('c')], images('x', 'y'), [fluxAdapter]);
+
+    expect(recalled).toMatchObject({ added: 1, dropped: 1, limit: 5, refusal: null });
+    expect(
+      recalled.referenceImages.map(({ config, id }) => [id, config.type === 'ip_adapter' ? config.model?.key : null])
+    ).toEqual([
+      ['a', 'sdxl-ip-adapter'],
+      ['b', 'sdxl-ip-adapter'],
+      ['c', 'sdxl-ip-adapter'],
+      ['flux', 'sdxl-ip-adapter'],
+      ['x', 'sdxl-ip-adapter'],
+    ]);
+  });
+
+  it('cuts additions past the limit before typing them, so a Krea-2 style reference stays when none lands', () => {
+    const fullSet = [style('s'), edit('a', false), edit('b', false)];
+
+    expect(keep(krea2, fullSet, images('x'))).toMatchObject({ dropped: 1, referenceImages: fullSet });
+    expect(strict(krea2, fullSet, images('x'))).toMatchObject({ referenceImages: fullSet, refusal: 'full' });
+    // A landing addition turns the lone style reference into edit.
+    expect(strict(krea2, [style('s'), edit('a', false)], images('x', 'y')).referenceImages).toEqual([
+      edit('s'),
+      edit('a', false),
+      edit('x'),
+    ]);
   });
 });
 
@@ -1138,6 +1279,65 @@ describe('the Qwen3.5 encoder slots of Anima-3.8B and MOSS-Image', () => {
     expect(offers(anima38, qwen35Encoder('qwen3_5_9b'))).toBe(false);
     expect(offers(mossSingleFile, qwen35Encoder('qwen3_5_9b'))).toBe(true);
     expect(offers(mossSingleFile, qwen35Encoder('qwen3_5_4b'))).toBe(false);
+  });
+});
+
+describe('Text LLM records that also serve as an encoder', () => {
+  const textLlm = (roleType: string, roleVariant: string): ComponentModelConfig => ({
+    base: 'any',
+    format: 'checkpoint',
+    key: `llm-${roleVariant}`,
+    name: `LLM ${roleVariant}`,
+    roles: [{ type: roleType, variant: roleVariant }],
+    type: 'text_llm',
+  });
+  const offers = (model: MainModelConfig, slotKey: string, candidate: ComponentModelConfig): boolean | undefined => {
+    const settings = createSettings(model);
+    const slot = getComponentSectionPolicy(model, settings).slots.find((s) => s.key === slotKey);
+
+    return slot?.filter?.(candidate, { model, selectedComponents: settings, settings });
+  };
+
+  it('offers a role-serving Text LLM only to the slot whose encoder size it matches', () => {
+    const moss = createModel('moss-image', { format: 'checkpoint' });
+    const zImage = createModel('z-image', { format: 'checkpoint' });
+    const klein4b = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_4b' });
+    const anima = createModel('anima', { format: 'checkpoint', variant: 'anima_qwen3' });
+
+    expect(offers(moss, 'qwen35EncoderModel', textLlm('qwen3_5_encoder', 'qwen3_5_9b'))).toBe(true);
+    expect(offers(moss, 'qwen35EncoderModel', textLlm('qwen3_5_encoder', 'qwen3_5_4b'))).toBe(false);
+    expect(offers(zImage, 'qwen3EncoderModel', textLlm('qwen3_encoder', 'qwen3_4b'))).toBe(true);
+    expect(offers(zImage, 'qwen3EncoderModel', textLlm('qwen3_encoder', 'qwen3_8b'))).toBe(false);
+    expect(offers(klein4b, 'qwen3EncoderModel', textLlm('qwen3_encoder', 'qwen3_4b'))).toBe(true);
+    expect(offers(klein4b, 'qwen3EncoderModel', textLlm('qwen3_encoder', 'qwen3_8b'))).toBe(false);
+    expect(offers(anima, 'qwen3EncoderModel', textLlm('qwen3_encoder', 'qwen3_06b'))).toBe(true);
+    expect(offers(zImage, 'qwen3EncoderModel', { ...textLlm('qwen3_encoder', 'qwen3_4b'), roles: [] })).toBe(false);
+  });
+
+  it('counts a selected role-serving Text LLM as the missing encoder', () => {
+    const moss = createModel('moss-image', { format: 'checkpoint' });
+    const zImage = createModel('z-image', { format: 'checkpoint' });
+
+    expect(
+      getGenerationValidationReasons(
+        moss,
+        createSettings(moss, { qwen35EncoderModel: textLlm('qwen3_5_encoder', 'qwen3_5_9b'), vae: flux2Vae })
+      )
+    ).toEqual([]);
+    expect(
+      getGenerationValidationReasons(
+        zImage,
+        createSettings(zImage, { qwen3EncoderModel: textLlm('qwen3_encoder', 'qwen3_4b'), vae: fluxVae })
+      )
+    ).toEqual([]);
+    expect(
+      getGenerationValidationReasons(
+        zImage,
+        createSettings(zImage, { qwen3EncoderModel: textLlm('qwen3_encoder', 'qwen3_8b'), vae: fluxVae })
+      )
+    ).toEqual([
+      'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on. Select a Qwen3 4B Encoder or clear it.',
+    ]);
   });
 });
 

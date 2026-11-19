@@ -1,4 +1,5 @@
 import type { GalleryItem } from '@features/gallery/contracts';
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { QueryClient } from '@tanstack/react-query';
 import type {
@@ -31,7 +32,7 @@ export const importPreviewFileDrop = async ({
   files: File[];
   gallery: Pick<WorkbenchGalleryCommands, 'selectItemInItsBoard' | 'setCompareItem'>;
   /** The project's gallery values when the files were dropped, which name its auto-add board. */
-  galleryValues: Record<string, unknown>;
+  galleryValues: ResolvedValues;
   notifications: WorkbenchNotificationCommands;
   /** The account the files were dropped in. */
   owner: AccountScope;

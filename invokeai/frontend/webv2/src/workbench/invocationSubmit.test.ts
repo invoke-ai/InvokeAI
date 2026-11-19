@@ -72,8 +72,7 @@ const getActiveProject = (state: ReturnType<typeof createInitialWorkbenchState>)
 };
 import { createWorkbenchStore } from './workbenchStore';
 
-// Production words rejections from the locale; tests only need the structured rejection to reach the notice.
-const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+const formatCanvasInvocationFailure = () => ({ message: 'canvas failure', title: 'canvas failure' });
 const formatUpscaleMetadataFailure = (name: string) => `metadataFailed: ${name}`;
 
 const field = (name: string, typeName: string, overrides: Record<string, unknown> = {}) => ({
@@ -210,7 +209,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
 
     await submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: undefined,
@@ -255,7 +254,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
     try {
       const submission = submitResolvedInvocation({
         commands,
-        formatControlLayerError,
+        formatCanvasInvocationFailure,
         formatUpscaleMetadataFailure,
         scopedDefaults: {},
         models: undefined,
@@ -324,7 +323,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
 
     await submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: undefined,
@@ -345,7 +344,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
 
     await submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: undefined,
@@ -448,7 +447,7 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
 
     await submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: undefined,
@@ -509,7 +508,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
 
     await submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: undefined,
@@ -561,7 +560,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
 
     await submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: undefined,
@@ -614,7 +613,7 @@ describe('submitResolvedInvocation for Video', () => {
 
     await submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: [wanModel],
@@ -708,7 +707,7 @@ describe('submitResolvedInvocation when the prompt changes while it expands', ()
     try {
       const submission = submitResolvedInvocation({
         commands: store.commands,
-        formatControlLayerError,
+        formatCanvasInvocationFailure,
         formatUpscaleMetadataFailure,
         scopedDefaults: {},
         models,
@@ -782,7 +781,7 @@ describe("submitResolvedInvocation reads the user's defaults", () => {
 
     await submitResolvedInvocation({
       commands: createWorkbenchStore().commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {
         canvas: { outputOnlyMaskedRegions: false },
@@ -846,7 +845,7 @@ describe('submitResolvedInvocation for Upscale', () => {
 
     await submitResolvedInvocation({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       scopedDefaults: {},
       models: [upscaler],

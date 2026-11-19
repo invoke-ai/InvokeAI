@@ -17,6 +17,7 @@ import {
 import {
   getDynamicPromptsConfig,
   getLockedAspectRatioSettings,
+  isMainModelConfig,
   normalizeDynamicPromptsSettings,
   sanitizeBatchCount,
 } from '@features/generation/settings';
@@ -45,6 +46,8 @@ import {
 import {
   getAcceleratorLoraChangeResult,
   getAcceleratorToggleResult,
+  getH3ModeSwitchSettings,
+  getEffectiveVideoModel,
   getEffectiveVideoTiming,
   getVideoDimensions,
   getAutoDurationBounds,
@@ -59,6 +62,7 @@ import {
   getVideoPanelIssueSections,
   syncVideoWidgetValuesWithModels,
 } from '@features/video/core/widgetValues';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Field, IconButton, Select } from '@platform/ui';
 import { Button } from '@platform/ui/Button';
@@ -202,6 +206,49 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
   );
 
   const patch = useCallback((next: Partial<VideoWidgetValues>) => patchValues(next), [patchValues]);
+
+  const toggleH3Mode = useCallback(
+    ({ checked }: { checked: boolean }) => {
+      flushWorkbenchDrafts();
+      let blocked = false;
+      let removedTurbo = false;
+      patchValues((current) => {
+        if (
+          current.references.length ||
+          current.firstFrameImage ||
+          current.lastFrameImage ||
+          current.sourceVideo ||
+          current.h3HybridBaseModel
+        ) {
+          blocked = true;
+          return {};
+        }
+        const latest = modelsStatus === 'loaded' ? syncVideoWidgetValuesWithModels(current, models) : current;
+        if (latest.model?.base !== 'minimax-h3' || latest.model.format !== 'checkpoint') {
+          return {};
+        }
+        const registered = models.find((item) => item.key === latest.model?.key && item.type === 'main');
+        const detected = registered && isMainModelConfig(registered) ? registered : latest.model;
+        removedTurbo = latest.acceleratorEnabled;
+        const next = getH3ModeSwitchSettings(latest, detected, models, checked);
+        return next;
+      });
+      if (blocked) {
+        toaster.create({
+          title: t('widgets.video.h3ClearModeInputs'),
+          description: t('widgets.video.h3ClearModeInputsDescription'),
+          type: 'warning',
+        });
+      } else if (removedTurbo) {
+        toaster.create({
+          title: t('widgets.video.settingsAdjusted'),
+          description: t('widgets.video.h3TurboRemoved'),
+          type: 'info',
+        });
+      }
+    },
+    [models, modelsStatus, patchValues, t]
+  );
 
   // Hidden Activity panels stop syncing and old callbacks target their project; drop writes then to avoid stale lists.
   const referencesRef = useRef({ live: true, projectId, references: values.references });
@@ -543,6 +590,28 @@ export const VideoWidgetView = ({ instance }: { instance?: { id: string } }) => 
               values={values}
             />
           </Stack>
+
+          {values.model?.base === 'minimax-h3' && values.model.format === 'checkpoint' ? (
+            <HStack px="2" py="1" justify="space-between">
+              <Text fontSize="sm">
+                {t('widgets.video.h3Mode', {
+                  mode: getEffectiveVideoModel(values.model, values).variant === 'ref2va' ? 'Ref2VA' : 'FL2VA',
+                  source: values.h3TaskOverride ? t('widgets.video.h3ModeOverride') : t('widgets.video.h3ModeDetected'),
+                })}
+              </Text>
+              <Switch.Root
+                checked={values.h3TaskOverride !== undefined}
+                disabled={modelsStatus !== 'loaded'}
+                onCheckedChange={toggleH3Mode}
+              >
+                <Switch.HiddenInput />
+                <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
+                  <Switch.Thumb />
+                </Switch.Control>
+                <Switch.Label>{t('widgets.video.h3SwitchMode')}</Switch.Label>
+              </Switch.Root>
+            </HStack>
+          ) : null}
 
           <VideoPromptFields
             batchCount={values.batchCount}

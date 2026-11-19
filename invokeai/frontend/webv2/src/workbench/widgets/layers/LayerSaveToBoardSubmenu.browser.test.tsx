@@ -4,6 +4,7 @@ import type { GalleryBoard } from '@features/gallery';
 import { ChakraProvider, Menu, Portal } from '@chakra-ui/react';
 import { getGallerySettings } from '@features/gallery/contracts';
 import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { SaveIcon } from 'lucide-react';
@@ -100,7 +101,7 @@ const hover = async (target: HTMLElement): Promise<void> => {
 
 const render = async (action: LayerContextAction, onSelect = vi.fn()) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const listing = galleryBoardsOptions(getGalleryListingBoardsQuery(getGallerySettings({})));
+  const listing = galleryBoardsOptions(getGalleryListingBoardsQuery(getGallerySettings(resolvedValues({}))));
   queryClient.setQueryData(listing.queryKey, [board('mine', ['read', 'add_media']), board('read-only', ['read'])]);
   host = document.createElement('div');
   document.body.append(host);
