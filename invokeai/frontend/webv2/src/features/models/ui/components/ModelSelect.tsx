@@ -1,6 +1,7 @@
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
 import type { PickerGroup, PickerOptionState, PickerStatus } from '@platform/ui/Picker';
+import type { ReactNode } from 'react';
 
 import {
   Badge,
@@ -44,7 +45,7 @@ import {
   RotateCcwIcon,
   XIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const EMPTY_BASES: ReadonlySet<string> = new Set();
@@ -107,7 +108,9 @@ export const ModelSelect = ({
   modelTypes,
   onChange,
   onOpen,
+  onPickerClose,
   pendingCandidates,
+  pickerHeader,
   placeholder,
   relatedTo = null,
   scopeLabel: scopeLabelOverride,
@@ -131,11 +134,13 @@ export const ModelSelect = ({
   onChange: (model: ModelConfig | null) => void;
   /** Called as the picker opens, e.g. to load what `filter` reads. */
   onOpen?: () => void;
+  onPickerClose?: () => void;
   /**
    * Candidates `filter` cannot decide yet, e.g. while the data it reads loads or after that load failed. Keeps the
    * trigger usable with no decided candidate, and shows this status in the list.
    */
   pendingCandidates?: PickerStatus;
+  pickerHeader?: ReactNode;
   placeholder?: string;
   /** Key of the model whose links rank this picker: its related models come first and carry a link icon. */
   relatedTo?: string | null;
@@ -151,6 +156,7 @@ export const ModelSelect = ({
   const loadError = useModelsSelector((snapshot) => snapshot.error);
   const loadStatus = useModelsSelector((snapshot) => snapshot.status);
   const [isOpen, setIsOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   // Like Select, an enclosing Field names the trigger and supplies its description, invalid and disabled states.
   const field = useFieldContext();
   const insideLabel = useInsideFieldLabel();
@@ -260,6 +266,7 @@ export const ModelSelect = ({
   const selectModel = (model: ModelConfig) => {
     onChange(model);
     setIsOpen(false);
+    onPickerClose?.();
   };
   const canClear = isClearable && Boolean(value);
 
@@ -280,6 +287,7 @@ export const ModelSelect = ({
   return (
     <Box className={className} minW="0" w="full">
       <Popover.Root
+        initialFocusEl={() => contentRef.current?.querySelector<HTMLInputElement>('input[role="combobox"]') ?? null}
         ids={id ? { trigger: id } : undefined}
         // Like Select: closed pickers hold no list, virtualizer or observers, and each open starts a fresh search.
         lazyMount
@@ -305,6 +313,9 @@ export const ModelSelect = ({
           }
 
           setIsOpen(event.open);
+          if (!event.open) {
+            onPickerClose?.();
+          }
         }}
       >
         <Box minW="0" position="relative" w="full">
@@ -384,6 +395,7 @@ export const ModelSelect = ({
         <Portal>
           <Popover.Positioner>
             <PopoverContent
+              ref={contentRef}
               aria-label={listLabel}
               css={dropdownContent}
               maxH="min(24rem, var(--available-height))"
@@ -393,6 +405,7 @@ export const ModelSelect = ({
               p="0"
               showArrow={false}
             >
+              {pickerHeader}
               <Picker<ModelConfig>
                 emptyMessage={emptyMessage}
                 getOptionId={getOptionId}
