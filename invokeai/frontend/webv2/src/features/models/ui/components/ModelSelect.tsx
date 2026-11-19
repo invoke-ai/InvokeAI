@@ -151,15 +151,11 @@ export const ModelSelect = ({
   const contentRef = useRef<HTMLDivElement>(null);
   // Like Select, an enclosing Field names the trigger and supplies its description, invalid and disabled states.
   const field = useFieldContext();
-  const fieldControlProps = field?.getInputProps();
   const insideLabel = useInsideFieldLabel();
   const fieldLabelId = useFieldLabelId() ?? insideLabel?.id ?? null;
   const valueTextId = useId();
   const isDisabled = Boolean(disabled || field?.disabled);
   const isInvalid = Boolean(invalid || field?.invalid);
-  const describedBy =
-    [fieldControlProps?.['aria-describedby'], fieldControlProps?.['aria-errormessage']].filter(Boolean).join(' ') ||
-    undefined;
   const [lastDisabled, setLastDisabled] = useState(isDisabled);
 
   const pickerId = id ?? `models:${modelTypes.join('+')}`;
@@ -308,7 +304,7 @@ export const ModelSelect = ({
         <Box minW="0" position="relative" w="full">
           <Popover.Trigger asChild>
             <Button
-              aria-describedby={describedBy}
+              aria-describedby={field?.ariaDescribedby}
               aria-haspopup="listbox"
               aria-invalid={isInvalid || undefined}
               // As on Select's trigger: the field label names the control, and the current choice follows as its value.

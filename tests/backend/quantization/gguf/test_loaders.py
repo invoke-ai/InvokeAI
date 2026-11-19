@@ -1,3 +1,5 @@
+import gc
+import weakref
 from collections.abc import Sequence
 
 import gguf
@@ -472,3 +474,45 @@ def test_unpacking_a_quantized_tensor_reserves_one_slice_of_temporaries_not_the_
 
     result = 37 * 512 * torch.bfloat16.itemsize
     assert reserved == [result + packed + HOST_DEQUANT_PEAK_COPIES * 3 * 512 * torch.bfloat16.itemsize]
+
+
+def _tensor_names_through_reader(path):
+    # A function of its own: like the callers of `WrappedGGUFReader`, the name `reader` ends when it returns.
+    with WrappedGGUFReader(path) as reader:
+        return [tensor.name for tensor in reader.tensors]
+
+
+@pytest.mark.parametrize("probe", ["header_read", "metadata", "state_dict", "reader"])
+def test_a_probed_gguf_is_free_to_delete_at_once(tmp_path, monkeypatch, probe):
+    """Installing a model deletes or moves the file right after identification, and Windows refuses that while
+    it is still mapped. The map must be released by reference count, not by a later collection.
+
+    The map's death is asserted directly as well, since POSIX renames and deletes a mapped file without complaint."""
+    path = tmp_path / "model.gguf"
+    write_gguf(path, {"proj.weight": torch.ones(4, 32)}, metadata={"general.name": "probe"})
+
+    maps: list[weakref.ref] = []
+    original_init = gguf.GGUFReader.__init__
+
+    def init_and_track_the_map(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        maps.append(weakref.ref(self.data))
+
+    monkeypatch.setattr(gguf.GGUFReader, "__init__", init_and_track_the_map)
+
+    gc.disable()
+    try:
+        if probe == "header_read":
+            gguf_header_state_dict(path, compute_dtype=torch.float32)
+        elif probe == "metadata":
+            assert ModelOnDisk(path).metadata()["general.name"] == "probe"
+        elif probe == "state_dict":
+            assert "proj.weight" in ModelOnDisk(path).load_state_dict()
+        else:
+            _tensor_names_through_reader(path)
+        assert maps
+        assert all(ref() is None for ref in maps)
+        path.rename(tmp_path / "moved.gguf")
+        (tmp_path / "moved.gguf").unlink()
+    finally:
+        gc.enable()

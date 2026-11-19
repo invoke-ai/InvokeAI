@@ -1945,7 +1945,10 @@ describe('WorkflowLibraryDialog', () => {
       expectUnclipped(close);
       await act(() => userEvent.keyboard('{Enter}'));
       expect(onOpenChange).toHaveBeenCalledWith(false);
-    }
+    },
+    // A thousand-card grid and up to a hundred sequential keystrokes: 2–6 s on CI, with rare starved runs past the
+    // default 15 s. A timed-out case can keep running into the next one and fail it too.
+    30000
   );
 
   it('keeps keyboard focus mounted across virtual row boundaries', async () => {
