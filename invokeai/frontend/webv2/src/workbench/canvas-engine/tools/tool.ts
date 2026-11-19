@@ -219,6 +219,8 @@ export interface ToolActivationOptions {
 /** A stateless-to-the-engine interaction handler. Implementations may hold private drag state. */
 export interface Tool {
   readonly id: ToolId;
+  /** A multi-press creation session may remain active between pointer gestures. */
+  hasSession?(): boolean;
   /** Called when the tool becomes active. */
   onActivate?(ctx: ToolContext, opts?: ToolActivationOptions): void;
   /** Called when the tool is deactivated (also on engine dispose). */
@@ -240,6 +242,11 @@ export interface Tool {
    * Gesture cancellation stays separate (`onPointerCancel`) and runs first when Escape lands mid-press.
    */
   onKeyCommand?(ctx: ToolContext, command: 'apply' | 'cancel'): boolean;
+  /** Owned modifier changes; returning true keeps a modifier from activating a temporary tool. */
+  onModifierKey?(ctx: ToolContext, code: 'Space' | 'Alt' | 'Shift', pressed: boolean): boolean;
+  /** Drop or reconcile an unfinished gesture when its document target changes. Never dispatch from this hook. */
+  onDocumentChanged?(ctx: ToolContext): void;
+
   /** Wheel over the canvas; `screenAnchor` is the CSS-pixel cursor position. */
   onWheel?(ctx: ToolContext, deltaY: number, screenAnchor: { x: number; y: number }, modifiers: PointerModifiers): void;
   /** The CSS cursor to show while this tool is active. */

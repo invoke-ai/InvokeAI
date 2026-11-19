@@ -356,6 +356,37 @@ describe('createDocumentModel', () => {
       expect(copy).toMatchObject({ adjustments });
     });
 
+    it('duplicates a locked node and a group holding one beside themselves, but copies nothing into a locked group', () => {
+      let next = 0;
+      const createId = () => `d${next++}`;
+      const project = projectWith(
+        [
+          layer('r1', 'raster', { isLocked: true }),
+          group('G', [layer('r2', 'raster', { isLocked: true })]),
+          group('L', [layer('r3')], { isLocked: true }),
+        ],
+        'r1'
+      );
+
+      const { after } = roundTrip(project, { createId, ids: ['r1', 'G', 'L'], type: 'duplicate' });
+      expect(outline(after.canvas.document)).toEqual([
+        'd0',
+        'r1',
+        'd1',
+        '  d2',
+        'G',
+        '  r2',
+        'd3',
+        '  d4',
+        'L',
+        '  r3',
+      ]);
+      expect(modelOf(project).prepare({ createId, ids: ['r3'], type: 'duplicate' })).toEqual({
+        ids: ['L'],
+        status: 'locked',
+      });
+    });
+
     it('moves within sibling lists, keeping a selected group and its descendants together', () => {
       const project = projectWith(tree(), 'r3');
       const moved = roundTrip(project, { ids: ['G', 'r3'], kind: 'front', type: 'move' });
@@ -820,7 +851,7 @@ describe('createDocumentModel', () => {
         model.prepare({ config: { adjustments: stack, layerType: 'raster' }, id: 'G', type: 'patch-config' })
       ).toEqual({
         actual: 'group',
-        expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask'],
+        expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'],
         status: 'wrong-type',
       });
 
@@ -1128,7 +1159,11 @@ describe('createDocumentModel', () => {
       [
         'a config patch on a group',
         { config: { layerType: 'raster', isTransparencyLocked: true }, id: 'G', type: 'patch-config' },
-        { actual: 'group', expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask'], status: 'wrong-type' },
+        {
+          actual: 'group',
+          expected: ['raster', 'control', 'regional_guidance', 'inpaint_mask', 'vector'],
+          status: 'wrong-type',
+        },
       ],
       [
         'a source patch on a mask',

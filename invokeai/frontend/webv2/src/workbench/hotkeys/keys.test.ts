@@ -84,7 +84,9 @@ describe('hotkey keys', () => {
       acceptsHotkeyPress(withAltGr({ altKey: true, code: 'Enter', ctrlKey: true, key: 'Enter' }), 'alt+mod+enter')
     ).toBe(true);
     expect(acceptsHotkeyPress(withAltGr({ altKey: true, code: 'Digit1', key: '1' }), 'alt+1')).toBe(true);
-    expect(isHotkeyPress(withAltGr({ altKey: true, code: 'Digit1', key: '1' }), 'alt+1')).toBe(true);
+    expect(isHotkeyPress(withAltGr({ altKey: true, code: 'Digit1', key: '1' }), 'alt+1')).toBe(
+      navigator.platform !== 'Win32'
+    );
     // AltGr+N types ń: not Cmd/Ctrl+Alt+N by position.
     expect(isHotkeyPress(withAltGr({ altKey: true, code: 'KeyN', key: 'ń', metaKey: true }), 'meta+alt+n')).toBe(false);
   });

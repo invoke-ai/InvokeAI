@@ -67,6 +67,7 @@ export interface CreateCompositeFrameDeps {
  */
 const STAGING_OVERLAY_STACKS: Readonly<Record<OverlayStackKind, boolean>> = {
   control: false,
+  vector: true,
   inpaint_mask: false,
   regional_guidance: false,
 };
@@ -77,7 +78,7 @@ const STAGING_OVERLAY_STACKS: Readonly<Record<OverlayStackKind, boolean>> = {
  */
 export const isInStagingHiddenStack = (doc: CanvasDocumentContractV3, nodeId: string | null): boolean => {
   const stack = nodeId ? getDocumentIndex(doc).byId.get(nodeId)?.stack : undefined;
-  return stack !== undefined && isOverlayStack(stack);
+  return stack !== undefined && isOverlayStack(stack) && !STAGING_OVERLAY_STACKS[stack];
 };
 
 /**
@@ -88,7 +89,12 @@ export const isInStagingHiddenStack = (doc: CanvasDocumentContractV3, nodeId: st
  */
 const stagingHiddenSelectedLeaf = (doc: CanvasDocumentContractV3): SemanticLeaf | null => {
   const leaf = doc.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
-  return leaf && isOverlayStack(leaf.stack) && isLeafDrawableForScreen(leaf, false) ? leaf : null;
+  return leaf &&
+    isOverlayStack(leaf.stack) &&
+    !STAGING_OVERLAY_STACKS[leaf.stack] &&
+    isLeafDrawableForScreen(leaf, false)
+    ? leaf
+    : null;
 };
 
 export interface CompositeFrame {

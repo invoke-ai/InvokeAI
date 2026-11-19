@@ -255,7 +255,7 @@ const projectFor = (document: CanvasDocumentContractV3): Project =>
 const outcomes = { locked: 0, nestedDuplicate: 0, nestedUngroup: 0, reparentInside: 0 };
 
 describe('document model fuzzing', () => {
-  it.each(Array.from({ length: 160 }, (_, seed) => seed + 1))(
+  it.each(Array.from({ length: 240 }, (_, seed) => seed + 1))(
     'keeps every invariant and round-trips undo through random edits (seed %i)',
     (seed) => {
       const random = rng(seed);

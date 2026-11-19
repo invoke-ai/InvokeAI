@@ -31,6 +31,8 @@ interface GenerateUndoOffer {
    * Undo does nothing. Otherwise it puts back the keys still holding what the change wrote and leaves the rest.
    */
   isWhole?: boolean;
+  /** Runs after an Undo that restored something, for state the caller keeps beside the settings. */
+  onUndone?: () => void;
 }
 
 /**
@@ -63,6 +65,7 @@ export const offerGenerateUndo = ({
   before,
   isWhole = false,
   message,
+  onUndone,
   projectId,
   slot,
   t,
@@ -86,6 +89,7 @@ export const offerGenerateUndo = ({
         (!isWhole || stillApplied.length === Object.keys(revertPatch).length)
       ) {
         ui.settings.patchGenerateSettings(Object.fromEntries(stillApplied), projectId);
+        onUndone?.();
       } else {
         ui.notifications.info(t('widgets.generate.undoStale'));
       }

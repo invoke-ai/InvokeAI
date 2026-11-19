@@ -111,7 +111,7 @@ export interface CompositeOptions {
   /** Isolate one leaf and suppress staged/filter previews; disabled or hidden leaves remain undrawn. */
   isolationLayerId?: string | null;
   /** Overlay stacks the screen draws; absence draws all. An isolated target draws whatever its stack. */
-  showOverlayStacks?: Readonly<Record<OverlayStackKind, boolean>>;
+  showOverlayStacks?: Readonly<Record<Exclude<OverlayStackKind, 'vector'>, boolean> & { vector?: boolean }>;
   /**
    * Memoized adjusted raster surface, or null for raw pixels. Optional provider; without it adjustments are
    * ignored. Cache versions prevent per-frame recomputation.
@@ -182,7 +182,7 @@ export const transformOverridesKey = (overrides: TransformOverrides | null | und
 /** A stable key for the overlay stack switches; absence shows every stack. */
 const overlayStacksKey = (shown: CompositeOptions['showOverlayStacks']): string => {
   const stacks = shown ?? ALL_OVERLAY_STACKS_SHOWN;
-  return `${+stacks.control}${+stacks.inpaint_mask}${+stacks.regional_guidance}`;
+  return `${+stacks.control}${+stacks.inpaint_mask}${+stacks.regional_guidance}${+(stacks.vector !== false)}`;
 };
 
 /**

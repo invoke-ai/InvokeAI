@@ -17,7 +17,6 @@ import {
   isNodeHidden,
   isOverlayStack,
 } from '@workbench/canvas-engine/api';
-import { publishLayerPanelSelection } from '@workbench/layerPanelState';
 import {
   CANVAS_HISTORY_HOTKEYS,
   CANVAS_MERGE_DOWN_HOTKEY,
@@ -33,13 +32,12 @@ import {
   type PreparedCommitOutcome,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import {
-  canGroupSelection,
-  canRemoveFromGroup,
-  canUngroupSelection,
+  deleteLayers,
+  duplicateLayers,
   groupLayers,
-  removeFromGroup,
   ungroupLayers,
-} from '@workbench/widgets/layers/layerGroupCommands';
+  type LayerCommandDeps,
+} from '@workbench/widgets/layers/layerCommands';
 
 /** Keys that act only while the Canvas itself holds focus; rows and fields own them elsewhere. */
 export const CANVAS_ONLY_HOTKEYS = [
@@ -161,8 +159,9 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
   readonly copySelection: (cut: boolean) => void;
   /** Crops every unlocked layer to the frame and reports the outcome, as the canvas menu does. */
   readonly cropAllLayers: () => void;
+  /** Delete, duplicate, group and ungroup run on `selectedLayerIds` through these, as every layer surface does. */
+  readonly layerCommands: LayerCommandDeps;
   readonly pasteFromClipboard: () => void;
-  readonly notifyLayerDuplicateFailed: () => void;
   readonly reportStructuralCommit: (result: StructuralCommitResult) => void;
   readonly reportPreparedCommit: (outcome: PreparedCommitOutcome) => void;
   readonly reportLayerOperation: (refusal: LayerOperationRefusal | AdjustmentRefusal | LayerUnreadable) => void;
@@ -178,11 +177,14 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
  */
 export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyContext): void => {
   const { dispatch, document, engine, t } = ctx;
+  if (commandId === 'canvas.deleteSelected' && engine?.interaction.get('vectorEditSession')) {
+    engine.layers.vectorEdit.deleteSelection();
+    return;
+  }
   const { selectedLayerId } = document;
   const index = getDocumentIndex(document);
   const selected = selectedLayerId ? index.byId.get(selectedLayerId) : undefined;
   const selectedLayer = selected && !isGroupNode(selected.node) ? selected.node : undefined;
-  const selectedFrozen = !!selected && (selected.ancestorsLocked || selected.node.isLocked);
 
   const stepsResults =
     commandId === 'canvas.prevEntity' ||
@@ -215,6 +217,15 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   // Arrow-key nudge: engine owns the bounds/lock logic (no-op with no/locked selection).
   const nudge = NUDGE_DELTAS[commandId];
   if (nudge) {
+    const vectorSession = engine?.interaction.get('vectorEditSession');
+    if (
+      engine &&
+      vectorSession &&
+      (vectorSession.activePathId !== null || vectorSession.selectedPoints.length > 0 || vectorSession.pathTransform)
+    ) {
+      engine.layers.vectorEdit.nudge(nudge.dx, nudge.dy);
+      return;
+    }
     const nudged = engine?.layers.nudgeSelectedLayer(nudge.dx, nudge.dy);
     // A nudge with nothing eligible selected is an expected no-op; only a broken commit is news.
     if (nudged?.status === 'postcondition-failed') {
@@ -241,12 +252,8 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     // Delete clears selected pixels before falling back to layer deletion.
     if (engine?.interaction.get('hasSelection')) {
       engine.selection.eraseSelection();
-    } else if (engine && selected && !selectedFrozen) {
-      ctx.reportPreparedCommit(
-        commitPreparedEdit(engine, t('widgets.canvas.commands.deleteLayer'), (model) =>
-          model.prepare({ ids: ctx.selectedLayerIds, type: 'remove' })
-        )
-      );
+    } else {
+      deleteLayers(ctx.layerCommands, ctx.selectedLayerIds);
     }
   } else if (commandId === 'canvas.copySelection' || commandId === 'canvas.cutSelection') {
     ctx.copySelection(commandId === 'canvas.cutSelection');
@@ -298,49 +305,13 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
       if (result.status !== 'created' && result.status !== 'empty') {
         ctx.reportLayerOperation(result.status);
       }
-    } else if (engine && selected) {
-      void engine.layers
-        .duplicateLayers(ctx.selectedLayerIds)
-        .then((result) => {
-          if (result.status === 'duplicated') {
-            publishLayerPanelSelection({
-              primaryId: result.selectedLayerId,
-              projectId: engine.projectId,
-              selectedIds: result.duplicateIds,
-            });
-            return;
-          }
-          if (result.status === 'busy') {
-            return;
-          }
-          if (result.status === 'nothing') {
-            ctx.notifyLayerDuplicateFailed();
-            return;
-          }
-          ctx.reportLayerOperation(result.status === 'unreadable' ? result : result.status);
-        })
-        .catch(() => {
-          // The engine keeps rejected transactions atomic; route both rejection
-          // and preflight refusal through the same user-facing command feedback.
-          ctx.notifyLayerDuplicateFailed();
-        });
+    } else {
+      void duplicateLayers(ctx.layerCommands, ctx.selectedLayerIds);
     }
   } else if (commandId === 'canvas.groupLayers') {
-    if (engine && selected && canGroupSelection(engine.document.model(), ctx.selectedLayerIds)) {
-      ctx.reportPreparedCommit(
-        groupLayers(engine, engine.projectId, ctx.selectedLayerIds, t('widgets.canvas.commands.groupLayers'))
-      );
-    }
+    groupLayers(ctx.layerCommands, ctx.selectedLayerIds);
   } else if (commandId === 'canvas.ungroupLayers') {
-    // Groups dissolve; a selection of leaves of one group moves out above it instead.
-    const model = engine?.document.model() ?? null;
-    if (engine && selected && canUngroupSelection(model, ctx.selectedLayerIds)) {
-      ctx.reportPreparedCommit(ungroupLayers(engine, ctx.selectedLayerIds, t('widgets.canvas.commands.ungroupLayers')));
-    } else if (engine && selected && canRemoveFromGroup(model, ctx.selectedLayerIds)) {
-      ctx.reportPreparedCommit(
-        removeFromGroup(engine, ctx.selectedLayerIds, t('widgets.layers.actions.removeFromGroup'))
-      );
-    }
+    ungroupLayers(ctx.layerCommands, ctx.selectedLayerIds);
   } else if (commandId === 'canvas.mergeDown') {
     mergeSelectedLayerDown(engine, document, ctx.reportLayerOperation, ctx.reportMergeDownRefusal);
   }

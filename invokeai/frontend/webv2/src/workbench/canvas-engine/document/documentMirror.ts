@@ -66,11 +66,15 @@ const bboxEqual = (a: Bbox, b: Bbox): boolean =>
   a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 
 /**
- * Raster invalidation identity is raster/control `source` or mask `bitmap`. Property edits preserve it; mask fill
- * changes must preserve unflushed alpha-cache strokes.
+ * Content invalidation identity is raster/control `source`, mask `bitmap`, or vector `paths`. Property edits
+ * preserve it; mask fill changes must preserve unflushed alpha-cache strokes.
  */
-const rasterSourceRef = (layer: CanvasLayerContract): unknown =>
-  layer.type === 'raster' || layer.type === 'control' ? layer.source : layer.mask.bitmap;
+const rasterSourceRef = (layer: CanvasLayerContract): unknown => {
+  if (layer.type === 'vector') {
+    return layer.paths;
+  }
+  return layer.type === 'raster' || layer.type === 'control' ? layer.source : layer.mask.bitmap;
+};
 
 const effectiveKey = (entry: CanvasNodeEntry): string =>
   `${entry.ancestorsEnabled ? 1 : 0}${entry.ancestorsLocked ? 1 : 0}${entry.ancestorsHidden ? 1 : 0}`;

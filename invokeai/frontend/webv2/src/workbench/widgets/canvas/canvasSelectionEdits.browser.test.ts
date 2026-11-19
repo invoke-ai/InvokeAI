@@ -17,7 +17,7 @@ import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { copyCanvasSelection } from './canvasClipboard';
-import { executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
+import { executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
 
 const cleanups: (() => void | Promise<void>)[] = [];
 afterEach(async () => {
@@ -136,7 +136,11 @@ const setup = async (layers: readonly Parameters<typeof stacksFrom>[0][number][]
       document: doc(),
       engine,
       hasMultipleStagingSlots: false,
-      notifyLayerDuplicateFailed: vi.fn(),
+      layerCommands: {
+        engine,
+        reportError: vi.fn(),
+        t: ((key: string) => key) as CanvasHotkeyContext['layerCommands']['t'],
+      },
       pasteFromClipboard: vi.fn(),
       reportLayerOperation: vi.fn(),
       reportMergeDownRefusal: vi.fn(),

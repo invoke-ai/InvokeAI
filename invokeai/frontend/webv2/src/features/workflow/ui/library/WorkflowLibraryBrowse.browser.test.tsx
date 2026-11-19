@@ -9,6 +9,7 @@ import { invalidateWorkflowLibraryCache } from '@features/workflow/data/libraryC
 import { WorkflowUiProvider, WorkflowGraphPreviewProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { setWorkflowLibraryTab } from '@features/workflow/ui/workflowUiStore';
 import { createProjectGraph } from '@features/workflow/utility';
+import { settleAnimations } from '@platform/browser/settleAnimations.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -263,6 +264,9 @@ const open = async () => {
     );
   });
   await waitFor(() => expect(card(0) ?? listRow(0)).not.toBeNull());
+  // The dialog opens scaled; geometry read before its animation ends is shrunken, and a slow runner can outlast a
+  // fixed settle.
+  await act(() => settleAnimations(document.querySelector('[data-scope="dialog"][data-part="content"]')!));
 };
 let activeDeepScroll: { abort: AbortController; done: Promise<void> } | null = null;
 

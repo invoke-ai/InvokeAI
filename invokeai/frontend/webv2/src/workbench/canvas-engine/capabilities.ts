@@ -13,7 +13,9 @@ import type {
 import type { CanvasMutationOrigin } from '@workbench/canvas-engine/mutationContracts';
 import type { StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
+import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 
+import type { CanvasVectorLayerContract } from './contracts';
 import type { BooleanRasterResult } from './controllers/booleanMergeController';
 import type { CopyLayerResult } from './controllers/copyLayerController';
 import type { CropAllLayersResult, CropLayerResult } from './controllers/cropLayerController';
@@ -190,6 +192,8 @@ export type CommitMaskImageResult = { status: 'committed'; layerId: string } | {
 export type PsdExportStatus = 'idle' | 'preparing' | 'serializing' | 'downloading' | 'cancelling';
 
 export interface CanvasInteractionState {
+  vectorEditSession: VectorEditSession | null;
+  vectorToolsStatus: 'idle' | 'loading' | 'ready' | 'failed';
   psdExportStatus: PsdExportStatus;
   activeTool: ToolId;
   bboxGrid: number;
@@ -786,7 +790,46 @@ export type BeginTransformResult =
   | 'ineligible'
   | SubsetOf<CanvasTransactionOutcome, 'busy'>;
 
+export interface CanvasVectorEditCapability {
+  /** Loads vector support before exposing its synchronous editing commands. */
+  prepare(): Promise<boolean>;
+  createLayer(input: { id: string; name?: string }): Promise<CanvasVectorLayerContract | null>;
+  transformPath(): void;
+  extractPath(): void;
+  targetContextMenu(screenPoint: Vec2): boolean;
+  deletePath(): void;
+  nudge(dx: number, dy: number): void;
+  setPointType(type: 'corner' | 'smooth' | 'symmetric'): void;
+  smooth(selectedOnly: boolean): void;
+  deleteSelection(): void;
+  copyPath(): void;
+  split(): void;
+  join(): void;
+  canSplit(): boolean;
+  canJoin(): boolean;
+}
+
+export type VectorTraceResult = {
+  status:
+    | 'committed'
+    | 'empty'
+    | 'aborted'
+    | 'stale'
+    | 'too-complex'
+    | 'busy'
+    | 'gesture-active'
+    | 'not-ready'
+    | 'over-budget'
+    | 'failed';
+};
+
 export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
+  /** Omit pathId to trace all paths; otherwise trace only that exact curve using the layer's Trace settings. */
+  traceVectorLayer(layerId: string, pathId?: string): Promise<VectorTraceResult>;
+  traceFillVectorLayer(layerId: string): Promise<VectorTraceResult>;
+  fillVectorPath(layerId: string, pathId: string): Promise<VectorTraceResult>;
+  cancelVectorTrace(): void;
+  readonly vectorEdit: CanvasVectorEditCapability;
   applyTransform(): void;
   /**
    * Selects `layerId`, switches to the transform tool and opens its session, even when transform is already active.
@@ -828,7 +871,8 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
    */
   cropAllLayersToBbox(): Promise<CropAllLayersResult>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
-  duplicateLayers(layerIds: readonly string[]): Promise<DuplicateLayersResult>;
+  /** Copies the outermost of `layerIds` with their pixels as one undo step named `label`, selecting the copies. */
+  duplicateLayers(label: string, layerIds: readonly string[]): Promise<DuplicateLayersResult>;
   /** Unions the masks' coverage into one new inpaint mask above the topmost source, removing the sources. */
   mergeInpaintMasks(layerIds: readonly string[]): Promise<MergeInpaintMasksResult>;
   mergeLayerDown(upperLayerId: string): Promise<MergeDownResult>;

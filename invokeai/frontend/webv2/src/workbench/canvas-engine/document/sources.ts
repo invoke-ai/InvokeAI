@@ -87,6 +87,10 @@ export const isRenderableLayer = (layer: CanvasLayerContract): boolean => {
  * unsupported sources throw.
  */
 export const getSourceContentRect = (layer: CanvasLayerContract, doc: CanvasDocumentContractV3): Rect => {
+  // Guide geometry owns no pixels, even when it has paths.
+  if (layer.type === 'vector') {
+    return { height: 0, width: 0, x: 0, y: 0 };
+  }
   const source = renderableSourceOf(layer);
   if (!source) {
     throw new Error(`getSourceContentRect: layer type '${layer.type}' has no rasterizable source`);

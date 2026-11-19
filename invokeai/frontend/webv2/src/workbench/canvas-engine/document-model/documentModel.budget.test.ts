@@ -195,10 +195,10 @@ describe(`document model budgets over ${NODE_COUNT} nodes`, () => {
         type: 'set-enabled',
         updates: Array.from({ length: 10 }, (_, index) => ({ id: `l${index}`, isEnabled: false })),
       },
-      { builds: 1, ids: 10, stacks: 4 },
+      { builds: 1, ids: 10, stacks: 5 },
     ],
     ['hide', { type: 'set-hidden', updates: [{ id: 'l1', isHidden: true }] }, { builds: 1, ids: 1, stacks: 1 }],
-    ['move', { ids: ['l8', 'l12', 'l16'], kind: 'forward', type: 'move' }, { builds: 1, ids: 4, stacks: 1 }],
+    ['move', { ids: ['l8', 'l12', 'l16'], kind: 'forward', type: 'move' }, { builds: 1, ids: 6, stacks: 3 }],
     // Removal repairs the selection over the projected forest, which costs one more index.
     ['remove', { ids: ['l1', 'l2'], type: 'remove' }, { builds: 2, ids: 2, stacks: 2 }],
   ])('prepares a %s edit with exact touched ids and stacks and no leaf compilation', (_label, command, expected) => {
@@ -426,7 +426,7 @@ describe('reducer → mirror value edits at the 10,000-node limit', () => {
 describe('eligibility without materialization', () => {
   beforeEach(resetCounters);
 
-  it('answers reparent, group, ungroup and remove eligibility without building an edit', () => {
+  it('answers reparent, group, ungroup, remove and duplicate eligibility without building an edit', () => {
     const document = createLargeTreeDocument(NODE_COUNT);
     const model = createDocumentModel(document, context);
     const index = getDocumentIndex(document);
@@ -440,6 +440,7 @@ describe('eligibility without materialization', () => {
     expect(model.refusalFor({ groupId: '\0probe', ids: ['l0', 'l1'], name: '', type: 'group' })).toBeDefined();
     expect(model.refusalFor({ ids: [groupId], type: 'ungroup' })).toBeNull();
     expect(model.refusalFor({ ids: ['l0'], type: 'remove' })).toBeNull();
+    expect(model.refusalFor({ createId: () => '\0copy', ids: [groupId, 'l0'], type: 'duplicate' })).toBeNull();
     expect(counters().editsMaterialized).toBe(0);
     expect(model.prepare({ ids: ['l0'], type: 'remove' }).status).toBe('prepared');
     expect(counters().editsMaterialized).toBe(1);

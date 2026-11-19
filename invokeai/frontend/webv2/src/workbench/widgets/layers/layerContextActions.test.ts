@@ -6,7 +6,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
-import { createControlLayer } from '@workbench/canvas-engine/api';
+import { createControlLayer, createVectorLayer } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { CircleDotIcon, CircleIcon } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
@@ -53,6 +53,8 @@ const makeLayer = (type: CanvasLayerContract['type']): CanvasLayerContract => {
       return createInpaintMaskLayer('Mask', 'mask');
     case 'regional_guidance':
       return createRegionalGuidanceLayer('Region', 0, 'region');
+    case 'vector':
+      return createVectorLayer({ id: 'vector', name: 'Vector' });
   }
 };
 
@@ -82,6 +84,7 @@ const makeState = (
     operationLocked: false,
     canGroupSelection: true,
     canDeleteSelection: true,
+    canDuplicateSelection: true,
     mergeMasksEligibility: 'eligible',
     canMergeSelection: true,
     canRemoveFromGroup: true,
