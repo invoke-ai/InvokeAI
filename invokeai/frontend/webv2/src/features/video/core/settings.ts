@@ -353,6 +353,8 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     stgScale: hasFiniteNumber(values, 'stgScale') ? (values.stgScale as number) : null,
     firstFrameImage,
     fps: hasFiniteNumber(values, 'fps') ? (values.fps as number) : SETTINGS_FALLBACKS.fps,
+    h3TaskOverride:
+      values.h3TaskOverride === 'fl2va' || values.h3TaskOverride === 'ref2va' ? values.h3TaskOverride : undefined,
     h3HybridBaseModel: isMainModelConfig(values.h3HybridBaseModel) ? values.h3HybridBaseModel : null,
     h3HybridStartBlock: Math.round(
       getClampedNumber(
@@ -431,6 +433,7 @@ export const isVideoSettings = (values: unknown): values is VideoSettings => {
 
   // Strict only over the keys normalize would have to invent.
   return (
+    values.h3TaskOverride === normalized.h3TaskOverride &&
     isSeedMode(values.seedMode) &&
     isVideoAspectRatioId(values.aspectRatioId) &&
     isVideoTargetResolution(values.targetResolution) &&

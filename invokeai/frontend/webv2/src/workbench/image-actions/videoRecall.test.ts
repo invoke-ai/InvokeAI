@@ -1,8 +1,17 @@
 import type { GenerationModelCatalogItem, MainModelConfig } from '@features/generation/contracts';
 
-import { createDefaultVideoWidgetValues, getVideoDimensions, type VideoWidgetValues } from '@features/video';
+import {
+  compileVideoGraph,
+  createDefaultVideoWidgetValues,
+  getAcceleratorToggleResult,
+  getDefaultVideoSettings,
+  getVideoDimensions,
+  syncVideoWidgetValuesWithModels,
+  type VideoWidgetValues,
+} from '@features/video';
 import { describe, expect, it } from 'vitest';
 
+import { recordOf } from './recallContract.testing';
 import {
   buildVideoRecallSettings,
   deriveAcceleratorRecallState,
@@ -489,6 +498,33 @@ describe('model-position recall shapes', () => {
     expect(result?.values.modelKey).toBe(checkpoint.key);
     expect(result?.values).toMatchObject({ acceleratorEnabled: true, acceleratorLoraKeys: [ref2vTurbo.key] });
   });
+
+  it('preserves an explicitly matching Ref2VA hybrid through partial recall and catalog sync', () => {
+    const hybrid = { ...checkpoint, key: 'quality-base', variant: 'fl2va' };
+    const models = [...catalog, hybrid];
+    const holding: VideoWidgetValues = {
+      ...currentValues,
+      model: checkpoint,
+      modelKey: checkpoint.key,
+      h3TaskOverride: 'ref2va',
+      h3HybridBaseModel: hybrid,
+      h3HybridStartBlock: 30,
+    };
+    const result = buildVideoRecallSettings({
+      currentValues: holding,
+      kind: 'seed',
+      metadata: { generation_mode: 'minimax_h3_ref2v', seed: 123 },
+      models,
+    });
+    expect(result).not.toBeNull();
+    const synced = syncVideoWidgetValuesWithModels(result!.values, models);
+    expect(synced).toMatchObject({
+      seed: 123,
+      h3TaskOverride: 'ref2va',
+      h3HybridBaseModel: hybrid,
+      h3HybridStartBlock: 30,
+    });
+  });
 });
 
 describe('portable records (metadata_version 1.0.0)', () => {
@@ -673,6 +709,84 @@ it('reads the legacy Wan VAE slot', () => {
     modelType: 'vae',
     valuesKey: 'vae',
     ref: { key: vae.key, base: vae.base, name: vae.name, type: vae.type, hash: null },
+  });
+});
+
+describe('H3 overridden task recall', () => {
+  it.each(['fl2va', 'ref2va'] as const)('round-trips a %s override with its Turbo through graph metadata', (task) => {
+    const model = { ...h3Model('hybrid'), format: 'checkpoint', variant: task === 'ref2va' ? 'fl2va' : 'ref2va' };
+    const component = h3Model('components');
+    const flTurbo = lora('MiniMax H3 Turbo LoRA', 'minimax-h3', null);
+    const refTurbo = lora('MiniMax H3 Ref2V Turbo LoRA', 'minimax-h3', null);
+    const catalog = [model, component, flTurbo, refTurbo];
+    const references = [
+      { kind: 'image' as const, detail: 'match' as const, image: { image_name: 'ref.png', width: 512, height: 512 } },
+    ];
+    const settings = getAcceleratorToggleResult(
+      {
+        ...getDefaultVideoSettings(model, catalog),
+        h3TaskOverride: task,
+        references: task === 'ref2va' ? references : [],
+      },
+      model,
+      catalog,
+      true
+    ).settings;
+    const selectedTurbo = task === 'ref2va' ? refTurbo : flTurbo;
+    expect(settings.acceleratorLoraKeys).toEqual([selectedTurbo.key]);
+    const graph = compileVideoGraph(settings, model).backendGraph;
+    expect(graph.nodes.model_loader).toMatchObject({ task_variant_override: task });
+    const metadata = recordOf(compileVideoGraph(settings, model), settings);
+    const result = buildVideoRecallSettings({
+      currentValues: createDefaultVideoWidgetValues(catalog),
+      kind: 'all',
+      metadata,
+      models: catalog,
+    })!;
+    expect(result.values.h3TaskOverride).toBe(task);
+    expect(result.values.model).toBe(model);
+    expect(result.values.acceleratorEnabled).toBe(true);
+    expect(result.values.acceleratorLoraKeys).toEqual([selectedTurbo.key]);
+    // Hydration supplies the media returned separately by recall.
+    const restored = syncVideoWidgetValuesWithModels({ ...result.values, references: settings.references }, catalog);
+    expect(compileVideoGraph(restored, restored.model!).backendGraph.nodes.model_loader).toMatchObject({
+      task_variant_override: task,
+    });
+    expect(restored.steps).toBe(settings.steps);
+  });
+
+  it('restores the effective task from generation_mode for the same checkpoint', () => {
+    const model = { ...h3Model('hybrid'), format: 'checkpoint', variant: 'fl2va' };
+    const values = createDefaultVideoWidgetValues([model]);
+    const result = buildVideoRecallSettings({
+      currentValues: values,
+      kind: 'all',
+      metadata: {
+        generation_mode: 'minimax_h3_ref2v',
+        model: { base: 'minimax-h3', key: model.key, name: model.name, type: 'main' },
+      },
+      models: [model],
+    });
+    expect(result?.values.h3TaskOverride).toBe('ref2va');
+    expect(result?.values.model).toBe(model);
+    expect(model.variant).toBe('fl2va');
+  });
+
+  it('does not apply the recorded task to an unrelated model when the recorded model is unavailable', () => {
+    const current = { ...h3Model('current'), format: 'checkpoint', variant: 'fl2va' };
+    const values = createDefaultVideoWidgetValues([current]);
+    const result = buildVideoRecallSettings({
+      currentValues: values,
+      kind: 'all',
+      metadata: {
+        generation_mode: 'minimax_h3_ref2v',
+        positive_prompt: 'test scene',
+        model: { base: 'minimax-h3', key: 'uninstalled', name: 'Missing model', type: 'main' },
+      },
+      models: [current],
+    });
+    expect(result?.values.h3TaskOverride).toBeUndefined();
+    expect(result?.values.model?.variant).toBe('fl2va');
   });
 });
 
