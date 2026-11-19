@@ -25001,6 +25001,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -25074,6 +25083,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -25156,6 +25166,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -25229,6 +25248,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -25311,6 +25331,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -25376,6 +25405,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -25458,6 +25488,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -25523,6 +25562,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -25762,6 +25802,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -25821,6 +25870,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -29379,6 +29429,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -29447,6 +29506,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "default_settings",
           "base",
@@ -29824,6 +29884,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -29901,6 +29970,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -29984,6 +30054,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -30049,6 +30128,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -30130,6 +30210,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -30195,6 +30284,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -30277,6 +30367,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -30349,6 +30448,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -30432,6 +30532,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -30497,6 +30606,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -30578,6 +30688,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -30643,6 +30762,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -30724,6 +30844,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -30789,6 +30918,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -30870,6 +31000,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -30935,6 +31074,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -31017,6 +31157,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -31074,6 +31223,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -31155,6 +31305,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -31212,6 +31371,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -31293,6 +31453,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -31350,6 +31519,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -31431,6 +31601,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -31488,6 +31667,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -36834,6 +37014,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -36933,6 +37122,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -37828,6 +38018,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -37871,6 +38070,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -46963,6 +47163,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -47018,6 +47227,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -47099,6 +47309,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -47154,6 +47373,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -47235,6 +47455,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -47302,6 +47531,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -47384,6 +47614,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -47450,6 +47689,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -50451,6 +50691,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -50494,6 +50743,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -50573,6 +50823,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -50616,6 +50875,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -50695,6 +50955,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -50738,6 +51007,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -50817,6 +51087,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -50860,6 +51139,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -50939,6 +51219,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -50982,6 +51271,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -51061,6 +51351,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -51108,6 +51407,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -51188,6 +51488,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -51235,6 +51544,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -51315,6 +51625,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -51362,6 +51681,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -69928,6 +70248,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -69971,6 +70300,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -72852,6 +73182,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -72911,6 +73250,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -73414,6 +73754,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -73484,6 +73833,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -73565,6 +73915,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -73645,6 +74004,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -73728,6 +74088,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -73798,6 +74167,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -73880,6 +74250,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -73950,6 +74329,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -74184,6 +74564,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -74254,6 +74643,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -74335,6 +74725,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -74405,6 +74804,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -74486,6 +74886,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -74566,6 +74975,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -74649,6 +75059,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -74719,6 +75138,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -74800,6 +75220,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -74880,6 +75309,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -74963,6 +75393,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -75033,6 +75472,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -75115,6 +75555,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -75185,6 +75634,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -75267,6 +75717,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -75337,6 +75796,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -75418,6 +75878,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -75498,6 +75967,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -75581,6 +76051,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -75651,6 +76130,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -75733,6 +76213,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -75803,6 +76292,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -75885,6 +76375,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -75955,6 +76454,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -76037,6 +76537,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -76107,6 +76616,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -76189,6 +76699,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -76259,6 +76778,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -76493,6 +77013,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -76563,6 +77092,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -76645,6 +77175,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -76715,6 +77254,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -76797,6 +77337,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -76867,6 +77416,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -76948,6 +77498,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -77018,6 +77577,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -77099,6 +77659,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -77179,6 +77748,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -77262,6 +77832,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -77332,6 +77911,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -77412,6 +77992,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -77507,6 +78096,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -77591,6 +78181,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -77671,6 +78270,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -77754,6 +78354,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -77824,6 +78433,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -77905,6 +78515,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -77975,6 +78594,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -78731,6 +79351,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -78816,6 +79445,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -78899,6 +79529,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -78986,6 +79625,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -79070,6 +79710,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -79152,6 +79801,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -79234,6 +79884,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -79320,6 +79979,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -79403,6 +80063,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -79489,6 +80158,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -79572,6 +80242,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -79658,6 +80337,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -79741,6 +80421,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -79830,6 +80519,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -79913,6 +80603,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -79999,6 +80698,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -80082,6 +80782,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -80173,6 +80882,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -80257,6 +80967,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -80348,6 +81067,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -80433,6 +81153,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -80515,6 +81244,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -80597,6 +81327,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -80683,6 +81422,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -80766,6 +81506,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -80859,6 +81608,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -80942,6 +81692,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -81031,6 +81790,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -81114,6 +81874,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -81203,6 +81972,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -81286,6 +82056,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -81375,6 +82154,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -81458,6 +82238,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -81547,6 +82336,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -81630,6 +82420,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -81723,6 +82522,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -81807,6 +82607,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -81893,6 +82702,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -81977,6 +82787,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -82051,6 +82870,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -82133,6 +82953,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -82207,6 +83036,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -82290,6 +83120,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -82367,6 +83206,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -82451,6 +83291,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -82528,6 +83377,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -82612,6 +83462,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -82689,6 +83548,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -82773,6 +83633,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -82847,6 +83716,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -82930,6 +83800,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -83007,6 +83886,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -83090,6 +83970,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -83187,6 +84076,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -83274,6 +84164,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -83357,6 +84256,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -83442,6 +84342,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -83516,6 +84425,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -83599,6 +84509,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -83676,6 +84595,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -83759,6 +84679,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -83844,6 +84773,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -83928,6 +84858,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -84008,6 +84947,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -84092,6 +85032,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -84172,6 +85121,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -84255,6 +85205,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -84358,6 +85317,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -84442,6 +85402,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -84522,6 +85491,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -84606,6 +85576,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -84686,6 +85665,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -84769,6 +85749,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -84865,6 +85854,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -84951,6 +85941,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -85028,6 +86027,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -85111,6 +86111,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -85198,6 +86207,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -85282,6 +86292,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -85364,6 +86383,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -85446,6 +86466,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -85532,6 +86561,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -85615,6 +86645,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -85701,6 +86740,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -85784,6 +86824,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -85870,6 +86919,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -85953,6 +87003,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -86042,6 +87101,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -86125,6 +87185,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -86211,6 +87280,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -86294,6 +87364,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -86385,6 +87464,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -86470,6 +87550,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -86552,6 +87641,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -86634,6 +87724,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -86720,6 +87819,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -86803,6 +87903,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -86896,6 +88005,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -87156,6 +88266,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -87248,6 +88367,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -87332,6 +88452,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -87418,6 +88547,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -87501,6 +88631,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -87597,6 +88736,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -87682,6 +88822,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -87777,6 +88926,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -87861,6 +89011,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -87957,6 +89116,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -88041,6 +89201,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -88127,6 +89296,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -88210,6 +89380,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -88296,6 +89475,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -88379,6 +89559,15 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "cover_image": {
             "anyOf": [
@@ -88465,6 +89654,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "trigger_phrases",
@@ -94409,6 +95599,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -94480,6 +95679,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -94563,6 +95763,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -94622,6 +95831,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -94704,6 +95914,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -94775,6 +95994,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -97946,6 +99166,22 @@
             ],
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page)"
+          },
+          "source_urls": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "name": {
             "anyOf": [
@@ -101495,6 +102731,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -101554,6 +102799,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -101636,6 +102882,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -101695,6 +102950,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -101777,6 +103033,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -101836,6 +103101,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -101918,6 +103184,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -101977,6 +103252,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -102059,6 +103335,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -102118,6 +103403,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -103795,6 +105081,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -103866,6 +105161,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -103979,6 +105275,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -104050,6 +105355,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -104133,6 +105439,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -104204,6 +105519,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -104287,6 +105603,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -104346,6 +105671,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -104428,6 +105754,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -104499,6 +105834,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -104582,6 +105918,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -104641,6 +105986,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -104759,6 +106105,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -104830,6 +106185,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -104913,6 +106269,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -104980,6 +106345,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -105062,6 +106428,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -105133,6 +106508,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -105216,6 +106592,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -105275,6 +106660,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -105363,6 +106749,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -105434,6 +106829,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -108237,6 +109633,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -108292,6 +109697,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -108373,6 +109779,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -108416,6 +109831,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -108496,6 +109912,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -108551,6 +109976,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -114263,6 +115689,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -114322,6 +115757,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -114670,6 +116106,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -114725,6 +116170,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -114805,6 +116251,15 @@
           "source": {
             "type": "string",
             "title": "Source"
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "name": {
             "type": "string",
@@ -115021,6 +116476,15 @@
           "source": {
             "type": "string",
             "title": "Source"
+          },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
           },
           "name": {
             "type": "string",
@@ -117003,6 +118467,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -117060,6 +118533,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -117141,6 +118615,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -117198,6 +118681,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -117302,6 +118786,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -117357,6 +118850,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -117438,6 +118932,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -117505,6 +119008,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -117587,6 +119091,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -117654,6 +119167,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -117736,6 +119250,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -117791,6 +119314,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -117872,6 +119396,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -117927,6 +119460,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -118031,6 +119565,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -118074,6 +119617,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -118153,6 +119697,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -118196,6 +119749,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -118275,6 +119829,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -118318,6 +119881,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -118397,6 +119961,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -118440,6 +120013,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -118519,6 +120093,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -118562,6 +120145,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -118641,6 +120225,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -118684,6 +120277,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "type",
           "format",
@@ -119002,6 +120596,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -119075,6 +120678,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -119158,6 +120762,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -119223,6 +120836,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -119910,6 +121524,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -119982,6 +121605,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -120064,6 +121688,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -120136,6 +121769,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -120218,6 +121852,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -120290,6 +121933,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -120372,6 +122016,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -120444,6 +122097,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -120526,6 +122180,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -120598,6 +122261,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -120680,6 +122344,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -120752,6 +122425,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -120834,6 +122508,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -120906,6 +122589,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -120988,6 +122672,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -121060,6 +122753,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -121451,6 +123145,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -121494,6 +123197,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",
@@ -122078,6 +123782,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -122145,6 +123858,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -122227,6 +123941,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -122294,6 +124017,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -122375,6 +124099,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -122442,6 +124175,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -122524,6 +124258,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -122591,6 +124334,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -122673,6 +124417,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -122740,6 +124493,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -122822,6 +124576,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -122889,6 +124652,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -122970,6 +124734,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -123037,6 +124810,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -123118,6 +124892,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -123185,6 +124968,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -123266,6 +125050,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -123333,6 +125126,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -123414,6 +125208,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -123487,6 +125290,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "type",
@@ -123570,6 +125374,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -123629,6 +125442,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -123710,6 +125524,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -123769,6 +125592,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -123851,6 +125675,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -123910,6 +125743,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -123992,6 +125826,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -124051,6 +125894,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -124132,6 +125976,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -124191,6 +126044,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -124272,6 +126126,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -124331,6 +126194,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -124412,6 +126276,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -124478,6 +126351,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "format",
           "repo_variant",
@@ -127681,6 +129555,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -127748,6 +129631,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "config_path",
           "base",
@@ -127830,6 +129714,15 @@
             "title": "Source Url",
             "description": "Optional URL for the model (e.g. download page or model page)."
           },
+          "source_urls": {
+            "items": {
+              "type": "string",
+              "pattern": "^https?://[^\\s/?#]+(?:[/?#][^\\s]*)?$"
+            },
+            "type": "array",
+            "title": "Source Urls",
+            "description": "Web pages about the model."
+          },
           "cover_image": {
             "anyOf": [
               {
@@ -127885,6 +129778,7 @@
           "source_type",
           "source_api_response",
           "source_url",
+          "source_urls",
           "cover_image",
           "base",
           "type",

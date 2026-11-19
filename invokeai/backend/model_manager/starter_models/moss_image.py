@@ -12,6 +12,7 @@ _MOSS_IMAGE_REQUIREMENTS = (
 )
 
 moss_image_base = StarterModel(
+    source_urls=["https://huggingface.co/OpenMOSS-Team/MOSS-Image-Base"],
     name="MOSS-Image Base",
     base=BaseModelType.MossImage,
     source="OpenMOSS-Team/MOSS-Image-Base",
@@ -24,6 +25,7 @@ moss_image_base = StarterModel(
 )
 
 moss_image_sft = StarterModel(
+    source_urls=["https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT"],
     name="MOSS-Image SFT",
     base=BaseModelType.MossImage,
     source="OpenMOSS-Team/MOSS-Image-SFT",
@@ -36,6 +38,7 @@ moss_image_sft = StarterModel(
 )
 
 moss_image_prompt_enhancer = StarterModel(
+    source_urls=["https://huggingface.co/google/gemma-4-E4B-it"],
     name="Gemma 4 E4B (Prompt Enhancer)",
     base=BaseModelType.Any,
     source="google/gemma-4-E4B-it",
@@ -52,6 +55,7 @@ moss_image_prompt_enhancer = StarterModel(
 # int8 layout was checked against: the file's `comfy_quant` markers drive the decode, so a re-upload at the same path
 # could change how it loads, and the pinned URL still matches the source check.
 moss_image_qwen3_5_encoder_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/MOSS-Image"],
     name="Qwen3.5 9B Encoder (int8)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/MOSS-Image/resolve/"
@@ -80,6 +84,7 @@ _MOSS_TRANSFORMER_ONLY = (
 )
 
 moss_image_base_single_file = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/MOSS-Image"],
     name="MOSS-Image Base (single file)",
     base=BaseModelType.MossImage,
     source=f"{_MOSS_COMFY}/moss_image_base_bf16.safetensors",
@@ -93,6 +98,7 @@ moss_image_base_single_file = StarterModel(
 )
 
 moss_image_sft_single_file = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/MOSS-Image"],
     name="MOSS-Image SFT (single file)",
     base=BaseModelType.MossImage,
     source=f"{_MOSS_COMFY}/moss_image_sft_bf16.safetensors",
@@ -106,6 +112,7 @@ moss_image_sft_single_file = StarterModel(
 )
 
 moss_image_base_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/MOSS-Image"],
     name="MOSS-Image Base (int8)",
     base=BaseModelType.MossImage,
     source=f"{_MOSS_COMFY}/moss_image_base_int8_convrot.safetensors",
@@ -119,6 +126,7 @@ moss_image_base_int8 = StarterModel(
 )
 
 moss_image_sft_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/MOSS-Image"],
     name="MOSS-Image SFT (int8)",
     base=BaseModelType.MossImage,
     source=f"{_MOSS_COMFY}/moss_image_sft_int8_convrot.safetensors",
@@ -132,6 +140,7 @@ moss_image_sft_int8 = StarterModel(
 )
 
 moss_image_base_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/MOSS-Image-Base-GGUF"],
     name="MOSS-Image Base (GGUF Q4_K_M)",
     base=BaseModelType.MossImage,
     source=f"{_MOSS_BASE_GGUF}/MOSS-Image-Base-Q4_K_M.gguf",
@@ -145,6 +154,7 @@ moss_image_base_gguf_q4_k_m = StarterModel(
 )
 
 moss_image_base_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/MOSS-Image-Base-GGUF"],
     name="MOSS-Image Base (GGUF Q8_0)",
     base=BaseModelType.MossImage,
     source=f"{_MOSS_BASE_GGUF}/MOSS-Image-Base-Q8_0.gguf",
@@ -158,6 +168,7 @@ moss_image_base_gguf_q8_0 = StarterModel(
 )
 
 moss_image_sft_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/MOSS-Image-SFT-GGUF"],
     name="MOSS-Image SFT (GGUF Q4_K_M)",
     base=BaseModelType.MossImage,
     source=f"{_MOSS_SFT_GGUF}/MOSS-Image-SFT-Q4_K_M.gguf",
@@ -171,6 +182,7 @@ moss_image_sft_gguf_q4_k_m = StarterModel(
 )
 
 moss_image_sft_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/MOSS-Image-SFT-GGUF"],
     name="MOSS-Image SFT (GGUF Q8_0)",
     base=BaseModelType.MossImage,
     source=f"{_MOSS_SFT_GGUF}/MOSS-Image-SFT-Q8_0.gguf",

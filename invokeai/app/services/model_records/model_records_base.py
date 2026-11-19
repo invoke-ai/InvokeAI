@@ -11,6 +11,7 @@ from pydantic import Field, field_validator
 
 from invokeai.app.services.shared.pagination import SQLiteDirection
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
+from invokeai.backend.model_manager.configs.base import SourceURL
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelDefaultSettings,
@@ -86,6 +87,8 @@ class ModelRecordChanges(BaseModelExcludeNull):
     source_type: Optional[ModelSourceType] = Field(description="type of model source", default=None)
     source_api_response: Optional[str] = Field(description="metadata from remote source", default=None)
     source_url: Optional[str] = Field(description="Optional URL for the model (e.g. download page)", default=None)
+
+    source_urls: Optional[list[SourceURL]] = Field(default=None, description="Web pages about the model.")
 
     @field_validator("source_url", mode="before")
     @classmethod

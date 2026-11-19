@@ -81,6 +81,47 @@ def test_type(store: ModelRecordServiceBase):
     assert isinstance(config1, TI_File_SD1_Config)
 
 
+def test_legacy_record_accepts_source_links_without_losing_its_original_source(
+    store: ModelRecordServiceSQL, database: Database
+) -> None:
+    legacy = example_ti_config("key1").model_dump(mode="json")
+    legacy.pop("source_urls")
+    legacy["source_url"] = "https://example.com/legacy"
+    database.queries.models.insert("key1", json.dumps(legacy))
+
+    assert store.get_model("key1").source_urls == []
+    store.update_model(
+        "key1", ModelRecordChanges(source_urls=["https://example.com/model", "https://example.com/quantized"])
+    )
+    store.update_model("key1", ModelRecordChanges(name="renamed"))
+    updated = store.get_model("key1")
+    assert updated.source_urls == ["https://example.com/model", "https://example.com/quantized"]
+    assert updated.source_url == "https://example.com/legacy"
+    assert updated.source == "test/source/"
+
+    store.update_model("key1", ModelRecordChanges(source_urls=[]))
+    assert store.get_model("key1").source_urls == []
+
+
+@pytest.mark.parametrize("url", ["javascript:alert(1)", "file:///tmp/model", "https:///model", "", 12])
+def test_source_links_reject_non_http_urls(url: Any) -> None:
+    from invokeai.backend.model_manager.starter_models import StarterModel
+
+    with pytest.raises(ValidationError):
+        ModelRecordChanges(source_urls=[url])
+    with pytest.raises(ValidationError):
+        TI_File_SD1_Config.model_validate({**example_ti_config().model_dump(), "source_urls": [url]})
+    with pytest.raises(ValidationError):
+        StarterModel(
+            name="model",
+            description="model",
+            source="org/repo",
+            base=BaseModelType.StableDiffusion1,
+            type=ModelType.Main,
+            source_urls=[url],
+        )
+
+
 def test_raises_on_violating_uniqueness(store: ModelRecordServiceBase):
     # The key and the path are unique: config1 again repeats both, config2 its path.
     config1 = example_ti_config("key1")

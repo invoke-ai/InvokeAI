@@ -17,6 +17,7 @@ TINY_AUTOENCODER_NOTE = (
 
 # This is CLIP-ViT-H-14-laion2B-s32B-b79K
 ip_adapter_sd_image_encoder = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/ip_adapter_sd_image_encoder"],
     name="IP Adapter SD1.5 Image Encoder",
     base=BaseModelType.Any,
     source="InvokeAI/ip_adapter_sd_image_encoder",
@@ -26,6 +27,7 @@ ip_adapter_sd_image_encoder = StarterModel(
 
 # This is CLIP-ViT-bigG-14-laion2B-39B-b160k
 ip_adapter_sdxl_image_encoder = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/ip_adapter_sdxl_image_encoder"],
     name="IP Adapter SDXL Image Encoder",
     base=BaseModelType.Any,
     source="InvokeAI/ip_adapter_sdxl_image_encoder",
@@ -41,6 +43,7 @@ ip_adapter_sdxl_image_encoder = StarterModel(
 # trained against these exact OpenAI weights, so its dependency must stay this
 # model, not the DFN2B one below.
 clip_vit_l_image_encoder = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/clip-vit-large-patch14"],
     name="clip-vit-large-patch14",
     base=BaseModelType.Any,
     source="InvokeAI/clip-vit-large-patch14",
@@ -55,6 +58,7 @@ clip_vit_l_image_encoder = StarterModel(
 # open_clip copy of the weights, which the HF file filter cannot distinguish
 # from the transformers copy — hence the doubled download size in the blurb.
 dfn2b_clip_vit_l_image_encoder = StarterModel(
+    source_urls=["https://huggingface.co/apple/DFN2B-CLIP-ViT-L-14-39B"],
     name="DFN2B-CLIP-ViT-L-14-39B",
     base=BaseModelType.Any,
     source="apple/DFN2B-CLIP-ViT-L-14-39B",
@@ -64,6 +68,7 @@ dfn2b_clip_vit_l_image_encoder = StarterModel(
 
 # region TextEncoders
 t5_base_encoder = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/t5-v1_1-xxl"],
     name="t5_base_encoder",
     base=BaseModelType.Any,
     source="InvokeAI/t5-v1_1-xxl::bfloat16",
@@ -72,6 +77,7 @@ t5_base_encoder = StarterModel(
 )
 
 t5_8b_quantized_encoder = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/t5-v1_1-xxl"],
     name="t5_bnb_int8_quantized_encoder",
     base=BaseModelType.Any,
     source="InvokeAI/t5-v1_1-xxl::bnb_llm_int8",
@@ -81,6 +87,7 @@ t5_8b_quantized_encoder = StarterModel(
 )
 
 t5_gguf_q3_k_s_encoder = StarterModel(
+    source_urls=["https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf"],
     name="t5_gguf_q3_k_s_encoder",
     base=BaseModelType.Any,
     source="https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q3_K_S.gguf",
@@ -90,6 +97,7 @@ t5_gguf_q3_k_s_encoder = StarterModel(
 )
 
 t5_gguf_q6_k_encoder = StarterModel(
+    source_urls=["https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf"],
     name="t5_gguf_q6_k_encoder",
     base=BaseModelType.Any,
     source="https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q6_K.gguf",
@@ -99,6 +107,7 @@ t5_gguf_q6_k_encoder = StarterModel(
 )
 
 clip_l_encoder = StarterModel(
+    source_urls=["https://huggingface.co/InvokeAI/clip-vit-large-patch14-text-encoder"],
     name="clip-vit-large-patch14",
     base=BaseModelType.Any,
     source="InvokeAI/clip-vit-large-patch14-text-encoder::bfloat16",
@@ -111,6 +120,7 @@ clip_l_encoder = StarterModel(
 # mirror Efficient-Large-Model/gemma-2-2b-it. It is shared across all PiD backbones, so it is a dependency of each
 # decoder below (and offered standalone here so it can be installed once).
 gemma2_2b_encoder = StarterModel(
+    source_urls=["https://huggingface.co/Efficient-Large-Model/gemma-2-2b-it"],
     name="Gemma 2 2B (PiD caption encoder)",
     base=BaseModelType.Any,
     source="Efficient-Large-Model/gemma-2-2b-it",
@@ -122,6 +132,7 @@ gemma2_2b_encoder = StarterModel(
 # endregion
 # region SpandrelImageToImage
 animesharp_v4_rcan = StarterModel(
+    source_urls=["https://github.com/Kim2091/Kim2091-Models"],
     name="2x-AnimeSharpV4_RCAN",
     base=BaseModelType.Any,
     source="https://github.com/Kim2091/Kim2091-Models/releases/download/2x-AnimeSharpV4/2x-AnimeSharpV4_RCAN.safetensors",
@@ -130,6 +141,7 @@ animesharp_v4_rcan = StarterModel(
 )
 
 realesrgan_x4 = StarterModel(
+    source_urls=["https://github.com/xinntao/Real-ESRGAN"],
     name="RealESRGAN_x4plus",
     base=BaseModelType.Any,
     source="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
@@ -138,6 +150,7 @@ realesrgan_x4 = StarterModel(
 )
 
 esrgan_srx4 = StarterModel(
+    source_urls=["https://github.com/xinntao/Real-ESRGAN"],
     name="ESRGAN_SRx4_DF2KOST_official",
     base=BaseModelType.Any,
     source="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.1/ESRGAN_SRx4_DF2KOST_official-ff704c30.pth",
@@ -146,6 +159,7 @@ esrgan_srx4 = StarterModel(
 )
 
 realesrgan_x2 = StarterModel(
+    source_urls=["https://github.com/xinntao/Real-ESRGAN"],
     name="RealESRGAN_x2plus",
     base=BaseModelType.Any,
     source="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth",
@@ -154,6 +168,7 @@ realesrgan_x2 = StarterModel(
 )
 
 swinir = StarterModel(
+    source_urls=["https://github.com/JingyunLiang/SwinIR"],
     name="SwinIR - realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN",
     base=BaseModelType.Any,
     source="https://github.com/JingyunLiang/SwinIR/releases/download/v0.0/003_realSR_BSRGAN_DFOWMFC_s64w8_SwinIR-L_x4_GAN-with-dict-keys-params-and-params_ema.pth",
@@ -162,6 +177,7 @@ swinir = StarterModel(
 )
 
 qwen_vl_encoder_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI"],
     name="Qwen2.5-VL Encoder (fp8 scaled)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
@@ -172,6 +188,7 @@ qwen_vl_encoder_fp8 = StarterModel(
 )
 
 qwen_vl_encoder_nvfp4 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI"],
     name="Qwen2.5-VL Encoder (NVFP4)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_nvfp4.safetensors",
@@ -183,6 +200,7 @@ qwen_vl_encoder_nvfp4 = StarterModel(
 )
 
 qwen_vl_encoder_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/unsloth/Qwen2.5-VL-7B-Instruct-GGUF"],
     name="Qwen2.5-VL Encoder (GGUF Q4_K_M)",
     base=BaseModelType.Any,
     source="https://huggingface.co/unsloth/Qwen2.5-VL-7B-Instruct-GGUF/resolve/main/Qwen2.5-VL-7B-Instruct-Q4_K_M.gguf",
@@ -194,6 +212,7 @@ qwen_vl_encoder_gguf_q4_k_m = StarterModel(
 )
 
 qwen_vl_encoder_diffusers = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen-Image-Edit-2511"],
     name="Qwen2.5-VL Encoder (Diffusers)",
     base=BaseModelType.Any,
     source="Qwen/Qwen-Image-Edit-2511::text_encoder+tokenizer+processor",
@@ -205,6 +224,7 @@ qwen_vl_encoder_diffusers = StarterModel(
 
 # region SigLIP
 siglip = StarterModel(
+    source_urls=["https://huggingface.co/google/siglip-so400m-patch14-384"],
     name="SigLIP - google/siglip-so400m-patch14-384",
     base=BaseModelType.Any,
     source="google/siglip-so400m-patch14-384",
@@ -216,6 +236,7 @@ siglip = StarterModel(
 # Anima IP-Adapter uses it, which declares it as a dependency, and `anima_ip_adapter` installs it on
 # first use when the adapter came from elsewhere.
 siglip2_base_512 = StarterModel(
+    source_urls=["https://huggingface.co/google/siglip2-base-patch16-512"],
     name="SigLIP2 - google/siglip2-base-patch16-512",
     base=BaseModelType.Any,
     source="google/siglip2-base-patch16-512",
@@ -225,6 +246,7 @@ siglip2_base_512 = StarterModel(
 
 # region LlavaOnevisionModel (vision-language models for Image-to-Prompt)
 llava_onevision = StarterModel(
+    source_urls=["https://huggingface.co/llava-hf/llava-onevision-qwen2-0.5b-ov-hf"],
     name="LLaVA Onevision Qwen2 0.5B",
     base=BaseModelType.Any,
     source="llava-hf/llava-onevision-qwen2-0.5b-ov-hf",
@@ -233,6 +255,7 @@ llava_onevision = StarterModel(
 )
 
 llava_onevision_7b = StarterModel(
+    source_urls=["https://huggingface.co/llava-hf/llava-onevision-qwen2-7b-ov-hf"],
     name="LLaVA Onevision Qwen2 7B",
     base=BaseModelType.Any,
     source="llava-hf/llava-onevision-qwen2-7b-ov-hf",
@@ -242,6 +265,7 @@ llava_onevision_7b = StarterModel(
 
 # region TextLLM (causal language models for Prompt Expansion)
 qwen2_5_1_5b_instruct = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct"],
     name="Qwen2.5-1.5B-Instruct",
     base=BaseModelType.Any,
     source="Qwen/Qwen2.5-1.5B-Instruct",
@@ -250,6 +274,7 @@ qwen2_5_1_5b_instruct = StarterModel(
 )
 
 qwen2_5_3b_instruct = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen2.5-3B-Instruct"],
     name="Qwen2.5-3B-Instruct",
     base=BaseModelType.Any,
     source="Qwen/Qwen2.5-3B-Instruct",
@@ -258,6 +283,7 @@ qwen2_5_3b_instruct = StarterModel(
 )
 
 smollm2_1_7b_instruct = StarterModel(
+    source_urls=["https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-Instruct"],
     name="SmolLM2-1.7B-Instruct",
     base=BaseModelType.Any,
     source="HuggingFaceTB/SmolLM2-1.7B-Instruct",
@@ -266,6 +292,7 @@ smollm2_1_7b_instruct = StarterModel(
 )
 
 flux2_klein_qwen3_4b_encoder = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.2-klein-4B"],
     name="FLUX.2 Klein Qwen3 4B Encoder",
     base=BaseModelType.Any,
     source="black-forest-labs/FLUX.2-klein-4B::text_encoder+tokenizer",
@@ -274,6 +301,7 @@ flux2_klein_qwen3_4b_encoder = StarterModel(
 )
 
 flux2_klein_qwen3_8b_encoder = StarterModel(
+    source_urls=["https://huggingface.co/black-forest-labs/FLUX.2-klein-9B"],
     name="FLUX.2 Klein Qwen3 8B Encoder",
     base=BaseModelType.Any,
     source="black-forest-labs/FLUX.2-klein-9B::text_encoder+tokenizer",
@@ -282,6 +310,7 @@ flux2_klein_qwen3_8b_encoder = StarterModel(
 )
 
 flux2_klein_qwen3_4b_encoder_fp4 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-4b"],
     name="FLUX.2 Klein Qwen3 4B Encoder (FP4 mixed)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-4b/resolve/main/split_files/text_encoders/qwen_3_4b_fp4_flux2.safetensors",
@@ -290,6 +319,7 @@ flux2_klein_qwen3_4b_encoder_fp4 = StarterModel(
 )
 
 flux2_klein_qwen3_8b_encoder_fp4 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-9b"],
     name="FLUX.2 Klein Qwen3 8B Encoder (FP4 mixed)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-9b/resolve/main/split_files/text_encoders/qwen_3_8b_fp4mixed.safetensors",
@@ -303,6 +333,7 @@ flux2_klein_qwen3_8b_encoder_fp4 = StarterModel(
 # same path that changed or dropped that flag would be derotated wrongly, and the result loads
 # cleanly, logs "Kept 252 of 252" and encodes noise.
 flux2_klein_qwen3_8b_encoder_int8 = StarterModel(
+    source_urls=["https://huggingface.co/supermind/int8_convrot_models"],
     name="FLUX.2 Klein Qwen3 8B Encoder (int8)",
     base=BaseModelType.Any,
     source="https://huggingface.co/supermind/int8_convrot_models/resolve/eb6682675836a42aa91fd4effcd77d68fe60ff42/text_encoders/qwen_3_8b_int8_convrot.safetensors",
@@ -313,6 +344,7 @@ flux2_klein_qwen3_8b_encoder_int8 = StarterModel(
 # Comfy-Org safetensors (single-file, 30-layer cow, with embedded Tekken tokenizer).
 # Higher precision than the cow GGUFs and avoids the Tekken-via-HF-Hub fetch.
 flux2_dev_comfy_mistral_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/flux2-dev"],
     name="FLUX.2 [dev] Mistral Encoder (Comfy FP8)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors",
@@ -321,6 +353,7 @@ flux2_dev_comfy_mistral_fp8 = StarterModel(
 )
 
 flux2_dev_comfy_mistral_bf16 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/flux2-dev"],
     name="FLUX.2 [dev] Mistral Encoder (Comfy BF16)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_bf16.safetensors",
@@ -329,6 +362,7 @@ flux2_dev_comfy_mistral_bf16 = StarterModel(
 )
 
 flux2_dev_comfy_mistral_fp4 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/flux2-dev"],
     name="FLUX.2 [dev] Mistral Encoder (Comfy FP4 mixed)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors",
@@ -340,6 +374,7 @@ flux2_dev_comfy_mistral_fp4 = StarterModel(
 # order under architecture `cow` rather than llama.cpp's conversion; they embed Tekken too.
 # Lower memory footprint than the Comfy safetensors but slightly lower fidelity.
 flux2_dev_cow_mistral_q4 = StarterModel(
+    source_urls=["https://huggingface.co/gguf-org/flux2-dev-gguf"],
     name="FLUX.2 [dev] cow Mistral Encoder (GGUF Q4)",
     base=BaseModelType.Any,
     source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-q4_0.gguf",
@@ -349,6 +384,7 @@ flux2_dev_cow_mistral_q4 = StarterModel(
 )
 
 flux2_dev_cow_mistral_q8 = StarterModel(
+    source_urls=["https://huggingface.co/gguf-org/flux2-dev-gguf"],
     name="FLUX.2 [dev] cow Mistral Encoder (GGUF Q8)",
     base=BaseModelType.Any,
     source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-q8_0.gguf",
@@ -358,6 +394,7 @@ flux2_dev_cow_mistral_q8 = StarterModel(
 )
 
 flux2_dev_cow_mistral_iq4_xs = StarterModel(
+    source_urls=["https://huggingface.co/gguf-org/flux2-dev-gguf"],
     name="FLUX.2 [dev] cow Mistral Encoder (GGUF IQ4_XS)",
     base=BaseModelType.Any,
     source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-iq4_xs.gguf",
@@ -368,6 +405,7 @@ flux2_dev_cow_mistral_iq4_xs = StarterModel(
 
 # region Z-Image
 z_image_qwen3_encoder = StarterModel(
+    source_urls=["https://huggingface.co/Tongyi-MAI/Z-Image-Turbo"],
     name="Z-Image Qwen3 Text Encoder",
     base=BaseModelType.Any,
     source="Tongyi-MAI/Z-Image-Turbo::text_encoder+tokenizer",
@@ -376,6 +414,7 @@ z_image_qwen3_encoder = StarterModel(
 )
 
 z_image_qwen3_encoder_quantized = StarterModel(
+    source_urls=["https://huggingface.co/worstplayer/Z-Image_Qwen_3_4b_text_encoder_GGUF"],
     name="Z-Image Qwen3 Text Encoder (quantized)",
     base=BaseModelType.Any,
     source="https://huggingface.co/worstplayer/Z-Image_Qwen_3_4b_text_encoder_GGUF/resolve/main/Qwen_3_4b-Q6_K.gguf",
@@ -385,6 +424,7 @@ z_image_qwen3_encoder_quantized = StarterModel(
 )
 
 z_image_qwen3_encoder_fp4 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/z_image"],
     name="Z-Image Qwen3 Text Encoder (FP4 mixed)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/z_image/resolve/main/split_files/text_encoders/qwen_3_4b_fp4_mixed.safetensors",
@@ -394,6 +434,7 @@ z_image_qwen3_encoder_fp4 = StarterModel(
 
 # The same community repack and commit as the FLUX.2 Klein Qwen3 8B int8 encoder, pinned for the same reason.
 z_image_qwen3_encoder_int8 = StarterModel(
+    source_urls=["https://huggingface.co/supermind/int8_convrot_models"],
     name="Z-Image Qwen3 Text Encoder (int8)",
     base=BaseModelType.Any,
     source="https://huggingface.co/supermind/int8_convrot_models/resolve/eb6682675836a42aa91fd4effcd77d68fe60ff42/text_encoders/qwen_3_4b_int8_convrot.safetensors",
@@ -408,6 +449,7 @@ z_image_qwen3_encoder_int8 = StarterModel(
 # with single-file / GGUF Krea-2 transformers, which ship only the transformer. The Qwen-Image VAE
 # dependency reuses the `qwen_image_vae` starter defined in the Qwen Image region.
 qwen3_vl_encoder_4b = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct"],
     name="Qwen3-VL 4B Encoder (Diffusers)",
     base=BaseModelType.Any,
     source="Qwen/Qwen3-VL-4B-Instruct",
@@ -418,6 +460,7 @@ qwen3_vl_encoder_4b = StarterModel(
 )
 
 qwen3_vl_encoder_8b = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Ideogram-4"],
     name="Qwen3-VL 8B Encoder",
     previous_names=["Qwen3-VL 8B Encoder (Ideogram 4)"],
     base=BaseModelType.Any,
@@ -456,6 +499,7 @@ _QWEN3_VL_GGUF_NOTE = (
 )
 
 qwen3_vl_encoder_4b_bf16 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Krea-2"],
     name="Qwen3-VL 4B Encoder (bf16)",
     base=BaseModelType.Any,
     source=f"{_QWEN3_VL_KREA2}/qwen3vl_4b_bf16.safetensors",
@@ -466,6 +510,7 @@ qwen3_vl_encoder_4b_bf16 = StarterModel(
 )
 
 qwen3_vl_encoder_4b_fp8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Krea-2"],
     name="Qwen3-VL 4B Encoder (fp8)",
     base=BaseModelType.Any,
     source=f"{_QWEN3_VL_KREA2}/qwen3vl_4b_fp8_scaled.safetensors",
@@ -476,6 +521,7 @@ qwen3_vl_encoder_4b_fp8 = StarterModel(
 )
 
 qwen3_vl_encoder_4b_int8 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Krea-2"],
     name="Qwen3-VL 4B Encoder (int8)",
     base=BaseModelType.Any,
     source=f"{_QWEN3_VL_KREA2}/qwen3vl_4b_int8_convrot.safetensors",
@@ -486,6 +532,7 @@ qwen3_vl_encoder_4b_int8 = StarterModel(
 )
 
 qwen3_vl_encoder_4b_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct-GGUF"],
     name="Qwen3-VL 4B Encoder (Q4_K_M GGUF)",
     base=BaseModelType.Any,
     source=f"{_QWEN3_VL_4B_GGUF}/Qwen3VL-4B-Instruct-Q4_K_M.gguf",
@@ -496,6 +543,7 @@ qwen3_vl_encoder_4b_gguf_q4_k_m = StarterModel(
 )
 
 qwen3_vl_encoder_4b_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen3-VL-4B-Instruct-GGUF"],
     name="Qwen3-VL 4B Encoder (Q8_0 GGUF)",
     base=BaseModelType.Any,
     source=f"{_QWEN3_VL_4B_GGUF}/Qwen3VL-4B-Instruct-Q8_0.gguf",
@@ -506,6 +554,7 @@ qwen3_vl_encoder_4b_gguf_q8_0 = StarterModel(
 )
 
 qwen3_vl_encoder_8b_nvfp4 = StarterModel(
+    source_urls=["https://huggingface.co/Comfy-Org/Ideogram-4"],
     name="Qwen3-VL 8B Encoder (NVFP4)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/Ideogram-4/resolve/2aa6c75ce6d5fabded0ca4d0f76abbfaf8edc87d/text_encoders/qwen3vl_8b_nvfp4.safetensors",
@@ -516,6 +565,7 @@ qwen3_vl_encoder_8b_nvfp4 = StarterModel(
 )
 
 qwen3_vl_encoder_8b_gguf_q4_k_m = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF"],
     name="Qwen3-VL 8B Encoder (Q4_K_M GGUF)",
     base=BaseModelType.Any,
     source=f"{_QWEN3_VL_8B_GGUF}/Qwen3VL-8B-Instruct-Q4_K_M.gguf",
@@ -526,6 +576,7 @@ qwen3_vl_encoder_8b_gguf_q4_k_m = StarterModel(
 )
 
 qwen3_vl_encoder_8b_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF"],
     name="Qwen3-VL 8B Encoder (Q8_0 GGUF)",
     base=BaseModelType.Any,
     source=f"{_QWEN3_VL_8B_GGUF}/Qwen3VL-8B-Instruct-Q8_0.gguf",
@@ -538,6 +589,7 @@ qwen3_vl_encoder_8b_gguf_q8_0 = StarterModel(
 # llama.cpp keeps a GGUF Qwen3-VL encoder's vision tower in this companion file, which Qwen-Image-2.1 edits read
 # reference images through. Standalone: no starter depends on it.
 qwen3_vl_vision_tower_8b = StarterModel(
+    source_urls=["https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF"],
     name="Qwen3-VL 8B Vision Tower",
     base=BaseModelType.Any,
     source=f"{_QWEN3_VL_8B_GGUF}/mmproj-Qwen3VL-8B-Instruct-F16.gguf",
@@ -562,6 +614,7 @@ qwen3_vl_vision_tower_4b = StarterModel(
 # (both T2V and I2V) uses a 16-channel VAE; TI2V-5B uses a 48-channel VAE. The
 # two VAEs are not interchangeable.
 wan_22_t5_encoder = StarterModel(
+    source_urls=["https://huggingface.co/Wan-AI/Wan2.2-T2V-A14B-Diffusers"],
     name="Wan T5 Encoder (UMT5-XXL)",
     base=BaseModelType.Any,
     source="Wan-AI/Wan2.2-T2V-A14B-Diffusers::text_encoder+tokenizer",
@@ -572,6 +625,7 @@ wan_22_t5_encoder = StarterModel(
 )
 
 wan_22_t5_encoder_gguf_q8_0 = StarterModel(
+    source_urls=["https://huggingface.co/city96/umt5-xxl-encoder-gguf"],
     name="Wan T5 Encoder (UMT5-XXL, GGUF Q8_0)",
     base=BaseModelType.Any,
     source="https://huggingface.co/city96/umt5-xxl-encoder-gguf/resolve/main/umt5-xxl-encoder-Q8_0.gguf",
@@ -584,6 +638,7 @@ wan_22_t5_encoder_gguf_q8_0 = StarterModel(
 # DALL-E 2 removed — deprecated by OpenAI, shutdown May 12, 2026.
 # region Anima
 anima_qwen3_encoder = StarterModel(
+    source_urls=["https://huggingface.co/circlestone-labs/Anima"],
     name="Anima Qwen3 0.6B Text Encoder",
     base=BaseModelType.Any,
     source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/text_encoders/qwen_3_06b_base.safetensors",

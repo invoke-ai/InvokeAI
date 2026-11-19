@@ -75,6 +75,7 @@ type ModelIdentityModel = Pick<
   | 'source'
   | 'source_type'
   | 'source_url'
+  | 'source_urls'
   | 'type'
   | 'variant'
 >;
@@ -125,6 +126,7 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
         source: model.source,
         source_type: model.source_type,
         source_url: model.source_url,
+        source_urls: model.source_urls,
         type: model.type,
         variant: model.variant,
       }
@@ -552,16 +554,12 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
       label: t('models.source'),
       value: model.source,
     },
-    // Render legacy non-HTTP(S) source links as text rather than unsafe anchors.
-    ...(model.source_url
-      ? [
-          {
-            href: model.source_url.startsWith('http') ? model.source_url : undefined,
-            label: t('models.sourceUrl'),
-            value: model.source_url,
-          },
-        ]
-      : []),
+    // Keep legacy source_url visible and deduplicate it against curated model pages.
+    ...[...new Set([...(model.source_urls ?? []), ...(model.source_url ? [model.source_url] : [])])].map((url) => ({
+      href: url.startsWith('https://') || url.startsWith('http://') ? url : undefined,
+      label: t('models.sourceUrl'),
+      value: url,
+    })),
     // Format-specific attrs; truthiness also skips repo_variant's '' default.
     ...(model.format === 'diffusers' && model.repo_variant
       ? [{ label: t('models.repoVariant'), value: model.repo_variant }]
@@ -580,7 +578,7 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
     <>
       <DataList.Root gap="2.5" orientation="horizontal" variant="subtle">
         {attributes.map((attribute) => (
-          <DataList.Item key={attribute.label}>
+          <DataList.Item key={`${attribute.label}-${attribute.value}`}>
             <DataList.ItemLabel color="fg.muted" fontSize="xs" minW="8rem" textTransform="uppercase">
               {attribute.label}
             </DataList.ItemLabel>

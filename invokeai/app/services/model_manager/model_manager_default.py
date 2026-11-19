@@ -107,6 +107,7 @@ class ModelManagerService(ModelManagerServiceBase):
             identified.trigger_phrases = config.trigger_phrases
         identified.source = config.source
         identified.source_type = config.source_type
+        identified.source_urls = config.source_urls
         if hasattr(config, "cpu_only") and hasattr(identified, "cpu_only"):
             identified.cpu_only = config.cpu_only
         previous_settings = getattr(config, "default_settings", None)
