@@ -3343,7 +3343,7 @@ const qwenImageSigmas = (size: { width: number; height: number }, steps: number)
 
 const SIGMA_CLIPPING: SigmaClipping = { kind: 'sigma' };
 
-// The schedules below track the nodes' default shift. Neither Upscale nor Canvas sends a shift with a partial pass.
+// The step schedules assume the node's default shift. Upscale sends no shift; Canvas can, so it reads only `kind`.
 const DENOISING_START_CLIPPING: Partial<Record<string, DenoisingStartClipping>> = {
   anima: {
     kind: 'step',
