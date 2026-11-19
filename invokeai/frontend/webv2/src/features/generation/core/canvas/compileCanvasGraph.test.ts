@@ -6,9 +6,9 @@ import type {
   MainModelConfig,
 } from '@features/generation/core/types';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getPidDecoderBaseForMainBase } from '@features/generation/core/pid';
 import { isPidDecodeNodeType } from '@features/generation/core/pidGraph';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ControlLayerGraphInput } from './addControlLayers';
@@ -85,6 +85,13 @@ const ideogram4Model: MainModelConfig = {
   format: 'diffusers',
   key: 'ideogram4-model',
   name: 'Ideogram 4',
+  type: 'main',
+};
+const ernieImageModel: MainModelConfig = {
+  base: 'ernie-image',
+  format: 'diffusers',
+  key: 'ernie-image-model',
+  name: 'ERNIE-Image',
   type: 'main',
 };
 const externalModel: GenerateModelConfig = {
@@ -314,6 +321,10 @@ describe('compileCanvasGraph', () => {
       const { backendGraph } = compile(sd1Model, 'img2img', { strength: 0.25 });
 
       expect(backendGraph.nodes.denoise_latents?.denoising_start).toBeCloseTo(0.75, 10);
+    });
+
+    it.each([ernieImageModel, ideogram4Model])('rejects img2img for $base, which has no latent space', (model) => {
+      expect(() => compile(model, 'img2img')).toThrow(`Canvas generation is not supported for ${model.name}.`);
     });
   });
 

@@ -1,6 +1,6 @@
 import type { GenerationModelCatalogItem, MainModelConfig } from '@features/generation/contracts';
 
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { LTX2_DEFAULT_NEGATIVE_PROMPT, LTX2_EXTEND_CONTEXT_FRAMES } from '@features/video/core/dimensions';
 import { describe, expect, it } from 'vitest';
 

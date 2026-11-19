@@ -3,11 +3,11 @@ import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type { ModelConfig } from '@features/models';
 import type { CanvasInvocationFailure } from '@workbench/widgets/canvas/invoke/canvasInvocationFailure';
 
-import { setArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
+import { setArchitectureCapabilities } from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient } from '@tanstack/react-query';
 import { FocusRegionProvider } from '@workbench/focusRegions';

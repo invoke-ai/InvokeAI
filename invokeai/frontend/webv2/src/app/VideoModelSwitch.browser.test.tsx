@@ -4,8 +4,8 @@ import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { GenerationUiProvider, type GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { getDefaultVideoSettings, normalizeVideoWidgetValues } from '@features/video';
 import { VideoWidgetView } from '@features/video/ui/VideoWidgetView';
@@ -110,7 +110,11 @@ vi.mock('@features/models/react', async (importOriginal) => ({
     }
 
     const options = (useModelSnapshot().models as ModelConfig[]).filter(
-      (candidate) => modelTypes.includes(candidate.type) && (!filter || filter(candidate))
+      (candidate) =>
+        [candidate.type, ...(candidate.roles ?? []).map((role) => role.type)].some((type) =>
+          modelTypes.includes(type)
+        ) &&
+        (!filter || filter(candidate))
     );
 
     return (

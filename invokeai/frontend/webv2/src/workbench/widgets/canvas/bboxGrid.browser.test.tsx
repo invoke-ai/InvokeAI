@@ -1,8 +1,8 @@
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';

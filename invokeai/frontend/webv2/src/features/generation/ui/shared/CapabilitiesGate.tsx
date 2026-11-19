@@ -5,7 +5,7 @@ import {
   ensureArchitectureCapabilitiesLoaded,
   getArchitectureCapabilitiesSnapshot,
   useArchitectureCapabilitiesSelector,
-} from '@features/generation/data/architectureCapabilitiesStore';
+} from '@features/models/architecturesStore';
 import { focusIfUnclaimed } from '@platform/react/focusIfUnclaimed';
 import { Button } from '@platform/ui/Button';
 import { useCallback, useRef, useState } from 'react';

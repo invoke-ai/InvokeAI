@@ -29,6 +29,22 @@ const getFiniteNumber = (metadata: Record<string, unknown>, key: string): number
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 };
 
+const getNumberOrScheduleDisplay = (metadata: Record<string, unknown>, key: string): string | number | null => {
+  const scalar = getFiniteNumber(metadata, key);
+
+  if (scalar !== null) {
+    return scalar;
+  }
+
+  const value = metadata[key];
+
+  return Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((entry) => typeof entry === 'number' && Number.isFinite(entry))
+    ? value.join(', ')
+    : null;
+};
+
 const getModelName = (metadata: Record<string, unknown>): string | null => {
   const ref = readRecordedModelRef(metadata.model);
 
@@ -55,7 +71,7 @@ export const parsePreviewMetadata = (
     const label = t(lookup);
     return label === lookup ? null : label;
   };
-  const cfgScale = getFiniteNumber(metadata, 'cfg_scale');
+  const cfgScale = getNumberOrScheduleDisplay(metadata, 'cfg_scale');
 
   push('positivePrompt', t('widgets.preview.fields.prompt'), getString(metadata, 'positive_prompt'), true);
   push('negativePrompt', t('widgets.preview.fields.negativePrompt'), getString(metadata, 'negative_prompt'), true);
@@ -69,7 +85,7 @@ export const parsePreviewMetadata = (
     push(
       'guidance',
       t('widgets.preview.fields.guidance'),
-      cfgScale === null ? getFiniteNumber(metadata, 'guidance') : null
+      cfgScale === null ? getNumberOrScheduleDisplay(metadata, 'guidance') : null
     );
     push('scheduler', t('widgets.preview.fields.scheduler'), getString(metadata, 'scheduler'));
     push('clipSkip', t('widgets.preview.fields.clipSkip'), getFiniteNumber(metadata, 'clip_skip'));

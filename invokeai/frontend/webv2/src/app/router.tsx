@@ -97,7 +97,7 @@ const publishSchedulerPolicy = (next: SchedulerPolicyState): void => {
   schedulerPolicyChannel.notify();
 };
 
-/** Generation's rules arrive with the first Default settings section; the Launchpad does not load them at startup. */
+/** Generation's rules and Models' architecture table arrive with the first Default settings section, not at startup. */
 const schedulerPolicySource: SchedulerPolicySource = {
   getSnapshot: () => schedulerPolicyState,
   load: () => {

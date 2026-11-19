@@ -7,7 +7,7 @@ import type * as WorkflowReact from '@features/workflow/react';
 import type { CreateCanvasFromImagesResult } from '@workbench/canvas-operations/api';
 import type * as SettingsStoreModule from '@workbench/settings/store';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { parseOpenApiToTemplates } from '@features/workflow/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { toaster } from '@platform/ui/toaster';

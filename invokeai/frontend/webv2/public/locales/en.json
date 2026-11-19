@@ -1426,6 +1426,7 @@
     "allBases": "All bases",
     "allInstalled": "all installed",
     "allModels": "All models",
+    "alsoUsableAs": "Also usable as",
     "apiKey": "API key",
     "apiKeyConfigured": "API key configured",
     "apiKeyFor": "{{title}} API key",
@@ -1642,6 +1643,7 @@
     },
     "library": "Model library",
     "libraryMaintenance": "Model library maintenance",
+    "listedAs": "{{name}}, listed as {{type}}",
     "linkedModel": "Linked model",
     "linkedToModel": "Linked to {{name}}",
     "loadingModels": "Loading models…",
@@ -1884,6 +1886,8 @@
     "updatePath": "Update path",
     "updatePathDescription": "If the model file moved on disk, point Invoke at its new location. The file is not moved or copied.",
     "useSupportedImage": "Use a PNG, JPEG, or WebP image.",
+    "vaePairingLoadFailed": "Couldn't load VAE pairings, so VAEs aren't listed.",
+    "vaePairingLoading": "Loading VAE pairings…",
     "variant": "Variant",
     "variantHelp": "Architecture variant, e.g. inpaint or dev.",
     "viewModel": "View model",
@@ -3126,11 +3130,15 @@
         "maskBlur": "Mask blur"
       },
       "conceptMenu": {
+        "clearExpertTarget": "Clear expert target",
         "disable": "Disable",
         "enable": "Enable",
         "openInModelManager": "Open in Model Manager",
-        "remove": "Remove"
+        "remove": "Remove",
+        "useSingleWeight": "Use single weight"
       },
+      "conceptHighNoiseWeightNamed": "{{name}} high-noise weight",
+      "conceptLowNoiseWeightNamed": "{{name}} low-noise weight",
       "conceptWeight": "{{name}} weight",
       "concepts": "Concepts",
       "conceptsUnsupported": "Concepts are not supported by the selected model.",
@@ -3587,8 +3595,15 @@
       "usingBundledVae": "Using the VAE bundled with the model.",
       "vae": "VAE",
       "vaePrecision": "VAE precision",
+      "highNoiseWeight": "High-noise weight",
+      "lowNoiseWeight": "Low-noise weight",
       "wanGuidanceLowNoise": "Low-noise guidance",
       "wanGuidanceLowNoiseHelp": "Guidance for the low-noise expert. Reuses the main guidance when unset.",
+      "wanLoraTargets": {
+        "both": "Both experts",
+        "high": "High-noise expert",
+        "low": "Low-noise expert"
+      },
       "weight": "Weight",
       "width": "Width",
       "xAxis": "X axis",

@@ -108,6 +108,99 @@ describe('compileVideoGraph — Wan 2.2', () => {
     expect(hasEdge(backendGraph, 'negative_prompt', 'value', 'core_metadata', 'negative_prompt')).toBe(true);
   });
 
+  it('chains wan_lora_loader nodes with expert targets and preserves target/low_noise_weight in metadata', () => {
+    const model = wanModel('t2v_a14b');
+    const highLora = {
+      isEnabled: true,
+      model: { base: 'wan', key: 'lit-high', name: 'Wan High', type: 'lora' as const, variant: 'a14b' },
+      target: 'high' as const,
+      weight: 0.9,
+    };
+    const lowLora = {
+      isEnabled: true,
+      model: { base: 'wan', key: 'lit-low', name: 'Wan Low', type: 'lora' as const, variant: 'a14b' },
+      target: 'low' as const,
+      weight: 0.5,
+    };
+    const dualLora = {
+      isEnabled: true,
+      lowNoiseWeight: 0.3,
+      model: { base: 'wan', key: 'lit-dual', name: 'Wan Dual', type: 'lora' as const, variant: 'a14b' },
+      target: 'both' as const,
+      weight: 0.8,
+    };
+    const untargetedLora = {
+      isEnabled: true,
+      model: { base: 'wan', key: 'lit-auto', name: 'Wan Auto', type: 'lora' as const, variant: 'a14b' },
+      weight: 0.7,
+    };
+
+    const { backendGraph } = compileVideoGraph(
+      settingsFor(model, { loras: [highLora, lowLora, dualLora, untargetedLora] }),
+      model
+    );
+
+    expect(nodesOfType(backendGraph, 'wan_lora_collection_loader')).toHaveLength(0);
+    const loaders = nodesOfType(backendGraph, 'wan_lora_loader');
+    expect(loaders).toHaveLength(5);
+    expect(
+      loaders.map((node) => ({ key: (node.lora as { key: string }).key, target: node.target, weight: node.weight }))
+    ).toEqual([
+      { key: 'lit-high', target: 'high', weight: 0.9 },
+      { key: 'lit-low', target: 'low', weight: 0.5 },
+      { key: 'lit-dual', target: 'high', weight: 0.8 },
+      { key: 'lit-dual', target: 'low', weight: 0.3 },
+      { key: 'lit-auto', target: 'auto', weight: 0.7 },
+    ]);
+    expect(hasEdge(backendGraph, 'model_loader', 'transformer', loaders[0]!.id, 'transformer')).toBe(true);
+    expect(hasEdge(backendGraph, loaders[4]!.id, 'transformer', 'denoise_latents', 'transformer')).toBe(true);
+    expect(nodeOfType(backendGraph, 'core_metadata').loras).toEqual([
+      { model: expect.objectContaining({ key: 'lit-high' }), target: 'high', weight: 0.9 },
+      { model: expect.objectContaining({ key: 'lit-low' }), target: 'low', weight: 0.5 },
+      { low_noise_weight: 0.3, model: expect.objectContaining({ key: 'lit-dual' }), target: 'both', weight: 0.8 },
+      { model: expect.objectContaining({ key: 'lit-auto' }), weight: 0.7 },
+    ]);
+
+    const equalLowNoise = compileVideoGraph(
+      settingsFor(model, {
+        loras: [{ ...dualLora, lowNoiseWeight: 0.8, target: 'both', weight: 0.8 }],
+      }),
+      model
+    );
+    const equalLoaders = nodesOfType(equalLowNoise.backendGraph, 'wan_lora_loader');
+    expect(equalLoaders).toHaveLength(1);
+    expect(equalLoaders[0]).toMatchObject({ target: 'both', weight: 0.8 });
+    expect(nodeOfType(equalLowNoise.backendGraph, 'core_metadata').loras).toEqual([
+      { model: expect.objectContaining({ key: 'lit-dual' }), target: 'both', weight: 0.8 },
+    ]);
+  });
+
+  it('emits a single wan_lora_loader node and omits low_noise_weight on single-transformer TI2V-5B even with lowNoiseWeight set', () => {
+    const model = wanModel('ti2v_5b');
+    const dualLora5b = {
+      isEnabled: true,
+      lowNoiseWeight: 0.4,
+      model: { base: 'wan', key: 'lit-5b-dual', name: 'Wan 5B Dual', type: 'lora' as const, variant: '5b' },
+      target: 'both' as const,
+      weight: 0.8,
+    };
+    const { backendGraph } = compileVideoGraph(settingsFor(model, { loras: [dualLora5b] }), model);
+    const loaders = nodesOfType(backendGraph, 'wan_lora_loader');
+
+    expect(nodesOfType(backendGraph, 'wan_lora_collection_loader')).toHaveLength(0);
+    expect(loaders).toHaveLength(1);
+    expect(loaders[0]).toMatchObject({
+      lora: expect.objectContaining({ key: 'lit-5b-dual' }),
+      target: 'both',
+      weight: 0.8,
+    });
+    expect(hasEdge(backendGraph, 'model_loader', 'transformer', loaders[0]!.id, 'transformer')).toBe(true);
+    expect(hasEdge(backendGraph, loaders[0]!.id, 'transformer', 'denoise_latents', 'transformer')).toBe(true);
+    expect(nodeOfType(backendGraph, 'core_metadata').loras).toEqual([
+      { model: expect.objectContaining({ key: 'lit-5b-dual' }), target: 'both', weight: 0.8 },
+    ]);
+  });
+
   it('wires first-frame conditioning through wan_ref_image_encoder with matching canvas and frames', () => {
     const model = wanModel('i2v_a14b');
     const settings = settingsFor(model, { firstFrameImage: FIRST_FRAME, targetResolution: '480p' });

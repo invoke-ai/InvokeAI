@@ -1,6 +1,6 @@
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
-import type { PickerGroup, PickerOptionState } from '@platform/ui/Picker';
+import type { PickerGroup, PickerOptionState, PickerStatus } from '@platform/ui/Picker';
 import type { ReactNode } from 'react';
 
 import {
@@ -18,7 +18,7 @@ import {
   VisuallyHidden,
 } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelBaseLongLabel } from '@features/models/core/baseIdentity';
-import { getModelPickerGroups, hasModelPickerCandidates } from '@features/models/core/library';
+import { getModelPickerGroups, getQualifyingType, hasModelPickerCandidates } from '@features/models/core/library';
 import { getModelTypeLabel, getModelTypePluralLabel } from '@features/models/core/taxonomy';
 import { getModelImageUrl } from '@features/models/data/api';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models/data/modelsStore';
@@ -107,7 +107,9 @@ export const ModelSelect = ({
   isClearable = false,
   modelTypes,
   onChange,
+  onOpen,
   onPickerClose,
+  pendingCandidates,
   pickerHeader,
   placeholder,
   relatedTo = null,
@@ -130,7 +132,14 @@ export const ModelSelect = ({
   isClearable?: boolean;
   modelTypes: readonly ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
+  /** Called as the picker opens, e.g. to load what `filter` reads. */
+  onOpen?: () => void;
   onPickerClose?: () => void;
+  /**
+   * Candidates `filter` cannot decide yet, e.g. while the data it reads loads or after that load failed. Keeps the
+   * trigger usable with no decided candidate, and shows this status in the list.
+   */
+  pendingCandidates?: PickerStatus;
   pickerHeader?: ReactNode;
   placeholder?: string;
   /** Key of the model whose links rank this picker: its related models come first and carry a link icon. */
@@ -180,8 +189,11 @@ export const ModelSelect = ({
 
   // Disable empty-library triggers after loading; preserve clearing for stale selections.
   const hasCandidates = useMemo(
-    () => loadStatus !== 'loaded' || hasModelPickerCandidates(models, { excludeKeys, filter, modelTypes }),
-    [excludeKeys, filter, loadStatus, modelTypes, models]
+    () =>
+      loadStatus !== 'loaded' ||
+      pendingCandidates !== undefined ||
+      hasModelPickerCandidates(models, { excludeKeys, filter, modelTypes }),
+    [excludeKeys, filter, loadStatus, modelTypes, models, pendingCandidates]
   );
   const isEmpty = !hasCandidates && !value;
   // Every compatible model is already chosen elsewhere, which is not the same as none being installed.
@@ -191,10 +203,12 @@ export const ModelSelect = ({
   );
   const isInert = isDisabled || isEmpty;
 
-  if (isInert !== lastDisabled) {
-    setLastDisabled(isInert);
+  // Disabling closes an open picker. Running out of candidates does not: the list says so, and the user closes it, so
+  // a load that admits nothing never snaps the popup shut under them.
+  if (isDisabled !== lastDisabled) {
+    setLastDisabled(isDisabled);
 
-    if (isInert) {
+    if (isDisabled) {
       setIsOpen(false);
     }
   }
@@ -214,7 +228,9 @@ export const ModelSelect = ({
   );
 
   const selectedModel = useModelsSelector((snapshot) => (value ? (snapshot.modelsByKey.get(value) ?? null) : null));
-  const hasMixedTypes = useMemo(() => new Set(candidates.map((model) => model.type)).size > 1, [candidates]);
+  // The type a candidate qualifies as in this picker: its primary type, else the first role type asked for.
+  const effectiveType = useCallback((model: ModelConfig) => getQualifyingType(model, modelTypes), [modelTypes]);
+  const hasMixedTypes = useMemo(() => new Set(candidates.map(effectiveType)).size > 1, [candidates, effectiveType]);
   const scopeLabel =
     scopeLabelOverride ??
     (modelTypes.length === 1
@@ -265,9 +281,10 @@ export const ModelSelect = ({
         model={model}
         showType={hasMixedTypes}
         state={state}
+        type={effectiveType(model)}
       />
     ),
-    [enableModelDescriptions, hasMixedTypes, relatedKeys, relatedToName]
+    [effectiveType, enableModelDescriptions, hasMixedTypes, relatedKeys, relatedToName]
   );
 
   return (
@@ -289,9 +306,13 @@ export const ModelSelect = ({
         }}
         unmountOnExit
         onOpenChange={(event) => {
-          if (isInert) {
+          if (event.open && isInert) {
             setIsOpen(false);
             return;
+          }
+
+          if (event.open) {
+            onOpen?.();
           }
 
           setIsOpen(event.open);
@@ -313,7 +334,8 @@ export const ModelSelect = ({
               colorPalette={isInvalid ? 'red' : 'gray'}
               // Opening it puts the caret in a search box, so it points like a combobox's input does.
               cursor={isInert ? undefined : 'text'}
-              disabled={isInert}
+              // An open picker keeps its trigger enabled so it can show why nothing is left to pick.
+              disabled={isInert && !isOpen}
               // Under an inside label the value reads at Select's and Combobox's regular weight; the label sets its
               // own.
               fontWeight={insideLabel ? 'normal' : undefined}
@@ -394,6 +416,7 @@ export const ModelSelect = ({
                 isCompact={isCompact}
                 isMatch={matchesModel}
                 listLabel={listLabel}
+                pending={pendingCandidates}
                 noMatchesMessage={
                   selectedBases.size > 0
                     ? t('models.scopeNoMatchBases', { scope: scopeLabel })
@@ -571,6 +594,7 @@ const ModelOptionContent = ({
   relatedToName,
   showType,
   state,
+  type,
 }: {
   enableDescription: boolean;
   isRelated: boolean;
@@ -578,6 +602,7 @@ const ModelOptionContent = ({
   relatedToName: string | null;
   showType: boolean;
   state: PickerOptionState;
+  type: ModelTaxonomyType;
 }) => {
   const { t } = useTranslation();
   const linkedLabel =
@@ -610,7 +635,7 @@ const ModelOptionContent = ({
           {isRelated ? <VisuallyHidden>{`, ${linkedLabel}`}</VisuallyHidden> : null}
           {showType ? (
             <Badge colorPalette="gray" flexShrink={0} fontSize="xs" variant="surface">
-              {getModelTypeLabel(model.type)}
+              {getModelTypeLabel(type)}
             </Badge>
           ) : null}
         </HStack>

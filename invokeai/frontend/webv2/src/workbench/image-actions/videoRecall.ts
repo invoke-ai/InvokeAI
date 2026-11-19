@@ -1,8 +1,8 @@
 import type {
   GenerateLora,
   GenerationModelCatalogItem as ModelConfig,
-  LoraModelConfig,
   MainModelConfig,
+  WanLoraTarget,
 } from '@features/generation/contracts';
 import type {
   VideoAspectRatioId,
@@ -36,6 +36,8 @@ import {
 import { SEED_MAX } from '@platform/core/seed';
 
 import {
+  mergeOpposingWanLoraTargets,
+  readMetadataLoraTarget,
   resolveRecordedModel,
   toRecordedModelRef,
   type RecordedModelPolicy,
@@ -239,7 +241,7 @@ export interface VideoRecallRecord {
   /** Whether the record carries a `loras` list at all; a partial recall replaces the panel's set only then. */
   hasLoraList: boolean;
   /** The usable entries of `loras`; a missing weight reads as 1. */
-  loras: readonly { model: RecordedModelRef; weight: number }[];
+  loras: readonly { lowNoiseWeight?: number; model: RecordedModelRef; target?: WanLoraTarget; weight: number }[];
   hybridStartBlock: number | null;
   contextFrames: number | null;
   /** Keyframes and source clip; in extend mode the first frame was extracted from the source, so it is dropped. */
@@ -270,20 +272,40 @@ const getConditioningClip = (metadata: Record<string, unknown>): VideoRecallCond
   return name !== null && (role === 'audio' || role === 'video') ? { name, role } : null;
 };
 
-const getLoras = (metadata: Record<string, unknown>): { model: RecordedModelRef; weight: number }[] =>
-  Array.isArray(metadata.loras)
-    ? metadata.loras.flatMap((entry) => {
-        const model = isRecord(entry) ? toRecordedModelRef(entry.model) : null;
+const getLoras = (
+  metadata: Record<string, unknown>
+): { lowNoiseWeight?: number; model: RecordedModelRef; target?: WanLoraTarget; weight: number }[] => {
+  if (!Array.isArray(metadata.loras)) {
+    return [];
+  }
 
-        if (!model) {
-          return [];
-        }
+  const loras: { lowNoiseWeight?: number; model: RecordedModelRef; target?: WanLoraTarget; weight: number }[] = [];
 
-        const weight = typeof entry.weight === 'number' && Number.isFinite(entry.weight) ? entry.weight : 1;
+  for (const entry of metadata.loras) {
+    const model = isRecord(entry) ? toRecordedModelRef(entry.model) : null;
 
-        return [{ model, weight }];
-      })
-    : [];
+    if (!model) {
+      continue;
+    }
+
+    const weight = typeof entry.weight === 'number' && Number.isFinite(entry.weight) ? entry.weight : 1;
+    const targetFields = isRecord(entry) ? readMetadataLoraTarget(entry, weight) : {};
+    const existingIndex = model.key ? loras.findIndex((lora) => lora.model.key === model.key) : -1;
+
+    if (existingIndex !== -1) {
+      const merged = mergeOpposingWanLoraTargets(loras[existingIndex]!, { target: targetFields.target, weight });
+
+      if (merged) {
+        loras[existingIndex] = merged;
+      }
+      continue;
+    }
+
+    loras.push({ model, weight, ...targetFields });
+  }
+
+  return loras;
+};
 
 const getReferences = (recorded: unknown[]): VideoRecallReferenceName[] =>
   // Capped at the request maximum (3 videos + 9 images): corrupt metadata must not drive unbounded gallery resolves.
@@ -851,13 +873,37 @@ export const buildVideoRecallSettings = ({
     }
   }
 
-  const resolvedLoras = record.loras.flatMap((entry) => {
+  const resolvedLoras: GenerateLora[] = [];
+
+  for (const entry of record.loras) {
     const installed = resolveVideoModel(entry.model, models);
 
-    return installed && isLoraModelConfig(installed) && isLoraCompatibleWithModel(installed, model)
-      ? [{ isEnabled: true, model: installed as LoraModelConfig, weight: entry.weight }]
-      : [];
-  });
+    if (!installed || !isLoraModelConfig(installed) || !isLoraCompatibleWithModel(installed, model)) {
+      continue;
+    }
+
+    const existingIndex = resolvedLoras.findIndex((lora) => lora.model.key === installed.key);
+
+    if (existingIndex !== -1) {
+      const merged = mergeOpposingWanLoraTargets(resolvedLoras[existingIndex]!, {
+        target: entry.target,
+        weight: entry.weight,
+      });
+
+      if (merged) {
+        resolvedLoras[existingIndex] = merged;
+      }
+      continue;
+    }
+
+    resolvedLoras.push({
+      isEnabled: true,
+      model: installed,
+      weight: entry.weight,
+      ...(entry.target !== undefined ? { target: entry.target } : {}),
+      ...(entry.lowNoiseWeight !== undefined ? { lowNoiseWeight: entry.lowNoiseWeight } : {}),
+    });
+  }
 
   // Reproduce the recorded LoRA set, even empty; a partial record without `loras` leaves the panel's set.
   if (lorasRecalled && (resolvedLoras.length > 0 || values.loras.length > 0)) {

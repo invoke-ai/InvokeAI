@@ -4,12 +4,12 @@ import type { Project } from '@workbench/projectContracts';
 import type * as settingsStoreModule from '@workbench/settings/store';
 import type { ReactNode } from 'react';
 
+import { getDefaultGenerateSettings } from '@features/generation/settings';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings } from '@features/generation/settings';
+} from '@features/models/core/architectureCapabilities';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
