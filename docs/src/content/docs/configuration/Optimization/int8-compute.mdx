@@ -1,7 +1,7 @@
 ---
 title: int8 Compute
 description: Run ComfyUI int8 builds on the int8 tensor cores of RTX 30-series and newer NVIDIA GPUs, up to twice as fast.
-lastUpdated: 2026-10-26
+lastUpdated: 2026-11-19
 sidebar:
   order: 6
 ---
@@ -53,14 +53,14 @@ in VRAM does not change the image.
 
 - **An NVIDIA GPU with compute capability 8.0 or newer**: RTX 30-series, RTX 40-series, RTX 50-series, A100,
   H100. Measured on an RTX 4090.
-- **Triton.** InvokeAI's NVIDIA install on Windows x64 and Linux includes it (on Windows, the `triton-windows`
-  package). A [manual install](/start-here/manual/) on Windows without the `cuda` extra has none: install the
-  `triton-windows` version matching InvokeAI's PyTorch as described under
+- **Triton.** InvokeAI's CUDA extra on Windows x64, Windows ARM64 and Linux includes it (on Windows, the
+  `triton-windows` package). A [manual install](/start-here/manual/) without the `cuda` extra must install the
+  version matching InvokeAI's PyTorch as described under
   [SageAttention](/configuration/optimization/sage-attention/#windows).
 - **An int8 build quantized with convrot**, as every published build is.
 
 Everything else falls back to the default path automatically: AMD (ROCm), Apple silicon (MPS), Intel (XPU), the CPU,
-older NVIDIA GPUs, and Windows on ARM64, whose install has no Triton.
+older NVIDIA GPUs, and manual Windows ARM64 installs without the `cuda` extra.
 
 ## Turning it on
 
