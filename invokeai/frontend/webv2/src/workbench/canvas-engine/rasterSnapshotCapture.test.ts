@@ -43,7 +43,6 @@ const okPixels = (layerId: string, size = 4): ExportLayerPixelsResult => ({
   surface: surface(size, size),
 });
 
-/** Mutable so a test can advance engine state mid-capture, the way an edit does. */
 interface Harness {
   deps: CreateRasterSnapshotCaptureDeps;
   memory: RasterMemoryBudgetController;
@@ -142,8 +141,6 @@ describe('isDocumentSnapshotCurrent', () => {
   it('rejects a replacement canvas that is structurally identical', () => {
     const capture = createRasterSnapshotCapture(harness.deps);
     const snapshot = capture.captureDocumentSnapshot()!;
-    // Same layers, same generation — only the object identity differs, which is
-    // exactly what a reducer pass produces.
     harness.state.canvas = canvasState();
     expect(capture.isDocumentSnapshotCurrent(snapshot)).toBe(false);
   });
@@ -334,7 +331,6 @@ describe('captureRasterSnapshot', () => {
     const detaching = makeHarness({ createSurface });
     detaching.state.canvas = canvasState(['a', 'b']);
     detaching.rasterize.mockImplementation((layerId: string) => {
-      // The edit lands while the FIRST layer is still rasterizing.
       detaching.state.directPixelEpoch += 1;
       const result = okPixels(layerId);
       detaching.currentGuards.add(result.status === 'ok' ? result.guard : guard(layerId));
@@ -347,7 +343,7 @@ describe('captureRasterSnapshot', () => {
   });
 
   it('goes stale when a layer rasterizes against an already-superseded guard', async () => {
-    harness.rasterize.mockResolvedValue(okPixels('a')); // never registered as current
+    harness.rasterize.mockResolvedValue(okPixels('a'));
     const capture = createRasterSnapshotCapture(harness.deps);
     const snapshot = capture.captureDocumentSnapshot()!;
     expect((await capture.captureRasterSnapshot(snapshot, ['a'])).status).toBe('stale');
@@ -362,7 +358,6 @@ describe('captureRasterSnapshot', () => {
         guards.push(result.guard);
         harness.currentGuards.add(result.guard);
       }
-      // Editing `a` while `b` rasterizes retires a's guard but not the document.
       if (layerId === 'b' && guards[0]) {
         harness.currentGuards.delete(guards[0]);
       }
@@ -406,7 +401,6 @@ describe('snapshot lifetime', () => {
       throw new Error('expected a captured snapshot');
     }
     result.snapshot.release();
-    // Teardown must not re-release, which would double-release the byte lease.
     expect(() => capture.releaseActiveSnapshots()).not.toThrow();
   });
 

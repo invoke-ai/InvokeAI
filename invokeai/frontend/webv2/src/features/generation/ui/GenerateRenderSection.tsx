@@ -77,10 +77,7 @@ const TIMESTEP_SHIFT_MARKS = [{ label: String(DEFAULT_TIMESTEP_SHIFT), value: DE
 const DYPE_EXPONENT_SLIDER_MAX = 10;
 const formatPercent = (value: number): string => `${value}%`;
 
-/**
- * Slider tracks are practical ranges, distinct from input/validation bounds; FLUX Fill's default 30 exceeds its
- * track.
- */
+/** Slider tracks are practical ranges, not input bounds: FLUX Fill's default of 30 exceeds its track. */
 const GUIDANCE_SLIDER_MAX = 10;
 const GUIDANCE_INPUT_MAX = 100;
 
@@ -248,12 +245,12 @@ interface SkipLayersDraft {
 }
 
 /**
- * The blocks MOSS-Image's negative branch skips. Typing only edits a draft, with its error shown while the text is
- * not a list of blocks; the list commits when the field loses focus or drafts flush before Invoke. Text that is not a
- * list then restores the list from before the edit, so no prefix typed on the way ever commits. Either way the field
- * then shows the stored list unique and ascending: exactly what is sent. A stored list changed from elsewhere
- * (recall, reset, preset) replaces the draft typed over the old one. CFG 1 runs no negative branch, so the field
- * rests disabled there.
+ * The blocks MOSS-Image's negative branch skips. Typing only edits a draft, with its error shown while the text is not
+ * a list of blocks; the list commits when the field loses focus or drafts flush before Invoke. Text that is not a list
+ * then restores the list from before the edit, so no prefix typed on the way ever commits. Either way the field then
+ * shows the stored list unique and ascending: exactly what is sent. A stored list changed from elsewhere (recall,
+ * reset, preset) replaces the draft typed over the old one. CFG 1 runs no negative branch, so the field rests disabled
+ * there.
  */
 const MossImageSkipLayersField = ({
   onCommitImmediate,
@@ -362,8 +359,8 @@ const Flux3PromptUpsamplerField = ({ onCommit, settings }: RenderFieldsProps) =>
 };
 
 /**
- * Perturbs conditioning between seeds — a variation concern, so it sits by the seed. Krea-2 and Z-Image each have
- * their own enhancer node with the same three settings.
+ * Perturbs conditioning between seeds — a variation concern, so it sits by the seed. Krea-2 and Z-Image each have their
+ * own enhancer node with the same three settings.
  */
 const SeedVarianceFields = ({
   enabled,
@@ -547,8 +544,8 @@ const TimestepShiftField = ({
           numberInputMin={MIN_TIMESTEP_SHIFT}
           step={0.1}
           value={shift}
-          // The input reports each keystroke, so typing 0.5 passes through 0. Settings read a shift outside its
-          // bounds as auto, which would drop the override mid-edit; the input clamps it on blur instead.
+          // The input reports each keystroke, so typing 0.5 passes through 0. Settings read a shift outside its bounds
+          // as auto, which would drop the override mid-edit; the input clamps it on blur instead.
           onChange={(next) => {
             if (next >= MIN_TIMESTEP_SHIFT && next <= MAX_TIMESTEP_SHIFT) {
               onChange(next);
@@ -611,7 +608,6 @@ const SeedField = ({ onCommit, settings }: RenderFieldsProps) => {
   );
 };
 
-/** The section reset's wording by where its values come from. */
 const RENDER_RESET_LABEL_KEYS = {
   withScheduler: {
     base: 'widgets.generate.sectionMenu.resetStepsGuidanceAndSchedulerBase',

@@ -32,10 +32,7 @@ const getChangedKeys = (before: ProjectPromptDraft, written: ProjectPromptDraftP
     (key) => !areJsonValuesStructurallyEqual(before[key], written[key])
   );
 
-/**
- * Compare prompt/LoRA content across reconstructed values to avoid costly rerenders and disturbed autocomplete
- * state.
- */
+/** Compare prompt/LoRA content across reconstructed values to avoid costly rerenders and reset autocomplete state. */
 
 export const UpscalePromptFields = memo(
   function UpscalePromptFields({
@@ -106,8 +103,8 @@ export const UpscalePromptFields = memo(
       [notifications, onPatchPromptDraft, projectId, readPromptDraft, t]
     );
 
-    // The positive prompt also lands in the prompt box as an edit (Ctrl+Z); replacing the negative prompt as well
-    // needs the toast's Undo.
+    // The positive prompt also lands in the prompt box as an edit (Ctrl+Z); replacing the negative prompt as well needs
+    // the toast's Undo.
     const handleUsePrompt = useCallback(
       (prompt: PromptHistoryItem) => {
         // A hidden negative prompt is not this model's to replace.

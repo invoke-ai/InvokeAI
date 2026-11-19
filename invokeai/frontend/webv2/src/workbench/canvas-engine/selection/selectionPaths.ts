@@ -2,7 +2,6 @@
 
 import type { Rect } from '@workbench/canvas-engine/types';
 
-/** SVG path data for a closed rectangle. */
 export const rectPathData = (r: Rect): string =>
   `M ${r.x} ${r.y} L ${r.x + r.width} ${r.y} L ${r.x + r.width} ${r.y + r.height} L ${r.x} ${r.y + r.height} Z`;
 

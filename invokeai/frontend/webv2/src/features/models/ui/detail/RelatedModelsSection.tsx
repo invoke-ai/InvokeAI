@@ -1,10 +1,23 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
+import type { RelatableModel } from '@features/models/core/relationships';
 import type { ModelConfig } from '@features/models/core/types';
+import type { ArchitectureCapabilitiesSnapshot } from '@features/models/data/architectureCapabilitiesStore';
+import type { PickerStatus } from '@platform/ui/Picker';
 
 import { Badge, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel } from '@features/models/core/baseIdentity';
-import { hasLinkableBase, isLinkablePair, LINKABLE_TYPES } from '@features/models/core/relationships';
+import {
+  hasLinkableBase,
+  isLinkableModel,
+  isLinkablePair,
+  isVaePair,
+  LINKABLE_TYPES,
+} from '@features/models/core/relationships';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
+import {
+  ensureArchitectureCapabilitiesLoaded,
+  useArchitectureCapabilitiesSelector,
+} from '@features/models/data/architectureCapabilitiesStore';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import {
   linkModels,
@@ -24,9 +37,28 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 interface RelatedModelsSectionProps {
-  model: Pick<ModelConfig, 'base' | 'key' | 'type'>;
+  model: RelatableModel & Pick<ModelConfig, 'key'>;
   onError: (message: string) => void;
 }
+
+/** A new filter per table revision: the rule reads the table, and the compiler caches by arguments. */
+const createLinkFilter =
+  (subject: RelatableModel, _capabilitiesRevision: number) =>
+  (candidate: ModelConfig): boolean =>
+    isLinkablePair(subject, candidate);
+
+/** Whether an installed, unlinked candidate waits on the architecture table to be decided. */
+const hasUndecidedVaePairs = (
+  subject: RelatableModel & Pick<ModelConfig, 'key'>,
+  models: readonly ModelConfig[],
+  excludeKeys: ReadonlySet<string>
+): boolean =>
+  models.some(
+    (candidate) => !excludeKeys.has(candidate.key) && isLinkableModel(candidate) && isVaePair(subject, candidate)
+  );
+
+const selectCapabilitiesRevision = (snapshot: ArchitectureCapabilitiesSnapshot) => snapshot.revision;
+const selectCapabilitiesStatus = (snapshot: ArchitectureCapabilitiesSnapshot) => snapshot.status;
 
 export const RelatedModelsSection = (props: RelatedModelsSectionProps) => (
   <RelatedModelsForModel key={props.model.key} {...props} />
@@ -34,7 +66,10 @@ export const RelatedModelsSection = (props: RelatedModelsSectionProps) => (
 
 const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) => {
   const { t } = useTranslation();
+  const models = useModelsSelector((snapshot) => snapshot.models);
   const modelsByKey = useModelsSelector((snapshot) => snapshot.modelsByKey);
+  const capabilitiesRevision = useArchitectureCapabilitiesSelector(selectCapabilitiesRevision);
+  const capabilitiesStatus = useArchitectureCapabilitiesSelector(selectCapabilitiesStatus);
   const relatedKeys = useRelatedModelKeys(model.key);
   const [isMutating, setIsMutating] = useState(false);
 
@@ -104,10 +139,21 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
     }
   };
 
-  // A subject whose base can never match a candidate (external/unknown, or an
-  // any-based type with no allowance) keeps its persisted links manageable but
-  // gets no add-picker — it would be a permanently empty combobox.
+  // A subject whose base can never match a candidate (external/unknown, or an any-based type with no allowance) keeps
+  // its persisted links manageable but gets no add-picker — it would be a permanently empty combobox.
   const canAddLinks = hasLinkableBase(model);
+  const linkFilter = createLinkFilter(model, capabilitiesRevision);
+  // VAE pairs fail closed without the table; say so instead of offering a list that silently lacks them.
+  const pendingVaePairs: PickerStatus | undefined =
+    capabilitiesStatus === 'loaded' || !hasUndecidedVaePairs(model, models, excludeKeys)
+      ? undefined
+      : capabilitiesStatus === 'error'
+        ? {
+            isError: true,
+            message: t('models.vaePairingLoadFailed'),
+            onRetry: () => void ensureArchitectureCapabilitiesLoaded(),
+          }
+        : { message: t('models.vaePairingLoading') };
 
   return (
     <Stack gap="2">
@@ -122,8 +168,9 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
       {canAddLinks ? (
         <ModelSelect
           excludeKeys={excludeKeys}
-          filter={(candidate) => isLinkablePair(model, candidate)}
+          filter={linkFilter}
           modelTypes={LINKABLE_TYPES}
+          pendingCandidates={pendingVaePairs}
           placeholder={t('models.searchCompatibleToLink')}
           showManagerButton={false}
           size="lg"
@@ -131,6 +178,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
           onChange={(target) => {
             void handleAdd(target);
           }}
+          onOpen={() => void ensureArchitectureCapabilitiesLoaded()}
         />
       ) : null}
       {relatedKeys === null ? (

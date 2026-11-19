@@ -1,21 +1,21 @@
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { SettingFieldProps } from '@platform/ui/settings/contracts';
 
 import { SettingControl } from '@platform/ui/settings/SettingControl';
-import { useLayeredSetting } from '@workbench/settings/useLayeredSetting';
+import { readBuiltIn, useLayeredSetting } from '@workbench/settings/useLayeredSetting';
 import { useCallback } from 'react';
 
 import { getPreviewComparisonMode, getPreviewFilmstripVisible } from './previewSettings';
 
-const EMPTY = {};
-
 export const Field = ({ field, surface, target }: SettingFieldProps) => {
-  const read = field.id === 'comparisonMode' ? getPreviewComparisonMode : getPreviewFilmstripVisible;
+  const read: (values: ResolvedValues) => boolean | string =
+    field.id === 'comparisonMode' ? getPreviewComparisonMode : getPreviewFilmstripVisible;
   const { disabled, layer, set, value } = useLayeredSetting<boolean | string>(
     'preview',
     field.id,
     target,
     read,
-    read(EMPTY),
+    readBuiltIn(read),
     field
   );
   const onChange = useCallback(

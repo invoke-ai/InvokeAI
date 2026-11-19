@@ -228,8 +228,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const { i18n, t } = useTranslation();
   const navigationBoundaryRef = useRef<HTMLDivElement | null>(null);
   const loupeControlsRef = useRef<PreviewLoupeControls | null>(null);
-  // The header's zoom commands close over the controls ref, so they are stable
-  // per mount; the readout itself streams through `previewStageStore`.
+  // The header's zoom commands close over the controls ref, so they are stable per mount; the readout itself streams
+  // through `previewStageStore`.
   const videoControllerRef = useRef<PreviewVideoFrameController | null>(null);
   const zoomCommands = useMemo<PreviewZoomCommands>(
     () => ({
@@ -333,8 +333,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     return boardItems.find((item) => toGalleryItemKey(item) === selectedItemKey) ?? selectedItem;
   }, [boardItems, selectedItem, selectedItemKey]);
   const exitCompare = useCallback(() => gallery.setCompareItem(null), [gallery]);
-  // Remember the comparison item's original page for swap-back, but only within its original query and board. Item
-  // moves can invalidate the page without changing query identity.
+  // Remember the comparison item's original page for swap-back, but only within its original query and board.
   const swappedOutRef = useRef<{ boardId: string; key: GalleryItemKey; page: number; queryKey: string } | null>(null);
   const swapCompareImages = useCallback(() => {
     if (selectedItem?.kind === 'image' && compareImage) {
@@ -445,8 +444,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
         return;
       }
 
-      // Prefer images we already hold (board context includes fresh local
-      // generations that would 404 on a backend by-name fetch).
+      // Prefer images we already hold (board context includes fresh local generations that would 404 on a backend
+      // by-name fetch).
       const localImageItem = boardItems.find((item) => item.kind === 'image' && item.name === resolution.imageName);
 
       if (localImageItem?.kind === 'image') {
@@ -477,8 +476,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   }, []);
   const getNavigationBoundary = useCallback(() => navigationBoundaryRef.current, []);
   // Resolved when focus returns, from the menu or from a deletion confirmation it opened: the opener while it is still
-  // there, else Preview itself, so its keys keep working; a point opening had no opener. An opener a deletion takes away
-  // only after focus is back on it (the item's filmstrip thumb, the video, the header's ⋮) hands focus to Preview
+  // there, else Preview itself, so its keys keep working; a point opening had no opener. An opener a deletion takes
+  // away only after focus is back on it (the item's filmstrip thumb, the video, the header's ⋮) hands focus to Preview
   // itself as it goes, so the target never has to wait for that render.
   const getContextMenuReturnFocus = useCallback((): HTMLElement | null => {
     const opener = contextMenuOpenerRef.current;
@@ -508,8 +507,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     [contextMenuItem, showContextMenu]
   );
   const closeContextMenu = useCallback(() => {
-    // Only while the closing menu still holds focus: an action that moved it on (into a dialog it opened, say) keeps
-    // it there.
+    // Only while the closing menu still holds focus: an action that moved it on (into a dialog it opened, say) keeps it
+    // there.
     if (document.activeElement?.closest('[role="menu"]')) {
       getContextMenuReturnFocus()?.focus({ preventScroll: true });
     }
@@ -518,8 +517,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   }, [getContextMenuReturnFocus]);
   const headerItemName = shouldFollowLive ? null : (selectedItem?.name ?? null);
 
-  // Publish selection/actions to hoisted chrome through an external store; clear on unmount to prevent stale
-  // headers.
+  // Publish selection/actions to hoisted chrome through an external store; clear on unmount to prevent stale headers.
   const filmstrip = useMemo<PreviewFilmstripProps | null>(
     () =>
       isFilmstripVisible && density !== 'minimal'
@@ -568,8 +566,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       position: hasHeaderItem
         ? { boardItemCount: position.total, isLoadingBoard, selectedIndex: position.index }
         : null,
-      // Only the single image frame carries a loupe: videos have none and
-      // compare has its own synced pair.
+      // Only the single image frame carries a loupe: videos have none and compare has its own synced pair.
       zoom: hasHeaderItem && !isComparing && contextMenuItem.kind === 'image' ? zoomCommands : null,
     });
   }, [
@@ -673,14 +670,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       isFollowingLive={shouldFollowLive}
       shownKind={selectedItem?.kind ?? null}
     >
-      {/*
-       * Show progress beneath floating Preview's title bar when the main topbar may be out of view; overlay it
-       * without reflow.
-       */}
+      {/* Show progress beneath floating Preview's title bar when the main topbar may be out of view; overlay it without
+          reflow. */}
       {region === 'floating' ? <QueueProgressRail css={FLOATING_RAIL_SX} /> : null}
-      {/* Single always-mounted focus target: DOM focus survives swaps
-          between the live, selected, and compare branches, so the keys
-          stay with Preview across them. */}
+      {/* Single always-mounted focus target: DOM focus survives swaps between the live, selected, and compare branches,
+          so the keys stay with Preview across them. */}
       <Stack
         ref={navigationBoundaryRef}
         aria-label={t('widgets.labels.preview')}
@@ -873,10 +867,7 @@ interface SelectedMediaPreviewProps {
   onVideoLoopChange?: (loop: boolean) => void;
 }
 
-/**
- * Use the same stage/filmstrip scaffold for live and finished media so completion changes pixels, not geometry;
- * multiple sessions remain filmstrip choices.
- */
+/** One stage/filmstrip scaffold for live and finished media, so completion changes pixels, not geometry. */
 const PreviewMediaScaffold = ({ children }: { children: ReactNode }) => (
   <Flex direction="column" h="full" minH="0" position="relative" w="full">
     {children}
@@ -961,11 +952,7 @@ const SelectedMediaPreview = ({
 const COMPARE_HINT_TOP = 'calc(var(--wb-center-chrome-inset, 0px) + var(--chakra-spacing-2))';
 const COMPARE_HINT_MOTION_REDUCE = { animation: 'none' } as const;
 
-/**
- * Says Select for compare is waiting for a second image, where the shown image is, with the way to call it off. Over
- * the top of the stage, under the drop zones that cover it during a drag; the filmstrip below stays free to pick from.
- * Narrower Preview keeps the text, then only its icon: the status line beside the stage says it in full.
- */
+/** Says Select for compare is waiting, and how to call it off; text, then icon only, on narrow Preview. */
 const PreviewCompareArmedHint = ({ density, onCancel }: { density: PreviewDensity; onCancel: () => void }) => {
   const { t } = useTranslation();
   const cancelLabel = t('widgets.preview.cancelCompare');
@@ -1034,11 +1021,7 @@ const PreviewCompareArmedHint = ({ density, onCancel }: { density: PreviewDensit
 
 const PREVIEW_EXIT_COMPARE_COMMAND = 'viewer.exitCompare';
 
-/**
- * Esc calls off Select for compare while it waits, and closes an open comparison. Mounted only meanwhile, so Esc keeps
- * its other meanings the rest of the time; Preview keys it by project and language, which its registration's source
- * and title follow. An open menu or dialog takes Esc first (`resolveHotkey`).
- */
+/** Mounted only while compare waits or is open, so Esc keeps its other meanings otherwise. */
 const PreviewExitCompareHotkey = ({ onExit, runtime }: { onExit: () => void; runtime: WidgetViewProps['runtime'] }) => {
   const { t } = useTranslation();
 
@@ -1106,12 +1089,7 @@ const LivePreview = ({
   );
 };
 
-/**
- * Says what a session that has no frame of its own yet is doing, in its run's own progress message, in place of a
- * frame the Preview does not switch to until there is one. In the stage's top hint slot, without a control. Model
- * loads are not named: the server reports them without the session they are for. The Preview's status line announces
- * the gap once; the message here changes as the session prepares.
- */
+/** What a frameless session is doing, from its run's progress message; model loads are not named. */
 const PreviewStartingCue = ({ density, session }: { density: PreviewDensity; session: QueueActiveSession }) => {
   const { t } = useTranslation();
   const label = useQueueItemProgress(session.queueItemId)?.message.trim() || t('widgets.preview.starting');

@@ -11,14 +11,14 @@ import { getLibraryWorkflowRecord, type WorkflowRecordDTO } from './api';
 import { savedWorkflowPickerQueryKeyPrefix } from './savedWorkflowQueries';
 
 /**
- * Library records behind open, replace, fork, download and browse enrichment. The server keeps only a record's
- * current revision, so a cached record is served only to a caller naming the revision its list shows, and only while
- * it is at least that revision; a caller without one always fetches. A record newer than the caller's list means the
- * list is behind, so listeners hear about it once. Every invalidation advances a generation: a read in flight across
- * one stores nothing and retries once rather than answer with what the library held before the change.
+ * Library records behind open, replace, fork, download and browse enrichment. The server keeps only a record's current
+ * revision, so a cached record is served only to a caller naming the revision its list shows, and only while it is at
+ * least that revision; a caller without one always fetches. A record newer than the caller's list means the list is
+ * behind, so listeners hear about it once. Every invalidation advances a generation: a read in flight across one stores
+ * nothing and retries once rather than answer with what the library held before the change.
  *
- * A matching revision guarantees the authored workflow document only: a visibility change rewrites `is_public` and
- * the `shared` tag without advancing it.
+ * A matching revision guarantees the authored workflow document only: a visibility change rewrites `is_public` and the
+ * `shared` tag without advancing it.
  */
 
 type WorkflowLibraryCacheInvalidationListener = (workflowId?: string) => void;
@@ -26,8 +26,8 @@ type WorkflowLibraryCacheInvalidationListener = (workflowId?: string) => void;
 const invalidationListeners = new Set<WorkflowLibraryCacheInvalidationListener>();
 
 /**
- * Registers a listener fired when the library changed: after every `invalidateWorkflowLibraryCache()` call, and when
- * a read finds a record newer than the list its caller showed.
+ * Registers a listener fired when the library changed: after every `invalidateWorkflowLibraryCache()` call, and when a
+ * read finds a record newer than the list its caller showed.
  */
 export const onWorkflowLibraryCacheInvalidated = (listener: WorkflowLibraryCacheInvalidationListener): (() => void) => {
   invalidationListeners.add(listener);

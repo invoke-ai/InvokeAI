@@ -16,7 +16,6 @@ import { VideoFrameImageField } from './VideoFrameImageField';
 import { VideoSourceClipField } from './VideoSourceClipField';
 import { VideoUiProvider, type VideoUiAdapter } from './VideoUiContext';
 
-/** Conditioning slots must pass media kind with name; video names cannot resolve through the image endpoint. */
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -137,7 +136,6 @@ describe('video conditioning find-in-gallery badges', () => {
   it('reveals the initial video as a video, once, from its start bound', async () => {
     await render(<VideoSourceClipField sourceVideo={CLIP} onChange={vi.fn()} />);
 
-    // Both bounds reference one clip; expose one find control.
     const bounds = findButtons('source.mp4');
 
     expect(bounds).toHaveLength(1);

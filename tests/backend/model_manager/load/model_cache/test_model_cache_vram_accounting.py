@@ -17,7 +17,7 @@ import torch
 
 from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import EmptyCacheOutcome, TorchDevice
 
 GB = 1024**3
 MB = 1024**2
@@ -294,12 +294,12 @@ def test_offloading_under_expandable_segments_stops_once_enough_is_free(monkeypa
         device["unmappable"] += 4 * GB
         return 4 * GB
 
-    def empty_cache() -> bool:
+    def empty_cache() -> EmptyCacheOutcome:
         if peer_busy:  # deferred: nothing is released, and the driver keeps reporting the old figure
-            return False
+            return EmptyCacheOutcome.DEFERRED
         device["free"] += device["unmappable"]
         device["unmappable"] = 0
-        return True
+        return EmptyCacheOutcome.RAN
 
     monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     monkeypatch.setattr(torch.cuda, "mem_get_info", lambda d: (device["free"], 16 * GB))

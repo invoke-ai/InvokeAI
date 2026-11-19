@@ -1,7 +1,7 @@
 /**
- * Pressure-opacity bands replace overlapping scratch pixels (destination-out then source-over), so newer pressure
- * wins without alpha compounding. Quantization to {@link PRESSURE_ALPHA_STEPS} limits outline/fill work; shared
- * {@link BAND_OVERLAP_SAMPLES} avoid seams. The completed scratch composites once at stroke opacity.
+ * Pressure-opacity bands replace overlapping scratch pixels (destination-out then source-over), so newer pressure wins
+ * without alpha compounding. Quantization to {@link PRESSURE_ALPHA_STEPS} limits outline/fill work; shared {@link
+ * BAND_OVERLAP_SAMPLES} avoid seams. The completed scratch composites once at stroke opacity.
  */
 
 import type { StrokeSamplePoint } from '@workbench/canvas-engine/freehand';
@@ -10,15 +10,14 @@ import type { StrokeSamplePoint } from '@workbench/canvas-engine/freehand';
 export const PRESSURE_ALPHA_STEPS = 16;
 
 /**
- * Samples a band repeats from the previous one. One is enough: `perfect-freehand` derives a
- * segment's outline from its endpoints, so sharing an endpoint makes the outlines meet.
+ * Samples a band repeats from the previous one. One is enough: `perfect-freehand` derives a segment's outline from its
+ * endpoints, so sharing an endpoint makes the outlines meet.
  */
 export const BAND_OVERLAP_SAMPLES = 1;
 
 /**
- * Floor on band alpha. A zero-pressure sample would otherwise contribute an invisible band,
- * and some devices report 0 for the first sample of a stroke before pressure ramps up — which
- * would leave a gap at the stroke's start.
+ * Floor on band alpha. A zero-pressure sample would otherwise contribute an invisible band, and some devices report 0
+ * for the first sample of a stroke before pressure ramps up — which would leave a gap at the stroke's start.
  */
 export const MIN_PRESSURE_ALPHA = 1 / PRESSURE_ALPHA_STEPS;
 

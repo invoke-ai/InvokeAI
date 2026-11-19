@@ -16,12 +16,7 @@ export const isProjectSortId = (value: unknown): value is ProjectSortId =>
 export const isProjectsViewId = (value: unknown): value is ProjectsViewId =>
   typeof value === 'string' && PROJECTS_VIEW_IDS.includes(value as ProjectsViewId);
 
-/**
- * `pinned` and `open` are cross-cutting: a project lands in one of them
- * instead of a date bucket, never in both. The rest are relative to `now`.
- * `all` is the flat bucket used when a search or an alphabetical sort makes
- * date headings meaningless.
- */
+/** `pinned` and `open` are cross-cutting: a project lands in one of them instead of a date bucket, never in both. */
 export type ProjectGroupId = 'pinned' | 'open' | 'today' | 'week' | 'month' | 'older' | 'all';
 
 export interface ProjectGroup {

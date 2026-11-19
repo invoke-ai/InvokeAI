@@ -13,8 +13,8 @@ import type { InvocationFlowNode as InvocationFlowNodeType } from './flowAdapter
 import { isInvocationFlowNodeInvalid } from './InvocationFlowNode';
 
 /**
- * The run state of this editor's nodes that the minimap shows, as `id:status` lines for the running and failed ones.
- * A string snapshot, so progress ticks and unrelated project changes do not render the minimap.
+ * The run state of this editor's nodes that the minimap shows, as `id:status` lines for the running and failed ones. A
+ * string snapshot, so progress ticks and unrelated project changes do not render the minimap.
  */
 const useMinimapRunStates = (nodeIds: readonly string[]): Map<string, 'failed' | 'running'> => {
   const { nodeExecution, project } = useWorkflowUi();

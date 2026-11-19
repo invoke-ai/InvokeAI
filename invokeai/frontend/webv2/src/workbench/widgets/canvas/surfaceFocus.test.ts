@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { INLINE_EDIT_SELECTOR, shouldFocusCanvasSurface } from './surfaceFocus';
 
-/** Model contains and inline-editor closest with a minimal parent-chain DOM stand-in. */
 class FakeElement {
   parent: FakeElement | null = null;
 
@@ -65,11 +64,8 @@ describe('shouldFocusCanvasSurface', () => {
     vi.stubGlobal('Element', FakeElement);
     const container = new FakeElement();
     const overlayCanvas = new FakeElement().appendTo(container);
-    // The text tool's contenteditable lives inside the surface container.
     const contenteditable = new FakeElement(true).appendTo(container);
 
-    // Click on the canvas OUTSIDE the editable — the commit gesture. Focus must
-    // stay on the editable so the engine's pointerdown commit-and-swallow runs.
     expect(shouldFocusCanvasSurface(asContainer(container), asTarget(overlayCanvas), asActive(contenteditable))).toBe(
       false
     );
@@ -78,8 +74,6 @@ describe('shouldFocusCanvasSurface', () => {
   it('does not steal focus when the click lands inside an inline editor', () => {
     vi.stubGlobal('Element', FakeElement);
     const container = new FakeElement();
-    // A portal-rendered editor: its DOM sits OUTSIDE the container, so only the
-    // target-side selector guard can spare it.
     const portalEditor = new FakeElement(true);
     const focusElsewhere = new FakeElement();
 

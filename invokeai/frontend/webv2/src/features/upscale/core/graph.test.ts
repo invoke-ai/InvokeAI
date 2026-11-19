@@ -1,7 +1,7 @@
 import type { GenerateLora, VaeModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import type { TileControlNetModelConfig, UpscaleWidgetValues } from './types';
@@ -26,7 +26,6 @@ const model = (key: string, type: string, base: string, name = key): ModelConfig
   source: key,
   source_type: 'path',
   type,
-  // Every installed CLIP Embed carries its variant; FLUX.1 takes only CLIP-L.
   ...(type === 'clip_embed' ? { variant: 'large' } : {}),
 });
 
@@ -310,9 +309,7 @@ describe('compileUpscaleGraph for FLUX.1', () => {
   });
 
   it('fits the frame to the grid flux_denoise accepts, instead of whatever Spandrel rounded to', () => {
-    // Spandrel's autoscale floors to a multiple of 8; `flux_denoise` declares multiple_of=16 and
-    // raises on anything else -- after the upscale has already been paid for. The 203x101 fixture
-    // at 4x is exactly that case: Spandrel gives 808x400, and 808 is not a multiple of 16.
+    // Spandrel floors 203x101 at 4x to 808x400; 808 is not a multiple of 16, which `flux_denoise` requires.
     const { edges, nodes } = compileUpscaleGraph(createFluxValues(), 'gallery', { useCpuNoise: true }).backendGraph;
 
     expect(nodes.fit_to_grid).toMatchObject({ height: 400, type: 'img_resize', width: 800 });
@@ -330,8 +327,6 @@ describe('compileUpscaleGraph for FLUX.1', () => {
   });
 
   it('resizes a frame the scale already puts on the grid, because a 1x model makes Spandrel ignore the scale', () => {
-    // The literal 2048 on the denoise node is a promise only the resize keeps: a restoration model
-    // that does not enlarge leaves the frame at 1024, and the latents would not match the node.
     const { edges, nodes } = compileUpscaleGraph(
       { ...createFluxValues(), inputImage: { height: 1024, image_name: 'input.png', width: 1024 }, scale: 2 },
       'gallery',
@@ -372,7 +367,6 @@ const createZImageValues = (options: { tileControlNet?: boolean; cfgScale?: numb
     model('main', 'main', 'z-image'),
     model('spandrel', 'spandrel_image_to_image', 'any'),
     model('lora', 'lora', 'z-image'),
-    // Z-Image decodes with a FLUX VAE, and reads the 4B Qwen3, never Anima's 0.6B.
     model('fluxvae', 'vae', 'flux'),
     withVariant(model('qwen3-06b', 'qwen3_encoder', 'any'), 'qwen3_06b'),
     withVariant(model('qwen3-4b', 'qwen3_encoder', 'any'), 'qwen3_4b'),
@@ -419,8 +413,6 @@ describe('compileUpscaleGraph for Z-Image', () => {
   it('gives the negative prompt a branch exactly where CFG runs an unconditional pass, as Generate does', () => {
     const turbo = compileUpscaleGraph(createZImageValues(), 'gallery', { useCpuNoise: true }).backendGraph;
     const withCfg = compileUpscaleGraph(createZImageValues({ cfgScale: 4 }), 'gallery', { useCpuNoise: true });
-    // Switched off, the prompt still gets its branch and the queue fills it with an empty string.
-    // Leaving the branch out would turn CFG off while the slider and the metadata still say 4.
     const switchedOff = compileUpscaleGraph(
       { ...createZImageValues({ cfgScale: 4 }), negativePromptEnabled: false },
       'gallery',
@@ -445,8 +437,6 @@ describe('compileUpscaleGraph for Z-Image', () => {
       { useCpuNoise: true }
     ).backendGraph;
 
-    // The control image is encoded inside the denoise at the frame's full size; untiled, that is
-    // the encode the i2l node is tiled to avoid.
     expect(nodes.tile_control).toMatchObject({
       begin_step_percent: 0,
       control_model: { key: 'tile' },
@@ -482,7 +472,6 @@ describe('compileUpscaleGraph for Z-Image', () => {
   });
 
   it('keeps an encoder the architecture does not read out of the graph and its metadata', () => {
-    // A T5 picked while FLUX was selected stays in the widget for when FLUX comes back.
     const staleT5 = { base: 'any', key: 'stale-t5', name: 'stale-t5', type: 't5_encoder' } as never;
     const { nodes } = compileUpscaleGraph({ ...createZImageValues(), t5EncoderModel: staleT5 }, 'gallery', {
       useCpuNoise: true,
@@ -556,7 +545,6 @@ const createKrea2Values = (variant: 'krea2_turbo' | 'krea2_base', format = 'gguf
     { ...withVariant(model('main', 'main', 'krea-2'), variant), format } as ModelConfig,
     model('spandrel', 'spandrel_image_to_image', 'any'),
     model('qwenvae', 'vae', 'qwen-image'),
-    // Ideogram 4's 8B is the same model type and sorts first; `krea2_model_loader` refuses it.
     withVariant(model('qwen3vl-8b', 'qwen3_vl_encoder', 'any'), 'qwen3_vl_8b'),
     withVariant(model('qwen3vl-4b', 'qwen3_vl_encoder', 'any'), 'qwen3_vl_4b'),
   ];
@@ -588,7 +576,6 @@ describe('compileUpscaleGraph for Krea-2', () => {
       type: 'krea2_denoise',
       width: 800,
     });
-    // The node has no scheduler, and picks its own shift: fixed for Turbo, by size for Raw.
     expect(nodes.denoise_latents).not.toHaveProperty('scheduler');
     expect(nodes.denoise_latents).not.toHaveProperty('shift');
     expect(nodes.core_metadata).toMatchObject({ qwen3_vl_encoder: { key: 'qwen3vl-4b' }, scheduler: 'euler' });
@@ -606,14 +593,6 @@ describe('compileUpscaleGraph for Krea-2', () => {
     expect(nodes.denoise_latents?.cfg_scale).toBe(1);
     expect(nodes.neg_cond).toBeUndefined();
   });
-
-  it('lets a Diffusers install supply its own encoder and VAE', () => {
-    const values = { ...createKrea2Values('krea2_turbo', 'diffusers'), vae: null };
-    const { nodes } = compileUpscaleGraph(values, 'gallery', { useCpuNoise: true }).backendGraph;
-
-    expect(nodes.model_loader?.qwen3_vl_encoder_model).toBeUndefined();
-    expect(nodes.model_loader?.vae_model).toBeUndefined();
-  });
 });
 
 const createFlux2Values = (variant: string, format = 'checkpoint') => {
@@ -622,7 +601,6 @@ const createFlux2Values = (variant: string, format = 'checkpoint') => {
     model('spandrel', 'spandrel_image_to_image', 'any'),
     model('lora', 'lora', 'flux2'),
     model('flux2vae', 'vae', 'flux2'),
-    // The 8B and the Ministral sort ahead of the encoders Klein 4B and [dev] take.
     withVariant(model('qwen3-8b', 'qwen3_encoder', 'any'), 'qwen3_8b'),
     withVariant(model('qwen3-4b', 'qwen3_encoder', 'any'), 'qwen3_4b'),
     withVariant(model('ministral', 'mistral_encoder', 'any'), 'ministral3_3b'),
@@ -652,8 +630,7 @@ describe('compileUpscaleGraph for FLUX.2', () => {
     });
     expect(nodes.i2l).toMatchObject({ tile_size: 1024, tiled: true, type: 'flux2_vae_encode' });
     expect(nodes.upscale_output).toMatchObject({ tile_size: 1024, tiled: true, type: 'flux2_vae_decode' });
-    // 203x101 at 4x: Spandrel gives 808x400, and flux2_denoise takes multiples of 16 only. A new Klein runs at
-    // the 4 steps it is served with.
+    // 203x101 at 4x: Spandrel gives 808x400; flux2_denoise takes multiples of 16. A new Klein runs its served 4 steps.
     expect(nodes.denoise_latents).toMatchObject({
       guidance: 4,
       height: 400,
@@ -662,13 +639,11 @@ describe('compileUpscaleGraph for FLUX.2', () => {
       type: 'flux2_denoise',
       width: 800,
     });
-    // CFG stays at the node's 1, as in Generate: the slider is guidance here, and there is no negative branch.
     expect(nodes.denoise_latents).not.toHaveProperty('cfg_scale');
     expect(nodes.neg_cond).toBeUndefined();
     expect(nodes.core_metadata).toMatchObject({ guidance: 4, qwen3_encoder: { key: 'qwen3-4b' } });
     expect(nodes.core_metadata).not.toHaveProperty('cfg_scale');
     expect(hasEdge(edges, 'negative_prompt', 'value', 'core_metadata', 'negative_prompt')).toBe(false);
-    // The denoise normalizes the encoded latents with the VAE's BN statistics.
     expect(hasEdge(edges, 'model_loader', 'vae', 'denoise_latents', 'vae')).toBe(true);
     expect(hasEdge(edges, 'model_loader', 'max_seq_len', 'pos_cond', 'max_seq_len')).toBe(true);
     expect(hasEdge(edges, 'pos_cond_collect', 'collection', 'denoise_latents', 'positive_text_conditioning')).toBe(
@@ -704,14 +679,6 @@ describe('compileUpscaleGraph for FLUX.2', () => {
     expect(hasEdge(edges, 'model_loader', 'max_seq_len', 'pos_cond', 'max_seq_len')).toBe(true);
     expect(nodes.core_metadata).toMatchObject({ mistral_encoder: { key: 'mistral' } });
     expect(nodes.core_metadata).not.toHaveProperty('qwen3_encoder');
-  });
-
-  it('lets a Diffusers install supply its own encoder and VAE', () => {
-    const values = { ...createFlux2Values('klein_4b', 'diffusers'), vae: null };
-    const { nodes } = compileUpscaleGraph(values, 'gallery', { useCpuNoise: true }).backendGraph;
-
-    expect(nodes.model_loader?.qwen3_encoder_model).toBeUndefined();
-    expect(nodes.model_loader?.vae_model).toBeUndefined();
   });
 });
 
@@ -754,10 +721,8 @@ describe('compileUpscaleGraph for Qwen Image', () => {
       type: 'qwen_image_denoise',
       width: 800,
     });
-    // A shift would replace the held dynamic one that Creativity is translated against.
     expect(nodes.denoise_latents).not.toHaveProperty('shift');
     expect(nodes.denoise_latents).not.toHaveProperty('scheduler');
-    // The denoise takes one conditioning per branch, not a collected list.
     expect(hasEdge(edges, 'pos_cond', 'conditioning', 'denoise_latents', 'positive_conditioning')).toBe(true);
     expect(hasEdge(edges, 'neg_cond', 'conditioning', 'denoise_latents', 'negative_conditioning')).toBe(true);
     expect(nodes.pos_cond_collect).toBeUndefined();
@@ -765,7 +730,6 @@ describe('compileUpscaleGraph for Qwen Image', () => {
       ([, node]) => node.type === 'qwen_image_lora_collection_loader'
     )?.[0];
     expect(loraLoaderId).toBeDefined();
-    // The LoRAs' text-encoder layers patch the encoder, so it reaches both prompts through the loader.
     expect(hasEdge(edges, 'model_loader', 'qwen_vl_encoder', loraLoaderId ?? '', 'qwen_vl_encoder')).toBe(true);
     expect(hasEdge(edges, loraLoaderId ?? '', 'qwen_vl_encoder', 'pos_cond', 'qwen_vl_encoder')).toBe(true);
     expect(hasEdge(edges, loraLoaderId ?? '', 'qwen_vl_encoder', 'neg_cond', 'qwen_vl_encoder')).toBe(true);
@@ -795,20 +759,35 @@ describe('compileUpscaleGraph for Qwen Image', () => {
     expect(nodes.neg_cond).toBeUndefined();
     expect(hasEdge(edges, 'negative_prompt', 'value', 'core_metadata', 'negative_prompt')).toBe(false);
   });
+});
 
-  it('lets a Diffusers install supply its own encoder and VAE', () => {
-    const values = { ...createQwenImageValues({ format: 'diffusers' }), vae: null };
-    const { nodes } = compileUpscaleGraph(values, 'gallery', { useCpuNoise: true }).backendGraph;
+describe('compileUpscaleGraph for a Diffusers install', () => {
+  it.each([
+    {
+      base: 'Krea-2',
+      encoder: 'qwen3_vl_encoder_model',
+      values: () => ({ ...createKrea2Values('krea2_turbo', 'diffusers'), vae: null }),
+    },
+    {
+      base: 'FLUX.2',
+      encoder: 'qwen3_encoder_model',
+      values: () => ({ ...createFlux2Values('klein_4b', 'diffusers'), vae: null }),
+    },
+    {
+      base: 'Qwen Image',
+      encoder: 'qwen_vl_encoder_model',
+      values: () => ({ ...createQwenImageValues({ format: 'diffusers' }), vae: null }),
+    },
+  ])('lets a $base Diffusers install supply its own $encoder and VAE', ({ encoder, values }) => {
+    const { nodes } = compileUpscaleGraph(values(), 'gallery', { useCpuNoise: true }).backendGraph;
 
-    expect(nodes.model_loader?.qwen_vl_encoder_model).toBeUndefined();
+    expect(nodes.model_loader?.[encoder]).toBeUndefined();
     expect(nodes.model_loader?.vae_model).toBeUndefined();
   });
 });
 
 describe('Creativity on index-clipping architectures', () => {
-  // Expected starts come from the backend's own schedules (`ZImageDenoiseInvocation._get_sigmas`
-  // with `Z_IMAGE_SHIFT_FIT`, `AnimaDenoiseInvocation._get_sigmas`) and the nodes' clipping line,
-  // `int(start * steps)`: each enters within one step of the sigma FLUX enters at, 1 - start.
+  // Expected starts come from the backend's own schedules and `int(start * steps)`: within a step of FLUX's 1 - start.
   const startFor = (values: UpscaleWidgetValues, creativity: number, inputSide: number) =>
     compileUpscaleGraph(
       { ...values, creativity, inputImage: { height: inputSide, image_name: 'in.png', width: inputSide }, scale: 2 },
@@ -837,8 +816,7 @@ describe('Creativity on index-clipping architectures', () => {
     expect(startFor(createAnimaValues(), creativity, 1024)).toBeCloseTo(expected, 6);
   });
 
-  // `krea2_denoise` rounds `start * steps` instead, so the start is the step itself. Expected steps were
-  // worked out from the node's schedule: `exp(mu) * t / (1 + (exp(mu) - 1) * t)` at `t = 1 - i / 30`.
+  // `krea2_denoise` rounds `start * steps`; steps from `exp(mu) * t / (1 + (exp(mu) - 1) * t)` at t = 1 - i / 30.
   it.each([
     ['Turbo', 'krea2_turbo', 1024, 0, 23 / 30],
     ['Turbo', 'krea2_turbo', 1024, 5, 15 / 30],
@@ -850,12 +828,10 @@ describe('Creativity on index-clipping architectures', () => {
     expect(startFor(createKrea2Values(variant), creativity, side)).toBeCloseTo(expected, 6);
   });
 
-  // `qwen_image_denoise` rounds as well. Its scheduler shifts by `exp(mu)`, mu = 0.5 + 0.4 * (tokens - 256) / 7936
-  // held at 0.9 past 8192 tokens, then stretches every sigma to `1 - (1 - s) / k`, `k = (1 - s(1/30)) / 0.98`, so
-  // the last step lands on 0.02. Expected steps were worked out by hand from that schedule at `t = 1 - i / 30`.
+  // `qwen_image_denoise`: mu = 0.5 + 0.4 * (tokens - 256) / 7936, held at 0.9, sigmas stretched by
+  // `k = (1 - s(1/30)) / 0.98` so the last lands on 0.02; steps worked out by hand at `t = 1 - i / 30`.
   it.each([
-    // 1024px result, 4096 tokens: mu 0.694, k 0.9545. Step 19 sits at 0.515 and step 20 at 0.476; unstretched
-    // they would be 0.537 and 0.500, and the pass would start a step later.
+    // 4096 tokens: mu 0.694, k 0.9545; step 19 at 0.515, step 20 at 0.476 (unstretched 0.537 and 0.500).
     [512, 19 / 30],
     // 4096px result: held at mu 0.9, k 0.9406. Step 20 sits at 0.523, step 21 at 0.482.
     [2048, 21 / 30],
@@ -865,7 +841,6 @@ describe('Creativity on index-clipping architectures', () => {
 
   it.each([
     ['FLUX.1', () => createFluxValues()],
-    // `flux2_denoise` clips by value too, then re-spaces the window to the requested steps.
     ['FLUX.2', () => createFlux2Values('klein_4b')],
   ] as const)('leaves the value-clipping %s pass on the legacy formula', (_label, create) => {
     expect(startFor(create(), 0, 1024)).toBeCloseTo(0.499, 6);
@@ -873,9 +848,6 @@ describe('Creativity on index-clipping architectures', () => {
 });
 
 describe('schedulers on the upscale pass', () => {
-  // A stored LCM on a flow model, or Heun on Anima -- left from SD, recalled, or picked before the
-  // list was narrowed -- would start the pass from pure noise, or on Anima below the blend. FLUX.2
-  // steps with Euler whenever the pass starts above pure noise.
   it.each([
     ['flux', () => createFluxValues(), 'lcm', 'euler'],
     ['flux', () => createFluxValues(), 'heun', 'heun'],
@@ -905,9 +877,6 @@ describe('upscale metadata', () => {
     ['flux2', () => createFlux2Values('klein_4b')],
     ['qwen-image', () => createQwenImageValues()],
   ] as const)('records the size of the image the %s pass encoded, which is the size of the result', (_base, create) => {
-    // Where a pass resizes Spandrel's frame, the result does not have Spandrel's size: a 1x
-    // restoration model leaves the frame unscaled, and its multiple of 8 is not FLUX's or Z-Image's
-    // 16. Recall restores the size recorded here.
     const { edges } = compileUpscaleGraph(create(), 'gallery', { useCpuNoise: true }).backendGraph;
     const sourceOf = (nodeId: string, field: string) =>
       edges.find((edge) => edge.destination.node_id === nodeId && edge.destination.field === field)?.source;

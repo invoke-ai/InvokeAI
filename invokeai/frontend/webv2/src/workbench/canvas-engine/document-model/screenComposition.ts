@@ -6,7 +6,7 @@ import type { SemanticLeaf } from './semanticLeaf';
 
 /** Screen-only state that never enters the document: overlay stack switches and isolation. */
 export interface CanvasScreenViewState {
-  readonly showOverlayStacks: Readonly<Record<OverlayStackKind, boolean>>;
+  readonly showOverlayStacks: Readonly<Record<Exclude<OverlayStackKind, 'vector'>, boolean> & { vector?: boolean }>;
   /** A leaf or a group; a group isolates its descendant leaves. */
   readonly isolationLayerId: string | null;
 }
@@ -22,18 +22,19 @@ export const ALL_OVERLAY_STACKS_SHOWN: Readonly<Record<OverlayStackKind, boolean
   control: true,
   inpaint_mask: true,
   regional_guidance: true,
+  vector: true,
 };
 
 const isStackShown = (stack: LayerStackKind, view: CanvasScreenViewState): boolean =>
-  stack === 'raster' || view.showOverlayStacks[stack];
+  stack === 'raster' || view.showOverlayStacks[stack] !== false;
 
 export const isLeafIsolated = (leaf: SemanticLeaf, isolationLayerId: string | null): boolean =>
   isolationLayerId !== null && (leaf.id === isolationLayerId || leaf.parentIds.includes(isolationLayerId));
 
 /**
- * Whether document visibility admits a leaf to the screen. Isolation deliberately overrides both
- * contribution and display visibility because isolated operations act on the named layer itself.
- * Frame-demand planning consumes this same predicate so allocation and composition cannot drift.
+ * Whether document visibility admits a leaf to the screen. Isolation deliberately overrides both contribution and
+ * display visibility because isolated operations act on the named layer itself. Frame-demand planning consumes this
+ * same predicate so allocation and composition cannot drift.
  */
 export const isLeafDrawableForScreen = (leaf: SemanticLeaf, isIsolated: boolean): boolean =>
   isIsolated || (leaf.contributionEnabled && !leaf.documentHidden);

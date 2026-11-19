@@ -104,8 +104,8 @@ const SETTLE_TIMEOUT_MS = 1000;
 
 /**
  * Brings a section to the top of its panel with its title focused, opening it first when it is folded. The scroll
- * repeats once the opening animation ends: until then the panel may be too short to put the section at the top. A
- * fold, unmount or newer reveal before then drops the repeat.
+ * repeats once the opening animation ends: until then the panel may be too short to put the section at the top. A fold,
+ * unmount or newer reveal before then drops the repeat.
  */
 export const revealPanelSection = (entry: SectionPanelEntry, persist: PersistSectionsOpen): void => {
   const wasOpen = isPanelSectionOpen(entry);
@@ -151,7 +151,6 @@ export const revealPanelSection = (entry: SectionPanelEntry, persist: PersistSec
 
 const SectionPanelContext = createContext<string | null>(null);
 
-/** The panel id the sections inside belong to, or null outside a panel. */
 export const useSectionPanelId = (): string | null => use(SectionPanelContext);
 
 /**

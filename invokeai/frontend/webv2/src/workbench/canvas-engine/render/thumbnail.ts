@@ -13,8 +13,8 @@ export interface ThumbnailSize {
 export type LayerThumbnailFallbackStage = 'thumbnail' | 'full' | 'failed';
 
 /**
- * Aspect-preserving fit without upscaling; positive sources return at least 1px dimensions, degenerate sources
- * return zero size.
+ * Aspect-preserving fit without upscaling; positive sources return at least 1px dimensions, degenerate sources return
+ * zero size.
  */
 export const fitThumbnailSize = (srcW: number, srcH: number, maxSize: number): ThumbnailSize => {
   if (srcW <= 0 || srcH <= 0 || maxSize <= 0) {
@@ -46,6 +46,9 @@ export const resolveLayerThumbnailImageRef = (layer: CanvasLayerContract): Canva
 
 /** Display-only properties that alter a layer thumbnail without changing its raster cache. */
 export const getLayerThumbnailDisplayKey = (layer: CanvasLayerContract): string => {
+  if (layer.type === 'vector') {
+    return `vector:${layer.opacity}`;
+  }
   if (layer.type === 'raster') {
     return `raster:${layer.opacity}:${adjustmentsKey(layer.adjustments)}`;
   }

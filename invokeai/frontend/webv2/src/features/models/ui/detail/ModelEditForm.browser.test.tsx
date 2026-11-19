@@ -61,7 +61,6 @@ const setInputValue = (input: HTMLInputElement, value: string): void => {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 };
 
-/** Each select trigger's accessible name, resolved through its aria-labelledby references. */
 const selectTriggerNames = (host: HTMLElement): string[] =>
   [...host.querySelectorAll('[data-scope="select"][data-part="trigger"]')].map((trigger) =>
     (trigger.getAttribute('aria-labelledby') ?? '')
@@ -131,9 +130,7 @@ describe('ModelEditForm', () => {
   it('offers format, a constrained variant select, and config path for a checkpoint main', async () => {
     await mount(checkpointMain);
 
-    // Each select trigger is named by its surrounding field's label.
     expect(selectTriggerNames(host)).toContain('models.format');
-    // sd-1 main has a curated variant list, so the field is a select.
     expect(selectTriggerNames(host)).toContain('models.variant');
     expect(host.textContent).toContain('models.configPath');
     expect(host.querySelector<HTMLInputElement>('input[value="v1-inference.yaml"]')).not.toBeNull();

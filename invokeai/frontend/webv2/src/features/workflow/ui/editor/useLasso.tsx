@@ -13,8 +13,8 @@ import {
 import type { WorkflowFlowInstance } from './flowInstanceStore';
 
 /**
- * Capture pointer events before pane dragging; hit-test flow-coordinate node corners/centers against the lasso and
- * draw a pointer-transparent overlay.
+ * Capture pointer events before pane dragging; hit-test flow-coordinate node corners/centers against the lasso and draw
+ * a pointer-transparent overlay.
  */
 
 const MIN_POLYGON_POINTS = 3;
@@ -103,8 +103,7 @@ export const useLasso = ({
       return;
     }
 
-    // Let clicks inside nodes/controls behave normally; the lasso only owns
-    // drags that start on the pane itself.
+    // Let clicks inside nodes/controls behave normally; the lasso only owns drags that start on the pane itself.
     if (!(event.target instanceof Element) || !event.target.classList.contains('react-flow__pane')) {
       return;
     }

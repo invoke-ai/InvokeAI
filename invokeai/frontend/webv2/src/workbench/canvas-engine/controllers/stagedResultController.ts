@@ -35,8 +35,8 @@ export interface StagedResultControllerOptions {
   readonly now: () => string;
   /**
    * Lands a live floating selection and applies an open transform session, each as its own step, so neither is lost
-   * when the accept moves the selection; false when one is still open (its landing was refused), which makes the
-   * accept `busy`.
+   * when the accept moves the selection; false when one is still open (its landing was refused), which makes the accept
+   * `busy`.
    */
   readonly settleEditSessions: () => boolean;
 }

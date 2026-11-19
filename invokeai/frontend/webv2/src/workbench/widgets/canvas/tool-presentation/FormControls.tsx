@@ -37,10 +37,7 @@ const affixOffset = (chars: number): string => `${INPUT_HEIGHT_PX - AFFIX_GUTTER
 const START_ELEMENT_PROPS = { ...AFFIX_PROPS, fontWeight: 'medium', pointerEvents: 'auto', ps: '1.5' } as const;
 const END_ELEMENT_PROPS = { ...AFFIX_PROPS, pe: '1.5', pointerEvents: 'none' } as const;
 
-/**
- * Keep drafts through typing/scrubbing and commit once on blur, Enter, or release only after edits. Do not
- * overwrite precise values by tabbing through rounded displays; show the accepted clamped result.
- */
+/** Drafts commit once on blur, Enter or release, and only after edits, so tabbing keeps precise values. */
 export const FormNumberField = ({
   'aria-label': ariaLabel,
   disabled,
@@ -71,10 +68,9 @@ export const FormNumberField = ({
     },
     [onValueCommit, value]
   );
-  // The number input commits on blur and Enter only; a scrub ends with the
-  // mouse button, so the draft it produced is committed when the button lifts.
-  // The listener reads the ref: a release in the same frame as the last move
-  // must not commit a draft one step behind.
+  // The number input commits on blur and Enter only; a scrub ends with the mouse button, so the draft it produced is
+  // committed when the button lifts. The listener reads the ref: a release in the same frame as the last move must not
+  // commit a draft one step behind.
   const onScrubStart = useCallback(() => {
     scrubEnd.current?.();
     const scrub = new AbortController();
@@ -135,20 +131,15 @@ export const useNumberCommit = (apply: (value: number) => void) =>
     [apply]
   );
 
-/**
- * Gesture state for a slider or scrubber whose settled value lives in the document: the
- * draft follows the thumb, `settle` runs ONCE on release (one history entry per
- * gesture), and optional `preview` mirrors ticks into a non-committing store.
- */
+/** Slider gesture state: `settle` runs once on release (one history entry); `preview` mirrors ticks. */
 export const useSliderGesture = (
   committed: number,
   settle: (value: number) => void,
   preview?: (value: number) => void
 ) => {
   const [draft, setDraft] = useState<number | null>(null);
-  // The end event also fires for gestures that changed nothing (a thumb click,
-  // an arrow key at the boundary); settling those would record empty history
-  // entries, so a gesture only settles a genuinely different value.
+  // The end event also fires for gestures that changed nothing (a thumb click, an arrow key at the boundary); settling
+  // those would record empty history entries, so a gesture only settles a genuinely different value.
   const committedRef = useRef(committed);
   useEffect(() => {
     committedRef.current = committed;
@@ -176,6 +167,7 @@ export const useSliderGesture = (
 export const ApplyCancelBar = ({
   applyDisabled = true,
   applyLoading = false,
+  applyLabel,
   cancelDisabled = true,
   children,
   onApply,
@@ -183,6 +175,7 @@ export const ApplyCancelBar = ({
 }: {
   applyDisabled?: boolean;
   applyLoading?: boolean;
+  applyLabel?: ReactNode;
   cancelDisabled?: boolean;
   children?: ReactNode;
   onApply?: () => void;
@@ -202,7 +195,7 @@ export const ApplyCancelBar = ({
         variant="solid"
         onClick={onApply}
       >
-        {t('common.apply')}
+        {applyLabel ?? t('common.apply')}
       </Button>
       <Button data-pane-action="cancel" disabled={cancelDisabled} flexShrink={0} variant="ghost" onClick={onCancel}>
         {t('common.cancel')}

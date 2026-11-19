@@ -181,7 +181,6 @@ describe('createHistory: eviction', () => {
     }
     expect(history.entries().past).toHaveLength(HISTORY_MAX_ENTRIES);
     expect(history.entries().past[0]).toBe('entry-1');
-    // The History pane says older steps are gone; a clear starts the count again.
     expect(history.entries().evicted).toBe(1);
     history.clear();
     expect(history.entries().evicted).toBe(0);

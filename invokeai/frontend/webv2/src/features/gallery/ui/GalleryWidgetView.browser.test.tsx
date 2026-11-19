@@ -2,6 +2,7 @@ import type { GalleryImageItem } from '@features/gallery/core/items';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { requestGalleryItemReveal } from '@features/gallery/core/selection';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, type ComponentProps } from 'react';
@@ -127,7 +128,7 @@ const adapter: GalleryUiAdapter = {
     toggleItemSelection: noop,
     updateSettings: noop,
   },
-  galleryValues: { galleryPage: 0, selectedBoardId: 'none' },
+  galleryValues: resolvedValues({ galleryPage: 0, selectedBoardId: 'none' }),
   generateValues: {},
   getItemLabel: () => Promise.resolve(null),
   liveFollowEnabled: false,

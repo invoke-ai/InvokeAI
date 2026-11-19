@@ -20,6 +20,7 @@ import type {
 } from './types';
 
 import {
+  addReferenceImages,
   GENERATE_COMPONENT_VALUE_KEYS,
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
@@ -29,16 +30,14 @@ import {
   isLoraSupported,
   isReferenceImageSupported,
   SUPPORTED_GENERATE_BASES,
-  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { getIsPidSupportedBase } from './pid';
 import { clampDimension, deriveAspectRatioId } from './settings';
 
-/** Compile both bundled and standalone component paths. */
 export interface ModelShape {
   label: string;
   overrides: Partial<MainModelConfig>;
-  /** Qwen-Image-2.1 and Krea-2: read the references with a GGUF encoder and its Vision Tower instead of a safetensors encoder. */
+  /** Read references through a GGUF encoder and its Vision Tower instead of a safetensors encoder. */
   ggufEncoder?: true;
 }
 
@@ -47,20 +46,16 @@ const DEFAULT_SHAPES: readonly ModelShape[] = [
   { label: 'standalone-components', overrides: { format: 'gguf_quantized' } },
 ];
 
-/** Check per-base shape overrides against supported bases. */
-export const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly ModelShape[]>> = {
-  // Anima ships single files only, checkpoint or GGUF; Anima-3.8B's variant adds a second encoder.
+const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly ModelShape[]>> = {
   anima: [
     { label: 'qwen3', overrides: { format: 'checkpoint', variant: 'anima_qwen3' } },
     { label: 'qwen3-gguf', overrides: { format: 'gguf_quantized', variant: 'anima_qwen3' } },
     { label: 'qwen35', overrides: { format: 'checkpoint', variant: 'anima_qwen35' } },
   ],
-  // Ideogram's standalone fixture is a conditional checkpoint, not GGUF.
   'ideogram-4': [
     { label: 'diffusers', overrides: { format: 'diffusers' } },
     { label: 'standalone-components', overrides: { branch: 'conditional', format: 'checkpoint' } },
   ],
-  // FLUX.2 dev and Klein need distinct encoder variants.
   flux2: [
     { label: 'dev-diffusers', overrides: { format: 'diffusers', variant: 'dev' } },
     { label: 'dev-standalone', overrides: { format: 'gguf_quantized', variant: 'dev' } },
@@ -75,7 +70,6 @@ export const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly Mod
     ...DEFAULT_SHAPES,
     { ggufEncoder: true, label: 'standalone-gguf-encoder', overrides: { format: 'gguf_quantized' } },
   ],
-  // FLUX.3 Klein samples without CFG; Klein Base compiles the negative branch at its CFG default.
   flux3: [
     { label: 'klein-diffusers', overrides: { format: 'diffusers', variant: 'flux3_klein' } },
     { label: 'klein-standalone', overrides: { format: 'gguf_quantized', variant: 'flux3_klein' } },
@@ -103,7 +97,6 @@ const CANDIDATE_VARIANTS = [
   'qwen3_5_4b',
   'qwen3_5_9b',
 ] as const;
-/** Ideogram 4's two transformer branches; every other main leaves the field unset. */
 const CANDIDATE_BRANCHES = [undefined, 'conditional', 'unconditional'] as const;
 /** VAE widths. A served row can constrain the width as well as the base -- Wan ships 16 and 48. */
 const CANDIDATE_LATENT_CHANNELS = [undefined, 16, 48] as const;
@@ -118,7 +111,6 @@ export const candidatesForSlot = (slot: ComponentSlotPolicy): ModelIdentifierCon
           for (const branch of type === 'main' ? CANDIDATE_BRANCHES : [undefined]) {
             candidates.push({
               base,
-              // Distinguish bundled component sources from single-file branch formats.
               format: slot.valueKind === 'main' ? (branch ? 'checkpoint' : 'diffusers') : undefined,
               key: `${base}-${type}-${variant ?? 'novariant'}${latentChannels ? `-${latentChannels}` : ''}${branch ? `-${branch}` : ''}`,
               name: `${base} ${type} ${variant ?? ''} ${branch ?? ''}`.trim(),
@@ -209,7 +201,7 @@ export const satisfiedSettingsFor = (base: SupportedGenerateBase, shape: ModelSh
     return { model, ...required };
   }
 
-  // The tower is optional, so it stays out of `filled` (the required components): pick the GGUF encoder, then what its slot offers.
+  // The tower is optional, so it stays out of `filled`.
   const settings = {
     ...required.settings,
     qwen3VLEncoderModel: { ...required.settings.qwen3VLEncoderModel, format: 'gguf_quantized' },
@@ -228,18 +220,15 @@ export const satisfiedSettingsFor = (base: SupportedGenerateBase, shape: ModelSh
     : { model, ...required, settings };
 };
 
-/** Every supported base in each of its component shapes. */
 export const generateGraphCases = SUPPORTED_GENERATE_BASES.flatMap((base) =>
   shapesForBase(base).map((shape) => ({ base, label: `${base} / ${shape.label}`, shape }))
 );
 
-/** Required components plus every optional slot a compatible candidate fits, with PiD decoding on where supported. */
 export const fullyFilledSettingsFor = (base: SupportedGenerateBase, shape: ModelShape) => {
   const { filled, model, settings: required } = satisfiedSettingsFor(base, shape);
   let settings: GenerateSettings = { ...required, pidMode: getIsPidSupportedBase(base) ? 'fit' : 'off' };
   const allFilled = new Set(filled);
 
-  // Fill to a fixed point: a filled slot can reveal or constrain another.
   for (let pass = 0; pass < 5; pass++) {
     const { slots } = getComponentSectionPolicy(model, settings);
     const context = buildContext(model, settings, slots);
@@ -267,7 +256,6 @@ export const fullyFilledSettingsFor = (base: SupportedGenerateBase, shape: Model
   return { filled: [...allFilled].sort(), model, settings };
 };
 
-/** References for the families whose builders wire them through their own nodes rather than an adapter. */
 const tunedReferenceImagesFor = (
   model: MainModelConfig,
   image: GenerateReferenceImageAsset,
@@ -277,8 +265,6 @@ const tunedReferenceImagesFor = (
     return [{ config: { image, styleStrength: 1, type: 'krea2_reference_image' }, id: 'style', isEnabled: true }];
   }
 
-  // Only an encoder with a vision tower reads references: a Diffusers pipeline's own, or a standalone safetensors
-  // one; other shapes compile without them.
   if (model.base === 'qwen-image-2-1' && isReferenceImageSupported(model, components)) {
     return [{ config: { image, type: 'qwen_image_2_1_reference_image' }, id: 'edit', isEnabled: true }];
   }
@@ -286,14 +272,10 @@ const tunedReferenceImagesFor = (
   return undefined;
 };
 
-/**
- * The optional per-family tuning and output filters, all switched on, so the backend contract also covers the nodes
- * and literal values a default recipe never emits. Settings a family ignores are harmless to carry.
- */
+/** Optional tuning and filters all on, so the backend contract covers nodes a default recipe never emits. */
 export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape) => {
   const { filled, model, settings } = satisfiedSettingsFor(base, shape);
   const image = { original: { image: { height: 1024, image_name: 'style-reference.png', width: 1024 } } };
-  // Only a graph with the FLUX.3 prompt upsampler switched on contains its node, so switch it on and pick a model.
   const upsamplerOn = { ...settings, flux3PromptUpsamplerEnabled: base === 'flux3' };
   const upsamplerSlot = getComponentSectionPolicy(model, upsamplerOn).slots.find(
     (slot) => slot.key === 'flux3PromptUpsamplerModel'
@@ -311,9 +293,7 @@ export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape)
     settings: {
       ...upsamplerOn,
       flux3PromptUpsamplerModel: upsamplerModel ?? null,
-      // CFG above 1 adds the negative prompt, which Qwen-Image-2.1 also encodes with the references.
       cfgScale: base === 'qwen-image-2-1' ? 4 : settings.cfgScale,
-      // Exercise explicit zero overrides as well as the default automatic metadata contract.
       hiDiffusionEnabled: base === 'sd-1' || base === 'sdxl',
       hiDiffusionT1Ratio: 0,
       hiDiffusionT2Ratio: 0,
@@ -334,11 +314,7 @@ const RECALL_REFERENCE_IMAGE: GenerateReferenceImageAsset = {
   original: { image: { height: 512, image_name: 'recall-reference.png', width: 512 } },
 };
 
-/**
- * Every setting image recall restores, at a value the policy accepts and no default holds, so a round trip that drops
- * one shows. Values a family does not record are harmless to carry. Seamless tiling and CFG rescale stay at their
- * defaults where the panel hides them: recall restores them on every family.
- */
+/** Every recalled setting off its default, so a round trip that drops one shows. */
 const withRecallTuning = (
   model: GenerateModelConfig,
   settings: GenerateSettings,
@@ -349,12 +325,10 @@ const withRecallTuning = (
 
   return {
     ...settings,
-    // Canvas inpainting then runs without the adapter in the filled slot, so its record shows the switch off.
     animaInpaintAdapterEnabled: false,
     aspectRatioId: deriveAspectRatioId(size.width, size.height),
     aspectRatioValue: size.width / size.height,
     cfgRescaleMultiplier: policy.cfgRescaleVisible ? 0.3 : defaults.cfgRescaleMultiplier,
-    // FLUX.3 Klein samples without CFG: validation refuses any scale but its default.
     cfgScale:
       model.base === 'flux3' && model.variant === 'flux3_klein'
         ? defaults.cfgScale
@@ -411,7 +385,6 @@ const withRecallTuning = (
   };
 };
 
-/** The reference the family reads: an adapter where the base takes one, otherwise the base's own reference type. */
 const recallReferenceImagesFor = (model: MainModelConfig, settings: GenerateSettings): GenerateReferenceImage[] => {
   if (model.base === 'krea-2') {
     return [
@@ -423,21 +396,19 @@ const recallReferenceImagesFor = (model: MainModelConfig, settings: GenerateSett
     ];
   }
 
-  return isReferenceImageSupported(model, settings)
-    ? withAddedReferenceImages(
-        model,
-        [{ base: model.base, key: `${model.base}-ip-adapter`, name: `${model.base} IP Adapter`, type: 'ip_adapter' }],
-        [],
-        [{ id: 'reference', image: RECALL_REFERENCE_IMAGE }]
-      )
-    : [];
+  return addReferenceImages({
+    additions: [{ id: 'reference', image: RECALL_REFERENCE_IMAGE }],
+    components: settings,
+    mode: 'strict',
+    model,
+    models: [
+      { base: model.base, key: `${model.base}-ip-adapter`, name: `${model.base} IP Adapter`, type: 'ip_adapter' },
+    ],
+    referenceImages: [],
+  }).referenceImages;
 };
 
-/**
- * A shape with every component filled and every recalled setting tuned off its default, PiD decoding included, and
- * the family's reference where it reads one. The size is off the model's default and not square. Z-Image decodes in
- * native PiD, which generates at a quarter of the recorded size, and the other PiD families in fit.
- */
+/** Everything filled and tuned; the size is off default and not square (Z-Image PiD is native, others fit). */
 export const recallTunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape) => {
   const { model, settings: fullyFilled } = fullyFilledSettingsFor(base, shape);
   const filled: GenerateSettings =
@@ -456,7 +427,6 @@ export const recallTunedSettingsFor = (base: SupportedGenerateBase, shape: Model
   };
 };
 
-/** The installed models a recall resolves the record against, the way the gallery hands them over. */
 export const recallCatalogFor = (model: GenerateModelConfig, settings: GenerateSettings) => ({
   models: [
     model,
@@ -475,7 +445,6 @@ export const recallCatalogFor = (model: GenerateModelConfig, settings: GenerateS
   vaeModels: settings.vae ? [settings.vae] : [],
 });
 
-/** SDXL finishing with its refiner, tuned off every refiner default; PiD, which replaces the decode it feeds, is off. */
 export const sdxlRefinerRecallCase = () => {
   const { model, settings } = recallTunedSettingsFor('sdxl', {
     label: 'diffusers-with-refiner',
@@ -500,7 +469,6 @@ export const sdxlRefinerRecallCase = () => {
   };
 };
 
-/** FLUX with a Redux reference in place of the IP-Adapter the tuned recipe carries. */
 export const fluxReduxRecallCase = () => {
   const { model, settings } = recallTunedSettingsFor('flux', {
     label: 'diffusers-with-redux',
@@ -529,7 +497,6 @@ export const fluxReduxRecallCase = () => {
   };
 };
 
-/** Krea-2 edit references in place of the style reference, read by the tuned LoRA, with the reference K/V cache on. */
 export const krea2EditRecallCase = () => {
   const { model, settings } = recallTunedSettingsFor('krea-2', {
     label: 'diffusers-with-edit-references',
@@ -568,10 +535,6 @@ const externalRecallCase = (
   },
 });
 
-/**
- * One model per hosted provider, each with its own options: GPT Image with a reference image, Gemini at one of its
- * named sizes, Seedream.
- */
 export const externalRecallCases = () => [
   externalRecallCase(
     {

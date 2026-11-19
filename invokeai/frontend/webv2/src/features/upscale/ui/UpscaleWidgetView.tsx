@@ -22,12 +22,6 @@ import {
 } from '@features/generation/components';
 import { useDynamicPrompts } from '@features/generation/react';
 import {
-  type ArchitectureCapabilitiesSnapshot,
-  ensureArchitectureCapabilitiesLoaded,
-  getArchitectureCapabilitiesSnapshot,
-  subscribeArchitectureCapabilities,
-} from '@features/generation/runtime';
-import {
   getDynamicPromptsConfig,
   getEffectivePrompts,
   isLoraCompatibleWithModel,
@@ -45,6 +39,12 @@ import {
   useModelsSelector,
   useOpenModelInManager,
 } from '@features/models';
+import {
+  type ArchitectureCapabilitiesSnapshot,
+  ensureArchitectureCapabilitiesLoaded,
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { ModelSelect, useHasModelPickerCandidates } from '@features/models/react';
 import {
   coerceUpscaleScheduler,
@@ -110,7 +110,6 @@ const LORA_MODEL_TYPES: readonly ModelTaxonomyType[] = ['lora'];
 const CONTROLNET_MODEL_TYPES: readonly ModelTaxonomyType[] = ['controlnet'];
 const VAE_MODEL_TYPES: readonly ModelTaxonomyType[] = ['vae'];
 
-/** How each encoder slot reads in the form; which slots show, and what fits them, is the core's call. */
 const COMPONENT_FIELD_UI: Record<
   UpscaleComponentField,
   {
@@ -227,7 +226,6 @@ const formatScale = (scale: number): string => `${scale}×`;
 const getRangeError = (label: string, value: number, min: number, max: number): string | undefined =>
   Number.isFinite(value) && value >= min && value <= max ? undefined : `${label} must be between ${min} and ${max}.`;
 
-/** The muted line under the preflight explaining how Model only reaches Scale with this upscaler. */
 const useModelOnlyPlanNote = (nativeScale: number | null, scale: number): string | null => {
   const { t } = useTranslation();
   const plan = getModelOnlyUpscalePlan(nativeScale, scale);
@@ -420,11 +418,7 @@ const UpscaleModelReconciler = ({
   return null;
 };
 
-/**
- * Each range field's error. CFG and Steps take their bounds from the served table, read when this runs, so its
- * revision is an argument: the React Compiler infers a memo's dependencies from what the callback reads, and a table
- * read through a function call is not one of them, so the bounds would stay those of the table before it loaded.
- */
+/** The table revision is an argument: the React Compiler does not see a table read through a function call. */
 const getFieldErrors = (t: (key: string) => string, values: UpscaleWidgetValues, _capabilitiesRevision: number) => ({
   cfgScale: getRangeError(t('widgets.upscale.cfgScale'), values.cfgScale, 1, upscaleMaxCfgScale(values.model)),
   creativity: getRangeError(
@@ -451,23 +445,14 @@ const getFieldErrors = (t: (key: string) => string, values: UpscaleWidgetValues,
   tileSize: getRangeError(t('widgets.upscale.tileSize'), values.tileSize, UPSCALE_TILE_SIZE_MIN, UPSCALE_TILE_SIZE_MAX),
 });
 
-/**
- * The scheduler choices, the scheduler the pass runs, and the highest CFG it takes, all read from the served table
- * when this runs; the revision is an argument for the reason `getFieldErrors` gives.
- */
+/** All read from the served table; the revision is an argument for the reason `getFieldErrors` gives. */
 const getServedSamplingFields = (model: MainModelConfig | null, scheduler: string, _capabilitiesRevision: number) => ({
   cfgScaleMax: upscaleMaxCfgScale(model),
   scheduler: coerceUpscaleScheduler(model, scheduler),
   schedulerOptions: upscaleSchedulerOptions(model),
 });
 
-/**
- * The section of each issue Invoke lists for these values, so each section's count matches Invoke's. The check reads
- * the served table when it runs, so the table's revision is an argument: the React Compiler infers a memo's
- * dependencies from what its callback reads, and the table read inside the check is not one, so without the argument
- * the memo would not re-run when the table arrives or reloads while `values` holds still (the models still loading).
- * Without the table Refine's form is held back, so no section counts anything.
- */
+/** The revision makes the memo re-run when the table arrives; without the table no section counts anything. */
 const getIssueSections = (
   values: UpscaleWidgetValues,
   models: readonly ModelConfig[] | undefined,
@@ -500,9 +485,7 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
     getArchitectureCapabilitiesSnapshot,
     selectCapabilitiesRevision
   );
-  // The sync picks VAEs and a new model's CFG from the served table, and a default applied without it
-  // would stick: nothing re-applies one to a model already selected. So the sync waits for the table,
-  // and until then the gate holds back the form, its model picker included.
+  // A default applied without the served table would stick, so the sync and the form wait for it.
   const hasCapabilities = capabilitiesRevision > 0;
   const canSync = modelsStatus === 'loaded' && hasCapabilities;
   const { patchPromptDraft: patchDraft, patchValues, projectId, promptDraft, rawValues } = selection;
@@ -602,8 +585,6 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
   );
   const selectedLoraKeys = useMemo(() => new Set(values.loras.map((lora) => lora.model.key)), [values.loras]);
 
-  // A control with nothing to steer is worse than no control, so the widget follows the table
-  // rather than showing every field for every architecture.
   const architecture = upscaleArchitectureFor(values.model);
   const tileControlNet = architecture?.tileControlNet ?? null;
   // Structure scales the ControlNet's weights, so with an optional one left out it steers nothing.
@@ -615,8 +596,7 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
       PRESET_ENTRIES.find(
         ([, preset]) =>
           values.creativity === preset.creativity &&
-          // Structure is hidden where nothing consumes it, so a stale value must not keep every
-          // preset unhighlighted with nothing on screen to explain why.
+          // A stale hidden Structure must not keep every preset unhighlighted.
           (!showStructure || values.structure === preset.structure)
       )?.[0] ?? null,
     [showStructure, values.creativity, values.structure]
@@ -692,8 +672,7 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
   );
 
   const vaePrecisionValue = useMemo(() => [values.vaePrecision], [values.vaePrecision]);
-  // The architecture's own list, less the schedulers that would ignore Creativity, showing the one the
-  // graph will really run. Where one is left there is nothing to choose, and the field goes.
+  // Schedulers that would ignore Creativity are dropped; with one left, the field goes.
   const { cfgScaleMax, scheduler, schedulerOptions } = useMemo(
     () => getServedSamplingFields(values.model, values.scheduler, capabilitiesRevision),
     [capabilitiesRevision, values.model, values.scheduler]
@@ -718,8 +697,7 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
   );
   // Model only keeps the Refine settings as they are, hidden, so switching back restores them.
   const isRefine = values.mode === 'refine';
-  // Folded, Detail guidance still says what Generate's prompt settings make of the prompt it shares: the template
-  // wrapped around it and how many prompts it expands to. The expansion is the one Invoke counts.
+  // Folded, Detail guidance still summarizes the shared prompt's template and expansion count.
   const promptExpansion = useDynamicPrompts(
     getEffectivePrompts(promptDraft).positivePrompt,
     isRefine ? getDynamicPromptsConfig(promptDraft) : null
@@ -730,8 +708,7 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
     () => [templateName, promptCount > 1 ? t('topbar.invoke.summary.promptCount', { count: promptCount }) : null],
     [promptCount, t, templateName]
   );
-  // Model only can neither show nor plan the passes of an upscaler installed before Invoke recorded native scales;
-  // the field's description says so, and re-identifying it in the Model Manager records it.
+  // Upscalers installed before native scales were recorded; re-identifying in the Model Manager fixes it.
   const isNativeScaleUnknown =
     values.mode === 'model-only' &&
     values.upscaleModel !== null &&
@@ -817,9 +794,8 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
                 )}`;
 
                 return (
-                  // The tooltip trigger merges onto the text, not the item: both
-                  // tooltip and segment item write `data-state`, and the tooltip's
-                  // open/closed would clobber the item's checked state.
+                  // The tooltip trigger merges onto the text, not the item: both tooltip and segment item write
+                  // `data-state`, and the tooltip's open/closed would clobber the item's checked state.
                   <SegmentGroup.Item key={id} flex="1" minW="0" value={id}>
                     <SegmentGroup.ItemHiddenInput />
                     <Tooltip content={tooltipContent}>
@@ -1101,8 +1077,7 @@ export const UpscaleWidgetView = ({ instance }: { instance?: { id: string } }) =
     </Stack>
   );
 
-  // The mode sits above the gate: Model only reads no main-model capabilities, so it stays reachable and usable while
-  // the table is loading or has failed, which holds back only Refine's form.
+  // The mode sits above the gate: Model only needs no served table, so it stays usable while it loads or fails.
   return (
     <GenerationSectionPanel id={instance?.id}>
       <Stack gap={0} minW={0}>

@@ -8,8 +8,7 @@ import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import type { GalleryPickerAccept, GalleryPickerSelection } from './galleryPicker';
 import type { GalleryPickerOpeningScope } from './useGalleryPickerScope';
 
-// Loaded on first open: every widget with an image slot mounts a trigger at
-// boot, and the view is most of the picker's weight.
+// Loaded on first open: every widget with an image slot mounts a trigger at boot, and the view is most of the weight.
 const GalleryPickerView = lazy(() =>
   import('./GalleryPickerView').then((module) => ({ default: module.GalleryPickerView }))
 );

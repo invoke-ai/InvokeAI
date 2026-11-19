@@ -17,13 +17,11 @@ import { galleryImages, toGalleryItemKey } from '@features/gallery';
 import { GalleryPickerPopover } from '@features/gallery/picker';
 import { isGalleryImageDragData, useGalleryImageDroppable } from '@features/gallery/utility';
 import {
+  addReferenceImages,
   createReferenceImageId,
   getGenerationDimensions,
-  getMaxReferenceImages,
-  getReferenceImageUnavailableReason,
-  isReferenceImageSupported,
+  getReferenceImageRoom,
   reconcileReferenceImagesWithModel,
-  withAddedReferenceImages,
 } from '@features/generation/core/baseGenerationPolicies';
 import {
   generatedImageToReferenceImage,
@@ -93,11 +91,13 @@ export const GenerateReferenceImagesContent = ({
   const { gallery, models: uiModels, notifications, project, settings } = useGenerationUi();
   const { openManager, readCatalog } = uiModels;
   const openModelManager = useCallback((modelType: string) => openManager({ modelType }), [openManager]);
-  const isSupported = isReferenceImageSupported(selectedModel, visionComponents);
-  const unavailableReason = getReferenceImageUnavailableReason(selectedModel, visionComponents);
-  const maxReferenceImages = getMaxReferenceImages(selectedModel, visionComponents);
+  const {
+    free: freeSlots,
+    isSupported,
+    limit: maxReferenceImages,
+    unavailableReason,
+  } = getReferenceImageRoom(selectedModel, visionComponents, referenceImages);
   const referenceImageCount = referenceImages.length;
-  const freeSlots = Math.max(0, maxReferenceImages - referenceImageCount);
   const canAdd = freeSlots > 0;
   // Still a target when full, so a drop there says why nothing was added instead of doing nothing.
   const { acceptsActiveDrag, isOver, setNodeRef } = useGalleryImageDroppable({
@@ -114,29 +114,23 @@ export const GenerateReferenceImagesContent = ({
   const appendReferenceImages = useCallback(
     (images: GenerateReferenceImageAsset[]): number => {
       // Mint IDs outside replayed updaters so draft and flushed identities match.
-      const ids = images.map(() => createReferenceImageId());
+      const additions = images.map((image) => ({ id: createReferenceImageId(), image }));
       let added = 0;
 
       // The commit applies the update at once (a later flush may replay it), so `added` is set when this returns.
       onCommit((currentSettings) => {
-        const remaining =
-          getMaxReferenceImages(selectedModel, currentSettings) - currentSettings.referenceImages.length;
+        const result = addReferenceImages({
+          additions,
+          components: currentSettings,
+          mode: 'strict',
+          model: selectedModel,
+          models,
+          referenceImages: currentSettings.referenceImages,
+        });
 
-        added = Math.max(0, Math.min(remaining, images.length));
+        added = result.added;
 
-        if (added === 0) {
-          return currentSettings;
-        }
-
-        return {
-          ...currentSettings,
-          referenceImages: withAddedReferenceImages(
-            selectedModel,
-            models,
-            currentSettings.referenceImages,
-            images.slice(0, remaining).map((image, index) => ({ id: ids[index] ?? createReferenceImageId(), image }))
-          ),
-        };
+        return added === 0 ? currentSettings : { ...currentSettings, referenceImages: result.referenceImages };
       });
 
       return added;
@@ -275,9 +269,9 @@ export const GenerateReferenceImagesContent = ({
         )
       ),
       mode: 'multiple',
-      remaining: { image: Math.max(0, maxReferenceImages - referenceImageCount) },
+      remaining: { image: freeSlots },
     }),
-    [maxReferenceImages, referenceImageCount, referenceImages]
+    [freeSlots, referenceImages]
   );
 
   const handlePick = useCallback(

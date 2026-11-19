@@ -3,10 +3,7 @@ import { useEffect } from 'react';
 
 import { isGalleryBoardDragData, isGalleryItemDragData } from './galleryDnd';
 
-/**
- * Mount once inside DndContext. The body marker enables global drag cursors that override element-specific button
- * and textarea cursors.
- */
+/** Mount once inside DndContext: the body marker's global drag cursors override button and textarea cursors. */
 export const GalleryDragCursor = () => {
   const { active } = useDndContext();
   const isGalleryDrag = isGalleryItemDragData(active?.data.current) || isGalleryBoardDragData(active?.data.current);
