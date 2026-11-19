@@ -39,7 +39,7 @@ import {
 } from '@features/gallery/queries';
 import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
-import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
+import { getReferenceImageRoom, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { submitUtilityGraph, type UtilityGraphSubmission, UtilityQueueError } from '@features/queue/utility';
 import { copyImage } from '@platform/browser/clipboard';
@@ -264,7 +264,7 @@ export const useImageActions = ({
 
       return {
         canUseAsReferenceImage: Boolean(
-          values && values.referenceImages.length < getMaxReferenceImages(values.model, values)
+          values && getReferenceImageRoom(values.model, values, values.referenceImages).free > 0
         ),
         currentGenerateValues: values,
       };

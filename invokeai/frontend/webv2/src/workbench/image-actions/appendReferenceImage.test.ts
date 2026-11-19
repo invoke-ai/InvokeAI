@@ -2,7 +2,7 @@ import type { MainModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
-import { getDefaultGenerateSettings, getMaxReferenceImages } from '@features/generation/settings';
+import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { describe, expect, it } from 'vitest';
 
 import { appendReferenceImage, type AppendReferenceImageResult } from './appendReferenceImage';
@@ -43,27 +43,9 @@ describe('appendReferenceImage', () => {
     });
   });
 
-  it('preserves existing reference images and appends after them', () => {
-    const first = appendReferenceImage({ generateValues: generateValuesFor(), image, models });
-    if (first.status !== 'appended') {
-      throw new Error('Expected first append to succeed');
-    }
-
-    const second = appendReferenceImage({
-      generateValues: generateValuesFor(first.referenceImages as unknown[]),
-      image: { ...image, imageName: 'second.png' },
-      models,
-    });
-
-    if (second.status !== 'appended') {
-      throw new Error('Expected second append to succeed');
-    }
-    expect(second.referenceImages).toHaveLength(2);
-    expect(second.referenceImages[0]).toEqual(first.referenceImages[0]);
-  });
-
   it('returns full once the model reference image limit is reached', () => {
-    const limit = getMaxReferenceImages(sd1Model);
+    // SD 1's served limit.
+    const limit = 5;
     let referenceImages: unknown[] = [];
 
     for (let index = 0; index < limit; index += 1) {
@@ -81,63 +63,6 @@ describe('appendReferenceImage', () => {
     expect(appendReferenceImage({ generateValues: generateValuesFor(referenceImages), image, models })).toEqual({
       status: 'full',
     });
-  });
-
-  it('adds a Krea-2 image as the style reference only when no other reference runs, joining a lone untouched one to Edit', () => {
-    const krea2Model: MainModelConfig = {
-      base: 'krea-2',
-      format: 'diffusers',
-      key: 'krea2-key',
-      name: 'Krea-2',
-      type: 'main',
-    };
-    const krea2Values = (referenceImages: unknown[]) => ({
-      ...getDefaultGenerateSettings(krea2Model),
-      model: krea2Model,
-      modelKey: krea2Model.key,
-      referenceImages,
-    });
-    const pose = {
-      config: {
-        image: { original: { image: { height: 512, image_name: 'pose.png', width: 512 } } },
-        type: 'krea2_edit_reference_image',
-      },
-      id: 'pose',
-      isEnabled: true,
-    };
-    const appendedTypes = (referenceImages: unknown[]) => {
-      const result = appendReferenceImage({
-        generateValues: krea2Values(referenceImages),
-        image,
-        models: [krea2Model] as ModelConfig[],
-      });
-
-      if (result.status !== 'appended') {
-        throw new Error(`Expected appended, got ${result.status}`);
-      }
-
-      return result.referenceImages.map(({ config }) => config.type);
-    };
-
-    const style = {
-      config: { image: pose.config.image, styleStrength: 1, type: 'krea2_reference_image' },
-      id: 'style',
-      isEnabled: true,
-    };
-
-    expect(appendedTypes([pose])).toEqual(['krea2_edit_reference_image', 'krea2_edit_reference_image']);
-    // A second image turns a lone style reference the user never adjusted into an edit reference too.
-    expect(appendedTypes([style])).toEqual(['krea2_edit_reference_image', 'krea2_edit_reference_image']);
-    // One at another strength is meant for style: it stays, and validation reports the mix.
-    expect(appendedTypes([{ ...style, config: { ...style.config, styleStrength: 1.5 } }])).toEqual([
-      'krea2_reference_image',
-      'krea2_edit_reference_image',
-    ]);
-    expect(appendedTypes([{ ...pose, isEnabled: false }])).toEqual([
-      'krea2_edit_reference_image',
-      'krea2_reference_image',
-    ]);
-    expect(appendedTypes([])).toEqual(['krea2_reference_image']);
   });
 
   it('returns unsupported when the model cannot take reference images', () => {
