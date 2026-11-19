@@ -25,6 +25,8 @@ export type ToolFormComponent = ComponentType<ToolFormProps>;
 export interface ToolPropertyGroup {
   id: string;
   labelKey: string;
+  /** The body already labels its rows; keep the accessible group name without another visible heading. */
+  hideLabel?: boolean;
   /** Present makes the header a disclosure; the value is the default state. */
   collapsible?: 'open' | 'collapsed';
   body: ToolFormComponent;
