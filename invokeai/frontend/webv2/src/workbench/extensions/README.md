@@ -52,6 +52,15 @@ Settings catalog is composed from first-party manifests, not live instance regis
 
 The browser composes first-party widget manifests from its bundled registry. Server-discovered custom nodes are a separate system. There is no widget-pack installation, remote asset discovery, signing, permission, or reload protocol.
 
+## Availability
+
+Discovery (`getWidgetsForRegion`, `getWidgetHosts`; region menus, the Widgets dialog, the palette, placement commands) lists only available widgets. Two manifest rules exist, and they combine:
+
+- `requiresAdmin`: a multi-user admin session. The authenticated route remounts on account changes, so this rule reads the session.
+- `requiresCapability`: a server grant for the signed-in account (`WidgetCapability`), resolved by `workbench/widgetCapabilities.ts` from Identity's role and the account-scoped frontend config (`workbench/frontendConfig.ts`). Single-user mode counts as admin. A grant can change while the editor stays mounted. Renders that list a region holding a capability widget (today the status bar and the Widgets dialog) pass `useWidgetCapabilities()` to discovery; it also observes the config query, so whoever needs a grant loads it. Every other caller, commands included, reads the current grant from the query cache. The registry context function stays stable. A pending grant is unavailable.
+
+Discovery is not the gate. A saved layout restores an instance by ID through `getWidgetById`, so a capability widget's own view checks the grant before doing any work. Without the grant it renders a localized refusal with its own way to leave the layout, since discovery also hides its chip. Example: [Server Output](../widgets/server-output/README.md).
+
 ## Implemented Shell Systems
 
 - Workbench and Launchpad command palette hosts with shared command and settings entries.

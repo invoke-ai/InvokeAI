@@ -1,6 +1,7 @@
 import asyncio
 from collections.abc import Collection
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -165,6 +166,86 @@ MODEL_INSTALL_EVENTS = (
 LLM_TASK_EVENTS = {LLMTaskProgressEvent, LLMTaskCompleteEvent, LLMTaskErrorEvent}
 
 
+_DEFAULT_PORTS = {"http": 80, "https": 443}
+# A WebSocket scope carries `ws`/`wss`, while a browser sends its page's `http`/`https` origin.
+_PAGE_SCHEMES = {"http": "http", "https": "https", "ws": "http", "wss": "https"}
+# Distinct refused origins that are logged as warnings; later ones are logged at debug level.
+_MAX_WARNED_ORIGINS = 32
+
+
+def _header(scope: Scope, name: bytes) -> str | None:
+    values = [value.decode("latin-1") for key, value in scope["headers"] if key == name]
+    # Repeated headers join, as engine.io joins them, so a duplicated Origin or Host matches nothing.
+    return ",".join(values) if values else None
+
+
+def _origin_key(scheme: str, netloc: str) -> tuple[str, str, int]:
+    parts = urlsplit(f"{scheme}://{netloc}")
+    if not parts.hostname:
+        raise ValueError(netloc)
+    return scheme, parts.hostname, parts.port or _DEFAULT_PORTS[scheme]
+
+
+def _is_public_origin(origin: str, scope: Scope) -> bool:
+    scheme = _PAGE_SCHEMES.get(scope.get("scheme", "http"))
+    host = _header(scope, b"host")
+    if scheme is None or host is None:
+        return False
+    try:
+        parts = urlsplit(origin)
+        if parts.scheme not in _DEFAULT_PORTS:
+            return False
+        return _origin_key(parts.scheme, parts.netloc) == _origin_key(scheme, host)
+    except ValueError:
+        return False
+
+
+class SocketOriginGuard:
+    """Refuses Socket.IO requests from a browser page whose origin is neither the server's own nor in `allow_origins`.
+
+    It sees every polling request and WebSocket upgrade, so both transports get the same decision. A request without
+    an Origin header (a non-browser client) is not checked. `*` in `allow_origins` allows every origin, as it does for
+    the CORS middleware, which also answers CORS for the origins listed here. Engine.IO's own check stays off: its
+    same-origin list believes X-Forwarded-Host and X-Forwarded-Proto from any client.
+
+    The server's own origin is the ASGI scope's scheme with the Host header. uvicorn takes the scheme from
+    X-Forwarded-Proto only from peers in `forwarded_allow_ips`. X-Forwarded-Host is deliberately ignored, because the
+    peer that sent it cannot be told apart once uvicorn has rewritten the client address; a proxy that rewrites Host
+    can list the site's public origin in `allow_origins` instead.
+    """
+
+    def __init__(self, app: ASGIApp, allow_origins: list[str]) -> None:
+        self._app = app
+        self._allow_all = "*" in allow_origins
+        self._listed = frozenset(allow_origins)
+        self._warned_origins: set[str] = set()
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in ("http", "websocket") and not self._allow_all:
+            origin = _header(scope, b"origin")
+            if origin and origin not in self._listed and not _is_public_origin(origin, scope):
+                await self._refuse(scope, send, origin)
+                return
+        await self._app(scope, receive, send)
+
+    async def _refuse(self, scope: Scope, send: Send, origin: str) -> None:
+        message = f"{origin} is not an accepted origin."
+        if origin in self._warned_origins or len(self._warned_origins) >= _MAX_WARNED_ORIGINS:
+            logger.debug(f"Refused a Socket.IO connection: {message}")
+        else:
+            self._warned_origins.add(origin)
+            logger.warning(
+                f"Refused a Socket.IO connection: {message} Add the origin to allow_origins, or have the reverse proxy "
+                "pass the original Host header, and X-Forwarded-Proto from an address in forwarded_allow_ips."
+            )
+        if scope["type"] == "websocket":
+            # Closing before accepting makes the server answer the upgrade with 403.
+            await send({"type": "websocket.close", "code": 1008, "reason": message})
+            return
+        await send({"type": "http.response.start", "status": 400, "headers": [(b"content-type", b"text/plain")]})
+        await send({"type": "http.response.body", "body": message.encode()})
+
+
 class DisconnectTolerantASGIApp:
     """Wraps the socket.io ASGI app so a peer that vanishes before its first event is a no-op.
 
@@ -221,16 +302,19 @@ class SocketIO:
     _unsub_bulk_download = "unsubscribe_bulk_download"
 
     def __init__(self, app: FastAPI):
-        self._sio = AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+        config = get_config()
+        # `SocketOriginGuard` checks origins and the CORS middleware answers CORS; an empty list turns off both in
+        # engine.io, whose CORS headers would otherwise duplicate the middleware's.
+        self._sio = AsyncServer(async_mode="asgi", cors_allowed_origins=[])
         # When deployed behind a reverse proxy under a sub-path, `base_url` is set and the
         # SubPathASGIMiddleware advertises it via `root_path`. Starlette then hands mounted
         # sub-apps the full public path (e.g. `/invoke/ws/socket.io`). Unlike routers and
         # StaticFiles, engine.io is not root_path-aware: it matches the raw `scope["path"]`
         # against `socketio_path`, so the path must include the sub-path prefix or every
         # handshake 404s. The frontend already targets `{basePath}/ws/socket.io`.
-        base_url = get_config().base_url or ""
+        base_url = config.base_url or ""
         self._app = ASGIApp(socketio_server=self._sio, socketio_path=f"{base_url}/ws/socket.io")
-        app.mount("/ws", DisconnectTolerantASGIApp(self._app))
+        app.mount("/ws", DisconnectTolerantASGIApp(SocketOriginGuard(self._app, config.allow_origins)))
 
         # Track user information for each socket connection
         self._socket_users: dict[str, dict[str, Any]] = {}

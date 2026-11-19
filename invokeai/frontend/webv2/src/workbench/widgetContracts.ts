@@ -21,6 +21,7 @@ export type FirstPartyWidgetTypeId =
   | 'preview'
   | 'queue'
   | 'queue-status'
+  | 'server-output'
   | 'server-status'
   | 'upscale'
   | 'video'
@@ -28,6 +29,14 @@ export type FirstPartyWidgetTypeId =
   | 'workflow';
 
 export type WidgetTypeId = FirstPartyWidgetTypeId | (string & {});
+
+/** Permissions the server grants the signed-in account, which gate a widget beyond the session's role. */
+export type WidgetCapability = 'viewServerOutput';
+
+/** `pending` until the server has answered; discovery treats it as unavailable. */
+export type WidgetCapabilityState = 'denied' | 'granted' | 'pending';
+
+export type WidgetCapabilities = Readonly<Record<WidgetCapability, WidgetCapabilityState>>;
 
 export type WidgetInstanceId = string;
 
@@ -106,6 +115,8 @@ export type WidgetImplementationLoadStatus = DeferredResourceStatus;
 export type WidgetImplementationResource = DeferredResource<WidgetImplementation>;
 
 export interface WidgetLabelProps {
+  /** The instance whose header this labels, for labels that show that instance's own state. */
+  instanceId: WidgetInstanceId;
   region: WorkbenchRegion;
   presentation?: 'compact' | 'expanded' | 'tooltip';
 }
@@ -276,6 +287,11 @@ export interface WidgetManifest {
   allowFloating?: boolean;
   /** Only offered while an admin is signed in to a multi-user backend. */
   requiresAdmin?: boolean;
+  /**
+   * Only offered while the server grants this capability to the signed-in account (single-user mode included). The
+   * view still checks it before reading anything: a saved layout restores the widget without discovery.
+   */
+  requiresCapability?: WidgetCapability;
   chrome?: {
     header?: 'hidden' | 'visible';
     body?: WidgetBodySizing;

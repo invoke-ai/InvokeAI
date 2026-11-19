@@ -1,25 +1,19 @@
+import type { QueryClient } from '@tanstack/react-query';
+
 import { chakra, Icon, Menu } from '@chakra-ui/react';
-import { apiFetchJson } from '@platform/transport/http';
-import { type QueryClient, queryOptions, useQuery } from '@tanstack/react-query';
+import { getAuthSession, useAuthSession } from '@features/identity';
+import { useQuery } from '@tanstack/react-query';
+import { frontendConfigQueryOptions } from '@workbench/frontendConfig';
 import { HeartIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-interface FrontendConfig {
-  show_donation_link: boolean;
-}
-
-const frontendConfigQueryOptions = queryOptions({
-  queryKey: ['frontend-config'],
-  queryFn: ({ signal }) => apiFetchJson<FrontendConfig>('/api/v1/app/frontend_config', { signal }),
-  staleTime: Infinity,
-});
-
 /**
  * Menu triggers call this on hover and focus so the setting usually resolves before the menu opens, rather than
- * inserting a row under the pointer. It also retries a failed request, which the mounted menu item never does.
+ * inserting a row under the pointer. It also retries a failed request, which the mounted menu item never does. It
+ * travels with the lazily loaded item, so the triggers load neither the config owner nor its query before then.
  */
 export const prefetchDonationMenuItem = (queryClient: QueryClient) =>
-  queryClient.prefetchQuery(frontendConfigQueryOptions);
+  queryClient.prefetchQuery(frontendConfigQueryOptions(getAuthSession()));
 
 export interface DonationMenuItemProps {
   /** Leads with its own separator where the link forms a group of one, so a hidden link leaves no separator behind. */
@@ -29,7 +23,7 @@ export interface DonationMenuItemProps {
 /** Both menus share the server's visibility policy and the same external destination. */
 export const DonationMenuItem = ({ separated = false }: DonationMenuItemProps) => {
   const { t } = useTranslation();
-  const { data } = useQuery(frontendConfigQueryOptions);
+  const { data } = useQuery(frontendConfigQueryOptions(useAuthSession()));
 
   // Keep the optional link hidden until the deployment's preference is known, including on request failure.
   if (!data?.show_donation_link) {

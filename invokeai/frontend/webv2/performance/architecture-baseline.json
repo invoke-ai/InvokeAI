@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 825939,
+        "brotliBytes": 827194,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 824908,
+        "gzipBytes": 826400,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2140669,
+        "initialRawBytes": 2144118,
         "largestAssetRawBytes": 770754,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 116630,
+        "ownedRawBytes": 116670,
         "requestCount": 34,
         "scriptRequestCount": 18,
         "sourceOwners": [
@@ -289,6 +289,7 @@
           "source:src/workbench/components/WorkbenchSplashScreen.tsx",
           "source:src/workbench/deferredResource.ts",
           "source:src/workbench/diagnostics/loggingPreferences.ts",
+          "source:src/workbench/frontendConfig.ts",
           "source:src/workbench/hotkeys/catalog.ts",
           "source:src/workbench/hotkeys/keyGlyphs.tsx",
           "source:src/workbench/hotkeys/keys.ts",
@@ -363,15 +364,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1297167,
+        "brotliBytes": 1299679,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1289769,
+        "gzipBytes": 1292423,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3598707,
+        "initialRawBytes": 3606599,
         "largestAssetRawBytes": 770754,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 174944,
+        "ownedRawBytes": 176603,
         "requestCount": 70,
         "scriptRequestCount": 54,
         "sourceOwners": [
@@ -926,6 +927,7 @@
           "source:src/workbench/extensions/extensionRegistry.ts",
           "source:src/workbench/floatingWindows.ts",
           "source:src/workbench/focusRegions.tsx",
+          "source:src/workbench/frontendConfig.ts",
           "source:src/workbench/graphSurfaces.ts",
           "source:src/workbench/graphWidgets.ts",
           "source:src/workbench/hotkeys/WorkbenchHotkeyRuntime.tsx",
@@ -1131,6 +1133,7 @@
           "source:src/workbench/widget-frame/widgetRecovery.ts",
           "source:src/workbench/widget-frame/widgetRecoveryStore.ts",
           "source:src/workbench/widget-frame/widgetRenderInstance.ts",
+          "source:src/workbench/widgetCapabilities.ts",
           "source:src/workbench/widgetDnd.ts",
           "source:src/workbench/widgetImplementationResource.ts",
           "source:src/workbench/widgetLabels.ts",
@@ -1166,6 +1169,7 @@
           "source:src/workbench/widgets/preview/spanPlaybackRequest.ts",
           "source:src/workbench/widgets/queue-status/manifest.ts",
           "source:src/workbench/widgets/queue/manifest.ts",
+          "source:src/workbench/widgets/server-output/manifest.ts",
           "source:src/workbench/widgets/server-status/manifest.ts",
           "source:src/workbench/widgets/shared/AutoSwitchMenu.tsx",
           "source:src/workbench/widgets/shared/DropZoneLabel.tsx",
@@ -1183,7 +1187,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-11-16",
+  "capturedAt": "2026-11-18",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

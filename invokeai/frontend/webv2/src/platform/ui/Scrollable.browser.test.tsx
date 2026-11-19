@@ -36,7 +36,10 @@ const waitFor = async (predicate: () => boolean, timeoutMs = 3000): Promise<void
   });
 };
 
-const renderScrollable = async (children: ReactNode, orientation: 'horizontal' | 'vertical'): Promise<HTMLElement> => {
+const renderScrollable = async (
+  children: ReactNode,
+  orientation: 'both' | 'horizontal' | 'vertical'
+): Promise<HTMLElement> => {
   host = document.createElement('div');
   host.style.cssText = 'width:200px;height:80px;';
   document.body.append(host);
@@ -105,6 +108,28 @@ describe('Scrollable', () => {
 
     await waitFor(() => getComputedStyle(scrollbar).display !== 'none');
     expect(getComputedStyle(scrollbar).display).not.toBe('none');
+  });
+
+  it('scrolls both ways when asked, showing each scrollbar for its own overflow', async () => {
+    const viewport = await renderScrollable(
+      <div style={{ whiteSpace: 'nowrap' }}>
+        {Array.from({ length: 12 }, (_, index) => (
+          <div key={index}>{UNBREAKABLE}</div>
+        ))}
+      </div>,
+      'both'
+    );
+
+    expect(viewport.scrollWidth).toBeGreaterThan(viewport.clientWidth);
+    expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
+
+    for (const axis of ['horizontal', 'vertical']) {
+      const scrollbar = document.querySelector<HTMLElement>(
+        `[data-scope="scroll-area"][data-part="scrollbar"][data-orientation="${axis}"]`
+      )!;
+      await waitFor(() => getComputedStyle(scrollbar).display !== 'none');
+      expect(getComputedStyle(scrollbar).display, axis).not.toBe('none');
+    }
   });
 
   it('hides the vertical scrollbar when only sideways spill exists', async () => {

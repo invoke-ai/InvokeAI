@@ -76,7 +76,7 @@ def test_frontend_config_exposes_only_presentation_settings_to_signed_in_users(
     response = client.get("/api/v1/app/frontend_config", headers=headers)
 
     assert response.status_code == 200
-    assert response.json() == {"show_donation_link": visible}
+    assert response.json() == {"show_donation_link": visible, "can_view_server_output": False}
 
 
 def _patch_database_cleaner(mock_invoker: Invoker, monkeypatch: Any) -> Mock:

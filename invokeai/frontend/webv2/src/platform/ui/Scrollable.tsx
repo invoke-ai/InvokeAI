@@ -35,8 +35,8 @@ export const Scrollable = ({
   contentProps?: ScrollAreaContentProps;
   /** Accessible name for the scroll viewport. */
   label?: string;
-  /** Scroll axis; the scrollbar and content sizing follow it. Defaults to vertical. */
-  orientation?: 'horizontal' | 'vertical';
+  /** Scroll axes; the scrollbars and content sizing follow them. Defaults to vertical. */
+  orientation?: 'both' | 'horizontal' | 'vertical';
   /** Extra props for the scrolling viewport itself, e.g. scroll/focus handlers. */
   viewportProps?: ScrollAreaViewportProps;
   /** Ref to the scrolling viewport; callback refs support mount-time offset restoration. */
@@ -67,16 +67,29 @@ export const Scrollable = ({
         ref={viewportCallback ? attachViewport : resolvedViewportRef}
       >
         <ScrollArea.Content
-          style={orientation === 'horizontal' ? undefined : VERTICAL_CONTENT_STYLE}
-          w={orientation === 'horizontal' ? 'max-content' : 'full'}
+          minW={orientation === 'both' ? 'full' : undefined}
+          style={orientation === 'vertical' ? VERTICAL_CONTENT_STYLE : undefined}
+          w={orientation === 'vertical' ? 'full' : 'max-content'}
           {...contentProps}
         >
           {children}
         </ScrollArea.Content>
       </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar orientation={orientation}>
-        <ScrollArea.Thumb />
-      </ScrollArea.Scrollbar>
+      {orientation === 'both' ? (
+        <>
+          <ScrollArea.Scrollbar orientation="vertical">
+            <ScrollArea.Thumb />
+          </ScrollArea.Scrollbar>
+          <ScrollArea.Scrollbar orientation="horizontal">
+            <ScrollArea.Thumb />
+          </ScrollArea.Scrollbar>
+          <ScrollArea.Corner />
+        </>
+      ) : (
+        <ScrollArea.Scrollbar orientation={orientation}>
+          <ScrollArea.Thumb />
+        </ScrollArea.Scrollbar>
+      )}
     </ScrollArea.Root>
   );
 };

@@ -10,12 +10,14 @@ import {
   collectCanvasLeaves,
   createMockBackendFixture,
   createLargeWorkflowLibraryFixture,
+  createServerOutputStartupLines,
   getFixtureProjectWorkflowDocument,
   getMockBackendFixtureCounts,
   MOCK_BACKEND_FIXED_EPOCH,
   MODEL_SEED_SETS,
 } from './mock-backend-fixtures.mjs';
 import { fixturePng, mediaDimensions } from './mock-media.mjs';
+import { createServerOutputMock } from './mock-server-output.mjs';
 import { createWorkingMemoryMock, WORKING_MEMORY_SCENARIOS } from './mock-working-memory.mjs';
 
 /** The canvas schema every mock project declares; the real server keeps the same floor per record. */
@@ -463,6 +465,10 @@ const createState = (profile, clock) => {
   const models = new Map(fixture.models.map((model) => [model.key, clone(model)]));
 
   return {
+    /** Console transcript; `POST /__server_output` restarts it, appends lines, pauses it, fails its reads, or turns capture off. */
+    serverOutput: createServerOutputMock({ clock, seedLines: createServerOutputStartupLines(profile) }),
+    serverOutputAvailable: true,
+    serverOutputFailing: false,
     boardMembers: new Map(),
     boards: new Map(fixture.boards.map((board) => [board.board_id, clone(board)])),
     // Dismiss the beta notice and What's New notes so journeys start on the requested page.
@@ -1477,6 +1483,31 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
         return json(200, { ok: true, faults: { ...faults } });
       }
 
+      if (method === 'POST' && path === '/__server_output') {
+        const body = await readJsonBody(request);
+        if (body.restart === true) {
+          state.serverOutput.restart();
+        }
+        if (Array.isArray(body.lines)) {
+          state.serverOutput.append(body.lines);
+        }
+        if (typeof body.live === 'boolean') {
+          state.serverOutput.setLive(body.live);
+        }
+        if (typeof body.available === 'boolean') {
+          state.serverOutputAvailable = body.available;
+        }
+        if (typeof body.failing === 'boolean') {
+          state.serverOutputFailing = body.failing;
+        }
+        return json(200, {
+          available: state.serverOutputAvailable,
+          failing: state.serverOutputFailing,
+          ok: true,
+          ...state.serverOutput.status(),
+        });
+      }
+
       // Changes what another account's board grants the caller behind the page's back: a share or a revocation.
       if (method === 'POST' && path === '/__board-access') {
         const body = await readJsonBody(request);
@@ -1603,7 +1634,24 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
       }
 
       if (method === 'GET' && path === '/api/v1/app/frontend_config') {
-        return json(200, { show_donation_link: true });
+        return json(200, {
+          can_view_server_output: state.serverOutputAvailable && isAdminCaller(faults),
+          show_donation_link: true,
+        });
+      }
+
+      if (method === 'GET' && path === '/api/v1/app/server_output') {
+        if (!isAdminCaller(faults)) {
+          return json(403, { detail: 'Admin privileges required' });
+        }
+        if (!state.serverOutputAvailable) {
+          return json(404, { detail: 'Server output is not available' });
+        }
+        if (state.serverOutputFailing) {
+          return json(503, { detail: 'Service unavailable' });
+        }
+        const { body, status } = state.serverOutput.read(url.searchParams.get('cursor'));
+        return json(status, body);
       }
 
       if (method === 'GET' && path === '/api/v1/app/generation_device_options') {

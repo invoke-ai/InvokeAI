@@ -53,6 +53,7 @@ from invokeai.app.services.object_serializer.object_serializer_disk import Objec
 from invokeai.app.services.object_serializer.object_serializer_forward_cache import ObjectSerializerForwardCache
 from invokeai.app.services.progress_previews.progress_previews_default import MemoryProgressPreviews
 from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
+from invokeai.app.services.server_output.server_output_store import ServerOutputStore
 from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
@@ -107,6 +108,8 @@ class ApiDependencies:
 
     invoker: Invoker
     database: Optional[Database] = None
+    # The console transcript of this server run, or None when the entry point did not install capture.
+    server_output: Optional[ServerOutputStore] = None
 
     @staticmethod
     def initialize(
@@ -114,6 +117,7 @@ class ApiDependencies:
         event_handler_id: int,
         loop: asyncio.AbstractEventLoop,
         logger: Logger = logger,
+        server_output: Optional[ServerOutputStore] = None,
     ) -> None:
         # The one authoritative architecture gate. Every entry point that builds services comes
         # through here — `run_app`'s lifespan, and the embedders and tests that never go through
@@ -318,9 +322,11 @@ class ApiDependencies:
             logger=logger,
         )
         ApiDependencies.database = database
+        ApiDependencies.server_output = server_output
 
     @staticmethod
     def shutdown() -> None:
+        ApiDependencies.server_output = None
         if ApiDependencies.invoker:
             ApiDependencies.invoker.stop()
         if ApiDependencies.database is not None:

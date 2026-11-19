@@ -142,6 +142,10 @@ export const queueSettings: SettingsContribution = {
   ]),
   quick: ['queueJobsScope'],
 };
+export const serverOutputSettings: SettingsContribution = {
+  ...section('serverOutput', 'Server Output', [preference('serverOutputWrapLines', 'Wrap long lines', 'console log')]),
+  quick: ['serverOutputWrapLines'],
+};
 export const imageMapVocabularySettings = section('imageMap', 'Image Map', [
   custom('imageMapVocabulary', 'Vocabulary', 'server'),
 ]);
@@ -190,9 +194,13 @@ export const applicationSettingsContributions = [
   aboutSettings,
 ];
 /** These are the same descriptors rendered in settings and used by palette preference actions. */
-export const preferenceSettingsFields = [...applicationSettingsContributions, workflowSettings, queueSettings].flatMap(
-  (contribution) =>
-    contribution.fields
-      .filter((field) => field.scope === 'preference' && field.kind !== 'custom')
-      .map((field) => ({ field, sectionId: contribution.id }))
+export const preferenceSettingsFields = [
+  ...applicationSettingsContributions,
+  workflowSettings,
+  queueSettings,
+  serverOutputSettings,
+].flatMap((contribution) =>
+  contribution.fields
+    .filter((field) => field.scope === 'preference' && field.kind !== 'custom')
+    .map((field) => ({ field, sectionId: contribution.id }))
 );

@@ -1,5 +1,6 @@
 import locale
 import re
+from collections.abc import Callable, Coroutine
 from enum import Enum
 from importlib.metadata import distributions
 from pathlib import Path as FilePath
@@ -8,8 +9,8 @@ from typing import Any, Literal, Union
 
 import torch
 import yaml
-from fastapi import Body, HTTPException, Path
-from fastapi.routing import APIRouter
+from fastapi import Body, HTTPException, Path, Query, Request, Response
+from fastapi.routing import APIRoute, APIRouter
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
@@ -27,6 +28,10 @@ from invokeai.app.services.external_generation.external_generation_common import
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.server_output.server_output_common import (
+    InvalidServerOutputCursorError,
+    ServerOutputRead,
+)
 from invokeai.app.services.shared.database.startup import redacted_database_url
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
@@ -57,11 +62,76 @@ class FrontendConfig(BaseModel):
     """Presentation settings any signed-in user may read; never include private runtime configuration here."""
 
     show_donation_link: bool = Field(description="Whether to show the Donate to InvokeAI menu link")
+    can_view_server_output: bool = Field(
+        description="Whether the current user may read the server's console output (GET /api/v1/app/server_output)"
+    )
 
 
 @app_router.get("/frontend_config", operation_id="get_frontend_config", response_model=FrontendConfig)
-def get_frontend_config(current_user: CurrentUserOrDefault) -> FrontendConfig:
-    return FrontendConfig(show_donation_link=get_config().show_donation_link)
+def get_frontend_config(current_user: CurrentUserOrDefault, response: Response) -> FrontendConfig:
+    # The answer depends on the caller's role, so no cache may reuse it for anyone else or after a role change.
+    response.headers["Cache-Control"] = "private, no-store"
+    return FrontendConfig(
+        show_donation_link=get_config().show_donation_link,
+        can_view_server_output=current_user.is_admin
+        and ApiDependencies.server_output is not None
+        and not ApiDependencies.server_output.stopped,
+    )
+
+
+SERVER_OUTPUT_UNAVAILABLE = "Server output is not available"
+
+
+class _NoStoreRoute(APIRoute):
+    """Marks every response `no-store`, the errors raised by its dependencies included."""
+
+    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
+        handler = super().get_route_handler()
+
+        async def no_store(request: Request) -> Response:
+            try:
+                response = await handler(request)
+            except HTTPException as error:
+                error.headers = {**(error.headers or {}), "Cache-Control": "no-store"}
+                raise
+            response.headers["Cache-Control"] = "no-store"
+            return response
+
+        return no_store
+
+
+# Its own router only for the route class; included into `app_router` below.
+server_output_router = APIRouter(route_class=_NoStoreRoute)
+
+
+@server_output_router.get(
+    "/server_output",
+    operation_id="get_server_output",
+    response_model=ServerOutputRead,
+    responses={
+        401: {"description": "Authentication required"},
+        403: {"description": "Admin privileges required"},
+        404: {"description": "This server is not capturing its console output"},
+        422: {"description": "The cursor is malformed or was not issued by this server"},
+    },
+)
+def get_server_output(
+    _: AdminUserOrDefault,
+    cursor: str | None = Query(
+        default=None, description="The cursor from the previous read; omit it for a fresh snapshot"
+    ),
+) -> ServerOutputRead:
+    """Read the server's console output: a snapshot, or the changes since `cursor`."""
+    store = ApiDependencies.server_output
+    if store is None or store.stopped:
+        raise HTTPException(status_code=404, detail=SERVER_OUTPUT_UNAVAILABLE)
+    try:
+        return store.read(cursor)
+    except InvalidServerOutputCursorError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from None
+
+
+app_router.include_router(server_output_router)
 
 
 @app_router.get("/version", operation_id="app_version", status_code=200, response_model=AppVersion)

@@ -119,8 +119,11 @@ Each panel can be placed only where it makes sense:
 | Preview | | ✓ | ✓ | | ✓ |
 | Layers, Queue | | ✓ | | | |
 | Diagnostics | | ✓ | | | |
+| Server Output | | | | ✓ | |
 
 A panel can appear in more than one place at once, for example the Gallery in the right rail *and* in the center, but only once in each place.
+
+**Server Output** shows the server's console output (what InvokeAI prints in the terminal it was started from) as it is written, progress bars included. Add it from the **Status bar widgets** menu and it opens in the bottom panel; its status bar chip opens and closes it after that. Its header shows whether it is live or reconnecting. Select text and press <kbd>Ctrl</kbd>+<kbd>C</kbd> (<kbd>⌘</kbd>+<kbd>C</kbd> on macOS) or use the copy button to copy it; with nothing selected, everything shown is copied. Its settings turn line wrapping on or off. On a multi-user server only administrators see it. Anyone who can reach a single-user server can open it, and an administrator can turn the feature off with `enable_server_output` (see the [configuration reference](/configuration/invokeai-yaml/)).
 
 ### Adding and removing panels
 

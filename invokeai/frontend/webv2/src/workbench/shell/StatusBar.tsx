@@ -30,6 +30,7 @@ import {
 import { CompactWidgetFailure } from '@workbench/widget-frame/WidgetFailureBoundary';
 import { useWidgetRecovery } from '@workbench/widget-frame/widgetRecovery';
 import { WidgetRecoveryAnnouncement } from '@workbench/widget-frame/WidgetRenderer';
+import { useWidgetCapabilities } from '@workbench/widgetCapabilities';
 import {
   getWidgetRegionDropId,
   getWidgetRegionEndDropData,
@@ -130,6 +131,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
   const { widgets } = useWorkbenchCommands();
+  const capabilities = useWidgetCapabilities();
   const [enableMenuTarget, setEnableMenuTarget] = useState<{ x: number; y: number } | null>(null);
   const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
   const getWidgetLabel = useCallback(
@@ -141,7 +143,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
     region: 'bottom',
     regionState: bottomRegion,
     widgetInstances: placementProject.widgetInstances,
-    widgets: getWidgetsForRegion('bottom'),
+    widgets: getWidgetsForRegion('bottom', capabilities),
   });
   const items = getWidgetRegionItems(bottomRegionViewModel);
   const compactItems = items.flatMap((item): BottomWidgetItem[] => {

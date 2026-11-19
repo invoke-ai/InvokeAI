@@ -2536,3 +2536,60 @@ test('opt-in large library has pageable metadata, representative documents, retr
     await backend.close();
   }
 });
+
+test('server output: a live transcript whose progress row rewrites in place, with restart and refusal', async () => {
+  let now = 0;
+
+  await withRepresentativeBackend(
+    async (backend) => {
+      const read = (cursor) =>
+        getJson(backend, `/api/v1/app/server_output${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`);
+      const config = () => getJson(backend, '/api/v1/app/frontend_config');
+
+      assert.equal((await config()).can_view_server_output, true);
+
+      const first = await read();
+      assert.equal(first.reset, 'initial');
+      assert.ok(first.rows.some((row) => row.text.startsWith('Traceback')));
+      const level = first.rows[0].styles[0];
+      assert.equal(first.rows[0].text.slice(level.offset, level.offset + level.length), 'INFO');
+
+      // Unchanged while no time passes: an empty change set and a stable cursor.
+      const idle = await read(first.cursor);
+      assert.deepEqual([idle.reset, idle.rows, idle.cursor], [null, [], first.cursor]);
+
+      now += 400 * 3;
+      const started = await read(idle.cursor);
+      const progress = started.rows.find((row) => row.text.startsWith('Denoising'));
+      assert.ok(progress);
+
+      now += 400 * 5;
+      const advanced = await read(started.cursor);
+      const rewritten = advanced.rows.find((row) => row.id === progress.id);
+      assert.notEqual(rewritten.text, progress.text);
+
+      await getJson(backend, '/__server_output', { body: JSON.stringify({ restart: true }), method: 'POST' });
+      const restarted = await read(advanced.cursor);
+      assert.equal(restarted.reset, 'restarted');
+      assert.notEqual(restarted.run_id, first.run_id);
+
+      await getJson(backend, '/__server_output', { body: JSON.stringify({ failing: true }), method: 'POST' });
+      assert.equal((await fetch(`${backend.origin}/api/v1/app/server_output`)).status, 503);
+      await getJson(backend, '/__server_output', { body: JSON.stringify({ failing: false }), method: 'POST' });
+
+      const malformed = await fetch(`${backend.origin}/api/v1/app/server_output?cursor=nope`);
+      assert.equal(malformed.status, 422);
+      assert.equal(malformed.headers.get('cache-control'), 'no-store');
+
+      await getJson(backend, '/__server_output', { body: JSON.stringify({ available: false }), method: 'POST' });
+      assert.equal((await config()).can_view_server_output, false);
+      assert.equal((await fetch(`${backend.origin}/api/v1/app/server_output`)).status, 404);
+
+      await getJson(backend, '/__reset', { method: 'POST' });
+      await getJson(backend, '/__faults?intermediatesCaller=user', { method: 'POST' });
+      assert.equal((await config()).can_view_server_output, false);
+      assert.equal((await fetch(`${backend.origin}/api/v1/app/server_output`)).status, 403);
+    },
+    { clock: () => now }
+  );
+});

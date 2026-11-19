@@ -138,6 +138,8 @@ export interface WorkbenchPreferences {
   /** Mirror recorded entries to the browser console; obeys the same recording filters. */
   developerConsoleOutputEnabled: boolean;
   developerPerformanceTimingsEnabled: boolean;
+  /** Wrap long server output lines; off keeps each on one line and scrolls sideways. */
+  serverOutputWrapLines: boolean;
   /** Group add-node search results under their categories; off lists them flat by relevance. */
   workflowGroupNodesByCategory: boolean;
   /** Always snap workflow nodes to the grid (Ctrl snaps temporarily when off). */

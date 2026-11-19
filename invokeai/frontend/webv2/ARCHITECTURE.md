@@ -43,6 +43,7 @@ Ownership follows invariants, not the first caller:
 - Controlled Chakra props stay synchronized when React Activity reconnects a retained section: Zag's watchers reconcile values changed while hidden without replaying unchanged ones, so a confirmation completed while hidden stays closed. `ConfirmDialog.browser.test.tsx` and the production workbench keep-alive scroll/zoom journey cover it; rerun both when upgrading Zag or Chakra.
 - `patches/@zag-js__presence@1.47.0.patch` and `patches/@zag-js__tooltip@1.47.0.patch` reconcile Zag machines when a hidden React Activity reconnects. A machine stops while hidden and drops what arrives meanwhile, such as the end of an exit animation or the pointer leaving its trigger; restarting resumes the stored state. Presence unmounts content that should be gone, and Tooltip forgets a pointer open and closes an uncontrolled tip left open, so a tip closed by the click that hid its section neither returns stuck nor ignores the next hover. Both module formats receive each patch. `src/platform/ui/Tooltip.browser.test.tsx` ("shows a tip again only when hovered after its section was hidden mid-fade") fails without either patch; `src/platform/ui/Menu.browser.test.tsx` ("stay closed when their section returns after it was hidden while they faded out") fails without the presence patch, which every Zag presence (menus, popovers) shares. A Zag upgrade must port both patches and rerun those tests. Remove them once upstream reconciles state on reconnect and the tests pass unpatched.
 - Platform State owns reusable projections of broad external stores into referentially stable read-only stores. App may build them for a feature port. Listener, caching, equality mechanics stay domain-neutral Platform code.
+- Workbench owns the frontend config read model (`workbench/frontendConfig.ts`): deployment presentation settings plus the server's grants for the signed-in account. The answer depends on the account and its role, so its query key carries the account lifetime, user and known role, and a refused grant invalidates it. It is a leaf that takes the session from its callers, so it imports no Identity runtime. It sits in the route-shared chunk, because the editor's status bar reads it at boot and the lazy donation link reads it on both routes. `workbench/widgetCapabilities.ts` combines those grants with Identity's role capability into the widget availability snapshot; its hook observes the query only where a grant is needed and only for roles that can be granted.
 
 `pnpm architecture:check` is the executable source of truth for dependency direction. It parses TypeScript and classifies static imports, type imports, dynamic imports, re-exports, inline imported types, after resolving aliases and relative paths. Temporary violations go in `src/architecture/migrationExceptions.ts` with owner and removal ticket. Architecture is complete only when that registry is empty.
 
@@ -60,23 +61,24 @@ The [lint configuration](.oxlintrc.json) checks hooks, dependencies, and common 
 
 Behavior specs live beside their owning code. Read the owner's document before changing its behavior. [VERIFICATION.md](VERIFICATION.md) maps user-visible flows to these owners and existing verification assets.
 
-| Topic                                                         | Document                                                                               |
-| ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Identity credential and session lifetimes                     | [features/identity/README.md](src/features/identity/README.md)                         |
-| Application and project event logging                         | [platform/logging/README.md](src/platform/logging/README.md)                           |
-| Models catalog and read fencing                               | [features/models/README.md](src/features/models/README.md)                             |
-| Queue backend port and active sessions                        | [features/queue/README.md](src/features/queue/README.md)                               |
-| Gallery listings and reveal                                   | [features/gallery/README.md](src/features/gallery/README.md)                           |
-| Intermediates manager and cleanup                             | [features/intermediates/README.md](src/features/intermediates/README.md)               |
-| Font catalog and registration                                 | [features/fonts/README.md](src/features/fonts/README.md)                               |
-| Project documents, workflows, persistence, and recovery       | [workbench/projects/README.md](src/workbench/projects/README.md)                       |
-| Widget placement, floating windows, focus, and shortcut hints | [workbench/widget-frame/README.md](src/workbench/widget-frame/README.md)               |
-| Notifications, toast actions, and undo notices                | [workbench/shell/notifications/README.md](src/workbench/shell/notifications/README.md) |
-| Settings contributions and the settings dialog                | [workbench/settings/README.md](src/workbench/settings/README.md)                       |
-| Widget manifests and extension discovery                      | [workbench/extensions/README.md](src/workbench/extensions/README.md)                   |
-| Canvas engine                                                 | [workbench/canvas-engine/ARCHITECTURE.md](src/workbench/canvas-engine/ARCHITECTURE.md) |
-| Workflow library retention and demand                         | [features/workflow/data/README.md](src/features/workflow/data/README.md)               |
-| Performance gates and byte budgets                            | [performance/README.md](performance/README.md)                                         |
+| Topic                                                         | Document                                                                                   |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Identity credential and session lifetimes                     | [features/identity/README.md](src/features/identity/README.md)                             |
+| Application and project event logging                         | [platform/logging/README.md](src/platform/logging/README.md)                               |
+| Models catalog and read fencing                               | [features/models/README.md](src/features/models/README.md)                                 |
+| Queue backend port and active sessions                        | [features/queue/README.md](src/features/queue/README.md)                                   |
+| Gallery listings and reveal                                   | [features/gallery/README.md](src/features/gallery/README.md)                               |
+| Intermediates manager and cleanup                             | [features/intermediates/README.md](src/features/intermediates/README.md)                   |
+| Font catalog and registration                                 | [features/fonts/README.md](src/features/fonts/README.md)                                   |
+| Project documents, workflows, persistence, and recovery       | [workbench/projects/README.md](src/workbench/projects/README.md)                           |
+| Widget placement, floating windows, focus, and shortcut hints | [workbench/widget-frame/README.md](src/workbench/widget-frame/README.md)                   |
+| Notifications, toast actions, and undo notices                | [workbench/shell/notifications/README.md](src/workbench/shell/notifications/README.md)     |
+| Settings contributions and the settings dialog                | [workbench/settings/README.md](src/workbench/settings/README.md)                           |
+| Widget manifests, discovery and availability                  | [workbench/extensions/README.md](src/workbench/extensions/README.md)                       |
+| Server Output reader, transcript and console view             | [workbench/widgets/server-output/README.md](src/workbench/widgets/server-output/README.md) |
+| Canvas engine                                                 | [workbench/canvas-engine/ARCHITECTURE.md](src/workbench/canvas-engine/ARCHITECTURE.md)     |
+| Workflow library retention and demand                         | [features/workflow/data/README.md](src/features/workflow/data/README.md)                   |
+| Performance gates and byte budgets                            | [performance/README.md](performance/README.md)                                             |
 
 ## Contract ownership
 

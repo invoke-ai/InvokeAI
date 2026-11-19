@@ -690,7 +690,7 @@ const CenterRegion = ({ children }: Pick<DndContextProps, 'children'>) => (
     </div>
     {showsHeaderLabel ? (
       <div data-testid="center-label">
-        <PreviewWidgetLabel region="center" />
+        <PreviewWidgetLabel instanceId="preview" region="center" />
       </div>
     ) : null}
   </section>

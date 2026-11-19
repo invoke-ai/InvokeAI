@@ -81,7 +81,7 @@ class InvokeAIAppConfig(BaseSettings):
     Attributes:
         host: IP address to bind to. Use `0.0.0.0` to serve to your local network.
         port: Port to bind to.
-        allow_origins: Allowed CORS origins.
+        allow_origins: Origins other than the server's own that browsers may use for the API and the Socket.IO connection, written as the browser sends them (`https://app.example.com`, no path or trailing slash). `*` allows any origin.
         allow_credentials: Allow CORS credentials.
         allow_methods: Methods allowed for CORS.
         allow_headers: Headers allowed for CORS.
@@ -108,6 +108,7 @@ class InvokeAIAppConfig(BaseSettings):
         log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
         log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.
         log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`
+        enable_server_output: Mirror the server's console output (Python stdout and stderr) so it can be read in the web UI's Server Output panel. In multi-user mode only administrators can read it; otherwise anyone who can reach the server can. Takes effect after restarting InvokeAI.
         use_memory_db: Use in-memory database. Useful for development.
         dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.
         profile_graphs: Enable graph profiling using `cProfile`.
@@ -175,7 +176,7 @@ class InvokeAIAppConfig(BaseSettings):
         external_seedream_api_key: API key for Seedream image generation.
         external_seedream_base_url: Base URL override for Seedream image generation.
         base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.
-        forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
+        forwarded_allow_ips: Comma-separated IP addresses or networks (or `*`) whose X-Forwarded-Proto and X-Forwarded-For headers are trusted. Set to the reverse proxy's IP. The Socket.IO same-origin check uses the forwarded scheme only from these addresses.
         http_compression_level: Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.
     """
 
@@ -192,14 +193,14 @@ class InvokeAIAppConfig(BaseSettings):
     # WEB
     host:                           str = Field(default="127.0.0.1",        description="IP address to bind to. Use `0.0.0.0` to serve to your local network.")
     port:                           int = Field(default=9090,               description="Port to bind to.")
-    allow_origins:            list[str] = Field(default=[],                 description="Allowed CORS origins.")
+    allow_origins:            list[str] = Field(default=[],                 description="Origins other than the server's own that browsers may use for the API and the Socket.IO connection, written as the browser sends them (`https://app.example.com`, no path or trailing slash). `*` allows any origin.")
     allow_credentials:             bool = Field(default=True,               description="Allow CORS credentials.")
     allow_methods:            list[str] = Field(default=["*"],              description="Methods allowed for CORS.")
     allow_headers:            list[str] = Field(default=["*"],              description="Headers allowed for CORS.")
     ssl_certfile:        Optional[Path] = Field(default=None,               description="SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
     ssl_keyfile:         Optional[Path] = Field(default=None,               description="SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.")
     base_url:             Optional[str] = Field(default=None,               description="Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Required when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`); optional when the proxy strips it (set it anyway so openapi/docs URLs are correct). Leave unset when serving at the domain root. Normalized to a single leading slash with no trailing slash.")
-    forwarded_allow_ips:            str = Field(default="127.0.0.1",        description="Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.")
+    forwarded_allow_ips:            str = Field(default="127.0.0.1",        description="Comma-separated IP addresses or networks (or `*`) whose X-Forwarded-Proto and X-Forwarded-For headers are trusted. Set to the reverse proxy's IP. The Socket.IO same-origin check uses the forwarded scheme only from these addresses.")
     http_compression_level:         int = Field(default=9, ge=0, le=9,       description="Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.")
 
     # MISC FEATURES
@@ -235,6 +236,7 @@ class InvokeAIAppConfig(BaseSettings):
     log_level:                LOG_LEVEL = Field(default="info",             description="Emit logging messages at this level or higher.")
     log_sql:                       bool = Field(default=False,              description="Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.")
     log_level_network:        LOG_LEVEL = Field(default='warning',          description="Log level for network-related messages. 'info' and 'debug' are very verbose.")
+    enable_server_output:          bool = Field(default=True,               description="Mirror the server's console output (Python stdout and stderr) so it can be read in the web UI's Server Output panel. In multi-user mode only administrators can read it; otherwise anyone who can reach the server can. Takes effect after restarting InvokeAI.")
 
     # Development
     use_memory_db:                 bool = Field(default=False,              description="Use in-memory database. Useful for development.")

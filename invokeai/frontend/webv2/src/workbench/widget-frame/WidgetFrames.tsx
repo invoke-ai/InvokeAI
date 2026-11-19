@@ -275,7 +275,7 @@ export const WidgetHeader = ({
       <HStack flex="1" gap="1.5" minW="0">
         <WidgetIdentityIcon icon={manifest.icon} />
         {HeaderLabel && !instance.title ? (
-          <HeaderLabel region={region} />
+          <HeaderLabel instanceId={instance.id} region={region} />
         ) : (
           <Text data-widget-identity-label="" fontWeight="700">
             {label}

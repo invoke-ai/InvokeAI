@@ -1,7 +1,11 @@
+import type * as HttpModule from '@platform/transport/http';
+
 import { ChakraProvider } from '@chakra-ui/react';
+import { getAuthSession } from '@features/identity';
 import { apiFetchJson } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { frontendConfigQueryKey } from '@workbench/frontendConfig';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -11,7 +15,11 @@ import { page, userEvent } from 'vitest/browser';
 
 import { HelpMenu } from './HelpMenu';
 
-vi.mock('@platform/transport/http', () => ({ apiFetchJson: vi.fn() }));
+// The menu item's module brings Identity and Query with it; only the config read is replaced.
+vi.mock('@platform/transport/http', async (importOriginal) => ({
+  ...(await importOriginal<typeof HttpModule>()),
+  apiFetchJson: vi.fn(),
+}));
 
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({
@@ -65,7 +73,9 @@ describe.each([false, true])('HelpMenu donation link (compact=%s)', (compact) =>
     expect(apiFetchJson).not.toHaveBeenCalled();
 
     await userEvent.hover(trigger());
-    await vi.waitFor(() => expect(client.getQueryState(['frontend-config'])?.status).toBe('success'));
+    await vi.waitFor(() =>
+      expect(client.getQueryState(frontendConfigQueryKey(getAuthSession()))?.status).toBe('success')
+    );
     await trigger().click();
 
     const community = page.getByRole('group', { name: 'Community' });
@@ -79,7 +89,9 @@ describe.each([false, true])('HelpMenu donation link (compact=%s)', (compact) =>
     vi.mocked(apiFetchJson).mockRejectedValue(new Error('Server restarting'));
 
     await trigger().click();
-    await vi.waitFor(() => expect(client.getQueryState(['frontend-config'])?.status).toBe('error'));
+    await vi.waitFor(() =>
+      expect(client.getQueryState(frontendConfigQueryKey(getAuthSession()))?.status).toBe('error')
+    );
     await expect.element(page.getByRole('menuitem', { name: 'GitHub' })).toBeVisible();
     expect(page.getByRole('menuitem', { name: 'Donate to InvokeAI' }).query()).toBeNull();
 
