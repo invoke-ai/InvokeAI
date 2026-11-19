@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-11-10
+lastUpdated: 2026-11-18
 sidebar:
   order: 3
 ---
@@ -232,7 +232,7 @@ starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by 
 | SDXL | ✓ (LyCORIS, Diffusers, OMI) | ✓ | IP-Adapter, T2I-Adapter, textual inversion |
 | FLUX.1 | ✓ (LyCORIS, Diffusers, OMI) | ✓ | Control LoRA, IP-Adapter, Redux |
 | FLUX.2, Z-Image | ✓ (LyCORIS, Diffusers) | FLUX.2 [dev] (single-file checkpoint), Z-Image | |
-| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya and Diffusers PEFT, including LoKR, and for Qwen-Image LoHA, where noted on the family page) | Qwen-Image (single-file checkpoint: Fun and InstantX ControlNet Unions; InstantX Inpainting is refused), Anima (ControlNet-LLLite) | |
+| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya and Diffusers PEFT, including LoKR, and for Qwen-Image LoHA, where noted on the family page) | Qwen-Image (single-file checkpoint: Fun and InstantX ControlNet Unions; InstantX Inpainting is refused), Anima (ControlNet-LLLite) | Krea-2 Control LoRA |
 | Qwen-Image-2.1 | ✓ (ComfyUI, diffusers/PEFT and kohya, including LoKR, LoHA and DoRA as noted on the family page) | ✗ | |
 | FLUX.3 | ✓ (diffusers/PEFT, ComfyUI and ai-toolkit files and Diffusers folders, including DoRA, and LoKR and LoHA under diffusers or BFL module names; LyCORIS's flattened `lycoris_…` names are not recognized, and PEFT LoKr/LoHa adapters with a diffusers header and distillation extracts are refused, as noted on the family page) | ✗ | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
@@ -262,6 +262,12 @@ Qwen-Image LoRAs, LoKR and LoHA files also load in ComfyUI's `diffusion_model.` 
 [family page](/users-guide/models/local-models/qwen-image/#lora).
 
 Qwen-Image LoRAs also patch the Qwen2.5-VL encoder when the file has text-encoder layers; see the same page.
+
+A Krea-2 Control LoRA is one `.safetensors` file in the layout of
+[Krea-2-controlnet](https://github.com/Tanmaypatil123/Krea-2-controlnet): native block LoRAs written as
+`blocks.N.<module>.A` / `.B`, plus a `first.weight` / `first.bias` input projection that takes 128 features, twice
+Krea-2's latent width. It installs as a **Control LoRA** for Krea-2; a file with an unpaired `.A` or `.B` or without
+`first.bias` is not recognized as one. See the [family page](/users-guide/models/local-models/krea-2/#control-lora).
 
 On Z-Image, Qwen-Image, Anima and MOSS-Image, DoRA in the `lora_A`/`lora_B` layout (`dora_scale`, PEFT
 `lora_magnitude_vector`, ai-toolkit `.magnitude`) applies with its magnitude. DoRA works wherever the transformer weight can be dequantized (GGUF, SDNQ, int8/int4-convrot, nvfp4, fp8), but not
