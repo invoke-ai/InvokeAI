@@ -5,8 +5,6 @@ import type {
   CanvasLayerContract,
   CanvasRasterLayerContractV2,
   CanvasStateContractV3,
-  RegionalGuidanceReferenceImage,
-  RegionalGuidanceReferenceImageAsset,
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -27,13 +25,15 @@ import {
   type GenerationCompositeHost,
 } from '@workbench/canvas-operations/api';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
+import { createInstance } from 'i18next';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { RunCanvasInvocationDeps } from './prepareCanvasInvocation';
 
 import { DEFAULT_CANVAS_COMPOSITING } from './canvasCompositing';
+import { describeCanvasInvocationFailure } from './canvasInvocationFailure';
 import { DEFAULT_CANVAS_SCALING } from './canvasScaling';
-import { resolveRegionalReferenceImages, runCanvasInvocation } from './prepareCanvasInvocation';
+import { runCanvasInvocation } from './prepareCanvasInvocation';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const externalModel: GenerateModelConfig = {
@@ -66,6 +66,19 @@ const rasterLayer = (id: string, size = 64): CanvasRasterLayerContractV2 => ({
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
   type: 'raster',
 });
+
+const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
+  eager: true,
+  import: 'default',
+});
+const english = createInstance();
+await english.init({
+  initAsync: false,
+  interpolation: { escapeValue: false },
+  lng: 'en',
+  resources: { en: { translation: Object.values(englishCatalogModules)[0] as Record<string, unknown> } },
+});
+const t = english.t.bind(english) as (key: string, options?: Record<string, unknown>) => string;
 
 const makeDoc = (layers: CanvasRasterLayerContractV2[], size = 64): CanvasDocumentContractV3 => ({
   background: 'transparent',
@@ -236,7 +249,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
       } as WorkbenchCommands['notifications'],
     },
     flushPendingUploads: flushPendingUploads as () => Promise<void>,
-    formatControlLayerError: ({ code, layerName }) => `${layerName}: ${code}`,
+    formatCanvasInvocationFailure: (failure) => describeCanvasInvocationFailure(t, failure),
     generateValues: { ...generateValuesFor(model), ...options.generateValues },
     inFlight: options.inFlight ?? new Set<string>(),
     models: options.models,
@@ -536,6 +549,21 @@ describe('runCanvasInvocation', () => {
         control_model: { key: 'sd1-depth' },
         type: 'controlnet',
       });
+    });
+
+    it('refuses a layer the judge blocks with a localized notice, before uploading anything', async () => {
+      const harness = makeHarness({ document: docWithLayers([typed('depth-layer', 'depth')]) });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toEqual([
+        expect.objectContaining({
+          message: `Control layer "depth-layer": ${t('widgets.layers.control.validation.models_unavailable')}`,
+          title: 'Canvas generation failed',
+        }),
+      ]);
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.uploadImage).not.toHaveBeenCalled();
     });
   });
 
@@ -978,63 +1006,5 @@ describe('runCanvasInvocation — inpaint / outpaint dispatch', () => {
     expect(nodes.image_alpha_to_mask?.type).toBe('tomask');
     expect(nodes.canvas_output?.type).toBe('apply_mask_to_image');
     expect(harness.notices()).toHaveLength(0);
-  });
-});
-
-describe('resolveRegionalReferenceImages', () => {
-  const asset = { imageName: 'ref.png' } as RegionalGuidanceReferenceImageAsset;
-  const ipAdapterModel = { base: 'sd-1', key: 'ipa', name: 'IP Adapter', type: 'ip_adapter' };
-  const fluxReduxModel = { base: 'flux', key: 'redux', name: 'FLUX Redux', type: 'flux_redux' };
-
-  const ipAdapterRef = (image: RegionalGuidanceReferenceImageAsset | null): RegionalGuidanceReferenceImage => ({
-    config: {
-      beginEndStepPct: [0, 1],
-      clipVisionModel: 'ViT-H',
-      image,
-      method: 'full',
-      model: ipAdapterModel,
-      type: 'ip_adapter',
-      weight: 1,
-    },
-    id: 'ref-ipa',
-    isEnabled: true,
-  });
-
-  const fluxReduxRef = (image: RegionalGuidanceReferenceImageAsset | null): RegionalGuidanceReferenceImage => ({
-    config: { image, imageInfluence: 'highest', model: fluxReduxModel, type: 'flux_redux' },
-    id: 'ref-redux',
-    isEnabled: true,
-  });
-
-  const withModelBase = (base: string): RegionalGuidanceReferenceImage => {
-    const ref = ipAdapterRef(asset);
-    return { ...ref, config: { ...ref.config, model: { ...ipAdapterModel, base } } };
-  };
-
-  it.each<[string, RegionalGuidanceReferenceImage, string, Record<string, unknown>[]]>([
-    ['drops an IP-Adapter ref with no image assigned', ipAdapterRef(null), 'sd-1', []],
-    [
-      'keeps an IP-Adapter ref once an image is assigned for a supported SD base',
-      ipAdapterRef(asset),
-      'sd-1',
-      [{ id: 'ref-ipa', imageName: 'ref.png', type: 'ip_adapter' }],
-    ],
-    ['drops regional reference images for FLUX.2', ipAdapterRef(asset), 'flux2', []],
-    ['drops regional reference images for krea-2', withModelBase('krea-2'), 'krea-2', []],
-    ['drops regional reference images for z-image', withModelBase('z-image'), 'z-image', []],
-    ['drops regional reference images for anima', withModelBase('anima'), 'anima', []],
-    ['keeps an SD2 IP-Adapter ref whose model matches the base', withModelBase('sd-2'), 'sd-2', [{ id: 'ref-ipa' }]],
-    ['drops a FLUX Redux ref with no image assigned', fluxReduxRef(null), 'flux', []],
-    [
-      'keeps a FLUX Redux ref once an image is assigned (FLUX base)',
-      fluxReduxRef(asset),
-      'flux',
-      [{ id: 'ref-redux', imageName: 'ref.png', type: 'flux_redux' }],
-    ],
-    ['drops a disabled ref even when an image is assigned', { ...ipAdapterRef(asset), isEnabled: false }, 'sd-1', []],
-  ])('%s', (_, ref, base, expected) => {
-    expect(resolveRegionalReferenceImages({ referenceImages: [ref] }, base)).toEqual(
-      expected.map((input) => expect.objectContaining(input))
-    );
   });
 });

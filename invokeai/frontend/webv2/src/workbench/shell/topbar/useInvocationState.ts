@@ -25,7 +25,6 @@ import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@f
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { getPlacedWidgetTypeIds, getVisibleWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
 import {
   createInvocationRouteInputSelector,
@@ -35,6 +34,7 @@ import {
 } from '@workbench/invocation';
 import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
+import { describeCanvasInvocationFailure } from '@workbench/widgets/canvas/invoke/canvasInvocationFailure';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -245,7 +245,7 @@ export const useInvocationState = ({ sourceId }: { sourceId?: InvocationSourceId
         onStarted,
         prepend,
         sourceId,
-        formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+        formatCanvasInvocationFailure: (failure) => describeCanvasInvocationFailure(t, failure),
         formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
         getModels: () => availabilityModels,
         queries,

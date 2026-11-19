@@ -1,7 +1,7 @@
 import type { GalleryImage, GalleryVideoItem } from '@features/gallery';
 import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type { ModelConfig } from '@features/models';
-import type { ControlLayerRejection } from '@workbench/widgets/canvas/invoke/prepareCanvasInvocation';
+import type { CanvasInvocationFailure } from '@workbench/widgets/canvas/invoke/canvasInvocationFailure';
 
 import { setArchitectureCapabilities } from '@features/models/core/architectureCapabilities';
 import {
@@ -22,9 +22,11 @@ import { useRegisterFirstPartyCommands } from './firstPartyCommands';
 
 const handlers = vi.hoisted(() => new Map<string, () => unknown>());
 const submitActiveInvocation = vi.hoisted(() =>
-  vi.fn<(args: { formatControlLayerError: (rejection: ControlLayerRejection) => string }) => Promise<void>>(() =>
-    Promise.resolve()
-  )
+  vi.fn<
+    (args: {
+      formatCanvasInvocationFailure: (failure: CanvasInvocationFailure) => { message: string; title: string };
+    }) => Promise<void>
+  >(() => Promise.resolve())
 );
 
 const workbench = vi.hoisted(() => ({
@@ -332,7 +334,7 @@ describe('viewer recall keys on a selected video', () => {
   });
 });
 
-it('words a blocked control layer from the locale when Invoke runs from its hotkey', async () => {
+it('words a blocked control layer and its notice title from the locale when Invoke runs from its hotkey', async () => {
   await renderCommands();
 
   await act(async () => {
@@ -340,7 +342,13 @@ it('words a blocked control layer from the locale when Invoke runs from its hotk
   });
 
   const [args] = submitActiveInvocation.mock.calls[0] ?? [];
-  expect(args?.formatControlLayerError({ code: 'switch_adapter_kind', layerName: 'Sketch' })).toBe(
-    'Control layer "Sketch": Choose a control type so a model for the selected main model can be picked.'
-  );
+  expect(
+    args?.formatCanvasInvocationFailure({
+      issue: { code: 'switch_adapter_kind', kind: 'control_layer', layerId: 'sketch', layerName: 'Sketch' },
+      kind: 'canvas_input',
+    })
+  ).toEqual({
+    message: 'Control layer "Sketch": Choose a control type so a model for the selected main model can be picked.',
+    title: 'Canvas generation failed',
+  });
 });
