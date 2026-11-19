@@ -9,6 +9,7 @@ import {
   ImagePlusIcon,
   MapPinIcon,
   SlidersHorizontalIcon,
+  SplineIcon,
   SquareDashedBottomIcon,
   SquareIcon,
   TypeIcon,
@@ -25,6 +26,7 @@ export const LAYER_KIND_ICONS: Readonly<Record<AddLayerItemId, LucideIcon>> = {
   group: FolderPlusIcon,
   inpaint_mask: SquareDashedBottomIcon,
   raster: BrushIcon,
+  vector: SplineIcon,
   regional_guidance: MapPinIcon,
   regional_reference_image: ImagePlusIcon,
 };
@@ -32,6 +34,8 @@ export const LAYER_KIND_ICONS: Readonly<Record<AddLayerItemId, LucideIcon>> = {
 /** The small identity glyph between a row's preview and its name. */
 export const layerTypeIcon = (layer: CanvasLayerContract): LucideIcon => {
   switch (layer.type) {
+    case 'vector':
+      return LAYER_KIND_ICONS.vector;
     case 'raster':
       switch (layer.source.type) {
         case 'image':

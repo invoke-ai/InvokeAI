@@ -3,6 +3,7 @@ import type { ProjectEvent } from '@workbench/projectEventContracts';
 import type {
   CanvasLayerRegionContract,
   CanvasAdjustmentsContract,
+  CanvasBezierPathContract,
   CanvasControlAdapterContract,
   CanvasControlLayerContract,
   CanvasDocumentContractV3,
@@ -46,6 +47,18 @@ export const LOCK_EXEMPT_PATCH_KEYS: readonly (keyof CanvasLayerBasePatch)[] = [
 ];
 
 export type CanvasLayerConfigPatch =
+  | {
+      layerType: 'vector';
+      paths?: CanvasBezierPathContract[];
+      guideColor?: string;
+      fillColor?: string;
+      strokeColor?: string;
+      strokeWidth?: number;
+      fillEnabled?: boolean;
+      strokeEnabled?: boolean;
+      traceTaperEnds?: boolean;
+      traceTaper?: number;
+    }
   | {
       layerType: 'raster';
       adjustments?: CanvasAdjustmentsContract;

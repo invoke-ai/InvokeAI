@@ -446,6 +446,13 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       setIncludePrompts: (includePrompts) => {
         void patchWorkbenchPreferences({ generatePresetsIncludePrompts: includePrompts });
       },
+      update: (presetId, values) => {
+        void patchWorkbenchPreferences({
+          generatePresets: getWorkbenchPreferences().generatePresets.map((preset) =>
+            preset.id === presetId ? { ...preset, values } : preset
+          ),
+        });
+      },
     }),
     [generatePresets, generatePresetsIncludePrompts]
   );

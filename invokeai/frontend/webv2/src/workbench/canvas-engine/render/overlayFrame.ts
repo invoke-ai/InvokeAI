@@ -11,14 +11,20 @@ import type { FloatingSelection } from '@workbench/canvas-engine/selection/float
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
 import type { ToolId, Vec2 } from '@workbench/canvas-engine/types';
 
-import { lookupDocumentLayer, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
+import {
+  compileDocumentLeaves,
+  lookupDocumentLayer,
+  lookupDocumentLeaf,
+} from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentIndex, type CanvasNodeEntry } from '@workbench/canvas-engine/document/documentIndex';
 import { isGroupNode } from '@workbench/canvas-engine/document/documentTree';
-import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
+import { applyToPoint, fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { hittableLayerRect, layerOutlineCorners } from '@workbench/canvas-engine/tools/moveHitTest';
 import { transformOverlayGeometry } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { FloatingSelectionFrame } from './floatingSelectionFrame';
+import type { VectorEditOverlay } from './vectorEditOverlay';
+import type { VectorGuideLayer } from './vectorGuides';
 
 /** The SAM preview's resting overlay opacity — it sits over the layer it describes. */
 const SAM_PREVIEW_OPACITY = 0.45;
@@ -91,7 +97,7 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
    * tracks the preview rather than lagging a frame behind it.
    */
   const moveOutlineCorners = (doc: CanvasDocumentContractV3): readonly Vec2[] | null => {
-    if (getActiveToolId() !== 'move') {
+    if (getActiveToolId() !== 'move' || stores.vectorEditSession.get()) {
       return null;
     }
     const target =
@@ -104,6 +110,22 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
 
   /** The transform-tool frame (rotated bounds + handles + rotation nub), or `null`. */
   const transformFrame = (doc: CanvasDocumentContractV3): TransformFrameOverlay | null => {
+    if (getActiveToolId() === 'spline') {
+      const edit = stores.vectorEditSession.get();
+      const frame = edit?.pathTransform;
+      const leaf = edit ? lookupDocumentLeaf(doc, edit.layerId) : null;
+      if (!frame || !leaf) {
+        return null;
+      }
+      const geometry = transformOverlayGeometry(frame.transform, frame.rect);
+      const toDocument = leaf.worldTransform;
+      return {
+        center: applyToPoint(toDocument, geometry.center),
+        corners: geometry.corners.map((point) => applyToPoint(toDocument, point)),
+        handles: geometry.handles.map((point) => applyToPoint(toDocument, point)),
+        rotationAnchor: applyToPoint(toDocument, geometry.rotationAnchor),
+      };
+    }
     if (getActiveToolId() !== 'transform') {
       return null;
     }
@@ -143,7 +165,32 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
       const activeTool = getActiveToolId();
       const bboxPreview = stores.bboxPreview.get();
       const samSession = stores.samInteraction.get();
+      const edit = stores.vectorEditSession.get();
+      let vectorEdit: VectorEditOverlay | null = null;
+      const vectorGuides: VectorGuideLayer[] = [];
+      for (const leaf of compileDocumentLeaves(doc)) {
+        if (leaf.layer.type !== 'vector' || !leaf.contributionEnabled || leaf.documentHidden) {
+          continue;
+        }
+        const transform = { ...leaf.layer.transform, ...transformOverrides.get(leaf.id) };
+        const matrix = transformOverrides.has(leaf.id)
+          ? fromTRS({ x: transform.x, y: transform.y }, transform.rotation, transform.scaleX, transform.scaleY)
+          : leaf.worldTransform;
+        if (edit?.layerId === leaf.id) {
+          vectorEdit = { session: edit, matrix };
+        }
+        vectorGuides.push({
+          paths: edit?.layerId === leaf.id ? edit.paths : leaf.layer.paths,
+          matrix,
+          opacity: leaf.layer.opacity,
+          guideColor: leaf.layer.guideColor,
+          ...(edit?.layerId === leaf.id ? { editActivePathId: edit.activePathId } : {}),
+        });
+      }
       return {
+        vectorEdit,
+        vectorGuides,
+        vectorShapePreview: stores.vectorShapePreview.get(),
         bbox: bboxPreview ?? doc.bbox,
         bboxHandles: activeTool === 'bbox',
         bboxOverlay: stores.bboxOverlay.get(),

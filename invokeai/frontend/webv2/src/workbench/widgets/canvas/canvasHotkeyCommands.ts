@@ -179,6 +179,10 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
  */
 export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyContext): void => {
   const { dispatch, document, engine, t } = ctx;
+  if (commandId === 'canvas.deleteSelected' && engine?.interaction.get('vectorEditSession')) {
+    engine.layers.vectorEdit.deleteSelection();
+    return;
+  }
   const { selectedLayerId } = document;
   const index = getDocumentIndex(document);
   const selected = selectedLayerId ? index.byId.get(selectedLayerId) : undefined;
@@ -215,6 +219,15 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   // Arrow-key nudge: engine owns the bounds/lock logic (no-op with no/locked selection).
   const nudge = NUDGE_DELTAS[commandId];
   if (nudge) {
+    const vectorSession = engine?.interaction.get('vectorEditSession');
+    if (
+      engine &&
+      vectorSession &&
+      (vectorSession.activePathId !== null || vectorSession.selectedPoints.length > 0 || vectorSession.pathTransform)
+    ) {
+      engine.layers.vectorEdit.nudge(nudge.dx, nudge.dy);
+      return;
+    }
     const nudged = engine?.layers.nudgeSelectedLayer(nudge.dx, nudge.dy);
     // A nudge with nothing eligible selected is an expected no-op; only a broken commit is news.
     if (nudged?.status === 'postcondition-failed') {

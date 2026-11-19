@@ -42,6 +42,18 @@ const useCanvasInteractionState = <K extends keyof CanvasInteractionState>(
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
+/** Point-tool selection and in-flight geometry preview. Completed edits use document history. */
+export const useVectorEditSession = (
+  engine: CanvasCoreStoreCapability | null
+): CanvasInteractionState['vectorEditSession'] => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('vectorEditSession', listener) ?? (() => {}),
+    [engine]
+  );
+  const read = useCallback(() => engine?.interaction.get('vectorEditSession') ?? null, [engine]);
+  return useSyncExternalStore(subscribe, read, read);
+};
+
 /**
  * Subscribe only to one layer's thumbnail version; null engines return undefined without subscribing for fallback
  * rendering.
@@ -266,8 +278,14 @@ export const useBboxOptions = (engine: CanvasCoreStoreCapability): BboxToolOptio
 export const useBboxGrid = (engine: CanvasCoreStoreCapability): number => useCanvasInteractionState(engine, 'bboxGrid');
 
 /** The active transform-tool session (layer id + live transform), or `null`. */
-export const useTransformSession = (engine: CanvasCoreStoreCapability): TransformSession | null =>
-  useCanvasInteractionState(engine, 'transformSession');
+export const useTransformSession = (engine: CanvasCoreStoreCapability | null): TransformSession | null => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('transformSession', listener) ?? (() => undefined),
+    [engine]
+  );
+  const read = useCallback(() => engine?.interaction.get('transformSession') ?? null, [engine]);
+  return useSyncExternalStore(subscribe, read, read);
+};
 
 /** The layer a requested transform waits on until its stroke saves; null when nothing is waiting. */
 export const usePendingTransformLayerId = (engine: CanvasCoreStoreCapability): string | null =>

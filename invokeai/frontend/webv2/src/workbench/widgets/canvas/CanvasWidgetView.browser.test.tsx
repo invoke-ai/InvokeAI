@@ -21,7 +21,7 @@ import { auditAccessibility } from '@platform/browser/auditAccessibility.testing
 import { TINY_PNG_BASE64 } from '@platform/browser/nativeDrag.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { createControlLayer } from '@workbench/canvas-engine/api';
+import { createControlLayer, createVectorLayer } from '@workbench/canvas-engine/api';
 import {
   groupContract,
   layerContract,
@@ -117,7 +117,13 @@ vi.mock('./useCreateFromBbox', () => ({
   useCreateFromBbox: () => ({ createFromBbox: () => undefined, isCreating: false }),
 }));
 vi.mock('./CanvasCreateFromBboxSubmenu', () => ({ CanvasCreateFromBboxSubmenu: () => null }));
-vi.mock('./CanvasGlobalContextMenu', () => ({ CanvasGlobalContextMenu: () => null }));
+vi.mock('./CanvasGlobalContextMenu', () => ({
+  CanvasGlobalContextMenu: () => (
+    <div aria-label="Canvas fallback" role="menu">
+      Canvas actions
+    </div>
+  ),
+}));
 vi.mock('./CanvasSaveToGallerySubmenu', () => ({ CanvasSaveToGallerySubmenu: () => null }));
 vi.mock('./CanvasSurface', () => ({ CanvasSurface: () => null }));
 vi.mock('./MissingFontsDialog', () => ({ MissingFontsDialog: () => null }));
@@ -259,6 +265,148 @@ const renderView = async (
   );
   return { commandHandlers, projectId, store };
 };
+
+describe('Canvas spline context menu', () => {
+  const renderSpline = async (selectPath = true) => {
+    const layer = createVectorLayer({ id: 'vector', name: 'Guides' });
+    layer.paths = [
+      {
+        id: 'selected-path',
+        name: null,
+        isClosed: false,
+        points: [
+          { anchor: { x: 300, y: 300 }, inHandle: null, outHandle: null, type: 'corner' },
+          { anchor: { x: 400, y: 300 }, inHandle: null, outHandle: null, type: 'corner' },
+        ],
+      },
+      {
+        id: 'other-path',
+        name: null,
+        isClosed: false,
+        points: [
+          { anchor: { x: 700, y: 450 }, inHandle: null, outHandle: null, type: 'corner' },
+          { anchor: { x: 800, y: 450 }, inHandle: null, outHandle: null, type: 'corner' },
+        ],
+      },
+    ];
+    await renderView('completed', {
+      selectedLayer: layer,
+      staged: false,
+    });
+    await act(async () => {
+      await harness.engine!.layers.vectorEdit.prepare();
+    });
+    await act(() => {
+      harness.engine!.tools.setTool('spline');
+      if (selectPath) {
+        expect(harness.engine!.layers.vectorEdit.targetContextMenu({ x: 350, y: 300 })).toBe(true);
+      }
+    });
+    const owner = host!.querySelector<HTMLDivElement>('[data-canvas-context-menu-owner]')!;
+    owner.tabIndex = -1;
+    owner.focus();
+    return { engine: harness.engine!, owner };
+  };
+
+  it.each(['{Shift>}{F10}{/Shift}', '{ContextMenu}'])(
+    'opens the active path away from the corner with %s and executes an action with keys',
+    async (keys) => {
+      const { engine, owner } = await renderSpline();
+      await act(() => userEvent.keyboard(keys));
+      await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+      expect(engine.interaction.get('vectorEditSession')?.activePathId).toBe('selected-path');
+      await act(() => userEvent.keyboard('{Escape}'));
+      await vi.waitFor(() => expect(document.activeElement).toBe(owner));
+      await act(() => userEvent.keyboard(keys));
+      await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+      // Copy Path is immediately before Delete Path; navigate the actual menu without a pointer.
+      await userEvent.keyboard('{End}{ArrowUp}');
+      await expect
+        .element(page.getByRole('menuitem', { name: 'Copy Path', exact: true }))
+        .toHaveAttribute('data-highlighted');
+      await act(() => userEvent.keyboard('{Enter}'));
+      await vi.waitFor(() => expect(engine.interaction.get('vectorEditSession')?.paths).toHaveLength(3));
+      expect(engine.interaction.get('vectorEditSession')?.paths[1]?.points).toEqual(
+        engine.interaction.get('vectorEditSession')?.paths[0]?.points
+      );
+    }
+  );
+
+  it('keeps the active path when a keyboard keydown is followed by a native contextmenu event', async () => {
+    const { engine, owner } = await renderSpline();
+    const bounds = owner.getBoundingClientRect();
+    const key = new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true, cancelable: true });
+    await act(() => owner.dispatchEvent(key));
+    expect(key.defaultPrevented).toBe(true);
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+
+    // Chromium emits this after the key, with coordinates unrelated to the selected path.
+    const nativeMenu = new PointerEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      button: -1,
+      pointerType: 'mouse',
+      clientX: bounds.left + 750,
+      clientY: bounds.top + 450,
+    });
+    await act(() => owner.dispatchEvent(nativeMenu));
+
+    expect(nativeMenu.defaultPrevented).toBe(true);
+    expect(engine.interaction.get('vectorEditSession')?.activePathId).toBe('selected-path');
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+  });
+
+  it('keeps pointer targeting and native menus in inline editors, without handling other widgets', async () => {
+    const { engine, owner } = await renderSpline();
+    const bounds = owner.getBoundingClientRect();
+    await act(() =>
+      owner.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: bounds.left + 750,
+          clientY: bounds.top + 450,
+        })
+      )
+    );
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+    expect(engine.interaction.get('vectorEditSession')?.activePathId).toBe('other-path');
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).not.toBeInTheDocument();
+
+    const editor = document.createElement('textarea');
+    owner.append(editor);
+    editor.focus();
+    const key = new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true, cancelable: true });
+    const nativeMenu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    await act(() => {
+      editor.dispatchEvent(key);
+      editor.dispatchEvent(nativeMenu);
+    });
+    expect(key.defaultPrevented).toBe(false);
+    expect(nativeMenu.defaultPrevented).toBe(false);
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).not.toBeInTheDocument();
+
+    const elsewhere = document.createElement('button');
+    elsewhere.textContent = 'Other widget';
+    host!.append(elsewhere);
+    owner.focus();
+    await act(() => userEvent.keyboard('{Shift>}{F10}{/Shift}'));
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Other widget' }).click();
+    await vi.waitFor(() => expect(document.activeElement).toBe(elsewhere));
+    await act(() => userEvent.keyboard('{Shift>}{F10}{/Shift}'));
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).not.toBeInTheDocument();
+  });
+
+  it('uses the Canvas fallback when no path is active, including native keyboard contextmenu events', async () => {
+    const { owner } = await renderSpline(false);
+    await act(() => owner.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 0 })));
+    await expect.element(page.getByRole('menu', { name: 'Canvas fallback' })).toBeVisible();
+    await expect.element(page.getByRole('menuitem', { name: 'Trace Path', exact: true })).not.toBeInTheDocument();
+  });
+});
 
 describe('CanvasWidgetView accept and stop', () => {
   it('accepts the result, then cancels its batch through the workbench queue command with the accept notice', async () => {

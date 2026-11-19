@@ -70,7 +70,7 @@ export const captureInsertionAnchor = (
   if (above && above.stack === stack) {
     const siblings =
       above.parentId === null
-        ? stacks[stack]
+        ? (stacks[stack] ?? [])
         : (index.byId.get(above.parentId)!.node as { children: CanvasNodeContract[] }).children;
     return {
       afterId: siblings[above.siblingIndex - 1]?.id ?? null,
@@ -83,7 +83,7 @@ export const captureInsertionAnchor = (
   }
   return {
     afterId: null,
-    beforeId: stacks[stack][0]?.id ?? null,
+    beforeId: stacks[stack]?.[0]?.id ?? null,
     capturedEditRevision: editRevision,
     parentPath: [],
     projectId,
@@ -105,7 +105,7 @@ export const captureRestoreAnchor = (
   }
   const siblings =
     entry.parentId === null
-      ? stacks[entry.stack]
+      ? (stacks[entry.stack] ?? [])
       : (index.byId.get(entry.parentId)!.node as { children: CanvasNodeContract[] }).children;
   return {
     afterId: siblings[entry.siblingIndex - 1]?.id ?? null,
