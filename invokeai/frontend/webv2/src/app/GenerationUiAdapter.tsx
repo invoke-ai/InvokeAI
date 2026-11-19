@@ -11,7 +11,7 @@ import {
 } from '@features/gallery/queries';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { clearGenerateModelSwitchConfirmation, GenerationUiProvider } from '@features/generation/react';
-import { isGenerateModelConfig, normalizeRebalancePresets } from '@features/generation/settings';
+import { normalizeRebalancePresets } from '@features/generation/settings';
 import { useAuthSession, useCapabilities } from '@features/identity';
 import {
   ensureModelsLoaded,
@@ -38,7 +38,6 @@ import { shallowEqual } from '@platform/state/selectors';
 import { createActionToast } from '@platform/ui/toaster';
 import { type QueryClient, QueryObserver, useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
-import { hasRasterContentInFrame } from '@workbench/invocation';
 import { useAspectRatioPresets } from '@workbench/settings/aspectRatioPresets';
 import {
   getWorkbenchPreferences,
@@ -225,18 +224,10 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       }),
     [store]
   );
-  const projectState = useActiveProjectSelector((activeProject) => {
-    const model = getProjectWidgetValues(activeProject, 'generate').model;
-    return {
-      activeProjectId: activeProject.id,
-      canvasRasterInFrame:
-        activeProject.invocation.sourceId === 'canvas' &&
-        isGenerateModelConfig(model) &&
-        model.type === 'external_image_generator' &&
-        hasRasterContentInFrame(activeProject.canvas.document),
-      invocationSourceId: activeProject.invocation.sourceId,
-    };
-  });
+  const projectState = useActiveProjectSelector((activeProject) => ({
+    activeProjectId: activeProject.id,
+    invocationSourceId: activeProject.invocation.sourceId,
+  }));
   const showPromptSyntaxHighlighting = useWorkbenchPreferenceSelector(
     (preferences) => preferences.showPromptSyntaxHighlighting
   );

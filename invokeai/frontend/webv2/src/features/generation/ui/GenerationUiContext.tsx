@@ -135,7 +135,6 @@ export interface GenerationUiAdapter {
   project: {
     activeProjectId: string;
     invocationSourceId: string;
-    canvasRasterInFrame: boolean;
     showPromptSyntaxHighlighting: boolean;
   };
   promptHistory: {

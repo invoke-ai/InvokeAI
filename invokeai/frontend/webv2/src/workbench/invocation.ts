@@ -14,9 +14,8 @@ import type {
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
-import { getLayoutDraftRejectionReason, getLayoutPromptRejectionReason } from '@features/generation/graph';
+import { getLayoutDraftRejectionReason } from '@features/generation/graph';
 import {
-  describeExternalCanvasRefusal,
   describeGenerationIssue,
   expandsDynamicPrompts,
   getEffectivePrompts,
@@ -44,13 +43,9 @@ import {
   isBaseRasterContentLayer,
   lookupDocumentNode,
 } from '@workbench/canvas-engine/api';
-import { isCompositableControlLayer, isCompositableRegionalGuidanceLayer } from '@workbench/canvasLayerContent';
+import { isCompositableRegionalGuidanceLayer } from '@workbench/canvasLayerContent';
 
-import {
-  createControlLayerCheckContext,
-  describeControlLayerIssue,
-  getBlockingControlLayerIssues,
-} from './controlLayerChecks';
+import { describeCanvasInputIssue, getCanvasInputIssues } from './canvasGenerationInputs';
 import { getActiveProjectGraph } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
@@ -173,7 +168,7 @@ export interface InvocationRouteInput {
   /** The canvas generation frame (document space) — its area gates a canvas invoke. */
   canvasBbox: { width: number; height: number };
   canvasLayers: readonly CanvasLayerContract[];
-  /** Measured only for hosted models; false for local models. */
+  /** Measured only with a text-only hosted model, which a raster in frame blocks; false otherwise. */
   canvasRasterInFrame: boolean;
   /** Measured whatever the model: which bases read regions is capability data that can arrive later. */
   canvasRegionalLayersInFrame: readonly CanvasRegionalGuidanceLayerContract[];
@@ -213,7 +208,7 @@ const overlapsFrame = (bounds: FrameRect, frame: FrameRect): boolean =>
   frame.y < bounds.y + bounds.height;
 
 /** Errs toward not blocking: text and zero-opacity layers are skipped; transparent pixels count as content. */
-export const hasRasterContentInFrame = (document: Project['canvas']['document']): boolean => {
+const hasRasterContentInFrame = (document: Project['canvas']['document']): boolean => {
   const { bbox } = document;
 
   if (bbox.width <= 0 || bbox.height <= 0) {
@@ -263,7 +258,7 @@ export const getInvocationRouteInput = (project: Project): InvocationRouteInput 
   const generateValues = getProjectWidgetValues(project, 'generate');
   // Measured whatever source is selected: a graph preview resolves the Canvas route from this input.
   const measuresRaster =
-    isGenerateModelConfig(generateValues.model) && generateValues.model.type === 'external_image_generator';
+    isGenerateModelConfig(generateValues.model) && isExternalTextOnlyCanvasModel(generateValues.model);
   const canvasLayers = compileContributingLayers(project.canvas.document);
 
   return {
@@ -309,8 +304,7 @@ const isWidgetMounted = (input: InvocationRouteInput, widgetId: WidgetId): boole
 const getGenerateSnapshotValidationReasons = (
   generateValues: Record<string, unknown>,
   models?: readonly ModelConfig[],
-  canvasBbox?: InvocationRouteInput['canvasBbox'],
-  canvasRasterInFrame = false
+  canvasBbox?: InvocationRouteInput['canvasBbox']
 ): InvocationValidationReason[] => {
   const values = normalizeGenerateWidgetValues(generateValues);
 
@@ -327,7 +321,7 @@ const getGenerateSnapshotValidationReasons = (
   // Generate itself stays text to image; the Canvas source checks the provider at the size its frame asks for.
   return [
     ...getGenerateInvocationIssues(values, {
-      ...(canvasBbox ? { canvasFrame: canvasBbox, canvasRasterInFrame } : {}),
+      ...(canvasBbox ? { canvasFrame: canvasBbox } : {}),
       ...(models ? { models } : {}),
     }).map((generationIssue) => ({ generationIssue })),
     ...(layoutDraftReason === null ? [] : [layoutDraftReason]),
@@ -401,52 +395,26 @@ export const resolveInvocationRouteInput = (
   }
 
   if (sourceId === 'canvas') {
-    validationReasons.push(
-      ...getGenerateSnapshotValidationReasons(input.generateValues, models, input.canvasBbox, input.canvasRasterInFrame)
-    );
+    validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models, input.canvasBbox));
 
     if (input.canvasBbox.width <= 0 || input.canvasBbox.height <= 0) {
       validationReasons.push({ routeIssue: { kind: 'emptyCanvasFrame' } });
     }
 
     const values = normalizeGenerateWidgetValues(input.generateValues);
-    if (values?.model.type === 'external_image_generator') {
-      const { model } = values;
-
-      if (input.canvasRasterInFrame && isExternalTextOnlyCanvasModel(model)) {
-        validationReasons.push(describeExternalCanvasRefusal(model, { kind: 'raster_content' }));
-      }
-      for (const layer of input.canvasLayers) {
-        if (isCompositableControlLayer(layer)) {
-          validationReasons.push(
-            describeExternalCanvasRefusal(model, { kind: 'control_layer', layerName: layer.name })
-          );
-        } else if (isCompositableRegionalGuidanceLayer(layer)) {
-          validationReasons.push(
-            describeExternalCanvasRefusal(model, { kind: 'regional_guidance', layerName: layer.name })
-          );
-        }
-      }
-    } else if (values && isSupportedGenerateModel(values.model)) {
-      // Wait for models before validating local adapters to avoid false missing-model errors.
-      if (models) {
-        validationReasons.push(
-          ...getBlockingControlLayerIssues({
-            context: createControlLayerCheckContext(values.model.base, getWorkbenchPreferences().controlModelMemory),
-            layers: input.canvasLayers,
-            mainModel: values.model,
-            models,
-          }).map((controlLayerIssue) => ({ controlLayerIssue }))
-        );
-      }
-      const layoutPromptReason = getLayoutPromptRejectionReason({
-        base: values.model.base,
-        prompt: getEffectivePrompts(values).positivePrompt,
-        regions: input.canvasRegionalLayersInFrame,
-      });
-      if (layoutPromptReason) {
-        validationReasons.push(layoutPromptReason);
-      }
+    if (values && (values.model.type === 'external_image_generator' || isSupportedGenerateModel(values.model))) {
+      validationReasons.push(
+        ...getCanvasInputIssues({
+          cfgScale: values.cfgScale,
+          controlModelMemory: getWorkbenchPreferences().controlModelMemory,
+          layers: input.canvasLayers,
+          model: values.model,
+          models,
+          prompt: getEffectivePrompts(values).positivePrompt,
+          rasterInFrame: input.canvasRasterInFrame,
+          regionalLayersInFrame: input.canvasRegionalLayersInFrame,
+        }).map((canvasInputIssue) => ({ canvasInputIssue }))
+      );
     }
   }
 
@@ -501,8 +469,8 @@ export const localizeInvocationValidationReason = (
   reason: InvocationValidationReason,
   t: (key: string, options?: Record<string, unknown>) => string
 ): string =>
-  typeof reason === 'object' && 'controlLayerIssue' in reason
-    ? describeControlLayerIssue(t, reason.controlLayerIssue)
+  typeof reason === 'object' && 'canvasInputIssue' in reason
+    ? describeCanvasInputIssue(t, reason.canvasInputIssue)
     : typeof reason === 'object' && 'generationIssue' in reason
       ? describeGenerationIssue(t, reason.generationIssue)
       : typeof reason === 'object' && 'routeIssue' in reason

@@ -205,12 +205,7 @@ const buildAdapter = (activeProjectId = 'project-1'): GenerationUiAdapter =>
   ({
     ...stableGroups,
     generateValues: storedValues(activeProjectId),
-    project: {
-      activeProjectId,
-      canvasRasterInFrame: false,
-      invocationSourceId: 'generate',
-      showPromptSyntaxHighlighting: false,
-    },
+    project: { activeProjectId, invocationSourceId: 'generate', showPromptSyntaxHighlighting: false },
   }) as unknown as GenerationUiAdapter;
 
 // Captured before any test fakes timers, so settling still yields to the browser while a debounce is held.
@@ -308,7 +303,7 @@ afterEach(async () => {
 });
 
 describe('Canvas hosted-provider preflight', () => {
-  it('updates the reference budget when raster content enters or leaves the frame', async () => {
+  it('shows a conditional Canvas budget hint without a blocking issue', async () => {
     const model = {
       ...MODEL,
       base: 'external',
@@ -340,14 +335,22 @@ describe('Canvas hosted-provider preflight', () => {
       })
     );
     const adapter = buildAdapter();
-    adapter.project = { ...adapter.project, invocationSourceId: 'canvas', canvasRasterInFrame: false };
+    adapter.project = { ...adapter.project, invocationSourceId: 'canvas' };
     await renderAdapter(adapter);
-    const message = 'Seedream supports at most 15 images total (reference + init + output), got 16.';
-    expect(host!.textContent).not.toContain(message);
-    await renderAdapter({ ...adapter, project: { ...adapter.project, canvasRasterInFrame: true } });
-    expect(host!.textContent).toContain(message);
+    const hint = 'widgets.generate.canvasReferenceImageBudgetHint';
+    const issue = 'Seedream supports at most 15 images total (reference + init + output), got 16.';
+    expect(host!.textContent).toContain(hint);
+    expect(host!.textContent).not.toContain(issue);
+    await renderAdapter(buildAdapter());
+    expect(host!.textContent).not.toContain(hint);
     await renderAdapter(adapter);
-    expect(host!.textContent).not.toContain(message);
+    await settle(() => {
+      const references = storedValues().getSnapshot().referenceImages as { isEnabled: boolean }[];
+      storedValues().patchSnapshot({
+        referenceImages: references.map((ref, i) => (i === 0 ? { ...ref, isEnabled: false } : ref)),
+      });
+    });
+    expect(host!.textContent).not.toContain(hint);
   });
 });
 
@@ -627,7 +630,6 @@ describe('GenerateSettingsForm render isolation', () => {
       ...buildAdapter('next-account-project'),
       project: {
         activeProjectId: 'next-account-project',
-        canvasRasterInFrame: false,
         invocationSourceId: 'generate',
         showPromptSyntaxHighlighting: false,
       },
