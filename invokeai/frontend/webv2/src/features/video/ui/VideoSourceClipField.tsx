@@ -22,8 +22,7 @@ const areSourceClipsEquivalent = (left: VideoSourceClip | null, right: VideoSour
   (left?.video_name === right?.video_name &&
     left?.startFrame === right?.startFrame &&
     left?.endFrame === right?.endFrame &&
-    // The bound thumbnails seek at frame/fps, so a same-name clip hydrated
-    // with a different probed rate must re-render.
+    // The bound thumbnails seek at frame/fps, so a same-name clip hydrated with a different probed rate must re-render.
     left?.fps === right?.fps);
 
 export const VideoSourceClipField = memo(
@@ -64,8 +63,8 @@ export const VideoSourceClipField = memo(
     );
 
     const maxFrameIndex = sourceVideo ? Math.max(0, sourceVideo.numFrames - 1) : 0;
-    // The crossfade join needs a 2-frame tail from the trimmed source, so the
-    // setters keep at least two frames between the bounds.
+    // The crossfade join needs a 2-frame tail from the trimmed source, so the setters keep at least two frames between
+    // the bounds.
     const setStartFrame = useCallback(
       (rawStart: number) => {
         if (!sourceVideo) {

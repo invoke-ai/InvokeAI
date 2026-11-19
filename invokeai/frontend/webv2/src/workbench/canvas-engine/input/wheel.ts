@@ -1,6 +1,6 @@
 /**
- * Plain wheel routes to the tool or cursor-centered zoom. Ctrl+wheel sizes brush/eraser and is otherwise
- * swallowed. Injected dependencies keep routing testable without DOM setup.
+ * Plain wheel routes to the tool or cursor-centered zoom. Ctrl+wheel sizes brush/eraser and is otherwise swallowed.
+ * Injected dependencies keep routing testable without DOM setup.
  */
 
 import type { InvalidatePayload } from '@workbench/canvas-engine/render/scheduler';
@@ -8,7 +8,6 @@ import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerModifiers, Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 
-/** Dependencies for {@link createWheelHandler}. */
 export interface WheelHandlerDeps {
   viewport: Viewport;
   invalidate(payload: InvalidatePayload): void;
@@ -17,10 +16,7 @@ export interface WheelHandlerDeps {
   getToolContext(): ToolContext;
   /** Steps the active brush/eraser diameter by one notch (`+1` grow, `-1` shrink). */
   stepActiveBrushSize(direction: 1 | -1): void;
-  /**
-   * Whether ctrl+wheel brush sizing is inverted. `false` (default): wheel-up
-   * grows. `true`: wheel-up shrinks. A user preference read fresh per event.
-   */
+  /** Inverts ctrl+wheel brush sizing (default false: wheel-up grows); a user preference read fresh per event. */
   getInvertBrushSizeScroll(): boolean;
 }
 
@@ -31,7 +27,6 @@ const modifiersOf = (event: WheelEvent): PointerModifiers => ({
   shift: event.shiftKey,
 });
 
-/** Creates the canvas wheel handler. See module docs for routing. */
 export const createWheelHandler = (deps: WheelHandlerDeps): ((event: WheelEvent) => void) => {
   return (event: WheelEvent): void => {
     event.preventDefault();

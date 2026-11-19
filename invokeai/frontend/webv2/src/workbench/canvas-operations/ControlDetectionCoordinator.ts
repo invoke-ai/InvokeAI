@@ -1,10 +1,6 @@
 /**
- * Background detection for control layers. Commands start it (a Properties intent, Retry, resuming after cooldown);
- * document changes never do, so undo and redo cannot re-run detection. One job per layer, at most
- * {@link CONTROL_DETECTION_MAX_CONCURRENT} graphs per engine; results land through the engine's guarded map commit,
- * which refuses while a modal operation, gesture or layer session holds the document, so a finished result waits
- * and retries instead of blocking them. The commit promotes a result to durable pixels only once it is about to
- * land, so a dropped result stays an intermediate the server collects.
+ * Commands start detection, document changes never do, so undo and redo cannot re-run it. The map commit refuses while
+ * the document is held, so a finished result waits and retries; a dropped result stays a server-collected intermediate.
  */
 
 import type { AccountOwnedResource, AccountScope } from '@platform/state/accountLifecycle';
@@ -46,12 +42,10 @@ import { ControlDetectionFailure, runControlDetection, type ControlDetectionMap 
 
 export const CONTROL_DETECTION_MAX_CONCURRENT = 2;
 export const CONTROL_DETECTION_COMMIT_RETRY_MS = { initial: 250, max: 2_000 } as const;
-/** How long a finished result keeps waiting for the document before it reports `commit-busy`. */
 export const CONTROL_DETECTION_COMMIT_TIMEOUT_MS = 30_000;
 /** Restarts after the input pixels changed under a running job (painting, an upload landing). */
 export const CONTROL_DETECTION_MAX_RESTARTS = 3;
 
-/** The engine's control derivation capability. */
 export type ControlDerivationPort = Pick<
   CanvasControlDerivationCapability,
   'captureControlDetectionGuard' | 'commitControlLayerPatch' | 'commitControlMap'
@@ -61,19 +55,15 @@ export interface ControlDetectionCoordinatorDeps {
   readonly projectId: string;
   readonly derivation: ControlDerivationPort;
   getDocument(): CanvasDocumentContractV3 | null;
-  /** Persists the layer's pending paint, waiting for an edit that holds it. */
   flushLayerUploads(layerId: string, options: { signal?: AbortSignal }): Promise<LayerFlushResult>;
   runFilterGraph(options: {
     graph: BackendGraphContract;
     outputNodeId: string;
     signal?: AbortSignal;
   }): Promise<{ height: number; imageName: string; width: number }>;
-  /** Adopts a result as canvas-owned pixels; called by the map commit once nothing refuses it. */
   makeDurable(imageName: string): Promise<void>;
-  /** Notifies when the edit lease or an editing session may have been released. */
   subscribeLockChanges(listener: () => void): () => void;
   readonly statuses?: ControlDetectionStatusStore;
-  /** Account lifetime; the platform lifecycle by default. */
   readonly accounts?: {
     capture(): AccountScope;
     register(resource: AccountOwnedResource): () => void;
@@ -85,15 +75,9 @@ export interface ControlDetectionCoordinator {
   retry(layerId: string): RetryControlDetectionResult;
   getStatus(layerId: string): ControlDetectionStatus;
   subscribeStatus(layerId: string, listener: () => void): () => void;
-  /** Cancels every job and remembers its layer, for {@link resume}. */
   suspend(): void;
-  /** Restarts the layers {@link suspend} interrupted that still need a map. */
   resume(): void;
-  /**
-   * Follows a document change without scheduling work: drops jobs and statuses of removed layers, cancels a job whose
-   * layer no longer needs it or whose input changed other than by its own paint landing (undo, redo), and settles a
-   * leftover error or queued status once the layer needs no detection (an undo past the failed edit).
-   */
+  /** Schedules no work: drops, cancels and settles jobs and statuses the document no longer supports. */
   reconcileWithDocument(): void;
   dispose(): void;
 }
@@ -130,19 +114,13 @@ type JobOutcome =
 interface Job {
   readonly layerId: string;
   readonly controller: AbortController;
-  /** The input key it detects (updated once a flush settles the paint); a command for the same key keeps it. */
   inputKey: string;
   /** The layer `inputKey` was read from, to tell the layer's own paint landing apart from other input changes. */
   recipe: CanvasControlLayerContract;
   readonly restarts: number;
   timer: ReturnType<typeof setTimeout> | null;
   running: boolean;
-  /**
-   * While its map commit runs: the commit's own publish changes the document and reconciles synchronously, and the
-   * engine's checks already settle what the job's result may still do.
-   */
   committing: boolean;
-  /** Ends a commit retry wait early (a lock was released). */
   wake: (() => void) | null;
 }
 
@@ -151,23 +129,14 @@ const detectorDefaults = (detector: string): Record<string, unknown> => {
   return definition ? buildFilterDefaults(definition) : {};
 };
 
-/** Whether the detection input is the layer's own paint, whose newest strokes may not be uploaded yet. */
 const isOwnPaintInput = (layer: CanvasControlLayerContract): boolean =>
   layer.original === undefined && !layer.filter && layer.source.type === 'paint';
 
-/**
- * Whether a run could produce a map: the document says the map is stale, or the input is the layer's own paint
- * whose pixels may still be in flight (a flush settles which).
- */
 const wantsDetection = (layer: CanvasControlLayerContract): boolean =>
   needsControlDetection(layer) ||
   (layer.controlType !== undefined && !!layer.detection && !isControlMapCurrent(layer) && isOwnPaintInput(layer));
 
-/**
- * Whether `after` differs from `before` only by its own paint landing (an upload, or strokes on the input): same type
- * and detector, and both detect their own paint source. An image swap (undo or redo of a replaced image) does not
- * qualify.
- */
+/** An image swap (undo or redo of a replaced image) does not count as the layer's own paint. */
 const onlyOwnPaintChanged = (before: CanvasControlLayerContract, after: CanvasControlLayerContract): boolean =>
   isOwnPaintInput(before) &&
   isOwnPaintInput(after) &&
@@ -270,11 +239,7 @@ export const createControlDetectionCoordinator = (
       signal.addEventListener('abort', onAbort, { once: true });
     });
 
-  /**
-   * Whether `guard` still describes the layer. The layer's own paint landing under the job (an upload, more strokes)
-   * runs again; anything else (removal, a document swap, an image swapped by undo or redo, another command) drops
-   * the result, so history never re-runs detection.
-   */
+  /** Only the layer's own paint landing reruns; any other change drops the result, so history never re-runs detection. */
   const checkGuard = (
     guard: ControlDetectionGuard,
     recipe: CanvasControlLayerContract
@@ -464,7 +429,6 @@ export const createControlDetectionCoordinator = (
       outcome = await detect(job, signal);
     } catch (error) {
       if (signal.aborted) {
-        // A cancel already settled the status; an account switch alone leaves nothing to show.
         if (jobs.get(job.layerId) === job) {
           jobs.delete(job.layerId);
           statuses.set(job.layerId, IDLE_CONTROL_DETECTION_STATUS);
@@ -565,8 +529,6 @@ export const createControlDetectionCoordinator = (
           continue;
         }
         if (job) {
-          // History moved the layer away from what the job detects: its result would be dropped, so stop the graph
-          // now. The layer's own paint landing keeps it, to restart once it finishes.
           const inputChanged =
             controlDetectionInputKey(layer) !== job.inputKey && !onlyOwnPaintChanged(job.recipe, layer);
           if (!wantsDetection(layer) || inputChanged) {
@@ -574,7 +536,6 @@ export const createControlDetectionCoordinator = (
           }
           continue;
         }
-        // Only a status left behind by a failed or interrupted run is stale here.
         const { status } = statuses.get(layerId);
         if ((status === 'error' || status === 'queued') && !wantsDetection(layer)) {
           interrupted.delete(layerId);

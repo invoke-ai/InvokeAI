@@ -11,7 +11,6 @@ export interface ModelLibraryFilters {
   typeFilter: ModelTaxonomyType | null;
   /** null = all bases. */
   baseFilter: string | null;
-  /** Only models whose files are missing on disk. */
   missingOnly: boolean;
   sortField: ModelSortField;
   sortDirection: 'asc' | 'desc';
@@ -189,11 +188,11 @@ export const hasModelPickerCandidates = (
 export const getModelPickerGroups = (models: ModelConfig[], options: ModelPickerOptions): ModelPickerResult => {
   const allowedTypes = new Set(options.modelTypes);
   const candidates = models.filter((model) => isModelPickerCandidate(model, allowedTypes, options));
-  // Chips are derived from candidates — before the base filter — so the chip
-  // row stays stable while the user toggles chips.
+  // Chips are derived from candidates — before the base filter — so the chip row stays stable while the user toggles
+  // chips.
   const availableBases = collectBasesForDisplay(candidates);
-  // A remembered base that this picker does not offer (uninstalled, or a
-  // sibling picker's choice) must not filter everything out behind a hidden chip.
+  // A remembered base that this picker does not offer (uninstalled, or a sibling picker's choice) must not filter
+  // everything out behind a hidden chip.
   const baseFilter = new Set(availableBases.filter((base) => options.baseFilter?.has(base)));
   const { relatedKeys } = options;
   const qualifyingTypes = new Map(candidates.map((model) => [model, getQualifyingType(model, options.modelTypes)]));
@@ -239,7 +238,6 @@ export const collectBases = (models: Pick<ModelConfig, 'base'>[]): string[] =>
 /** Bases that exist but carry no architecture meaning, sorted after the rest. */
 const DEPRIORITIZED_BASES: ReadonlySet<string> = new Set(['any', 'external', 'unknown']);
 
-/** Order known bases by registry, then unfamiliar bases, with any/external/unknown last. */
 const KNOWN_BASE_RANKS = new Map<string, number>(KNOWN_MODEL_BASES.map((base, index) => [base, index]));
 
 /** Display rank for a base: registry order, unknown bases next, meaningless bases last. */

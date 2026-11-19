@@ -14,7 +14,6 @@ import { useModelGridSize } from './bboxGrid';
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-/** Stands in for the canvas widget's `engine.viewport.setBboxGrid` feed and the header's fit-bbox. */
 const GridProbe = ({ base }: { base: string }) => <span data-testid="grid">{useModelGridSize(base)}</span>;
 
 const render = async (base: string): Promise<void> => {
@@ -38,8 +37,6 @@ afterEach(async () => {
 
 describe('useModelGridSize', () => {
   it('re-reads the grid when the capability table lands after mount', async () => {
-    // Capability arrival must update a restored unchanged base's snapping grid rather than retaining boot fallback
-    // 8.
     await render('wan');
     expect(grid()).toBe('8');
 

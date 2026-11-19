@@ -5,6 +5,9 @@
 
 import type { CanvasLayerSourceContract, ParametricShapeKind } from '@workbench/canvas-engine/contracts';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
+
+import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
 
 import type { RasterizeDeps, RasterizeResult } from './types';
 
@@ -73,10 +76,10 @@ export const buildParametricShapePath = (
 };
 
 /**
- * Draw into an isolated transparent target: the shape rasterizer clears it, and the Shape tool supplies fresh
- * scratch pixels. With an outline, compose the styles first and mask them to the silhouette once; clipping the
- * stroke over an already-antialiased fill would expose fill color along the exterior edge. The final mask clears
- * everything outside the shape, so this must never draw directly over existing layer pixels.
+ * Draw into an isolated transparent target: the shape rasterizer clears it, and the Shape tool supplies fresh scratch
+ * pixels. With an outline, compose the styles first and mask them to the silhouette once; clipping the stroke over an
+ * already-antialiased fill would expose fill color along the exterior edge. The final mask clears everything outside
+ * the shape, so this must never draw directly over existing layer pixels.
  */
 export const drawShapeSource = (
   ctx: Ctx,
@@ -137,4 +140,37 @@ export const rasterizeShapeSource = (
   drawShapeSource(ctx, source, 0, 0, width, height);
 
   return Promise.resolve({ rect: { height, width, x: 0, y: 0 }, surface });
+};
+
+export const SHAPE_PREVIEW_COLOR = '#38bdf8';
+export const SHAPE_PREVIEW_DASH: readonly number[] = [4, 4];
+const VERTEX_HALF_PX = 2;
+
+/** Shared Shapes/polyline markers in CSS pixels: vertices and a close target filled while armed. */
+export const drawPolylineVertices = (
+  ctx: RasterSurface['ctx'],
+  view: Mat2d,
+  points: readonly Vec2[],
+  closeRadiusPx: number | null,
+  closeArmed: boolean
+): void => {
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = SHAPE_PREVIEW_COLOR;
+  ctx.fillStyle = SHAPE_PREVIEW_COLOR;
+  ctx.lineWidth = 1;
+  points.forEach((point, index) => {
+    const p = applyToPoint(view, point);
+    if (index === 0 && closeRadiusPx !== null) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, closeRadiusPx, 0, Math.PI * 2);
+      if (closeArmed) {
+        ctx.fill();
+      }
+      ctx.stroke();
+    } else {
+      ctx.fillRect(p.x - VERTEX_HALF_PX, p.y - VERTEX_HALF_PX, VERTEX_HALF_PX * 2, VERTEX_HALF_PX * 2);
+    }
+  });
+  ctx.restore();
 };

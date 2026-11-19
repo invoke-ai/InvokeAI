@@ -49,7 +49,6 @@ describe('classifySource', () => {
     expect(classifySource(value)).toMatchObject({ isInstallable: false, labelKey: null, localKind: null });
   });
 
-  // Relative paths satisfy the repo shape but are not installable sources.
   it.each(['models/juggernaut.safetensors', 'checkpoints/model.ckpt', './owner/repo', '../models/foo.gguf'])(
     'treats the relative path %s as a search term, not a repo',
     (value) => {

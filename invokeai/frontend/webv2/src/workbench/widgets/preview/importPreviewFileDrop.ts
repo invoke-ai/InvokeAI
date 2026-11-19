@@ -15,13 +15,7 @@ import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 
 import type { PreviewDropZone } from './PreviewDropSurface';
 
-/**
- * Uploads media files dropped on Preview as the Gallery uploads them (the project's auto-add board, the upload's own
- * notices, unsupported files refused there) and then shows them: the newest upload is selected within its own board,
- * as a pick from Preview's mini gallery is, or on the compare zone the first image becomes the comparison. Both go to
- * the project the files were dropped on, so a switch made meanwhile leaves the open project's Preview alone; an
- * account change on the way leaves nothing behind.
- */
+/** Uploads like the Gallery, then shows or compares them in the drop's project; account changes drop them. */
 export const importPreviewFileDrop = async ({
   files,
   gallery,

@@ -15,7 +15,6 @@ import { page } from 'vitest/browser';
 
 const workbench = vi.hoisted(() => ({ store: null as ReturnType<typeof createWorkbenchStore> | null }));
 
-// A real store without the provider's persistence: the list reads placement from it and acts through its commands.
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => {
   const { useSyncExternalStore } = await import('react');
 
@@ -83,7 +82,6 @@ afterEach(async () => {
 
 describe('WidgetsDialog', () => {
   it('lists placed widgets with where they are, and brings a removed one back', async () => {
-    // Compose docks the Queue on the right and leaves Layers out.
     expect(sectionItems('In this layout')).toContain(row('queue'));
     expect(row('queue')?.textContent).toContain('Right panel');
     expect(sectionItems('Not in this layout')).toContain(row('type:layers'));
@@ -92,14 +90,12 @@ describe('WidgetsDialog', () => {
 
     expect(activeProject().widgetRegions.right.instanceIds).not.toContain('queue');
     expect(sectionItems('Not in this layout')).toContain(row('type:queue'));
-    // The row's buttons changed under focus; focus lands on what the list offers for that widget now.
     await expect.element(page.getByRole('button', { name: 'Add Queue' })).toHaveFocus();
 
     await act(() => page.getByRole('button', { name: 'Add Queue' }).click());
     expect(row('type:queue')).toBeNull();
   });
 
-  // Status chips render no panel, so a placement open refuses them; the list puts them back in the status bar.
   it('adds a removed status-bar chip back to the status bar', async () => {
     const autosave = activeProject().widgetRegions.bottom.instanceIds.find(
       (instanceId) => activeProject().widgetInstances[instanceId]?.typeId === 'autosave-status'

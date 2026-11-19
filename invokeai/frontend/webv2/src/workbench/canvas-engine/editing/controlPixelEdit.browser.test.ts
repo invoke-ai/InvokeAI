@@ -191,8 +191,6 @@ describe('image-layer erasing with real browser pixels', () => {
     expect([...beforeStroke.data]).toEqual(expectedPixels);
     expect(pixels(h.composite())).toEqual(displayBefore);
 
-    // Erase only the final transformed pixel. The preceding pixels must stay
-    // byte-identical to the pre-edit display, not a raw-then-adjusted variant.
     preview.surface.ctx.clearRect(preview.rect.width - 1, 0, 1, 1);
     const afterStroke = preview.surface.ctx.getImageData(0, 0, preview.rect.width, preview.rect.height);
     transaction!.commit({
@@ -242,7 +240,6 @@ describe('image-layer erasing with real browser pixels', () => {
       uploadImage,
     });
 
-    // Use the same real layer store in the controller and persistence seams.
     const h = setup(original, bitmapStore, {
       backend,
       layers,

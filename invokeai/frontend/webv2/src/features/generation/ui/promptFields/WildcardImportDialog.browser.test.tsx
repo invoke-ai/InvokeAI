@@ -73,7 +73,6 @@ afterEach(async () => {
 describe('wildcard import dialog', () => {
   it('resolves one clash without touching the other', async () => {
     const onConfirm = await renderDialog();
-    // The first group is the apply-to-all row; the rest are the clashes.
     const [, colours] = segmentGroups();
 
     await clickOption(colours, 'importReplace');

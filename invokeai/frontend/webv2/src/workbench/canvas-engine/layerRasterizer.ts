@@ -62,8 +62,8 @@ export const RASTERIZATION_RETRY_MAX_MS = 60_000;
 
 export interface LayerRasterizer {
   /**
-   * Starts or joins rasterization for the same source, cache version and document generation; repeated frame
-   * requests do not restart it.
+   * Starts or joins rasterization for the same source, cache version and document generation; repeated frame requests
+   * do not restart it.
    */
   getOrStartLayerRasterization(
     layer: CanvasLayerContract,
@@ -72,14 +72,14 @@ export interface LayerRasterizer {
   ): Promise<LayerRasterizationOutcome>;
   /**
    * How the last rasterization of `layer`'s current source, cache version and document generation failed, or null:
-   * `unreadable` when its stale cache cannot become ready by waiting, `unavailable` when its image could not be
-   * fetched for now. A success or any change to the layer clears it.
+   * `unreadable` when its stale cache cannot become ready by waiting, `unavailable` when its image could not be fetched
+   * for now. A success or any change to the layer clears it.
    */
   getFailure(layer: CanvasLayerContract): RasterizationFailureKind | null;
   /**
-   * Whether a failure of either kind is recorded and its retry backoff is still running. The backoff starts at
-   * {@link RASTERIZATION_RETRY_BASE_MS} and doubles per repeated failure up to {@link RASTERIZATION_RETRY_MAX_MS}; its
-   * end invalidates the layer's render, so a displayed layer retries on its own.
+   * Whether a failure of either kind is recorded and its retry backoff is still running. The backoff starts at {@link
+   * RASTERIZATION_RETRY_BASE_MS} and doubles per repeated failure up to {@link RASTERIZATION_RETRY_MAX_MS}; its end
+   * invalidates the layer's render, so a displayed layer retries on its own.
    */
   isBackingOff(layer: CanvasLayerContract): boolean;
   /** Cancels pending retry timers. */
@@ -102,9 +102,9 @@ interface RasterizationFailure {
 
 /**
  * Rasterize into scratch, publishing only if source value, cache version, document generation, installed job and
- * lifecycle still match. Post-success also checks cache-entry identity to distinguish recreation at version zero;
- * font callbacks run before job installation. Text renders available fonts immediately and invalidates when the
- * real face loads.
+ * lifecycle still match. Post-success also checks cache-entry identity to distinguish recreation at version zero; font
+ * callbacks run before job installation. Text renders available fonts immediately and invalidates when the real face
+ * loads.
  */
 export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRasterizer => {
   const { jobs, layerCache } = deps;
@@ -166,8 +166,8 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
       if (!signal) {
         return existing.promise;
       }
-      // Joining with a signal must be able to cancel the shared job, but the
-      // listener has to come off again or a long-lived signal accumulates them.
+      // Joining with a signal must be able to cancel the shared job, but the listener has to come off again or a
+      // long-lived signal accumulates them.
       const abort = (): void => {
         existing.abortedByCaller = true;
         existing.controller.abort(signal.reason);

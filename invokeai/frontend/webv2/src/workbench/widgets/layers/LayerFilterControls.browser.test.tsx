@@ -70,10 +70,8 @@ afterEach(async () => {
   root = null;
 });
 
-// No locale resources: the field is labelled by its key's fallback, the parameter name.
 const lowThreshold = () => page.getByRole('slider', { name: 'low_threshold' });
 
-/** One drag on the low-threshold scrubber (a 0–255 track) through each offset, released at the last. */
 const drag = async (offsets: number[], beforeRelease: () => void = () => undefined) => {
   const frame = lowThreshold().element().closest<HTMLElement>('[data-scope="scrubber"]')!;
   const rect = frame.getBoundingClientRect();
@@ -142,7 +140,6 @@ describe('LayerFilterControls enum parameters', () => {
     await act(() => userEvent.click(modelSize().getByText('base', { exact: true })));
     expect(onSettingsChange).toHaveBeenLastCalledWith({ model_size: 'base' });
 
-    // Arrow keys move from the checked segment, which a rerender would keep at small_v2.
     onSettingsChange.mockClear();
     await act(async () => {
       (modelSize().getByRole('radio', { name: 'small_v2' }).element() as HTMLElement).focus();

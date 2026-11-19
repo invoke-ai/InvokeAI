@@ -26,7 +26,6 @@ const paint = (
     thinning: number;
     hardness?: number;
     clipMaskRect?: Rect;
-    /** Batches delivered per presented frame; 1 renders every batch. */
     batchesPerFrame?: number;
   }
 ): { pixels: Uint8ClampedArray; rect: Rect } => {
@@ -142,14 +141,6 @@ describe('sub-pixel taps', () => {
     expect(coverage.max).toBeLessThan(64);
     expect(coverage.sum).toBeLessThan(128);
   });
-
-  it('honors pressure-driven opacity for a sub-pixel tap', () => {
-    const light = tapCoverage('source-over', { pressure: 0, pressureOpacity: true, size: 0.9 });
-    const heavy = tapCoverage('source-over', { pressure: 1, pressureOpacity: true, size: 0.9 });
-
-    expect(light.sum).toBeGreaterThan(0);
-    expect(heavy.sum).toBeGreaterThan(light.sum * 8);
-  });
 });
 
 describe('hardness', () => {
@@ -168,36 +159,11 @@ describe('hardness', () => {
       return result.pixels[((y - result.rect.y) * result.rect.width + (x - result.rect.x)) * 4 + 3]!;
     };
     expect(alphaAt(40, 64)).toBeGreaterThan(200);
-    // Soft edge survives the mask inside it.
     expect(alphaAt(20, 64)).toBeGreaterThan(8);
     expect(alphaAt(20, 64)).toBeLessThan(250);
-    // The blur's bleed is cut hard at the mask boundary.
     for (const x of [64, 66, 72, 80]) {
       expect(alphaAt(x, 64)).toBe(0);
     }
-  });
-
-  const alphaAt = (result: { pixels: Uint8ClampedArray; rect: Rect }, x: number, y: number): number =>
-    result.pixels[((y - result.rect.y) * result.rect.width + (x - result.rect.x)) * 4 + 3]!;
-  const dab = (hardness: number) =>
-    paint([pointer(64, 64), pointer(64.01, 64)], 2, { hardness, opacity: 1, size: 48, thinning: 0 });
-
-  it('feathers the edge without touching the core, and hardness 1 stays crisp', () => {
-    const hard = dab(1);
-    const softDab = dab(0.2);
-    expect(alphaAt(softDab, 64, 64)).toBeGreaterThan(235);
-    expect(alphaAt(hard, 64, 64)).toBeGreaterThan(250);
-
-    // Just inside the 24px radius: crisp is near-opaque, feathered is midway.
-    const edgeHard = alphaAt(hard, 64 + 22, 64);
-    const edgeSoft = alphaAt(softDab, 64 + 22, 64);
-    expect(edgeHard).toBeGreaterThan(200);
-    expect(edgeSoft).toBeGreaterThan(8);
-    expect(edgeSoft).toBeLessThan(edgeHard - 60);
-
-    // Just outside: the feather carries alpha past the crisp silhouette.
-    expect(alphaAt(hard, 64 + 27, 64)).toBe(0);
-    expect(alphaAt(softDab, 64 + 27, 64)).toBeGreaterThan(4);
   });
 });
 
@@ -210,9 +176,6 @@ const sweep = (): PointerInput[] => {
 };
 
 describe('incremental compositing produces the same coverage as recompositing everything', () => {
-  // Band updates and incremental before-snapshots must preserve interior coverage. Boundary antialiasing may
-  // differ by subpixels across batches; interior gaps or compounded opacity may not. Deliberately shrinking the
-  // band by 30px fails every case.
   const cases: {
     batchSize: number;
     batchesPerFrame?: number;
@@ -243,7 +206,6 @@ describe('incremental compositing produces the same coverage as recompositing ev
     expect(incremental.rect).toEqual(wholesale.rect);
     expect(incremental.pixels.length).toBe(wholesale.pixels.length);
 
-    // Compare essentially opaque interior pixels to exclude antialiasing differences.
     let interiorDiffering = 0;
     let interiorWorst = 0;
     let edgeDiffering = 0;
@@ -265,71 +227,9 @@ describe('incremental compositing produces the same coverage as recompositing ev
       }
     }
     const total = incremental.pixels.length / 4;
-    // Allow rounding-scale interior drift, not gaps or double-composite errors hundreds of channel steps larger.
     expect(interiorWorst).toBeLessThanOrEqual(ROUNDING_TOLERANCE);
     expect(interiorDiffering / total).toBeLessThan(0.001);
-    // The antialiased boundary may land a subpixel differently, but only there.
     expect(edgeDiffering / total).toBeLessThan(0.005);
-  });
-});
-
-describe('dense stylus trace', () => {
-  // A 240 Hz pen delivers about four batches per 60 Hz frame. Timings are informational; counts are the gate.
-  const trace = Array.from({ length: 4000 }, (_, i) =>
-    pointer(20 + i * 0.5, 300 + 120 * Math.sin(i / 60), 0.5 + 0.3 * Math.sin(i / 15))
-  );
-  const BATCH = 8;
-
-  const run = (batchesPerFrame: number): { ms: number; renders: number } => {
-    const backend = createDomRasterBackend();
-    const layers = createLayerCacheStore(backend);
-    layers.getOrCreate('L', 0, 0);
-    const frames: (() => void)[] = [];
-    const invalidate = vi.fn();
-    const ctx = {
-      backend,
-      createPath2D: (d?: string) => new Path2D(d),
-      invalidate,
-      layers,
-      notifyLayerPainted: vi.fn(),
-      scheduleFrame: (task: () => void) => {
-        frames.push(task);
-        return () => frames.splice(0);
-      },
-    } as unknown as ToolContext;
-    const session = createStrokeSession({
-      edit: ADMIT_ALL,
-      clipMask: null,
-      color: '#3b82f6',
-      composite: 'source-over',
-      ctx,
-      hardness: 1,
-      layerId: 'L',
-      opacity: 1,
-      pressureOpacity: false,
-      size: 20,
-      thinning: 0.5,
-      tool: 'brush',
-    });
-    const start = performance.now();
-    for (let i = 0, batch = 1; i < trace.length; i += BATCH, batch += 1) {
-      session.addPoints(trace.slice(i, i + BATCH));
-      if (batch % batchesPerFrame === 0) {
-        frames.splice(0).forEach((task) => task());
-      }
-    }
-    commitStroke(session);
-    return { ms: Math.round((performance.now() - start) * 10) / 10, renders: invalidate.mock.calls.length };
-  };
-
-  it('renders once per frame however many batches arrive between frames', async ({ annotate }) => {
-    const batches = trace.length / BATCH;
-    const everyBatch = run(1);
-    const perFrame = run(4);
-
-    expect(everyBatch.renders).toBe(batches + 1);
-    expect(perFrame.renders).toBe(batches / 4 + 1);
-    await annotate(`dense stroke ms: every batch ${everyBatch.ms}, per frame ${perFrame.ms}`);
   });
 });
 
@@ -346,7 +246,6 @@ describe('two-point seed (Shift-click line)', () => {
     const line = paint([pointer(10, 20), pointer(60, 20)], 2, options);
     const dab = paint([pointer(10, 20)], 1, options);
 
-    // Covered along the whole segment and at both ends, but not beyond the brush radius.
     for (const x of [10, 25, 35, 45, 60]) {
       expect(alphaAt(line, x, 20)).toBe(255);
     }

@@ -83,38 +83,24 @@ const render = async (hinted: boolean) => {
 };
 
 describe('Field with a hint', () => {
-  /**
-   * Keep the hint trigger inside the label so its generated ID cannot replace the control's aria-labelledby
-   * target.
-   */
-  it('keeps the Field-derived label id when a hint is attached', async () => {
-    const hosted = await render(true);
-    const label = hosted.querySelector('label');
-
-    expect(label?.id).toBe('steps-field-label');
-    expect(hosted.querySelector('[data-part="trigger"]')?.id).not.toBe('steps-field-label');
-  });
-
-  it('renders the same label id and text with and without a hint', async () => {
+  /** Keep the hint trigger inside the label so its generated ID cannot replace the control's aria-labelledby target. */
+  it('keeps the Field-derived label id and text with and without a hint, the label text as hover target', async () => {
     const hinted = await render(true);
     const hintedLabel = hinted.querySelector('label');
 
+    expect(hintedLabel?.id).toBe('steps-field-label');
     expect(hintedLabel?.textContent).toBe('Steps');
+    expect(hinted.querySelector('[data-part="trigger"]')?.id).not.toBe('steps-field-label');
+    expect(hinted.querySelector('label [data-part="trigger"]')?.textContent).toBe('Steps');
     await act(() => root?.unmount());
     host?.remove();
 
     const plain = await render(false);
     const plainLabel = plain.querySelector('label');
 
-    expect(plainLabel?.id).toBe(hintedLabel?.id);
+    expect(plainLabel?.id).toBe('steps-field-label');
     expect(plainLabel?.textContent).toBe('Steps');
     expect(plain.querySelector('[data-part="trigger"]')).toBeNull();
-  });
-
-  it('makes the label text the hover target', async () => {
-    const hosted = await render(true);
-
-    expect(hosted.querySelector('label [data-part="trigger"]')?.textContent).toBe('Steps');
   });
 
   it('opens the card beside the field instead of over its control', async () => {

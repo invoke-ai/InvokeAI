@@ -221,7 +221,6 @@ describe('StructuralLayerController', () => {
         prepareRename(createDocumentModel(document(), { editRevision: ctx.getEditRevision(), projectId }), name);
       const hovered = controller.beginPreview()!;
       hovered.apply(rename('layer', 'Hovered'));
-      // Prepared over the previewed value, whose revision is current only until the preview ends.
       const overPreview = prepareAtCurrent('Renamed');
 
       expect(controller.commitPrepared('Rename', overPreview)).toMatchObject({ status: 'stale' });
@@ -237,7 +236,6 @@ describe('StructuralLayerController', () => {
       expect(layerName(document())).toBe('Layer');
       expect(history.canUndo()).toBe(false);
 
-      // A session that previewed nothing leaves the document, and an edit prepared against it, current.
       const idle = controller.beginPreview()!;
       expect(controller.commitPrepared('Rename', prepareAtCurrent('Renamed'))).toEqual({ status: 'committed' });
       expect(idle.isActive()).toBe(false);
@@ -413,7 +411,6 @@ describe('hierarchy recovery', () => {
     if (result.status !== 'prepared') {
       throw new Error(result.status);
     }
-    // Fault injection: the edit lands but claims an order the reducer did not produce.
     const tampered = {
       ...result.edit,
       postconditions: [
@@ -428,7 +425,6 @@ describe('hierarchy recovery', () => {
     expect(document().selectedLayerId).toBe(before.selectedLayerId);
     expect(history.canUndo()).toBe(false);
 
-    // Prepared afresh against the reverted document, the same edit lands and undoes exactly.
     const fresh = createDocumentModel(document(), { editRevision: ctx.getEditRevision(), projectId }).prepare({
       beforeId: null,
       ids: ['layer'],
@@ -483,7 +479,6 @@ describe('preview sessions ended by the engine', () => {
     expect(layerName(document())).toBe('Layer');
     expect(session.isActive()).toBe(false);
     expect(session.baseline()).toBeNull();
-    // The widget's late cancel and commit change nothing: the undone step stays undone.
     session.cancel();
     expect(session.commit('Rename', prepareRename(harness, 'Late'))).toEqual({ status: 'busy' });
     expect(layerName(document())).toBe('Layer');

@@ -243,8 +243,8 @@ const acceptsVae = (base: string, model: GenerateComponentCandidate, variant?: u
     return false;
   }
 
-  // A null `vae` block is the backend saying "its own base, no constraints" — what `accepts_vae`
-  // answers for an architecture that declares no facet. It is a declaration, not a missing one.
+  // A null `vae` block is the backend saying "its own base, no constraints" — what `accepts_vae` answers for an
+  // architecture that declares no facet. It is a declaration, not a missing one.
   if (!row.vae) {
     return model.base === base;
   }

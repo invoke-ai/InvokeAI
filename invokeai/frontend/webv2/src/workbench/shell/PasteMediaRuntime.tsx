@@ -23,10 +23,7 @@ const PasteMediaDialog = lazy(() =>
 // The dialog is open, and modal, from the paste that requested it, not from when its module arrives.
 const PENDING_DIALOG = <Dialog.Pending />;
 
-/**
- * Offer destinations for workbench media paste. Canvas handles its own chord; text fields and open dialogs retain
- * normal paste behavior.
- */
+/** Workbench media paste; Canvas handles its own chord, and text fields and dialogs keep normal paste. */
 export const PasteMediaRuntime = () => {
   const [request, setRequest] = useState<PasteMediaRequest | null>(null);
   const settle = useCallback(() => setRequest(null), []);

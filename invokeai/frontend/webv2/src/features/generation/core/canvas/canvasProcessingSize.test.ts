@@ -84,7 +84,6 @@ describe('resolveCanvasProcessingSize', () => {
       height: 832,
       width: 1216,
     });
-    // The same size on another base is below its optimal area and still grows.
     expect(resolveCanvasProcessingSize(sd1, 'off', { height: 1216, width: 832 }, auto)).toEqual({
       height: 1216,
       width: 832,

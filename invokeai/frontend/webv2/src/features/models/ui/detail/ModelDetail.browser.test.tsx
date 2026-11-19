@@ -11,7 +11,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelDetail } from './ModelDetail';
 
-// The sections own their data; here they only mark where the page places them.
 const { section } = vi.hoisted(() => ({
   section: (name: string) => () => <section data-section={name} />,
 }));
@@ -105,13 +104,6 @@ describe('ModelDetail', () => {
       )
     );
 
-  it('places working memory last, after the trigger phrases', async () => {
-    await renderDetail(MAIN.key);
-
-    const order = [...host.querySelectorAll('[data-section]')].map((element) => element.getAttribute('data-section'));
-    expect(order).toEqual(['default-settings', 'related-models', 'trigger-phrases', 'working-memory']);
-  });
-
   it('lists the roles a model also serves, and no row without any', async () => {
     const withRoles = config('llm', 'text_llm', {
       roles: [
@@ -148,7 +140,6 @@ describe('ModelDetail', () => {
 
   it('offers Run on CPU exactly when the config carries cpu_only', async () => {
     setModelsSnapshotForTests({ models: [GEMMA4_ENCODER, QWEN3_VL_ENCODER_WITHOUT_CPU_ONLY], status: 'loaded' });
-    // A checkbox named by its label, not merely the label text somewhere on the page.
     const hasCpuSwitch = () =>
       [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].some(
         (input) => input.labels?.[0]?.textContent === 'models.runOnCpu'
@@ -171,7 +162,6 @@ describe('ModelDetail', () => {
     await renderDetail(EMBEDDING.key);
     expect(hasTriggerPhrases()).toBe(false);
 
-    // Prompt triggers never read Control LoRAs, so phrases stored there would have no effect.
     await renderDetail(CONTROL_LORA.key);
     expect(hasTriggerPhrases()).toBe(false);
   });

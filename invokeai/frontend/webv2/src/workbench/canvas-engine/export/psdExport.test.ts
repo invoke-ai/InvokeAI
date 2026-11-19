@@ -247,8 +247,6 @@ describe('planPsdExport — folders', () => {
       throw new Error(plan.status);
     }
     const folders = plan.tree.filter((node): node is PsdPlanFolder => node.kind === 'folder');
-    // A default group is pass-through; writing 'normal' would isolate it in
-    // Photoshop and change how members blend with layers below the group.
     expect(folders.find((f) => f.id === 'plain')).toMatchObject({
       blendMode: 'pass through',
       compositeBlend: 'source-over',
@@ -259,7 +257,6 @@ describe('planPsdExport — folders', () => {
       compositeBlend: 'multiply',
       opacity: 0.25,
     });
-    // An unmapped blend still isolates (it is non-normal); only the KEY falls back.
     expect(folders.find((f) => f.id === 'odd')).toMatchObject({ blendMode: 'normal' });
     expect(plan.unmappedBlends).toEqual(['plasma']);
   });
@@ -367,7 +364,6 @@ describe('planPsdExport — folders', () => {
     expect(folder.hidden).toBe(true);
     expect(folder.children?.map((child) => child.name)).toEqual(['Shade']);
     expect(folder.children![0]).toMatchObject({ blendMode: 'multiply', hidden: false });
-    // Opacity rides an 8-bit field in the file.
     expect(folder.children![0]!.opacity).toBeCloseTo(0.5, 2);
   });
 });
@@ -424,7 +420,6 @@ describe('executePsdExport — adjustments', () => {
     const expectedWorld = midGray(10, 6);
     applyAdjustments(expectedWorld, enclosing, { x: 7, y: 4 });
     expect([...world!.pixels.data]).toEqual([...expectedWorld.data]);
-    // The world surface resamples the adjusted layer-local copy, not the raw cache.
     const drawn = (world!.surface as StubRasterSurface).callLog.find((call) => call.op === 'drawImage');
     expect(drawn?.args[0]).toBe(local!.surface.canvas);
   });

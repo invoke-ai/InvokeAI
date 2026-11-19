@@ -12,7 +12,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoReferenceListField } from './VideoReferenceListField';
 import { VideoUiProvider, type VideoUiAdapter } from './VideoUiContext';
 
-/** Modality counters span the whole list; reordering must update labels even on otherwise unchanged memoized cards. */
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -111,13 +110,11 @@ const render = async (initial: VideoReferenceItem[]): Promise<void> => {
   );
 };
 
-/** The rendered label badges, in document order -- the trim thumbs badge their frames too. */
 const badges = (): string[] =>
   [...host.querySelectorAll<HTMLElement>('.chakra-badge')]
     .map((badge) => badge.textContent!)
     .filter((text) => /^<(?:Picture|Video|Audio) \d+>$/.test(text));
 
-/** Assert labels paired with media names so reused same-name cards cannot display another reference's labels. */
 const cards = (): string[] =>
   // `[aria-label]` narrows past the unnamed groups Chakra's own slider and select markup adds.
   [...host.querySelectorAll<HTMLElement>('[role="group"][aria-label]')].map((card) => card.getAttribute('aria-label')!);
@@ -143,9 +140,7 @@ describe('video reference prompt labels', () => {
       videoReference('b-roll.mp4', 'video'),
     ]);
 
-    // Badges must preserve the encoder's token syntax, including brackets.
     expect(badges()).toEqual(['<Audio 1>', '<Picture 1>', '<Video 1>', '<Audio 2>', '<Picture 2>', '<Video 2>']);
-    // Modality counters are independent of card position.
     expect(cards()).toEqual([
       '<Audio 1> voiceover.mp4',
       '<Picture 1> portrait.png',
@@ -167,7 +162,6 @@ describe('video reference prompt labels', () => {
     expect(option).not.toBeNull();
     await act(() => option!.click());
 
-    // Removing this image track renumbers an otherwise unchanged memoized sibling.
     expect(cards()).toEqual(['<Audio 1> v1.mp4', '<Video 1> <Audio 2> v2.mp4']);
   });
   it('keeps the token in prompt order inside an RTL document', async () => {
@@ -182,7 +176,6 @@ describe('video reference prompt labels', () => {
   });
 
   it('moves the labels with the card, not with the slot', async () => {
-    // Same-name cards reuse their instances; label props must still follow the reordered references.
     await render([videoReference('twin.mp4', 'video'), videoReference('twin.mp4', 'video_audio')]);
     expect(cards()).toEqual(['<Video 1> twin.mp4', '<Video 2> <Audio 1> twin.mp4']);
 

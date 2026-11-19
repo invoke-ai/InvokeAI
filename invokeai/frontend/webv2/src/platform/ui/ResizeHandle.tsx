@@ -10,15 +10,11 @@ export type PointerDragEnd = 'release' | 'interrupt' | 'escape';
 interface PointerDragOptions {
   /** Shown everywhere for the whole gesture, so a pointer outrunning the handle does not flicker. */
   cursor: string;
-  /** Called at most once per animation frame with the offset from the gesture's start. */
   onMove: (deltaX: number, deltaY: number) => void;
   onEnd: (reason: PointerDragEnd) => void;
 }
 
-/**
- * Run one pointer gesture from a pointerdown. Moves are coalesced to animation frames; Escape ends it as `escape`,
- * `pointercancel` as `interrupt`. Aborting the returned controller ends it without calling `onEnd`.
- */
+/** Escape ends it as `escape`, `pointercancel` as `interrupt`; aborting the controller ends it without `onEnd`. */
 export const beginPointerDrag = (
   event: ReactPointerEvent<HTMLElement>,
   { cursor, onEnd, onMove }: PointerDragOptions
@@ -109,10 +105,7 @@ export const beginPointerDrag = (
   return session;
 };
 
-/**
- * Owns one gesture at a time and ends it silently when the component unmounts. The returned controller lets the
- * caller end the gesture early, without `onEnd`, when what it was dragging stops making sense.
- */
+/** Ends the gesture silently on unmount; the controller ends it early without `onEnd`. */
 export const usePointerDrag = (): ((
   event: ReactPointerEvent<HTMLElement>,
   options: PointerDragOptions
@@ -142,7 +135,6 @@ const setResizeActive = (isActive: boolean) => {
 /** True while a resize handle is being dragged; costly layout consumers may wait for it to end. */
 export const isResizeDragActive = (): boolean => activeResizeCount > 0;
 
-/** Count a resize gesture a caller runs itself, from now until its session aborts. */
 export const trackResizeDrag = (signal: AbortSignal): void => {
   if (signal.aborted) {
     return;
@@ -161,9 +153,7 @@ const COLLAPSE_HYSTERESIS_PX = 40;
 const DEFAULT_STEP = { '%': 2, px: 16 } as const;
 
 export interface ResizeCollapse {
-  /** Raw drag value at or below which releasing collapses the pane. */
   at: number;
-  /** Size the pane previews while a release would collapse it. */
   preview: number;
   onCollapse: (source: 'keyboard' | 'pointer') => void;
 }
@@ -171,13 +161,11 @@ export interface ResizeCollapse {
 export interface ResizeHandleProps {
   collapse?: ResizeCollapse;
   label: string;
-  /** Hides the divider line while something else, such as a region outline, is drawn over it. */
   lineHidden?: boolean;
   max: number;
   min: number;
   /** The divider line's direction: a vertical divider resizes widths. */
   orientation: 'horizontal' | 'vertical';
-  /** Which side of the divider the sized pane is on. */
   pane: 'after' | 'before';
   /** Receives the live size inline while dragging, so the drag renders without React. */
   paneRef: RefObject<HTMLElement | null>;
@@ -190,10 +178,7 @@ export interface ResizeHandleProps {
   onCommit: (value: number) => void;
 }
 
-/**
- * The shared divider for resizable panes: a hairline with a centered grip, keyboard stepping, and an optional
- * drag-past-the-floor collapse. Callers render the committed size; drags write the live size to `paneRef`.
- */
+/** Callers render the committed size; drags write the live size to `paneRef`. */
 export const ResizeHandle = ({
   collapse,
   label,
@@ -319,7 +304,6 @@ export const ResizeHandle = ({
         return;
       }
       event.preventDefault();
-      // A further shrink at the floor collapses.
       if (collapse && change < 0 && renderedValue <= min) {
         collapse.onCollapse('keyboard');
         return;
@@ -354,11 +338,7 @@ export const ResizeHandle = ({
 const toCssProperty = (property: NonNullable<ResizeHandleProps['sizeProperty']>) =>
   property === 'flexBasis' ? 'flex-basis' : property;
 
-/**
- * A window's bottom-right resize grip: the labelled, keyboard-operable handle. The caller owns the pointer
- * gesture, so it runs on the same path as the window's other handles, and marks the grip `data-dragging` while
- * it does.
- */
+/** The caller owns the pointer gesture and marks the grip `data-dragging` while it runs. */
 export const ResizeCorner = ({
   label,
   valueMax,

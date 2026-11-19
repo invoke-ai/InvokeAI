@@ -11,10 +11,7 @@ import type {
 import { isLoraFieldCollectionEntry, isModelFieldType, toLoraFieldCollectionList } from './fields';
 import { isInvocationNode } from './types';
 
-/**
- * Extract exact models and template-described empty required slots; blank slots are normal workflow requirements,
- * not merely a fallback.
- */
+/** Empty required model slots are ordinary workflow requirements, not merely a fallback. */
 
 export interface WorkflowModelIdentifier {
   key: string;
@@ -32,8 +29,6 @@ export interface WorkflowModelRequirementSet {
   requirements: readonly WorkflowModelRequirement[];
   primaryBase: string | null;
 }
-
-// #region Labeling
 
 /** Display labels for known model bases. Unknown bases fall back to a humanized form. */
 const BASE_LABELS: Record<string, string> = {
@@ -195,10 +190,7 @@ const computePrimaryBase = (requirements: readonly WorkflowModelRequirement[]): 
   return mostFrequentBase(mainBaseCounts) ?? mostFrequentBase(allBaseCounts);
 };
 
-/**
- * Visits the model each of a node's model fields names, and each required model field left empty; connection-fed
- * inputs are owned upstream and skipped.
- */
+/** Connection-fed inputs are owned upstream and skipped. */
 const visitNodeModelNeeds = (
   node: WorkflowInvocationNode,
   template: InvocationTemplate,
@@ -219,8 +211,7 @@ const visitNodeModelNeeds = (
 
     const value = node.data.inputs[fieldTemplate.name]?.value;
 
-    // Inspect nested identifiers in LoRA collections so their requirements match equivalent selector-node
-    // graphs.
+    // Inspect nested identifiers in LoRA collections so their requirements match equivalent selector-node graphs.
     if (isLoraCollection) {
       const entries = toLoraFieldCollectionList(value);
 
@@ -230,8 +221,7 @@ const visitNodeModelNeeds = (
         }
       }
 
-      // An empty collection still falls through to the slot path below, so a required-but-blank
-      // field keeps describing what it needs the way every other blank model field does.
+      // An empty collection falls through to the slot path, so a required blank field still describes what it needs.
       if (entries.length > 0) {
         continue;
       }
@@ -259,7 +249,6 @@ const visitNodeModelNeeds = (
 const getConnectionTargets = (document: ProjectGraphState): Set<string> =>
   new Set(document.edges.map((edge) => `${edge.target}::${edge.targetHandle}`));
 
-/** Classify concrete model identifiers as exact requirements and empty required inputs as slots. */
 export const extractWorkflowModelRequirements = (
   document: ProjectGraphState,
   templates: InvocationTemplates
@@ -314,16 +303,12 @@ export const extractWorkflowModelRequirements = (
   return { primaryBase: computePrimaryBase(requirements), requirements };
 };
 
-/** One model field's requirement: the model it names, or the kind it needs while empty. */
 export interface WorkflowFieldModelRequirement {
   fieldName: string;
   requirement: WorkflowModelRequirement;
 }
 
-/**
- * The same requirements per invocation node and field, so a view can mark the node or the input that needs a model.
- * A node lists each model it names and each empty required model field; nodes with neither are absent.
- */
+/** Per node and field, so a view can mark what needs a model; nodes needing none are absent. */
 export const extractNodeModelRequirements = (
   document: ProjectGraphState,
   templates: InvocationTemplates
@@ -500,10 +485,7 @@ const resolveFromStarter = (
   };
 };
 
-/**
- * Resolve exact requirements by key, hash, then name/base/type; slots by base/type. Starter fallback reports
- * installing sources, including dependencies.
- */
+/** Exact requirements match by key, hash, then name/base/type; slots by base/type; starters include dependencies. */
 export const resolveWorkflowModelRequirements = (
   requirements: readonly WorkflowModelRequirement[],
   deps: ResolutionDeps
@@ -536,10 +518,7 @@ export const resolveWorkflowModelRequirements = (
     );
   });
 
-/**
- * Link only missing requirements to Add Models. Prefer catalog names, then exact model names or raw slot
- * base/type; display prose is not searchable taxonomy.
- */
+/** Catalog names first, then exact model names or raw slot base/type: display prose is not searchable taxonomy. */
 export const getAddModelsSearchTerm = (resolved: ResolvedModelRequirement): string | null => {
   if (resolved.status === 'installed') {
     return null;
@@ -559,5 +538,3 @@ export const getAddModelsSearchTerm = (resolved: ResolvedModelRequirement): stri
 
   return requirement.base?.trim() || requirement.modelType?.trim() || null;
 };
-
-// #endregion

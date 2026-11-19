@@ -156,9 +156,9 @@ const compiledSources = new WeakMap<
 >();
 
 /**
- * Preview the entry's saved document without active-project destination or live updates; catch malformed cached
- * data despite ready enrichment. The preview draws the document; the compiled graph is what its Graph view shows and
- * its JSON items export. Compiled once per document and templates.
+ * Preview the entry's saved document without active-project destination or live updates; catch malformed cached data
+ * despite ready enrichment. The preview draws the document; the compiled graph is what its Graph view shows and its
+ * JSON items export. Compiled once per document and templates.
  */
 export const buildLibraryGraphPreviewSource = (
   document: ProjectGraphState,

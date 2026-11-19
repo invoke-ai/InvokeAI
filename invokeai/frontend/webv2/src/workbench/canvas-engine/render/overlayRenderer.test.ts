@@ -31,8 +31,6 @@ describe('renderOverlay', () => {
 
     const ops = target.callLog.map((e) => e.op);
     expect(ops).toContain('clearRect');
-    // The document rect is retired as a visual boundary: nothing is stroked, and the frame's dashed bands are the
-    // only fills, many dash rects each.
     expect(ops).not.toContain('strokeRect');
     expect(ops).not.toContain('stroke');
     expect(ops.filter((op) => op === 'fill')).toHaveLength(3);
@@ -43,7 +41,6 @@ describe('renderOverlay', () => {
     const backend = createTestStubRasterBackend();
     const target = backend.createSurface(200, 200);
     renderOverlay(target, baseState({ gridSize: 10, showGrid: false }));
-    // No path building beyond stroking rects (no moveTo/lineTo for grid lines).
     expect(target.callLog.some((e) => e.op === 'moveTo')).toBe(false);
   });
 
@@ -59,7 +56,6 @@ describe('renderOverlay', () => {
   it('skips the grid when zoomed out below the density threshold', () => {
     const backend = createTestStubRasterBackend();
     const target = backend.createSurface(200, 200);
-    // gridSize * scale below MIN_GRID_SPACING_PX -> too dense, skip.
     const smallScale = (MIN_GRID_SPACING_PX - 1) / 10;
     const view: Mat2d = scale(identity(), smallScale);
     renderOverlay(target, baseState({ gridSize: 10, showGrid: true, view }));
@@ -114,7 +110,6 @@ describe('renderOverlay', () => {
     const strokes = target.callLog.flatMap((entry, index) =>
       entry.op === 'strokeRect' ? [{ args: entry.args, index }] : []
     );
-    // A halo then the dashes for each region, then the bbox frame drawn over them.
     expect(strokes.map((stroke) => stroke.args)).toEqual([
       [0, 0, 20, 20],
       [0, 0, 20, 20],
@@ -131,7 +126,6 @@ describe('renderOverlay', () => {
     const look = (index: number) =>
       ['lineWidth', 'globalAlpha', 'strokeStyle'].map((prop) => lastSetBefore(prop, strokes[index]!.index));
     const [otherHalo, otherDash, selectedHalo, selectedDash] = [0, 1, 2, 3].map(look);
-    // The halo is wider than its dashes and dark; the selected outline is wider and opaque.
     expect(otherHalo![0]).toBeGreaterThan(otherDash![0] as number);
     expect(otherHalo![2]).not.toBe(otherDash![2]);
     expect(selectedDash![0] as number).toBeGreaterThan(otherDash![0] as number);
@@ -153,7 +147,6 @@ describe('renderOverlay', () => {
     const target = backend.createSurface(200, 200);
     renderOverlay(target, baseState());
     const fillStyles = findSet(target.callLog, 'fillStyle');
-    // Only bbox chrome is drawn, the accent core last over both casings; there is no document outline.
     expect(fillStyles).toHaveLength(3);
     expect(fillStyles.at(-1)).toBe('#3b82f6');
     expect(new Set(fillStyles).size).toBe(3);
@@ -162,7 +155,6 @@ describe('renderOverlay', () => {
   it('traces only the frame dashes inside the surface at deep zoom', () => {
     const backend = createTestStubRasterBackend();
     const target = backend.createSurface(200, 200);
-    // Edges 8000 px long would hold about a thousand dashes each; a corner and two short stretches show.
     renderOverlay(target, baseState({ view: { a: 200, b: 0, c: 0, d: 200, e: -1900, f: -1900 } }));
     expect(target.callLog.filter((e) => e.op === 'rect').length).toBeLessThan(3 * 2 * 40);
   });
@@ -182,7 +174,6 @@ describe('renderOverlay', () => {
 
     const on = backend.createSurface(200, 200);
     renderOverlay(on, baseState({ bboxOverlay: true }));
-    // One even-odd fill: the viewport rect with the bbox rect punched out.
     expect(on.callLog.filter((e) => e.op === 'fill' && e.args[0] === 'evenodd')).toHaveLength(1);
     const rects = on.callLog.filter((e) => e.op === 'rect').map((e) => e.args);
     expect(rects).toContainEqual([0, 0, 200, 200]);
@@ -193,7 +184,6 @@ describe('renderOverlay', () => {
     const backend = createTestStubRasterBackend();
     const target = backend.createSurface(200, 200);
     renderOverlay(target, baseState({ ruleOfThirds: true }));
-    // Four guide lines: two vertical + two horizontal moveTo/lineTo pairs.
     const moveTos = target.callLog.filter((e) => e.op === 'moveTo');
     expect(moveTos).toHaveLength(4);
   });
@@ -212,7 +202,6 @@ describe('renderOverlay', () => {
         view: { a: 2, b: 0, c: 0, d: 2, e: 0, f: 0 },
       })
     );
-    // The endpoint dots are 3px arcs; the radius circle spans the screen-space drag.
     const arcs = target.callLog.filter((e) => e.op === 'arc').map((e) => e.args);
     expect(arcs.filter((args) => args[2] !== 3)).toHaveLength(circles);
     if (circles > 0) {
@@ -239,7 +228,6 @@ describe('renderOverlay', () => {
       return target.callLog;
     };
     const idle = render(false);
-    // The ring is the close hit radius itself, so it never disagrees with the click.
     expect(idle.filter((e) => e.op === 'arc').map((e) => e.args.slice(0, 3))).toEqual([[10, 10, 8]]);
     expect(idle.filter((e) => e.op === 'fillRect')).toHaveLength(2);
     expect(idle.filter((e) => e.op === 'fill')).toHaveLength(0);

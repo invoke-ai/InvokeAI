@@ -101,7 +101,6 @@ const uploadedImage: GalleryImageItem = {
   width: 2,
 };
 
-// A 2x2 PNG: real bytes so the preview <img> renders instead of logging a decode error.
 const PNG_BYTES = Uint8Array.from(
   atob('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVR4nGP4z8DwHwyBNAMDAC+tBv1+4dL7AAAAAElFTkSuQmCC'),
   (char) => char.charCodeAt(0)
@@ -129,7 +128,6 @@ describe('PasteMediaRuntime', () => {
   beforeEach(async () => {
     mocks.canUseAsReferenceImage = true;
     mocks.project = createInitialWorkbenchState().projects[0]!;
-    // Following the selected board, so pastes go where the gallery is.
     Object.assign(getProjectWidgetInstance(mocks.project, 'gallery')!.state.values, {
       followSelectedBoard: true,
       selectedBoardId: 'board-1',
@@ -224,7 +222,6 @@ describe('PasteMediaRuntime', () => {
     paste(document.body, [imageFile()]);
 
     await expect.element(page.getByRole('button', { name: /Upload to gallery/ })).toHaveAccessibleName(/Moodboard/);
-    // Read by the upload action as the paste is chosen, once it has the listing the board is judged from.
     const { selectedBoardId } = mocks.uploadOptions!;
     expect(selectedBoardId).toBeTypeOf('function');
     expect((selectedBoardId as () => string)()).toBe('board-1');
@@ -283,13 +280,11 @@ describe('PasteMediaRuntime', () => {
     } finally {
       release();
     }
-    // A non-modal dialog announces no modal presence but still owns pastes from inside it.
     const nameInput = page.getByRole('textbox', { name: 'Name' }).element();
     nameInput.focus();
     expect(paste(nameInput, [imageFile()]).defaultPrevented).toBe(false);
     expect(pasteDialog().elements()).toHaveLength(0);
 
-    // A media-only paste into a field is still media.
     expect(paste(textarea, [imageFile()]).defaultPrevented).toBe(true);
     await expect.element(pasteDialog()).toBeVisible();
     await page.getByRole('button', { name: i18n.t('common.cancel') }).click();
@@ -309,7 +304,6 @@ describe('PasteMediaRuntime', () => {
       expect(isModalPresent()).toBe(false);
     });
 
-    // An unmounted dialog never reaches its closed state, so it cannot animate out; a retained one does, then leaves.
     expect(closingFrames(frames)).not.toHaveLength(0);
     await expect.poll(() => document.querySelector('[role="dialog"][data-state]')).toBeNull();
   });

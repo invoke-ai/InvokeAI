@@ -1,7 +1,6 @@
 /**
- * Draws black/white selection paths with zoom-compensated widths and dashes. A throttled injected frame loop
- * advances phase through overlay-only invalidation; run only while selected and attached, and cancel pending
- * frames on stop.
+ * Draws black/white selection paths with zoom-compensated widths and dashes. A throttled injected frame loop advances
+ * phase through overlay-only invalidation; run only while selected and attached, and cancel pending frames on stop.
  */
 
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -28,16 +27,13 @@ export interface MarchingAntsRender {
   /** Animated dash offset in screen pixels. */
   phase: number;
   /**
-   * Optional document transform moves ants with live float pixels without rebuilding paths. Commit replaces
-   * selection geometry and removes the override.
+   * Optional document transform moves ants with live float pixels without rebuilding paths. Commit replaces selection
+   * geometry and removes the override.
    */
   matrix?: Mat2d | null;
 }
 
-/**
- * `view` maps document to CSS pixels; `base` maps CSS to backing pixels, so dash and width stay CSS-constant at any
- * device-pixel ratio.
- */
+/** `view` maps document→CSS px and `base` CSS→backing px, so dash and width stay CSS-constant at any DPR. */
 export const drawMarchingAnts = (
   ctx: RasterSurface['ctx'],
   view: Mat2d,
@@ -48,8 +44,7 @@ export const drawMarchingAnts = (
     return;
   }
   const transform = multiply(base, render.matrix ? multiply(view, render.matrix) : view);
-  // Line width and dash stay screen-constant, so they follow the VIEW scale
-  // only — a float scaled up must not thicken its own outline.
+  // Width and dash follow the VIEW scale only, staying screen-constant: a float scaled up must not thicken its outline.
   const scale = getScale(view) || 1;
   const dash = ANTS_DASH_PX / scale;
   const lineWidth = ANTS_LINE_WIDTH_PX / scale;
@@ -83,7 +78,6 @@ export interface AntsAnimator {
   start(): void;
   /** Stops the loop and cancels any pending frame (idempotent). */
   stop(): void;
-  /** True while the loop is running. */
   readonly isRunning: boolean;
 }
 

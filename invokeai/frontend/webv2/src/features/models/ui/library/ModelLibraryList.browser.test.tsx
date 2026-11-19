@@ -146,7 +146,6 @@ describe('ModelLibraryList keyboard context menu', () => {
     const primary = row.querySelector<HTMLButtonElement>('[data-list-primary]')!;
 
     await act(() => primary.focus());
-    // Keyboard-invoked context menus arrive as a contextmenu event with no pointer position.
     await act(() => {
       row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 0, clientY: 0 }));
     });
@@ -267,9 +266,8 @@ describe('ModelLibraryList pinned group header', () => {
 
   beforeEach(() => {
     accountLifecycle.activate('library-pin-test-a', ':user:library-pin-test-a');
-    // Enough rows in both groups that the second group's header can reach the
-    // top of an 800px viewport with the first group still inside the
-    // virtualizer's overscan window.
+    // Enough rows in both groups that the second group's header can reach the top of an 800px viewport with the first
+    // group still inside the virtualizer's overscan window.
     setModelsSnapshotForTests({
       models: [
         ...Array.from({ length: 20 }, (_, i) => model(`main-${i}`, 'main')),
@@ -321,8 +319,8 @@ describe('ModelLibraryList pinned group header', () => {
       });
     };
 
-    // Rows: main header (32px) + 20 main rows (56px each) put the LoRAs header
-    // at 1152px; one row past it, the first visible row is a lora.
+    // Rows: main header (32px) + 20 main rows (56px each) put the LoRAs header at 1152px; one row past it, the first
+    // visible row is a lora.
     await scrollTo(1208);
     expect(pinnedHeaderText()).toContain('LoRAs');
 

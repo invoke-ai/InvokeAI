@@ -177,17 +177,14 @@ describe('Generate component compatibility', () => {
     const diffusersDev = pipeline('diffusers', 'dev');
     const pipelines = [sdnqKlein, sdnqDev, diffusersKlein, diffusersDev];
 
-    // Any Diffusers pipeline gives [dev] its VAE; only a [dev] one its Mistral encoder.
     expect(pipelines.map(isFlux2PipelineForModel(flux2Model('dev')))).toEqual([false, false, true, true]);
     expect(pipelines.map(isFlux2EncoderSourceForModel(flux2Model('dev')))).toEqual([false, false, false, true]);
     expect(pipelines.map(isFlux2PipelineForModel(flux2Model('klein_9b')))).toEqual([true, true, true, true]);
     expect(pipelines.map(isFlux2EncoderSourceForModel(flux2Model('klein_9b')))).toEqual([true, false, true, false]);
-    // The selected install counts as bundled by the same rule.
     expect(pipelines.map(isBundledFlux2Main)).toEqual([true, false, true, true]);
   });
 
   it('keeps each Mistral-family encoder out of the other family slot', () => {
-    // Filter variants even when they share a model type.
     const ministral = candidate({ type: 'mistral_encoder', variant: 'ministral3_3b' });
     const mistralSmall3 = candidate({ type: 'mistral_encoder', variant: 'cow_mistral3_small' });
     const mistral24b = candidate({ type: 'mistral_encoder', variant: 'mistral3_24b' });
@@ -246,7 +243,6 @@ describe('Generate component compatibility', () => {
   });
 
   it('offers each Wan variant only the VAE width its decode accepts', () => {
-    // Wan A14B and 5B require compatible VAE channel widths.
     const wanMain = (variant: string) =>
       ({ base: 'wan', key: `wan-${variant}`, name: `Wan ${variant}`, type: 'main', variant }) as GenerateModelConfig;
     const wanVae = (latentChannels: number) =>
@@ -315,7 +311,6 @@ describe('encoder predicates over roles', () => {
 });
 
 describe('the VAE filters and the backend declarations', () => {
-  // Exercise each variant row with its own variant.
   const mainOf = (base: string, variant: string | null = null) =>
     ({
       base,
@@ -336,7 +331,6 @@ describe('the VAE filters and the backend declarations', () => {
 
   const ALL_BASES = [...new Set(architectureCapabilitiesFixture.map((row) => row.base))];
 
-  /** Check parity with served VAE policy instead of duplicating frontend rules. */
   it('accepts every VAE base the backend declares for that architecture', () => {
     const declared = architectureCapabilitiesFixture.filter((row) => row.vae);
     expect(declared.length).toBeGreaterThan(0);
@@ -344,7 +338,6 @@ describe('the VAE filters and the backend declarations', () => {
     for (const row of declared) {
       for (const accepted of row.vae!.accepted) {
         expect(
-          // Only wan distinguishes VAEs by latent width; the others leave it null.
           isVaeCompatibleWithGenerateModel(
             mainOf(row.base, row.variant),
             vaeOf(accepted.base, accepted.latent_channels ?? undefined)
@@ -355,7 +348,6 @@ describe('the VAE filters and the backend declarations', () => {
     }
   });
 
-  /** Negative parity cases must reject an always-true filter. */
   it('rejects every VAE base the backend does not declare for that architecture', () => {
     for (const row of architectureCapabilitiesFixture) {
       const accepted = row.vae?.accepted ?? [{ base: row.base, latent_channels: null }];
@@ -371,7 +363,6 @@ describe('the VAE filters and the backend declarations', () => {
         ).toBe(false);
       }
 
-      // Same-base VAEs are still constrained by channel width.
       for (const entry of accepted) {
         if (entry.latent_channels === null) {
           continue;

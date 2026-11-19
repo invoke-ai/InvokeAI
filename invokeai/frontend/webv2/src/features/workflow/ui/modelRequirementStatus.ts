@@ -75,8 +75,9 @@ export const useModelRequirementDeps = (): ModelRequirementDeps => {
 };
 
 /**
- * The preview's nodes that need a model, as the rail counts one, from the catalog as loaded: a model a node names, or the kind an empty field asks
- * for, that is not installed and can be (not one installing now, nor one before the catalog has said either way).
+ * The preview's nodes that need a model, as the rail counts one, from the catalog as loaded: a model a node names, or
+ * the kind an empty field asks for, that is not installed and can be (not one installing now, nor one before the
+ * catalog has said either way).
  */
 export const useNodesNeedingModel = (model: WorkflowPreviewModel | null): ReadonlySet<string> => {
   const deps = useLoadedModelRequirementDeps();

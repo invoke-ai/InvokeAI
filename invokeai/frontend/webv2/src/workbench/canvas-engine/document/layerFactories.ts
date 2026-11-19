@@ -23,7 +23,7 @@ export const REGIONAL_GUIDANCE_FILL_COLORS: readonly string[] = [
   '#a178d6',
 ];
 
-const nextNumberedName = (prefix: string, existingNames: readonly string[]): string => {
+export const nextNumberedName = (prefix: string, existingNames: readonly string[]): string => {
   const expression = new RegExp(`^${prefix} (\\d+)$`);
   const used = new Set(
     existingNames

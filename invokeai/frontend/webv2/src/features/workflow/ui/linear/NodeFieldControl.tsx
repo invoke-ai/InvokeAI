@@ -74,8 +74,8 @@ export const NodeFieldControl = ({
   const projectId = useWorkflowProjectSelector((project) => project.id);
   const { effectiveTemplate, fieldName, formSettings, instance, invocationNode, nodeContext, nodeId, template } =
     useNodeFieldBinding(element, projectGraph);
-  // The form stays mounted across a workflow switch; a value that arrives later (an upload) must still land in
-  // the workflow this control rendered.
+  // The form stays mounted across a workflow switch; a value that arrives later (an upload) must still land in the
+  // workflow this control rendered.
   const target = useMemo(() => ({ projectId, workflowId: projectGraph.id }), [projectId, projectGraph.id]);
   // Seed focused label drafts from displayed text, including template fallback.
   const [draftLabel, setDraftLabel] = useState<string | null>(null);

@@ -475,8 +475,7 @@ describe('getAddModelsSearchTerm', () => {
   });
 
   it('has nothing to offer for a requirement that is already installed', () => {
-    // Add Models searches the starter catalog, which need not carry an
-    // installed model's name at all.
+    // Add Models searches the starter catalog, which need not carry an installed model's name at all.
     expect(getAddModelsSearchTerm(resolve(fluxSlot, 'installed', starter('FLUX.1 dev')))).toBeNull();
   });
 

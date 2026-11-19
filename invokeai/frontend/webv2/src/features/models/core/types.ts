@@ -1,8 +1,8 @@
 import type { components } from '@api/schema';
 
 /**
- * Mirror snake_case backend model contracts with open unions so unknown architectures display generic labels
- * without a frontend release.
+ * Mirror snake_case backend model contracts with open unions so unknown architectures display generic labels without a
+ * frontend release.
  */
 
 /** Known model base architectures. Open union: new bases still render. */
@@ -142,8 +142,8 @@ export interface ExternalImageSize {
 }
 
 /**
- * The capability matrix of an external model (`ExternalModelCapabilities`). Fields the editor does not expose are
- * typed loosely and carried through unchanged, because a PATCH replaces the whole object.
+ * The capability matrix of an external model (`ExternalModelCapabilities`). Fields the editor does not expose are typed
+ * loosely and carried through unchanged, because a PATCH replaces the whole object.
  */
 export interface ExternalModelCapabilities {
   modes?: ExternalGenerationMode[];
@@ -170,8 +170,8 @@ export type ModelRole = {
 };
 
 /**
- * A model config record. This is the union of fields across all backend config
- * classes; fields not applicable to a given type/format are absent.
+ * A model config record. This is the union of fields across all backend config classes; fields not applicable to a
+ * given type/format are absent.
  */
 export interface ModelConfig {
   key: string;

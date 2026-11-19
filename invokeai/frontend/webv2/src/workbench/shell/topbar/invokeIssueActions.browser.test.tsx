@@ -36,13 +36,11 @@ vi.mock('@workbench/projects/api', async (importOriginal) => ({
   ...(await importOriginal<typeof ProjectsApiModule>()),
   setClientStateValue: async () => {},
 }));
-// A real store without the provider's persistence: every action acts on it.
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useWorkbenchCommands: () => workbench.store!.commands,
   useWorkbenchQueries: () => workbench.store!.queries,
 }));
-// Navigation is the Model Manager's own (its tests cover the hash and filter); here, only what the action asks for.
 vi.mock('@features/models', async (importOriginal) => ({
   ...(await importOriginal<typeof ModelsModule>()),
   openModelManager: (request: unknown) => workbench.managerRequests.push(request),
@@ -62,10 +60,6 @@ let host: HTMLDivElement;
 let root: Root;
 let getActions: ((issue: InvocationIssue) => InvokeIssueAction[]) | null = null;
 
-/**
- * The real registry, minus chunk preloading: opening a widget here should change the layout, not pull the Canvas and
- * workflow editor bundles into a run that renders neither.
- */
 const withoutPreload = (widget: RegisteredWidget): RegisteredWidget => ({
   ...widget,
   implementation: { ...widget.implementation, preload: () => {} },
@@ -77,7 +71,6 @@ const getQuietWidgetById = (typeId: string) => {
   return widget ? withoutPreload(widget) : undefined;
 };
 
-/** Publishes the hook's latest result on every render, so a re-render with other capabilities is seen. */
 const Probe = ({ onActions }: { onActions: (actions: (issue: InvocationIssue) => InvokeIssueAction[]) => void }) => {
   onActions(useInvokeIssueActions());
 

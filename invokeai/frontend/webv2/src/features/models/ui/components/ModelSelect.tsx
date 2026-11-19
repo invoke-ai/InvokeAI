@@ -81,8 +81,7 @@ const useLazyRelatedModelKeys = (modelKey: string | null): readonly string[] | n
 
       unsubscribe = relationships.subscribeToRelationships(read);
       read();
-      // A missing relationship list is not worth surfacing; the picker just
-      // loses its pinning.
+      // A missing relationship list is not worth surfacing; the picker just loses its pinning.
       relationships.ensureRelatedModelKeysLoaded(modelKey).catch(() => {});
     });
 
@@ -307,7 +306,8 @@ export const ModelSelect = ({
               // Opening it puts the caret in a search box, so it points like a combobox's input does.
               cursor={isInert ? undefined : 'text'}
               disabled={isInert}
-              // Under an inside label the value reads at Select's and Combobox's regular weight; the label sets its own.
+              // Under an inside label the value reads at Select's and Combobox's regular weight; the label sets its
+              // own.
               fontWeight={insideLabel ? 'normal' : undefined}
               justifyContent="space-between"
               minW="0"

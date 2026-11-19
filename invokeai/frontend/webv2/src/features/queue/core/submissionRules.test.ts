@@ -3,11 +3,7 @@ import type { QueueSourceId } from '@features/queue/core/types';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  BACKEND_SUBMITTABLE_SOURCE_IDS,
-  isBackendSubmittableSourceId,
-  shouldSubmitPendingQueueItem,
-} from './submissionRules';
+import { isBackendSubmittableSourceId, shouldSubmitPendingQueueItem } from './submissionRules';
 
 /** Minimal queue item whose submission gate only reads `status` + `snapshot.sourceId`. */
 const makeQueueItem = (sourceId: QueueSourceId, status: QueueHistoryItemStatus): QueueItem =>
@@ -24,36 +20,20 @@ describe('isBackendSubmittableSourceId', () => {
     expect(isBackendSubmittableSourceId('canvas')).toBe(true);
   });
 
-  it('includes generate and workflow', () => {
-    expect(isBackendSubmittableSourceId('generate')).toBe(true);
-    expect(isBackendSubmittableSourceId('workflow')).toBe(true);
-  });
-
-  it('includes upscale', () => {
-    expect(isBackendSubmittableSourceId('upscale')).toBe(true);
-  });
-
-  it('exposes canvas in the exported allow-list', () => {
-    expect(BACKEND_SUBMITTABLE_SOURCE_IDS).toContain('canvas');
+  it.each(['generate', 'workflow', 'upscale'] as const)('submits %s invocations to the backend', (sourceId) => {
+    expect(isBackendSubmittableSourceId(sourceId)).toBe(true);
   });
 });
 
 describe('shouldSubmitPendingQueueItem', () => {
-  it('submits a pending canvas item', () => {
-    expect(shouldSubmitPendingQueueItem(makeQueueItem('canvas', 'pending'))).toBe(true);
-  });
-
-  it('submits a pending generate item', () => {
-    expect(shouldSubmitPendingQueueItem(makeQueueItem('generate', 'pending'))).toBe(true);
-  });
-
-  it('does not submit a non-pending canvas item', () => {
-    expect(shouldSubmitPendingQueueItem(makeQueueItem('canvas', 'running'))).toBe(false);
-    expect(shouldSubmitPendingQueueItem(makeQueueItem('canvas', 'completed'))).toBe(false);
-    expect(shouldSubmitPendingQueueItem(makeQueueItem('canvas', 'cancelled'))).toBe(false);
-  });
-
-  it('submits a pending upscale item', () => {
-    expect(shouldSubmitPendingQueueItem(makeQueueItem('upscale', 'pending'))).toBe(true);
+  it.each<[QueueSourceId, QueueHistoryItemStatus, boolean]>([
+    ['canvas', 'pending', true],
+    ['generate', 'pending', true],
+    ['upscale', 'pending', true],
+    ['canvas', 'running', false],
+    ['canvas', 'completed', false],
+    ['canvas', 'cancelled', false],
+  ])('decides a %s item in %s submits: %s', (sourceId, status, expected) => {
+    expect(shouldSubmitPendingQueueItem(makeQueueItem(sourceId, status))).toBe(expected);
   });
 });

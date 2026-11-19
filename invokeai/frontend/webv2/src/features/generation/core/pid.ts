@@ -20,7 +20,6 @@ export const PID_MODES: readonly PidMode[] = ['off', 'fit', 'native'];
 export const isPidMode = (value: unknown): value is PidMode =>
   typeof value === 'string' && (PID_MODES as readonly string[]).includes(value);
 
-/** Native PiD scales the target by 4; other modes use 1. */
 export const getPidScale = (mode: PidMode): number => (mode === 'native' ? PID_SCALE : 1);
 
 /** Z-Image reuses FLUX's decoder; FLUX.3 and MOSS-Image reuse FLUX.2's, whose latents they share. Unsupported bases return null. */
@@ -42,7 +41,6 @@ export const getPidDecoderBaseForMainBase = (base: string | null | undefined): K
   }
 };
 
-/** Whether a main-model base can decode through PiD. */
 export const getIsPidSupportedBase = (base: string | null | undefined): boolean =>
   getPidDecoderBaseForMainBase(base) !== null;
 

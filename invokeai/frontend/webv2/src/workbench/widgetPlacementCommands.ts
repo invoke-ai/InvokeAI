@@ -274,8 +274,8 @@ export const cycleRegionWidget = ({
 };
 
 /**
- * Activate a rail slot. A docked tab is revealed in its region. A floating window's marker brings the window
- * forward and expands it instead: docking is the window's own control and the marker's menu.
+ * Activate a rail slot. A docked tab is revealed in its region. A floating window's marker brings the window forward
+ * and expands it instead: docking is the window's own control and the marker's menu.
  */
 export const activateRailPlacement = ({
   instanceId,
@@ -321,9 +321,9 @@ export const dockFloatingPlacement = ({
 };
 
 /**
- * Close a floating window outright — never dock-then-toggle, which would pop its panel open and retarget the route
- * on the way. Reports where the window would have returned and whether the reducer hands an emptied center its
- * view back, so focus can go somewhere instead of dying with the window.
+ * Close a floating window outright — never dock-then-toggle, which would pop its panel open and retarget the route on
+ * the way. Reports where the window would have returned and whether the reducer hands an emptied center its view back,
+ * so focus can go somewhere instead of dying with the window.
  */
 export const removeFloatingPlacement = ({
   instanceId,
@@ -429,8 +429,8 @@ const rememberReturnView = (project: WidgetPlacementProject): void => {
 };
 
 /**
- * Swaps the preview into the center and back to the view it replaced. Opening it in the center hands any rail
- * fronting the same instance to its neighbour (see `openRegionWidget`).
+ * Swaps the preview into the center and back to the view it replaced. Opening it in the center hands any rail fronting
+ * the same instance to its neighbour (see `openRegionWidget`).
  */
 export const toggleCenterPreview = ({
   getWidgetsForRegion,
