@@ -85,10 +85,7 @@ interface LayerChildRowProps {
   selected: boolean;
 }
 
-/**
- * Modifier child rows share tree focus and route Properties; toggle/Delete edit them, while drops land below their
- * owning layer.
- */
+/** Modifier rows share tree focus; drops land below their owning layer. */
 const LayerChildRowComponent = ({
   ariaSetSize,
   child,
@@ -200,8 +197,8 @@ const LayerChildRowComponent = ({
     (refocus: boolean) => {
       const draft = nameInput.current?.value.trim() ?? '';
       const cancelled = renameCancelled.current;
-      // Refocusing the row blurs the still-mounted input, which re-enters this
-      // handler; claiming the commit first keeps it to one dispatch.
+      // Refocusing the row blurs the still-mounted input, which re-enters this handler; claiming the commit first keeps
+      // it to one dispatch.
       renameCancelled.current = true;
       finishRename(refocus);
       if (!cancelled) {

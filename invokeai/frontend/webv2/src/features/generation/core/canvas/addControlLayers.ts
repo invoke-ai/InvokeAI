@@ -13,7 +13,6 @@ import { createControlValidationSequence } from './controlValidation';
 
 const LLLITE_COLLECTOR_NODE_ID = 'control_lllite_collector';
 
-/** The control-adapter kinds a control layer can carry. */
 export type { ControlAdapterKind } from './controlValidation';
 
 /** A resolved control-adapter model identifier (the backend model field shape). */
@@ -55,8 +54,8 @@ export { isControlKindSupportedForBase } from './controlValidation';
 export type ImageSource = { node: BackendInvocationContract; field: string } | { image_name: string };
 
 /**
- * What the canvas inpaint and outpaint graphs regenerate: the image the denoise encodes, at processing size, and
- * the canvas mask as uploaded (white = keep). Adapters that condition on the region read both.
+ * What the canvas inpaint and outpaint graphs regenerate: the image the denoise encodes, at processing size, and the
+ * canvas mask as uploaded (white = keep). Adapters that condition on the region read both.
  */
 export interface CanvasInpaintSources {
   image: ImageSource;
@@ -77,7 +76,6 @@ const feedImage = (
   }
 };
 
-/** Options for {@link addControlLayers}. */
 export interface AddControlLayersOptions {
   /** The main model base — selects the adapter nodes and support. */
   base: SupportedGenerateBase;
@@ -92,8 +90,7 @@ export interface AddControlLayersOptions {
   layers: readonly ControlLayerGraphInput[];
   /**
    * Present when the canvas compiles in inpaint or outpaint mode. The Qwen-Image and FLUX.2 control nodes also
-   * condition on the inpainted region and take them, except an InstantX Qwen-Image union; the other kinds ignore
-   * them.
+   * condition on the inpainted region and take them, except an InstantX Qwen-Image union; the other kinds ignore them.
    */
   inpaint?: CanvasInpaintSources;
   /** The family's latent space and denoise size; a Krea-2 Control LoRA encodes its control image with them. */
@@ -104,8 +101,8 @@ export interface AddControlLayersOptions {
 /**
  * The Fun-ControlNet-Union nodes (`qwen_image_control`, `flux2_control`): the control image, plus the region being
  * regenerated when the canvas inpaints or outpaints (not for an InstantX Qwen-Image union, which conditions on the
- * control image alone), wired straight to the denoise's single `control` field.
- * Validation admits one per generation, so there is no collector.
+ * control image alone), wired straight to the denoise's single `control` field. Validation admits one per generation,
+ * so there is no collector.
  */
 const addFunUnionControl = (
   graph: BackendGraphContract,
@@ -189,7 +186,6 @@ export const getOrAddLliteCollector = (
   return collector;
 };
 
-/** Resolves the backend node type for a controlnet layer on `base`. */
 const controlNetNodeType = (base: string): string => (base === 'flux' ? 'flux_controlnet' : 'controlnet');
 
 /** Validate defensively through the shared policy before graph wiring. */

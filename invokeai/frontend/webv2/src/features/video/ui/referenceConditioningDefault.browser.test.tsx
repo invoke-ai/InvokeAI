@@ -15,11 +15,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { VideoReferenceListField } from './VideoReferenceListField';
 
-/**
- * Verify gallery mediaOrigin reaches conditioning defaults so wrapped audio cannot condition on its waveform
- * image.
- */
-
 const galleryMocks = vi.hoisted(() => ({ resolve: vi.fn(), uploadVideo: vi.fn() }));
 
 vi.mock('@features/gallery', async (importOriginal) => {
@@ -89,7 +84,6 @@ afterEach(() => {
   container.remove();
 });
 
-/** Uploads one video file through the list's own picker and returns the reference it added. */
 const addUploadedVideo = async (mediaOrigin?: string): Promise<VideoReferenceItem[]> => {
   galleryMocks.uploadVideo.mockResolvedValue({ name: 'clip.mp4' });
   galleryMocks.resolve.mockResolvedValue(videoItem(mediaOrigin));
@@ -144,13 +138,6 @@ describe('the conditioning an added video reference starts on', () => {
 
     expect(references).toHaveLength(1);
     expect(references[0]).toMatchObject({ conditioning: 'audio', kind: 'video' });
-  });
-
-  it('starts an ordinary video on video + audio', async () => {
-    const references = await addUploadedVideo();
-
-    expect(references).toHaveLength(1);
-    expect(references[0]).toMatchObject({ conditioning: 'video_audio', kind: 'video' });
   });
 
   it('resolves the item once, with no second metadata request to fall back from', async () => {

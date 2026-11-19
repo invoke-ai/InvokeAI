@@ -15,7 +15,6 @@ export interface CanvasHeaderCommandEngine {
   };
 }
 
-/** What the header's commands read and act through. */
 export interface CanvasHeaderCommandContext {
   readonly engine: CanvasHeaderCommandEngine;
   readonly document: CanvasDocumentContractV3;

@@ -20,8 +20,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-// Real command registrations, hotkey routing, preferences, focus, registry, and project reducer.
-// Only provider plumbing, remote services, and the expensive widget views are replaced.
 const runtime = vi.hoisted(() => ({
   extensions: null as unknown as ExtensionRegistry,
   store: null as unknown as WorkbenchInternalStore,
@@ -109,7 +107,6 @@ let queryClient: QueryClient;
 const project = () => runtime.store.getSnapshot().activeProject;
 const regionElement = (region: WidgetRegion) => host.querySelector<HTMLElement>(`[data-focus-region="${region}"]`)!;
 const press = (keys: string) => act(() => userEvent.keyboard(keys));
-/** The default region-focus chord: Control+Command+Arrow on macOS, Alt+Shift+Arrow elsewhere. */
 const regionChord = (arrow: string) =>
   IS_MAC_OS ? `{Control>}{Meta>}{${arrow}}{/Meta}{/Control}` : `{Alt>}{Shift>}{${arrow}}{/Shift}{/Alt}`;
 const focusRegion = (region: WidgetRegion) => act(() => regionElement(region).focus());
@@ -413,7 +410,6 @@ it('can leave a floating window overlapping every visible docked region', async 
   await press(regionChord('ArrowRight'));
   await expectFocusedRegion('right');
   await act(() => userEvent.click(window));
-  // A pending dock-focus settle must not reclaim the window the user deliberately returned to.
   await act(
     () =>
       new Promise<void>((resolve) => {

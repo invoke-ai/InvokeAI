@@ -1,5 +1,3 @@
-/** Real-canvas check that a floating selection's baked display copy matches the layer pixels it was lifted from. */
-
 import type { CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 
 import { createAdjustedSurfaceCache } from '@workbench/canvas-engine/render/adjustedSurfaceCache';

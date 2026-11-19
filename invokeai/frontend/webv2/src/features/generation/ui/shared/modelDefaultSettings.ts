@@ -90,8 +90,8 @@ export const getDefaultSizePatch = (
 
 /**
  * What a field's reset returns to, named honestly: the model's default when the model sets it, the base's (a main
- * model) when it does not, both for a size with one side set, or a plain default for an external model, whose
- * fallbacks belong to no base.
+ * model) when it does not, both for a size with one side set, or a plain default for an external model, whose fallbacks
+ * belong to no base.
  */
 export const getFieldResetLabel = (
   setting: Exclude<ModelDefaultSetting, 'vae'>,

@@ -1,8 +1,4 @@
-/**
- * The canvas's losses made undoable: discarding staged results, the results an accept sets aside, clearing the canvas
- * and restoring a point. Each reports what happened with an Undo, as the workbench does for reversible actions, and
- * every Undo captures its project id, never "the active project".
- */
+/** Undoable canvas losses; every Undo captures its project id, never "the active project". */
 
 import type { CanvasSnapshotContract, CanvasStagingCandidateContract } from '@workbench/canvas-engine/api';
 import type { Notify } from '@workbench/useNotify';
@@ -36,10 +32,7 @@ const restoreUndoKey = (projectId: string): string => `canvas-restore:${projectI
 
 type WorkbenchQueries = ReturnType<typeof useWorkbenchQueries>;
 
-/**
- * Whether the project's canvas was edited since the swap that offered an Undo, read when the Undo runs. A newer swap
- * withdraws that Undo, but painting does not, and the Undo may come minutes later from the Notifications list.
- */
+/** Edited since the swap that offered an Undo, read when it runs, since painting does not withdraw it. */
 const readEditedSince = (queries: WorkbenchQueries, projectId: string): (() => boolean) => {
   const canvas = queries.getProject(projectId)?.canvas;
   // Only the document: the closure may wait a whole session, and the rest of the canvas state is not compared.
@@ -107,11 +100,7 @@ const explainRestore = (outcome: RestoreOutcome, notify: Notify, t: TFunction): 
   }
 };
 
-/**
- * Undo of a Clear canvas or of a restore: brings the point back like the History pane does, keeping what the canvas
- * holds now as a point of its own, and says why when it cannot. Once the canvas was edited since, it leaves the edits
- * alone; the point stays in History.
- */
+/** Undoes a Clear or restore like the History pane, unless the canvas was edited since. */
 const undoWithPoint = async (
   ports: RestorePointPorts,
   pointId: string,
@@ -135,10 +124,7 @@ const undoWithPoint = async (
   }
 };
 
-/**
- * Discard, Discard all and accept, each reporting what left staging with a way to bring it back, and Stop generating,
- * which stops every run still generating for the canvas and keeps its results.
- */
+/** Discard, Discard all and accept with ways back, and Stop generating, which keeps the canvas's results. */
 export const useStagingRecovery = () => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -245,10 +231,7 @@ export const useStagingRecovery = () => {
     );
   }, [canvas, notify, offerRestore, portsFor, projectId, queries, queue, t]);
 
-  /**
-   * After an accept that set other results aside: says so (and that it stopped the batch) and offers them back for
-   * review. The accepted layer stays; undoing it on the canvas removes it without re-staging it.
-   */
+  /** Offers set-aside results back for review; undoing the accepted layer does not re-stage it. */
   const reportAccepted = useCallback(
     (
       before: { documentRevision: number; pendingImages: readonly CanvasStagingCandidateContract[] },

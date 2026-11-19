@@ -27,7 +27,6 @@ const strokeEvent = (overrides: Partial<StrokeCommittedEvent> = {}): StrokeCommi
   ...overrides,
 });
 
-/** The stroke edits over a real reducer, mutation context and history. */
 const createHarness = (byteBudget?: number, gesture = { active: false }) => {
   let project = applyCanvasProjectMutation(createInitialWorkbenchState().projects[0]!, {
     document: documentFrom([layerContract('paint')]),

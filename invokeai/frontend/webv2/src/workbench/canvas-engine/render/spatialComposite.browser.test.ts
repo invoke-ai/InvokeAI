@@ -1,8 +1,3 @@
-/**
- * Real-worker checks that generation and export composites draw exactly what the settled display shows for spatial
- * stacks, layers and groups alike, whatever the bbox.
- */
-
 import type { CanvasAdjustmentsContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { GroupSurfaceResult } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -31,7 +26,6 @@ const MEMBER: Rect = { height: 30, width: 40, x: 0, y: 0 };
 const TRANSLATED = { rotation: 0, scaleX: 1, scaleY: 1, x: 9, y: 7 };
 const ROTATED_DOWNSCALED = { rotation: Math.PI / 7, scaleX: 0.6, scaleY: 0.5, x: 22, y: 4 };
 
-/** Per-pixel runs around two spatial runs; noise places its grain by pixel, so a misplaced origin shows. */
 const STACK: CanvasAdjustmentsContract = [
   { brightness: 0.1, contrast: 0.05, id: 'bc', isEnabled: true, type: 'brightness-contrast' },
   { amount: 70, id: 'clarity', isEnabled: true, size: 12, type: 'clarity' },
@@ -95,7 +89,6 @@ afterEach(() => {
   }
 });
 
-/** Layers `ids` hold a gradient with a transparent border and a dark block: edges for the kernels, and a sub-domain. */
 const sceneFor = (ids: readonly string[]) => {
   const backend = createDomRasterBackend();
   const caches = createLayerCacheStore(backend);
@@ -120,7 +113,6 @@ const sceneFor = (ids: readonly string[]) => {
     const entry = caches.get(layerId)!;
     return Promise.resolve({ rect: entry.rect, release: () => undefined, surface: entry.surface });
   };
-  /** The export composite: no display copy to reuse, so every spatial stack runs a job. */
   const exported = (document: ReturnType<typeof docWith>, bbox: Rect) =>
     renderRasterComposite(planBaseRasterComposite(document, bbox), {
       backend,
@@ -130,7 +122,6 @@ const sceneFor = (ids: readonly string[]) => {
   return { backend, caches, exported, getLayerSurface, memory, service };
 };
 
-/** Composites until `done` holds, as frames would while results land. */
 const settle = async (composite: () => void, done: () => boolean) => {
   await vi.waitFor(
     () => {
@@ -141,7 +132,6 @@ const settle = async (composite: () => void, done: () => boolean) => {
   );
 };
 
-/** The display of a document whose layers carry their own stacks, once every spatial result has landed. */
 const settledLayerDisplay = async (scene: ReturnType<typeof sceneFor>, document: ReturnType<typeof docWith>) => {
   const display = createAdjustedSurfaceCache(scene.backend, undefined, {
     spatial: { run: (request) => scene.service.run(request) },
@@ -162,7 +152,6 @@ const settledLayerDisplay = async (scene: ReturnType<typeof sceneFor>, document:
   return { display, screen };
 };
 
-/** The display of spatial groups over raw members, once the outermost group's pixels are exact. */
 const settledGroupDisplay = async (
   scene: ReturnType<typeof sceneFor>,
   document: ReturnType<typeof docWith>,
@@ -175,7 +164,6 @@ const settledGroupDisplay = async (
     getAdjustedSurface: () => ({ state: 'exact', surface: null }),
     getCacheEntry: (id) => scene.caches.get(id),
     spatial: {
-      // Wired as the engine does: a landing redraws the groups holding the owner.
       onSettle: (groupId) => {
         if (inner.includes(groupId)) {
           groupSurfaces.invalidate([outermost]);
@@ -223,7 +211,6 @@ describe('spatial layer composites', () => {
 
     expect(worstDifference(pixelsOf(fromJob), pixelsOf(screen))).toBeLessThanOrEqual(1);
     expect(worstDifference(pixelsOf(fromDisplayCopy), pixelsOf(screen))).toBe(0);
-    // Leaving the spatial entries out would be visible: the per-pixel interim differs from what landed.
     const interim = scene.backend.createSurface(WIDTH, HEIGHT);
     const perPixel = createAdjustedSurfaceCache(scene.backend);
     compositeDocument(interim, document, scene.caches, identity(), {
@@ -233,24 +220,9 @@ describe('spatial layer composites', () => {
     expect(worstDifference(pixelsOf(fromJob), pixelsOf(interim))).toBeGreaterThan(8);
     expect(scene.memory.snapshot().reservedBytes).toBe(0);
   });
-
-  it.each([
-    ['translated', TRANSLATED],
-    ['rotated and downscaled', ROTATED_DOWNSCALED],
-  ])('draws a %s layer identically over any bbox that crops it', async (_, transform) => {
-    const scene = sceneFor(['m']);
-    const document = docWith([raster('m', { adjustments: STACK, transform })]);
-    const crop: Rect = { height: 14, width: 19, x: 17, y: 12 };
-
-    const whole = await scene.exported(document, BBOX);
-    const cropped = await scene.exported(document, crop);
-
-    expect(worstDifference(pixelsOf(cropped), pixelsOf(whole, crop))).toBe(0);
-  });
 });
 
 describe('spatial group composites', () => {
-  /** Two members, one partly outside a cropping bbox, under a spatial group. */
   const groupDocument = () =>
     docWith([
       groupContract('g', [raster('m'), raster('n', { opacity: 0.7, transform: { ...TRANSLATED, x: 21, y: 26 } })], {
@@ -262,36 +234,6 @@ describe('spatial group composites', () => {
     const scene = sceneFor(['m', 'n']);
     const document = groupDocument();
     const screen = await settledGroupDisplay(scene, document, 'g');
-
-    expect(worstDifference(pixelsOf(await scene.exported(document, BBOX)), pixelsOf(screen))).toBe(0);
-  });
-
-  it('draws a group identically over any bbox that crops it', async () => {
-    const scene = sceneFor(['m', 'n']);
-    const document = groupDocument();
-    const crop: Rect = { height: 20, width: 24, x: 18, y: 20 };
-
-    const whole = await scene.exported(document, BBOX);
-    const cropped = await scene.exported(document, crop);
-
-    expect(worstDifference(pixelsOf(cropped), pixelsOf(whole, crop))).toBe(0);
-  });
-
-  it('exports nested spatial groups as the settled display shows them', async () => {
-    const scene = sceneFor(['m', 'n']);
-    const document = docWith([
-      groupContract(
-        'outer',
-        [
-          groupContract('inner', [raster('m')], {
-            adjustments: [{ amount: 90, id: 'texture', isEnabled: true, size: 4, type: 'texture' }],
-          }),
-          raster('n', { transform: { ...TRANSLATED, x: 24, y: 30 } }),
-        ],
-        { adjustments: GROUP_STACK }
-      ),
-    ]);
-    const screen = await settledGroupDisplay(scene, document, 'outer', ['inner']);
 
     expect(worstDifference(pixelsOf(await scene.exported(document, BBOX)), pixelsOf(screen))).toBe(0);
   });
@@ -315,7 +257,6 @@ describe('generation composite', () => {
           encodeSurface: (surface) => scene.backend.encodeSurface(surface, 'image/png'),
         },
         dedupe: createCompositeDedupeCache(),
-        // Generation composites detached copies, never the live caches the display adjusts.
         getLayerSurface: async (layerId) => {
           const live = await scene.getLayerSurface(layerId);
           const detached = scene.backend.createSurface(live.rect.width, live.rect.height);

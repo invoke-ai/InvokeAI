@@ -32,8 +32,8 @@ export const CONTROL_ADAPTER_DEFAULTS: Readonly<
     model: null,
     weight: 0.75,
   },
-  // The Fun-ControlNet-Union's recommended 0.70–0.95 context scale, centred. An InstantX union on Qwen Image 2512
-  // wants about 1.5–2.0, which the user sets.
+  // The Fun-ControlNet-Union's recommended 0.70–0.95 context scale, centred. An InstantX union on Qwen Image 2512 wants
+  // about 1.5–2.0, which the user sets.
   qwen_image_control: {
     beginEndStepPct: [0, 1],
     controlMode: null,
@@ -80,8 +80,8 @@ export const getDefaultControlAdapterKind = (base: string | null | undefined): C
   base === 'krea-2' ? 'control_lora' : getControlNetKindForBase(base);
 
 /**
- * The adapter kind a control model runs as on its own base: T2I-Adapter and Control LoRA by type, a `controlnet`
- * model as its base's own kind (Z-Image, Qwen-Image, FLUX.2, Anima LLLite) or plain ControlNet. Null for other types.
+ * The adapter kind a control model runs as on its own base: T2I-Adapter and Control LoRA by type, a `controlnet` model
+ * as its base's own kind (Z-Image, Qwen-Image, FLUX.2, Anima LLLite) or plain ControlNet. Null for other types.
  */
 export const deriveControlKind = (model: {
   type: string;
@@ -118,8 +118,8 @@ const CONTROL_MODES: readonly unknown[] = ['balanced', 'more_prompt', 'more_cont
 /**
  * Whether a stored weight can be kept: finite and within -1..2, the widest range any kind accepts. A stored adapter's
  * kind is advisory (the layer runs as the kind its model resolves to, which the panel, readiness validation and the
- * graph all use), so persistence must not judge the weight by it: a Fun kind's 0 floor would refuse or reset a
- * negative weight a layer created under that base may now validly run with.
+ * graph all use), so persistence must not judge the weight by it: a Fun kind's 0 floor would refuse or reset a negative
+ * weight a layer created under that base may now validly run with.
  */
 export const isStorableControlWeight = (weight: unknown): weight is number =>
   typeof weight === 'number' && Number.isFinite(weight) && weight >= -1 && weight <= 2;
@@ -137,9 +137,9 @@ export const isStorableControlStepRange = (range: unknown): range is [number, nu
   range[0] < range[1];
 
 /**
- * Maps a persisted adapter to the contract, keeping every stored value persistence can hold and repairing the rest
- * with the stored kind's defaults. No kind-specific reset applies (see {@link isStorableControlWeight}): the stored
- * kind and model are kept as they are, and the resolved kind governs what runs.
+ * Maps a persisted adapter to the contract, keeping every stored value persistence can hold and repairing the rest with
+ * the stored kind's defaults. No kind-specific reset applies (see {@link isStorableControlWeight}): the stored kind and
+ * model are kept as they are, and the resolved kind governs what runs.
  */
 export const normalizeControlAdapter = (value: unknown): unknown => {
   if (!isRecord(value) || !isControlAdapterKind(value.kind)) {

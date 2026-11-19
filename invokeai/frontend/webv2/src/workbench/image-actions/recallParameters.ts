@@ -55,11 +55,10 @@ import {
 } from './imageRecall';
 
 /**
- * Wire payload of the backend's `recall_parameters_updated` socket event, emitted
- * by `POST /api/v1/recall/{queue_id}`. `parameters` carries the request body after
- * the backend resolved model names to keys and image names to `{ image_name,
- * width, height }`; in strict mode every omitted key is present as `null` (lists
- * as `[]`), and `append: true` rides along as a pseudo-parameter.
+ * Wire payload of the backend's `recall_parameters_updated` socket event, emitted by `POST /api/v1/recall/{queue_id}`.
+ * `parameters` carries the request body after the backend resolved model names to keys and image names to `{
+ * image_name, width, height }`; in strict mode every omitted key is present as `null` (lists as `[]`), and `append:
+ * true` rides along as a pseudo-parameter.
  */
 export interface RecallParametersUpdatedEvent {
   parameters: Record<string, unknown>;
@@ -183,8 +182,8 @@ const toReferenceImage = (config: GenerateReferenceImageConfig): GenerateReferen
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 /**
- * Apply present payload keys; strict nulls reset to effective-model defaults. Report unsupported fields and
- * unresolved models in skipped. The caller verifies reference availability and commits.
+ * Apply present payload keys; strict nulls reset to effective-model defaults. Report unsupported fields and unresolved
+ * models in skipped. The caller verifies reference availability and commits.
  */
 export const buildRecallParametersSettings = ({
   currentValues,
@@ -458,8 +457,8 @@ export const buildRecallParametersSettings = ({
   );
 
   if (has('guidance') && parameters.guidance !== null) {
-    // Only meaningful for graphs that wire cfgScale to `guidance`; an explicit
-    // cfg_scale in the same request wins because it names the field directly.
+    // Only meaningful for graphs that wire cfgScale to `guidance`; an explicit cfg_scale in the same request wins
+    // because it names the field directly.
     if (!GUIDANCE_BASES.has(values.model.base)) {
       skip('guidance', 'incompatible', values.model.name);
     } else if (getCfgScale(parameters) !== null) {

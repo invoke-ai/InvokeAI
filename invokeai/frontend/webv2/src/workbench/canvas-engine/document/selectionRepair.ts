@@ -29,10 +29,10 @@ const siblingsOf = (index: CanvasDocumentIndex, entry: CanvasNodeEntry): readonl
   index.nodes.filter((candidate) => candidate.stack === entry.stack && candidate.parentId === entry.parentId);
 
 /**
- * The primary selection after `stacks` replaced `previous`. A surviving selection is kept. A removed
- * one moves to its nearest surviving sibling in the previous order (below first, then above), then
- * to its previous parent, then to the nearest surviving node of its stack, then to the nearest
- * surviving node of any stack; without a previous order the top node is selected.
+ * The primary selection after `stacks` replaced `previous`. A surviving selection is kept. A removed one moves to its
+ * nearest surviving sibling in the previous order (below first, then above), then to its previous parent, then to the
+ * nearest surviving node of its stack, then to the nearest surviving node of any stack; without a previous order the
+ * top node is selected.
  */
 export const repairSelectedLayerId = (
   stacks: CanvasStackForests,
@@ -69,11 +69,11 @@ export const repairSelectedLayerId = (
 
 /**
  * The primary selection once an accepted result lands as a new raster layer on top of the raster stack. A selected
- * overlay leaf (an inpaint or regional mask, a control layer) stays the editing target while the next stroke can
- * edit it, by the rule painting uses: it and every ancestor enabled and unlocked. Otherwise the result is selected:
- * nothing, a missing node or a group (no paint target) was selected, the overlay leaf would refuse the stroke, or
- * the selection was raster work the result now covers. The accept adds only a raster leaf, so the controller (on the
- * stacks before it) and the rollback (on the stacks after it) see the same entry for the selection and agree.
+ * overlay leaf (an inpaint or regional mask, a control layer) stays the editing target while the next stroke can edit
+ * it, by the rule painting uses: it and every ancestor enabled and unlocked. Otherwise the result is selected: nothing,
+ * a missing node or a group (no paint target) was selected, the overlay leaf would refuse the stroke, or the selection
+ * was raster work the result now covers. The accept adds only a raster leaf, so the controller (on the stacks before
+ * it) and the rollback (on the stacks after it) see the same entry for the selection and agree.
  */
 export const selectionAfterAcceptedResult = (
   stacks: CanvasStackForests,

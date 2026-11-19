@@ -4,11 +4,10 @@ import { INVK_MAX_ENTRIES } from './archive';
 import { InvkFormatError } from './format';
 
 /**
- * The independently versioned board entry includes unreferenced media. Validate it strictly before uploading
- * anything.
+ * The independently versioned board entry includes unreferenced media. Validate it strictly before uploading anything.
  *
- * Version 2 carries every board of the project: the inbox first, then the boards made inside it. Version 1 carried
- * the inbox alone, as a flat item list; it is still read, as a project with no other boards.
+ * Version 2 carries every board of the project: the inbox first, then the boards made inside it. Version 1 carried the
+ * inbox alone, as a flat item list; it is still read, as a project with no other boards.
  */
 
 export type InvkMediaKind = 'image' | 'video';
@@ -81,8 +80,8 @@ const zBoard = z
   .strict();
 
 /**
- * Boards an archive may name. Each one costs the importer a create and a move, so a file must not be able to ask
- * for an unbounded number of them in a few kilobytes; no real project comes near this.
+ * Boards an archive may name. Each one costs the importer a create and a move, so a file must not be able to ask for an
+ * unbounded number of them in a few kilobytes; no real project comes near this.
  */
 export const INVK_MAX_BOARDS = 1000;
 

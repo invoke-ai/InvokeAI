@@ -41,9 +41,9 @@ const countIssuesBySection = (sectionsKey: string): ReadonlyMap<string, number> 
 };
 
 /**
- * The section of each of a form's Invoke-blocking issues (undefined for one no section fixes), so each section's
- * title carries its count; an issue two sections can fix is listed once for each. For forms whose fields word their
- * own errors; Generate's provider sets it from its issues.
+ * The section of each of a form's Invoke-blocking issues (undefined for one no section fixes), so each section's title
+ * carries its count; an issue two sections can fix is listed once for each. For forms whose fields word their own
+ * errors; Generate's provider sets it from its issues.
  */
 export const GenerationSectionIssuesProvider = ({
   children,
@@ -52,8 +52,8 @@ export const GenerationSectionIssuesProvider = ({
   children: ReactNode;
   issueSections: readonly (string | undefined)[];
 }) => {
-  // Keyed by content, as `areGenerationIssuesEqual` keeps Generate's list: a re-validation on every keystroke that finds
-  // the same issues keeps the counts' identity, so the section titles re-render only when a count changes.
+  // Keyed by content, as `areGenerationIssuesEqual` keeps Generate's list: a re-validation on every keystroke that
+  // finds the same issues keeps the counts' identity, so the section titles re-render only when a count changes.
   const sectionsKey = issueSections.map((section) => section ?? '').join(SECTION_KEY_SEPARATOR);
   const counts = useMemo(() => countIssuesBySection(sectionsKey), [sectionsKey]);
 
@@ -91,7 +91,6 @@ export const areGenerationIssuesEqual = (
       JSON.stringify(issue.fix) === JSON.stringify(right[index]?.fix)
   );
 
-/** How many issues a section holds, for its title's count. */
 export const useGenerateSectionIssueCount = (section: string | undefined): number => {
   const counts = use(SectionIssueCountsContext);
 
@@ -262,7 +261,7 @@ const IssueFixButton = ({
   </Button>
 );
 
-/** How many issues a section holds, for sections that place their own badge. */
+/** A section's issues, for sections that place their own badge. */
 export const useGenerateSectionIssues = (section: GenerateSectionId): readonly GenerationIssue[] => {
   const issues = use(GenerateIssuesContext)?.issues ?? NO_ISSUES;
 
@@ -280,8 +279,8 @@ export interface GenerateIssueAction {
 
 /**
  * A list row's issues as one icon beside its switch: the row says something is wrong without a line of its own. Hover
- * or focus shows the messages; pressing it opens them in a popover with their one-step fixes. Renders nothing while
- * the row has no issue. A reveal from the Invoke issue list finds it by `data-issue-ids` and opens it.
+ * or focus shows the messages; pressing it opens them in a popover with their one-step fixes. Renders nothing while the
+ * row has no issue. A reveal from the Invoke issue list finds it by `data-issue-ids` and opens it.
  */
 export const GenerateIssueButton = ({
   getAction,

@@ -6,18 +6,10 @@ import { useTranslation } from 'react-i18next';
 
 import { CUE_WIDTH, OverflowCue, ROW_PADDING_X, useOverflowEdges } from './overflowEdges';
 
-/**
- * The narrowest island that still shows `controlWidth` of its row's start clear of the end cue: border, start padding,
- * the control, and the cue.
- */
+/** Narrowest island showing `controlWidth` of its row clear of the end cue. */
 export const getChromeIslandMinWidth = (controlWidth: string): string =>
   `calc(${controlWidth} + {spacing.${ROW_PADDING_X}} + ${CUE_WIDTH} + 2px)`;
 
-/**
- * A floating island of center chrome. Its row scrolls sideways, without a scrollbar, once the island reaches the width
- * its parent allows: by wheel, swipe, or focus, which brings a focused control clear of the cues. Each end hiding
- * content shows a fade into the island's background and a button that scrolls to that end.
- */
 export const ChromeIsland = ({
   children,
   flexShrink = 1,

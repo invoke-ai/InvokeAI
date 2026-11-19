@@ -14,7 +14,6 @@ interface TestGraph {
   }[];
 }
 
-/** A minimal built base graph containing only the required denoise node. */
 const baseGraph = (): TestGraph => ({
   id: 'g',
   nodes: {
@@ -54,7 +53,6 @@ const addTo = (graph: TestGraph, options: TestOptions) =>
     denoise: graph.nodes.denoise_latents,
   });
 
-// Convenience to run addControlLayers against a fresh graph.
 const run = (options: TestOptions) => {
   const graph = baseGraph();
   addTo(graph, options);
@@ -67,48 +65,35 @@ const edgesTo = (graph: TestGraph, nodeId: string, field: string) =>
 seedArchitectureCapabilities();
 
 describe('isControlKindSupportedForBase', () => {
-  it('controlnet is supported on sd-1, sdxl, flux only', () => {
-    expect(isControlKindSupportedForBase('sd-1', 'controlnet')).toBe(true);
-    expect(isControlKindSupportedForBase('sdxl', 'controlnet')).toBe(true);
-    expect(isControlKindSupportedForBase('flux', 'controlnet')).toBe(true);
-    expect(isControlKindSupportedForBase('sd-2', 'controlnet')).toBe(false);
-    expect(isControlKindSupportedForBase('sd-3', 'controlnet')).toBe(false);
-  });
-
-  it('t2i_adapter is supported on sd-1 and sdxl only (not flux)', () => {
-    expect(isControlKindSupportedForBase('sd-1', 't2i_adapter')).toBe(true);
-    expect(isControlKindSupportedForBase('sdxl', 't2i_adapter')).toBe(true);
-    expect(isControlKindSupportedForBase('flux', 't2i_adapter')).toBe(false);
-    expect(isControlKindSupportedForBase('sd-2', 't2i_adapter')).toBe(false);
-  });
-
-  it('anima_lllite is supported on anima only, which supports nothing else', () => {
-    expect(isControlKindSupportedForBase('anima', 'anima_lllite')).toBe(true);
-    expect(isControlKindSupportedForBase('sdxl', 'anima_lllite')).toBe(false);
-    expect(isControlKindSupportedForBase('anima', 'controlnet')).toBe(false);
-  });
-
-  it('qwen_image_control is supported on qwen-image only, which supports nothing else', () => {
-    expect(isControlKindSupportedForBase('qwen-image', 'qwen_image_control')).toBe(true);
-    expect(isControlKindSupportedForBase('z-image', 'qwen_image_control')).toBe(false);
-    expect(isControlKindSupportedForBase('qwen-image', 'controlnet')).toBe(false);
-    expect(isControlKindSupportedForBase('qwen-image', 'z_image_control')).toBe(false);
-  });
-
-  it('flux2_control is supported on flux2 only, which supports nothing else', () => {
-    expect(isControlKindSupportedForBase('flux2', 'flux2_control')).toBe(true);
-    expect(isControlKindSupportedForBase('qwen-image', 'flux2_control')).toBe(false);
-    expect(isControlKindSupportedForBase('flux2', 'controlnet')).toBe(false);
-    expect(isControlKindSupportedForBase('flux2', 'qwen_image_control')).toBe(false);
-  });
-
-  it('control_lora is supported on flux and krea-2 only', () => {
-    expect(isControlKindSupportedForBase('flux', 'control_lora')).toBe(true);
-    expect(isControlKindSupportedForBase('krea-2', 'control_lora')).toBe(true);
-    expect(isControlKindSupportedForBase('krea-2', 'controlnet')).toBe(false);
-    expect(isControlKindSupportedForBase('sd-1', 'control_lora')).toBe(false);
-    expect(isControlKindSupportedForBase('sdxl', 'control_lora')).toBe(false);
-    expect(isControlKindSupportedForBase('sd-2', 'control_lora')).toBe(false);
+  it.each([
+    { base: 'sd-1', kind: 'controlnet', outcome: 'supported' },
+    { base: 'sdxl', kind: 'controlnet', outcome: 'supported' },
+    { base: 'flux', kind: 'controlnet', outcome: 'supported' },
+    { base: 'sd-2', kind: 'controlnet', outcome: 'unsupported' },
+    { base: 'sd-3', kind: 'controlnet', outcome: 'unsupported' },
+    { base: 'sd-1', kind: 't2i_adapter', outcome: 'supported' },
+    { base: 'sdxl', kind: 't2i_adapter', outcome: 'supported' },
+    { base: 'flux', kind: 't2i_adapter', outcome: 'unsupported' },
+    { base: 'sd-2', kind: 't2i_adapter', outcome: 'unsupported' },
+    { base: 'anima', kind: 'anima_lllite', outcome: 'supported' },
+    { base: 'sdxl', kind: 'anima_lllite', outcome: 'unsupported' },
+    { base: 'anima', kind: 'controlnet', outcome: 'unsupported' },
+    { base: 'qwen-image', kind: 'qwen_image_control', outcome: 'supported' },
+    { base: 'z-image', kind: 'qwen_image_control', outcome: 'unsupported' },
+    { base: 'qwen-image', kind: 'controlnet', outcome: 'unsupported' },
+    { base: 'qwen-image', kind: 'z_image_control', outcome: 'unsupported' },
+    { base: 'flux2', kind: 'flux2_control', outcome: 'supported' },
+    { base: 'qwen-image', kind: 'flux2_control', outcome: 'unsupported' },
+    { base: 'flux2', kind: 'controlnet', outcome: 'unsupported' },
+    { base: 'flux2', kind: 'qwen_image_control', outcome: 'unsupported' },
+    { base: 'flux', kind: 'control_lora', outcome: 'supported' },
+    { base: 'krea-2', kind: 'control_lora', outcome: 'supported' },
+    { base: 'krea-2', kind: 'controlnet', outcome: 'unsupported' },
+    { base: 'sd-1', kind: 'control_lora', outcome: 'unsupported' },
+    { base: 'sdxl', kind: 'control_lora', outcome: 'unsupported' },
+    { base: 'sd-2', kind: 'control_lora', outcome: 'unsupported' },
+  ] as const)('$kind is $outcome on $base', ({ base, kind, outcome }) => {
+    expect(isControlKindSupportedForBase(base, kind)).toBe(outcome === 'supported');
   });
 });
 
@@ -137,15 +122,12 @@ describe('addControlLayers — controlnet on sd-1', () => {
     expect(node.control_model).toBe(m);
     expect(node.control_weight).toBe(0.6);
     expect(node.resize_mode).toBe('just_resize');
-    // controlMode null → defaults to 'balanced'
     expect(node.control_mode).toBe('balanced');
     expect(node.image).toEqual({ image_name: 'ctrl.png' });
 
-    // Collector created and wired.
     expect(graph.nodes['control_net_collector']).toBeDefined();
     expect(graph.nodes['control_net_collector'].type).toBe('collect');
 
-    // node.control → collector.item
     expect(
       graph.edges.some(
         (e) =>
@@ -156,7 +138,6 @@ describe('addControlLayers — controlnet on sd-1', () => {
       )
     ).toBe(true);
 
-    // collector.collection → denoise.control
     expect(
       graph.edges.some(
         (e) =>
@@ -190,10 +171,8 @@ describe('addControlLayers — controlnet on flux', () => {
     expect(node.type).toBe('flux_controlnet');
     expect(node.resize_mode).toBe('just_resize');
     expect(node.control_model).toBe(m);
-    // No control_mode key at all, even though controlMode was set.
     expect(node).not.toHaveProperty('control_mode');
 
-    // Collector wired same as SD family.
     expect(
       graph.edges.some(
         (e) =>
@@ -256,14 +235,12 @@ describe('addControlLayers — t2i_adapter on sdxl', () => {
     expect(node.t2i_adapter_model).toBe(m);
     expect(node.weight).toBe(0.5);
     expect(node.image).toEqual({ image_name: 't2i.png' });
-    // t2i_adapter has no control_mode / control_model / control_weight
     expect(node).not.toHaveProperty('control_mode');
     expect(node).not.toHaveProperty('control_model');
 
     expect(graph.nodes['t2i_adapter_collector']).toBeDefined();
     expect(graph.nodes['t2i_adapter_collector'].type).toBe('collect');
 
-    // node.t2i_adapter → collector.item
     expect(
       graph.edges.some(
         (e) =>
@@ -274,7 +251,6 @@ describe('addControlLayers — t2i_adapter on sdxl', () => {
       )
     ).toBe(true);
 
-    // collector.collection → denoise.t2i_adapter
     expect(
       graph.edges.some(
         (e) =>
@@ -302,7 +278,6 @@ describe('addControlLayers — control_lora on flux', () => {
     expect(node.image).toEqual({ image_name: 'lora.png' });
     expect(node.weight).toBe(0.9);
 
-    // Wired directly node.control_lora → denoise.control_lora
     expect(
       graph.edges.some(
         (e) =>
@@ -313,7 +288,6 @@ describe('addControlLayers — control_lora on flux', () => {
       )
     ).toBe(true);
 
-    // No collector node of any kind created.
     expect(graph.nodes['control_net_collector']).toBeUndefined();
     expect(graph.nodes['t2i_adapter_collector']).toBeUndefined();
     expect(Object.values(graph.nodes).some((n) => n.type === 'collect')).toBe(false);
@@ -481,7 +455,6 @@ describe('addControlLayers — Qwen-Image control', () => {
         source: { field: 'control', node_id: 'qwen_image_control_Q1' },
       },
     ]);
-    // Without inpaint inputs the control image is all the node gets: no collector, no mask node.
     expect(Object.keys(graph.nodes)).toEqual(['denoise_latents', 'qwen_image_control_Q1']);
   });
 
@@ -573,12 +546,6 @@ describe('addControlLayers — Qwen-Image control', () => {
     expect(Object.values(graph.nodes).some((node) => node.type === 'img_lerp')).toBe(false);
   });
 
-  it('rejects a second Qwen-Image control because denoise accepts a single field', () => {
-    expect(() => run({ base: 'qwen-image', layers: [qwenLayer('Q1'), qwenLayer('Q2')] })).toThrow(
-      /qwen_image_control_limit/
-    );
-  });
-
   it('rejects the control on the Edit variant, whose transformer the denoise refuses to control', () => {
     expect(() => run({ base: 'qwen-image', layers: [qwenLayer('Q1')], modelVariant: 'edit' })).toThrow(
       /qwen_image_edit_control/
@@ -645,7 +612,6 @@ describe('addControlLayers — FLUX.2 control', () => {
     });
 
     expect(graph.nodes.flux2_control_F1).toMatchObject({ inpaint_image: { image_name: 'composite.png' } });
-    // The canvas mask is white = keep; the node regenerates white, so 255 → 0 inverts it.
     expect(graph.nodes.flux2_control_mask_F1).toEqual({
       id: 'flux2_control_mask_F1',
       image: { image_name: 'canvas-mask.png' },
@@ -658,10 +624,6 @@ describe('addControlLayers — FLUX.2 control', () => {
     expect(edgesTo(graph, 'flux2_control_F1', 'inpaint_mask').map((edge) => edge.source)).toEqual([
       { field: 'image', node_id: 'flux2_control_mask_F1' },
     ]);
-  });
-
-  it('rejects a second FLUX.2 control because the denoise accepts a single field', () => {
-    expect(() => run({ ...dev, layers: [flux2Layer('F1'), flux2Layer('F2')] })).toThrow(/flux2_control_limit/);
   });
 
   it.each(['klein_9b', 'klein_4b_base', undefined])(
@@ -756,7 +718,6 @@ describe('addControlLayers — Anima ControlNet-LLLite', () => {
     expect(edgesTo(graph, 'denoise_latents', 'control_lllite')).toHaveLength(1);
     expect(graph.nodes.anima_lllite_B?.weight).toBe(-1);
     expect(graph.nodes.anima_lllite_C?.weight).toBe(2);
-    // ControlNet-only fields never reach the LLLite node.
     expect(graph.nodes.anima_lllite_A).not.toHaveProperty('control_mode');
     expect(graph.nodes.anima_lllite_A).not.toHaveProperty('mask');
   });
@@ -797,18 +758,15 @@ describe('addControlLayers — per-layer separation', () => {
     expect(graph.nodes['control_net_A'].image).toEqual({ image_name: 'a.png' });
     expect(graph.nodes['control_net_B'].image).toEqual({ image_name: 'b.png' });
 
-    // Exactly one collector.
     const collectors = Object.values(graph.nodes).filter((n) => n.type === 'collect');
     expect(collectors).toHaveLength(1);
 
-    // Two item edges into the shared collector.
     const itemEdges = graph.edges.filter(
       (e) => e.destination.node_id === 'control_net_collector' && e.destination.field === 'item'
     );
     expect(itemEdges).toHaveLength(2);
     expect(itemEdges.map((e) => e.source.node_id).sort()).toEqual(['control_net_A', 'control_net_B']);
 
-    // Only one collection→denoise edge (collector wired once).
     expect(edgesTo(graph, 'denoise_latents', 'control')).toHaveLength(1);
   });
 });

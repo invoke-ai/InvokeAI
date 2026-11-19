@@ -81,8 +81,7 @@ export interface InvkExpansionBudget {
 }
 
 /**
- * Return size refusals instead of throwing inside the filter, which would misclassify oversized archives as
- * corrupt.
+ * Return size refusals instead of throwing inside the filter, which would misclassify oversized archives as corrupt.
  */
 export const createExpansionBudget = (): InvkExpansionBudget => {
   let entryCount = 0;

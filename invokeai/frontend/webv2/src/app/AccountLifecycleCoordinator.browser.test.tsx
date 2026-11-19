@@ -222,8 +222,7 @@ describe('authenticated route account lifecycle', () => {
     sessionStore.setSnapshot(signedInSession(1));
     const { router } = await import('./router');
 
-    // Let RouterProvider load: a reused router's retained transition hook would wait forever for a pre-render
-    // commit.
+    // Let RouterProvider load: a reused router's retained transition hook would wait forever for a pre-render commit.
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);

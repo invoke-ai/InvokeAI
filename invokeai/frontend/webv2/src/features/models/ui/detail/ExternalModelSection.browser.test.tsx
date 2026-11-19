@@ -58,7 +58,6 @@ const gptImage: ExternalModelSettingsModel = {
   type: 'external_image_generator',
 };
 
-// Reads the record from the library store, as the model detail does, so a save's reply reaches the form.
 const LibraryBackedSection = ({ onError, onSaved }: { onError: (message: string) => void; onSaved: () => void }) => {
   const model = useModelsSelector((snapshot) => snapshot.models.find((candidate) => candidate.key === gptImage.key));
 
@@ -78,7 +77,6 @@ describe('ExternalModelSection', () => {
   const onError = vi.fn();
   const onSaved = vi.fn();
 
-  // The editor is read-only until the starter catalog has answered, so every render waits for it.
   const render = async (model: ExternalModelSettingsModel) => {
     await act(() => {
       root.render(
@@ -120,7 +118,6 @@ describe('ExternalModelSection', () => {
           globalThis.setTimeout(resolve, 50);
         })
     );
-  // The provider is the section's only select; inside its Field it takes the field's label.
   const providerTrigger = () => host.querySelector<HTMLButtonElement>('[data-scope="select"][data-part="trigger"]');
 
   beforeEach(() => {
@@ -213,7 +210,6 @@ describe('ExternalModelSection', () => {
     expect(checkbox('models.externalModes.inpaint').getAttribute('aria-invalid')).toBe('true');
     expect(document.activeElement).toBe(checkbox('models.externalModes.txt2img'));
     expect(api.updateModel).not.toHaveBeenCalled();
-    // Reset discards the draft and the error together.
     await click(button('common.reset'));
     expect(host.querySelector('[role="alert"]')).toBeNull();
     expect(checkbox('models.externalModes.inpaint').getAttribute('aria-invalid')).not.toBe('true');
@@ -239,7 +235,6 @@ describe('ExternalModelSection', () => {
     expect(document.activeElement).toBe(height);
     expect(api.updateModel).not.toHaveBeenCalled();
 
-    // Editing clears the marking along with the message.
     await type(height, '2048');
     expect(height.getAttribute('aria-invalid')).toBeNull();
     expect(host.querySelector('[role="alert"]')).toBeNull();
@@ -341,7 +336,6 @@ describe('ExternalModelSection', () => {
     const retry = button('common.retry');
     retry.focus();
     await click(retry);
-    // The button stays mounted and focused while the catalog reloads, and refuses a second request.
     expect(document.activeElement).toBe(retry);
     expect(retry.getAttribute('aria-busy')).toBe('true');
     expect(retry.getAttribute('aria-disabled')).toBe('true');
@@ -355,7 +349,6 @@ describe('ExternalModelSection', () => {
     await settle();
     expect(host.querySelector('[role="alert"]')).toBeNull();
     expect(providerTrigger()?.disabled).toBe(false);
-    // Focus moves to the editor the catalog unlocked rather than falling to the page.
     expect(document.activeElement).toBe(providerTrigger());
     expect(checkbox('models.externalModes.txt2img').checked).toBe(true);
     expect(getModelDraft('gpt-image-1')?.external).toBeUndefined();
@@ -374,13 +367,11 @@ describe('ExternalModelSection', () => {
 
     const firstAlert = host.querySelector('[role="alert"]');
     expect(firstAlert?.textContent).toBe('models.externalFields.catalogUnavailable');
-    // The status region is already mounted, empty, so the retry's loading text arrives as a change to it.
     const status = host.querySelector('[role="status"]')!;
     expect(status.textContent).toBe('');
     const retry = button('common.retry');
     retry.focus();
     await click(retry);
-    // While the retry runs the failure is withdrawn, so the next one is new to assistive tech.
     expect(host.querySelector('[role="alert"]')).toBeNull();
     expect(host.querySelector('[role="status"]')).toBe(status);
     expect(status.textContent).toBe('models.externalFields.catalogLoading');
@@ -492,7 +483,6 @@ describe('ExternalModelSection', () => {
 
   it('shows what the backend saved, not what was sent, once the save lands', async () => {
     setModelsSnapshotForTests({ models: [gptImage as ModelConfig], status: 'loaded' });
-    // The backend normalizes the route it stores.
     api.updateModel.mockImplementation((_key: string, changes: Record<string, unknown>) =>
       Promise.resolve({ ...gptImage, ...changes, provider_model_id: 'gpt-image-1.5-2026' })
     );

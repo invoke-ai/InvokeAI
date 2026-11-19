@@ -54,10 +54,6 @@ describe('describeModelSwitchChanges', () => {
 });
 
 describe('notifyGenerateModelSwitched', () => {
-  /**
-   * Switches from SDXL at 30 steps to FLUX dev, which stored 28 steps; `later` is what the project holds when Undo is
-   * pressed.
-   */
   const notify = (later: Record<string, unknown>) => {
     const notifications = { info: vi.fn(), undoable: vi.fn() };
     const patchGenerateSettings = vi.fn();
