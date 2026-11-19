@@ -18,7 +18,7 @@ import {
   VisuallyHidden,
 } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel, getModelBaseLongLabel } from '@features/models/core/baseIdentity';
-import { getModelPickerGroups, hasModelPickerCandidates } from '@features/models/core/library';
+import { getModelPickerGroups, getQualifyingType, hasModelPickerCandidates } from '@features/models/core/library';
 import { getModelTypeLabel, getModelTypePluralLabel } from '@features/models/core/taxonomy';
 import { getModelImageUrl } from '@features/models/data/api';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models/data/modelsStore';
@@ -214,7 +214,9 @@ export const ModelSelect = ({
   );
 
   const selectedModel = useModelsSelector((snapshot) => (value ? (snapshot.modelsByKey.get(value) ?? null) : null));
-  const hasMixedTypes = useMemo(() => new Set(candidates.map((model) => model.type)).size > 1, [candidates]);
+  // The type a candidate qualifies as in this picker: its primary type, else the first role type asked for.
+  const effectiveType = useCallback((model: ModelConfig) => getQualifyingType(model, modelTypes), [modelTypes]);
+  const hasMixedTypes = useMemo(() => new Set(candidates.map(effectiveType)).size > 1, [candidates, effectiveType]);
   const scopeLabel =
     scopeLabelOverride ??
     (modelTypes.length === 1
@@ -265,9 +267,10 @@ export const ModelSelect = ({
         model={model}
         showType={hasMixedTypes}
         state={state}
+        type={effectiveType(model)}
       />
     ),
-    [enableModelDescriptions, hasMixedTypes, relatedKeys, relatedToName]
+    [effectiveType, enableModelDescriptions, hasMixedTypes, relatedKeys, relatedToName]
   );
 
   return (
@@ -571,6 +574,7 @@ const ModelOptionContent = ({
   relatedToName,
   showType,
   state,
+  type,
 }: {
   enableDescription: boolean;
   isRelated: boolean;
@@ -578,6 +582,7 @@ const ModelOptionContent = ({
   relatedToName: string | null;
   showType: boolean;
   state: PickerOptionState;
+  type: ModelTaxonomyType;
 }) => {
   const { t } = useTranslation();
   const linkedLabel =
@@ -610,7 +615,7 @@ const ModelOptionContent = ({
           {isRelated ? <VisuallyHidden>{`, ${linkedLabel}`}</VisuallyHidden> : null}
           {showType ? (
             <Badge colorPalette="gray" flexShrink={0} fontSize="xs" variant="surface">
-              {getModelTypeLabel(model.type)}
+              {getModelTypeLabel(type)}
             </Badge>
           ) : null}
         </HStack>

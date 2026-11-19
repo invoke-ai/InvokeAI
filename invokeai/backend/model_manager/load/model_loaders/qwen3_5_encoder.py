@@ -175,6 +175,14 @@ def load_qwen3_5_text_encoder(
 class Qwen35EncoderCheckpointLoader(ModelLoader):
     """Loads a single-file Qwen3.5 text encoder and the vendored Qwen3.5 tokenizer."""
 
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        # A few small tokenizer files, or the vendored one: the generic sizing would charge the whole model.
+        if submodel_type is SubModelType.Tokenizer:
+            return 0
+        return super().get_size_fs(config, model_path, submodel_type)
+
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Qwen35Encoder_Checkpoint_Config):
             raise ValueError("Only Qwen35Encoder_Checkpoint_Config models are supported here.")

@@ -17,14 +17,16 @@ from safetensors.torch import save_file
 from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
 
 from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
+from invokeai.backend.model_manager.configs.roles import view_as
 from invokeai.backend.model_manager.load.model_loaders import qwen3_5_encoder as loader_module
 from invokeai.backend.model_manager.load.model_loaders.qwen3_5_encoder import (
     Qwen35EncoderCheckpointLoader,
     load_qwen3_5_text_encoder,
 )
-from invokeai.backend.model_manager.taxonomy import Qwen35VariantType, SubModelType
+from invokeai.backend.model_manager.taxonomy import ModelType, Qwen35VariantType, SubModelType
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.qwen3_5.qwen3_5_encoder import Qwen35Encoder, qwen3_5_text_config_from_config_json
+from tests.fixtures.model_roles import text_llm_file
 from tests.fixtures.quantized_payloads import comfy_quant_marker, quantize_convrot
 
 _LAST = 3
@@ -216,6 +218,27 @@ def test_the_variant_decides_whether_a_single_file_loads_the_final_norm(
     assert ("norm.weight" in model.state_dict()) is loads_the_norm
 
 
+def test_a_text_llm_record_viewed_as_the_encoder_loads_the_same_language_model_as_an_encoder_record(
+    tmp_path: Path, loader, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("invokeai.backend.qwen3_5.qwen3_5_encoder.qwen3_5_text_config", lambda _variant: _config())
+    loader._keep_fp8_weights = lambda _config, _submodel: False
+    loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+    weights = _reference(final_norm=True).state_dict()
+    path = tmp_path / "whole.safetensors"
+    save_file({f"{_PREFIX}{k}": v for k, v in weights.items()} | _random({"lm_head.weight": [64, 32]}), path)
+    record = text_llm_file("llm").model_copy(update={"path": str(path)})
+    native = Qwen35Encoder_Checkpoint_Config.model_construct(
+        path=str(path), name="encoder", variant=Qwen35VariantType.Qwen35_9B
+    )
+
+    from_view = loader._load_model(view_as(record, ModelType.Qwen35Encoder), SubModelType.TextEncoder)
+    from_native = loader._load_model(native, SubModelType.TextEncoder)
+
+    _assert_loaded(from_view, weights)
+    _assert_loaded(from_native, weights)
+
+
 # -- ComfyUI's int8_tensorwise build: the whole vision-language model, of which the encoder reads the language model. --
 
 _PREFIX = "model.language_model."
@@ -348,3 +371,12 @@ def test_a_scaled_fp8_layer_is_refused_before_room_is_reserved(tmp_path: Path, l
     with pytest.raises(ValueError, match="quantization side channel"):
         load_qwen3_5_text_encoder(loader, [path], _config(), final_norm=True, keep_fp8=False, what="test")
     loader._ram_cache.make_room.assert_not_called()
+
+
+def test_the_bundled_tokenizer_is_not_sized_as_the_whole_file(tmp_path: Path, loader) -> None:
+    path = tmp_path / "encoder.safetensors"
+    save_file(_random({"language_model.embed_tokens.weight": [64, 32]}), path)
+    config = Qwen35Encoder_Checkpoint_Config.model_construct(path=str(path), name="encoder")
+
+    assert loader.get_size_fs(config, path, SubModelType.Tokenizer) == 0
+    assert loader.get_size_fs(config, path, SubModelType.TextEncoder) == path.stat().st_size

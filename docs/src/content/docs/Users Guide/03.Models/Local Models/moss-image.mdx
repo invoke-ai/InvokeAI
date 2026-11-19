@@ -85,13 +85,17 @@ When a single-file MOSS-Image model is selected, the **Components** section next
 
 - **Qwen3.5 Encoder**: a single-file Qwen3.5 9B encoder, such as the ComfyUI export
   `moss-image-qwen35.safetensors`. A file that carries the vision tower as well loads; the vision tower stays
-  on disk. The bf16 files in Comfy-Org's MOSS-Image repository install as this encoder when installed from their URL. The shards of a sharded export, such as the files in the pipeline's `text_encoder/` folder, do not
+  on disk. The files in Comfy-Org's MOSS-Image repository (`text_encoders/`, bf16 and `int8_convrot`) serve as this encoder
+  however they were installed: from their URL, from a repository id or from a local copy. A whole Qwen3.5 9B file with its vision tower and LM head is
+  filed as a [Text LLM](/users-guide/models/model-format-support/#text-llms) that also serves as the encoder, so it
+  appears in this picker. A model's roles are recorded when it is installed or re-identified. The shards of a sharded export, such as the files in the pipeline's `text_encoder/` folder, do not
   work on their own: the first shard is refused at install with a message saying so, and the others install as
   unknown models. The shards in `transformer/` install as unknown models too. Install the whole Diffusers
   folder or a merged single file instead. Anima-3.8B uses the Qwen3.5 4B, which installs under the same encoder type. The two are
   not interchangeable, so the picker lists only 9B encoders. ComfyUI's int8 build of the encoder works as well:
-  install it with the **Qwen3.5 9B Encoder (int8)** starter model or from its Comfy-Org URL. A local copy of the file is
-  identified as a Text LLM, because nothing in it distinguishes it from the FLUX.3 prompt upsampler. On an RTX 4090 it
+  install it with the **Qwen3.5 9B Encoder (int8)** starter model, which files it as a Qwen3.5 Encoder that also
+  serves as a Text LLM, or from its Comfy-Org URL. The FLUX.3 prompt upsampler is a fine-tune of Qwen3.5 9B and appears
+  in this picker too, but MOSS-Image was trained on the stock encoder: use Comfy-Org's MOSS-Image encoder file. On an RTX 4090 it
   renders the same scene as the bf16 encoder with shifted details, and the file is about half the size. The w4a8
   build is refused at install.
 - **VAE**: a FLUX.2 VAE. MOSS-Image ships the FLUX.2 VAE with a smaller decoder (the ComfyUI export
