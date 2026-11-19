@@ -50,7 +50,7 @@ vi.mock('./settings/store', async (importOriginal) => {
   };
 });
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 
 import { describeCanvasInputIssue } from './canvasGenerationInputs';
 import {

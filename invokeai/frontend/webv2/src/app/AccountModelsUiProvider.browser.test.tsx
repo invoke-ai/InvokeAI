@@ -1,4 +1,4 @@
-import type { ArchitectureCapabilitiesRow } from '@features/generation/core/architectureCapabilities';
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
 import type { ModelConfig } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
 import type { DefaultSettingsModel } from '@features/models/ui/detail/defaultSettingsFields';
@@ -6,8 +6,8 @@ import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getGallerySettings } from '@features/gallery/contracts';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { useModelsUi } from '@features/models';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { AddModelsView } from '@features/models/ui/add-models/AddModelsView';
 import { DefaultSettingsSection } from '@features/models/ui/detail/DefaultSettingsSection';
@@ -44,7 +44,7 @@ vi.mock('@features/models/data/api', async (importOriginal) => ({
   ...(await importOriginal<typeof ModelsApi>()),
   ...api,
 }));
-vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
+vi.mock('@features/models/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => capabilitiesApi.get(),
 }));
 vi.mock('@features/identity', async (importOriginal) => ({

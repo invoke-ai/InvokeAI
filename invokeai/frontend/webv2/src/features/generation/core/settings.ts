@@ -21,6 +21,7 @@ import type {
   QwenImageEncoderQuantization,
   VaeModelConfig,
   VaePrecision,
+  WanLoraTarget,
 } from './types';
 
 import { sanitizeBatchCount } from './batch';
@@ -383,11 +384,52 @@ export {
   KREA2_REBALANCE_WEIGHT_COUNT,
 };
 
-const isGenerateLora = (value: unknown): value is GenerateLora =>
-  isRecord(value) &&
-  isLoraModelConfig(value.model) &&
-  hasFiniteNumber(value, 'weight') &&
-  typeof value.isEnabled === 'boolean';
+export const isWanLoraTarget = (value: unknown): value is WanLoraTarget =>
+  value === 'high' || value === 'low' || value === 'both';
+
+export const isGenerateLora = (value: unknown): value is GenerateLora => {
+  if (
+    !isRecord(value) ||
+    !isLoraModelConfig(value.model) ||
+    !hasFiniteNumber(value, 'weight') ||
+    typeof value.isEnabled !== 'boolean'
+  ) {
+    return false;
+  }
+
+  if (value.target !== undefined && !isWanLoraTarget(value.target)) {
+    return false;
+  }
+
+  if (value.lowNoiseWeight !== undefined && (value.target !== 'both' || !hasFiniteNumber(value, 'lowNoiseWeight'))) {
+    return false;
+  }
+
+  return true;
+};
+
+export const normalizeGenerateLora = (value: unknown): GenerateLora | null => {
+  if (
+    !isRecord(value) ||
+    !isLoraModelConfig(value.model) ||
+    !hasFiniteNumber(value, 'weight') ||
+    typeof value.isEnabled !== 'boolean'
+  ) {
+    return null;
+  }
+
+  const target = isWanLoraTarget(value.target) ? value.target : undefined;
+  const lowNoiseWeight =
+    target === 'both' && hasFiniteNumber(value, 'lowNoiseWeight') ? (value.lowNoiseWeight as number) : undefined;
+
+  return {
+    isEnabled: value.isEnabled,
+    model: value.model,
+    weight: value.weight as number,
+    ...(target !== undefined ? { target } : {}),
+    ...(lowNoiseWeight !== undefined ? { lowNoiseWeight } : {}),
+  };
+};
 
 export const DEFAULT_REFERENCE_IMAGE_LIMIT = 5;
 
@@ -1008,7 +1050,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       : getClampedNumber(values, 'hiDiffusionT2Ratio', 0, MAX_HIDIFFUSION_RATIO, 0),
     ...normalizeDynamicPromptsSettings(values),
     height,
-    loras: Array.isArray(values.loras) ? values.loras.filter(isGenerateLora) : [],
+    loras: Array.isArray(values.loras) ? values.loras.flatMap((entry) => normalizeGenerateLora(entry) ?? []) : [],
     modelKey: values.modelKey as string,
     negativePromptEnabled: typeof values.negativePromptEnabled === 'boolean' ? values.negativePromptEnabled : true,
     negativePrompt: values.negativePrompt as string,

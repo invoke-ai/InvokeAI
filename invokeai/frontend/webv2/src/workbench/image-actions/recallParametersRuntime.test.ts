@@ -23,7 +23,7 @@ const modelsApi = vi.hoisted(() => ({
 vi.mock('@features/gallery', () => galleryApi);
 vi.mock('@features/models', () => modelsApi);
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 
 import { createRecallParametersRuntime } from './recallParametersRuntime';
 

@@ -16,6 +16,7 @@ export {
   getGenerateValuesRevertPatch,
   isAspectRatioLocked,
   isFluxDypePreset,
+  isGenerateLora,
   isIdeogram4SamplerPreset,
   isGenerateModelConfig,
   isLoraCompatibleWithModel,
@@ -25,6 +26,7 @@ export {
   isQwenImageEncoderQuantization,
   isValidMossImageSkipLayers,
   isVaeModelConfig,
+  isWanLoraTarget,
   isWanLoraTargetingMain,
   MAX_FLUX_DYPE_EXPONENT,
   MAX_FLUX_DYPE_SCALE,
@@ -40,6 +42,7 @@ export {
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeDynamicPromptsSettings,
+  normalizeGenerateLora,
   normalizeGenerateSettings,
   normalizeMossImageSkipLayers,
   normalizeGenerateWidgetValues,
@@ -87,7 +90,6 @@ export {
   type GenerationIssue,
   type GenerationIssueFix,
 } from './core/generationIssues';
-export { hasArchitectureCapabilities } from './core/architectureCapabilities';
 export {
   describeExternalCanvasRefusal,
   GEMINI_TEMPERATURE_MAX,

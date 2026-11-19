@@ -2,8 +2,11 @@
 
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/api';
 
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { getDimensionGrid } from '@features/generation/settings';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { useCallback } from 'react';
 

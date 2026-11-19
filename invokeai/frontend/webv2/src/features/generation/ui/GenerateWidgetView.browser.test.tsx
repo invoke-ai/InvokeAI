@@ -1,9 +1,9 @@
 import type { GenerationModelCatalogItem } from '@features/generation/contracts';
-import type { ArchitectureCapabilitiesRow } from '@features/generation/core/architectureCapabilities';
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { ensureArchitectureCapabilitiesLoaded } from '@features/generation/data/architectureCapabilitiesStore';
+import { ensureArchitectureCapabilitiesLoaded } from '@features/models/architecturesStore';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act } from 'react';
@@ -44,7 +44,7 @@ const pendingRequest = (): Promise<ArchitectureCapabilitiesRow[]> =>
     // Intentionally never settles.
   });
 
-vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
+vi.mock('@features/models/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => getArchitectureCapabilities(),
 }));
 

@@ -1,8 +1,8 @@
 import type { MainModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import { appendReferenceImage, type AppendReferenceImageResult } from './appendReferenceImage';

@@ -8,14 +8,12 @@ import type { GenerationModelCatalogItem as ModelConfig } from '@features/genera
 
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 
-import type { ArchitectureCapabilitiesRow } from './architectureCapabilities';
 import type { ComponentPolicyContext, ComponentSlotPolicy } from './baseGenerationPolicies';
 import type { ControlLayerGraphInput } from './canvas/addControlLayers';
 import type { CanvasCompositingSettings, CanvasScalingSettings } from './canvas/types';
 import type { BackendGraphContract, GenerationProjectSettings, ResultDestination } from './contracts';
 import type { ComponentModelConfig, GenerateModelConfig, GenerateWidgetValues } from './types';
 
-import { resetArchitectureCapabilities, setArchitectureCapabilities } from './architectureCapabilities';
 import {
   addReferenceImages,
   coerceSchedulerForGraph,
@@ -129,17 +127,6 @@ const NON_OVERRIDABLE_SETTINGS: ReadonlySet<string> = new Set([
 const listKeys = (keys: readonly string[]): string => (keys.length > 0 ? keys.join(', ') : 'none');
 
 const listModelKeys = (models: readonly ModelConfig[]): string => listKeys(models.map((model) => model.key));
-
-/** Hold `rows` as the capability table, which every Generation policy reads, while `run` compiles. */
-export const withArchitectureCapabilities = <T>(rows: readonly ArchitectureCapabilitiesRow[], run: () => T): T => {
-  setArchitectureCapabilities(rows);
-
-  try {
-    return run();
-  } finally {
-    resetArchitectureCapabilities();
-  }
-};
 
 const getSelectableModel = (key: string, models: readonly ModelConfig[]): GenerateModelConfig => {
   const selectable = models.filter(isGenerateModelSelectable).filter(isArchitectureDescribed);

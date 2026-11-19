@@ -4,7 +4,6 @@ import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@wo
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 import { useDynamicPrompts } from '@features/generation/react';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import {
   describeDynamicPromptsFailure,
   describeGenerationIssue,
@@ -16,6 +15,10 @@ import {
   sanitizeDynamicPromptsConfig,
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { isUpscaleBatchCountFixed, readsUpscalePrompt } from '@features/upscale';
 import { normalizeVideoWidgetValues } from '@features/video';
 import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@features/workflow/react';

@@ -38,9 +38,12 @@ import {
   patchGalleryItemCaches,
 } from '@features/gallery/queries';
 import { setPendingPromptTemplateDraft } from '@features/generation/react';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { getReferenceImageRoom, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { submitUtilityGraph, type UtilityGraphSubmission, UtilityQueueError } from '@features/queue/utility';
 import { copyImage } from '@platform/browser/clipboard';
 import { downloadBlob } from '@platform/browser/downloadBlob';

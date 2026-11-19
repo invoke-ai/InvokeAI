@@ -506,13 +506,22 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
       const candidate = snapshot.modelsByKey.get(modelKey);
 
       return candidate
-        ? { base: candidate.base, key: candidate.key, roles: candidate.roles, type: candidate.type }
+        ? {
+            base: candidate.base,
+            key: candidate.key,
+            latent_channels: candidate.latent_channels,
+            roles: candidate.roles,
+            type: candidate.type,
+            variant: candidate.variant,
+          }
         : null;
     },
     (left, right) =>
       left?.key === right?.key &&
       left?.base === right?.base &&
       left?.type === right?.type &&
+      left?.variant === right?.variant &&
+      left?.latent_channels === right?.latent_channels &&
       left?.roles === right?.roles
   );
   const handleSectionError = useCallback(

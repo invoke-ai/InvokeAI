@@ -1,14 +1,15 @@
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
+
+import capabilitiesFixture from '@features/models/core/__fixtures__/architectureCapabilities.json';
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/models/core/architectureCapabilities';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { GenerationModelCatalogItem } from './contracts';
 import type { GenerateLora, GenerateWidgetValues, LoraModelConfig, MainModelConfig } from './types';
 
-import capabilitiesFixture from './__fixtures__/architectureCapabilities.json';
-import {
-  type ArchitectureCapabilitiesRow,
-  resetArchitectureCapabilities,
-  setArchitectureCapabilities,
-} from './architectureCapabilities';
 import { getDefaultGenerateSettings } from './baseGenerationPolicies';
 import { compileGeneratePreviewGraph, stabilizeBackendGraphIds, stabilizeBackendGraphNodeIds } from './previewGraph';
 
