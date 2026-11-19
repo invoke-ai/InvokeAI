@@ -37,7 +37,6 @@ interface LayerFilterControlsProps {
   onSettingsChange(value: Record<string, unknown>): void;
 }
 
-/** The pane form is the one consumer left; the toolbar's horizontal variant died with it. */
 const getLayerFilterControlPolicy = () =>
   ({
     controlMinH: undefined,

@@ -23,18 +23,13 @@ import { useSelectedMainModel } from './useSelectedMainModel';
 const selectCapabilitiesStatus = (snapshot: ArchitectureCapabilitiesSnapshot) => snapshot.status;
 const selectControlModelMemory = (preferences: WorkbenchPreferences) => preferences.controlModelMemory;
 
-/**
- * A control layer row's status: a spinner while its map is queued for or being detected, else a warning when the
- * layer needs attention, judged as its Properties panel judges it. `contributing` is the effective enablement; a
- * layer gated by a group is not validated.
- */
+/** Spinner while detecting, else a warning judged as Properties does; group-gated layers are not validated. */
 export const ControlLayerStatusIcon = ({
   layer,
   contributing = layer.isEnabled,
   engine,
 }: {
   contributing?: boolean;
-  /** The canvas engine whose detection status the row reflects. */
   engine: object | null;
   layer: CanvasControlLayerContract;
 }) => {
@@ -48,8 +43,8 @@ export const ControlLayerStatusIcon = ({
     getArchitectureCapabilitiesSnapshot,
     selectCapabilitiesStatus
   );
-  // Read inside the store's selector: whether a kind is supported comes from the capability table, and a call
-  // memoised on the layer and model would keep its first answer after the table loads.
+  // Read inside the store's selector: whether a kind is supported comes from the capability table, and a call memoised
+  // on the layer and model would keep its first answer after the table loads.
   const reason = useExternalStoreSelector(
     subscribeArchitectureCapabilities,
     getArchitectureCapabilitiesSnapshot,
@@ -66,8 +61,8 @@ export const ControlLayerStatusIcon = ({
     )
   );
 
-  // A queued run (debounce, a free slot, a commit waiting for the document) is as busy as a running one; it names
-  // the detector the layer asks for, since it has not started one yet.
+  // A queued run (debounce, a free slot, a commit waiting for the document) is as busy as a running one; it names the
+  // detector the layer asks for, since it has not started one yet.
   const detector =
     detection.status === 'processing'
       ? detection.detector

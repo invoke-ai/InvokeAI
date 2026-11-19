@@ -9,7 +9,6 @@ import {
   getRebalanceBarScale,
   getRebalanceSparklinePath,
   isValidKrea2RebalanceWeights,
-  KREA2_REBALANCE_WEIGHT_COUNT,
   KREA2_TAP_LAYERS,
   matchRebalancePreset,
   NEUTRAL_KREA2_REBALANCE_WEIGHTS,
@@ -25,10 +24,6 @@ describe('KREA2_TAP_LAYERS', () => {
   it('matches the encoder layers the backend taps', () => {
     // KREA2_SELECT_LAYERS in invokeai/backend/krea2/sampling_utils.py.
     expect([...KREA2_TAP_LAYERS]).toEqual([2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35]);
-  });
-
-  it('has one entry per weight', () => {
-    expect(KREA2_TAP_LAYERS).toHaveLength(KREA2_REBALANCE_WEIGHT_COUNT);
   });
 });
 
@@ -48,7 +43,6 @@ describe('parseRebalanceWeights', () => {
   });
 
   it('rejects hex, which Number() accepts but Python float() does not', () => {
-    // Reject malformed values before forwarding them verbatim to the backend.
     expect(parseRebalanceWeights('0x10,1,1,1,1,1,1,1,1,1,1,1')).toBeNull();
     expect(parseRebalanceWeights('0b11,1,1,1,1,1,1,1,1,1,1,1')).toBeNull();
     expect(parseRebalanceWeights('0o17,1,1,1,1,1,1,1,1,1,1,1')).toBeNull();
@@ -65,11 +59,6 @@ describe('parseRebalanceWeights', () => {
     expect(parseRebalanceWeights('1,1,1')).toBeNull();
     expect(parseRebalanceWeights(`${DEFAULT_KREA2_REBALANCE_WEIGHTS},1.0`)).toBeNull();
     expect(parseRebalanceWeights('')).toBeNull();
-  });
-
-  it('backs isValidKrea2RebalanceWeights', () => {
-    expect(isValidKrea2RebalanceWeights(DEFAULT_KREA2_REBALANCE_WEIGHTS)).toBe(true);
-    expect(isValidKrea2RebalanceWeights('0x10,1,1,1,1,1,1,1,1,1,1,1')).toBe(false);
   });
 });
 

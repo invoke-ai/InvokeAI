@@ -1,8 +1,8 @@
 import type { QueueItemReadModel } from '@features/queue/core/types';
 
 /**
- * Prefer local snapshots, then named node fields. Preserve blank positive prompts; only unknown graph fields fall
- * back to type/order heuristics.
+ * Prefer local snapshots, then named node fields. Preserve blank positive prompts; only unknown graph fields fall back
+ * to type/order heuristics.
  */
 
 export interface QueueGenerationMeta {
@@ -25,8 +25,7 @@ export const extractNamedGenerationMeta = (item: QueueItemReadModel): QueueGener
 
   for (const { nodePath, value } of item.fieldValues ?? []) {
     if (nodePath === POSITIVE_PROMPT_NODE_PATH && typeof value === 'string') {
-      // Recorded verbatim, empty included: an empty positive is a real
-      // submission, not a missing field.
+      // Recorded verbatim, empty included: an empty positive is a real submission, not a missing field.
       meta.positivePrompt = value;
     } else if (nodePath === NEGATIVE_PROMPT_NODE_PATH && typeof value === 'string') {
       meta.negativePrompt = value;

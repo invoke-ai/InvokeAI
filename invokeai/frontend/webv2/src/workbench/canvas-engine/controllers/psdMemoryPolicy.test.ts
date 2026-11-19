@@ -169,7 +169,6 @@ describe('installed ag-psd memory policy', () => {
           )
         ),
       };
-      // These admission fixtures never read pixels; even the 8192² surface holds only dimensions and call logs.
       const surfaces = new Map(
         Array.from({ length: count }, (_, i) => [
           String(i),

@@ -26,8 +26,8 @@ describe('mergeDownMatrix', () => {
   });
 
   it('translates the upper cache into the below layer local space (offset below cancels)', () => {
-    // Below sits at (10, 20); the upper layer sits at the document origin. In
-    // below-local space the origin is therefore at (-10, -20).
+    // Below sits at (10, 20); the upper layer sits at the document origin. In below-local space the origin is therefore
+    // at (-10, -20).
     const m = mergeDownMatrix(transform({ x: 10, y: 20 }), transform());
     expect(m).not.toBeNull();
     expect(m!.e).toBeCloseTo(-10);

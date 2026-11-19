@@ -31,7 +31,6 @@ const entryOf = (overrides: Partial<LayerCacheEntry> = {}): LayerCacheEntry =>
     ...overrides,
   }) as LayerCacheEntry;
 
-/** A cache store backed by one entry, which is all any guard reads. */
 const cacheOf = (entry: LayerCacheEntry | undefined): LayerCacheStore =>
   ({
     get: (id: string) => (id === entry?.layerId ? entry : undefined),
@@ -181,7 +180,6 @@ describe('captureCurrentLayerExportGuard', () => {
   });
 
   it('refuses when the entry exists but the guard it would stamp is already invalid', () => {
-    // A torn-down canvas state fails the currency re-check the capture ends with.
     canvasState = false;
     expect(build().captureCurrentLayerExportGuard('layer-1')).toBeNull();
   });
@@ -225,8 +223,6 @@ describe('hasExportableLayerContent', () => {
   });
 
   it('is false for a non-paint source with an empty content rect, cache notwithstanding', () => {
-    // Only paint can hold pixels beyond its persisted rect, so the live cache is
-    // not consulted here — this layer has a fresh, non-empty one and still fails.
     layer = layerOf({ image: { height: 0, imageName: 'a.png', width: 0 }, type: 'image' } as CanvasLayerSourceContract);
     expect(entry.stale).toBe(false);
     expect(build().hasExportableLayerContent('layer-1')).toBe(false);

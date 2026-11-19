@@ -247,7 +247,6 @@ describe('ProjectSwitcher', () => {
 
   it('keeps its folder icon and drops the project name where the topbar is too narrow for it', async () => {
     const trigger = document.querySelector<HTMLElement>('button[aria-label="topbar.projectSwitcher.trigger"]')!;
-    // The menu is open here, so the trigger shows its open-folder glyph.
     const folderIcon = trigger.querySelector<SVGElement>('svg.lucide-folder-open')!;
     const name = [...trigger.children].find((child) => child.textContent === 'Prompt project')!;
     const { innerHeight, innerWidth } = window;
@@ -317,7 +316,6 @@ describe('ProjectSwitcher', () => {
       .join(' ');
     expect(description).toContain('common.copyUnavailable');
 
-    // Playwright refuses to click an aria-disabled item; the guard under test is the item's own.
     await act(() => userEvent.click(item, { force: true }));
     expect(harness.copyText).not.toHaveBeenCalled();
     expect(harness.notify.success).not.toHaveBeenCalled();

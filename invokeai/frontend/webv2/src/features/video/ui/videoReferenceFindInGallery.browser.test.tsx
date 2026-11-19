@@ -13,7 +13,6 @@ import { userEvent } from 'vitest/browser';
 import { VideoReferenceListField } from './VideoReferenceListField';
 import { VideoUiProvider, type VideoUiAdapter } from './VideoUiContext';
 
-/** Each reference exposes one find action; pass kind with name so videos resolve against the video endpoint. */
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -100,8 +99,8 @@ const render = async (): Promise<void> => {
 };
 
 /**
- * Park the pointer before mount: an origin hover would reveal the first badge, and moving afterward starts a fade
- * that invalidates resting-opacity assertions.
+ * Park the pointer before mount: an origin hover would reveal the first badge, and moving afterward starts a fade that
+ * invalidates resting-opacity assertions.
  */
 const parkPointer = async (): Promise<void> => {
   const parking = document.createElement('div');
@@ -168,7 +167,6 @@ describe('video reference find-in-gallery badges', () => {
   it('reveals a video reference as a video, once, from its start bound', async () => {
     await render();
 
-    // Both bounds reference the same clip; expose one find control.
     const bounds = findButtons('clip.mp4');
 
     expect(bounds).toHaveLength(1);

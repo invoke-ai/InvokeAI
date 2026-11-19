@@ -146,7 +146,6 @@ const pointer = (type: string, target: EventTarget, clientX: number, clientY: nu
   );
 };
 
-/** A non-primary touch — a second finger joining the one already down. */
 const secondFinger = (type: string, target: EventTarget, clientX: number, clientY: number): void => {
   target.dispatchEvent(
     new PointerEvent(type, {
@@ -194,7 +193,6 @@ describe('PreviewFrame image drag', () => {
     const image = host!.querySelector<HTMLImageElement>('img[alt="preview.png"]')!;
     const frame = image.parentElement!;
 
-    // The 128px image fits larger than its own size, so zooming far out rests at 100%, under fit.
     await interact(() =>
       image.dispatchEvent(
         new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: 140, clientY: 140, deltaY: 2000 })
@@ -215,7 +213,6 @@ describe('PreviewFrame image drag', () => {
   });
 
   it('gives a second finger the pinch and abandons the drag it interrupted', async () => {
-    // A second touch must cancel image dragging before taking over pinch, avoiding an unintended drop on release.
     const onDrop = await renderHarness();
     const image = host!.querySelector<HTMLImageElement>('img[alt="preview.png"]')!;
     const frame = image.parentElement!;
@@ -241,7 +238,6 @@ describe('PreviewFrame image drag', () => {
   });
 
   it('does not offer its own compare target to the image it is showing', async () => {
-    // Reject self-comparison drops so they cannot silently pause follow and arm a future comparison.
     const onDrop = await renderHarness();
     const image = host!.querySelector<HTMLImageElement>('img[alt="preview.png"]')!;
 
@@ -263,7 +259,6 @@ describe('PreviewFrame video drag', () => {
     const handle = host!.querySelector<HTMLElement>('[title="Drag video"]')!;
 
     expect(handle).not.toBeNull();
-    // Unfocusable drag surfaces prevent invisible keyboard drags and accidental Tab drops.
     expect(handle.tabIndex).toBeLessThan(0);
     expect(handle.closest('button')).toBeNull();
     const rect = handle.getBoundingClientRect();

@@ -23,7 +23,7 @@ export interface SeedFieldProps {
   children?: ReactNode;
 }
 
-/** The labelled seed row of the Generate-shaped widgets: the shared control under a field label, with its sequence sized by the widget's own batch. */
+/** The labelled seed row of Generate-shaped widgets, its sequence sized by the widget's own batch. */
 export const SeedField = ({
   batchCount,
   children,

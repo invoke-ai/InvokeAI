@@ -1,6 +1,6 @@
 /**
- * from/to/date accept ISO days, today/yesterday, or Nd/Nw/Nm ago (one day, not a span). Keep invalid tokens in
- * both text and invalidTokens. Relative dates use local calendar arithmetic; backend date boundaries are UTC.
+ * from/to/date accept ISO days, today/yesterday, or Nd/Nw/Nm ago (one day, not a span). Keep invalid tokens in both
+ * text and invalidTokens. Relative dates use local calendar arithmetic; backend date boundaries are UTC.
  */
 
 export type DateTokenKey = 'from' | 'to' | 'date';

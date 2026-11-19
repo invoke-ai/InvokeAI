@@ -24,7 +24,6 @@ const NO_GROUP_CONTENT: GroupSurfaceContent = { excludeIds: new Set(), float: nu
 
 const owners = vi.hoisted(() => ({ raster: null as RasterController | null }));
 
-// Captures the engine's real raster owner; its behavior is unchanged.
 vi.mock('./controllers/rasterController', async (importOriginal) => {
   const actual = await importOriginal<typeof RasterControllerModule>();
   class CapturedRasterController extends actual.RasterController {
@@ -423,10 +422,8 @@ describe('engine raster composite export', () => {
 
     await expect(exportRect()).resolves.toMatchObject({ status: 'ok' });
 
-    // The output and the sampled layer-local scratch, never a layer-sized adjusted copy outside the reservation.
     expect(allocated).toEqual([[EXPORT_RECT.width, EXPORT_RECT.height], SAMPLED_SIZE]);
     const [sampledWidth, sampledHeight] = SAMPLED_SIZE;
-    // Output surface, plus the scratch surface and its ImageData readback.
     expect(reserved[0]).toBeGreaterThanOrEqual(
       (EXPORT_RECT.width * EXPORT_RECT.height + sampledWidth * sampledHeight * 2) * 4
     );

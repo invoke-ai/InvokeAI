@@ -235,8 +235,8 @@ const fontFaceDescriptors = (face: FontRecord, reference: FontDownloadReference)
   const axes = new Set(face.axes.map((axis) => axis.tag));
   const requestedAxes = reference.axes ?? {};
 
-  // Pinned axes must set the CSS descriptor to avoid synthesizing bold over an already-bold instance. Otherwise
-  // retain catalog descriptors for browser synthesis.
+  // Pinned axes must set the CSS descriptor to avoid synthesizing bold over an already-bold instance. Otherwise retain
+  // catalog descriptors for browser synthesis.
   if (axes.has('wght') && Number.isFinite(requestedAxes.wght)) {
     weight = requestedAxes.wght!;
   }

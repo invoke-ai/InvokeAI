@@ -145,7 +145,6 @@ describe('gradient tool: create when no gradient selected', () => {
     ) {
       expect(forward.layer.source.angle).toBeCloseTo(90);
       expect(forward.layer.source.kind).toBe('linear');
-      // Layer-local: the drag minus the bbox origin the layer sits at.
       expect(forward.layer.source.center).toEqual({ x: 10, y: 60 });
       expect(forward.layer.source.span).toBe(100);
       expect(forward.layer.source.width).toBe(96);
@@ -240,7 +239,6 @@ describe('gradient tool: edit selected gradient layer', () => {
     } else {
       throw new Error('expected an updateCanvasLayerSource gradient edit');
     }
-    // Inverse restores the exact original source object.
     if (inverse?.type === 'updateCanvasLayerSource' && layer.type === 'raster') {
       expect(inverse.source).toBe(layer.source);
     } else {
@@ -280,8 +278,8 @@ describe('gradient tool: edit selected gradient layer', () => {
   });
 
   it("reads the drag in the layer's local space when it is moved, scaled and rotated", () => {
-    // Local +x points down the document after a quarter turn: a downward
-    // document drag of 200px is a 100px local drag along +x at scale 2.
+    // Local +x points down the document after a quarter turn: a downward document drag of 200px is a 100px local drag
+    // along +x at scale 2.
     const layer = gradientLayer({ transform: { rotation: Math.PI / 2, scaleX: 2, scaleY: 2, x: 100, y: 100 } });
     const doc = makeDoc({ stacks: stacksFrom([layer]), selectedLayerId: 'grad-existing' });
     const h = createHarness(doc);

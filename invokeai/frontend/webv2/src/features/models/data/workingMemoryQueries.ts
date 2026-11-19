@@ -34,8 +34,8 @@ export const hasRunningRun = (summary: WorkingMemorySummary | null | undefined):
 
 /**
  * The plan sizes its cases for the GPU memory free on the server when it is read and for the measurements stored by
- * then. It is read again whenever the section opens and right before a calibration starts
- * (`refreshWorkingMemoryPlan`, `fetchCurrentWorkingMemoryPlan`); in between it holds.
+ * then. It is read again whenever the section opens and right before a calibration starts (`refreshWorkingMemoryPlan`,
+ * `fetchCurrentWorkingMemoryPlan`); in between it holds.
  */
 export const workingMemoryPlanQueryOptions = (modelKey: string, owner = captureAccountScope()) =>
   queryOptions({

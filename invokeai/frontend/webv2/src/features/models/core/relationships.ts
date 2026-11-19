@@ -2,7 +2,6 @@ import type { ModelBase, ModelConfig, ModelTaxonomyType } from './types';
 
 /** Related-model links are symmetric curation hints and permit only models usable in one pipeline. */
 
-/** The two fields the compatibility rule reads. */
 export type RelatableModel = Pick<ModelConfig, 'base' | 'type'>;
 
 /**

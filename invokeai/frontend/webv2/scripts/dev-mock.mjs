@@ -1,7 +1,7 @@
 /**
  * Serve the dev app against the in-repo mock backend. The mock takes a free port unless INVOKEAI_MOCK_BACKEND_PORT is
- * set, and INVOKEAI_MOCK_BACKEND_PROFILE picks its fixtures. Remaining arguments go to `vite dev`, for example
- * `pnpm dev:mock --port 5273 --strictPort`.
+ * set, and INVOKEAI_MOCK_BACKEND_PROFILE picks its fixtures. Remaining arguments go to `vite dev`, for example `pnpm
+ * dev:mock --port 5273 --strictPort`.
  */
 
 import { spawn } from 'node:child_process';

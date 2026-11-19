@@ -4,7 +4,7 @@
 - Keep PR, main-push, merge-group, manual-dispatch, reusable-workflow events. `github.base_ref` is not always set outside PRs.
 - Change detection must include workflows and relevant shared actions/config. Test-only and tooling-only changes must trigger owning checks.
 - Keep tool versions, lockfiles, reproducible installs, hardware/platform matrices, pinned action revisions.
-- Prefer package completion commands over duplicating them in YAML. Webv2 `pnpm check:release`: install locked Chromium, Firefox, WebKit and required Linux dependencies first. Completion includes the three-engine lifecycle smoke and reuses its performance build.
+- Run package scripts, not raw tool commands. The webv2 tests workflow splits `check:release:tests` into parallel jobs; [the workflow test](../invokeai/frontend/webv2/src/architecture/architectureWorkflow.test.ts) enforces that CI runs every gate of the local chain once and that each job builds before it reads `dist`. Locally, `pnpm check:release` needs locked Chromium, Firefox, WebKit and their Linux dependencies, and its journeys reuse the performance build; in CI only the journeys job installs all three engines.
 - Keep failure diagnostics with `always()` where fitting. Generated review/performance artifacts stay out of Git.
 - Hooks must match CI's Ruff version and config. Validation never rewrites formatting.
 - Workflow changes neither configure hosted branch protection nor install local hooks. Verify before claiming either.

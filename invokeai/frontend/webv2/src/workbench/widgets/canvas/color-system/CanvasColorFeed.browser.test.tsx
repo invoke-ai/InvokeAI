@@ -17,7 +17,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-/** The real workbench store the hooks under test read and write, standing in for the provider. */
 const harness = vi.hoisted(() => ({ store: null as WorkbenchInternalStore | null }));
 
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => {
@@ -75,7 +74,6 @@ const TEXT_SOURCE = {
 
 type Router = (hex: string, phase: ColorSamplePhase) => boolean;
 
-/** The Color pane's tint editor, mounted beside the feed as the pane mounts it beside the canvas. */
 const TintEditorProbe = ({
   engine,
   onEditor,
@@ -101,9 +99,6 @@ afterEach(async () => {
   harness.store = null;
 });
 
-/**
- * A real engine over a project holding a mask, a shape, a text layer and a paint layer, with `selected` selected. The feed's registered router is captured so tests drive picks the way the color-picker tool does.
- */
 const setup = async (
   selected: 'm0' | 'shape' | 'text' | 'paint',
   { shapeSource = SHAPE_SOURCE, withTintEditor = false }: { shapeSource?: ShapeSource; withTintEditor?: boolean } = {}
@@ -176,7 +171,6 @@ const setup = async (
       store.getState().projects.find((project) => project.id === projectId)!,
       'canvas'
     );
-  /** One pick: previews each color, then ends with `end` carrying the last one, as the tool does. */
   const pick = (colors: readonly string[], end: 'commit' | 'cancel') =>
     act(() => {
       for (const hex of colors) {
@@ -209,7 +203,6 @@ describe('CanvasColorFeed Alt-pick routing', () => {
     const pairBefore = view.canvasValues().activeColors;
 
     await act(() => view.router()('#101010', 'preview'));
-    // A preview shows live, on the next frame, without recording history.
     await expect.poll(() => tintOf(view.layer('m0'))).toBe('#101010');
     expect(view.engine.history.getEntries().past).toEqual([]);
 
@@ -236,13 +229,11 @@ describe('CanvasColorFeed Alt-pick routing', () => {
   it('records a pending Color pane tint edit before an Alt-pick, so the pick lands last as its own step', async () => {
     const view = await setup('m0', { withTintEditor: true });
     await act(() => armMaskTintTarget('m0'));
-    // A pane edit waits out its settle delay before recording; the pick arrives inside that window.
     await act(() => view.tintEditor()!.commit('#111111'));
     await view.pick([PICKED], 'commit');
     expect(tintOf(view.layer('m0'))).toBe(PICKED);
     expect(view.engine.history.getEntries().past).toEqual(['Fill', 'Fill']);
 
-    // The pane's settle delay passing changes nothing more.
     await act(() => wait(500));
     expect(tintOf(view.layer('m0'))).toBe(PICKED);
     expect(view.engine.history.getEntries().past).toEqual(['Fill', 'Fill']);
@@ -330,7 +321,6 @@ describe('CanvasColorFeed Alt-pick routing', () => {
     await act(() => view.store.commands.widgets.patchValues('canvas', { activeColorTarget: 'background' }));
 
     await act(() => view.router()('#101010', 'preview'));
-    // The pair follows every preview, as before.
     expect(view.canvasValues().activeColors).toEqual({ background: '#101010', foreground: '#000000' });
     await act(() => view.router()(PICKED, 'commit'));
     expect(view.canvasValues().activeColors).toEqual({ background: PICKED, foreground: '#000000' });

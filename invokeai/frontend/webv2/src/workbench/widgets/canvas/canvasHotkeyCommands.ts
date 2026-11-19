@@ -43,8 +43,6 @@ import {
 export const CANVAS_ONLY_HOTKEYS = [
   ...CANVAS_HISTORY_HOTKEYS,
   // With several results staged or generating `alt+[` / `alt+]` step through them; otherwise they walk the layers.
-  // Left and right step through them too unless the Move or Transform tool is active (see STAGING_NUDGE_TOOLS); the
-  // other arrows always nudge, and Delete always acts on the document: the staging bar handles its own keys.
   ['canvas.prevEntity', 'widgets.canvas.commands.previousEntity', ['alt+[']],
   ['canvas.nextEntity', 'widgets.canvas.commands.nextEntity', ['alt+]']],
   ['canvas.quickSwitch', 'widgets.canvas.commands.quickSwitch', ['q']],
@@ -67,7 +65,6 @@ export const CANVAS_ONLY_HOTKEYS = [
   ['canvas.nudgeRightLarge', 'widgets.canvas.commands.nudgeRightLarge', ['shift+arrowright']],
   ['canvas.nudgeUpLarge', 'widgets.canvas.commands.nudgeUpLarge', ['shift+arrowup']],
   ['canvas.nudgeDownLarge', 'widgets.canvas.commands.nudgeDownLarge', ['shift+arrowdown']],
-  // Layer management.
   ['canvas.duplicateLayer', 'widgets.canvas.commands.duplicateLayer', ['mod+j']],
   ['canvas.groupLayers', 'widgets.canvas.commands.groupLayers', ['mod+g']],
   ['canvas.ungroupLayers', 'widgets.canvas.commands.ungroupLayers', ['mod+shift+g']],
@@ -92,10 +89,7 @@ const NUDGE_DELTAS: Record<string, { dx: number; dy: number }> = {
   'canvas.nudgeUpLarge': { dx: 0, dy: -10 },
 };
 
-/**
- * Tools that keep left/right as nudges while results are staged. With any other tool active a horizontal nudge is
- * almost always a reach for the next result after panning or clicking the canvas, and a 1px move is easy to miss.
- */
+/** Tools that keep left/right as nudges while results are staged; elsewhere the arrows step results. */
 const STAGING_NUDGE_TOOLS: ReadonlySet<ToolId> = new Set(['move', 'transform']);
 
 /** Command id → z-reorder direction (index 0 = top-most; "forward" moves toward 0). */
@@ -106,10 +100,7 @@ const REORDER_KINDS: Record<string, LayerStackMoveKind> = {
   'canvas.layerToFront': 'front',
 };
 
-/**
- * The layer `steps` away from the selection in layer order, wrapping. A selected group stands at its first
- * descendant leaf: next enters the group there, previous leaves it upward. None selected starts from either end.
- */
+/** The layer `steps` away in layer order, wrapping; a selected group stands at its first descendant leaf. */
 const cycleLayerId = (document: CanvasDocumentContractV3, steps: 1 | -1): string | null => {
   const { byId, leaves } = getDocumentIndex(document);
   if (leaves.length === 0) {
@@ -130,10 +121,7 @@ const cycleLayerId = (document: CanvasDocumentContractV3, steps: 1 | -1): string
   return leaves[(current + steps + leaves.length) % leaves.length]!.id;
 };
 
-/**
- * Q: the bookmarked layer when one is set and not already selected, else the previously selected layer. Ids whose
- * layer no longer exists are skipped rather than cleared, so a removed bookmark never selects nothing.
- */
+/** Q: the bookmark unless already selected, else the previous layer; ids of removed layers are skipped. */
 const quickSwitchLayerId = (document: CanvasDocumentContractV3, engine: CanvasEngine): string | null => {
   const { byId } = getDocumentIndex(document);
   const { bookmarkedLayerId, previousLayerId } = engine.interaction.get('layerQuickSwitch');
@@ -148,11 +136,7 @@ const quickSwitchLayerId = (document: CanvasDocumentContractV3, engine: CanvasEn
 export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'engine' | 'selectedLayerId'> {
   readonly document: CanvasDocumentContractV3;
   readonly engine: CanvasEngine | null;
-  /**
-   * More than one staging slot exists, so alt+[ / alt+] step through results (a placeholder shows its progress) instead
-   * of layers, and left / right do too outside the Move and Transform tools. With a single slot there is nothing to step
-   * to: they walk the layers and nudge as usual.
-   */
+  /** Several staging slots: alt+[ / alt+] (and left/right outside Move and Transform) step results. */
   readonly hasMultipleStagingSlots: boolean;
   readonly selectedLayerIds: readonly string[];
   readonly dispatch: CanvasProjectMutationDispatch;
@@ -165,18 +149,16 @@ export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'eng
   readonly reportStructuralCommit: (result: StructuralCommitResult) => void;
   readonly reportPreparedCommit: (outcome: PreparedCommitOutcome) => void;
   readonly reportLayerOperation: (refusal: LayerOperationRefusal | AdjustmentRefusal | LayerUnreadable) => void;
-  /** Explains why the selected layer cannot merge down. */
   readonly reportMergeDownRefusal: (refusal: DocumentRefusal) => void;
   readonly t: (key: string) => string;
 }
 
-/**
- * Routes one canvas command id to its effect. Staged results never lock the canvas: only alt+[ / alt+], and left /
- * right outside the Move and Transform tools, change meaning while several results are staged or generating (they step
- * through them); every other key edits the document as usual.
- */
 export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyContext): void => {
   const { dispatch, document, engine, t } = ctx;
+  if (commandId === 'canvas.deleteSelected' && engine?.interaction.get('vectorEditSession')) {
+    engine.layers.vectorEdit.deleteSelection();
+    return;
+  }
   const { selectedLayerId } = document;
   const index = getDocumentIndex(document);
   const selected = selectedLayerId ? index.byId.get(selectedLayerId) : undefined;
@@ -213,6 +195,15 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   // Arrow-key nudge: engine owns the bounds/lock logic (no-op with no/locked selection).
   const nudge = NUDGE_DELTAS[commandId];
   if (nudge) {
+    const vectorSession = engine?.interaction.get('vectorEditSession');
+    if (
+      engine &&
+      vectorSession &&
+      (vectorSession.activePathId !== null || vectorSession.selectedPoints.length > 0 || vectorSession.pathTransform)
+    ) {
+      engine.layers.vectorEdit.nudge(nudge.dx, nudge.dy);
+      return;
+    }
     const nudged = engine?.layers.nudgeSelectedLayer(nudge.dx, nudge.dy);
     // A nudge with nothing eligible selected is an expected no-op; only a broken commit is news.
     if (nudged?.status === 'postcondition-failed') {
@@ -285,8 +276,7 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   } else if (commandId === 'canvas.invertSelection') {
     engine?.selection.invertSelection();
   } else if (commandId === 'canvas.duplicateLayer') {
-    // With a live pixel selection, mod+J is "layer via copy" — it lifts just
-    // the selected pixels. With none, it duplicates the whole layer.
+    // With a live pixel selection, mod+J is "layer via copy" — it lifts just the selected pixels.
     if (engine?.interaction.get('hasSelection')) {
       const result = engine.selection.liftSelectionToLayer();
       if (result.status !== 'created' && result.status !== 'empty') {

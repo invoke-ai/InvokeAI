@@ -128,9 +128,9 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const repeats = (ids: unknown[]): boolean => new Set(ids).size !== ids.length;
 
 /**
- * The item ids a lock or presence marker names must each name one item (SF-12): within a workflow, its nodes, its
- * edges and its form elements. Layers are already unique across a canvas document's stacks, checked as it loads.
- * Refused rather than repaired: a repair would have to guess which of two items an edit meant.
+ * The item ids a lock or presence marker names must each name one item (SF-12): within a workflow, its nodes, its edges
+ * and its form elements. Layers are already unique across a canvas document's stacks, checked as it loads. Refused
+ * rather than repaired: a repair would have to guess which of two items an edit meant.
  */
 export const findRepeatedWorkflowItem = (entries: unknown[]): string | null => {
   for (const entry of entries) {

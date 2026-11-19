@@ -67,7 +67,6 @@ await i18n
 const DROP_STATE = { helperText: '', isActive: false, isAllowed: false };
 const STATUS_MENU_LABEL = 'Status bar widgets';
 
-/** A popover body with plain content and a row that owns its own context menu, as notification rows do. */
 const FixtureView = ({ presentation }: WidgetViewProps) => {
   const [ownMenuOpen, setOwnMenuOpen] = useState(false);
   if (presentation === 'compact') {
@@ -108,7 +107,6 @@ const makeState = (): WorkbenchState => {
   return state;
 };
 
-/** Every open menu naming the status bar's widgets: the widgets menu, opened from the bar. */
 const statusMenus = () =>
   [...document.querySelectorAll<HTMLElement>('[role="menu"]')].filter(
     (menu) => menu.textContent?.includes(STATUS_MENU_LABEL) && menu.closest('[data-state="open"]') !== null
@@ -124,7 +122,6 @@ const expectNoStatusMenu = async () => {
   expect(statusMenus()).toHaveLength(0);
 };
 
-/** Records whether the page's handlers left a right-click's default (the browser's own menu) in place. */
 const lastContextMenuDefault = () => {
   const seen: { prevented: boolean | null } = { prevented: null };
   const record = (event: Event) => {
@@ -137,7 +134,6 @@ const lastContextMenuDefault = () => {
   };
 };
 
-/** The shell's mouse sensor, so a click on a chip activates it instead of starting a drag. */
 const ShellDnd = ({ children }: { children: ReactNode }) => {
   const sensors = useSensors(useSensor(PrimaryMouseSensor, { activationConstraint: { distance: 6 } }));
   return <DndContext sensors={sensors}>{children}</DndContext>;
@@ -204,7 +200,6 @@ describe('status bar context menus', () => {
 
     try {
       await userEvent.click(popup.getByText('Fixture body'), { button: 'right' });
-      // The browser's own menu applies: nothing on the page claimed the event.
       expect(contextMenu.seen.prevented).toBe(false);
       await expectNoStatusMenu();
 
@@ -222,7 +217,6 @@ describe('status bar context menus', () => {
     const bar = host.querySelector<HTMLElement>('footer')!;
     const bounds = bar.getBoundingClientRect();
 
-    // The middle of the bar is its spacer, between the start cluster and the end cluster.
     await userEvent.click(bar, { button: 'right', position: { x: bounds.width / 2, y: bounds.height / 2 } });
 
     await expect.poll(() => statusMenus()).toHaveLength(1);

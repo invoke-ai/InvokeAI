@@ -23,11 +23,10 @@ export interface ModelsUiSnapshot {
   addModelsQuery: string;
   /** One-shot starter type filter for links identifying a missing model kind rather than a name. */
   addModelsTypeSeed: ModelTaxonomyType | null;
-  /** Model focused in the manager library's detail pane. */
   activeModelKey: string | null;
   /**
-   * Whether the detail, not the library, is the pane shown when the manager is too narrow for both; null until the
-   * user opens or leaves one, when the manager decides from whether the library is empty.
+   * Whether the detail, not the library, is the pane shown when the manager is too narrow for both; null until the user
+   * opens or leaves one, when the manager decides from whether the library is empty.
    */
   detailOpen: boolean | null;
   /** Consume provider reveal once so returning to Keys does not replay an old highlight. */
@@ -40,7 +39,6 @@ export interface ModelsUiSnapshot {
   hfLookup: HFLookupState | null;
   /** Starter bundle selected in Add Models, kept across tab switches. */
   selectedBundleName: string | null;
-  /** Whether the always-visible install queue footer is expanded. */
   queueExpanded: boolean;
   /** Whether the expanded queue fills the detail pane instead of docking as a footer. */
   queueMaximized: boolean;
@@ -79,9 +77,9 @@ registerAccountOwnedResource({
 });
 
 /**
- * Every opener reveals the detail and every clear returns to the library, so no caller has to remember the
- * single-pane state: setting a tab or a different model opens the detail; clearing the open model while its Details
- * tab shows closes it. An explicit `detailOpen` wins.
+ * Every opener reveals the detail and every clear returns to the library, so no caller has to remember the single-pane
+ * state: setting a tab or a different model opens the detail; clearing the open model while its Details tab shows
+ * closes it. An explicit `detailOpen` wins.
  */
 const withDetailOpen = (current: ModelsUiSnapshot, next: Partial<ModelsUiSnapshot>): Partial<ModelsUiSnapshot> => {
   if (next.detailOpen !== undefined) {
@@ -131,12 +129,10 @@ export const pruneModelsUiKeys = (deletedKeys: string[]): void => {
 
 // Revealing a tab must also restore the pane a maximized queue is covering.
 
-/** Jump the model manager's detail pane to a specific tab. */
 export const openModelManagerTab = (activeTab: ModelManagerTab): void => {
   updateModelsUi({ activeTab, queueMaximized: false });
 };
 
-/** Focus a model and reveal it in the detail tab (e.g. from a library row). */
 export const openModelDetail = (modelKey: string): void => {
   updateModelsUi({ activeModelKey: modelKey, activeTab: 'details', queueMaximized: false });
 };
@@ -147,8 +143,8 @@ export const closeModelDetail = (): void => {
 };
 
 /**
- * Decide the starting pane once, when the library first loads: an empty library opens on Add Models, any other on
- * the list. Later installs and deletes never move the user; only openers and Back do.
+ * Decide the starting pane once, when the library first loads: an empty library opens on Add Models, any other on the
+ * list. Later installs and deletes never move the user; only openers and Back do.
  */
 export const settleInitialModelsPane = (isLibraryEmpty: boolean): void => {
   if (store.getSnapshot().detailOpen === null) {
@@ -223,7 +219,6 @@ export const clearAddModelsTypeSeed = (): void => {
   }
 };
 
-/** Expand the always-visible install queue footer (e.g. from a "View queue" link). */
 export const openInstallQueue = (): void => {
   updateModelsUi({ queueExpanded: true });
 };

@@ -16,47 +16,31 @@ import { fetchVerifiedGalleryItemPage, GALLERY_PAGE_SIZE, galleryBoardsOptions }
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
 
-/** Inject workbench dependencies so reveal loads on demand without adding gallery transfer code to editor boot. */
+/** Injected so reveal loads on demand without adding gallery transfer code to editor boot. */
 export interface GalleryRevealContext {
   commands: WorkbenchCommands;
   queries: WorkbenchQueries;
   queryClient: QueryClient;
 }
 
-/**
- * What the gesture was, at the moment it was made. The caller captures the
- * account, project, and sequence before lazy loading; the reveal must not take
- * any of them from whatever state exists when the chunk lands.
- */
+/** Captured before lazy loading: the reveal must not read account, project or sequence from later state. */
 export interface GalleryRevealTicket {
-  /** Account identity lifetime at the original gesture, before any lazy import or media fetch. */
   accountScope: AccountScope;
-  /** Announced in the Gallery's live region once the item is revealed; reveals the user asked for set none. */
+  /** Reveals the user asked for set none. */
   announcement?: GalleryRevealAnnouncement;
-  /** Canceled when a later Gallery navigation supersedes this locator. */
   locatorSignal?: AbortSignal;
-  /**
-   * A further condition checked wherever the ticket is, last immediately before the first Gallery change; false
-   * stands the reveal down. For reveals nobody on screen asked for.
-   */
+  /** Checked last immediately before the first Gallery change; for reveals nobody on screen asked for. */
   mayApply?: () => boolean;
-  /** The project the press belongs to; its writes may not land in another. */
   projectId: string;
-  /** This navigation's place in the global ordering; see `claimGalleryNavigationSequence`. */
   sequence: number;
 }
 
-/**
- * Reveal a freshly resolved item in its board/view after its exact filtered-list position and page agree. Do not
- * change Gallery state until the page verifies the locator result. Caller-minted gesture tickets fence project
- * changes and later selections even across lazy loading.
- */
+/** No Gallery state changes before the item's filtered-list position and page agree. */
 export const revealGalleryItem = (
   { commands, queries, queryClient }: GalleryRevealContext,
   ref: GalleryItemRef,
   { accountScope, announcement, locatorSignal, mayApply, projectId, sequence }: GalleryRevealTicket
 ): Promise<void> => {
-  // Fence the network result to the gesture's project before clearing filters or selecting.
   const isCurrent = () =>
     !accountScope.signal.aborted &&
     isGalleryNavigationCurrent(sequence) &&
@@ -76,7 +60,7 @@ export const revealGalleryItem = (
 
     const targetView = getGalleryItemView(image);
 
-    // A Canvas-owned (`other`) item is in no view's listing, so there is nowhere to reveal it.
+    // A Canvas-owned (`other`) item is in no view's listing.
     if (targetView === null) {
       return;
     }
@@ -86,9 +70,9 @@ export const revealGalleryItem = (
       return getResolvedProjectWidgetValues(snapshot.activeProject, 'gallery', snapshot.scopedDefaults);
     };
     const settings = getGallerySettings(getGalleryValues());
-    // Match the post-reveal listing filters and starred partition so prefetched pages enter the gallery's cache.
+    // Match the post-reveal filters so prefetched pages enter the gallery's cache.
     const wantsStarredOnly = image.starred === true;
-    // A media filter that hides the item's kind is reset to both, like the other filters; one that shows it stays.
+    // A media filter that hides the item's kind resets to both.
     const currentMediaKind = toGalleryMediaKind(settings.mediaFilter);
     const resetsMediaFilter = currentMediaKind !== undefined && currentMediaKind !== image.kind;
     const listingFilter = {
@@ -99,8 +83,6 @@ export const revealGalleryItem = (
       searchTerm: '',
       starred: wantsStarredOnly,
     };
-    // The board list determines whether the destination can present an archived board. The locator itself uses
-    // the same filters as the destination's 60-item page and avoids downloading every item name.
     const boardsPromise = queryClient
       .fetchQuery(
         galleryBoardsOptions({
@@ -110,7 +92,7 @@ export const revealGalleryItem = (
           orderDir: settings.boardOrderDir,
         })
       )
-      // Unknown beats blocked: without the boards list the reveal proceeds as if the board were listable.
+      // Unknown beats blocked: without the boards list the reveal proceeds.
       .catch(() => null);
     const [verified, boards] = await Promise.all([
       fetchVerifiedGalleryItemPage(queryClient, listingFilter, ref, accountScope, locatorSignal),
@@ -126,13 +108,11 @@ export const revealGalleryItem = (
     const values = getGalleryValues();
     const settingsNow = getGallerySettings(values);
 
-    // The listing's ordering or media filter may have changed while the locator was in flight; the computed index
-    // describes the old listing, so the page landing is dropped.
+    // The computed index describes the old listing if ordering or media filter changed meanwhile.
     if (settingsNow.imageOrderDir !== settings.imageOrderDir || settingsNow.mediaFilter !== settings.mediaFilter) {
       return;
     }
 
-    // Do not use a hidden board's offset when board resolution will present Uncategorized instead.
     const isBoardListable =
       image.boardId === 'none' ||
       boards === null ||
@@ -145,7 +125,6 @@ export const revealGalleryItem = (
       (typeof values.searchTerm === 'string' && values.searchTerm !== '') ||
       typeof values.semanticSearchText === 'string';
 
-    // Clear filters to match the indexed listing and select the item's starred partition.
     if (
       hasSearch ||
       resetsMediaFilter ||
@@ -165,14 +144,13 @@ export const revealGalleryItem = (
       commands.gallery.setView(targetView);
     }
 
-    // Select the board before the item so its navigation query captures the destination listing for Preview
-    // next/previous.
+    // Board before item, so its navigation query captures the destination listing for Preview next/previous.
     commands.gallery.selectBoard(image.boardId);
 
     const page = boardIndex !== null ? Math.floor(boardIndex / GALLERY_PAGE_SIZE) : null;
 
     if (page !== null && settingsNow.paginationMode === 'paginated') {
-      // The verified page is cached, and its own total lets the listing open it past a stale retained total.
+      // Its own total lets the listing open it past a stale retained total.
       commands.gallery.setPage(page);
     }
 

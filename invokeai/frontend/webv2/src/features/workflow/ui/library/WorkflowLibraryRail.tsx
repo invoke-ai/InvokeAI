@@ -11,24 +11,16 @@ import { BookOpenIcon, ClockIcon, FolderIcon, LayoutTemplateIcon, UsersIcon } fr
 import { useCallback, useId, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * The library's left rail: the places it browses, then the current place's tags as any-of checkboxes. Counts are
- * the place's own, never narrowed by the search or the checked tags, so checking a tag never changes its neighbours.
- */
+/** Counts are the place's own, never narrowed by search or checked tags, so checking a tag never changes neighbours. */
 
 const RAIL_WIDTH = '12.25rem';
 
 /**
- * The library's one layout breakpoint, on the dialog's container (`containerName: workflow-library-dialog`): below
- * 56rem (a window under about 960px) the rail, a usable card column and the 18rem detail rail no longer fit side by
- * side. There the places become a select in the toolbar, the tags a popover behind a Tags button that counts the
- * checked ones, the order and view controls one options menu, and the detail rail a bottom sheet
- * (`WorkflowDetailSheet`).
+ * The library's one breakpoint, on the dialog container: below 56rem (about a 960px window) the rail, a card column and
+ * the 18rem detail rail no longer fit side by side.
  */
 export const WORKFLOW_LIBRARY_NARROW = '@container workflow-library-dialog (width < 56rem)';
-/** The complement of `WORKFLOW_LIBRARY_NARROW`: the rail, centre column and detail rail side by side. */
 export const WORKFLOW_LIBRARY_WIDE = '@container workflow-library-dialog (width >= 56rem)';
-/** Controls that only the wide layout shows. */
 export const WORKFLOW_LIBRARY_WIDE_ONLY_CSS = { [WORKFLOW_LIBRARY_NARROW]: { display: 'none' } } as const;
 
 const TAG_HOVER = { bg: 'bg.muted' } as const;
@@ -41,7 +33,6 @@ const PLACES: ReadonlyArray<{ icon: LucideIcon; labelKey: string; value: Workflo
   { icon: UsersIcon, labelKey: 'workflowLibrary.placeShared', value: 'shared' },
 ];
 
-/** A place's name, as the rail lists it. */
 export const getWorkflowLibraryPlaceLabelKey = (place: WorkflowLibraryTab): string =>
   PLACES.find((candidate) => candidate.value === place)!.labelKey;
 
@@ -49,17 +40,14 @@ export const getWorkflowLibraryPlaceLabelKey = (place: WorkflowLibraryTab): stri
 export const getWorkflowLibraryPlaceLabelId = (idBase: string, place: WorkflowLibraryTab) => `${idBase}-place-${place}`;
 
 export interface WorkflowLibraryRailProps {
-  /** Prefix for the place labels' ids; see `getWorkflowLibraryPlaceLabelId`. */
   idBase: string;
   place: WorkflowLibraryTab;
   /** Unfiltered totals per library place; an absent place shows no count. */
   placeTotals: Readonly<Partial<Record<WorkflowLibraryPlace, number>>>;
-  /** In this project's count. */
   projectTotal: number;
   showShared: boolean;
   tagCounts: readonly WorkflowTagCount[];
   checkedTags: readonly string[];
-  /** A sentence under the rail, for the place it describes. */
   footer?: string;
   onPlaceChange: (place: WorkflowLibraryTab) => void;
   onTagsChange: (tags: readonly string[]) => void;
@@ -71,7 +59,6 @@ const SectionLabel = ({ children, id }: { children: string; id: string }) => (
   </Text>
 );
 
-// Localized labels wrap rather than clip, so every place and tag reads in full.
 const LABEL_WRAP = { overflowWrap: 'anywhere', whiteSpace: 'normal' } as const;
 
 const PlaceButton = ({
@@ -182,7 +169,6 @@ export interface WorkflowLibraryTagGroupProps {
   getFallbackFocus: () => HTMLElement | null | undefined;
 }
 
-/** The current place's tags as any-of checkboxes with Clear, shared by the rail and the narrow layout's popover. */
 export const WorkflowLibraryTagGroup = ({
   checkedTags,
   getFallbackFocus,
@@ -196,10 +182,7 @@ export const WorkflowLibraryTagGroup = ({
   const tagsHintId = useId();
   // A checked tag the counts no longer list (a failed count, a deleted workflow) stays visible, so it can be cleared.
   const listedTags = useMemo(() => new Set(tagCounts.map(({ tag }) => tag)), [tagCounts]);
-  /**
-   * Controls that leave on this change (Clear with the last checked tag, an unlisted tag once unchecked) hand focus to
-   * the first listed tag, or the fallback when no tag stays, rather than letting it fall to the page.
-   */
+  /** Controls leaving on this change hand focus to the first listed tag, or the fallback, not the page. */
   const keepFocus = useCallback(() => {
     (
       groupRef.current?.querySelector<HTMLElement>('[data-library-tag]:not([data-unlisted]) input[type="checkbox"]') ??
@@ -349,7 +332,6 @@ export type WorkflowLibraryPlaceSelectProps = Pick<
   'place' | 'placeTotals' | 'projectTotal' | 'showShared' | 'onPlaceChange'
 >;
 
-/** The narrow layout's places: a select at the start of the toolbar naming the current place and its count. */
 export const WorkflowLibraryPlaceSelect = ({
   place,
   placeTotals,
@@ -408,10 +390,7 @@ export const WorkflowLibraryPlaceSelect = ({
 
 const TAG_FILTER_POSITIONING = { placement: 'bottom-start' } as const;
 
-/**
- * The narrow layout's tags button, in the toolbar after the places select: "Tags N" opens the tag checkboxes in a
- * popover. Absent while the place has no tags and none is checked.
- */
+/** Absent while the place has no tags and none is checked. */
 export const WorkflowLibraryTagButton = ({
   checkedTags,
   getFallbackFocus,
