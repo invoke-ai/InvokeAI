@@ -10,7 +10,7 @@ import logging
 import threading
 import time
 import weakref
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 import torch
@@ -2474,7 +2474,10 @@ def test_cuda_cache_init_queries_total_vram_without_mem_get_info(mock_logger):
 
     mc = "invokeai.backend.model_manager.load.model_cache.model_cache"
     with (
-        patch(f"{mc}.torch.cuda.get_device_properties", return_value=MagicMock(total_memory=48 * GB)) as mock_props,
+        patch(
+            f"{mc}.torch.cuda.get_device_properties",
+            return_value=MagicMock(total_memory=48 * GB, is_integrated=False),
+        ) as mock_props,
         patch(f"{mc}.torch.cuda.mem_get_info", return_value=(10 * GB, 48 * GB)) as mock_mem_get_info,
     ):
         cache = ModelCache(
@@ -2486,7 +2489,7 @@ def test_cuda_cache_init_queries_total_vram_without_mem_get_info(mock_logger):
             logger=mock_logger,
         )
         try:
-            mock_props.assert_called_once_with(torch.device("cuda:1"))
+            assert mock_props.call_args_list == [call(1), call(torch.device("cuda:1"))]
             mock_mem_get_info.assert_not_called()
         finally:
             cache.shutdown()

@@ -21,6 +21,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_w
     CachedModelWithPartialLoad,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.util.devices import EmptyCacheOutcome, TorchDevice
 from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule
 
 
@@ -68,6 +69,30 @@ def _patch_integrated(is_integrated: bool | None):
         ),
     ):
         yield
+
+
+@contextmanager
+def _patch_integrated_cuda():
+    with (
+        patch("invokeai.backend.util.devices.device_is_integrated", return_value=True),
+        patch("invokeai.backend.model_manager.load.model_cache.model_cache.device_is_integrated", return_value=True),
+        patch("torch.version.hip", None),
+        patch.object(torch.cuda, "get_device_properties", return_value=SimpleNamespace(total_memory=8 * 2**30)),
+    ):
+        yield
+
+
+def _make_cuda_cache(logger: MagicMock, enable_partial_loading: bool = False, keep_ram_copy: bool = True) -> ModelCache:
+    with _patch_integrated_cuda():
+        return ModelCache(
+            execution_device_working_mem_gb=1.0,
+            enable_partial_loading=enable_partial_loading,
+            keep_ram_copy_of_weights=keep_ram_copy,
+            execution_device="cuda:0",
+            storage_device="cpu",
+            logger=logger,
+            shared_cpu_weights=None,
+        )
 
 
 def _logged_messages(logger: MagicMock) -> list[str]:
@@ -129,6 +154,27 @@ def test_partial_loading_is_honoured_on_an_integrated_gpu():
         assert isinstance(cache._cached_models["m"].cached_model, CachedModelWithPartialLoad)
         # and it still streams without a RAM copy
         assert cache._cached_models["m"].cached_model.get_cpu_state_dict() is None
+    finally:
+        cache.shutdown()
+
+
+@pytest.mark.parametrize("keep_ram_copy", [True, False])
+def test_integrated_cuda_preserves_explicit_ram_copy_setting(keep_ram_copy: bool, mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=keep_ram_copy)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+        assert (cache._cached_models["m"].cached_model.get_cpu_state_dict() is not None) is keep_ram_copy
+    finally:
+        cache.shutdown()
+
+
+def test_partial_loading_is_honoured_on_integrated_cuda(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, enable_partial_loading=True)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+        assert isinstance(cache._cached_models["m"].cached_model, CachedModelWithPartialLoad)
     finally:
         cache.shutdown()
 
@@ -198,6 +244,60 @@ def test_relocking_a_resident_model_on_an_integrated_gpu_is_not_refused(mock_log
             # Free memory is now smaller than the model (it is the model); the re-lock must pass.
             assert cache._move_model_to_vram(entry, vram_available=0) == (0, False)
             assert "m" in cache._cached_models
+    finally:
+        cache.shutdown()
+
+
+def test_oversized_model_on_integrated_cuda_raises_before_full_load(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            with pytest.raises(torch.OutOfMemoryError, match="shares memory with the CPU"):
+                cache._move_model_to_vram(_entry(cache, "m"), vram_available=0)
+    finally:
+        cache.shutdown()
+
+
+def test_relocking_a_resident_integrated_cuda_model_is_not_refused(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            entry.cached_model._is_in_vram = True
+            assert cache._move_model_to_vram(entry, vram_available=0) == (0, False)
+            assert "m" in cache._cached_models
+    finally:
+        cache.shutdown()
+
+
+@pytest.mark.parametrize("offload", ["except", "unlocked"])
+@pytest.mark.parametrize("keep_ram_copy", [True, False], ids=["retained-copy", "no-copy"])
+def test_integrated_cuda_offload_only_releases_a_retained_device_copy(
+    offload: str, keep_ram_copy: bool, mock_logger: MagicMock
+):
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=keep_ram_copy)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            size = entry.cached_model.total_bytes()
+            entry.cached_model.cur_vram_bytes = lambda: size  # type: ignore[method-assign]
+            with (
+                patch.object(cache, "_move_model_to_ram", return_value=size) as move,
+                patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN),
+            ):
+                freed = (
+                    cache.offload_models_from_vram_except(set())
+                    if offload == "except"
+                    else cache.offload_unlocked_models_from_vram()
+                )
+                assert freed == (size if keep_ram_copy else 0)
+        if keep_ram_copy:
+            move.assert_called_once()
+        else:
+            move.assert_not_called()
     finally:
         cache.shutdown()
 

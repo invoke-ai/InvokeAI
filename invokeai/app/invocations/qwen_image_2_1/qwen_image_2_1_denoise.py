@@ -43,7 +43,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImage21ConditioningInfo
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
-from invokeai.backend.util.devices import TorchDevice, device_has_dedicated_vram
+from invokeai.backend.util.devices import TorchDevice, device_has_dedicated_vram, device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
 
 LATENT_CHANNELS = 64
@@ -147,8 +147,12 @@ def prefix_cache_fits(cache_bytes: int, device: torch.device) -> bool:
     They cannot be offloaded the way the transformer's weights can, so caches larger than half the card would
     leave too little for the model however it streams: four references at CFG above 1 hold ~16 GiB. Past that the
     prefix is recomputed every step instead -- slower, but within the memory of an ordinary run. Memory that is
-    not a dedicated card's (CPU, MPS, an integrated XPU) is not limited here, nor a card that reports no size.
+    CPU and MPS are not limited here. Integrated CUDA uses host headroom; integrated XPU and cards with unknown size
+    retain their existing behavior.
     """
+    if device.type == "cuda" and torch.version.hip is None and device_is_integrated(device) is True:
+        available = TorchDevice.memory_available_to_process(device) - torch.cuda.memory_allocated(device)
+        return cache_bytes <= available // 2
     if not device_has_dedicated_vram(device):
         return True
     backend = torch.xpu if device.type == "xpu" else torch.cuda

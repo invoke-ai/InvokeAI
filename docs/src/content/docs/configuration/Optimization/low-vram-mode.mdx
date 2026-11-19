@@ -85,7 +85,7 @@ none of them.
 | `max_cache_ram_gb` | unset: half your RAM minus 2 GB, within limits | You want more inactive models kept in RAM, or Invoke to use less RAM. | More: faster reloads, more RAM in use. |
 | `keep_ram_copy_of_weights` | `true` | RAM is consistently tight. | Off: lower average RAM use, slower model switching and LoRA patching. |
 | `offload_on_architecture_switch` | `true` | You alternate between model architectures that fit in VRAM together. | Off: other architectures' models stay in VRAM until a load needs the room. |
-| `clear_vram_after_session` | `false` | A generation that runs fine once runs out of memory, or slows down sharply, when repeated. | A few seconds per queue item to reload models from RAM. |
+| `clear_vram_after_session` | `false` | A generation that runs fine once runs out of memory, or slows down sharply, when repeated. On integrated CUDA, it can unload the duplicate CUDA copy when `keep_ram_copy_of_weights` is enabled. | A few seconds per queue item to reload models from RAM. The physical-memory effect on integrated CUDA is hardware-dependent. |
 | `pytorch_cuda_alloc_conf` | unset | You want to tune peak reserved VRAM, for example with `backend:cudaMallocAsync`. | The best value depends on the GPU, driver and CUDA version: test it. |
 | `auto_tiled_decode` | `true` | You never want a decode tiled unless you ask for it. | Decodes too large for the card run out of memory. |
 | `force_tiled_decode` | `false` | You want every supported decode and encode tiled. | Slower, and not pixel-identical to an untiled decode. |
@@ -187,11 +187,13 @@ offload_on_architecture_switch: false
 <details>
 <summary><span>`clear_vram_after_session`: clearing VRAM after every generation</span></summary>
 
-After every queue item (every image of a batch), Invoke moves the models it holds in VRAM to RAM and hands the freed
-memory back to the GPU driver. The models stay cached in RAM, so each queue item then costs a few seconds to reload
-them, not a load from disk; with `keep_ram_copy_of_weights: false` also the time to copy them back to RAM. With several
-GPUs, handing the memory back briefly holds up a generation running on another GPU. On the CPU, Apple silicon and
-integrated Intel GPUs, whose VRAM is system memory, it changes nothing.
+After every queue item (every image of a batch), Invoke moves models it holds in separate VRAM to RAM and hands the
+freed memory back to the GPU driver. The models stay cached in RAM, so each queue item then costs a few seconds to
+reload them, not a load from disk; with `keep_ram_copy_of_weights: false` also the time to copy them back to RAM. On
+integrated NVIDIA CUDA, the same setting can unload the duplicate CUDA copy when `keep_ram_copy_of_weights` is enabled.
+Its effect on physical system-memory pressure is hardware-dependent and remains unverified on Spark. With no retained
+copy, or on the CPU, Apple silicon, MPS and integrated Intel GPUs, there is no separate device pool to return.
+With several GPUs, handing the memory back briefly holds up a generation running on another GPU.
 
 ```yaml
 clear_vram_after_session: true

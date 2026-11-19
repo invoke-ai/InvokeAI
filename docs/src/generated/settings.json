@@ -606,7 +606,7 @@
     {
       "category": "CACHE",
       "default": false,
-      "description": "After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.",
+      "description": "After every queue item (each image of a batch), move models held in separate VRAM to RAM and return the freed memory to the GPU driver. Integrated CUDA can also unload the duplicate CUDA copy when keep_ram_copy_of_weights is enabled; the physical-memory effect is hardware-dependent and unverified. With no retained copy, or on CPU, MPS and integrated XPU, there is no separate device pool to free. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because memory pressure rises when it is repeated.",
       "env_var": "INVOKEAI_CLEAR_VRAM_AFTER_SESSION",
       "literal_values": [],
       "name": "clear_vram_after_session",

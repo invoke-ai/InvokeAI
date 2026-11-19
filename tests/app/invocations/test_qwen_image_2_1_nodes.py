@@ -716,6 +716,15 @@ def test_caches_larger_than_half_the_card_are_not_kept(monkeypatch: pytest.Monke
     assert not prefix_cache_fits(2 * 4 * 4200 * RELEASED_KV_BYTES, cuda)
 
 
+def test_integrated_cuda_prefix_cache_uses_host_headroom(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(f"{DENOISE}.device_is_integrated", lambda _device: True)
+    monkeypatch.setattr(f"{DENOISE}.TorchDevice.memory_available_to_process", lambda _device: 21 * 2**30)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: 1 * 2**30)
+    cuda = torch.device("cuda")
+    assert prefix_cache_fits(10 * 2**30, cuda)
+    assert not prefix_cache_fits(11 * 2**30, cuda)
+
+
 @pytest.mark.parametrize(("integrated", "fits"), [(False, False), (True, True)], ids=["discrete", "integrated"])
 def test_a_discrete_xpu_card_is_limited_like_any_dedicated_card(
     monkeypatch: pytest.MonkeyPatch, integrated: bool, fits: bool

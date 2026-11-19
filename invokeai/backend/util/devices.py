@@ -3,6 +3,7 @@ import threading
 from collections import Counter, defaultdict
 from enum import Enum
 from functools import wraps
+from pathlib import Path
 from typing import Dict, Literal, Optional, Protocol, Union
 
 import psutil
@@ -25,6 +26,39 @@ MPS_DEVICE = torch.device("mps")
 # Devices for which the blind free-VRAM estimate has already been reported, so the
 # warning is emitted once per device rather than on every cache query.
 _XPU_MEM_FALLBACK_WARNED: set[str] = set()
+
+
+def _host_memory_available() -> int:
+    """Return conservative host headroom for an integrated CUDA device."""
+    available = int(psutil.virtual_memory().available)
+    if sys.platform != "linux":
+        return available
+    try:
+        cgroup = next(
+            (line.partition("::")[2] for line in Path("/proc/self/cgroup").read_text().splitlines() if "::" in line),
+            None,
+        )
+        if cgroup is None:
+            # shortcut: cgroup v1 is unsupported; use host MemAvailable until v2 support is available.
+            return available
+        parts = [part for part in cgroup.split("/") if part]
+        cgroup_headroom: int | None = None
+        for depth in range(len(parts), -1, -1):
+            cgroup_dir = Path("/sys/fs/cgroup") / "/".join(parts[:depth])
+            try:
+                limit = (cgroup_dir / "memory.max").read_text().strip()
+                if limit == "max":
+                    continue
+                current = int((cgroup_dir / "memory.current").read_text())
+                remaining = max(0, int(limit) - current)
+                cgroup_headroom = remaining if cgroup_headroom is None else min(cgroup_headroom, remaining)
+            except (OSError, ValueError):
+                continue
+        if cgroup_headroom is not None:
+            available = min(available, cgroup_headroom)
+    except (OSError, ValueError):
+        pass
+    return available
 
 
 class EmptyCacheOutcome(Enum):
@@ -88,11 +122,12 @@ def device_is_integrated(device: torch.device) -> Optional[bool]:
 def device_has_dedicated_vram(device: torch.device) -> bool:
     """Whether to budget device memory as dedicated VRAM rather than shared system RAM.
 
-    CUDA/ROCm retains its dedicated-memory budget. Integrated XPU shares system RAM; an unknown
-    XPU type keeps the discrete-device policy rather than guessing.
+    CUDA/ROCm retains its dedicated-memory budget. Integrated NVIDIA CUDA shares system RAM;
+    an unknown CUDA type keeps the dedicated-device policy rather than guessing. Integrated XPU
+    shares system RAM; an unknown XPU type keeps the discrete-device policy.
     """
     if device.type == "cuda":
-        return True
+        return torch.version.hip is not None or device_is_integrated(device) is not True
     if device.type == "xpu":
         return xpu_device_is_integrated(device) is not True
     return False
@@ -634,14 +669,16 @@ class TorchDevice:
         """What this process can hold on a GPU `device`, what it holds there included.
 
         On a device with its own memory (`device_has_dedicated_vram`): what the driver has free plus what torch has
-        allocated. On one whose "VRAM" is system RAM (MPS, an integrated XPU): the system's available RAM plus what the
-        backend holds for this process (`torch.mps.driver_allocated_memory`, `torch.xpu.memory_reserved`), since the
+        allocated. On one whose "VRAM" is system RAM (MPS, an integrated CUDA/XPU): the system's available RAM plus
+        what the backend holds for this process, since the
         device totals say nothing about what the host still has free. The model cache budgets from it
         (`ModelCache._get_vram_available`, which adds the caching allocator's reclaimable blocks on a dedicated
         device), and a working-memory calibration plan sizes its cases from it. Raises ValueError for a device that is
         not a GPU.
         """
         if device.type == "cuda":
+            if device_is_integrated(device) is True and torch.version.hip is None:
+                return _host_memory_available() + torch.cuda.memory_allocated(device)
             free, _ = cls.cuda_mem_get_info(device)
             return free + torch.cuda.memory_allocated(device)
         if device.type == "xpu" and device_has_dedicated_vram(device):

@@ -11,6 +11,7 @@ import pytest
 import torch
 
 from invokeai.app.services.config import get_config
+from invokeai.backend.util import devices as devices_module
 from invokeai.backend.util.devices import (
     EmptyCacheOutcome,
     TorchDevice,
@@ -57,6 +58,94 @@ def test_device_memory_budget_classification(device_name, integrated, expected, 
     monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: SimpleNamespace(is_integrated=1))
     monkeypatch.setattr(torch.version, "hip", "7.15.26333")
     assert device_has_dedicated_vram(device) is expected
+
+
+@pytest.mark.parametrize(("integrated", "expected"), [(True, False), (False, True), (None, True)])
+def test_cuda_memory_budget_classification(integrated, expected, monkeypatch):
+    monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: SimpleNamespace(is_integrated=integrated))
+    assert device_has_dedicated_vram(torch.device("cuda:0")) is expected
+
+
+def test_integrated_cuda_memory_available_uses_host_headroom(monkeypatch):
+    device = torch.device("cuda:0")
+    monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: SimpleNamespace(is_integrated=1))
+    monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda *_: pytest.fail("CUDA free used")))
+    monkeypatch.setattr("invokeai.backend.util.devices._host_memory_available", lambda: 100)
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: 7)
+    assert TorchDevice.memory_available_to_process(device) == 107
+
+
+def test_host_memory_available_clamps_nested_cgroup_limit(monkeypatch):
+    files = {
+        "/proc/self/cgroup": "0::/user.slice/invokeai",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.max": "600",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.current": "200",
+    }
+    monkeypatch.setattr(devices_module.psutil, "virtual_memory", lambda: SimpleNamespace(available=1000))
+    monkeypatch.setattr(devices_module.sys, "platform", "linux")
+
+    def read_text(path):
+        try:
+            return files[str(path)]
+        except KeyError as exc:
+            raise OSError from exc
+
+    monkeypatch.setattr(devices_module.Path, "read_text", read_text)
+    assert devices_module._host_memory_available() == 400
+
+
+def test_host_memory_available_ignores_unlimited_cgroup_and_swap(monkeypatch):
+    files = {
+        "/proc/self/cgroup": "0::/user.slice/invokeai",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.max": "max",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.current": "200",
+    }
+    monkeypatch.setattr(devices_module.psutil, "virtual_memory", lambda: SimpleNamespace(available=1000))
+    monkeypatch.setattr(devices_module.sys, "platform", "linux")
+
+    def read_text(path):
+        try:
+            return files[str(path)]
+        except KeyError as exc:
+            raise OSError from exc
+
+    monkeypatch.setattr(devices_module.Path, "read_text", read_text)
+    assert devices_module._host_memory_available() == 1000
+
+
+def test_host_memory_available_clamps_to_finite_ancestor_when_leaf_is_unlimited(monkeypatch):
+    files = {
+        "/proc/self/cgroup": "0::/user.slice/invokeai",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.max": "max",
+        "/sys/fs/cgroup/user.slice/invokeai/memory.current": "200",
+        "/sys/fs/cgroup/user.slice/memory.max": "700",
+        "/sys/fs/cgroup/user.slice/memory.current": "300",
+    }
+    monkeypatch.setattr(devices_module.psutil, "virtual_memory", lambda: SimpleNamespace(available=1000))
+    monkeypatch.setattr(devices_module.sys, "platform", "linux")
+
+    def read_text(path):
+        try:
+            return files[str(path)]
+        except KeyError as exc:
+            raise OSError from exc
+
+    monkeypatch.setattr(devices_module.Path, "read_text", read_text)
+    assert devices_module._host_memory_available() == 400
+
+
+@pytest.mark.parametrize("error", [OSError("missing"), ValueError("malformed")])
+def test_host_memory_available_falls_back_when_cgroup_is_unreadable(monkeypatch, error):
+    monkeypatch.setattr(devices_module.psutil, "virtual_memory", lambda: SimpleNamespace(available=1000))
+    monkeypatch.setattr(devices_module.sys, "platform", "linux")
+
+    def read_text(_path):
+        raise error
+
+    monkeypatch.setattr(devices_module.Path, "read_text", read_text)
+    assert devices_module._host_memory_available() == 1000
 
 
 # ===== per-thread session device (multi-GPU worker pinning) ================
@@ -1067,6 +1156,22 @@ def test_auto_keeps_cuda_devices_whose_properties_do_not_say():
 
 def test_device_is_integrated_is_unknown_when_the_properties_cannot_be_read():
     with patch("invokeai.backend.util.devices.torch.cuda.get_device_properties", side_effect=RuntimeError("no GPU")):
+        assert device_is_integrated(torch.device("cuda", 0)) is None
+
+
+@pytest.mark.parametrize(
+    ("property_value", "expected"),
+    [(1, True), (0, False)],
+    ids=["truthy-driver-attribute", "false-driver-attribute"],
+)
+def test_device_is_integrated_normalizes_cuda_driver_attribute(property_value, expected):
+    properties = SimpleNamespace(is_integrated=property_value)
+    with patch("invokeai.backend.util.devices.torch.cuda.get_device_properties", return_value=properties):
+        assert device_is_integrated(torch.device("cuda", 0)) is expected
+
+
+def test_device_is_integrated_is_unknown_when_property_is_missing():
+    with patch("invokeai.backend.util.devices.torch.cuda.get_device_properties", return_value=SimpleNamespace()):
         assert device_is_integrated(torch.device("cuda", 0)) is None
 
 
