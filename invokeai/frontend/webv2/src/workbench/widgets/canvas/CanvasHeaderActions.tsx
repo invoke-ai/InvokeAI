@@ -1,3 +1,4 @@
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { CanvasDocumentContractV3, Rect } from '@workbench/canvas-engine/api';
 import type { CanvasGallerySaveRegion, CreateFromBboxDestination } from '@workbench/canvas-operations/api';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
@@ -90,7 +91,7 @@ const selectModelBase = (project: Project): string | null => {
 };
 
 /** The project's clamped compositing mask blur, which fit-to-masks clears so the feathered edge stays in frame. */
-const selectMaskBlur = (values: Record<string, unknown>): number => readCanvasCompositingSettings(values).maskBlur;
+const selectMaskBlur = (values: ResolvedValues): number => readCanvasCompositingSettings(values).maskBlur;
 
 const selectModelVariant = (project: Project): string | null => {
   const values = getProjectWidgetValues(project, 'generate') as { model?: { variant?: unknown } } | undefined;

@@ -11,6 +11,8 @@ import type { VideoWidgetValues } from './types';
 
 import {
   getAcceleratorLoraChangeResult,
+  getAcceleratorToggleResult,
+  getEffectiveVideoModel,
   getDefaultVideoSettings,
   getVideoComponentSectionPolicy,
   getVideoIssueSections,
@@ -64,19 +66,37 @@ export const syncVideoWidgetValuesWithModels = (
 
   const modelsByKey = new Map(models.map((model) => [model.key, model]));
   const storedMain = values.model ? modelsByKey.get(values.model.key) : undefined;
-  // Preserve supported legacy nonselectable mains for repair guidance; automatic choices use the stricter selectable
-  // filter.
-  const model: MainModelConfig | null =
+  // Preserve supported legacy nonselectable mains for repair guidance; automatic choices use the stricter
+  // selectable filter.
+  const registered: MainModelConfig | null =
     storedMain && isSupportedVideoModel(storedMain)
       ? storedMain
       : ((models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null);
+  const sameH3 =
+    registered?.base === 'minimax-h3' && registered.format === 'checkpoint' && registered.key === values.modelKey;
+  const model = registered;
 
-  // Run canonical selection transitions after model replacement so family-specific fps, frames, and resolution cannot
-  // remain stale.
-  const base: VideoWidgetValues =
+  // Run canonical selection transitions after model replacement so family-specific fps, frames, and resolution
+  // cannot remain stale.
+  let base: VideoWidgetValues =
     model && model.key !== values.model?.key
       ? { ...getVideoModelSelectionResult({ currentSettings: values, model, models }).settings, model }
       : values;
+
+  // Catalog reclassification changes Detected's task, not user intent. Replace only toggle-owned Turbo
+  // adapters; retain media for validation instead of silently discarding it in a model-selection transition.
+  if (
+    sameH3 &&
+    base.acceleratorEnabled &&
+    model &&
+    getEffectiveVideoModel(values.model, values)?.variant !== getEffectiveVideoModel(model, base).variant
+  ) {
+    const enabled = getAcceleratorToggleResult(base, model, models, true);
+    base = {
+      ...base,
+      ...(enabled.missingLoras ? getAcceleratorToggleResult(base, model, models, false).settings : enabled.settings),
+    };
+  }
 
   const componentPolicy = model ? getVideoComponentSectionPolicy(model, base) : null;
   const slotsByKey = new Map(componentPolicy?.slots.map((slot) => [slot.key, slot]) ?? []);
@@ -163,6 +183,7 @@ export const syncVideoWidgetValuesWithModels = (
     ltx2TextEncoderModel: syncComponent('ltx2TextEncoderModel', base.ltx2TextEncoderModel),
     model,
     modelKey: model?.key ?? base.modelKey,
+    h3TaskOverride: sameH3 ? base.h3TaskOverride : undefined,
     vae: syncComponent('vae', base.vae),
     wanLowNoiseModel: syncComponent('wanLowNoiseModel', base.wanLowNoiseModel),
     wanT5EncoderModel: syncComponent('wanT5EncoderModel', base.wanT5EncoderModel),
@@ -175,7 +196,7 @@ export const syncVideoWidgetValuesWithModels = (
   }
 
   // Drop orphaned references when the replacement model lacks reference mode, preserving identity otherwise.
-  if (next.references.length > 0 && model && !getVideoModes(model).includes('reference')) {
+  if (next.references.length > 0 && model && !sameH3 && !getVideoModes(model).includes('reference')) {
     next.references = [];
   }
 
@@ -183,6 +204,7 @@ export const syncVideoWidgetValuesWithModels = (
     base === values &&
     next.model === values.model &&
     next.modelKey === values.modelKey &&
+    next.h3TaskOverride === values.h3TaskOverride &&
     next.acceleratorEnabled === values.acceleratorEnabled &&
     next.acceleratorLoraKeys === values.acceleratorLoraKeys &&
     next.vae === values.vae &&
@@ -212,10 +234,15 @@ export const getVideoWidgetValidationIssues = (
     return [{ fields: [], message: 'Video needs a Wan 2.2, MiniMax H3 or LTX-2 main model.' }];
   }
 
-  const issues = getVideoValidationIssues(values.model, values);
+  // Readiness may receive the persisted (classified) record before the view's catalog sync.
+  // Resolve the same effective H3 task the graph compiler will use, without changing any media.
+  const registered = models?.find((item) => item.key === values.model?.key);
+  const source = registered && isSupportedVideoModel(registered) ? registered : values.model;
+  const effectiveModel = getEffectiveVideoModel(source, values);
+  const issues = getVideoValidationIssues(source, values);
 
   if (models) {
-    issues.push(...getVideoModelAvailabilityIssues(values.model, values, models));
+    issues.push(...getVideoModelAvailabilityIssues(effectiveModel, values, models));
   }
 
   return issues;

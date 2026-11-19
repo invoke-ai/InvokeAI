@@ -79,6 +79,18 @@ import {
 
 export type SupportedVideoBase = 'wan' | 'minimax-h3' | 'ltx-2';
 
+/** Catalog records stay untouched; only task-dependent consumers use this derived model. */
+export const getEffectiveVideoModel = <T extends MainModelConfig | undefined | null>(
+  model: T,
+  settings: Pick<VideoSettings, 'h3TaskOverride'>
+): T => {
+  if (model?.base !== 'minimax-h3' || model.format !== 'checkpoint') {
+    return model;
+  }
+  const variant = settings.h3TaskOverride ?? (model.variant === 'ref2va' ? 'ref2va' : 'fl2va');
+  return (variant === model.variant ? model : { ...model, variant }) as T;
+};
+
 export type VideoNegativePromptUsage = 'always' | 'cfg-gated' | 'never';
 
 export interface VideoTargetResolutionOption {
@@ -502,9 +514,16 @@ export const getVideoDimensions = (
   model: MainModelConfig | undefined,
   settings: Pick<
     VideoSettings,
-    'aspectRatioId' | 'targetResolution' | 'firstFrameImage' | 'lastFrameImage' | 'sourceVideo' | 'conditioningClip'
+    | 'aspectRatioId'
+    | 'targetResolution'
+    | 'firstFrameImage'
+    | 'lastFrameImage'
+    | 'sourceVideo'
+    | 'conditioningClip'
+    | 'h3TaskOverride'
   >
 ): ResolvedVideoDimensions | null => {
+  model = getEffectiveVideoModel(model, settings);
   const config = getVideoConfig(model);
   const targetResolution = coerceTargetResolution(config, settings.targetResolution);
 
@@ -747,6 +766,7 @@ export const getAutoDurationBounds = (
 };
 
 export const getVideoModelPolicy = (model: MainModelConfig | undefined, settings: VideoSettings): VideoModelPolicy => {
+  model = getEffectiveVideoModel(model, settings);
   const config = getVideoConfig(model);
   const guidanceDistilled = isGuidanceDistilled(config, settings);
   // Only for LTX-2 extend with a source picked: the ceiling is the source's.
@@ -1036,6 +1056,7 @@ export const getAcceleratorToggleResult = (
   models: readonly ModelConfig[],
   enabled: boolean
 ): AcceleratorToggleResult => {
+  model = getEffectiveVideoModel(model, settings);
   const config = getVideoConfig(model);
   // Remove only the entries the previous toggle added, never a user's own Lightning-style LoRA.
   const previousKeys = new Set(settings.acceleratorLoraKeys);
@@ -1097,6 +1118,19 @@ export const getAcceleratorToggleResult = (
   };
 };
 
+/** Switch H3 tasks without leaving Turbo's sampling recipe behind when its adapter is removed. */
+export const getH3ModeSwitchSettings = (
+  settings: VideoSettings,
+  model: MainModelConfig,
+  models: readonly ModelConfig[],
+  override: boolean
+): VideoSettings => {
+  const detected = getEffectiveVideoModel(model, {}).variant;
+  const h3TaskOverride = override ? (detected === 'ref2va' ? 'fl2va' : 'ref2va') : undefined;
+  const next: VideoSettings = { ...settings, h3TaskOverride };
+  return settings.acceleratorEnabled ? getAcceleratorToggleResult(next, model, models, false).settings : next;
+};
+
 export type AcceleratorLoraChangeOutcome = 'unchanged' | 'switched' | 'disabled';
 
 export interface AcceleratorLoraChangeResult {
@@ -1113,6 +1147,7 @@ export const getAcceleratorLoraChangeResult = (
   models: readonly ModelConfig[],
   loras: GenerateLora[]
 ): AcceleratorLoraChangeResult => {
+  model = getEffectiveVideoModel(model, settings);
   const config = getVideoConfig(model);
   const next: VideoSettings = { ...settings, loras };
 
@@ -1435,8 +1470,9 @@ export const getVideoComponentSectionPolicy = (
       required: (ctx) => !isH3TextEncoderSatisfied(ctx),
       valueKind: 'component',
     },
-    // The hybrid replaces non-AdaLN weights with an FL2VA base while retaining Ref2VA task identity and projections.
-    ...(model.variant === 'ref2va'
+    // The hybrid replaces non-AdaLN weights with an FL2VA base while retaining Ref2VA task identity and
+    // projections.
+    ...(model.variant === 'ref2va' && getEffectiveVideoModel(model, _settings).variant === 'ref2va'
       ? [
           {
             filter: isH3HybridBaseCandidate,
@@ -1595,6 +1631,7 @@ export const getDefaultVideoSettings = (
           : null,
     firstFrameImage: null,
     fps: config.fps.defaultValue,
+    h3TaskOverride: undefined,
     h3HybridBaseModel: null,
     h3HybridStartBlock: MINIMAX_H3_HYBRID_BLOCK_RANGE.defaultStart,
     h3TextEncoderModel: null,
@@ -1654,6 +1691,7 @@ export const getVideoSettingsWithModelDefaults = (
     cfgScaleLowNoise: modelDefaults.cfgScaleLowNoise,
     componentSourceModel: modelDefaults.componentSourceModel,
     fps: modelDefaults.fps,
+    h3TaskOverride: undefined,
     h3HybridBaseModel: modelDefaults.h3HybridBaseModel,
     h3HybridStartBlock: modelDefaults.h3HybridStartBlock,
     h3TextEncoderModel: modelDefaults.h3TextEncoderModel,
@@ -1716,22 +1754,35 @@ export const getVideoModelSelectionResult = ({
   currentSettings,
   model,
   models,
+  h3TaskOverride,
 }: {
   currentSettings: VideoSettings;
   model: MainModelConfig;
   models: readonly ModelConfig[];
+  /** Task override for the incoming H3 model, applied before the loss preview. */
+  h3TaskOverride?: VideoSettings['h3TaskOverride'];
 }): VideoModelSelectionResult => {
+  const catalogModel = model;
+  h3TaskOverride = model.base === 'minimax-h3' && model.format === 'checkpoint' ? h3TaskOverride : undefined;
+  model = getEffectiveVideoModel(model, { h3TaskOverride });
   const config = getVideoConfig(model);
   // No modelKey means healing defaults, not user choices: bootstrap the model's defaults first.
   const start = currentSettings.modelKey
     ? currentSettings
     : getVideoSettingsWithModelDefaults(currentSettings, model, models);
-  const next: VideoSettings = { ...start, modelKey: model.key };
+  const next: VideoSettings = {
+    ...start,
+    modelKey: model.key,
+    h3TaskOverride,
+  };
   const losses: VideoModelSwitchLoss[] = [];
   const adjustments = new Set<VideoModelSwitchAdjustment>();
   const modes = config.modes;
   const previousModel = models.find((entry) => entry.key === currentSettings.modelKey);
-  const previousConfig = previousModel && isSupportedVideoModel(previousModel) ? getVideoConfig(previousModel) : null;
+  const previousConfig =
+    previousModel && isSupportedVideoModel(previousModel)
+      ? getVideoConfig(getEffectiveVideoModel(previousModel, currentSettings))
+      : null;
 
   if (next.references.length > 0 && !modes.includes('reference')) {
     // An untouched Initial Video anchor is re-derived on the way back; a set trim or conditioning on it is not.
@@ -1890,7 +1941,7 @@ export const getVideoModelSelectionResult = ({
 
   // Concepts stay, as in Generate: the graph loads only compatible ones (`getActiveCompatibleLoras`).
 
-  const policy = getVideoComponentSectionPolicy(model, next);
+  const policy = getVideoComponentSectionPolicy(catalogModel, next);
   const slotsByKey = new Map(policy.slots.map((slotPolicy) => [slotPolicy.key, slotPolicy]));
   // A component the previous model seeds again on the way back is not a loss.
   let previousSeeds: VideoSettings | null | undefined;
@@ -2111,6 +2162,8 @@ export const getVideoModelAvailabilityIssues = (
 
 /** Why Video cannot run with this model, each with the controls that fix it, in the order Invoke lists them. */
 export const getVideoValidationIssues = (model: MainModelConfig, settings: VideoSettings): VideoValidationIssue[] => {
+  const catalogModel = model;
+  model = getEffectiveVideoModel(model, settings);
   // The model picker fixes these, and it sits in no section.
   if (!isSupportedVideoModel(model)) {
     return [{ message: 'Video needs a supported video model before it can be invoked.', fields: [] }];
@@ -2434,7 +2487,7 @@ export const getVideoValidationIssues = (model: MainModelConfig, settings: Video
     });
   }
 
-  const componentPolicy = getVideoComponentSectionPolicy(model, settings);
+  const componentPolicy = getVideoComponentSectionPolicy(catalogModel, settings);
   issues.push(
     ...componentPolicy
       .validate(getVideoComponentPolicyContext(model, settings))
