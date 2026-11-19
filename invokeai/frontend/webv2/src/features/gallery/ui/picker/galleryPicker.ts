@@ -167,9 +167,8 @@ const NAV_KEYS: ReadonlySet<string> = new Set<GalleryPickerNavKey>([
 export const isGalleryPickerNavKey = (key: string): key is GalleryPickerNavKey => NAV_KEYS.has(key);
 
 /**
- * Keyboard movement over a row-major grid. Left/right walk reading order
- * across row ends; up/down stay in the column and hold still when no tile
- * sits there (a ragged last row). No active tile resolves to an edge.
+ * Keyboard movement over a row-major grid. Left/right walk reading order across row ends; up/down stay in the column
+ * and hold still when no tile sits there (a ragged last row). No active tile resolves to an edge.
  */
 export const getGalleryPickerNeighborIndex = (
   index: number,

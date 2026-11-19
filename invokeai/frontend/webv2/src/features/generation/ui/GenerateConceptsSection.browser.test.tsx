@@ -79,7 +79,6 @@ const render = async (selectedModel: GenerateModelConfig = MAIN_MODEL, settings 
   return { onCommit, renderProject, row: host };
 };
 
-/** The settings a recorded commit produces from the rendered ones. */
 const applied = (update: GenerateSettingsUpdate | undefined): GenerateLora | undefined =>
   (typeof update === 'function' ? update(SETTINGS) : { ...SETTINGS, ...update }).loras[0];
 
@@ -128,7 +127,6 @@ describe('GenerateConceptsContent', () => {
     expect(onCommit).toHaveBeenCalledTimes(1);
     const update = onCommit.mock.calls[0]?.[0];
     expect(typeof update).toBe('function');
-    // A weight that landed after this render must survive the add.
     const latest = { ...SETTINGS, loras: [{ ...LORA, weight: 0.9 }] };
     expect((update as (settings: GenerateSettings) => GenerateSettings)(latest).loras).toEqual([
       { ...LORA, weight: 0.9 },
@@ -262,7 +260,6 @@ describe('a concept that is not installed', () => {
     expect(missingRow.textContent).toContain('widgets.generate.notInstalled');
     expect(toggle.matches(':checked') || toggle.getAttribute('aria-checked') === 'true').toBe(true);
     expect(toggle.matches(':disabled') || toggle.getAttribute('aria-disabled') === 'true').toBe(true);
-    // The issue is an icon beside the switch, named by its message; its fix waits in the icon's popover.
     const icon = missingRow.querySelector<HTMLButtonElement>('button[data-issue-ids]')!;
     expect(icon.getAttribute('data-issue-ids')).toBe(issue.id);
     expect(icon.getAttribute('aria-label')).toBe('widgets.generate.issuesNamed');

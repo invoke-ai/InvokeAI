@@ -1,8 +1,4 @@
-/**
- * A glanceable readout of the generation frame's size and, when it differs, the size the frame renders at. It sits in
- * the canvas's top-right corner, under the center chrome, follows a Frame tool drag before it commits, and never takes
- * the pointer. The render size comes from the policy the canvas graph compiler applies, so the two cannot disagree.
- */
+/** The frame's size and, when it differs, its render size, from the compiler's own scaling policy. */
 
 import type { CanvasScalingSettings, PidMode } from '@features/generation/contracts';
 import type { Project } from '@workbench/projectContracts';
@@ -58,11 +54,7 @@ const renderInputsEqual = (a: RenderInputs, b: RenderInputs): boolean =>
 // Below the center view's header row, as the tool strip sits.
 const READOUT_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 
-/**
- * The layer spans the canvas so the readout can query its size: on a canvas too narrow it would crowd the top-center
- * chips (the control layer view switch), and on one too short, the tool strip's row, so it steps aside. It stacks under
- * the drop zones and the tool strip (z-index 2).
- */
+/** Spans the canvas so the readout can query its size and step aside on narrow or short canvases. */
 const LAYER_CSS = { containerType: 'size' } as const;
 const READOUT_CSS = {
   '@container (width < 34rem)': { display: 'none' },

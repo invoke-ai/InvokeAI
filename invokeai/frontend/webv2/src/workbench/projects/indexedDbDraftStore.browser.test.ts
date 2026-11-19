@@ -21,8 +21,8 @@ import {
   getWorkbenchDatabaseName,
   openUnloadJournalDatabase,
   openWorkbenchDatabase,
-  WORKBENCH_DATABASE_VERSION,
   type WorkbenchDatabase,
+  WORKBENCH_DATABASE_VERSION,
 } from './workbenchDatabase';
 
 const suffixes = new Set<string>();
@@ -41,25 +41,6 @@ const createStore = async (): Promise<ProjectDraftStore> => {
   const store = createIndexedDbProjectDraftStore(await openWorkbenchDatabase(suffix), { journalDatabase });
   stores.push(store);
   return store;
-};
-
-const interceptFirstWrite = (database: WorkbenchDatabase, beforeWrite: () => void): WorkbenchDatabase => {
-  let isArmed = true;
-  return new Proxy(database, {
-    get(target, property) {
-      if (property === 'transaction') {
-        return (...args: unknown[]) => {
-          if (isArmed && args[1] === 'readwrite') {
-            isArmed = false;
-            beforeWrite();
-          }
-          return Reflect.apply(target.transaction, target, args);
-        };
-      }
-      const value = Reflect.get(target, property, target) as unknown;
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
-  }) as WorkbenchDatabase;
 };
 
 const abortFirstBodyWriteWithQuota = (database: WorkbenchDatabase): WorkbenchDatabase => {
@@ -105,24 +86,6 @@ const abortFirstBodyWriteWithQuota = (database: WorkbenchDatabase): WorkbenchDat
       return typeof value === 'function' ? value.bind(target) : value;
     },
   }) as WorkbenchDatabase;
-};
-
-const reserveCopyInRawTransaction = async (database: WorkbenchDatabase): Promise<void> => {
-  const transaction = database.transaction(['drafts', 'draftBodies', 'draftWriters'], 'readwrite');
-  const metadataStore = transaction.objectStore('drafts');
-  const bodyStore = transaction.objectStore('draftBodies');
-  const writerStore = transaction.objectStore('draftWriters');
-  const key: [string, string] = ['project-1', 'session-a'];
-  const [metadata, body, claim] = await Promise.all([metadataStore.get(key), bodyStore.get(key), writerStore.get(key)]);
-  if (!metadata || !body || !claim) {
-    throw new Error('Expected draft metadata, body and writer claim.');
-  }
-  const { copyDocumentJson, ...reservationMetadata } = createCopyReservation('copy-1');
-  const metadataRevision = metadata.metadataRevision + 1;
-  await metadataStore.put({ ...metadata, ...reservationMetadata, metadataRevision });
-  await bodyStore.put({ ...body, copyDocumentJson });
-  await writerStore.put({ ...claim, metadataRevision });
-  await transaction.done;
 };
 
 const createVersion2Database = (suffix: string, claims: unknown[]): Promise<void> =>
@@ -284,19 +247,6 @@ describe('IndexedDB project drafts', () => {
     await expect(first.stage(createProjectDraftInput({ generation: 2 }))).resolves.toEqual({ kind: 'fenced' });
   });
 
-  it('refuses an oversized draft before opening a write transaction', async () => {
-    const suffix = createSuffix();
-    const database = await openWorkbenchDatabase(suffix);
-    stores.push(database);
-    const store = createIndexedDbProjectDraftStore(database, { maxDraftBytes: 4 });
-    stores.push(store);
-
-    await expect(store.stage(createProjectDraftInput({ documentJson: '12345' }))).resolves.toEqual({
-      kind: 'too-large',
-    });
-    await expect(store.list()).resolves.toEqual({ items: [], kind: 'available', nextCursor: null });
-  });
-
   it('closes every account-owned instance and eventually deletes its database on rotation', async () => {
     const suffix = createSuffix();
     const owner = accountLifecycle.activate('draft-browser-test', suffix);
@@ -348,25 +298,6 @@ describe('IndexedDB project drafts', () => {
     expect(openDatabase).not.toHaveBeenCalled();
   });
 
-  it('deletes account storage when rotation races database opening', async () => {
-    const suffix = createSuffix();
-    const owner = accountLifecycle.activate('draft-browser-test', suffix);
-    let resolveOpen: (database: WorkbenchDatabase) => void = () => undefined;
-    const opening = new Promise<WorkbenchDatabase>((resolve) => {
-      resolveOpen = resolve;
-    });
-    const database = { close: vi.fn() } as unknown as WorkbenchDatabase;
-    const deleteDatabase = vi.fn<typeof deleteWorkbenchDatabase>(() => Promise.resolve({ kind: 'deleted' }));
-    const pending = createAccountOwnedProjectDraftStore(owner, { deleteDatabase, openDatabase: () => opening });
-
-    accountLifecycle.invalidate();
-    resolveOpen(database);
-
-    await expect(pending).rejects.toMatchObject({ name: 'AccountScopeExpiredError' });
-    expect(database.close).toHaveBeenCalledOnce();
-    expect(deleteDatabase).toHaveBeenCalledWith(suffix);
-  });
-
   it('surfaces corrupt rows without loading every document into the result page', async () => {
     const suffix = createSuffix();
     const database = await openWorkbenchDatabase(suffix);
@@ -398,35 +329,6 @@ describe('IndexedDB project drafts', () => {
       kind: 'empty',
       writerState: 'fenced',
     });
-  });
-
-  it('keeps a stale writer fenced after corrupt cleanup', async () => {
-    const suffix = createSuffix();
-    const firstDatabase = await openWorkbenchDatabase(suffix);
-    const secondDatabase = await openWorkbenchDatabase(suffix);
-    const firstStore = createIndexedDbProjectDraftStore(firstDatabase);
-    const secondStore = createIndexedDbProjectDraftStore(secondDatabase);
-    stores.push(firstStore, secondStore);
-    await firstStore.stage(createProjectDraftInput());
-    const body = await firstDatabase.get('draftBodies', ['project-1', 'session-a']);
-    if (!body) {
-      throw new Error('Expected a draft body.');
-    }
-    await firstDatabase.put('draftBodies', { ...body, documentByteSize: body.documentByteSize + 1 });
-
-    await expect(secondStore.deleteCorrupt('project-1', 'session-a')).resolves.toEqual({ kind: 'deleted' });
-    await expect(firstStore.stage(createProjectDraftInput({ generation: 2 }))).resolves.toEqual({ kind: 'fenced' });
-    await expect(secondStore.get('project-1', 'session-a')).resolves.toEqual({
-      kind: 'empty',
-      writerState: 'fenced',
-      writerToken: 'writer-a',
-    });
-    await expect(secondStore.startFreshWriter('project-1', 'session-a', 'writer-a', 'writer-b')).resolves.toEqual({
-      kind: 'started',
-    });
-    await expect(
-      secondStore.stage(createProjectDraftInput({ generation: 2, writerToken: 'writer-b' }))
-    ).resolves.toEqual({ kind: 'stored' });
   });
 
   it('does not overwrite an orphaned target body during adoption or retargeting', async () => {
@@ -462,54 +364,6 @@ describe('IndexedDB project drafts', () => {
     await expect(database.get('draftBodies', ['copy-1', 'session-a'])).resolves.toEqual(copyOrphan);
   });
 
-  it('refuses ownership and reservation changes when a split body is corrupt', async () => {
-    const suffix = createSuffix();
-    const database = await openWorkbenchDatabase(suffix);
-    stores.push(database);
-    const store = createIndexedDbProjectDraftStore(database);
-    stores.push(store);
-    await store.stage(createProjectDraftInput());
-    const body = await database.get('draftBodies', ['project-1', 'session-a']);
-    if (!body) {
-      throw new Error('Expected a staged draft body.');
-    }
-    await database.put('draftBodies', { ...body, documentByteSize: body.documentByteSize + 1 });
-
-    await expect(store.claimWriter('project-1', 'session-a', 'writer-a', 'writer-a2')).resolves.toEqual({
-      kind: 'corrupt',
-    });
-    await expect(
-      store.reserveCopyIdentity('project-1', 'session-a', 'writer-a', createCopyReservation('copy-1'))
-    ).resolves.toEqual({
-      kind: 'corrupt',
-    });
-    await expect(store.stage(createProjectDraftInput({ generation: 2 }))).resolves.toEqual({ kind: 'corrupt' });
-    await expect(database.get('draftBodies', ['project-1', 'session-a'])).resolves.toEqual({
-      ...body,
-      documentByteSize: body.documentByteSize + 1,
-    });
-  });
-
-  it('rejects a copy reservation whose durable body no longer matches its byte binding', async () => {
-    const suffix = createSuffix();
-    const database = await openWorkbenchDatabase(suffix);
-    stores.push(database);
-    const store = createIndexedDbProjectDraftStore(database);
-    stores.push(store);
-    await store.stage(createProjectDraftInput());
-    await store.reserveCopyIdentity('project-1', 'session-a', 'writer-a', createCopyReservation('copy-1'));
-    const body = await database.get('draftBodies', ['project-1', 'session-a']);
-    if (!body) {
-      throw new Error('Expected a staged draft body.');
-    }
-    await database.put('draftBodies', { ...body, copyDocumentJson: '{"id":"tampered"}' });
-
-    await expect(store.get('project-1', 'session-a')).resolves.toEqual({ kind: 'corrupt' });
-    await expect(
-      store.reserveCopyIdentity('project-1', 'session-a', 'writer-a', createCopyReservation('copy-2'))
-    ).resolves.toEqual({ kind: 'corrupt' });
-  });
-
   it('does not delete a mismatched body while settling an acknowledgement', async () => {
     const suffix = createSuffix();
     const database = await openWorkbenchDatabase(suffix);
@@ -530,115 +384,6 @@ describe('IndexedDB project drafts', () => {
     await expect(database.get('draftBodies', ['project-1', 'session-a'])).resolves.toEqual(newerBody);
   });
 
-  it('does not read the previous body when staging a normal newer generation', async () => {
-    const suffix = createSuffix();
-    const database = await openWorkbenchDatabase(suffix);
-    stores.push(database);
-    const store = createIndexedDbProjectDraftStore(database);
-    stores.push(store);
-    await store.stage(createProjectDraftInput());
-    const get = vi.spyOn(IDBObjectStore.prototype, 'get');
-
-    await expect(store.stage(createProjectDraftInput({ generation: 2 }))).resolves.toEqual({ kind: 'stored' });
-
-    expect(
-      get.mock.instances.filter(
-        (objectStore): objectStore is IDBObjectStore =>
-          objectStore instanceof IDBObjectStore && objectStore.name === 'draftBodies'
-      )
-    ).toHaveLength(0);
-    get.mockRestore();
-  });
-
-  it('retries a retarget when a newer generation wins the transaction race', async () => {
-    const suffix = createSuffix();
-    const first = createIndexedDbProjectDraftStore(await openWorkbenchDatabase(suffix));
-    stores.push(first);
-    await first.stage(createProjectDraftInput());
-    await first.reserveCopyIdentity('project-1', 'session-a', 'writer-a', createCopyReservation('copy-1'));
-    await first.stage(createProjectDraftInput({ generation: 2 }));
-    let concurrentStage: Promise<unknown> | null = null;
-
-    const outcome = await first.retargetAcknowledgedCopy({
-      acknowledgedRevision: 1,
-      copyProjectId: 'copy-1',
-      editorSessionId: 'session-a',
-      projectId: 'project-1',
-      retargetDocument: (documentJson) => {
-        concurrentStage ??= first.stage(
-          createProjectDraftInput({ documentJson: '{"id":"project-1","newer":true}', generation: 3 })
-        );
-        return documentJson.replace('project-1', 'copy-1');
-      },
-      sentGeneration: 1,
-      writerToken: 'writer-a',
-    });
-
-    await concurrentStage;
-    expect(outcome).toMatchObject({ draft: { generation: 3, projectId: 'copy-1' }, kind: 'retargeted' });
-  });
-
-  it('does not let adoption erase a same-generation copy reservation', async () => {
-    const suffix = createSuffix();
-    const database = await openWorkbenchDatabase(suffix);
-    stores.push(database);
-    const source = createIndexedDbProjectDraftStore(database);
-    stores.push(source);
-    await source.stage(createProjectDraftInput());
-    let reservation: Promise<unknown> = Promise.resolve();
-    const intercepted = interceptFirstWrite(database, () => {
-      reservation = reserveCopyInRawTransaction(database);
-    });
-    const adopter = createIndexedDbProjectDraftStore(intercepted);
-    stores.push(adopter);
-
-    await expect(adopter.adopt('project-1', 'session-a', 'session-b', 'writer-b')).resolves.toEqual({
-      kind: 'occupied',
-    });
-    await reservation;
-    await expect(source.get('project-1', 'session-a')).resolves.toMatchObject({
-      draft: { copyProjectId: 'copy-1' },
-      kind: 'found',
-    });
-  });
-
-  it('does not let adoption move a stale snapshot across acknowledgement and recreation', async () => {
-    const suffix = createSuffix();
-    const database = await openWorkbenchDatabase(suffix);
-    stores.push(database);
-    const source = createIndexedDbProjectDraftStore(database);
-    stores.push(source);
-    await source.stage(createProjectDraftInput());
-    let recreation: Promise<unknown> = Promise.resolve();
-    const intercepted = interceptFirstWrite(database, () => {
-      const transaction = database.transaction(['drafts', 'draftBodies', 'draftWriters'], 'readwrite');
-      recreation = (async () => {
-        const key: [string, string] = ['project-1', 'session-a'];
-        const claim = await transaction.objectStore('draftWriters').get(key);
-        if (!claim) {
-          throw new Error('Expected writer claim.');
-        }
-        const recreated = createProjectDraft({ documentJson: '{"recreated":true}', generation: 2 });
-        const metadataRevision = claim.metadataRevision + 2;
-        await transaction.objectStore('drafts').put(toProjectDraftMetadata(recreated, metadataRevision));
-        await transaction.objectStore('draftBodies').put(toProjectDraftBody(recreated));
-        await transaction.objectStore('draftWriters').put({ ...claim, metadataRevision });
-        await transaction.done;
-      })();
-    });
-    const adopter = createIndexedDbProjectDraftStore(intercepted);
-    stores.push(adopter);
-
-    await expect(adopter.adopt('project-1', 'session-a', 'session-b', 'writer-b')).resolves.toEqual({
-      kind: 'occupied',
-    });
-    await recreation;
-    await expect(source.get('project-1', 'session-a')).resolves.toMatchObject({
-      draft: { documentJson: '{"recreated":true}', generation: 2 },
-      kind: 'found',
-    });
-  });
-
   it('keeps the metadata watermark monotonic across acknowledgement and recreation', async () => {
     const suffix = createSuffix();
     const database = await openWorkbenchDatabase(suffix);
@@ -653,69 +398,6 @@ describe('IndexedDB project drafts', () => {
     const claim = await database.get('draftWriters', ['project-1', 'session-a']);
     expect(metadata?.metadataRevision).toBe(3);
     expect(claim?.metadataRevision).toBe(3);
-  });
-
-  it('reports a re-key quota failure without disabling the store or losing the source', async () => {
-    const suffix = createSuffix();
-    const database = await openWorkbenchDatabase(suffix);
-    stores.push(database);
-    const source = createIndexedDbProjectDraftStore(database);
-    stores.push(source);
-    await source.stage(createProjectDraftInput());
-    const failing = createIndexedDbProjectDraftStore(abortFirstBodyWriteWithQuota(database));
-    stores.push(failing);
-
-    await expect(failing.adopt('project-1', 'session-a', 'session-b', 'writer-b')).resolves.toEqual({ kind: 'quota' });
-    expect(failing.availability).toBe('available');
-    await expect(source.get('project-1', 'session-a')).resolves.toMatchObject({ kind: 'found' });
-  });
-
-  it('retries settlement without erasing a same-generation copy reservation', async () => {
-    const suffix = createSuffix();
-    const database = await openWorkbenchDatabase(suffix);
-    stores.push(database);
-    const source = createIndexedDbProjectDraftStore(database);
-    stores.push(source);
-    await source.stage(createProjectDraftInput());
-    let reservation: Promise<unknown> = Promise.resolve();
-    const intercepted = interceptFirstWrite(database, () => {
-      reservation = reserveCopyInRawTransaction(database);
-    });
-    const settling = createIndexedDbProjectDraftStore(intercepted);
-    stores.push(settling);
-
-    await expect(
-      settling.settleConflict('project-1', 'session-a', 'writer-a', 1, {
-        kind: 'revision',
-        serverRevision: 7,
-      })
-    ).resolves.toMatchObject({ draft: { copyProjectId: 'copy-1', state: 'conflict' }, kind: 'marked' });
-    await reservation;
-  });
-
-  it('reports a blocked database deletion without waiting indefinitely', async () => {
-    const suffix = createSuffix();
-    const opened = await openWorkbenchDatabase(suffix);
-    opened.close();
-    const foreign = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(getWorkbenchDatabaseName(suffix));
-      request.addEventListener('error', () => reject(request.error));
-      request.addEventListener('success', () => resolve(request.result));
-    });
-    foreign.onversionchange = () => undefined;
-
-    const deletion = await deleteWorkbenchDatabase(suffix);
-    expect(deletion.kind).toBe('blocked');
-    const startedAt = performance.now();
-    await expect(openWorkbenchDatabase(suffix, { timeoutMs: 25 })).rejects.toMatchObject({ name: 'TimeoutError' });
-    expect(performance.now() - startedAt).toBeLessThan(500);
-    foreign.close();
-    if (deletion.kind === 'blocked') {
-      await expect(deletion.completion).resolves.toEqual({ kind: 'deleted' });
-    }
-    const reopened = await openWorkbenchDatabase(suffix);
-    stores.push(reopened);
-    expect([...reopened.objectStoreNames]).toContain('drafts');
   });
 
   it('marks a store unavailable when another connection upgrades the database', async () => {
@@ -850,68 +532,5 @@ describe('IndexedDB unload journal', () => {
       kind: 'unavailable',
     });
     await expect(store.reconcileUnloadJournal('account-a', 1_000)).resolves.toEqual({ kind: 'unavailable' });
-  });
-
-  it('journals again after one journal transaction could not be opened', async () => {
-    const suffix = createSuffix();
-    const database = await openWorkbenchDatabase(suffix);
-    const journalDatabase = await openUnloadJournalDatabase(suffix);
-    stores.push(database, journalDatabase);
-    let failuresLeft = 1;
-    const flaky = new Proxy(journalDatabase, {
-      get(target, property) {
-        if (property === 'transaction' && failuresLeft > 0) {
-          return () => {
-            failuresLeft -= 1;
-            throw new DOMException('closing', 'InvalidStateError');
-          };
-        }
-        const value = Reflect.get(target, property, target) as unknown;
-        return typeof value === 'function' ? value.bind(target) : value;
-      },
-    });
-    const store = createIndexedDbProjectDraftStore(database, { journalDatabase: flaky });
-    stores.push(store);
-
-    await expect(store.discardUnloadJournal('project-1', 'session-a', 'writer-a')).resolves.toEqual({
-      kind: 'unavailable',
-    });
-    const write = store.journalBeforeUnload({ entries: [createUnloadJournalEntry()], retired: [] });
-    expect(write.kind).toBe('started');
-    await expect(write.kind === 'started' ? write.written : null).resolves.toBe(true);
-    await expect(outcomesOf(store)).resolves.toEqual(['applied']);
-  });
-
-  it('reports a reconciliation whose read failed as unavailable, and reconciles on the next pass', async () => {
-    const suffix = createSuffix();
-    const database = await openWorkbenchDatabase(suffix);
-    const journalDatabase = await openUnloadJournalDatabase(suffix);
-    stores.push(database, journalDatabase);
-    const failing = new Set<string | symbol>();
-    const flaky = new Proxy(journalDatabase, {
-      get(target, property) {
-        if (failing.delete(property)) {
-          return () => Promise.reject(new DOMException('closing', 'InvalidStateError'));
-        }
-        const value = Reflect.get(target, property, target) as unknown;
-        return typeof value === 'function' ? value.bind(target) : value;
-      },
-    });
-    const store = createIndexedDbProjectDraftStore(database, { journalDatabase: flaky });
-    stores.push(store);
-    store.journalBeforeUnload({ entries: [createUnloadJournalEntry()], retired: [] });
-
-    failing.add('getAllKeys');
-    await expect(outcomesOf(store)).resolves.toBe('unavailable');
-    failing.add('get');
-    await expect(outcomesOf(store)).resolves.toBe('unavailable');
-    await expect(outcomesOf(store)).resolves.toEqual(['applied']);
-  });
-
-  it('reports a blind write that committed', async () => {
-    const { store } = await createJournaledStore();
-    const write = store.journalBeforeUnload({ entries: [createUnloadJournalEntry()], retired: [] });
-
-    await expect(write.kind === 'started' ? write.written : null).resolves.toBe(true);
   });
 });

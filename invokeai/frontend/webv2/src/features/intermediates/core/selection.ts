@@ -4,9 +4,9 @@ import { getIntermediatesRowKey } from './types';
 
 /**
  * Row selection for the manager. `rows` keeps a snapshot of every picked row, so picks survive paging and can be
- * summarized and targeted without the page that showed them; `all-matching` stands for every row the current
- * filters match, including rows never loaded, minus the excluded rows, whose snapshots keep the estimate honest. The
- * server resolves what "all matching" is when a preview is requested.
+ * summarized and targeted without the page that showed them; `all-matching` stands for every row the current filters
+ * match, including rows never loaded, minus the excluded rows, whose snapshots keep the estimate honest. The server
+ * resolves what "all matching" is when a preview is requested.
  */
 export type IntermediatesSelection =
   | { mode: 'rows'; rows: ReadonlyMap<string, IntermediatesRow> }
@@ -71,10 +71,10 @@ const sumRows = (rows: Iterable<IntermediatesRow>): SelectionSummary => {
 };
 
 /**
- * Sums the selection. Explicit picks are summed from their snapshots, whichever page showed them; "all matching"
- * starts from the server's totals and subtracts the excluded rows, never going below what is visibly selected (an
- * excluded row may have vanished off-page since its snapshot). A row on the current page is read fresh, since its
- * snapshot may predate a cleanup; the server preview stays the authority for what a delete does.
+ * Sums the selection. Explicit picks are summed from their snapshots, whichever page showed them; "all matching" starts
+ * from the server's totals and subtracts the excluded rows, never going below what is visibly selected (an excluded row
+ * may have vanished off-page since its snapshot). A row on the current page is read fresh, since its snapshot may
+ * predate a cleanup; the server preview stays the authority for what a delete does.
  */
 export const summarizeSelection = (
   selection: IntermediatesSelection,
@@ -109,8 +109,8 @@ export interface IntermediatesScopeFilters {
 }
 
 /**
- * What a confirmation acts on. Explicit picks become their targets. Without exclusions, a project filter or a
- * search, "all matching" is exactly the owner filter (or everyone); otherwise the server resolves the filters.
+ * What a confirmation acts on. Explicit picks become their targets. Without exclusions, a project filter or a search,
+ * "all matching" is exactly the owner filter (or everyone); otherwise the server resolves the filters.
  */
 export const resolveScope = ({
   ownerId,

@@ -33,7 +33,6 @@ const applySystemPatch = (
   systemPatch: Partial<GenerateWidgetValues>
 ): Record<string, unknown> => ({ ...storedValues, ...systemPatch });
 
-// Seed backend fixtures and clean up the registry to isolate policy tests.
 beforeEach(() => {
   setArchitectureCapabilities(capabilitiesFixture as ArchitectureCapabilitiesRow[]);
 });
@@ -53,7 +52,6 @@ describe('resolveGenerateWidgetValues', () => {
   it.each(['checkpoint', 'gguf_quantized'] as const)(
     'never defaults to a model that cannot run on its own (%s)',
     (format) => {
-      // Default resolution excludes unconditional Ideogram branches that cannot generate independently.
       const unconditional = createModel('ideogram4-uncond', {
         base: 'ideogram-4',
         branch: 'unconditional',
@@ -68,7 +66,6 @@ describe('resolveGenerateWidgetValues', () => {
       const result = resolveGenerateWidgetValues({ models: [unconditional, conditional], storedValues: {} });
 
       expect(result?.values.model.key).toBe('ideogram4-cond');
-      // And with nothing else installed there is no default to fall back to at all.
       expect(resolveGenerateWidgetValues({ models: [unconditional], storedValues: {} })).toBeNull();
     }
   );
@@ -161,7 +158,6 @@ describe('resolveGenerateWidgetValues', () => {
       both.loras
     );
 
-    // Two removed copies of one file: only the first takes the reinstalled concept; the other stays as saved.
     const copy = { ...removedLora, key: 'old-lora-copy' };
     const twice = createValues(model, {
       loras: [
@@ -290,7 +286,6 @@ describe('resolveGenerateWidgetValues', () => {
   });
 
   it('maps the random toggle saved before seed modes instead of reusing the record as-is', () => {
-    // Reused as-is, the record reaches the seed menu with no mode and the icon lookup throws.
     const model = createModel('model');
     const { seedMode: _, ...legacy } = createValues(model);
     const storedValues = { ...legacy, shouldRandomizeSeed: true };
@@ -335,7 +330,6 @@ describe('resolveGenerateWidgetValues', () => {
 
 describe('without the backend capability table', () => {
   it('resolves nothing rather than falling back to generic defaults', () => {
-    // Return null before capabilities load rather than persist fallback defaults.
     resetArchitectureCapabilities();
 
     const model: MainModelConfig = { base: 'sdxl', key: 'model', name: 'model', type: 'main' };
@@ -348,7 +342,6 @@ describe('resolveGenerateWidgetValues and an architecture the table omits', () =
   const rows = capabilitiesFixture as ArchitectureCapabilitiesRow[];
 
   it('will not select a model whose architecture the backend did not describe', () => {
-    // Reject missing rows to protect persisted settings from generic defaults.
     setArchitectureCapabilities(rows.filter((row) => row.base !== 'cogview4'));
 
     expect(

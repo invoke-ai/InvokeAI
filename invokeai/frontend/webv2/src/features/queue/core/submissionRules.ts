@@ -32,8 +32,8 @@ export const isBackendSubmittableSourceId = (sourceId: QueueSourceId): boolean =
   BACKEND_SUBMITTABLE_SOURCE_ID_SET.has(sourceId);
 
 /**
- * Whether a queue item is a fresh, backend-submittable `pending` item — the
- * runtime still applies its own "already started this id" dedupe on top of this.
+ * Whether a queue item is a fresh, backend-submittable `pending` item — the runtime still applies its own "already
+ * started this id" dedupe on top of this.
  */
 export const shouldSubmitPendingQueueItem = (queueItem: QueueItem): boolean =>
   queueItem.status === 'pending' && isBackendSubmittableSourceId(queueItem.snapshot.sourceId);
@@ -46,8 +46,8 @@ export const shouldSubmitPendingQueueItem = (queueItem: QueueItem): boolean =>
 const MAX_SUBMISSION_RETRY_MESSAGE_LENGTH = 500;
 
 /**
- * The message cut to MAX_SUBMISSION_RETRY_MESSAGE_LENGTH, ending with an ellipsis when cut. The cut never keeps half
- * of a surrogate pair.
+ * The message cut to MAX_SUBMISSION_RETRY_MESSAGE_LENGTH, ending with an ellipsis when cut. The cut never keeps half of
+ * a surrogate pair.
  */
 export const boundSubmissionRetryMessage = (message: string): string => {
   if (message.length <= MAX_SUBMISSION_RETRY_MESSAGE_LENGTH) {

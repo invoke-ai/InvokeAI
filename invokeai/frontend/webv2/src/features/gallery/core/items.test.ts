@@ -230,8 +230,7 @@ describe('gallery video duration formatting', () => {
 });
 
 describe('gallery item ordering', () => {
-  // The two timestamp shapes the grid mixes: backend rows carry SQLite's
-  // `created_at`; overlaid recents carry the queue's ISO `submittedAt`.
+  // The grid mixes backend rows' SQLite `created_at` with overlaid recents' ISO `submittedAt` from the queue.
   const sqliteItem = galleryItem('backend.png', false);
   const overlayItem = legacyGeneratedImageToGalleryItem(generatedImage);
 
@@ -257,8 +256,7 @@ describe('gallery item ordering', () => {
     const image = { ...sqliteItem, createdAt: '2026-08-29 13:01:20.649' };
     const video = { ...image, durationSeconds: 2, kind: 'video' as const, name: 'backend.png' };
 
-    // The same instant written in both shapes is a chronological tie. (DESC
-    // ties come back as -0 — direction * 0 — so compare with `===`.)
+    // One instant in both shapes ties chronologically (DESC ties are -0, direction * 0, so compare with `===`).
     expect(
       compareGalleryItems({ ...image, createdAt: '2026-08-29T13:01:20.649Z' }, image, { orderDir: 'DESC' }) === 0
     ).toBe(true);
@@ -309,8 +307,7 @@ describe('classifyGalleryUpload', () => {
 });
 
 describe('getGalleryUploadAccept', () => {
-  // Assert every accepted video/audio extension from videos.py; sampled expectations would miss picker
-  // restrictions.
+  // Assert every accepted video/audio extension from videos.py; sampled expectations would miss picker restrictions.
   it('offers every container and audio format the video upload route ingests', () => {
     expect(getGalleryUploadAccept(['video']).split(',')).toEqual([
       'video/*',

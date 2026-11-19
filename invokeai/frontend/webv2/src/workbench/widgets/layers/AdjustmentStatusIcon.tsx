@@ -69,11 +69,7 @@ const DelayedSpinner = () => {
   );
 };
 
-/**
- * A layer or group row's spatial adjustment indicator: a delayed spinner while a job runs, a warning when the canvas
- * cannot apply them. `descriptionId` lets the row point its accessible description at the warning, since the row's
- * controls are pointer-only.
- */
+/** Spatial adjustment indicator; `descriptionId` exposes the warning since row controls are pointer-only. */
 export const AdjustmentStatusIcon = ({
   descriptionId,
   status,
@@ -104,10 +100,7 @@ export const AdjustmentStatusIcon = ({
   );
 };
 
-/**
- * The same warning, in words, above a spatial adjustment's settings, where the keyboard reaches it. The empty live
- * region stays mounted so screen readers announce a warning when it appears.
- */
+/** The warning in words where the keyboard reaches it; the empty live region stays mounted to announce. */
 export const AdjustmentStatusNotice = ({
   engine,
   ownerId,

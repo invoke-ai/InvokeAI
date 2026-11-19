@@ -44,8 +44,8 @@ import {
 } from './submissionApi';
 
 /**
- * This tab's own retry answers, delivered like the socket's `queue_items_retried` so a rerun is adopted even when
- * the socket misses that event; handlers ignore the pairs they have already seen.
+ * This tab's own retry answers, delivered like the socket's `queue_items_retried` so a rerun is adopted even when the
+ * socket misses that event; handlers ignore the pairs they have already seen.
  */
 const ownRetryHandlers = new Set<(payload: never) => void>();
 

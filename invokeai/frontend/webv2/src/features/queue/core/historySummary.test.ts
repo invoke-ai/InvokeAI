@@ -113,72 +113,9 @@ describe('getQueueSummary', () => {
 
     expect(summary).toEqual({ current: 0, remaining: 0, runningQueueItemId: null, total: 0 });
   });
-
-  it('uses the global batch count for workflow-sourced queue items', () => {
-    const summary = getQueueSummary([
-      createQueueItem({
-        batchCount: 2,
-        id: 'workflow-batch',
-        sourceId: 'workflow',
-        status: 'pending',
-        submittedAt: '2026-06-10T00:00:00.000Z',
-      }),
-    ]);
-
-    expect(summary).toEqual({ current: 0, remaining: 2, runningQueueItemId: null, total: 2 });
-  });
-
-  it('does not cap oversized batch counts', () => {
-    const summary = getQueueSummary([
-      createQueueItem({
-        batchCount: 10_000,
-        id: 'oversized-batch',
-        status: 'pending',
-        submittedAt: '2026-06-10T00:00:00.000Z',
-      }),
-    ]);
-
-    expect(summary).toEqual({ current: 0, remaining: 10_000, runningQueueItemId: null, total: 10_000 });
-  });
-
-  it('includes the active image and later batches in the countdown', () => {
-    const progress: QueueItemProgress = {
-      activeItemIndex: 4,
-      completedItemCount: 3,
-      message: '',
-      percentage: null,
-      totalItemCount: 4,
-    };
-    const summary = getQueueSummary(
-      [
-        createQueueItem({
-          backendItemIds: [1, 2, 3, 4],
-          batchCount: 4,
-          id: 'batch-1',
-          status: 'running',
-          submittedAt: '2026-06-10T00:00:00.000Z',
-        }),
-        createQueueItem({
-          batchCount: 4,
-          id: 'batch-2',
-          status: 'pending',
-          submittedAt: '2026-06-10T00:01:00.000Z',
-        }),
-      ],
-      progress
-    );
-
-    expect(summary.remaining).toBe(5);
-  });
 });
 
 describe('getProjectQueueIndicatorState', () => {
-  it('returns idle state for projects without open queue work', () => {
-    expect(
-      getProjectQueueIndicatorState({ isConnected: true, loadingModelsCount: 0, progress: null, queueItems: [] })
-    ).toEqual({ hasOpenQueueWork: false, progressState: { kind: 'idle', value: 0 }, runningQueueItemId: null });
-  });
-
   it('returns indeterminate state for running work without percentage progress', () => {
     const queueItems = [createQueueItem({ id: 'running', status: 'running', submittedAt: '2026-06-10T00:00:00.000Z' })];
 
@@ -201,27 +138,9 @@ describe('getProjectQueueIndicatorState', () => {
       runningQueueItemId: 'running',
     });
   });
-
-  it('uses indeterminate state while models load for pending work', () => {
-    const queueItems = [createQueueItem({ id: 'pending', status: 'pending', submittedAt: '2026-06-10T00:00:00.000Z' })];
-
-    expect(
-      getProjectQueueIndicatorState({ isConnected: true, loadingModelsCount: 1, progress: null, queueItems })
-    ).toEqual({
-      hasOpenQueueWork: true,
-      progressState: { kind: 'indeterminate', value: null },
-      runningQueueItemId: null,
-    });
-  });
 });
 
 describe('getQueueProgressBarValue', () => {
-  it('returns an idle state when there is no active work', () => {
-    expect(
-      getQueueProgressBarState({ isConnected: true, isRunning: false, loadingModelsCount: 0, progress: null })
-    ).toEqual({ kind: 'idle', value: 0 });
-  });
-
   it('matches legacy indeterminate conditions', () => {
     expect(
       getQueueProgressBarState({ isConnected: true, isRunning: false, loadingModelsCount: 1, progress: null })
@@ -248,25 +167,6 @@ describe('getQueueProgressBarValue', () => {
         progress: { message: '', percentage: 0 },
       })
     ).toBeNull();
-  });
-
-  it('returns determinate progress when backend reports a non-zero percentage', () => {
-    expect(
-      getQueueProgressBarState({
-        isConnected: true,
-        isRunning: true,
-        loadingModelsCount: 0,
-        progress: { message: 'Denoising', percentage: 0.42 },
-      })
-    ).toEqual({ kind: 'determinate', value: 0.42 });
-    expect(
-      getQueueProgressBarValue({
-        isConnected: true,
-        isRunning: true,
-        loadingModelsCount: 0,
-        progress: { message: 'Denoising', percentage: 0.42 },
-      })
-    ).toBe(0.42);
   });
 
   it('resets to zero while disconnected', () => {

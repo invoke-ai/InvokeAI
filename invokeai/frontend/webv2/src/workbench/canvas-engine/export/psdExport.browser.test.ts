@@ -1,5 +1,3 @@
-/** Real-worker check that a PSD leaf carries what the settled display shows for its own spatial stack. */
-
 import type { CanvasAdjustmentsContract } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
@@ -70,7 +68,6 @@ describe('executePsdExport with a spatial stack', () => {
         runSpatial: (request) => service.run(request),
       });
 
-      // What the canvas shows: the display's exact adjusted surface resampled through the transform.
       const worldRect = plan.status === 'ok' ? plan.layers[0]!.worldRect : CONTENT;
       const reference = backend.createSurface(worldRect.width, worldRect.height);
       const { rotation, scaleX, scaleY, x, y } = TRANSFORM;

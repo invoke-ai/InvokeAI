@@ -11,102 +11,56 @@ export type ListDensity = 'compact' | 'regular' | 'comfortable' | 'snug';
 export interface ListContextMenuAnchor {
   x: number;
   y: number;
-  /**
-   * Where keyboard focus belongs once the menu, or a dialog it opened, closes: this row while it exists, otherwise
-   * the list's current tab stop. Resolved late because virtualization or the action itself can unmount the row;
-   * suits a Dialog's `finalFocusEl`.
-   */
+  /** Resolved late because virtualization or the action can unmount the row; suits a Dialog's `finalFocusEl`. */
   focusTarget: () => HTMLElement | null;
   restoreFocus: () => void;
 }
 
 export interface ListItemProps {
   title: string;
-  /**
-   * An editor shown in place of the title, such as a rename field; it names itself. While set, the primary area is a
-   * plain container instead of a button, since a field cannot sit inside a button, and the row opens no context menu,
-   * so the field keeps the browser's text menu. Size it to the title's line so the row keeps its height. Inside a `List`
-   * the field keeps its own arrows, Home and End; the caller ends the edit (Enter, Escape, blur) and moves focus back
-   * to the row, whose button returns with the List's tab stop.
-   */
+  /** While set, the primary area is no button and the row opens no context menu; the caller ends the edit. */
   titleEditor?: ReactNode;
   /** Identifiers keep their tail visible; prose keeps its start. */
   titleTruncate?: 'middle' | 'end';
   /** Media or icon before the text; size it for the density (36px at comfortable and snug). */
   leading?: ReactNode;
-  /** Inline after the title, e.g. a status badge; keep it short so the title keeps its room. */
   badges?: ReactNode;
-  /** Second line: muted text, or a node such as a badge row. */
   description?: ReactNode;
-  /** Trailing metadata or badges; string content renders muted. */
   trailing?: ReactNode;
-  /** Controls that act on the row, rendered beside the primary button so they never nest inside it. */
   actions?: ReactNode;
-  /**
-   * Content under the row that belongs to it, such as a control tuning the item; it shares the row's surface but sits
-   * outside the primary button, so it may hold controls. A context menu it handles itself takes precedence.
-   */
+  /** Sits outside the primary button, so it may hold controls; its own context menu takes precedence. */
   detail?: ReactNode;
   density?: ListDensity;
-  /** The one row whose detail is open; announced with aria-current and filled with the accent tone. */
   isActive?: boolean;
-  /** Part of a multi-selection; only meaningful with onCheckedChange. */
   isChecked?: boolean;
   /** Shown but inert while its page is being replaced; focus is kept so paging does not lose it. */
   isBusy?: boolean;
-  /**
-   * Shown dimmed and inert because the item itself cannot be used; say why in the row's text (a badge, say). Only its
-   * primary button stays focusable, so a List's arrow keys still reach it and assistive tech reads the reason with its
-   * name; press, checkbox, context menu, intent, actions and detail are all off.
-   */
+  /** Only the primary button stays focusable, so arrows reach it and the reason is read; all else is off. */
   isDisabled?: boolean;
-  /** The row discloses content below itself; announced with aria-expanded. */
   isExpanded?: boolean;
-  /** This row's context menu is open; the row keeps its hover surface so it is clear what the menu acts on. */
   isMenuOpen?: boolean;
-  /** Accessible name of the checkbox when the title alone is ambiguous; defaults to "Select {title}". */
   checkLabel?: string;
-  /** Identifies the row to its owning List for focus management. */
   itemKey?: string;
-  /**
-   * DOM id of the primary button, so a menu or dialog opened from outside the row can name it as the trigger focus
-   * returns to.
-   */
   id?: string;
-  /**
-   * Id of the popup the primary button discloses, named with aria-controls only while the button is expanded
-   * (`isExpanded`, or `isMenuOpen` for a row whose press opens its menu). A modal dialog's focus trap admits focus only
-   * into portalled content that an expanded control inside it names.
-   */
+  /** Named only while expanded: a modal's focus trap admits portalled content only an expanded control names. */
   controls?: string;
   /** `presentation` when a caller's own list item wraps this row together with content that belongs to it. */
   role?: 'listitem' | 'presentation';
-  /** Roving tabindex from the owning List; standalone rows are tab stops. */
   tabIndex?: number;
   positionInSet?: number;
   setSize?: number;
-  /** Makes a standalone row a button; without it, and without a context menu, the row is static content. */
   onPress?: (event: MouseEvent<HTMLButtonElement>) => void;
-  /** Accessible name of the row's button when its text alone does not say what pressing it does. */
   pressLabel?: string;
-  /** Fires on hover and focus, ahead of a press, to warm what the press will need. */
   onIntent?: () => void;
-  /** Renders the leading checkbox. */
   onCheckedChange?: (checked: boolean) => void;
-  /**
-   * Without onPress, activating the primary button also opens this menu, except from a mouse click, where
-   * right-click is the path; keyboard, assistive-technology, touch, and pen activation all open it.
-   */
+  /** Without onPress, activation also opens it, except from a mouse click (right-click is that path). */
   onContextMenu?: (anchor: ListContextMenuAnchor) => void;
 }
 
 const PRIMARY_SELECTOR = '[data-list-primary]';
 const TRUNCATE_CSS = { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
 
-/**
- * The checkbox and the actions are siblings of the primary button so nothing nests an interactive control. The
- * whole surface hovers as one; the primary button carries the accessible name and the focus ring wraps the row.
- */
+/** Checkbox and actions are siblings of the primary button, so nothing nests an interactive control. */
 export const ListItem = ({
   actions,
   badges,
@@ -138,18 +92,14 @@ export const ListItem = ({
   onPress,
   pressLabel,
 }: ListItemProps) => {
-  // Its own ids, so a row inside a form Field (a popover opened from a field's label, say) never takes the Field's
-  // control id: that would point the checkbox's label at the Field's input instead of this checkbox.
+  // Own ids, so a row inside a form Field never points the checkbox's label at the Field's input.
   const checkInputId = useId();
   const checkIds = useMemo(() => ({ hiddenInput: checkInputId }), [checkInputId]);
   const { t } = useTranslation();
   const recipe = useSlotRecipe({ recipe: listItemSlotRecipe });
   const tone = isActive ? 'accent' : isChecked ? 'selected' : 'none';
   const styles = useMemo(() => recipe({ active: tone, density }), [density, recipe, tone]);
-  // Inside a List every row is a keyboard stop; a standalone row is a button only when pressing it does something.
   const isInteractive = onPress !== undefined || onContextMenu !== undefined || itemKey !== undefined;
-  // A row with actions is pointed like an interactive one, so its buttons read as belonging to it; only a row with
-  // nothing to act on stays static.
   const isStatic = !isInteractive && (actions === undefined || actions === null);
   const isEditingTitle = titleEditor !== undefined && titleEditor !== null;
   const menu = isDisabled || isEditingTitle ? undefined : onContextMenu;
@@ -209,8 +159,7 @@ export const ListItem = ({
     (details: { checked: boolean | 'indeterminate' }) => onCheckedChange?.(details.checked === true),
     [onCheckedChange]
   );
-  // Detect a mouse press positively: screen readers synthesize clicks that look like pointer clicks (detail 1), and
-  // touch has no right-click, so only a click that a mouse pressed skips the menu.
+  // Detect a mouse press positively: screen readers synthesize pointer-like clicks, and touch has no right-click.
   const pressPointerType = useRef<string | null>(null);
   const handlePointerDown = useCallback((event: PointerEvent<HTMLButtonElement>) => {
     pressPointerType.current = event.pointerType;
@@ -232,7 +181,6 @@ export const ListItem = ({
     },
     [isBusy, isDisabled, onPress, openContextMenu]
   );
-  // Plain text keeps to its line; a node (badge row, figures) lays itself out.
   const descriptionCss = useMemo(
     () => (typeof description === 'string' ? [styles.description, TRUNCATE_CSS] : styles.description),
     [description, styles.description]

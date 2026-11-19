@@ -43,19 +43,6 @@ const DEPENDENCY_REPAIRS = {
     'Production must not import test support. Move reusable production behavior into its owner and have tests import it.',
 } as const;
 
-export interface MigrationException {
-  /** Optional ISO date after which the exception is considered expired debt. */
-  expires?: string;
-  /** ISO date the exception was added. */
-  introduced: string;
-  owner: string;
-  reason: string;
-  removalTicket: string;
-  rule: string;
-  sourcePrefix: string;
-  targetPrefix: string;
-}
-
 const ALIASES: ReadonlyArray<readonly [string, string]> = [
   ['@app', 'app'],
   ['@features', 'features'],
@@ -346,8 +333,3 @@ export const checkSource = (sourcePath: string, source: string): DependencyViola
 
 export const formatViolation = ({ rule, source, target }: DependencyViolation): string =>
   `${rule}: ${source} -> ${target}\n  ${DEPENDENCY_REPAIRS[rule]}`;
-
-export const isExcepted = (violation: DependencyViolation, exception: MigrationException): boolean =>
-  violation.rule === exception.rule &&
-  violation.source.startsWith(exception.sourcePrefix) &&
-  violation.target.startsWith(exception.targetPrefix);

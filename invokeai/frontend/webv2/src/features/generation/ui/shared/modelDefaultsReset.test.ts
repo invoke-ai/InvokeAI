@@ -42,7 +42,6 @@ const fixVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae-fix', name: 'SDXL 
 const fluxVae: VaeModelConfig = { base: 'flux', key: 'flux-vae', name: 'FLUX VAE', type: 'vae' };
 const customVae: VaeModelConfig = { base: 'sdxl', key: 'custom-vae', name: 'Custom VAE', type: 'vae' };
 
-/** The user's own values: SDXL's base defaults changed everywhere the model's defaults could reach. */
 const userSettings = (overrides: Partial<GenerateSettings> = {}): GenerateSettings => ({
   ...getDefaultGenerateSettings(sdxl()),
   aspectRatioId: 'Free',
@@ -127,7 +126,6 @@ describe('getApplyModelDefaultsPlan', () => {
     expect(getApplyModelDefaultsPlan(userSettings(), sdxl({ vae: 'default' }), [fixVae]).patch).toEqual({
       vae: null,
     });
-    // The same VAE as a different snapshot is no change.
     expect(
       getApplyModelDefaultsPlan(userSettings({ vae: { ...fixVae } }), sdxl({ vae: fixVae.key }), [fixVae]).patch
     ).toEqual({});
@@ -135,18 +133,15 @@ describe('getApplyModelDefaultsPlan', () => {
   });
 
   it("applies the bundled VAE for the 'default' sentinel where the VAE is an optional component", () => {
-    // A Diffusers pipeline; a GGUF SD3 transformer requires its VAE.
     const sd3: MainModelConfig = { ...sdxl({ vae: 'default' }), base: 'sd-3', format: 'diffusers' };
     const sd3Vae: VaeModelConfig = { base: 'sd-3', key: 'sd3-vae', name: 'SD3 VAE', type: 'vae' };
     const settings = { ...getDefaultGenerateSettings(sd3), vae: sd3Vae };
     const plan = getApplyModelDefaultsPlan(settings, sd3, [sd3Vae]);
 
-    // SD3 has no VAE override field; the default the model sets is applied and told all the same.
     expect(plan.patch).toEqual({ vae: null });
     expect(describeChanges(plan.changed, settings, after(settings, plan.patch), sd3, t, 'en')).toBe(
       'VAE SD3 VAE → Bundled VAE'
     );
-    // With the bundled VAE in use, the model's defaults hold: it does set one.
     expect(getApplyModelDefaultsPlan({ ...settings, vae: null }, sd3, [sd3Vae]).defined).toEqual(['vae']);
   });
 
@@ -156,7 +151,6 @@ describe('getApplyModelDefaultsPlan', () => {
 
     expect(plan.patch).toEqual({ steps: 8 });
     expect(plan.isVaeMissing).toBe(true);
-    // The VAE is told apart: the model does set one.
     expect(describeUnset(plan.unset, model, t, 'en')).toBe('Size, CFG, Scheduler, and VAE precision');
     expect(after(userSettings(), getModelDefaultsPatch(userSettings(), model, [fixVae])).vae).toBe(customVae);
   });
@@ -167,10 +161,8 @@ describe('getApplyModelDefaultsPlan', () => {
     const plan = getApplyModelDefaultsPlan(settings, flux, [fluxVae]);
 
     expect(plan.patch).toEqual({ steps: 20 });
-    // No VAE override field, and nothing the model sets: VAE is not even mentioned.
     expect(plan.unset).not.toContain('vae');
     expect(after(settings, getModelDefaultsPatch(settings, flux, [fluxVae])).vae).toBe(fluxVae);
-    // A FLUX VAE the model names and the catalog holds still applies.
     expect(
       getApplyModelDefaultsPlan({ ...settings, vae: null }, { ...flux, default_settings: { vae: fluxVae.key } }, [
         fluxVae,
@@ -190,7 +182,6 @@ describe('getApplyModelDefaultsPlan', () => {
 describe('getModelDefaultsPatch (reset everything)', () => {
   it('tells a ratio the reset locks, even when the size stays, and leaves out what the family hides', () => {
     const model = sdxl();
-    // SDXL hides CFG rescale; a leftover value the reset clears is no change worth telling.
     const settings = userSettings({
       cfgRescaleMultiplier: 0.7,
       cfgScale: 7,

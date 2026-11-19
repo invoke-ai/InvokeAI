@@ -44,11 +44,7 @@ export const formatSettingValue = (field: SettingDefinition, value: LayeredSetti
   return String(value);
 };
 
-/**
- * The instance a widget owner's pin lives on: always the project's instance of the owner's type, the one every reader
- * of its values reads (an alias such as `gallery:center` shares it). A requested `instanceId` only fences: it must
- * still exist with the owner's type. Undefined while the target is not the open project's or fails that fence.
- */
+/** A requested `instanceId` only fences: it must still exist with the owner's type. */
 const getTargetInstance = (project: Project, ownerId: string, target: SettingsTarget) => {
   if (target.projectId !== project.id) {
     return undefined;
@@ -60,7 +56,6 @@ const getTargetInstance = (project: Project, ownerId: string, target: SettingsTa
   return instance?.typeId === ownerId ? instance : undefined;
 };
 
-/** The project's own values for `ownerId` (instance values, or the project's settings), or null while not current. */
 const getPins = (project: Project, ownerId: string, target: SettingsTarget): object | null => {
   if (ownerId === PROJECT_SETTINGS_OWNER) {
     return target.projectId === project.id ? project.settings : null;
@@ -68,11 +63,9 @@ const getPins = (project: Project, ownerId: string, target: SettingsTarget): obj
   return getTargetInstance(project, ownerId, target)?.state.values ?? null;
 };
 
-/** A pin's value; undefined where the key is not pinned. */
 const getPin = (pins: object, key: string): unknown =>
   Object.hasOwn(pins, key) ? (pins as Record<string, unknown>)[key] : undefined;
 
-/** What `ownerId` reads with in the open project: its pins over the user's defaults over the built-ins. */
 const getResolvedValues = (snapshot: WorkbenchSnapshot, ownerId: string, target: SettingsTarget) => {
   const project = snapshot.activeProject;
   if (ownerId === PROJECT_SETTINGS_OWNER) {
@@ -84,14 +77,8 @@ const getResolvedValues = (snapshot: WorkbenchSnapshot, ownerId: string, target:
 };
 
 /**
- * One per-project setting, layered as project pin, then the user's default, then `builtIn`. `ownerId` is the
- * `scopedDefaults` key: a widget type id, where `generate` pins the project's own generation flags rather than the
- * Generate widget's values. `read` is the owner's normalizer over a possibly partial record. `field` names values in
- * the indicator's menu.
- *
- * Without a target the row edits the user's default, and its layer is `default` while that differs from the built-in.
- * With one it edits the target's pin, fenced against a stale project, account or instance, and its layer is `pinned`
- * while the pin exists. `set` takes the value stored under `key`, which is what `read` turns back into the row's value.
+ * Layered as project pin, then the user's default, then `builtIn`. Without a target the row edits the user's default;
+ * with one it edits the target's pin, fenced against a stale project, account or instance.
  */
 export const useLayeredSetting = <V extends LayeredSettingValue>(
   ownerId: string,
@@ -128,7 +115,6 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
     () => isAccountScopeCurrent(accountScope) && (!projectId || queries?.isActiveProject(projectId) === true),
     [accountScope, projectId, queries]
   );
-  /** The current pins for this target, read at the moment of a write. */
   const readPins = useCallback(() => {
     if (!projectId || !queries || !isCurrent()) {
       return null;
@@ -191,7 +177,6 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
     [isPinMode, writeDefault, writePin]
   );
   const settingName = resolveSettingsText(field.label, t);
-  /** The user's default for `key` as it stands: whether one exists, and its stored value. */
   const readDefault = useCallback(() => {
     const current = getWorkbenchPreferences().scopedDefaults[ownerId] ?? EMPTY;
     return { exists: Object.hasOwn(current, key), value: current[key] };
@@ -201,10 +186,7 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
       void (prior.exists ? patchScopedDefault(ownerId, { [key]: prior.value }) : clearScopedDefault(ownerId, [key])),
     [key, ownerId]
   );
-  /**
-   * The pin an Undo would restore into `pinProjectId`, addressed by project rather than through the row's target: the
-   * project may be open but not active by then, and an alias instance the row came from may be gone.
-   */
+  /** Addressed by project: it may be open but not active by then, and the row's alias instance may be gone. */
   const readProjectPins = useCallback(
     (pinProjectId: string) => {
       const project = queries?.getProject(pinProjectId);
@@ -212,7 +194,6 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
     },
     [ownerId, queries]
   );
-  /** Whether `pinProjectId` is open with `key` unpinned, the state each pin action leaves behind. */
   const isUnpinnedIn = useCallback(
     (pinProjectId: string) => {
       const pins = readProjectPins(pinProjectId);
@@ -220,7 +201,6 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
     },
     [key, readProjectPins]
   );
-  /** Re-pins `stored` in `pinProjectId`, addressed by project id: it may be open but not active by then. */
   const repinIn = useCallback(
     (pinProjectId: string, stored: unknown) => {
       const project = queries?.getProject(pinProjectId);
@@ -238,10 +218,6 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
     },
     [commands, key, ownerId, queries]
   );
-  /**
-   * Reports an action with an Undo. `restore` restores the setting and returns true while it still holds what the
-   * action left; false (changed since) says there is nothing to undo.
-   */
   const offerUndo = useCallback(
     (title: string, options: { projectId?: string; supersedes: string }, restore: () => boolean) =>
       notify.undoable(title, {
@@ -255,8 +231,7 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
       }),
     [accountScope, notify, settingName, t]
   );
-  // A later action on the same key withdraws an earlier Undo. Defaults are account-wide, so the actions that change one
-  // share an account-wide slot; following the default only changes its project.
+  // A later action on the same key withdraws an earlier Undo; defaults share an account-wide slot.
   const defaultUndoKey = `settings-layer:${ownerId}:${key}`;
   const getFollowUndoKey = useCallback(
     (pinProjectId: string) => `settings-layer:${pinProjectId}:${ownerId}:${key}`,

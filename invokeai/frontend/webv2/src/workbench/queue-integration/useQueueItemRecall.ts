@@ -37,8 +37,8 @@ const selectGenerateValues = createGenerateFormValuesSelector();
 const NO_REASONS: QueueRecallAvailability['reasons'] = {};
 
 /**
- * What an item's recall menus offer, and the recall itself. Mount it only for the item whose menu or details are
- * open: it reads the durable snapshot and loads the model catalog.
+ * What an item's recall menus offer, and the recall itself. Mount it only for the item whose menu or details are open:
+ * it reads the durable snapshot and loads the model catalog.
  */
 export const useQueueItemRecall = (
   origin: string | null | undefined,

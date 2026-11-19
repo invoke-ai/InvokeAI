@@ -134,9 +134,9 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
 const selectDefaultSettingsModel = (snapshot: ModelsSnapshot, modelKey: string): DefaultSettingsModel | null => {
   const model = findModel(snapshot, modelKey);
 
-  // `base` and `format` are projected too: together with the type they are the loader key the backend
-  // answers the FP8 Storage question on, and all three parts change the answer. `variant` joins them
-  // for Generate's scheduler rules, which differ by variant within a base.
+  // `base` and `format` are projected too: together with the type they are the loader key the backend answers the FP8
+  // Storage question on, and all three parts change the answer. `variant` joins them for Generate's scheduler rules,
+  // which differ by variant within a base.
   return model
     ? {
         base: model.base,
@@ -531,8 +531,8 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
   const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
   const pathDialog = useExitPresence(isPathDialogOpen);
-  // Managed models store paths relative to the models directory; show the
-  // resolved absolute path so it can be found on disk.
+  // Managed models store paths relative to the models directory; show the resolved absolute path so it can be found on
+  // disk.
   const fullPath = resolveModelAbsolutePath(model.path, modelsDir);
   // Allow repointing absolute-path installs, including missing files.
   const canUpdatePath = isAbsoluteModelPath(model.path) || isMissing;

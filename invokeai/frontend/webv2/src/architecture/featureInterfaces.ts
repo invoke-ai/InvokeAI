@@ -1,6 +1,6 @@
 /**
- * Unregistered features and unlisted modules are private; index is public for registered features. Cover new
- * entries in dependencyPolicy.test.ts.
+ * Unregistered features and unlisted modules are private; index is public for registered features. Cover new entries in
+ * dependencyPolicy.test.ts.
  */
 export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[]>> = {
   gallery: [

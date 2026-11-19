@@ -61,7 +61,6 @@ import { StatusBar } from '@workbench/shell/StatusBar';
 
 import { ShortcutGuide } from './ShortcutGuide';
 
-/** The chip is named by its content: only the guide's name, never the preview hints. */
 const SHORTCUTS_CHIP = { exact: true, name: 'Shortcuts' };
 
 const widgetWidths = createExternalStore<Record<string, number>>({});
@@ -161,7 +160,6 @@ const render = async (width = 900, withCanvasSource = true) => {
   );
 };
 
-/** The center canvas holds focus until the user goes elsewhere: Generate, on the left, adds no hints of its own. */
 const leaveCanvas = () =>
   act(() =>
     host!.querySelector('[data-testid="left"]')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
@@ -223,7 +221,6 @@ describe('contextual status-bar guide', () => {
     await leaveCanvas();
     const guide = page.getByRole('button', SHORTCUTS_CHIP);
     expect(guide.element().textContent).toContain('Invoke');
-    // The preview hints stay out of the name, so a voice command for a hint cannot land on the chip.
     await expect.element(guide).toHaveAccessibleName('Shortcuts');
     expect(guide.element().textContent).not.toContain('Cancel generation');
     expect(guide.element().textContent).not.toContain('Command palette');
@@ -298,7 +295,6 @@ describe('contextual status-bar guide', () => {
     await act(() => widgetWidths.setSnapshot({ ...widgetWidths.getSnapshot(), 'server-status': 250 }));
     await render(700);
     await expect.poll(() => guide.element().getBoundingClientRect().width).toBeLessThanOrEqual(28);
-    // Icon only: the visible label is gone, and its hidden copy keeps the chip's name.
     expect(guide.element().querySelector('[data-shortcut-guide]')?.lastElementChild?.querySelector('p')).toBeNull();
     await expect.element(guide).toHaveAccessibleName('Shortcuts');
     expect(notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
@@ -317,13 +313,10 @@ describe('contextual status-bar guide', () => {
     await page.viewport(700, 600);
     await render(700);
     const footer = host!.querySelector('footer')!;
-    // The strip's own padding is no room for widgets: the trailing chip must end where its content box does.
     const stripEnd = footer.getBoundingClientRect().right - parseFloat(getComputedStyle(footer).paddingRight);
     const notification = host!.querySelector('[data-status-bar-widget="notifications"]')!;
     const content = () => host!.querySelector<HTMLElement>('[data-shortcut-guide]')!;
     const visibleRow = () => content().lastElementChild!;
-    // Text runs past its box when the chip is too narrow for it, so measure the glyphs, not the elements. The
-    // visually hidden name is clipped to nothing and stays out.
     const visibleContentRight = () =>
       Math.max(
         ...[...visibleRow().children]
@@ -335,7 +328,6 @@ describe('contextual status-bar guide', () => {
           })
       );
     const misfits: number[] = [];
-    // One pixel at a time from a hint through the label to icon only, so every fit boundary is crossed.
     for (let other = 400; visibleRow().querySelector('p'); other++) {
       expect(other).toBeLessThan(700);
       await act(() => widgetWidths.setSnapshot({ 'server-status': other }));
@@ -365,7 +357,6 @@ describe('contextual status-bar guide', () => {
     await expect
       .poll(() => host!.querySelector('[data-hint-measurements]')?.nextElementSibling?.textContent)
       .toBe('Shortcuts');
-    // The visible fallback label is the whole name, not repeated by the hidden one.
     await expect.element(guide).toHaveAccessibleName('Shortcuts');
     await guide.click();
     const popup = page.getByRole('dialog');
@@ -437,7 +428,6 @@ describe('contextual status-bar guide', () => {
       await leaveCanvas();
       await expect.poll(() => host!.textContent).toContain('Cancel generation');
       await act(() => field.focus());
-      // Invoke stays usable from text fields; Cancel generation is not, so the guide must judge the focused field.
       await expect.poll(() => host!.textContent).not.toContain('Cancel generation');
       expect(host!.textContent).toContain('Invoke');
       // Leaving for the body fires focusout without a focusin.

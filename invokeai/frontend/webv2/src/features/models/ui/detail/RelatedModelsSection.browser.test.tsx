@@ -147,13 +147,10 @@ describe('RelatedModelsSection', () => {
     const options = optionTexts().join(' ');
 
     expect(options).toContain('FLUX LoRA');
-    // T5 has base `any` but a curated allowance for flux.
     expect(options).toContain('T5 XXL');
     expect(options).not.toContain('SDXL LoRA');
     expect(options).not.toContain('GPT Image');
-    // The subject model never offers itself.
     expect(options).not.toContain('FLUX Dev');
-    // Single-slot types never offer their own type: no second main.
     expect(options).not.toContain('FLUX Krea');
   });
 
@@ -168,7 +165,6 @@ describe('RelatedModelsSection', () => {
     await act(() => t5Option?.click());
 
     expect(api.addModelRelationship).toHaveBeenCalledWith('flux-main', 't5-xxl', expect.anything());
-    // The shared store patch renders the row; no second fetch happens.
     await expect.poll(() => host.textContent).toContain('T5 XXL');
     expect(api.getRelatedModelKeys).toHaveBeenCalledTimes(1);
   });
@@ -193,10 +189,8 @@ describe('RelatedModelsSection', () => {
     api.getRelatedModelKeys.mockResolvedValue(['flux-main']);
     await renderSection({ base: 'external', key: 'gpt-image', type: 'main' });
 
-    // The wildcard-era link renders with its unlink affordance...
     await expect.poll(() => host.textContent).toContain('FLUX Dev');
     expect(host.querySelector('[aria-label*="unlinkNamed"]')).not.toBeNull();
-    // ...but an external-base subject can never match, so no add-picker.
     expect(host.querySelector('[aria-haspopup="listbox"]')).toBeNull();
   });
 

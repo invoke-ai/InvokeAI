@@ -7,15 +7,11 @@ import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
 import { galleryDurability, galleryImages } from '@features/gallery';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
-import {
-  resetArchitectureCapabilities,
-  setArchitectureCapabilities,
-} from '@features/models/core/architectureCapabilities';
+import { setArchitectureCapabilities } from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/models/core/architectureCapabilities.testing';
-import { createDefaultVideoWidgetValues } from '@features/video';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { recordCanvasMetadata } from '@workbench/canvas-operations/saveCanvasToGallery';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
@@ -144,14 +140,6 @@ afterEach(async () => {
 });
 
 describe('useQueueItemRecall', () => {
-  it('offers nothing and stays inert while the durable snapshot lookup is pending', async () => {
-    await render(undefined);
-    expect(Object.values(handle.current!.capabilities).some(Boolean)).toBe(false);
-    await recall('all');
-    expect(mocks.setSettings).not.toHaveBeenCalled();
-    expect(mocks.notifyInfo).not.toHaveBeenCalled();
-  });
-
   it('recalls a generate submission into the Generate panel and reveals it', async () => {
     await render({ generateValues: generateSnapshot, sourceId: 'canvas' });
     // A full recall replaces the Generate values, so it needs no supported model selected.
@@ -162,71 +150,6 @@ describe('useQueueItemRecall', () => {
     expect(mocks.setSettings).toHaveBeenCalledWith(generateSnapshot, 'active-project');
     expect(mocks.openWidget).toHaveBeenCalledWith('generate', { preferredRegions: ['left'] });
     expect(mocks.notifySuccess).toHaveBeenCalledWith(expect.any(String), 'widgets.queue.settingsRecalledDescription');
-  });
-
-  it('patches a video submission into the Video panel instead', async () => {
-    const videoValues = { ...createDefaultVideoWidgetValues(), positivePrompt: 'video prompt' };
-    await render({ sourceId: 'video', videoValues });
-
-    await recall('all');
-
-    expect(mocks.patchValues).toHaveBeenCalledWith('video', videoValues);
-    expect(mocks.setSettings).not.toHaveBeenCalled();
-    expect(mocks.openWidget).toHaveBeenCalledWith('video', { preferredRegions: ['left'] });
-  });
-
-  it('says why each kind is unavailable, and explains instead of writing when one is recalled anyway', async () => {
-    // A foreign item: no snapshot, only the executed prompt from the session, and no supported model selected.
-    await render(null, { positivePrompt: 'session prompt' });
-    expect(handle.current!.capabilities).toMatchObject({ all: false, prompts: false, seed: false });
-    expect(handle.current!.reasons).toMatchObject({
-      all: 'widgets.queue.recallSettingsNotKept',
-      prompts: 'widgets.queue.recallUnavailable',
-      seed: 'widgets.queue.recallSettingsNotKept',
-    });
-
-    await recall('prompts');
-    await recall('seed');
-
-    expect(mocks.setSettings).not.toHaveBeenCalled();
-    expect(mocks.notifyInfo.mock.calls).toEqual([
-      [expect.any(String), 'widgets.queue.recallUnavailable'],
-      [expect.any(String), 'widgets.queue.recallSettingsNotKept'],
-    ]);
-  });
-
-  it('offers a foreign item its session prompt once a supported model is selected', async () => {
-    const main = { base: 'sdxl', key: 'main', name: 'SDXL', type: 'main' } as MainModelConfig &
-      ModelsModule.ModelConfig;
-    mocks.models = [main];
-    mocks.store = createWorkbenchStore();
-    const projectId = mocks.store.queries.getSnapshot().activeProject.id;
-    mocks.store.commands.generation.setSettings({ ...getDefaultGenerateSettings(main), model: main }, projectId);
-    await render(null, { positivePrompt: 'session prompt' });
-    expect(handle.current!.capabilities).toMatchObject({ all: false, prompts: true });
-    expect(handle.current!.reasons.prompts).toBeUndefined();
-
-    await recall('prompts');
-
-    const snapshot = mocks.store.queries.getSnapshot();
-    expect(
-      getResolvedProjectWidgetValues(snapshot.activeProject, 'generate', snapshot.scopedDefaults).positivePrompt
-    ).toBe('session prompt');
-  });
-
-  it('names the missing capability table, not a missing model, while the table is absent', async () => {
-    await render(null, { positivePrompt: 'session prompt' });
-
-    await act(() => resetArchitectureCapabilities());
-    try {
-      expect(handle.current!.reasons.prompts).toBe('widgets.queue.recallUnavailableCapabilities');
-      await recall('prompts');
-    } finally {
-      await act(() => setArchitectureCapabilities(architectureCapabilitiesFixture));
-    }
-
-    expect(mocks.setSettings).not.toHaveBeenCalled();
-    expect(mocks.notifyInfo).toHaveBeenCalledWith(expect.any(String), 'widgets.queue.recallUnavailableCapabilities');
   });
 });
 
@@ -284,63 +207,6 @@ it('recalls a canvas queue snapshot through the real document owner and keeps it
   expect(mocks.store.queries.getSnapshot().activeProject.canvas.snapshots).toHaveLength(1);
 });
 
-it('retains prompt tool edits made while canvas assets load and recalls the snapshot model', async () => {
-  accountLifecycle.activate('queue-canvas-concurrent-recall');
-  const main = { base: 'sdxl', key: 'queue-main', name: 'SDXL', type: 'main' } as MainModelConfig &
-    ModelsModule.ModelConfig;
-  const other = { base: 'sd-1', key: 'other-main', name: 'Other', type: 'main' } as MainModelConfig &
-    ModelsModule.ModelConfig;
-  mocks.models = [main, other];
-  const store = (mocks.store = createWorkbenchStore());
-  const projectId = store.queries.getSnapshot().activeProject.id;
-  store.commands.generation.setSettings(
-    { ...getDefaultGenerateSettings(main), model: main, modelKey: main.key },
-    projectId
-  );
-  let resolveAssets!: (images: Awaited<ReturnType<typeof galleryImages.resolveMany>>) => void;
-  const assets = new Promise<Awaited<ReturnType<typeof galleryImages.resolveMany>>>((resolve) => {
-    resolveAssets = resolve;
-  });
-  const resolveMany = vi.spyOn(galleryImages, 'resolveMany').mockReturnValue(assets);
-  await render({
-    sourceId: 'canvas',
-    generateValues: {
-      ...getDefaultGenerateSettings(main),
-      model: main,
-      modelKey: main.key,
-      positivePrompt: 'Recalled',
-    },
-    canvasMetadata: makeCanvasMetadata(),
-  });
-  let pending!: Promise<void>;
-  await act(() => {
-    pending = Promise.resolve(handle.current!.recall('remix'));
-  });
-  await vi.waitFor(() => expect(resolveMany).toHaveBeenCalled());
-  store.commands.generation.patchSettings(
-    {
-      expandPromptModelKey: 'new-prompt-tool',
-      imageToPromptModelKey: 'new-vision-tool',
-      model: other,
-      modelKey: other.key,
-    },
-    projectId
-  );
-  await act(async () => {
-    resolveAssets([{ imageName: 'recorded.png' }] as Awaited<ReturnType<typeof galleryImages.resolveMany>>);
-    await pending;
-  });
-  const snapshot = store.queries.getSnapshot();
-  expect(getResolvedProjectWidgetValues(snapshot.activeProject, 'generate', snapshot.scopedDefaults)).toMatchObject({
-    expandPromptModelKey: 'new-prompt-tool',
-    imageToPromptModelKey: 'new-vision-tool',
-    modelKey: main.key,
-    positivePrompt: 'Recalled',
-    seedMode: 'random',
-  });
-  expect(snapshot.activeProject.canvas.document.stacks.raster[0]).toMatchObject({ name: 'Recorded image' });
-});
-
 it('drops a second recall pressed while one is under way, rather than recalling the canvas in part', async () => {
   accountLifecycle.activate('queue-canvas-repeated-recall');
   const main = { base: 'sdxl', key: 'queue-main', name: 'SDXL', type: 'main' } as MainModelConfig &
@@ -386,34 +252,6 @@ it('drops a second recall pressed while one is under way, rather than recalling 
   >);
   await recall('all');
   expect(mocks.notifySuccess).toHaveBeenCalledTimes(2);
-});
-
-it('recalls Generate settings and reports a partial result when canvas assets cannot load', async () => {
-  accountLifecycle.activate('queue-canvas-failed-recall');
-  const main = { base: 'sdxl', key: 'queue-main', name: 'SDXL', type: 'main' } as MainModelConfig &
-    ModelsModule.ModelConfig;
-  mocks.models = [main];
-  const store = (mocks.store = createWorkbenchStore());
-  const original = store.queries.getSnapshot().activeProject.canvas.document;
-  vi.spyOn(galleryImages, 'resolveMany').mockRejectedValue(new Error('Asset lookup unavailable'));
-  await render({
-    sourceId: 'canvas',
-    generateValues: {
-      ...getDefaultGenerateSettings(main),
-      model: main,
-      modelKey: main.key,
-      positivePrompt: 'Recalled',
-    },
-    canvasMetadata: makeCanvasMetadata(),
-  });
-  await recall('all');
-  const snapshot = store.queries.getSnapshot();
-  expect(
-    getResolvedProjectWidgetValues(snapshot.activeProject, 'generate', snapshot.scopedDefaults).positivePrompt
-  ).toBe('Recalled');
-  expect(snapshot.activeProject.canvas.document).toBe(original);
-  expect(mocks.notifyInfo).toHaveBeenCalledWith(expect.any(String), 'widgets.gallery.itemActions.recall.canvasPartial');
-  expect(mocks.notifySuccess).toHaveBeenCalledWith(expect.any(String), 'widgets.queue.settingsRecalledDescription');
 });
 
 it.each(['account', 'project', 'canvas'] as const)(

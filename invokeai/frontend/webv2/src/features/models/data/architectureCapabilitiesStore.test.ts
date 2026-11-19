@@ -14,7 +14,6 @@ describe('architecture capabilities store', () => {
   });
 
   it('fills the core registry rather than the snapshot', async () => {
-    // The core registry is the sole synchronous table authority.
     api.getArchitectureCapabilities.mockResolvedValue(rows);
     const store = await import('./architectureCapabilitiesStore');
     const registry = await import('@features/models/core/architectureCapabilities');
@@ -57,17 +56,14 @@ describe('architecture capabilities store', () => {
     await Promise.resolve();
     expect(store.getArchitectureCapabilitiesSnapshot().status).toBe('error');
 
-    // One failed load must not stick...
     await store.refreshArchitectureCapabilities();
     expect(store.getArchitectureCapabilitiesSnapshot().status).toBe('loaded');
 
-    // ...and a loaded table is never refetched: it is static per backend build.
     store.ensureArchitectureCapabilitiesLoaded();
     expect(api.getArchitectureCapabilities).toHaveBeenCalledTimes(2);
   });
 
   it('clears the registry as well as the snapshot when the account changes', async () => {
-    // Clear registry rows with store status so previous-account data cannot survive.
     api.getArchitectureCapabilities.mockResolvedValue(rows);
     const lifecycle = await import('@platform/state/accountLifecycle');
     const store = await import('./architectureCapabilitiesStore');
@@ -83,7 +79,6 @@ describe('architecture capabilities store', () => {
   });
 
   it('publishes the registry rather than its own request state', async () => {
-    // Subscribe to the registry, not fetch status, so every table writer notifies readers.
     api.getArchitectureCapabilities.mockResolvedValue(rows);
     const store = await import('./architectureCapabilitiesStore');
     const registry = await import('@features/models/core/architectureCapabilities');
@@ -103,7 +98,6 @@ describe('architecture capabilities store', () => {
   });
 
   it('reloads the table for the account that replaces the one it was cleared for', async () => {
-    // Rearm after account changes; boot effects and subscribers do not remount.
     api.getArchitectureCapabilities.mockResolvedValue(rows);
     const lifecycle = await import('@platform/state/accountLifecycle');
     const store = await import('./architectureCapabilitiesStore');

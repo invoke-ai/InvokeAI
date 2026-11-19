@@ -14,17 +14,15 @@ describe('getImageMapClusterEps', () => {
   });
 
   it('rejects stored values the endpoint would refuse', () => {
-    // Persisted widget values survive upgrades and hand-edited project files,
-    // so a bad one must fall back to the heuristic rather than 422 every
-    // points request and leave the map permanently empty.
+    // Persisted widget values survive upgrades and hand-edited project files, so a bad one must fall back to the
+    // heuristic rather than 422 every points request and leave the map permanently empty.
     expect(getImageMapClusterEps({ clusterEps: 0 })).toBeNull();
     expect(getImageMapClusterEps({ clusterEps: -1 })).toBeNull();
     expect(getImageMapClusterEps({ clusterEps: Number.NaN })).toBeNull();
     expect(getImageMapClusterEps({ clusterEps: Infinity })).toBeNull();
     expect(getImageMapClusterEps({ clusterEps: '0.2' })).toBeNull();
     expect(getImageMapClusterEps({ clusterEps: MIN_CLUSTER_EPS / 2 })).toBeNull();
-    // And the high side: the endpoint caps eps at 2.0, so a larger stored
-    // value 422s every refresh and strands the map on an error.
+    // And the high side: the endpoint caps eps at 2.0, so a larger stored value 422s every refresh and strands the map.
     expect(getImageMapClusterEps({ clusterEps: MAX_CLUSTER_EPS + 1 })).toBeNull();
     expect(getImageMapClusterEps({ clusterEps: 1000 })).toBeNull();
   });

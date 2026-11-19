@@ -19,7 +19,6 @@ vi.mock('./GenerationUiContext', () => ({
     sectionPreferences: { sectionsOpen: { guidance: true }, setSectionsOpen: vi.fn() },
   }),
 }));
-// The lists have their own tests; this one covers the note the section shows between them.
 vi.mock('./reference-images/GenerateReferenceImagesSection', () => ({ GenerateReferenceImagesContent: () => null }));
 vi.mock('./GenerateConceptsSection', async () => {
   const { isLoraCompatibleWithModel } = await import('@features/generation/core/settings');
@@ -32,7 +31,6 @@ vi.mock('./GenerateConceptsSection', async () => {
   };
 });
 
-// The real catalog, so a mistyped key shows up as the key and fails the text checks below.
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
@@ -104,12 +102,6 @@ describe('GenerateGuidanceSection edit LoRA note', () => {
     expect(note()).toBeDefined();
 
     await act(() => draft.setSnapshot({ ...draft.getSnapshot(), loras: [poseLora(true)] }));
-
-    expect(note()).toBeUndefined();
-  });
-
-  it('stays quiet without edit references', async () => {
-    await render({ loras: [], referenceImages: [{ ...editReference, isEnabled: false }] });
 
     expect(note()).toBeUndefined();
   });

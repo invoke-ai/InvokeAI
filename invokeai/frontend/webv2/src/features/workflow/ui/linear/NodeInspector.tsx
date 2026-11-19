@@ -186,8 +186,8 @@ const OutputsTab = ({ nodeId, template }: { nodeId: string; template: Invocation
     );
   }
 
-  // The store keeps the previous run's result while a node runs or fails;
-  // showing it under a "Running…" or "Failed" line would pass it off as this run's.
+  // The store keeps the previous run's result while a node runs or fails; showing it under a "Running…" or "Failed"
+  // line would pass it off as this run's.
   const hasResult =
     execution.status === 'completed' && execution.latestOutput !== null && execution.latestOutput !== undefined;
 

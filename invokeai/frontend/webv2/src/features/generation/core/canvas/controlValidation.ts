@@ -66,8 +66,8 @@ export const isControlKindSupportedForBase = (base: string, kind: ControlAdapter
   getArchitectureFeatures(base)?.control_kinds.includes(kind) ?? false;
 
 /**
- * The kind to offer a layer whose kind `base` does not support: ControlNet where it is supported, otherwise the
- * base's one kind. Null when the base supports no control layers at all.
+ * The kind to offer a layer whose kind `base` does not support: ControlNet where it is supported, otherwise the base's
+ * one kind. Null when the base supports no control layers at all.
  */
 export const getSuggestedControlKind = (base: string): ControlAdapterKind | null => {
   const supported = CONTROL_ADAPTER_KINDS.filter((kind) => isControlKindSupportedForBase(base, kind));
@@ -75,8 +75,8 @@ export const getSuggestedControlKind = (base: string): ControlAdapterKind | null
 };
 
 /**
- * Whether a model can drive a control layer of `kind`, judged from the model alone. Model pickers filter with this
- * so they never offer what validation would reject.
+ * Whether a model can drive a control layer of `kind`, judged from the model alone. Model pickers filter with this so
+ * they never offer what validation would reject.
  */
 export const isControlModelUsableForKind = (model: ControlAdapterModelFacts, kind: ControlAdapterKind): boolean =>
   getControlModelUnusableReason(model, kind) === null;
@@ -90,19 +90,19 @@ export const getControlModelUnusableReason = (
     return 'incompatible_adapter';
   }
   if (kind === 'anima_lllite' && model.cond_in_channels !== 3) {
-    // A control layer supplies only a control image; `anima_denoise` rejects a 4-channel (inpainting) adapter
-    // without a mask, and an install that predates `cond_in_channels` may be either.
+    // A control layer supplies only a control image; `anima_denoise` rejects a 4-channel (inpainting) adapter without a
+    // mask, and an install that predates `cond_in_channels` may be either.
     return typeof model.cond_in_channels === 'number' ? 'lllite_inpaint_adapter' : 'lllite_channels_unknown';
   }
   return null;
 };
 
 /**
- * Whether an Anima ControlNet-LLLite model is the inpainting adapter the canvas inpaint/outpaint graphs feed with
- * the raster image and mask. The 4-channel (RGB + mask) variants are inpaint adapters; an install that predates
+ * Whether an Anima ControlNet-LLLite model is the inpainting adapter the canvas inpaint/outpaint graphs feed with the
+ * raster image and mask. The 4-channel (RGB + mask) variants are inpaint adapters; an install that predates
  * `cond_in_channels` reads null, and only the inpaint variant predates the field, so it counts too (legacy
- * `isAnimaInpaintControlNetModelConfig`). Control layers reject the same models through
- * {@link getControlModelUnusableReason}.
+ * `isAnimaInpaintControlNetModelConfig`). Control layers reject the same models through {@link
+ * getControlModelUnusableReason}.
  */
 export const isAnimaInpaintAdapterModel = (model: ControlAdapterModelFacts): boolean =>
   model.type === 'controlnet' && model.base === 'anima' && model.cond_in_channels !== 3;
@@ -184,8 +184,8 @@ export const getControlValidationReason = (params: {
     return 'flux_fill_control_lora';
   }
   if (kind === 'qwen_image_control' && mainBase === 'qwen-image' && mainVariant === 'edit') {
-    // Both ControlNet designs were trained beside the generation transformer; `qwen_image_denoise` refuses either on
-    // an Edit transformer.
+    // Both ControlNet designs were trained beside the generation transformer; `qwen_image_denoise` refuses either on an
+    // Edit transformer.
     return 'qwen_image_edit_control';
   }
   return null;

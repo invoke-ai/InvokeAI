@@ -90,9 +90,8 @@ export const EDITABLE_MODEL_FORMATS: readonly string[] = Object.keys(FORMAT_LABE
 );
 
 /**
- * External page for a model's install source: the URL itself, or the
- * HuggingFace page for a repo-id source. Null for local paths and anything
- * else that has no linkable home.
+ * External page for a model's install source: the URL itself, or the HuggingFace page for a repo-id source. Null for
+ * local paths and anything else that has no linkable home.
  */
 export const getModelSourceHref = (source: string, sourceType: string): string | null => {
   if (source.startsWith('https://') || source.startsWith('http://')) {
@@ -107,7 +106,6 @@ export const getModelSourceHref = (source: string, sourceType: string): string |
   return null;
 };
 
-/** Long display names for every known variant value. */
 export const MODEL_VARIANT_LABELS: Record<string, string> = {
   '5b': 'Wan 2.2 5B LoRA',
   a14b: 'Wan 2.2 A14B LoRA',
@@ -160,8 +158,8 @@ export const MODEL_VARIANT_LABELS: Record<string, string> = {
 
 export const getModelVariantLabel = (variant: string): string => MODEL_VARIANT_LABELS[variant] ?? toTitleCase(variant);
 
-// Mirrors the backend's per-class variant enums (taxonomy.py): main models
-// key their variants off the base, and a few non-main types carry their own.
+// Mirrors the backend's per-class variant enums (taxonomy.py): main models key their variants off the base, and a few
+// non-main types carry their own.
 const MAIN_VARIANTS_BY_BASE: Record<string, readonly string[]> = {
   anima: ['anima_qwen3', 'anima_qwen35'],
   flux: ['schnell', 'dev', 'dev_fill'],
@@ -193,9 +191,8 @@ const VARIANTS_BY_TYPE: Record<string, readonly string[]> = {
 };
 
 /**
- * Constrained variant choices for a base/type pair; empty means the pair has no
- * variant concept, so the edit form hides the field unless the model already
- * stores a variant, which it then edits as free text.
+ * Constrained variant choices for a base/type pair; empty means the pair has no variant concept, so the edit form hides
+ * the field unless the model already stores a variant, which it then edits as free text.
  */
 export const getVariantOptionsFor = (base: string, type: string): readonly string[] => {
   if (type === 'main') {

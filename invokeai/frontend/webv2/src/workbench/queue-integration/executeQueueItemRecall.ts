@@ -32,8 +32,8 @@ export interface QueueItemRecallContext {
 
 /**
  * Recalls a local submission snapshot, or a foreign item's session prompts and seed, into the active project, then
- * reveals the destination panel. An unavailable kind writes nothing and says why. A Canvas recall pressed while
- * another runs says so (see `claimCanvasRecall`).
+ * reveals the destination panel. An unavailable kind writes nothing and says why. A Canvas recall pressed while another
+ * runs says so (see `claimCanvasRecall`).
  */
 export const executeQueueItemRecall = async ({
   context,

@@ -315,11 +315,7 @@ const useSamStatus = (engine: ToolFormProps['engine']): OperationStatus | null =
   };
 };
 
-/**
- * Find object is the manual run while auto-update is off. With auto-update on it is the retry after a failed run, the
- * only way to run the same input again, and stays while that retry runs (`retrying`), whether the button or Enter in
- * the prompt started it, so it shows the retry's progress.
- */
+/** The manual run with auto-update off; with it on, the retry after a failed run, kept while `retrying`. */
 const SamActions = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useSamSession(engine);

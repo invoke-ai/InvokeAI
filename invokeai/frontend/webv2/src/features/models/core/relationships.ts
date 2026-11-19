@@ -4,7 +4,6 @@ import { architectureAcceptsVae, someArchitectureVariantAcceptsVae } from './arc
 
 /** Related-model links are symmetric curation hints and permit only models usable in one pipeline. */
 
-/** The fields the compatibility rule reads: a VAE pair also asks for the host's variant and the VAE's latent width. */
 export type RelatableModel = Pick<ModelConfig, 'base' | 'latent_channels' | 'type' | 'variant'>;
 
 /**

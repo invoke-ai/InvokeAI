@@ -698,8 +698,7 @@ describe('importGalleryImagesToCanvas', () => {
 
   it('does not upload an old account image after local preprocessing crosses an account switch', async () => {
     accountLifecycle.activate('user-a');
-    // Reseed capabilities after the account reset so this test reaches the account fence rather than the resize
-    // gate.
+    // Reseed capabilities after the account reset so this test reaches the account fence rather than the resize gate.
     setArchitectureCapabilities(architectureCapabilitiesFixture);
     const { project, state } = withProject();
     let resolveFetch: ((response: Response) => void) | undefined;

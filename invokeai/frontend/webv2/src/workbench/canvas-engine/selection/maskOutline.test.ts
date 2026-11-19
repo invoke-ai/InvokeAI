@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import { traceMaskOutlinePath } from './maskOutline';
 
-/** Builds RGBA data from a row-major alpha grid. */
 const alphaGrid = (
   rows: readonly (readonly number[])[]
 ): { data: Uint8ClampedArray; height: number; width: number } => {
@@ -75,8 +74,6 @@ describe('traceMaskOutlinePath', () => {
     const loops = path.split(' Z').filter((segment) => segment.trim().length > 0);
     expect(loops).toHaveLength(2);
     expect(path).toContain('M 0 0 L 3 0 L 3 3 L 0 3 Z');
-    // The hole loop winds opposite to the outer loop (counter-clockwise), so
-    // nonzero fill keeps the hole.
     expect(path).toContain('M 2 1 L 1 1 L 1 2 L 2 2 Z');
   });
 

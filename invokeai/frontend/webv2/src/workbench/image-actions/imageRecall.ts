@@ -86,7 +86,6 @@ export interface ImageRecallCapabilities {
   seed: boolean;
   dimensions: boolean;
   clipSkip: boolean;
-  /** The image embeds the workflow that made it, so it can be loaded into the editor. */
   workflow: boolean;
 }
 
@@ -131,7 +130,7 @@ export type ImageRecallSkipReason =
   | 'modelUnavailable'
   | 'unresolved';
 
-/** A recorded model recall could not restore; `name` is the best label the record or catalog offers. */
+/** `name` is the best label the record or catalog offers. */
 export interface ImageRecallSkip {
   name: string | null;
   reason: ImageRecallSkipReason;
@@ -231,10 +230,7 @@ export const getSteps = (metadata: unknown): number | null => {
   return steps !== null && steps >= 1 ? steps : null;
 };
 
-/**
- * The value the model's single guidance slider holds. Distilled-guidance families record it as `guidance` and
- * their older records carry no `cfg_scale` at all, so for them the dedicated key wins.
- */
+/** Distilled-guidance families record their slider as `guidance`, and older records carry no `cfg_scale`. */
 export const getCfgScale = (metadata: unknown, model?: GenerateModelConfig): number | null => {
   const { guidanceLabel, guidanceMin } = getGenerationUiPolicy(model);
   const cfgScale =
@@ -314,8 +310,7 @@ const getImageSize = (
   image: GalleryImage,
   model: GenerateModelConfig
 ): Pick<GenerateWidgetValues, 'height' | 'width'> | null => {
-  // Decline dimension recall without architecture policy; persisting fallback grid 8 can leave sizes the model
-  // rejects.
+  // Decline dimension recall without architecture policy; persisting fallback grid 8 can leave sizes the model rejects.
   const grid = getDimensionGrid(model.base, model.variant);
 
   if (grid === null) {
@@ -332,7 +327,6 @@ export const getMetadataSize = (
   metadata: unknown,
   model: GenerateModelConfig
 ): Partial<Pick<GenerateWidgetValues, 'height' | 'width'>> => {
-  // Return no size and omit its field label when architecture policy is unavailable.
   const grid = getDimensionGrid(model.base, model.variant);
 
   if (grid === null) {
@@ -351,7 +345,6 @@ export const getMetadataSize = (
 /** Image recall restores only the exact weights that ran, and only a model the record names unambiguously. */
 const IMAGE_RECORDED_MODEL_POLICY: RecordedModelPolicy = { ambiguous: 'refuse', hashMiss: 'refuse' };
 
-/** The installed model a recorded reference names, or null when none (or more than one) does. */
 const resolveMetadataModel = <T extends ComponentModelConfig>(value: unknown, models: readonly T[]): T | null => {
   const ref = toRecordedModelRef(value);
   const resolved = ref ? resolveRecordedModel(ref, models, IMAGE_RECORDED_MODEL_POLICY) : null;
@@ -427,9 +420,7 @@ const getPromptPatch = (
 > => {
   const positivePrompt = getString(metadata, 'positive_prompt');
   const negativePrompt = getNullableString(metadata, 'negative_prompt');
-  // Image metadata records the prompt the model was given, so it already has any
-  // template baked in. Clearing the active template stops it wrapping the text a
-  // second time on the next Invoke.
+  // The recorded prompt already has any template baked in; clearing the active template stops a second wrap.
   const clearTemplate = positivePrompt !== null || negativePrompt !== undefined;
 
   return {
@@ -441,7 +432,6 @@ const getPromptPatch = (
 
 const hasPrompt = (metadata: unknown): boolean => Object.keys(getPromptPatch(metadata)).length > 0;
 
-/** Seed templates from merged metadata prompts: these are the words the model received. */
 export const getMetadataPrompts = (metadata: unknown): { negativePrompt: string; positivePrompt: string } => ({
   negativePrompt: getNullableString(metadata, 'negative_prompt') ?? '',
   positivePrompt: getString(metadata, 'positive_prompt') ?? '',
@@ -458,7 +448,6 @@ const hasGenerationSettings = (metadata: unknown, model: GenerateModelConfig): b
   getBoolean(metadata, 'seamless_x') !== null ||
   getBoolean(metadata, 'seamless_y') !== null;
 
-/** Gate Krea-2 rebalance on model base and validate metadata before forwarding weights verbatim to the node parser. */
 const getMetadataKrea2Rebalance = (
   metadata: unknown,
   model: GenerateModelConfig | undefined
@@ -508,10 +497,7 @@ const getMetadataKrea2SeedVariance = (
 const hasKrea2SeedVariance = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataKrea2SeedVariance(metadata, model)).length > 0;
 
-/**
- * MOSS-Image's negative-branch skip layers; an empty list is a recorded choice, skipping none. A list naming a block
- * MOSS-Image lacks keeps the current setting: applying it would block every generation until edited.
- */
+/** An empty list is a recorded choice; a list naming a block MOSS-Image lacks keeps the current setting. */
 const getMetadataMossImageSkipLayers = (
   metadata: unknown,
   model: GenerateModelConfig | undefined
@@ -528,10 +514,7 @@ const getMetadataMossImageSkipLayers = (
 const hasMossImageSkipLayers = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataMossImageSkipLayers(metadata, model)).length > 0;
 
-/**
- * Generation graphs stamp `generation_mode` and record what ran, so on such a record a missing list or switch means
- * none or the node default. Other records that name a model, such as canvas saves, never record concepts or tuning.
- */
+/** On a stamped generation record a missing list or switch means none or the default; canvas saves record neither. */
 const isGenerationRecord = (metadata: unknown): boolean => getString(metadata, 'generation_mode') !== null;
 
 const getBoundedNumber = (metadata: unknown, key: string, min: number, max: number): number | null => {
@@ -540,10 +523,7 @@ const getBoundedNumber = (metadata: unknown, key: string, min: number, max: numb
   return value !== null && value >= min && value <= max ? value : null;
 };
 
-/**
- * A recorded shift: `'auto'` (webv2) or `null` (legacy) for one the node derived, a number for an override.
- * Undefined when the key is missing or holds something else.
- */
+/** `'auto'` (webv2) or `null` (legacy) when the node derived it, a number if overridden; else undefined. */
 const getRecordedTimestepShift = (metadata: unknown, key: string): number | null | undefined => {
   if (!isRecord(metadata) || !(key in metadata)) {
     return undefined;
@@ -556,10 +536,8 @@ const getRecordedTimestepShift = (metadata: unknown, key: string): number | null
   return getBoundedNumber(metadata, key, MIN_TIMESTEP_SHIFT, MAX_TIMESTEP_SHIFT) ?? undefined;
 };
 
-/** The recorded value, else the fallback when a generation record of the model's own family leaves the key out. */
 type RecordedOrDefault = <T>(key: string, recorded: T | undefined, fallback: T) => T | undefined;
 
-/** The settings each family records under its own keys. */
 const getFamilyTuning = (
   metadata: Record<string, unknown>,
   model: GenerateModelConfig,
@@ -659,8 +637,7 @@ const getFamilyTuning = (
   }
 
   if (model.base === 'krea-2') {
-    // Recorded only when the switch was sent: with edit references and a LoRA. A record without it says nothing
-    // about the switch, so the user's setting stays.
+    // Recorded only when the switch was sent; a record without it leaves the user's setting.
     const referenceKvCache = getBoolean(metadata, 'krea2_reference_kv_cache');
 
     return referenceKvCache === null ? {} : { krea2ReferenceKvCache: referenceKvCache };
@@ -669,11 +646,7 @@ const getFamilyTuning = (
   return {};
 };
 
-/**
- * PiD decoding, shared by several families. The graphs record its keys only while it decodes, so a generation record
- * of the model's family without the mode decoded through the VAE. Out-of-range steps are clamped to what the decoder
- * takes rather than applied.
- */
+/** Graphs record PiD keys only while it decodes, so a same-family record without the mode used the VAE. */
 const getPidTuning = (
   metadata: Record<string, unknown>,
   model: GenerateModelConfig,
@@ -693,13 +666,8 @@ const getPidTuning = (
 };
 
 /**
- * Per-family tuning the graphs record under their own keys, and PiD. Gated on the model recall settles on, since each
- * setting only reaches that family's denoise, encoder or decode nodes.
- *
- * A generation record of that same family that leaves a switch out ran the node's default: webv2 recorded no tuning
- * before the panel offered it. Restoring the default there means a preset turned on since does not survive recall.
- * Values that only matter while a switch is on (DyPE scale, variance strength, PiD steps) stay as they are when
- * missing.
+ * Gated on the model recall settles on. A same-family generation record that leaves a switch out ran the node's
+ * default, so it is restored; values that only matter while a switch is on stay when missing.
  */
 const getMetadataModelTuning = (
   metadata: unknown,
@@ -722,19 +690,14 @@ const getMetadataModelTuning = (
 const hasModelTuning = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataModelTuning(metadata, model)).length > 0;
 
-/** The canvas inpaint and outpaint graphs record the adapter key whenever the adapter ran. */
 const ANIMA_INPAINT_ADAPTER_MODES: readonly string[] = ['anima_inpaint', 'anima_outpaint'];
 
-/**
- * Provider options and the named size, gated on what the effective model's provider accepts: the keys are recorded
- * by the provider nodes (`openai_quality`, `gemini_temperature`, ...), so a value only applies to the same provider.
- */
+/** Provider nodes record these keys, so a value applies only to the same provider. */
 const getMetadataExternalProvider = (
   metadata: unknown,
   model: GenerateModelConfig | undefined,
   isCanvasFrame: boolean
 ): Partial<GenerateWidgetValues> => {
-  // Local models advertise no provider options or presets, so every lookup below answers nothing for them.
   const patch: Partial<GenerateWidgetValues> = {};
   const imageSize = getString(metadata, 'image_size');
 
@@ -748,9 +711,7 @@ const getMetadataExternalProvider = (
     const exact = named.filter(
       (preset) => (width === null || preset.width === width) && (height === null || preset.height === height)
     );
-    // A Canvas output records its frame, not the provider size: the Canvas asked for the named size at the ratio
-    // nearest the frame, so Generate recall picks that one. A Canvas route keeps the recorded frame instead, and the
-    // Canvas derives the same named size from it.
+    // A Canvas output records its frame, not the provider size: pick the named size at the ratio nearest the frame.
     const ratioDistance = (preset: { width: number; height: number }) =>
       width !== null && height !== null && width > 0 && height > 0
         ? Math.abs(Math.log(preset.width / preset.height / (width / height)))
@@ -761,7 +722,7 @@ const getMetadataExternalProvider = (
         : undefined;
     const preset = exact.length === 1 ? exact[0] : nearest;
 
-    // A name alone can describe many aspect ratios. Restore only a size the record pins down, with its dimensions.
+    // A name alone can describe many aspect ratios; restore only a size the record pins down.
     if (preset) {
       patch.externalImageSize = preset.image_size;
       patch.width = preset.width;
@@ -771,8 +732,7 @@ const getMetadataExternalProvider = (
     }
   }
 
-  // Provider outputs omit nullable fields when their default was used. The provider stamp distinguishes those
-  // omissions from partial or unrelated metadata, where the current choice should remain untouched.
+  // Provider outputs omit fields left at default; the provider stamp separates those from unrelated metadata.
   const usesProviderDefaults = getString(metadata, 'external_provider') === model?.provider_id;
   const isDefault = (key: string): boolean =>
     isRecord(metadata) && (metadata[key] === null || (usesProviderDefaults && !(key in metadata)));
@@ -851,10 +811,8 @@ const hasExternalProvider = (metadata: unknown, model: GenerateModelConfig | und
   Object.keys(getMetadataExternalProvider(metadata, model, false)).length > 0;
 
 /**
- * The adapter switch and weight; only an Anima image can carry them. A recorded adapter means it ran, so the switch
- * turns on. `core_metadata` drops `null` on write, so an inpaint or outpaint record without the key ran without one:
- * the switch turns off and the current pick stays for the next time it is wanted. Other records say nothing about
- * it. An out-of-range weight is clamped rather than applied, which would block every inpaint until the user edits it.
+ * A recorded adapter means it ran. `core_metadata` drops `null` on write, so an inpaint/outpaint record without the key
+ * ran without one. An out-of-range weight is clamped: applying it would block every inpaint.
  */
 const getMetadataAnimaInpaintAdapter = (
   metadata: unknown,
@@ -882,11 +840,7 @@ const getMetadataAnimaInpaintAdapter = (
 const hasAnimaInpaintAdapterSettings = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataAnimaInpaintAdapter(metadata, model)).length > 0;
 
-/**
- * The prompt upsampler switch; only a FLUX.3 image can carry it. A recorded model means the upsampler ran, so the
- * switch turns on. `core_metadata` drops `null` on write, so a FLUX.3 record without the key ran without it: the
- * switch turns off and the current pick stays. Other records say nothing about it.
- */
+/** A recorded model means the upsampler ran; `core_metadata` drops `null`, so a FLUX.3 record without it did not. */
 const getMetadataFlux3PromptUpsampler = (
   metadata: unknown,
   model: GenerateModelConfig | undefined
@@ -927,14 +881,10 @@ type RecalledComponentSetting = keyof Pick<
 interface RecalledComponent {
   metadataKey: string;
   setting: RecalledComponentSetting;
-  /** The setting holds a main model (a component source or second transformer), not an encoder. */
   isMainModel?: true;
 }
 
-/**
- * The component keys the generation graphs record; a key missing here is silently dropped by Remix. The first
- * recorded key wins for a shared setting.
- */
+/** Remix silently drops a key missing here. The first recorded key wins. */
 const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { isMainModel: true, metadataKey: 'qwen3_source', setting: 'componentSourceModel' },
   { isMainModel: true, metadataKey: 'qwen_image_component_source', setting: 'componentSourceModel' },
@@ -967,7 +917,7 @@ const getRecalledComponent = (
     ? getMetadataMainModel(metadata, component.metadataKey, models)
     : getMetadataComponent(metadata, component.metadataKey, models);
 
-/** Recorded components that resolve to installed models; `null` clears a slot the image left empty. */
+/** `null` clears a slot the image left empty. */
 const getComponentPatch = (
   metadata: unknown,
   models: readonly ComponentModelConfig[]
@@ -1009,18 +959,13 @@ const getNumberInRange = (metadata: unknown, key: string, min: number, max: numb
 
 interface RefinerRecall {
   patch: RefinerPatch;
-  /** The recorded refiner could not be restored; its current model and tuning stay together. */
   skipped: ImageRecallSkip | null;
 }
 
 const isInstalledRefiner = (model: ComponentModelConfig): model is MainModelConfig =>
   isMainModelConfig(model) && isRefinerModel(model);
 
-/**
- * The refiner an SDXL image ran with, resolved against installed refiner models, plus its tuning. Generation records
- * only name a refiner when one ran, so a stamped record without one clears the slot, as a missing `loras` list means
- * no concepts.
- */
+/** Records name a refiner only when one ran, so a stamped record without one clears the slot. */
 const getRefinerRecall = (
   metadata: unknown,
   model: GenerateModelConfig,
@@ -1034,9 +979,7 @@ const getRefinerRecall = (
   const patch: RefinerPatch = {};
   const ref = toRecordedModelRef(metadata.refiner_model);
 
-  // Refiner presence and tuning describe the recorded main model, including records that ran without a refiner.
   if (getRecord(metadata, 'model') && sourceModel?.key !== model.key) {
-    // As with concepts, only a refiner the record names is reported; a record without one keeps the slot quietly.
     const recordsRefiner = Object.entries(metadata).some(
       ([key, value]) => key.startsWith('refiner_') && value !== null
     );
@@ -1104,16 +1047,11 @@ const getRefinerRecall = (
 };
 
 interface ConceptRecall {
-  /** The concept list to apply, or null when the metadata says nothing reliable about concepts. */
   loras: GenerateLora[] | null;
   skipped: ImageRecallSkip[];
 }
 
-/**
- * Concepts the image was generated with, resolved against installed LoRAs that fit `model`, the model recall settles
- * on. `sourceModel` is the recorded main model as resolved from the installed catalog. The metadata lists only the
- * LoRAs that ran, so every restored concept is enabled at its recorded weight.
- */
+/** The metadata lists only LoRAs that ran, so every restored concept is enabled at its recorded weight. */
 const getMetadataConcepts = (
   metadata: unknown,
   models: readonly ComponentModelConfig[],
@@ -1122,10 +1060,9 @@ const getMetadataConcepts = (
 ): ConceptRecall => {
   const recorded = isRecord(metadata) ? metadata.loras : undefined;
 
-  // Matching keys alone are not enough: persisted settings can still name a model that is no longer installed.
+  // Matching keys alone are not enough: persisted settings can name a model that is no longer installed.
   if (getRecord(metadata, 'model') && sourceModel?.key !== model.key) {
-    // Concepts belong to the model they ran on. Without it the current set stays, rather than being judged against
-    // a model recall did not choose.
+    // Without the model the concepts ran on, the current set stays.
     const entries = Array.isArray(recorded) ? recorded : [];
 
     return {
@@ -1187,18 +1124,15 @@ const getMetadataConcepts = (
   return { loras, skipped };
 };
 
-// A refused sentinel makes truncation partial without inspecting entries beyond the recall limit.
 const boundReferenceEntries = (entries: unknown[]): unknown[] =>
   entries.length > 10000 ? [...entries.slice(0, 10000), null] : entries;
 
-/** Historical Canvas global references were serialized both as an array and as an entity container. */
 export const getLegacyCanvasReferenceEntries = (metadata: unknown): unknown[] | null => {
   const references = getRecord(metadata, 'canvas_v2_metadata')?.referenceImages;
   const entries = Array.isArray(references) ? references : isRecord(references) ? references.entities : null;
   return Array.isArray(entries) ? entries : null;
 };
 
-/** A bounded projection of supported reference records, before asset dimensions are available. */
 const getMetadataReferenceEntries = (metadata: unknown): unknown[] | null => {
   if (!isRecord(metadata)) {
     return null;
@@ -1282,7 +1216,7 @@ const getMetadataReferenceEntries = (metadata: unknown): unknown[] | null => {
   });
 };
 
-/** Reads references without transport; name-only v4 assets wait for their actual Gallery dimensions. */
+/** Name-only v4 assets wait for their actual Gallery dimensions. */
 export const readMetadataReferenceImages = (
   metadata: unknown,
   assets?: ReadonlyMap<string, Pick<GalleryImage, 'width' | 'height'>>,
@@ -1349,14 +1283,10 @@ export const readMetadataReferenceImages = (
   };
 };
 
-/** Existing pure callers can read dimensioned references; transport recall hydrates name-only records first. */
 export const getMetadataReferenceImages = (metadata: unknown): GenerateReferenceImage[] | null =>
   readMetadataReferenceImages(metadata).images;
 
-/**
- * Point each recorded adapter at the installed model it names, or clear it so Generate asks for one: a reinstall gives
- * the adapter a new key, and a stale key would pass validation and fail only on the server.
- */
+/** Clear an adapter whose model is not installed: a stale key passes validation and fails only on the server. */
 const resolveReferenceImageModels = (
   referenceImages: GenerateReferenceImage[],
   models: readonly ComponentModelConfig[]
@@ -1403,10 +1333,7 @@ export const getSupportedClipSkip = (metadata: unknown, model: GenerateModelConf
   return clipSkip !== null && clipSkipMax !== null ? Math.min(clipSkipMax, clipSkip) : null;
 };
 
-/**
- * Require served policy for Recall All, Remix, and CLIP skip before persisting model defaults or compatibility
- * choices. Prompts/seed are intrinsic; dimension recall gates its own grid.
- */
+/** Require served policy before persisting model defaults; prompts and seed are intrinsic. */
 export const isImageRecallKindAvailable = (kind: ImageRecallKind): boolean =>
   kind === 'prompts' || kind === 'seed' || kind === 'dimensions' || hasArchitectureCapabilities();
 
@@ -1515,7 +1442,7 @@ export const buildImageRecallSettings = ({
 }: {
   currentValues: GenerateWidgetValues;
   image: GalleryImage;
-  /** The Generate size is the Canvas frame (a Canvas route), which recall sets as recorded. */
+  /** The Generate size is the Canvas frame, which recall sets as recorded. */
   isCanvasFrame?: boolean;
   kind: ImageRecallKind;
   metadata: unknown;
@@ -1531,7 +1458,6 @@ export const buildImageRecallSettings = ({
   const fields: RecalledField[] = [];
   const skipped: ImageRecallSkip[] = [];
   let values: GenerateWidgetValues = cloneGenerateWidgetValues(currentValues);
-  // A restored provider size is what the provider was asked for; the recorded size may be a Canvas frame instead.
   let restoredProviderSize = false;
   let referenceRecall: ReturnType<typeof readMetadataReferenceImages> | null = null;
 
@@ -1548,8 +1474,7 @@ export const buildImageRecallSettings = ({
     const componentPatch = getComponentPatch(metadata, models);
     const recordedSettings = Object.keys(componentPatch) as RecalledComponentSetting[];
     const effectiveModel = values.model;
-    // A recorded component that does not fit the effective model is skipped, so the current pick stays. Each is judged
-    // beside the ones already restored, because a slot can depend on another (the Vision Tower on a GGUF encoder).
+    // Skip components that do not fit, judged beside those already restored (a Vision Tower depends on a GGUF encoder).
     const fittingSettings: RecalledComponentSetting[] = [];
 
     for (const setting of recordedSettings) {
@@ -1592,7 +1517,7 @@ export const buildImageRecallSettings = ({
 
     const tuningPatch = getMetadataModelTuning(metadata, values.model);
 
-    // A same-family record always restores its switches, so only count the field when one actually changes.
+    // A same-family record always restores its switches; count the field only when one changes.
     if (Object.entries(tuningPatch).some(([key, value]) => values[key as keyof GenerateWidgetValues] !== value)) {
       values = { ...values, ...tuningPatch };
       fields.push('modelTuning');
@@ -1613,14 +1538,11 @@ export const buildImageRecallSettings = ({
     }
 
     if (model || fittingSettings.length > 0) {
-      // Same transition as picking the model: clears picks left over from the previous model and fills an
-      // automatic FLUX.2 component source.
       const { settings } = getGenerateModelSelectionResult({ currentValues: values, model: values.model, models });
       values = { ...values, ...settings };
     }
 
-    // Judged after the transition, which can complete or undo a recorded pick. The adapter switch is a component
-    // change too: a record can turn it off without touching the pick.
+    // Judged after the transition, which can complete or undo a recorded pick.
     if (
       recordedSettings.some((setting) => values[setting]?.key !== currentValues[setting]?.key) ||
       values.animaInpaintAdapterEnabled !== currentValues.animaInpaintAdapterEnabled ||
@@ -1629,7 +1551,6 @@ export const buildImageRecallSettings = ({
       fields.push('components');
     }
 
-    // Judged against the model the transition settled on; the recorded concepts replace the list it left.
     const concepts = getMetadataConcepts(metadata, models, values.model, model);
 
     skipped.push(...concepts.skipped);
@@ -1639,19 +1560,16 @@ export const buildImageRecallSettings = ({
       fields.push('loras');
     }
 
-    // Recalled reference images must fit the effective model — when the
-    // metadata model was not recalled (e.g. uninstalled), `values.model` is
-    // still the current one and incompatible configs are re-targeted or dropped.
+    // References must fit the effective model, which is still the current one when the recorded model was not recalled.
     referenceRecall = readMetadataReferenceImages(metadata, referenceAssets, models, values.model);
     const recordedReferenceImages = referenceRecall.images;
-    // Only the base decides; an encoder without a vision tower is flagged by validation, not recalled away.
     const referenceImages = getCompatibleReferenceImages(
       resolveReferenceImageModels(recordedReferenceImages ?? [], models),
       values.model,
       models
     );
 
-    // A record of no references clears the current ones; a record whose references do not fit leaves them.
+    // No recorded references clears the current ones; references that do not fit leave them.
     if (referenceImages.length > 0 || (recordedReferenceImages?.length === 0 && values.referenceImages.length > 0)) {
       values = { ...values, referenceImages };
       fields.push('referenceImages');
@@ -1737,7 +1655,6 @@ export const buildImageRecallSettings = ({
       fields.push('hiDiffusion');
     }
 
-    // Judged against the model the recall settled on: a non-SDXL main has no refiner to restore.
     const refinerRecall = getRefinerRecall(
       metadata,
       values.model,

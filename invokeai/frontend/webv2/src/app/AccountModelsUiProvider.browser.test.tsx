@@ -155,8 +155,8 @@ describe('Account Models port on the Launchpad', () => {
   });
 
   describe('Default settings scheduler', () => {
-    // The rules are a lazy chunk (the reader and the Generation modules it imports); load it up front so the first
-    // test is not timing a cold transform. Importing it starts nothing: the section's load does.
+    // The rules are a lazy chunk (the reader and the Generation modules it imports); load it up front so the first test
+    // is not timing a cold transform. Importing it starts nothing: the section's load does.
     beforeAll(async () => {
       await import('./modelSchedulerPolicyReader');
     });

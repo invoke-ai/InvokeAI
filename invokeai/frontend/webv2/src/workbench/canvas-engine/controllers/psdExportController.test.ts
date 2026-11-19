@@ -526,7 +526,6 @@ describe('PsdExportController — spatial adjustments', () => {
   });
 
   it("refuses with the group's name when its spatial stack cannot run on a leaf", async () => {
-    // The leaf's own Texture runs; the inner group's Clarity cannot.
     const runSpatial = vi
       .fn()
       .mockImplementationOnce((request: { pixels: Uint8ClampedArray }) =>

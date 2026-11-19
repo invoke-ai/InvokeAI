@@ -34,7 +34,6 @@ describe('the registry', () => {
     setArchitectureCapabilities(rows);
 
     expect(getArchitectureCapabilityRow('flux', 'schnell')?.variant).toBe('schnell');
-    // A variant with no row of its own, and no variant at all, both land on the base row.
     expect(getArchitectureCapabilityRow('flux', 'made-up')?.variant).toBeNull();
     expect(getArchitectureCapabilityRow('flux')?.variant).toBeNull();
   });
@@ -63,7 +62,6 @@ describe('publishing the table', () => {
   const broken = { base: 'broken', variant: null } as unknown as ArchitectureCapabilitiesRow;
 
   it('stays empty when a row is malformed', () => {
-    // Validate before publication so a malformed table cannot mark the registry loaded.
     expect(() => setArchitectureCapabilities([...rows, broken])).toThrow();
     expect(hasArchitectureCapabilities()).toBe(false);
     expect(getArchitectureCapabilitiesRevision()).toBe(0);
@@ -80,13 +78,11 @@ describe('publishing the table', () => {
   });
 
   it('notifies subscribers when the table is replaced or dropped', () => {
-    // One registry subscription serves all synchronous policy readers.
     const seen: number[] = [];
     const unsubscribe = onArchitectureCapabilitiesChanged(() => seen.push(getArchitectureCapabilitiesRevision()));
 
     setArchitectureCapabilities(rows);
     resetArchitectureCapabilities();
-    // Already empty: nothing changed, so nothing is announced.
     resetArchitectureCapabilities();
     unsubscribe();
     setArchitectureCapabilities(rows);

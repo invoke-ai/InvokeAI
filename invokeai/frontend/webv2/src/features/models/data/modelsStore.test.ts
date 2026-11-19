@@ -196,7 +196,6 @@ describe('models store loading', () => {
           resolveB = resolve;
         })
       )
-      // The join during user B's flight queues a trailing rerun.
       .mockResolvedValueOnce([modelB]);
     const userARefresh = modelsStore.refreshModels();
 
@@ -213,7 +212,6 @@ describe('models store loading', () => {
 
     expect(modelsStore.getModelsSnapshot().models.map((model) => model.key)).toEqual(['model-b']);
 
-    // The mid-flight join re-fetches once more after the shared flight settles.
     await new Promise((resolve) => {
       setTimeout(resolve, 0);
     });

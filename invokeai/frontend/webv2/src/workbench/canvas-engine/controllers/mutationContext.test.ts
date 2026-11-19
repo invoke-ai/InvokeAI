@@ -175,7 +175,6 @@ describe('createCanvasMutationContext', () => {
     const entry = (bytes = 10) => ({ bytes, heldAssetRefs: NO_HELD_ASSET_REFS, redo: vi.fn(), undo: vi.fn() });
     const select = (id: string): CanvasProjectMutation => ({ id, type: 'setCanvasSelectedLayer' });
 
-    /** A reducer whose documents record the selected id; the mirror follows unless told to lag. */
     const createDocuments = () => {
       const state = {
         dispatchError: null as Error | null,

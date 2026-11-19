@@ -18,8 +18,8 @@ const writePresets = (aspectRatioPresets: StoredAspectRatioPreset[]): void => {
 
 /**
  * The account's saved aspect ratios, for Generate's Size section (through the Generation UI adapter) and the canvas
- * Frame tool alike. Reads are generation-normalized; writes edit the stored list, so an entry this build cannot use
- * (a newer build's) is kept.
+ * Frame tool alike. Reads are generation-normalized; writes edit the stored list, so an entry this build cannot use (a
+ * newer build's) is kept.
  *
  * The cap counts every stored entry, listed or not: it bounds the synced blob, and an entry past it would be stored but
  * never listed, so nothing could remove it. Settings already drops records without a usable shape or with a repeated

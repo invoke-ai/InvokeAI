@@ -48,7 +48,6 @@ describe('toBaseGenerationConfig', () => {
   });
 
   it('derives the optimal side from the declared area, not from width alone', () => {
-    // Nonsquare defaults verify that optimum derives from area.
     expect(toBaseGenerationConfig(row('sd-1')).dimensions.optimalSide).toBe(512);
     expect(toBaseGenerationConfig(row('sd-2')).dimensions.optimalSide).toBe(768);
     expect(toBaseGenerationConfig(row('minimax-h3')).dimensions.optimalSide).toBe(1016); // sqrt(1344*768)
@@ -69,13 +68,11 @@ describe('toBaseGenerationConfig', () => {
   });
 
   it('turns an absent clip-skip ceiling into undefined rather than null', () => {
-    // Consumers branch on presence as well as falsiness.
     expect(toBaseGenerationConfig(row('flux')).ui.clipSkipMax).toBeUndefined();
     expect('clipSkipMax' in toBaseGenerationConfig(row('flux')).ui).toBe(true);
   });
 
   it('declares ERNIE-Image scheduler choice as reaching the graph', () => {
-    // ernie_image_denoise builds its sampler from the `scheduler` field, so the dropdown is real.
     expect(toBaseGenerationConfig(row('ernie-image')).schedulerAppliesToGraph).toBe(true);
   });
 });

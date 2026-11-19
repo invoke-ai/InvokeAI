@@ -31,7 +31,6 @@ describe('selectStagedPreviewSource', () => {
   });
 
   it('pins the selected placeholder progress frame to its submitted rect, scaled to fill it', () => {
-    // The submitted rect, not the frame's native 64x64 and not wherever the bbox is now.
     expect(selectStagedPreviewSource({ ...base, progressImage: frame, progressRect: submitted })).toEqual({
       dataUrl: frame.dataUrl,
       placement: { ...submitted, opacity: 1 },
@@ -57,9 +56,7 @@ describe('stagedPreviewKey', () => {
     expect(stagedPreviewKey(null)).toBe('none');
     expect(stagedPreviewKey({ imageName: 'a', placement })).toBe(stagedPreviewKey({ imageName: 'a', placement }));
     expect(stagedPreviewKey({ imageName: 'a', placement })).not.toBe(stagedPreviewKey({ imageName: 'b', placement }));
-    // A new progress frame (different data URL) yields a new key so the effect re-fires.
     expect(stagedPreviewKey({ dataUrl: 'AA', placement })).not.toBe(stagedPreviewKey({ dataUrl: 'BB', placement }));
-    // Toggling the eye republishes the candidate.
     expect(stagedPreviewKey({ hidden: true, imageName: 'a', placement })).not.toBe(
       stagedPreviewKey({ imageName: 'a', placement })
     );

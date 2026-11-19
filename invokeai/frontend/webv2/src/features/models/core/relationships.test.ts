@@ -32,19 +32,15 @@ describe('isBaseCompatible', () => {
   });
 
   it('allows curated cross-base helpers with their consuming bases', () => {
-    // z_image_pid_decode reuses the FLUX PiD decoder.
     expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'pid_decoder'))).toBe(true);
     // MOSS-Image decodes with flux2_pid_decode.
     expect(isBaseCompatible(model('moss-image', 'main'), model('flux2', 'pid_decoder'))).toBe(true);
-    // The pairing is the decoder's, not the base pair's: FLUX.2 LoRAs do not fit MOSS-Image.
     expect(isBaseCompatible(model('moss-image', 'main'), model('flux2', 'lora'))).toBe(false);
   });
 
   it('limits cross-base allowances to the helper type and cited pairs', () => {
-    // The allowance belongs to the decoder type, not to the base pair.
     expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'lora'))).toBe(false);
     expect(isBaseCompatible(model('z-image', 'main'), model('flux', 'main'))).toBe(false);
-    // Only the FLUX decoder is shared; other PiD pairings must match exactly.
     expect(isBaseCompatible(model('qwen-image', 'main'), model('flux', 'pid_decoder'))).toBe(false);
     expect(isBaseCompatible(model('sdxl', 'main'), model('sdxl', 'pid_decoder'))).toBe(true);
   });
@@ -83,12 +79,9 @@ describe('isBaseCompatible', () => {
     expect(isBaseCompatible(model('any', 'siglip'), model('flux', 'main'))).toBe(true);
     expect(isBaseCompatible(model('any', 'clip_vision'), model('sdxl', 'main'))).toBe(true);
     expect(isBaseCompatible(model('any', 'mistral_encoder'), model('flux2', 'main'))).toBe(true);
-    // Z-Image PiD decode consumes a standalone Gemma2 encoder.
     expect(isBaseCompatible(model('any', 'gemma2_encoder'), model('z-image', 'main'))).toBe(true);
-    // moss_image_model_loader reads a standalone Qwen3.5 encoder, and its PiD decode a Gemma2 one.
     expect(isBaseCompatible(model('any', 'qwen3_5_encoder'), model('moss-image', 'main'))).toBe(true);
     expect(isBaseCompatible(model('any', 'gemma2_encoder'), model('moss-image', 'main'))).toBe(true);
-    // No pipeline feeds a CLIP Vision model to an SD2 main.
     expect(isBaseCompatible(model('any', 'clip_vision'), model('sd-2', 'main'))).toBe(false);
   });
 
@@ -116,7 +109,6 @@ describe('isBaseCompatible', () => {
 
 describe('isLinkablePair', () => {
   it('blocks same-type pairs of single-slot types', () => {
-    // A pipeline runs exactly one of each; two are never "used together".
     expect(isLinkablePair(model('sdxl', 'main'), model('sdxl', 'main'))).toBe(false);
     expect(isLinkablePair(model('sdxl', 'vae'), model('sdxl', 'vae'))).toBe(false);
     expect(isLinkablePair(model('any', 't5_encoder'), model('any', 't5_encoder'))).toBe(false);
@@ -210,7 +202,6 @@ describe('LINKABLE_TYPES', () => {
   });
 
   it('includes the concrete-based helper types the backend loaders consume', () => {
-    // flux_control_lora_loader, flux_redux, and pid_decoder_loader.
     expect(isLinkableType('control_lora')).toBe(true);
     expect(isLinkableType('flux_redux')).toBe(true);
     expect(isLinkableType('pid_decoder')).toBe(true);

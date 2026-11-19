@@ -54,7 +54,6 @@ describe('document tree', () => {
     getDocumentIndex({ stacks: before });
     resetDocumentIndexBuildCount();
     const after = updateNodeValues(before, new Map([['r3', (node) => ({ ...node, name: 'renamed' })]]));
-    // r3 and its two ancestors; r1, r2, r4 and c1 are never visited.
     expect(getValueEditVisitCount()).toBe(3);
 
     expect(after).not.toBe(before);
@@ -78,7 +77,6 @@ describe('document tree', () => {
       ])
     );
     const edit = valueEditBetween(before, renamed)!;
-    // Only the updated nodes are listed: g1 was rebuilt for a new child array, not edited.
     expect([...edit.keys()]).toEqual(['r3', 'g2']);
     expect(edit.get('r3')!.before).toBe(collectSubtreeLeaves(g1(before))[1]);
     expect((edit.get('g2')!.after as CanvasGroupContract).children[0]).toBe(edit.get('r3')!.after);
@@ -88,7 +86,6 @@ describe('document tree', () => {
     expect(folded.get('r3')!.before).toBe(edit.get('r3')!.before);
     expect(folded.get('r3')!.after).toMatchObject({ name: 'renamed', opacity: 0.5 });
     expect(folded.has('g2')).toBe(true);
-    // Structural edits are not value edits: nothing connects the forests across a removal.
     expect(valueEditBetween(before, removeNodes(moved, new Set(['r4'])))).toBeNull();
   });
 

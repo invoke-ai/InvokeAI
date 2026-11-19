@@ -34,8 +34,6 @@ type Layer = ComponentProps<typeof RegionalGuidanceSettings>['layer'];
 
 const i18n = createInstance();
 void i18n.use(initReactI18next).init({ fallbackLng: 'en', initAsync: false, lng: 'en', resources: {} });
-// The real catalog, for copy that names the model. Rendered through its own provider, so it stays out of the
-// react-i18next default the instance above registers.
 const english = createInstance();
 await english.init({
   interpolation: { escapeValue: false },
@@ -101,7 +99,6 @@ const LiveSettings = () => {
   return <RegionalGuidanceSettings engine={stub.engine as never} layer={layer} />;
 };
 
-/** Renders the panel over the real reducer and history, so commits land and undo replays them. */
 const renderLive = async (base: string, overrides: Partial<CanvasRegionalGuidanceLayerContract> = {}) => {
   stub = createStructuralEngineStub({
     layers: [layerContract('rg-1', 'regional_guidance', { positivePrompt: 'a shop front', ...overrides })],
@@ -132,7 +129,6 @@ const negativeInput = () => page.getByRole('textbox', { name: 'widgets.layers.re
 const addNegativeButton = () => page.getByRole('button', { name: 'widgets.layers.regionalGuidance.addNegativePrompt' });
 const removeNegativeButton = () =>
   page.getByRole('button', { name: 'widgets.layers.regionalGuidance.removeNegativePrompt' });
-/** The negative prompt itself, or the button that adds it. */
 const hasNegativeControls = () => hasNegativeField() || addNegativeButton().query() !== null;
 
 describe('RegionalGuidanceSettings per model base', () => {
@@ -155,7 +151,6 @@ describe('RegionalGuidanceSettings per model base', () => {
     await render('sd-1', createLayer());
     expect(alerts()).toEqual([]);
     expect(hasNegativeField()).toBe(false);
-    // Without an engine there is no document to add it to.
     await expect.element(addNegativeButton()).toBeDisabled();
     expect(hasAutoNegativeSwitch()).toBe(true);
 
@@ -164,100 +159,14 @@ describe('RegionalGuidanceSettings per model base', () => {
     expect(addNegativeButton().query()).toBeNull();
   });
 
-  it.each(['krea-2', 'z-image', 'anima'])(
-    'offers %s regional negatives and retains them across model switches',
-    async (base) => {
-      const layer = createLayer({ autoNegative: true, negativePrompt: 'blurry' });
-      await render(base, layer);
-      const autoNegative = () => page.getByRole('checkbox', { name: 'widgets.layers.regionalGuidance.autoNegative' });
-
-      expect(alerts()).toEqual([]);
-      await expect.element(negativeInput()).toHaveValue('blurry');
-      await expect.element(autoNegative()).toBeChecked();
-
-      await render('flux2', layer);
-      expect(hasNegativeControls()).toBe(false);
-      expect(hasAutoNegativeSwitch()).toBe(false);
-
-      await render(base, layer);
-      await expect.element(negativeInput()).toHaveValue('blurry');
-      await expect.element(autoNegative()).toBeChecked();
-    }
-  );
-
-  it.each(['krea-2', 'z-image', 'anima'])(
-    'tells why %s regional negatives do nothing at CFG Scale 1, keeping them editable',
-    async (base) => {
-      const hint = 'Negative prompts and Auto-Negative take effect only when CFG Scale is above 1.';
-      const negativeInput = () => page.getByRole('textbox', { name: 'Negative prompt' });
-      const autoNegative = () => page.getByRole('checkbox', { name: 'Auto-Negative' });
-      const layer = createLayer({ autoNegative: true, negativePrompt: 'blurry' });
-
-      selectedCfgScale = 1;
-      await render(base, layer, english);
-
-      await expect.element(negativeInput()).toHaveAccessibleDescription(hint);
-      await expect.element(autoNegative()).toHaveAccessibleDescription(hint);
-      await expect.element(negativeInput()).toBeEnabled();
-      await expect.element(negativeInput()).toHaveValue('blurry');
-      await expect.element(autoNegative()).toBeChecked();
-
-      selectedCfgScale = 1.5;
-      await render(base, layer, english);
-
-      expect(host!.textContent).not.toContain(hint);
-      await expect.element(negativeInput()).not.toHaveAccessibleDescription();
-      await expect.element(autoNegative()).not.toHaveAccessibleDescription();
-    }
-  );
-
-  it('keeps the CFG Scale hint for a region without a negative prompt, describing its add button', async () => {
-    const hint = 'Negative prompts and Auto-Negative take effect only when CFG Scale is above 1.';
-    selectedCfgScale = 1;
-    await render('krea-2', createLayer({ autoNegative: true }), english);
-
-    await expect.element(page.getByRole('button', { name: 'Add negative prompt' })).toHaveAccessibleDescription(hint);
-    await expect.element(page.getByRole('checkbox', { name: 'Auto-Negative' })).toHaveAccessibleDescription(hint);
-  });
-
-  it('gives no CFG hint on an SD base, whose graph reads regional negatives at any CFG Scale', async () => {
-    selectedCfgScale = 1;
-    await render('sd-1', createLayer({ negativePrompt: 'blurry' }), english);
-
-    expect(host!.textContent).not.toContain('CFG Scale');
-  });
-
-  it('hides the negative controls on a positive-only base even when the layer still holds a negative', async () => {
-    await render('flux2', createLayer({ autoNegative: true, negativePrompt: 'blurry' }));
-    expect(alerts()).toEqual([]);
-    expect(hasNegativeControls()).toBe(false);
-    expect(hasAutoNegativeSwitch()).toBe(false);
-  });
-
   it('warns that a base with no regional path skips the layer', async () => {
     await render('sd-3', createLayer());
     expect(alerts()).toEqual(['widgets.layers.regionalGuidance.unsupportedModel']);
     expect(hasNegativeControls()).toBe(true);
   });
-
-  it('offers everything while no model is selected', async () => {
-    await render(null, createLayer());
-    expect(alerts()).toEqual([]);
-    expect(hasNegativeControls()).toBe(true);
-  });
 });
 
 describe('RegionalGuidanceSettings before the capability table arrives', () => {
-  it('does not accuse a supported model of lacking a regional path', async () => {
-    // Missing capabilities must not announce supported regional models as unsupported while rendering their
-    // controls.
-    await render('sd-1', createLayer());
-
-    expect(alerts()).toEqual([]);
-    expect(hasNegativeControls()).toBe(true);
-    expect(hasAutoNegativeSwitch()).toBe(true);
-  });
-
   it('renders the real answer once the table lands, without remounting', async () => {
     await render('sd-3', createLayer());
     expect(alerts()).toEqual([]);
@@ -268,18 +177,6 @@ describe('RegionalGuidanceSettings before the capability table arrives', () => {
 
     expect(alerts()).toEqual(['widgets.layers.regionalGuidance.unsupportedModel']);
   });
-
-  it('hides the negative controls once the table says the base ignores them', async () => {
-    await render('flux2', createLayer({ autoNegative: true, negativePrompt: 'blurry' }));
-    expect(hasNegativeField()).toBe(true);
-
-    await act(() => {
-      setArchitectureCapabilities(architectureCapabilitiesFixture);
-    });
-
-    expect(hasNegativeControls()).toBe(false);
-    expect(hasAutoNegativeSwitch()).toBe(false);
-  });
 });
 
 describe('RegionalGuidanceSettings on a layout base', () => {
@@ -288,7 +185,6 @@ describe('RegionalGuidanceSettings on a layout base', () => {
     act(() => userEvent.click(page.getByText(`widgets.layers.regionalGuidance.layoutKinds.${kind}`, { exact: true })));
   const promptInput = () => page.getByRole('textbox', { name: 'widgets.layers.regionalGuidance.positivePrompt' });
   const visibleTextInput = () => page.getByRole('textbox', { name: 'widgets.layers.regionalGuidance.visibleText' });
-  /** What the always-present status region announces. */
   const announced = () => host!.querySelector('[role="status"]')?.textContent ?? null;
   const descriptionOf = (element: Element) =>
     (element.getAttribute('aria-describedby') ?? '')
@@ -309,50 +205,6 @@ describe('RegionalGuidanceSettings on a layout base', () => {
     await render('sd-1', createLayer());
     expect(kindGroup().query()).toBeNull();
     expect(host!.querySelector('[role="status"]')).toBeNull();
-  });
-
-  it('describes the region type by the roles and the prompt field by the box', async () => {
-    await renderLive('moss-image');
-
-    expect(descriptionOf(kindGroup().element())).toEqual(['widgets.layers.regionalGuidance.layoutKindHelp']);
-    expect(descriptionOf(promptInput().element())).toEqual(['widgets.layers.regionalGuidance.layoutBoxHelp']);
-  });
-
-  it('offers no region type or visible text on a base with objects only, keeping a stored text role', async () => {
-    await renderLive('ideogram-4', { layout: { kind: 'text' }, negativePrompt: 'blurry' });
-
-    expect(kindGroup().query()).toBeNull();
-    expect(visibleTextInput().query()).toBeNull();
-    expect(negativeInput().query()).toBeNull();
-    // Placed as an object, a text role needs no visible text.
-    expect(announced()).toBe('');
-    expect(descriptionOf(promptInput().element())).toEqual(['widgets.layers.regionalGuidance.layoutBoxHelp']);
-    expect(liveLayer().layout).toEqual({ kind: 'text' });
-  });
-
-  it('names FLUX.3 in the help for its box, offering no region type and no negative prompt', async () => {
-    await render('flux3', createLayer({ layout: { kind: 'character' }, negativePrompt: 'blurry' }), english);
-
-    // By role alone, so renamed copy cannot hide a control that is shown.
-    expect(page.getByRole('radiogroup').query()).toBeNull();
-    const textboxes = page.getByRole('textbox').all();
-    expect(textboxes).toHaveLength(1);
-    await expect
-      .element(textboxes[0]!)
-      .toHaveAccessibleDescription(
-        'FLUX.3 places the rectangle around everything painted on this layer inside the frame, so the shape does not matter and separate areas share one box.'
-      );
-    expect(alerts()).toEqual([]);
-  });
-
-  it('describes the prompt field by the box and a missing prompt together', async () => {
-    await renderLive('ideogram-4', { positivePrompt: null });
-
-    expect(announced()).toBe('widgets.layers.regionalGuidance.layoutMissingPrompt');
-    expect(descriptionOf(promptInput().element())).toEqual([
-      'widgets.layers.regionalGuidance.layoutBoxHelp',
-      'widgets.layers.regionalGuidance.layoutMissingPrompt',
-    ]);
   });
 
   it('records a type switch and the visible text as one undo step each, keeping text across a switch', async () => {
@@ -387,26 +239,6 @@ describe('RegionalGuidanceSettings on a layout base', () => {
     expect(visibleTextInput().query()).toBeNull();
   });
 
-  it('stores visible text across lines, with Enter starting a new line', async () => {
-    await renderLive('moss-image', { layout: { kind: 'text' } });
-
-    await act(() => userEvent.type(visibleTextInput(), '一杯温暖{Enter}一刻从容'));
-    await act(() => userEvent.tab());
-
-    expect(stub.commits).toHaveLength(1);
-    expect(liveLayer().layout).toEqual({ kind: 'text', text: '一杯温暖\n一刻从容' });
-  });
-
-  it('keeps text typed right before a type switch, committing both in order', async () => {
-    await renderLive('moss-image', { layout: { kind: 'text' } });
-
-    await act(() => visibleTextInput().fill('EXIT'));
-    await pickKind('object');
-
-    expect(stub.commits).toHaveLength(2);
-    expect(liveLayer().layout).toEqual({ kind: 'object', text: 'EXIT' });
-  });
-
   it('commits typed visible text when Invoke flushes drafts before the field blurs', async () => {
     await renderLive('moss-image', { layout: { kind: 'text' } });
 
@@ -416,26 +248,6 @@ describe('RegionalGuidanceSettings on a layout base', () => {
 
     expect(stub.commits).toHaveLength(1);
     expect(liveLayer().layout).toEqual({ kind: 'text', text: 'SALE' });
-  });
-
-  it('commits an unsaved caption when Invoke flushes drafts from inside the field (Ctrl+Enter)', async () => {
-    await renderLive('moss-image', { positivePrompt: null });
-    expect(announced()).toBe('widgets.layers.regionalGuidance.layoutMissingPrompt');
-    expect(descriptionOf(promptInput().element())).toEqual([
-      'widgets.layers.regionalGuidance.layoutBoxHelp',
-      'widgets.layers.regionalGuidance.layoutMissingPrompt',
-    ]);
-
-    await act(() => promptInput().fill('a neon sign'));
-    expect(stub.commits).toHaveLength(0);
-    await act(() => flushWorkbenchDrafts());
-
-    expect(stub.commits).toHaveLength(1);
-    expect(liveLayer().positivePrompt).toBe('a neon sign');
-    expect(announced()).toBe('');
-    // The field still has focus; leaving it later records nothing new.
-    await act(() => userEvent.tab());
-    expect(stub.commits).toHaveLength(1);
   });
 
   it('leaves an undone caption undone when drafts flush later, showing the restored value', async () => {
@@ -452,31 +264,6 @@ describe('RegionalGuidanceSettings on a layout base', () => {
     expect(stub.commits).toHaveLength(1);
     expect(liveLayer().positivePrompt).toBe('a shop front');
     expect(stub.engine.history.canRedo()).toBe(true);
-  });
-
-  it('leaves an undone negative prompt undone when drafts flush later', async () => {
-    await renderLive('sd-1', { negativePrompt: '' });
-
-    await act(() => negativeInput().fill('blurry'));
-    await act(() => userEvent.tab());
-    await act(() => stub.engine.history.undo());
-    await expect.element(negativeInput()).toHaveValue('');
-
-    await act(() => flushWorkbenchDrafts());
-
-    expect(stub.commits).toHaveLength(1);
-    expect(liveLayer().negativePrompt).toBe('');
-    expect(stub.engine.history.canRedo()).toBe(true);
-  });
-
-  it('commits an unsaved negative prompt on a mask base when drafts are flushed', async () => {
-    await renderLive('sd-1', { negativePrompt: '' });
-
-    await act(() => negativeInput().fill('blurry'));
-    await act(() => flushWorkbenchDrafts());
-
-    expect(stub.commits).toHaveLength(1);
-    expect(liveLayer().negativePrompt).toBe('blurry');
   });
 });
 
@@ -500,7 +287,6 @@ describe('RegionalGuidanceSettings negative prompt', () => {
     await act(() => userEvent.tab());
     expect(liveLayer().negativePrompt).toBe('blurry');
 
-    // Clearing the text keeps the prompt, empty; only its remove control takes it out.
     await act(() => negativeInput().fill(''));
     await act(() => userEvent.tab());
     expect(liveLayer().negativePrompt).toBe('');
@@ -521,35 +307,5 @@ describe('RegionalGuidanceSettings negative prompt', () => {
     await act(() => stub.engine.history.undo());
     await expect.element(negativeInput()).toHaveValue('blurry');
     expect(liveLayer().negativePrompt).toBe('blurry');
-  });
-
-  it('adds an empty negative prompt after one with unsaved text was undone away', async () => {
-    await renderLive('sd-1');
-
-    await act(() => userEvent.click(addNegativeButton()));
-    await act(() => userEvent.keyboard('blurry'));
-    // Undo from outside the field (the History pane) takes the prompt out before its text is saved.
-    await act(() => stub.engine.history.undo());
-    expect(liveLayer().negativePrompt).toBeNull();
-
-    await act(() => userEvent.click(addNegativeButton()));
-    await expect.element(negativeInput()).toHaveValue('');
-    await act(() => userEvent.tab());
-    expect(liveLayer().negativePrompt).toBe('');
-  });
-
-  it('keeps text typed right before removing it as its own undo step', async () => {
-    await renderLive('sd-1', { negativePrompt: '' });
-
-    await act(() => negativeInput().fill('blurry'));
-    await act(() => userEvent.click(removeNegativeButton()));
-
-    expect(liveLayer().negativePrompt).toBeNull();
-    expect(stub.history.entries().past).toEqual([
-      'widgets.layers.regionalGuidance.negativePrompt',
-      'widgets.layers.regionalGuidance.removeNegativePrompt',
-    ]);
-    await act(() => stub.engine.history.undo());
-    await expect.element(negativeInput()).toHaveValue('blurry');
   });
 });

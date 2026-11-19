@@ -139,9 +139,8 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
     }
   };
 
-  // A subject whose base can never match a candidate (external/unknown, or an
-  // any-based type with no allowance) keeps its persisted links manageable but
-  // gets no add-picker — it would be a permanently empty combobox.
+  // A subject whose base can never match a candidate (external/unknown, or an any-based type with no allowance) keeps
+  // its persisted links manageable but gets no add-picker — it would be a permanently empty combobox.
   const canAddLinks = hasLinkableBase(model);
   const linkFilter = createLinkFilter(model, capabilitiesRevision);
   // VAE pairs fail closed without the table; say so instead of offering a list that silently lacks them.
