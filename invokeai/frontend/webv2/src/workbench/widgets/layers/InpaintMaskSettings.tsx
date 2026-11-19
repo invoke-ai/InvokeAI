@@ -22,6 +22,7 @@ const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
   'solid',
   'grid',
   'crosshatch',
+  'diagonal_left',
   'diagonal',
   'horizontal',
   'vertical',

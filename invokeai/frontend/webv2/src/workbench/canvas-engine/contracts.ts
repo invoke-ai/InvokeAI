@@ -266,7 +266,7 @@ export interface CanvasControlAdapterContract {
 }
 
 export interface CanvasMaskFillContract {
-  style: 'solid' | 'grid' | 'crosshatch' | 'diagonal' | 'horizontal' | 'vertical';
+  style: 'solid' | 'grid' | 'crosshatch' | 'diagonal' | 'diagonal_left' | 'horizontal' | 'vertical';
   color: string;
 }
 

@@ -171,7 +171,7 @@ const zControlAdapter = z
   .refine(({ weight }) => isStorableControlWeight(weight));
 const zMaskFill = z.object({
   color: z.string(),
-  style: z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']),
+  style: z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'diagonal_left', 'horizontal', 'vertical']),
 });
 const zMask = z.object({
   bitmap: zImageRef.nullable(),

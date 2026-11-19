@@ -296,6 +296,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         preparation: frame,
         // Screen frames are display-time: the region tint may draw, except over a staged result.
         regionOverlays: !staging,
+        screenPixelRatio: viewport.getDpr(),
         showOverlayStacks,
         // Candidates and progress frames alike land at the rect pinned at submission, never the live bbox.
         stagedPreview:
