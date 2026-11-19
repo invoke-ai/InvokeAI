@@ -17,6 +17,46 @@ const initialSavePath = '/api/v1/projects/fixture-project-002';
 const isInitialSaveUrl = (url) => url.origin === origin && url.pathname === initialSavePath;
 const sessionKey = 'invokeai:v7:webv2:editor-session';
 const lockPrefix = `${sessionKey}:`;
+/** Which committed unload-journal entries and staged drafts hold `needle`, read from IndexedDB. */
+const readHeldDocuments = (page, needle) =>
+  page.evaluate(async (needle) => {
+    const result = { journal: [], drafts: [] };
+    for (const { name } of await indexedDB.databases()) {
+      const kind = name.startsWith('invokeai:v7:webv2:unload-journal')
+        ? 'journal'
+        : name.startsWith('invokeai:v7:webv2:workbench')
+          ? 'drafts'
+          : null;
+      if (!kind) {
+        continue;
+      }
+      const db = await new Promise((resolve, reject) => {
+        const request = indexedDB.open(name);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      try {
+        const store = kind === 'journal' ? 'entries' : 'draftBodies';
+        if (!db.objectStoreNames.contains(store)) {
+          continue;
+        }
+        const records = await new Promise((resolve, reject) => {
+          const request = db.transaction(store).objectStore(store).getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        result[kind].push(
+          ...records.map((record) => ({
+            projectId: record.projectId,
+            hasMarker: record.documentJson.includes(needle),
+          }))
+        );
+      } finally {
+        db.close();
+      }
+    }
+    return result;
+  }, needle);
 await mkdir(artifacts, { recursive: true });
 const reports = [];
 for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
@@ -118,55 +158,19 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
             }
             await waitForRenderedMedia(page);
             await expect.poll(() => heldPuts.length, { timeout: 20_000 }).toBeGreaterThan(0);
-            // No blur/debounce/save wait after A: the actual unload must checkpoint the held field over B.
             let marker = `smoke held prompt ${engine}`;
+            const initial = await readHeldDocuments(page, marker);
+            assert.ok(
+              initial.drafts.some((entry) => entry.projectId === 'fixture-project-002' && !entry.hasMarker),
+              'The initial save must have staged old B'
+            );
+            // No blur/debounce/save wait after A: the actual unload must checkpoint the held field over B.
             await prompt.fill(marker);
             await navigate(() => page.goto(`${origin}/__browser-smoke-idle`, { waitUntil: 'domcontentloaded' }));
-            const recovery = await page.evaluate(async (needle) => {
-              const result = { journal: [], drafts: [] };
-              for (const { name } of await indexedDB.databases()) {
-                const kind = name.startsWith('invokeai:v7:webv2:unload-journal')
-                  ? 'journal'
-                  : name.startsWith('invokeai:v7:webv2:workbench')
-                    ? 'drafts'
-                    : null;
-                if (!kind) {
-                  continue;
-                }
-                const db = await new Promise((resolve, reject) => {
-                  const request = indexedDB.open(name);
-                  request.onsuccess = () => resolve(request.result);
-                  request.onerror = () => reject(request.error);
-                });
-                try {
-                  const store = kind === 'journal' ? 'entries' : 'draftBodies';
-                  if (!db.objectStoreNames.contains(store)) {
-                    continue;
-                  }
-                  const records = await new Promise((resolve, reject) => {
-                    const request = db.transaction(store).objectStore(store).getAll();
-                    request.onsuccess = () => resolve(request.result);
-                    request.onerror = () => reject(request.error);
-                  });
-                  result[kind].push(
-                    ...records.map((record) => ({
-                      projectId: record.projectId,
-                      hasMarker: record.documentJson.includes(needle),
-                    }))
-                  );
-                } finally {
-                  db.close();
-                }
-              }
-              return result;
-            }, marker);
+            const recovery = await readHeldDocuments(page, marker);
             const journaledA = recovery.journal.some((entry) => entry.hasMarker);
             if (engine === 'chromium') {
               assert.ok(journaledA, 'Committed journal must contain A');
-              assert.ok(
-                recovery.drafts.some((entry) => entry.projectId === 'fixture-project-002' && !entry.hasMarker),
-                'The initial save must have staged old B'
-              );
               assert.ok(!recovery.drafts.some((entry) => entry.hasMarker), 'Staged B must not explain A recovery');
               assert.ok(heldPuts.length && heldPuts.every((body) => !body.includes(marker)), 'Only old B reached PUT');
             } else {
@@ -176,10 +180,7 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
                 (entry) => entry.projectId === 'fixture-project-002' && entry.hasMarker
               );
               assert.ok(journaledA || stagedA, 'A must be held in the committed journal or the staged draft');
-              assert.ok(
-                stagedA || heldPuts.every((body) => !body.includes(marker)),
-                'A must be staged before it is sent'
-              );
+              assert.ok(stagedA || heldPuts.every((body) => !body.includes(marker)), 'A sent by PUT must be staged');
             }
             const server = await fetch(
               `${backend.origin}/api/v1/projects/fixture-project-002?max_canvas_schema_version=4&max_document_schema_version=4`
