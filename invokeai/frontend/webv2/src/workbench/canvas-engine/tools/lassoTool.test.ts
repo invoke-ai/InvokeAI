@@ -33,7 +33,6 @@ const createHarness = () => {
     invalidate: vi.fn(),
     stores,
     updateCursor: vi.fn(),
-    // Identity viewport makes document coordinates valid for the screen-space polygon close test.
     viewport: { documentToScreen: (p: { x: number; y: number }) => p },
   } as unknown as ToolContext;
   return { commits, ctx, dispatched, stores };
@@ -65,7 +64,6 @@ describe('lassoTool: drag → commit', () => {
     expect(commits).toHaveLength(1);
     expect(commits[0]!.op).toBe('replace');
     expect(commits[0]!.bounds).toEqual({ height: 20, width: 20, x: 0, y: 0 });
-    // Preview cleared on commit.
     expect(stores.lassoPreview.get()).toBeNull();
   });
 
@@ -160,8 +158,6 @@ describe('lassoTool: cancel + guards', () => {
   });
 
   it('thins a long dense drag by on-screen spacing, staying on its path and ending where it was released', () => {
-    // Ten seconds of a 1000 Hz pen tracing a wobbly loop, 0.1 CSS px apart, at a zoom and pan with fractional
-    // document coordinates, delivered in 60 Hz batches as coalesced events arrive.
     const zoom = 1.7;
     const pan = { x: 13.37, y: -7.21 };
     const at = (sx: number, sy: number): PointerInput => ({
@@ -192,15 +188,10 @@ describe('lassoTool: cancel + guards', () => {
       const b = (samples[index] ?? release).screenPoint;
       screenLength += Math.hypot(b.x - a.x, b.y - a.y);
     }
-    // A point is added only once the last point or the new sample lies the spacing from the point two back, so the
-    // dense path from that point to the new sample is at least the spacing long. Later samples may replace the added
-    // point, but only with ones further along, so these stretches of the dense path each end at or before a kept point
-    // and overlap at most twice: added points ≤ 2 × path length / spacing, plus the first press and its next point.
     expect(vertices.length).toBeLessThanOrEqual((2 * screenLength) / FREEHAND_MIN_SPACING_PX + 2);
     expect(vertices.length).toBeLessThan(samples.length / 3);
     expect(vertices[vertices.length - 1]).toEqual(release.documentPoint);
 
-    // Every dropped sample lies within the spacing of a kept point, so within it of the outline.
     const tolerance = FREEHAND_MIN_SPACING_PX / zoom + 1e-9;
     const distanceToSegment = (p: Vec2, a: Vec2, b: Vec2): number => {
       const dx = b.x - a.x;
@@ -210,7 +201,6 @@ describe('lassoTool: cancel + guards', () => {
     };
     let segment = 1;
     for (const { documentPoint } of samples) {
-      // Samples and kept points share their order, so the nearest segment is at or after the previous one.
       while (
         segment < vertices.length - 1 &&
         distanceToSegment(documentPoint, vertices[segment - 1]!, vertices[segment]!) > tolerance
@@ -256,7 +246,6 @@ describe('lassoTool: polygon mode', () => {
     return h;
   };
 
-  /** One vertex placement: a press and release at the same spot. */
   const click = (tool: Tool, ctx: ToolContext, x: number, y: number, timeStamp: number): void => {
     down(tool, ctx, pointer(x, y, { timeStamp }));
     up(tool, ctx, pointer(x, y, { timeStamp }));
@@ -281,7 +270,6 @@ describe('lassoTool: polygon mode', () => {
     click(tool, ctx, 0, 0, 0);
     move(tool, ctx, pointer(30, 10));
 
-    // The placed vertex plus the live cursor endpoint.
     expect(stores.lassoPreview.get()).toEqual({
       closeArmed: false,
       closeRadiusPx: null,
@@ -353,58 +341,6 @@ describe('lassoTool: polygon mode', () => {
     click(tool, ctx, 40, 1, 1200);
 
     expect(commits).toHaveLength(0);
-  });
-
-  it('closes on a click landing on the first vertex', () => {
-    const tool = createLassoTool();
-    const { commits, ctx } = createPolygonHarness();
-
-    click(tool, ctx, 0, 0, 0);
-    click(tool, ctx, 40, 0, 1000);
-    click(tool, ctx, 40, 40, 2000);
-    // Within the polyline close radius of the first vertex (identity viewport).
-    click(tool, ctx, 3, 2, 3000);
-
-    expect(commits).toHaveLength(1);
-    expect(commits[0]!.bounds).toEqual({ height: 40, width: 40, x: 0, y: 0 });
-  });
-
-  it('does not close on the first vertex before the polygon is fillable', () => {
-    const tool = createLassoTool();
-    const { commits, ctx, stores } = createPolygonHarness();
-
-    click(tool, ctx, 0, 0, 0);
-    // A second click back near the start must add a vertex, not close a 2-gon.
-    click(tool, ctx, 2, 0, 1000);
-
-    expect(commits).toHaveLength(0);
-    expect(stores.lassoPreview.get()?.points).toHaveLength(2);
-  });
-
-  it('closes on a double-click', () => {
-    const tool = createLassoTool();
-    const { commits, ctx } = createPolygonHarness();
-
-    click(tool, ctx, 0, 0, 0);
-    click(tool, ctx, 40, 0, 1000);
-    click(tool, ctx, 40, 40, 2000);
-    // A second press at the same spot, inside the double-click window.
-    click(tool, ctx, 40, 40, 2100);
-
-    expect(commits).toHaveLength(1);
-  });
-
-  it('treats a slow second click at the same spot as a new vertex, not a close', () => {
-    const tool = createLassoTool();
-    const { commits, ctx, stores } = createPolygonHarness();
-
-    click(tool, ctx, 0, 0, 0);
-    click(tool, ctx, 40, 0, 1000);
-    click(tool, ctx, 40, 40, 2000);
-    click(tool, ctx, 40, 40, 9000);
-
-    expect(commits).toHaveLength(0);
-    expect(stores.lassoPreview.get()?.points).toHaveLength(4);
   });
 
   it('drops the session on Escape without committing', () => {

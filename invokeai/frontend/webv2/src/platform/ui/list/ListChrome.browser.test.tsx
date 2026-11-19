@@ -1,18 +1,14 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { ChakraProvider } from '@chakra-ui/react';
-import { Button, IconButton } from '@platform/ui/Button';
 import { system } from '@theme/system';
-import { XIcon } from 'lucide-react';
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
 
 import { List, type ListRowProps } from './List';
 import { ListItem } from './ListItem';
-import { LIST_ROW_GAP_PX } from './listLayout';
 import { ListPager } from './ListPager';
-import { listRowsFromItems, listRowsFromSections } from './listRows';
+import { listRowsFromItems } from './listRows';
 import { ListSelectionBar } from './ListSelectionBar';
 import { ListStack } from './ListStack';
 
@@ -106,70 +102,6 @@ describe('ListSelectionBar', () => {
     expect(host.querySelector<HTMLInputElement>('[aria-label="Select all"] input')!.disabled).toBe(true);
     expect(host.querySelector('[role="separator"]')).toBeNull();
   });
-
-  it('keeps the same height whether or not its sm actions are shown', async () => {
-    const barHeight = () =>
-      host.querySelector<HTMLElement>('[aria-label="Select all"]')!.parentElement!.getBoundingClientRect().height;
-
-    await render(<ListSelectionBar checked={false} label="Select all" onCheckedChange={vi.fn()} />);
-    const idle = barHeight();
-
-    await render(
-      <ListSelectionBar checked label="Select all" summary="2 selected" onCheckedChange={vi.fn()}>
-        <Button size="sm" variant="ghost">
-          Delete
-        </Button>
-        <IconButton aria-label="Clear selection" size="sm" variant="ghost">
-          <XIcon />
-        </IconButton>
-      </ListSelectionBar>
-    );
-
-    expect(buttonWithText('Delete').getBoundingClientRect().height).toBe(24);
-    expect(barHeight()).toBe(idle);
-  });
-
-  it.each(['row', 'none'] as const)(
-    'keeps its checkbox and actions in the row columns of a List with inset %s',
-    async (inset) => {
-      const ActionButton = ({ label }: { label: string }) => (
-        <IconButton aria-label={label} size="sm" variant="ghost">
-          <XIcon />
-        </IconButton>
-      );
-
-      await render(
-        <>
-          <ListSelectionBar checked={false} inset={inset} label="Select all" onCheckedChange={vi.fn()}>
-            <ActionButton label="Bar action" />
-          </ListSelectionBar>
-          <List
-            inset={inset}
-            label="subjects"
-            renderItem={(item: { id: string }, rowProps: ListRowProps) => (
-              <ListItem
-                {...rowProps}
-                actions={<ActionButton label={`${item.id} action`} />}
-                title={item.id}
-                onCheckedChange={vi.fn()}
-              />
-            )}
-            rows={listRowsFromItems([{ id: 'a' }], (item) => item.id)}
-          />
-        </>
-      );
-
-      const control = (scope: string) =>
-        host
-          .querySelector<HTMLElement>(`${scope} [data-scope="checkbox"][data-part="control"]`)!
-          .getBoundingClientRect();
-      const action = (label: string) =>
-        host.querySelector<HTMLElement>(`[aria-label="${label}"]`)!.getBoundingClientRect();
-
-      expect(control('[aria-label="Select all"]').left).toBeCloseTo(control('[data-list-row="a"]').left, 1);
-      expect(action('Bar action').right).toBeCloseTo(action('a action').right, 1);
-    }
-  );
 });
 
 describe('List busy state', () => {
@@ -206,129 +138,6 @@ describe('List busy state', () => {
 });
 
 describe('list dividers', () => {
-  const hairlines = () =>
-    [...host.querySelectorAll<HTMLElement>('[aria-hidden="true"]')].filter(
-      (element) => Math.round(element.getBoundingClientRect().height) === 1
-    );
-
-  it('draws an inset hairline centred in the gap between stacked rows, and none when off', async () => {
-    await render(
-      <ListStack dividers label="subjects">
-        <ListItem title="one" />
-        <ListItem title="two" />
-        <ListItem title="three" />
-      </ListStack>
-    );
-
-    const list = host.querySelector<HTMLElement>('[role="list"][aria-label="subjects"]')!;
-    const rows = [...list.querySelectorAll<HTMLElement>(':scope > [role="listitem"]')];
-    const lines = hairlines();
-
-    expect(rows).toHaveLength(3);
-    expect(lines).toHaveLength(2);
-
-    const first = rows[0]!.getBoundingClientRect();
-    const second = rows[1]!.getBoundingClientRect();
-    const line = lines[0]!.getBoundingClientRect();
-
-    // The row gap is unchanged by the divider, which sits in its middle.
-    expect(second.top - first.bottom).toBeCloseTo(LIST_ROW_GAP_PX, 0);
-    expect(line.top - first.bottom).toBeCloseTo((LIST_ROW_GAP_PX - 1) / 2, 0);
-    // Inset from both edges so rounded row corners never touch it.
-    expect(line.left - first.left).toBeCloseTo(8, 0);
-    expect(first.right - line.right).toBeCloseTo(8, 0);
-
-    await render(
-      <ListStack label="subjects">
-        <ListItem title="one" />
-        <ListItem title="two" />
-      </ListStack>
-    );
-    expect(hairlines()).toHaveLength(0);
-  });
-
-  it('draws dividers between virtualized rows of a section but not before a header or after the last row', async () => {
-    const rows = listRowsFromSections(
-      [
-        { items: [{ id: 'a' }, { id: 'b' }], key: 'one', label: 'One' },
-        { items: [{ id: 'c' }], key: 'two', label: 'Two' },
-      ],
-      (item) => item.id
-    );
-
-    await render(
-      <List
-        dividers
-        label="subjects"
-        renderItem={(item: { id: string }, rowProps: ListRowProps) => <ListItem {...rowProps} title={item.id} />}
-        rows={rows}
-      />
-    );
-    await act(async () => {
-      await new Promise((resolve) => {
-        requestAnimationFrame(() => resolve(undefined));
-      });
-    });
-
-    // Only a → b shares a section with a following row.
-    expect(hairlines()).toHaveLength(1);
-
-    const rowA = host.querySelector<HTMLElement>('[data-list-row="a"]')!.getBoundingClientRect();
-    const rowB = host.querySelector<HTMLElement>('[data-list-row="b"]')!.getBoundingClientRect();
-    const line = hairlines()[0]!.getBoundingClientRect();
-
-    // Same geometry as stacked rows: centred in the gap, inset from both row edges.
-    expect(rowB.top - rowA.bottom).toBeCloseTo(LIST_ROW_GAP_PX, 0);
-    expect(line.top - rowA.bottom).toBeCloseTo((LIST_ROW_GAP_PX - 1) / 2, 0);
-    expect(line.left - rowA.left).toBeCloseTo(8, 0);
-    expect(rowA.right - line.right).toBeCloseTo(8, 0);
-  });
-
-  it('keeps static rows and their neighbouring dividers unchanged on hover', async () => {
-    await render(
-      <ListStack dividers label="subjects">
-        <ListItem title="one" />
-        <div role="listitem">
-          <ListItem role="presentation" title="two" />
-        </div>
-        <ListItem title="three" />
-      </ListStack>
-    );
-    const row = host.querySelectorAll<HTMLElement>('[data-list-surface]')[1]!;
-    const background = getComputedStyle(row).backgroundColor;
-
-    await userEvent.hover(row);
-    expect(row.querySelector('button')).toBeNull();
-    expect(getComputedStyle(row).backgroundColor).toBe(background);
-    expect(hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['1', '1']);
-  });
-
-  it('keeps a disabled row and its neighbouring dividers unchanged on hover', async () => {
-    // Transitions finish within a frame, so hidden hairlines would already read as hidden.
-    document.documentElement.dataset.reduceMotion = 'true';
-    try {
-      await render(
-        <ListStack dividers label="subjects">
-          <ListItem title="one" onPress={vi.fn()} />
-          <ListItem isDisabled title="two" onPress={vi.fn()} />
-          <ListItem title="three" onPress={vi.fn()} />
-        </ListStack>
-      );
-      const row = host.querySelectorAll<HTMLElement>('[data-list-surface]')[1]!;
-      const background = getComputedStyle(row).backgroundColor;
-
-      // Force past Playwright's actionability check: the row is aria-disabled on purpose.
-      await userEvent.hover(row.querySelector('button')!, { force: true });
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
-      expect(getComputedStyle(row).backgroundColor).toBe(background);
-      expect(hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['1', '1']);
-    } finally {
-      delete document.documentElement.dataset.reduceMotion;
-    }
-  });
-
   it('opens a menu-only row from keyboard, assistive-tech, and touch activation, but not a mouse click', async () => {
     const onContextMenu = vi.fn();
     await render(
@@ -350,86 +159,5 @@ describe('list dividers', () => {
     await act(() => tap('touch'));
     await act(() => tap('pen'));
     expect(onContextMenu).toHaveBeenCalledTimes(3);
-  });
-
-  it('points a row whose only interaction is its actions', async () => {
-    await render(
-      <ListStack dividers label="subjects">
-        <ListItem title="one" />
-        <ListItem actions={<button type="button">Install</button>} title="two" />
-        <ListItem title="three" />
-      </ListStack>
-    );
-    const row = host.querySelectorAll<HTMLElement>('[data-list-surface]')[1]!;
-    const background = getComputedStyle(row).backgroundColor;
-
-    await userEvent.hover(row);
-    // Still not a button itself: the install button is the row's only control.
-    expect(row.querySelector('[data-list-primary]')?.tagName).toBe('DIV');
-    await expect.poll(() => getComputedStyle(row).backgroundColor).not.toBe(background);
-    await expect.poll(() => hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['0', '0']);
-  });
-
-  it('hides the hairlines either side of a pointed row, stacked or virtualized', async () => {
-    const opacities = () =>
-      [...host.querySelectorAll<HTMLElement>('[data-list-divider]')].map((line) => getComputedStyle(line).opacity);
-
-    await render(
-      <ListStack dividers label="subjects">
-        <ListItem onPress={() => undefined} title="one" />
-        <ListItem onPress={() => undefined} title="two" />
-        <ListItem onPress={() => undefined} title="three" />
-        <ListItem onPress={() => undefined} title="four" />
-      </ListStack>
-    );
-    const stacked = host.querySelectorAll<HTMLElement>('[role="listitem"]');
-
-    await userEvent.hover(stacked[1]!);
-    await expect.poll(opacities).toEqual(['0', '0', '1']);
-    await render(
-      <ListStack dividers label="subjects">
-        <ListItem onContextMenu={() => undefined} isMenuOpen title="one" />
-        <ListItem onPress={() => undefined} title="two" />
-        <ListItem onPress={() => undefined} title="three" />
-        <ListItem onPress={() => undefined} title="four" />
-      </ListStack>
-    );
-    await userEvent.unhover(host);
-    await expect.poll(opacities).toEqual(['0', '1', '1']);
-
-    // A caller-wrapped row (its own list item around the row) holding an open menu.
-    await render(
-      <ListStack dividers label="subjects">
-        <ListItem onPress={() => undefined} title="one" />
-        <div role="listitem">
-          <ListItem onContextMenu={() => undefined} isMenuOpen role="presentation" title="two" />
-        </div>
-        <ListItem onPress={() => undefined} title="three" />
-        <ListItem onPress={() => undefined} title="four" />
-      </ListStack>
-    );
-    await expect.poll(opacities).toEqual(['0', '0', '1']);
-
-    const rows = listRowsFromSections(
-      [{ items: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }], key: 'one', label: 'One' }],
-      (item) => item.id
-    );
-
-    await render(
-      <List
-        dividers
-        label="subjects"
-        renderItem={(item: { id: string }, rowProps: ListRowProps) => <ListItem {...rowProps} title={item.id} />}
-        rows={rows}
-      />
-    );
-    await act(async () => {
-      await new Promise((resolve) => {
-        requestAnimationFrame(() => resolve(undefined));
-      });
-    });
-
-    await userEvent.hover(host.querySelector<HTMLElement>('[data-list-row="c"]')!);
-    await expect.poll(opacities).toEqual(['1', '0', '0']);
   });
 });

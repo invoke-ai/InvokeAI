@@ -15,8 +15,8 @@ export const WidgetOverlayOwnerContext = createContext(false);
 const subscribeToNothing = (): (() => void) => () => undefined;
 
 /**
- * Register while mounted; hide content synchronously after dismissal and resend the library close when a hidden
- * widget returns.
+ * Register while mounted; hide content synchronously after dismissal and resend the library close when a hidden widget
+ * returns.
  */
 export const useRegisterWidgetOverlay = (open: boolean, setOpen: (open: boolean) => void): boolean => {
   const ownedByWidget = useContext(WidgetOverlayOwnerContext);

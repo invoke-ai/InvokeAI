@@ -20,10 +20,7 @@ export const getCanvasImageDropData = (destination: CanvasImageDropData['destina
 export const getCanvasImageDropId = (destination: CanvasImageDropData['destination']): string =>
   `canvas-image-target:${destination}`;
 
-/**
- * Marks each zone's element. A file dragged in from the desktop is an HTML5 drag dnd-kit never sees; it finds its zone
- * the way dnd-kit's collision does, by the zone's rect under the pointer, whatever is painted above it.
- */
+/** Marks each zone's element; desktop file drags find their zone by rect, as dnd-kit's collision does. */
 export const CANVAS_IMAGE_DROP_DESTINATION_ATTRIBUTE = 'data-canvas-image-drop-destination';
 
 export const findCanvasImageDropDestination = (

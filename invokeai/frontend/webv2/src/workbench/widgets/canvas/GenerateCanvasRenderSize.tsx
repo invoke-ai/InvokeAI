@@ -1,8 +1,4 @@
-/**
- * Canvas mode's render size: generate at the frame's size, the model's optimal size, or a custom size, then resize
- * the result back to the frame. The choice persists in canvas values for invocation compilation. A locked ratio
- * links the custom sides; the workbench's canvas dims sync carries them to a new locked ratio.
- */
+/** Canvas render size: frame, model-optimal or custom, with the result resized back to the frame. */
 
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasScaleMethod, CanvasScalingSettings, PidMode } from '@features/generation/contracts';
@@ -72,15 +68,14 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
   const { widgets } = useWorkbenchCommands();
   const scaling = useActiveProjectSelector(selectScaling, scalingEqual);
   const context = useActiveProjectSelector(selectProcessingContext, processingContextEqual);
-  // The committed frame resolves from the exact bbox, as the compiler does; a resize the Size section has not
-  // committed yet resolves from the size it shows, so the preview follows a drag.
+  // The committed frame resolves from the exact bbox, as the compiler does; a resize the Size section has not committed
+  // yet resolves from the size it shows, so the preview follows a drag.
   const isFrameCommitted =
     (context.committedFrame.width === null || context.committedFrame.width === frame.width) &&
     (context.committedFrame.height === null || context.committedFrame.height === frame.height);
   const sourceWidth = isFrameCommitted ? context.bbox.width : frame.width;
   const sourceHeight = isFrameCommitted ? context.bbox.height : frame.height;
-  // Read policy inside the capability selector so arrival replaces fallback grid/area despite compiler
-  // memoization.
+  // Read policy inside the capability selector so arrival replaces fallback grid/area despite compiler memoization.
   const { dimensions, processingSize } = useExternalStoreSelector(
     subscribeArchitectureCapabilities,
     getArchitectureCapabilitiesSnapshot,
@@ -115,8 +110,8 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
       if (!method) {
         return;
       }
-      // Custom starts from the size the frame renders at today, so both
-      // sides are pinned and a later frame resize cannot move one of them.
+      // Custom starts from the size the frame renders at today, so both sides are pinned and a later frame resize
+      // cannot move one of them.
       const seed =
         method === 'manual' && processingSize
           ? {
@@ -130,10 +125,9 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
   );
   const snap = useCallback((value: number) => clampDimension(value, dimensions.grid), [dimensions.grid]);
   const { lockedRatio } = context;
-  // Typing needs the raw digits to land; the size snaps to the grid on commit
-  // (Enter / blur), and the compiler clamps whatever is persisted meanwhile.
-  // A locked ratio derives the other side as the frame's own width and height do: unsnapped while typing, both
-  // sides snapped on commit.
+  // Typing needs the raw digits to land; the size snaps to the grid on commit (Enter / blur), and the compiler clamps
+  // whatever is persisted meanwhile. A locked ratio derives the other side as the frame's own width and height do:
+  // unsnapped while typing, both sides snapped on commit.
   const sideHandlers = useCallback(
     (key: typeof CANVAS_SCALING_KEYS.height | typeof CANVAS_SCALING_KEYS.width) => {
       const sidePatch = (value: number, shouldSnap: boolean): Record<string, number> => {

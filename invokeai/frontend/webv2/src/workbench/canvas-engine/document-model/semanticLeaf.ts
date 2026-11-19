@@ -7,8 +7,8 @@ import { isLayerHidden } from '@workbench/canvas-engine/document/layerEligibilit
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 
 /**
- * Document facts about one leaf, with its ancestors already applied; nothing about the screen,
- * the panel or the session. Ordering belongs to the sequence a leaf is returned in.
+ * Document facts about one leaf, with its ancestors already applied; nothing about the screen, the panel or the
+ * session. Ordering belongs to the sequence a leaf is returned in.
  */
 export interface SemanticLeaf {
   readonly id: string;

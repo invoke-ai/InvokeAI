@@ -92,9 +92,8 @@ const hasLayerContract = (document: CanvasDocumentContractV3 | null, expected: C
 
 /**
  * Owns the exclusive direct/materialized pixel transaction for control layers and raster images. Each is admitted
- * before the first pixel changes. A commit that records nothing leaves the edit open: callers restore the pixels
- * they touched, then cancel, which releases the transaction and, for a materialized edit, reinstates the unbaked
- * cache last.
+ * before the first pixel changes. A commit that records nothing leaves the edit open: callers restore the pixels they
+ * touched, then cancel, which releases the transaction and, for a materialized edit, reinstates the unbaked cache last.
  */
 export class PixelEditController {
   // `publishing` while the edit records its own step: the document change it makes is not an external one.
@@ -282,8 +281,8 @@ export class PixelEditController {
     const o = this.options;
     const original = o.layers.captureState(layerId);
     const lifecycle = this.openTransaction(txn, layerId, () => {
-      // The caller already put back the pixels and extent it touched; reinstate the exact entry, version included,
-      // so guards captured before the edit stay current. An extent it could not restore falls back to rasterizing.
+      // The caller already put back the pixels and extent it touched; reinstate the exact entry, version included, so
+      // guards captured before the edit stay current. An extent it could not restore falls back to rasterizing.
       const surface = original?.surface;
       if (!original || (surface!.width === original.rect.width && surface!.height === original.rect.height)) {
         o.layers.restoreState(layerId, original);
@@ -375,9 +374,8 @@ export class PixelEditController {
         const adjusted = layer.type === 'raster' ? o.getAdjustedSurface(layer, originalEntry) : null;
         const baked = bakePixelEditSurface({
           backend: o.backend,
-          // Raster presentation adjustments precede transforms in the normal
-          // compositor. Bake from that adjusted surface so interpolation occurs
-          // in the same order and untouched pixels remain visually identical.
+          // Raster presentation adjustments precede transforms in the normal compositor. Bake from that adjusted
+          // surface so interpolation occurs in the same order and untouched pixels remain visually identical.
           source: adjusted ?? originalEntry.surface,
           sourceRect: originalEntry.rect,
           transform: layer.transform,
@@ -456,8 +454,8 @@ export class PixelEditController {
           ? false
           : commit(strokeCommitLabel(event.tool), event),
       commitPatch: (label, patch) => (isImageDataEqual(patch.before, patch.after) ? false : commit(label)),
-      // The entry is two whole-layer snapshots, admitted at begin; the stroke's own footprint is never retained.
-      // A cache the stroke grew past that admission grows it at publication instead.
+      // The entry is two whole-layer snapshots, admitted at begin; the stroke's own footprint is never retained. A
+      // cache the stroke grew past that admission grows it at publication instead.
       grow: () => lifecycle.owns(),
       layerId,
     };

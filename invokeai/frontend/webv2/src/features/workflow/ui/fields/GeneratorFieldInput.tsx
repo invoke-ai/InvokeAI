@@ -57,8 +57,8 @@ const CATEGORY_OPTIONS = [
 ] as const;
 
 /**
- * One labelled number in a settings row, on the shared numeric control: committed as typed, `null` when cleared,
- * and marked by the generator's own rule for that setting rather than corrected here.
+ * One labelled number in a settings row, on the shared numeric control: committed as typed, `null` when cleared, and
+ * marked by the generator's own rule for that setting rather than corrected here.
  */
 const NumberSetting = ({
   ariaLabel,
@@ -297,8 +297,8 @@ const PreviewBox = ({ children, tone = 'fg.muted' }: { children: string; tone?: 
 
 const AsyncPreview = ({ request }: { request: WorkflowAsyncGeneratorRequest }) => {
   const { t } = useTranslation();
-  // Both request kinds select into the same result shape; the union of option types is wider than useQuery wants.
-  // Query identity comes from the key hash, so a fresh options object per render costs nothing.
+  // Both request kinds select into the same result shape; the union of option types is wider than useQuery wants. Query
+  // identity comes from the key hash, so a fresh options object per render costs nothing.
   const query = useQuery(
     getWorkflowGeneratorQueryOptions(request) as unknown as UseQueryOptions<
       unknown,
@@ -338,8 +338,8 @@ const AsyncPreview = ({ request }: { request: WorkflowAsyncGeneratorRequest }) =
 };
 
 /**
- * What the generator will produce. Synchronous variants derive in render; async ones query, on the value as it
- * stood before the current burst of typing until the burst settles.
+ * What the generator will produce. Synchronous variants derive in render; async ones query, on the value as it stood
+ * before the current burst of typing until the burst settles.
  */
 const GeneratorPreview = ({
   generator,

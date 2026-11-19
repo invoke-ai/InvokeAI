@@ -26,8 +26,8 @@ const drawDiagonalLines = (
   spacing: number,
   direction: 'anti' | 'main'
 ): void => {
-  // Sweep `c` well beyond the tile so every crossing line is drawn; the surface
-  // clips to its bounds. `spacing` divides `size`, so the family tiles seamlessly.
+  // Sweep `c` well beyond the tile so every crossing line is drawn; the surface clips to its bounds. `spacing` divides
+  // `size`, so the family tiles seamlessly.
   for (let c = -size; c <= 2 * size; c += spacing) {
     ctx.beginPath();
     if (direction === 'anti') {

@@ -1,12 +1,6 @@
 /**
- * Sync only for Canvas sources: then the canvas frame and Generate's size are one frame-size model. Bbox edits keep
- * the exact footprint and derive model-grid processing dimensions; Generate edits resize the frame around its centre,
- * the anchor every size path uses. The aspect lock is Generate's own (`aspectRatioIsLocked`), and the Frame tool
- * follows it: a frame edit under the lock keeps the locked ratio, one that changes the ratio carries the lock to the
- * new ratio, and a free edit leaves the ratio free (it never reads as a preset the person did not pick).
- * A frame resize this sync makes goes through the canvas's undo history when a canvas engine is open, so undoing it
- * restores both sides; otherwise it is a `system` write. The Custom render size follows the locked ratio. Capability
- * changes retrigger reconciliation; update the expected snapshot before dispatch and guard re-entry.
+ * Sync only for Canvas sources. Bbox edits keep the exact footprint; Generate edits resize the frame around its centre.
+ * A sync resize goes through canvas undo when an engine is open. Update the expected snapshot before dispatch.
  */
 
 import type { AspectRatioId, CanvasScaleMethod, GenerateModelConfig, PidMode } from '@features/generation/contracts';
@@ -29,7 +23,6 @@ import { getProjectWidgetValues } from './widgetState';
 
 type Bbox = CanvasDocumentContractV3['bbox'];
 
-/** The last-synced width/height on both sides, used to detect which side changed. */
 export interface CanvasDimsSnapshot {
   bboxWidth: number;
   bboxHeight: number;
@@ -38,7 +31,6 @@ export interface CanvasDimsSnapshot {
   grid: number;
 }
 
-/** Generate's aspect fields: the one aspect lock the frame and the Size section share. */
 export interface CanvasDimsAspect {
   aspectRatioId: AspectRatioId;
   aspectRatioIsLocked: boolean;
@@ -53,31 +45,18 @@ const RATIO_TOLERANCE = 0.01;
 export interface CanvasDimsReconcileInput {
   /** The current generation frame, or `null` when the sync should stay inert (no canvas mode). */
   bbox: Bbox | null;
-  /** The current committed generate width/height. */
   dims: { width: number; height: number };
-  /** The current aspect lock; free when absent. */
   aspect?: CanvasDimsAspect;
-  /** The bbox/generate snapping grid (model-derived; identical on both sides). */
   grid: number;
-  /** The last snapshot this sync wrote/observed, or `null` on first run / after a reset. */
   prev: CanvasDimsSnapshot | null;
 }
 
 export type CanvasDimsReconcileResult =
   | { kind: 'none' }
-  /**
-   * The frame decides: snapped processing dimensions, plus the aspect fields when the frame's ratio is not the locked
-   * one (a locked frame of another ratio moves the lock to it; an unlocked one stays free).
-   */
   | ({ kind: 'patch-dims'; width: number; height: number } & Partial<CanvasDimsAspect>)
-  /** Resize the bbox to the (grid-snapped) generate dims around its centre. */
   | { kind: 'set-bbox'; bbox: Bbox };
 
-/**
- * The aspect fields a frame of `width`×`height` leaves Generate with; none when they already describe it. Only the
- * person's own lock (a chosen preset or the lock button, `aspectRatioIsLocked`) holds on the canvas: a preset label a
- * size alone implied (a new project's 1:1, a recalled size) would otherwise lock the frame nobody locked.
- */
+/** Only the person's own lock holds on the canvas, never a preset label a size alone implied. */
 const aspectForFrame = (aspect: CanvasDimsAspect, width: number, height: number): Partial<CanvasDimsAspect> => {
   const ratio = height > 0 ? width / height : 1;
   if (!aspect.aspectRatioIsLocked) {
@@ -106,10 +85,7 @@ const createSnapshot = (
   grid,
 });
 
-/**
- * The changed side wins; bbox wins on first run or simultaneous changes. Write model-grid dimensions without
- * changing its exact footprint, and skip already-consistent state.
- */
+/** The changed side wins; bbox wins on first run or simultaneous changes. */
 export const reconcileCanvasDims = ({
   aspect = FREE_ASPECT,
   bbox,
@@ -153,7 +129,6 @@ export const reconcileCanvasDims = ({
   return { kind: 'none' };
 };
 
-/** The minimal workbench store surface the sync depends on. */
 export interface CanvasDimsSyncStore {
   commands: {
     canvas: Pick<WorkbenchCommands['canvas'], 'apply'>;
@@ -168,10 +143,6 @@ export interface CanvasDimsSync {
   dispose(): void;
 }
 
-/**
- * Records a frame resize as an undoable canvas step when the project's canvas engine is open (true), so canvas undo
- * puts the frame, and through this sync Generate's size, back; false leaves it to a `system` write.
- */
 export type CanvasFrameCommit = (projectId: string, from: Bbox, to: Bbox) => boolean;
 
 const readFiniteDimension = (values: Record<string, unknown>, key: 'width' | 'height'): number | null => {
@@ -208,7 +179,6 @@ export const createCanvasDimsSync = (
 ): CanvasDimsSync => {
   let prev: CanvasDimsSnapshot | null = null;
   let lastProjectId: string | null = null;
-  /** What the render size last saw of the active canvas project; null until it has seen one. */
   let renderPrev: {
     isExplicitlyLocked: boolean;
     method: CanvasScaleMethod;
@@ -217,7 +187,6 @@ export const createCanvasDimsSync = (
   } | null = null;
   let isSyncing = false;
 
-  /** Reconcile the frame with Generate's size. */
   const syncFrame = (): void => {
     const state = store.getState();
     const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
@@ -250,8 +219,7 @@ export const createCanvasDimsSync = (
     const bbox = project.canvas.document.bbox;
     const grid = resolveModelGrid(readModelBase(generateValues), readModelVariant(generateValues));
 
-    // Wait for backend capabilities before persisting dimensions; a fallback grid may be invalid for this
-    // architecture.
+    // Wait for backend capabilities before persisting dimensions; a fallback grid may be invalid for this architecture.
     if (grid === null) {
       prev = null;
       return;
@@ -316,7 +284,6 @@ export const createCanvasDimsSync = (
     const base = readModelBase(generateValues);
     const variant = readModelVariant(generateValues);
 
-    // Hold the change until the architecture answers, as the frame does: a fallback grid may be invalid for it.
     if (resolveModelGrid(base, variant) === null) {
       return;
     }
@@ -335,7 +302,6 @@ export const createCanvasDimsSync = (
       (previous.ratio === ratio &&
         previous.method === 'manual' &&
         (previous.isExplicitlyLocked || !isExplicitlyLocked)) ||
-      // Without a size of its own, manual renders at the frame, which already holds the ratio.
       (scaling.width === null && scaling.height === null)
     ) {
       return;
@@ -380,7 +346,6 @@ export const createCanvasDimsSync = (
   // Capability arrival may not change workbench state, so subscribe directly to retry the gated reconciliation.
   const unsubscribeCapabilities = subscribeArchitectureCapabilities(handleChange);
 
-  // Seed from the current state so an already-canvas project reconciles on mount.
   handleChange();
 
   return {

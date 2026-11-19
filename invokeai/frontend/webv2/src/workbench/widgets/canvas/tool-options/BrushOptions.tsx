@@ -65,10 +65,7 @@ export const PaintSizeControl = ({
 
 const formatPercent = (value: number): string => `${value}%`;
 
-/**
- * A 0–1 paint option (opacity, hardness) as a percent scrubber, shared by the brush and eraser. Tool options are not
- * history, so every step writes through.
- */
+/** A 0–1 paint option (opacity, hardness) as a percent scrubber, shared by the brush and eraser. */
 export const PaintPercentControl = ({
   defaultValue,
   label,
@@ -123,8 +120,8 @@ export const PaintStrokePreview = ({
     canvas.height = Math.max(1, Math.round(height * dpr));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
-    // Fit radius + curve swing + the full 3-sigma feather inside the box, so
-    // softness has room to demonstrate instead of clipping at the edges.
+    // Fit radius + curve swing + the full 3-sigma feather inside the box, so softness has room to demonstrate instead
+    // of clipping at the edges.
     const swing = height * 0.14;
     const featherFactor = 1 + 1.5 * (1 - hardness);
     const drawn = Math.max(1, Math.min(size, (height - 2 * swing - 8) / featherFactor));

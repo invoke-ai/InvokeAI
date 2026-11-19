@@ -12,8 +12,8 @@ import { queryOptions } from '@tanstack/react-query';
 import { invalidateGallery, refreshGalleryThumbnails } from './queryCache';
 
 /**
- * Server image storage: the subfolder layout new images are written to, and the admin-only move/recovery job
- * that relocates existing files into it. Both routes are admin-only, so callers gate reads on the capability.
+ * Server image storage: the subfolder layout new images are written to, and the admin-only move/recovery job that
+ * relocates existing files into it. Both routes are admin-only, so callers gate reads on the capability.
  */
 
 export const IMAGE_STORAGE_LAYOUTS = ['flat', 'date', 'type', 'hash'] as const;
@@ -28,13 +28,11 @@ type ImageMoveOperation = 'move_all' | 'recovery';
 export type ImageMoveJobState = 'planned' | 'moving' | 'moved' | 'committed' | 'error';
 
 export interface ImageMoveStatus {
-  /** Whether a move or recovery is running right now. */
   isRunning: boolean;
   operation: ImageMoveOperation | null;
   /** A journaled job that has not committed; with `isRunning` false it needs recovery. */
   activeJobId: number | null;
   latestJob: { id: number; state: ImageMoveJobState; errorMessage: string | null } | null;
-  /** The last background worker error. */
   lastError: string | null;
   /** Images still stored under a layout other than the configured one. */
   needsMoveCount: number;
@@ -115,8 +113,7 @@ const getImageMoveStatus = (signal?: AbortSignal): Promise<ImageMoveStatus> =>
   apiFetchJson<ImageMoveStatusDTO>('/api/v1/image_moves/status', { signal }).then(toImageMoveStatus);
 
 /**
- * The move relocated the files and answered thumbnail reads with 409 while it ran, so a gallery that saw it needs
- * its listings and its mounted thumbnails read again.
+ * The move relocated files and answered thumbnail reads with 409, so a gallery that saw it rereads listings and thumbs.
  */
 const refreshGalleryAfterMove = (client: QueryClient, owner: AccountScope): void => {
   void invalidateGallery(client, owner);
@@ -124,8 +121,7 @@ const refreshGalleryAfterMove = (client: QueryClient, owner: AccountScope): void
 };
 
 /**
- * Polls while a job runs. The read that first sees a job stop refreshes the gallery, since the move changed
- * where its files live, whichever consumer happens to hold the query at the time.
+ * Polls while a job runs; the read that first sees it stop refreshes the gallery (files moved), whoever holds it.
  */
 export const imageMoveStatusQueryOptions = (owner = captureAccountScope()) =>
   queryOptions<ImageMoveStatus>({
@@ -160,10 +156,10 @@ const postImageMove = async (
       signal: owner.signal,
     }).then(toImageMoveStatus);
   } catch (error) {
-    // A refusal usually means the cached status is stale (another admin's job, finished queue work): re-read it
-    // before the caller unlocks, so the editor's controls follow what the server says now rather than the stale
-    // status. A failed re-read leaves the status query in error (which keeps the controls locked) and never
-    // replaces the refusal: invalidation does not reject on refetch errors.
+    // A refusal usually means the cached status is stale (another admin's job, finished queue work): re-read it before
+    // the caller unlocks, so the editor's controls follow what the server says now rather than the stale status. A
+    // failed re-read leaves the status query in error (which keeps the controls locked) and never replaces the refusal:
+    // invalidation does not reject on refetch errors.
     if (isAccountScopeCurrent(owner)) {
       await client.invalidateQueries({ queryKey });
     }

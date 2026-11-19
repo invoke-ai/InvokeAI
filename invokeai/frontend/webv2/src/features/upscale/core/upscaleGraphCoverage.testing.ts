@@ -21,7 +21,6 @@ const model = (key: string, type: string, base: string, extra: Record<string, un
     ...extra,
   }) as ModelConfig;
 
-/** What the widget picks components from, the way it does for a user. */
 export const INSTALLED = [
   model('spandrel', 'spandrel_image_to_image', 'any'),
   model('t5', 't5_encoder', 'any'),
@@ -43,9 +42,9 @@ export const INSTALLED = [
 ];
 
 /**
- * One case per path a builder can take: CFG above 1 where the negative branch is CFG-gated, the
- * optional Z-Image ControlNet, a bundled Z-Image, Krea-2, FLUX.2, MOSS-Image or Qwen Image install, Anima-3.8B's
- * second encoder, and FLUX.2 Klein at either encoder size and [dev] with its own loaders.
+ * One case per path a builder can take: CFG above 1 where the negative branch is CFG-gated, the optional Z-Image
+ * ControlNet, a bundled Z-Image, Krea-2, FLUX.2, MOSS-Image or Qwen Image install, Anima-3.8B's second encoder, and
+ * FLUX.2 Klein at either encoder size and [dev] with its own loaders.
  */
 export const CASES: { label: string; main: ModelConfig; patch?: Partial<UpscaleWidgetValues> }[] = [
   { label: 'sd-1', main: model('sd1', 'main', 'sd-1') },
@@ -109,14 +108,12 @@ export const CASES: { label: string; main: ModelConfig; patch?: Partial<UpscaleW
   },
 ];
 
-/** The widget values a case compiles, picked from the installed models plus its main model and a LoRA for it. */
 export const valuesForCase = ({ main, patch }: (typeof CASES)[number]) => {
   const installed = [main, ...INSTALLED, model(`${main.key}-lora`, 'lora', main.base)];
   const defaults = createDefaultUpscaleWidgetValues(installed);
   const values: UpscaleWidgetValues = {
     ...defaults,
     inputImage: { height: 101, image_name: 'input.png', width: 203 },
-    // Every builder's concept loader, so its node and edges reach the contract too.
     loras: [{ isEnabled: true, model: installed.at(-1) as UpscaleWidgetValues['loras'][number]['model'], weight: 1 }],
     ...patch,
   };

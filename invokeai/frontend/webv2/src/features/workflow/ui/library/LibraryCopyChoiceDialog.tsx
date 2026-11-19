@@ -14,9 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { findProjectCopiesOf } from './projectWorkflowEntries';
 import { useOpenLibraryWorkflow, type OpenLibraryWorkflow } from './useOpenLibraryWorkflow';
 
-/**
- * Asks what opening a template the project already holds should do; one host serves the library and the palette.
- */
+/** Asks what opening a template the project already holds should do; one host serves the library and the palette. */
 export const LibraryCopyChoiceHost = () => {
   const { project } = useWorkflowUi();
   const request = workflowUiStore.useSelector((snapshot) => snapshot.libraryCopyChoice);

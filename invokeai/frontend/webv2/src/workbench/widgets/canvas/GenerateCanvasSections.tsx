@@ -4,5 +4,4 @@ import { GenerateCanvasCompositingSection } from './GenerateCanvasCompositingSec
 export { GenerateCanvasRenderSize } from './GenerateCanvasRenderSize';
 export { GenerateDenoisingStrength } from './GenerateDenoisingStrength';
 
-/** The Generate form's canvas-only sections. */
 export const GenerateCanvasSections = () => <GenerateCanvasCompositingSection />;

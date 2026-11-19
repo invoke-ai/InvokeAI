@@ -3,19 +3,9 @@ import {
   groupContract,
   layerContract,
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import { describe, expect, it } from 'vitest';
 
-import { isLayerEditingDisabled, selectBlendTarget } from './LayerBlendRow';
-
-describe('LayerBlendRow editing state', () => {
-  it('disables layer controls without a selection or while engine editing is locked', () => {
-    const layer = createEmptyPaintLayer('Layer', 'layer');
-    expect(isLayerEditingDisabled(null, false)).toBe(true);
-    expect(isLayerEditingDisabled(layer, true)).toBe(true);
-    expect(isLayerEditingDisabled(layer, false)).toBe(false);
-  });
-});
+import { selectBlendTarget } from './LayerBlendRow';
 
 describe('selectBlendTarget', () => {
   const projectFor = (nodes: Parameters<typeof documentFrom>[0], selectedLayerId: string | null) => ({

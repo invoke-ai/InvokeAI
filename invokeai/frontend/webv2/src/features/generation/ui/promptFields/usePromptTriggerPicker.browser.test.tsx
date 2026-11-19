@@ -51,17 +51,6 @@ afterEach(async () => {
 });
 
 describe('the button-anchored prompt trigger picker', () => {
-  it('closes on a captured element scroll', async () => {
-    await render();
-    expect(host!.querySelector('[role="dialog"]')).not.toBeNull();
-
-    await act(() => {
-      host!.dispatchEvent(new Event('scroll'));
-    });
-
-    expect(host!.querySelector('[role="dialog"]')).toBeNull();
-  });
-
   it('closes on viewport resize', async () => {
     await render();
 

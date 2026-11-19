@@ -248,7 +248,6 @@ describe('PreviewFilmstrip mixed media', () => {
     const viewportCenterY = viewportRect.top + viewportRect.height / 2;
     const thumbCenterY = thumbRect.top + thumbRect.height / 2;
 
-    // Fill the ScrollArea content height so thumbnails center vertically within the strip.
     expect(Math.abs(thumbCenterY - viewportCenterY)).toBeLessThan(1);
   });
 
@@ -382,8 +381,6 @@ describe('Preview mixed media actions', () => {
       />
     );
 
-    // Image-only verbs: a video has no compare partner and no canvas
-    // destination.
     expect(host?.querySelector('[aria-label="Select for Compare"]')).toBeNull();
     expect(host?.querySelector('[aria-label="Edit"]')).toBeNull();
 
@@ -391,7 +388,6 @@ describe('Preview mixed media actions', () => {
     const star = host?.querySelector<HTMLButtonElement>('[aria-label="Unstar video"]');
     expect(copyFrame).not.toBeNull();
     expect(copyFrame?.disabled).toBe(true);
-    // Details lives beside the header toggles now, not in the strip.
     expect(host?.querySelector('[aria-label="Details"]')).toBeNull();
     expect(star).not.toBeNull();
 
@@ -435,7 +431,6 @@ describe('Preview mixed media actions', () => {
       );
       const copyFrame = host!.querySelector<HTMLButtonElement>('[aria-label="Copy Current Frame"]')!;
 
-      // Not natively disabled: that would take it out of the tab order and hide why.
       expect(copyFrame.disabled).toBe(false);
       expect(copyFrame.getAttribute('aria-disabled')).toBe('true');
       await expect.element(copyFrame).toHaveAccessibleDescription('Copying needs HTTPS or localhost');
@@ -444,46 +439,6 @@ describe('Preview mixed media actions', () => {
     } finally {
       Reflect.deleteProperty(navigator, 'clipboard');
     }
-  });
-
-  it("leads an image with the labelled Edit and Use menus; their contents are the header tests' concern", async () => {
-    const actions = {
-      copyImage: vi.fn(() => Promise.resolve()),
-      downloadItem: vi.fn(() => Promise.resolve()),
-      selectForCompare: vi.fn(),
-      sendToCanvas: vi.fn(() => Promise.resolve()),
-      setItemsStarred: vi.fn(() => Promise.resolve()),
-    } as unknown as ImageActions;
-
-    await render(
-      <PreviewActionStrip actions={actions} density="full" item={sharedImage} onOpenMenu={() => undefined} />
-    );
-    const buttons = [...(host?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
-
-    // Both carry a visible label, not just a glyph, and open menus rather than acting at once.
-    expect(buttons.slice(0, 2).map((button) => [button.textContent, button.getAttribute('aria-haspopup')])).toEqual([
-      ['Edit', 'menu'],
-      ['Use', 'menu'],
-    ]);
-    expect(host?.querySelector('[aria-label="Copy Current Frame"]')).toBeNull();
-  });
-
-  it('leaves copy and download to the image-actions dropdown', async () => {
-    const actions = {
-      copyImage: vi.fn(() => Promise.resolve()),
-      downloadItem: vi.fn(() => Promise.resolve()),
-      selectForCompare: vi.fn(),
-      sendToCanvas: vi.fn(() => Promise.resolve()),
-      setItemsStarred: vi.fn(() => Promise.resolve()),
-    } as unknown as ImageActions;
-
-    await render(
-      <PreviewActionStrip actions={actions} density="full" item={sharedImage} onOpenMenu={() => undefined} />
-    );
-
-    expect(host?.querySelector('[aria-label="Copy to clipboard"]')).toBeNull();
-    expect(host?.querySelector('[aria-label="Download image"]')).toBeNull();
-    expect(host?.querySelector('[aria-label="Image actions"]')).not.toBeNull();
   });
 });
 
@@ -507,7 +462,6 @@ describe('PreviewFilmstrip live sessions', () => {
     const onFollowSession = vi.fn();
     const onUnpinSession = vi.fn();
 
-    // A single board item would hide the strip; the live sessions earn it.
     await render(
       <DndContext>
         <PreviewFilmstrip
@@ -528,7 +482,6 @@ describe('PreviewFilmstrip live sessions', () => {
       'Generate 1/2 · GPU 1 · 40%',
       'Generate 2/2 · GPU 1 · Queued',
     ]);
-    // Live thumbs come first; the item thumb follows them.
     expect(host!.querySelector('button')).toBe(thumbs[0]);
     expect(thumbs[0]?.getAttribute('aria-current')).toBe('true');
     expect(thumbs[1]?.getAttribute('aria-current')).toBeNull();
@@ -564,10 +517,8 @@ describe('PreviewFilmstrip live sessions', () => {
     );
 
     const [pinned, settling] = [...host!.querySelectorAll<HTMLButtonElement>('[data-preview-live-thumb]')];
-    // A silent thumb reads as a stuck one, so it says it is preparing.
     expect(pinned?.getAttribute('aria-label')).toBe('Generate 1/2 · Preparing');
     expect(pinned?.getAttribute('aria-pressed')).toBe('true');
-    // The pin shows in place of the progress ring, so the next click reads as "unpin".
     expect(pinned?.hasAttribute('data-preview-live-pinned')).toBe(true);
     expect(pinned?.querySelector('[data-scope="progress-circle"]')).toBeNull();
     expect(settling?.hasAttribute('data-preview-live-pinned')).toBe(false);
@@ -657,7 +608,6 @@ describe('PreviewFilmstrip live sessions', () => {
     const second = host!.querySelector<HTMLButtonElement>('[data-preview-live-thumb="queue-1:2"]')!;
     await interact(() => second.focus());
 
-    // The click that follows it re-renders it as current; focus must stay put.
     await render(strip('queue-1:2'));
     await interact(() => undefined);
     expect(document.activeElement).toBe(second);

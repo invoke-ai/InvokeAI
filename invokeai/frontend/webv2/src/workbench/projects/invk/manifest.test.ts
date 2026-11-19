@@ -114,24 +114,14 @@ describe('buildInvkManifest', () => {
 });
 
 describe('toInvkFileName', () => {
-  it('replaces characters filesystems reject', () => {
-    expect(toInvkFileName('a/b\\c:d*e?f"g<h>i|j')).toBe('a_b_c_d_e_f_g_h_i_j.invk');
-  });
-
-  it('keeps non-Latin names intact', () => {
-    expect(toInvkFileName('プロジェクト')).toBe('プロジェクト.invk');
-  });
-
-  it('keeps spaces and hyphens', () => {
-    expect(toInvkFileName('My cool - project')).toBe('My cool - project.invk');
-  });
-
-  it('strips leading and trailing dots', () => {
-    expect(toInvkFileName('..hidden..')).toBe('hidden.invk');
-  });
-
-  it('falls back for a name that sanitizes to nothing', () => {
-    expect(toInvkFileName('   ')).toBe('project.invk');
-    expect(toInvkFileName('...')).toBe('project.invk');
+  it.each([
+    ['replaces characters filesystems reject', 'a/b\\c:d*e?f"g<h>i|j', 'a_b_c_d_e_f_g_h_i_j.invk'],
+    ['keeps non-Latin names intact', 'プロジェクト', 'プロジェクト.invk'],
+    ['keeps spaces and hyphens', 'My cool - project', 'My cool - project.invk'],
+    ['strips leading and trailing dots', '..hidden..', 'hidden.invk'],
+    ['falls back for a blank name', '   ', 'project.invk'],
+    ['falls back for a name of dots', '...', 'project.invk'],
+  ])('%s', (_label, name, expected) => {
+    expect(toInvkFileName(name)).toBe(expected);
   });
 });

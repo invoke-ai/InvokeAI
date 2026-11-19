@@ -3,8 +3,8 @@ import type { ProjectAssetRefs } from '@workbench/projects/projectAssets';
 import type { InvkBoardItem, InvkMediaKind } from './board';
 
 /**
- * Board media needs fresh ownership; document-only references may be reused. Shared references remap to the copy,
- * and failed copies receive missing placeholders.
+ * Board media needs fresh ownership; document-only references may be reused. Shared references remap to the copy, and
+ * failed copies receive missing placeholders.
  */
 
 /** One item, in whichever namespace it belongs to. */
