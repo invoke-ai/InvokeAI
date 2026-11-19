@@ -96,6 +96,6 @@ export interface FamilyPipelineInput {
 /** A family graph plus the decode node whose image is the result. */
 export interface FamilyPipeline extends FamilyGraph {
   output: BackendInvocationContract;
-  /** The VAE the graph loads over the main model's own; null where it decodes with the model's bundled VAE. */
+  /** The VAE model handed to the loader; null where the graph decodes with a bundled or source model's VAE. */
   vaeModel: VaeModelConfig | null;
 }

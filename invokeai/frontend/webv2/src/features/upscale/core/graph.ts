@@ -104,7 +104,7 @@ const addUpscaleMetadata = (
     /** The image the pass encoded, which the result matches in size, so Recall restores the real one. */
     frame: BackendInvocationContract;
     output: BackendInvocationContract;
-    /** The VAE the pipeline loaded, which is not the widget's pick where the model bundles its own. */
+    /** The VAE the pipeline loaded; the widget's pick is dropped where it is incompatible or the family ignores it. */
     vaeModel: UpscaleWidgetValues['vae'];
   },
   settings: UpscaleWidgetValues,
@@ -207,7 +207,7 @@ const toPipelineSettings = (settings: UpscaleWidgetValues, model: MainModelConfi
   };
 };
 
-/** Where the pass enters for the widget's Creativity, translated into the denoise node's terms where it clips by step. */
+/** Creativity's start, translated into the node's terms where it clips by step. */
 const getUpscaleEntry = (
   model: MainModelConfig,
   denoiseSize: { width: number; height: number },
