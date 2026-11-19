@@ -19,7 +19,7 @@ import {
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createInstance } from 'i18next';
 import { act, createRef, useImperativeHandle, useState, type Ref } from 'react';
@@ -329,7 +329,7 @@ const sketchesBoard: GalleryBoard = {
 
 const listBoards = (panelBoards: GalleryBoard[], destinationBoards: GalleryBoard[]) => {
   const listing = galleryBoardsOptions(
-    getGalleryListingBoardsQuery(getGallerySettings(getProjectWidgetValues(mocks.project, 'gallery')))
+    getGalleryListingBoardsQuery(getGallerySettings(getResolvedProjectWidgetValues(mocks.project, 'gallery', {})))
   );
   queryClient.setQueryData(listing.queryKey, panelBoards, { updatedAt: Date.now() - 1_000 });
   queryClient.setQueryData(galleryBoardsOptions({ includeArchived: true }).queryKey, destinationBoards);

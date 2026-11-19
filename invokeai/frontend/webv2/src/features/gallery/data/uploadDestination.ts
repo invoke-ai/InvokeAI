@@ -1,3 +1,4 @@
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { QueryClient } from '@tanstack/react-query';
 
 import { getGalleryAutoAddBoardId } from '@features/gallery/ui/galleryStateView';
@@ -10,7 +11,7 @@ import { canAddToCachedGalleryBoard, ensureGalleryBoardDestinations } from './qu
  * none is cached; Uncategorized when no board takes it. An auto-add board is never redirected for want of a listing.
  */
 export const resolveGalleryUploadBoardId = async (
-  galleryValues: Record<string, unknown>,
+  galleryValues: ResolvedValues,
   client: QueryClient
 ): Promise<string> => {
   await ensureGalleryBoardDestinations(client);

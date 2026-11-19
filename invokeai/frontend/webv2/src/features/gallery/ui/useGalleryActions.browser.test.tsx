@@ -3,6 +3,7 @@ import type { GalleryUiAdapter } from '@features/gallery/react';
 
 import { getGallerySettings } from '@features/gallery/core/settings';
 import { GalleryUiProvider } from '@features/gallery/react';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -116,7 +117,7 @@ const Probe = ({
   ref: Ref<GalleryActions>;
   selectedBoardId: string;
 }) => {
-  const { autoAddBoardId } = getGallerySettings(galleryValues);
+  const { autoAddBoardId } = getGallerySettings(resolvedValues(galleryValues));
   const currentGalleryLocationRef = useRef({ autoAddBoardId, galleryView, selectedBoardId });
 
   // Match GalleryWidgetView's render-assigned live-read port.
@@ -204,10 +205,13 @@ const adapter: GalleryUiAdapter = {
     toggleItemSelection: noop,
     updateSettings,
   },
-  galleryValues: {},
+  galleryValues: resolvedValues(),
   generateValues: {},
   getItemLabel: () => Promise.resolve(null),
-  getProjectGalleryValues: (projectId: string) => mocks.projectGalleryValues(projectId),
+  getProjectGalleryValues: (projectId: string) => {
+    const values = mocks.projectGalleryValues(projectId);
+    return values && resolvedValues(values);
+  },
   liveFollowEnabled: false,
   progressSessions: [],
   pinnedProgressSessionId: null,
@@ -250,7 +254,7 @@ const renderProbe = async () => {
   await act(() => {
     root?.render(
       <QueryClientProvider client={new QueryClient()}>
-        <GalleryUiProvider adapter={{ ...adapter, galleryValues }}>
+        <GalleryUiProvider adapter={{ ...adapter, galleryValues: resolvedValues(galleryValues) }}>
           <Probe galleryView={galleryView} ref={actionsRef} selectedBoardId={selectedBoardId} />
         </GalleryUiProvider>
       </QueryClientProvider>
@@ -502,7 +506,9 @@ describe('optimistic board updates', () => {
     await act(() => {
       root?.render(
         <QueryClientProvider client={new QueryClient()}>
-          <GalleryUiProvider adapter={{ ...adapter, galleryValues, projectId: 'project-2' }}>
+          <GalleryUiProvider
+            adapter={{ ...adapter, galleryValues: resolvedValues(galleryValues), projectId: 'project-2' }}
+          >
             <Probe galleryView={galleryView} ref={actionsRef} selectedBoardId="none" />
           </GalleryUiProvider>
         </QueryClientProvider>

@@ -11,6 +11,7 @@ import type { ComposeForGenerationOptions, ComposeForGenerationResult } from '@w
 import type { CanvasInputIssue, ControlLayerVerdict, RegionalLayerVerdict } from '@workbench/canvasGenerationInputs';
 import type { ControlModelMemory } from '@workbench/controlModelResolution';
 import type { ExpandedPositivePrompts, ResultDestination } from '@workbench/invocationContracts';
+import type { CanvasCompositingSettings } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 import type { WorkbenchCommands, WorkbenchNotificationCommands } from '@workbench/workbenchStore';
 
 import { compileCanvasGraph, type CanvasCompileMode } from '@features/generation/canvasGraph';
@@ -26,10 +27,6 @@ import {
 import { getCanvasEngine, getCanvasOperations, recordCanvasMetadata } from '@workbench/canvas-operations/api';
 import { createCanvasInputJudge } from '@workbench/canvasGenerationInputs';
 import { getWorkbenchPreferences } from '@workbench/settings/store';
-import {
-  DEFAULT_CANVAS_COMPOSITING,
-  type CanvasCompositingSettings,
-} from '@workbench/widgets/canvas/invoke/canvasCompositing';
 
 import type { CanvasInvocationFailure, CanvasInvocationNotice } from './canvasInvocationFailure';
 
@@ -247,8 +244,8 @@ export interface PrepareCanvasInvocationArgs {
   canvasValues?: Record<string, unknown>;
   strength: number;
   signal?: AbortSignal;
-  /** Persisted compositing settings, already defaulted and clamped by the caller; legacy defaults when omitted. */
-  compositing?: CanvasCompositingSettings;
+  /** From resolved canvas values, so user defaults apply. */
+  compositing: CanvasCompositingSettings;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   formatCanvasInvocationFailure: RunCanvasInvocationDeps['formatCanvasInvocationFailure'];
 }
@@ -269,7 +266,7 @@ export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs)
   const signal = args.signal ? AbortSignal.any([args.signal, owner.signal]) : owner.signal;
 
   await runCanvasInvocation({
-    compositing: args.compositing ?? DEFAULT_CANVAS_COMPOSITING,
+    compositing: args.compositing,
     destination: args.destination,
     commands: args.commands,
     expansion: args.expansion,
