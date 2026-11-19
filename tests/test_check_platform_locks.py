@@ -7,11 +7,9 @@ tokens, percent-encoded `+` in WHL-index URLs). The repo lockfile itself is chec
 
 import importlib.util
 import sys
-import tomllib
 from pathlib import Path
 
 import pytest
-from packaging.requirements import Requirement
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "check_platform_locks.py"
@@ -25,9 +23,8 @@ spec.loader.exec_module(check_platform_locks)
 NVIDIA = check_platform_locks.NVIDIA_WIN_ARM64_REGISTRY
 PYPI = "https://pypi.org/simple"
 CU130 = "https://download.pytorch.org/whl/cu130"
-WIN_ARM64_WHEELS = check_platform_locks.WIN_ARM64_WHEEL_URLS
+SELF_BUILT = "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html"
 WIN_ARM = "platform_machine == 'ARM64' and sys_platform == 'win32'"
-WIN_X64 = "platform_machine == 'AMD64' and sys_platform == 'win32'"
 NOT_WIN_ARM = "(platform_machine != 'ARM64' or sys_platform != 'win32')"
 AARCH64 = "platform_machine == 'aarch64' and sys_platform == 'linux'"
 NOT_AARCH64 = "(platform_machine != 'aarch64' or sys_platform != 'linux')"
@@ -39,36 +36,28 @@ TORCHVISION_CUDA_VERSION = "0.28.0+cu130"
 
 
 def wheel(name: str, version: str, tag: str, registry: str) -> str:
-    return (
-        f'{{ url = "{registry}/{name.replace("-", "_")}-{version.replace("+", "%2B")}-{tag}.whl", hash = "sha256:0" }}'
-    )
+    return f'{{ url = "{registry}/{name}-{version.replace("+", "%2B")}-{tag}.whl", hash = "sha256:0" }}'
 
 
 def package(
     name: str,
     version: str,
-    registry: str | None,
+    registry: str,
     wheels: list[str],
     deps: list[str] = (),
     extras: dict[str, list[str]] | None = None,
     sdist: bool = False,
-    source_url: str | None = None,
-    resolution_markers: list[str] = (),
 ) -> str:
-    if (registry is None) == (source_url is None):
-        raise ValueError("provide exactly one of registry or source_url")
-    source = f'source = {{ url = "{source_url}" }}' if source_url else f'source = {{ registry = "{registry}" }}'
     dep_lines = "\n".join(f"    {d}," for d in deps)
     text = f'''
 [[package]]
 name = "{name}"
 version = "{version}"
-{source}
+source = {{ registry = "{registry}" }}
+dependencies = [
+{dep_lines}
+]
 '''
-    if resolution_markers:
-        marker_lines = "\n".join(f'    "{marker}",' for marker in resolution_markers)
-        text += f"resolution-markers = [\n{marker_lines}\n]\n"
-    text += f"dependencies = [\n{dep_lines}\n]\n"
     if sdist:
         text += f'sdist = {{ url = "{registry}/{name}-{version}.tar.gz", hash = "sha256:0" }}\n'
     text += "wheels = [\n" + "\n".join("    " + w + "," for w in wheels) + "\n]\n"
@@ -85,7 +74,6 @@ def dep(
     registry: str | None = None,
     marker: str | None = None,
     extra: list[str] | None = None,
-    url: str | None = None,
 ) -> str:
     parts = [f'name = "{name}"']
     if extra:
@@ -94,15 +82,9 @@ def dep(
         parts.append(f'version = "{version}"')
     if registry:
         parts.append(f'source = {{ registry = "{registry}" }}')
-    if url:
-        parts.append(f'source = {{ url = "{url}" }}')
     if marker:
         parts.append(f'marker = "{marker}"')
     return "{ " + ", ".join(parts) + " }"
-
-
-def direct_wheel(url: str) -> str:
-    return f'{{ url = "{url}", hash = "sha256:0" }}'
 
 
 def make_lock(
@@ -157,32 +139,6 @@ def make_lock(
     ]
     # The aarch64 fallback pins are the PyPI edges; without them the extra leans on the base's torch alone.
     cpu_torch = base_torch if cpu_extra_aarch64_torch else [d for d in base_torch if PYPI not in d]
-    windows_wheel_packages = (("blake3", "1.0.9"), ("opencv-contrib-python", "4.11.0.86"), ("tiktoken", "0.13.0"))
-    windows_route_edges = "\n".join(
-        "    " + dep(name, version, marker=WIN_ARM, url=WIN_ARM64_WHEELS[name]) + ","
-        for name, version in windows_wheel_packages
-    )
-    windows_route_edges += "\n" + "\n".join(
-        "    " + dep(name, version, PYPI, NOT_WIN_ARM) + "," for name, version in windows_wheel_packages
-    )
-    windows_route_packages = "\n".join(
-        package(
-            name,
-            version,
-            None,
-            [direct_wheel(WIN_ARM64_WHEELS[name])],
-            source_url=WIN_ARM64_WHEELS[name],
-            resolution_markers=[WIN_ARM],
-        )
-        + package(
-            name,
-            version,
-            PYPI,
-            [wheel(name, version, "cp312-cp312-win_amd64", PYPI)],
-            resolution_markers=[WIN_X64],
-        )
-        for name, version in windows_wheel_packages
-    )
     return f"""
 version = 1
 requires-python = ">=3.12, <3.13"
@@ -203,8 +159,8 @@ dependencies = [
     {dep("imageio", extra=["ffmpeg"])},
     {dep("imageio")},
 {("    " + dep(sdist_only) + ",") if sdist_only else ""}
-    {dep("arm-closure-test-package", "1.0", PYPI, WIN_ARM)},
-{windows_route_edges}
+    {dep("blake3", "1.0.9", SELF_BUILT, WIN_ARM)},
+    {dep("blake3", "1.0.9", PYPI, NOT_WIN_ARM)},
 {chr(10).join("    " + d + "," for d in base_torch)}
 ]
 
@@ -228,8 +184,8 @@ test = [
 {package("av", "18.1.0", PYPI, [wheel("av", "18.1.0", extra_dep_tag, PYPI)])}
 {package("imageio-ffmpeg", "0.6.0", PYPI, [], sdist=True)}
 {package(sdist_only, "1.0", PYPI, [], sdist=True) if sdist_only else ""}
-{package("arm-closure-test-package", "1.0", PYPI, [wheel("arm-closure-test-package", "1.0", closure_tag, PYPI)], sdist=True, resolution_markers=[WIN_ARM])}
-{windows_route_packages}
+{package("blake3", "1.0.9", SELF_BUILT, [wheel("blake3", "1.0.9", closure_tag, SELF_BUILT)])}
+{package("blake3", "1.0.9", PYPI, [wheel("blake3", "1.0.9", "cp312-cp312-win_amd64", PYPI)])}
 {package("torch", aarch64_cpu_torch_version, aarch64_cpu_registry, [wheel("torch", aarch64_cpu_torch_version, aarch64_torch_tag, aarch64_cpu_registry)])}
 {package("torch", aarch64_cuda_torch_version, aarch64_cuda_registry, [wheel("torch", aarch64_cuda_torch_version, aarch64_cuda_torch_tag, aarch64_cuda_registry)])}
 {package("torch", "2.14.0+cu134", win_arm_torch_registry, [wheel("torch", "2.14.0+cu134", win_arm_torch_tag, win_arm_torch_registry)])}
@@ -248,62 +204,8 @@ def run(tmp_path: Path, text: str, *platforms: str) -> int:
     return check_platform_locks.main(args)
 
 
-def fixture_lock(tmp_path: Path):
-    lock = tmp_path / "uv.lock"
-    lock.write_text(make_lock())
-    return check_platform_locks.Lock(lock)
-
-
 def test_well_formed_lock_passes_both_platforms(tmp_path: Path):
     assert run(tmp_path, make_lock()) == 0
-
-
-def test_project_dependencies_keep_registry_metadata():
-    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text())
-    direct_urls = [
-        str(requirement)
-        for requirement in map(Requirement, pyproject["project"]["dependencies"])
-        if requirement.url is not None
-    ]
-    assert not direct_urls, f"project dependencies must remain version-based: {direct_urls}"
-
-
-@pytest.mark.parametrize("route", ["win_arm64", "win_amd64"])
-@pytest.mark.parametrize("failure", ["source", "wheel"])
-@pytest.mark.parametrize(
-    ("package_name", "arm_url"),
-    list(WIN_ARM64_WHEELS.items()),
-    ids=list(WIN_ARM64_WHEELS),
-)
-def test_windows_wheel_routes_reject_wrong_source_or_wheel(
-    tmp_path: Path, route: str, failure: str, package_name: str, arm_url: str
-):
-    lock = fixture_lock(tmp_path)
-    route_name, expected_source, wrong_source, expected_platform, wrong_platform = (
-        (
-            "win32/ARM64",
-            {"url": arm_url},
-            {"registry": PYPI},
-            "win_arm64",
-            "win_amd64",
-        )
-        if route == "win_arm64"
-        else (
-            "win32/AMD64",
-            {"registry": PYPI},
-            {"url": arm_url},
-            "win_amd64",
-            "win_arm64",
-        )
-    )
-    package = next(package for package in lock.by_name[package_name] if package.get("source") == expected_source)
-    if failure == "source":
-        package["source"] = wrong_source
-    else:
-        package["wheels"][0]["url"] = package["wheels"][0]["url"].replace(expected_platform, wrong_platform)
-
-    problems = check_platform_locks.check_windows_arm64_wheel_routes(lock)
-    assert any(f"[{package_name}]" in problem and route_name in problem for problem in problems)
 
 
 def test_win_arm64_torch_from_the_wrong_registry_fails(tmp_path: Path):

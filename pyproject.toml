@@ -45,15 +45,14 @@ dependencies = [
   "mistral-common>=1.5.4,<2",             # canonical Tekken tokenizer for FLUX.2 [dev] Mistral encoder; the
                                           # loader depends on private surface (Tekkenizer internals) that
                                           # moves across majors, so cap below 2.x (validated against 1.11.6)
-  # Keep project metadata version-based; the ARM64 wheels are URL sources below.
-  "tiktoken==0.13.0; sys_platform == 'win32' and platform_machine == 'ARM64'",   # mistral-common dependency; self-built win_arm64 wheel
+  "tiktoken==0.13.0; sys_platform == 'win32' and platform_machine == 'ARM64'",   # mistral-common dependency; self-built win_arm64 wheel (see invoke-win-arm64-wheels)
   "numpy<2.0.0; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "numpy>=2.3,<2.4; sys_platform == 'win32' and platform_machine == 'ARM64'",   # first win_arm64 wheels are 2.3; <2.4 is mistral-common's cap on 3.12
   "onnx==1.22.0",
   "onnxruntime==1.19.2; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "onnxruntime>=1.24.2; sys_platform == 'win32' and platform_machine == 'ARM64'",   # CPU execution provider only; no GPU build exists for win_arm64
   "opencv-contrib-python; (sys_platform != 'win32' or platform_machine != 'ARM64')",
-  "opencv-contrib-python==4.11.0.86; sys_platform == 'win32' and platform_machine == 'ARM64'",   # self-built win_arm64 wheel
+  "opencv-contrib-python==4.11.0.86; sys_platform == 'win32' and platform_machine == 'ARM64'",   # self-built win_arm64 wheel (see invoke-win-arm64-wheels)
   "imageio[ffmpeg]>=2.37; (sys_platform != 'win32' or platform_machine != 'ARM64')",  # video encode (for Wan 2.2 T2V/I2V output); encode behavior (macro_block_size) is version-sensitive
   # imageio-ffmpeg's wheels exist only to bundle an ffmpeg binary, and there is none for win_arm64: the sdist builds a
   # pure wheel and get_ffmpeg_exe() falls back to the ffmpeg on PATH (or IMAGEIO_FFMPEG_EXE).
@@ -115,7 +114,7 @@ dependencies = [
 
   # Auxiliary dependencies, pinned only if necessary.
   "blake3; (sys_platform != 'win32' or platform_machine != 'ARM64')",
-  "blake3==1.0.9; sys_platform == 'win32' and platform_machine == 'ARM64'",   # self-built win_arm64 wheel
+  "blake3==1.0.9; sys_platform == 'win32' and platform_machine == 'ARM64'",   # self-built win_arm64 wheel (see invoke-win-arm64-wheels)
   "bcrypt>=4.1,<6",   # used directly (not via passlib, which is incompatible with bcrypt>=4.1 -- the first release with win_arm64 wheels)
   "Deprecated",
   "dnspython",
@@ -526,9 +525,11 @@ xformers = [
 triton-xpu = [
   { index = "torch-xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or (sys_platform == 'win32' and platform_machine != 'ARM64')" },
 ]
-blake3 = [{ url = "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/blake3-1.0.9-cp312-cp312-win_arm64.whl", marker = "sys_platform == 'win32' and platform_machine == 'ARM64'" }]
-opencv-contrib-python = [{ url = "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/opencv_contrib_python-4.11.0.86-cp312-cp312-win_arm64.whl", marker = "sys_platform == 'win32' and platform_machine == 'ARM64'" }]
-tiktoken = [{ url = "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/tiktoken-0.13.0-cp312-cp312-win_arm64.whl", marker = "sys_platform == 'win32' and platform_machine == 'ARM64'" }]
+# Windows ARM64 wheels PyPI does not provide, built by .github/workflows/build-win-arm64-wheels.yml
+# and served from the release's index page. Elsewhere these resolve from PyPI as usual.
+opencv-contrib-python = [{ index = "invoke-win-arm64-wheels", marker = "sys_platform == 'win32' and platform_machine == 'ARM64'" }]
+blake3 = [{ index = "invoke-win-arm64-wheels", marker = "sys_platform == 'win32' and platform_machine == 'ARM64'" }]
+tiktoken = [{ index = "invoke-win-arm64-wheels", marker = "sys_platform == 'win32' and platform_machine == 'ARM64'" }]
 
 [[tool.uv.index]]
 name = "pypi"
@@ -560,6 +561,15 @@ explicit = true
 [[tool.uv.index]]
 name = "torch-nvidia-win-arm64"
 url = "https://pypi.nvidia.com/nvtorch_oot/"
+explicit = true
+
+# A flat (find-links style) page listing this repo's self-built win_arm64 wheels, published as
+# release assets by .github/workflows/build-win-arm64-wheels.yml. Bump the tag together with the
+# ARM64 pins of the packages it serves.
+[[tool.uv.index]]
+name = "invoke-win-arm64-wheels"
+url = "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html"
+format = "flat"
 explicit = true
 
 [project.scripts]
