@@ -354,7 +354,8 @@
           "source:src/workbench/settings/settingsSearchShortcut.ts",
           "source:src/workbench/settings/store.ts",
           "source:src/workbench/shell/useWhatsNew.ts",
-          "source:src/workbench/shell/whatsNewStore.ts"
+          "source:src/workbench/shell/whatsNewStore.ts",
+          "source:src/workbench/widgetState.ts"
         ]
       },
       "owner": "app",

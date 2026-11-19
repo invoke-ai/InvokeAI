@@ -1,3 +1,4 @@
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { SettingDefinition, SettingLayer, SettingsTarget } from '@platform/ui/settings/contracts';
 import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
@@ -28,6 +29,10 @@ import {
 export type LayeredSettingValue = boolean | string | number | null;
 
 const EMPTY: Readonly<Record<string, unknown>> = {};
+
+const asUnpinned = (defaults: Readonly<Record<string, unknown>>): ResolvedValues => defaults as ResolvedValues;
+
+export const readBuiltIn = <V>(read: (values: ResolvedValues) => V): V => read(asUnpinned(EMPTY));
 
 /** A value as a settings row names it: a select's option label, On/Off, the number; `null` is "Automatic". */
 export const formatSettingValue = (field: SettingDefinition, value: LayeredSettingValue, t: TFunction): string => {
@@ -69,9 +74,10 @@ const getPin = (pins: object, key: string): unknown =>
 const getResolvedValues = (snapshot: WorkbenchSnapshot, ownerId: string, target: SettingsTarget) => {
   const project = snapshot.activeProject;
   if (ownerId === PROJECT_SETTINGS_OWNER) {
-    return getEffectiveProjectSettings(project.settings, snapshot.scopedDefaults[PROJECT_SETTINGS_OWNER]) as Readonly<
-      Record<string, unknown>
-    >;
+    return getEffectiveProjectSettings(
+      project.settings,
+      snapshot.scopedDefaults[PROJECT_SETTINGS_OWNER]
+    ) as unknown as ResolvedValues;
   }
   return resolveWidgetValues(getTargetInstance(project, ownerId, target), snapshot.scopedDefaults);
 };
@@ -84,7 +90,7 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
   ownerId: string,
   key: string,
   target: SettingsTarget | undefined,
-  read: (values: Readonly<Record<string, unknown>>) => V,
+  read: (values: ResolvedValues) => V,
   builtIn: V,
   field: SettingDefinition
 ): { value: V; layer: SettingLayer | undefined; set: (value: V) => void; disabled: boolean } => {
@@ -94,7 +100,7 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
   const commands = useOptionalWorkbenchCommands();
   const queries = useOptionalWorkbenchQueries();
   const defaults = useWorkbenchPreferenceSelector((preferences) => preferences.scopedDefaults[ownerId] ?? EMPTY);
-  const defaultValue = read(defaults);
+  const defaultValue = read(asUnpinned(defaults));
   const hasDefault = Object.hasOwn(defaults, key);
   const pinned = useOptionalWorkbenchSelector((snapshot) => {
     const pins = target ? getPins(snapshot.activeProject, ownerId, target) : null;
@@ -134,7 +140,7 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
       }
       const current = getWorkbenchPreferences().scopedDefaults[ownerId] ?? EMPTY;
       // A default equal to the built-in is no default: the key goes, so the record keeps only real choices.
-      if (read({ ...current, [key]: stored }) === builtIn) {
+      if (read(asUnpinned({ ...current, [key]: stored })) === builtIn) {
         void clearScopedDefault(ownerId, [key]);
       } else {
         void patchScopedDefault(ownerId, { [key]: stored });
@@ -238,7 +244,7 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
     [key, ownerId]
   );
   const valueText = useCallback(
-    (values: Readonly<Record<string, unknown>>) => formatSettingValue(field, read(values), t),
+    (defaults: Readonly<Record<string, unknown>>) => formatSettingValue(field, read(asUnpinned(defaults)), t),
     [field, read, t]
   );
 
@@ -286,7 +292,7 @@ export const useLayeredSetting = <V extends LayeredSettingValue>(
     const prior = readDefault();
     const written = { ...(getWorkbenchPreferences().scopedDefaults[ownerId] ?? EMPTY), [key]: pin };
     // `writeDefault` drops a default equal to the built-in, so the default it leaves is either the pin or nothing.
-    const writesDefault = read(written) !== builtIn;
+    const writesDefault = read(asUnpinned(written)) !== builtIn;
     writeDefault(pin);
     clearPin();
     const isDefaultAsWritten = () => {

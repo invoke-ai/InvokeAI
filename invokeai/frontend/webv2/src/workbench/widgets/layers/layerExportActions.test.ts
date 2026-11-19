@@ -5,6 +5,7 @@ import {
   galleryKeys,
   getGalleryListingBoardsQuery,
 } from '@features/gallery/queries';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
@@ -112,7 +113,10 @@ describe('saveLayerToBoard', () => {
     ]);
     const client = createClient();
     await client.fetchQuery(galleryBoardsOptions({ includeArchived: true }));
-    const panel = new QueryObserver(client, galleryBoardsOptions(getGalleryListingBoardsQuery(getGallerySettings({}))));
+    const panel = new QueryObserver(
+      client,
+      galleryBoardsOptions(getGalleryListingBoardsQuery(getGallerySettings(resolvedValues({}))))
+    );
     const unsubscribe = panel.subscribe(() => undefined);
     await vi.waitFor(() => expect(panel.getCurrentResult().data?.some((board) => board.id === 'board-7')).toBe(true));
     const itemList = seedItemList(client, 'board-7');

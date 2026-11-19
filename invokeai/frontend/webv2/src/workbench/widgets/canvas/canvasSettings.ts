@@ -1,5 +1,7 @@
 /** Per-project canvas preferences, outside undo history; engine-backed ones feed stores one way. */
 
+import type { ResolvedValues } from '@platform/core/resolvedValues';
+
 import { CANVAS_COMPOSITING_KEYS, DEFAULT_CANVAS_COMPOSITING } from './invoke/canvasCompositing';
 
 /** Which engine boolean store a setting feeds (settings without one are consumed elsewhere in the frontend). */
@@ -122,14 +124,14 @@ export type ResolvedCanvasSettings = Record<string, boolean>;
 
 /** Reads one boolean setting from a widget's `state.values`, applying its default when unset/non-boolean. */
 export const readCanvasBooleanSetting = (
-  values: Record<string, unknown> | undefined,
+  values: ResolvedValues | undefined,
   setting: CanvasBooleanSetting
 ): boolean => {
   const raw = values?.[setting.key];
   return typeof raw === 'boolean' ? raw : setting.defaultValue;
 };
 
-export const resolveCanvasSettings = (values: Record<string, unknown> | undefined): ResolvedCanvasSettings => {
+export const resolveCanvasSettings = (values: ResolvedValues | undefined): ResolvedCanvasSettings => {
   const resolved: ResolvedCanvasSettings = {};
   for (const setting of CANVAS_SETTINGS) {
     resolved[setting.key] = readCanvasBooleanSetting(values, setting);

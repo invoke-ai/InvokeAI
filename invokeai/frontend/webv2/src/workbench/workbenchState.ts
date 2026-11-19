@@ -72,6 +72,8 @@ import {
   stripInfiniteWindowAnchor,
   stripUnresolvableGallerySearch,
   gallerySemanticReferenceKey,
+  getGalleryChosenAutoAddBoardId,
+  getGalleryMediaFilter,
   getGallerySettings,
   toGalleryMediaKind,
   parseGallerySemanticReference,
@@ -3562,7 +3564,7 @@ const removeGalleryItemsFromAllProjects = (
 /** Its own inbox is left out: it exists only with the project and goes with it. */
 export const getProjectGalleryBoardReferences = (project: Project): string[] => {
   const values = getWidgetValues(project, 'gallery');
-  const { autoAddBoardId } = getGallerySettings(values);
+  const autoAddBoardId = getGalleryChosenAutoAddBoardId(values);
   const references = new Set<string>();
 
   for (const boardId of [
@@ -4367,7 +4369,7 @@ const getRankingStampFields = (
   return semanticKey
     ? {
         boardId: getGallerySelectionBoardId(values),
-        mediaKind: toGalleryMediaKind(getGallerySettings(values).mediaFilter) ?? null,
+        mediaKind: toGalleryMediaKind(getGalleryMediaFilter(values)) ?? null,
         semanticKey,
       }
     : { semanticKey: null };
