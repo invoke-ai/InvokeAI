@@ -2,7 +2,7 @@ import type { ModelConfig } from '@features/models';
 import type { VideoUiAdapter } from '@features/video/ui/VideoUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
 import { createDefaultVideoWidgetValues } from '@features/video';

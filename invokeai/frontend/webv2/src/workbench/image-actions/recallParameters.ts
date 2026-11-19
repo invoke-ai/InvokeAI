@@ -22,7 +22,6 @@ import {
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   getSettingsWithModelDefaults,
-  hasArchitectureCapabilities,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
@@ -38,6 +37,7 @@ import {
   getRecallDefaultVae,
   resolveModelDefaultVae,
 } from '@features/generation/settings';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 
 import {
   getBoolean,

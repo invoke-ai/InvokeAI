@@ -87,7 +87,6 @@ export {
   type GenerationIssue,
   type GenerationIssueFix,
 } from './core/generationIssues';
-export { hasArchitectureCapabilities } from './core/architectureCapabilities';
 export {
   describeExternalCanvasRefusal,
   GEMINI_TEMPERATURE_MAX,

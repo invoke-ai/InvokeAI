@@ -6,9 +6,9 @@ import type {
   MainModelConfig,
 } from '@features/generation/core/types';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getPidDecoderBaseForMainBase } from '@features/generation/core/pid';
 import { isPidDecodeNodeType } from '@features/generation/core/pidGraph';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ControlLayerGraphInput } from './addControlLayers';

@@ -6,10 +6,10 @@ import type { GenerateSettingsUpdate } from '@features/generation/ui/generateDeb
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { type GenerationUiAdapter, GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
 import { GenerateIssuesProvider } from '@features/generation/ui/shared/GenerateIssues';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { system } from '@theme/system';
 import i18next from 'i18next';
 import { act, createRef, type Ref, useCallback, useImperativeHandle, useState } from 'react';
