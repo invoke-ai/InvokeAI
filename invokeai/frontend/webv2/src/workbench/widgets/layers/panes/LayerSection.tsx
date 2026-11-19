@@ -25,11 +25,15 @@ import { RasterLayerFilterSection } from '@workbench/widgets/layers/RasterLayerF
 import { ReferenceImageSettings } from '@workbench/widgets/layers/ReferenceImageSettings';
 import { RegionalGuidanceSettings } from '@workbench/widgets/layers/RegionalGuidanceSettings';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
-import { useCallback } from 'react';
+import { lazy, Suspense, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GroupSelectedNotice } from './GroupSelectedNotice';
 import { PropertiesSection } from './PropertiesSection';
+
+const VectorLayerSettings = lazy(() =>
+  import('@workbench/widgets/layers/VectorLayerSettings').then((module) => ({ default: module.VectorLayerSettings }))
+);
 
 type LayerSectionEngine = Pick<
   CanvasEngineHandle,
@@ -152,7 +156,15 @@ const LayerTypeSettings = ({
   engine: LayerSectionEngine | null;
   layer: CanvasLayerContract;
 }) => {
+  const { t } = useTranslation();
+  const loading = useMemo(() => <Text>{t('common.loading')}</Text>, [t]);
   switch (layer.type) {
+    case 'vector':
+      return (
+        <Suspense fallback={loading}>
+          <VectorLayerSettings key={layer.id} engine={engine} layer={layer} />
+        </Suspense>
+      );
     case 'inpaint_mask':
       return <InpaintMaskSettings key={layer.id} engine={engine} layer={layer} />;
     case 'regional_guidance':

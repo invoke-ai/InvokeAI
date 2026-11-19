@@ -46,6 +46,9 @@ export const resolveLayerThumbnailImageRef = (layer: CanvasLayerContract): Canva
 
 /** Display-only properties that alter a layer thumbnail without changing its raster cache. */
 export const getLayerThumbnailDisplayKey = (layer: CanvasLayerContract): string => {
+  if (layer.type === 'vector') {
+    return `vector:${layer.opacity}`;
+  }
   if (layer.type === 'raster') {
     return `raster:${layer.opacity}:${adjustmentsKey(layer.adjustments)}`;
   }

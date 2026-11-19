@@ -47,7 +47,7 @@ describe('getProjectWithinSize', () => {
     );
     await expect(getProjectWithinSize('p-1', 1000)).resolves.toEqual(record);
     expect(transport.apiFetch).toHaveBeenCalledWith(
-      '/api/v1/projects/p-1?max_canvas_schema_version=6&max_document_schema_version=4',
+      '/api/v1/projects/p-1?max_canvas_schema_version=7&max_document_schema_version=4',
       { signal: undefined }
     );
 
@@ -95,7 +95,7 @@ describe('createProjectSettled', () => {
   const post = () => ({
     body: JSON.stringify({
       ...request,
-      max_canvas_schema_version: 6,
+      max_canvas_schema_version: 7,
       max_document_schema_version: 4,
       minimum_canvas_schema_version: 3,
     }),
@@ -124,7 +124,7 @@ describe('createProjectSettled', () => {
     expect(transport.apiFetchJson).toHaveBeenNthCalledWith(2, '/api/v1/projects/', post());
     expect(transport.apiFetchJson).toHaveBeenNthCalledWith(
       3,
-      '/api/v1/projects/project-1?max_canvas_schema_version=6&max_document_schema_version=4',
+      '/api/v1/projects/project-1?max_canvas_schema_version=7&max_document_schema_version=4',
       expect.anything()
     );
   });
@@ -210,7 +210,7 @@ describe('canvas schema compatibility declarations', () => {
     await getProject('project/one');
 
     expect(transport.apiFetchJson).toHaveBeenCalledWith(
-      '/api/v1/projects/project%2Fone?max_canvas_schema_version=6&max_document_schema_version=4',
+      '/api/v1/projects/project%2Fone?max_canvas_schema_version=7&max_document_schema_version=4',
       { signal: expect.any(AbortSignal) }
     );
   });
@@ -225,7 +225,7 @@ describe('canvas schema compatibility declarations', () => {
         data: {},
         minimum_document_schema_version: 4,
         name: 'Project',
-        max_canvas_schema_version: 6,
+        max_canvas_schema_version: 7,
         max_document_schema_version: 4,
         minimum_canvas_schema_version: 3,
       }),
@@ -358,7 +358,7 @@ describe('project workspaces', () => {
       body: JSON.stringify({
         data: { layout: {} },
         expected_revision: 1,
-        max_canvas_schema_version: 6,
+        max_canvas_schema_version: 7,
         max_document_schema_version: 4,
       }),
       method: 'PUT',
@@ -404,7 +404,7 @@ describe('project workspaces', () => {
         minimum_document_schema_version: 4,
         name: 'Project',
         workspace: { layout: {} },
-        max_canvas_schema_version: 6,
+        max_canvas_schema_version: 7,
         max_document_schema_version: 4,
         minimum_canvas_schema_version: 3,
       }),

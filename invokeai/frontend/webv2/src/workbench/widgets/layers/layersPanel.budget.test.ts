@@ -47,7 +47,7 @@ describe(`layers panel budgets over ${NODE_COUNT} nodes`, () => {
     expect(Object.values(expanded).reduce((total, stack) => total + stack.rows.length, 0)).toBe(NODE_COUNT);
     expect(getDocumentModelDiagnostics().nodesCompiled).toBe(NODE_COUNT);
     const flat = flattenPanelRows(expanded, [], () => false);
-    expect(flat.filter((row) => row.kind === 'header')).toHaveLength(4);
+    expect(flat.filter((row) => row.kind === 'header')).toHaveLength(5);
     expect(flat.filter((row) => row.kind === 'node')).toHaveLength(NODE_COUNT);
   });
 

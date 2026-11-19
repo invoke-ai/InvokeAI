@@ -70,7 +70,7 @@ export const buildLayerStackRows = (
   const kept = filtered?.kept ?? null;
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const setSizeOf = (node: SemanticNode): number =>
-    node.parentId === null ? stacks[node.stack].length : (byId.get(node.parentId)?.childCount ?? 0);
+    node.parentId === null ? (stacks[node.stack]?.length ?? 0) : (byId.get(node.parentId)?.childCount ?? 0);
   const result = Object.fromEntries(
     LAYER_STACKS_TOP_FIRST.map((stack) => [
       stack,

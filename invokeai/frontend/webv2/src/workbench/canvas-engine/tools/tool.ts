@@ -147,6 +147,9 @@ export interface ToolActivationOptions {
 
 export interface Tool {
   readonly id: ToolId;
+  /** A multi-press creation session may remain active between pointer gestures. */
+  hasSession?(): boolean;
+  /** Called when the tool becomes active. */
   onActivate?(ctx: ToolContext, opts?: ToolActivationOptions): void;
   onDeactivate?(ctx: ToolContext, opts?: ToolActivationOptions): void;
   onPointerDown?(ctx: ToolContext, input: PointerInput): void;
@@ -156,7 +159,12 @@ export interface Tool {
   onPointerCancel?(ctx: ToolContext): void;
   /** A handled `cancel` ends the Escape ladder, so Escape never also clears the selection. */
   onKeyCommand?(ctx: ToolContext, command: 'apply' | 'cancel'): boolean;
-  /** `screenAnchor` is in CSS pixels. */
+  /** Owned modifier changes; returning true keeps a modifier from activating a temporary tool. */
+  onModifierKey?(ctx: ToolContext, code: 'Space' | 'Alt' | 'Shift', pressed: boolean): boolean;
+  /** Drop or reconcile an unfinished gesture when its document target changes. Never dispatch from this hook. */
+  onDocumentChanged?(ctx: ToolContext): void;
+
+  /** Wheel over the canvas; `screenAnchor` is the CSS-pixel cursor position. */
   onWheel?(ctx: ToolContext, deltaY: number, screenAnchor: { x: number; y: number }, modifiers: PointerModifiers): void;
   cursor?(ctx: ToolContext): string;
   /** The pointer pipeline must not turn this tool's alt-hold into the temporary color picker. */

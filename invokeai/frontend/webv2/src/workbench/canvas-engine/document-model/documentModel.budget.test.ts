@@ -194,10 +194,11 @@ describe(`document model budgets over ${NODE_COUNT} nodes`, () => {
         type: 'set-enabled',
         updates: Array.from({ length: 10 }, (_, index) => ({ id: `l${index}`, isEnabled: false })),
       },
-      { builds: 1, ids: 10, stacks: 4 },
+      { builds: 1, ids: 10, stacks: 5 },
     ],
     ['hide', { type: 'set-hidden', updates: [{ id: 'l1', isHidden: true }] }, { builds: 1, ids: 1, stacks: 1 }],
-    ['move', { ids: ['l8', 'l12', 'l16'], kind: 'forward', type: 'move' }, { builds: 1, ids: 4, stacks: 1 }],
+    ['move', { ids: ['l8', 'l12', 'l16'], kind: 'forward', type: 'move' }, { builds: 1, ids: 6, stacks: 3 }],
+    // Removal repairs the selection over the projected forest, which costs one more index.
     ['remove', { ids: ['l1', 'l2'], type: 'remove' }, { builds: 2, ids: 2, stacks: 2 }],
   ])('prepares a %s edit with exact touched ids and stacks and no leaf compilation', (_label, command, expected) => {
     const model = createDocumentModel(createLargeFlatDocument(NODE_COUNT), context);

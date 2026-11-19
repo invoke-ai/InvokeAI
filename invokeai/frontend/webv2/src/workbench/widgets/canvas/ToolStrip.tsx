@@ -23,6 +23,7 @@ import {
   ScanIcon,
   SquareDashedMousePointerIcon,
   TypeIcon,
+  SplinePointerIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, type ElementType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -250,6 +251,13 @@ const ToolStripRoot = ({ engine }: { engine: ToolStripEngine }) => {
           toolId="text"
         />
         <SelectFamilyButton engine={engine} />
+        <ToolStripButton
+          engine={engine}
+          hotkey={hotkeyFor('canvas.tool.spline')}
+          icon={SplinePointerIcon}
+          label={t('widgets.canvas.tools.spline')}
+          toolId="spline"
+        />
       </Toolbar>
     </Box>
   );

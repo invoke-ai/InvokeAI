@@ -372,7 +372,14 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         return;
       }
       if (event.code === 'Space' && !event.repeat) {
-        if (event.ctrlKey || event.metaKey || event.altKey || holdOwner(event) === null) {
+        if (event.ctrlKey || event.metaKey || holdOwner(event) === null) {
+          return;
+        }
+        if (deps.getActiveTool()?.onModifierKey?.(deps.getToolContext(), 'Space', true)) {
+          event.preventDefault();
+          return;
+        }
+        if (event.altKey) {
           return;
         }
         beginTempTool('space', SPACE_TEMP_TOOL);
@@ -388,6 +395,10 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         // Firefox and Windows activate the menu bar on a lone Alt unless both press and release are prevented.
         event.preventDefault();
         altClaimed = true;
+        if (deps.getActiveTool()?.onModifierKey?.(deps.getToolContext(), 'Alt', true)) {
+          return;
+        }
+        // A tool that reads Alt as a gesture modifier keeps it; pointer events still carry `altKey`.
         if (deps.getActiveTool()?.usesAltKey) {
           return;
         }
@@ -401,6 +412,9 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       if (isBboxKey(event) && !event.repeat && ownsSessionKey(event)) {
         beginBboxTempTool();
       }
+      if (event.key === 'Shift' && holdOwner(event) !== null) {
+        deps.getActiveTool()?.onModifierKey?.(deps.getToolContext(), 'Shift', true);
+      }
     },
     heldRestoreToolId: () => (tempHold && tempSwitched ? priorToolId : null),
     hoverPoint: () => hoverPoint,
@@ -409,6 +423,11 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       pointerFocused = event.target && arrivedByPointer(event.target) ? new WeakRef(event.target) : null;
     },
     onKeyUp: (event) => {
+      const modifier =
+        event.code === 'Space' ? 'Space' : isAltKey(event) ? 'Alt' : event.key === 'Shift' ? 'Shift' : null;
+      if (modifier) {
+        deps.getActiveTool()?.onModifierKey?.(deps.getToolContext(), modifier, false);
+      }
       if (event.code === 'Space' && tempHold === 'space') {
         releaseTempTool();
       } else if (isAltKey(event)) {
@@ -553,6 +572,12 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         endTempTool();
       }
       clearBboxTapTimer();
+      // Tool-owned holds can outlive a press (polygon drafts) and miss keyup while the window is unfocused.
+      const tool = deps.getActiveTool();
+      const ctx = deps.getToolContext();
+      for (const modifier of ['Space', 'Alt', 'Shift'] as const) {
+        tool?.onModifierKey?.(ctx, modifier, false);
+      }
       altPending = false;
       altClaimed = false;
       hovered = false;

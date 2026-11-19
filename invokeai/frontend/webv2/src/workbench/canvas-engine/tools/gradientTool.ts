@@ -78,7 +78,7 @@ const predictRefusal = (ctx: ToolContext): CanvasLayerEditRefusal | null => {
   if (!leaf || !selected) {
     return null;
   }
-  if (isMaskLayer(selected)) {
+  if (isMaskLayer(selected) || selected.type === 'vector') {
     return { layerId: selected.id, layerName: selected.name, status: 'gradient-unsupported' };
   }
   const status = selected.type === 'raster' && selected.source.type === 'gradient' ? leafEditRefusal(leaf) : null;

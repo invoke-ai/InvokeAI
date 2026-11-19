@@ -304,7 +304,7 @@ const replaceLeaf = (
   const stacks = removeNodes(document.stacks, new Set([layer.id]));
   return withStacks(
     document,
-    anchor ? insertNodesAtAnchor(stacks, anchor, [layer]) : { ...stacks, [target]: [layer, ...stacks[target]] }
+    anchor ? insertNodesAtAnchor(stacks, anchor, [layer]) : { ...stacks, [target]: [layer, ...(stacks[target] ?? [])] }
   );
 };
 
@@ -450,7 +450,7 @@ const applyMoves = (stacks: CanvasStackForests, moves: readonly CanvasNodeMove[]
   };
   const next = { ...removed };
   for (const stack of Object.keys(next) as CanvasNodeInsertionAnchor['stack'][]) {
-    const roots = materialize(lists.get(siblingKey(stack, null)) ?? removed[stack], stack);
+    const roots = materialize(lists.get(siblingKey(stack, null)) ?? removed[stack] ?? [], stack);
     if (roots !== removed[stack]) {
       next[stack] = [...roots];
     }
@@ -606,6 +606,20 @@ const isConfigTargetValid = (
 const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPatch): CanvasNodeContract => {
   if (layer.type !== config.layerType) {
     return layer;
+  }
+  if (layer.type === 'vector' && config.layerType === 'vector') {
+    return {
+      ...layer,
+      ...(Object.hasOwn(config, 'paths') ? { paths: config.paths ?? layer.paths } : {}),
+      ...(Object.hasOwn(config, 'guideColor') ? { guideColor: config.guideColor } : {}),
+      ...(Object.hasOwn(config, 'fillEnabled') ? { fillEnabled: config.fillEnabled } : {}),
+      ...(Object.hasOwn(config, 'strokeEnabled') ? { strokeEnabled: config.strokeEnabled } : {}),
+      ...(Object.hasOwn(config, 'fillColor') ? { fillColor: config.fillColor } : {}),
+      ...(config.strokeColor !== undefined ? { strokeColor: config.strokeColor } : {}),
+      ...(config.strokeWidth !== undefined ? { strokeWidth: config.strokeWidth } : {}),
+      ...(Object.hasOwn(config, 'traceTaperEnds') ? { traceTaperEnds: config.traceTaperEnds } : {}),
+      ...(Object.hasOwn(config, 'traceTaper') ? { traceTaper: config.traceTaper } : {}),
+    };
   }
   if (layer.type === 'group' && config.layerType === 'group') {
     return {

@@ -265,7 +265,7 @@ export interface LayerContextAction {
 
 export type LayerConfigPatchKind = 'control-transparency-effect' | 'regional-auto-negative';
 
-const ALL_LAYER_TYPES = ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const;
+const ALL_LAYER_TYPES = ['raster', 'control', 'inpaint_mask', 'regional_guidance', 'vector'] as const;
 type AdjustmentAddItem = {
   readonly defaultLabel: string;
   readonly icon: LucideIcon;
@@ -435,7 +435,13 @@ const hasReadablePixels = (context: LayerContextActionState): boolean =>
 const hasMutablePixels = (context: LayerContextActionState): boolean =>
   isLayerMutable(context) && hasReadablePixels(context);
 const hasTransformablePixels = (context: LayerContextActionState): boolean =>
-  context.layer.isEnabled && hasMutablePixels(context);
+  context.layer.type === 'vector'
+    ? context.layer.isEnabled &&
+      isLayerMutable(context) &&
+      context.hasEngine &&
+      !(layerEntry(context)?.ancestorsEnabled === false) &&
+      context.layer.paths.some((path) => path.points.length >= 2)
+    : context.layer.isEnabled && hasMutablePixels(context);
 const hasDocumentContent = (context: LayerContextActionState): boolean => {
   const contentRect = getSourceContentRect(context.layer, context.document);
   return contentRect.width > 0 && contentRect.height > 0;
@@ -474,7 +480,7 @@ const siblingPosition = (context: LayerContextActionState): { index: number; cou
   }
   const parent = entry.parentId === null ? null : index.byId.get(entry.parentId)!.node;
   const count =
-    parent && parent.type === 'group' ? parent.children.length : context.document.stacks[entry.stack].length;
+    parent && parent.type === 'group' ? parent.children.length : (context.document.stacks[entry.stack]?.length ?? 0);
   return { count, index: entry.siblingIndex };
 };
 
@@ -614,7 +620,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     labelKey: 'widgets.layers.actions.transform',
     order: 10,
     section: 'primary',
-    supportedLayerTypes: ['raster', 'control', 'inpaint_mask', 'regional_guidance'],
+    supportedLayerTypes: ['raster', 'control', 'vector', 'inpaint_mask', 'regional_guidance'],
   },
   {
     defaultLabel: 'Rename',

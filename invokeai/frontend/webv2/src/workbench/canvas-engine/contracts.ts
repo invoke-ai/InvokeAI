@@ -62,7 +62,8 @@ export interface CanvasStagingAreaContract {
   areThumbnailsVisible: boolean;
 }
 
-// Top-first stack forests; leaves store stable image names, never ephemeral URLs. Groups gate enabled/locked/hidden.
+// Top-first stack forests hold raster, control, vector, regional guidance and inpaint nodes. Leaves use transforms
+// and stable image names, never ephemeral URLs. Groups gate descendant enabled, locked and hidden state.
 
 export type CanvasBlendMode =
   | 'normal'
@@ -292,7 +293,40 @@ export interface CanvasRasterLayerContractV2 extends CanvasLayerBaseContract {
   filter?: { type: string; settings: Record<string, unknown> };
 }
 
-/** A closed set: an unknown value refuses the document. */
+export interface CanvasBezierPointContract {
+  anchor: { x: number; y: number };
+  /** Layer-local coordinates, rather than offsets from the anchor. */
+  inHandle: { x: number; y: number } | null;
+  outHandle: { x: number; y: number } | null;
+  type: 'corner' | 'smooth' | 'symmetric';
+}
+
+export interface CanvasBezierPathContract {
+  id: string;
+  name: string | null;
+  isClosed: boolean;
+  points: CanvasBezierPointContract[];
+}
+
+/** Editable guide geometry; no raster source and no contribution to image generation. */
+export { DEFAULT_VECTOR_GUIDE_COLOR, DEFAULT_VECTOR_STROKE_COLOR, DEFAULT_VECTOR_STROKE_WIDTH } from './vectorDefaults';
+
+export interface CanvasVectorLayerContract extends CanvasLayerBaseContract {
+  type: 'vector';
+  paths: CanvasBezierPathContract[];
+  /** Display-only guide color; absent uses DEFAULT_VECTOR_GUIDE_COLOR. */
+  guideColor?: string;
+  fillColor?: string;
+  strokeColor: string;
+  strokeWidth: number;
+  fillEnabled?: boolean;
+  strokeEnabled?: boolean;
+  traceTaperEnds?: boolean;
+  traceTaper?: number;
+  isHidden?: boolean;
+}
+
+/** What a control layer's image should control; a closed set, so an unknown value refuses the document. */
 export const CONTROL_TYPES = ['pose', 'depth', 'edges', 'softedge', 'lineart', 'sketch', 'color', 'tile'] as const;
 export type ControlType = (typeof CONTROL_TYPES)[number];
 
@@ -366,6 +400,7 @@ export interface CanvasInpaintMaskLayerContract extends CanvasLayerBaseContract 
 }
 
 export type CanvasLayerContract =
+  | CanvasVectorLayerContract
   | CanvasRasterLayerContractV2
   | CanvasControlLayerContract
   | CanvasRegionalGuidanceLayerContract
@@ -394,12 +429,17 @@ export interface CanvasGroupContract {
 
 export type CanvasNodeContract = CanvasLayerContract | CanvasGroupContract;
 
-export type CanvasStackForests = Record<CanvasLayerStackKind, CanvasNodeContract[]>;
+/** One top-first forest per stack; a node's stack is the forest it lives in. */
+export type CanvasStackForests = Record<Exclude<CanvasLayerStackKind, 'vector'>, CanvasNodeContract[]> & {
+  /** Absent until first used so projects without vectors retain their existing schema. */
+  vector?: CanvasNodeContract[];
+};
 
 /** Bottom stack first; the one table every consumer reads. */
 export const LAYER_STACK_ORDER: readonly CanvasLayerStackKind[] = [
   'raster',
   'control',
+  'vector',
   'regional_guidance',
   'inpaint_mask',
 ];
@@ -410,8 +450,15 @@ export const CANVAS_MAX_NODE_DEPTH = 10;
 export const CANVAS_MAX_NODE_COUNT = 10_000;
 
 export interface CanvasDocumentContractV3 {
-  /** 3 plain, 4 custom fonts, 5 noise/spatial, 6 control derivation; mutations raise it, snapshots keep theirs. */
-  version: 3 | 4 | 5 | 6;
+  /**
+   * Schema this document needs: 3 for plain content, 4 for custom-font typography, 5 for noise or spatial
+   * (clarity, texture, dehaze) adjustments, 6 for control-layer derivation fields, 7 for vector geometry and
+   * layer appearance. Each mutation
+   * raises it to the newer of its content's need and the canvas state's version. A restored snapshot keeps its own,
+   * possibly lower, version until the next mutation; the state's version and the project's compatibility floor stay
+   * put meanwhile.
+   */
+  version: 3 | 4 | 5 | 6 | 7;
   width: number;
   height: number;
   background: 'transparent' | { color: string };
@@ -439,8 +486,13 @@ export interface CanvasStagingAreaContractV2 extends CanvasStagingAreaContract {
 }
 
 export interface CanvasStateContractV3 {
-  /** Newest schema the state or any snapshot needs; sticky, removing content never lowers it. */
-  version: 3 | 4 | 5 | 6;
+  /**
+   * Newest schema the state needs: the newest of its previous version, the live document's and every snapshot's
+   * (3 plain, 4 custom-font typography, 5 noise or spatial adjustments, 6 control-layer derivation fields,
+   * 7 vector geometry and layer appearance). Sticky:
+   * removing that content never lowers it.
+   */
+  version: 3 | 4 | 5 | 6 | 7;
   document: CanvasDocumentContractV3;
   /** Wholesale-replacement counter; the mirror clears pixel history on change, even with reused ids. */
   documentRevision: number;

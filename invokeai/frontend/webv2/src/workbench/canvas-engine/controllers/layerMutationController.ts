@@ -273,7 +273,7 @@ export class LayerMutationController {
             if (duplicate.source.type === 'paint') {
               duplicate.source = { bitmap: null, type: 'paint' };
             }
-          } else {
+          } else if (duplicate.type === 'inpaint_mask' || duplicate.type === 'regional_guidance') {
             duplicate.mask = { ...duplicate.mask, bitmap: null, offset: { x: 0, y: 0 } };
           }
         }

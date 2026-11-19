@@ -155,6 +155,8 @@ export interface GenerationUiAdapter {
     remove(presetId: string): void;
     /** Undoes a remove: puts `preset` back at `index` (or last), unless a preset with its id is still there. */
     restore(preset: GeneratePresetRecord, index: number): void;
+    /** Replaces a preset's snapshot, keeping its id and label. */
+    update(presetId: string, values: Record<string, unknown>): void;
   };
   /** Subscribing keeps the queue read observed, so only displaying controls read it (`useGenerationQueueInsights`). */
   queueInsights: ReadableExternalStore<GenerationQueueInsights>;

@@ -7,9 +7,11 @@ import type {
   ParametricShapeKind,
 } from '@workbench/canvas-engine/contracts';
 import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
+import type { VectorShapePreview } from '@workbench/canvas-engine/render/vectorGuides';
 import type { SamInteractionState } from '@workbench/canvas-engine/samInteraction';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect, SelectionOp, ToolId, Vec2 } from '@workbench/canvas-engine/types';
+import type { VectorEditSession } from '@workbench/canvas-engine/vectorEditState';
 
 import { type CheckerColors, DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
 
@@ -422,6 +424,11 @@ export interface EngineStores {
   /** Cleared by commit, cancel, a real tool switch, deletion or replacement. */
   textEditSession: ScalarStore<TextEditSession | null>;
   shapePreview: ScalarStore<{ rect: Rect; kind: ParametricShapeKind } | null>;
+  /** Vector creation preview is guide geometry, never a rasterization source. */
+  vectorShapePreview: ScalarStore<VectorShapePreview | null>;
+  vectorEditSession: ScalarStore<VectorEditSession | null>;
+  vectorToolsStatus: ScalarStore<'idle' | 'loading' | 'ready' | 'failed'>;
+  /** Document-space gradient drag vector; overlay shows a linear ramp or radial circle. Cleared on commit/cancel. */
   gradientPreview: ScalarStore<GradientPreview | null>;
   hasSelection: ScalarStore<boolean>;
   hasFloatingSelection: ScalarStore<boolean>;
@@ -652,6 +659,9 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   samInteraction: createScalarStore(null),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),
   shapePreview: createScalarStore<{ rect: Rect; kind: ParametricShapeKind } | null>(null, rectShapePreviewEqual),
+  vectorShapePreview: createScalarStore<VectorShapePreview | null>(null),
+  vectorEditSession: createScalarStore<VectorEditSession | null>(null),
+  vectorToolsStatus: createScalarStore<'idle' | 'loading' | 'ready' | 'failed'>('idle'),
   showBbox: createScalarStore<boolean>(true),
   showGrid: createScalarStore<boolean>(false),
   snapToGrid: createScalarStore<boolean>(true),

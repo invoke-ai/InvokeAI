@@ -514,7 +514,7 @@ export const layerChildMoveTargets = (
   document: CanvasDocumentContractV3,
   child: Pick<ProjectedChildRow, 'kind' | 'layerId' | 'itemId' | 'stack'>
 ): LayerChildMoveTarget[] =>
-  preorder(document.stacks[child.stack]).flatMap((node) => {
+  preorder(document.stacks[child.stack] ?? []).flatMap((node) => {
     if (node.id === child.layerId) {
       return [];
     }

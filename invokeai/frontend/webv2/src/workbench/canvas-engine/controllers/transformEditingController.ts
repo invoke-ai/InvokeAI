@@ -126,7 +126,7 @@ export class TransformEditingController {
     const document = this.deps.getDocument();
     const leaf = lookupDocumentLeaf(document, layerId);
     const layer = leaf?.layer;
-    if (!document || !layer || !isLeafEditable(leaf) || !hittableLayerSize(layer, document)) {
+    if (!document || !layer || !this.deps.canEdit() || !isLeafEditable(leaf) || !hittableLayerSize(layer, document)) {
       return;
     }
     this.cancel();
@@ -316,7 +316,7 @@ export class TransformEditingController {
       !document ||
       !layer ||
       !size ||
-      !isRenderableLayer(layer) ||
+      (layer.type !== 'vector' && !isRenderableLayer(layer)) ||
       !isLeafEditable(lookupDocumentLeaf(document, session.layerId)) ||
       unchanged(session.transform, session.startTransform)
     ) {
@@ -346,6 +346,7 @@ export class TransformEditingController {
     const source = layer.type === 'raster' || layer.type === 'control' ? layer.source : null;
     // A mask keeps its transform like an image, so its coverage is resampled only when composited, never baked.
     if (
+      layer.type === 'vector' ||
       isMaskLayer(layer) ||
       source?.type === 'image' ||
       source?.type === 'shape' ||

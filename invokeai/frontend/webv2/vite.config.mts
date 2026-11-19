@@ -192,6 +192,28 @@ const EDITOR_BOOT_SHARED_MODULES = [
 
 // Editor runtime the workbench store reaches; ungrouped, Rolldown splits it by importer set into extra boot requests.
 const WORKBENCH_RUNTIME_SHARED_MODULES = [
+  // Layer factories are shared with lazy vector creation; keep the adapter helper in the existing boot request.
+  '/workbench/controlAdapters.ts',
+  // The boot document model and lazy vector runtime share these already-eager primitives.
+  '/workbench/canvas-engine/contracts.ts',
+  '/workbench/canvas-engine/document-model/documentModel.ts',
+  '/workbench/canvas-engine/document-model/postconditions.ts',
+  '/workbench/canvas-engine/document-model/semanticLeaf.ts',
+  '/workbench/canvas-engine/document-model/semanticNode.ts',
+  '/workbench/canvas-engine/document/documentIndex.ts',
+  '/workbench/canvas-engine/document/documentTree.ts',
+  '/workbench/canvas-engine/document/insertionAnchors.ts',
+  '/workbench/canvas-engine/document/layerEligibility.ts',
+  '/workbench/canvas-engine/document/layerStacks.ts',
+  '/workbench/canvas-engine/document/selectionRepair.ts',
+  '/workbench/canvas-engine/document/sources.ts',
+  '/workbench/canvas-engine/layerExportGuards.ts',
+  '/workbench/canvas-engine/math/mat2d.ts',
+  '/workbench/canvas-engine/math/rect.ts',
+  '/workbench/canvas-engine/math/snapping.ts',
+  '/workbench/canvas-engine/mutationContracts.ts',
+  '/workbench/canvas-engine/render/rasterizers/textRasterizer.ts',
+  '/workbench/canvas-engine/transform/transformMath.ts',
   '/platform/react/draftRegistry.ts',
   '/features/generation/core/projectPromptDraft.ts',
   '/features/generation/core/prompt/compel.ts',

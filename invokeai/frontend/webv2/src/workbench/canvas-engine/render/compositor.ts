@@ -75,9 +75,12 @@ export interface CompositeOptions {
   layerPreviews?: ReadonlyMap<string, { surface: RasterSurface; rect: Rect }> | null;
   /** Also suppresses staged and filter previews. */
   isolationLayerId?: string | null;
-  /** Absent draws all; an isolated target draws whatever its stack. */
-  showOverlayStacks?: Readonly<Record<OverlayStackKind, boolean>>;
-  /** Null for raw pixels; without a provider adjustments are ignored. */
+  /** Overlay stacks the screen draws; absence draws all. An isolated target draws whatever its stack. */
+  showOverlayStacks?: Readonly<Record<Exclude<OverlayStackKind, 'vector'>, boolean> & { vector?: boolean }>;
+  /**
+   * Memoized adjusted raster surface, or null for raw pixels. Optional provider; without it adjustments are
+   * ignored. Cache versions prevent per-frame recomputation.
+   */
   adjustedSurface?: ((layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null) | null;
   derivedSurfaces?: DerivedSurfaceCache | null;
   /** Layer-local, composed with the layer transform. */
@@ -128,7 +131,7 @@ export const transformOverridesKey = (overrides: TransformOverrides | null | und
 
 const overlayStacksKey = (shown: CompositeOptions['showOverlayStacks']): string => {
   const stacks = shown ?? ALL_OVERLAY_STACKS_SHOWN;
-  return `${+stacks.control}${+stacks.inpaint_mask}${+stacks.regional_guidance}`;
+  return `${+stacks.control}${+stacks.inpaint_mask}${+stacks.regional_guidance}${+(stacks.vector !== false)}`;
 };
 
 /** Stable while document, isolation, overlay stacks, grouping and overrides are, so callers share it. */

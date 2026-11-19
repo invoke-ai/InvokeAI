@@ -123,6 +123,9 @@ const cropEligibility = (
  * persistence once the cropped pixels land.
  */
 const croppedLayerContract = (layer: CanvasLayerContract, rect: Rect): CanvasLayerContract => {
+  if (layer.type === 'vector') {
+    return layer;
+  }
   const before = structuredClone(layer);
   const identity = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
   const offset = { x: rect.x, y: rect.y };

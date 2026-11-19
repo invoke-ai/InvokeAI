@@ -81,6 +81,10 @@ export const isRenderableLayer = (layer: CanvasLayerContract): boolean => {
  * dims), or paint bitmap size at its offset (legacy: zero). Empty paint is an empty rect; unsupported sources throw.
  */
 export const getSourceContentRect = (layer: CanvasLayerContract, doc: CanvasDocumentContractV3): Rect => {
+  // Guide geometry owns no pixels, even when it has paths.
+  if (layer.type === 'vector') {
+    return { height: 0, width: 0, x: 0, y: 0 };
+  }
   const source = renderableSourceOf(layer);
   if (!source) {
     throw new Error(`getSourceContentRect: layer type '${layer.type}' has no rasterizable source`);

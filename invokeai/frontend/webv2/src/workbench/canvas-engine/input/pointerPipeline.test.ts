@@ -492,4 +492,29 @@ describe('pointer pipeline: cancellation ownership', () => {
     h.pipeline.onPointerMove(makePointerEvent({ buttons: 0, clientX: 6, pointerId: 4 }));
     expect(h.tool.moves).toHaveLength(2);
   });
+
+  it('releases tool-owned modifiers on blur reset when their keyup was missed between presses', () => {
+    const h = createHarness();
+    const held = new Set<string>();
+    h.tool.onModifierKey = (_ctx, modifier, pressed) => {
+      if (pressed) {
+        held.add(modifier);
+      } else {
+        held.delete(modifier);
+      }
+      return true;
+    };
+    const moves: string[][] = [];
+    h.tool.onPointerMove = () => moves.push([...held]);
+    h.pipeline.onPointerEnter();
+    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', target: SURFACE_TARGET }));
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Alt', code: 'AltLeft', target: SURFACE_TARGET }));
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Shift', target: SURFACE_TARGET }));
+    expect(held.size).toBe(3);
+    h.pipeline.reset();
+    h.pipeline.onPointerEnter();
+    h.pipeline.onPointerDown(makePointerEvent());
+    h.pipeline.onPointerMove(makePointerEvent({ clientX: 50, clientY: 50 }));
+    expect(moves).toEqual([[]]);
+  });
 });

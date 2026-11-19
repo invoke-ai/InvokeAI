@@ -12,9 +12,13 @@ const createHarness = () => {
   const updateCursor = vi.fn();
   const invalidateOverlay = vi.fn();
   const order: string[] = [];
-  const beforeSwitch = vi.fn(() => order.push('beforeSwitch'));
+  const beforeSwitch = vi.fn(() => {
+    order.push('beforeSwitch');
+  });
   const cancelGesture = vi.fn(() => order.push('cancelGesture'));
-  vi.mocked(view.onDeactivate!).mockImplementation(() => order.push('view:deactivate'));
+  vi.mocked(view.onDeactivate!).mockImplementation(() => {
+    order.push('view:deactivate');
+  });
   const stepBrushSize = vi.fn();
   const controller = new InteractionController({
     beforeSwitch,

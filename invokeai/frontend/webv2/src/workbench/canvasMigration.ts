@@ -250,6 +250,41 @@ const zLayerBase = z.object({
 });
 const zCanvasLayer = z.discriminatedUnion('type', [
   zLayerBase.extend({
+    isHidden: z.boolean().optional(),
+    paths: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string().nullable(),
+        isClosed: z.boolean(),
+        points: z.array(
+          z.object({
+            anchor: zCoordinate,
+            inHandle: zCoordinate.nullable(),
+            outHandle: zCoordinate.nullable(),
+            type: z.enum(['corner', 'smooth', 'symmetric']),
+          })
+        ),
+      })
+    ),
+    type: z.literal('vector'),
+    guideColor: z
+      .string()
+      .regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i)
+      .optional()
+      .catch(undefined),
+    fillColor: z
+      .string()
+      .regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i)
+      .optional()
+      .catch(undefined),
+    fillEnabled: z.boolean().optional().catch(undefined),
+    strokeColor: z.string().regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i),
+    strokeWidth: z.number().int().min(1).max(600),
+    strokeEnabled: z.boolean().optional().catch(undefined),
+    traceTaperEnds: z.boolean().optional().catch(undefined),
+    traceTaper: z.number().int().min(1).max(500).optional().catch(undefined),
+  }),
+  zLayerBase.extend({
     // A pre-stack adjustments OBJECT is dropped rather than failing the document.
     adjustments: zAdjustments.optional().catch(undefined),
     inpaint: z
@@ -439,7 +474,7 @@ const ownSchemaRequirement = (node: Record<string, unknown>): CanvasSchemaVersio
 
 /**
  * The newest schema a node or any descendant needs. v4: custom-font typography. v5: a noise or spatial adjustment,
- * enabled or not, which a v4 reader would drop. v6: a control layer carrying any derivation field.
+ * enabled or not, which a v4 reader would drop. v6: control derivation fields.
  */
 const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
   if (!isRecord(node)) {
@@ -463,6 +498,9 @@ export const writableCanvasSchemaVersion = (
   document: Pick<CanvasDocumentContractV3, 'stacks'>
 ): CanvasSchemaVersion => {
   let version = newestCanvasSchemaVersion(declaredVersions);
+  if (document.stacks.vector !== undefined) {
+    version = Math.max(version, 7) as CanvasSchemaVersion;
+  }
   for (const roots of Object.values(document.stacks)) {
     for (const root of roots) {
       if (version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
@@ -698,6 +736,9 @@ const parseStacks = (value: unknown, path: string): ParsedStacks => {
     }
   }
   for (const stack of LAYER_STACK_ORDER) {
+    if (stack === 'vector' && value.vector === undefined) {
+      continue;
+    }
     const roots = value[stack] === undefined ? [] : value[stack];
     if (!Array.isArray(roots)) {
       context.diagnostics.push({ message: `${stack} stack is not an array`, path: `${path}.${stack}` });

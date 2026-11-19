@@ -260,6 +260,8 @@ export interface AddedRasterLayerEdit {
   readonly anchor: CanvasNodeInsertionAnchor;
   /** The selection undo restores. */
   readonly selectedLayerId: string | null;
+  /** Keep the existing selection when inserting and replaying this edit. Defaults to selecting the new layer. */
+  readonly preserveSelection?: boolean;
   /** Enabled flags the edit sets on other layers, and the values undo restores. */
   readonly enabled?: { readonly before: EnabledUpdates; readonly after: EnabledUpdates };
   readonly heldAssetRefs?: HeldAssetRefs;
@@ -278,12 +280,13 @@ export const publishAddedRasterLayer = (
   edit: AddedRasterLayerEdit
 ): EditPublishResult => {
   const { anchor, layer, pixels, rect, selectedLayerId } = edit;
+  const nextSelectedLayerId = edit.preserveSelection ? selectedLayerId : layer.id;
   const after = edit.enabled?.after ?? [];
   const before = edit.enabled?.before ?? [];
   const forward: CanvasProjectMutation = {
     add: [{ anchor, nodes: [layer] }],
     enabledUpdates: after,
-    selectedLayerId: layer.id,
+    selectedLayerId: nextSelectedLayerId,
     type: 'applyCanvasLayerStackMutation',
   };
   const inverse: CanvasProjectMutation = {
@@ -295,7 +298,7 @@ export const publishAddedRasterLayer = (
   const hasEnabled = (document: CanvasDocumentContractV3 | null, updates: EnabledUpdates): boolean =>
     updates.every((update) => getDocumentLayer(document, update.id)?.isEnabled === update.isEnabled);
   const added = (document: CanvasDocumentContractV3 | null): boolean =>
-    document?.selectedLayerId === layer.id &&
+    document?.selectedLayerId === nextSelectedLayerId &&
     getDocumentLayer(document, layer.id) === layer &&
     hasEnabled(document, after);
   const removed = (document: CanvasDocumentContractV3 | null): boolean =>
@@ -323,3 +326,24 @@ export const publishAddedRasterLayer = (
       ctx.applyStep({ accepted: removed, mutation: inverse, rollback: { mutation: forward, restored: added } }),
   });
 };
+
+/** Structural pair for a newly created vector layer. Callers choose whether insertion selects it. */
+export const addedVectorLayerMutations = (
+  layer: Extract<CanvasLayerContract, { type: 'vector' }>,
+  anchor: CanvasNodeInsertionAnchor,
+  selectedBefore: string | null,
+  selectNew = true
+): { forward: CanvasProjectMutation; inverse: CanvasProjectMutation } => ({
+  forward: {
+    type: 'applyCanvasLayerStackMutation',
+    enabledUpdates: [],
+    add: [{ anchor, nodes: [layer] }],
+    selectedLayerId: selectNew ? layer.id : selectedBefore,
+  },
+  inverse: {
+    type: 'applyCanvasLayerStackMutation',
+    enabledUpdates: [],
+    removeIds: [layer.id],
+    selectedLayerId: selectedBefore,
+  },
+});

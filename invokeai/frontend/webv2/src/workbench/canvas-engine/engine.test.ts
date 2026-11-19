@@ -30,6 +30,8 @@ import {
   type CanvasProjectMutation,
 } from '@workbench/canvasProjectMutations';
 
+import type * as VectorRuntimeModule from './vectorRuntime';
+
 type EngineTestAction = WorkbenchAction | CanvasProjectMutation;
 
 import type { SpatialAdjustmentExecutor } from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
@@ -38,6 +40,7 @@ import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-mod
 import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { haveSameStructure } from '@workbench/canvas-engine/document/layerStacks';
+import { createVectorLayer } from '@workbench/canvas-engine/document/vectorLayerFactories';
 import * as compositor from '@workbench/canvas-engine/render/compositor';
 import { DEFAULT_CHECKER_COLORS } from '@workbench/canvas-engine/render/compositor';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
@@ -292,13 +295,14 @@ const createFakeStore = (
   };
 };
 
-const createEngine = () => {
+const createEngine = (loadVectorRuntime?: TestCanvasEngineOptions['loadVectorRuntime']) => {
   const doc = makeDoc();
   const { store, unsubscribe } = createFakeStore(doc);
   const engine = createCanvasEngine({
     backend: createTestStubRasterBackend(),
     imageResolver: () => Promise.resolve(new Blob()),
     projectId: 'p1',
+    loadVectorRuntime,
     store,
   });
   return { doc, engine, unsubscribe };
@@ -9621,5 +9625,284 @@ describe('edit feedback on the surface', () => {
         }
       );
     });
+  });
+});
+
+it('reactivates Spline Edit on the same selected vector after engine cooldown', async () => {
+  const vector = {
+    ...createVectorLayer({ id: 'v', name: 'Vector' }),
+    transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+    paths: [],
+  };
+  const doc = { ...makeDoc(), stacks: stacksFrom([vector]), selectedLayerId: 'v' };
+  const { store } = createFakeStore(doc);
+  const engine = createCanvasEngine({
+    backend: createTestStubRasterBackend(),
+    imageResolver: () => Promise.resolve(new Blob()),
+    projectId: 'p1',
+    store,
+  });
+  try {
+    await engine.layers.vectorEdit.prepare();
+    engine.tools.setTool('spline');
+    expect(engine.interaction.get('vectorEditSession')?.layerId).toBe('v');
+    await engine.lifecycle.beginCooldown();
+    expect(engine.interaction.get('vectorEditSession')).toBeNull();
+    engine.lifecycle.activate();
+    expect(engine.interaction.get('activeTool')).toBe('spline');
+    expect(engine.interaction.get('vectorEditSession')).toMatchObject({
+      layerId: 'v',
+      activePathId: null,
+      selectedPoints: [],
+    });
+  } finally {
+    engine.lifecycle.dispose();
+  }
+});
+
+it('aborts pending vector region work on Escape and document changes without creating raster output', async () => {
+  const vector = {
+    ...createVectorLayer({ id: 'v', name: 'Vector' }),
+    fillEnabled: true,
+    strokeEnabled: false,
+    transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+    paths: [
+      {
+        id: 'p',
+        name: null,
+        isClosed: true,
+        points: [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+          { x: 0, y: 100 },
+        ].map((anchor) => ({ anchor, inHandle: null, outHandle: null, type: 'corner' as const })),
+      },
+    ],
+  };
+  const doc = { ...makeDoc(), stacks: stacksFrom([vector]), selectedLayerId: 'v' };
+  const h = createReactiveStore(doc);
+  const engine = createCanvasEngine({
+    backend: createTestStubRasterBackend(),
+    imageResolver: () => Promise.resolve(new Blob()),
+    projectId: 'p1',
+    store: h.store,
+  });
+  try {
+    engine.tools.setTool('spline');
+    const first = engine.layers.traceFillVectorLayer('v');
+    engine.tools.handleEscapePriority({ gestureWasActive: false });
+    expect(await first).toEqual({ status: 'aborted' });
+    const second = engine.layers.traceFillVectorLayer('v');
+    h.setDocument({ ...doc, selectedLayerId: null });
+    expect(await second).toEqual({ status: 'aborted' });
+    expect(h.store.dispatch).not.toHaveBeenCalled();
+  } finally {
+    engine.lifecycle.dispose();
+  }
+});
+
+it('keeps pending vector rendering independent of brush color and size changes', async () => {
+  vi.stubGlobal(
+    'Path2D',
+    class {
+      moveTo() {}
+      lineTo() {}
+      closePath() {}
+      quadraticCurveTo() {}
+      bezierCurveTo() {}
+    }
+  );
+  const vector = {
+    ...createVectorLayer({ id: 'v', name: 'Vector' }),
+    fillEnabled: true,
+    fillColor: '#00ff00',
+    strokeColor: '#ff0000',
+    strokeWidth: 8,
+    paths: [
+      {
+        id: 'p',
+        name: null,
+        isClosed: true,
+        points: [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+          { x: 100, y: 100 },
+        ].map((anchor) => ({ anchor, inHandle: null, outHandle: null, type: 'corner' as const })),
+      },
+    ],
+  };
+  const h = createReducerBackedStore({ ...makeDoc(), stacks: stacksFrom([vector]), selectedLayerId: 'v' });
+  const engine = createCanvasEngine({
+    backend: createTestStubRasterBackend(),
+    imageResolver: () => Promise.resolve(new Blob()),
+    projectId: h.projectId,
+    store: h.store,
+  });
+  try {
+    const pending = engine.layers.traceFillVectorLayer('v');
+    engine.interaction.set('brushOptions', { ...engine.interaction.get('brushOptions'), color: '#0000ff', size: 99 });
+    expect(await pending).toEqual({ status: 'committed' });
+    expect(getDocumentLayer(h.store.getState().projects[0]!.canvas.document, 'v')).toMatchObject({
+      strokeColor: '#ff0000',
+      strokeWidth: 8,
+      fillColor: '#00ff00',
+    });
+  } finally {
+    engine.lifecycle.dispose();
+  }
+});
+
+describe('lazy vector readiness', () => {
+  const deferredModule = () => {
+    let resolve!: (module: typeof VectorRuntimeModule) => void;
+    const promise = new Promise<typeof VectorRuntimeModule>((settle) => {
+      resolve = settle;
+    });
+    return { resolve, load: vi.fn(() => promise) };
+  };
+
+  it('keeps ordinary raster tool activation independent of vector loading', () => {
+    const pending = deferredModule();
+    const { engine } = createEngine(pending.load);
+    try {
+      engine.tools.setTool('brush');
+      engine.tools.setTool('shape');
+      expect(engine.interaction.get('activeTool')).toBe('shape');
+      expect(pending.load).not.toHaveBeenCalled();
+    } finally {
+      engine.lifecycle.dispose();
+    }
+  });
+
+  it('coalesces readiness requests and produces the first layer only after support is ready', async () => {
+    const pending = deferredModule();
+    const { engine } = createEngine(pending.load);
+    try {
+      let produced = false;
+      const layer = engine.layers.vectorEdit.createLayer({ id: 'new-vector' }).then((value) => {
+        produced = true;
+        return value;
+      });
+      const ready = engine.layers.vectorEdit.prepare();
+      await vi.waitFor(() => expect(pending.load).toHaveBeenCalledOnce());
+      expect(engine.interaction.get('vectorToolsStatus')).toBe('loading');
+      expect(produced).toBe(false);
+      pending.resolve(await import('./vectorRuntime'));
+      expect(await ready).toBe(true);
+      expect(await layer).toMatchObject({
+        id: 'new-vector',
+        type: 'vector',
+        paths: [],
+        strokeColor: '#000000',
+        strokeWidth: 50,
+      });
+      expect(engine.interaction.get('vectorToolsStatus')).toBe('ready');
+      expect(pending.load).toHaveBeenCalledOnce();
+    } finally {
+      engine.lifecycle.dispose();
+    }
+  });
+
+  it('does not activate Spline after a later tool request', async () => {
+    const pending = deferredModule();
+    const { engine } = createEngine(pending.load);
+    try {
+      engine.tools.setTool('spline');
+      engine.tools.setTool('brush');
+      pending.resolve(await import('./vectorRuntime'));
+      expect(await engine.layers.vectorEdit.prepare()).toBe(true);
+      expect(engine.interaction.get('activeTool')).toBe('brush');
+      expect(engine.interaction.get('vectorEditSession')).toBeNull();
+    } finally {
+      engine.lifecycle.dispose();
+    }
+  });
+
+  it('does not instantiate vector state after the engine is disposed during loading', async () => {
+    const pending = deferredModule();
+    const module = await import('./vectorRuntime');
+    const create = vi.fn(module.createVectorRuntime);
+    const { engine } = createEngine(pending.load);
+    const ready = engine.layers.vectorEdit.prepare();
+    await vi.waitFor(() => expect(pending.load).toHaveBeenCalledOnce());
+    engine.lifecycle.dispose();
+    pending.resolve({ ...module, createVectorRuntime: create });
+    expect(await ready).toBe(false);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('cancels an old layer request across cooldown and permits a fresh request after activation', async () => {
+    const pending = deferredModule();
+    const { engine } = createEngine(pending.load);
+    try {
+      const abandoned = engine.layers.vectorEdit.createLayer({ id: 'abandoned' });
+      await engine.lifecycle.beginCooldown();
+      engine.lifecycle.activate();
+      pending.resolve(await import('./vectorRuntime'));
+      expect(await abandoned).toBeNull();
+      expect(await engine.layers.vectorEdit.createLayer({ id: 'fresh' })).toMatchObject({
+        id: 'fresh',
+        type: 'vector',
+      });
+    } finally {
+      engine.lifecycle.dispose();
+    }
+  });
+
+  it('handles the first path hit synchronously once the requested Spline tool is ready', async () => {
+    const pending = deferredModule();
+    const vector = createVectorLayer({ id: 'v', name: 'Vector' });
+    vector.paths = [
+      {
+        id: 'p',
+        name: null,
+        isClosed: false,
+        points: [
+          { anchor: { x: 0, y: 0 }, inHandle: null, outHandle: null, type: 'corner' },
+          { anchor: { x: 100, y: 0 }, inHandle: null, outHandle: null, type: 'corner' },
+        ],
+      },
+    ];
+    const { store } = createFakeStore({ ...makeDoc(), stacks: stacksFrom([vector]), selectedLayerId: 'v' });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+      loadVectorRuntime: pending.load,
+    });
+    try {
+      engine.tools.setTool('spline');
+      expect(engine.interaction.get('activeTool')).not.toBe('spline');
+      pending.resolve(await import('./vectorRuntime'));
+      await engine.layers.vectorEdit.prepare();
+      expect(engine.interaction.get('activeTool')).toBe('spline');
+      expect(engine.layers.vectorEdit.targetContextMenu({ x: 50, y: 0 })).toBe(true);
+      expect(engine.interaction.get('vectorEditSession')?.activePathId).toBe('p');
+    } finally {
+      engine.lifecycle.dispose();
+    }
+  });
+
+  it('reports a failed load and allows an explicit retry', async () => {
+    const outage = new Error('Vector module unavailable');
+    const load = vi
+      .fn<NonNullable<TestCanvasEngineOptions['loadVectorRuntime']>>()
+      .mockRejectedValueOnce(outage)
+      .mockImplementation(() => import('./vectorRuntime'));
+    const { engine } = createEngine(load);
+    try {
+      expect(await engine.layers.vectorEdit.prepare()).toBe(false);
+      expect(engine.interaction.get('vectorToolsStatus')).toBe('failed');
+      expect(reportedErrors.at(-1)).toMatchObject({
+        message: 'Vector tools could not be loaded',
+        context: { error: outage },
+      });
+      expect(await engine.layers.vectorEdit.prepare()).toBe(true);
+      expect(engine.interaction.get('vectorToolsStatus')).toBe('ready');
+      expect(load).toHaveBeenCalledTimes(2);
+    } finally {
+      engine.lifecycle.dispose();
+    }
   });
 });

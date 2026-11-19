@@ -1,5 +1,5 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
-import type { MouseEvent as ReactMouseEvent } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
@@ -29,8 +29,10 @@ import {
   useWorkbenchCommands,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import type { VectorPathMenuTarget } from './VectorPathContextMenu';
 
 import { useModelGridSize } from './bboxGrid';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
@@ -84,6 +86,10 @@ import { useCreateFromBbox } from './useCreateFromBbox';
 import { useStagedResultGallerySave } from './useStagedResultGallerySave';
 import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
 
+const VectorPathContextMenu = lazy(() =>
+  import('./VectorPathContextMenu').then((module) => ({ default: module.VectorPathContextMenu }))
+);
+
 const MissingFontsDialog = lazy(() =>
   import('./MissingFontsDialog').then((module) => ({ default: module.MissingFontsDialog }))
 );
@@ -126,8 +132,20 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   // Warm the split invocation chunk when Canvas mounts so the first submission need not download it.
   useMountEffect(preloadCanvasInvocation);
 
-  // Right-click on the canvas surface targets the selected layer (the panel is the sole authority; the stack is never
-  // hit-tested) and opens either the shared per-layer menu or the global menu at the pointer.
+  // Right-click on the canvas surface targets the selected layer (the panel is
+  // the sole authority; the stack is never hit-tested) and opens either the
+  // shared per-layer menu or the global menu at the pointer.
+  const [vectorMenuTarget, setVectorMenuTarget] = useState<VectorPathMenuTarget | null>(null);
+  const vectorMenuReturnFocus = useRef<HTMLElement | null>(null);
+  const closeVectorMenu = useCallback(() => {
+    setVectorMenuTarget(null);
+    const focusTarget = vectorMenuReturnFocus.current;
+    vectorMenuReturnFocus.current = null;
+    const focused = focusTarget?.ownerDocument.activeElement;
+    if (focusTarget?.isConnected && (focused === focusTarget.ownerDocument.body || focused?.closest('[role="menu"]'))) {
+      focusTarget.focus({ preventScroll: true });
+    }
+  }, []);
   const [contextMenuTarget, setContextMenuTarget] = useState<CanvasContextMenuTarget | null>(null);
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
   // Feed model grid policy into the model-agnostic engine using primitive selectors for value-stable subscriptions.
@@ -226,26 +244,65 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     },
     [canvasCommands, notifications, queries, queryClient, startDroppedFileUpload, t]
   );
+  const openSurfaceContextMenu = useCallback(
+    (surface: HTMLDivElement, clientX: number, clientY: number, keyboard: boolean) => {
+      setVectorMenuTarget(null);
+      vectorMenuReturnFocus.current = null;
+      const bounds = surface.getBoundingClientRect();
+      const x = keyboard ? bounds.left + bounds.width / 2 : clientX;
+      const y = keyboard ? bounds.top + bounds.height / 2 : clientY;
+      // Keyboard invocation acts on the current path; only a pointer invocation retargets by geometry.
+      if (keyboard || engine?.layers.vectorEdit.targetContextMenu({ x: x - bounds.left, y: y - bounds.top })) {
+        const edit = engine?.interaction.get('vectorEditSession');
+        if (edit?.activePathId) {
+          const focused = surface.ownerDocument.activeElement;
+          if (keyboard && focused instanceof HTMLElement && surface.contains(focused)) {
+            vectorMenuReturnFocus.current = focused;
+          }
+          setContextMenuTarget(null);
+          setVectorMenuTarget({ x, y, layerId: edit.layerId, pathId: edit.activePathId });
+          return;
+        }
+      }
+      setContextMenuTarget(
+        resolveCanvasContextMenu({
+          clientX: x,
+          clientY: y,
+          isInlineEditor: false,
+          selectedLayerId: engine?.tools.canTargetLayerFromContextMenu() ? canvas.document.selectedLayerId : null,
+        }).target
+      );
+    },
+    [canvas.document.selectedLayerId, engine]
+  );
   const { drag: fileDrag, handlers: fileDragHandlers } = useNativeFileDrag({
     findZone: findCanvasImageDropDestination,
     onDrop: importDroppedFiles,
   });
   const handleSurfaceContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
-      // Preserve native menus in inline editors.
-      const resolution = resolveCanvasContextMenu({
-        clientX: event.clientX,
-        clientY: event.clientY,
-        isInlineEditor: event.target instanceof Element && !!event.target.closest(INLINE_EDIT_SELECTOR),
-        selectedLayerId: engine?.tools.canTargetLayerFromContextMenu() ? canvas.document.selectedLayerId : null,
-      });
-      if (!resolution.preventDefault) {
+      if (event.target instanceof Element && event.target.closest(INLINE_EDIT_SELECTOR)) {
         return;
       }
       event.preventDefault();
-      setContextMenuTarget(resolution.target);
+      openSurfaceContextMenu(event.currentTarget, event.clientX, event.clientY, event.button <= 0);
     },
-    [canvas.document.selectedLayerId, engine]
+    [openSurfaceContextMenu]
+  );
+  const handleSurfaceMenuKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (
+        event.defaultPrevented ||
+        (event.key !== 'ContextMenu' &&
+          !(event.key === 'F10' && event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey)) ||
+        (event.target instanceof Element && event.target.closest(INLINE_EDIT_SELECTOR))
+      ) {
+        return;
+      }
+      event.preventDefault();
+      openSurfaceContextMenu(event.currentTarget, 0, 0, true);
+    },
+    [openSurfaceContextMenu]
   );
 
   const handleCanvasImageDrop = useCallback(
@@ -571,11 +628,25 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
           <MissingFontsDialog key={projectId} engine={engine} groups={fontReferences} />
         </Suspense>
       ) : null}
-      <CanvasSurfaceContextLayout surface={canvasSurface} onContextMenu={handleSurfaceContextMenu}>
+      <CanvasSurfaceContextLayout
+        surface={canvasSurface}
+        onContextMenu={handleSurfaceContextMenu}
+        onKeyDown={handleSurfaceMenuKeyDown}
+      >
+        {!engine ? (
+          <Box role="status" position="absolute" inset="0" display="grid" placeItems="center" color="fg.muted">
+            {t('common.loading')}
+          </Box>
+        ) : null}
         <CanvasImageDropOverlay fileDrag={fileDrag} isDocumentEditingLocked={isDocumentEditingLocked} />
         {engine ? (
           <>
             <ToolStrip engine={engine} />
+            {vectorMenuTarget ? (
+              <Suspense fallback={null}>
+                <VectorPathContextMenu engine={engine} target={vectorMenuTarget} onClose={closeVectorMenu} />
+              </Suspense>
+            ) : null}
             <CanvasFrameSizeReadout engine={engine} />
             <ControlLayerCanvasOverlay engine={engine} isFileDragActive={fileDrag !== null} />
             <CanvasLayerContextMenu
