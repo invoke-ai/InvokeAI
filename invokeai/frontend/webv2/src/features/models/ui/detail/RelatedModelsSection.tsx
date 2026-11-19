@@ -8,8 +8,8 @@ import { Badge, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel } from '@features/models/core/baseIdentity';
 import {
   hasLinkableBase,
+  isLinkableModel,
   isLinkablePair,
-  isLinkableType,
   isVaePair,
   LINKABLE_TYPES,
 } from '@features/models/core/relationships';
@@ -54,7 +54,7 @@ const hasUndecidedVaePairs = (
   excludeKeys: ReadonlySet<string>
 ): boolean =>
   models.some(
-    (candidate) => !excludeKeys.has(candidate.key) && isLinkableType(candidate.type) && isVaePair(subject, candidate)
+    (candidate) => !excludeKeys.has(candidate.key) && isLinkableModel(candidate) && isVaePair(subject, candidate)
   );
 
 const selectCapabilitiesRevision = (snapshot: ArchitectureCapabilitiesSnapshot) => snapshot.revision;

@@ -119,6 +119,7 @@ export {
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
+  servesAsType,
 } from './core/componentCompatibility';
 export {
   getLockedAspectRatioSettings,

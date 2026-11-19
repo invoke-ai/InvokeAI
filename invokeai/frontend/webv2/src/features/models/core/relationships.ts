@@ -4,7 +4,10 @@ import { architectureAcceptsVae, someArchitectureVariantAcceptsVae } from './arc
 
 /** Related-model links are symmetric curation hints and permit only models usable in one pipeline. */
 
-export type RelatableModel = Pick<ModelConfig, 'base' | 'latent_channels' | 'type' | 'variant'>;
+/** The fields the compatibility rule reads. A model counts as each of its types: the primary one and its roles. */
+export type RelatableModel = Pick<ModelConfig, 'base' | 'latent_channels' | 'roles' | 'type' | 'variant'>;
+
+const typesOf = (model: RelatableModel): ModelTaxonomyType[] => [model.type, ...(model.roles ?? []).map((r) => r.type)];
 
 /**
  * any denotes no base association, not universal compatibility; external and unknown convey no architecture
@@ -75,15 +78,22 @@ const LINKABLE_TYPE_SET: ReadonlySet<ModelTaxonomyType> = new Set(LINKABLE_TYPES
 
 export const isLinkableType = (type: ModelTaxonomyType): boolean => LINKABLE_TYPE_SET.has(type);
 
+/** Whether any type the model counts as can be linked, e.g. a Text LLM that also serves as a Qwen3.5 encoder. */
+export const isLinkableModel = (model: Pick<RelatableModel, 'roles' | 'type'>): boolean =>
+  typesOf({ ...model, base: 'any' }).some(isLinkableType);
+
 /** Only concrete bases or explicitly allowed any-based helper types can receive new links. */
 export const hasLinkableBase = (model: RelatableModel): boolean =>
-  hasConcreteBase(model) || (model.base === 'any' && NULL_BASE_ALLOWANCES[model.type] !== undefined);
+  hasConcreteBase(model) ||
+  (model.base === 'any' && typesOf(model).some((type) => NULL_BASE_ALLOWANCES[type] !== undefined));
 
 const isAllowedHelperFor = (helper: RelatableModel, host: RelatableModel): boolean =>
-  helper.base === 'any' && hasConcreteBase(host) && (NULL_BASE_ALLOWANCES[helper.type]?.has(host.base) ?? false);
+  helper.base === 'any' &&
+  hasConcreteBase(host) &&
+  typesOf(helper).some((type) => NULL_BASE_ALLOWANCES[type]?.has(host.base) ?? false);
 
 const isAllowedCrossBaseHelperFor = (helper: RelatableModel, host: RelatableModel): boolean =>
-  CROSS_BASE_ALLOWANCES[helper.type]?.[helper.base]?.has(host.base) ?? false;
+  typesOf(helper).some((type) => CROSS_BASE_ALLOWANCES[type]?.[helper.base]?.has(host.base) ?? false);
 
 /**
  * A VAE and a model of another type, both of concrete bases: linkable only as the served table says, so the answer
@@ -146,4 +156,4 @@ const SINGLETON_LINK_TYPES: ReadonlySet<ModelTaxonomyType> = new Set<ModelTaxono
 
 /** The full candidate rule for the link picker: compatible bases, and no same-type pair of a single-slot type. */
 export const isLinkablePair = (a: RelatableModel, b: RelatableModel): boolean =>
-  isBaseCompatible(a, b) && !(a.type === b.type && SINGLETON_LINK_TYPES.has(a.type));
+  isBaseCompatible(a, b) && !typesOf(a).some((type) => SINGLETON_LINK_TYPES.has(type) && typesOf(b).includes(type));

@@ -51,7 +51,24 @@ const ENHANCER = {
   supports_images: true,
   type: 'text_llm',
 };
+
+/** A record whose primary type is another one but whose files also serve as a Text LLM. */
+const ROLE_ENHANCER = {
+  ...ENHANCER,
+  key: 'role-e4b',
+  name: 'Gemma 4 E4B (encoder)',
+  roles: [{ format: null, type: 'text_llm', variant: null }],
+  source: 'google/gemma-4-E4B-it',
+  type: 'qwen3_5_encoder',
+};
 const MOSS_PROMPT_ID = '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011';
+const MOSS_SUGGESTION: ExpandPromptSuggestion = {
+  image: null,
+  imageSystemPromptId: null,
+  modelName: 'Gemma 4 E4B (Prompt Enhancer)',
+  modelSource: 'google/gemma-4-E4B-it',
+  systemPromptId: MOSS_PROMPT_ID,
+};
 const FLUX3_PROMPT_ID = '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0012';
 const prompt = (id: string, content: string) => ({
   content,
@@ -81,7 +98,13 @@ const LTX_SUGGESTION: ExpandPromptSuggestion = {
 
 const notices = vi.hoisted(() => ({ info: vi.fn(), offer: vi.fn(), undoable: vi.fn() }));
 
-let catalog: (typeof TEXT_ONLY | typeof ENHANCER | typeof VISION_A)[] = [];
+// Read at render time by the mocks below, so each test can set them before rendering.
+let catalog: (
+  | typeof TEXT_ONLY
+  | typeof ENHANCER
+  | typeof VISION_A
+  | (Omit<typeof ROLE_ENHANCER, 'roles'> & { roles?: unknown[] })
+)[] = [];
 let arePromptsLoading = false;
 
 const StubSelect = ({
@@ -319,6 +342,21 @@ it("keeps the surface's saved pick over an installed suggestion, also after a re
 
   await choose('text llm', 'e2b');
   expect(saved.onChange).toHaveBeenCalledExactlyOnceWith({ expandPromptModelKey: 'e2b' });
+});
+
+it('offers a record that serves as a Text LLM through a role, and suggests it by source', async () => {
+  catalog = [TEXT_ONLY, ROLE_ENHANCER];
+  await renderAndOpen(MOSS_SUGGESTION, savedModels());
+
+  expect(select('text llm')?.value).toBe('role-e4b');
+});
+
+it('does not take a record of another type without the Text LLM role as a candidate', async () => {
+  catalog = [TEXT_ONLY, { ...ROLE_ENHANCER, roles: [] }];
+  await renderAndOpen(MOSS_SUGGESTION, savedModels());
+
+  expect(select('text llm')?.value).toBe('qwen');
+  expect(document.body.textContent).toContain('is not installed');
 });
 
 it("starts another project from its own saved Expand Prompt model, not the previous project's pick", async () => {
