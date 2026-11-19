@@ -61,6 +61,7 @@ import {
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeMossImageSkipLayers,
   normalizeReferenceImages,
+  takesReferenceImages,
   getRecallDefaultVae,
   resolveModelDefaultVae,
 } from '@features/generation/settings';
@@ -1124,6 +1125,9 @@ const getMetadataConcepts = (
   return { loras, skipped };
 };
 
+/** Legacy-UI Krea-2 generation graphs used a style reference without recording `ref_images`. */
+const LEGACY_UNRECORDED_REFERENCE_BASE = 'krea-2';
+
 const boundReferenceEntries = (entries: unknown[]): unknown[] =>
   entries.length > 10000 ? [...entries.slice(0, 10000), null] : entries;
 
@@ -1222,10 +1226,13 @@ export const readMetadataReferenceImages = (
   assets?: ReadonlyMap<string, Pick<GalleryImage, 'width' | 'height'>>,
   models?: readonly ComponentModelConfig[],
   mainModel?: GenerateModelConfig
-): { images: GenerateReferenceImage[] | null; names: string[]; partial: boolean } => {
+): { absent: boolean; images: GenerateReferenceImage[] | null; names: string[]; partial: boolean } => {
   const entries = getMetadataReferenceEntries(metadata);
   if (entries === null) {
-    return { images: null, names: [], partial: false };
+    // `absent`: the record has no reference entry at all. An unreadable `ref_images` (v6.3–6.10 nested Kontext lists)
+    // or a v4.2 object-form `control_layers`, whose global IP-Adapter layers are not read here, still lists some.
+    const absent = isRecord(metadata) && !('ref_images' in metadata) && !isRecord(metadata.control_layers);
+    return { absent, images: null, names: [], partial: false };
   }
   const names = new Set<string>();
   const ipAdapterModels = models?.filter((model) => model.type === 'ip_adapter');
@@ -1277,6 +1284,7 @@ export const readMetadataReferenceImages = (
   });
   const images = normalizeReferenceImages(hydrated).filter((ref) => ref.config.image !== null);
   return {
+    absent: false,
     images: images.length > 0 || entries.length === 0 ? images : null,
     names: [...names],
     partial: images.length < entries.length,
@@ -1562,7 +1570,20 @@ export const buildImageRecallSettings = ({
 
     // References must fit the effective model, which is still the current one when the recorded model was not recalled.
     referenceRecall = readMetadataReferenceImages(metadata, referenceAssets, models, values.model);
-    const recordedReferenceImages = referenceRecall.images;
+    // v6+ generation graphs omitted `ref_images` only when no references were used, so such a record without a
+    // reference entry had none. v5 Canvas-staged records dropped the references they used along with
+    // `canvas_v2_metadata`, so older records prove nothing. A model that takes no references keeps them, switched off.
+    const recordedReferenceImages =
+      referenceRecall.images ??
+      (referenceRecall.absent &&
+      model &&
+      isGenerationRecord(metadata) &&
+      Number.parseInt(getString(metadata, 'app_version') ?? '', 10) >= 6 &&
+      takesReferenceImages(values.model) &&
+      values.model.base !== LEGACY_UNRECORDED_REFERENCE_BASE
+        ? []
+        : null);
+    // Only the base decides; an encoder without a vision tower is flagged by validation, not recalled away.
     const referenceImages = getCompatibleReferenceImages(
       resolveReferenceImageModels(recordedReferenceImages ?? [], models),
       values.model,
