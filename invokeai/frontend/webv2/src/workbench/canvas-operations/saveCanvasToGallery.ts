@@ -132,16 +132,16 @@ const toCanvasSaveBoardId = (galleryValues: Record<string, unknown>): string | u
 };
 
 /**
- * Where Canvas puts new gallery images: the project's auto-add board, or no board (Uncategorized), as the cached
- * board listing says. Callers resolve through `resolveCanvasSaveBoardId`, which has the listing read first.
+ * Where Canvas puts new gallery images: the project's auto-add board, or no board (Uncategorized), as the cached board
+ * listing says. Callers resolve through `resolveCanvasSaveBoardId`, which has the listing read first.
  */
 export const getCanvasSaveBoardId = (project: Project, scopedDefaults: ScopedDefaults): string | undefined =>
   toCanvasSaveBoardId(getResolvedProjectWidgetValues(project, 'gallery', scopedDefaults));
 
 /**
- * `getCanvasSaveBoardId` from a listing read first, so a board is never trusted unseen nor redirected for want of
- * one. The project's gallery values are read before anything is awaited: a later change to the project cannot
- * redirect a save already under way.
+ * `getCanvasSaveBoardId` from a listing read first, so a board is never trusted unseen nor redirected for want of one.
+ * The project's gallery values are read before anything is awaited: a later change to the project cannot redirect a
+ * save already under way.
  */
 export const resolveCanvasSaveBoardId = async (
   project: Project,

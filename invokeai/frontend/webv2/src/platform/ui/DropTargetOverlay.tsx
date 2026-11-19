@@ -10,7 +10,6 @@ export const DropTargetOverlay = ({
 }: {
   /** A compatible drag is in flight somewhere; the overlay exists only then. */
   isActive: boolean;
-  /** That drag is hovering this target right now. */
   isOver?: boolean;
   /** Centered call-to-action; omit for targets too small to carry text. */
   label?: string;

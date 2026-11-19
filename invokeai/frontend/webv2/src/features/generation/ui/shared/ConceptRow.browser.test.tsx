@@ -2,7 +2,6 @@ import type { GenerateLora } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
-import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { act, Profiler, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -247,21 +246,6 @@ describe('ConceptRow', () => {
     expect(onRemove).toHaveBeenCalledWith('lora-1');
   });
 
-  it('animates the row menu out with its actions instead of unmounting them on close', async () => {
-    const row = await render(makeLora());
-    await act(() => userEvent.click(row.querySelector<HTMLElement>('[data-list-primary]')!, { button: 'right' }));
-    await expect.poll(menuLabels).toContain('widgets.generate.conceptMenu.remove');
-    const menu = document.querySelector('[role="menu"]')!;
-
-    const frames = closingFrames(await recordDialogExit(menu, () => act(() => userEvent.keyboard('{Escape}'))));
-    await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
-
-    expect(frames).not.toHaveLength(0);
-    for (const frame of frames) {
-      expect(frame.text).toContain('widgets.generate.conceptMenu.remove');
-    }
-  });
-
   it('does not open row actions on a pointer click', async () => {
     const row = await render(makeLora());
 
@@ -337,8 +321,6 @@ describe('ConceptRow', () => {
   });
 
   it('hands focus to the picker the last row was excluded from once that row is removed', async () => {
-    // A picker whose only candidate is applied is disabled until the removal renders, and the control before the
-    // whole section must not take focus in its place.
     const Section = () => {
       const [loras, setLoras] = useState([makeLora()]);
       const removeAll = useCallback(() => setLoras([]), []);

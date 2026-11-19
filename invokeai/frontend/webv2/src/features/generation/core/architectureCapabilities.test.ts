@@ -59,7 +59,6 @@ describe('toBaseGenerationConfig', () => {
   });
 
   it('derives the optimal side from the declared area, not from width alone', () => {
-    // Nonsquare defaults verify that optimum derives from area.
     expect(toBaseGenerationConfig(row('sd-1')).dimensions.optimalSide).toBe(512);
     expect(toBaseGenerationConfig(row('sd-2')).dimensions.optimalSide).toBe(768);
     expect(toBaseGenerationConfig(row('minimax-h3')).dimensions.optimalSide).toBe(1016); // sqrt(1344*768)
@@ -80,13 +79,11 @@ describe('toBaseGenerationConfig', () => {
   });
 
   it('turns an absent clip-skip ceiling into undefined rather than null', () => {
-    // Consumers branch on presence as well as falsiness.
     expect(toBaseGenerationConfig(row('flux')).ui.clipSkipMax).toBeUndefined();
     expect('clipSkipMax' in toBaseGenerationConfig(row('flux')).ui).toBe(true);
   });
 
   it('declares ERNIE-Image scheduler choice as reaching the graph', () => {
-    // ernie_image_denoise builds its sampler from the `scheduler` field, so the dropdown is real.
     expect(toBaseGenerationConfig(row('ernie-image')).schedulerAppliesToGraph).toBe(true);
   });
 });
@@ -107,7 +104,6 @@ describe('the registry', () => {
 
     expect(getArchitectureGenerationConfig('flux', 'schnell')?.defaults.steps).toBe(4);
     expect(getArchitectureGenerationConfig('flux', 'dev')?.defaults.steps).toBe(28);
-    // A variant with no row of its own, and no variant at all, both land on the base row.
     expect(getArchitectureGenerationConfig('flux', 'made-up')?.defaults.steps).toBe(28);
     expect(getArchitectureGenerationConfig('flux')?.defaults.steps).toBe(28);
   });
@@ -140,7 +136,6 @@ describe('the registry', () => {
 
 describe('publishing the table', () => {
   it('stays empty when a malformed row makes the mapping throw', () => {
-    // Validate before publication so malformed rows cannot mark fallback policy loaded.
     const malformed = [...rows, { base: 'broken', variant: null } as unknown as ArchitectureCapabilitiesRow];
 
     expect(() => setArchitectureCapabilities(malformed)).toThrow();
@@ -161,13 +156,11 @@ describe('publishing the table', () => {
   });
 
   it('notifies subscribers when the table is replaced or dropped', () => {
-    // One registry subscription serves all synchronous policy readers.
     const seen: number[] = [];
     const unsubscribe = onArchitectureCapabilitiesChanged(() => seen.push(getArchitectureCapabilitiesRevision()));
 
     setArchitectureCapabilities(rows);
     resetArchitectureCapabilities();
-    // Already empty: nothing changed, so nothing is announced.
     resetArchitectureCapabilities();
     unsubscribe();
     setArchitectureCapabilities(rows);

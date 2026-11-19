@@ -1,7 +1,6 @@
 /**
- * Batch and generator nodes never run on the backend: the editor resolves them into queue batch groups at submit
- * time. Value shapes and resolution rules mirror the legacy editor so saved workflows keep their meaning, with one
- * exception: seeded random draws use a different generator, so a legacy seed yields different values here.
+ * Batch and generator nodes resolve into queue batch groups at submit time, mirroring legacy shapes and rules, except
+ * that seeded random draws use a different generator.
  */
 
 import type { InvocationTemplates, ProjectGraphState, WorkflowInvocationNode } from './types';
@@ -9,8 +8,6 @@ import type { InvocationTemplates, ProjectGraphState, WorkflowInvocationNode } f
 import { getCanonicalWorkflowEdges } from './forLoops';
 import { createWorkflowIssue, type WorkflowIssueReason } from './readinessIssues';
 import { isInvocationNode } from './types';
-
-// #region Node classification
 
 export const WORKFLOW_BATCH_GROUP_IDS = ['None', 'Group 1', 'Group 2', 'Group 3', 'Group 4', 'Group 5'] as const;
 export type WorkflowBatchGroupId = (typeof WORKFLOW_BATCH_GROUP_IDS)[number];
@@ -48,7 +45,6 @@ export const isWorkflowBatchNodeType = (type: string): type is WorkflowBatchNode
 export const isWorkflowGeneratorNodeType = (type: string): type is WorkflowGeneratorNodeType =>
   Object.hasOwn(GENERATOR_OUTPUT_FIELDS, type);
 
-/** The list input a batch node iterates, or the list output a generator produces. */
 export const getWorkflowBatchCollectionField = (type: string): string | null =>
   isWorkflowBatchNodeType(type) ? BATCH_COLLECTION_FIELDS[type] : null;
 
@@ -64,10 +60,6 @@ export const getWorkflowBatchGroupId = (node: WorkflowInvocationNode): WorkflowB
 
   return WORKFLOW_BATCH_GROUP_IDS.includes(value as WorkflowBatchGroupId) ? (value as WorkflowBatchGroupId) : 'None';
 };
-
-// #endregion
-
-// #region Generator values
 
 export interface FloatGeneratorArithmeticSequence {
   type: 'float_generator_arithmetic_sequence';
@@ -261,7 +253,6 @@ const VARIANT_DEFAULTS: { [V in WorkflowGeneratorVariant]: Extract<WorkflowGener
   string_generator_parse_string: { input: 'foo,bar,baz,qux', splitOn: ',', type: 'string_generator_parse_string' },
 };
 
-/** How each stored property is read: what it must be, and what an absent one falls back to. */
 type PropertySpec = 'boardId' | 'category' | 'count' | 'integer' | 'number' | 'seed' | 'string' | 'values';
 
 const VARIANT_PROPERTIES: Record<WorkflowGeneratorVariant, Record<string, PropertySpec>> = {
@@ -323,9 +314,8 @@ const readProperty = (spec: PropertySpec, raw: unknown, fallback: unknown): unkn
 };
 
 /**
- * Reads a stored generator value the way the legacy schemas did: missing properties take their defaults, a missing
- * variant is the field's first one, and a wrong-typed property makes the whole value unusable (null). Numbers are
- * kept as entered; `getWorkflowGeneratorInvalidReason` says whether they can run.
+ * Reads a stored generator as the legacy schemas did: missing properties default, a missing variant is the first, and
+ * a wrong-typed property makes it unusable (null). Numbers stay as entered.
  */
 export const parseWorkflowGeneratorValue = (fieldTypeName: string, raw: unknown): WorkflowGeneratorValue | null => {
   if (!isWorkflowGeneratorFieldTypeName(fieldTypeName) || typeof raw !== 'object' || raw === null) {
@@ -447,7 +437,6 @@ export const getWorkflowGeneratorPropertyInvalidReason = (
   return null;
 };
 
-/** The first setting that keeps a readable generator from running, or null when it can. */
 export const getWorkflowGeneratorInvalidReason = (value: WorkflowGeneratorValue): string | null => {
   // A legacy resolved override stands in for the settings, as it does when resolving.
   if ('values' in value && value.values) {
@@ -465,14 +454,10 @@ export const getWorkflowGeneratorInvalidReason = (value: WorkflowGeneratorValue)
   return null;
 };
 
-/** A generator whose settings all pass `getWorkflowGeneratorInvalidReason`: numbers present, seeds still optional. */
 type Runnable<T> = T extends unknown ? { [K in keyof T]: K extends 'seed' ? T[K] : Exclude<T[K], null> } : never;
 export type RunnableWorkflowGeneratorValue = Runnable<WorkflowGeneratorValue>;
 
-/**
- * How many items a generator asks for, before any are built: a stored count can be arbitrarily large, and the
- * queue accepts at most `WORKFLOW_BATCH_MAX_ITEMS`, so callers refuse oversized requests without materializing them.
- */
+/** A stored count can be arbitrarily large, so callers refuse oversized requests without materializing them. */
 export const getWorkflowGeneratorRequestedCount = (value: WorkflowGeneratorValue): number | null =>
   'values' in value && value.values
     ? value.values.length
@@ -490,10 +475,6 @@ export const isRandomWorkflowGeneratorValue = (value: WorkflowGeneratorValue): b
     value.type === 'integer_generator_random_distribution_uniform' ||
     value.type === 'string_generator_dynamic_prompts_random') &&
   value.seed === null;
-
-// #endregion
-
-// #region Resolution
 
 export type WorkflowBatchItem = number | string | { image_name: string };
 
@@ -552,7 +533,6 @@ const parseNumbers = (input: string, splitOn: string, parse: (text: string) => n
 const sequence = (count: number, at: (index: number) => number): number[] =>
   Array.from({ length: count }, (_, index) => at(index));
 
-/** Turns a stored generator into its items, or into the request an async source needs. */
 export const resolveWorkflowGeneratorValue = (
   stored: WorkflowGeneratorValue,
   random: () => number = Math.random
@@ -631,10 +611,6 @@ export const resolveWorkflowGeneratorValue = (
   }
 };
 
-// #endregion
-
-// #region Planning
-
 export interface WorkflowBatchDatum {
   nodeId: string;
   fieldName: string;
@@ -646,7 +622,6 @@ export type WorkflowGeneratorResolutions = Record<string, { key: string; items: 
 
 export interface WorkflowPendingGenerator {
   nodeId: string;
-  /** The generator's display name, for the error a failed resolution shows. */
   nodeLabel: string;
   key: string;
   request: WorkflowAsyncGeneratorRequest;
@@ -655,7 +630,6 @@ export interface WorkflowPendingGenerator {
 export interface WorkflowBatchPlan {
   /** Outer list is a cartesian product; each inner list is zipped, the backend's `Batch.data` shape. */
   groups: WorkflowBatchDatum[][];
-  /** Sessions one run of the graph produces, or null while an async generator is still unresolved. */
   batchSize: number | null;
   hasBatchNodes: boolean;
   pendingGenerators: WorkflowPendingGenerator[];
@@ -675,10 +649,7 @@ const toBatchKind = (type: WorkflowBatchNodeType, items: unknown[]): WorkflowBat
     type === 'string_batch' && typeof item === 'number' ? String(item) : item
   ) as WorkflowBatchItem[];
 
-/**
- * Resolves every batch node into the datums its outgoing connections need, grouped the way the backend zips and
- * multiplies them: ungrouped nodes each form a cartesian dimension, named groups zip their members together.
- */
+/** Ungrouped batch nodes each form a cartesian dimension; named groups zip their members. */
 export const planWorkflowBatch = (
   document: Pick<ProjectGraphState, 'nodes' | 'edges'>,
   templates: InvocationTemplates,
@@ -908,5 +879,3 @@ export const planWorkflowBatch = (
 
   return { batchSize, groups, hasBatchNodes: true, pendingGenerators, reasons };
 };
-
-// #endregion

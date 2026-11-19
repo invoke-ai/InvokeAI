@@ -29,7 +29,6 @@ const COMMIT_SETTLE_MS = 400;
 
 export interface MaskTintEditor {
   layerId: string;
-  /** The armed mask's current tint. */
   color: string;
   /** Live, un-recorded preview during a drag. */
   preview: (hex: string) => void;
@@ -37,10 +36,7 @@ export interface MaskTintEditor {
   commit: (hex: string) => void;
 }
 
-/**
- * Capture the layer id, latest color, and timer together so commits survive rerenders, disarming, and unmount. The
- * engine's preview session holds the fill the gesture started from.
- */
+/** Layer id, latest color and timer held together so commits survive rerenders, disarming and unmount. */
 interface TintGesture {
   layerId: string;
   latestHex: string;
@@ -89,10 +85,7 @@ export const prepareMaskTintEdit = (
   return model.prepare({ before: baselineConfig(baseline, config), config, id: live.id, type: 'patch-config' });
 };
 
-/**
- * Clear invalid/unselected mask targets and return to pair editing. Settle each pending preview into exactly one
- * history entry on idle, disarm, or unmount.
- */
+/** Clears stale targets; each pending preview settles into exactly one history entry. */
 export const useMaskTintEditor = (engine: MaskTintEngine | null): MaskTintEditor | null => {
   const { t } = useTranslation();
   const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
@@ -127,8 +120,8 @@ export const useMaskTintEditor = (engine: MaskTintEngine | null): MaskTintEditor
       clearMaskTintTarget();
     }
   }, [armedLayerId, layer]);
-  // Disarm and unmount both flush the pending gesture; the gesture carries its
-  // own layer, so this works even after the selection has moved on.
+  // Disarm and unmount both flush the pending gesture; the gesture carries its own layer, so this works even after the
+  // selection has moved on.
   useEffect(() => {
     if (!armedLayerId) {
       settleRef.current();

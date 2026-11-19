@@ -77,9 +77,9 @@ export const getPsdRequiredBytes = (plan: Extract<PsdExportPlan, { status: 'ok' 
 export const PSD_SERIALIZATION_ALLOWANCE_BYTES = 1280 * 1024 * 1024;
 
 /**
- * Installed PackBits: full literal packets add one byte per 128 samples. An interrupted literal header is
- * paid for by the following >=3-sample run's saving. A final 1/2-sample packet can add one more header.
- * Add the two-byte row length table for each of four channels.
+ * Installed PackBits: full literal packets add one byte per 128 samples. An interrupted literal header is paid for by
+ * the following >=3-sample run's saving. A final 1/2-sample packet can add one more header. Add the two-byte row length
+ * table for each of four channels.
  */
 export const getPsdRleBound = (width: number, height: number): number =>
   4 * height * (width + Math.ceil(width / 128) + 3);
@@ -179,11 +179,9 @@ export class PsdExportController {
         }
         // Omit uncaptured leaves; derive effective visibility from own flags as Photoshop does.
         let missing: string | null = null;
-        // PSD cannot represent a group stack: bake enclosing stacks into each
-        // leaf (own first, then innermost outward). Approximate under member
-        // opacity/blending, and for spatial entries (clarity, texture, dehaze),
-        // which see the leaf's pixels alone rather than the group composite;
-        // the merged preview flattens the same baked pixels.
+        // PSD cannot represent a group stack: bake enclosing stacks into each leaf (own first, then innermost outward).
+        // Approximate under member opacity/blending, and for spatial entries (clarity, texture, dehaze), which see the
+        // leaf's pixels alone rather than the group composite; the merged preview flattens the same baked pixels.
         const toInputs = (
           nodes: readonly CanvasNodeContract[],
           ancestorStacks: readonly PsdGroupStack[] = []

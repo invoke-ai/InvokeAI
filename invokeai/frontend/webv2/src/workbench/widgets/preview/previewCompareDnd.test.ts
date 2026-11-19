@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import { PREVIEW_COMPARE_DROP_DATA, resolvePreviewCompareDrop } from './previewCompareDnd';
 
-/** Nothing on screen, so no drop can be a self-compare. */
 const NOTHING_PREVIEWED = null;
 
 describe('resolvePreviewCompareDrop', () => {
@@ -52,8 +51,6 @@ describe('resolvePreviewCompareDrop', () => {
   });
 
   it('refuses to compare the previewed image with itself', () => {
-    // Self-comparison must be refused because it pauses follow and can reveal a latent comparison on later
-    // selection.
     const activeData = getGalleryItemDragData([{ kind: 'image', name: 'shown.png' }]);
 
     expect(resolvePreviewCompareDrop(activeData, PREVIEW_COMPARE_DROP_DATA, 'shown.png')).toBeNull();
@@ -68,9 +65,6 @@ describe('resolvePreviewCompareDrop', () => {
   });
 
   it('judges a multi-image drag by the image it would arm', () => {
-    // Only `items[0]` is compared, because only `items[0]` is ever armed — a
-    // drag whose *first* image is the previewed one is refused even though the
-    // rest of the selection differs, and vice versa.
     const leadingIsPreviewed = getGalleryItemDragData([
       { kind: 'image', name: 'shown.png' },
       { kind: 'image', name: 'other.png' },

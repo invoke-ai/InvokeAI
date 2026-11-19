@@ -96,12 +96,9 @@ const usages = Object.entries(sourceModules)
   .flatMap(([path, source]) => collectKeys(source as string).map((key) => ({ key, path })));
 
 describe('translation keys', () => {
-  it('scans the source tree', () => {
-    // A broken glob would make every other assertion vacuously pass.
-    expect(usages.length).toBeGreaterThan(500);
-  });
-
   it('resolves every static key against the English catalog', () => {
+    // A broken glob would make every assertion here vacuously pass.
+    expect(usages.length).toBeGreaterThan(500);
     const missing = usages
       .filter(({ key }) => !catalogKeys.has(key))
       .filter(({ key }) => !DYNAMIC_KEY_PREFIXES.some((prefix) => key.startsWith(prefix)))

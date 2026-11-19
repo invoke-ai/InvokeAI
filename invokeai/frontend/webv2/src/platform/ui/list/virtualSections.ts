@@ -1,8 +1,8 @@
 import { defaultRangeExtractor, type Range } from 'react-hook-tanstack-virtual';
 
 /**
- * Range rules shared by virtualized lists whose section headers pin to the top. Headers and rows share one flat
- * index space; the header pinned at the top is the last one at or before the first visible index.
+ * Range rules shared by virtualized lists whose section headers pin to the top. Headers and rows share one flat index
+ * space; the header pinned at the top is the last one at or before the first visible index.
  */
 
 export const lastHeaderAtOrBefore = (headerIndexes: readonly number[], index: number): number | null => {
@@ -25,8 +25,8 @@ export const lastHeaderAtOrBefore = (headerIndexes: readonly number[], index: nu
 };
 
 /**
- * The visible range plus the rows that must stay mounted wherever the list scrolls: the pinned header, and the
- * keyboard target (a focused row, or the option a combobox names as its active descendant). -1 keeps nothing.
+ * The visible range plus the rows that must stay mounted wherever the list scrolls: the pinned header, and the keyboard
+ * target (a focused row, or the option a combobox names as its active descendant). -1 keeps nothing.
  */
 export const extractRangeKeepingPinned = (
   range: Range,

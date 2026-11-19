@@ -106,10 +106,8 @@ export const HomePage = () => {
       title={greeting}
     >
       <Stack css={SECTION_DIVIDERS_SX} gap="5">
-        {/*
-         * Order panels by urgency; empty panels render nothing. The models panel loads its admin-only catalog and
-         * install data only for accounts that can manage models; everyone else learns who can add them.
-         */}
+        {/* Order panels by urgency; empty panels render nothing. The models panel loads its admin-only catalog and
+            install data only for accounts that can manage models; everyone else learns who can add them. */}
         <Box>
           <LivePanel panel="models" />
         </Box>

@@ -9,7 +9,6 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-/** Holds the dialog's module back, as a slow connection does on the first delete. */
 const chunk = vi.hoisted(() => {
   let arrive = () => {};
   const arrived = new Promise<void>((resolve) => {
@@ -98,6 +97,5 @@ it('suspends shortcuts from the request that opens the delete dialog, while its 
     await chunk.arrived;
   });
   await expect.poll(() => document.querySelector('[data-testid="delete"]')?.getAttribute('data-open')).toBe('true');
-  // The stand-in steps aside for the loaded dialog, which this test replaces with one that announces nothing.
   expect(isModalPresent()).toBe(false);
 });

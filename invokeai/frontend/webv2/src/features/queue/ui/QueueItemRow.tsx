@@ -93,8 +93,8 @@ export const QueueItemRow = memo(
     const liveImage = progress?.image ?? null;
     const resultImageName = getResultImageName(item);
     const statusLabel = t(getStatusMeta(item.status).labelKey);
-    // A running item's device arrives on the progress event before the row's DTO is
-    // refetched, so prefer the live value and fall back to the persisted one.
+    // A running item's device arrives on the progress event before the row's DTO is refetched, so prefer the live value
+    // and fall back to the persisted one.
     const deviceLabel = useDeviceLabel(progress?.device ?? item.device);
 
     // Rows read by what they made; the id stays alongside for matching against logs and other tabs.

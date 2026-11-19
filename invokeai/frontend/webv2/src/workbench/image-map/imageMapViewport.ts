@@ -44,10 +44,7 @@ export const computePercentileRanges = (
   return { x: build(xs), y: build(ys) };
 };
 
-/**
- * Minimally expand ranges to keep the current marker inside padded edges before fitting, avoiding immediate
- * recentering.
- */
+/** Minimally expand ranges to keep the current marker inside padded edges before fitting, avoiding a recenter. */
 export const expandRangesToInclude = (
   ranges: AxisRanges,
   point: { x: number; y: number },
@@ -63,8 +60,7 @@ export const expandRangesToInclude = (
 };
 
 /**
- * Expand ranges for equal-scale axes before handing them to Plotly; otherwise its aspect correction may crop one
- * axis. Never shrink the requested box.
+ * Expand ranges for equal-scale axes before Plotly, whose aspect correction may crop one otherwise; never shrink them.
  */
 export const fitRangesToAspect = (ranges: AxisRanges, aspectRatio: number): AxisRanges => {
   if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
@@ -96,18 +92,14 @@ export const fitRangesToAspect = (ranges: AxisRanges, aspectRatio: number): Axis
 const WHEEL_LINE_HEIGHT_PX = 16;
 const WHEEL_PAGE_HEIGHT_PX = 400;
 
-/**
- * Distinguish larger mouse-wheel deltas from small synthetic ctrl+wheel pinch steps; normalize Firefox line units
- * first.
- */
+/** Tell larger mouse-wheel deltas from small synthetic ctrl+wheel pinch steps; normalize Firefox line units first. */
 const PINCH_DELTA_LIMIT_PX = 40;
 
 /** The most a single wheel event may scale the view, in either direction. */
 const MAX_WHEEL_ZOOM_STEP = 1.25;
 
 /**
- * Normalize delta units: Firefox mouse wheels report lines, whose raw values would otherwise produce imperceptible
- * zoom while native scrolling is prevented.
+ * Normalize delta units: Firefox wheels report lines, whose raw values zoom imperceptibly with native scroll blocked.
  */
 export const normalizeWheelDeltaY = (deltaY: number, deltaMode: number): number => {
   if (deltaMode === 1) {
@@ -132,8 +124,7 @@ export const zoomFactorFromWheel = (deltaY: number, deltaMode: number, isCtrlHel
 };
 
 /**
- * Scale both ranges by `factor` while keeping the point at the given
- * fractional position (0..1 from each range's start) fixed on screen.
+ * Scale both ranges by `factor`, keeping the point at the fractional position (0..1 from each range's start) fixed.
  */
 export const zoomRangesAroundFraction = (
   ranges: AxisRanges,
@@ -156,9 +147,7 @@ export const zoomRangesAroundFraction = (
 };
 
 /**
- * If the point sits within `padFraction` of (or beyond) a viewport edge,
- * translate the ranges to center it — preserving the zoom width. Returns
- * null when the point is comfortably in view.
+ * Within `padFraction` of (or past) a viewport edge, translate the ranges to center the point, same zoom; else null.
  */
 export const rangesToKeepMarkerInView = (
   ranges: AxisRanges,

@@ -3,9 +3,9 @@ import type { GenerateLora, GenerateModelConfig, LoraModelConfig, WanLoraTarget 
 import { getDefaultLoraWeight, isLoraCompatibleWithModel } from './settings';
 
 /**
- * Concept (LoRA) list edits shared by every widget that stores a `GenerateLora[]`. Adds prevent new duplicate keys
- * and only add concepts the main model can load. An edit that changes nothing returns the same array,
- * so callers can skip the write: a row removed mid-edit still flushes its draft, and that must stay a no-op.
+ * Concept (LoRA) list edits shared by every widget that stores a `GenerateLora[]`. Adds prevent new duplicate keys and
+ * only add concepts the main model can load. An edit that changes nothing returns the same array, so callers can skip
+ * the write: a row removed mid-edit still flushes its draft, and that must stay a no-op.
  */
 
 export interface ConceptUpdate {

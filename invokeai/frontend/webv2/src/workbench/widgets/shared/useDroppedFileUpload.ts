@@ -29,16 +29,7 @@ const uploadLogger = createLogger({ area: 'file-drop-upload', namespace: 'galler
 // added it is the only one that removes it.
 const pendingUploads = new Set<string>();
 
-/**
- * Runs the upload of files dropped on a surface (Canvas, Preview), loading its code on demand. Each surface, named by
- * its widget (`surface`; neither allows a second instance per project), runs one upload per project at a time: while one
- * is under way for the open project, a further drop on that surface is refused with `pendingKey`'s notice, even after
- * the surface remounts, so a slow upload is never doubled; other projects and surfaces go ahead. Past a moment a
- * progress notice (`uploadingKey`, with the file count) shows until the upload ends.
- * The drop's account, project and gallery values are captured at the drop, so nothing that changes while the code
- * loads or the files upload can retarget it. Code that cannot load (offline, or replaced by a newer deploy) is
- * reported as an upload that did not start; `runFailedMessage` names a failure of the work itself.
- */
+/** One upload per surface and project at a time, code loaded on demand; drop context is captured at the drop. */
 export const useDroppedFileUpload = ({
   pendingKey,
   surface,

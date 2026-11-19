@@ -41,11 +41,7 @@ const menuItemValueAt = (event: ReactPointerEvent): string | null =>
   document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>(MENU_ITEM_SELECTOR)?.dataset.value ??
   null;
 
-/**
- * A strip slot standing for a family of subtools. Click selects the current subtool; hold, right-click, ArrowRight
- * or the context-menu key open a menu of the family. Releasing a hold over an entry selects it; releasing elsewhere
- * leaves the menu open for a click.
- */
+/** A slot for a subtool family: click selects; hold, right-click or ArrowRight opens the family menu. */
 export const ToolFamilyButton = ({
   currentId,
   icon,
@@ -65,8 +61,8 @@ export const ToolFamilyButton = ({
   onActivate: () => void;
   onSelectSubtool: (id: string) => void;
 }) => {
-  // The menu anchors to, and returns focus to, the element carrying the trigger id: the slot, through its tooltip.
-  // The slot is not a `Menu.Trigger`, whose click would open the menu instead of selecting the current subtool.
+  // The menu anchors to, and returns focus to, the element carrying the trigger id: the slot, through its tooltip. The
+  // slot is not a `Menu.Trigger`, whose click would open the menu instead of selecting the current subtool.
   const { t } = useTranslation();
   const ids = useTooltipTriggerIds();
   const menuMachine = useMenu({ ids, positioning: MENU_POSITIONING });
@@ -100,8 +96,8 @@ export const ToolFamilyButton = ({
       openedByHold.current = false;
       clearHoldTimer();
       try {
-        // Without capture the release over a menu entry targets the entry,
-        // not this button, and the release-to-select path never runs.
+        // Without capture the release over a menu entry targets the entry, not this button, and the release-to-select
+        // path never runs.
         event.currentTarget.setPointerCapture(event.pointerId);
       } catch {
         // Synthetic pointers have no active id to capture.
@@ -118,9 +114,7 @@ export const ToolFamilyButton = ({
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (holdTimer.current !== null) {
         clearHoldTimer();
-        // Short press: an ordinary click on the slot — but only released over
-        // it. Capture retargets the release here even after a drag-off, and a
-        // drag-off release must cancel, like any button.
+        // Short press: an ordinary click on the slot — but only released over it.
         if (!isOverElement(event.currentTarget, event)) {
           return;
         }
@@ -133,8 +127,7 @@ export const ToolFamilyButton = ({
       }
       if (menu.open && openedByHold.current) {
         openedByHold.current = false;
-        // Held open: releasing over an entry selects it; elsewhere keeps the
-        // menu open for a click.
+        // Held open: releasing over an entry selects it; elsewhere keeps the menu open for a click.
         const value = menuItemValueAt(event);
         if (value !== null) {
           onSelectSubtool(value);
@@ -147,16 +140,15 @@ export const ToolFamilyButton = ({
   const onPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (holdTimer.current !== null) {
-        // Leaving the slot cancels a pending hold; capture keeps delivering
-        // moves here, so the bounds stand in for pointerleave.
+        // Leaving the slot cancels a pending hold; capture keeps delivering moves here, so the bounds stand in for
+        // pointerleave.
         if (!isOverElement(event.currentTarget, event)) {
           clearHoldTimer();
         }
         return;
       }
       if (menu.open && openedByHold.current) {
-        // Captured moves never reach the entries, so highlight the one the
-        // drag is over the way hovering would.
+        // Captured moves never reach the entries, so highlight the one the drag is over the way hovering would.
         const value = menuItemValueAt(event);
         if (value !== null && value !== menu.highlightedValue) {
           menu.setHighlightedValue(value);
@@ -166,15 +158,15 @@ export const ToolFamilyButton = ({
     [clearHoldTimer, menu]
   );
   const onPointerCancel = useCallback(() => {
-    // A canceled pointer (touch scroll takeover, OS gesture) must not open the
-    // menu later; an already-open menu stays for a click, like quick release.
+    // A canceled pointer (touch scroll takeover, OS gesture) must not open the menu later; an already-open menu stays
+    // for a click, like quick release.
     clearHoldTimer();
     openedByHold.current = false;
   }, [clearHoldTimer]);
   const onClick = useCallback(
     (event: ReactMouseEvent<HTMLButtonElement>) => {
-      // Pointer clicks are resolved on release above; a click with no pointer
-      // detail is Enter or Space on the focused slot.
+      // Pointer clicks are resolved on release above; a click with no pointer detail is Enter or Space on the focused
+      // slot.
       if (event.detail === 0) {
         onActivate();
       }
@@ -207,8 +199,8 @@ export const ToolFamilyButton = ({
         menu.setOpen(false);
         return;
       }
-      // An open menu keeps unmodified keys from the workbench hotkeys, so the keycaps an entry shows are honoured
-      // here: the entry's binding chooses it, as a click would, instead of moving the typeahead highlight.
+      // An open menu keeps unmodified keys from the workbench hotkeys, so the keycaps an entry shows are honoured here:
+      // the entry's binding chooses it, as a click would, instead of moving the typeahead highlight.
       const item = items.find((candidate) =>
         candidate.hotkeys?.some((hotkey) => isHotkeyPress(event.nativeEvent, hotkey))
       );

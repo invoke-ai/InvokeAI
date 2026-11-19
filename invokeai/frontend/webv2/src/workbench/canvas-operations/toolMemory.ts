@@ -1,9 +1,9 @@
 /**
  * Tool options a person tunes once and expects to find again: brush, eraser, shape and text settings. They belong to
- * the account (its preferences), not to one engine, so a canvas whose engine was disposed after its project went out
- * of view, or another project's canvas, starts with them. Brush color is not here: it follows the project's color
- * pair. Stored values are normalized against the engine defaults on every read, so an older or hand-edited record
- * never reaches a store.
+ * the account (its preferences), not to one engine, so a canvas whose engine was disposed after its project went out of
+ * view, or another project's canvas, starts with them. Brush color is not here: it follows the project's color pair.
+ * Stored values are normalized against the engine defaults on every read, so an older or hand-edited record never
+ * reaches a store.
  */
 
 import type {
@@ -173,11 +173,11 @@ export interface CanvasToolMemoryBinding {
 }
 
 /**
- * Seeds an engine's option stores from the account's memory and keeps them in step with it, then writes each tool
- * that changed back once the stores have been quiet for {@link TOOL_MEMORY_WRITE_DELAY_MS}. Writing only the changed
- * tools, and taking in what another canvas stored for the rest, keeps two engines (a warm one waiting out its grace
- * period and the one now open) from overwriting each other with stale options. Disposal writes a pending change at
- * once and stops listening.
+ * Seeds an engine's option stores from the account's memory and keeps them in step with it, then writes each tool that
+ * changed back once the stores have been quiet for {@link TOOL_MEMORY_WRITE_DELAY_MS}. Writing only the changed tools,
+ * and taking in what another canvas stored for the rest, keeps two engines (a warm one waiting out its grace period and
+ * the one now open) from overwriting each other with stale options. Disposal writes a pending change at once and stops
+ * listening.
  */
 export const bindCanvasToolMemory = (
   stores: ToolMemoryStores,

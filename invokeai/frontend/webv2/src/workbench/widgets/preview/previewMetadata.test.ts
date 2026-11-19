@@ -171,7 +171,6 @@ it('shows useful controls, authored layers, adapters and family settings with ra
       { config: { type: 'ip_adapter', model: { name: 'Style' }, image: { image_name: 'style.png' }, weight: 0.6 } },
       {
         config: { type: 'flux2_reference_image', image: { image_name: 'pose.png' } },
-        // Shown as Generate stores it: trimmed and capped.
         name: `  Hero pose${' '.repeat(3)}`,
       },
       { config: { type: 'flux2_reference_image', image: { image_name: 'long.png' } }, name: 'x'.repeat(200) },
@@ -196,7 +195,6 @@ it('shows useful controls, authored layers, adapters and family settings with ra
     ideogram4_color_palette: 'green, gold',
     'control_layers-0': 'Edges · controlnet · edges.png · Weight 0.75',
     'ref_images-0': 'Style · ip_adapter · style.png · Weight 0.6',
-    // A named reference leads with the name it was given.
     'ref_images-1': 'Hero pose · flux2_reference_image · pose.png',
     'ref_images-2': `${'x'.repeat(80)} · flux2_reference_image · long.png`,
     canvasLayerCount: '1 layer',

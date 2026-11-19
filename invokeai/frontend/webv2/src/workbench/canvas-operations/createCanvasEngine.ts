@@ -111,8 +111,8 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
       await ensureProjectOnServer();
       return Date.now() - projectMissingAt < MISSING_PROJECT_REUSE_MS ? undefined : options.projectId;
     } catch (error) {
-      // A project the server has not accepted (offline, conflicted, deleted elsewhere) costs the upload its
-      // provenance, never the edit; only a closed project stops it.
+      // A project the server has not accepted (offline, conflicted, deleted elsewhere) costs the upload its provenance,
+      // never the edit; only a closed project stops it.
       if (error instanceof DOMException && error.name === 'AbortError') {
         throw error;
       }

@@ -139,7 +139,6 @@ describe('Canvas gesture guidance', () => {
     const moveHints = hintLabels({ ...state, activeTool: 'move' });
     expect(moveHints[0]).toBe('workbench.shortcuts.actions.moveLayer');
     expect(moveHints).toContain('canvas.nudgeRight');
-    // Alt skips the grid on these tools, so it advertises no color sample.
     expect([...bbox, ...moveHints]).not.toContain('workbench.shortcuts.actions.sample');
   });
 });

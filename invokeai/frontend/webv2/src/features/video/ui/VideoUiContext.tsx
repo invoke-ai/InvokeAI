@@ -24,8 +24,8 @@ export interface VideoUiAdapter {
   findInGallery(ref: GalleryItemRef): void;
   /**
    * Where an upload made from the panel lands, resolved when the upload starts from the listing of every readable
-   * board: the Gallery's auto-add board while that listing lets the account add to it, else the project's inbox;
-   * `none` is Uncategorized.
+   * board: the Gallery's auto-add board while that listing lets the account add to it, else the project's inbox; `none`
+   * is Uncategorized.
    */
   getUploadBoardId(): Promise<string>;
   /** Notices about this project; `undoable` reports a change that already happened, with its Undo. */
@@ -39,8 +39,8 @@ export interface VideoUiAdapter {
     origin?: 'user' | 'system'
   ): void;
   /**
-   * Select item in Preview and request looping this window. Returns its playback token, or null if Preview could
-   * not be raised and no request was made.
+   * Select item in Preview and request looping this window. Returns its playback token, or null if Preview could not be
+   * raised and no request was made.
    */
   playVideoSpanInPreview(span: { endSeconds: number; item: GalleryVideoItem; startSeconds: number }): number | null;
   projectId: string;
@@ -57,8 +57,8 @@ export interface VideoUiAdapter {
 }
 
 /**
- * Reports the armed request token, or null after disarming. isPlaying mirrors the element; pause preserves the
- * armed window for native resume.
+ * Reports the armed request token, or null after disarming. isPlaying mirrors the element; pause preserves the armed
+ * window for native resume.
  */
 export interface VideoSpanPlaybackState {
   isPlaying: boolean;

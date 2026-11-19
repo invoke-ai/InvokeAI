@@ -6,8 +6,7 @@ import { collectSubtreeLeaves, isGroupNode, subtreeDepth } from '@workbench/canv
 import { isNodeHidden } from '@workbench/canvas-engine/document/layerEligibility';
 
 /**
- * Node facts with ancestor state applied, shared by rows, tools and planners without screen or session
- * dependencies.
+ * Node facts with ancestor state applied, shared by rows, tools and planners without screen or session dependencies.
  */
 export interface SemanticNode {
   readonly id: string;
@@ -35,8 +34,8 @@ export interface SemanticNode {
 }
 
 /**
- * Compiles the node for `entry`. `previous` is the node compiled for the same id before a value
- * edit: structure is unchanged then, so its counts and depth carry over instead of a subtree walk.
+ * Compiles the node for `entry`. `previous` is the node compiled for the same id before a value edit: structure is
+ * unchanged then, so its counts and depth carry over instead of a subtree walk.
  */
 export const compileSemanticNode = (entry: CanvasNodeEntry, previous?: SemanticNode): SemanticNode => {
   const { node } = entry;

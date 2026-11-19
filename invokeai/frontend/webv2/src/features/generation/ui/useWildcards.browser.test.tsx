@@ -10,14 +10,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const createWildcard = vi.fn(() => Promise.resolve());
 const updateWildcard = vi.fn(() => Promise.resolve());
-// Records each call; the real invalidation still runs against the test's query client.
 const invalidateWildcardDependents = vi.fn();
-// Answers as the server does: every id it was sent was the caller's.
 const deleteWildcards = vi.fn((ids: readonly string[], _signal?: AbortSignal) => Promise.resolve([...ids]));
 const listWildcards = vi.fn<() => Promise<WildcardsModule.WildcardRecord[]>>();
 
 vi.mock('@features/generation/data/wildcards', async (importOriginal) => {
-  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
   const actual = await importOriginal<typeof WildcardsModule>();
 
   return {
@@ -35,7 +32,6 @@ vi.mock('@features/generation/data/wildcards', async (importOriginal) => {
   };
 });
 
-/** Holds the catalog's refetches until released, as a refresh retrying against an outage would. */
 const holdCatalogRefetch = (answer: () => WildcardsModule.WildcardRecord[] = () => []): (() => void) => {
   let release = () => {};
   const held = new Promise<void>((resolve) => {
@@ -244,7 +240,6 @@ describe('removeMany', () => {
       caught = await catalogRef.current!.removeMany(['w0']).catch((error: unknown) => error);
     });
 
-    // The failure is reported while the refresh is still out.
     expect(caught).toBeInstanceOf(WildcardDeleteError);
     expect((caught as WildcardDeleteError).deletedIds).toEqual([]);
     expect(queryClient.getQueryState(expansionKey)?.isInvalidated).toBe(true);

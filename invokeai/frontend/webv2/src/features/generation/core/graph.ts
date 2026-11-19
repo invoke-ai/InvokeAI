@@ -89,12 +89,10 @@ const getCompatibleComponent = (
   filter: GenerateComponentFilter
 ): ComponentModelConfig | null => (component && filter(component) ? component : null);
 
-// Encode node types shared across families: a family that denoises in another's VAE latent space encodes with its node.
-/** FLUX.2's VAE encode; FLUX.3 and MOSS-Image denoise in the FLUX.2 VAE's raw latent layout. */
+/** FLUX.3 and MOSS-Image denoise in the FLUX.2 VAE's raw latent layout, so they encode with it too. */
 const FLUX2_ENCODE_TYPE = 'flux2_vae_encode';
 /** Qwen-Image's VAE encode; Krea-2 shares the Qwen-Image VAE. Canvas and reference-image encodes use it alike. */
 const QWEN_IMAGE_ENCODE_TYPE = 'qwen_image_i2l';
-/** Qwen-Image-2.1's VAE encode, for Canvas and reference-image encodes alike. */
 const QWEN_IMAGE_2_1_ENCODE_TYPE = 'qwen_image_2_1_i2l';
 
 const toImageField = (image: GenerateReferenceImageAsset) => ({
@@ -155,7 +153,6 @@ const addIPAdapterReferenceImages = (
       image: toImageField(image),
       ip_adapter_model: adapterModel,
     };
-    // Anima's adapter brings its own SigLIP2 encoder and has no method: it takes a strength alone.
     const node = strengthOnly
       ? addNode(graph, { ...shared, id: createId('anima_ip_adapter'), strength: weight, type: 'anima_ip_adapter' })
       : addNode(graph, {
@@ -445,7 +442,6 @@ const buildSDGraph = (
     steps: settings.steps,
     type: 'denoise_latents',
   });
-  // A VAE override only applies when it matches the main model's architecture.
   const vaeOverride = getCompatibleVae(settings, model);
   const vaeLoader = vaeOverride
     ? addNode(graph, { id: 'vae_loader', type: 'vae_loader', vae_model: vaeOverride })
@@ -520,7 +516,6 @@ const buildSDGraph = (
   const refinerDenoise = refiner
     ? addSDXLRefinerStage({ denoise, graph, model, negativePrompt, positivePrompt, refiner, seamless, settings })
     : null;
-  // Create decode only after resolving the final VAE source.
   const vaeSource = seamless ?? vaeLoader ?? modelLoader;
   const output = addDecodeOutput({
     denoise: refinerDenoise ?? denoise,
@@ -599,7 +594,6 @@ const addDecodeOutput = ({
   graph: BackendGraphContract;
   settings: GenerateSettings;
   model: MainModelConfig;
-  /** The base's ordinary VAE-decode node type, used when PiD is off. */
   l2iType: string;
   /** Extra props for the ordinary decode node; ignored by the PiD chain, which has its own. */
   l2iProps?: Record<string, unknown>;
@@ -728,10 +722,7 @@ const buildSD3Graph = (
   };
 };
 
-/**
- * The node's own default is `off`, so that preset sends nothing and the graph stays as it was. Scale and exponent
- * only mean anything under `manual`; the other presets derive theirs from the image size.
- */
+/** The node defaults to `off`, so that preset sends nothing; scale and exponent apply only under `manual`. */
 const getFluxDypeFields = (
   settings: GenerateSettings
 ): { dype_preset?: string; dype_scale?: number; dype_exponent?: number } => {
@@ -1029,7 +1020,6 @@ const buildErnieImageGraph = (
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
 ): FamilyGraph => {
-  // Bundles supply submodels; single-file models need explicit encoder/VAE selections.
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
   const mistralEncoderModel = getCompatibleComponent(settings.mistralEncoderModel, isErnieImageMistralEncoder);
@@ -1376,7 +1366,6 @@ const buildAnimaGraph = (
     settings.qwen3EncoderModel && isAnimaQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null,
     'Qwen3 Encoder'
   );
-  // Anima-3.8B's bundled semantic connector also reads Qwen3.5; no other Anima model does.
   const qwen35EncoderModel =
     model.variant === 'anima_qwen35'
       ? requireComponent(getCompatibleComponent(settings.qwen35EncoderModel, isAnimaQwen35Encoder), 'Qwen3.5 Encoder')
@@ -1420,7 +1409,7 @@ const buildAnimaGraph = (
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, loraSource, 'qwen3_encoder', posCond, 'qwen3_encoder');
   if (qwen35EncoderModel) {
-    // Straight from the loader: the LoRA collection loader passes Qwen3.5 through untouched, so it has no output for it.
+    // Straight from the loader: the LoRA collection loader passes Qwen3.5 through untouched and has no output for it.
     addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
   }
   addEdge(graph, modelLoader, 'vae', output, 'vae');
@@ -1465,11 +1454,7 @@ const buildAnimaGraph = (
   };
 };
 
-/**
- * Edit references reach the model twice, in the same order: each prompt the denoise checks reads them through the
- * encoder's vision tower, and their latents join the denoise as clean image tokens. Chained collects keep that order,
- * which a single collect would take from execution order.
- */
+/** Each reference reaches encoder and denoise in the same order; chained collects keep it, a single one would not. */
 const addKrea2EditReferences = (
   graph: BackendGraphContract,
   {
@@ -1525,7 +1510,6 @@ const buildKrea2Graph = (
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
 ): FamilyGraph => {
-  // Standalone Krea needs a separate VAE/encoder without a component source.
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
   const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl4bEncoder);
@@ -1610,9 +1594,7 @@ const buildKrea2Graph = (
           (referenceImage) => referenceImage.config.styleStrength > 0
         );
 
-  // The cache changes how edit references run, and only an edit LoRA trained with it (ai-toolkit's `kv_cache`) reads
-  // them that way; the base model alone sees them through attention it never learned. Without a LoRA the stored
-  // switch is kept but not sent, so the denoise runs its default and the record says nothing about it.
+  // Only an edit LoRA trained with `kv_cache` reads the cache; without one the stored switch is kept but not sent.
   const referenceKvCache =
     editReferenceImages.length > 0 && activeLoras.length > 0 ? settings.krea2ReferenceKvCache : undefined;
 
@@ -1675,11 +1657,9 @@ const buildQwenImage21Graph = (
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
 ): FamilyGraph => {
-  // A Diffusers pipeline brings its VAE and encoder; for single-file and GGUF transformers the generation policy
-  // requires both before this runs.
+  // For single-file and GGUF transformers the generation policy requires VAE and encoder before this runs.
   const vaeModel = getCompatibleVae(settings, model);
   const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl8bEncoder);
-  // The loader rejects a tower beside any other encoder, so a stale pick is never sent.
   const qwen3VlVisionTowerModel =
     qwen3VlEncoderModel && isGgufQwen3Vl8bEncoder(qwen3VlEncoderModel)
       ? getCompatibleComponent(settings.qwen3VLVisionTowerModel, isQwen3Vl8bVisionTower)
@@ -1732,8 +1712,7 @@ const buildQwenImage21Graph = (
     denoise,
     modelLoader,
   });
-  // The denoise adds the prefix-cache mode it ran to the record, which changes the image, so the metadata passes
-  // through it on the way to the decoder.
+  // The denoise adds its prefix-cache mode to the record, so metadata passes through it.
   addMetadata(graph, denoise, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     qwen3_vl_vision_tower: qwen3VlVisionTowerModel ?? undefined,
@@ -1752,11 +1731,7 @@ const buildQwenImage21Graph = (
   };
 };
 
-/**
- * Qwen-Image-2.1 reads each reference twice, at one size: the prompt encoder sees it through the vision tower, and
- * the denoise node places its clean latents in the prompt's image slots. Both prompts are encoded with the
- * references, and the latents follow in the same order.
- */
+/** The encoder sees each reference through its vision tower and the denoise places its latents, in one order. */
 const addQwenImage21ReferenceImages = (
   graph: BackendGraphContract,
   settings: GenerateSettings,
@@ -1818,8 +1793,7 @@ const buildMossImageGraph = (
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
 ): FamilyGraph => {
-  // A Diffusers pipeline brings its encoder and VAE; a single-file transformer needs both. The filter drops a stale
-  // Qwen3.5 4B selection left over from Anima-3.8B, which shares the setting.
+  // The filter drops a stale Qwen3.5 4B pick left over from Anima-3.8B, which shares the setting.
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
   const qwen35EncoderModel = getCompatibleComponent(settings.qwen35EncoderModel, isMossImageQwen35Encoder);
@@ -1878,9 +1852,7 @@ const buildMossImageGraph = (
   // The denoise node reads the VAE's BatchNorm statistics, which define the latent space it works in.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
-  // The layout node compiles a layout draft (e.g. from Expand Prompt) and canvas regions into the model's layout
-  // prompt at run time, and passes plain text through. Canvas fills `regions`; batch prompt variation still flows
-  // through `positive_prompt`.
+  // Compiles a layout draft and canvas `regions` at run time; batch prompt variation still flows via `positive_prompt`.
   const layoutPrompt = addNode(graph, {
     height: denoiseSize.height,
     id: 'layout_prompt',
@@ -1926,7 +1898,6 @@ const buildFlux3Graph = (
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
 ): FamilyGraph => {
-  // A single-file or GGUF FLUX.3 model is the transformer alone; a Diffusers one bundles the VAE and encoder.
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
   const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl4bEncoder);
@@ -1954,9 +1925,7 @@ const buildFlux3Graph = (
         'transformer',
       ])
     : modelLoader;
-  // Canvas regions become a box table at the end of the prompt here, at run time, so batch prompt variation still
-  // flows through `positive_prompt`. Without regions the prompt passes through unchanged. The prompt upsampler takes
-  // this place when it is on: it takes the regions itself and also reads the reference images.
+  // Canvas regions become a box table at run time; the prompt upsampler takes this place when on.
   const upsamplerModel = settings.flux3PromptUpsamplerEnabled
     ? requireComponent(
         getCompatibleComponent(settings.flux3PromptUpsamplerModel, isVisionTextLlm),
@@ -2050,7 +2019,6 @@ const buildIdeogram4Graph = (
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
 ): FamilyGraph => {
-  // Standalone Ideogram needs its other branch, encoder, and VAE; bundles supply them.
   const isDiffusers = model.format === 'diffusers';
   const unconditionalModel = settings.ideogram4UnconditionalModel;
   const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl8bEncoder);
@@ -2117,7 +2085,6 @@ const buildIdeogram4Graph = (
     ideogram4_mu: settings.ideogram4Mu ?? null,
     ideogram4_sampler_preset: settings.ideogram4SamplerPreset,
     ideogram4_steps: settings.ideogram4Steps ?? null,
-    // Record both transformer files in provenance.
     ideogram4_unconditional_model: isDiffusers ? undefined : (unconditionalModel ?? undefined),
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
@@ -2141,7 +2108,6 @@ const buildWanGraph = (
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
 ): FamilyGraph => {
-  // GGUF Wan sources encoder/VAE from standalone selections or a bundle.
   const sourceModel = getDiffusersSource(settings, model);
   const vaeModel = getCompatibleVae(settings, model);
   const wanT5EncoderModel = settings.wanT5EncoderModel;
@@ -2163,7 +2129,6 @@ const buildWanGraph = (
     vae_model: vaeModel ?? undefined,
     wan_t5_encoder_model: wanT5EncoderModel ?? undefined,
   });
-  // Wan LoRAs patch only the transformer; the text encoder is untouched.
   const loraSource = activeLoras.length ? addWanLoraLoaders(graph, activeLoras, modelLoader, model) : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'wan_text_encoder' });
   const negCond = addNode(graph, { id: 'neg_cond', type: 'wan_text_encoder' });
@@ -2210,13 +2175,9 @@ const buildWanGraph = (
   };
 };
 
-/** Canvas inputs per external mode: the composited bbox is the init image for img2img. */
 export type ExternalCanvasInputs = { mode: 'txt2img' } | { mode: 'img2img'; initImageName: string };
 
-/**
- * Hosted providers take the whole request on one node: prompt, seed, size, provider options, and (on the canvas) the
- * init image. The Canvas keep-mask does not match any provider's edit-mask contract, so inpaint is not compiled.
- */
+/** The Canvas keep-mask matches no provider's edit-mask contract, so inpaint is not compiled. */
 export const buildExternalGraph = (
   settings: GenerateSettings,
   model: GenerateModelConfig,

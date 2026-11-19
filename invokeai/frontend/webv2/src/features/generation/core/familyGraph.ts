@@ -26,7 +26,6 @@ export interface FamilyGraph {
 }
 
 export interface FamilyLatentSpace {
-  /** The image-to-latents node type. */
   encodeType: string;
   /** The VAE the graph decodes with, override and seamless wrapping included; encodes and masks use the same one. */
   vae: GraphOutput;
@@ -49,8 +48,8 @@ export interface FamilyConditioning {
    */
   ipAdapterCollector: BackendInvocationContract | null;
   /**
-   * The collector the builder already feeds `denoise.redux_conditioning` from, when it wired FLUX Redux. Only read where
-   * regional references are FLUX Redux (FLUX).
+   * The collector the builder already feeds `denoise.redux_conditioning` from, when it wired FLUX Redux. Only read
+   * where regional references are FLUX Redux (FLUX).
    */
   fluxReduxCollector: BackendInvocationContract | null;
 }

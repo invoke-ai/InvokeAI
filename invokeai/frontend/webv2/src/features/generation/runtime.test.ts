@@ -113,7 +113,6 @@ beforeEach(() => {
   templateQuery.queryFn.mockResolvedValue([]);
 });
 
-// Seed the shared capability fixture and clear it after each test.
 beforeEach(() => {
   setArchitectureCapabilities(capabilitiesFixture as ArchitectureCapabilitiesRow[]);
 });
@@ -258,7 +257,6 @@ describe('createGenerateWidgetSyncRuntime', () => {
 });
 
 describe('the architecture-capabilities gate', () => {
-  // Constructor reconciliation persists values, so it must wait for authoritative capabilities.
   it('writes nothing until the capability table has arrived', () => {
     const { capabilitiesLoaded, patches } = setup({
       capabilitiesLoaded: false,

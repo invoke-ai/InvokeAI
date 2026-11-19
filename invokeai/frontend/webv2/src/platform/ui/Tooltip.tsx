@@ -80,15 +80,8 @@ type GatedEvent = 'onFocus' | 'onPointerMove' | 'onPointerOver';
 type GatedHandlers = Partial<Record<GatedEvent, (event: SyntheticEvent) => void>>;
 
 /**
- * Trigger handlers that run the trigger's own handlers, then hide the event from the tooltip when `isHidden` says so.
- * Zag's trigger handlers skip an event whose default is prevented, and run after the child's own (Ark merges the
- * child's handlers first). None of these events has a default action, and focus cannot be cancelled natively, so only
- * the tooltip notices.
- *
- * This is how a tip is kept shut, rather than Zag's `disabled` or a controlled `open` alone. While another tooltip is
- * showing, Zag opens a hovered trigger at once whatever the controlled prop says, and the tip then stays painted with
- * no prop change left to close it. `disabled` also hides the pointer leave, leaving Zag's record that the pointer
- * opened the tip standing, so the next hover after a re-enable shows nothing.
+ * Zag skips trigger events whose default is prevented; this keeps a tip shut where `disabled` or `open` fail:
+ * Zag opens a hovered trigger at once while another tip shows, and `disabled` swallows the pointer leave.
  */
 const gateTriggerEvents = (
   own: readonly (GatedHandlers | undefined)[],
@@ -122,16 +115,10 @@ export interface TooltipProps extends ChakraTooltip.RootProps {
   content: ReactNode;
   contentRef?: Ref<HTMLDivElement>;
   contentProps?: ChakraTooltip.ContentProps;
-  /** Shorthand for positioning.placement; an explicit positioning.placement wins. */
   placement?: TooltipPlacement;
   ref?: Ref<HTMLButtonElement>;
   triggerProps?: TooltipTriggerProps;
-  /**
-   * `disabled` normally unmounts the tooltip and leaves the bare trigger. This keeps it mounted and shut instead, for a
-   * tooltip that toggles while its trigger is in use, such as one that keeps quiet while its menu is open: unmounting
-   * would remount the trigger, dropping its focus or pointer capture. Use it, never a bare `open={false}`; see
-   * `gateTriggerEvents`.
-   */
+  /** Keeps the tooltip mounted and shut instead of unmounting, which would drop the trigger's focus or capture. */
   keepsRootWhenDisabled?: boolean;
 }
 
@@ -190,8 +177,7 @@ export const Tooltip = (props: TooltipProps) => {
     return triggerChild;
   }
 
-  // Shut through the controlled prop, which closes a tip already showing; focus opens wait for it, and the gate above
-  // keeps the pointer from opening around it.
+  // Shut through the controlled prop; the gate above keeps the pointer from opening around it.
   return (
     <ChakraTooltip.Root {...(rootProps as ChakraTooltip.RootProps)} {...(isKeptShut ? { open: false } : {})}>
       <ChakraTooltip.Trigger asChild>{triggerChild}</ChakraTooltip.Trigger>
@@ -215,15 +201,10 @@ export interface ClippedTooltipProps extends Omit<
   TooltipProps,
   'defaultOpen' | 'disabled' | 'keepsRootWhenDisabled' | 'onOpenChange' | 'open'
 > {
-  /** Whether the trigger hides some of the text the tooltip shows, such as a truncated name. */
   isClipped: () => boolean;
 }
 
-/**
- * A tooltip that shows the full text of a clipped label, and nothing while the label shows it all. Measured each time
- * the pointer or focus arrives on the trigger, so a resize costs no render; a label that does not hide anything keeps
- * the arrival from the tooltip (see `gateTriggerEvents`).
- */
+/** Measured as the pointer or focus arrives, so a resize costs no render. */
 export const ClippedTooltip = ({ children, isClipped, triggerProps, ...props }: ClippedTooltipProps) => {
   const isClippedRef = useRef(false);
   const childProps = isValidElement(children) ? (children.props as GatedHandlers) : undefined;
@@ -267,18 +248,13 @@ interface TooltipGroupProps {
   content: ReactNode;
   /** Each trigger keeps its own element id (a tab's, say); the group anchors to that id rather than replacing it. */
   getTriggerId: (value: string) => string;
-  /**
-   * Whether the tip shows for the trigger with this value. A trigger that is not enabled when focus or the pointer
-   * arrives shows nothing until they arrive again, and one that stops being enabled closes the tip.
-   */
+  /** A trigger not enabled on arrival shows nothing until the next one; one that stops being enabled closes the tip. */
   isEnabled: (value: string) => boolean;
   showArrow?: boolean;
 }
 
 interface TooltipGroupState {
-  /** The trigger focus or the pointer is on, as the tooltip reports it. */
   value: string | null;
-  /** The tooltip asked to show and has not asked to hide since. */
   isRequested: boolean;
 }
 
@@ -296,7 +272,6 @@ const reduceTooltipGroup = (state: TooltipGroupState, action: TooltipGroupAction
 };
 
 interface TooltipGroupContextValue {
-  /** The trigger the shown tip describes, if any. */
   describedValue: string | null;
   isEnabled: (value: string) => boolean;
 }
@@ -304,18 +279,8 @@ interface TooltipGroupContextValue {
 const TooltipGroupContext = createContext<TooltipGroupContextValue>({ describedValue: null, isEnabled: () => false });
 
 /**
- * One tooltip shared by a group of triggers, such as the tabs of a strip, so moving focus or the pointer between them
- * hands the tip over. Separate tooltips close and open through deferred events, and a focus move made inside a key
- * handler (roving tab focus) can deliver the closing one's release after the arriving one opened, closing it again.
- *
- * The tip is controlled: the tooltip only asks to open and close, reporting the trigger and the open in an order that
- * depends on how it got there. A request on a trigger that is not enabled ends at the next render, and so does one
- * whose trigger stops being enabled: the tooltip then stays closed and ignores the blur or pointer leave that would
- * otherwise end the request, and a request left standing would open the tip later on a trigger nobody is on.
- *
- * Refusing works for every open but one: while another tooltip is showing, Zag opens a hovered trigger at once,
- * whatever the controlled prop says, and a refused open leaves the tip painted with no prop change to close it. So a
- * trigger that is not enabled keeps the pointer from Zag altogether (see TooltipGroupTrigger).
+ * One tooltip shared across triggers: separate ones close via deferred events, and roving focus can close the new one.
+ * A disabled trigger keeps the pointer from Zag entirely (see TooltipGroupTrigger).
  */
 const TooltipGroupRoot = ({
   children,
@@ -329,8 +294,7 @@ const TooltipGroupRoot = ({
   const isOnDisabledTrigger = state.value !== null && !isEnabled(state.value);
   const isShown = state.isRequested && state.value !== null && !isOnDisabledTrigger;
 
-  // Adjusted during render (React's pattern for state derived from changing input). A request with no trigger yet is
-  // left alone: the trigger may be reported just after the open.
+  // Derived state adjusted during render; a request with no trigger yet is left alone.
   if (state.isRequested && isOnDisabledTrigger) {
     dispatch({ type: 'close' });
   }
@@ -381,12 +345,7 @@ const HIDE_POINTER_FROM_TOOLTIP = {
   onPointerOverCapture: (event: PointerEvent) => event.preventDefault(),
 };
 
-/**
- * The tooltip describes every trigger in a group while open; only the one it shows on keeps the description. A trigger
- * that is not enabled hides the pointer from the tooltip, so it can neither open on it nor hand the tip to it. Focus
- * needs no such guard: from closed, Zag waits for the controlled prop; from open, it switches the trigger at once and
- * the group's reducer closes the tip at the next render.
- */
+/** Only the shown trigger keeps the description; a disabled trigger hides the pointer, while focus needs no guard. */
 const TooltipGroupTrigger = ({ children, value }: { children: ReactElement; value: string }) => {
   const { describedValue, isEnabled } = use(TooltipGroupContext);
 

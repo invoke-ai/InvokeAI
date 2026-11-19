@@ -41,7 +41,6 @@ describe('external provider options', () => {
       'seedreamWatermark',
       'seedreamOptimizePrompt',
     ]);
-    // Alibaba Cloud and Atlas Cloud nodes add nothing beyond the shared fields.
     expect(getExternalProviderOptionKeys(external('alibabacloud', { modes: ['txt2img'] }))).toEqual([]);
     expect(getExternalProviderOptionKeys({ base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' })).toEqual([]);
     expect(getExternalProviderOptionKeys(undefined)).toEqual([]);
@@ -100,7 +99,6 @@ describe('external provider options', () => {
     expect(resolveExternalImageSize({ externalImageSize: '2K', height: 1152, width: 2048 }, gemini)).toBe('2K');
     expect(resolveExternalImageSize({ externalImageSize: '4K', height: 1152, width: 2048 }, gemini)).toBe('2K');
     expect(resolveExternalImageSize({ externalImageSize: null, height: 1152, width: 2048 }, gemini)).toBe('2K');
-    // A size typed by hand after picking a preset is custom: the provider buckets the dimensions instead.
     expect(resolveExternalImageSize({ externalImageSize: '2K', height: 1152, width: 2000 }, gemini)).toBeNull();
     expect(
       resolveExternalImageSize(
@@ -153,7 +151,6 @@ describe('external provider options', () => {
 });
 
 describe('Canvas request size', () => {
-  // The starter catalog's GPT Image and Seedream 2K size tables.
   const gptImage = external('openai', {
     aspect_ratio_sizes: {
       '1:1': { height: 1024, width: 1024 },

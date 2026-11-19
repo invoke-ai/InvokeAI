@@ -20,18 +20,14 @@ export const selectClusterSelectionId = (values: Record<string, unknown>): strin
   return reference?.kind === 'cluster' ? reference.clusterId : null;
 };
 
-/**
- * Names the selected cluster over the dimmed map and offers the way back to full colour. It is what explains the grey:
- * without it a dimmed map reads as a rendering fault, and the only clear lived in the Gallery's search field.
- */
+/** Names the selected cluster over the dimmed map, explaining the grey, and offers the clear. */
 export const ClusterSelectionChip = () => {
   const { t } = useTranslation();
   const clusterId = useWidgetValuesSelector('gallery', selectClusterSelectionId);
   const clearClusterSelection = useClearClusterSelection();
   const handleClear = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
-      // The button unmounts with the chip; hand focus to the map instead of
-      // letting it fall to the page.
+      // The button unmounts with the chip; hand focus to the map instead of letting it fall to the page.
       event.currentTarget.closest<HTMLElement>('[data-image-map-surface]')?.focus();
       clearClusterSelection();
     },

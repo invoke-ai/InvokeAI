@@ -27,10 +27,7 @@ const getBlobKey = (blob: Blob): number => {
 
 interface PromptTemplateImageProps extends Omit<ImageProps, 'src'> {
   fallback: ReactNode;
-  /**
-   * Undefined means "show the stored image"; a URL previews a local
-   * replacement, and null explicitly hides a removed image.
-   */
+  /** Undefined shows the stored image, a URL previews a local replacement, and null hides a removed image. */
   localPreviewUrl?: string | null;
   template: Pick<PromptTemplateRecord, 'hasImage' | 'id'>;
 }

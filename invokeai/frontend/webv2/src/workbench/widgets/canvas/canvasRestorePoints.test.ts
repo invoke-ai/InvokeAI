@@ -14,11 +14,9 @@ interface Fixture {
   blank?: boolean;
   lock?: 'editing' | 'canvas' | null;
   flush?: () => Promise<void>;
-  /** What the engine's document swaps report. */
   swaps?: boolean;
 }
 
-/** Ports over a recorded project and engine: `order` interleaves flushes, mutations, swaps and stops. */
 const createFixture = ({ blank = false, flush, lock = null, open = true, swaps = true }: Fixture = {}) => {
   const order: string[] = [];
   const applied: CanvasProjectMutation[] = [];
@@ -60,7 +58,6 @@ const createFixture = ({ blank = false, flush, lock = null, open = true, swaps =
   return { applied, engage, engine, order, ports };
 };
 
-/** `stop` is read when the clear asks for it, so a test can enqueue a run while the strokes save. */
 const clear = (fixture: ReturnType<typeof createFixture>, stop: string[] = []) => {
   const cancelQueueItem = vi.fn((id: string) => fixture.order.push(`stop ${id}`));
   const outcome = clearCanvasWithRestorePoint({

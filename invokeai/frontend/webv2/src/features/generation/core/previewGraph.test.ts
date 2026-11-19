@@ -40,7 +40,6 @@ const storedValues = createGenerateValues({
   width: 1024,
 });
 
-// Seed authoritative fixtures and clear the registry for test isolation.
 beforeEach(() => {
   setArchitectureCapabilities(capabilitiesFixture as ArchitectureCapabilitiesRow[]);
 });
