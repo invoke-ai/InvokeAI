@@ -43,6 +43,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  mcp-tests:
+    name: 'MCP bridge tests'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 10
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: setup uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: '0.11.28'
+
+      - name: run MCP bridge tests in isolation
+        run: >-
+          uv run --no-project --python 3.12 --with mcp==1.30.0 --with httpx==0.28.1
+          --with pytest --with pytest-asyncio --with jsonschema
+          python -m pytest -c scripts/mcp_tests/pytest.ini --confcutdir=scripts scripts/mcp_tests
+
   matrix:
     strategy:
       # Let the other platforms finish when one runner fails, so a rerun repeats only the failed job.

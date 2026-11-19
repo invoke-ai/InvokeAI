@@ -643,7 +643,8 @@ version = { attr = "invokeai.version.__version__" }
 # this overrides `loadfile` and can split a single file across workers, repeating
 # module-scoped fixture setup. This config default also applies when `-n` is passed by hand.
 # Coverage is opt-in via `--cov`.
-addopts = "--strict-markers --dist loadfile -m \"not slow\""
+# MCP bridge tests run separately without the application dependency set.
+addopts = "--strict-markers --dist loadfile -m \"not slow\" --ignore=scripts/mcp_tests"
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
   "timeout: Marks the timeout override.",
