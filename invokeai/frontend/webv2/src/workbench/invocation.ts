@@ -14,9 +14,8 @@ import type {
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
-import { getLayoutDraftRejectionReason, getLayoutPromptRejectionReason } from '@features/generation/graph';
+import { getLayoutDraftRejectionReason } from '@features/generation/graph';
 import {
-  describeExternalCanvasRefusal,
   describeGenerationIssue,
   expandsDynamicPrompts,
   getEffectivePrompts,
@@ -44,13 +43,9 @@ import {
   isBaseRasterContentLayer,
   lookupDocumentNode,
 } from '@workbench/canvas-engine/api';
-import { isCompositableControlLayer, isCompositableRegionalGuidanceLayer } from '@workbench/canvasLayerContent';
+import { isCompositableRegionalGuidanceLayer } from '@workbench/canvasLayerContent';
 
-import {
-  createControlLayerCheckContext,
-  describeControlLayerIssue,
-  getBlockingControlLayerIssues,
-} from './controlLayerChecks';
+import { describeCanvasInputIssue, getCanvasInputIssues } from './canvasGenerationInputs';
 import { getActiveProjectGraph } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
@@ -407,43 +402,19 @@ export const resolveInvocationRouteInput = (
     }
 
     const values = normalizeGenerateWidgetValues(input.generateValues);
-    if (values?.model.type === 'external_image_generator') {
-      const { model } = values;
-
-      if (input.canvasRasterInFrame && isExternalTextOnlyCanvasModel(model)) {
-        validationReasons.push(describeExternalCanvasRefusal(model, { kind: 'raster_content' }));
-      }
-      for (const layer of input.canvasLayers) {
-        if (isCompositableControlLayer(layer)) {
-          validationReasons.push(
-            describeExternalCanvasRefusal(model, { kind: 'control_layer', layerName: layer.name })
-          );
-        } else if (isCompositableRegionalGuidanceLayer(layer)) {
-          validationReasons.push(
-            describeExternalCanvasRefusal(model, { kind: 'regional_guidance', layerName: layer.name })
-          );
-        }
-      }
-    } else if (values && isSupportedGenerateModel(values.model)) {
-      // Wait for models before validating local adapters to avoid false missing-model errors.
-      if (models) {
-        validationReasons.push(
-          ...getBlockingControlLayerIssues({
-            context: createControlLayerCheckContext(values.model.base, getWorkbenchPreferences().controlModelMemory),
-            layers: input.canvasLayers,
-            mainModel: values.model,
-            models,
-          }).map((controlLayerIssue) => ({ controlLayerIssue }))
-        );
-      }
-      const layoutPromptReason = getLayoutPromptRejectionReason({
-        base: values.model.base,
-        prompt: getEffectivePrompts(values).positivePrompt,
-        regions: input.canvasRegionalLayersInFrame,
-      });
-      if (layoutPromptReason) {
-        validationReasons.push(layoutPromptReason);
-      }
+    if (values && (values.model.type === 'external_image_generator' || isSupportedGenerateModel(values.model))) {
+      validationReasons.push(
+        ...getCanvasInputIssues({
+          cfgScale: values.cfgScale,
+          controlModelMemory: getWorkbenchPreferences().controlModelMemory,
+          layers: input.canvasLayers,
+          model: values.model,
+          models,
+          prompt: getEffectivePrompts(values).positivePrompt,
+          rasterInFrame: input.canvasRasterInFrame,
+          regionalLayersInFrame: input.canvasRegionalLayersInFrame,
+        }).map((canvasInputIssue) => ({ canvasInputIssue }))
+      );
     }
   }
 
@@ -498,8 +469,8 @@ export const localizeInvocationValidationReason = (
   reason: InvocationValidationReason,
   t: (key: string, options?: Record<string, unknown>) => string
 ): string =>
-  typeof reason === 'object' && 'controlLayerIssue' in reason
-    ? describeControlLayerIssue(t, reason.controlLayerIssue)
+  typeof reason === 'object' && 'canvasInputIssue' in reason
+    ? describeCanvasInputIssue(t, reason.canvasInputIssue)
     : typeof reason === 'object' && 'generationIssue' in reason
       ? describeGenerationIssue(t, reason.generationIssue)
       : typeof reason === 'object' && 'routeIssue' in reason
