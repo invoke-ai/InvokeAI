@@ -208,11 +208,14 @@ const buildAdapter = (activeProjectId = 'project-1'): GenerationUiAdapter =>
     project: { activeProjectId, invocationSourceId: 'generate', showPromptSyntaxHighlighting: false },
   }) as unknown as GenerationUiAdapter;
 
+// Captured before any test fakes timers, so settling still yields to the browser while a debounce is held.
+const realSetTimeout = globalThis.setTimeout;
+
 const settle = (run: () => void = noop, ms = 0) =>
   act(async () => {
     run();
     await new Promise<void>((resolve) => {
-      globalThis.setTimeout(resolve, ms);
+      realSetTimeout(resolve, ms);
     });
   });
 
@@ -291,6 +294,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await act(() => root?.unmount());
+  vi.useRealTimers();
   host?.remove();
   host = null;
   root = null;
@@ -552,6 +556,8 @@ describe('GenerateSettingsForm render isolation', () => {
   });
 
   it('flushes a pending edit to its own project on unmount, not on ordinary re-renders', async () => {
+    // Holds the debounce, so only a flush can persist the edit, however long the re-renders take on a busy runner.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await stepSteps();
     await renderAdapter(buildAdapter());
     await settle(() => storedValues().patchSnapshot({ positivePrompt: 'a harbour' }));
