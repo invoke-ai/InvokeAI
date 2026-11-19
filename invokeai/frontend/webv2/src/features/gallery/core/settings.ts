@@ -1,3 +1,5 @@
+import type { ResolvedValues } from '@platform/core/resolvedValues';
+
 import type { GalleryItemKind } from './items';
 import type { GalleryBoardOrderBy, GalleryOrderDir } from './types';
 
@@ -176,15 +178,18 @@ export const toggleGalleryBoardSection = (
     : { collapsedBoardSections: toggle(settings.collapsedBoardSections, !isOpen) };
 };
 
-export const getGallerySettings = (values: Record<string, unknown>): GallerySettings => {
+/** Not layered, so it reads stored values. */
+export const getGalleryChosenAutoAddBoardId = (values: Readonly<Record<string, unknown>>): string | null =>
+  typeof values.autoAddBoardId === 'string' && values.autoAddBoardId !== '' && !isLegacyFollowAutoAdd(values)
+    ? values.autoAddBoardId
+    : DEFAULT_GALLERY_SETTINGS.autoAddBoardId;
+
+export const getGallerySettings = (values: ResolvedValues): GallerySettings => {
   const paginationMode: GalleryPaginationMode =
     values.paginationMode === 'paginated' ? 'paginated' : DEFAULT_GALLERY_SETTINGS.paginationMode;
 
   return {
-    autoAddBoardId:
-      typeof values.autoAddBoardId === 'string' && values.autoAddBoardId !== '' && !isLegacyFollowAutoAdd(values)
-        ? values.autoAddBoardId
-        : DEFAULT_GALLERY_SETTINGS.autoAddBoardId,
+    autoAddBoardId: getGalleryChosenAutoAddBoardId(values),
     boardOrderBy: isBoardOrderBy(values.boardOrderBy) ? values.boardOrderBy : DEFAULT_GALLERY_SETTINGS.boardOrderBy,
     boardOrderDir: isOrderDir(values.boardOrderDir) ? values.boardOrderDir : DEFAULT_GALLERY_SETTINGS.boardOrderDir,
     boardPanelCollapsed:

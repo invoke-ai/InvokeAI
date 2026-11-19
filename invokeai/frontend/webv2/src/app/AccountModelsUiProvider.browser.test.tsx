@@ -5,6 +5,8 @@ import type { DefaultSettingsModel } from '@features/models/ui/detail/defaultSet
 import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { getGallerySettings } from '@features/gallery/contracts';
+import { useModelsUi } from '@features/models';
 import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { AddModelsView } from '@features/models/ui/add-models/AddModelsView';
@@ -51,7 +53,11 @@ vi.mock('@features/identity', async (importOriginal) => ({
 }));
 
 // The account preferences, kept beyond each mount as the settings store keeps them.
-const accountPreferences = createExternalStore({ enableModelDescriptions: true, installInPlace: true });
+const accountPreferences = createExternalStore({
+  enableModelDescriptions: true,
+  installInPlace: true,
+  scopedDefaults: {},
+});
 vi.mock('@workbench/settings/store', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   patchWorkbenchPreferences: (next: Record<string, unknown>) => {
@@ -131,7 +137,7 @@ describe('Account Models port on the Launchpad', () => {
 
   beforeEach(() => {
     session.canManageModels = true;
-    accountPreferences.setSnapshot({ enableModelDescriptions: true, installInPlace: true });
+    accountPreferences.setSnapshot({ enableModelDescriptions: true, installInPlace: true, scopedDefaults: {} });
     preferences.patch.mockReset();
     capabilitiesApi.get.mockReset();
     capabilitiesApi.get.mockResolvedValue(architectureCapabilitiesFixture);
@@ -346,6 +352,21 @@ describe('Account Models port on the Launchpad', () => {
       root = createRoot(host);
       await render(<AddModelsView />);
       expect(inplaceInput()?.checked).toBe(false);
+    });
+
+    it("hands the manager's gallery pickers the user's Gallery defaults", async () => {
+      accountPreferences.setSnapshot({
+        enableModelDescriptions: true,
+        installInPlace: true,
+        scopedDefaults: { gallery: { thumbnailFit: 'aspect' } },
+      });
+      const Probe = () => {
+        const { galleryValues } = useModelsUi();
+        return galleryValues ? getGallerySettings(galleryValues).thumbnailFit : null;
+      };
+      await render(<Probe />);
+
+      expect(host.textContent).toBe('aspect');
     });
   });
 });

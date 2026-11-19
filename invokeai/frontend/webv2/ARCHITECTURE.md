@@ -82,6 +82,7 @@ Behavior specs live beside their owning code. Read the owner's document before c
 
 - Contracts live with the module owning their invariants. Retired `workbench/types.ts` path is an architecture violation. Workbench aggregate, widget, Canvas, persistence, settings, feature contracts each have an owner-local canonical path.
 - Persisted schemas and backend DTOs stay private versioned/wire values. They cross seams only through explicit serializers, hydrators, mappers.
+- `platform/core/resolvedValues.ts` is a type-only brand: Workbench resolves widget values, but Feature readers such as `getGallerySettings` must require them and cannot import Workbench.
 - `platform/core/outputImages.ts` is the explicit shared adapter for backend invocation-output image names. Platform owns it because Queue and Nodes both need the projection and cannot import each other's private code. It recognizes only direct image, image-collection, workflow-return output contracts. Never grow it into a recursive walker of arbitrary metadata or input fields.
 - Imports of another feature's `core/`, `data/`, `ui/`, or runtime implementation fail.
 - Wildcard exports may aggregate files inside one owner. Never across an ownership seam.
