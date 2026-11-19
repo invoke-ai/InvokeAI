@@ -239,6 +239,49 @@ class OpenAIImageGenerationInvocation(BaseExternalImageGenerationInvocation):
 
 
 @invocation(
+    "azure_image_generation",
+    title="Azure AI Foundry Image Generation",
+    tags=["external", "generation", "azure"],
+    category="image",
+    version="1.0.0",
+)
+class AzureAIFoundryImageGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Generate images with GPT Image or MAI image deployments in an Azure AI Foundry resource."""
+
+    provider_id = "azure"
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.External],
+        ui_model_type=[ModelType.ExternalImageGenerator],
+        ui_model_format=[ModelFormat.ExternalApi],
+        ui_model_provider_id=["azure"],
+    )
+
+    # Like OpenAI, Foundry's image APIs have no img2img/inpaint distinction: the edits endpoint is used whenever
+    # images are supplied, so mode, init_image and mask_image are hidden.
+    mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode.", ui_hidden=True)
+    init_image: ImageField | None = InputField(
+        default=None, description="Init image (use reference_images instead)", ui_hidden=True
+    )
+    mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
+
+    quality: Literal["auto", "high", "medium", "low"] = InputField(
+        default="auto", description="Output image quality (GPT Image models only)"
+    )
+    background: Literal["auto", "transparent", "opaque"] = InputField(
+        default="auto", description="Background transparency handling"
+    )
+
+    def _build_provider_options(self) -> dict[str, Any]:
+        return {"quality": self.quality, "background": self.background}
+
+    def _build_output_provider_metadata(self) -> dict[str, Any]:
+        # Same keys as the OpenAI node: the UI reuses its quality/background settings for Azure models.
+        return {"openai_quality": self.quality, "openai_background": self.background}
+
+
+@invocation(
     "gemini_image_generation",
     title="Gemini Image Generation",
     tags=["external", "generation", "gemini"],

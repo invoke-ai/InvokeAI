@@ -47,6 +47,8 @@ EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_alibabacloud_base_url",
     "external_atlascloud_api_key",
     "external_atlascloud_base_url",
+    "external_azure_api_key",
+    "external_azure_base_url",
     "external_gemini_api_key",
     "external_gemini_base_url",
     "external_openai_api_key",
@@ -168,6 +170,8 @@ class InvokeAIAppConfig(BaseSettings):
         external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.
         external_atlascloud_api_key: API key for Atlas Cloud image generation.
         external_atlascloud_base_url: Base URL override for Atlas Cloud image generation.
+        external_azure_api_key: API key of the Azure AI Foundry resource used for image generation.
+        external_azure_base_url: Azure AI Foundry resource endpoint, e.g. `https://<resource>.services.ai.azure.com`. Required for Azure.
         external_gemini_api_key: API key for Gemini image generation.
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
@@ -323,6 +327,13 @@ class InvokeAIAppConfig(BaseSettings):
     )
     external_atlascloud_base_url: Optional[str] = Field(
         default=None, description="Base URL override for Atlas Cloud image generation."
+    )
+    external_azure_api_key: Optional[str] = Field(
+        default=None, description="API key of the Azure AI Foundry resource used for image generation."
+    )
+    external_azure_base_url: Optional[str] = Field(
+        default=None,
+        description="Azure AI Foundry resource endpoint, e.g. `https://<resource>.services.ai.azure.com`. Required for Azure.",
     )
     external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
     external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")

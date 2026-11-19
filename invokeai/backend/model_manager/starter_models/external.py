@@ -82,6 +82,7 @@ gemini_flash_image = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img"],
         supports_seed=True,
         supports_reference_images=True,
@@ -123,6 +124,7 @@ gemini_pro_image_preview = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img"],
         supports_seed=True,
         supports_reference_images=True,
@@ -144,6 +146,7 @@ gemini_3_1_flash_image_preview = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img"],
         supports_seed=True,
         supports_reference_images=True,
@@ -604,6 +607,7 @@ openai_gpt_image_2 = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img", "img2img"],
         supports_reference_images=True,
         max_images_per_request=10,
@@ -622,6 +626,7 @@ openai_gpt_image_1_5 = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img", "img2img"],
         supports_reference_images=True,
         max_images_per_request=10,
@@ -640,6 +645,7 @@ openai_gpt_image_1 = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img", "img2img"],
         supports_reference_images=True,
         max_images_per_request=10,
@@ -658,6 +664,7 @@ openai_gpt_image_1_mini = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img", "img2img"],
         supports_reference_images=True,
         max_images_per_request=10,
@@ -676,6 +683,7 @@ openai_dall_e_3 = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img"],
         max_images_per_request=1,
         allowed_aspect_ratios=["1:1", "7:4", "4:7"],
@@ -687,6 +695,157 @@ openai_dall_e_3 = StarterModel(
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+
+
+# Azure AI Foundry. Model IDs are deployment names; starters assume the Foundry default of naming a
+# deployment after its model. GPT Image deployments use the Azure OpenAI v1 API; MAI models use the MAI API.
+# MAI sizes stay within the smallest documented pixel cap (MAI-Image-2.6: 2,359,296) and the 768px minimum side.
+AZURE_MAI_ASPECT_RATIOS = ["1:1", "3:2", "2:3", "16:9", "9:16"]
+
+AZURE_MAI_ASPECT_RATIO_SIZES = {
+    "1:1": ExternalImageSize(width=1024, height=1024),
+    "3:2": ExternalImageSize(width=1536, height=1024),
+    "2:3": ExternalImageSize(width=1024, height=1536),
+    "16:9": ExternalImageSize(width=1792, height=1008),
+    "9:16": ExternalImageSize(width=1008, height=1792),
+}
+
+azure_gpt_image_2 = StarterModel(
+    name="Azure GPT Image 2",
+    base=BaseModelType.External,
+    source="external://azure/gpt-image-2",
+    description="GPT Image 2 deployed in Azure AI Foundry (Azure OpenAI v1 API). Requires an Azure AI Foundry resource key and endpoint, and a deployment named exactly `gpt-image-2` (the Foundry default). May incur Azure usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+
+azure_gpt_image_2_5_sunburst = StarterModel(
+    name="Azure GPT Image 2.5 Sunburst",
+    base=BaseModelType.External,
+    source="external://azure/gpt-image-2.5-sunburst",
+    description="GPT Image 2.5 Sunburst deployed in Azure AI Foundry (Azure OpenAI v1 API). Requires an Azure AI Foundry resource key and endpoint, and a deployment named exactly `gpt-image-2.5-sunburst` (the Foundry default). May incur Azure usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+
+azure_gpt_image_2_5_flare = StarterModel(
+    name="Azure GPT Image 2.5 Flare",
+    base=BaseModelType.External,
+    source="external://azure/gpt-image-2.5-flare",
+    description="GPT Image 2.5 Flare deployed in Azure AI Foundry (Azure OpenAI v1 API). Requires an Azure AI Foundry resource key and endpoint, and a deployment named exactly `gpt-image-2.5-flare` (the Foundry default). May incur Azure usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+
+azure_mai_image_2_7 = StarterModel(
+    name="Azure MAI Image 2.7",
+    base=BaseModelType.External,
+    source="external://azure/MAI-Image-2.7",
+    description="Microsoft MAI-Image-2.7 (preview). Supports transparent backgrounds. Edits from up to 5 reference images. Requires an Azure AI Foundry resource key and endpoint, and a deployment named exactly `MAI-Image-2.7` (the Foundry default). May incur Azure usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=5,
+        max_images_per_request=1,
+        allowed_aspect_ratios=AZURE_MAI_ASPECT_RATIOS,
+        aspect_ratio_sizes=AZURE_MAI_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+
+azure_mai_image_2_7_flash = StarterModel(
+    name="Azure MAI Image 2.7 Flash",
+    base=BaseModelType.External,
+    source="external://azure/MAI-Image-2.7-Flash",
+    description="Microsoft MAI-Image-2.7-Flash (preview), a faster, lower-cost MAI-Image-2.7. Supports transparent backgrounds. Edits from up to 5 reference images. Requires an Azure AI Foundry resource key and endpoint, and a deployment named exactly `MAI-Image-2.7-Flash` (the Foundry default). May incur Azure usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=5,
+        max_images_per_request=1,
+        allowed_aspect_ratios=AZURE_MAI_ASPECT_RATIOS,
+        aspect_ratio_sizes=AZURE_MAI_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+
+azure_mai_image_2_6 = StarterModel(
+    name="Azure MAI Image 2.6",
+    base=BaseModelType.External,
+    source="external://azure/MAI-Image-2.6",
+    description="Microsoft MAI-Image-2.6. Edits from up to 5 reference images. Requires an Azure AI Foundry resource key and endpoint, and a deployment named exactly `MAI-Image-2.6` (the Foundry default). May incur Azure usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=5,
+        max_images_per_request=1,
+        allowed_aspect_ratios=AZURE_MAI_ASPECT_RATIOS,
+        aspect_ratio_sizes=AZURE_MAI_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+
+azure_mai_image_2_6_flash = StarterModel(
+    name="Azure MAI Image 2.6 Flash",
+    base=BaseModelType.External,
+    source="external://azure/MAI-Image-2.6-Flash",
+    description="Microsoft MAI-Image-2.6-Flash, a faster, lower-cost MAI-Image-2.6. Edits from up to 5 reference images. Requires an Azure AI Foundry resource key and endpoint, and a deployment named exactly `MAI-Image-2.6-Flash` (the Foundry default). May incur Azure usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=5,
+        max_images_per_request=1,
+        allowed_aspect_ratios=AZURE_MAI_ASPECT_RATIOS,
+        aspect_ratio_sizes=AZURE_MAI_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
 )
 
 SEEDREAM_ASPECT_RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"]
@@ -723,6 +882,7 @@ seedream_5_0 = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img", "img2img"],
         supports_reference_images=True,
         max_reference_images=14,
@@ -742,6 +902,7 @@ seedream_5_0_lite = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img", "img2img"],
         supports_reference_images=True,
         max_reference_images=14,
@@ -761,6 +922,7 @@ seedream_4_5 = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img", "img2img"],
         supports_reference_images=True,
         max_reference_images=14,
@@ -780,6 +942,7 @@ seedream_4_0 = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
+        supports_negative_prompt=False,
         modes=["txt2img", "img2img"],
         supports_reference_images=True,
         max_reference_images=14,

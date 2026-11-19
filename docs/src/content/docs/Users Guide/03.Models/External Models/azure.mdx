@@ -1,0 +1,61 @@
+---
+title: Azure AI Foundry
+---
+
+import { Steps } from '@astrojs/starlight/components'
+
+Invoke supports image models deployed in an [Azure AI Foundry](https://ai.azure.com) resource: the **GPT Image** family (through the Azure OpenAI v1 API) and Microsoft's **MAI image models** (through the MAI API). Both are served from the same resource endpoint and use the same resource key.
+
+## Setting Up Foundry
+
+<Steps>
+1. Create an Azure AI Foundry resource (or use an existing one) in a region that offers the models you want.
+2. Deploy each model you want to use. **Keep the default deployment name**, which is the model name (for example `gpt-image-2` or `MAI-Image-2.7`). Invoke sends the model name as the deployment name.
+3. From the resource's **Keys and Endpoint** page, copy a key and the endpoint of the form `https://<resource>.services.ai.azure.com`.
+</Steps>
+
+## Configuration
+
+Add both values to `api_keys.yaml` in your Invoke root directory, or enter them on the Azure AI Foundry card in the model manager:
+
+```yaml
+external_azure_api_key: "<resource key>"
+external_azure_base_url: "https://<resource>.services.ai.azure.com"
+```
+
+Both are required. Restart Invoke after editing the file.
+
+## Available Models
+
+| Model | Deployment name | API | Reference images | Batch | Notes |
+| --- | --- | --- | --- | --- | --- |
+| **Azure GPT Image 2** | `gpt-image-2` | Azure OpenAI v1 | yes | up to 10 | |
+| **Azure GPT Image 2.5 Sunburst** | `gpt-image-2.5-sunburst` | Azure OpenAI v1 | yes | up to 10 | |
+| **Azure GPT Image 2.5 Flare** | `gpt-image-2.5-flare` | Azure OpenAI v1 | yes | up to 10 | |
+| **Azure MAI Image 2.7** | `MAI-Image-2.7` | MAI | up to 5 | 1 per request | Preview. Transparent backgrounds. |
+| **Azure MAI Image 2.7 Flash** | `MAI-Image-2.7-Flash` | MAI | up to 5 | 1 per request | Preview. Faster, lower cost. |
+| **Azure MAI Image 2.6** | `MAI-Image-2.6` | MAI | up to 5 | 1 per request | |
+| **Azure MAI Image 2.6 Flash** | `MAI-Image-2.6-Flash` | MAI | up to 5 | 1 per request | Faster, lower cost. |
+
+A model only works if the resource has a deployment with exactly that name. Deployments with custom names are not supported yet.
+
+Inpainting (mask-based editing) is not supported. img2img and reference images go to the edits endpoint without a mask.
+
+## Provider-Specific Options
+
+- **Quality** (GPT Image only): `low`, `medium`, `high`, or `auto`.
+- **Background**: `auto`, `transparent`, or `opaque`. `transparent` returns a PNG with an alpha channel. Among the MAI models, transparent backgrounds are documented for MAI-Image-2.7 and 2.7 Flash.
+
+Input fidelity is not offered: the GPT Image 2.5 deployments reject it, and MAI has no such option.
+
+## How Requests Are Routed
+
+- GPT Image models: text-to-image goes to `/openai/v1/images/generations`, and anything with an init or reference image goes to `/openai/v1/images/edits`.
+- MAI models: text-to-image goes to `/mai/v1/images/generations`, and anything with images goes to `/mai/v1/images/edits`, with each image in its own `image` form field. MAI takes the output size as `width` and `height`, each at least 768 px. Every size Invoke offers is within the smallest documented pixel limit (MAI-Image-2.6: 2,359,296 px).
+
+## Tips
+
+<Steps>
+1. Larger batches are split into multiple requests: up to 10 images per GPT Image request, and one per MAI request.
+2. Rate limits come from your deployment's quota and surface as failed invocations. Retry after a short wait, or raise the deployment's capacity in Foundry.
+</Steps>

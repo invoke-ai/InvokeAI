@@ -60,6 +60,19 @@ describe('external provider options', () => {
     ).toContain('openaiInputFidelity');
   });
 
+  it('offers Azure GPT Image deployments quality and background, and MAI models background only', () => {
+    const azure = (modelId: string) =>
+      external('azure', { modes: ['txt2img', 'img2img'], supports_reference_images: true }, modelId);
+
+    expect(getExternalProviderOptionKeys(azure('gpt-image-2.5-sunburst'))).toEqual([
+      'openaiQuality',
+      'openaiBackground',
+    ]);
+    for (const modelId of ['MAI-Image-2.7', 'mai-image-2.6-flash']) {
+      expect(getExternalProviderOptionKeys(azure(modelId))).toEqual(['openaiBackground']);
+    }
+  });
+
   it('offers no OpenAI options to DALL·E, which the provider sends none of', () => {
     for (const modelId of ['dall-e-2', 'dall-e-3']) {
       expect(getExternalProviderOptionKeys(external('openai', { modes: ['txt2img', 'img2img'] }, modelId))).toEqual([]);
