@@ -160,16 +160,27 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
               }
               return result;
             }, marker);
-            assert.ok(
-              recovery.journal.some((entry) => entry.hasMarker),
-              'Committed journal must contain A'
-            );
-            assert.ok(
-              recovery.drafts.some((entry) => entry.projectId === 'fixture-project-002' && !entry.hasMarker),
-              'The initial save must have staged old B'
-            );
-            assert.ok(!recovery.drafts.some((entry) => entry.hasMarker), 'Staged B must not explain A recovery');
-            assert.ok(heldPuts.length && heldPuts.every((body) => !body.includes(marker)), 'Only old B reached PUT');
+            const journaledA = recovery.journal.some((entry) => entry.hasMarker);
+            if (engine === 'chromium') {
+              assert.ok(journaledA, 'Committed journal must contain A');
+              assert.ok(
+                recovery.drafts.some((entry) => entry.projectId === 'fixture-project-002' && !entry.hasMarker),
+                'The initial save must have staged old B'
+              );
+              assert.ok(!recovery.drafts.some((entry) => entry.hasMarker), 'Staged B must not explain A recovery');
+              assert.ok(heldPuts.length && heldPuts.every((body) => !body.includes(marker)), 'Only old B reached PUT');
+            } else {
+              // Once unload cancels the held B PUT, Firefox and WebKit can run the pagehide save on: it stages A
+              // over B, retiring the journal, and may then PUT A.
+              const stagedA = recovery.drafts.some(
+                (entry) => entry.projectId === 'fixture-project-002' && entry.hasMarker
+              );
+              assert.ok(journaledA || stagedA, 'A must be held in the committed journal or the staged draft');
+              assert.ok(
+                stagedA || heldPuts.every((body) => !body.includes(marker)),
+                'A must be staged before it is sent'
+              );
+            }
             const server = await fetch(
               `${backend.origin}/api/v1/projects/fixture-project-002?max_canvas_schema_version=4&max_document_schema_version=4`
             );
@@ -202,7 +213,7 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
             );
             void initialGalleryReads.catch(() => {});
             await open();
-            await expect(prompt, 'Journal-only held field must survive actual unload').toHaveValue(marker);
+            await expect(prompt, 'Held field must survive actual unload').toHaveValue(marker);
             await initialGalleryReads;
             await waitForRenderedMedia(page, {
               allImagesSelector: '[data-hotkey-widget-type-id="gallery"] [data-gallery-tile-media] img',
