@@ -31,8 +31,8 @@ export interface StagedPreviewBlobCacheOptions {
 }
 
 /**
- * Caches compressed candidate bytes with bounded background demand. Latest explicit get preempts stale requests
- * and promotes queued work without retaining all decoded surfaces.
+ * Caches compressed candidate bytes with bounded background demand. Latest explicit get preempts stale requests and
+ * promotes queued work without retaining all decoded surfaces.
  */
 export const createStagedPreviewBlobCache = (
   resolveImage: ImageResolver,
@@ -79,8 +79,8 @@ export const createStagedPreviewBlobCache = (
       if (entries.size <= maxEntries && retainedBytes <= maxBytes) {
         return;
       }
-      // In-flight requests are bounded separately and become eligible as soon
-      // as they settle, so trimming never breaks request coalescing.
+      // In-flight requests are bounded separately and become eligible as soon as they settle, so trimming never breaks
+      // request coalescing.
       if (entry.active) {
         continue;
       }
@@ -117,9 +117,8 @@ export const createStagedPreviewBlobCache = (
       .finally(() => {
         releaseActive(entry);
         trim();
-        // A demanded request may need its single foreground retry. Its wrapper
-        // owns queue draining so a background item cannot take the freed slot
-        // only to be aborted immediately by that retry.
+        // A demanded request may need its single foreground retry. Its wrapper owns queue draining so a background item
+        // cannot take the freed slot only to be aborted immediately by that retry.
         if (!entry.demandPromise) {
           drainPrefetchQueue();
         }
@@ -190,9 +189,8 @@ export const createStagedPreviewBlobCache = (
     queued.delete(imageName);
     makeRoomForLatestDemand(imageName);
     const demanded = start(imageName, 'demand');
-    // Every explicit demand gets at most one retry. A caller that arrives while
-    // this retry is active shares the raw retry promise instead of wrapping it
-    // in another retry cycle.
+    // Every explicit demand gets at most one retry. A caller that arrives while this retry is active shares the raw
+    // retry promise instead of wrapping it in another retry cycle.
     demanded.demandPromise = demanded.promise;
     drainPrefetchQueue();
     return demanded.promise;

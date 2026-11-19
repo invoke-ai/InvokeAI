@@ -25,8 +25,7 @@ const isGeneratedImageContract = (value: unknown): value is GeneratedImageContra
 };
 
 /**
- * Validates a newest-first recent-image overlay, retaining the newest occurrence
- * of each image name and bounding the persisted result.
+ * Validates a newest-first recent-image overlay: the newest occurrence of each image name, bounded for persistence.
  */
 export const getBoundedRecentImages = (value: unknown): GeneratedImageContract[] => {
   if (!Array.isArray(value)) {

@@ -207,9 +207,9 @@ const MODEL_DEFAULT_VALUE_KEYS = [
 ] as const satisfies readonly (keyof GenerateSettings)[];
 
 /**
- * Reset everything to defaults, limited to the model-governed keys so prompts and other fields stay untouched.
- * Concepts are left as they are: the model already skips the ones it cannot load, and keeping them lets a compatible
- * model run them again.
+ * Reset everything to defaults, limited to the model-governed keys so prompts and other fields stay untouched. Concepts
+ * are left as they are: the model already skips the ones it cannot load, and keeping them lets a compatible model run
+ * them again.
  */
 export const getModelDefaultsPatch = (
   settings: GenerateSettings,

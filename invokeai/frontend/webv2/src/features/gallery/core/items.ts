@@ -40,10 +40,10 @@ export interface GalleryImageItem extends GalleryItemBase {
 export interface GalleryVideoItem extends GalleryItemBase {
   durationSeconds: number;
   fps?: number;
-  /** Whether the video embeds the workflow that made it. Video records say; the mixed-media listing does not. */
+  /** Video records say; the mixed-media listing does not. */
   hasWorkflow?: boolean;
   kind: 'video';
-  /** `audio_upload` identifies audio converted into a waveform video rather than footage. */
+  /** `audio_upload` marks audio converted into a waveform video. */
   mediaOrigin?: string;
 }
 
@@ -51,15 +51,14 @@ export type GalleryItem = GalleryImageItem | GalleryVideoItem;
 
 export interface GalleryItemsPage {
   items: GalleryItem[];
-  /** Absolute list offset requested for this page. Omitted only by legacy fixtures/cache entries. */
+  /** Omitted only by legacy fixtures/cache entries. */
   offset?: number;
-  /** Absolute slot for each item, kept aligned with `items`; sparse hydration leaves index gaps. */
+  /** Aligned with `items`; sparse hydration leaves index gaps. */
   itemIndices?: number[];
   total: number;
 }
 
 export interface GalleryItemMutationResult {
-  /** Boards whose contents/counts changed for at least one confirmed success. */
   affectedBoardIds?: string[];
   failed: GalleryItemRef[];
   succeeded: GalleryItemRef[];
@@ -67,11 +66,7 @@ export interface GalleryItemMutationResult {
 
 export const toGalleryItemKey = ({ kind, name }: GalleryItemRef): GalleryItemKey => `${kind}:${name}`;
 
-/**
- * The Gallery view that lists each category, mirroring the backend's `IMAGE_CATEGORIES` and `ASSETS_CATEGORIES`
- * (`invokeai/app/services/image_records/image_records_common.py`). `other` is in neither: it marks pixels a Canvas
- * layer owns, which the backend keeps durable but never lists or counts, so no view can show such an item.
- */
+/** Mirrors the backend's `IMAGE_CATEGORIES`/`ASSETS_CATEGORIES`; `other` marks Canvas-owned pixels no view lists. */
 const galleryViewByCategory: Record<GalleryItemCategory, GalleryView | null> = {
   control: 'assets',
   general: 'images',
@@ -80,14 +75,10 @@ const galleryViewByCategory: Record<GalleryItemCategory, GalleryView | null> = {
   user: 'assets',
 };
 
-/**
- * Which Gallery view lists an item, for images and videos alike; null for a Canvas-owned (`other`) item that no view
- * lists. Callers must not open or navigate a view for a null item: the listing would never contain it.
- */
+/** Null for a Canvas-owned item: callers must not open a view for it, as the listing would never contain it. */
 export const getGalleryItemView = ({ category }: Pick<GalleryItem, 'category'>): GalleryView | null =>
   galleryViewByCategory[category];
 
-/** The categories a view's backend listing requests: the inverse of `getGalleryItemView`. */
 export const getGalleryViewCategories = (view: GalleryView): GalleryItemCategory[] =>
   (Object.keys(galleryViewByCategory) as GalleryItemCategory[]).filter(
     (category) => galleryViewByCategory[category] === view
@@ -124,14 +115,11 @@ export const assertNeverGalleryItem = (item: never): never => {
 
 const compareSqliteBinaryText = (a: string, b: string): number => (a === b ? 0 : a < b ? -1 : 1);
 
-/**
- * Normalize SQLite and ISO timestamps before comparing; their space/T separators otherwise misorder same-day
- * items.
- */
+/** SQLite and ISO separators would otherwise misorder same-day items. */
 export const compareCreatedAt = (a: string, b: string): number =>
   compareSqliteBinaryText(normalizeServerTimestamp(a), normalizeServerTimestamp(b));
 
-/** Mirrors the backend's time/kind/name order for mixed gallery items. */
+/** Mirrors the backend's time/kind/name order. */
 export const compareGalleryItems = (
   a: GalleryItem,
   b: GalleryItem,
@@ -219,12 +207,7 @@ export const formatGalleryVideoDuration = (durationSeconds: number): string => {
   return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
 
-/** Share upload acceptance and classification here to prevent drift without adding an initial bundle request. */
-
-/**
- * Audio uploads become waveform videos. Video/audio MIME wildcards mirror server checks; extensions cover unknown
- * MIME types. Images deliberately offer only round-trippable formats.
- */
+/** MIME wildcards mirror server checks; images offer only round-trippable formats. */
 const GALLERY_UPLOAD_FORMATS: Record<GalleryItemKind, { extensions: readonly string[]; mimes: readonly string[] }> = {
   image: {
     extensions: ['.png', '.jpg', '.jpeg', '.webp'],
@@ -259,31 +242,20 @@ const GALLERY_UPLOAD_FORMATS: Record<GalleryItemKind, { extensions: readonly str
   },
 };
 
-/**
- * Keep top-level declarations tree-shakeable; scanning the small format table avoids retaining this module's
- * barrels.
- */
+/** Keeps top-level declarations tree-shakeable, so this module's barrels stay out. */
 const GALLERY_UPLOAD_KINDS = ['image', 'video'] as const;
 
-/**
- * The file input `accept` list for the given kinds. Advisory only — every browser offers an
- * "All files" escape hatch, so callers still classify what comes back.
- */
+/** Advisory only (browsers offer "All files"), so callers classify. */
 export const getGalleryUploadAccept = (kinds: readonly GalleryItemKind[]): string =>
   kinds
     .flatMap((kind) => [...GALLERY_UPLOAD_FORMATS[kind].mimes, ...GALLERY_UPLOAD_FORMATS[kind].extensions])
     .join(',');
 
-/**
- * Which upload route a picked file belongs to, or null when no route takes it. An exact MIME
- * match wins over a wildcard, and both win over the filename, so a file the OS typed is never
- * routed by its extension.
- */
+/** Exact MIME beats wildcard beats filename, so a file the OS typed is never routed by its extension. */
 export const classifyGalleryUpload = (file: Pick<File, 'name' | 'type'>): { kind: GalleryItemKind } | null => {
   const mimeType = file.type.toLowerCase();
 
-  // The legacy alias some Windows tools emit; the image route accepts it, but no picker
-  // needs to advertise it, so it is classified without being offered.
+  // The legacy alias some Windows tools emit: accepted, never advertised.
   if (mimeType === 'image/jpg') {
     return { kind: 'image' };
   }
@@ -293,7 +265,7 @@ export const classifyGalleryUpload = (file: Pick<File, 'name' | 'type'>): { kind
     }
   }
   for (const kind of GALLERY_UPLOAD_KINDS) {
-    // `video/*` matches any `video/` type, mirroring ACCEPTED_*_MIME_PREFIXES on the routes.
+    // Mirrors ACCEPTED_*_MIME_PREFIXES on the routes.
     if (
       GALLERY_UPLOAD_FORMATS[kind].mimes.some((mime) => mime.endsWith('/*') && mimeType.startsWith(mime.slice(0, -1)))
     ) {
@@ -312,13 +284,10 @@ export const classifyGalleryUpload = (file: Pick<File, 'name' | 'type'>): { kind
   return null;
 };
 
-/** Virtual "by date" boards (`by_date:<YYYY-MM-DD>`) list items but can never receive them. */
+/** They list items but can never receive them. */
 export const DATE_BOARD_ID_PREFIX = 'by_date:';
 
-/**
- * The listing scope of every board the caller may read plus their Uncategorized items, as the gallery endpoints take
- * it for `board_id`. A scope, not a board: nothing is ever stored on it.
- */
+/** A request scope, never stored on. */
 export const ALL_READABLE_BOARDS_ID = 'all';
 
 export const isDateBoardId = (boardId: string): boolean => boardId.startsWith(DATE_BOARD_ID_PREFIX);

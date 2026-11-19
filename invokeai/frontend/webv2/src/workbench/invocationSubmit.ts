@@ -1,8 +1,3 @@
-/**
- * After callers flush drafts and validate route/connection, send Canvas through async preparation and other
- * sources through reducer submission. Inject Canvas preparation to keep this decision independent of the engine.
- */
-
 import type { ParseDynamicPromptsResponse } from '@features/generation/prompts';
 import type { ModelConfig } from '@features/models';
 import type { ProjectGraphState } from '@features/workflow/contracts';
@@ -55,7 +50,6 @@ const BATCH_NOT_READY_TITLE = { title: 'The batch is not ready', titleKey: 'topb
 /** Settled, never rejected: it may fail while the board listing is still awaited, before anything awaits it. */
 type UpscaleSourceMetadataRead = UpscaleSourceMetadata | { error: unknown; imageName: string };
 
-/** Upscale in Model only mode copies its input's metadata into the result, so it is read before dispatch. */
 const readModelOnlyUpscaleSourceMetadata = (
   project: Project,
   route: ResolvedInvocationRoute,
@@ -80,39 +74,21 @@ const readModelOnlyUpscaleSourceMetadata = (
 };
 
 export interface SubmitResolvedInvocationDeps {
-  /** The resolved route to submit — the caller has already checked it is valid. */
   route: ResolvedInvocationRoute;
-  /** The project the canvas pipeline reads its generate/canvas widget values from. */
   project: Project;
-  /** The user's defaults captured with `project`; settings and widget values resolve against them. */
   scopedDefaults: ScopedDefaults;
-  /** Loaded models (or `undefined` while loading), forwarded verbatim to both paths. */
   models: readonly ModelConfig[] | undefined;
-  /**
-   * The project workflow a workflow route submits. Captured with the project snapshot so a switch during
-   * generator resolution never submits another workflow; defaults to the snapshot's active workflow.
-   */
+  /** Captured with the project snapshot so a switch during generator resolution never submits another workflow. */
   workflowId?: string;
-  /** Identity lifetime that initiated this submission. */
   owner: AccountScope;
-  /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
   prepend?: boolean;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
-  /**
-   * Resolves after Canvas preparation queues or reports failure; Canvas never dispatches
-   * submitResolvedInvocationSnapshot.
-   */
   prepareCanvasInvocation: (args: PrepareCanvasInvocationArgs) => Promise<void> | void;
-  /** Words a control-layer rejection from the locale; its error message is for logs only. */
   formatControlLayerError: PrepareCanvasInvocationArgs['formatControlLayerError'];
-  /** Words, from the locale, a Model only upscale whose input image's metadata could not be read. */
   formatUpscaleMetadataFailure: (imageName: string) => string;
 }
 
-/**
- * Expand here to avoid a gallery → queue → generation cycle. Treat null or response.error as failure even if
- * prompts are present.
- */
+/** Expanded here to avoid a gallery → queue → generation cycle; null or response.error is failure. */
 const resolveExpandedPrompts = async (
   source: DynamicPromptsExpansionSource,
   sampleSeed: number | null
@@ -134,7 +110,6 @@ const getSubmittedWorkflowDocument = (project: Project, workflowId: string | und
     ? (project.workflows.entries.find((entry) => entry.document.id === workflowId)?.document ?? null)
     : getActiveProjectWorkflow(project).document;
 
-/** The async generators (dynamic prompts, board listings) a workflow submission still has to resolve. */
 const getPendingWorkflowGenerators = (
   document: ProjectGraphState | null,
   route: ResolvedInvocationRoute
@@ -148,10 +123,6 @@ const getPendingWorkflowGenerators = (
   return planWorkflowBatch(document, templatesSnapshot.templates).pendingGenerators;
 };
 
-/**
- * Resolves the pending generators, the only asynchronous step before the reducer; their outputs travel with the
- * action and the planner re-checks them against the document it compiles.
- */
 const resolveWorkflowGeneratorsForRoute = async (
   project: Project,
   document: ProjectGraphState,
@@ -178,7 +149,6 @@ const resolveWorkflowGeneratorsForRoute = async (
     return null;
   }
 
-  // Sizes were unknown until now: an empty board or a mismatched group only shows once the lists exist.
   const resolvedPlan = planWorkflowBatch(document, templatesSnapshot.templates, {
     generators: resolutions,
   });
@@ -230,20 +200,14 @@ export const submitResolvedInvocation = async ({
     return;
   }
 
-  // The reducer resolves where results land (the auto-add board, a workflow node's board) from the cached board
-  // listing, so a board is judged from a listing and never trusted unseen. Any cached listing decides at once, a
-  // stale one refreshing in the background for the next run; only with none cached does a read start now, alongside
-  // generator resolution and prompt expansion, to be awaited as the run is dispatched. So this path is synchronous
-  // but for the first run after the listings were cleared, which the Invoke control shows as preparing. A run bound
-  // for the canvas names no board, unless it is a workflow, whose nodes carry their boards whatever the destination.
+  // Any cached board listing decides at once (a stale one refreshes for the next run); only with none cached does a
+  // read start now, awaited at dispatch.
   const pendingBoards =
     route.destination === 'gallery' || route.sourceId === 'workflow'
       ? ensureGalleryBoardDestinations(queryClient)
       : null;
-  // Upscale routes have no other asynchronous step, so this is awaited at dispatch, alongside the board listing.
   const pendingUpscaleMetadata = readModelOnlyUpscaleSourceMetadata(project, route, owner);
 
-  // Only a workflow with unresolved generators needs this round trip; every other route dispatches synchronously.
   const pendingGenerators = getPendingWorkflowGenerators(workflowDocument, route);
   let workflowGenerators: WorkflowGeneratorResolutions | undefined;
 
@@ -265,7 +229,6 @@ export const submitResolvedInvocation = async ({
 
   const expansionSource = getDynamicPromptsExpansionSource(project, route.sourceId);
 
-  // Only dynamic prompts require a round trip.
   if (expansionSource) {
     const { sampleSeed: drawSeed, ...expandedFrom } = expansionSource;
     const sampleSeed = expandedFrom.combinatorial ? null : drawSeed;
@@ -274,10 +237,8 @@ export const submitResolvedInvocation = async ({
       return;
     }
 
-    // Reject failed expansions for hotkey and preview callers too, so literal dynamic syntax never reaches
-    // generation.
+    // Reject failed expansions for hotkey and preview callers too, so literal dynamic syntax never reaches generation.
     if (expansion === null || expansion.error) {
-      // A request that never answered has no server reason, so the notice says what failed instead.
       commands.notifications.add({
         ...EXPANSION_FAILED_TITLE,
         ...(expansion === null ? EXPANSION_UNREACHABLE_MESSAGE : { message: expansion.error ?? undefined }),
@@ -351,8 +312,6 @@ const dispatchResolvedInvocation = async (
   pendingBoards: Promise<void> | null,
   pendingUpscaleMetadata: Promise<UpscaleSourceMetadataRead> | null = null
 ): Promise<void> => {
-  // The board listing the destination is judged from, read while the rest was resolved when none was cached;
-  // nothing to wait for keeps the dispatch synchronous.
   if (pendingBoards) {
     await pendingBoards;
     if (!isAccountScopeCurrent(owner)) {
@@ -380,8 +339,7 @@ const dispatchResolvedInvocation = async (
   }
 
   if (route.sourceId === 'canvas') {
-    // Await Canvas preparation to retain the submission guard until completion; pass the resolved destination so
-    // Canvas can output to Gallery.
+    // Await Canvas preparation so the submission guard holds until it completes.
     const canvasValues = getResolvedProjectWidgetValues(project, 'canvas', scopedDefaults);
     await prepareCanvasInvocation({
       compositing: readCanvasCompositingSettings(canvasValues),

@@ -4,8 +4,8 @@ import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
 
 /**
- * Store high-frequency progress outside workbench state to avoid global rerenders and autosave; subscribe per
- * local item ID.
+ * Store high-frequency progress outside workbench state to avoid global rerenders and autosave; subscribe per local
+ * item ID.
  */
 
 export interface QueueItemProgressSink {

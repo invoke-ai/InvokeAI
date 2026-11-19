@@ -81,8 +81,8 @@ const INDETERMINATE_SX: SystemStyleObject = {
 };
 
 /**
- * One session's fill. Each segment subscribes to its own item so a step event
- * on one GPU does not re-render the other GPUs' segments — or the top bar.
+ * One session's fill. Each segment subscribes to its own item so a step event on one GPU does not re-render the other
+ * GPUs' segments — or the top bar.
  */
 const RailSegment = ({ isLoadingModels, itemId }: { isLoadingModels: boolean; itemId: number | null }) => {
   const progress = useItemProgress(itemId);

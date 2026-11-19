@@ -51,8 +51,8 @@ const describeProgress = (t: Translate, progress: ProjectFileProgress): string =
 const PROGRESS_REDRAW_INTERVAL_MS = 200;
 
 /**
- * Every reporter path must finalize the toast. Direction determines failure wording; account cancellation
- * dismisses without a verdict.
+ * Every reporter path must finalize the toast. Direction determines failure wording; account cancellation dismisses
+ * without a verdict.
  */
 export const startProjectFileReport = (
   t: Translate,

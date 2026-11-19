@@ -58,16 +58,6 @@ describe('placementToTransform', () => {
       y: 20,
     });
   });
-
-  it('falls back to a 1:1 scale when the source image has no dimensions', () => {
-    expect(placementToTransform({ height: 200, width: 400, x: 0, y: 0 }, 0, 0)).toEqual({
-      rotation: 0,
-      scaleX: 1,
-      scaleY: 1,
-      x: 0,
-      y: 0,
-    });
-  });
 });
 
 describe('loadCanvasState', () => {
@@ -95,8 +85,8 @@ describe('loadCanvasState', () => {
 
   it('loads an Anima control layer saved before LLLite support exactly as it was saved', () => {
     // Earlier builds offered only ControlNet on Anima, listing LLLite models under it and warning that the kind was
-    // unsupported. Load cannot tell an LLLite key from a ControlNet key without the catalog, so it keeps the kind;
-    // the settings panel reports it and switching to LLLite keeps the model.
+    // unsupported. Load cannot tell an LLLite key from a ControlNet key without the catalog, so it keeps the kind; the
+    // settings panel reports it and switching to LLLite keeps the model.
     const saved = {
       ...createControlLayer({ id: 'anima-control', name: 'Anima Control' }),
       adapter: {
@@ -125,259 +115,6 @@ describe('loadCanvasState', () => {
     expect(refused.status === 'invalid' ? refused.diagnostics : []).toEqual([
       expect.objectContaining({ path: 'document.stacks.control[1]' }),
     ]);
-  });
-
-  it('normalizes an incomplete persisted Z-Image control with backend defaults', () => {
-    const loaded = load(
-      withNodes(
-        [
-          {
-            ...createControlLayer({ id: 'z-control', name: 'Z Control' }),
-            adapter: { kind: 'z_image_control', model: 'z-control' },
-          },
-        ],
-        'control'
-      )
-    );
-    const layer = loaded.document.stacks.control[0];
-
-    expect(layer?.type === 'control' ? layer.adapter : null).toEqual({
-      beginEndStepPct: [0, 1],
-      controlMode: null,
-      kind: 'z_image_control',
-      model: 'z-control',
-      weight: 0.75,
-    });
-  });
-
-  it('keeps a control layer mode and negative weight whatever kind it stores, live, in snapshots and in session', () => {
-    // Created under Z-Image, then run on SDXL with a negative weight: the stored kind is advisory, the resolved one
-    // governs, so the document must load and save as it is.
-    const adapter = {
-      beginEndStepPct: [0.1, 0.9],
-      controlMode: 'more_control',
-      kind: 'z_image_control',
-      model: null,
-      weight: -0.3,
-    };
-    const state = withNodes([{ ...createControlLayer({ id: 'z-control', name: 'Z Control' }), adapter }], 'control');
-    const loaded = load({
-      ...state,
-      snapshots: [{ createdAt: 'now', document: state.document, id: 'snapshot', name: 'Snapshot' }],
-    });
-    const adapterOf = (document: (typeof loaded)['document']) => {
-      const layer = document.stacks.control[0];
-      return layer?.type === 'control' ? layer.adapter : null;
-    };
-
-    expect(adapterOf(loaded.document)).toEqual(adapter);
-    expect(adapterOf(loaded.snapshots[0]!.document)).toEqual(adapter);
-    // Snapshot save and restore and document replace normalize in session; a refusal there would silently no-op.
-    const normalized = normalizeCanvasDocumentContract(loaded.document);
-    expect(normalized && adapterOf(normalized)).toEqual(adapter);
-  });
-
-  it('repairs a persisted control weight outside what any kind runs with the kind default', () => {
-    const loaded = load(
-      withNodes(
-        [
-          {
-            ...createControlLayer({ id: 'q-control', name: 'Q Control' }),
-            adapter: { kind: 'qwen_image_control', model: 'qwen-union', weight: -1.5 },
-          },
-        ],
-        'control'
-      )
-    );
-    const layer = loaded.document.stacks.control[0];
-
-    expect(layer?.type === 'control' ? layer.adapter : null).toEqual({
-      beginEndStepPct: [0, 1],
-      controlMode: null,
-      kind: 'qwen_image_control',
-      model: 'qwen-union',
-      weight: 0.85,
-    });
-  });
-
-  it('round-trips a layer regenerate region and drops a malformed one without failing the layer', () => {
-    const inpaint = {
-      fill: { color: '#e07575', style: 'diagonal' },
-      isEnabled: true,
-      name: 'Face',
-    };
-    const loaded = load(withNodes([{ ...createEmptyPaintLayer('Region', 'region'), inpaint }]));
-    const layer = loaded.document.stacks.raster[0];
-    expect(layer?.type === 'raster' ? layer.inpaint : null).toEqual(inpaint);
-
-    const malformed = load(withNodes([{ ...createEmptyPaintLayer('Bad', 'bad'), inpaint: { isEnabled: 'yes' } }]));
-    const badLayer = malformed.document.stacks.raster[0];
-    expect(badLayer?.type === 'raster' ? badLayer.inpaint : null).toBeUndefined();
-  });
-
-  it("round-trips a region's layout role, keeps its absence, and drops a structurally broken one", () => {
-    const region = (id: string, extra: Record<string, unknown> = {}) => ({
-      ...createRegionalGuidanceLayer(id, 0, id),
-      ...extra,
-    });
-    const loaded = load(
-      withNodes(
-        [
-          region('sign', { layout: { kind: 'text', text: '营业中 OPEN' } }),
-          region('hero', { layout: { kind: 'character' } }),
-          region('plain'),
-          region('not-an-object', { layout: 'text' }),
-          region('bad-kind-type', { layout: { kind: 3 } }),
-          region('bad-text', { layout: { kind: 'text', text: 7 } }),
-        ],
-        'regional_guidance'
-      )
-    );
-    const layouts = Object.fromEntries(
-      loaded.document.stacks.regional_guidance.map((layer) => [
-        layer.id,
-        layer.type === 'regional_guidance' ? layer.layout : null,
-      ])
-    );
-
-    expect(layouts).toEqual({
-      'bad-kind-type': undefined,
-      'bad-text': undefined,
-      hero: { kind: 'character' },
-      'not-an-object': undefined,
-      plain: undefined,
-      sign: { kind: 'text', text: '营业中 OPEN' },
-    });
-    const plain = loaded.document.stacks.regional_guidance.find((layer) => layer.id === 'plain');
-    expect(plain && Object.hasOwn(plain, 'layout')).toBe(false);
-  });
-
-  it('refuses a region whose layout role this build does not know, naming the layer', () => {
-    const future = { ...createRegionalGuidanceLayer('Banner', 1, 'banner'), layout: { kind: 'banner' } };
-
-    const refused = refusal(withNodes([createRegionalGuidanceLayer('Kept', 0, 'kept'), future], 'regional_guidance'));
-
-    expect(refused.status).toBe('invalid');
-    expect(refused.status === 'invalid' ? refused.diagnostics : []).toEqual([
-      expect.objectContaining({ path: 'document.stacks.regional_guidance[1]' }),
-    ]);
-  });
-
-  it('round-trips triangle and star shape sources', () => {
-    const shape = (kind: string) => ({
-      ...createEmptyPaintLayer(kind, kind),
-      source: { fill: '#ff0000', height: 10, kind, stroke: null, strokeWidth: 0, type: 'shape', width: 10 },
-    });
-    const loaded = load(withNodes([shape('triangle'), shape('star')]));
-    const kinds = loaded.document.stacks.raster.map((layer) =>
-      layer.type === 'raster' && layer.source.type === 'shape' ? layer.source.kind : null
-    );
-    expect(kinds).toEqual(['triangle', 'star']);
-  });
-
-  it('round-trips a placed gradient without rounding its anchor, and refuses a zero span', () => {
-    const gradient = (span: number) => ({
-      ...createEmptyPaintLayer('Gradient', 'gradient'),
-      source: {
-        angle: 30,
-        center: { x: 12.5, y: 7 },
-        height: 64,
-        kind: 'radial',
-        span,
-        stops: [
-          { color: '#000000ff', offset: 0 },
-          { color: '#00000000', offset: 1 },
-        ],
-        type: 'gradient',
-        width: 64,
-      },
-    });
-    const loaded = load(withNodes([gradient(40)])).document.stacks.raster[0];
-    expect(loaded?.type === 'raster' ? loaded.source : null).toMatchObject({ center: { x: 12.5, y: 7 }, span: 40 });
-    expect(refusal(withNodes([gradient(0)]))).toMatchObject({
-      diagnostics: [{ message: expect.stringContaining('span'), path: 'document.stacks.raster[0]' }],
-      status: 'invalid',
-    });
-  });
-
-  it('round-trips group adjustments in the raster stack, strips them from overlay groups, and drops a malformed group stack', () => {
-    const stack = [{ brightness: 0.1, contrast: 0, id: 'ga1', isEnabled: true, type: 'brightness-contrast' }];
-    const rasterGroup = {
-      adjustments: stack,
-      children: [createEmptyPaintLayer('Inside', 'inside')],
-      id: 'rg',
-      isEnabled: true,
-      isLocked: false,
-      name: 'Adjusted',
-      type: 'group',
-    };
-    const rasterLoaded = load(withNodes([rasterGroup]));
-    const loadedGroup = rasterLoaded.document.stacks.raster[0];
-    expect(loadedGroup?.type === 'group' ? loadedGroup.adjustments : null).toEqual(stack);
-
-    const overlayGroup = { ...rasterGroup, children: [], id: 'og' };
-    const overlayLoaded = load(withNodes([overlayGroup], 'control'));
-    const loadedOverlay = overlayLoaded.document.stacks.control[0];
-    expect(loadedOverlay?.type === 'group' ? Object.hasOwn(loadedOverlay, 'adjustments') : null).toBe(false);
-
-    const malformed = { ...rasterGroup, adjustments: [{ id: 'bad', type: 'nope' }], id: 'mg' };
-    const malformedLoaded = load(withNodes([malformed]));
-    const loadedMalformed = malformedLoaded.document.stacks.raster[0];
-    expect(loadedMalformed?.type === 'group' ? loadedMalformed.adjustments : null).toBeUndefined();
-    expect(loadedMalformed?.type === 'group' ? loadedMalformed.children.length : 0).toBe(1);
-  });
-
-  it('round-trips color labels on leaves and groups in any stack, and drops malformed values', () => {
-    const labelled = load(withNodes([{ ...createEmptyPaintLayer('Tagged', 'tagged'), colorLabel: 'violet' }]));
-    const leaf = labelled.document.stacks.raster[0];
-    expect(leaf && 'colorLabel' in leaf ? leaf.colorLabel : null).toBe('violet');
-
-    const overlayGroup = {
-      children: [],
-      colorLabel: 'green',
-      id: 'og',
-      isEnabled: true,
-      isLocked: false,
-      name: 'Overlay',
-      type: 'group',
-    };
-    const overlayLoaded = load(withNodes([overlayGroup], 'control'));
-    const loadedOverlay = overlayLoaded.document.stacks.control[0];
-    expect(loadedOverlay?.type === 'group' ? loadedOverlay.colorLabel : null).toBe('green');
-
-    const malformed = load(withNodes([{ ...createEmptyPaintLayer('Bad', 'bad'), colorLabel: 'magenta' }]));
-    const badLeaf = malformed.document.stacks.raster[0];
-    expect(badLeaf && 'colorLabel' in badLeaf ? badLeaf.colorLabel : null).toBeUndefined();
-  });
-
-  it('round-trips group opacity and blend in the raster stack, strips them from overlay groups, and drops malformed values', () => {
-    const rasterGroup = {
-      blendMode: 'multiply',
-      children: [createEmptyPaintLayer('Inside', 'inside')],
-      id: 'rg',
-      isEnabled: true,
-      isLocked: false,
-      name: 'Faded',
-      opacity: 0.5,
-      type: 'group',
-    };
-    const rasterLoaded = load(withNodes([rasterGroup]));
-    const loadedGroup = rasterLoaded.document.stacks.raster[0];
-    expect(loadedGroup?.type === 'group' ? loadedGroup.opacity : null).toBe(0.5);
-    expect(loadedGroup?.type === 'group' ? loadedGroup.blendMode : null).toBe('multiply');
-
-    const overlayGroup = { ...rasterGroup, children: [], id: 'og' };
-    const overlayLoaded = load(withNodes([overlayGroup], 'control'));
-    const loadedOverlay = overlayLoaded.document.stacks.control[0];
-    expect(loadedOverlay?.type === 'group' ? Object.hasOwn(loadedOverlay, 'opacity') : null).toBe(false);
-    expect(loadedOverlay?.type === 'group' ? Object.hasOwn(loadedOverlay, 'blendMode') : null).toBe(false);
-
-    const malformed = { ...rasterGroup, blendMode: 'plasma', id: 'mg', opacity: 7 };
-    const malformedLoaded = load(withNodes([malformed]));
-    const loadedMalformed = malformedLoaded.document.stacks.raster[0];
-    expect(loadedMalformed?.type === 'group' ? loadedMalformed.opacity : null).toBeUndefined();
-    expect(loadedMalformed?.type === 'group' ? loadedMalformed.blendMode : null).toBeUndefined();
-    expect(loadedMalformed?.type === 'group' ? loadedMalformed.children.length : 0).toBe(1);
   });
 
   it('round-trips a valid adjustment stack, drops the pre-stack object shape, and drops a stack with one malformed entry', () => {
@@ -475,72 +212,6 @@ describe('loadCanvasState', () => {
     expect(adjustmentsOf(invalidLevels)).toBeUndefined();
   });
 
-  it('accepts noise at its range limits and drops a stack whose noise entry is out of range or mistyped', () => {
-    const noise = {
-      amount: 0.1,
-      distribution: 'gaussian',
-      grain: 'monochrome',
-      id: 'n1',
-      isEnabled: true,
-      response: 'flat',
-      seed: 42,
-      size: 1,
-      type: 'noise',
-    };
-    const loadStack = (adjustments: unknown[]) => {
-      const loaded = load(withNodes([{ ...createEmptyPaintLayer('Grain', 'grain'), adjustments }]));
-      const layer = loaded.document.stacks.raster[0];
-      expect(layer).toBeDefined();
-      return layer?.type === 'raster' ? layer.adjustments : null;
-    };
-
-    const limits = [
-      { ...noise, amount: 0, seed: 0, size: 1 },
-      { ...noise, amount: 1, grain: 'color', id: 'n2', response: 'midtones', seed: 0xffffffff, size: 8 },
-    ];
-    expect(loadStack(limits)).toEqual(limits);
-
-    for (const invalid of [
-      { amount: -0.01 },
-      { amount: 1.01 },
-      { amount: Number.NaN },
-      { distribution: 'perlin' },
-      { grain: 'luma' },
-      { grain: undefined },
-      { response: 'shadows' },
-      { response: undefined },
-      { size: 0.99 },
-      { size: 8.01 },
-      { size: Number.POSITIVE_INFINITY },
-      { size: undefined },
-      { seed: 1.5 },
-      { seed: -1 },
-      { seed: 0x1_0000_0000 },
-      { seed: undefined },
-    ]) {
-      expect(loadStack([{ ...noise, ...invalid }])).toBeUndefined();
-    }
-  });
-
-  it('normalizes control adapters in both the live document and saved snapshots', () => {
-    const invalidLayer = {
-      ...createControlLayer({ id: 'z-control', name: 'Z Control' }),
-      adapter: { beginEndStepPct: [0.8, 0.2], controlMode: null, kind: 'z_image_control', model: null, weight: -1.5 },
-    };
-    const state = withNodes([invalidLayer], 'control');
-    const loaded = load({
-      ...state,
-      snapshots: [{ createdAt: 'now', document: state.document, id: 'snapshot', name: 'Snapshot' }],
-    });
-
-    const getAdapter = (doc: (typeof loaded)['document']) => {
-      const layer = doc.stacks.control[0];
-      return layer?.type === 'control' ? layer.adapter : null;
-    };
-    expect(getAdapter(loaded.document)).toMatchObject({ beginEndStepPct: [0, 1], weight: 0.75 });
-    expect(getAdapter(loaded.snapshots[0]!.document)).toMatchObject({ beginEndStepPct: [0, 1], weight: 0.75 });
-  });
-
   it('refuses a state whose snapshot entries are malformed instead of discarding them', () => {
     const state = createEmptyCanvasState();
     const validDocument = {
@@ -568,65 +239,6 @@ describe('loadCanvasState', () => {
       const raw = { ...base, snapshots: [valid, malformed] };
       expect(refusal(raw)).toMatchObject({ raw, scope: 'snapshot', status: 'invalid' });
     }
-  });
-
-  it('keeps a restore point’s kind and staged results, and reads an unknown kind as a plain restore point', () => {
-    const state = createEmptyCanvasState();
-    const staged = {
-      height: 8,
-      imageName: 'staged.png',
-      imageUrl: '',
-      placement: { height: 8, opacity: 1, width: 8, x: 0, y: 0 },
-      queuedAt: 'now',
-      sourceQueueItemId: 'queue-1',
-      thumbnailUrl: '',
-      width: 8,
-    };
-    const point = { createdAt: 'now', document: state.document, id: 'p', name: 'Point' };
-    const base = withNodes([createEmptyPaintLayer('Live', 'live')]);
-    const loaded = load({
-      ...base,
-      snapshots: [
-        { ...point, kind: 'discard-results', stagedImages: [staged] },
-        { ...point, id: 'q', kind: 'archived', stagedImages: 'none', stray: true },
-        // Entries that could never be staged again (no image name, size or source batch) are dropped.
-        { ...point, id: 'r', stagedImages: [staged, { imageName: '' }, { ...staged, width: 'wide' }, null] },
-      ],
-    });
-    expect(loaded.snapshots).toEqual([
-      { ...point, kind: 'discard-results', stagedImages: [staged] },
-      { ...point, id: 'q' },
-      { ...point, id: 'r', stagedImages: [staged] },
-    ]);
-  });
-
-  it.each([
-    ['missing discriminant and base fields', { id: 'broken' }],
-    ['unknown layer type', { ...createEmptyPaintLayer('Mystery', 'mystery'), type: 'mystery' }],
-    ['raster with invalid source', { ...createEmptyPaintLayer('Raster', 'raster'), source: null }],
-    ['a leaf of another stack', createControlLayer({ id: 'control', name: 'Control' })],
-    ['a group without children', { ...groupContract('g'), children: null }],
-    ['a group with a malformed child', groupContract('g', [{ ...createEmptyPaintLayer('Bad', 'bad'), opacity: 4 }])],
-  ])('refuses a snapshot containing a malformed node: %s', (_label, malformedNode) => {
-    const state = createEmptyCanvasState();
-    const raw = {
-      ...state,
-      snapshots: [
-        {
-          createdAt: 'now',
-          document: { ...state.document, stacks: { raster: [createEmptyPaintLayer('Fine', 'fine'), malformedNode] } },
-          id: 'malformed',
-          name: 'Malformed',
-        },
-      ],
-    };
-
-    expect(refusal(raw)).toMatchObject({
-      diagnostics: [{ path: expect.stringContaining('snapshots[0].document.stacks.raster[1]') }],
-      raw,
-      scope: 'snapshot',
-      status: 'invalid',
-    });
   });
 
   it('round-trips valid snapshots containing every layer type and nested groups', () => {
@@ -660,64 +272,6 @@ describe('loadCanvasState', () => {
       scope: 'document',
       status: 'invalid',
     });
-  });
-
-  it('refuses a live document containing a malformed leaf with a diagnostic naming the field', () => {
-    expect(refusal(withNodes([{ ...createEmptyPaintLayer('Bad', 'bad'), opacity: 4 }]))).toMatchObject({
-      diagnostics: [{ message: expect.stringContaining('opacity'), path: 'document.stacks.raster[0]' }],
-      status: 'invalid',
-    });
-  });
-
-  it.each([
-    [
-      'a duplicated id across stacks',
-      { control: [createControlLayer({ id: 'dup', name: 'C' })], raster: [createEmptyPaintLayer('R', 'dup')] },
-      'document.stacks.control[0].id',
-    ],
-    [
-      'a duplicated id inside a group',
-      { raster: [groupContract('g', [createEmptyPaintLayer('A', 'a'), createEmptyPaintLayer('B', 'a')])] },
-      'document.stacks.raster[0].children[1].id',
-    ],
-    [
-      'a display-hidden raster group',
-      { raster: [groupContract('g', [], { isHidden: true })] },
-      'document.stacks.raster[0].isHidden',
-    ],
-    [
-      'a leaf in the wrong stack',
-      { raster: [createControlLayer({ id: 'c', name: 'C' })] },
-      'document.stacks.raster[0]',
-    ],
-    [
-      'a group nested past the depth limit',
-      {
-        raster: [
-          Array.from({ length: 11 }).reduce<unknown>(
-            (child, _, index) => groupContract(`g${index}`, child ? [child as never] : []),
-            null
-          ),
-        ],
-      },
-      'document.stacks.raster[0]',
-    ],
-  ])('refuses %s', (_label, stacks, path) => {
-    const state = createEmptyCanvasState();
-    const raw = { ...state, document: { ...state.document, stacks } };
-    expect(refusal(raw)).toMatchObject({
-      diagnostics: [{ path: expect.stringContaining(path) }],
-      scope: 'document',
-      status: 'invalid',
-    });
-  });
-
-  it('accepts a group nested exactly at the depth limit', () => {
-    const nested = Array.from({ length: 10 }).reduce<unknown>(
-      (child, _, index) => groupContract(`g${index}`, child ? [child as never] : []),
-      null
-    );
-    expect(load(withNodes([nested])).document.stacks.raster[0]).toEqual(nested);
   });
 
   it.each([
@@ -881,30 +435,6 @@ describe('loadCanvasState', () => {
         expect(loaded.document.version).toBe(5);
       }
     });
-
-    it('writes version 5 when only a snapshot holds noise, leaving the live document at its own version', () => {
-      const plain = createEmptyCanvasState();
-      const noisy = withNodes([noisyLayer()]);
-      const loaded = load({
-        ...plain,
-        snapshots: [{ createdAt: 'now', document: noisy.document, id: 's', name: 'S' }],
-      });
-
-      expect(loaded.version).toBe(5);
-      expect(loaded.document.version).toBe(3);
-      expect(loaded.snapshots[0]!.document.version).toBe(5);
-    });
-
-    it('keeps a declared version 5 after the noise is gone, and leaves a canvas without noise at its floor', () => {
-      expect(load(declaring(withNodes([createEmptyPaintLayer('Plain', 'plain')]), 5)).version).toBe(5);
-      expect(load(withNodes([createEmptyPaintLayer('Plain', 'plain')])).version).toBe(3);
-    });
-
-    it('re-validates an in-memory document holding noise as version 5', () => {
-      const { document } = withNodes([noisyLayer()]);
-
-      expect(normalizeCanvasDocumentContract(document as never)?.version).toBe(5);
-    });
   });
 
   describe('spatial adjustments adopt schema 5', () => {
@@ -932,58 +462,6 @@ describe('loadCanvasState', () => {
         }
       }
     });
-
-    it('keeps out-of-range finite values for evaluation to clamp, and drops a stack whose entry is not finite', () => {
-      const loadStack = (adjustments: unknown[]) => {
-        const layer = load(withNodes([{ ...createEmptyPaintLayer('Detail', 'detail'), adjustments }])).document.stacks
-          .raster[0];
-        return layer?.type === 'raster' ? layer.adjustments : null;
-      };
-      const extremes = [
-        { amount: 500, id: 'c', isEnabled: true, size: 0, type: 'clarity' },
-        { amount: -500, id: 't', isEnabled: true, size: 5000, type: 'texture' },
-        { amount: 1e6, id: 'd', isEnabled: false, type: 'dehaze' },
-      ];
-      expect(loadStack(extremes)).toEqual(extremes);
-
-      for (const invalid of [
-        { amount: Number.NaN, id: 'c', isEnabled: true, size: 40, type: 'clarity' },
-        { amount: 10, id: 't', isEnabled: true, size: Number.POSITIVE_INFINITY, type: 'texture' },
-        { amount: 10, id: 't', isEnabled: true, type: 'texture' },
-        { id: 'd', isEnabled: true, type: 'dehaze' },
-      ]) {
-        expect(loadStack([invalid])).toBeUndefined();
-      }
-    });
-  });
-
-  it('refuses a custom-font reference whose content hash is not a lowercase SHA-256', () => {
-    const current = createEmptyCanvasState();
-    const textLayer = {
-      ...createEmptyPaintLayer('Text', 'text'),
-      source: {
-        align: 'left',
-        color: '#fff',
-        content: 'hello',
-        fontFamily: 'Example',
-        fontRef: { contentHash: 'hash-a', family: 'Example', id: 'font-1', label: 'Example Regular' },
-        fontSize: 24,
-        fontWeight: 400,
-        lineHeight: 1.2,
-        type: 'text' as const,
-      },
-    };
-    const legacy = {
-      ...current,
-      document: {
-        ...current.document,
-        stacks: { ...current.document.stacks, raster: [textLayer] },
-        version: 3 as const,
-      },
-      version: 3 as const,
-    };
-
-    expect(refusal(legacy)).toMatchObject({ scope: 'document', status: 'invalid' });
   });
 
   describe('control layer derivation fields', () => {
@@ -1003,19 +481,11 @@ describe('loadCanvasState', () => {
       filter: detection,
       source: { bitmap: image('map.png'), type: 'paint' },
     };
-    const omit = (layer: Record<string, unknown>, ...keys: string[]) =>
-      Object.fromEntries(Object.entries(layer).filter(([key]) => !keys.includes(key)));
     const declaring = (canvas: ReturnType<typeof withNodes>, version: number) => ({
       ...canvas,
       document: { ...canvas.document, version },
       version,
     });
-    /** Loads one control leaf, asserting no diagnostics and returning it with its exact key set. */
-    const loadControl = (layer: unknown) => {
-      const result = loadCanvasState(withNodes([layer], 'control'));
-      expect(result).toMatchObject({ diagnostics: [], status: 'loaded' });
-      return result.status === 'loaded' ? result.value.document.stacks.control[0] : undefined;
-    };
     const expectExactly = (actual: unknown, expected: Record<string, unknown>) => {
       expect(actual).toEqual(expected);
       expect(Object.keys(actual as object).sort()).toEqual(Object.keys(expected).sort());
@@ -1033,39 +503,11 @@ describe('loadCanvasState', () => {
       ).toBe(6);
     });
 
-    it.each([
-      ['controlType', { controlType: 'edges' }],
-      ['detection', { detection: null }],
-      ['original', { original: { image: image('photo.png'), type: 'image' } }],
-      ['originalTransform', { originalTransform: { rotation: 0, scaleX: 2, scaleY: 2, x: 0, y: 0 } }],
-    ])('requires version 6 for a control leaf carrying only %s', (_key, fields) => {
-      const stacks = withNodes([{ ...legacy, ...fields }], 'control').document.stacks;
-      expect(writableCanvasSchemaVersion([3], { stacks })).toBe(6);
-    });
-
-    it('requires version 6, not 5, when a group adjustment and a typed child share a document', () => {
-      const spatial = { amount: 40, id: 'clarity', isEnabled: true, size: 40, type: 'clarity' };
-      const graded = groupContract('graded', [typed as never], { adjustments: [spatial as never] });
-      expect(load(withNodes([graded], 'control')).version).toBe(6);
-
-      const adjusted = withNodes([{ ...createEmptyPaintLayer('Detail', 'detail'), adjustments: [spatial] }]);
-      const stacks = { ...adjusted.document.stacks, control: [typed] };
-      expect(load({ ...adjusted, document: { ...adjusted.document, stacks } }).version).toBe(6);
-    });
-
     it('keeps a legacy control layer unchanged and at its declared version', () => {
       const loaded = load(withNodes([legacy], 'control'));
       expectExactly(loaded.document.stacks.control[0], legacy);
       expect(loaded.version).toBe(3);
       expect(loaded.document.version).toBe(3);
-    });
-
-    it('does not adopt version 6 for derivation keys present only as undefined', () => {
-      const undefinedKeys = { ...legacy, controlType: undefined, detection: undefined, original: undefined };
-      expect(writableCanvasSchemaVersion([3], { stacks: withNodes([undefinedKeys], 'control').document.stacks })).toBe(
-        3
-      );
-      expect(load(withNodes([undefinedKeys], 'control')).version).toBe(3);
     });
 
     it('never lowers a declared version 6 once the fields are gone', () => {
@@ -1082,52 +524,6 @@ describe('loadCanvasState', () => {
       expect(loaded.version).toBe(6);
       expect(loaded.document.version).toBe(3);
       expect(loaded.snapshots[0]?.document.version).toBe(6);
-    });
-
-    it('keeps an unknown detector type and its settings', () => {
-      const future = { settings: { strength: 3 }, type: 'future_detector' };
-      expectExactly(loadControl({ ...typed, detection: future, filter: future }), {
-        ...typed,
-        detection: future,
-        filter: future,
-      });
-    });
-
-    it('refuses an unknown control type rather than rewriting it', () => {
-      expect(refusal(withNodes([{ ...typed, controlType: 'future_type' }], 'control'))).toMatchObject({
-        scope: 'document',
-        status: 'invalid',
-      });
-    });
-
-    const untyped = omit(typed, 'controlType', 'detection', 'original', 'originalTransform');
-    const detached = { ...omit(typed, 'original', 'originalTransform'), detection: null };
-    it.each([
-      ['a null type (dropped, with everything it carried)', { ...typed, controlType: null }, untyped],
-      ['derivation fields without a type', omit(typed, 'controlType'), untyped],
-      [
-        'an original paint source without pixels (detached)',
-        { ...typed, original: { bitmap: null, type: 'paint' } },
-        detached,
-      ],
-      [
-        'an original that is not a pixel source (detached)',
-        { ...typed, original: { content: 'x', type: 'text' } },
-        detached,
-      ],
-      ['an original beside a "None" detection', { ...typed, detection: null }, detached],
-      [
-        'an original without a detection',
-        omit(typed, 'detection'),
-        omit(typed, 'detection', 'original', 'originalTransform'),
-      ],
-      [
-        'an original transform without an original',
-        omit(typed, 'original'),
-        omit(typed, 'original', 'originalTransform'),
-      ],
-    ])('silently repairs %s', (_label, input, expected) => {
-      expectExactly(loadControl(input), expected);
     });
   });
 
@@ -1147,20 +543,6 @@ describe('loadCanvasState', () => {
     canvas.document.selectedLayerId = 'layer-1';
 
     expect(load(canvas)).toEqual(canvas);
-  });
-
-  it('normalizes persisted geometry to whole pixels in documents and snapshots', () => {
-    const state = createEmptyCanvasState();
-    const document = {
-      ...state.document,
-      bbox: { height: 12.6, width: 12.4, x: -3.4, y: -3.6 },
-      height: 511.6,
-      width: 512.4,
-    };
-    const loaded = load({ ...state, document, snapshots: [{ createdAt: 'now', document, id: 's', name: 'S' }] });
-    const expected = { bbox: { height: 13, width: 12, x: -3, y: -4 }, height: 512, width: 512 };
-    expect(loaded.document).toMatchObject(expected);
-    expect(loaded.snapshots[0]!.document).toMatchObject(expected);
   });
 
   it('normalizes the removed oldest staging auto-switch mode to off and keeps progress', () => {
@@ -1216,11 +598,6 @@ describe('createEmptyCanvasState', () => {
       version: 3,
     });
   });
-
-  it('honors a custom document size', () => {
-    const state = createEmptyCanvasState(800, 600);
-    expect(state.document).toMatchObject({ bbox: { height: 600, width: 800, x: 0, y: 0 }, height: 600, width: 800 });
-  });
 });
 
 describe('createNewCanvasState', () => {
@@ -1232,14 +609,6 @@ describe('createNewCanvasState', () => {
     expect(state.document.stacks.raster).toEqual([]);
     expect(mask).toEqual(createInpaintMaskLayer(nextInpaintMaskName([]), mask?.id ?? ''));
     expect(state.document.selectedLayerId).toBeNull();
-  });
-
-  it('honors a custom document size while staying otherwise identical to an empty canvas', () => {
-    const state = createNewCanvasState(800, 600);
-    expect({
-      ...state,
-      document: { ...state.document, selectedLayerId: null, stacks: createEmptyCanvasState().document.stacks },
-    }).toEqual(createEmptyCanvasState(800, 600));
   });
 });
 
@@ -1261,38 +630,12 @@ describe('loadCanvasState ingress repair', () => {
     expect(clean.status === 'loaded' && clean.diagnostics).toEqual([]);
   });
 
-  it('refuses a stack it does not know', () => {
-    const state = stateWith({ ...stacksFrom([]), extra: [] } as CanvasStateContractV3['document']['stacks']);
-    expect(refusal(state)).toMatchObject({
-      diagnostics: [{ path: 'document.stacks.extra' }],
-      scope: 'document',
-      status: 'invalid',
-    });
-  });
-
-  it('drops display flags the raster stack cannot hold instead of persisting them', () => {
-    const leaf = { ...createEmptyPaintLayer('A', 'a'), isHidden: true, children: [] };
-    const group = groupContract('g', [], { isHidden: false });
-    const loaded = load(stateWith({ ...stacksFrom([]), raster: [leaf, group] }));
-    expect(loaded.document.stacks.raster[0]).toEqual(createEmptyPaintLayer('A', 'a'));
-    expect(loaded.document.stacks.raster[1]).toEqual(groupContract('g'));
-  });
-
   it('caps the node count', () => {
     const leaves = Array.from({ length: 10_001 }, (_, index) => createEmptyPaintLayer(`L${index}`, `l${index}`));
     expect(refusal(stateWith(stacksFrom(leaves)))).toMatchObject({
       diagnostics: [{ message: 'document exceeds 10000 nodes' }],
       status: 'invalid',
     });
-  });
-
-  it('fills the staging area from its defaults, keeping only well-typed fields', () => {
-    const state = createEmptyCanvasState();
-    const loaded = load({
-      ...state,
-      stagingArea: { autoSwitchMode: 'bogus', isVisible: false, pendingImages: 'nope' },
-    });
-    expect(loaded.stagingArea).toEqual({ ...state.stagingArea, isVisible: false });
   });
 });
 

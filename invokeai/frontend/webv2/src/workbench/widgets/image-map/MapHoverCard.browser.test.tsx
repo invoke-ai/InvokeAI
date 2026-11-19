@@ -12,7 +12,6 @@ vi.mock('@workbench/image-map/imageLabelCache', () => ({ getImageLabels: mocks.g
 
 import { MapHoverCard } from './MapHoverCard';
 
-// The components read the global instance; give it the English catalog.
 await i18next.use(initReactI18next).init({
   interpolation: { escapeValue: false },
   lng: 'en',
@@ -61,7 +60,6 @@ afterEach(async () => {
 
 describe('MapHoverCard', () => {
   it('marks a video with the gallery’s play badge and its duration', async () => {
-    // Identify videos because their still thumbnails otherwise look like images.
     const text = await render({
       clientX: 10,
       clientY: 10,
@@ -98,7 +96,6 @@ describe('MapHoverCard', () => {
     });
 
     expect(mocks.getImageLabels).toHaveBeenCalledWith({ kind: 'video', name: 'clip.mp4' });
-    // Named apart from the cluster's tags.
     expect(text).toContain('Image tags: clip, surf');
   });
 });

@@ -32,7 +32,6 @@ export interface GenerationSelectedImage {
   thumbnailUrl: string;
 }
 
-/** One executed seed from a recent completed Generate run. */
 export interface GenerationSeedHistoryItem {
   seed: number;
   thumbnailUrl: string | null;
@@ -52,31 +51,24 @@ export interface GeneratePresetRecord {
   values: Record<string, unknown>;
 }
 
-/** What the canvas tells the Size section about the size the model generates at. */
 export interface CanvasRenderSize {
-  /** The render-size controls, laid out in the Size section's footer. */
   controls: ReactNode;
   /** The result is generated at this size, then resized to the frame; null until a model is selected. */
   size: { height: number; width: number } | null;
 }
 
 export interface CanvasRenderSizeProps {
-  /** Lays out the Size section around the canvas's render size. */
   children: (renderSize: CanvasRenderSize) => ReactNode;
   /** The frame as the Size section shows it, including a resize that has not been committed yet. */
   frame: { height: number; width: number };
 }
 
-/** What the canvas adds to the Render section. */
 export interface CanvasDenoisingStrength {
-  /** The strength summary, shown in the section's title row while it is folded. */
   summary: ReactNode;
-  /** The strength control, laid out under guidance. */
   field: ReactNode;
 }
 
 export interface CanvasDenoisingStrengthProps {
-  /** Lays out the Render section around the canvas's denoising strength. */
   children: (strength: CanvasDenoisingStrength) => ReactNode;
 }
 
@@ -100,15 +92,10 @@ export interface GenerationUiAdapter {
     canManageSharedSystemPrompts: boolean;
   };
   gallery: {
-    /** Raise Gallery/Preview and locate the image's board, page, and cell. */
     findImage(imageName: string): void;
     selectedImage: GenerationSelectedImage | null;
     touchImages(): void;
-    /**
-     * Where an upload made from Generate lands, resolved when the upload starts from the listing of every readable
-     * board: the Gallery's auto-add board while that listing lets the account add to it, else the project's inbox;
-     * `none` is Uncategorized.
-     */
+    /** Resolved at upload: the auto-add board while addable, else the project inbox; `none` is Uncategorized. */
     getUploadBoardId(): Promise<string>;
   };
   models: {
@@ -121,7 +108,6 @@ export interface GenerationUiAdapter {
     getImageUrl(key: string): string;
     /** Absent when this session may not manage models. */
     openInModelManager?: (key: string) => void;
-    /** Apply the optional model-type filter when opening Add Models. */
     openManager(options?: { modelType?: string }): void;
     /** The catalog as it is now, for an Undo that runs long after the render that offered it. */
     readCatalog(): readonly GenerationModelCatalogItem[];
@@ -132,20 +118,13 @@ export interface GenerationUiAdapter {
   notifications: {
     error(title: string, message?: string): void;
     info(title: string, message?: string): void;
-    /**
-     * Offers a choice about something that arrived on its own (a result held back), as buttons in a toast that stays
-     * until the user picks one or closes it, and closes with the account. Each `onClick` must check its target still
-     * exists.
-     */
+    /** A toast choice that stays until picked or closed, closing with the account; `onClick` rechecks its target. */
     offer(
       title: string,
       notice: { actions: readonly { label: string; onClick: () => void }[]; message?: string }
     ): void;
     reportError(error: { area: string; message: string; namespace: 'generation'; projectId?: string }): void;
-    /**
-     * Reports a change that already happened, with Undo. `onUndo` must capture the ids it reverts (the toast outlives
-     * tab switches); with `projectId`, Undo is withdrawn once that project closes.
-     */
+    /** `onUndo` must capture the ids it reverts; with `projectId`, Undo is withdrawn once that project closes. */
     undoable(
       title: string,
       notice: { message?: string; onUndo: () => void; projectId?: string; supersedes?: string }
@@ -170,9 +149,7 @@ export interface GenerationUiAdapter {
     /** Whether a new preset keeps the prompts too; the save dialog's last choice, remembered per account. */
     includePrompts: boolean;
     setIncludePrompts(includePrompts: boolean): void;
-    /** User-saved Generate settings snapshots ("recipes"), in save order. */
     presets: readonly GeneratePresetRecord[];
-    /** Adds a snapshot under a new id and returns it. */
     save(label: string, values: Record<string, unknown>): GeneratePresetRecord;
     rename(presetId: string, label: string): void;
     remove(presetId: string): void;
@@ -181,15 +158,11 @@ export interface GenerationUiAdapter {
     /** Replaces a preset's snapshot, keeping its id and label. */
     update(presetId: string, values: Record<string, unknown>): void;
   };
-  /**
-   * Insights from the project's recent queue runs. Subscribing keeps the backing queue read observed, so only the
-   * controls that display them read it, through `useGenerationQueueInsights`.
-   */
+  /** Subscribing keeps the queue read observed, so only displaying controls read it (`useGenerationQueueInsights`). */
   queueInsights: ReadableExternalStore<GenerationQueueInsights>;
   rebalancePresets: {
     /** User-saved conditioning rebalance curves; built-ins are not included. */
     presets: readonly RebalancePreset[];
-    /** Adds a curve under a new id and returns it. */
     save(label: string, weights: string, multiplier: number): RebalancePreset;
     rename(presetId: string, label: string): void;
     remove(presetId: string): void;

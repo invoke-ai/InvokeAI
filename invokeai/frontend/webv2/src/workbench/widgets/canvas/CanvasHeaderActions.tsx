@@ -245,8 +245,8 @@ const CanvasHeaderActionsInner = ({
     [clearCanvas, editingLocked, inFlightCount, stopGenerations]
   );
 
-  // Register catalog commands once while useEffectEvent reads current fit rects/dialog openers; new-session uses
-  // the button's confirmation flow.
+  // Register catalog commands once while useEffectEvent reads current fit rects/dialog openers; new-session uses the
+  // button's confirmation flow.
   const executeHeaderCommand = useEffectEvent((commandId: string) =>
     executeCanvasHeaderCommand(commandId, commandContext())
   );
@@ -473,10 +473,7 @@ const describeSave = (
   return board ?? undefined;
 };
 
-/**
- * The frame save, then the whole canvas, each saying what it would save and where. Mounted only while the menu is
- * open, so the canvas content bounds (the rect the canvas save exports) are planned then, not on every edit.
- */
+/** Mounted only while the menu is open, so the content bounds are planned then, not on every edit. */
 const SaveMenuItems = ({
   board,
   document,

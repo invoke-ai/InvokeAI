@@ -2,8 +2,8 @@ import type { ProjectGraphState, WorkflowNode } from '@features/workflow/core/ty
 
 /**
  * A workflow's shape for a thumbnail well that has no image: one rect per node, in fractions of a 3:2 well. Node
- * documents carry positions but no measured sizes, so each node kind gets a nominal size (invocation height grows
- * with its inputs). Large graphs keep their full extent but draw an evenly spaced, deterministic subset of nodes.
+ * documents carry positions but no measured sizes, so each node kind gets a nominal size (invocation height grows with
+ * its inputs). Large graphs keep their full extent but draw an evenly spaced, deterministic subset of nodes.
  */
 
 export interface WorkflowSilhouetteRect {
@@ -144,9 +144,9 @@ export const toWorkflowSilhouetteImage = (rects: readonly WorkflowSilhouetteRect
 };
 
 /**
- * One image per parsed document. A document object stands for one revision of one workflow (an edit or a newer
- * revision parses a new one), and the cache lets go of it with the document, so a card scrolling back into view or
- * re-rendering never lays the graph out again.
+ * One image per parsed document. A document object stands for one revision of one workflow (an edit or a newer revision
+ * parses a new one), and the cache lets go of it with the document, so a card scrolling back into view or re-rendering
+ * never lays the graph out again.
  */
 const images = new WeakMap<ProjectGraphState, WorkflowSilhouetteImage | null>();
 

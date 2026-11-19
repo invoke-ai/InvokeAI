@@ -14,35 +14,21 @@ import type { ImageIndexCounts } from './indexProgress';
 import { fetchImageMapClusterLabels, fetchImageMapPoints, fetchImageMapStatus, requestImageMapRefresh } from './api';
 import { hasProgressed } from './indexProgress';
 
-/** Shared image-map read model with one in-flight fetch and refreshes from user actions and socket events. */
-
 export interface ImageMapSnapshot {
   data: ImageMapPoints | null;
   loadState: 'idle' | 'loading' | 'loaded' | 'error';
   error: string | null;
-  /** Embedding-index progress; only ever pushed to admins by the backend. */
+  /** Only ever pushed to admins by the backend. */
   indexCounts: ImageIndexCounts | null;
-  /** Time of actual indexing progress, not count writes or gallery-total changes. Null without counts. */
+  /** Time of actual indexing progress, not count writes or gallery-total changes. */
   indexUpdatedAt: number | null;
-  /** Cluster id -> automatic label info; null when unavailable (e.g. no text encoder). */
+  /** Null when unavailable (e.g. no text encoder). */
   clusterLabels: Record<string, ImageMapClusterLabelInfo> | null;
-  /**
-   * Fingerprint of the visible set used for cluster labels. Labels may lag refreshed points whose cluster ids
-   * changed; precise consumers such as hover cards require equality with `data.visibleHash`.
-   */
+  /** Labels may lag refreshed points; precise consumers (hover cards) require equality with `data.visibleHash`. */
   clusterLabelsHash: string | null;
-  /**
-   * The eps `clusterLabels` were clustered at. The visible-set hash alone
-   * stopped being enough once the strength became adjustable: changing it
-   * renumbers every cluster while the projection and the visible set — and
-   * so `visibleHash` — stay exactly the same, which would let the previous
-   * strength's tags be shown against the new clustering for a round trip.
-   */
+  /** Changing the strength renumbers clusters without moving `visibleHash`, so the hash alone cannot retire labels. */
   clusterLabelsEps: number | null;
-  /**
-   * Plot/WebGL failure differs from fetch failure: cached points remain useful after fetch errors, but render
-   * errors require unmounting the plot and reporting inability to draw.
-   */
+  /** Unlike fetch errors, render errors unmount the plot; cached points stay useful after fetch errors. */
   renderError: string | null;
 }
 
@@ -63,27 +49,19 @@ export const imageMapStore = createExternalStore<ImageMapSnapshot>(EMPTY_IMAGE_M
 let inflight: Promise<void> | null = null;
 let rerunRequested = false;
 let statusInflight: Promise<void> | null = null;
-// Bumped by every socket-delivered status report, so a status fetch that
-// started earlier can tell whether one landed while it was in flight.
+// Bumped by every socket status report, so a status fetch can tell whether one landed while it was in flight.
 let indexEventSequence = 0;
-// Status and points can discover model changes concurrently. Only a response
-// that began against the current read model may replace its availability.
+// Only a response that began against the current read model may replace its availability.
 let mapRevision = 0;
 
-// The projection is per-user server state: a login/logout must drop it before
-// the next account's widgets can observe it.
 registerAccountOwnedResource({
   clear: () => {
     inflight = null;
     rerunRequested = false;
-    // Per-project widget state, so it must not survive into the next
-    // account: the widget pushes the new one down when it mounts, but a
-    // socket-driven refresh could beat it there.
+    // Per-project: a socket-driven refresh could beat the next account's widget pushing its own value.
     clusterEps = null;
-    // Per-project like the strength; the runtime pushes the next account's filter when its project loads.
     mediaKind = undefined;
     pointsMediaKind = undefined;
-    // Retire label requests so old-account completion/failure cannot update the new account.
     labelsSequence += 1;
     statusInflight = null;
     indexEventSequence += 1;
@@ -93,12 +71,7 @@ registerAccountOwnedResource({
   name: 'image-map',
 });
 
-/**
- * The eps the clustering-strength control has been set to, or null for the
- * server's adaptive value. Pushed down from the widget rather than passed by
- * callers: every refresh — socket-driven, manual, or the first load — has to
- * cluster at the strength the user chose, and only this module sees them all.
- */
+/** Null for the server's adaptive value. Pushed down from the widget because only this module sees every refresh. */
 let clusterEps: number | null = null;
 
 export const setClusterEps = (eps: number | null): void => {
@@ -108,13 +81,10 @@ export const setClusterEps = (eps: number | null): void => {
 
   clusterEps = eps;
 
-  // The labels in the store describe the previous strength's cluster ids, and
-  // the refresh below will not move `visibleHash`, so nothing else retires
-  // them.
+  // The refresh below will not move `visibleHash`, so nothing else retires the old strength's labels.
   imageMapStore.patchSnapshot({ clusterLabels: null, clusterLabelsEps: null, clusterLabelsHash: null });
 
-  // Nothing has been fetched yet, so the first fetch will carry the new value
-  // on its own; refreshing here would race it for no gain.
+  // Nothing fetched yet: the first fetch carries the new value itself.
   if (imageMapStore.getSnapshot().loadState === 'idle') {
     return;
   }
@@ -122,18 +92,14 @@ export const setClusterEps = (eps: number | null): void => {
   void refreshImageMapPoints();
 };
 
-/**
- * The media kind the map shows, or undefined for both: the active project's Gallery media filter. Pushed down by the
- * data runtime, like the strength, so every refresh path fetches the same set.
- */
+/** Undefined for both kinds; pushed down by the data runtime so every refresh path fetches the same set. */
 let mediaKind: GalleryItemKind | undefined;
-/** The media kind the published points were fetched with; their labels must be requested with the same one. */
+/** Labels must be requested with the same kind as the published points. */
 let pointsMediaKind: GalleryItemKind | undefined;
 
-/** Mounted map views. A change nobody is watching waits for the next `ensureImageMapLoaded` instead of fetching. */
+/** A change nobody is watching waits for the next `ensureImageMapLoaded` instead of fetching. */
 let viewerCount = 0;
 
-/** Mount registration for a map view; the returned disposer ends it. */
 export const attachImageMapViewer = (): (() => void) => {
   viewerCount += 1;
   let attached = true;
@@ -152,25 +118,20 @@ export const setImageMapMediaKind = (kind: GalleryItemKind | undefined): void =>
   }
 
   mediaKind = kind;
-  // Labels describe the previous set's cluster ids; retire any request still in flight with them.
   labelsSequence += 1;
 
-  // A points response still in flight describes the previous set: the revision bump drops it. With none in flight
-  // the revision stays, so an unrelated status diagnosis already under way still lands.
+  // With no points response in flight the revision stays, so an unrelated status diagnosis still lands.
   if (inflight) {
     mapRevision += 1;
   }
 
   const { data, loadState } = imageMapStore.getSnapshot();
 
-  // Nothing fetched yet: the first fetch carries the new kind on its own.
   if (data === null && loadState === 'idle') {
     return;
   }
 
-  // The previous kind's points must not stay on screen or clickable: a click reveals its item, and revealing an item
-  // the new filter hides resets the filter to both kinds, undoing the choice. Back to idle, the next
-  // `ensureImageMapLoaded` refetches if nothing does sooner.
+  // The previous kind's points must not stay clickable: revealing an item the filter hides would reset the filter.
   imageMapStore.patchSnapshot({
     clusterLabels: null,
     clusterLabelsEps: null,
@@ -188,8 +149,7 @@ export const setImageMapMediaKind = (kind: GalleryItemKind | undefined): void =>
 
 export const refreshImageMapPoints = (): Promise<void> => {
   if (inflight) {
-    // Coalesce mid-flight refresh requests into one rerun after settling instead of swallowing them through
-    // dedupe.
+    // Coalesce mid-flight requests into one rerun instead of swallowing them through dedupe.
     rerunRequested = true;
 
     return inflight;
@@ -211,7 +171,6 @@ export const refreshImageMapPoints = (): Promise<void> => {
 
       mapRevision += 1;
       pointsMediaKind = requestMediaKind;
-      // Clear renderError on retry so fresh points receive a new WebGL draw attempt.
       imageMapStore.patchSnapshot({ data, error: null, loadState: 'loaded', renderError: null });
       refreshClusterLabels(data);
     })
@@ -226,8 +185,7 @@ export const refreshImageMapPoints = (): Promise<void> => {
       });
     })
     .finally(() => {
-      // Release only this refresh's claim: an account switch already reset
-      // `inflight` and may have let a fresh refresh start.
+      // An account switch may already have reset `inflight` and started a fresh refresh.
       if (inflight === refresh) {
         inflight = null;
       }
@@ -243,13 +201,10 @@ export const refreshImageMapPoints = (): Promise<void> => {
   return refresh;
 };
 
-/**
- * A person asked for a fresh map: POST /refresh is what bypasses the backend's refit cooldown. Automatic callers stay
- * on `refreshImageMapPoints`, since passing through here would bring the refit loop back.
- */
+/** Only user requests may bypass the refit cooldown; automatic callers here would bring the refit loop back. */
 export const requestImageMapRecompute = (): Promise<void> => {
   void requestImageMapRefresh().catch(() => {
-    // The refit is best effort; the points fetch below reports connectivity errors.
+    // Best effort; the points fetch below reports connectivity errors.
   });
 
   return refreshImageMapPoints();
@@ -283,8 +238,6 @@ const areLabelMapsEqual = (
   );
 };
 
-/** Best-effort labels must match point projection and current request sequence before publication. */
-/** Skip labels entirely when hidden, avoiding server clustering, embedding gathers and vocabulary scoring. */
 let clusterLabelsEnabled = true;
 
 export const setClusterLabelsEnabled = (enabled: boolean): void => {
@@ -295,7 +248,6 @@ export const setClusterLabelsEnabled = (enabled: boolean): void => {
   clusterLabelsEnabled = enabled;
 
   if (!enabled) {
-    // Bump the sequence so a request already in flight cannot land after this.
     labelsSequence += 1;
     imageMapStore.patchSnapshot({ clusterLabels: null, clusterLabelsEps: null, clusterLabelsHash: null });
 
@@ -309,16 +261,10 @@ export const setClusterLabelsEnabled = (enabled: boolean): void => {
   }
 };
 
-/**
- * Bounded label backoff covers pending vocabulary builds, including cold starts. After exhaustion, the next points
- * refresh or label toggle retries.
- */
+/** Spans vocabulary builds and cold starts; then a points refresh or label toggle retries. */
 const LABELS_RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000, 60_000, 60_000, 60_000];
 
-/**
- * Retry 409 vocabulary/text-tower unavailability, 5xx and fetch TypeErrors. Auth/contract failures 401, 403 and
- * 422 settle immediately.
- */
+/** 401, 403 and 422 settle at once. */
 const isRetryableLabelsFailure = (error: unknown): boolean => {
   if (error instanceof ApiError) {
     return error.status === 409 || error.status >= 500;
@@ -327,10 +273,8 @@ const isRetryableLabelsFailure = (error: unknown): boolean => {
   return error instanceof TypeError;
 };
 
-/** Every deferred retry checks sequence; newer requests, toggles and account switches retire prior callbacks. */
 const attemptClusterLabels = (sequence: number, data: ImageMapPoints, attempt: number): void => {
-  // Reuse the points' effective eps, but still require visibleHash equality because cluster ids can drift with the
-  // visible set.
+  // Reuse the points' eps, but still require visibleHash equality: cluster ids drift with the visible set.
   void fetchImageMapClusterLabels({
     ...(data.clusterEps !== null ? { eps: data.clusterEps } : {}),
     mediaKind: pointsMediaKind,
@@ -355,9 +299,7 @@ const attemptClusterLabels = (sequence: number, data: ImageMapPoints, attempt: n
       }
     })
     .catch((error: unknown) => {
-      // Same staleness rule as success: only the newest request may clear the
-      // labels. A slow stale request failing after a newer one already set
-      // fresh labels must not wipe them.
+      // Only the newest request may clear the labels, so a slow stale failure cannot wipe fresh ones.
       if (sequence !== labelsSequence) {
         return;
       }
@@ -368,8 +310,7 @@ const attemptClusterLabels = (sequence: number, data: ImageMapPoints, attempt: n
         return;
       }
 
-      // Retry pending vocabulary responses because loaded-widget activation may fetch nothing and the next socket
-      // event may be far away.
+      // Retry pending vocabulary: the next socket event may be far off.
       const delay = LABELS_RETRY_DELAYS_MS[attempt];
       setTimeout(() => {
         if (sequence === labelsSequence) {
@@ -385,9 +326,7 @@ const refreshClusterLabels = (data: ImageMapPoints): void => {
   }
 
   if (data.state !== 'ready') {
-    // Nothing to label; a disabled index would 409 on every refresh. Bump the
-    // sequence so an in-flight labels response cannot repopulate the labels
-    // this clears.
+    // A disabled index would 409 on every refresh.
     labelsSequence += 1;
     imageMapStore.patchSnapshot({ clusterLabels: null, clusterLabelsEps: null, clusterLabelsHash: null });
 
@@ -399,7 +338,6 @@ const refreshClusterLabels = (data: ImageMapPoints): void => {
   attemptClusterLabels(sequence, data, 0);
 };
 
-/** Refresh labels without moving points after vocabulary rebuild; no-op when labels are hidden or points absent. */
 export const refetchClusterLabels = (): void => {
   const { data } = imageMapStore.getSnapshot();
 
@@ -408,10 +346,7 @@ export const refetchClusterLabels = (): void => {
   }
 };
 
-/**
- * Socket reports alone bump the fetch-fencing sequence, preventing older status fetches from rewinding event
- * counts.
- */
+/** Only socket reports bump the fencing sequence, so older status fetches cannot rewind event counts. */
 export const recordImageIndexStatus = (
   counts: ImageIndexCounts,
   at: number = Date.now(),
@@ -422,26 +357,20 @@ export const recordImageIndexStatus = (
   }
 
   const { indexCounts: previous, indexUpdatedAt: previousAt } = imageMapStore.getSnapshot();
-  // Restart the stall clock only for actual completed work, not repeated counts or generation-driven total
-  // changes.
+  // Restart the stall clock only for completed work.
   const updatedAt = hasProgressed(previous, counts) ? at : (previousAt ?? at);
 
   imageMapStore.patchSnapshot({ indexCounts: counts, indexUpdatedAt: updatedAt });
 };
 
-/**
- * Best-effort status fetch recovers paused-worker counts and missed completion events on load/reconnect/retry.
- * Failure leaves socket reports authoritative.
- */
+/** Recovers paused-worker counts and missed completion events; failure leaves socket reports authoritative. */
 export const refreshImageIndexStatus = (): void => {
-  // Deduplicate status requests so an older response cannot land last and rewind counts.
+  // Deduplicate so an older response cannot land last and rewind counts.
   if (statusInflight) {
     return;
   }
 
   const owner = captureAccountScope();
-  // Events that land while this is in flight are strictly newer than what it
-  // will return, and must not be rewound by it.
   const sequence = indexEventSequence;
   const revision = mapRevision;
 
@@ -454,8 +383,7 @@ export const refreshImageIndexStatus = (): void => {
       if (revision === mapRevision) {
         const { data } = imageMapStore.getSnapshot();
         const missing = status.state === 'model_missing';
-        // An installed replacement waiting for the retired encoder's work to drain: no model is active, so the
-        // loaded points and labels belong to an encoder that is already gone.
+        // A replacement waiting for the retired encoder's work to drain: loaded points belong to a gone encoder.
         const draining = status.state === 'computing' && status.modelId === null;
         // A repeated diagnosis must not bump the revision: that would discard an in-flight Check again.
         const unchanged = missing
@@ -489,25 +417,21 @@ export const refreshImageIndexStatus = (): void => {
             renderError: null,
           });
           if (missing || draining) {
-            // Nothing to fetch until a model is active; the next poll that reports one reloads the points.
             return;
           }
           void refreshImageMapPoints();
         }
       }
 
-      // Counts aggregate every account and are omitted for non-admins. Newer
-      // socket counts fence this part of the response, not its model diagnosis.
+      // Counts aggregate every account and are omitted for non-admins; newer socket counts fence only them.
       if (status.index !== null && sequence === indexEventSequence) {
         recordImageIndexStatus(status.index, Date.now(), { measure: false });
       }
     })
     .catch(() => {
-      // Progress failure is optional detail; point loading reports its own errors.
+      // Optional detail; point loading reports its own errors.
     })
     .finally(() => {
-      // Release only this request's claim: an account switch already cleared
-      // it and may have let a fresh one start.
       if (statusInflight === request) {
         statusInflight = null;
       }
@@ -519,21 +443,16 @@ export const refreshImageIndexStatus = (): void => {
 export const ensureImageMapLoaded = (): void => {
   const { data, loadState } = imageMapStore.getSnapshot();
 
-  // A missing encoder is installed from the Model Manager, which unmounts this widget: ask again on every reopen
-  // rather than keep the retained diagnosis until someone presses Check again.
+  // The Model Manager unmounts this widget, so ask again on every reopen after a missing encoder.
   if (loadState === 'idle' || (data?.state === 'model_missing' && loadState !== 'loading')) {
     void refreshImageMapPoints();
   }
 
-  // Always refresh cheap status counts on reopen; a paused worker may emit no event. Store guards prevent stale
-  // rewinds.
+  // A paused worker may emit no event; store guards stop stale rewinds.
   refreshImageIndexStatus();
 };
 
-/**
- * Poll only while a map view is mounted and its page is visible; missing encoders produce no index events. A page
- * returning to view checks at once instead of waiting out the interval.
- */
+/** Missing encoders emit no index events, so poll while a view is mounted and visible. */
 export const attachImageMapStatusPolling = (): (() => void) => {
   const owner = captureAccountScope();
   const poll = () => {

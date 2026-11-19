@@ -17,13 +17,7 @@ import type { CanvasImageDropData } from './canvasImageDnd';
 
 import { importCanvasDropImages } from './executeCanvasImageDropImport';
 
-/**
- * Lands image files dropped on a canvas zone as that zone lands gallery images. They are uploaded first, as pasted
- * media is: to the project's auto-add board, reporting the upload's outcome and failures. The images then go to the
- * project the drop was made on, read again once they are stored so edits made meanwhile are kept, through the canvas
- * engine live for it then; a project switched away from, or one whose Canvas was closed meanwhile, takes them through
- * its ingestion, never the canvas now showing. An account change on the way leaves nothing behind.
- */
+/** Uploads dropped files like pasted media, then lands them in the drop's project, never the current one. */
 export const importCanvasFileDrop = async ({
   canvas,
   destination,

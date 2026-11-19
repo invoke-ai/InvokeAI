@@ -31,7 +31,6 @@ vi.mock('./GenerateSettingsForm', () => ({
     selectedModel?: { key: string };
     settings: { positivePrompt: string };
   }) => (
-    // A button, so the form has something operable to receive focus, as the real one does.
     <button data-testid="generate-form" type="button">
       {`model:${selectedModel?.key ?? 'none'} prompt:${settings.positivePrompt}`}
     </button>
@@ -40,7 +39,6 @@ vi.mock('./GenerateSettingsForm', () => ({
 
 const getArchitectureCapabilities = vi.fn<() => Promise<ArchitectureCapabilitiesRow[]>>();
 
-/** A request still in flight: the fetch neither resolves nor rejects while the assertions run. */
 const pendingRequest = (): Promise<ArchitectureCapabilitiesRow[]> =>
   new Promise(() => {
     // Intentionally never settles.
@@ -64,7 +62,6 @@ const STORED_MODEL: GenerationModelCatalogItem = {
   type: 'main',
 } as GenerationModelCatalogItem;
 
-/** Stable fixture references preserve memoization across capability arrival. */
 const CATALOG: readonly GenerationModelCatalogItem[] = [OTHER_MODEL, STORED_MODEL];
 
 const STORED_VALUES = {
@@ -140,7 +137,6 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
-  // Returns the capability store and the core registry to their unloaded state between tests.
   accountLifecycle.invalidate();
 });
 
@@ -167,7 +163,6 @@ describe('GenerateWidgetView capability gate', () => {
 
     const alert = document.querySelector('[role="alert"]');
 
-    // A localized headline, with what the request said as the detail beneath it.
     expect(alert?.textContent).toContain('Could not load model capabilities from the backend.');
     expect(alert?.textContent).toContain('Fixture capability outage.');
     expect(formStub()).toBeNull();
@@ -179,9 +174,7 @@ describe('GenerateWidgetView capability gate', () => {
       retryButton().click();
     });
 
-    // The stored selection, not the catalog's first entry, and the project's own prompt.
     expect(formStub()?.textContent).toBe('model:stored-sdxl prompt:a saved prompt');
-    // The button that held focus is gone; focus moved into the form it revealed, not to <body>.
     expect(document.activeElement).toBe(formStub());
   });
 

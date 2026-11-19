@@ -1,6 +1,6 @@
 /**
- * Shared layer/source geometry. `getSourceBounds` returns document-space bounds; `getSourcePixelSize` returns
- * unscaled cache dimensions because compositing applies transforms.
+ * Shared layer/source geometry. `getSourceBounds` returns document-space bounds; `getSourcePixelSize` returns unscaled
+ * cache dimensions because compositing applies transforms.
  */
 
 import type {
@@ -17,23 +17,19 @@ import { estimateTextExtent } from '@workbench/canvas-engine/render/rasterizers/
 
 import { isLayerContributing } from './layerEligibility';
 
-/** A layer type that carries a rasterizable `source` (raster or control). */
 type SourceLayer = Extract<CanvasLayerContract, { source: CanvasLayerSourceContract }>;
 
-/** A mask-bearing layer (inpaint mask / regional guidance); its `mask` holds an alpha bitmap. */
 type MaskLayer = Extract<CanvasLayerContract, { mask: unknown }>;
 
-/** True when a layer carries a `source` field (raster / control layers). */
 const hasSource = (layer: CanvasLayerContract): layer is SourceLayer =>
   layer.type === 'raster' || layer.type === 'control';
 
-/** True when a layer carries a `mask` (inpaint mask / regional guidance). */
 export const isMaskLayer = (layer: CanvasLayerContract): layer is MaskLayer =>
   layer.type === 'inpaint_mask' || layer.type === 'regional_guidance';
 
 /**
- * Views mask alpha as paint for shared rasterization, growth, stroke and persistence paths. Compositing alone
- * colorizes with mask fill. Returns null for non-mask layers.
+ * Views mask alpha as paint for shared rasterization, growth, stroke and persistence paths. Compositing alone colorizes
+ * with mask fill. Returns null for non-mask layers.
  */
 export const maskAsPaintSource = (
   layer: CanvasLayerContract
@@ -41,8 +37,7 @@ export const maskAsPaintSource = (
   isMaskLayer(layer) ? { bitmap: layer.mask.bitmap, offset: layer.mask.offset, type: 'paint' } : null;
 
 /**
- * Shared rasterizable-source accessor: raster/control source or a synthetic paint view of mask alpha; otherwise
- * null.
+ * Shared rasterizable-source accessor: raster/control source or a synthetic paint view of mask alpha; otherwise null.
  */
 export const renderableSourceOf = (layer: CanvasLayerContract): CanvasLayerSourceContract | null => {
   if (hasSource(layer)) {
@@ -82,9 +77,8 @@ export const isRenderableLayer = (layer: CanvasLayerContract): boolean => {
 };
 
 /**
- * Untransformed local cache extent: native image size, shape/text extent, explicit gradient extent (legacy
- * document dimensions), or paint bitmap size at its offset (legacy zero). Empty paint has an empty rect;
- * unsupported sources throw.
+ * Untransformed local cache extent: native image size, shape/text extent, explicit gradient extent (legacy: document
+ * dims), or paint bitmap size at its offset (legacy: zero). Empty paint is an empty rect; unsupported sources throw.
  */
 export const getSourceContentRect = (layer: CanvasLayerContract, doc: CanvasDocumentContractV3): Rect => {
   // Guide geometry owns no pixels, even when it has paths.
@@ -110,8 +104,8 @@ export const getSourceContentRect = (layer: CanvasLayerContract, doc: CanvasDocu
       return { height: extent.height, width: extent.width, x: 0, y: 0 };
     }
     case 'gradient': {
-      // Explicit extent when present; legacy gradients (no extent) were
-      // document-sized by construction, so default to the document dims.
+      // Explicit extent when present; legacy gradients (no extent) were document-sized by construction, so default to
+      // the document dims.
       const width = source.width ?? doc.width;
       const height = source.height ?? doc.height;
       return { height, width, x: 0, y: 0 };
@@ -128,8 +122,8 @@ export const getSourceContentRect = (layer: CanvasLayerContract, doc: CanvasDocu
 };
 
 /**
- * Rotation-aware document bounds from transformed {@link getSourceContentRect}, for culling and fitting.
- * Unsupported sources throw.
+ * Rotation-aware document bounds from transformed {@link getSourceContentRect}, for culling and fitting. Unsupported
+ * sources throw.
  */
 export const getSourceBounds = (layer: CanvasLayerContract, doc: CanvasDocumentContractV3): Rect => {
   const contentRect = getSourceContentRect(layer, doc);

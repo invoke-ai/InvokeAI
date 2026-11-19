@@ -75,7 +75,6 @@ it('says the items could not load, leaves the editor standing, and loads them on
   );
   const trigger = page.getByRole('button', { name: 'widgets.generate.resetSettings' });
 
-  // Pointing at the button warms the items; that load failing is no unhandled rejection.
   await userEvent.hover(trigger);
   await userEvent.click(trigger);
   const failed = page.getByRole('menuitem', { name: 'common.menuPartLoadFailed' });
@@ -86,7 +85,6 @@ it('says the items could not load, leaves the editor standing, and loads them on
   await userEvent.keyboard('{Escape}');
   await expect.element(page.getByRole('menu')).not.toBeInTheDocument();
 
-  // The keyboard reaches the failed item, and it says how to recover.
   trigger.element().focus();
   await userEvent.keyboard('{Enter}');
   await expect.element(failed).toBeInTheDocument();

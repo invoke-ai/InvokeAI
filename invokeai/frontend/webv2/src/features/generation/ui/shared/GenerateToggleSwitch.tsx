@@ -67,8 +67,8 @@ interface GenerateToggleSwitchProps {
 }
 
 /**
- * A Generate setting's on/off row: the label is the switch's own `<label>`, so clicking it toggles and names it. A
- * long label wraps under itself while the switch stays at the trailing edge, level with the label's first line.
+ * A Generate setting's on/off row: the label is the switch's own `<label>`, so clicking it toggles and names it. A long
+ * label wraps under itself while the switch stays at the trailing edge, level with the label's first line.
  */
 export const GenerateToggleSwitch = ({
   checked,
@@ -147,8 +147,8 @@ export const GenerateToggleSwitch = ({
 };
 
 /**
- * A switch acting on a list row, named by `label` alone because the row's own title is its visible label and
- * belongs to the row's primary button. Settings rows use GenerateToggleSwitch.
+ * A switch acting on a list row, named by `label` alone because the row's own title is its visible label and belongs to
+ * the row's primary button. Settings rows use GenerateToggleSwitch.
  */
 export const GenerateRowSwitch = ({
   checked,

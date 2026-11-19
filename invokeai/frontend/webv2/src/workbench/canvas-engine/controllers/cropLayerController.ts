@@ -33,8 +33,8 @@ import {
 
 /**
  * `locked`: the layer or a group above it is locked. `outside-frame`: the layer lies wholly outside the frame, so the
- * crop would empty it (crop all does that; an explicit crop of one layer refuses). {@link LayerUnreadable}: its
- * pixels could not be read (an image that is gone or does not decode).
+ * crop would empty it (crop all does that; an explicit crop of one layer refuses). {@link LayerUnreadable}: its pixels
+ * could not be read (an image that is gone or does not decode).
  */
 export type CropLayerResult =
   | { status: 'cropped' }
@@ -51,9 +51,9 @@ interface CropAllSkipped {
 
 /**
  * `skippedLocked` counts locked leaves (own or ancestor lock) and `skippedUnreadable` lists leaves whose pixels could
- * not be read, each only when its content reaches past the frame; both are left as they are. `nothing` when every
- * other leaf already fits; every refusal leaves document, pixels and history alone. A leaf whose image could not be
- * fetched for now refuses the whole crop as `not-ready`, since trying again can crop it too.
+ * not be read, each only when its content reaches past the frame; both are left as they are. `nothing` when every other
+ * leaf already fits; every refusal leaves document, pixels and history alone. A leaf whose image could not be fetched
+ * for now refuses the whole crop as `not-ready`, since trying again can crop it too.
  */
 export type CropAllLayersResult =
   | ({ status: 'cropped'; cropped: number } & CropAllSkipped)
@@ -119,8 +119,8 @@ const cropEligibility = (
 
 /**
  * The contract of `layer` cropped to `rect`: its baked pixels now sit at `rect` in a paint source (or mask bitmap) with
- * an identity transform, so transform, raster adjustments and control filter no longer apply. The bitmap is
- * written by persistence once the cropped pixels land.
+ * an identity transform, so transform, raster adjustments and control filter no longer apply. The bitmap is written by
+ * persistence once the cropped pixels land.
  */
 const croppedLayerContract = (layer: CanvasLayerContract, rect: Rect): CanvasLayerContract => {
   if (layer.type === 'vector') {
@@ -152,10 +152,8 @@ const cropPixels = (backend: RasterBackend, exported: RasterSurface, exportedRec
   return cropped;
 };
 
-/** What crop all makes of one leaf's export. */
 type CropExport = Extract<ExportResult, { status: 'ok' }> | { status: 'skip' } | LayerUnreadable | CropAllLayersResult;
 
-/** One leaf's crop: its contract and pixels before and after. */
 interface LayerCrop {
   readonly before: CanvasLayerContract;
   readonly beforePixels: LayerPixels;
@@ -279,8 +277,8 @@ export class CropLayerController {
    * Crops every leaf of every stack to the frame as one history entry. Locked leaves (their own lock or an ancestor's)
    * and leaves whose pixels cannot be read are skipped; leaves already inside the frame, empty ones and unsupported
    * sources are left alone; a leaf entirely outside the frame is emptied in place, so ids, order, groups and flags
-   * never change. Pending paint uploads settle first. Each leaf's export is released as soon as its cropped pixels
-   * are copied, so the peak is the cropped set plus one export.
+   * never change. Pending paint uploads settle first. Each leaf's export is released as soon as its cropped pixels are
+   * copied, so the peak is the cropped set plus one export.
    */
   async cropAll(): Promise<CropAllLayersResult> {
     const { ctx } = this.deps;

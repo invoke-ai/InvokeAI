@@ -148,8 +148,8 @@ export class EditingController {
     this.transform.dispose();
     this.selectionPixels.dispose();
     this.selectionImage.dispose();
-    // Before the selection: disposing a live float puts its pixels back, and
-    // that read still needs the selection's mask to be intact.
+    // Before the selection: disposing a live float puts its pixels back, and that read still needs the selection's mask
+    // to be intact.
     this.floatingSelection.dispose();
     this.selection.dispose();
   }

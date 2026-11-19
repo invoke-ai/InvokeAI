@@ -41,8 +41,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  // Let any live watcher observe a terminal state so it cannot leak into the
-  // next test through the module-level dedup flag.
+  // Let any live watcher see a terminal state so it cannot leak into the next test via the module-level dedup flag.
   mocks.apiFetchJson.mockResolvedValue(backendVocab('ready'));
   await advancePolls(3);
   vi.useRealTimers();

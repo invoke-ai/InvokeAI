@@ -15,11 +15,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { VideoReferenceListField } from './VideoReferenceListField';
 
-/**
- * An upload the board refused leaves the listing the board was chosen from stale: that listing is read again at once
- * so an upload that follows the read is routed by it. Other failures leave the listing alone.
- */
-
 const galleryMocks = vi.hoisted(() => ({ upload: vi.fn() }));
 
 vi.mock('@features/gallery', async (importOriginal) => {
@@ -71,7 +66,6 @@ afterEach(() => {
   container.remove();
 });
 
-/** Uploads one image file through the list's own picker. */
 const uploadImage = async (): Promise<void> => {
   act(() => {
     root.render(

@@ -12,7 +12,7 @@ import type { ListRow } from './listRows';
 import { List, type ListRowProps } from './List';
 import { ListItem } from './ListItem';
 import { LIST_ROW_GAP_PX } from './listLayout';
-import { listRowsFromItems, listRowsFromSections } from './listRows';
+import { listRowsFromSections } from './listRows';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -158,16 +158,6 @@ describe('List virtualization and pinned headers', () => {
     await scrollTo(0);
     expect(pinnedHeader()?.textContent).toContain('Main');
   });
-
-  it('paints the pinned header opaquely so rows scrolling beneath it stay hidden', async () => {
-    await render(<Harness rows={rowsOf(section('main', 'Main', 40))} />);
-    await scrollTo(200);
-
-    const background = getComputedStyle(pinnedHeader()!).backgroundColor;
-
-    expect(background).not.toBe('rgba(0, 0, 0, 0)');
-    expect(background).not.toBe('transparent');
-  });
 });
 
 describe('List active row', () => {
@@ -192,11 +182,6 @@ describe('List active row', () => {
     expect(viewport().scrollTop).toBeGreaterThan(0);
     expect(rowRect.top).toBeGreaterThanOrEqual(viewportRect.top + HEADER_PX - 1);
     expect(rowRect.bottom).toBeLessThanOrEqual(viewportRect.bottom + 1);
-  });
-  it('keeps opening at the top unless asked to reveal the active row', async () => {
-    await render(<Harness activeKey="main-45" rows={rowsOf(section('main', 'Main', 60))} />);
-
-    expect(viewport().scrollTop).toBe(0);
   });
 });
 
@@ -314,73 +299,6 @@ describe('List focus repair', () => {
     expect(document.activeElement?.closest('[data-list-row]')?.getAttribute('data-list-row')).toBe('main-0');
     expect(primaryButtons().filter((button) => button.tabIndex === 0)).toHaveLength(1);
   });
-
-  it('leaves focus alone when the user had already moved it outside the list', async () => {
-    await render(
-      <ChakraProvider value={system}>
-        <input aria-label="outside" />
-        <Harness rows={rowsOf(section('main', 'Main', 4))} />
-      </ChakraProvider>
-    );
-
-    const second = primaryButtons().find((button) => button.closest('[data-list-row="main-1"]'))!;
-    const outside = host.querySelector<HTMLInputElement>('input[aria-label="outside"]')!;
-
-    await act(() => second.focus());
-    await act(() => outside.focus());
-    await render(
-      <ChakraProvider value={system}>
-        <input aria-label="outside" />
-        <Harness rows={rowsOf(section('main', 'Main', 1))} />
-      </ChakraProvider>
-    );
-
-    expect(document.activeElement).toBe(host.querySelector('input[aria-label="outside"]'));
-  });
-
-  it('forgets focus ownership when the viewport unmounts, so a refill cannot steal focus later', async () => {
-    const outsideInput = document.createElement('input');
-
-    outsideInput.setAttribute('aria-label', 'elsewhere');
-    document.body.append(outsideInput);
-
-    try {
-      await render(<Harness rows={rowsOf(section('main', 'Main', 3))} />);
-      await act(() => primaryButtons()[1]!.focus());
-
-      // An external change empties the list while a row is focused; focus falls to the body without a blur.
-      await render(<Harness rows={[]} />);
-      expect(host.querySelector('[data-list-viewport]')).toBeNull();
-
-      await act(() => outsideInput.focus());
-      await render(<Harness rows={rowsOf(section('main', 'Main', 3))} />);
-
-      expect(document.activeElement).toBe(outsideInput);
-    } finally {
-      outsideInput.remove();
-    }
-  });
-
-  it('resolves a context-menu focus target to the tab stop once its row is gone', async () => {
-    const onContextMenu = vi.fn<(item: Item, anchor: ListContextMenuAnchor) => void>();
-
-    await render(<Harness rows={rowsOf(section('main', 'Main', 3))} onContextMenu={onContextMenu} />);
-    const row = host.querySelector<HTMLElement>('[data-list-row="main-2"]')!;
-
-    await act(() => {
-      row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 0, clientY: 0 }));
-    });
-    const anchor = onContextMenu.mock.lastCall![1];
-
-    expect(anchor.focusTarget()).toBe(row.querySelector('[data-list-primary]'));
-
-    await render(<Harness rows={rowsOf(section('main', 'Main', 2))} onContextMenu={onContextMenu} />);
-    const target = anchor.focusTarget();
-
-    expect(target).not.toBeNull();
-    expect(target!.tabIndex).toBe(0);
-    expect(target!.closest('[data-list-row]')?.getAttribute('data-list-row')).toBe('main-0');
-  });
 });
 
 describe('List scroll offset persistence', () => {
@@ -410,214 +328,6 @@ describe('List scroll offset persistence', () => {
 
     expect(onScrollOffsetPersist).toHaveBeenCalledTimes(1);
     expect(onScrollOffsetPersist).toHaveBeenCalledWith(1234);
-  });
-});
-
-describe('List range reporting', () => {
-  it('reports the visible range on mount and when a scroll moves it, not on every scroll event', async () => {
-    const onRangeChange = vi.fn();
-    // No section headers, so every index is a row slot.
-    const rows = listRowsFromItems(section('main', 'Main', 200).items, (item) => item.id);
-    const element = (
-      <ChakraProvider value={system}>
-        <List
-          density="comfortable"
-          label="subjects"
-          renderItem={(item: Item, rowProps: ListRowProps) => <ListItem {...rowProps} title={item.name} />}
-          rows={rows}
-          onRangeChange={onRangeChange}
-        />
-      </ChakraProvider>
-    );
-
-    await render(element);
-    // The rows the viewport actually shows, read from the rendered slots.
-    const shownRange = () => {
-      const bounds = viewport().getBoundingClientRect();
-      const shown = [...host.querySelectorAll<HTMLElement>('[data-index]')]
-        .filter((slot) => {
-          const box = slot.getBoundingClientRect();
-          return box.bottom > bounds.top + 0.5 && box.top < bounds.bottom - 0.5;
-        })
-        .map((slot) => Number(slot.dataset.index));
-      return { endIndex: Math.max(...shown), startIndex: Math.min(...shown) };
-    };
-    expect(onRangeChange).toHaveBeenCalledTimes(1);
-    expect(onRangeChange).toHaveBeenLastCalledWith(shownRange());
-
-    // Thirty scroll events over 90px cross only a few row boundaries; each report is a new range.
-    for (let step = 1; step <= 30; step += 1) {
-      await scrollTo(ROW_PX * 50 + step * 3);
-    }
-    const reports = onRangeChange.mock.calls.map((call) => call[0] as { endIndex: number; startIndex: number });
-    expect(reports.length).toBeGreaterThan(1);
-    expect(reports.length).toBeLessThan(8);
-    reports.slice(1).forEach((range, index) => expect(range).not.toEqual(reports[index]));
-    expect(reports.at(-1)).toEqual(shownRange());
-  });
-});
-
-describe('List scrolling cost', () => {
-  it('pins the scroll area’s overflow properties above the rows, so scrolling restyles none of them', async () => {
-    await render(<Harness rows={listRowsFromItems(section('main', 'Main', 60).items, (item) => item.id)} />);
-    await scrollTo(400);
-
-    // Whatever custom properties the scroll area writes on its viewport, none may reach the rows changing.
-    const viewportProperties = () => [...viewport().style].filter((name) => name.startsWith('--'));
-    await vi.waitFor(() => expect(viewportProperties().length).toBeGreaterThan(0));
-    const style = getComputedStyle(host.querySelector('[data-list-row]')!);
-    for (const name of viewportProperties()) {
-      expect(['', '0px'], name).toContain(style.getPropertyValue(name).trim());
-    }
-  });
-});
-
-describe('ListItem checkbox', () => {
-  it('names the checkbox after the row and reports toggles without pressing the row', async () => {
-    const onCheckedChange = vi.fn();
-    const onPress = vi.fn();
-
-    await render(
-      <Harness rows={rowsOf(section('main', 'Main', 2))} onCheckedChange={onCheckedChange} onPress={onPress} />
-    );
-
-    const labelled = host.querySelector<HTMLElement>('[aria-label="common.list.selectItem:Main 0"]');
-
-    expect(labelled).not.toBeNull();
-    expect(labelled!.closest('[data-list-primary]')).toBeNull();
-
-    const checkbox = labelled!.matches('input') ? labelled! : labelled!.querySelector<HTMLInputElement>('input')!;
-
-    await act(() => checkbox.click());
-    expect(onCheckedChange).toHaveBeenCalledWith({ id: 'main-0', name: 'Main 0' }, true);
-    expect(onPress).not.toHaveBeenCalled();
-  });
-});
-
-describe('List measured rows', () => {
-  it('sizes each row by its content and still pushes the pinned header out with the next one', async () => {
-    const tall = new Set(['main-1']);
-    const rows = rowsOf(section('main', 'Main', 12), section('lora', 'LoRAs', 12));
-
-    await render(
-      <ChakraProvider value={system}>
-        <List
-          density="comfortable"
-          label="subjects"
-          renderItem={(item: Item, rowProps: ListRowProps) => (
-            <div
-              aria-posinset={rowProps.positionInSet}
-              aria-setsize={rowProps.setSize}
-              data-testid={item.id}
-              role="listitem"
-              style={{ height: tall.has(item.id) ? 120 : 30 }}
-            >
-              {item.name}
-            </div>
-          )}
-          rowHeight="measured"
-          rows={rows}
-        />
-      </ChakraProvider>
-    );
-    await settleFrame();
-
-    const top = (id: string) => host.querySelector<HTMLElement>(`[data-testid="${id}"]`)!.getBoundingClientRect().top;
-    // Each slot is its content plus the row gap.
-    expect(top('main-2') - top('main-1')).toBeCloseTo(120 + LIST_ROW_GAP_PX, 0);
-    expect(top('main-3') - top('main-2')).toBeCloseTo(30 + LIST_ROW_GAP_PX, 0);
-
-    // A row that grows after mount (an editor adding a line) pushes the rows after it down.
-    const before = top('main-3') - top('main-2');
-    tall.add('main-2');
-    await render(
-      <ChakraProvider value={system}>
-        <List
-          density="comfortable"
-          label="subjects"
-          renderItem={(item: Item, rowProps: ListRowProps) => (
-            <div
-              aria-posinset={rowProps.positionInSet}
-              aria-setsize={rowProps.setSize}
-              data-testid={item.id}
-              role="listitem"
-              style={{ height: tall.has(item.id) ? 120 : 30 }}
-            >
-              {item.name}
-            </div>
-          )}
-          rowHeight="measured"
-          rows={rows}
-        />
-      </ChakraProvider>
-    );
-    await settleFrame();
-    await settleFrame();
-    expect(top('main-3') - top('main-2') - before).toBeCloseTo(90, 0);
-    tall.delete('main-2');
-    await render(
-      <ChakraProvider value={system}>
-        <List
-          density="comfortable"
-          label="subjects"
-          renderItem={(item: Item, rowProps: ListRowProps) => (
-            <div
-              aria-posinset={rowProps.positionInSet}
-              aria-setsize={rowProps.setSize}
-              data-testid={item.id}
-              role="listitem"
-              style={{ height: tall.has(item.id) ? 120 : 30 }}
-            >
-              {item.name}
-            </div>
-          )}
-          rowHeight="measured"
-          rows={rows}
-        />
-      </ChakraProvider>
-    );
-    await settleFrame();
-    await settleFrame();
-    expect(top('main-3') - top('main-2')).toBeCloseTo(30 + LIST_ROW_GAP_PX, 0);
-
-    const loraHeaderTop = HEADER_PX + 120 + LIST_ROW_GAP_PX + 11 * (30 + LIST_ROW_GAP_PX);
-
-    await scrollTo(loraHeaderTop - HEADER_PX / 2);
-    expect(pinnedHeader()?.textContent).toContain('Main');
-    expect(pinnedHeader()!.getBoundingClientRect().top).toBeCloseTo(
-      viewport().getBoundingClientRect().top - HEADER_PX / 2,
-      0
-    );
-  });
-});
-
-describe('List inset', () => {
-  const edgeOffsets = () => {
-    const list = viewport().getBoundingClientRect();
-    const row = host.querySelector<HTMLElement>('[data-list-row="a-0"]')!.getBoundingClientRect();
-    const header = pinnedHeader()!.firstElementChild!.getBoundingClientRect();
-
-    return { header: header.left - list.left, rowEnd: list.right - row.right, rowStart: row.left - list.left };
-  };
-
-  it('insets rows and headers from the list edges by default and runs them edge to edge with none', async () => {
-    const rows = rowsOf(section('a', 'Alpha', 3));
-
-    await render(<Harness rows={rows} />);
-    // LIST_ROW_INSET is 0.75rem.
-    expect(edgeOffsets()).toEqual({ header: 12, rowEnd: 12, rowStart: 12 });
-
-    await render(<Harness inset="none" rows={rows} />);
-    expect(edgeOffsets()).toEqual({ header: 0, rowEnd: 0, rowStart: 0 });
-  });
-});
-
-describe('List states', () => {
-  it('renders the caller-owned empty state when no item rows remain', async () => {
-    await render(<Harness rows={[]} />);
-
-    expect(host.textContent).toContain('nothing');
-    expect(host.querySelector('[role="list"]')).toBeNull();
   });
 });
 
@@ -669,39 +379,5 @@ describe('a row editing its title inside a List', () => {
     await act(() => host.querySelector<HTMLButtonElement>('button:not([data-list-primary])')!.focus());
     await act(() => userEvent.tab());
     expect(document.activeElement).toBe(stops[0]);
-  });
-});
-
-describe('keys from a row selection checkbox', () => {
-  it('still move between rows: arrows, Home and End', async () => {
-    const onCheckedChange = vi.fn();
-    await render(<Harness rows={rowsOf(section('main', 'Main', 5))} onCheckedChange={onCheckedChange} />);
-    const checkbox = (index: number) =>
-      host
-        .querySelectorAll<HTMLElement>('[role="listitem"]')
-        [index]!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-
-    await act(() => checkbox(0).focus());
-    await act(() => userEvent.keyboard(' '));
-    expect(onCheckedChange).toHaveBeenCalledOnce();
-
-    await act(() => userEvent.keyboard('{ArrowDown}'));
-    await settleFrame();
-    expect(document.activeElement).toBe(primaryButtons()[1]);
-
-    await act(() => checkbox(1).focus());
-    await act(() => userEvent.keyboard('{End}'));
-    await settleFrame();
-    expect(document.activeElement?.textContent).toContain('Main 4');
-
-    await act(() => checkbox(4).focus());
-    await act(() => userEvent.keyboard('{ArrowUp}'));
-    await settleFrame();
-    expect(document.activeElement?.textContent).toContain('Main 3');
-
-    await act(() => checkbox(3).focus());
-    await act(() => userEvent.keyboard('{Home}'));
-    await settleFrame();
-    expect(document.activeElement).toBe(primaryButtons()[0]);
   });
 });

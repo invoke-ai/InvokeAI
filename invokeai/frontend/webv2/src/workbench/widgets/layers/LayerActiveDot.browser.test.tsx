@@ -32,7 +32,6 @@ afterEach(async () => {
 
 const noop = (): void => undefined;
 
-/** Every fill a layer row can rest on: at rest, pointed, selected, primary, and the muted ancestor tone. */
 const FILLS: readonly { id: string; active?: RowProps['active']; pointed?: boolean }[] = [
   { id: 'rest' },
   { id: 'hover', pointed: true },
@@ -75,8 +74,6 @@ const renderDots = async (checked: boolean, gatedReason: string | null = null) =
 };
 
 describe('LayerActiveDot', () => {
-  // A dot that is off is the faintest state of an on/off control: its ring stays a visible boundary (WCAG 1.4.11) on
-  // every fill a row can take, in every theme, while staying a solid ring unlike the gated dashed one.
   it.each(THEMES.map((theme) => [theme.id, theme.colorScheme] as const))(
     'draws the off ring at 3:1 or more against every row fill in the %s (%s) theme',
     async (themeId) => {

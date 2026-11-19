@@ -4,7 +4,6 @@ import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/ras
 import { eraseMaskedRegion, fillMaskedRegion } from '@workbench/canvas-engine/selection/selectionOps';
 import { describe, expect, it } from 'vitest';
 
-/** Wraps the stub backend so every scratch surface it mints is captured for assertions. */
 const createCapturingBackend = (): { backend: StubRasterBackend; created: StubRasterSurface[] } => {
   const inner = createTestStubRasterBackend();
   const created: StubRasterSurface[] = [];
@@ -29,7 +28,7 @@ describe('fillMaskedRegion', () => {
     const { backend, created } = createCapturingBackend();
     const target = backend.createSurface(100, 100);
     const mask = backend.createSurface(100, 100);
-    created.length = 0; // ignore target/mask; capture only the op's scratch
+    created.length = 0;
 
     fillMaskedRegion({
       backend,
@@ -41,13 +40,11 @@ describe('fillMaskedRegion', () => {
       targetOrigin: { x: 0, y: 0 },
     });
 
-    // The scratch: fill the color, then intersect with the mask.
     const scratch = created[0]!;
     const scratchOps = scratch.callLog.map((e) => e.op);
     expect(scratchOps).toContain('fillRect');
     expect(compositeOps(scratch)).toContain('destination-in');
 
-    // The target: the masked color is drawn source-over at the rect origin.
     const targetDraw = target.callLog.find((e) => e.op === 'drawImage');
     expect(targetDraw).toBeDefined();
     expect(compositeOps(target)).toContain('source-over');
@@ -70,7 +67,6 @@ describe('fillMaskedRegion', () => {
       targetOrigin: { x: 0, y: 0 },
     });
 
-    // Source-atop fill preserves transparency by coloring only existing target coverage.
     expect(compositeOps(target)).toContain('source-atop');
     expect(compositeOps(target)).not.toContain('source-over');
   });
@@ -81,10 +77,9 @@ describe('fillMaskedRegion', () => {
     const mask = backend.createSurface(100, 100);
     created.length = 0;
 
-    // Edit region at doc (50,50); mask surface origin (40,40); target cache
-    // origin (30,30). The mask is drawn into the region-local scratch at
-    // (maskOrigin - rect) = (-10,-10); the scratch is drawn onto the target at
-    // (rect - targetOrigin) = (20,20).
+    // Edit region at doc (50,50); mask surface origin (40,40); target cache origin (30,30). The mask is drawn into the
+    // region-local scratch at (maskOrigin - rect) = (-10,-10); the scratch is drawn onto the target at (rect -
+    // targetOrigin) = (20,20).
     fillMaskedRegion({
       backend,
       color: '#ff0000',

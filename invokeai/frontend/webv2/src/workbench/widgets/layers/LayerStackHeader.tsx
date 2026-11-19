@@ -32,7 +32,6 @@ interface LayerStackHeaderProps {
   engine: LayerStackActionsEngine | null;
   focused: boolean;
   leafCount: number;
-  /** The header's tree key, the id the tree addresses it by. */
   rowKey: string;
   posInSet: number;
   setSize: number;
@@ -43,10 +42,7 @@ interface LayerStackHeaderProps {
 
 const stopPropagation = (event: { stopPropagation: () => void }): void => event.stopPropagation();
 
-/**
- * Stack headers own the roving tree stop; pointer-only action buttons remain keyboard-accessible through Shift+F10
- * menus.
- */
+/** Headers own the roving tree stop; pointer-only buttons are reachable through Shift+F10 menus. */
 const LayerStackHeaderComponent = ({
   collapsed,
   commands,
@@ -97,8 +93,8 @@ const LayerStackHeaderComponent = ({
   const hintId = STACK_HINTS[stack];
   const descriptionId = `layer-stack-hint-${stack}`;
   return (
-    // Attach hints to tree-item focus/hover with persistent described-by text; exclude action buttons with their
-    // own tooltips.
+    // Attach hints to tree-item focus/hover with persistent described-by text; exclude action buttons with their own
+    // tooltips.
     <FeatureHint hint={hintId}>
       <Box
         ref={element}

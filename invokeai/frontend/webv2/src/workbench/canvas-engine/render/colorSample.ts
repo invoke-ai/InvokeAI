@@ -33,9 +33,9 @@ export interface ColorSampleArea {
 
 export interface ColorSampler {
   /**
-   * Floors document coordinates to a pixel; transformed content remains pickable outside document dimensions.
-   * Returns null for zero-alpha coverage. Repeating a pixel of an unchanged document and cache revision reuses the
-   * previous result.
+   * Floors document coordinates to a pixel; transformed content remains pickable outside document dimensions. Returns
+   * null for zero-alpha coverage. Repeating a pixel of an unchanged document and cache revision reuses the previous
+   * result.
    */
   sample(
     doc: CanvasDocumentContractV3,

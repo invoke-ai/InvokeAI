@@ -116,9 +116,9 @@ const moveSelectedIds = (
 };
 
 /**
- * Moves every selected node among its own siblings, selected members keeping their relative order.
- * A selected node whose ancestor is also selected moves with the ancestor. Returns one command per
- * sibling list whose order changes, in document order.
+ * Moves every selected node among its own siblings, selected members keeping their relative order. A selected node
+ * whose ancestor is also selected moves with the ancestor. Returns one command per sibling list whose order changes, in
+ * document order.
  */
 export const moveNodesWithinSiblings = (
   index: CanvasDocumentIndex,

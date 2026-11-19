@@ -22,10 +22,7 @@ export const trackPointerDown = (
   return [first!, second!];
 };
 
-/**
- * Tolerate capture failure for already-released pointers; uncaptured gestures still work while pointers remain on
- * the surface.
- */
+/** Tolerates capture failure on released pointers; uncaptured gestures work on the surface. */
 export const capturePointer = (element: Element, pointerId: number): void => {
   try {
     element.setPointerCapture(pointerId);
@@ -34,7 +31,6 @@ export const capturePointer = (element: Element, pointerId: number): void => {
   }
 };
 
-/** Releases a capture this surface holds, if it holds one. */
 export const releasePointer = (element: Element, pointerId: number): void => {
   if (element.hasPointerCapture(pointerId)) {
     element.releasePointerCapture(pointerId);

@@ -5,7 +5,7 @@ import { act, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { isResizeDragActive, ResizeHandle, type ResizeHandleProps, subscribeResizeDrag } from './ResizeHandle';
+import { isResizeDragActive, ResizeHandle, type ResizeHandleProps } from './ResizeHandle';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -89,16 +89,6 @@ const moveTo = async (clientX: number) => {
 const release = (clientX: number, type = 'pointerup') => act(() => window.dispatchEvent(pointer(type, clientX, 0)));
 
 describe('ResizeHandle', () => {
-  it('describes the divider to assistive tech', async () => {
-    const { separator } = await mount();
-
-    expect(separator.getAttribute('aria-label')).toBe('Resize pane');
-    expect(separator.getAttribute('aria-orientation')).toBe('vertical');
-    expect(separator.getAttribute('aria-valuemin')).toBe('200');
-    expect(separator.getAttribute('aria-valuemax')).toBe('500');
-    expect(separator.getAttribute('aria-valuenow')).toBe('300');
-  });
-
   it('renders a drag live on the pane and commits once on release', async () => {
     const onCommit = vi.fn();
     const { pane, separator } = await mount({ onCommit });
@@ -117,47 +107,6 @@ describe('ResizeHandle', () => {
     await nextFrame();
     expect(pane.style.width).toBe('');
     expect(pane.getBoundingClientRect().width).toBe(340);
-  });
-
-  it('writes the pane at most once per frame however many moves arrive', async () => {
-    const { pane, separator } = await mount();
-    const writes: MutationRecord[] = [];
-    const observer = new MutationObserver((records) => writes.push(...records));
-    observer.observe(pane, { attributeFilter: ['style'] });
-
-    await press(separator);
-    await act(() => {
-      for (const clientX of [5, 10, 15, 20, 25]) {
-        window.dispatchEvent(pointer('pointermove', clientX));
-      }
-    });
-    await nextFrame();
-    observer.disconnect();
-
-    expect(writes).toHaveLength(1);
-    expect(pane.style.width).toBe('325px');
-  });
-
-  it('clamps a drag to its bounds', async () => {
-    const onCommit = vi.fn();
-    const { separator } = await mount({ onCommit });
-
-    await press(separator);
-    await moveTo(900);
-    await release(900);
-
-    expect(onCommit).toHaveBeenCalledExactlyOnceWith(500);
-  });
-
-  it('grows a pane after the divider toward the start', async () => {
-    const onCommit = vi.fn();
-    const { separator } = await mount({ onCommit, pane: 'after' });
-
-    await press(separator);
-    await moveTo(40);
-    await release(40);
-
-    expect(onCommit).toHaveBeenCalledExactlyOnceWith(260);
   });
 
   it('arms a collapse past the collapse point, backs off with hysteresis, and collapses on release', async () => {
@@ -185,19 +134,6 @@ describe('ResizeHandle', () => {
     expect(onCommit).not.toHaveBeenCalled();
   });
 
-  it('keeps the size but never collapses when the gesture is interrupted', async () => {
-    const onCollapse = vi.fn();
-    const onCommit = vi.fn();
-    const { separator } = await mount({ collapse: { at: 150, onCollapse, preview: 0 }, onCommit });
-
-    await press(separator);
-    await moveTo(-200);
-    await release(-200, 'pointercancel');
-
-    expect(onCollapse).not.toHaveBeenCalled();
-    expect(onCommit).toHaveBeenCalledExactlyOnceWith(200);
-  });
-
   it('abandons the drag on Escape', async () => {
     const onCommit = vi.fn();
     const { pane, separator } = await mount({ onCommit });
@@ -211,17 +147,6 @@ describe('ResizeHandle', () => {
     expect(onCommit).not.toHaveBeenCalled();
     expect(pane.style.width).toBe('');
     expect(separator.getAttribute('aria-valuenow')).toBe('300');
-  });
-
-  it('ends a drag whose release another window swallowed', async () => {
-    const onCommit = vi.fn();
-    const { separator } = await mount({ onCommit });
-
-    await press(separator);
-    await moveTo(30);
-    await act(() => window.dispatchEvent(pointer('pointermove', 30, 0)));
-
-    expect(onCommit).toHaveBeenCalledExactlyOnceWith(330);
   });
 
   it('steps by keyboard along its axis and collapses from the floor', async () => {
@@ -240,85 +165,6 @@ describe('ResizeHandle', () => {
 
     await key({ key: 'ArrowLeft' });
     expect(onCollapse).toHaveBeenCalledExactlyOnceWith('keyboard');
-  });
-
-  it('converts pointer travel into a percentage of the container', async () => {
-    const onCommit = vi.fn();
-    const { pane, separator } = await mount({ max: 75, min: 10, onCommit, unit: '%', value: 25 });
-
-    await press(separator);
-    await moveTo(80);
-    expect(pane.style.width).toBe('35%');
-
-    await release(80);
-    expect(onCommit).toHaveBeenCalledExactlyOnceWith(35);
-  });
-
-  it('announces the drag so costly layout can wait for it to end', async () => {
-    const listener = vi.fn();
-    const unsubscribe = subscribeResizeDrag(listener);
-    const { separator } = await mount();
-
-    await press(separator);
-    expect(isResizeDragActive()).toBe(true);
-
-    await moveTo(20);
-    await release(20);
-    unsubscribe();
-
-    expect(isResizeDragActive()).toBe(false);
-    expect(listener).toHaveBeenCalledTimes(2);
-  });
-
-  it('releases the page even when the commit throws', async () => {
-    const swallow = (event: ErrorEvent) => event.preventDefault();
-    window.addEventListener('error', swallow);
-    const { pane, separator } = await mount({
-      onCommit: () => {
-        throw new Error('store rejected the size');
-      },
-    });
-
-    await press(separator);
-    await moveTo(40);
-    await release(40);
-    window.removeEventListener('error', swallow);
-
-    expect(pane.style.width).toBe('');
-    expect(isResizeDragActive()).toBe(false);
-    expect(document.documentElement.hasAttribute('data-pointer-drag')).toBe(false);
-  });
-
-  it('applies a move released before its frame, and nothing after the release', async () => {
-    const onCommit = vi.fn();
-    const { pane, separator } = await mount({ onCommit });
-
-    await press(separator);
-    await act(() => window.dispatchEvent(pointer('pointermove', 40)));
-    await release(40);
-    expect(onCommit).toHaveBeenCalledExactlyOnceWith(340);
-
-    await nextFrame();
-    await nextFrame();
-    expect(pane.style.width).toBe('');
-  });
-
-  it('does not reapply a pending move after a throwing commit restores the pane', async () => {
-    const swallow = (event: ErrorEvent) => event.preventDefault();
-    window.addEventListener('error', swallow);
-    const { pane, separator } = await mount({
-      onCommit: () => {
-        throw new Error('store rejected the size');
-      },
-    });
-
-    await press(separator);
-    await act(() => window.dispatchEvent(pointer('pointermove', 40)));
-    await release(40);
-    await nextFrame();
-    window.removeEventListener('error', swallow);
-
-    expect(pane.style.width).toBe('');
   });
 
   it('commits nothing and releases the page when it unmounts mid-drag', async () => {

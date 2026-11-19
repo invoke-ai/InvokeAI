@@ -301,8 +301,8 @@ const FontLibrary = () => {
   const [filter, setFilter] = useState<FontFilter>('all');
   // Null until the library first loads (see below).
   const [chosenTab, setActiveTab] = useState<string | null>(null);
-  // Which pane a manager too narrow for both shows; opening a font or a tab reveals the detail. Null until the
-  // library first loads (see below).
+  // Which pane a manager too narrow for both shows; opening a font or a tab reveals the detail. Null until the library
+  // first loads (see below).
   const [detailOpen, setDetailOpen] = useState<boolean | null>(null);
   const [selectedFont, setSelectedFont] = useState<FontRecord | null>(null);
   const [search, setSearch] = useState('');
@@ -325,8 +325,8 @@ const FontLibrary = () => {
   const query = useQuery(fontsQueryOptions(params));
   const fonts = query.data?.items ?? NO_FONTS;
   const rows = useMemo(() => listRowsFromItems(fonts, getFontId), [fonts]);
-  // A new page, filter or search replaces every row: remount the list so it starts from the top whether or not
-  // the query is cached.
+  // A new page, filter or search replaces every row: remount the list so it starts from the top whether or not the
+  // query is cached.
   const listKey = `${filter}:${offset}:${search}`;
 
   const invalidateFonts = useCallback(() => queryClient.invalidateQueries({ queryKey: fontKeys.all }), [queryClient]);
@@ -500,8 +500,8 @@ const FontLibrary = () => {
   }, []);
   const closeDetail = useCallback(() => setDetailOpen(false), []);
   const addAction = useMemo(() => ({ label: t('fonts.addFonts'), onAdd: () => openTab('add') }), [openTab, t]);
-  // The starting pane and tab are decided once, when the library first loads: an empty library opens on Add Fonts,
-  // any other on the list. Later uploads and deletes never move the user; only opening a font or a tab, and Back, do.
+  // The starting pane and tab are decided once, when the library first loads: an empty library opens on Add Fonts, any
+  // other on the list. Later uploads and deletes never move the user; only opening a font or a tab, and Back, do.
   if (detailOpen === null && !query.isPending) {
     const isLibraryEmpty = query.data?.total === 0 && offset === 0 && filter === 'all' && search === '';
 
