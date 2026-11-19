@@ -8,6 +8,9 @@
 
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
+import { polygonBounds } from '@workbench/canvas-engine/math/rect';
+export { polygonBounds } from '@workbench/canvas-engine/math/rect';
+
 import { getStrokeOutlinePoints, getStrokePoints } from 'perfect-freehand';
 
 /** A single pressure-sampled input point for a stroke. */
@@ -217,32 +220,6 @@ export const traceSmoothPolygon = (path: Path2D, polygon: readonly Vec2[]): void
     path.quadraticCurveTo(control.x, control.y, (control.x + next.x) / 2, (control.y + next.y) / 2);
   }
   path.closePath();
-};
-
-/** Axis-aligned bounds of an outline polygon; an empty polygon yields a zero-size rect. */
-export const polygonBounds = (polygon: readonly Vec2[]): Rect => {
-  if (polygon.length === 0) {
-    return { height: 0, width: 0, x: 0, y: 0 };
-  }
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const p of polygon) {
-    if (p.x < minX) {
-      minX = p.x;
-    }
-    if (p.y < minY) {
-      minY = p.y;
-    }
-    if (p.x > maxX) {
-      maxX = p.x;
-    }
-    if (p.y > maxY) {
-      maxY = p.y;
-    }
-  }
-  return { height: maxY - minY, width: maxX - minX, x: minX, y: minY };
 };
 
 /** Traces an outline polygon into a fresh path and reports its bounds. */

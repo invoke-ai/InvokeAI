@@ -28,7 +28,8 @@ export interface MediaUsage {
   refs: GalleryItemRef[];
 }
 
-type StackKind = keyof Project['canvas']['document']['stacks'];
+// Vector guides have no raster sources or media references.
+type StackKind = Exclude<keyof Project['canvas']['document']['stacks'], 'vector'>;
 
 /** The canvas layer stacks, each its own surface; a new stack kind fails to compile until it has one. */
 const STACK_SURFACES = {

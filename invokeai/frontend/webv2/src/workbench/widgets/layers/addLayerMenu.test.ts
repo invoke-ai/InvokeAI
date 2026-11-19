@@ -22,7 +22,7 @@ describe('ADD_LAYER_MENU', () => {
   });
 
   it('lists control + raster under Layers', () => {
-    expect(ADD_LAYER_MENU[1]?.items.map((item) => item.id)).toEqual(['control', 'raster', 'group']);
+    expect(ADD_LAYER_MENU[1]?.items.map((item) => item.id)).toEqual(['control', 'raster', 'vector', 'group']);
   });
 
   it('gives every item a widgets.layers i18n label key', () => {

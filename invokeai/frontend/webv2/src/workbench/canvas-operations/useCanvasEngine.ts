@@ -55,18 +55,37 @@ export const createImageResolver = (): ImageResolver => async (imageName, signal
 export const createCanvasEngineResource = (projectId: string, deps: EngineDeps): CanvasEngineResource => {
   let engine: CanvasEngine | null = null;
   const listeners = new Set<() => void>();
-
+  let unsubscribeVectorState: (() => void) | null = null;
+  let unsubscribeDocument: (() => void) | null = null;
+  const publish = () => {
+    if (
+      engine?.document.getDocument()?.stacks.vector?.length &&
+      engine.interaction.get('vectorToolsStatus') === 'idle'
+    ) {
+      void engine.layers.vectorEdit.prepare();
+      return;
+    }
+    for (const listener of listeners) {
+      listener();
+    }
+  };
   return {
-    getSnapshot: () => engine,
+    getSnapshot: () => (engine?.interaction.get('vectorToolsStatus') === 'loading' ? null : engine),
     subscribe: (listener) => {
       listeners.add(listener);
       if (listeners.size === 1) {
         engine = getOrCreateEngine(projectId, deps);
-        listener();
+        unsubscribeVectorState = engine.interaction.subscribe('vectorToolsStatus', publish);
+        unsubscribeDocument = engine.interaction.subscribe('documentEpoch', publish);
+        publish();
       }
       return () => {
         listeners.delete(listener);
         if (listeners.size === 0 && engine) {
+          unsubscribeVectorState?.();
+          unsubscribeDocument?.();
+          unsubscribeVectorState = null;
+          unsubscribeDocument = null;
           engine = null;
           releaseEngine(projectId);
         }

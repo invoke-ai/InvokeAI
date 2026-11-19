@@ -252,6 +252,6 @@ registerAccountOwnedResource({
 export const getOrCreateEngine = defaultRegistry.getOrCreateEngine;
 export const releaseEngine = defaultRegistry.releaseEngine;
 
-/** Non-owning public lookup. Engine construction and lease management stay inside Canvas composition. */
+/** Queries the default registry without constructing an engine or acquiring a lease. */
 export const getCanvasEngine = (projectId: string): PublicCanvasEngine | undefined =>
   defaultRegistry.getEngine(projectId);
