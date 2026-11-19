@@ -15,21 +15,19 @@ import type { BackendGraphContract, GenerationProjectSettings, ResultDestination
 import type { ComponentModelConfig, GenerateModelConfig, GenerateWidgetValues } from './types';
 
 import {
+  addReferenceImages,
   coerceSchedulerForGraph,
   GENERATE_COMPONENT_VALUE_KEYS,
   getComponentPolicyContext,
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
   getGenerateModelSelectionResult,
-  getReferenceImageUnavailableReason,
   getSchedulerOptions,
   isArchitectureDescribed,
   isGenerateModelSelectable,
   isLoraSupported,
-  isReferenceImageSupported,
   getRecallDefaultVae,
   resolveModelDefaultVae,
-  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { compileCanvasGraph } from './canvas/compileCanvasGraph';
 import {
@@ -310,30 +308,34 @@ const withReferenceImages = (
   }
 
   const { model } = values;
+  const { dropped, limit, referenceImages, refusal, unavailableReason } = addReferenceImages({
+    additions: input.referenceImages.map((imageName, index) => ({
+      id: `reference_image_${index + 1}`,
+      // Cases name images only; the output size stands in for dimensions that reach metadata, not inference.
+      image: { original: { image: { height: input.height, image_name: imageName, width: input.width } } },
+    })),
+    components: values,
+    mode: 'strict',
+    model,
+    models,
+    referenceImages: values.referenceImages,
+  });
 
-  if (!isReferenceImageSupported(model, values)) {
+  if (refusal && refusal !== 'full') {
     throw new Error(
       `reference_images: ${model.name} takes no reference images${
-        getReferenceImageUnavailableReason(model, values)
+        unavailableReason
           ? ' without a vision tower (a Diffusers model, a safetensors Qwen3-VL 8B encoder, or a GGUF one with its Vision Tower)'
           : ''
       }.`
     );
   }
 
-  return {
-    ...values,
-    referenceImages: withAddedReferenceImages(
-      model,
-      models,
-      values.referenceImages,
-      input.referenceImages.map((imageName, index) => ({
-        id: `reference_image_${index + 1}`,
-        // Cases name images only; the output size stands in for dimensions that reach metadata, not inference.
-        image: { original: { image: { height: input.height, image_name: imageName, width: input.width } } },
-      }))
-    ),
-  };
+  if (dropped > 0) {
+    throw new Error(`reference_images: ${model.name} takes at most ${limit} reference image${limit === 1 ? '' : 's'}.`);
+  }
+
+  return { ...values, referenceImages };
 };
 
 /** The widget reconciles after every commit; reconciliation can pick a FLUX.2 component source. */
