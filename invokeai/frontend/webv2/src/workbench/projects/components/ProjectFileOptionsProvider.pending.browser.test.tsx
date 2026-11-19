@@ -69,5 +69,5 @@ it('suspends shortcuts from the request that opens the dialog, while its module 
   });
   await expect.poll(() => host.querySelector('[data-testid="options"]')).not.toBeNull();
   // The stand-in steps aside for the loaded dialog, which this test replaces with one that announces nothing.
-  expect(isModalPresent()).toBe(false);
+  await expect.poll(() => isModalPresent()).toBe(false);
 });

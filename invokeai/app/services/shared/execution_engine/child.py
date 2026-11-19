@@ -15,8 +15,6 @@ from pydantic_core import PydanticSerializationError
 ChildTerminalStatus = Literal["completed", "failed", "canceled"]
 ChildState = Literal["pending", "queued", "running", "completed", "failed", "canceled"]
 ChildDependencyStatus = Literal["waiting", "running", "completed", "failed", "canceled"]
-ChildFailurePolicy = Literal["fail_parent", "cancel_siblings", "continue"]
-ChildCancellationPolicy = Literal["cancel_parent", "cancel_siblings", "continue"]
 
 _JSON_SERIALIZER = TypeAdapter(Any)
 _TERMINAL_STATES = frozenset({"completed", "failed", "canceled"})
@@ -172,8 +170,6 @@ class ChildDependencyUpdate:
     terminal: bool
     status: ChildDependencyStatus
     aggregated_outputs: dict[str, list[Any]]
-    parent_action: Literal["failed", "canceled"] | None = None
-    cancel_child_ids: list[str] | None = None
     error_message: str | None = None
 
     def __iter__(self):
@@ -202,8 +198,6 @@ class ChildExecutionCapability(_ChildModel):
     max_depth: int = Field(default=64, ge=0)
     max_children: int = Field(default=1000, ge=1)
     capacity: int = Field(default=1000, ge=0)
-    failure_policy: ChildFailurePolicy = "fail_parent"
-    cancellation_policy: ChildCancellationPolicy = "cancel_parent"
 
     model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
 
@@ -322,8 +316,6 @@ class ChildExecutionCapability(_ChildModel):
         parent_execution_id: str | None = None,
         parent_frame: Sequence[int | str] | None = None,
         parent_reference_id: str | None = None,
-        failure_policy: ChildFailurePolicy | None = None,
-        cancellation_policy: ChildCancellationPolicy | None = None,
     ) -> "ChildDependencyRecord":
         self._check_parent(parent_execution_id, parent_frame, parent_reference_id)
         if children is not None and child_execution_ids is not None:
@@ -409,8 +401,6 @@ class ChildExecutionCapability(_ChildModel):
             parent_frame=expected_frame,
             parent_reference_id=expected_reference,
             children=child_records,
-            failure_policy=failure_policy or self.failure_policy,
-            cancellation_policy=cancellation_policy or self.cancellation_policy,
         )
 
     create_child_dependency = create_dependency
@@ -427,8 +417,6 @@ class ChildDependencyRecord(_ChildModel):
     children: list[ChildExecutionRecord] = Field(default_factory=list)
     completions: dict[str, ChildCompletion] = Field(default_factory=dict)
     status: ChildDependencyStatus = "waiting"
-    failure_policy: ChildFailurePolicy = "fail_parent"
-    cancellation_policy: ChildCancellationPolicy = "cancel_parent"
     error_message: str | None = None
     output_keys: tuple[str, ...] | None = None
     terminal_transition_count: int = Field(default=0, ge=0)
@@ -580,43 +568,12 @@ class ChildDependencyRecord(_ChildModel):
         if self.output_keys is not None and tuple(sorted(outputs)) != self.output_keys:
             raise ValueError("child completions returned different output keys")
 
-    def _update_for_terminal(self, status: ChildTerminalStatus, message: str | None) -> ChildDependencyUpdate:
-        parent_action: Literal["failed", "canceled"] | None = None
-        cancel_child_ids: list[str] = []
-        if status == "failed":
-            if self.failure_policy in ("fail_parent", "cancel_siblings"):
-                parent_action = "failed"
-            if self.failure_policy == "cancel_siblings":
-                cancel_child_ids = [
-                    child_id for child_id in self.child_execution_ids if child_id not in self.completions
-                ]
-        elif status == "canceled":
-            if self.cancellation_policy in ("cancel_parent", "cancel_siblings"):
-                parent_action = "canceled"
-            if self.cancellation_policy == "cancel_siblings":
-                cancel_child_ids = [
-                    child_id for child_id in self.child_execution_ids if child_id not in self.completions
-                ]
-        return ChildDependencyUpdate(
-            changed=True,
-            terminal=True,
-            status=self.status,
-            aggregated_outputs=self.aggregated_outputs,
-            parent_action=parent_action,
-            cancel_child_ids=cancel_child_ids,
-            error_message=message,
-        )
-
-    def _result(
-        self, *, changed: bool, parent_action: Literal["failed", "canceled"] | None = None
-    ) -> ChildDependencyUpdate:
+    def _result(self, *, changed: bool) -> ChildDependencyUpdate:
         return ChildDependencyUpdate(
             changed=changed,
             terminal=self.status in _TERMINAL_STATES,
             status=self.status,
             aggregated_outputs=self.aggregated_outputs,
-            parent_action=parent_action,
-            cancel_child_ids=[],
             error_message=self.error_message,
         )
 
@@ -652,37 +609,15 @@ class ChildDependencyRecord(_ChildModel):
             self.output_keys = tuple(sorted(completion.outputs))
         child.state = completion.status
         self.status = "running"
-        if completion.status == "failed" and self.failure_policy != "continue":
+        if completion.status == "failed":
             self.transition_terminal("failed", completion.error_message)
-            return self._update_for_terminal("failed", completion.error_message)
-        if completion.status == "canceled" and self.cancellation_policy != "continue":
+            return self._result(changed=True)
+        if completion.status == "canceled":
             self.transition_terminal("canceled", completion.error_message)
-            return self._update_for_terminal("canceled", completion.error_message)
+            return self._result(changed=True)
         if len(self.completions) == len(self.children):
-            final_status: ChildTerminalStatus = "completed"
-            final_message: str | None = None
-            if any(item.status == "failed" for item in self.completions.values()):
-                final_status = "failed"
-                final_message = next(
-                    (
-                        item.error_message
-                        for item in self.completions.values()
-                        if item.status == "failed" and item.error_message
-                    ),
-                    "child failed",
-                )
-            elif any(item.status == "canceled" for item in self.completions.values()):
-                final_status = "canceled"
-                final_message = next(
-                    (
-                        item.error_message
-                        for item in self.completions.values()
-                        if item.status == "canceled" and item.error_message
-                    ),
-                    "child canceled",
-                )
-            self.transition_terminal(final_status, final_message)
-            return self._update_for_terminal(final_status, final_message)
+            # Failed and canceled children returned above, so a full ledger holds only successes.
+            self.transition_terminal("completed", None)
         return self._result(changed=True)
 
     def record_completion(self, completion: ChildCompletion) -> ChildDependencyUpdate:

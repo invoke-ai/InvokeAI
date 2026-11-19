@@ -125,7 +125,10 @@ const setUp = (owner: Owner, adjustments: CanvasAdjustmentEntry[]): void => {
     },
   });
   adjustmentStatus = createFakeAdjustmentStatus();
-  Object.assign(stub.engine, { interaction: adjustmentStatus.interaction });
+  // The group menu reads its commands' availability on every render; the stub's document never changes beneath it.
+  Object.assign(stub.engine, {
+    interaction: { ...adjustmentStatus.interaction, subscribe: () => () => undefined },
+  });
 };
 
 const mount = async (element: ReactElement): Promise<void> => {
@@ -197,8 +200,8 @@ const scrub = async (frame: HTMLElement, offsets: number[]): Promise<void> => {
   const rect = frame.getBoundingClientRect();
   const startX = rect.left + rect.width / 2;
   const y = rect.top + rect.height / 2;
-  // The track is inset 10px from each edge of the frame.
-  const xAt = (offset: number): number => startX + offset * (rect.width - 20);
+  // The track is inset 6px from each edge of the frame.
+  const xAt = (offset: number): number => startX + offset * (rect.width - 12);
   await settle(() => pointer(frame, 'pointerdown', startX, y));
   for (const offset of offsets) {
     await settle(() => pointer(window, 'pointermove', xAt(offset), y));
@@ -232,7 +235,7 @@ describe('scalar and levels editors', () => {
     const rect = hue.getBoundingClientRect();
     const startX = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
-    const trackWidth = rect.width - 20;
+    const trackWidth = rect.width - 12;
 
     await settle(() => pointer(hue, 'pointerdown', startX, y));
     await settle(() => pointer(window, 'pointermove', startX + trackWidth * 0.1, y));
@@ -273,7 +276,7 @@ describe('scalar and levels editors', () => {
     const rect = hue.getBoundingClientRect();
     const startX = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
-    const trackWidth = rect.width - 20;
+    const trackWidth = rect.width - 12;
 
     await settle(() => pointer(hue, 'pointerdown', startX, y));
     await settle(() => pointer(window, 'pointermove', startX + trackWidth * 0.1, y));
@@ -322,7 +325,7 @@ describe('scalar and levels editors', () => {
     const y = rect.top + rect.height / 2;
 
     await settle(() => pointer(hue, 'pointerdown', startX, y));
-    await settle(() => pointer(window, 'pointermove', startX + (rect.width - 20) * 0.1, y));
+    await settle(() => pointer(window, 'pointermove', startX + (rect.width - 12) * 0.1, y));
     expect(latestAdjustments()[2]).toMatchObject({ id: 'hue1', rotation: 36 });
 
     await act(() => stub.engine.history.undo());

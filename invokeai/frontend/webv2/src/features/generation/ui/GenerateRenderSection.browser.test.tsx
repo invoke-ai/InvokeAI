@@ -13,7 +13,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { CanvasDenoisingStrengthProps } from './GenerationUiContext';
 
@@ -32,11 +32,12 @@ vi.mock('./GenerationUiContext', () => ({
     // Stands in for the canvas's strength slot, which lays out the section around its badge and field.
     CanvasDenoisingStrength: ({ children }: CanvasDenoisingStrengthProps) =>
       children({
-        badges: <span data-testid="strength-badge">75%</span>,
+        summary: <span data-testid="strength-badge">75%</span>,
         field: <div data-testid="strength-field" />,
       }),
+    models: { getBaseLabel: (base: string) => ({ 'sd-1': 'SD 1.x', sdxl: 'SDXL' })[base] ?? base },
     project: { invocationSourceId: harness.invocationSourceId },
-    sectionPreferences: { sectionsOpen: { render: true }, setSectionOpen: vi.fn() },
+    sectionPreferences: { sectionsOpen: { render: true }, setSectionsOpen: vi.fn() },
   }),
 }));
 
@@ -103,6 +104,14 @@ void i18n.use(initReactI18next).init({
             render: 'Render',
             resetToDefault: 'Reset to default',
             scheduler: 'Scheduler',
+            sectionMenu: {
+              resetStepsAndGuidance: 'Reset steps and {{guidance}} to model defaults',
+              resetStepsAndGuidanceBase: 'Reset steps and {{guidance}} to {{base}} defaults',
+              resetStepsGuidanceAndScheduler: 'Reset steps, {{guidance}} and scheduler to model defaults',
+              resetStepsGuidanceAndSchedulerBase: 'Reset steps, {{guidance}} and scheduler to {{base}} defaults',
+              resetStepsGuidanceAndSchedulerMixed:
+                'Reset steps, {{guidance}} and scheduler to model and {{base}} defaults',
+            },
             seedSummary: '{{mode}} · {{seed}}',
             steps: 'Steps',
             useSeed: 'Use seed {{seed}}',
@@ -236,6 +245,9 @@ const menuItem = (label: string) =>
     item.textContent?.startsWith(label)
   ) ?? null;
 const preview = () => host?.querySelector('[data-testid="seed-sequence-preview"]')?.textContent ?? null;
+// Summary separators are CSS-drawn, so join the items as the section's copy action does.
+const summaryText = () =>
+  [...(host?.querySelectorAll('[data-section-summary] > *') ?? [])].map((item) => item.textContent?.trim()).join(' · ');
 
 afterEach(async () => {
   harness.invocationSourceId = 'generate';
@@ -451,13 +463,13 @@ describe('GenerateRenderSection guidance field', () => {
     const ranges = (label: string) =>
       slidersNamed(label).map((slider) => [slider.getAttribute('aria-valuemin'), slider.getAttribute('aria-valuemax')]);
 
-    expect(host?.textContent).toContain('12 · Guidance 7');
+    expect(summaryText()).toContain('12 · Guidance 7');
     expect(ranges('Guidance')).toEqual([]);
     expect(ranges('Steps')).toEqual([]);
 
     await settle(() => draftStore?.patchSnapshot({ ideogram4GuidanceScale: 5, ideogram4Mu: 1, ideogram4Steps: 18 }));
 
-    expect(host?.textContent).toContain('18 · Guidance 5');
+    expect(summaryText()).toContain('18 · Guidance 5');
     expect(ranges('Guidance')).toEqual([['1', '20']]);
     expect(ranges('Steps')).toEqual([['2', '100']]);
     expect(ranges('Mu')).toEqual([['-4', '4']]);
@@ -744,5 +756,87 @@ describe('GenerateRenderSection model-family tuning', () => {
 
     expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceStrength: expect.closeTo(0.15) });
     expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceRandomizePercent: 51 });
+  });
+});
+
+describe('GenerateRenderSection title defaults', () => {
+  // Scheduler visibility comes from the architecture capabilities.
+  seedArchitectureCapabilities();
+
+  const title = () => host!.querySelector<HTMLElement>('.generate-section > [data-part="trigger"]')!;
+  const isMarked = () => title().querySelector('[data-section-changed]') !== null;
+  const otherScheduler = (model: GenerateModelConfig) =>
+    getDefaultGenerateSettings(model).scheduler === 'ddim' ? 'euler' : 'ddim';
+  const openMenu = () =>
+    act(() => {
+      title().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+
+  it('marks steps, CFG and scheduler off the model defaults, and resets those three only', async () => {
+    const defaults = getDefaultGenerateSettings(sd1Model);
+    const onCommit = await render(sd1Model, { scheduler: otherScheduler(sd1Model), seed: 42, seedMode: 'fixed' }, true);
+
+    expect(host?.textContent).toContain('Scheduler');
+    expect(isMarked()).toBe(true);
+    await openMenu();
+    await act(() =>
+      userEvent.click(page.getByRole('menuitem', { name: 'Reset steps, CFG and scheduler to SD 1.x defaults' }))
+    );
+
+    expect(onCommit).toHaveBeenLastCalledWith({
+      cfgScale: defaults.cfgScale,
+      scheduler: defaults.scheduler,
+      steps: defaults.steps,
+    });
+    expect(draftStore?.getSnapshot()).toMatchObject({ seed: 42, seedMode: 'fixed' });
+    expect(isMarked()).toBe(false);
+  });
+
+  it('leaves a hidden scheduler out of the mark and the reset', async () => {
+    const defaults = getDefaultGenerateSettings(qwenImageModel);
+    const onCommit = await render(qwenImageModel, { scheduler: otherScheduler(qwenImageModel) }, true);
+
+    expect(isMarked()).toBe(false);
+
+    await settle(() => draftStore?.patchSnapshot({ steps: defaults.steps + 4 }));
+    expect(isMarked()).toBe(true);
+    await openMenu();
+    await act(() =>
+      userEvent.click(page.getByRole('menuitem', { name: 'Reset steps and CFG to qwen-image defaults' }))
+    );
+
+    expect(onCommit).toHaveBeenLastCalledWith({ cfgScale: defaults.cfgScale, steps: defaults.steps });
+  });
+
+  it('names the guidance field as the model labels it', async () => {
+    const defaults = getDefaultGenerateSettings(fluxDevModel);
+    const onCommit = await render(fluxDevModel, { steps: defaults.steps + 4 }, true);
+
+    await openMenu();
+    const reset = page.getByRole('menuitem', { name: /^Reset steps.* to flux defaults$/ });
+
+    expect(reset.element().textContent).toContain('Guidance');
+    expect(reset.element().textContent).not.toContain('CFG');
+    await act(() => userEvent.click(reset));
+
+    expect(onCommit).toHaveBeenLastCalledWith(expect.objectContaining({ steps: defaults.steps }));
+  });
+
+  it.each([
+    [{ steps: 20 }, 'Reset steps, CFG and scheduler to model and SD 1.x defaults'],
+    [{ cfg_scale: 5, scheduler: 'ddim', steps: 20 }, 'Reset steps, CFG and scheduler to model defaults'],
+  ])('names where the reset takes its values from when the model sets %o', async (defaultSettings, label) => {
+    const model: MainModelConfig = { ...sd1Model, default_settings: defaultSettings };
+    const onCommit = await render(model, { steps: 33 }, true);
+
+    await openMenu();
+    await act(() => userEvent.click(page.getByRole('menuitem', { name: label })));
+
+    // The values are what they were: the model's where it sets them, the base's otherwise.
+    expect(onCommit).toHaveBeenLastCalledWith({
+      cfgScale: getDefaultGenerateSettings(model).cfgScale,
+      scheduler: getDefaultGenerateSettings(model).scheduler,
+      steps: 20,
+    });
   });
 });

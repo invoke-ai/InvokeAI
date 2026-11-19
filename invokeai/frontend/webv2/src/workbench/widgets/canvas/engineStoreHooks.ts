@@ -86,6 +86,21 @@ export const useCanvasEngineRead = <T extends boolean | number | string | null>(
   return useSyncExternalStore(subscribe, read, read);
 };
 
+/**
+ * A primitive read of the engine's document model, as `useCanvasEngineRead` but re-read only when the document
+ * changes: for answers pixels cannot change, such as command eligibility, so painting never re-runs them.
+ */
+export const useCanvasDocumentRead = <T extends boolean | number | string | null>(
+  engine: CanvasCoreStoreCapability | null,
+  read: () => T
+): T => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('documentEpoch', listener) ?? (() => undefined),
+    [engine]
+  );
+  return useSyncExternalStore(subscribe, read, read);
+};
+
 /** Subscribes to one layer's thumbnail request state; an absent key is idle. */
 export const useLayerThumbnailStatus = (
   engine: CanvasCoreStoreCapability | null,
@@ -113,6 +128,14 @@ export const useCanvasViewportReady = (engine: CanvasCoreStoreCapability): boole
 /** The control layer the canvas shows as its original (or original under map); null while every map shows. */
 export const useControlLayerView = (engine: CanvasCoreStoreCapability): CanvasInteractionState['controlLayerView'] =>
   useCanvasInteractionState(engine, 'controlLayerView');
+
+/** Whether a staged or progress preview, shown or toggled off, hides control layers, masks and regions. */
+export const useCanvasStagingHidesOverlays = (engine: CanvasCoreStoreCapability): boolean =>
+  useCanvasInteractionState(engine, 'stagingHidesOverlays');
+
+/** The generation frame while a Frame tool drag reshapes it; null when the committed frame is current. */
+export const useCanvasBboxPreview = (engine: CanvasCoreStoreCapability): CanvasInteractionState['bboxPreview'] =>
+  useCanvasInteractionState(engine, 'bboxPreview');
 
 /** The active tool id for `engine`. */
 export const useCanvasActiveTool = (engine: CanvasCoreStoreCapability): ToolId =>
@@ -281,6 +304,9 @@ export const useTextOptions = (engine: CanvasCoreStoreCapability): TextToolOptio
 /** The active text-editing session (create/edit mode + live source + transform), or `null`. */
 export const useTextEditSession = (engine: CanvasCoreStoreCapability): TextEditSession | null =>
   useCanvasInteractionState(engine, 'textEditSession');
+
+export const useTransformOptions = (engine: CanvasCoreStoreCapability) =>
+  useCanvasInteractionState(engine, 'transformOptions');
 
 /** PSD preparation/worker/download lifecycle belongs to the engine, across widget remounts. */
 export const usePsdExportStatus = (

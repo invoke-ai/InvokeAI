@@ -381,6 +381,135 @@ def test_a_decode_reads_and_writes_exactly_what_the_pipeline_does() -> None:
     assert np.array_equal(np.asarray(saved[0]), np.asarray(pipeline.convert("RGB")))
 
 
+META = torch.device("meta")
+
+
+GIB = 1024**3
+
+
+@pytest.fixture
+def meta_is_miopen(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Price a `meta` compute device as an AMD GPU, where decode and encode cost differently, without needing one; the
+    session device stays the CPU. The device holds 20 GiB of untiled working memory before the nodes tile."""
+    from invokeai.backend.qwen_image_2_1 import vae
+    from invokeai.backend.working_memory import spec
+    from invokeai.backend.working_memory.platform import Platform
+
+    real = spec.platform_for
+    for module in (spec, vae):
+        monkeypatch.setattr(
+            module, "platform_for", lambda d: Platform("miopen", "native", "linux") if d.type == "meta" else real(d)
+        )
+    monkeypatch.setattr(vae, "should_pretile_vae_decode", lambda device, needed: device == META and needed > 20 * GIB)
+
+
+class _Float32Params:
+    """A stand-in VAE's float32 weights, so the element size the node reads is not the bf16 its compute dtype has."""
+
+    def parameters(self):
+        return iter([torch.zeros(1, dtype=torch.float32)])
+
+
+def _vae_context(vae, reservations: list, **extra) -> SimpleNamespace:
+    @contextmanager
+    def on_device(**kwargs):
+        reservations.append(kwargs)
+        yield None, vae
+
+    return SimpleNamespace(
+        models=SimpleNamespace(
+            load=lambda _identifier: SimpleNamespace(compute_device=META, model=vae, model_on_device=on_device)
+        ),
+        config=SimpleNamespace(get=lambda: SimpleNamespace(force_tiled_decode=False, auto_tiled_decode=True)),
+        util=SimpleNamespace(signal_progress=lambda _message: None),
+        **extra,
+    )
+
+
+def test_a_decode_reserves_its_estimate_on_the_vaes_compute_device(meta_is_miopen) -> None:
+    from invokeai.app.invocations.vae.qwen_image_2_1_latents_to_image import QwenImage21LatentsToImageInvocation
+    from invokeai.backend.qwen_image_2_1.vae import estimate_working_memory
+
+    class _VAE(_Float32Params, _DecodingVAE):
+        def enable_tiling(self, **_geometry) -> None:
+            self.use_tiling = True
+
+    vae = _VAE([0.0] * LATENT_CHANNELS, [1.0] * LATENT_CHANNELS)
+    reservations: list = []
+    context = _vae_context(
+        vae,
+        reservations,
+        tensors=SimpleNamespace(load=lambda _name: torch.zeros(1, LATENT_CHANNELS, 96, 96)),
+        images=SimpleNamespace(save=lambda image: SimpleNamespace(image_name="out.png", width=64, height=64)),
+    )
+    QwenImage21LatentsToImageInvocation.model_construct(
+        latents=LatentsField(latents_name="latents"), vae=SimpleNamespace(vae=None), tiled=False, tile_size=0
+    ).invoke(context)
+
+    # 96x96 latents are a 1536x1536 frame. Its fp32 decode measured ~35 GiB untiled, past the device's 20, so it is
+    # tiled up front -- an encode of it measured ~10 GiB and would not be -- at the largest tile, as `meta` reports no
+    # memory of its own.
+    expected = estimate_working_memory("decode", 1536, 1536, 1024, 4, META)
+    assert reservations == [{"working_memory": expected}]
+    assert expected != estimate_working_memory("encode", 1536, 1536, 1024, 4, META)
+    assert expected != estimate_working_memory("decode", 1536, 1536, 1024, 4, torch.device("cpu"))
+
+
+@pytest.mark.parametrize(
+    ("tiled", "tile_size", "side", "tile"),
+    # A 2560x2560 fp32 encode prices past the device's 20 GiB untiled: tiled up front at the largest tile, unasked.
+    [(False, 0, 1536, None), (True, 512, 1536, 512), (False, 0, 2560, 1024)],
+    ids=["whole", "tiled", "tiled_up_front"],
+)
+def test_an_encode_reserves_its_estimate_on_the_vaes_compute_device(
+    meta_is_miopen, tiled: bool, tile_size: int, side: int, tile: int | None
+) -> None:
+    from PIL import Image
+
+    from invokeai.app.invocations.fields import ImageField
+    from invokeai.app.invocations.vae.qwen_image_2_1_image_to_latents import QwenImage21ImageToLatentsInvocation
+    from invokeai.backend.qwen_image_2_1.vae import estimate_working_memory
+
+    class _EncodingVAE(_Float32Params):
+        dtype = torch.bfloat16
+        use_tiling = False
+        tile_sample_min_height = tile_sample_min_width = 256
+        tile_sample_stride_height = tile_sample_stride_width = 192
+        config = SimpleNamespace(latents_mean=[0.0] * LATENT_CHANNELS, latents_std=[1.0] * LATENT_CHANNELS)
+
+        def disable_tiling(self) -> None:
+            self.use_tiling = False
+
+        def enable_tiling(self, **_geometry) -> None:
+            self.use_tiling = True
+
+        def encode(self, pixels: torch.Tensor):
+            latents = torch.zeros(1, LATENT_CHANNELS, 1, pixels.shape[-2] // 16, pixels.shape[-1] // 16)
+            return SimpleNamespace(latent_dist=SimpleNamespace(mode=lambda: latents))
+
+    reservations: list = []
+    context = _vae_context(
+        _EncodingVAE(),
+        reservations,
+        images=SimpleNamespace(get_pil=lambda _name: Image.new("RGB", (side, side))),
+        tensors=SimpleNamespace(save=lambda tensor: "latents"),
+    )
+    QwenImage21ImageToLatentsInvocation.model_construct(
+        image=ImageField(image_name="in.png"), vae=SimpleNamespace(vae=None), tiled=tiled, tile_size=tile_size
+    ).invoke(context)
+
+    # An fp32 encode of 1536x1536 measured ~10 GiB untiled: it stays whole on the 20 GiB device, where a decode would
+    # be tiled, unless the node asks for tiles; then it reserves its tile.
+    expected = estimate_working_memory("encode", side, side, tile, 4, META)
+    assert reservations == [{"working_memory": expected}]
+    assert expected != estimate_working_memory("decode", side, side, tile, 4, META)
+    assert expected != estimate_working_memory("encode", side, side, tile, 4, torch.device("cpu"))
+    if tile is not None:
+        assert (
+            expected.reservation_bytes < estimate_working_memory("encode", side, side, None, 4, META).reservation_bytes
+        )
+
+
 def _loader(**fields) -> QwenImage21ModelLoaderInvocation:
     def ident(key: str, base: BaseModelType, type: ModelType) -> ModelIdentifierField:
         return ModelIdentifierField(key=key, hash=key, name=key, base=base, type=type)
@@ -1480,21 +1609,27 @@ def test_a_sidecar_reserves_what_its_forward_allocates(kinds: list[str], monkeyp
     assert abs(reserved - beyond_cpu - mode.peak) < weight_copy / 2, (reserved / weight_copy, mode.peak / weight_copy)
 
 
-def test_a_dora_lora_on_an_int8_transformer_is_refused_before_the_transformer_is_loaded() -> None:
+def test_a_dora_lora_runs_on_an_int8_transformer(monkeypatch: pytest.MonkeyPatch) -> None:
     from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
         apply_custom_layers_to_model,
     )
+    from invokeai.backend.patches.layer_patcher import LayerPatcher
     from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 
+    monkeypatch.setattr(LayerPatcher, "_is_any_part_of_layer_on_cpu", staticmethod(lambda _module: False))
     transformer = _LinearTransformer()
-    weight = torch.zeros(8, 8, dtype=torch.int8)
-    transformer.transformer_blocks[0].attn.to_q = Int8ConvrotLinear(weight, torch.ones(8, 1), convrot=False)
+    transformer.transformer_blocks[0].attn.to_q = Int8ConvrotLinear(
+        torch.ones(8, 8, dtype=torch.int8), torch.full((8, 1), 0.125), convrot=False
+    )
     apply_custom_layers_to_model(transformer)
-    low_rank = {"lora_A.weight": torch.zeros(2, 8), "lora_B.weight": torch.zeros(8, 2)}
-    dora = _patch(**low_rank, **{"lora_magnitude_vector.weight": torch.ones(8)})
+    magnitude = torch.arange(1, 9, dtype=torch.float32) / 4
+    dora = _patch(
+        "transformer_blocks.0.attn.to_q",
+        **{"lora_A.weight": _DOWN, "lora_B.weight": _UP, "lora_magnitude_vector.weight": magnitude},
+    )
     transformer_info = _ReservingTransformerInfo(transformer)
     context = _context(_Transformer(), QwenImage21VariantType.Base)
-    loaded = {"lora": SimpleNamespace(model=dora)}
+    loaded = {"lora": SimpleNamespace(model=dora, model_in_ram=nullcontext)}
     context.models = SimpleNamespace(
         load=lambda identifier: loaded.get(identifier.key, transformer_info),
         get_config=lambda _identifier: SimpleNamespace(
@@ -1504,13 +1639,13 @@ def test_a_dora_lora_on_an_int8_transformer_is_refused_before_the_transformer_is
     node = _denoise(steps=1)
     node.transformer.loras.append(_lora_field(1.0))
 
-    with pytest.raises(ValueError) as refused:
-        node._run_diffusion(context)
-    assert _LORA_NAME in str(refused.value) and "int8" in str(refused.value)
-    assert transformer_info.reserved == []
-    # A low-rank LoRA runs there as a sidecar.
-    loaded["lora"] = SimpleNamespace(model=_patch(**low_rank))
-    node._refuse_dora_on_int8(context, transformer)
+    node._run_diffusion(context)
+
+    # DoRA of the dequantized weight (0.125 everywhere): the updated rows, rescaled to the magnitude.
+    updated = torch.full((8, 8), 0.125) + _UP @ _DOWN
+    expected = (magnitude[:, None] * updated / updated.norm(dim=1, keepdim=True)) @ torch.ones(8)
+    torch.testing.assert_close(transformer.seen[0][1][0], expected)
+    assert len(transformer_info.reserved) == 1
 
 
 def test_a_lora_already_on_the_transformer_is_not_applied_again() -> None:

@@ -5,16 +5,29 @@ import { useAuthSession, useCapabilities } from '@features/identity';
 import { getModelLoads, subscribeModelLoads } from '@features/models';
 import { getQueueItemSnapshotLabel } from '@features/queue/contracts';
 import { getQueueItemAccess, QueueUiProvider, type QueueLocalRun, type QueueUiAdapter } from '@features/queue/react';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { areArraysEqual, shallowEqual } from '@platform/state/selectors';
+import { createMenuPartLoader } from '@platform/ui/Menu';
+import { useQueryClient } from '@tanstack/react-query';
 import { isUnsubmittedQueueItem } from '@workbench/canvasStagingView';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import {
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+  useWorkbenchSelector,
+} from '@workbench/WorkbenchContext';
 import { lazy, useMemo, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const importQueueItemActions = () => import('@workbench/queue-integration/QueueItemActions');
 const QueueItemActions = lazy(() => importQueueItemActions().then((module) => ({ default: module.QueueItemActions })));
+// The row menu's recall entries share the details' chunk: one request warms both.
+const queueItemRecallMenuGroup = createMenuPartLoader(() =>
+  importQueueItemActions().then((module) => module.QueueItemRecallMenuGroup)
+);
 
 const toQueueLocalRun = (projectId: string, item: QueueItem): QueueLocalRun => {
   const retry = item.submissionRetry;
@@ -52,8 +65,12 @@ const loadingModel = {
 };
 
 export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) => {
+  const { t } = useTranslation();
   const notify = useNotify();
-  const { queue } = useWorkbenchCommands();
+  const commands = useWorkbenchCommands();
+  const { queue } = commands;
+  const queries = useWorkbenchQueries();
+  const queryClient = useQueryClient();
   const activeProjectId = useActiveProjectSelector((project) => project.id);
   const activeProjectName = useActiveProjectSelector((project) => project.name);
   const { canManageAppConfig, canManageModels } = useCapabilities();
@@ -86,12 +103,36 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       cancelLocalRuns: (projectId) => queue.cancelUnsubmitted(projectId ?? undefined),
       isConnected,
       isProjectOpen: (projectId) => openProjectIds.includes(projectId),
+      itemRecallMenuGroup: queueItemRecallMenuGroup,
       loadingModel,
       localRuns,
       notify,
       openQueue: () => openWorkbenchWidget('queue'),
-      preloadItemActions: () => void importQueueItemActions(),
+      // A failed warm-up is no error: the details' own load reports it when they open.
+      preloadItemActions: () => void importQueueItemActions().catch(() => undefined),
       queueJobsScope,
+      recallAllFromItem: (item) => {
+        // Taken at the press: the recall's module may still be loading when the account or project changes.
+        const owner = captureAccountScope();
+        const projectId = queries.getSnapshot().activeProject.id;
+
+        import('@workbench/queue-integration/recallQueueItem')
+          .then(({ recallQueueItem }) =>
+            recallQueueItem({
+              context: { commands, notify, openWidget: openWorkbenchWidget, queries, t },
+              item,
+              kind: 'all',
+              owner,
+              projectId,
+              queryClient,
+            })
+          )
+          .catch((error: unknown) => {
+            if (isAccountScopeCurrent(owner)) {
+              notify.error(t('widgets.queue.recallAll'), error instanceof Error ? error.message : undefined);
+            }
+          });
+      },
       viewer: !viewer.multiuserEnabled ? 'single' : viewer.isAdmin ? 'admin' : 'member',
     };
   }, [
@@ -99,14 +140,18 @@ export const QueueUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     activeProjectName,
     canManageAppConfig,
     canManageModels,
+    commands,
     isConnected,
     localRuns,
     notify,
     openProjectIds,
     openWorkbenchWidget,
+    queries,
+    queryClient,
     queue,
     queueJobsScope,
     session,
+    t,
   ]);
 
   return <QueueUiProvider adapter={adapter}>{children}</QueueUiProvider>;

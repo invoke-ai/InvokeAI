@@ -285,23 +285,14 @@ def test_the_reservation_prices_the_loras_the_sampling_applies() -> None:
     assert applied.reserved[0].features["lora_sidecar_bytes"] == (24 + _TOKENS * (4 + 2)) * 4
 
 
-def test_a_dora_lora_on_quantized_layers_is_refused_before_the_transformer_is_loaded() -> None:
-    """A DoRA layer normalizes the updated weight, which a Linear keeping its weight in buffers never forms. Here it is
-    on BFL's output modulation, whose layer comes wrapped to swap its halves."""
-    transformer = _Transformer()
-    transformer.norm_out.linear = Int8ConvrotLinear(torch.ones(4, 8, dtype=torch.int8), torch.ones(4, 1), False)
-    apply_custom_layers_to_model(transformer)
-    native = "diffusion_model.final_layer.image.adaLN_modulation.1"
-    low_rank = {f"{native}.lora_A.weight": torch.zeros(2, 8), f"{native}.lora_B.weight": torch.zeros(4, 2)}
-    dora = lora_model_from_flux3_state_dict(
-        low_rank | {f"{native}.lora_magnitude_vector.weight": torch.ones(4)}, name=_LORA_NAME
-    )
-    transformer_info = _TransformerInfo(transformer)
+def test_a_dora_lora_runs_on_a_quantized_layer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A DoRA layer normalizes the updated weight, so the int8 Linear hands the sidecar its dequantized weight."""
+    monkeypatch.setattr(LayerPatcher, "_is_any_part_of_layer_on_cpu", staticmethod(lambda _module: False))
+    magnitude = torch.arange(1, 5, dtype=torch.float32) / 4
+    dora = _lora(**{"lora_A.weight": _DOWN, "lora_B.weight": _UP, "lora_magnitude_vector.weight": magnitude})
 
-    with pytest.raises(ValueError, match=f"LoRA '{_LORA_NAME}' has DoRA layers.*quantized layers"):
-        _run(transformer_info, ModelFormat.Checkpoint, {"lora": (dora, 1.0)})
-    assert transformer_info.reserved == []
-    # A low-rank LoRA there runs as a sidecar.
-    plain = lora_model_from_flux3_state_dict(low_rank, name=_LORA_NAME)
-    _run(transformer_info, ModelFormat.Checkpoint, {"lora": (plain, 1.0)})
-    assert len(transformer_info.reserved) == 1
+    seen = _run(_TransformerInfo(_int8_transformer()), ModelFormat.Checkpoint, {"lora": (dora, 1.0)})
+
+    updated = torch.full((4, 8), 0.125) + _UP @ _DOWN
+    expected = (magnitude[:, None] * updated / updated.norm(dim=1, keepdim=True)) @ torch.ones(8)
+    torch.testing.assert_close(seen["out"][0], expected)

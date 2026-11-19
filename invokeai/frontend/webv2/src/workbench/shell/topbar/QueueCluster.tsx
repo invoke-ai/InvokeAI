@@ -19,7 +19,15 @@ import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
 import { useQueueChromeActivity } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { CloudOffIcon, ListOrderedIcon, ListXIcon, PauseIcon, XIcon } from 'lucide-react';
-import { useCallback, useMemo, useState, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { TopbarMenuChevron } from './TopbarMenuChevron';
@@ -78,8 +86,9 @@ export const QueueCluster = () => {
   const isCancellable = !cancelCurrent?.disabled;
   const [lastCancellable, setLastCancellable] = useState(isCancellable);
 
-  // The "x" unmounts while hovered when the running job finishes, so its
-  // pointer-leave never fires; reset the gesture state with it.
+  // Hover is tracked only while the "x" is enabled, so the shift gesture cannot arm a button that does nothing. It
+  // turns disabled under a resting pointer when the running job finishes, and that pointer's leave goes unhandled;
+  // reset the gesture state with it.
   if (isCancellable !== lastCancellable) {
     setLastCancellable(isCancellable);
 
@@ -100,9 +109,16 @@ export const QueueCluster = () => {
     setIsCancelHovered(false);
     setIsShiftHeld(false);
   }, []);
-  // Shift-click reaches every item, so it confirms first; a plain click stops only the running one and does not.
+  // Shift-click reaches every item, so it confirms first; a plain click stops one item, the running one or between
+  // items the next one waiting (the button's name says which), and does not.
+  // The later clicks of a double click are one gesture with the first, however long the system lets it take; the
+  // command's own settle window covers double taps from the keyboard and the palette.
   const handleCancelClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
+      if (event.detail > 1) {
+        return;
+      }
+
       if (event.shiftKey && cancelAll && !cancelAll.disabled) {
         void cancelAll.trigger();
         return;
@@ -112,6 +128,13 @@ export const QueueCluster = () => {
     },
     [cancelAll, cancelCurrent]
   );
+  // A held Enter clicks on every auto-repeat, and the repeats outlast the command's settle window; one press stops one
+  // item. Space clicks on release, so it never repeats. Enter alone: a held Tab moving through must not stop here.
+  const handleCancelKeyDown = useCallback((event: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (event.repeat && event.key === 'Enter') {
+      event.preventDefault();
+    }
+  }, []);
 
   return (
     <Menu.Root>
@@ -145,23 +168,28 @@ export const QueueCluster = () => {
           </Button>
         </QueueButtonTooltip>
 
-        {isCancellable && cancelCurrent ? (
+        {/* Always present, so the cluster keeps its width and the control its place; disabled with nothing to stop. */}
+        {cancelCurrent ? (
           <Tooltip
             content={
               isCancelAllArmed && cancelAll
                 ? cancelAll.label
-                : `${cancelCurrent.label} · ${t('topbar.queue.shiftCancelsAll')}`
+                : isCancellable
+                  ? `${cancelCurrent.label} · ${t('topbar.queue.shiftCancelsAll')}`
+                  : cancelCurrent.label
             }
             showArrow
           >
             <IconButton
               aria-label={isCancelAllArmed && cancelAll ? cancelAll.label : cancelCurrent.label}
-              color="fg.error"
+              color={isCancellable ? 'fg.error' : undefined}
+              disabled={!isCancellable}
               size="lg"
               variant="outline"
               onClick={handleCancelClick}
-              onPointerEnter={handleCancelPointerEnter}
-              onPointerLeave={handleCancelPointerLeave}
+              onKeyDown={handleCancelKeyDown}
+              onPointerEnter={isCancellable ? handleCancelPointerEnter : undefined}
+              onPointerLeave={isCancellable ? handleCancelPointerLeave : undefined}
             >
               <Icon as={isCancelAllArmed ? ListXIcon : XIcon} />
             </IconButton>

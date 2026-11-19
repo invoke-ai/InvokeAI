@@ -14,8 +14,6 @@ export {
   getDynamicPromptsConfig,
   getDynamicPromptsSettingsPatch,
   getGenerateValuesRevertPatch,
-  getModelDefaultVae,
-  hasModelDefaultVae,
   isAspectRatioLocked,
   isFluxDypePreset,
   isIdeogram4SamplerPreset,
@@ -45,6 +43,7 @@ export {
   normalizeGenerateSettings,
   normalizeMossImageSkipLayers,
   normalizeGenerateWidgetValues,
+  normalizeReferenceImageName,
   normalizeReferenceImages,
   syncGenerateWidgetValuesWithModels,
 } from './core/settings';
@@ -66,6 +65,8 @@ export {
   getReferenceImageLimit,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
+  getRecallDefaultVae,
+  resolveModelDefaultVae,
   isArchitectureDescribed,
   isGenerateModelSelectable,
   isKnownScheduler,
@@ -116,6 +117,7 @@ export {
   isDiffusersMainForBase,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
+  isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
@@ -132,6 +134,7 @@ export {
   type RebalancePreset,
 } from './core/conditioningRebalance';
 export { MIN_BATCH_COUNT, sanitizeBatchCount } from './core/batch';
+export { clampPidSteps, isPidMode } from './core/pid';
 export {
   getActiveRefiner,
   isRefinerModel,
@@ -158,8 +161,13 @@ export {
   sanitizeSampleSeed,
   type DynamicPromptsConfig,
   type DynamicPromptsSeedBehaviour,
+  type GenerateSubmissionSource,
 } from './core/dynamicPrompts';
-export { getEffectivePrompts } from './core/promptTemplates';
+export {
+  flattenPromptTemplateExpansion,
+  getEffectivePrompts,
+  type PromptTemplateSnapshot,
+} from './core/promptTemplates';
 export {
   addPromptHistoryItem,
   getPromptHistoryItemFromGenerateSettings,

@@ -749,18 +749,86 @@ describe('CanvasHeaderActions use frame as', () => {
 });
 
 describe('CanvasHeaderActions undo and redo', () => {
-  it('name the step they would undo or redo, and plain Undo and Redo without one', async () => {
-    await renderActions({ canvasValues: { snapToGrid: false }, layers: [sizedLayer(128, 96)] });
-    await expect.element(page.getByRole('button', { exact: true, name: 'Undo' })).toBeDisabled();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Redo' })).toBeDisabled();
-
+  const historyButton = (name: string) => page.getByRole('button', { exact: true, name });
+  /** One undoable step: the frame fitted to a layer it does not already match. */
+  const fitFrame = async () => {
     await frameTrigger().click();
     await menuItem(/^Fit frame to layers/).click();
+    await expect.element(historyButton('Undo: Fit generation frame')).not.toHaveAttribute('aria-disabled');
+  };
 
-    const undo = page.getByRole('button', { exact: true, name: 'Undo: Fit generation frame' });
-    await expect.element(undo).toBeEnabled();
-    await undo.click();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Redo: Fit generation frame' })).toBeEnabled();
-    await expect.element(page.getByRole('button', { exact: true, name: 'Undo' })).toBeDisabled();
+  it('name the step they would undo or redo, and plain Undo and Redo without one', async () => {
+    await renderActions({ canvasValues: { snapToGrid: false }, layers: [sizedLayer(128, 96)] });
+    await expect.element(historyButton('Undo')).toHaveAttribute('aria-disabled', 'true');
+    await expect.element(historyButton('Redo')).toHaveAttribute('aria-disabled', 'true');
+
+    await fitFrame();
+    await historyButton('Undo: Fit generation frame').click();
+    await expect.element(historyButton('Redo: Fit generation frame')).not.toHaveAttribute('aria-disabled');
+    await expect.element(historyButton('Undo')).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('show their bound keys after the step in the tooltip', async () => {
+    await renderActions();
+    const keys = (step: string) =>
+      [...page.getByRole('tooltip').filter({ hasText: step }).element().querySelectorAll('kbd')].map(
+        (key) => key.textContent
+      );
+
+    await userEvent.hover(historyButton('Undo'));
+    await expect.element(page.getByRole('tooltip').filter({ hasText: 'Undo' })).toBeVisible();
+    expect(keys('Undo')).toHaveLength(2);
+    expect(keys('Undo').at(-1)).toBe('z');
+
+    await userEvent.hover(historyButton('Redo'));
+    await expect.element(page.getByRole('tooltip').filter({ hasText: 'Redo' })).toBeVisible();
+    expect(keys('Redo')).toHaveLength(3);
+    expect(keys('Redo').at(-1)).toBe('z');
+  });
+
+  it('keep keyboard focus on Undo when it steps back over the last edit, and step no further', async () => {
+    await renderActions({ canvasValues: { snapToGrid: false }, layers: [sizedLayer(128, 96)] });
+    await fitFrame();
+    const undo = historyButton('Undo: Fit generation frame').element() as HTMLButtonElement;
+
+    undo.focus();
+    await userEvent.keyboard('{Enter}');
+
+    // The history is now empty: the button says so but keeps focus, so the keyboard user is not dropped to the page.
+    await expect.element(historyButton('Undo')).toHaveAttribute('aria-disabled', 'true');
+    expect(document.activeElement).toBe(undo);
+    await userEvent.keyboard('{Enter}');
+    await expect.element(historyButton('Redo: Fit generation frame')).toBeInTheDocument();
+    expect(harness.engine!.stores.canUndo.get()).toBe(false);
+  });
+
+  it('say why an existing step cannot run while an operation holds the document, and do not run it', async () => {
+    const { rerender } = await renderActions({ canvasValues: { snapToGrid: false }, layers: [sizedLayer(128, 96)] });
+    await fitFrame();
+    harness.editingLocked = true;
+    await rerender();
+
+    const undo = historyButton('Undo: Fit generation frame');
+    await expect.element(undo).toHaveAttribute('aria-disabled', 'true');
+    await expect.element(undo).toHaveAccessibleDescription('Finish or cancel the current canvas operation first.');
+    // The tooltip carries the step, its keys and the reason, as valid markup: no layout inside a paragraph. Pointer
+    // tooling refuses aria-disabled targets; keyboard focus opens it (a key press first makes the focus visible).
+    await userEvent.keyboard('{Tab}');
+    await act(() => (undo.element() as HTMLElement).focus());
+    const tooltip = () => document.querySelector('[role="tooltip"]');
+    await vi.waitFor(() =>
+      expect(tooltip()?.textContent).toMatch(
+        /^Undo: Fit generation frame.*Finish or cancel the current canvas operation/
+      )
+    );
+    expect([...tooltip()!.querySelectorAll('kbd')].at(-1)?.textContent).toBe('z');
+    expect(tooltip()!.querySelector('p div, p p')).toBeNull();
+
+    // A click still reaches the element and must do nothing.
+    await act(() => (undo.element() as HTMLButtonElement).click());
+    expect(harness.engine!.stores.canUndo.get()).toBe(true);
+    // Nothing to redo has nothing to explain.
+    await expect.element(historyButton('Redo')).toHaveAttribute('aria-disabled', 'true');
+    await expect.element(historyButton('Redo')).not.toHaveAccessibleDescription();
   });
 });

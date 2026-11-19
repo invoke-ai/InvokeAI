@@ -7,27 +7,37 @@ expectation.
 """
 
 import json
+import weakref
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+import safetensors.torch
 import torch
 from safetensors.torch import save_file
 
+from invokeai.backend.model_manager.load import load_default
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    apply_custom_layers_to_model,
+)
 from invokeai.backend.model_manager.load.model_loaders.wan import (
     _WAN_NATIVE_TO_DIFFUSERS_RENAMES,
     WanCheckpointModel,
     _build_wan_transformer_config,
 )
 from invokeai.backend.model_manager.taxonomy import SubModelType, WanVariantType
+from invokeai.backend.quantization.fp8_scaled import is_scale_metadata_key, set_full_precision_hints_respected
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from tests.fixtures.quantized_payloads import (
     comfy_quant_marker,
+    mxfp8_tensors,
     nvfp4_signed_tensors,
     quantize_convrot,
     quantize_scaled_fp8,
 )
+from tests.fixtures.safetensors_files import needs_mapping_that_shows_file_writes, overwrite_payloads
 
 # A structurally faithful but tiny Wan transformer. attention_head_dim must stay
 # at 128 — the loader derives num_attention_heads as inner_dim // 128, matching
@@ -94,6 +104,7 @@ def _recording_model() -> tuple[MagicMock, dict[str, torch.Tensor]]:
 def _make_loader() -> WanCheckpointModel:
     loader = object.__new__(WanCheckpointModel)
     loader._ram_cache = MagicMock()
+    loader._torch_device = torch.device("cpu")
     return loader
 
 
@@ -236,7 +247,7 @@ class TestEndToEnd:
         assert on what the loader actually hands over rather than on the result."""
         target = "blocks.0.attn1.to_q.weight"
         sd = _tiny_model().state_dict()
-        sd[target] = torch.full_like(sd[target], 0.5)
+        sd[target] = torch.full_like(sd[target], 0.5).to(torch.float8_e4m3fn)
         sd["blocks.0.attn1.to_q.scale_weight"] = torch.tensor([4.0])
         sd["blocks.0.attn1.to_q.scale_input"] = torch.tensor([1.0])
         sd["scaled_fp8"] = torch.zeros(1, dtype=torch.float8_e4m3fn)
@@ -245,16 +256,15 @@ class TestEndToEnd:
         save_file(sd, path)
 
         model, handed_over = _recording_model()
+        loader = _make_loader()
+        loader._should_use_fp8 = lambda *_args: False
         with patch("diffusers.WanTransformer3DModel", return_value=model):
-            _load(path)
+            _load(path, loader=loader)
 
         assert not [k for k in handed_over if k.endswith((".scale_weight", ".scale_input")) or k == "scaled_fp8"]
         # ...without eating scale_shift_table, which is a real Wan parameter.
         assert "scale_shift_table" in handed_over
-        # The scale is applied whatever the weight's dtype — `_dequantize_comfyui_fp8`
-        # has no fp8 gate, deliberately, because "scaled" checkpoints are not all fp8.
-        # Asserted rather than left implicit: this fixture's weight is bf16, so without
-        # this line the test would construct a 4x-scaled weight and say nothing about it.
+        # Folded with its scale: 0.5 * 4.0.
         assert torch.allclose(handed_over[target].float(), torch.full_like(handed_over[target].float(), 2.0))
 
     def test_extra_modules_are_refused_not_dropped(self, tmp_path: Path) -> None:
@@ -378,6 +388,193 @@ class TestSubmodelGuard:
     def test_wrong_config_class_is_rejected(self) -> None:
         with pytest.raises(TypeError, match="Main_Checkpoint_Wan_Config"):
             _make_loader()._load_model(MagicMock(), SubModelType.Transformer)
+
+
+class TestHeaderFirstRead:
+    """What the header settles before any payload is read, and what the loaded model still holds of the file."""
+
+    @staticmethod
+    def _load_recording(
+        path: Path, loader: WanCheckpointModel | None = None
+    ) -> tuple[torch.nn.Module, list[tuple], list[set[str]]]:
+        """Load through the real reader, logging each payload it hands out and each reservation, in order.
+
+        Also returns, per read, the earlier payloads that are not bf16 and were still alive: source tensors that a
+        conversion on arrival has already replaced by then, unless the load keeps them as stored.
+        """
+        events: list[tuple] = []
+        alive_at_read: list[set[str]] = []
+        sources: list[tuple[str, weakref.ref]] = []
+        real_safe_open = safetensors.safe_open
+
+        def handed_out(key: str, tensor: torch.Tensor) -> torch.Tensor:
+            events.append(("read", key))
+            alive = [(source, ref()) for source, ref in sources]
+            alive_at_read.append({source for source, t in alive if t is not None and t.dtype != torch.bfloat16})
+            del alive
+            sources.append((key, weakref.ref(tensor)))
+            return tensor
+
+        class Handle:
+            def __init__(self, handle) -> None:
+                self._handle = handle
+
+            def __getattr__(self, name: str):
+                return getattr(self._handle, name)
+
+            def get_tensor(self, key: str) -> torch.Tensor:
+                return handed_out(key, self._handle.get_tensor(key))
+
+            def get_tensors(self) -> dict[str, torch.Tensor]:
+                # What `load_file` reads through: the whole file.
+                return {key: handed_out(key, tensor) for key, tensor in self._handle.get_tensors().items()}
+
+        @contextmanager
+        def safe_open(*args, **kwargs):
+            with real_safe_open(*args, **kwargs) as handle:
+                yield Handle(handle)
+
+        loader = loader or _make_loader()
+        loader._ram_cache.make_room.side_effect = lambda size: events.append(("reserve", size))
+        dtype = torch.float32 if "int8" in path.name else torch.bfloat16
+        with patch.object(safetensors, "safe_open", safe_open), patch.object(safetensors.torch, "safe_open", safe_open):
+            model = _load(path, loader=loader, dtype=dtype)
+        return model, events, alive_at_read
+
+    @staticmethod
+    def _load_mapped(path: Path, dtype: torch.dtype) -> torch.nn.Module:
+        """The same load with the reader on safetensors' default mmap backend: the control for the overwrite probe."""
+        real_safe_open = safetensors.safe_open
+
+        def mapped(*args, backend: str = "mmap", **kwargs):
+            return real_safe_open(*args, **kwargs)
+
+        with patch.object(safetensors, "safe_open", mapped):
+            return _load(path, dtype=dtype)
+
+    @staticmethod
+    def _all_in_one(tmp_path: Path) -> tuple[torch.nn.Module, Path]:
+        """An fp16 transformer under ComfyUI's prefix, bundled with a VAE and a text encoder."""
+        reference = _tiny_model()
+        sd = {f"model.diffusion_model.{k}": v.half() for k, v in reference.state_dict().items()}
+        sd["vae.decoder.conv_in.weight"] = torch.ones(64, 64, dtype=torch.float16)
+        sd["text_encoders.umt5xxl.transformer.shared.weight"] = torch.ones(64, 64, dtype=torch.float16)
+        path = tmp_path / "wan2.2_t2v_high_noise_14B_aio.safetensors"
+        save_file(sd, path)
+        return reference, path
+
+    def test_bundled_components_are_never_read(self, tmp_path: Path) -> None:
+        reference, path = self._all_in_one(tmp_path)
+
+        _, events, _ = self._load_recording(path)
+
+        read = [key for kind, key in events if kind == "read"]
+        assert sorted(read) == sorted(f"model.diffusion_model.{k}" for k in reference.state_dict())
+
+    def test_room_for_the_cast_size_is_made_before_the_first_read(self, tmp_path: Path) -> None:
+        reference, path = self._all_in_one(tmp_path)
+
+        model, events, _ = self._load_recording(path)
+
+        bf16_size = sum(v.numel() for v in reference.state_dict().values()) * 2
+        assert events[0] == ("reserve", bf16_size)
+        assert [event for event in events if event[0] == "reserve"] == [("reserve", bf16_size)]
+        assert all(t.dtype == torch.bfloat16 for t in model.state_dict().values())
+
+    def test_each_tensor_is_cast_before_the_next_is_read(self, tmp_path: Path) -> None:
+        """The peak stays the finished state dict plus the tensor in flight, never the whole fp16 source."""
+        _, path = self._all_in_one(tmp_path)
+
+        _, _, alive_at_read = self._load_recording(path)
+
+        assert len(alive_at_read) > 2
+        assert not set().union(*alive_at_read)
+
+    def test_scaled_fp8_room_is_the_folded_size_and_its_metadata_is_never_read(self, tmp_path: Path) -> None:
+        reference = _tiny_model()
+        sd = {k: v.clone() for k, v in reference.state_dict().items()}
+        target = "blocks.0.attn1.to_q.weight"
+        sd[target] = torch.full_like(sd[target], 0.5).to(torch.float8_e4m3fn)
+        sd["blocks.0.attn1.to_q.scale_weight"] = torch.full((128,), 4.0)
+        sd["blocks.0.attn1.to_q.scale_input"] = torch.tensor([1.0])
+        sd["scaled_fp8"] = torch.zeros(1, dtype=torch.float8_e4m3fn)
+        path = tmp_path / "Wan2.2-A14B-HighNoise-fp8_scaled.safetensors"
+        save_file(sd, path)
+
+        model, events, alive_at_read = self._load_recording(path)
+
+        # The folded size, plus the one fold in flight: the weight's float32 copy and product, and its float32 scale.
+        in_flight = 2 * 128 * 128 * torch.float32.itemsize + 128 * torch.float32.itemsize
+        assert events[0] == ("reserve", sum(v.numel() for v in reference.state_dict().values()) * 2 + in_flight)
+        read = {key for kind, key in events if kind == "read"}
+        assert read == set(reference.state_dict()) | {"blocks.0.attn1.to_q.scale_weight"}
+        # Only the fp8 weight is still alive while its scale is read; it is folded right after.
+        assert max(len(alive) for alive in alive_at_read) == 1
+        folded = model.state_dict()[target]
+        assert folded.dtype == torch.bfloat16
+        assert torch.equal(folded.float(), torch.full_like(folded.float(), 2.0))
+
+    def test_an_int8_checkpoint_reserves_before_any_weight_is_read(self, tmp_path: Path) -> None:
+        """Only the markers are read first. The reservation is every payload at its stored width: dense float32 at
+        the float32 compute dtype, the codes one byte each, the scales float32."""
+        _, sd = _int8_checkpoint(BLOCK_LAYERS)
+        path = _write(tmp_path, sd)
+
+        _, events, _ = self._load_recording(path)
+
+        reserves = [event for event in events if event[0] == "reserve"]
+        first_reserve = events.index(reserves[0])
+        assert all(key.endswith(".comfy_quant") for _, key in events[:first_reserve])
+        assert reserves == [("reserve", sum(v.nbytes for k, v in sd.items() if not k.endswith(".comfy_quant")))]
+        assert len(events[first_reserve + 1 :]) == len(sd) - len(BLOCK_LAYERS)
+
+    @needs_mapping_that_shows_file_writes
+    def test_a_bf16_checkpoint_leaves_nothing_reading_the_file(self, tmp_path: Path) -> None:
+        """bf16 on disk is the case where the cast is a no-op: a mapped tensor would come through it still mapped."""
+        reference = _tiny_model().to(torch.bfloat16)
+        path = tmp_path / "wan22-t2v-a14b-high_noise.safetensors"
+        save_file(reference.state_dict(), path)
+        mapped = self._load_mapped(path, torch.bfloat16)
+
+        model = _load(path)
+        overwrite_payloads(path)
+
+        assert any(not torch.equal(mapped.state_dict()[k], v) for k, v in reference.state_dict().items()), (
+            "the probe sees no change through mmap either, so it cannot tell a copy from a view"
+        )
+        for key, value in reference.state_dict().items():
+            assert torch.equal(model.state_dict()[key], value), key
+
+    @needs_mapping_that_shows_file_writes
+    def test_an_int8_checkpoint_leaves_nothing_reading_the_file(self, tmp_path: Path) -> None:
+        """The int8 codes are kept as stored, so they are never copied by a cast either."""
+        _, sd = _int8_checkpoint(BLOCK_LAYERS)
+        path = _write(tmp_path, sd)
+        mapped = self._load_mapped(path, torch.float32)
+        mapped_before = {key: value.clone() for key, value in mapped.state_dict().items()}
+
+        model = _load(path, dtype=torch.float32)
+        loaded = {key: value.clone() for key, value in model.state_dict().items()}
+        overwrite_payloads(path)
+
+        assert any(not torch.equal(v, mapped_before[k]) for k, v in mapped.state_dict().items()), (
+            "the probe sees no change through mmap either, so it cannot tell a copy from a view"
+        )
+        for key, value in model.state_dict().items():
+            assert torch.equal(value, loaded[key]), key
+
+    def test_an_mx_exponent_grid_is_refused_by_name(self, tmp_path: Path) -> None:
+        """An E8M0 grid has to reach the MXFP8 refusal; a header dtype the reader cannot map would stop it short."""
+        reference = _tiny_model()
+        sd = {k: v.clone() for k, v in reference.state_dict().items()}
+        target = "blocks.0.attn1.to_q"
+        sd[f"{target}.weight"] = sd[f"{target}.weight"].to(torch.float8_e4m3fn)
+        sd[f"{target}.weight_scale"] = torch.full((128, 4), 1.0).to(torch.float8_e8m0fnu)
+        path = tmp_path / "Wan2.2-A14B-HighNoise-mxfp8.safetensors"
+        save_file(sd, path)
+
+        with pytest.raises(NotImplementedError, match="MXFP8"):
+            _load(path)
 
 
 # --- ComfyUI int8_tensorwise (convrot) -------------------------------------------------------------------------
@@ -633,3 +830,449 @@ class TestInt8Convrot:
 
         with pytest.raises(ValueError, match="mixing convrot layers with scaled fp8"):
             _load(path)
+
+
+# --- ComfyUI fp8_scaled ------------------------------------------------------------------------------------------
+
+FP8_MARKER = {"format": "float8_e4m3fn"}
+E5M2_MAX = 57344.0
+# MXFP8 scales sit in cuBLAS tiles of 128 rows by 4 blocks of 32 weights; only the 128x128 attention projections fit.
+MX_BLOCK = 32
+
+
+@pytest.fixture
+def hints_respected():
+    set_full_precision_hints_respected(True)
+    yield
+    set_full_precision_hints_respected(None)
+
+
+def _scaled_fp8_checkpoint(
+    layers: list[str],
+    *,
+    markers: bool = True,
+    e5m2: tuple[str, ...] = (),
+    hinted: tuple[str, ...] = (),
+) -> tuple[torch.nn.Module, dict[str, torch.Tensor], dict[str, torch.Tensor]]:
+    """A diffusers-layout state dict with ``layers`` stored as ComfyUI scaled fp8, and the dense model it decodes to.
+
+    The reference carries each layer's round trip (codes times scale) from the fixture's own quantizer, which is
+    what a correct loader must reconstruct. The third value is the scales by layer path. ``e5m2`` layers are stored in
+    that float8 flavour, ``hinted`` ones carry a per-layer ``full_precision_matrix_mult`` marker.
+    """
+    torch.manual_seed(0)
+    reference = _tiny_model().float()
+    sd = {key: value.detach().clone() for key, value in reference.state_dict().items()}
+    scales: dict[str, torch.Tensor] = {}
+    for path in layers:
+        weight = reference.get_submodule(path).weight
+        if path in e5m2:
+            scale = (weight.detach().abs().max() / E5M2_MAX).float()
+            codes = (weight.detach() / scale).to(torch.float8_e5m2)
+            decoded = codes.float() * scale
+        else:
+            payload = quantize_scaled_fp8(weight.detach().float())
+            scale, codes, decoded = payload.scale, payload.codes, payload.dequantized
+        with torch.no_grad():
+            weight.copy_(decoded)
+        sd[f"{path}.weight"] = codes
+        sd[f"{path}.weight_scale"] = scale
+        scales[path] = scale
+        if markers:
+            extra = {"full_precision_matrix_mult": True} if path in hinted else {}
+            sd[f"{path}.comfy_quant"] = comfy_quant_marker({**FP8_MARKER, **extra})
+    sd["scaled_fp8"] = torch.zeros(1, dtype=torch.float8_e4m3fn)
+    return reference, sd, scales
+
+
+def _mxfp8_checkpoint(layers: list[str]) -> tuple[torch.nn.Module, dict[str, torch.Tensor]]:
+    """``layers`` (128x128 projections) stored as MXFP8 with all-ones codes and a varied exponent grid, plus the dense
+    model they decode to. The expected weight is the grid itself, expanded over its blocks of 32."""
+    torch.manual_seed(0)
+    reference = _tiny_model().float()
+    sd = {key: value.detach().clone() for key, value in reference.state_dict().items()}
+    for path in layers:
+        tensors, block_scale = mxfp8_tensors(path, torch.randint(120, 128, (128, 128 // MX_BLOCK)).float())
+        sd.update(tensors)
+        sd[f"{path}.comfy_quant"] = comfy_quant_marker({"format": "mxfp8"})
+        with torch.no_grad():
+            reference.get_submodule(path).weight.copy_(block_scale.repeat_interleave(MX_BLOCK, dim=1))
+    return reference, sd
+
+
+def _storage_loader(monkeypatch: pytest.MonkeyPatch, *, storage: bool, fp8_matmul: bool = False) -> WanCheckpointModel:
+    """A loader whose settings are as given and whose FP8 Storage cast is the real one."""
+    loader = _make_loader()
+    loader._should_use_fp8 = lambda *_args: storage
+    monkeypatch.setattr(load_default, "should_keep_fp8_weights", lambda _device: fp8_matmul)
+    return loader
+
+
+def _round_trip_through_fp8_storage(reference: torch.nn.Module, layers: list[str]) -> None:
+    """Make ``reference`` hold what FP8 Storage leaves behind in the layers the checkpoint shipped dense (biases too)."""
+    for path in layers:
+        for param in reference.get_submodule(path).parameters():
+            with torch.no_grad():
+                param.copy_(param.to(torch.float8_e4m3fn).to(param.dtype))
+
+
+def _assert_forwards_like(model: torch.nn.Module, reference: torch.nn.Module, **tolerance) -> None:
+    expected = _forward(reference)
+    assert expected.abs().max() > 0, "reference output is degenerate, the comparison would pass vacuously"
+    torch.testing.assert_close(_forward(model), expected, **tolerance)
+
+
+class TestScaledFp8:
+    @pytest.mark.parametrize("native", [True, False], ids=["native-keys", "diffusers-keys"])
+    @pytest.mark.parametrize("prefix", ["", "model.diffusion_model."], ids=["bare", "comfyui-prefix"])
+    def test_fp8_storage_keeps_the_scaled_layers_packed_and_forwards_like_the_folded_model(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, native: bool, prefix: str
+    ) -> None:
+        reference, sd, scales = _scaled_fp8_checkpoint(ATTENTION)
+        path = _write(tmp_path, sd, native=native, prefix=prefix)
+
+        model = _load(path, loader=_storage_loader(monkeypatch, storage=True), dtype=torch.float32)
+
+        for name in ATTENTION:
+            layer = model.get_submodule(name)
+            assert layer.weight.dtype is torch.float8_e4m3fn, name
+            # The file's own scale, on the module the weight landed in rather than the one it was named after.
+            torch.testing.assert_close(layer.weight_scale, scales[name], rtol=0, atol=0)
+        for name in FFN:
+            layer = model.get_submodule(name)
+            assert layer.weight.dtype is torch.float8_e4m3fn, name
+            assert getattr(layer, "weight_scale", None) is None, name
+        _round_trip_through_fp8_storage(reference, FFN)
+        apply_custom_layers_to_model(model)
+        _assert_forwards_like(model, reference, rtol=1e-3, atol=1e-4)
+
+    def test_scale_keys_never_reach_the_model(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An unexpected key is blamed on an Animate/S2V variant, and `strict=False` would drop it silently
+        otherwise, so assert on what the loader hands over."""
+        _, sd, _ = _scaled_fp8_checkpoint(ATTENTION)
+        for layer in ATTENTION:
+            sd[f"{layer}.input_scale"] = torch.ones(())
+        path = _write(tmp_path, sd)
+        model, handed_over = _recording_model()
+        with patch("diffusers.WanTransformer3DModel", return_value=model):
+            _load(path, loader=_storage_loader(monkeypatch, storage=False), dtype=torch.float32)
+
+        assert not [k for k in handed_over if is_scale_metadata_key(k)]
+        assert "scale_shift_table" in handed_over
+
+    def test_without_fp8_storage_or_the_fp8_matmul_the_file_is_folded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        reference, sd, _ = _scaled_fp8_checkpoint(ATTENTION)
+        path = _write(tmp_path, sd)
+
+        model = _load(path, loader=_storage_loader(monkeypatch, storage=False), dtype=torch.float32)
+
+        assert not any(p.dtype is torch.float8_e4m3fn for p in model.parameters())
+        assert not any(name.endswith("weight_scale") for name, _ in model.named_buffers())
+        _assert_forwards_like(model, reference, rtol=1e-4, atol=1e-5)
+
+    def test_the_fp8_matmul_keeps_the_layers_packed_without_casting_the_rest(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        reference, sd, _ = _scaled_fp8_checkpoint(ATTENTION)
+        path = _write(tmp_path, sd)
+
+        model = _load(path, loader=_storage_loader(monkeypatch, storage=False, fp8_matmul=True), dtype=torch.float32)
+
+        for name in ATTENTION:
+            assert model.get_submodule(name).weight.dtype is torch.float8_e4m3fn, name
+        for name in FFN:
+            assert model.get_submodule(name).weight.dtype is torch.float32, name
+        apply_custom_layers_to_model(model)
+        _assert_forwards_like(model, reference, rtol=1e-3, atol=1e-4)
+
+    def test_quantized_embedders_are_folded_so_the_condition_embedder_can_read_its_dtype(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`condition_embedder` is a model-declared skip pattern: a scaled layer there cannot stay fp8, and has to be
+        folded with its scale rather than cast without it."""
+        reference, sd, _ = _scaled_fp8_checkpoint(ATTENTION + EMBEDDERS)
+        path = _write(tmp_path, sd)
+
+        model = _load(path, loader=_storage_loader(monkeypatch, storage=True), dtype=torch.float32)
+
+        for name in EMBEDDERS:
+            layer = model.get_submodule(name)
+            assert layer.weight.dtype is torch.float32, name
+            torch.testing.assert_close(layer.weight, reference.get_submodule(name).weight, rtol=1e-6, atol=1e-7)
+        _round_trip_through_fp8_storage(reference, FFN)
+        apply_custom_layers_to_model(model)
+        _assert_forwards_like(model, reference, rtol=1e-3, atol=1e-4)
+
+    def test_a_scaled_layer_the_split_folds_is_not_re_encoded_unscaled_by_fp8_storage(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """float8_e5m2 cannot stay packed, so its layer is folded with its scale. It then has no `weight_scale` and
+        matches no skip pattern, which is exactly what the layerwise cast would otherwise take for a dense weight and
+        store as unscaled e4m3: roughly 1% of its weights flushed to zero."""
+        folded = "blocks.0.attn1.to_q"
+        reference, sd, scales = _scaled_fp8_checkpoint(ATTENTION, e5m2=(folded,))
+        path = _write(tmp_path, sd)
+
+        model = _load(path, loader=_storage_loader(monkeypatch, storage=True), dtype=torch.float32)
+
+        layer = model.get_submodule(folded)
+        assert layer.weight.dtype is torch.float32
+        torch.testing.assert_close(layer.weight, reference.get_submodule(folded).weight, rtol=1e-6, atol=1e-7)
+        for name in ATTENTION:
+            if name != folded:
+                kept = model.get_submodule(name)
+                assert kept.weight.dtype is torch.float8_e4m3fn, name
+                torch.testing.assert_close(kept.weight_scale, scales[name], rtol=0, atol=0)
+        _round_trip_through_fp8_storage(reference, FFN)
+        apply_custom_layers_to_model(model)
+        _assert_forwards_like(model, reference, rtol=1e-3, atol=1e-4)
+
+    def test_a_file_whose_scaled_layers_are_all_folded_still_gets_no_unscaled_cast(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With nothing left to attach, the load must not fall through to the generic cast, which would store every
+        folded layer unscaled. The dense remainder still goes to fp8."""
+        reference, sd, _ = _scaled_fp8_checkpoint(ATTENTION, e5m2=tuple(ATTENTION))
+        path = _write(tmp_path, sd)
+
+        model = _load(path, loader=_storage_loader(monkeypatch, storage=True), dtype=torch.float32)
+
+        for name in ATTENTION:
+            assert model.get_submodule(name).weight.dtype is torch.float32, name
+            torch.testing.assert_close(
+                model.get_submodule(name).weight, reference.get_submodule(name).weight, rtol=1e-6, atol=1e-7
+            )
+        for name in FFN:
+            assert model.get_submodule(name).weight.dtype is torch.float8_e4m3fn, name
+        _round_trip_through_fp8_storage(reference, FFN)
+        apply_custom_layers_to_model(model)
+        _assert_forwards_like(model, reference, rtol=1e-3, atol=1e-4)
+
+    @pytest.mark.parametrize("storage", [False, True], ids=["storage-off", "storage-on"])
+    def test_an_mxfp8_file_is_decoded_and_its_layers_stay_at_the_compute_dtype(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, storage: bool
+    ) -> None:
+        """A block-wise scale has no fp8 matmul to feed, so those layers are folded at load. Under FP8 Storage they
+        must not then be re-encoded without it: blocks whose scale is far below 1 would flush to zero."""
+        reference, sd = _mxfp8_checkpoint(ATTENTION)
+        path = _write(tmp_path, sd)
+
+        model = _load(path, loader=_storage_loader(monkeypatch, storage=storage), dtype=torch.float32)
+
+        for name in ATTENTION:
+            weight = model.get_submodule(name).weight
+            assert weight.dtype is torch.float32, name
+            torch.testing.assert_close(weight, reference.get_submodule(name).weight, rtol=0, atol=0)
+        if storage:
+            _round_trip_through_fp8_storage(reference, FFN)
+        apply_custom_layers_to_model(model)
+        _assert_forwards_like(model, reference, rtol=1e-3, atol=1e-4)
+
+    @pytest.mark.parametrize("header_prefix", ["", "model.diffusion_model."], ids=["bare-header", "prefixed-header"])
+    def test_a_precision_hint_declared_only_in_the_header_reaches_the_renamed_module(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hints_respected: None, header_prefix: str
+    ) -> None:
+        """Header entries name layers natively. The flag has to land on the layer it was written for, in the model's
+        own names, and on no other."""
+        _, sd, _ = _scaled_fp8_checkpoint(ATTENTION, markers=False)
+        hinted = ATTENTION[0]
+        native_name = next(iter(_to_native_layout({f"{hinted}.weight": torch.empty(0)}))).removesuffix(".weight")
+        header = {
+            "_quantization_metadata": json.dumps(
+                {
+                    "format_version": "1.0",
+                    "layers": {f"{header_prefix}{native_name}": {**FP8_MARKER, "full_precision_matrix_mult": True}},
+                }
+            )
+        }
+        path = tmp_path / "wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"
+        save_file(
+            {f"model.diffusion_model.{k}": v.contiguous() for k, v in _to_native_layout(sd).items()},
+            path,
+            metadata=header,
+        )
+
+        model = _load(path, loader=_storage_loader(monkeypatch, storage=True), dtype=torch.float32)
+
+        assert model.get_submodule(hinted)._fp8_full_precision_matmul is True
+        assert not any(model.get_submodule(name)._fp8_full_precision_matmul for name in ATTENTION[1:])
+
+    @pytest.mark.parametrize("native", [True, False], ids=["native-keys", "diffusers-keys"])
+    def test_a_precision_hint_carried_by_the_layers_own_marker_reaches_the_renamed_module(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hints_respected: None, native: bool
+    ) -> None:
+        """The marker tensors are deleted by the extraction, so their hints have to be read first, in the file's names,
+        and then follow the weight's rename."""
+        hinted = ATTENTION[-1]
+        _, sd, _ = _scaled_fp8_checkpoint(ATTENTION, hinted=(hinted,))
+        path = _write(tmp_path, sd, native=native)
+
+        model = _load(path, loader=_storage_loader(monkeypatch, storage=True), dtype=torch.float32)
+
+        assert model.get_submodule(hinted)._fp8_full_precision_matmul is True
+        assert not any(model.get_submodule(name)._fp8_full_precision_matmul for name in ATTENTION[:-1])
+
+    def test_the_reservation_charges_kept_layers_one_byte_and_the_rest_the_compute_width(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Kept: one byte per code plus the float32 scale. Folded, the same layers would be charged the compute
+        width, which is what made a 14B expert reserve twice what it holds."""
+        _, sd, _ = _scaled_fp8_checkpoint(ATTENTION)
+        path = _write(tmp_path, sd)
+        loader = _storage_loader(monkeypatch, storage=True)
+
+        _load(path, loader=loader, dtype=torch.float32)
+
+        kept = set(ATTENTION)
+        expected = 0
+        for key, tensor in _tiny_model().state_dict().items():
+            if key.endswith(".weight") and key[: -len(".weight")] in kept:
+                expected += tensor.numel() * 1 + torch.float32.itemsize
+            else:
+                expected += tensor.numel() * torch.float32.itemsize
+        loader._ram_cache.make_room.assert_called_once_with(expected)
+
+    def test_kept_layers_are_read_after_the_one_reservation_and_stay_as_stored(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Kept or not, the reservation is settled from the header: only the markers are read before it. A kept layer's
+        codes and float32 scale arrive as stored and are never widened or copied, and its input scale is read only
+        because the layer stays fp8. What is folded or cast is dead by the next read."""
+        _, sd, scales = _scaled_fp8_checkpoint(ATTENTION + EMBEDDERS)
+        calibrated = ATTENTION[0]
+        # The spelling ComfyUI's own fp8_scaled files carry.
+        sd[f"{calibrated}.scale_input"] = torch.tensor(0.5)
+        codes = {name: sd[f"{name}.weight"].clone() for name in ATTENTION}
+        path = _write(tmp_path, sd, native=False)
+        path = path.rename(path.with_name("wan2.2_t2v_high_noise_14B_fp8_scaled.safetensors"))
+
+        model, events, alive_at_read = TestHeaderFirstRead._load_recording(
+            path, loader=_storage_loader(monkeypatch, storage=True)
+        )
+
+        reserves = [index for index, event in enumerate(events) if event[0] == "reserve"]
+        assert len(reserves) == 1
+        assert all(key.endswith(".comfy_quant") for _, key in events[: reserves[0]])
+        read = {key for kind, key in events[reserves[0] + 1 :] if kind == "read"}
+        assert read == (
+            set(_tiny_model().state_dict())
+            | {f"{name}.weight_scale" for name in ATTENTION + EMBEDDERS}
+            | {f"{calibrated}.scale_input"}
+        )
+        # At each weight read, the earlier payloads still alive (bf16 aside) are the kept codes and at most their
+        # scales: the folded embedders' codes and scales and the cast float32 sources are gone.
+        kept_codes = {f"{name}.weight" for name in ATTENTION}
+        kept_scales = {f"{name}.weight_scale" for name in ATTENTION} | {f"{calibrated}.scale_input"}
+        reads = [key for kind, key in events if kind == "read"]
+        weight_reads = 0
+        for index, (key, alive) in enumerate(zip(reads, alive_at_read, strict=True)):
+            if key in sd and not is_scale_metadata_key(key):
+                assert {source for source in alive if not is_scale_metadata_key(source)} == kept_codes & set(
+                    reads[:index]
+                ), key
+                assert {source for source in alive if is_scale_metadata_key(source)} <= kept_scales, key
+                weight_reads += 1
+        assert weight_reads == len(_tiny_model().state_dict())
+        for name in ATTENTION:
+            layer = model.get_submodule(name)
+            assert layer.weight.dtype is torch.float8_e4m3fn, name
+            # Its own storage, one byte per code: neither a widened copy nor a slice of a larger buffer.
+            assert layer.weight.untyped_storage().nbytes() == layer.weight.numel(), name
+            assert torch.equal(layer.weight.view(torch.uint8), codes[name].view(torch.uint8)), name
+            assert layer.weight_scale.dtype is torch.float32, name
+            torch.testing.assert_close(layer.weight_scale, scales[name], rtol=0, atol=0)
+        assert model.get_submodule(calibrated).input_scale.item() == 0.5
+        for name in EMBEDDERS:
+            assert model.get_submodule(name).weight.dtype is torch.bfloat16, name
+
+    @pytest.mark.parametrize("storage", [False, True], ids=["storage-off", "storage-on"])
+    def test_a_scale_beside_a_weight_that_is_not_fp8_is_folded_into_it(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, storage: bool
+    ) -> None:
+        """ComfyUI's legacy `scaled_fp8` ops apply `scale_weight` whatever the weight's dtype: a "scaled" checkpoint is
+        not all fp8. Such a layer is folded, and FP8 Storage leaves it at the compute dtype like any other folded
+        scaled layer rather than re-encoding it without its scale."""
+        target = ATTENTION[0]
+        sd = {key: value.detach().clone() for key, value in _tiny_model().state_dict().items()}
+        stored = sd[f"{target}.weight"].to(torch.bfloat16)
+        sd[f"{target}.weight"] = stored
+        sd[f"{target}.scale_weight"] = torch.tensor([0.25])
+        path = _write(tmp_path, sd)
+
+        model = _load(path, loader=_storage_loader(monkeypatch, storage=storage), dtype=torch.float32)
+
+        loaded = model.get_submodule(target).weight
+        assert loaded.dtype is torch.float32
+        # A power-of-two scale, so the product is exact.
+        torch.testing.assert_close(loaded, stored.float() * 0.25, rtol=0, atol=0)
+        if storage:
+            assert model.get_submodule(FFN[0]).weight.dtype is torch.float8_e4m3fn
+
+    @pytest.mark.parametrize(
+        ("storage", "fp8_matmul"),
+        [(False, False), (False, True), (True, False)],
+        ids=["folded", "fp8-matmul", "fp8-storage"],
+    )
+    def test_the_reservation_covers_what_the_load_holds_within_a_few_scalars(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, storage: bool, fp8_matmul: bool
+    ) -> None:
+        """The reservation is planned from the header, before any scale is read, so it has to agree with what the read
+        ends up holding: kept per-tensor layers with both input-scale spellings, an e5m2 layer and the embedders the
+        split folds, a scaled weight that is not fp8, and dense float32 tensors. Measured before the FP8 Storage cast,
+        which shrinks the model afterwards. The slack is exactly the largest fold in flight, here the 768x128
+        `time_proj` with its float32 copy and product and its scalar scale, and, where the layers are kept, the
+        placeholder input scale the plan counts and the extraction drops."""
+        e5m2 = ATTENTION[1]
+        _, sd, _ = _scaled_fp8_checkpoint(ATTENTION + EMBEDDERS, e5m2=(e5m2,))
+        sd[f"{ATTENTION[0]}.scale_input"] = torch.tensor(0.5)
+        # An uncalibrated placeholder, which the extraction drops.
+        sd[f"{ATTENTION[2]}.input_scale"] = torch.tensor(1.0)
+        sd[f"{FFN[0]}.weight"] = sd[f"{FFN[0]}.weight"].to(torch.bfloat16)
+        sd[f"{FFN[0]}.scale_weight"] = torch.tensor([0.5])
+        path = _write(tmp_path, sd)
+        loader = _storage_loader(monkeypatch, storage=storage, fp8_matmul=fp8_matmul)
+        loader._apply_fp8_to_nn_module = lambda *_args, **_kwargs: None
+
+        model = _load(path, loader=loader, dtype=torch.float32)
+
+        held = sum(t.nelement() * t.element_size() for t in model.parameters()) + sum(
+            b.nelement() * b.element_size()
+            for name, b in model.named_buffers()
+            if name.endswith((".weight_scale", ".input_scale"))
+        )
+        reserved = loader._ram_cache.make_room.call_args_list
+        assert len(reserved) == 1
+        in_flight = 2 * 768 * 128 * torch.float32.itemsize + torch.float32.itemsize
+        placeholder = torch.float32.itemsize if storage or fp8_matmul else 0
+        assert reserved[0].args[0] - held == in_flight + placeholder
+        if storage or fp8_matmul:
+            assert model.get_submodule(ATTENTION[0]).weight.dtype is torch.float8_e4m3fn
+
+    @pytest.mark.parametrize("storage", [False, True], ids=["storage-off", "storage-on"])
+    @pytest.mark.parametrize("slab_rows", [None, 32], ids=["whole", "slabs"])
+    def test_an_mxfp8_file_reserves_for_its_largest_grid_in_flight(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, slab_rows: int | None, storage: bool
+    ) -> None:
+        """Every MXFP8 layer is folded, with FP8 Storage or without, so no grid stays resident, but each is alive
+        through its own fold, and the fold widens it across the weight. The reservation covers what the model holds
+        plus one such layer, not every grid at once: its float32 grid, and the fold's float32 weight copy, product and
+        widened grid over the rows it folds at once (with the row index that picks a slab's grid rows). Measured before
+        the FP8 Storage cast, which shrinks the dense layers afterwards."""
+        from invokeai.backend.quantization import fp8_scaled
+
+        if slab_rows is not None:
+            monkeypatch.setattr(fp8_scaled, "_FOLD_SLAB_ELEMENTS", slab_rows * 128)
+        _, sd = _mxfp8_checkpoint(ATTENTION)
+        path = _write(tmp_path, sd)
+        loader = _storage_loader(monkeypatch, storage=storage)
+        loader._apply_fp8_to_nn_module = lambda *_args, **_kwargs: None
+
+        model = _load(path, loader=loader, dtype=torch.float32)
+
+        held = sum(t.nelement() * t.element_size() for t in model.parameters())
+        grid = 128 * (128 // MX_BLOCK) * torch.float32.itemsize
+        rows = 128 if slab_rows is None else slab_rows
+        fold = 3 * rows * 128 * torch.float32.itemsize + (0 if slab_rows is None else rows * torch.int64.itemsize)
+        loader._ram_cache.make_room.assert_called_once_with(held + grid + fold)

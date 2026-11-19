@@ -16,7 +16,7 @@ vi.mock('@features/queue/publicApi', () => ({
   queueCommands: {},
 }));
 
-import { createTestLocalRun, createTestQueueUiAdapter } from './queueUiAdapter.testing';
+import { createTestLocalRun, createTestQueueUiAdapter, createTestQueueWidgetRuntime } from './queueUiAdapter.testing';
 import { QueueUiProvider, type QueueLocalRun, type QueueUiAdapter } from './QueueUiContext';
 import { QueueWidgetView } from './QueueWidgetView';
 
@@ -78,7 +78,7 @@ const render = async (overrides: Partial<QueueUiAdapter>, listed?: number) => {
         <ChakraProvider value={system}>
           <QueryClientProvider client={client}>
             <QueueUiProvider adapter={adapter}>
-              <QueueWidgetView region="right" />
+              <QueueWidgetView region="right" runtime={createTestQueueWidgetRuntime()} />
             </QueueUiProvider>
           </QueryClientProvider>
         </ChakraProvider>

@@ -58,12 +58,6 @@ const HIGHLIGHTS: readonly { descriptionKey: string; icon: LucideIcon; multiuser
 const readItems = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
-/**
- * The modal traps focus, so focus outside it is never the user leaving. Under StrictMode the first, lazily loaded
- * mount restores focus to the launcher button mid-open, and the stale dismiss layer closed the notes on that.
- */
-const keepOpenOnFocusOutside = (event: { preventDefault: () => void }) => event.preventDefault();
-
 export const WhatsNewDialog = ({ onExitComplete }: { onExitComplete?: () => void }) => {
   const { t } = useTranslation();
   const { isOpen, isUnseen, version } = useWhatsNew();
@@ -102,7 +96,6 @@ export const WhatsNewDialog = ({ onExitComplete }: { onExitComplete?: () => void
       scrollBehavior="inside"
       size="lg"
       onExitComplete={onExitComplete}
-      onFocusOutside={keepOpenOnFocusOutside}
       onOpenChange={handleOpenChange}
     >
       <Portal>

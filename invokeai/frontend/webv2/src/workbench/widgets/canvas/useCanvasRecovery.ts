@@ -135,7 +135,10 @@ const undoWithPoint = async (
   }
 };
 
-/** Discard, Discard all and accept, each reporting what left staging with a way to bring it back. */
+/**
+ * Discard, Discard all and accept, each reporting what left staging with a way to bring it back, and Stop generating,
+ * which stops every run still generating for the canvas and keeps its results.
+ */
 export const useStagingRecovery = () => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -275,9 +278,24 @@ export const useStagingRecovery = () => {
     [offerRestore, projectId, t]
   );
 
+  const stopGenerating = useCallback(() => {
+    const project = queries.getProject(projectId);
+    if (!project) {
+      return;
+    }
+    const inFlight = getInFlightCanvasItems(project.canvas, project.queue.items);
+    // One notice says how many stopped, not a cancel notice each.
+    for (const item of inFlight) {
+      queue.cancel(projectId, item.id, null);
+    }
+    if (inFlight.length > 0) {
+      notify.info(t('widgets.canvas.staging.stoppedGenerating', { count: inFlight.length }));
+    }
+  }, [notify, projectId, queries, queue, t]);
+
   return useMemo(
-    () => ({ discardAll, discardSelected, reportAccepted }),
-    [discardAll, discardSelected, reportAccepted]
+    () => ({ discardAll, discardSelected, reportAccepted, stopGenerating }),
+    [discardAll, discardSelected, reportAccepted, stopGenerating]
   );
 };
 

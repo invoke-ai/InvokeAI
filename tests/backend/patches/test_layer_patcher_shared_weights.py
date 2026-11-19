@@ -8,6 +8,7 @@ corrupt the weights seen by the other GPU (and taint the cached "clean" copy eve
 These run on CPU and force direct patching, which is the path that touches CPU-resident weights.
 """
 
+import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
@@ -74,10 +75,14 @@ def test_force_direct_patch_does_not_mutate_canonical_cpu_weights():
     assert torch.allclose(out_before, model(x))
 
 
+@pytest.mark.parametrize("pass_cached_weights", [True, False], ids=["cached_weights", "no_cached_weights"])
 @torch.no_grad()
-def test_two_models_sharing_canonical_are_isolated_under_direct_patch():
+def test_two_models_sharing_canonical_are_isolated_under_direct_patch(pass_cached_weights: bool):
     """Patch one model built from the shared canonical weights; a second model built from the same
-    canonical tensors must be unaffected (no cross-device bleed)."""
+    canonical tensors must be unaffected (no cross-device bleed).
+
+    Without `cached_weights`, `save()` copies the original, so nothing but the CPU rule in
+    `_can_update_in_place` keeps `add_` out of the tensor that model_b also holds."""
     in_features, out_features, rank = 4, 8, 2
     model_a = DummyModuleWithOneLayer(in_features, out_features, device="cpu", dtype=torch.float32)
     apply_custom_layers_to_model(model_a)
@@ -97,7 +102,7 @@ def test_two_models_sharing_canonical_are_isolated_under_direct_patch():
         patches=lora_models,
         prefix="",
         dtype=torch.float32,
-        cached_weights=canonical,
+        cached_weights=canonical if pass_cached_weights else None,
         force_direct_patching=True,
     ):
         # model_a is patched; model_b (sharing the canonical weights) must be unchanged.
