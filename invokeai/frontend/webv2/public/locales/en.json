@@ -3365,6 +3365,7 @@
       "presetsEmpty": "No presets yet. Save the current settings to reuse them later.",
       "presetsNoMatches": "No presets match your search.",
       "presetUnreadable": "This preset could not be read.",
+      "presetUpdated": "Updated preset {{name}}",
       "promptHistory": "Prompt history",
       "promptHistoryEntries": "Prompt history entries",
       "promptHistoryKeyboardHelp": "Alt+Up/Down switches between prompts while focused.",
@@ -3395,6 +3396,8 @@
       "savePresetTitle": "Save preset",
       "selectSupportedModelFirst": "Select a supported Generate model first.",
       "searchPresets": "Search presets",
+      "updatePreset": "Update the loaded preset with the current settings",
+      "updatePresetNamed": "Update preset {{name}} with the current settings",
       "secondsPerRun": "~{{value}}s/run",
       "sectionChanged": "Changed from defaults",
       "sectionMenu": {
