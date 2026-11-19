@@ -1,8 +1,8 @@
 import type { components } from '@api/schema';
 
 /**
- * Mirror snake_case backend model contracts with open unions so unknown architectures display generic labels
- * without a frontend release.
+ * Mirror snake_case backend model contracts with open unions so unknown architectures display generic labels without a
+ * frontend release.
  */
 
 /** Known model base architectures. Open union: new bases still render. */
@@ -142,8 +142,8 @@ export interface ExternalImageSize {
 }
 
 /**
- * The capability matrix of an external model (`ExternalModelCapabilities`). Fields the editor does not expose are
- * typed loosely and carried through unchanged, because a PATCH replaces the whole object.
+ * The capability matrix of an external model (`ExternalModelCapabilities`). Fields the editor does not expose are typed
+ * loosely and carried through unchanged, because a PATCH replaces the whole object.
  */
 export interface ExternalModelCapabilities {
   modes?: ExternalGenerationMode[];
@@ -162,9 +162,16 @@ export interface ExternalModelCapabilities {
   input_image_required_for?: ExternalGenerationMode[] | null;
 }
 
+/** Another model type the same files serve as, besides the record's primary `type`. */
+export type ModelRole = {
+  type: ModelTaxonomyType;
+  format?: string | null;
+  variant?: string | null;
+};
+
 /**
- * A model config record. This is the union of fields across all backend config
- * classes; fields not applicable to a given type/format are absent.
+ * A model config record. This is the union of fields across all backend config classes; fields not applicable to a
+ * given type/format are absent.
  */
 export interface ModelConfig {
   key: string;
@@ -181,6 +188,8 @@ export interface ModelConfig {
   type: ModelTaxonomyType;
   format: ModelFileFormat;
   variant?: string | null;
+  /** Other types these files serve as. The backend always sends it; older fixtures may omit it. */
+  roles?: ModelRole[];
   prediction_type?: PredictionType | null;
   config_path?: string | null;
   cpu_only?: boolean | null;
@@ -191,6 +200,8 @@ export interface ModelConfig {
   repo_variant?: string | null;
   /** InvokeAI-format IP adapters: the paired image encoder's model id. */
   image_encoder_model_id?: string;
+  /** VAEs: latent width. Only `wan` ships more than one, and its two are different decoders. */
+  latent_channels?: number | null;
   /** Anima ControlNet-LLLite: 3 = control image, 4 = inpainting; null when installed before it was recorded. */
   cond_in_channels?: number | null;
   /** Qwen-Image ControlNets: `fun_union` also conditions on an inpainted region, `instantx_union` does not. */

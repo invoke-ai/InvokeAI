@@ -19,8 +19,8 @@ const isOperationKey = (queryKey: readonly unknown[], accountKey: readonly unkno
 /**
  * Keeps the open manager current. Socket events replace the operation record; whichever path delivers a settled
  * operation first (socket or the polled query) invalidates the account's counts exactly once, since every row the
- * operation touched changed. Admins receive other accounts' events too, which is exactly when their totals change.
- * A reconnect invalidates everything, since events during the gap were lost.
+ * operation touched changed. Admins receive other accounts' events too, which is exactly when their totals change. A
+ * reconnect invalidates everything, since events during the gap were lost.
  */
 export const attachIntermediatesRealtime = (queryClient: QueryClient): (() => void) => {
   const owner = captureAccountScope();

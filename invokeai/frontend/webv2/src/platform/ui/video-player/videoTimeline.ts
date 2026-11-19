@@ -31,8 +31,8 @@ export const getFrameTime = (frame: number, fps: number): number => (frame + 0.5
 
 /**
  * Scrubber steps without a frame rate. `pointer` is a thousandth of the clip, finer than a track's pixels, so a drag
- * lands where it points. `keyboard` is a hundredth, between 0.1 s (short clips stay fine-grained) and 5 s (an arrow
- * key on a long clip still moves visibly).
+ * lands where it points. `keyboard` is a hundredth, between 0.1 s (short clips stay fine-grained) and 5 s (an arrow key
+ * on a long clip still moves visibly).
  */
 export const getScrubSteps = (durationSeconds: number): { keyboard: number; pointer: number } => ({
   keyboard: Math.min(5, Math.max(0.1, durationSeconds / 100)),

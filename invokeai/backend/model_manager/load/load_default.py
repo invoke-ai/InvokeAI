@@ -465,7 +465,13 @@ class ModelLoader(ModelLoaderBase):
         return decision.keep_checkpoint_fp8, decision.dtype
 
     def _get_cache_key(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
-        return get_model_cache_key(config.key, submodel_type, variant=self._cache_key_variant(config, submodel_type))
+        if submodel_type is None:
+            submodel_type = self._default_submodel_type
+        # A role view loads the same files through a different loader and needs its own cache entry.
+        role = config.type if getattr(config, "role_of", None) is not None else None
+        return get_model_cache_key(
+            config.key, submodel_type, role=role, variant=self._cache_key_variant(config, submodel_type)
+        )
 
     def _load_and_cache(
         self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None

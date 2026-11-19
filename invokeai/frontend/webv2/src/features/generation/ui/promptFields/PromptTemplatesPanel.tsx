@@ -108,7 +108,6 @@ export const PromptTemplatesPanel = ({
     try {
       await catalog.remove(pendingDelete);
 
-      // Deleting the active template detaches it while keeping the manager open.
       if (activeTemplate?.id === pendingDelete.id) {
         onDetach();
       }

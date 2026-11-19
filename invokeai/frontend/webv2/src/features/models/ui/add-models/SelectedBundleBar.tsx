@@ -6,7 +6,6 @@ import { Button } from '@platform/ui/Button';
 import { ChevronRightIcon, DownloadIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-/** Summary + install action for the currently selected bundle. */
 export const SelectedBundleBar = ({
   bundle,
   decoder,

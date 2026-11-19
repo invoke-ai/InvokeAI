@@ -25,39 +25,27 @@ type Props = {
   defaultOpen?: boolean;
   /** When set, the open state persists per user across reloads under this id. */
   sectionId?: string;
-  /**
-   * What the fields are set to (a size, a seed, an override count), shown after the title only while the section is
-   * folded, as muted text joined by middle dots. Falsy items are skipped.
-   */
+  /** Shown after the title only while folded; falsy items are skipped. */
   summary?: readonly ReactNode[];
   /** Badges that hold whether the section is open or not (an incompatibility, a shared setting). */
   status?: ReactNode;
   /** The fields differ from the defaults `onReset` restores; marks the title with a dot. */
   isChanged?: boolean;
-  /** Restores the section's fields to their defaults, offered from the title's context menu. */
   onReset?: () => void;
   /** Names what `onReset` restores when it is less than the whole section; "Reset section to defaults" otherwise. */
   resetLabel?: string;
   children: ReactNode;
 };
 
-/**
- * An open section reads as one card: a title bar, dimmer than the panel, over a lighter tray holding the fields, the
- * two a hair apart. A folded section is its title row alone, and hairlines separate the folded rows; the hairlines
- * either side of an open or pointed section hide, since its card or hover fill already bounds it. The title bar
- * spans the row, so its summary and badges sit inside it.
- */
+/** Open: a card (title bar over tray). Folded: a title row between hairlines, hidden beside open or pointed rows. */
 const POINTED = ':has(> [data-part="trigger"]:hover)';
 const SECTION_STYLES = {
   '&:last-child': { borderBottomWidth: '1px' },
-  // An open section is a card of its own (title bar over tray), and a pointed title fills its row as a list row
-  // does, so the hairlines either side of either go.
   [`&:is([data-state="open"], ${POINTED}), .generate-section:is([data-state="open"], ${POINTED}) + &`]: {
     borderTopColor: 'transparent',
   },
   [`&:last-child:is([data-state="open"], ${POINTED})`]: { borderBottomColor: 'transparent' },
-  // Anything brought into view inside the fields (a focused control, a revealed issue) stops below the pinned title
-  // rather than under it: the title's height plus a little air.
+  // Revealed fields stop below the pinned title, not under it.
   '& > [data-part="content"] *': { scrollMarginTop: 'calc(var(--chakra-sizes-9) + var(--chakra-spacing-7))' },
 } as const;
 // Dimmer than the panel while its section shows; the fields' tray below is the lighter surface.
@@ -65,14 +53,9 @@ const CHIP_SHOWN_BG = 'color-mix(in oklab, {colors.bg} 50%, {colors.bg.subtle})'
 const SEAM_RADIUS = '2px';
 const TRAY_BG = 'bg.muted';
 const COLLAPSIBLE_INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' };
-/**
- * The fields grow in by a fixed few pixels while the content opens, and back as it folds, on the recipe's duration
- * (1ms under Reduce motion). On the fields, not the content: the content clips its animating height, and Chromium
- * leaves fields unpainted when one element does both that and a composited transform animation.
- */
+/** Animated on the fields, not the content: Chromium skips painting an element that clips height and transforms. */
 const FIELDS_STYLES = {
-  // Controls that back themselves with the surface they sit on (a row's weight, a reference image's fields) take
-  // the tray's here, not the widget's.
+  // Self-backed controls take the tray's surface, not the widget's.
   '--wb-field-surface': '{colors.bg.muted}',
   transformOrigin: 'top',
   '[data-part="content"][data-state="open"] > &': {
@@ -86,13 +69,10 @@ const FIELDS_STYLES = {
   },
 } as const;
 const TRIGGER_STYLES = {
-  // The open title bar nearly touches its tray, and both square off the corners that face the seam.
   '&[data-state="open"]': { color: 'fg', pb: '2px' },
   '&[data-state="open"] > [data-section-chip]': { bg: CHIP_SHOWN_BG, borderBottomRadius: SEAM_RADIUS },
-  // Pointed, the title takes the tray's surface, open or folded.
   '&:hover > [data-section-chip]': { bg: TRAY_BG },
   '&:not([data-state="open"]):hover': { color: 'fg' },
-  // A section with issues says so on its chip, open or folded.
   '& > [data-section-chip][data-issues]': { bg: 'bg.error', color: 'fg.error' },
   '&:hover > [data-section-chip][data-issues]': { bg: 'red.hoverTint/20' },
   // The row is full-bleed, so the scroller would clip a ring drawn around it; the chip carries the ring, inset.
@@ -102,15 +82,13 @@ const TRIGGER_STYLES = {
     outlineColor: 'accent.solid',
     outlineOffset: '-2px',
   },
-  // Summaries say what a folded section holds; an open one shows its fields instead.
-  // They leave downward, toward the fields that open in their place.
+  // Summaries leave downward, toward the fields that open in their place.
   '&[data-state="open"] [data-section-summary]': {
     opacity: 0,
     transform: 'translateY(4px)',
     visibility: 'hidden',
   },
-  // A hairline under the title only while it is pinned over the fields scrolling beneath it. Chromium resolves the
-  // scroll-state query; elsewhere the title pins without the edge.
+  // A hairline only while pinned; scroll-state queries are Chromium-only, elsewhere it pins without the edge.
   containerType: 'scroll-state',
   '&::after': {
     bg: 'border',
@@ -175,7 +153,6 @@ export const GenerateCollapsibleSection = ({
     }
   };
 
-  // Joins the panel while mounted; a new label or id re-registers it.
   const registerRoot = useCallback(
     (root: HTMLDivElement | null) => {
       const trigger = root?.querySelector<HTMLElement>(':scope > [data-part="trigger"]');
@@ -255,8 +232,8 @@ export const GenerateCollapsibleSection = ({
       root,
     });
     open({
-      // A frame late: Zag focuses the menu a frame after a highlight, and a pick within that frame would otherwise
-      // land focus back in the closing menu.
+      // A frame late: Zag focuses the menu a frame after a highlight, and a pick within that frame would otherwise land
+      // focus back in the closing menu.
       restoreFocus: () => requestAnimationFrame(() => trigger.focus()),
       x: fromKeyboard ? rect.left : event.clientX,
       y: fromKeyboard ? rect.bottom : event.clientY,

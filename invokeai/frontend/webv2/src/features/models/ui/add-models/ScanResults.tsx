@@ -47,8 +47,8 @@ export const ScanResults = ({
 }) => {
   const { t } = useTranslation();
   const { filter, filteredItems: filteredResults, setFilter } = useSourceNameFilter(scan.results, pathOf);
-  // Live library state: `is_installed` is a scan-time snapshot, so a model
-  // installed from this list would otherwise keep offering Install forever.
+  // Live library state: `is_installed` is a scan-time snapshot, so a model installed from this list would otherwise
+  // keep offering Install forever.
   const installedSourceKeys = useInstalledSourceKeys();
   const installedKeyOf = (result: FoundModel) => findInstalledLocalPathKey(result.path, installedSourceKeys);
   const isRowInstalled = (result: FoundModel) => result.is_installed || installedKeyOf(result) !== null;

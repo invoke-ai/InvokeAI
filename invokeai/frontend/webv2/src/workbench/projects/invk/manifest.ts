@@ -33,8 +33,8 @@ const zManifestV2 = z.object({
 
 const zManifestV3 = zManifestV2.extend({
   /**
-   * The document schema `project.json` is written in: 4 for project content (beside an optional `workspace.json`), 3
-   * or lower for a whole document an exporter could not split.
+   * The document schema `project.json` is written in: 4 for project content (beside an optional `workspace.json`), 3 or
+   * lower for a whole document an exporter could not split.
    */
   documentSchemaVersion: z.number().int().min(1),
   version: z.literal(3),

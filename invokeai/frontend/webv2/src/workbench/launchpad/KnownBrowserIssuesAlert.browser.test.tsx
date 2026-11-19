@@ -136,7 +136,6 @@ describe('known browser issues alert', () => {
     expect(alert?.textContent).toContain('canvas-protection extension');
     expect(alert?.textContent).toContain('helium://flags/#helium-noise-canvas');
     expect(copyButton?.hasAttribute('title')).toBe(false);
-    // The readback alert stays until the browser is fixed: no dismiss control.
     expect(host?.querySelectorAll('button')).toHaveLength(1);
   });
 

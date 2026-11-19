@@ -242,6 +242,12 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 
     _bfloat16_safe = True
 
+    def _select_model_dtype(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType], device: torch.device
+    ) -> torch.dtype:
+        # Pipeline weights use the session dtype even when its text encoder is placed on CPU.
+        return super()._select_model_dtype(config, submodel_type, self._torch_device)
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -255,20 +261,19 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 
         model_path = Path(config.path)
         submodel_path = resolve_submodel_path(config, submodel_type, model_path / submodel_type.value)
+        dtype = self._decision(config, submodel_type).dtype
 
         # Check if submodel folder has SDNQ quantization - if so, use SDNQ loader
         if self._is_sdnq_folder(submodel_path):
             if submodel_type == SubModelType.TextEncoder:
-                return self._load_sdnq_text_encoder(submodel_path)
+                return self._load_sdnq_text_encoder(submodel_path, dtype)
             elif submodel_type == SubModelType.Transformer:
-                return self._load_sdnq_transformer(submodel_path)
+                return self._load_sdnq_transformer(submodel_path, dtype)
 
         load_class = self.get_hf_load_class(model_path, submodel_type)
         repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
 
-        # Reuse the constructor dtype that selected the shared-weight key.
-        dtype = self._decision(config, submodel_type).dtype
         try:
             result: AnyModel = load_class.from_pretrained(
                 submodel_path,
@@ -293,7 +298,7 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
         """
         return is_sdnq_folder(folder_path)
 
-    def _load_sdnq_text_encoder(self, text_encoder_path: Path) -> AnyModel:
+    def _load_sdnq_text_encoder(self, text_encoder_path: Path, compute_dtype: torch.dtype) -> AnyModel:
         """Load SDNQ-quantized text encoder from folder."""
         from transformers import Qwen3Config, Qwen3ForCausalLM
 
@@ -302,9 +307,6 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
         logger.info(f"Loading SDNQ-quantized text encoder from {text_encoder_path}")
-
-        target_device = TorchDevice.choose_torch_device()
-        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         # Load the SDNQ state dict
         sd = sdnq_sd_loader(text_encoder_path, compute_dtype=compute_dtype)
@@ -413,7 +415,7 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 
         return model
 
-    def _load_sdnq_transformer(self, transformer_path: Path) -> AnyModel:
+    def _load_sdnq_transformer(self, transformer_path: Path, compute_dtype: torch.dtype) -> AnyModel:
         """Load SDNQ-quantized transformer from folder."""
         from diffusers import ZImageTransformer2DModel
 
@@ -422,9 +424,6 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
         logger.info(f"Loading SDNQ-quantized transformer from {transformer_path}")
-
-        target_device = TorchDevice.choose_torch_device()
-        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         # Load the SDNQ state dict
         sd = sdnq_sd_loader(transformer_path, compute_dtype=compute_dtype)
@@ -965,6 +964,14 @@ class ZImageSDNQCheckpointModel(ModelLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Qwen3Encoder, format=ModelFormat.Qwen3Encoder)
 class Qwen3EncoderLoader(ModelLoader):
     """Class to load standalone Qwen3 Encoder models for Z-Image (directory format)."""
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        # A few small tokenizer files, or the vendored one: the generic sizing would charge the whole model.
+        if submodel_type is SubModelType.Tokenizer:
+            return 0
+        return super().get_size_fs(config, model_path, submodel_type)
 
     def _load_model(
         self,

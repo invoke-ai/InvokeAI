@@ -265,8 +265,8 @@ export const getCanvasStagingSlotCount = (canvas: CanvasStateContractV3, queueIt
   getCanvasStagingSlots(canvas, queueItems).length;
 
 /**
- * Whether this canvas session has results to lose: a staged candidate, or a generation still queued or running for
- * the current document revision (even one whose placeholders are all spent). A document swap throws them away.
+ * Whether this canvas session has results to lose: a staged candidate, or a generation still queued or running for the
+ * current document revision (even one whose placeholders are all spent). A document swap throws them away.
  */
 export const hasPendingCanvasResults = (
   canvas: Pick<CanvasStateContractV3, 'documentRevision' | 'stagingArea'>,
@@ -285,8 +285,8 @@ export const isCancellableQueueItem = (item: QueueItem): boolean =>
   item.cancellable && (item.status === 'pending' || item.status === 'running');
 
 /**
- * A run this tab queued that the backend has not accepted: never sent, or its enqueue still in flight. A backend
- * cancel cannot reach it; only marking it canceled here stops it (an enqueue that lands then is canceled at once).
+ * A run this tab queued that the backend has not accepted: never sent, or its enqueue still in flight. A backend cancel
+ * cannot reach it; only marking it canceled here stops it (an enqueue that lands then is canceled at once).
  */
 export const isUnsubmittedQueueItem = (item: QueueItem): boolean =>
   isCancellableQueueItem(item) && !item.backendItemIds?.length;

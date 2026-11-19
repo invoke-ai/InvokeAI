@@ -4,11 +4,13 @@ import pytest
 import torch
 from safetensors.torch import save_file
 
+from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Wan_Config,
     Main_Diffusers_Flux3_Config,
     Main_Diffusers_MossImage_Config,
     Main_Diffusers_QwenImage21_Config,
+    Main_Diffusers_ZImage_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
@@ -19,6 +21,7 @@ from invokeai.backend.model_manager.load.model_loaders.ltx2 import LTX2FolderMod
 from invokeai.backend.model_manager.load.model_loaders.moss_image import MossImageDiffusersModel
 from invokeai.backend.model_manager.load.model_loaders.qwen_image_2_1 import QwenImage21DiffusersModel
 from invokeai.backend.model_manager.load.model_loaders.wan import WanCheckpointModel, WanDiffusersModel
+from invokeai.backend.model_manager.load.model_loaders.z_image import ZImageDiffusersModel
 from invokeai.backend.model_manager.taxonomy import SubModelType, WanVariantType
 from invokeai.backend.util.devices import TorchDevice
 from tests.backend.model_manager.load.test_fp8_shared_weight_variants import _load, _loader
@@ -58,6 +61,60 @@ def test_wan_checkpoint_distinct_dtypes_do_not_adopt_each_other(monkeypatch, tmp
     finally:
         for loader in (half, full, peer):
             loader._ram_cache.shutdown()
+
+
+def test_z_image_pipeline_sdnq_encoder_keys_match_its_session_dtype_when_forced_to_cpu(monkeypatch, tmp_path):
+    from transformers import Qwen3Config, Qwen3ForCausalLM
+
+    from invokeai.backend.quantization.sdnq import loaders as sdnq_loaders
+
+    monkeypatch.setattr(
+        TorchDevice,
+        "choose_bfloat16_safe_dtype",
+        staticmethod(lambda device: torch.bfloat16 if device.index == 0 else torch.float32),
+    )
+    text_encoder_path = tmp_path / "text_encoder"
+    text_encoder_path.mkdir()
+    (text_encoder_path / "quantization_config.json").write_text('{"quant_method":"sdnq"}', encoding="utf-8")
+    tiny_config = Qwen3Config(
+        vocab_size=32,
+        hidden_size=16,
+        intermediate_size=24,
+        num_hidden_layers=1,
+        num_attention_heads=1,
+        num_key_value_heads=1,
+        head_dim=128,
+        tie_word_embeddings=True,
+    )
+    source = Qwen3ForCausalLM(tiny_config).state_dict()
+    reads = []
+
+    def read(path, *, compute_dtype):
+        assert path == text_encoder_path
+        reads.append(compute_dtype)
+        return {key: tensor.to(dtype=compute_dtype, copy=True) for key, tensor in source.items()}
+
+    monkeypatch.setattr(sdnq_loaders, "sdnq_sd_loader", read)
+    config = Main_Diffusers_ZImage_Config.model_construct(
+        key="z-image", name="Z-Image", path=str(tmp_path), default_settings=MainModelDefaultSettings(cpu_only=True)
+    )
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(10**9, store)
+    reduced = _loader(ZImageDiffusersModel, store, budget, "cuda:0", tmp_path)
+    full = _loader(ZImageDiffusersModel, store, budget, "cuda:1", tmp_path)
+    try:
+        submodel = SubModelType.TextEncoder
+        reduced_weights = _load(reduced, config, submodel).model.embed_tokens.weight
+        full_weights = _load(full, config, submodel).model.embed_tokens.weight
+
+        assert reduced_weights.dtype is torch.bfloat16
+        assert full_weights.dtype is torch.float32
+        assert reads == [torch.bfloat16, torch.float32]
+        assert reduced._get_cache_key(config, submodel).endswith(":storage=full-bfloat16")
+        assert full._get_cache_key(config, submodel).endswith(":storage=full-float32")
+    finally:
+        reduced._ram_cache.shutdown()
+        full._ram_cache.shutdown()
 
 
 def test_component_variants_follow_actual_dtype_and_keep_dtype_independent_components_shared(monkeypatch, tmp_path):

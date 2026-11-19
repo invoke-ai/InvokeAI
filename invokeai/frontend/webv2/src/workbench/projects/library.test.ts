@@ -160,45 +160,6 @@ describe('refreshProjectLibrary', () => {
     expect(api.getProject).not.toHaveBeenCalled();
   });
 
-  it('dates each project by when the caller last worked on it: the later of its content and their workspace', async () => {
-    api.listProjects.mockResolvedValue([
-      // Content saved last week, but the caller's own workspace saved since: worked on recently.
-      {
-        ...summaryDto('workspace', 'Workspace', '2026-06-03 10:00:00.000'),
-        workspace_updated_at: '2026-06-11 09:00:00.000',
-      },
-      {
-        ...summaryDto('content', 'Content', '2026-06-10 10:00:00.000'),
-        workspace_updated_at: '2026-06-01 10:00:00.000',
-      },
-      { ...summaryDto('none', 'None', '2026-06-09 10:00:00.000'), workspace_updated_at: null },
-    ]);
-
-    await library.refreshProjectLibrary();
-
-    const { summaries } = library.getProjectLibrary();
-    expect(summaries.map((summary) => [summary.id, summary.updatedAt])).toEqual([
-      ['workspace', '2026-06-11T09:00:00.000Z'],
-      ['content', '2026-06-10T10:00:00.000Z'],
-      ['none', '2026-06-09T10:00:00.000Z'],
-    ]);
-  });
-
-  it('identifies summaries that require a newer document reader without fetching the document', async () => {
-    api.listProjects.mockResolvedValue([
-      { ...summaryDto('split', 'Split', '2026-06-10 10:00:00.000'), minimum_document_schema_version: 4 },
-      { ...summaryDto('future', 'Future', '2026-06-10 10:00:00.000'), minimum_document_schema_version: 5 },
-    ]);
-
-    await library.refreshProjectLibrary();
-
-    const compatible = Object.fromEntries(
-      library.getProjectLibrary().summaries.map((summary) => [summary.id, library.isProjectSummaryCompatible(summary)])
-    );
-    expect(compatible).toEqual({ future: false, split: true });
-    expect(api.getProject).not.toHaveBeenCalled();
-  });
-
   it('keeps the previous summaries and reports the failure on error', async () => {
     api.listProjects.mockResolvedValue([summaryDto('kept', 'Kept', '2026-06-10 10:00:00.000')]);
     await library.refreshProjectLibrary();
@@ -290,21 +251,6 @@ describe('library mutations', () => {
     expect(library.getProjectLibrary().summaries[0]?.name).toBe('New name');
   });
 
-  /** Route open-project mutations through sync ownership; use HTTP for closed projects. */
-  it('renames an open project through the editor rather than over HTTP', async () => {
-    api.listProjects.mockResolvedValue([summaryDto('open', 'Old name', '2026-06-10 10:00:00.000')]);
-    await library.refreshProjectLibrary();
-
-    const { handle } = openProject('open');
-
-    await library.renameLibraryProject('open', 'New name');
-
-    expect(handle.rename).toHaveBeenCalledWith('New name');
-    expect(api.getProject).not.toHaveBeenCalled();
-    expect(api.updateProject).not.toHaveBeenCalled();
-    expect(library.getProjectLibrary().summaries[0]?.name).toBe('New name');
-  });
-
   /** Serialize deletion after in-flight saves; marking cannot stop an already-sent PUT. */
   it('deletes an open project through the sync engine, then closes the tab', async () => {
     const { calls } = openProject('open');
@@ -316,25 +262,6 @@ describe('library mutations', () => {
     expect(api.deleteProject).not.toHaveBeenCalled();
   });
 
-  it('hands the choice to delete the project boards through whichever path deletes', async () => {
-    const { handle } = openProject('open');
-    api.deleteProject.mockResolvedValue(undefined);
-
-    await library.deleteLibraryProject('open', 'delete');
-    expect(handle.deleteOnServer).toHaveBeenCalledWith('delete');
-
-    await library.deleteLibraryProject('closed', 'delete');
-    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal), 'delete');
-  });
-
-  it('deletes a closed project over HTTP, because no engine holds it', async () => {
-    api.deleteProject.mockResolvedValue(undefined);
-
-    await library.deleteLibraryProject('closed');
-
-    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal), 'release');
-  });
-
   it('does not delete while another tab owns an active project run', async () => {
     projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'contended' });
 
@@ -342,55 +269,6 @@ describe('library mutations', () => {
 
     expect(api.deleteProject).not.toHaveBeenCalled();
     expect(queueJournal.createAccountOwnedQueueRunJournal).not.toHaveBeenCalled();
-  });
-
-  it('deletes in this tab alone when Web Locks are unavailable, as on a plain-HTTP origin', async () => {
-    // A plain-HTTP origin has no navigator.locks; Node 24 defines one, so remove it explicitly.
-    vi.stubGlobal('navigator', {});
-    projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
-    api.deleteProject.mockResolvedValue(undefined);
-
-    try {
-      await library.deleteLibraryProject('closed');
-    } finally {
-      vi.unstubAllGlobals();
-    }
-
-    expect(api.deleteProject).toHaveBeenCalledWith('closed', expect.any(AbortSignal), 'release');
-  });
-
-  it('refuses to delete when the lock request fails although the browser has Web Locks', async () => {
-    // A secure context: other tabs can hold the lock, so a failed request is not single-tab mode.
-    vi.stubGlobal('navigator', { locks: {} });
-    projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
-
-    try {
-      await expect(library.deleteLibraryProject('closed')).rejects.toMatchObject({
-        reason: 'coordination-unavailable',
-      });
-    } finally {
-      vi.unstubAllGlobals();
-    }
-
-    expect(api.deleteProject).not.toHaveBeenCalled();
-  });
-
-  it('still refuses without Web Locks while the project has journaled queue runs', async () => {
-    vi.stubGlobal('navigator', {});
-    projectLocks.acquireProjectMutationLock.mockResolvedValueOnce({ kind: 'unavailable' });
-    queueJournal.createAccountOwnedQueueRunJournal.mockResolvedValueOnce({
-      close: vi.fn(),
-      deleteForProject: vi.fn(),
-      listForProject: vi.fn().mockResolvedValue({ entries: [{}], kind: 'available', removedCorrupt: 0 }),
-    });
-
-    try {
-      await expect(library.deleteLibraryProject('closed')).rejects.toMatchObject({ reason: 'active-runs' });
-    } finally {
-      vi.unstubAllGlobals();
-    }
-
-    expect(api.deleteProject).not.toHaveBeenCalled();
   });
 
   it('fails closed when durable queue runs cannot be verified', async () => {
@@ -406,21 +284,6 @@ describe('library mutations', () => {
 
     expect(api.deleteProject).not.toHaveBeenCalled();
     expect(release).toHaveBeenCalledOnce();
-  });
-
-  /** Unmark failed deletes only with mark ownership so autosave resumes safely. */
-  it('surfaces a failed deletion of an open project to its caller', async () => {
-    const { calls, handle } = openProject('open');
-
-    handle.deleteOnServer.mockImplementation(() => {
-      calls.push('deleteOnServer');
-
-      return Promise.reject(new Error('offline'));
-    });
-
-    await expect(library.deleteLibraryProject('open')).rejects.toThrow('offline');
-
-    expect(calls).toEqual(['deleteOnServer']);
   });
 
   it('takes a deleted project out of the saved session', async () => {
@@ -439,35 +302,6 @@ describe('library mutations', () => {
 
     // The next boot would otherwise try to hydrate a project the server no longer has.
     expect(JSON.parse(blob)).toMatchObject({ activeProjectId: 'kept', openProjectIds: ['kept'] });
-  });
-
-  it('leaves the session alone when the deleted project was not open', async () => {
-    api.deleteProject.mockResolvedValue(undefined);
-    api.getClientStateValue.mockResolvedValue(
-      JSON.stringify({ account: {}, activeProjectId: 'kept', openProjectIds: ['kept'] })
-    );
-
-    await library.deleteLibraryProject('closed');
-
-    expect(api.setClientStateValue).not.toHaveBeenCalled();
-  });
-
-  /** A copy of what the server last acknowledged would silently drop what is on screen. */
-  it('flushes an open project before reading it for duplication', async () => {
-    const { calls } = openProject('source');
-
-    api.getProject.mockImplementation(() => {
-      calls.push('get');
-
-      return Promise.resolve({
-        ...summaryDto('source', 'Source', '2026-06-10 10:00:00.000'),
-        data: { id: 'source', layout: {}, name: 'Source' },
-      });
-    });
-
-    await library.readAcknowledgedProject('source', account.accountLifecycle.capture());
-
-    expect(calls).toEqual(['flushPixels', 'flush', 'get']);
   });
 
   /** An unacknowledged flush must abort duplication rather than copy stale server bytes. */

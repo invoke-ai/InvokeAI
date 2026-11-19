@@ -66,8 +66,8 @@ export const GenerateGuidanceSection = ({
   const activeCount = activeReferenceImages + activeConcepts;
   const totalCount = referenceImageCount + settings.loras.length;
 
-  // Whether something here cannot run, or is all switched off, holds open or folded; what is active is a summary.
-  // Both read as the title row's own summary text, so a section's state looks the same whichever kind it is.
+  // Whether something here cannot run, or is all switched off, holds open or folded; what is active is a summary. Both
+  // read as the title row's own summary text, so a section's state looks the same whichever kind it is.
   const isAllOff = activeCount === 0 && totalCount > 0;
   const status = useMemo(
     () => (

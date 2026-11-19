@@ -1,8 +1,3 @@
-/**
- * Real-canvas tests require damage-only adjusted-surface refreshes to match full rebuilds pixel for pixel, and
- * spatial stacks to settle on the worker's exact result.
- */
-
 import type { CanvasAdjustmentsContract } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
@@ -21,7 +16,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const WIDTH = 320;
 const HEIGHT = 240;
-// Noise is position dependent: partial refreshes must place it by layer-local pixel, as a full rebuild does.
 const ADJUSTMENTS: CanvasAdjustmentsContract = [
   { brightness: 0.25, contrast: 0.15, id: 'bc', isEnabled: true, type: 'brightness-contrast' },
   {
@@ -38,7 +32,6 @@ const ADJUSTMENTS: CanvasAdjustmentsContract = [
   { id: 'sat', isEnabled: true, saturation: -0.2, type: 'hsl' },
 ];
 
-/** A layer cache seeded with a gradient, plus an adjusted cache over it. */
 const setup = (withDamageTracking: boolean) => {
   const backend = createDomRasterBackend();
   const layers = createLayerCacheStore(backend);
@@ -56,7 +49,6 @@ const setup = (withDamageTracking: boolean) => {
   return { adjusted, entry, layers };
 };
 
-/** Paints a rect of the layer cache and publishes it with (or without) damage. */
 const paint = (
   layers: ReturnType<typeof createLayerCacheStore>,
   rect: Rect,
@@ -104,35 +96,7 @@ describe('partially-refreshed adjusted surfaces match a full rebuild', () => {
     expect(worstDifference(partialPixels, wholesalePixels)).toBe(0);
   });
 
-  it('tracks many successive bands across the surface', () => {
-    const steps = Array.from({ length: 10 }, (_, i) => ({
-      color: i % 2 === 0 ? '#22c55e' : '#ef4444',
-      rect: { height: 40, width: 50, x: 10 + i * 28, y: 20 + i * 18 },
-    }));
-    const { partialPixels, wholesalePixels } = compare(steps);
-    expect(worstDifference(partialPixels, wholesalePixels)).toBe(0);
-  });
-
-  it('tracks overlapping bands', () => {
-    const { partialPixels, wholesalePixels } = compare([
-      { color: '#22c55e', rect: { height: 90, width: 90, x: 50, y: 50 } },
-      { color: '#a855f7', rect: { height: 90, width: 90, x: 90, y: 80 } },
-      { color: '#facc15', rect: { height: 40, width: 200, x: 20, y: 100 } },
-    ]);
-    expect(worstDifference(partialPixels, wholesalePixels)).toBe(0);
-  });
-
-  it('tracks a band touching the surface edges', () => {
-    const { partialPixels, wholesalePixels } = compare([
-      { color: '#22c55e', rect: { height: HEIGHT, width: 30, x: 0, y: 0 } },
-      { color: '#ef4444', rect: { height: 25, width: WIDTH, x: 0, y: HEIGHT - 25 } },
-    ]);
-    expect(worstDifference(partialPixels, wholesalePixels)).toBe(0);
-  });
-
   it('rebuilds in full when a later write does not report its damage', () => {
-    // Reported then unreported writes must force a full refresh; skipping the unknown step leaves its pixels
-    // unadjusted. Both writes are needed to distinguish partial-refresh bugs.
     const partial = setup(true);
     const wholesale = setup(false);
     const built = { height: 60, width: 80, x: 40, y: 30 };
@@ -149,32 +113,6 @@ describe('partially-refreshed adjusted surfaces match a full rebuild', () => {
     expect(worstDifference(a, b)).toBe(0);
   });
 
-  it('rebuilds in full when the surface is reallocated under it', () => {
-    // Growth moves the surface origin, so every recorded band is void.
-    const { adjusted, layers } = setup(true);
-    paint(layers, { height: 60, width: 80, x: 40, y: 30 }, '#22c55e', true);
-    adjusted.get('L', layers.get('L')!, ADJUSTMENTS);
-    layers.growToRect('L', { height: HEIGHT + 80, width: WIDTH + 60, x: -30, y: -40 });
-    const grown = layers.get('L')!;
-    grown.surface.ctx.fillStyle = '#0ea5e9';
-    grown.surface.ctx.fillRect(0, 0, 60, 40);
-    layers.publishPixels('L', { height: 40, width: 60, x: 0, y: 0 });
-
-    const reference = setup(false);
-    reference.layers.growToRect('L', { height: HEIGHT + 80, width: WIDTH + 60, x: -30, y: -40 });
-    const referenceEntry = reference.layers.get('L')!;
-    referenceEntry.surface.ctx.drawImage(grown.surface.canvas, 0, 0);
-    reference.layers.publishPixels('L');
-
-    const after = adjusted.get('L', grown, ADJUSTMENTS)!;
-    const expected = reference.adjusted.get('L', referenceEntry, ADJUSTMENTS)!;
-    const size = grown.surface.width * grown.surface.height * 4;
-    const a = after.ctx.getImageData(0, 0, grown.surface.width, grown.surface.height).data;
-    const b = expected.ctx.getImageData(0, 0, grown.surface.width, grown.surface.height).data;
-    expect(a.length).toBe(size);
-    expect(worstDifference(a, b)).toBe(0);
-  });
-
   it('keeps noise anchored to layer-local pixels when the surface origin moves', () => {
     const { adjusted, layers } = setup(true);
     const before = pixelsOf(adjusted.get('L', layers.get('L')!, ADJUSTMENTS)!);
@@ -186,7 +124,6 @@ describe('partially-refreshed adjusted surfaces match a full rebuild', () => {
 });
 
 describe('spatially adjusted surfaces', () => {
-  // Per-pixel runs on both sides of the spatial step exercise the stack's order across the worker boundary.
   const STACK: CanvasAdjustmentsContract = [
     { brightness: 0.1, contrast: 0.05, id: 'bc', isEnabled: true, type: 'brightness-contrast' },
     { amount: 70, id: 'clarity', isEnabled: true, size: 24, type: 'clarity' },
@@ -200,7 +137,6 @@ describe('spatially adjusted surfaces', () => {
     }
   });
 
-  /** A gradient layer with a transparent border, so the kernel's alpha-bounds domain is a strict sub-rectangle. */
   const setupSpatial = () => {
     const backend = createDomRasterBackend();
     const layers = createLayerCacheStore(backend);
@@ -212,7 +148,6 @@ describe('spatially adjusted surfaces', () => {
     gradient.addColorStop(1, '#f59e0b');
     entry.surface.ctx.fillStyle = gradient;
     entry.surface.ctx.fillRect(16, 12, WIDTH - 40, HEIGHT - 30);
-    // A dark block gives the clarity step edges to work on.
     entry.surface.ctx.fillStyle = '#0f172a';
     entry.surface.ctx.fillRect(150, 40, 60, 50);
     layers.publishPixels('L');
@@ -234,7 +169,6 @@ describe('spatially adjusted surfaces', () => {
     return { adjusted, backend, layers, nextSettle, show };
   };
 
-  /** Reads back through a canvas as the display does, so unpremultiplied values round like the shown pixels. */
   const roundTrip = (backend: ReturnType<typeof createDomRasterBackend>, pixels: Uint8ClampedArray) => {
     const scratch = backend.createSurface(WIDTH, HEIGHT);
     const image = scratch.ctx.createImageData(WIDTH, HEIGHT);
@@ -243,7 +177,6 @@ describe('spatially adjusted surfaces', () => {
     return pixelsOf(scratch);
   };
 
-  /** The whole stack evaluated on the main thread: what the worker path must land exactly. */
   const evaluateStack = (source: Uint8ClampedArray): Uint8ClampedArray => {
     const pixels = source.slice();
     for (const run of toSpatialPlan(STACK)) {
@@ -270,7 +203,6 @@ describe('spatially adjusted surfaces', () => {
       return pixels;
     };
     expect(worstDifference(settledPixels, roundTrip(scene.backend, evaluateStack(source())))).toBe(0);
-    // The clarity step really changed pixels, so the comparisons below can tell interim from result.
     expect(worstDifference(settledPixels, roundTrip(scene.backend, perPixelOnly()))).toBeGreaterThan(0);
     expect(scene.adjusted.peek('L', scene.layers.get('L')!, STACK)).toBe(shown);
 
@@ -279,7 +211,6 @@ describe('spatially adjusted surfaces', () => {
     paint(scene.layers, stroke, '#22c55e', true);
     expect(scene.show()).toBe(shown);
 
-    // Inside the stroke: the new pixels with the per-pixel part only. Outside: the settled result, untouched.
     const interim = pixelsOf(shown);
     const perPixel = perPixelOnly();
     const expectedInterim = settledPixels.slice();

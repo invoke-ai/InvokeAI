@@ -1,6 +1,6 @@
 /**
- * Mode detection uses precomputed geometry/coverage only. No intersection means txt2img; full opaque coverage
- * means img2img or inpaint when a mask is active; partial coverage or holes means outpaint.
+ * Mode detection uses precomputed geometry/coverage only. No intersection means txt2img; full opaque coverage means
+ * img2img or inpaint when a mask is active; partial coverage or holes means outpaint.
  */
 
 import type { CanvasGenerationMode, Rect } from './types';
@@ -14,11 +14,10 @@ export interface CanvasModeInput {
   /** Opaque coverage is alpha-scanned and contains no holes. */
   bboxFullyCovered: boolean;
   /**
-   * Some composited pixel in the bbox is not fully transparent. Local modes ignore it: content whose bounds overlap
-   * the frame keeps it an outpaint, as before. A hosted model's strategy reads it instead.
+   * Some composited pixel in the bbox is not fully transparent. Local modes ignore it: content whose bounds overlap the
+   * frame keeps it an outpaint, as before. A hosted model's strategy reads it instead.
    */
   bboxHasContent: boolean;
-  /** True when an active mask contains inpaint content. */
   hasActiveInpaintMask: boolean;
 }
 
@@ -30,7 +29,6 @@ export const rectsIntersect = (a: Rect, b: Rect): boolean => {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 };
 
-/** Resolves the generation mode for a canvas invoke from precomputed facts. */
 export const detectCanvasMode = (input: CanvasModeInput): CanvasGenerationMode => {
   const { bbox, bboxFullyCovered, contentBounds, hasActiveInpaintMask } = input;
 
@@ -39,12 +37,10 @@ export const detectCanvasMode = (input: CanvasModeInput): CanvasGenerationMode =
     return 'txt2img';
   }
 
-  // No enabled raster content touches the bbox: pure text-to-image.
   if (!contentBounds || !rectsIntersect(contentBounds, bbox)) {
     return 'txt2img';
   }
 
-  // Content opaquely fills the whole bbox: img2img, or inpaint when masked.
   if (bboxFullyCovered) {
     return hasActiveInpaintMask ? 'inpaint' : 'img2img';
   }

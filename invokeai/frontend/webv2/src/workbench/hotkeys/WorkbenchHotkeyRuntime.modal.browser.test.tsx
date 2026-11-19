@@ -19,12 +19,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-/**
- * The real hotkey runtime beneath the real shared dialogs: while a modal dialog is open, application shortcuts
- * behind it do not run, and they return the moment it closes. Only the workbench context plumbing and the
- * first-party command registrations (which need the whole application) are replaced.
- */
-
 const runtimeMocks = vi.hoisted(() => ({
   extensions: null as unknown as ExtensionRegistry,
   store: null as unknown as WorkbenchInternalStore,
@@ -36,7 +30,6 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useOptionalWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchInternalStore: () => runtimeMocks.store,
-  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
   useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => runtimeMocks.store.queries,
   useWorkbenchSubscription: () => runtimeMocks.store.subscribe,
@@ -158,10 +151,8 @@ beforeEach(async () => {
     typeId: 'image-map',
   };
 
-  // The first-party catalog binds Mod+Enter to invoke and Mod+K to the palette; the handlers stand in for the app's.
   commands.register({ handler: () => ran.push('app.invoke'), id: 'app.invoke', title: 'Invoke' });
   commands.register({ handler: () => ran.push('app.openCommandPalette'), id: 'app.openCommandPalette', title: 'P' });
-  // Widget shortcuts on a plain key and on the keys a dialog closes with, as Gallery and Canvas bind them.
   for (const [id, key] of [
     ['map.widget', 'j'],
     ['map.escape', 'esc'],
@@ -186,7 +177,6 @@ beforeEach(async () => {
       </StrictMode>
     )
   );
-  // The widget command needs a target: the floating window holds focus until a dialog takes it.
   await act(() =>
     host!.querySelector('[data-testid="window"]')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
   );
@@ -246,7 +236,6 @@ describe('WorkbenchHotkeyRuntime under a modal dialog', () => {
     await userEvent.keyboard('{Enter}');
     expect(confirmed).toBe(1);
     expect(ran).toEqual(['map.escape']);
-    // From outside any control: Enter on a focused button (focus may return to one) is the button's own press.
     document.body.dispatchEvent(
       new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'Enter', key: 'Enter' })
     );
@@ -276,7 +265,6 @@ describe('WorkbenchHotkeyRuntime under a modal dialog', () => {
     const dialog = confirmDialog().element();
 
     await setScene({ confirm: false });
-    // Still on screen, animating out and inert.
     expect(dialog.isConnected).toBe(true);
     expect(dialog.getAttribute('data-state')).toBe('closed');
     dispatchKey({ ctrlKey: true, key: 'Enter' });

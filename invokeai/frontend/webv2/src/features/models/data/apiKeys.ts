@@ -1,8 +1,8 @@
 import { getUserStorageScope } from '@features/identity';
 
 /**
- * HuggingFace credentials live server-side; Civitai keys are account-scoped browser storage and become
- * access_token only on matching install URLs.
+ * HuggingFace credentials live server-side; Civitai keys are account-scoped browser storage and become access_token
+ * only on matching install URLs.
  */
 
 const CIVITAI_KEY_BASE_STORAGE_KEY = 'invokeai-webv2-civitai-api-key';

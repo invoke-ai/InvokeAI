@@ -49,8 +49,8 @@ const NO_MEDIA_DELETED: Omit<GalleryBoardDeletionResult, 'boardId'> = {
 const OPEN_QUEUE_ACTIONS: readonly WorkbenchNotificationAction[] = [{ kind: 'open-widget', widgetId: 'queue' }];
 
 /**
- * Open reuses or hydrates a project. Close flushes while preserving the server record; closing the last tab
- * returns Home. Delete removes the server project.
+ * Open reuses or hydrates a project. Close flushes while preserving the server record; closing the last tab returns
+ * Home. Delete removes the server project.
  */
 
 export const useProjectActions = (): {

@@ -46,7 +46,6 @@ const renderStart = async () => {
     return null;
   };
   root = createRoot(document.createElement('div'));
-  // A new key mounts a new hook instance, as a surface's host does when it is rebuilt for another project.
   const render = (key: number) =>
     act(() =>
       root!.render(
@@ -71,7 +70,6 @@ describe('useDroppedFileUpload', () => {
 
     await act(() => {
       start()([new File(['x'], 'one.png', { type: 'image/png' })], {
-        // What a lost connection or a replaced deploy gives a lazy import.
         load: () => Promise.reject(new TypeError('Failed to fetch dynamically imported module: /assets/upload.js')),
         run,
         runFailedMessage: 'unused',
@@ -81,7 +79,6 @@ describe('useDroppedFileUpload', () => {
     await vi.waitFor(() =>
       expect(store.getState().notifications[0]).toMatchObject({ kind: 'error', title: 'No files uploaded. 1 failed.' })
     );
-    // The browser's own wording stays out of the notice.
     expect(JSON.stringify(store.getState().notifications[0])).not.toContain('dynamically imported module');
     expect(run).not.toHaveBeenCalled();
   });
@@ -152,7 +149,6 @@ describe('useDroppedFileUpload', () => {
             }),
           runFailedMessage: 'unused',
         });
-        // Past the lazy load, so an accepted drop has reached its run.
         await settle();
       });
     const finish = (index: number) =>
@@ -167,7 +163,6 @@ describe('useDroppedFileUpload', () => {
     await act(() => {
       projectB = store.commands.projects.create().id;
     });
-    // A's surface host goes with the project switch; the one B gets must still know A's upload.
     await remount();
     await drop();
     await act(() => {
@@ -178,7 +173,6 @@ describe('useDroppedFileUpload', () => {
     expect(started.map(({ projectId }) => projectId)).toEqual([projectA, projectB]);
     expect(pendingNotices()).toBe(1);
 
-    // A's first upload ending frees A only.
     await finish(0);
     await drop();
     await act(() => {
@@ -188,7 +182,6 @@ describe('useDroppedFileUpload', () => {
     expect(started.map(({ projectId }) => projectId)).toEqual([projectA, projectB, projectA]);
     expect(pendingNotices()).toBe(2);
 
-    // B's ending frees B, and A's second upload still holds A.
     await finish(1);
     await drop();
     await act(() => {
