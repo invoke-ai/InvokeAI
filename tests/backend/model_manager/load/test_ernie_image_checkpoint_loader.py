@@ -9,7 +9,6 @@ wrong network. Both the values and the kwarg contract are pinned here.
 
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
 import accelerate
 import pytest
@@ -23,6 +22,7 @@ from invokeai.backend.model_manager.load.model_loaders.ernie_image import (
     ErnieImageCheckpointModel,
 )
 from invokeai.backend.model_manager.taxonomy import SubModelType
+from tests.fixtures.loader_seams import Seam, SeamRun, prepare
 
 # `baidu/ERNIE-Image`'s released `transformer/config.json`, verbatim. Kept as a literal so this
 # fails when the loader's constant drifts, rather than agreeing with whatever the loader says.
@@ -58,6 +58,8 @@ TINY_TRANSFORMER_CONFIG = {
     "text_in_dim": 16,
 }
 
+SEAM = Seam(loader=ErnieImageCheckpointModel, module=loader_module, entry="_load_model", patches_device=True)
+
 
 def test_the_carried_geometry_is_the_released_one() -> None:
     """The file has no config of its own, so this constant *is* the architecture."""
@@ -80,24 +82,16 @@ def test_the_released_geometry_still_builds_a_model() -> None:
     assert model.config.text_in_dim == RELEASED_TRANSFORMER_CONFIG["text_in_dim"]
 
 
-def _loader(monkeypatch: pytest.MonkeyPatch) -> tuple[ErnieImageCheckpointModel, MagicMock]:
-    ram_cache = MagicMock()
-    loader = object.__new__(ErnieImageCheckpointModel)
-    loader._torch_device = torch.device("cpu")
-    loader._ram_cache = ram_cache
-    loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
-    monkeypatch.setattr(loader_module.TorchDevice, "choose_torch_device", staticmethod(lambda: torch.device("cpu")))
-    monkeypatch.setattr(
-        loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _device: torch.float32)
-    )
-    return loader, ram_cache
+def _loader(monkeypatch: pytest.MonkeyPatch) -> tuple[ErnieImageCheckpointModel, SeamRun]:
+    run = prepare(SEAM, monkeypatch)
+    return run.loader, run
 
 
 def _tiny_checkpoint(path: Path) -> torch.nn.Module:
     from diffusers import ErnieImageTransformer2DModel
 
     torch.manual_seed(0)
-    reference = ErnieImageTransformer2DModel(**TINY_TRANSFORMER_CONFIG)
+    reference = ErnieImageTransformer2DModel(**TINY_TRANSFORMER_CONFIG).to(dtype=torch.float16)
     save_file({key: value.contiguous() for key, value in reference.state_dict().items()}, str(path))
     return reference
 
@@ -107,7 +101,7 @@ def test_a_single_file_loads_into_the_model_it_describes(monkeypatch: pytest.Mon
     monkeypatch.setattr(loader_module, "ERNIE_IMAGE_TRANSFORMER_CONFIG", TINY_TRANSFORMER_CONFIG)
     checkpoint = tmp_path / "ernie-image.safetensors"
     reference = _tiny_checkpoint(checkpoint)
-    loader, ram_cache = _loader(monkeypatch)
+    loader, run = _loader(monkeypatch)
     config = Main_Checkpoint_ErnieImage_Config.model_construct(path=str(checkpoint), name="ernie-image")
 
     model = loader._load_model(config, SubModelType.Transformer)
@@ -115,10 +109,11 @@ def test_a_single_file_loads_into_the_model_it_describes(monkeypatch: pytest.Mon
     assert [name for name, param in model.named_parameters() if param.is_meta] == []
     expected = reference.state_dict()
     for name, param in model.named_parameters():
-        assert torch.equal(param, expected[name]), name
+        assert expected[name].dtype == torch.float16, name
+        assert param.dtype == torch.float32, name
+        assert torch.equal(param, expected[name].to(torch.float32)), name
     # The reservation is what keeps a 16GB file from evicting itself mid-load.
-    ram_cache.make_room.assert_called_once()
-    assert ram_cache.make_room.call_args.args[0] > 0
+    assert run.reserved == [sum(tensor.numel() * torch.float32.itemsize for tensor in expected.values())]
 
 
 def test_the_checkpoint_refuses_submodels_it_does_not_contain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
