@@ -60,14 +60,12 @@ interface AspectRatioPickerCommonProps {
   valueText?: ReactNode;
 }
 
-/** Built-ins, Free, and the account's saved ratios with their add and edit form. */
 export interface AspectRatioPickerFullProps extends AspectRatioPickerCommonProps {
   /** The live size: the Free thumbnail's shape and the Add ratio form's prefill. */
   currentSize: Size;
   /** The ratio the lock holds, or null while unlocked (Free). */
   lockedRatio: number | null;
   presets: AspectRatioPresetsPort;
-  /** The size choosing `ratio` would set, shown beside each saved ratio. */
   getSizeForRatio: (ratio: number) => Size;
   /** A ratio to lock, or null for Free. Not called for the ratio already chosen. */
   onChange: (ratio: number | null) => void;
@@ -79,7 +77,6 @@ export interface AspectRatioPickerFixedProps extends AspectRatioPickerCommonProp
   lockedRatio: number;
   presets?: never;
   getSizeForRatio?: never;
-  /** A built-in's ratio. Not called for the ratio already chosen. */
   onChange: (ratio: number) => void;
 }
 
@@ -103,7 +100,6 @@ const PRESET_ROW_CSS = {
 
 const formatSize = (size: Size): string => `${Math.round(size.width)}×${Math.round(size.height)}`;
 
-/** Text that truncates, with its whole text in a tooltip while it is cut short. */
 const ClippedText = ({ children, ...props }: TextProps & { children: string }) => {
   const ref = useRef<HTMLParagraphElement>(null);
   const isClipped = useCallback(() => !!ref.current && ref.current.scrollWidth > ref.current.clientWidth, []);
@@ -117,10 +113,7 @@ const ClippedText = ({ children, ...props }: TextProps & { children: string }) =
   );
 };
 
-/**
- * Digits with decimals after either separator; a trailing separator (`5.`) reads as the whole number. Nothing else
- * `Number` reads (`0x10`, `1e1`), and no thousands separator: `1,000` reads as a decimal with too many places.
- */
+/** No `0x10`/`1e1`, and no thousands separator: `1,000` reads as a decimal with too many places. */
 const TERM_PATTERN = /^\d*(?:[.,](\d*))?$/;
 /** The precision a term keeps: saved terms come back to the edit form at two decimals. */
 const MAX_TERM_DECIMALS = 2;
@@ -178,7 +171,6 @@ const PresetForm = ({
   onCancel,
   onSubmit,
 }: {
-  /** Names the size the entered ratio would set, on the line under the terms while no error shows. */
   getSizeForRatio: (ratio: number) => Size;
   registerFocusTarget: DeferredFocus['registerTarget'];
   initial: { label: string; terms: AspectRatioTerms };
@@ -216,7 +208,6 @@ const PresetForm = ({
         : termsErrorKind
           ? t('widgets.generate.aspectRatioTermsInvalid')
           : null;
-  // Follows the terms as they are typed; a dashed square until they make a ratio this build accepts.
   const previewRatio = termsErrorKind === null ? (widthTerm as number) / (heightTerm as number) : null;
   const showsTermsError = hasSubmitted && termsError !== null;
   // Marked only where the shown message applies: a term with another error waits until this one is fixed.
@@ -238,7 +229,6 @@ const PresetForm = ({
     setHasSubmitted(true);
 
     if (nameError || termsError) {
-      // The name, else the first term the message is about; both are for a ratio out of range.
       const target = nameError
         ? '[data-focus-key="form-name"]'
         : widthTerm === termsErrorKind || termsErrorKind === 'range'
@@ -255,9 +245,7 @@ const PresetForm = ({
   return (
     <Stack asChild gap="2" py="1">
       <form aria-label={title} noValidate onSubmit={handleSubmit}>
-        {/* A square preview well as tall as the fields beside it (name, terms and the line under them: 88px), at a fixed size
-            so a name error's extra line moves nothing sideways. The line under the terms always holds the hint or the
-            error, so neither the shape nor a terms error changes the form's height. */}
+        {/* Fixed-size preview and an always-filled hint line, so errors never move the layout. */}
         <HStack alignItems="flex-start" gap="2">
           <Flex
             alignItems="center"
@@ -429,11 +417,7 @@ const GroupLabel = ({ children, id }: { children: ReactNode; id: string }) => (
   </Text>
 );
 
-/**
- * The aspect ratio control: built-in ratios as a grid of shapes, the account's saved ratios as rows, and an inline
- * form to add or edit one. Choosing applies at once and closes; callers own what a ratio does to the size.
- * Without `presets` it offers the built-in grid alone.
- */
+/** Choosing applies at once and closes; callers own what a ratio does to the size. */
 export const AspectRatioPicker = (props: AspectRatioPickerProps) => {
   const { disabled, lockedRatio, valueText: valueTextOverride } = props;
   // Like Select, an enclosing Field's label names the trigger and its disabled state applies; else a hidden label does.
@@ -552,8 +536,7 @@ export const AspectRatioPicker = (props: AspectRatioPickerProps) => {
     focusKey(saved ? `choose:${saved.id}` : last ? `choose:${last.id}` : 'add');
   };
 
-  // Deleting is undoable (the port reports it with Undo), so it asks nothing. Focus moves to the next row's delete,
-  // the previous one's after the last row, or Add ratio once none are left.
+  // Deleting is undoable, so it asks nothing; focus moves to the next delete, else the previous, else Add ratio.
   const deletePreset = (preset: AspectRatioPreset) => {
     if (!full) {
       return;

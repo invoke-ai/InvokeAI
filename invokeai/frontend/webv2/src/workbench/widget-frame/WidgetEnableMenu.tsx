@@ -43,7 +43,8 @@ interface WidgetEnableMenuProps {
   onToggle: (item: WidgetEnableMenuItem) => void;
 }
 
-const TRIGGER_HOVER_PROPS = { bg: 'bg.muted' };
+/** The neighbouring rail slots' and status-bar chips' pointed fill, kept while the menu is open. */
+const TRIGGER_POINTED_PROPS = { bg: 'bg.hover', color: 'fg' };
 const MENU_ITEM_DISABLED_PROPS = { opacity: 0.4 };
 
 const getWidgetEnableMenuTriggerButton = (label: string, trigger: WidgetEnableMenuTrigger) => {
@@ -60,17 +61,18 @@ const getWidgetEnableMenuTriggerButton = (label: string, trigger: WidgetEnableMe
   return (
     <Flex
       align="center"
-      // Center the fixed-size trigger within full-width rail drop targets; fill the status bar inside its border.
+      // Center the fixed-size trigger within full-width rail drop targets; take the status-bar chips' inset height.
       alignSelf={isBottom ? 'stretch' : 'center'}
       aria-label={label}
       as="button"
       color="fg"
       h={isBottom ? undefined : '9'}
       justify="center"
-      rounded={isBottom ? 'sm' : 'md'}
+      rounded={isBottom ? 'control' : 'md'}
       transition="background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease"
       w={isBottom ? '6' : '9'}
-      _hover={TRIGGER_HOVER_PROPS}
+      _expanded={TRIGGER_POINTED_PROPS}
+      _hover={TRIGGER_POINTED_PROPS}
     >
       <Icon as={MoreHorizontalIcon} boxSize={isBottom ? '4' : '5'} />
     </Flex>
@@ -186,7 +188,7 @@ const WidgetEnableMenuRow = ({
       {...intentPreloadProps}
       onClick={handleClick}
     >
-      <Icon as={CheckIcon} boxSize="3" opacity={item.isEnabled ? 1 : 0} />
+      <Icon as={CheckIcon} boxSize="3" color="fg" opacity={item.isEnabled ? 1 : 0} />
       <WidgetIcon icon={item.icon} boxSize="3.5" />
       <Menu.ItemText>{item.label}</Menu.ItemText>
       {meta ? (

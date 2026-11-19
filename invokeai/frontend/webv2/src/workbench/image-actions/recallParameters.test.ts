@@ -154,6 +154,38 @@ describe('buildRecallParametersSettings', () => {
     expect(result.values.vae).toBeNull();
   });
 
+  describe("the new model's default VAE", () => {
+    const sdxlNamingMissingVae = makeModel('sdxl-missing-vae', 'sdxl', 'main', { default_settings: { vae: 'gone' } });
+    // The Model Manager stores "default" when the VAE default is on with no VAE picked. A Diffusers pipeline's VAE is
+    // an optional override; a GGUF SD3 transformer needs one, as FLUX does.
+    const sd3DefaultVae = makeModel('sd3-default-vae', 'sd-3', 'main', {
+      default_settings: { vae: 'default' },
+      format: 'diffusers',
+    });
+    const sd3Vae = makeModel('sd3-vae', 'sd-3', 'vae');
+    const catalog = [...models, sdxlNamingMissingVae, sd3DefaultVae, sd3Vae];
+    const buildWith = (currentValues: ReturnType<typeof currentFor>, parameters: Record<string, unknown>) =>
+      buildRecallParametersSettings({
+        currentValues,
+        models: catalog,
+        parameters,
+        supportedModels: catalog.filter(isSupportedGenerateModel) as GenerateModelConfig[],
+        vaeModels: catalog.filter(isVaeModelConfig) as VaeModelConfig[],
+      });
+
+    it('uses the bundled VAE when the default names one that is not installed, as recall always has', () => {
+      const result = buildWith(currentFor(sdxl, { vae: sdxlVae }), { model: sdxlNamingMissingVae.key });
+
+      expect(result.values.vae).toBeNull();
+    });
+
+    it("clears an optional VAE override for the 'default' sentinel", () => {
+      const result = buildWith(currentFor(sd3, { vae: sd3Vae }), { model: sd3DefaultVae.key });
+
+      expect(result.values.vae).toBeNull();
+    });
+  });
+
   it('reports an unknown model and a VAE from another family without changing the selection', () => {
     const current = currentFor(sdxl);
     const result = build(current, { model: 'not-installed', vae_model: sdxlVae.name });

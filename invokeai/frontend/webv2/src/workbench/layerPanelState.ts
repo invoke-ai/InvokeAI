@@ -5,8 +5,8 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { getDocumentIndex } from '@workbench/canvas-engine/api';
 
 /**
- * Per-project transient selection stays outside persistence/history; primaryId detects external primary changes
- * and clears stale secondaries.
+ * Per-project transient selection stays outside persistence/history; primaryId detects external primary changes and
+ * clears stale secondaries.
  */
 
 export interface LayerPanelState {
@@ -26,8 +26,8 @@ export interface LayerPanelState {
 }
 
 /**
- * Panel preferences that survive a primary change. Each open project keeps its own, so switching to another project
- * and back finds them as they were; closing the project drops them.
+ * Panel preferences that survive a primary change. Each open project keeps its own, so switching to another project and
+ * back finds them as they were; closing the project drops them.
  */
 type LayerPanelCarry = Pick<
   LayerPanelState,
@@ -263,8 +263,8 @@ export const reconcileLayerPanelState = (
 };
 
 /**
- * Applies plain, Ctrl/Cmd-toggle, and Shift-range row selection semantics over the rows the panel
- * renders; an additive range keeps selected rows hidden inside collapsed stacks.
+ * Applies plain, Ctrl/Cmd-toggle, and Shift-range row selection semantics over the rows the panel renders; an additive
+ * range keeps selected rows hidden inside collapsed stacks.
  */
 export const selectLayerInPanel = (
   state: LayerPanelState,

@@ -100,8 +100,8 @@ export const GeneratePromptFields = ({
     [onCommitImmediate, projectId, t, ui]
   );
 
-  // The positive prompt also lands in the prompt box as an edit (Ctrl+Z); replacing the negative prompt as well
-  // needs the toast's Undo.
+  // The positive prompt also lands in the prompt box as an edit (Ctrl+Z); replacing the negative prompt as well needs
+  // the toast's Undo.
   const usePromptHistoryItem = useCallback(
     (prompt: PromptHistoryItem) => {
       if (!promptPolicy.negativeVisible) {
@@ -141,9 +141,9 @@ export const GeneratePromptFields = ({
     [onCommitImmediate]
   );
 
-  // Reset view mode when the template changes so prompts do not become unexpectedly read-only. Choosing or clearing
-  // one changes what generates without touching the prompt text, so it gets an Undo; keeping it in step with the
-  // catalog does not.
+  // Reset view mode when the template changes so prompts do not become unexpectedly read-only. Choosing or clearing one
+  // changes what generates without touching the prompt text, so it gets an Undo; keeping it in step with the catalog
+  // does not.
   const applyPromptTemplate = useCallback(
     (promptTemplate: PromptTemplateSnapshot | null, change: PromptTemplateChange = 'chosen') => {
       const patch = { promptTemplate, promptTemplateViewMode: false };

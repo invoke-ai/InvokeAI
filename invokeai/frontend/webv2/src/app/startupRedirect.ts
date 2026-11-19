@@ -11,7 +11,6 @@ import {
 } from '@workbench/launchpad/startupLaunch';
 import { isProjectSummaryCompatible } from '@workbench/projects/library';
 
-/** How the page was loaded: its URL hash and its Navigation Timing type. */
 export interface InitialPageLoad {
   hash: string;
   navigationType?: NavigationTimingType;
@@ -20,15 +19,11 @@ export interface InitialPageLoad {
 export interface StartupDependencies {
   /** Projects the saved session would reopen; null when that cannot be told. */
   peekOpenProjectIds: () => Promise<string[] | null>;
-  /** Lists the account's projects into the library and returns its snapshot (summaries newest edit first). */
   loadProjectLibrary: () => Promise<ProjectLibrarySnapshot>;
-  /** Starts downloading the editor so it overlaps the lookups. */
   preloadEditor: () => void;
-  /** Tells the viewer the launch stayed home because the previous one never rendered the editor. */
   reportSkippedLaunch: () => void;
 }
 
-/** Redirect options for the editor route: a project, or (without one) the saved session's tabs. */
 export interface StartupRedirect {
   replace: true;
   search: Pick<WorkbenchSearch, 'project'>;
@@ -36,31 +31,20 @@ export interface StartupRedirect {
 }
 
 export interface StartupRedirects {
-  /** Called on every authenticated route load; returns where the launch goes instead of Home, or null. */
   take: (
     arrival: { pathname: string; preload: boolean },
     destination: StartupDestination
   ) => Promise<StartupRedirect | null>;
-  /**
-   * True once, for the editor entry a session-restoring launch redirect started: the launch's peek already found open
-   * projects, so the editor route's empty-session guard need not fetch the session again.
-   */
+  /** True once, for an editor entry whose launch peek already found open projects. */
   takeOpenSessionProof: () => boolean;
 }
 
-/** The most recently edited project this build can open; null when there is none or the library is unavailable. */
 const findRecentProjectId = (library: ProjectLibrarySnapshot): string | null =>
   library.status === 'ready' ? (library.summaries.find(isProjectSummaryCompatible)?.id ?? null) : null;
 
 /**
- * Decides, once per page load, whether the app's launch skips the Launchpad. Only opening the bare URL (a bookmark,
- * the installed app's start URL) is a launch: deep links keep their destination, including `#/` from reloading Home.
- * The router leaves a bare URL bare on Home, so reloading or returning to it there is not a launch either. The first
- * authenticated arrival (not a preload) consumes the launch, so it survives sign-in (which lands on Home) while later
- * visits to Home (app menu, the editor's empty-session guard, the not-found fallback) never redirect again. A session
- * with open projects reopens them; otherwise the launch opens the most recently edited compatible project, if any.
- * The splash can call the launch off while it decides or opens, and a launch whose editor never rendered makes the
- * next one stay on the Launchpad, with a notice.
+ * Only a bare URL is a launch; the first authenticated arrival consumes it, so it survives sign-in, never re-fires.
+ * A launch whose editor never rendered makes the next one stay on the Launchpad.
  */
 export const createStartupRedirects = (
   { hash, navigationType }: InitialPageLoad,
@@ -113,8 +97,7 @@ export const createStartupRedirects = (
         return { replace: true, search: {}, to: '/app' };
       }
 
-      // An empty or unknown session (no blob yet) opens the most recent project, as the editor itself would without a
-      // blob; an unavailable library leaves the launch on the Launchpad.
+      // An empty or unknown session opens the most recent project; an unavailable library stays on the Launchpad.
       const projectId = findRecentProjectId(await dependencies.loadProjectLibrary());
 
       if (projectId === null || hasStayedOnLaunchpad()) {

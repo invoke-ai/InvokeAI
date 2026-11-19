@@ -20,12 +20,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-/**
- * The hotkey runtime under the real focus provider, a real store, and the real extension registry: which command
- * a key press runs depends on the floating window that holds focus. Only the context plumbing and the first-party
- * command registrations (which need the whole application) are replaced.
- */
-
 const runtimeMocks = vi.hoisted(() => ({
   extensions: null as unknown as ExtensionRegistry,
   store: null as unknown as WorkbenchInternalStore,
@@ -37,7 +31,6 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useOptionalWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchInternalStore: () => runtimeMocks.store,
-  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
   useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => runtimeMocks.store.queries,
   useWorkbenchSubscription: () => runtimeMocks.store.subscribe,
@@ -77,7 +70,6 @@ let root: Root | null = null;
 let ran: string[] = [];
 
 const projectId = () => runtimeMocks.store.getSnapshot().activeProject.id;
-/** Register a command and a shortcut for it, the way a widget does through its runtime. */
 const contribute = (
   id: string,
   key: string,
@@ -94,7 +86,6 @@ const pressKey = (key: string, target: EventTarget = document.body) =>
     );
     await Promise.resolve();
   });
-/** Mod+Comma, Settings: a global chord the popups leave alone (Zag menus swallow Enter whatever the modifiers). */
 const pressOpenSettings = (target: EventTarget) =>
   act(async () => {
     target.dispatchEvent(
@@ -132,7 +123,6 @@ beforeEach(async () => {
     typeId: 'gallery',
   };
 
-  // Keys the first-party catalog does not use.
   contribute('map.instance', 'j', 'instance', floating);
   contribute('map.widget', 'k', 'widget', floating);
   contribute('map.window', 'y', 'focused-region', floating);
@@ -178,8 +168,6 @@ describe('WorkbenchHotkeyRuntime under a floating window', () => {
     await pressKey('k');
     await pressKey('y');
 
-    // Instance, widget, and the window's own focused-region shortcut all run; the shortcut tied to the right
-    // region shares the key and stays out of it.
     expect(ran).toEqual(['map.instance', 'map.widget', 'map.window']);
   });
 
@@ -222,7 +210,6 @@ describe('WorkbenchHotkeyRuntime and toast buttons', () => {
       region: 'floating',
       typeId: 'image-map',
     };
-    // What an active canvas session's apply command looks like to the runtime.
     contribute('map.apply', 'enter', 'widget', floating);
     const retried = vi.fn();
     await pressOn('window');
@@ -241,14 +228,12 @@ describe('WorkbenchHotkeyRuntime and toast buttons', () => {
     expect(retried).toHaveBeenCalledOnce();
     expect(ran).toEqual([]);
 
-    // Outside the toast the binding still runs.
     await pressKey('Enter', host!.querySelector('[data-testid="window"]')!);
     expect(ran).toEqual(['map.apply']);
   });
 });
 
 describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
-  /** A docked widget's DOM as the widget frame marks it for key targeting. */
   const mountWidget = (typeId: string, region: string) => {
     const element = document.createElement('div');
     element.dataset.hotkeyWidgetInstanceId = typeId;
@@ -259,7 +244,6 @@ describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
   };
 
   beforeEach(() => {
-    // First-party commands are registered without a source, as `useRegisterFirstPartyCommands` does.
     for (const id of [
       'viewer.recallAll',
       'viewer.recallSeed',
@@ -273,7 +257,6 @@ describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
     }
   });
 
-  // Recall acts on the gallery selection, so its keys answer where the user selects it as well as in Preview.
   it('recalls from the gallery selection with focus in Gallery or Preview', async () => {
     const gallery = mountWidget('gallery', 'right');
     const preview = mountWidget('preview', 'center');
@@ -308,8 +291,6 @@ describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
 });
 
 describe('WorkbenchHotkeyRuntime and catalog rows a widget also contributes', () => {
-  // The catalog lists Canvas's keys for settings; the mounted Canvas registers the same ids. Its own registration
-  // decides how the key behaves, so a widget flag the catalog row lacks is not overridden by the row.
   it('lets the widget registration of a catalog id answer, with its own flags', async () => {
     const canvas = document.createElement('div');
     canvas.dataset.hotkeyWidgetInstanceId = 'canvas';
@@ -355,7 +336,6 @@ describe('WorkbenchHotkeyRuntime and open menus', () => {
   let menuRoot: Root | null = null;
 
   beforeEach(() => {
-    // First-party commands are registered without a source, as `useRegisterFirstPartyCommands` does.
     for (const id of ['viewer.recallSeed', 'app.openSettings']) {
       runtimeMocks.extensions.commands.register({ handler: () => ran.push(id), id, title: id });
     }
@@ -366,7 +346,6 @@ describe('WorkbenchHotkeyRuntime and open menus', () => {
     menuRoot = null;
   });
 
-  /** A gallery item's context menu: portaled content, so its DOM lies outside every widget. */
   const ImageMenu = () => (
     <Menu.Root>
       <Menu.Trigger>Image actions</Menu.Trigger>
@@ -382,7 +361,6 @@ describe('WorkbenchHotkeyRuntime and open menus', () => {
   );
 
   const sizes = createListCollection({ items: ['Small', 'Seed', 'Square'] });
-  /** A settings Select: portaled content that takes focus as a `listbox` and runs its own typeahead. */
   const SizeSelect = () => (
     <Select.Root collection={sizes}>
       <Select.Control>
@@ -404,7 +382,6 @@ describe('WorkbenchHotkeyRuntime and open menus', () => {
     </Select.Root>
   );
 
-  /** Gallery holds workbench focus, then the popup opens from its trigger and takes focus. */
   const openPopup = async (popup: React.ReactNode, role: 'listbox' | 'menu') => {
     await pressOn('right');
     const menuHost = document.createElement('div');
@@ -442,7 +419,6 @@ describe('WorkbenchHotkeyRuntime and open menus', () => {
   });
 
   it('leaves a letter typed into a portaled menu to the menu while Gallery holds focus', async () => {
-    // Gallery is the right region's active widget: a press outside any widget's DOM resolves against it.
     await pressOn('right');
     await pressKey('s');
     expect(ran).toEqual(['viewer.recallSeed']);
@@ -463,14 +439,12 @@ describe('WorkbenchHotkeyRuntime and open menus', () => {
       expect(content).not.toBeNull();
       return content!;
     });
-    // Zag focuses the content on open; typeahead keydowns target it, prevent their default, and still bubble.
     await vi.waitFor(() => expect(document.activeElement).toBe(menu));
 
     await pressKey('s', menu);
     await pressKey('s', menu.querySelector('[role="menuitem"]')!);
 
     expect(ran).toEqual(['viewer.recallSeed']);
-    // Gallery still holds workbench focus: the menu, not lost focus, kept the key.
     await pressKey('s');
     expect(ran).toEqual(['viewer.recallSeed', 'viewer.recallSeed']);
   });
@@ -480,7 +454,6 @@ describe('WorkbenchHotkeyRuntime and prompt weighting', () => {
   let promptRoot: Root | null = null;
 
   beforeEach(() => {
-    // Registered without a source, as `useRegisterFirstPartyCommands` does.
     runtimeMocks.extensions.commands.register({
       handler: () => adjustFocusedPromptAttention('increment', false),
       id: 'app.promptWeightUp',
@@ -514,7 +487,6 @@ describe('WorkbenchHotkeyRuntime and prompt weighting', () => {
     );
   };
 
-  /** Select "cat" and press Ctrl+Up; report whether the runtime took the key from the text field. */
   const pressWeightUp = async (attentionSyntax: 'edit' | 'none') => {
     const promptHost = document.createElement('div');
     host!.append(promptHost);
@@ -584,7 +556,6 @@ describe('WorkbenchHotkeyRuntime and a focused segmented control', () => {
   };
 
   it('leaves arrow keys to the radio group while Gallery, which binds them, holds focus', async () => {
-    // Gallery's grid binds the plain arrows to its own navigation.
     contribute('gallery.galleryNavRight', 'arrowright', 'focused-region', {
       instanceId: 'gallery',
       projectId: projectId(),
@@ -622,8 +593,42 @@ describe('WorkbenchHotkeyRuntime and a focused segmented control', () => {
     expect(radio('overlay').checked).toBe(true);
     expect(document.activeElement).toBe(radio('overlay'));
 
-    // Outside the radio group the same press is Gallery's.
     await pressKey('ArrowRight', host!.querySelector('[data-testid="right"]')!);
     expect(ran).toEqual(['gallery.galleryNavRight']);
+  });
+});
+
+describe('WorkbenchHotkeyRuntime and a held key', () => {
+  const pressCancel = (repeat: boolean) =>
+    act(async () => {
+      document.body.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          code: 'KeyX',
+          key: 'X',
+          repeat,
+          shiftKey: true,
+        })
+      );
+      await Promise.resolve();
+    });
+
+  it('runs a once-per-press command once while its key is held, and again on the next press', async () => {
+    await act(() => {
+      runtimeMocks.extensions.commands.register({
+        handler: () => ran.push('app.cancelQueueItem'),
+        id: 'app.cancelQueueItem',
+        title: 'Cancel current or next queue item',
+      });
+    });
+
+    await pressCancel(false);
+    await pressCancel(true);
+    await pressCancel(true);
+    expect(ran).toEqual(['app.cancelQueueItem']);
+
+    await pressCancel(false);
+    expect(ran).toEqual(['app.cancelQueueItem', 'app.cancelQueueItem']);
   });
 });

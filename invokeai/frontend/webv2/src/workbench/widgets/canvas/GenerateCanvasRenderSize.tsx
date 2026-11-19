@@ -1,20 +1,16 @@
-/**
- * Canvas mode's render size: generate at the frame's size, the model's optimal size, or a custom size, then resize
- * the result back to the frame. The choice persists in canvas values for invocation compilation. A locked ratio
- * links the custom sides; the workbench's canvas dims sync carries them to a new locked ratio.
- */
+/** Canvas render size: frame, model-optimal or custom, with the result resized back to the frame. */
 
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasScaleMethod, CanvasScalingSettings, PidMode } from '@features/generation/contracts';
 import type { CanvasRenderSizeProps } from '@features/generation/react';
 import type { Project } from '@workbench/projectContracts';
 
-import { Box, chakra, createListCollection, Grid, HStack, NumberInput, Text } from '@chakra-ui/react';
+import { Box, createListCollection, HStack, NumberInput, Stack, Text } from '@chakra-ui/react';
 import { resolveCanvasProcessingSize } from '@features/generation/canvasProcessingSize';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { clampDimension, getGenerationDimensions, isGenerateModelConfig } from '@features/generation/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
-import { FieldLabel, Select, Tooltip } from '@platform/ui';
+import { Field, Select, Tooltip } from '@platform/ui';
 import {
   CANVAS_SCALE_METHODS,
   CANVAS_SCALING_KEYS,
@@ -23,12 +19,11 @@ import {
 } from '@workbench/widgets/canvas/invoke/canvasScaling';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { type MouseEvent, useCallback, useId, useMemo } from 'react';
+import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 const SIDE_INPUT_CSS = { flex: '1', minW: '0' } as const;
-const VALUE_TEXT_PROPS = { truncate: true } as const;
 
 const selectScaling = (project: Project): CanvasScalingSettings =>
   readCanvasScaling(getProjectWidgetValues(project, 'canvas'));
@@ -73,15 +68,14 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
   const { widgets } = useWorkbenchCommands();
   const scaling = useActiveProjectSelector(selectScaling, scalingEqual);
   const context = useActiveProjectSelector(selectProcessingContext, processingContextEqual);
-  // The committed frame resolves from the exact bbox, as the compiler does; a resize the Size section has not
-  // committed yet resolves from the size it shows, so the preview follows a drag.
+  // The committed frame resolves from the exact bbox, as the compiler does; a resize the Size section has not committed
+  // yet resolves from the size it shows, so the preview follows a drag.
   const isFrameCommitted =
     (context.committedFrame.width === null || context.committedFrame.width === frame.width) &&
     (context.committedFrame.height === null || context.committedFrame.height === frame.height);
   const sourceWidth = isFrameCommitted ? context.bbox.width : frame.width;
   const sourceHeight = isFrameCommitted ? context.bbox.height : frame.height;
-  // Read policy inside the capability selector so arrival replaces fallback grid/area despite compiler
-  // memoization.
+  // Read policy inside the capability selector so arrival replaces fallback grid/area despite compiler memoization.
   const { dimensions, processingSize } = useExternalStoreSelector(
     subscribeArchitectureCapabilities,
     getArchitectureCapabilitiesSnapshot,
@@ -116,8 +110,8 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
       if (!method) {
         return;
       }
-      // Custom starts from the size the frame renders at today, so both
-      // sides are pinned and a later frame resize cannot move one of them.
+      // Custom starts from the size the frame renders at today, so both sides are pinned and a later frame resize
+      // cannot move one of them.
       const seed =
         method === 'manual' && processingSize
           ? {
@@ -131,10 +125,9 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
   );
   const snap = useCallback((value: number) => clampDimension(value, dimensions.grid), [dimensions.grid]);
   const { lockedRatio } = context;
-  // Typing needs the raw digits to land; the size snaps to the grid on commit
-  // (Enter / blur), and the compiler clamps whatever is persisted meanwhile.
-  // A locked ratio derives the other side as the frame's own width and height do: unsnapped while typing, both
-  // sides snapped on commit.
+  // Typing needs the raw digits to land; the size snaps to the grid on commit (Enter / blur), and the compiler clamps
+  // whatever is persisted meanwhile. A locked ratio derives the other side as the frame's own width and height do:
+  // unsnapped while typing, both sides snapped on commit.
   const sideHandlers = useCallback(
     (key: typeof CANVAS_SCALING_KEYS.height | typeof CANVAS_SCALING_KEYS.width) => {
       const sidePatch = (value: number, shouldSnap: boolean): Record<string, number> => {
@@ -181,46 +174,30 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
   const label = t('widgets.generate.renderSize.label');
   // The tooltip's trigger is the wrapper, so the select points at an always-present copy of the tip itself.
   const descriptionId = useId();
-  const triggerId = useId();
-  const selectIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   const triggerProps = useMemo(() => ({ 'aria-describedby': descriptionId }), [descriptionId]);
   const description = t('widgets.generate.renderSize.description');
-  // Like a native select's label, a click focuses the select rather than activating (opening) it.
-  const focusSelect = useCallback(
-    (event: MouseEvent<HTMLLabelElement>) => {
-      event.preventDefault();
-      document.getElementById(triggerId)?.focus();
-    },
-    [triggerId]
-  );
-  // Custom's sides sit under the select they belong to, so the grid keeps the label in its own column.
   const controls = (
-    <Grid alignItems="center" columnGap="2" rowGap="1.5" templateColumns="fit-content(40%) minmax(0, 1fr)">
-      {/* The select carries the same name for assistive technology; this copy is what sighted people read and click. */}
-      <chakra.label aria-hidden cursor="default" htmlFor={triggerId} onClick={focusSelect}>
-        <FieldLabel>{label}</FieldLabel>
-      </chakra.label>
+    <Stack gap="1.5" minW="0">
       {/* The legacy name for this setting lives in the tooltip, so people who knew it can still find it. */}
       <Tooltip content={description} placement="top">
         <Box minW="0">
           <Text id={descriptionId} srOnly>
             {description}
           </Text>
-          <Select
-            aria-label={label}
-            collection={methodCollection}
-            ids={selectIds}
-            positioning={SELECT_POSITIONING}
-            triggerProps={triggerProps}
-            value={methodValue}
-            valueText={methodLabel(scaling.method)}
-            valueTextProps={VALUE_TEXT_PROPS}
-            onValueChange={handleMethodChange}
-          />
+          <Field label={label} labelPlacement="inside">
+            <Select
+              collection={methodCollection}
+              positioning={SELECT_POSITIONING}
+              triggerProps={triggerProps}
+              value={methodValue}
+              valueText={methodLabel(scaling.method)}
+              onValueChange={handleMethodChange}
+            />
+          </Field>
         </Box>
       </Tooltip>
       {scaling.method === 'manual' ? (
-        <HStack gap="1" gridColumn="2" minW="0">
+        <HStack gap="1" minW="0">
           {sideInput(t('widgets.generate.renderSize.width'), scaling.width ?? context.bbox.width, widthHandlers)}
           <Text aria-hidden color="fg.muted" flexShrink="0" fontSize="xs">
             ×
@@ -228,7 +205,7 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
           {sideInput(t('widgets.generate.renderSize.height'), scaling.height ?? context.bbox.height, heightHandlers)}
         </HStack>
       ) : null}
-    </Grid>
+    </Stack>
   );
 
   return children({ controls, size: processingSize });

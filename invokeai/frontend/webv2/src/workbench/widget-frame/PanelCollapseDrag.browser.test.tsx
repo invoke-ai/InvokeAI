@@ -13,8 +13,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-/** Exercise real store/reducer/shell wiring absent from command-mocked unit tests. */
-
 const storeRef = vi.hoisted(() => ({ current: null as WorkbenchInternalStore | null }));
 
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
@@ -50,7 +48,6 @@ const interact = (run: () => void): Promise<void> =>
     await Promise.resolve();
   });
 
-/** Mirrors how `WorkbenchShell`/`BottomPanel` decide to mount a panel at all. */
 const Shell = ({ region }: { region: 'bottom' | 'left' | 'right' }) => {
   const store = storeRef.current!;
   const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
@@ -91,7 +88,6 @@ const renderShell = async (region: 'bottom' | 'left' | 'right') => {
   return separator;
 };
 
-/** A real gesture: buttons held while moving, one frame for the move to land, then release. */
 const drag = async (separator: Element, axis: 'clientX' | 'clientY', delta: number) => {
   const pointer = (type: string, at: number, buttons: number) =>
     new PointerEvent(type, { bubbles: true, buttons, pointerId: 1, [axis]: at });
@@ -117,7 +113,6 @@ beforeEach(() => {
   root = createRoot(host);
   storeRef.current = createWorkbenchStore();
 
-  // Open the bottom strip through its active status widget; setRegionCollapsed does not set isBottomOpen.
   const bottom = storeRef.current.getSnapshot().activeProject.widgetRegions.bottom;
 
   storeRef.current.commands.widgets.select({
@@ -128,7 +123,6 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  // Focus is per test: the next one starts with no region outlined and no move pending.
   focusController.clear();
   await interact(() => root?.unmount());
   host?.remove();

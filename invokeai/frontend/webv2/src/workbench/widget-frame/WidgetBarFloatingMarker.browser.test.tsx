@@ -21,11 +21,6 @@ import { userEvent } from 'vitest/browser';
 
 import { WidgetBar, type WidgetBarGroup } from './WidgetBar';
 
-/**
- * A floated widget keeps its rail slot as a marker: it points at the window instead of docking it, and docking
- * and removing are its context menu's job.
- */
-
 const TestView = () => null;
 
 const createWidget = (id: WidgetTypeId, label: string): RegisteredWidget => ({
@@ -79,7 +74,7 @@ await i18n.use(initReactI18next).init({
             railMarker: '{{label}}, floating window',
             railMarkerHint: '{{label}} is floating — click to show the window',
           },
-          rail: { inspectWidgets: 'Inspect widgets' },
+          regionWidgets: { right: 'Right panel widgets' },
           removeWidget: 'Remove {{label}}',
         },
       },
@@ -162,7 +157,6 @@ describe('WidgetBar floating marker', () => {
 
     expect(labels).toEqual(['Gallery', 'Image Map, floating window', 'Queue']);
     expect(marker().querySelector('[data-floating-badge]')).not.toBeNull();
-    // A plain button: not a sortable tab, and not a toggle.
     expect(marker().getAttribute('aria-roledescription')).toBeNull();
     expect(marker().hasAttribute('aria-pressed')).toBe(false);
     expect(slot('Gallery').getAttribute('aria-roledescription')).toBe('sortable');
@@ -228,7 +222,7 @@ describe('WidgetBar floating marker', () => {
   it('removes the window from the enable menu as a toggle, not as a marker removal', async () => {
     await renderBar();
     await act(async () => {
-      slot('Inspect widgets').click();
+      slot('Right panel widgets').click();
       await Promise.resolve();
     });
 
@@ -260,17 +254,35 @@ describe('WidgetBar floating marker', () => {
     expect(handlers.onRemoveFloating).not.toHaveBeenCalled();
   });
 
+  it("leaves a right-click inside a slot's menu to that menu, and opens the widgets menu from the rail itself", async () => {
+    const openWidgetsMenus = () =>
+      [...document.body.querySelectorAll<HTMLElement>('[role="menu"][data-state="open"]')].filter((menu) =>
+        menu.textContent?.includes('Right panel widgets')
+      );
+    await renderBar();
+    await openMenu(slot('Queue'));
+
+    await openMenu(menuItem('remove-widget')!);
+    expect(openWidgetsMenus()).toHaveLength(0);
+    expect(menuItem('remove-widget')).not.toBeNull();
+
+    await act(async () => {
+      menuItem('remove-widget')?.click();
+      await Promise.resolve();
+    });
+    await openMenu(host!.querySelector('nav')!);
+    expect(openWidgetsMenus()).toHaveLength(1);
+  });
+
   it("closes a marker's menu when the project changes, so it cannot dock or remove the new project's window", async () => {
     await renderBar('project-a');
     await openMenu(marker());
     expect(menuItem('dock-widget')).not.toBeNull();
 
-    // Project B has a floating window with the same instance id, as default widgets do.
     await renderBar('project-b');
     expect(menuItem('dock-widget')).toBeNull();
     expect(menuItem('remove-widget')).toBeNull();
 
-    // Coming back to project A does not bring the old menu back.
     await renderBar('project-a');
     expect(menuItem('dock-widget')).toBeNull();
   });

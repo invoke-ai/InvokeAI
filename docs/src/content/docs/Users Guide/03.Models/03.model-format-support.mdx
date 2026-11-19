@@ -35,7 +35,7 @@ reader's error; if the file is incomplete or corrupt, download it again.
 | Family | Diffusers | Single file (bf16) | fp8 scaled | int8 | int4 | nvfp4 | MXFP8 | GGUF | SDNQ | NF4 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | [SD 1.x / 2.x](/users-guide/models/local-models/stable-diffusion-1-2/), [SDXL](/users-guide/models/local-models/sdxl/) | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | R | ✗ | ✗ |
-| [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ (transformer only: T5, CLIP-L, CLIP-G and VAE installed separately) | ✗ | ✗ |
 | [FLUX.1](/users-guide/models/local-models/flux-1/) | ✓ | ✓ | ✓ | ✓ | L | ✗ | ✓ | ✓ | ✓ | ✓ |
 | [FLUX.2](/users-guide/models/local-models/flux-2/) | ✓ | ✓ | ✓ | ✓ | L | ✗ | ✓ | ✓ | ✓ | inside the Diffusers folder (FLUX.2 [dev]) |
 | [FLUX.3](/users-guide/models/local-models/flux-3/) | ✓ | ✓ | ✓ | ✓ | R | ✓ | – | ✓ | – | – |
@@ -47,8 +47,8 @@ reader's error; if the file is incomplete or corrupt, download it again.
 | [Krea-2](/users-guide/models/local-models/krea-2/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
 | [Ideogram 4](/users-guide/models/local-models/ideogram4/) | ✓ | ✓ | ✓ | ✓ | R | R | ✓ | ✓ | ✗ | inside the Diffusers folder |
 | [ERNIE-Image](/users-guide/models/local-models/ernie-image/) | ✓ | ✓ | L | L | L | L | ✗ | ✓ | ✗ | ✗ |
-| [MOSS-Image](/users-guide/models/local-models/moss-image/) | ✓ | ✓ | R | ✓ | R | R | R | ✓ | ✗ | ✗ |
-| [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | ✓ | R | L | L | ✓ | ✗ | ✗ |
+| [MOSS-Image](/users-guide/models/local-models/moss-image/) | ✓ | ✓ | unsloth torchao build ✓, others R | ✓ | R | R | R | ✓ | ✗ | ✗ |
+| [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | ✓ | R | L | ✓ | ✓ | ✗ | ✗ |
 | [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout ✗ | ✓ | L | ✓ | L | ✓ | ✗ | ✓ | ✗ | ✗ |
 | [MiniMax H3](/users-guide/video-generation/minimax-h3/) | ✓ | ✓ | L | ✓ | L | L | ✗ | ✗ | ✗ | ✗ |
 
@@ -57,16 +57,18 @@ reader's error; if the file is incomplete or corrupt, download it again.
   `int4_tensorwise`, which most builds mix with int8 layers. **nvfp4** and **fp8 scaled** mean ComfyUI's checkpoint
   layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the model loads. FLUX.3 also loads Black Forest
   Labs' own builds: the nvfp4 export in NVIDIA ModelOpt's layout and `fp8r` (fp8 with one scale per row). It refuses
-  AWQ and other producers' nvfp4 at install. For Qwen-Image-2.1 and FLUX.3, unsloth's torchao FP8 builds (fp8 weights
-  with one scale per output row; FLUX.3's under diffusers' key names) load as fp8 scaled; other torchao layouts, such
-  as per-tensor or block-wise fp8 and INT8 builds, are refused at install. Ideogram 4 refuses the torchao exports it
-  recognizes; one that also quantized the projections Ideogram 4 is recognized by does not install as Ideogram 4 at
-  all. MOSS-Image loads Comfy-Org's int8 build and GGUFs; its fp8, nvfp4 and w4a8 transformers, and unsloth's torchao
-  builds, are refused at install, unscaled fp8 included. ComfyUI's other low-bit layouts (`w4a8`, `w6a8`, SVDQuant)
+  AWQ and other producers' nvfp4 at install. For Qwen-Image-2.1, MOSS-Image and FLUX.3, unsloth's torchao FP8 builds
+  (fp8 weights with one scale per output row; FLUX.3's under diffusers' key names) load as fp8 scaled; other torchao
+  layouts, such as per-tensor or block-wise fp8 and INT8 builds, are refused at install. Apart from that, MOSS-Image
+  loads Comfy-Org's int8 build and GGUFs; its raw and ComfyUI scaled fp8, nvfp4 and w4a8 transformers are refused at
+  install. Ideogram 4 refuses the torchao exports it recognizes; one that also quantized the projections Ideogram 4 is
+  recognized by does not install as Ideogram 4 at all. ComfyUI's other low-bit layouts (`w4a8`, `w6a8`, SVDQuant)
   are not supported; Krea-2, Qwen-Image and Wan 2.2 refuse them at install.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` (int8) and
   `Q4_CR` (int4) files load for Krea-2 only; for every other model with GGUF support the install fails, as it does
   for `Q4_CR` files of ComfyUI-GGUF's retired W4A16 kind.
+- **SD 3 GGUF** covers city96's transformer-only builds and stable-diffusion.cpp's conversions, whose bundled VAE is
+  not used.
 - LTX-2.0/2.3 files, GGUF builds included, fail to install with a message. Wan 2.1, Wan Animate, S2V, Fun-Control
   and VACE single files and GGUFs are not recognized as Wan 2.2 and install as unknown models; a Wan 2.1 Diffusers
   folder is not detected and is not supported either.
@@ -100,6 +102,16 @@ a GPU) is held and computed in float32: bf16 matrix multiplication on the CPU fa
 slowly where the CPU has no native bf16 support. That takes about 19 GB of RAM for a single-file or Diffusers T5-XXL, so
 if the RAM cache (`max_cache_ram_gb`) is smaller than that, raise it or use a GGUF T5. A GGUF T5 keeps its quantized
 weights packed; only its dequantized embeddings and the per-layer dequantization transients are float32.
+
+Single-file Qwen3 and Qwen2.5-VL (`qwen_2.5_vl_7b_fp8_scaled`) encoders in ComfyUI's scaled fp8 layout also keep their
+Linear layers in fp8, with the file's own scales, on a GPU that can hold fp8: about 4.4 GB instead of about 8.0 GB for
+Qwen3 4B, about 8.2 GB instead of about 15.1 GB for Qwen3 8B, and about the size of the file (9.4 GB) instead of about
+16.6 GB for Qwen2.5-VL. They are dequantized layer by layer on each forward and never multiplied in fp8, whatever
+`fp8_compute` says. Token embeddings are always widened to the compute dtype. On a CPU, and for a Qwen3 encoder set to
+run on the CPU, everything is widened to the dtype the encoder computes in. An MXFP8 encoder file that names its layers
+in its markers or header loads too, decoded to bf16; MX scales that nothing names are refused, as is any scaled fp8 file
+whose scales use a spelling InvokeAI does not read (such as `weight_scale_inv`), with a message rather than a load of
+unscaled weights.
 
 The single-file CLIP builds are ComfyUI's `clip_l` and `clip_g`, as used by FLUX.1 and SD 3. SD and SDXL take their
 CLIP encoders from the main model only, so a separate CLIP file does not change them. A CLIP-G file needs its
@@ -225,7 +237,7 @@ starter models do, needs no name. TAEF2, TAEQI2.1 and TAEW2.2 are recognized by 
 | FLUX.3 | ✓ (diffusers/PEFT, ComfyUI and ai-toolkit files and Diffusers folders, including DoRA, and LoKR and LoHA under diffusers or BFL module names; LyCORIS's flattened `lycoris_…` names are not recognized, and PEFT LoKr/LoHa adapters with a diffusers header and distillation extracts are refused, as noted on the family page) | ✗ | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
 | ERNIE-Image | ✓ (ai-toolkit/ComfyUI, diffusers/PEFT; LoKR and LoHA too, DoRA is refused) | ✗ | |
-| SD 3 / 3.5 | ✓ (diffusers, PEFT, SimpleTuner LyCORIS, kohya; CLIP-L/G too; DoRA is refused) | ✗ | |
+| SD 3 / 3.5 | ✓ (diffusers, PEFT, SimpleTuner LyCORIS, kohya; CLIP-L/G too; DoRA is refused; on Diffusers and GGUF mains) | ✗ | |
 | Ideogram 4 | ✓ (ai-toolkit/ComfyUI, kohya and diffusers files and Diffusers folders, LoKR too; DoRA is refused, LoHA is not recognized) | ✗ | |
 | MOSS-Image | ✓ (diffusers/PEFT, ComfyUI/ai-toolkit and kohya files and Diffusers folders; LyCORIS LoKr and LoHa and DoRA too, as noted on the family page) | ✗ | |
 | CogView4 | ✗ | ✗ | |
@@ -254,6 +266,11 @@ Qwen-Image LoRAs also patch the Qwen2.5-VL encoder when the file has text-encode
 On Z-Image, Qwen-Image, Anima and MOSS-Image, DoRA in the `lora_A`/`lora_B` layout (`dora_scale`, PEFT
 `lora_magnitude_vector`, ai-toolkit `.magnitude`) applies with its magnitude. DoRA works wherever the transformer weight can be dequantized (GGUF, SDNQ, int8/int4-convrot, nvfp4, fp8), but not
 on bitsandbytes NF4/LLM.int8 bases.
+
+Anima's Diffusers PEFT LoRAs share their layer names with other transformers (LTX-2, LTX-Video, CogView4, PixArt,
+Sana and others). A file whose attention widths are not Anima's is not recognized as Anima. If no other supported
+model family matches, it installs as an unknown model. LTX-Video LoRAs without cross-attention key and value layers
+have Anima's widths and still install as Anima; see the [family page](/users-guide/models/local-models/anima/#lora).
 
 [PiD decoders](/users-guide/image-generation/advanced-topics/pid-decode/) load for FLUX.1, FLUX.2, SD 3, SDXL and
 Qwen-Image (v1 and v1.5, bf16 and int8 builds). FLUX.3 and MOSS-Image use the FLUX.2 decoders.

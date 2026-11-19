@@ -6,13 +6,11 @@ import {
   collectImportReferences,
   formatViolation,
   getModuleOwner,
-  isExcepted,
   isProductionSourcePath,
   primeImportSources,
   resolveImportPath,
 } from './dependencyPolicy';
 import { FEATURE_PUBLIC_INTERFACES } from './featureInterfaces';
-import { migrationExceptions } from './migrationExceptions';
 import { closeSourceAnalysis } from './tsSourceAnalysis';
 
 const sources = import.meta.glob('../**/*.{ts,tsx}', {
@@ -66,21 +64,25 @@ describe('dependency policy rules', () => {
     const violations = checkDependency('features/queue/runtime.ts', '@workbench/workbenchStore');
 
     expect(violations.map(formatViolation)).toEqual([
-      'feature-dependency-direction: features/queue/runtime.ts -> workbench/workbenchStore',
+      'feature-dependency-direction: features/queue/runtime.ts -> workbench/workbenchStore\n  Features cannot depend on App or Workbench. Inject the required capability at the App composition root.',
     ]);
   });
 
   it('rejects cross-feature implementation bypasses but permits public interfaces', () => {
-    expect(checkDependency('features/queue/ui/View.tsx', '@features/gallery/data/api')).toMatchObject([
-      { rule: 'feature-public-interface' },
-    ]);
+    const violations = checkDependency('features/queue/ui/View.tsx', '@features/gallery/data/api');
+    expect(violations).toMatchObject([{ rule: 'feature-public-interface' }]);
+    expect(violations.map(formatViolation).join('\n')).toContain(
+      'Use the feature public entry registered in src/architecture/featureInterfaces.ts'
+    );
     expect(checkDependency('features/queue/ui/View.tsx', '@features/gallery')).toEqual([]);
   });
 
   it('rejects private Canvas paths outside Canvas and permits its public API', () => {
-    expect(checkDependency('workbench/widgets/canvas/View.tsx', '@workbench/canvas-engine/engine')).toMatchObject([
-      { rule: 'canvas-private-interface' },
-    ]);
+    const violations = checkDependency('workbench/widgets/canvas/View.tsx', '@workbench/canvas-engine/engine');
+    expect(violations).toMatchObject([{ rule: 'canvas-private-interface' }]);
+    expect(violations.map(formatViolation).join('\n')).toContain(
+      'Use @workbench/canvas-engine/api or @workbench/canvas-operations/api'
+    );
     expect(checkDependency('workbench/widgets/canvas/View.tsx', '@workbench/canvas-engine/api')).toEqual([]);
     expect(checkDependency('workbench/widgets/canvas/View.tsx', '@workbench/canvas-operations/api')).toEqual([]);
     expect(checkDependency('workbench/widgets/canvas/View.tsx', '@workbench/canvas-operations/react')).toEqual([]);
@@ -286,7 +288,6 @@ describe('production dependency graph', () => {
     const violations = Object.entries(sources)
       .filter(([path]) => isProduction(path))
       .flatMap(([path, source]) => checkSource(toSourcePath(path), source))
-      .filter((violation) => !migrationExceptions.some((exception) => isExcepted(violation, exception)))
       .map(formatViolation)
       .sort();
 
@@ -294,8 +295,4 @@ describe('production dependency graph', () => {
     // A whole-source scan whose cost grows with the codebase; on shared CI runners it already takes 3-5s, so the
     // default 5s budget turned runner speed into test failures.
   }, 60_000);
-
-  it('has no remaining migration exceptions', () => {
-    expect(migrationExceptions).toEqual([]);
-  });
 });

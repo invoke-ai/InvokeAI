@@ -5,6 +5,7 @@ import type { TFunction } from 'i18next';
 import {
   ALL_READABLE_BOARDS_ID,
   isDateBoardId,
+  parseGalleryItemKey,
   toGalleryItemKey,
   type GalleryItem,
   type GalleryItemKey,
@@ -36,11 +37,7 @@ const GALLERY_MEDIA_FILTER_OPTIONS = [
   { icon: FilmIcon, labelKey: 'widgets.gallery.mediaFilterVideos', value: 'video' },
 ] as const;
 
-/**
- * The media-type menu's content for `IconRadioMenu`, for surfaces outside the Gallery that edit its per-project
- * media filter (the Image Map header). It lives in this boot-loaded view module, exported through `contracts`, so
- * those lazily loaded widgets add no module of their own.
- */
+/** Lives in this boot-loaded view module, via `contracts`, so lazy widgets add no module. */
 export const getGalleryMediaFilterMenuProps = (
   t: TFunction,
   value: GalleryMediaFilter
@@ -65,7 +62,7 @@ export const getGalleryMediaFilterMenuProps = (
   };
 };
 
-/** Leave the placeholder name empty; getGalleryBoardLabel localizes it from kind. */
+/** getGalleryBoardLabel localizes the empty name from kind. */
 const UNCATEGORIZED_BOARD: GalleryBoard = {
   archived: false,
   assetCount: 0,
@@ -80,53 +77,36 @@ const UNCATEGORIZED_BOARD: GalleryBoard = {
 };
 
 export interface GalleryStateView {
-  /**
-   * A nonzero infinite anchor prevents scrolling to earlier rows; the surface must explain it and provide a return
-   * to the top.
-   */
+  /** A nonzero infinite anchor blocks scrolling to earlier rows; the surface must explain it and offer the top. */
   anchoredWindowPage: number;
   boards: GalleryBoard[];
   compareImageKey: GalleryItemKey | null;
   galleryView: GalleryView;
-  /** A compare image is set and differs from the visible image selection. */
   isComparisonActive: boolean;
-  /** A text, date or semantic search narrows the listing, so the search scope applies. */
+  /** The compare image is the visible image selection itself, waiting for a second image. */
+  isCompareArmed: boolean;
   isSearchActive: boolean;
-  /** The current scope's listing only; how it stands (loading, failed, ...) is the listing read state's to say. */
   items: GalleryItem[];
-  /**
-   * The board id the listing reads: the selected board, or `ALL_READABLE_BOARDS_ID` while a search looks in every
-   * board. A selection made in the grid is stamped with it.
-   */
+  /** `ALL_READABLE_BOARDS_ID` while a search looks in every board; grid selections are stamped with it. */
   listingBoardId: string;
-  /** The grid's current page in paginated mode; the window anchor otherwise. */
   page: number;
   projectBoardId: string | null;
-  /**
-   * The selection's stamped paginated page, when the stamp names the listing
-   * the grid is showing; null otherwise. Reveals follow it across pages.
-   */
+  /** Null unless the selection's stamp names the shown listing; reveals follow it across pages. */
   revealTargetPage: number | null;
-  /** Where the current search looks; `board` whenever no search is active. */
   searchScope: GallerySearchScope;
   searchTerm: string;
-  /** The board the panel shows as selected; a search of every board leaves it as it is. */
+  /** A search of every board leaves it as it is. */
   selectedBoardId: string;
-  /** The persisted primary selection, retained while its sparse page is not loaded. */
+  /** Retained while its sparse page is not loaded. */
   primarySelectedItemKey: GalleryItemKey | null;
   selectedItemKey: GalleryItemKey | null;
   selectedItemKeys: GalleryItemKey[];
-  /**
-   * The selection was made in a starred-only listing, so its members were starred when selected. A selection carried
-   * in from another listing says nothing about the star flags of members no page has loaded.
-   */
+  /** Members were starred when selected; a selection carried in from another listing says nothing about star flags. */
   selectionStarredOnly: boolean;
-  /** Active image-similarity query, rendered as a chip in place of the search text. */
   semanticImageQuery: GallerySemanticReference | null;
-  /** The semantic field's text while the field is in semantic mode; null in metadata mode. */
+  /** Null in metadata mode. */
   semanticSearchText: string | null;
   settings: GallerySettings;
-  /** The listing is restricted to starred items. */
   starredOnly: boolean;
 }
 
@@ -136,31 +116,24 @@ export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
 export const getGallerySearchTerm = (values: Record<string, unknown>): string =>
   typeof values.searchTerm === 'string' ? values.searchTerm : '';
 
-/** The starred-only listing filter; a session value kept beside `searchTerm`. */
 export const getGalleryStarredOnly = (values: Record<string, unknown>): boolean => values.starredOnly === true;
 
 export const getGallerySemanticImageQuery = (values: Record<string, unknown>): GallerySemanticReference | null =>
   parseGallerySemanticReference(values.semanticImageQuery);
 
-/** Semantic mode is the presence of its text: null means the field searches metadata. */
 export const getGallerySemanticSearchText = (values: Record<string, unknown>): string | null =>
   typeof values.semanticSearchText === 'string' ? values.semanticSearchText : null;
 
-/** A text, date or semantic search narrows the listing: the only time the search scope applies. */
 export const isGallerySearchActive = (values: Record<string, unknown>): boolean =>
   getGallerySearchTerm(values).trim() !== '' ||
   getGallerySemanticImageQuery(values) !== null ||
   (getGallerySemanticSearchText(values) ?? '').trim() !== '';
 
-/**
- * Gallery values with the search scope settled: with no active search the scope returns to 'board', so the next
- * search starts on the selected board whatever cleared the last one (the field, a reveal, a load-time strip). The
- * values themselves when nothing changes. Every write of gallery values goes through it.
- */
+/** With no active search the scope returns to 'board'. Every write of gallery values goes through it. */
 export const settleGallerySearchScope = (values: Record<string, unknown>): Record<string, unknown> =>
   values.searchScope === 'all' && !isGallerySearchActive(values) ? { ...values, searchScope: 'board' } : values;
 
-/** Whether two sets of values list the same items: board, view, search, scope and filters agree; order and page aside. */
+/** Board, view, search, scope and filters agree; order and page aside. */
 const isSameGalleryListing = (left: Record<string, unknown>, right: Record<string, unknown>): boolean =>
   getGalleryRawSelectedBoardId(left) === getGalleryRawSelectedBoardId(right) &&
   getGalleryView(left) === getGalleryView(right) &&
@@ -171,19 +144,43 @@ const isSameGalleryListing = (left: Record<string, unknown>, right: Record<strin
   gallerySemanticReferenceKey(getGallerySemanticImageQuery(left)) ===
     gallerySemanticReferenceKey(getGallerySemanticImageQuery(right));
 
+const getPrimaryGalleryItemKey = (values: Record<string, unknown>): GalleryItemKey | null => {
+  if (typeof values.selectedImageName === 'string') {
+    return toGalleryItemKey(parseGalleryItemKey(values.selectedImageName));
+  }
+
+  const selectedItem = getSelectedGalleryItemFromValues(values);
+
+  return selectedItem ? toGalleryItemKey(selectedItem) : null;
+};
+
+/** A selection landing on the comparison image would compare it with itself, so the comparison ends instead. */
+const movesPrimaryOntoComparison = (previous: Record<string, unknown>, next: Record<string, unknown>): boolean => {
+  if (!next.compareImage || next.compareImage !== previous.compareImage) {
+    return false;
+  }
+
+  const compareImage = getGalleryCompareImage(next);
+  const primaryKey = getPrimaryGalleryItemKey(next);
+
+  return (
+    compareImage !== null &&
+    primaryKey === toGalleryItemKey({ kind: 'image', name: compareImage.imageName }) &&
+    primaryKey !== getPrimaryGalleryItemKey(previous)
+  );
+};
+
 /**
- * Gallery values as every write leaves them: the search scope settled, and a selection the write left in place
- * dropped when the write changed which items the listing holds (board, view, search, scope, starred or media filter).
- * Selection acts on what is on screen, so Delete never reaches items another board or filter hides; clearing a search
- * drops it too. The primary item stays for Preview; the grid acts on it only while it is listed. A write that sets the
- * selection itself (its list, or the listing stamp every selection writes), such as a reveal landing on its item,
- * keeps it. The values themselves when nothing changes.
+ * Every write settles the search scope, ends a comparison its selection lands on, and drops a selection left in place
+ * when the listing changed: Delete must never reach items another board or filter hides. A write that sets the
+ * selection itself keeps it.
  */
 export const settleGalleryValues = (
   previous: Record<string, unknown>,
   next: Record<string, unknown>
 ): Record<string, unknown> => {
-  const settled = settleGallerySearchScope(next);
+  const scoped = settleGallerySearchScope(next);
+  const settled = movesPrimaryOntoComparison(previous, scoped) ? { ...scoped, compareImage: null } : scoped;
   const setsSelection =
     settled.selectedImageNames !== previous.selectedImageNames ||
     settled.selectedImageQuery !== previous.selectedImageQuery;
@@ -199,28 +196,19 @@ export const settleGalleryValues = (
   return { ...settled, selectedImageNames: [] };
 };
 
-/** Where the current search looks: every readable board only while a search is active and that scope is chosen. */
 export const getGallerySearchScope = (values: Record<string, unknown>): GallerySearchScope =>
   getGallerySettings(values).searchScope === 'all' && isGallerySearchActive(values) ? 'all' : 'board';
 
-/** The saved board choice as persisted, before any resolution against loaded boards. */
 export const getGalleryRawSelectedBoardId = (values: Record<string, unknown>): string | null =>
   typeof values.selectedBoardId === 'string' ? values.selectedBoardId : null;
 
-/**
- * The board a selection made in the grid is stamped with: the scope of every board while a search looks there, else
- * the saved choice, else the project board the grid falls back to showing. Stamping Uncategorized instead points
- * Preview at a listing the selection is not in.
- */
+/** Stamping Uncategorized would point Preview at a listing without it. */
 export const getGallerySelectionBoardId = (values: Record<string, unknown>): string =>
   getGallerySearchScope(values) === 'all'
     ? ALL_READABLE_BOARDS_ID
     : (getGalleryRawSelectedBoardId(values) ?? getGalleryProjectBoardId(values) ?? 'none');
 
-/**
- * Use the chosen destination or project board; date buckets defer to the project, while explicit none remains
- * Uncategorized.
- */
+/** Date buckets defer to the project; explicit none stays Uncategorized. */
 export const getGalleryDestinationBoardId = (values: Record<string, unknown>): string | null => {
   const selectedBoardId = getGalleryRawSelectedBoardId(values);
 
@@ -229,15 +217,10 @@ export const getGalleryDestinationBoardId = (values: Record<string, unknown>): s
     : getGalleryProjectBoardId(values);
 };
 
-/** The destination nothing was chosen for: the project's inbox, or Uncategorized for a gallery without one. */
 export const getGalleryDefaultDestinationBoardId = (values: Record<string, unknown>): string =>
   getGalleryProjectBoardId(values) ?? 'none';
 
-/**
- * Where results without a board of their own go: the chosen auto-add board, else the default destination; the selected
- * board instead only while `followSelectedBoard` is on. A board `canAddTo` refuses, someone else's the caller can only
- * view, sends them to the project's inbox instead.
- */
+/** The selected board only while `followSelectedBoard` is on; a board `canAddTo` refuses sends results to the inbox. */
 export const getGalleryAutoAddBoardId = (
   values: Record<string, unknown>,
   canAddTo: (boardId: string) => boolean
@@ -252,10 +235,7 @@ export const getGalleryAutoAddBoardId = (
     : target;
 };
 
-/**
- * The board new results are meant for before any refusal, as the panel and the destination control show it: the
- * selected board while following it (the project board for a date board), else the chosen or default destination.
- */
+/** Before any refusal, as the panel and destination control show it. */
 export const getGalleryIntendedDestinationId = (
   view: Pick<GalleryStateView, 'projectBoardId' | 'selectedBoardId' | 'settings'>
 ): string => {
@@ -268,10 +248,7 @@ export const getGalleryIntendedDestinationId = (
   return autoAddBoardId ?? view.projectBoardId ?? 'none';
 };
 
-/**
- * Preserve valid destinations, otherwise use the project board. An empty board list means loading, so defer
- * resolution.
- */
+/** An empty board list means loading, so defer resolution. */
 export const resolveGallerySelectedBoardId = (
   { projectBoardId, selectedBoardId }: { projectBoardId: string | null; selectedBoardId: string | null },
   backendBoards: GalleryBoard[]
@@ -297,10 +274,6 @@ export const getGallerySelectedBoardId = (values: Record<string, unknown>, backe
     backendBoards
   );
 
-/**
- * The board id the Gallery's listing reads: `ALL_READABLE_BOARDS_ID` while a search looks in every board, else the
- * selected board. Not a destination: uploads and results never go to it.
- */
 export const getGalleryListingBoardId = (values: Record<string, unknown>, backendBoards: GalleryBoard[]): string =>
   getGallerySearchScope(values) === 'all' ? ALL_READABLE_BOARDS_ID : getGallerySelectedBoardId(values, backendBoards);
 
@@ -318,17 +291,13 @@ export interface GallerySelectedImageQuery {
   boardId: string;
   galleryView: GalleryView;
   imageOrderDir: GalleryOrderDir;
-  /**
-   * The listing's media-kind restriction when the item was selected; null lists both. Stamps written before the field
-   * existed read as null, never as the current filter: they were made in a listing of both kinds.
-   */
+  /** Null lists both; stamps written before the field existed read as null, never as the current filter. */
   mediaKind: GalleryItemKind | null;
   page: number;
   paginationMode: 'infinite' | 'paginated';
   searchTerm: string;
-  /** The selection navigates its item's own board, unranked: one made outside the Gallery, such as a search pick. */
+  /** One made outside the Gallery, such as a search pick: navigates its item's own board, unranked. */
   itemBoard: boolean;
-  /** Ranking identity for a semantic result page; null for ordinary listings and legacy state. */
   semanticKey: string | null;
   starredOnly: boolean;
 }
@@ -366,11 +335,7 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
   };
 };
 
-/**
- * The selection was made in the listing the view shows: its stamp names the same board (or the scope of every board),
- * view, order, search, starred filter and media kind. A selection stamped elsewhere (another board, or before a search
- * or filter changed) is not this listing's, though it persists across those switches.
- */
+/** A selection stamped elsewhere is not this listing's, though it persists across those switches. */
 export const isGallerySelectionInScope = (
   selectedImageQuery: GallerySelectedImageQuery,
   scope: Pick<GalleryStateView, 'galleryView' | 'listingBoardId' | 'searchTerm' | 'settings' | 'starredOnly'>
@@ -397,7 +362,6 @@ export const getGalleryCompareImage = (values: Record<string, unknown>): Gallery
     selectedImageName: null,
   });
 
-/** The infinite window's anchor page; 0 whenever the window covers the top of the listing. */
 export const getGalleryAnchoredWindowPage = (values: Record<string, unknown>): number => {
   const page = getGalleryPage(values);
 
@@ -405,32 +369,21 @@ export const getGalleryAnchoredWindowPage = (values: Record<string, unknown>): n
 };
 
 /**
- * How one Gallery read model stands for the scope its query is keyed on (board, search, view, page). Derived from
- * Query state on every render, never stored.
- *
- * - `loading`: nothing for this scope yet, and no failure on record.
- * - `ready` / `empty`: this scope's latest request succeeded, with or without items.
- * - `error`: this scope has nothing to show and its latest request failed. A retry in flight stays here, so the
- *   Retry control keeps focus instead of flashing back to a loading state.
- * - `stale-error`: this scope's earlier results are shown; refreshing them failed.
- * - `more-error`: this scope's earlier pages are shown; the next page failed.
+ * Derived from Query state on every render, never stored. A retry in flight stays `error` so Retry keeps focus;
+ * `stale-error` and `more-error` show earlier results or pages.
  */
 export type GalleryReadStatus = 'empty' | 'error' | 'loading' | 'more-error' | 'ready' | 'stale-error';
 
-/** A read model's standing plus its Query-backed recovery. */
 export interface GalleryReadState {
   status: GalleryReadStatus;
-  /** The failure behind a failed status, for its detail line; null while a retry is in flight. */
+  /** Null while a retry is in flight. */
   error: Error | null;
-  /** A failed scope is being fetched again; Retry shows busy without unmounting. */
   isRetrying: boolean;
-  /** Re-runs this scope's failed request through Query. */
   retry: () => Promise<void>;
 }
 
-/** The Query facts a read status derives from, for the query keyed on the current scope. */
 export interface GalleryQueryFacts {
-  /** Data for this exact scope. Placeholder data carried over from another scope does not count. */
+  /** Placeholder data carried over from another scope does not count. */
   hasData: boolean;
   isError: boolean;
   /** Survives the reset a refetch applies to a query without data, so a retrying failure still reads as failed. */
@@ -456,11 +409,7 @@ export const getGalleryReadStatus = (facts: GalleryQueryFacts, itemCount: number
   return itemCount === 0 ? 'empty' : 'ready';
 };
 
-/**
- * The listing for the current scope. `scopedItems` is the backend window merged with recents already filtered to
- * this scope (only the recents while nothing has loaded); they may ride along while the scope loads or has data,
- * but never stand in for a failed load.
- */
+/** Recents ride along while the scope loads or has data, never for a failed load. */
 export const getGalleryListing = (
   facts: GalleryQueryFacts,
   scopedItems: GalleryItem[]
@@ -474,14 +423,13 @@ export const getGalleryListing = (
   return { items: scopedItems, status };
 };
 
-/** Starred selections remain visible in the pinned strip rather than the unstarred listing. */
 export const getGalleryStateView = (
   values: Record<string, unknown>,
   backendBoards: GalleryBoard[],
   backendItems: GalleryItem[] | null,
   starredStripItems: readonly GalleryItem[] = []
 ): GalleryStateView => {
-  // Nothing stands in for a listing the current scope does not have: unfiltered recents would read as this board's.
+  // Unfiltered recents would read as this board's.
   const items = backendItems ?? [];
   const selectedItem = getSelectedGalleryItemFromValues(values);
   const persistedSelectedItemKey =
@@ -520,6 +468,7 @@ export const getGalleryStateView = (
     visibleSelectedItemKey?.startsWith('image:') === true &&
     compareImageKey !== null &&
     compareImageKey !== visibleSelectedItemKey;
+  const isCompareArmed = compareImageKey !== null && compareImageKey === visibleSelectedItemKey;
   const semanticImageQuery = getGallerySemanticImageQuery(values);
   const page = getGalleryPage(values);
   const selectedImageQuery = getGallerySelectedImageQuery(values);
@@ -534,8 +483,7 @@ export const getGalleryStateView = (
       settings,
       starredOnly,
     }) &&
-    // A starred item lives in the strip, never on a page of the unstarred
-    // listing; Preview stamps its starred-list page, which the grid must not follow.
+    // A starred item lives in the strip, so the grid must not follow Preview's starred-list page.
     (starredOnly || selectedItem?.starred !== true)
       ? selectedImageQuery.page
       : null;
@@ -546,6 +494,7 @@ export const getGalleryStateView = (
     compareImageKey,
     galleryView,
     isComparisonActive,
+    isCompareArmed,
     isSearchActive: isGallerySearchActive(values),
     items,
     listingBoardId,
@@ -569,11 +518,7 @@ export const getGalleryStateView = (
   };
 };
 
-/**
- * What a board holds, split as its tabs list it: Media holds generated images and videos, Uploads the uploaded ones
- * (the backend counts uploaded videos among `videoCount` and again in `assetVideoCount`). Clamped, since counts read by
- * parallel requests can briefly disagree after a deletion.
- */
+/** Uploaded videos count in both `videoCount` and `assetVideoCount`. Clamped: parallel reads can disagree briefly. */
 export const getBoardCounts = (
   board: GalleryBoard
 ): { images: number; items: number; media: number; uploads: number; videos: number } => {

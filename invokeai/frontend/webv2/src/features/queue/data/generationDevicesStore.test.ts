@@ -39,8 +39,8 @@ describe('generationDevicesStore', () => {
   });
 
   it('still reports the options when the admin-only runtime config is forbidden', async () => {
-    // The options endpoint is open to any authenticated user; runtime_config is
-    // admin-only. A non-admin must get a read-only view, not an error state.
+    // The options endpoint is open to any authenticated user; runtime_config is admin-only. A non-admin must get a
+    // read-only view, not an error state.
     mocks.apiFetchJson.mockImplementation((url: string) =>
       url.includes('generation_device_options') ? Promise.resolve(options) : Promise.reject(new Error('403'))
     );

@@ -43,14 +43,13 @@ export interface GalleryBoardMenuTarget {
   y: number;
 }
 
-/** Keep the board dropdown open beneath its cursor-anchored actions menu; actions need not select the board. */
+/** Actions need not select the board. */
 export const GalleryBoardMenu = ({
   target,
   onBoardRelocated,
   onClose,
 }: {
   target: GalleryBoardMenuTarget | null;
-  /** A move or an archive was started from the menu: the board's row is leaving its place in the list. */
   onBoardRelocated?: (boardId: string) => void;
   onClose: () => void;
 }) => {
@@ -66,12 +65,9 @@ export const GalleryBoardMenu = ({
   targetRef.current = target;
 
   const board = target?.board ?? null;
-  // Other than an inbox, a real board is managed as far as the server allows the caller.
   const isManagedBoard = board !== null && isManagedGalleryBoard(board, gallery.projectBoardId);
   const can = (action: GalleryBoardAction) => board !== null && isManagedBoard && canOnBoard(board, action);
-  // A dialog stays open only while the board is listed and still allows its action: a refetch after a revocation
-  // or a deletion elsewhere closes it, for good, rather than leaving a change that would only be refused or reopening
-  // it with what was typed when access returns.
+  // Close for good once the board is unlisted or its action revoked, rather than keep a change that would be refused.
   const isStillAllowed = (dialogBoard: GalleryBoard, action: GalleryBoardAction) => {
     const listed = gallery.boards.find((candidate) => candidate.id === dialogBoard.id);
     return Boolean(listed && canOnBoard(listed, action));
@@ -167,8 +163,7 @@ export const GalleryBoardMenu = ({
           <Menu.Positioner>
             {board && (
               <MenuContent
-                // Focus moves to the items, outside the header's group: the menu itself is described by it, so
-                // whose board it is and what the caller may do is announced as the menu opens.
+                // The header describes the menu, so whose board it is is announced as the menu opens.
                 aria-describedby={hasAccessHeader(board) ? accessHeaderId : undefined}
                 minW="12rem"
               >
@@ -180,7 +175,6 @@ export const GalleryBoardMenu = ({
                   </>
                 )}
                 {!gallery.settings.followSelectedBoard && board.id === gallery.settings.autoAddBoardId ? (
-                  // Back to the default destination; the default itself has nothing to stop.
                   <BoardAutoAddMenuItem boardId={null} label={t('widgets.gallery.stopAutoAdd')} />
                 ) : (gallery.settings.followSelectedBoard || board.id !== getGalleryIntendedDestinationId(gallery)) &&
                   board.kind !== 'date' &&
@@ -256,13 +250,9 @@ export const GalleryBoardMenu = ({
   );
 };
 
-/** From this many items, also deleting them needs the board's name typed, not only a tick. */
 export const BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS = 50;
 
-/**
- * Deleting a board keeps its media by default: it moves to Uncategorized in the Library, where the server puts what a
- * deleted board held. Deleting the media too is the opt-in, behind a checkbox and, for many items, the typed name.
- */
+/** Deleting a board keeps its media by default (moved to Uncategorized); deleting the media too is the opt-in. */
 const BoardDeleteDialog = ({
   board,
   getMediaUsage,
@@ -271,7 +261,6 @@ const BoardDeleteDialog = ({
   onOpenChange,
 }: {
   board: GalleryBoard | null;
-  /** Where the board's media is still used, checked once deleting it is ticked. */
   getMediaUsage: (boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>;
   onCancel: () => void;
   onDelete: (includeMedia: boolean) => void;
@@ -279,13 +268,11 @@ const BoardDeleteDialog = ({
 }) => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  // The board and the choices stay shown while the dialog animates out; the choices belong to one opening and start
-  // over with the next one, for the same board too. The dialog is not remounted, which would cut the exit animation.
+  // Not remounted per opening, which would cut the exit animation; the choices still reset each opening.
   const [shownBoard, setShownBoard] = useState(board);
   const [openedBoardId, setOpenedBoardId] = useState(board?.id ?? null);
-  // `hasTyped`: the user has typed into the name field this opening, which then stays (see `needsTypedName`).
+  // `hasTyped` stays once set this opening (see `needsTypedName`).
   const [choices, setChoices] = useState({ hasTyped: false, includeMedia: false, typedName: '' });
-  // Each opening asks where the media is used afresh; ticking and unticking within one opening does not.
   const [opening, setOpening] = useState(0);
   if (board !== null && board !== shownBoard) {
     setShownBoard(board);
@@ -302,9 +289,7 @@ const BoardDeleteDialog = ({
   const checksUsage = includeMedia && shownBoard !== null;
   const boardId = shownBoard?.id ?? '';
   const owner = captureAccountScope();
-  // An opening's check lives under its own key while the dialog is open. However the dialog closes (Cancel, Escape,
-  // Delete, or the board revoked or deleted elsewhere), the observer leaves that key, and Query stops a check still
-  // running there (its server call and project reads) and drops it.
+  // Each opening's check has its own key; however the dialog closes, Query stops a check still running there.
   const usageOptions = useMemo(
     () => galleryBoardMediaUsageQueryOptions({ boardId, load: getMediaUsage, opening: isOpen ? opening : null, owner }),
     [boardId, getMediaUsage, isOpen, opening, owner]
@@ -312,8 +297,7 @@ const BoardDeleteDialog = ({
   const { queryKey: usageQueryKey } = usageOptions;
   const usageQuery = useQuery({ ...usageOptions, enabled: isOpen && checksUsage });
   const { data: usageReport, isFetching: isCheckingUsage, refetch: refetchUsage, status: usageStatus } = usageQuery;
-  // The opening's last answer, kept while the box is unticked and as the dialog closes, so neither the report nor the
-  // counts it gives come and go.
+  // Kept while unticked and as the dialog closes, so the report and counts do not come and go.
   const [keptAnswer, setKeptAnswer] = useState<{ check: GalleryMediaUsageSettledCheck; opening: number } | null>(null);
   const answer: GalleryMediaUsageSettledCheck | null =
     usageStatus === 'success' && usageReport
@@ -331,7 +315,7 @@ const BoardDeleteDialog = ({
   ) {
     setKeptAnswer({ check: answer, opening });
   }
-  // Unticking stops a check still running too; it reverts, so ticking again asks again. An answer stays for the opening.
+  // Unticking stops a running check too; an answer stays for the opening.
   const cancelUsageCheck = useCallback(
     () => void queryClient.cancelQueries({ exact: true, queryKey: usageQueryKey }),
     [queryClient, usageQueryKey]
@@ -341,10 +325,9 @@ const BoardDeleteDialog = ({
       return null;
     }
 
-    // A retry keeps the last answer on screen while it runs.
     return isCheckingUsage || !keptCheck ? { previous: keptCheck ?? undefined, status: 'checking' } : keptCheck;
   }, [checksUsage, isCheckingUsage, keptCheck]);
-  // A closing dialog's Retry stays in place, disabled: running it would ask on the closed key, which nothing stops.
+  // A closing dialog's Retry stays disabled: running it would ask on the closed key, which nothing stops.
   const handleRetryUsage = useCallback(() => {
     if (isOpen) {
       void refetchUsage();
@@ -361,9 +344,7 @@ const BoardDeleteDialog = ({
     uploads: counts?.uploads ?? 0,
     videos: counts?.videos ?? 0,
   });
-  // Deleting the media takes what the check counted, once it has: on a shared board only the caller's own items, while
-  // the board's counts include everyone's; the rest moves to Uncategorized, as when the media is kept. An administrator
-  // overriding takes everything, so a lower count there is only a board count gone stale.
+  // On a shared board only the caller's own items go; an administrator override takes everything.
   const keptReport = keptCheck?.status === 'ready' ? keptCheck.report : undefined;
   const deletedCount = keptReport?.checkedCount ?? itemCount;
   const deletesOwnMedia = deletedCount < itemCount && shownBoard?.access?.adminOverride !== true;
@@ -393,8 +374,7 @@ const BoardDeleteDialog = ({
       : t(deletesOwnMedia ? 'widgets.gallery.deleteBoardAndOwnMedia' : 'widgets.gallery.deleteBoardAndMedia', {
           count: deletedCount,
         });
-  // The board's count until the check answers, then what deleting the media actually takes. Once the user has typed
-  // into the field this opening it stays, with its requirement: an answer arriving mid-typing never takes their text.
+  // Once the user has typed, the requirement stays: an answer arriving mid-typing never takes their text.
   const needsTypedName = includeMedia && (hasTyped || deletedCount >= BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS);
   const canDelete = !needsTypedName || typedName.trim() === boardName.trim();
   const handleIncludeMediaChange = useCallback(
@@ -412,20 +392,12 @@ const BoardDeleteDialog = ({
     setChoices((current) => ({ ...current, hasTyped: current.hasTyped || typed !== '', typedName: typed }));
   }, []);
   const getInitialFocus = useCallback(() => cancelRef.current, []);
-  // With none of the media the caller's, nothing is asked to be deleted: the board goes, and its notices say only that.
   const deletesMedia = includeMedia && !deletesNoMedia;
   const handleConfirm = useCallback(() => onDelete(deletesMedia), [deletesMedia, onDelete]);
 
   return (
     // Cancel takes focus, not the checkbox that would delete the media.
-    // Top-anchored: the usage report arrives after the dialog opens, and grows it downward instead of moving it.
-    <Dialog.Root
-      initialFocusEl={getInitialFocus}
-      open={board !== null}
-      placement="top"
-      role="alertdialog"
-      onOpenChange={onOpenChange}
-    >
+    <Dialog.Root initialFocusEl={getInitialFocus} open={board !== null} role="alertdialog" onOpenChange={onOpenChange}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -463,8 +435,6 @@ const BoardDeleteDialog = ({
                 ) : null}
                 {itemCount > 0 && usageCheck ? (
                   <GalleryMediaUsagePanel
-                    // Once the answer says none of the media is the caller's, nothing goes and there is no use to
-                    // report: the panel only reads out the description that changed with it.
                     announcement={deletesNoMedia ? withMediaDescription : undefined}
                     check={usageCheck}
                     isRetryDisabled={!isOpen}
@@ -502,7 +472,7 @@ const BoardDeleteDialog = ({
   );
 };
 
-/** Project export includes the document; the separate media-only download retains its video-omission warning. */
+/** The separate media-only download keeps its video-omission warning. */
 const BoardExportProjectMenuItem = ({ board }: { board: GalleryBoard }) => {
   const { t } = useTranslation();
   const { actions } = useGalleryWidget();
@@ -525,10 +495,7 @@ const BoardExportProjectMenuItem = ({ board }: { board: GalleryBoard }) => {
 
 const SUBMENU_POSITIONING = { gutter: 2, placement: 'right-start' } as const;
 
-/**
- * Where a board can go: the Library, then under a Projects heading the open project and the account's other projects
- * by name — every tier but the one it is in. Nested so the board menu keeps its one-level shape for the common actions.
- */
+/** Nested so the board menu keeps its one-level shape for the common actions. */
 const BoardMoveSubMenu = ({
   board,
   onBoardMoved,
@@ -627,7 +594,7 @@ const BoardMoveMenuItem = ({
   );
 };
 
-/** Fixes where new results go, which stops following the selected board; null returns them to the default. */
+/** Stops following the selected board; null returns results to the default. */
 const BoardAutoAddMenuItem = ({ boardId, label }: { boardId: string | null; label: string }) => {
   const { actions } = useGalleryWidget();
   const handleClick = useCallback(
@@ -752,10 +719,7 @@ const BoardMenuItem = ({
   </Menu.Item>
 );
 
-/**
- * Whose board someone else's board is and what the caller may do with it, above its actions: the menu offers only
- * what is allowed, so this says why the rest is missing and whom to ask. Nothing on the caller's own boards.
- */
+/** On someone else's board, says why missing actions are missing and whom to ask. */
 const hasAccessHeader = (board: GalleryBoard) => board.access !== undefined && board.access.role !== 'owner';
 
 const BoardAccessHeader = ({ board, id }: { board: GalleryBoard; id: string }) => {
@@ -784,7 +748,6 @@ const BoardAccessHeader = ({ board, id }: { board: GalleryBoard; id: string }) =
 
 const GENERAL_ACCESS_OPTIONS: readonly GalleryGeneralAccess[] = ['restricted', 'viewer', 'contributor'];
 
-/** Who else may open the board, for its owner and admins: applied at once, and reported. */
 const BoardGeneralAccessSubMenu = ({ board }: { board: GalleryBoard }) => {
   const { t } = useTranslation();
   const { actions } = useGalleryWidget();
@@ -843,7 +806,7 @@ const BoardGeneralAccessSubMenu = ({ board }: { board: GalleryBoard }) => {
   );
 };
 
-/** One choice, named by its label alone and described by its consequence, so each is announced distinctly. */
+/** Named by its label and described by its consequence, so each is announced distinctly. */
 const GeneralAccessOption = ({
   description,
   label,

@@ -12,20 +12,12 @@ import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createCanvasMutationContext } from './mutationContext';
 
 export interface LayerOperationHarnessOptions {
-  /** History byte budget; an edit whose entry can never fit is refused. */
   readonly historyBytes?: number;
   readonly gestureActive?: boolean;
-  /** Observes where the context ends an open structural preview (`getDocument`, `begin`). */
   readonly endStructuralPreview?: () => void;
-  /** Real canvases for pixel checks in browser tests; the stub backend otherwise. */
   readonly backend?: RasterBackend;
 }
 
-/**
- * Layer operations over the real reducer, mutation context, history and layer caches. The mirror is the reducer
- * document; `rasterBytes`, `refuse` and `interleave` let a test starve memory, make the reducer reject a mutation, or
- * break an accepted mutation's postconditions.
- */
 export const createLayerOperationHarness = (
   document: CanvasDocumentContractV3,
   options: LayerOperationHarnessOptions = {}
@@ -39,9 +31,7 @@ export const createLayerOperationHarness = (
   });
   const listeners = new Set<() => void>();
   const dispatched: CanvasProjectMutation[] = [];
-  /** User edits routed to the invocation controller; system-origin publications never appear here. */
   const committedEdits: CanvasEditIntent[] = [];
-  /** An operation's edit lease: while held, edits without the operation's owner are refused. */
   let editingLocked = false;
   const lockListeners = new Set<() => void>();
   const installed: PreparedLayerCacheReplacement[] = [];
@@ -49,7 +39,6 @@ export const createLayerOperationHarness = (
     gestureActive: options.gestureActive ?? false,
     rasterBytes: Number.POSITIVE_INFINITY,
     refuse: (_mutation: CanvasProjectMutation): boolean => false,
-    /** A mutation applied right after an accepted one, as an interleaved edit would, to fail its postconditions. */
     interleave: (_mutation: CanvasProjectMutation): CanvasProjectMutation | null => null,
   };
   let reserved = 0;

@@ -10,29 +10,21 @@ import type {
 
 import { Box, chakra, Stack, Text } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { INSIDE_LABEL_INSET } from '@platform/ui/Field';
 import { FEATURE_HINT_FIELD_PROPS, FeatureHint } from '@platform/ui/hints';
 import { fieldLabelRecipe, scrubberInteraction } from '@theme/recipes';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/** Track inset from the frame edge; the text padding clears it so the thumb never crosses a glyph. */
-const TRACK_INSET_PX = 10;
-/**
- * At the track's start the fill ends this far past the thumb's centre, just enough for its rounded end to frame the
- * 2px thumb without drifting away from it.
- */
+/** The label and value sit 12px in, so an end thumb lands a text clearance outside them. */
+const TRACK_INSET_PX = 6;
+/** Just enough for the fill's rounded end to frame the 2px thumb. */
 const FILL_OVERHANG_PX = 4;
-/** Clearance between the fill and the frame's border. */
 const FILL_INSET_PX = 1.5;
-/** Shift-drag moves the value this fraction of the pointer's track distance. */
 const FINE_DRAG_RATIO = 0.1;
-/** Shift/PageUp/PageDown step multiplier. */
 const COARSE_STEP_MULTIPLIER = 10;
-/** Marks land as `at-value` when within this fraction of a step. */
 const MARK_EPSILON_RATIO = 1e-6;
-/** Clearance between a stop and the label or value text before the stop hides. */
 const TEXT_CLEARANCE_PX = 6;
-// A panel-coloured halo keeps text legible where the fill passes behind it.
 const SCRUBBER_TEXT_SHADOW = '0 1px 2px {colors.bg.panel}, 0 0 4px {colors.bg.panel}';
 /** A touch must travel this far horizontally before it scrubs; until then the panel may pan. */
 const TOUCH_INTENT_PX = 8;
@@ -42,7 +34,6 @@ type ScrubberMarkState = 'at-value' | 'over-value' | 'under-value';
 /** A drag or held-key run of `onChange` calls; settling ends it and reports its final value once. */
 type Gesture = { readonly kind: 'drag' | 'keys'; latest: number; settle: () => void };
 
-/** Keys that step the value; holding one repeats within a single gesture. */
 const STEP_KEYS = new Set(['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'End', 'Home', 'PageDown', 'PageUp']);
 
 /** Where the label ends and the value begins, in px from the frame's left edge. */
@@ -54,35 +45,24 @@ type OwnProps = {
   min: number;
   max: number;
   step: number;
-  /** Stops along the track; Alt-drag snaps to them. `defaultValue` is always a stop; stops at `min`/`max` are implied by the track ends and not drawn. */
+  /** Alt-drag snaps to these; `defaultValue` is always a stop, and stops at `min`/`max` are not drawn. */
   marks?: number[];
   /** Looser clamps for typed and keyboard values (the track bounds apply to scrubbing). */
   inputMin?: number;
   inputMax?: number;
-  /**
-   * How values spread along the track. `'log'` gives equal travel to equal ratios, so small values get room; the
-   * thumb, stops, drags (Shift-fine included) and Alt-snap follow it, while `value`, typing, keys and bounds stay in
-   * real units. It needs `min > 0` and positive typed values; with `min <= 0` the track stays linear.
-   */
+  /** `value`, typing, keys and bounds stay in real units; `log` needs `min > 0`, else the track stays linear. */
   scale?: 'linear' | 'log';
-  /** The keyboard step from `value` in `direction`, for steps that grow with the value. Shift/Page keys ×10. */
   stepFor?: (value: number, direction: 1 | -1) => number;
-  /** Double-click or Backspace/Delete restores this value. No reset without it. */
   defaultValue?: number;
   disabled?: boolean;
   hint?: FeatureHintId;
-  /** Validation error, shown in place of `helpText`; also marks the field invalid. */
   error?: string | null;
   helpText?: string;
   /** Formats the displayed value and its `aria-valuetext`; typing always edits the raw number. */
   formatValue?: (value: number) => string;
   /** Fires per step of a gesture. A drag keeps the handler it started with, so patch-style handlers only. */
   onChange: (value: number) => void;
-  /**
-   * Fires once with the final value after every gesture that called `onChange`: a drag's release, a held step key's
-   * release or blur, a typed commit, a reset, or unmounting mid-gesture. Pair it with `onChange` previews to record
-   * one undo step per gesture; a drag or held key keeps the handler it started with.
-   */
+  /** Once per gesture that called `onChange`, so previews can record one undo step; a drag keeps its first handler. */
   onChangeEnd?: (value: number) => void;
 };
 
@@ -99,7 +79,6 @@ const countDecimals = (value: number): number => {
 
 const roundTo = (value: number, decimals: number): number => Number(value.toFixed(decimals));
 
-/** The stop nearest a raw track position, measured along the track so a log scale snaps to what looks closest. */
 const nearestMark = (rawTrack: number, marks: readonly number[], toTrack: (value: number) => number): number =>
   marks.reduce((best, mark) => (Math.abs(toTrack(mark) - rawTrack) < Math.abs(toTrack(best) - rawTrack) ? mark : best));
 
@@ -125,9 +104,7 @@ const ROOT_CSS = {
   _disabled: { cursor: 'not-allowed', opacity: 0.5 },
   '&[data-dragging]': { borderColor: 'border.emphasized' },
   '& [data-part="fill"]': {
-    // The same pointed tint as list rows, so a field and the row it sits in share one interaction color.
     bg: 'bg.hover',
-    // Concentric with the frame's corner inside its 1px border and the fill's clearance.
     borderRadius: `calc({radii.control} - ${1 + FILL_INSET_PX}px)`,
     insetBlock: `${FILL_INSET_PX}px`,
     insetInlineStart: `${FILL_INSET_PX}px`,
@@ -136,7 +113,6 @@ const ROOT_CSS = {
     transitionDuration: 'var(--wb-motion-duration-fast)',
     transitionProperty: 'width',
   },
-  // Stops share the centerline with the text; one under a glyph hides rather than colliding.
   '& [data-part="mark"]': {
     borderRadius: 'full',
     boxSize: '5px',
@@ -174,7 +150,7 @@ const ROOT_CSS = {
     flexShrink: 1,
     minW: '0',
     overflow: 'hidden',
-    ps: '3',
+    ps: INSIDE_LABEL_INSET,
     position: 'relative',
     textOverflow: 'ellipsis',
     textShadow: SCRUBBER_TEXT_SHADOW,
@@ -224,10 +200,6 @@ const readTextExtents = (root: HTMLElement): TextExtents | null => {
 const isSameExtents = (a: TextExtents | null, b: TextExtents): boolean =>
   a !== null && a.labelEnd === b.labelEnd && a.valueStart === b.valueStart && a.width === b.width;
 
-/**
- * Relative drag; Shift fine, Alt stops. Click the value to edit; arrows step, Shift/Page keys ×10, Home/End
- * bounds. Double-click or Backspace/Delete resets. Caller owns debouncing or per-gesture commits (`onChangeEnd`).
- */
 export const ScrubberField = ({
   defaultValue,
   disabled = false,
@@ -263,7 +235,6 @@ export const ScrubberField = ({
 
   useMountEffect(() => () => gestureRef.current?.settle());
 
-  // Track label/value bounds so stops stay hidden beneath changing text.
   const measureText = useCallback((root: HTMLElement) => {
     const next = readTextExtents(root);
 
@@ -290,7 +261,6 @@ export const ScrubberField = ({
 
   // A log track needs a positive minimum; without one it falls back to linear rather than produce NaN.
   const isLog = scale === 'log' && min > 0;
-  // Track length in scale units: value units, or natural-log ratio units.
   const span = isLog ? Math.log(max / min) : max - min;
   const decimals = Math.max(countDecimals(step), countDecimals(min));
   const typedMin = inputMin ?? min;
@@ -333,7 +303,6 @@ export const ScrubberField = ({
   };
   const valueFraction = fractionOf(value);
   const thumbPosition = trackPosition(valueFraction);
-  // The overhang grows along the track so a full value fills the frame instead of stopping at the inset thumb.
   const fillOverhang =
     FILL_OVERHANG_PX - FILL_INSET_PX + valueFraction * (TRACK_INSET_PX - FILL_INSET_PX - FILL_OVERHANG_PX);
   const formatted = formatValue ? formatValue(value) : String(value);
@@ -356,7 +325,6 @@ export const ScrubberField = ({
     [markEpsilon, markValues, max, min, value]
   );
 
-  // A typed value or reset is a whole gesture: it settles any open one first.
   const commitValue = useCallback(
     (next: number) => {
       if (next === value) {
@@ -369,7 +337,6 @@ export const ScrubberField = ({
     [onChange, onChangeEnd, value]
   );
 
-  // Key repeats extend one gesture until the key is released or focus leaves.
   const stepTo = useCallback(
     (next: number) => {
       if (next === value) {
@@ -449,15 +416,13 @@ export const ScrubberField = ({
       const rect = root.getBoundingClientRect();
       const trackLeft = rect.left + TRACK_INSET_PX;
       const trackWidth = Math.max(1, rect.width - TRACK_INSET_PX * 2);
-      // Unclamped, so a press left of the thumb can still be dragged past the track's end to max.
       const trackAt = (clientX: number): number => (clientX - trackLeft) / trackWidth;
       const session = new AbortController();
       let isPendingTouch = event.pointerType === 'touch';
       let moved = false;
       // Re-anchor on sensitivity changes so toggling Shift mid-drag does not jump.
       let anchor = { clientX: event.clientX, ratio: event.shiftKey ? FINE_DRAG_RATIO : 1, track: toTrack(value) };
-      // A value typed or stepped beyond the track stays reachable: dragging toward the track moves smoothly from it,
-      // dragging away holds it, instead of snapping onto the track's end.
+      // A value beyond the track stays reachable: dragging away holds it rather than snapping to the track's end.
       const lower = Math.min(min, value);
       const upper = Math.max(max, value);
       const drag: Gesture = {
@@ -499,7 +464,6 @@ export const ScrubberField = ({
           ? nearestMark(rawTrack, markValues, toTrack)
           : snapToStep(fromTrack(rawTrack), lower, upper);
       };
-      // Only the initiating pointer may move or end this gesture.
       const apply = (pointer: PointerSample) => {
         if (pointer.pointerId !== event.pointerId) {
           return;
@@ -591,7 +555,6 @@ export const ScrubberField = ({
           }
           return;
         default:
-          // A digit (or sign/point) starts typing straight away, like a spreadsheet cell.
           if (!event.altKey && /^[\d.-]$/.test(event.key)) {
             event.preventDefault();
             event.stopPropagation();
@@ -662,7 +625,6 @@ export const ScrubberField = ({
     },
     [observeText, selectAll]
   );
-  // With no relatedTarget, retain the slider tab stop.
   const handleInputBlur = useCallback(
     (event: FocusEvent<HTMLInputElement>) => finishEditing(true, event.relatedTarget === null),
     [finishEditing]
@@ -752,7 +714,6 @@ export const ScrubberField = ({
             aria-label={t('common.scrubber.editValue', { label, value: formatted })}
             data-part="value"
             disabled={disabled}
-            // One tab stop per field: the slider opens the editor with Enter or a digit.
             tabIndex={-1}
             type="button"
             onClick={handleValueClick}

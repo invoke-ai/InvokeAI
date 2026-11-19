@@ -40,9 +40,8 @@ export const canMergeVisibleRasters = (
 };
 
 /**
- * Destructive merge-selected may only collapse one uninterrupted run of raster siblings: leaves
- * under one parent with nothing between them, since any node in between takes part in the
- * composite between the selected layers.
+ * Destructive merge-selected may only collapse one uninterrupted run of raster siblings: leaves under one parent with
+ * nothing between them, since any node in between takes part in the composite between the selected layers.
  */
 export const areSelectedRasterLayersContiguous = (
   document: Pick<CanvasDocumentContractV3, 'stacks'>,
@@ -87,8 +86,8 @@ export const canMergeSelectedRasters = (
     );
 
 /**
- * What generation applies across an inpaint mask's area besides its coverage: the enabled noise level and denoise
- * limit (a disabled modifier keeps its tuned value out of generation). Fill and opacity are display-only.
+ * What generation applies across an inpaint mask's area besides its coverage: the enabled noise level and denoise limit
+ * (a disabled modifier keeps its tuned value out of generation). Fill and opacity are display-only.
  */
 const maskGenerationSettings = (layer: CanvasInpaintMaskLayerContract): string =>
   `${layer.noise?.isEnabled ? layer.noise.level : '-'}|${layer.denoise?.isEnabled ? layer.denoise.limit : '-'}`;

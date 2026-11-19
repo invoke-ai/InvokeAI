@@ -8,6 +8,7 @@ export const workflowWidgetManifest: WidgetManifest = {
   allowMultiple: false,
   allowedRegions: ['center', 'left', 'bottom'],
   bottomPanel: 'expandable',
+  chrome: { body: 'fill' },
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
   graphBearing: {
     defaultGraphId: 'workflow-graph',

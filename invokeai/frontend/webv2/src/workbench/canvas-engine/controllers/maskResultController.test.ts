@@ -48,7 +48,6 @@ describe('MaskResultController (a guarded result)', () => {
 
   it('rolls back an addition whose postconditions fail and reports it as stale', async () => {
     const h = createHarness();
-    // An interleaved edit to the new layer means the document no longer holds the contract this result added.
     h.state.interleave = (mutation) =>
       mutation.type === 'addCanvasLayer'
         ? { id: mutation.layer.id, patch: { name: 'Interleaved' }, type: 'updateCanvasLayer' }

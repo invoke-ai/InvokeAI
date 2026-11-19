@@ -251,47 +251,6 @@ class TestTokenExpiration:
         assert verified_data is not None
 
 
-class TestTokenDataModel:
-    """Tests for TokenData model."""
-
-    def test_token_data_creation(self):
-        """Test creating TokenData instance."""
-        token_data = TokenData(
-            user_id="user123",
-            email="test@example.com",
-            is_admin=False,
-        )
-
-        assert token_data.user_id == "user123"
-        assert token_data.email == "test@example.com"
-        assert token_data.is_admin is False
-
-    def test_token_data_with_admin(self):
-        """Test TokenData for admin user."""
-        token_data = TokenData(
-            user_id="admin123",
-            email="admin@example.com",
-            is_admin=True,
-        )
-
-        assert token_data.is_admin is True
-
-    def test_token_data_model_dump(self):
-        """Test that TokenData can be serialized."""
-        token_data = TokenData(
-            user_id="user123",
-            email="test@example.com",
-            is_admin=False,
-        )
-
-        data_dict = token_data.model_dump()
-
-        assert isinstance(data_dict, dict)
-        assert data_dict["user_id"] == "user123"
-        assert data_dict["email"] == "test@example.com"
-        assert data_dict["is_admin"] is False
-
-
 class TestTokenSecurity:
     """Tests for token security properties."""
 

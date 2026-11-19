@@ -2,6 +2,7 @@ import type { GalleryImage } from '@features/gallery';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
 import { isGalleryImageDragData } from '@features/gallery/utility';
+import { findDropZoneAt } from '@platform/browser/dropZones';
 
 export interface CanvasImageDropData {
   kind: 'canvas-image-target';
@@ -18,6 +19,17 @@ export const getCanvasImageDropData = (destination: CanvasImageDropData['destina
 
 export const getCanvasImageDropId = (destination: CanvasImageDropData['destination']): string =>
   `canvas-image-target:${destination}`;
+
+/** Marks each zone's element; desktop file drags find their zone by rect, as dnd-kit's collision does. */
+export const CANVAS_IMAGE_DROP_DESTINATION_ATTRIBUTE = 'data-canvas-image-drop-destination';
+
+export const findCanvasImageDropDestination = (
+  root: Element,
+  point: { clientX: number; clientY: number }
+): CanvasImageDropData['destination'] | null => {
+  const destination = findDropZoneAt(root, CANVAS_IMAGE_DROP_DESTINATION_ATTRIBUTE, point);
+  return isCanvasImageDropDestination(destination) ? destination : null;
+};
 
 export interface CanvasImageDropResolution {
   destination: CanvasImageDropData['destination'];

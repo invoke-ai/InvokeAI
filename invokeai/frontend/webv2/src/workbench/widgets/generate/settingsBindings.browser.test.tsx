@@ -74,7 +74,6 @@ describe('project settings bindings', () => {
     const store = storeRef.current!;
     const target = { projectId: store.getSnapshot().activeProject.id };
     const control = await renderField(target);
-    // A new project pins nothing: the control shows the built-in, and a click pins its opposite.
     expect(store.getSnapshot().activeProject.settings.useCpuNoise).toBeUndefined();
     expect(control.checked).toBe(BUILT_IN_PROJECT_SETTINGS.useCpuNoise);
     await interact(() => control.click());

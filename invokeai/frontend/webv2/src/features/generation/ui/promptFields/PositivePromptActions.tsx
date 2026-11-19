@@ -71,8 +71,6 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
-/** Beside the trigger, so the prompt the request rewrites stays in view while it runs. */
-const POPOVER_POSITIONING_BESIDE = { placement: 'right-start' } as const;
 const TEXT_LLM_MODEL_TYPES = ['text_llm'];
 const LLAVA_MODEL_TYPES = ['llava_onevision'];
 /** Keep triggers available so missing-model states can explain recovery. */
@@ -106,10 +104,7 @@ const getFirstModelByName = (models: readonly ModelConfig[]): ModelConfig | null
     null
   );
 
-/**
- * The picked model when it is still installed, else the suggested one, else the first listed. A pick is saved
- * to the surface when it keeps one, and only when it differs from what is saved.
- */
+/** Picked if still installed, else suggested, else first listed; saved only when it differs from the saved pick. */
 const usePromptModelPick = ({
   candidates,
   onSave,
@@ -144,23 +139,22 @@ const usePromptModelPick = ({
 };
 
 export interface PromptTemplateState {
-  /** The applied template, or null when none is. */
   active: PromptTemplateSnapshot | null;
-  /** Whether the box is showing the merged result rather than the authored text. */
   isViewMode: boolean;
-  /** Absent on surfaces with no template concept (Upscale). */
+  /** Absent on surfaces with no template concept (Video). */
   onApply?: (template: PromptTemplateSnapshot | null, change: PromptTemplateChange) => void;
   /** Absent wherever `onApply` is; view mode has nothing to show without it. */
   onViewModeChange?: (viewMode: boolean) => void;
   /** Writes already-merged text into the authored field and drops the template. */
   onFlatten: (prompt: string) => void;
+  /** Whether a template draft handed over from the gallery opens here (Generate's field, not Upscale's). */
+  takesPendingDraft: boolean;
 }
 
 interface PositivePromptActionsProps {
   batchCount: number;
-  /** An image dropped on the prompt box, for the image-to-prompt popover to open on. */
   droppedImage: DroppedPromptImage;
-  /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
+  /** Absent on surfaces whose prompt is not batch-expanded. */
   dynamicPrompts: DynamicPromptsFieldConfig | null;
   /** Absent on surfaces whose model family has no prompt enhancer of its own. */
   expandPromptSuggestion?: ExpandPromptSuggestion | null;
@@ -242,7 +236,6 @@ export const PositivePromptActions = ({
   );
 };
 
-/** Show the view toggle only for an applied template. */
 const PromptTemplateControls = ({
   showSyntaxHighlighting,
   template,
@@ -255,6 +248,7 @@ const PromptTemplateControls = ({
       <PromptTemplatesButton
         activeTemplate={template.active}
         showSyntaxHighlighting={showSyntaxHighlighting}
+        takesPendingDraft={template.takesPendingDraft}
         onApply={template.onApply}
       />
     ) : null}
@@ -467,11 +461,8 @@ interface PromptRewrite {
 const HELD_RESULT_PREVIEW_LENGTH = 280;
 
 /**
- * One Expand or Image to Prompt request at a time; it keeps running when its popover closes. Its result replaces the
- * prompt only while the prompt reads as it did when the request started: as an edit (Ctrl+Z) while the popover is
- * still open, else without taking focus from wherever the user went; an Undo toast covers both. A prompt changed
- * meanwhile is never overwritten: the result is offered in a toast instead. A field that unmounts or moves to another
- * project drops the request, so a late result never lands in the wrong prompt.
+ * One request at a time, surviving popover close. Its result replaces the prompt only if unchanged since the
+ * request began (Undo toast); otherwise it is offered in a toast. Unmount or project change drops the request.
  */
 const usePromptRewrite = ({
   editor,
@@ -483,10 +474,8 @@ const usePromptRewrite = ({
   editor: PromptEditor;
   /** Whether the popover is open, read when the result lands. */
   isOpen: () => boolean;
-  /** Closes the popover after a result landed while it was open. */
   onLandedOpen: () => void;
   projectId: string;
-  /** The Undo toast's title once a result replaced the prompt. */
   title: string;
 }): PromptRewrite => {
   const { t } = useTranslation();
@@ -605,10 +594,7 @@ const StopWaitingButton = ({ rewrite }: { rewrite: PromptRewrite }) => {
   ) : null;
 };
 
-/**
- * A popover that runs a prompt rewrite. It sits beside its trigger rather than over the prompt, and closes like any
- * popover: the request keeps running (the trigger spins) and its result lands on its own.
- */
+/** Closing leaves the request running (the trigger spins); its result lands on its own. */
 const usePromptRewritePopover = ({
   editor,
   onClose,
@@ -645,7 +631,12 @@ const usePromptRewritePopover = ({
     isOpen,
     open,
     rewrite,
-    rootProps: { finalFocusEl, onOpenChange: handleOpenChange, open: isOpen, positioning: POPOVER_POSITIONING_BESIDE },
+    rootProps: {
+      finalFocusEl,
+      onOpenChange: handleOpenChange,
+      open: isOpen,
+      positioning: POPOVER_POSITIONING_BOTTOM_END,
+    },
   };
 };
 
@@ -728,7 +719,6 @@ const ExpandPromptButton = ({
       async (taskId) =>
         (
           await expandPrompt({
-            // Forward the selected prompt's optional token cap to expansion.
             image_name: conditioningImage?.image_name,
             max_tokens: selectedSystemPrompt?.maxTokens ?? undefined,
             model_key: selectedModel.key,
@@ -939,7 +929,6 @@ const ImageToPromptButton = ({
     onSave: saveModelKey,
     savedKey: savedPromptModels?.imageToPromptModelKey,
   });
-  // Dropped images take precedence over gallery selection.
   const image = droppedImage.image ?? selectedImage;
   const droppedImageName = droppedImage.image?.imageName ?? null;
   // Each drop opens the popover once, keyed by image name, so later renders cannot reopen it.

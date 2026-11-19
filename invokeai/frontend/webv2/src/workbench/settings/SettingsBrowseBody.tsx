@@ -81,8 +81,8 @@ export const SettingsBrowseBody = ({
   const error = useWorkbenchSettingsSelector((snapshot) => snapshot.error);
   const viewportProps = useMemo(() => ({ onScroll }), [onScroll]);
   const sectionProps = { onReveal, onRevealed, revealEntryId };
-  // A filling editor (the hotkeys table) scrolls itself: the body hands it the
-  // height instead of wrapping it in a second scroll container.
+  // A filling editor (the hotkeys table) scrolls itself: the body hands it the height instead of wrapping it in a
+  // second scroll container.
   const fills =
     !searching && displayed.length === 1 && displayed[0].entries.some((entry) => isFillSettingsEntry(entry, 'dialog'));
   return (

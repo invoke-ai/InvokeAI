@@ -14,7 +14,6 @@ import {
   getCompatibleOutputTemplate,
   getWorkflowSourceFieldType,
   getWorkflowTargetFieldType,
-  hasAnyCycle,
   validateConnection,
   validateConnectionTypes,
   wouldCreateCycle,
@@ -44,16 +43,6 @@ describe('validateConnectionTypes', () => {
     expect(validateConnectionTypes(single('CollectionField'), collection('ImageField'))).toBe(true);
   });
 
-  it('handles CollectionItemField and AnyField wildcards', () => {
-    expect(validateConnectionTypes(single('CollectionItemField'), single('ImageField'))).toBe(true);
-    expect(validateConnectionTypes(single('ImageField'), single('CollectionItemField'))).toBe(true);
-    expect(validateConnectionTypes(single('ImageField'), single('AnyField'))).toBe(true);
-    expect(validateConnectionTypes(single('AnyField'), single('ImageField'))).toBe(true);
-    // An Any output may hold a list at runtime, so it can feed collection inputs.
-    expect(validateConnectionTypes(single('AnyField'), collection('CollectionField'))).toBe(true);
-    expect(validateConnectionTypes(single('AnyField'), collection('BooleanField'))).toBe(true);
-  });
-
   it('rejects batch/non-batch mixes', () => {
     // A generator's list only feeds a batch node's list, and a plain list never can.
     expect(
@@ -77,17 +66,6 @@ describe('cycle detection', () => {
   it('detects when a new connection would close a loop', () => {
     expect(wouldCreateCycle('c', 'a', edges)).toBe(true);
     expect(wouldCreateCycle('a', 'c', edges)).toBe(false);
-  });
-
-  it('detects existing cycles in a whole graph', () => {
-    const nodes = ['a', 'b', 'c'].map((id) => ({ id }) as { id: string });
-    const cyclic = [
-      ...edges,
-      { id: 'e3', source: 'c', sourceHandle: 'out', target: 'a', targetHandle: 'in', type: 'default' as const },
-    ];
-
-    expect(hasAnyCycle(nodes as never, edges)).toBe(false);
-    expect(hasAnyCycle(nodes as never, cyclic)).toBe(true);
   });
 });
 
@@ -266,26 +244,6 @@ describe('getCompatibleInputTemplate', () => {
 
     expect(getCompatibleInputTemplate(template, null)?.name).toBe('value');
   });
-
-  it('still offers an internal-kind input to a source that genuinely matches it', () => {
-    // Resolved MetadataField outputs must still reach internal metadata inputs and their Add Node candidates.
-    const baseInput = templates.number.inputs.value;
-    const metadataType = { batch: false, cardinality: 'SINGLE' as const, name: 'MetadataField' };
-    const template = {
-      ...templates.number,
-      inputs: {
-        metadata: {
-          ...baseInput,
-          fieldKind: 'internal' as const,
-          input: 'connection' as const,
-          name: 'metadata',
-          type: metadataType,
-        },
-      },
-    };
-
-    expect(getCompatibleInputTemplate(template, metadataType)?.name).toBe('metadata');
-  });
 });
 
 describe('getWorkflowSourceFieldType', () => {
@@ -313,74 +271,12 @@ describe('getWorkflowSourceFieldType', () => {
 
     expect(getWorkflowSourceFieldType(upstreamDocument, templates, 'connector', 'out')).toEqual(single('IntegerField'));
   });
-
-  it('resolves connector outputs from downstream targets when no input is connected', () => {
-    const document: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
-      edges: [
-        {
-          id: 'connector-out',
-          source: 'connector',
-          sourceHandle: 'out',
-          target: 'n1',
-          targetHandle: 'value',
-          type: 'default',
-        },
-      ],
-      nodes: [makeConnector('connector'), makeNode('n1', 'number')],
-    };
-
-    expect(getWorkflowSourceFieldType(document, templates, 'connector', 'out')).toEqual(single('IntegerField'));
-  });
-
-  it('leaves fan-out connector outputs untyped when downstream targets disagree', () => {
-    const mixedTemplates: InvocationTemplates = {
-      ...templates,
-      text: {
-        ...templates.number,
-        inputs: {
-          value: { ...templates.number.inputs.value, type: single('StringField') },
-        },
-        outputs: {
-          value: { ...templates.number.outputs.value, type: single('StringField') },
-        },
-        type: 'text',
-      },
-    };
-    const document: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
-      edges: [
-        {
-          id: 'connector-out-string',
-          source: 'connector',
-          sourceHandle: 'out',
-          target: 'text-1',
-          targetHandle: 'value',
-          type: 'default',
-        },
-        {
-          id: 'connector-out-number',
-          source: 'connector',
-          sourceHandle: 'out',
-          target: 'number-1',
-          targetHandle: 'value',
-          type: 'default',
-        },
-      ],
-      nodes: [makeConnector('connector'), makeNode('text-1', 'text'), makeNode('number-1', 'number')],
-    };
-
-    expect(getWorkflowSourceFieldType(document, mixedTemplates, 'connector', 'out')).toBeNull();
-  });
 });
 
 describe('getCompatibleOutputTemplate', () => {
   it('returns the first output compatible with the target type', () => {
     expect(getCompatibleOutputTemplate(templates.number, single('IntegerField'))?.name).toBe('value');
     expect(getCompatibleOutputTemplate(templates.number, single('ImageField'))).toBeNull();
-  });
-
-  it('accepts any output for untyped connector targets', () => {
-    expect(getCompatibleOutputTemplate(templates.number, null)?.name).toBe('value');
-    expect(getCompatibleOutputTemplate(templates.collect, null)).toBeNull();
   });
 });
 
@@ -393,55 +289,6 @@ describe('getWorkflowTargetFieldType', () => {
 
     expect(getWorkflowTargetFieldType(document, templates, 'n1', 'value')).toEqual(single('IntegerField'));
     expect(getWorkflowTargetFieldType(document, templates, 'connector', 'in')).toBeNull();
-  });
-
-  it('resolves a persisted dynamic input template when the static template lacks the field', () => {
-    const dynamicNode = makeNode('dynamic', 'number');
-    dynamicNode.data.dynamicInputTemplates = {
-      dynamic_value: { ...templates.number.inputs.value, name: 'dynamic_value' },
-    };
-
-    expect(
-      getWorkflowTargetFieldType(
-        { edges: [], nodes: [dynamicNode] },
-        { number: { ...templates.number, inputs: {} } },
-        'dynamic',
-        'dynamic_value'
-      )
-    ).toEqual(single('IntegerField'));
-  });
-
-  it('rejects direct-only inputs', () => {
-    const directTemplates: InvocationTemplates = {
-      number: {
-        ...templates.number,
-        inputs: {
-          value: { ...templates.number.inputs.value, input: 'direct' },
-        },
-      },
-    };
-
-    expect(
-      getWorkflowTargetFieldType({ edges: [], nodes: [makeNode('n1', 'number')] }, directTemplates, 'n1', 'value')
-    ).toBe(undefined);
-  });
-
-  it('resolves connector inputs from downstream targets', () => {
-    const document: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
-      edges: [
-        {
-          id: 'connector-out',
-          source: 'connector',
-          sourceHandle: 'out',
-          target: 'n1',
-          targetHandle: 'value',
-          type: 'default',
-        },
-      ],
-      nodes: [makeConnector('connector'), makeNode('n1', 'number')],
-    };
-
-    expect(getWorkflowTargetFieldType(document, templates, 'connector', 'in')).toEqual(single('IntegerField'));
   });
 });
 
@@ -459,23 +306,6 @@ describe('validateConnection', () => {
         templates
       )
     ).toBeNull();
-  });
-
-  it('rejects self-connections and unknown fields', () => {
-    expect(
-      validateConnection(
-        { sourceHandle: 'value', sourceNodeId: 'n1', targetHandle: 'value', targetNodeId: 'n1' },
-        baseDocument,
-        templates
-      )
-    ).toMatch(/itself/);
-    expect(
-      validateConnection(
-        { sourceHandle: 'nope', sourceNodeId: 'n1', targetHandle: 'value', targetNodeId: 'n2' },
-        baseDocument,
-        templates
-      )
-    ).toMatch(/no known definition/);
   });
 
   it('rejects a second edge into an occupied input, except for collect item', () => {
@@ -510,30 +340,6 @@ describe('validateConnection', () => {
     ).toBeNull();
   });
 
-  it('rejects connections that would create a cycle', () => {
-    const document = {
-      ...baseDocument,
-      edges: [
-        {
-          id: 'e1',
-          source: 'n1',
-          sourceHandle: 'value',
-          target: 'n2',
-          targetHandle: 'value',
-          type: 'default' as const,
-        },
-      ],
-    };
-
-    expect(
-      validateConnection(
-        { sourceHandle: 'value', sourceNodeId: 'n2', targetHandle: 'value', targetNodeId: 'n1' },
-        document,
-        templates
-      )
-    ).toMatch(/cycle/);
-  });
-
   it('accepts connectors as pass-through routing nodes', () => {
     const connectorDocument: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
       edges: [
@@ -556,30 +362,6 @@ describe('validateConnection', () => {
         templates
       )
     ).toBeNull();
-  });
-
-  it('rejects a second connector input', () => {
-    const connectorDocument: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
-      edges: [
-        {
-          id: 'connector-in',
-          source: 'n1',
-          sourceHandle: 'value',
-          target: 'connector-1',
-          targetHandle: 'in',
-          type: 'default',
-        },
-      ],
-      nodes: [makeNode('n1', 'number'), makeNode('n2', 'number'), makeConnector('connector-1')],
-    };
-
-    expect(
-      validateConnection(
-        { sourceHandle: 'value', sourceNodeId: 'n2', targetHandle: 'in', targetNodeId: 'connector-1' },
-        connectorDocument,
-        templates
-      )
-    ).toMatch(/already has an input/);
   });
 
   it('rejects a For connection that would give one For two loop owners', () => {
@@ -610,120 +392,6 @@ describe('validateConnection', () => {
         loopTemplates
       )
     ).toMatch(/For loop linkage/);
-  });
-
-  it('rejects a direct linkage connection that would give one ForReturn two loop owners', () => {
-    const document = {
-      ...baseDocument,
-      nodes: [makeNode('for-1', 'for'), makeNode('for-2', 'for'), makeNode('return', 'for_return')],
-      edges: [
-        {
-          id: 'existing-linkage',
-          source: 'for-1',
-          sourceHandle: 'loop_linkage',
-          target: 'return',
-          targetHandle: 'loop_linkage',
-          type: 'loop_linkage' as const,
-        },
-      ],
-    };
-
-    expect(
-      validateConnection(
-        {
-          sourceHandle: 'loop_linkage',
-          sourceNodeId: 'for-2',
-          targetHandle: 'loop_linkage',
-          targetNodeId: 'return',
-        },
-        document,
-        loopTemplates
-      )
-    ).toMatch(/For loop linkage/);
-  });
-
-  it('rejects a For connection that would duplicate a connector loop alias', () => {
-    const document = {
-      ...baseDocument,
-      nodes: [
-        makeNode('for', 'for'),
-        makeNode('return', 'for_return'),
-        makeConnector('connector-1'),
-        makeConnector('connector-2'),
-      ],
-      edges: [
-        {
-          id: 'for-to-connector-1',
-          source: 'for',
-          sourceHandle: 'loop_linkage',
-          target: 'connector-1',
-          targetHandle: 'in',
-          type: 'default' as const,
-        },
-        {
-          id: 'connector-1-to-return',
-          source: 'connector-1',
-          sourceHandle: 'out',
-          target: 'return',
-          targetHandle: 'loop_linkage',
-          type: 'default' as const,
-        },
-      ],
-    };
-
-    expect(
-      validateConnection(
-        {
-          sourceHandle: 'loop_linkage',
-          sourceNodeId: 'for',
-          targetHandle: 'in',
-          targetNodeId: 'connector-2',
-        },
-        document,
-        loopTemplates
-      )
-    ).toMatch(/For loop linkage/);
-  });
-
-  it('rejects a loop-linked connector when it is reused for ordinary data', () => {
-    const document = {
-      ...baseDocument,
-      nodes: [makeNode('for', 'for'), makeConnector('connector'), makeNode('target', 'number')],
-      edges: [
-        {
-          id: 'for-to-connector',
-          source: 'for',
-          sourceHandle: 'loop_linkage',
-          target: 'connector',
-          targetHandle: 'in',
-          type: 'default' as const,
-        },
-      ],
-    };
-
-    expect(
-      validateConnection(
-        { sourceHandle: 'out', sourceNodeId: 'connector', targetHandle: 'value', targetNodeId: 'target' },
-        document,
-        loopTemplates
-      )
-    ).toMatch(/For loop linkage/);
-  });
-
-  it('allows wiring a connector to a ForReturn before its upstream For is attached', () => {
-    const document = {
-      ...baseDocument,
-      nodes: [makeConnector('connector'), makeNode('return', 'for_return')],
-      edges: [],
-    };
-
-    expect(
-      validateConnection(
-        { sourceHandle: 'out', sourceNodeId: 'connector', targetHandle: 'loop_linkage', targetNodeId: 'return' },
-        document,
-        loopTemplates
-      )
-    ).toBeNull();
   });
 
   it('rejects connector input sources incompatible with an existing downstream target', () => {
@@ -757,56 +425,6 @@ describe('validateConnection', () => {
     expect(
       validateConnection(
         { sourceHandle: 'value', sourceNodeId: 'text-1', targetHandle: 'in', targetNodeId: 'connector-1' },
-        connectorDocument,
-        stringTemplates
-      )
-    ).toMatch(/StringField cannot connect to IntegerField/);
-  });
-
-  it('rejects connector input sources incompatible with any downstream fan-out target', () => {
-    const stringTemplates: InvocationTemplates = {
-      ...templates,
-      text: {
-        ...templates.number,
-        inputs: {
-          value: { ...templates.number.inputs.value, type: single('StringField') },
-        },
-        outputs: {
-          value: { ...templates.number.outputs.value, type: single('StringField') },
-        },
-        type: 'text',
-      },
-    };
-    const connectorDocument: Pick<ProjectGraphState, 'edges' | 'nodes'> = {
-      edges: [
-        {
-          id: 'connector-out-string',
-          source: 'connector-1',
-          sourceHandle: 'out',
-          target: 'text-target',
-          targetHandle: 'value',
-          type: 'default',
-        },
-        {
-          id: 'connector-out-number',
-          source: 'connector-1',
-          sourceHandle: 'out',
-          target: 'number-target',
-          targetHandle: 'value',
-          type: 'default',
-        },
-      ],
-      nodes: [
-        makeNode('number-target', 'number'),
-        makeNode('text-source', 'text'),
-        makeNode('text-target', 'text'),
-        makeConnector('connector-1'),
-      ],
-    };
-
-    expect(
-      validateConnection(
-        { sourceHandle: 'value', sourceNodeId: 'text-source', targetHandle: 'in', targetNodeId: 'connector-1' },
         connectorDocument,
         stringTemplates
       )

@@ -1,7 +1,4 @@
-/**
- * Pure policy for hosted image providers: which provider-specific options a selected external model exposes, the
- * named sizes and fixed-size ratios it advertises, and the invocation fields those settings compile to.
- */
+/** Pure policy for hosted image providers' options, named sizes and the invocation fields they compile to. */
 
 import type {
   ExternalGenerationMode,
@@ -39,10 +36,7 @@ export const isGeminiThinkingLevel = (value: unknown): value is GeminiThinkingLe
 export const isExternalGenerationMode = (value: unknown): value is ExternalGenerationMode =>
   value === 'txt2img' || value === 'img2img' || value === 'inpaint';
 
-/**
- * Seedream's batch endpoint counts inputs and outputs against one total. Mirrors `_SEEDREAM_BATCH_PREFIXES` and
- * `_SEEDREAM_BATCH_MAX_TOTAL_IMAGES` in `invokeai/app/services/external_generation/providers/seedream.py`.
- */
+/** Inputs and outputs share one total; mirrors `_SEEDREAM_BATCH_*` in providers/seedream.py. */
 const SEEDREAM_BATCH_MODEL_PREFIXES = [
   'seedream-5',
   'seedream-4.5',
@@ -92,16 +86,11 @@ const getCapabilities = (model: GenerateModelConfig | undefined): ExternalModelC
 const getProviderId = (model: GenerateModelConfig | undefined): string | null =>
   model?.type === 'external_image_generator' && typeof model.provider_id === 'string' ? model.provider_id : null;
 
-/** True when the model accepts image inputs in any form (an edit mode or reference images). */
 const acceptsImageInputs = (capabilities: ExternalModelCapabilities | null): boolean =>
   capabilities?.supports_reference_images === true ||
   (capabilities?.modes ?? []).some((mode) => mode === 'img2img' || mode === 'inpaint');
 
-/**
- * The provider options the selected model's invocation accepts, in display order. Each provider's node declares its
- * own fields, so the provider decides. OpenAI sends them only for GPT Image models (DALL·E takes none), and input
- * fidelity only with image inputs, so a model that takes none does not offer it.
- */
+/** Each provider node declares its own fields; OpenAI only for GPT Image, input fidelity only with image inputs. */
 export const getExternalProviderOptionKeys = (model: GenerateModelConfig | undefined): ExternalProviderOptionKey[] => {
   const capabilities = getCapabilities(model);
 
@@ -151,10 +140,7 @@ export const findExternalResolutionPreset = (
   return presets.find((preset) => preset.image_size === settings.externalImageSize) ?? presets[0] ?? null;
 };
 
-/**
- * The named size to send: the selected model's preset the current size matches exactly, including a hand-typed size. A
- * pick left over from another model never overrides the dimensions at the provider.
- */
+/** Only an exact match of the current size; a pick left over from another model never overrides dimensions. */
 export const resolveExternalImageSize = (
   settings: Pick<GenerateSettings, 'externalImageSize' | 'height' | 'width'>,
   model: GenerateModelConfig | undefined
@@ -170,12 +156,8 @@ const parseWholeRatio = (ratio: string): ExternalImageSize | null => {
 };
 
 /**
- * The sizes a Canvas request may name, keyed by nominal ratio: the resolution presets, else the fixed size per ratio,
- * else per whole-number allowed ratio its smallest exact multiple covering the frame within the maximum size and the
- * generation limit. The backend's bucketing (`_bucket_request`) passes a fixed size (its own table entry) and an exact
- * multiple (it reduces to a declared ratio) through unchanged. A preset whose rounded size is off its exact ratio may
- * be nudged by a pixel or so, which is harmless: the provider sizes its output from the ratio and the preset's name,
- * and the compiler restores whatever comes back to the bbox.
+ * Resolution presets, else fixed per-ratio sizes, else each allowed ratio's smallest exact multiple covering the
+ * frame. The backend's `_bucket_request` passes all of these through unchanged.
  */
 const getCanvasRequestSizes = (
   model: GenerateModelConfig,
@@ -213,11 +195,7 @@ const getCanvasRequestSizes = (
   });
 };
 
-/**
- * The size a Canvas frame asks a hosted provider for. A provider limited to certain shapes gets one of its own sizes,
- * so the compiler knows the shape it gets back: the ratio closest to the frame's, then the smallest size of that ratio
- * covering the frame, else the largest. A free-form provider gets the frame.
- */
+/** Shape-limited providers get the closest ratio's smallest covering size, else its largest; free-form, the frame. */
 export const resolveExternalCanvasRequestSize = (
   model: GenerateModelConfig,
   frame: ExternalImageSize
@@ -245,7 +223,6 @@ export const resolveExternalCanvasRequestSize = (
   return { height: size.height, width: size.width };
 };
 
-/** The reference images a request sends: none unless the model takes them. */
 export const getExternalReferenceImages = (
   settings: Pick<GenerateSettings, 'referenceImages'>,
   model: GenerateModelConfig
@@ -260,10 +237,7 @@ export const getExternalReferenceImages = (
       )
     : [];
 
-/**
- * Canvas content a hosted model cannot take, worded once for readiness and for the invoke-time check that measures
- * pixel coverage. Raster content in the frame selects an edit mode, which a model without image-to-image cannot run.
- */
+/** Worded once for readiness and for the invoke-time pixel-coverage check. */
 export const describeExternalCanvasRefusal = (
   model: Pick<GenerateModelConfig, 'name'>,
   refusal: { kind: 'control_layer' | 'regional_guidance'; layerName: string } | { kind: 'raster_content' }
@@ -278,17 +252,11 @@ export const describeExternalCanvasRefusal = (
   }
 };
 
-/**
- * Whether a hosted model only generates from text on the Canvas. Image-to-image is the only provider edit mode the
- * Canvas compiles, so a model without it (even one advertising inpaint) cannot use content in the frame.
- */
+/** Image-to-image is the only edit mode Canvas compiles, so inpaint-only models cannot use frame content. */
 export const isExternalTextOnlyCanvasModel = (model: GenerateModelConfig): boolean =>
   model.type === 'external_image_generator' && !(model.capabilities?.modes ?? ['txt2img']).includes('img2img');
 
-/**
- * Provider-specific invocation fields for the selected model, keyed as the node declares them. Optional fields are
- * omitted when unset so the node applies its own default.
- */
+/** Unset optional fields are omitted so the node applies its own default. */
 export const getExternalProviderInvocationOptions = (
   settings: GenerateSettings,
   model: GenerateModelConfig

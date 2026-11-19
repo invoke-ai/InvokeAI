@@ -74,9 +74,9 @@ const COPY_LABELS: Record<CopyLayerTarget, string> = {
 
 /**
  * Owns guarded baked copies into new paint layers. The copy holds the layer's pixels as displayed: its own adjustment
- * stack evaluated exactly (spatial entries included, or refused) and its transform, at an identity transform. An
- * empty raster image or paint layer has no pixels to bake, so its control copy is a plain clone of its source and
- * transform, without the stack.
+ * stack evaluated exactly (spatial entries included, or refused) and its transform, at an identity transform. An empty
+ * raster image or paint layer has no pixels to bake, so its control copy is a plain clone of its source and transform,
+ * without the stack.
  */
 export class CopyLayerController {
   private disposed = false;

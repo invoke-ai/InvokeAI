@@ -40,8 +40,8 @@ import { toMediaRefs } from './transfer';
 
 export interface InvkArchiveContents {
   /**
-   * What the project's boards held, or `null` for an archive that names no board — which is not an empty inbox:
-   * nothing is staged for it, and the server makes the project's inbox itself.
+   * What the project's boards held, or `null` for an archive that names no board — which is not an empty inbox: nothing
+   * is staged for it, and the server makes the project's inbox itself.
    */
   boardSnapshot: InvkBoardSnapshot | null;
   /** Bundled preview bytes and the entry they came from, when the archive has one. */
@@ -203,8 +203,8 @@ export const createArchiveMediaMaterializer = (
 
   return async (boards, onItemSettled) => {
     const result: Awaited<ReturnType<MediaMaterializer>> = { failed: [], materialized: [] };
-    // One pool across the boards: uploads are per item, so an archive of many small boards would otherwise run
-    // little more than one at a time.
+    // One pool across the boards: uploads are per item, so an archive of many small boards would otherwise run little
+    // more than one at a time.
     const uploads = boards.flatMap(({ items, stagingBoardId }) =>
       items.map((item) => ({ boardId: stagingBoardId, item }))
     );
@@ -265,8 +265,8 @@ export type RestoreArchiveMediaDeps = ArchiveBoardUploadDeps &
   Omit<RestoreProjectMediaDeps, 'documentMediaBytes' | 'materializeBoardMedia'>;
 
 /**
- * Make an archive's media exist here: board items onto the staging board under fresh identities,
- * document-only references deduplicated against what is already present.
+ * Make an archive's media exist here: board items onto the staging board under fresh identities, document-only
+ * references deduplicated against what is already present.
  */
 export const restoreArchiveMedia = (
   archive: InvkArchiveContents,

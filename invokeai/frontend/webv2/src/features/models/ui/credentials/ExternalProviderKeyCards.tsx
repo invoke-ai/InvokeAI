@@ -54,8 +54,8 @@ export const ExternalProviderKeyCards = ({ onError }: { onError: (title: string,
     });
   });
 
-  // Only a settled failure renders as an error — a retry in flight after a
-  // remount shows nothing rather than the previous attempt's stale message.
+  // Only a settled failure renders as an error — a retry in flight after a remount shows nothing rather than the
+  // previous attempt's stale message.
   if (status === 'error') {
     return (
       <Text color="fg.error" fontSize="xs">
@@ -121,9 +121,8 @@ const ExternalProviderKeyCard = ({
   const { t } = useTranslation();
   // Consume the reveal request once; keep the highlight local until the Keys tab unmounts.
   const [isRevealed, setIsRevealed] = useState(false);
-  // A callback ref rather than an effect: the provider list loads async, so
-  // the card can mount well after the request, and this fires exactly when the
-  // node to scroll finally exists.
+  // A callback ref rather than an effect: the provider list loads async, so the card can mount well after the request,
+  // and this fires exactly when the node to scroll finally exists.
   const revealRef = useCallback(
     (node: HTMLDivElement | null) => {
       if (!node || !isHighlighted) {
@@ -186,9 +185,8 @@ const ExternalProviderKeyCard = ({
       () => saveExternalProviderConfig(config.provider_id, nextConfig),
       (next, owner) => {
         if (apiKeyWasSet && next.api_key_configured) {
-          // The backend queues this provider's external starter models on
-          // key-set; pull the new jobs and refresh starters so its rows flip to
-          // Installed without an app restart.
+          // The backend queues this provider's external starter models on key-set; pull the new jobs and refresh
+          // starters so its rows flip to Installed without an app restart.
           void refreshInstalls(owner);
           refreshStartersIfLoaded();
         }

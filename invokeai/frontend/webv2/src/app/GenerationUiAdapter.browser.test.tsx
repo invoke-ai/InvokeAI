@@ -239,8 +239,8 @@ describe('Generation adapter queue insights', () => {
     const { queryKey } = getQueueReadModelOptions({
       originPrefix: buildProjectQueueItemOriginPrefix(store.getSnapshot().activeProject.id),
     });
-    // Another observer of the same query is notified first and reads the insights store in its callback, as a
-    // render driven by that observer would, before the store's own observer delivers the change.
+    // Another observer of the same query is notified first and reads the insights store in its callback, as a render
+    // driven by that observer would, before the store's own observer delivers the change.
     const stopEarlierReader = new QueryObserver(queryClient, { enabled: false, queryKey }).subscribe(() => {
       adapter.queueInsights.getSnapshot();
     });

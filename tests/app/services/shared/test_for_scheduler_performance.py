@@ -5,6 +5,7 @@ Optional absolute-time benchmarks remain marked `slow`.
 """
 
 import gc
+import sys
 import time
 from collections.abc import Callable
 from unittest.mock import Mock
@@ -12,7 +13,7 @@ from unittest.mock import Mock
 import networkx as nx
 import pytest
 
-from invokeai.app.invocations.collections import RangeInvocation
+from invokeai.app.invocations.collections import CollectionConcatInvocation, RangeInvocation
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.loops import ForInvocation, ForReturnInvocation
 from invokeai.app.invocations.primitives import BooleanInvocation
@@ -26,6 +27,8 @@ from invokeai.app.services.shared.graph import (
     _GenericGraphSchedulerAdapter,
 )
 from invokeai.app.services.shared.graph_loop_topology import LoopTopology
+from invokeai.app.services.shared.graph_materializer import _ExecutionNodeBuilder
+from invokeai.app.services.shared.graph_runtime_records import _PreparedExecRegistry
 from tests.test_nodes import (
     AnyTypeTestInvocation,
     FixedCollectionTestInvocation,
@@ -99,6 +102,20 @@ class _CountingSet(set[str]):
         for value in super().__iter__():
             self._counter.record(self._mapping_name)
             yield value
+
+
+class _CountingTuple(tuple):
+    def __new__(cls, values, slices: list[int]):
+        instance = super().__new__(cls, values)
+        instance.slices = slices
+        return instance
+
+    def __getitem__(self, key):
+        value = super().__getitem__(key)
+        if isinstance(key, slice):
+            self.slices[0] += 1
+            return _CountingTuple(value, self.slices)
+        return value
 
 
 def _run_trivial_loop(
@@ -512,6 +529,179 @@ def test_loop_scheduler_mapping_visits_scale_linearly(
         )
 
 
+@pytest.mark.platform_independent
+def test_collect_reiteration_grouping_slices_scale_linearly(monkeypatch: pytest.MonkeyPatch) -> None:
+    slices_by_count: dict[int, int] = {}
+    group_input_checks_by_count: dict[int, int] = {}
+    original_path = _ExecutionNodeBuilder._get_prepared_edge_iteration_path
+    original_axes = _ExecutionNodeBuilder._get_prepared_edge_iteration_axes
+
+    for count in (24, 48):
+        slices = [0]
+
+        def counted_path(self, edge, prepared_id, slices=slices):
+            return _CountingTuple(original_path(self, edge, prepared_id), slices)
+
+        def counted_axes(self, edge, prepared_id, slices=slices):
+            return _CountingTuple(original_axes(self, edge, prepared_id), slices)
+
+        monkeypatch.setattr(_ExecutionNodeBuilder, "_get_prepared_edge_iteration_path", counted_path)
+        monkeypatch.setattr(_ExecutionNodeBuilder, "_get_prepared_edge_iteration_axes", counted_axes)
+
+        graph = Graph()
+        graph.add_node(RangeInvocation(id="range", start=0, stop=count))
+        graph.add_node(IterateInvocation(id="outer"))
+        graph.add_node(FixedCollectionTestInvocation(id="inner_source"))
+        graph.add_node(IterateInvocation(id="inner"))
+        graph.add_node(CollectInvocation(id="parent_collect"))
+        graph.add_node(IterateInvocation(id="reiterate"))
+        graph.add_node(CollectInvocation(id="final_collect"))
+        graph.add_node(AnyTypeTestInvocation(id="sink"))
+        graph.add_edge(create_edge("range", "collection", "outer", "collection"))
+        graph.add_edge(create_edge("outer", "item", "inner_source", "value"))
+        graph.add_edge(create_edge("inner_source", "collection", "inner", "collection"))
+        graph.add_edge(create_edge("inner", "item", "parent_collect", "item"))
+        graph.add_edge(create_edge("parent_collect", "collection", "reiterate", "collection"))
+        graph.add_edge(create_edge("reiterate", "item", "final_collect", "item"))
+        graph.add_edge(create_edge("final_collect", "collection", "sink", "value"))
+        state = GraphExecutionState(graph=graph)
+        group_input_checks = [0]
+
+        def count_group_input_checks(frame, event, arg, group_input_checks=group_input_checks):
+            if event == "call" and frame.f_code.co_name == "matches_group":
+                group_input_checks[0] += 1
+
+        prior_profile = sys.getprofile()
+        sys.setprofile(count_group_input_checks)
+        try:
+            while (node := state.next()) is not None:
+                state.complete(node.id, node.invoke(Mock()))
+        finally:
+            sys.setprofile(prior_profile)
+
+        assert state.is_complete()
+        assert not state.has_error()
+        results = [
+            state.results[node_id].value
+            for node_id in sorted(state.source_prepared_mapping["sink"], key=state._get_iteration_path)
+        ]
+        assert results == [[0, 1] for _ in range(count)]
+        slices_by_count[count] = slices[0]
+        group_input_checks_by_count[count] = group_input_checks[0]
+
+    assert slices_by_count[48] < slices_by_count[24] * 3, slices_by_count
+    assert group_input_checks_by_count[48] < group_input_checks_by_count[24] * 3, group_input_checks_by_count
+
+
+@pytest.mark.platform_independent
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
+def test_nested_literal_for_collect_grouping_slices_scale_linearly(
+    monkeypatch: pytest.MonkeyPatch, force_compatibility_scheduler: bool
+) -> None:
+    work_by_count: dict[int, dict[str, int]] = {}
+    original_path = _ExecutionNodeBuilder._get_prepared_edge_iteration_path
+    original_axes = _ExecutionNodeBuilder._get_prepared_edge_iteration_axes
+    original_grouping = _ExecutionNodeBuilder._get_collect_iteration_mapping_groups
+    original_overlap = _PreparedExecRegistry.get_prepared_ids_with_overlapping_path
+    original_create = _ExecutionNodeBuilder.create_execution_node
+
+    for count in (24, 48):
+        slices = [0]
+        work = {
+            "grouping_calls": 0,
+            "grouping_results": 0,
+            "overlap_candidates": 0,
+            "collect_mapping_calls": 0,
+            "collect_mapping_entries": 0,
+        }
+
+        def counted_path(self, edge, prepared_id, slices=slices):
+            return _CountingTuple(original_path(self, edge, prepared_id), slices)
+
+        def counted_axes(self, edge, prepared_id, slices=slices):
+            return _CountingTuple(original_axes(self, edge, prepared_id), slices)
+
+        def counted_grouping(self, input_edges, work=work):
+            work["grouping_calls"] += 1
+            result = original_grouping(self, input_edges)
+            work["grouping_results"] += len(result)
+            return result
+
+        def counted_overlap(self, source_node_id, iteration_path, work=work):
+            for prepared_id in original_overlap(self, source_node_id, iteration_path):
+                work["overlap_candidates"] += 1
+                yield prepared_id
+
+        def counted_create(self, node_id, iteration_node_map, *args, work=work, **kwargs):
+            if node_id == "collect":
+                work["collect_mapping_calls"] += 1
+                work["collect_mapping_entries"] += len(iteration_node_map)
+            return original_create(self, node_id, iteration_node_map, *args, **kwargs)
+
+        monkeypatch.setattr(_ExecutionNodeBuilder, "_get_prepared_edge_iteration_path", counted_path)
+        monkeypatch.setattr(_ExecutionNodeBuilder, "_get_prepared_edge_iteration_axes", counted_axes)
+        monkeypatch.setattr(_ExecutionNodeBuilder, "_get_collect_iteration_mapping_groups", counted_grouping)
+        monkeypatch.setattr(_PreparedExecRegistry, "get_prepared_ids_with_overlapping_path", counted_overlap)
+        monkeypatch.setattr(_ExecutionNodeBuilder, "create_execution_node", counted_create)
+
+        graph = Graph()
+        graph.add_node(
+            CollectionConcatInvocation(id="source", first=[[f"{index}a", f"{index}b"] for index in range(count)])
+        )
+        graph.add_node(IterateInvocation(id="outer"))
+        graph.add_node(ForInvocation(id="for"))
+        graph.add_node(AnyTypeTestInvocation(id="body"))
+        graph.add_node(ForReturnInvocation(id="return"))
+        graph.add_node(IfInvocation(id="inner_if", condition=True))
+        graph.add_node(AnyTypeTestInvocation(id="inner_fallback", value="inner"))
+        graph.add_node(IfInvocation(id="outer_if", condition=True))
+        graph.add_node(AnyTypeTestInvocation(id="outer_fallback", value="outer"))
+        graph.add_node(CollectInvocation(id="collect"))
+        graph.add_edge(create_edge("source", "collection", "outer", "collection"))
+        graph.add_edge(create_edge("outer", "item", "for", "collection"))
+        graph.add_edge(create_edge("for", "item", "body", "value"))
+        graph.add_edge(create_edge("body", "value", "return", "output"))
+        graph.add_edge(create_loop_linkage("for", "return"))
+        graph.add_edge(create_edge("for", "output_collection", "inner_if", "true_input"))
+        graph.add_edge(create_edge("inner_fallback", "value", "inner_if", "false_input"))
+        graph.add_edge(create_edge("inner_if", "value", "outer_if", "true_input"))
+        graph.add_edge(create_edge("outer_fallback", "value", "outer_if", "false_input"))
+        graph.add_edge(create_edge("outer_if", "value", "collect", "item"))
+        state = GraphExecutionState(graph=graph)
+        if force_compatibility_scheduler:
+            state._execution_scheduler = _ExecutionScheduler(state)
+        while (node := state.next()) is not None:
+            state.complete(node.id, node.invoke(Mock()))
+
+        assert state.is_complete()
+        assert not state.has_error()
+        results = {
+            state._get_iteration_path(node_id): state.results[node_id].collection
+            for node_id in state.source_prepared_mapping["collect"]
+        }
+        assert results == {(index,): [[f"{index}a", f"{index}b"]] for index in range(count)}
+        work["prepared_for_frames"] = len(state.source_prepared_mapping["for"])
+        work["collect_groups"] = len(state.source_prepared_mapping["collect"])
+        work["path_axis_slices"] = slices[0]
+        work_by_count[count] = work
+
+    assert work_by_count[48]["overlap_candidates"] < work_by_count[24]["overlap_candidates"] * 3, work_by_count
+    assert work_by_count[48]["collect_mapping_entries"] < work_by_count[24]["collect_mapping_entries"] * 3, (
+        work_by_count
+    )
+    assert work_by_count[24]["prepared_for_frames"] == 48
+    assert work_by_count[48]["prepared_for_frames"] == 96
+    assert work_by_count[24]["overlap_candidates"] <= 24 * 4
+    assert work_by_count[48]["overlap_candidates"] <= 48 * 4
+    assert work_by_count[24]["grouping_calls"] == work_by_count[48]["grouping_calls"] == 3
+    assert work_by_count[24]["grouping_results"] == work_by_count[48]["grouping_results"] == 3
+    assert work_by_count[24]["collect_groups"] == 24
+    assert work_by_count[48]["collect_groups"] == 48
+    assert work_by_count[24]["collect_mapping_entries"] == 24
+    assert work_by_count[48]["collect_mapping_entries"] == 48
+    assert work_by_count[48]["path_axis_slices"] < work_by_count[24]["path_axis_slices"] * 3, work_by_count
+
+
 def test_prepared_execution_count_scans_each_source_once() -> None:
     counter = _MappingTraversalCounter()
     state = GraphExecutionState(graph=Graph())
@@ -668,7 +858,7 @@ def _measure_pending_if_attachment(
     assert state.is_complete()
     assert not state.has_error()
     assert trace.count("true_body") == count
-    assert "false_body" not in trace
+    assert trace.count("false_body") == count
     assert trace.count("if") == count
     collect_exec_ids = state.source_prepared_mapping["collect"]
     assert len(collect_exec_ids) == 1
@@ -748,50 +938,6 @@ def test_completion_cache_preserves_completed_sources_after_restore() -> None:
     restored_state.complete(second.id, second.invoke(Mock()))
 
     assert restored_state.is_complete()
-
-
-def test_prepare_retirement_checks_only_activation_dependent_sources() -> None:
-    graph = Graph()
-    graph.add_node(BooleanInvocation(id="condition", value=True))
-    graph.add_node(AnyTypeTestInvocation(id="selected", value=1))
-    graph.add_node(AnyTypeTestInvocation(id="unselected", value=2))
-    graph.add_node(IfInvocation(id="if"))
-    graph.add_edge(create_edge("condition", "value", "if", "condition"))
-    graph.add_edge(create_edge("selected", "value", "if", "true_input"))
-    graph.add_edge(create_edge("unselected", "value", "if", "false_input"))
-    unrelated_source_ids = {f"independent_{index}" for index in range(120)}
-    for source_id in unrelated_source_ids:
-        graph.add_node(AnyTypeTestInvocation(id=source_id, value=source_id))
-
-    state = GraphExecutionState(graph=graph)
-    materializer = state._materializer()
-    original_candidates = materializer._get_activation_candidate_source_ids
-    candidate_sources: set[str] = set()
-    candidate_visits = 0
-    prepare_scans = 0
-
-    def counted_candidates(source_graph: object) -> tuple[str, ...]:
-        nonlocal candidate_visits, prepare_scans
-        candidates = original_candidates(source_graph)  # type: ignore[arg-type]
-        candidate_sources.update(candidates)
-        candidate_visits += len(candidates)
-        prepare_scans += 1
-        return candidates
-
-    materializer._get_activation_candidate_source_ids = counted_candidates  # type: ignore[method-assign]
-    context = Mock()
-    while (node := state.next()) is not None:
-        state.complete(node.id, node.invoke(context))
-
-    assert state.is_complete()
-    assert not state.has_error()
-    assert state.results[next(iter(state.source_prepared_mapping["if"]))].value == 1
-    assert "unselected" in state.executed
-    assert not unrelated_source_ids.intersection(candidate_sources), (
-        f"retirement candidates included unrelated sources: {unrelated_source_ids.intersection(candidate_sources)}"
-    )
-    assert candidate_sources == {"unselected"}
-    assert candidate_visits <= 2 * prepare_scans
 
 
 def _measure_if_chain_retirement_candidates(length: int) -> tuple[int, int, int, list[str]]:

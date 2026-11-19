@@ -1,8 +1,8 @@
 /**
- * The image recall contract. Every key an image graph records, and every key the backend declares for
- * `core_metadata`, has an entry here; the gates hold each entry to what recall does with records compiled from
- * settings tuned off every default. A key a builder starts to write fails G1 until it has an entry, and a key the
- * backend starts to declare fails `tsc` until it has one.
+ * The image recall contract. Every key an image graph records, and every key the backend declares for `core_metadata`,
+ * has an entry here; the gates hold each entry to what recall does with records compiled from settings tuned off every
+ * default. A key a builder starts to write fails G1 until it has an entry, and a key the backend starts to declare
+ * fails `tsc` until it has one.
  */
 
 import type { components } from '@api/schema';
@@ -120,8 +120,8 @@ const IMAGE_RECALL_CONTRACT = {
     when: (_model, written) => typeof written.height === 'number',
   },
 
-  // Sampling. Recall restores CFG rescale and seamless tiling on every family; the fixtures carry their defaults
-  // where the panel hides them.
+  // Sampling. Recall restores CFG rescale and seamless tiling on every family; the fixtures carry their defaults where
+  // the panel hides them.
   steps: { restores: ['steps'] },
   cfg_scale: { restores: ['cfgScale'] },
   guidance: { restores: ['cfgScale'], when: (model) => getGenerationUiPolicy(model).guidanceLabel === 'Guidance' },
@@ -151,6 +151,8 @@ const IMAGE_RECALL_CONTRACT = {
   vae: { restores: ['vae'] },
   qwen_image_vae: { consumed: "Qwen-Image's VAE alias, read only from records without `vae`; the graph writes both." },
   clip_embed_model: { restores: ['clipEmbedModel'] },
+  clip_g_model: { restores: ['clipGEmbedModel'] },
+  clip_l_model: { restores: ['clipLEmbedModel'] },
   t5_encoder: { restores: ['t5EncoderModel'] },
   mistral_encoder: { restores: ['mistralEncoderModel'] },
   qwen3_encoder: { restores: ['qwen3EncoderModel'] },

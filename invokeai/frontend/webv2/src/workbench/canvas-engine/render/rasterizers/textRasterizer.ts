@@ -1,7 +1,7 @@
 /**
- * Editable parametric text uses manual newlines, font-size line-height and per-line alignment within measured
- * bounds. Browser measureText/fillText supply metrics and shaping; there is no custom layout or automatic
- * wrapping. Empty text retains a minimal 1xlineHeight extent. The engine owns late-font rerasterization.
+ * Editable parametric text uses manual newlines, font-size line-height and per-line alignment within measured bounds.
+ * Browser measureText/fillText supply metrics and shaping; there is no custom layout or automatic wrapping. Empty text
+ * retains a minimal 1xlineHeight extent. The engine owns late-font rerasterization.
  */
 
 import type { CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
@@ -9,13 +9,12 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 
 import type { RasterizeDeps, RasterizeResult } from './types';
 
-/** A `text` layer source. */
 export type TextSource = Extract<CanvasLayerSourceContract, { type: 'text' }>;
 type Ctx = RasterSurface['ctx'];
 
 /**
- * Pure estimated character advance matches node stub metrics. Browser measureText determines final surfaces;
- * estimates only seed bounds/cache sizing.
+ * Pure estimated character advance matches node stub metrics. Browser measureText determines final surfaces; estimates
+ * only seed bounds/cache sizing.
  */
 export const TEXT_CHAR_WIDTH_FACTOR = 0.6;
 
@@ -39,8 +38,8 @@ export const textLines = (content: string): string[] => content.split('\n');
 const lineHeightPx = (source: TextSource): number => source.fontSize * source.lineHeight;
 
 /**
- * DOM-free text extent estimate for pre-measure geometry. Rasterization resizes to actual measured bounds; node
- * stubs use matching metrics.
+ * DOM-free text extent estimate for pre-measure geometry. Rasterization resizes to actual measured bounds; node stubs
+ * use matching metrics.
  */
 export const estimateTextExtent = (source: TextSource): { width: number; height: number } => {
   const lines = textLines(source.content);
@@ -64,8 +63,7 @@ const measureBlock = (ctx: Ctx, source: TextSource, lines: string[]): { width: n
 };
 
 /**
- * Draws into measured text bounds, resizing an optional target. Returns a resolved promise to match source
- * dispatch.
+ * Draws into measured text bounds, resizing an optional target. Returns a resolved promise to match source dispatch.
  */
 export const rasterizeTextSource = (
   source: TextSource,
@@ -78,7 +76,6 @@ export const rasterizeTextSource = (
     ctx as Ctx & { fontVariationSettings?: string };
   const variationSettings = textFontVariationSettings(source);
 
-  // Measure on the target's own ctx (or a fresh surface) with the font applied.
   const surface = target ?? deps.backend.createSurface(1, 1);
   surface.ctx.font = font;
   context(surface.ctx).fontVariationSettings = variationSettings || 'normal';
@@ -88,8 +85,7 @@ export const rasterizeTextSource = (
     surface.resize(width, height);
   }
   const { ctx } = surface;
-  // A resize resets the browser context state, so (re)apply the transform, font,
-  // and paint state AFTER resizing.
+  // A resize resets the browser context state, so (re)apply the transform, font, and paint state AFTER resizing.
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, width, height);
   ctx.font = font;

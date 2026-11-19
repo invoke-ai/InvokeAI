@@ -86,10 +86,8 @@ describe('rasterizeShapeSource — rect', () => {
     const surface = (await rasterizeShapeSource(rect({ fill: '#00ff00', stroke: null }), deps))
       .surface as StubRasterSurface;
     const log = surface.callLog;
-    // Fill style applied and a rect path filled.
     expect(log.some((e) => e.op === 'set' && e.args[0] === 'fillStyle' && e.args[1] === '#00ff00')).toBe(true);
     expect(ops(surface)).toContain('fill');
-    // No stroke was drawn.
     expect(ops(surface)).not.toContain('stroke');
   });
 

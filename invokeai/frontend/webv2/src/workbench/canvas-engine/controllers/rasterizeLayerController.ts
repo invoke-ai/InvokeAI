@@ -60,8 +60,8 @@ export class RasterizeLayerController {
   constructor(private readonly deps: RasterizeLayerControllerOptions) {}
 
   /**
-   * Bakes the layer's source and transform into paint pixels as one undo step. Undo restores the parametric
-   * contract, which rerasterizes from its source; redo reinstalls the baked pixels, never a rerender.
+   * Bakes the layer's source and transform into paint pixels as one undo step. Undo restores the parametric contract,
+   * which rerasterizes from its source; redo reinstalls the baked pixels, never a rerender.
    *
    * A position-dependent stack (noise) or a spatial one (clarity, texture, dehaze) is baked too, all of it, on the
    * layer-local render before the transform resamples it as the display does, and leaves the contract: kept, it would

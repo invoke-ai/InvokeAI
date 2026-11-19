@@ -9,7 +9,6 @@ import { expect, it, vi } from 'vitest';
 
 import { PreviewFrame } from './PreviewFrame';
 
-// Holds the player module back, so the frame renders before it arrives, as on a first video after boot.
 const playerModule = vi.hoisted(() => {
   let release = (): void => {};
   const loaded = new Promise<void>((resolve) => {
@@ -25,7 +24,8 @@ vi.mock('@platform/ui/video-player/VideoPlayer', async (importOriginal) => {
   return importOriginal();
 });
 
-vi.mock('@features/identity', () => ({
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   getAuthSession: () => ({ accountEpoch: 1 }),
   refreshProtectedMediaCookie: () => Promise.resolve(false),
 }));
@@ -79,8 +79,8 @@ it('shows the poster while the player loads, then the player in its place', asyn
 
     playerModule.release();
 
-    // The mocked module resolves through the test server, which a loaded machine can keep for well over a second;
-    // this test is about what shows first and what replaces it, not how fast.
+    // The mocked module resolves through the test server, which a loaded machine can keep for well over a second; this
+    // test is about what shows first and what replaces it, not how fast.
     await vi.waitFor(
       async () => {
         await act(async () => {});

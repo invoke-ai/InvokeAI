@@ -1,13 +1,10 @@
 import type { TFunction } from 'i18next';
 
+import { normalizeReferenceImageName } from '@features/generation/settings';
 import { readRecordedModelRef } from '@workbench/image-actions';
 import { getLegacyCanvasReferenceEntries } from '@workbench/image-actions/imageRecall';
 
-/**
- * Parse variable untyped generation metadata tolerantly into display rows; skip unknown or malformed fields while the
- * complete raw record stays available for JSON display. Rows show what was recorded, whether or not recall could
- * apply it to the current panel.
- */
+/** Tolerant parse of untyped metadata into rows; malformed fields are skipped, the raw record stays. */
 
 export interface PreviewMetadataEntry {
   key: string;
@@ -68,8 +65,7 @@ export const parsePreviewMetadata = (
   push('cfgScale', t('widgets.preview.fields.cfgScale'), cfgScale);
 
   if (kind === 'image') {
-    // Older distilled-guidance records store their single guidance value as `guidance` with no `cfg_scale`. With both
-    // recorded, which one drove the run depends on the model, which display does not consult.
+    // Older distilled-guidance records store their single guidance value as `guidance` with no `cfg_scale`.
     push(
       'guidance',
       t('widgets.preview.fields.guidance'),
@@ -260,6 +256,8 @@ export const parsePreviewMetadata = (
       const original =
         asset && isRecord(asset.original) && isRecord(asset.original.image) ? asset.original.image : asset;
       const parts = [
+        // A Generate reference the user named leads with its name.
+        key === 'ref_images' && !showLegacyReferences ? (normalizeReferenceImageName(entry.name) ?? null) : null,
         model,
         getString(config, 'type'),
         getString(config, 'imageName') ??

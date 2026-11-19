@@ -8,9 +8,7 @@ const INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' } as const;
 const TRIGGER_HOVER_STYLES = { color: 'fg' } as const;
 
 /**
- * One collapsible group in the board panel. The trailing `action` is a sibling
- * of the disclosure trigger rather than a child, so the "+" button is not a
- * <button> nested inside another one.
+ * One collapsible board-panel group; the trailing `action` is the trigger's sibling: no <button> inside a <button>.
  */
 export const GalleryBoardSection = ({
   action,

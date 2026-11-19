@@ -12,18 +12,15 @@ import type { RasterBackend, RasterSurface } from './raster';
 import { createColorSampler } from './colorSample';
 import { createLayerCacheStore } from './layerCache';
 
-/** A fake surface that records `drawImage`/`setTransform` calls, for asserting traversal order and translation math. */
 interface FakeSurface extends RasterSurface {
   drawnCanvases: unknown[];
   transforms: number[][];
 }
 
-/** A {@link RasterBackend} test double that also exposes every surface it created, for assertions. */
 interface FixedPixelBackend extends RasterBackend {
   __surfaces: FakeSurface[];
 }
 
-/** Fixed-pixel scratch surfaces isolate sampling bounds, alpha and traversal without simulating compositing. */
 const createFixedPixelBackend = (pixel: readonly [number, number, number, number]): FixedPixelBackend => {
   const createdSurfaces: FakeSurface[] = [];
 
@@ -114,7 +111,6 @@ describe('createColorSampler', () => {
     expect(sampler.sample(doc, layers, { x: 100, y: 5 })).toBeNull();
     expect(sampler.sample(doc, layers, { x: 5, y: -1 })).toBeNull();
     expect(sampler.sample(doc, layers, { x: 5, y: 100 })).toBeNull();
-    // One scratch serves every sample.
     expect(backend.__surfaces).toHaveLength(1);
   });
 
@@ -141,7 +137,6 @@ describe('createColorSampler', () => {
     const layers = createLayerCacheStore(backend);
     const topEntry = layers.getOrCreate('top', 100, 100);
     const bottomEntry = layers.getOrCreate('bottom', 100, 100);
-    // 'disabled' and 'nocache' are deliberately excluded from compositing.
     const doc = makeDoc([
       rasterLayer('top'),
       rasterLayer('disabled', { isEnabled: false }),
@@ -173,8 +168,6 @@ describe('createColorSampler', () => {
     createColorSampler(backend).sample(doc, layers, { x: 12.7, y: 34.2 });
 
     const scratch = backend.__surfaces.at(-1)!;
-    // Identity-layer sampling translates by the negated floored point; inspect the final per-layer transform after
-    // reset.
     expect(scratch.transforms.at(-1)).toEqual([1, 0, 0, 1, -12, -34]);
   });
 

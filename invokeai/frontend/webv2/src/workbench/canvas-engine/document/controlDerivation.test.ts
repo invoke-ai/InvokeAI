@@ -27,7 +27,6 @@ const layer = (patch: Partial<CanvasControlLayerContract> = {}): CanvasControlLa
   ...createControlLayer({ id: 'c1', name: 'Control Layer 1' }),
   ...patch,
 });
-/** A typed layer whose photo was detected into `map`. */
 const detected = (patch: Partial<CanvasControlLayerContract> = {}) =>
   layer({ controlType: 'edges', detection: canny, filter: canny, original: photo, source: map, ...patch });
 
