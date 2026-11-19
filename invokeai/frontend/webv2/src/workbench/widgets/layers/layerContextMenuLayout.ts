@@ -28,6 +28,7 @@ export interface LayerContextMenuGroupLayout {
 }
 
 type LayerContextMenuLayerLabelKey =
+  | 'widgets.layers.types.vector'
   | 'widgets.canvas.import.control'
   | 'widgets.canvas.import.inpaintMask'
   | 'widgets.canvas.import.raster'
@@ -126,6 +127,8 @@ export const getLayerContextMenuGroupLayout = (
 /** Resolves the singular layer labels used by the legacy canvas context menu. */
 export const getLayerContextMenuLayerLabelKey = (type: LayerType): LayerContextMenuLayerLabelKey => {
   switch (type) {
+    case 'vector':
+      return 'widgets.layers.types.vector';
     case 'control':
       return 'widgets.canvas.import.control';
     case 'inpaint_mask':

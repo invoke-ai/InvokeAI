@@ -72,7 +72,6 @@ const getActiveProject = (state: ReturnType<typeof createInitialWorkbenchState>)
 };
 import { createWorkbenchStore } from './workbenchStore';
 
-// Production words failures from the locale; Canvas preparation never runs here.
 const formatCanvasInvocationFailure = () => ({ message: 'canvas failure', title: 'canvas failure' });
 const formatUpscaleMetadataFailure = (name: string) => `metadataFailed: ${name}`;
 

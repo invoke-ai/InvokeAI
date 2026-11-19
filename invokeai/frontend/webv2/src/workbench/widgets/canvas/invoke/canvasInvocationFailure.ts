@@ -2,13 +2,11 @@ import type { ComposeForGenerationResult } from '@workbench/canvas-operations/ap
 
 import { describeCanvasInputIssue, type CanvasInputIssue } from '@workbench/canvasGenerationInputs';
 
-/** Why a canvas invocation stopped before it queued, kept structured until the caller words it from the locale. */
 export type CanvasInvocationFailure =
   | { kind: 'canvas_input'; issue: CanvasInputIssue }
   | { kind: 'capture'; result: Exclude<ComposeForGenerationResult, { status: 'ok' }> }
   | { kind: 'no_model' }
   | { kind: 'canvas_not_open' }
-  /** A failure worded where it was raised, such as Generation's graph validation or a paint upload. */
   | { kind: 'error'; message: string };
 
 export interface CanvasInvocationNotice {
@@ -48,7 +46,6 @@ const describeCapture = (t: Translate, result: Extract<CanvasInvocationFailure, 
   }
 };
 
-/** The notice a failed canvas invocation records, worded in the caller's language. */
 export const describeCanvasInvocationFailure = (
   t: Translate,
   failure: CanvasInvocationFailure

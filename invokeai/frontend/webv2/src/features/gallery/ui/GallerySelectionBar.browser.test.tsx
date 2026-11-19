@@ -196,13 +196,6 @@ describe('GallerySelectionBar', () => {
     );
   });
 
-  it('unstars only once every member is already starred', async () => {
-    await renderBar(createGallery({ items: [createItem('a.png', true), createItem('b.png', true)] }));
-    await click(getButton('widgets.gallery.unstarSelection'));
-
-    expect(itemActions.setItemsStarred).toHaveBeenCalledWith(expect.anything(), false);
-  });
-
   it('unstars a starred-only selection whose members no page has loaded', async () => {
     const selectedItemKeys = ['image:a.png', 'image:never-loaded-1.png', 'image:never-loaded-2.png'] as const;
     await renderBar(

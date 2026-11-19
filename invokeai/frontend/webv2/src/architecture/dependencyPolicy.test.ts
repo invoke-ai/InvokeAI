@@ -6,13 +6,11 @@ import {
   collectImportReferences,
   formatViolation,
   getModuleOwner,
-  isExcepted,
   isProductionSourcePath,
   primeImportSources,
   resolveImportPath,
 } from './dependencyPolicy';
 import { FEATURE_PUBLIC_INTERFACES } from './featureInterfaces';
-import { migrationExceptions } from './migrationExceptions';
 import { closeSourceAnalysis } from './tsSourceAnalysis';
 
 const sources = import.meta.glob('../**/*.{ts,tsx}', {
@@ -290,7 +288,6 @@ describe('production dependency graph', () => {
     const violations = Object.entries(sources)
       .filter(([path]) => isProduction(path))
       .flatMap(([path, source]) => checkSource(toSourcePath(path), source))
-      .filter((violation) => !migrationExceptions.some((exception) => isExcepted(violation, exception)))
       .map(formatViolation)
       .sort();
 
@@ -298,8 +295,4 @@ describe('production dependency graph', () => {
     // A whole-source scan whose cost grows with the codebase; on shared CI runners it already takes 3-5s, so the
     // default 5s budget turned runner speed into test failures.
   }, 60_000);
-
-  it('has no remaining migration exceptions', () => {
-    expect(migrationExceptions).toEqual([]);
-  });
 });

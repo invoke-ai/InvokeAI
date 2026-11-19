@@ -97,8 +97,8 @@ export interface InvocationProgressEvent extends InvocationEventBase {
   /** Intermittent denoising preview, when the invocation produces one. */
   image?: { width: number; height: number; dataURL: string } | null;
   /**
-   * Monotonic per queue item and session on image-bearing frames. Drop revisions at or below the latest accepted
-   * frame so live and reconnect replay cannot move preview backward.
+   * Monotonic per queue item and session on image-bearing frames. Drop revisions at or below the latest accepted frame
+   * so live and reconnect replay cannot move preview backward.
    */
   revision?: number | null;
   /** Device identifies concurrent accelerator sessions; null denotes CPU/MPS or single-device mode. */
@@ -135,8 +135,8 @@ const QUEUE_ITEM_ORIGIN_PREFIX = 'webv2:';
 const PROJECT_QUEUE_ITEM_ORIGIN_PREFIX = 'webv2:p:';
 
 /**
- * Utility origins isolate one-shot graphs from project adoption and result routing. Parse util before generic
- * webv2 origins to prevent accidental local IDs.
+ * Utility origins isolate one-shot graphs from project adoption and result routing. Parse util before generic webv2
+ * origins to prevent accidental local IDs.
  */
 const UTILITY_QUEUE_ITEM_ORIGIN_PREFIX = 'webv2:util:';
 

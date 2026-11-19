@@ -12,7 +12,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoReferenceListField } from './VideoReferenceListField';
 import { VideoUiProvider, type VideoUiAdapter } from './VideoUiContext';
 
-/** Reordering must preserve card identity and transfer focus when the pressed arrow becomes disabled. */
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -100,7 +99,6 @@ const render = async (names: string[]) => {
 const buttons = (label: string): HTMLButtonElement[] =>
   [...document.querySelectorAll(`button[aria-label="${label}"]`)] as HTMLButtonElement[];
 
-/** The thumbnails ARE the rendered order. */
 const order = (): string[] => [...document.querySelectorAll('img')].map((image) => image.src.split('/').at(-2) ?? '');
 
 beforeEach(() => {
@@ -159,7 +157,6 @@ describe('video reference reorder focus', () => {
   });
 
   it('never fires a stale handoff after a dropped write', async () => {
-    // A dropped write must not leave an arm that steals focus when a later change disables the arrow.
     let drop = true;
     let mutate: (next: string[]) => void = () => undefined;
 
@@ -215,7 +212,6 @@ describe('video reference reorder focus', () => {
     await act(() => up?.focus());
     await act(() => up?.click());
 
-    // Dropped: nothing moved, and the arm is still sitting on the card.
     expect(order()).toEqual(['a.png', 'b.png', 'c.png']);
 
     const field = document.querySelector('[aria-label="Prompt"]') as HTMLInputElement;
@@ -231,7 +227,6 @@ describe('video reference reorder focus', () => {
   });
 
   it('keeps focus when a card moves PAST a duplicate of another reference', async () => {
-    // Repeated clips use occurrence keys; moving tail past the second duplicate must preserve tail's identity.
     await render(['dup.png', 'tail.png', 'dup.png', 'end.png']);
 
     const down = buttons('Move reference down')[1];

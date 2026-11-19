@@ -27,48 +27,39 @@ import {
   type ControlLayerIssue,
 } from './controlLayerChecks';
 
-/** Canvas content a hosted model cannot take, as Generation words it. */
 export type HostedCanvasRefusal = Parameters<typeof describeExternalCanvasRefusal>[1];
 
-/** Why the canvas's layers keep generation from running, kept structured until the shell words it. */
 export type CanvasInputIssue =
   | ({ kind: 'control_layer' } & ControlLayerIssue)
   | { kind: 'hosted_refusal'; modelName: string; refusal: HostedCanvasRefusal }
-  /** Generation words this one; it has no locale key. */
   | { kind: 'layout_prompt'; message: string };
 
 export type ControlLayerVerdict =
   | { status: 'blocked'; issue: CanvasInputIssue }
-  /** Judged against no model list it would misjudge every layer: readiness waits, an invocation refuses. */
+  /** Readiness waits for the model list; an invocation refuses. */
   | { status: 'awaiting_models'; issue: CanvasInputIssue }
-  /** No type and no model: it warns in the panel but contributes nothing. */
   | { status: 'skipped' }
   | { status: 'contributes'; input: Omit<ControlLayerGraphInput, 'imageName'> };
 
 export type RegionalLayerVerdict =
   | { status: 'blocked'; issue: CanvasInputIssue }
-  /** Contributes nothing the base can use. */
   | { status: 'skipped' }
   | { status: 'contributes'; input: Omit<RegionalGuidanceInput, 'maskImageName' | 'maskBounds'> };
 
 export interface CanvasInputJudgeParams {
   model: GenerateModelConfig;
-  /** Undefined while the model list loads. */
   models: readonly ModelConfig[] | undefined;
   controlModelMemory: ControlModelMemory;
   cfgScale: number;
 }
 
-/**
- * Judges each layer generation would composite, as Invoke readiness and the invocation both do. Call `control` in
- * generation order on one judge per invocation: per-generation limits count only the layers that passed before.
- */
+/** Call `control` in generation order on one judge per invocation: per-generation limits count passed layers. */
 export interface CanvasInputJudge {
   control(layer: CanvasControlLayerContract): ControlLayerVerdict;
   regional(layer: CanvasRegionalGuidanceLayerContract): RegionalLayerVerdict;
 }
 
-/** Unlike Generation's `toModelIdentifier`, never carries `submodel_type`: these graph inputs have not. */
+/** Unlike Generation's `toModelIdentifier`: these graph inputs carry no `submodel_type`. */
 const toModelReference = (model: { base: string; key: string; name: string; type: string; hash?: unknown }) => ({
   base: model.base,
   key: model.key,
@@ -77,7 +68,6 @@ const toModelReference = (model: { base: string; key: string; name: string; type
   ...(typeof model.hash === 'string' ? { hash: model.hash } : {}),
 });
 
-/** A region's enabled reference images the base can read, with an image and a model of its base; others drop out. */
 const resolveRegionalReferenceImages = (
   region: CanvasRegionalGuidanceLayerContract,
   base: string
@@ -216,20 +206,13 @@ export const createCanvasInputJudge = ({
   };
 };
 
-/**
- * What blocks Invoke before anything is captured, in the order it is listed: raster content a text-only hosted model
- * cannot take, then each compositable layer the judge blocks, in layer order, then a layout built around a blank
- * prompt. Control layers wait for the model list rather than block on its absence.
- */
+/** Control layers wait for the model list rather than block on its absence. */
 export const getCanvasInputIssues = (
   params: CanvasInputJudgeParams & {
-    /** The contributing layers, in generation order. */
     layers: readonly CanvasLayerContract[];
-    /** Whether visible raster content overlaps the frame; measured only for a text-only hosted model. */
+    /** Measured only for a text-only hosted model. */
     rasterInFrame: boolean;
-    /** The compositable regions whose masks reach into the frame, which a layout base places. */
     regionalLayersInFrame: readonly CanvasRegionalGuidanceLayerContract[];
-    /** The positive prompt as submitted, template applied. */
     prompt: string;
   }
 ): CanvasInputIssue[] => {
@@ -263,7 +246,6 @@ export const getCanvasInputIssues = (
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
-/** The one wording of a canvas input issue, for the Invoke tooltip and the failed-invoke notice alike. */
 export const describeCanvasInputIssue = (t: Translate, issue: CanvasInputIssue): string => {
   switch (issue.kind) {
     case 'control_layer':

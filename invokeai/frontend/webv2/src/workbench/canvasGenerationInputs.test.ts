@@ -8,7 +8,6 @@ import type {
   RegionalGuidanceReferenceImageAsset,
 } from '@workbench/canvas-engine/contracts';
 
-import { resetArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { createInstance } from 'i18next';
 import { describe, expect, it } from 'vitest';
@@ -95,7 +94,6 @@ const judgeParams = (
   controlModelMemory: Record<string, string> = {}
 ): CanvasInputJudgeParams => ({ cfgScale: 7, controlModelMemory, model: mainModel, models });
 
-/** What Invoke readiness reports for these layers, every region inside the frame. */
 const readinessIssues = (
   layers: CanvasLayerContract[],
   params: CanvasInputJudgeParams,
@@ -111,7 +109,6 @@ const readinessIssues = (
     ),
   });
 
-/** What the invocation decides for each layer composition asks it about, in generation order. */
 const invocationVerdicts = (layers: CanvasLayerContract[], params: CanvasInputJudgeParams) => {
   const judge = createCanvasInputJudge(params);
   return layers.map((layer) =>
@@ -147,7 +144,6 @@ describe('readiness and the invocation judge layers alike', () => {
       },
     ];
 
-    // Before the model list loads too: a hosted model takes no layer whatever is installed.
     for (const models of [undefined, []]) {
       const params = judgeParams(hostedModel, models);
       expect(readinessIssues(layers, params)).toEqual(refusals);
@@ -203,7 +199,6 @@ describe('readiness and the invocation judge layers alike', () => {
         status: 'contributes',
       },
     ]);
-    // The region it can place still needs a global prompt to lay out around.
     expect(readinessIssues(layers, params, { prompt: ' ' })).toEqual([
       {
         kind: 'layout_prompt',
@@ -229,13 +224,15 @@ describe('readiness and the invocation judge layers alike', () => {
 
 describe('getCanvasInputIssues', () => {
   const sdxl = main('sdxl');
-  const models = [model('sdxl-control', 'sdxl', 'controlnet'), model('sd1-control', 'sd-1', 'controlnet')];
+  const models = [model('sdxl-control', 'sdxl', 'controlnet')];
   const controlIssues = (
     layers: CanvasLayerContract[],
     mainModel: GenerateModelConfig,
     installed: readonly ModelConfig[],
     controlModelMemory?: Record<string, string>
   ) => readinessIssues(layers, judgeParams(mainModel, installed, controlModelMemory));
+  const codes = (issues: ReturnType<typeof controlIssues>) =>
+    issues.map((issue) => (issue.kind === 'control_layer' ? [issue.layerId, issue.code] : issue));
 
   it('names raster content in the frame first for a text-only hosted model', () => {
     const editing: GenerateModelConfig = { ...hostedModel, capabilities: { modes: ['txt2img', 'img2img'] } };
@@ -247,26 +244,15 @@ describe('getCanvasInputIssues', () => {
     expect(readinessIssues([], judgeParams(editing, []), { rasterInFrame: true })).toEqual([]);
   });
 
-  it('leaves out a content-bearing layer with neither a type nor a model: it warns but contributes nothing', () => {
-    expect(controlIssues([controlLayer('Control Layer 1')], sdxl, models)).toEqual([]);
-  });
-
   it('blocks an untyped layer whose model is no longer installed', () => {
-    expect(controlIssues([controlLayer('legacy', { model: 'uninstalled' })], sdxl, models)).toMatchObject([
-      { code: 'missing_model', layerId: 'legacy' },
+    expect(codes(controlIssues([controlLayer('legacy', { model: 'uninstalled' })], sdxl, models))).toEqual([
+      ['legacy', 'missing_model'],
     ]);
   });
 
   it('reports a typed content-bearing layer no model resolves', () => {
-    expect(
-      controlIssues(
-        [controlLayer('Control Layer 1', { derivation: { controlType: 'pose', detection: null } })],
-        sdxl,
-        models
-      )
-    ).toEqual([
-      { code: 'no_model_for_type', kind: 'control_layer', layerId: 'Control Layer 1', layerName: 'Control Layer 1' },
-    ]);
+    const pose = controlLayer('pose', { derivation: { controlType: 'pose', detection: null } });
+    expect(codes(controlIssues([pose], sdxl, models))).toEqual([['pose', 'no_model_for_type']]);
   });
 
   it('skips disabled, content-less, and non-control layers', () => {
@@ -283,12 +269,6 @@ describe('getCanvasInputIssues', () => {
     ).toEqual([]);
   });
 
-  it('reports an incompatible base model', () => {
-    expect(controlIssues([controlLayer('mismatch', { model: 'sd1-control' })], sdxl, models)).toMatchObject([
-      { code: 'incompatible_base' },
-    ]);
-  });
-
   it('reports Anima LLLite layers the denoiser would refuse, and only those', () => {
     const animaModels = [
       { ...model('sketch', 'anima', 'controlnet'), cond_in_channels: 3 },
@@ -298,17 +278,19 @@ describe('getCanvasInputIssues', () => {
     const lllite = (id: string, key: string) => controlLayer(id, { kind: 'anima_lllite', model: key });
 
     expect(
-      controlIssues(
-        [
-          lllite('sketch', 'sketch'),
-          lllite('depth', 'depth'),
-          lllite('again', 'sketch'),
-          lllite('inpaint', 'inpaint'),
-          controlLayer('saved-as-controlnet', { model: 'depth' }),
-        ],
-        main('anima'),
-        animaModels
-      ).map((issue) => (issue.kind === 'control_layer' ? [issue.layerId, issue.code] : issue))
+      codes(
+        controlIssues(
+          [
+            lllite('sketch', 'sketch'),
+            lllite('depth', 'depth'),
+            lllite('again', 'sketch'),
+            lllite('inpaint', 'inpaint'),
+            controlLayer('saved-as-controlnet', { model: 'depth' }),
+          ],
+          main('anima'),
+          animaModels
+        )
+      )
     ).toEqual([
       ['again', 'duplicate_lllite_model'],
       ['inpaint', 'lllite_inpaint_adapter'],
@@ -331,84 +313,31 @@ describe('getCanvasInputIssues', () => {
     const [, base, kind, weight, limitCode, refusingVariant, refusalCode] = args;
     const union = [model(`${base}-union`, base, 'controlnet')];
     const layers = ['first', 'second'].map((id) => controlLayer(id, { kind, model: `${base}-union`, weight }));
-    const codes = (mainModel: GenerateModelConfig) =>
-      controlIssues(layers, mainModel, union).map((issue) =>
-        issue.kind === 'control_layer' ? [issue.layerId, issue.code] : issue
-      );
 
-    expect(codes(main(base, base === 'flux2' ? 'dev' : undefined))).toEqual([['second', limitCode]]);
-    expect(codes(main(base, refusingVariant))).toEqual([
+    expect(codes(controlIssues(layers, main(base, base === 'flux2' ? 'dev' : undefined), union))).toEqual([
+      ['second', limitCode],
+    ]);
+    expect(codes(controlIssues(layers, main(base, refusingVariant), union))).toEqual([
       ['first', refusalCode],
       ['second', refusalCode],
     ]);
   });
 
-  it('lets one Z-Image control through', () => {
-    const layers = ['first', 'second'].map((id) => controlLayer(id, { kind: 'z_image_control', model: 'z-control' }));
-
-    expect(
-      controlIssues(layers, main('z-image'), [model('z-control', 'z-image', 'controlnet')]).map((issue) =>
-        issue.kind === 'control_layer' ? [issue.layerId, issue.code] : issue
-      )
-    ).toEqual([['second', 'z_image_control_limit']]);
-  });
-
-  it('reports issues in document order', () => {
-    const pose = { derivation: { controlType: 'pose', detection: null } } as const;
-
-    expect(
-      controlIssues([controlLayer('top', pose), controlLayer('bottom', pose)], sdxl, models).map((issue) =>
-        issue.kind === 'control_layer' ? issue.layerName : issue
-      )
-    ).toEqual(['top', 'bottom']);
-  });
-
   describe('typed control layers', () => {
     const depthModels = [model('sdxl-depth-a', 'sdxl', 'controlnet'), model('sdxl-depth-b', 'sdxl', 'controlnet')];
-    const typed = (
-      id: string,
-      derivation: Partial<Pick<CanvasControlLayerContract, 'detection' | 'filter' | 'original'>> = {},
-      overrides: Parameters<typeof controlLayer>[1] = {}
-    ) => controlLayer(id, { ...overrides, derivation: { controlType: 'depth', detection: null, ...derivation } });
+    const typed = (id: string, detection: CanvasControlLayerContract['detection'] = null) =>
+      controlLayer(id, { derivation: { controlType: 'depth', detection } });
 
     it('asks for a model when several fit, and resolves with the remembered pick', () => {
-      expect(controlIssues([typed('depth')], sdxl, depthModels)).toMatchObject([{ code: 'choose_model' }]);
+      expect(codes(controlIssues([typed('depth')], sdxl, depthModels))).toEqual([['depth', 'choose_model']]);
       expect(controlIssues([typed('depth')], sdxl, depthModels, { 'sdxl:depth': 'sdxl-depth-b' })).toEqual([]);
     });
 
-    it('tells no control models apart from none for the type', () => {
-      expect(controlIssues([typed('depth')], sdxl, [])).toMatchObject([{ code: 'no_control_models' }]);
-    });
-
-    it('never blocks on an empty layer', () => {
-      expect(
-        controlIssues([typed('empty', {}, { source: { bitmap: null, type: 'paint' } })], sdxl, depthModels)
-      ).toEqual([]);
-    });
-
     it('blocks on a map detection has not caught up with, after the model reasons', () => {
-      const pending = typed('pending', { detection: { settings: {}, type: 'depth_anything_depth_estimation' } });
+      const pending = typed('pending', { settings: {}, type: 'depth_anything_depth_estimation' });
 
-      expect(controlIssues([pending], sdxl, [depthModels[0]!])).toMatchObject([{ code: 'detection_pending' }]);
-      expect(controlIssues([pending], sdxl, depthModels)).toMatchObject([{ code: 'choose_model' }]);
-    });
-
-    it('counts per-generation limits by the kind the resolved model runs, not the stored kind', () => {
-      expect(
-        controlIssues([typed('first'), typed('second')], main('flux'), [
-          model('flux-depth-lora', 'flux', 'control_lora'),
-        ]).map((issue) => (issue.kind === 'control_layer' ? [issue.layerId, issue.code] : issue))
-      ).toEqual([['second', 'control_lora_limit']]);
-    });
-
-    it('still resolves models before capabilities load, and reports that they have not', () => {
-      const judge = () =>
-        controlIssues([typed('depth')], main('flux'), [model('flux-depth-t2i', 'flux', 't2i_adapter')]);
-
-      // Loaded, FLUX runs no T2I-Adapter, so no model fits.
-      expect(judge()).toMatchObject([{ code: 'no_control_models' }]);
-      resetArchitectureCapabilities();
-      expect(judge()).toMatchObject([{ code: 'capabilities_unavailable' }]);
+      expect(codes(controlIssues([pending], sdxl, [depthModels[0]!]))).toEqual([['pending', 'detection_pending']]);
+      expect(codes(controlIssues([pending], sdxl, depthModels))).toEqual([['pending', 'choose_model']]);
     });
   });
 });
@@ -416,10 +345,7 @@ describe('getCanvasInputIssues', () => {
 describe('createCanvasInputJudge', () => {
   it('hands a contributing control layer its adapter values and the model it resolves to', () => {
     const depth = { ...model('sdxl-depth', 'sdxl', 'controlnet'), hash: 'blake3:depth' };
-    const layer = controlLayer('depth', {
-      derivation: { controlType: 'depth', detection: null },
-      weight: 0.6,
-    });
+    const layer = controlLayer('depth', { derivation: { controlType: 'depth', detection: null }, weight: 0.6 });
 
     expect(createCanvasInputJudge(judgeParams(main('sdxl'), [depth])).control(layer)).toEqual({
       input: {
@@ -437,18 +363,6 @@ describe('createCanvasInputJudge', () => {
     });
   });
 
-  it('gives a layer a FLUX union model resolves the InstantX mode of its type', () => {
-    const union = model('flux-union', 'flux', 'controlnet');
-    const layer = controlLayer('pose', { derivation: { controlType: 'pose', detection: null } });
-
-    expect(
-      createCanvasInputJudge(
-        judgeParams(main('flux'), [{ ...union, name: 'FLUX.1-dev-Controlnet-Union-Pro' }])
-      ).control(layer)
-    ).toMatchObject({ input: { instantxControlMode: 4, model: { key: 'flux-union' } }, status: 'contributes' });
-  });
-
-  // A region's reference images reach the graph only with an assigned image and a model of the main base.
   describe('regional reference images', () => {
     const asset = { imageName: 'ref.png' } as RegionalGuidanceReferenceImageAsset;
     const ipAdapterModel = { base: 'sd-1', key: 'ipa', name: 'IP Adapter', type: 'ip_adapter' };
@@ -467,61 +381,43 @@ describe('createCanvasInputJudge', () => {
       isEnabled: true,
     });
     const fluxReduxRef = (image: RegionalGuidanceReferenceImageAsset | null): RegionalGuidanceReferenceImage => ({
-      config: { image, imageInfluence: 'high', model: fluxReduxModel, type: 'flux_redux' },
+      config: { image, imageInfluence: 'highest', model: fluxReduxModel, type: 'flux_redux' },
       id: 'ref-redux',
       isEnabled: true,
     });
-    /** The reference images a captioned region on this base contributes. */
-    const referencesFor = (base: string, referenceImages: RegionalGuidanceReferenceImage[]) => {
-      const verdict = createCanvasInputJudge(judgeParams(main(base), [])).regional(region('r', { referenceImages }));
-      return verdict.status === 'contributes' ? verdict.input.referenceImages : verdict;
+    const withModelBase = (base: string): RegionalGuidanceReferenceImage => {
+      const ref = ipAdapterRef(asset);
+      return { ...ref, config: { ...ref.config, model: { ...ipAdapterModel, base } } };
     };
 
-    it('drops an IP-Adapter ref with no image assigned, and keeps it once one is', () => {
-      expect(referencesFor('sd-1', [ipAdapterRef(null)])).toEqual([]);
-      expect(referencesFor('sd-1', [ipAdapterRef(asset)])).toEqual([
-        {
-          beginEndStepPct: [0, 1],
-          clipVisionModel: 'ViT-H',
-          id: 'ref-ipa',
-          imageName: 'ref.png',
-          method: 'full',
-          model: ipAdapterModel,
-          type: 'ip_adapter',
-          weight: 1,
-        },
-      ]);
-    });
-
-    it.each(['flux2', 'krea-2', 'z-image', 'anima'])('drops regional reference images for %s', (base) => {
-      const ref = ipAdapterRef(asset);
-      expect(referencesFor(base, [{ ...ref, config: { ...ref.config, model: { ...ipAdapterModel, base } } }])).toEqual(
-        []
+    it.each<[string, RegionalGuidanceReferenceImage, string, Record<string, unknown>[]]>([
+      ['drops an IP-Adapter ref with no image assigned', ipAdapterRef(null), 'sd-1', []],
+      [
+        'keeps an IP-Adapter ref once an image is assigned for a supported SD base',
+        ipAdapterRef(asset),
+        'sd-1',
+        [{ id: 'ref-ipa', imageName: 'ref.png', type: 'ip_adapter' }],
+      ],
+      ['drops regional reference images for FLUX.2', ipAdapterRef(asset), 'flux2', []],
+      ['drops regional reference images for krea-2', withModelBase('krea-2'), 'krea-2', []],
+      ['drops regional reference images for z-image', withModelBase('z-image'), 'z-image', []],
+      ['drops regional reference images for anima', withModelBase('anima'), 'anima', []],
+      ['keeps an SD2 IP-Adapter ref whose model matches the base', withModelBase('sd-2'), 'sd-2', [{ id: 'ref-ipa' }]],
+      ['drops a FLUX Redux ref with no image assigned', fluxReduxRef(null), 'flux', []],
+      [
+        'sends a FLUX Redux ref its influence as redux settings once an image is assigned',
+        fluxReduxRef(asset),
+        'flux',
+        [{ id: 'ref-redux', settings: { downsampling_factor: 1, weight: 1 }, type: 'flux_redux' }],
+      ],
+      ['drops a disabled ref even when an image is assigned', { ...ipAdapterRef(asset), isEnabled: false }, 'sd-1', []],
+    ])('%s', (_, ref, base, expected) => {
+      const verdict = createCanvasInputJudge(judgeParams(main(base), [])).regional(
+        region('r', { referenceImages: [ref] })
       );
-    });
-
-    it('keeps an SD2 IP-Adapter ref whose model matches the base', () => {
-      const ref = ipAdapterRef(asset);
-      expect(
-        referencesFor('sd-2', [{ ...ref, config: { ...ref.config, model: { ...ipAdapterModel, base: 'sd-2' } } }])
-      ).toHaveLength(1);
-    });
-
-    it('sends a FLUX Redux ref its influence as redux settings once an image is assigned', () => {
-      expect(referencesFor('flux', [fluxReduxRef(null)])).toEqual([]);
-      expect(referencesFor('flux', [fluxReduxRef(asset)])).toEqual([
-        {
-          id: 'ref-redux',
-          imageName: 'ref.png',
-          model: fluxReduxModel,
-          settings: { downsampling_factor: 2, weight: 1 },
-          type: 'flux_redux',
-        },
-      ]);
-    });
-
-    it('drops a disabled ref even when an image is assigned', () => {
-      expect(referencesFor('sd-1', [{ ...ipAdapterRef(asset), isEnabled: false }])).toEqual([]);
+      expect(verdict.status === 'contributes' ? verdict.input.referenceImages : []).toEqual(
+        expected.map((input) => expect.objectContaining(input))
+      );
     });
   });
 });

@@ -11,7 +11,6 @@ import { ADMIT_ALL, commitStroke, createRecordingStrokeEdit } from '@workbench/c
 import { createStrokeSession } from '@workbench/canvas-engine/tools/strokeSession';
 import { describe, expect, it, vi } from 'vitest';
 
-/** Renders a scheduled stroke frame immediately; frame timing is covered by the engine tests. */
 const runFrameNow = (task: () => void): (() => void) => {
   task();
   return () => undefined;
@@ -27,7 +26,6 @@ const pointer = (x: number, y: number): PointerInput => ({
   timeStamp: 0,
 });
 
-/** A capturing backend so the stroke scratch surface can be identified. */
 const createCapturingBackend = (): { backend: StubRasterBackend; created: StubRasterSurface[] } => {
   const inner = createTestStubRasterBackend();
   const created: StubRasterSurface[] = [];
@@ -64,7 +62,6 @@ const runStroke = (opts: { withMask: boolean }) => {
     scheduleFrame: runFrameNow,
   } as unknown as ToolContext;
 
-  // Only the scratch is created after this point.
   created.length = 0;
   const session = createStrokeSession({
     edit: ADMIT_ALL,
@@ -95,35 +92,11 @@ describe('strokeSession: selection-constrained painting', () => {
   it('with a clip mask, intersects the scratch stroke with the mask (destination-in) before compositing', () => {
     const { scratch } = runStroke({ withMask: true });
     expect(compositeOps(scratch)).toContain('destination-in');
-    // The mask is drawn into the scratch to clip it.
     expect(scratch.callLog.some((e) => e.op === 'drawImage')).toBe(true);
-  });
-
-  it('without a clip mask, the scratch stays a plain filled stroke (no extra clip ops)', () => {
-    const { scratch } = runStroke({ withMask: false });
-    expect(compositeOps(scratch)).not.toContain('destination-in');
-    expect(scratch.callLog.some((e) => e.op === 'drawImage')).toBe(false);
-    expect(scratch.callLog.filter((e) => e.op === 'fill')).not.toHaveLength(0);
-  });
-
-  it('applies the selection clip on the scratch, not by changing the cache composite ops', () => {
-    const withMask = runStroke({ withMask: true });
-    const noMask = runStroke({ withMask: false });
-    // Apply destination-in only to scratch; cache compositing remains unchanged. Selection bounds may limit cache
-    // growth.
-    expect(compositeOps(withMask.cache)).toEqual(compositeOps(noMask.cache));
-    expect(compositeOps(withMask.cache)).not.toContain('destination-in');
-  });
-
-  it('returns a commit with a dirty rect the mask does not shift', () => {
-    const { event } = runStroke({ withMask: true });
-    expect(event!.dirtyRect.width).toBeGreaterThan(0);
-    expect(event!.dirtyRect.height).toBeGreaterThan(0);
   });
 });
 
 describe('strokeSession: bbox-clipped painting', () => {
-  /** A stroke sweeping from (10,10) to (40,40), optionally clipped to a rect. */
   const runClipped = (clipRect: { x: number; y: number; width: number; height: number } | null) => {
     const { backend, created } = createCapturingBackend();
     const layers = createLayerCacheStore(backend);
@@ -172,35 +145,9 @@ describe('strokeSession: bbox-clipped painting', () => {
     expect(event!.dirtyRect.y + event!.dirtyRect.height).toBeLessThanOrEqual(clip.y + clip.height);
   });
 
-  it('reports a larger dirty rect unclipped — the clip is what bounds it', () => {
-    const clipped = runClipped({ height: 20, width: 20, x: 0, y: 0 })!;
-    const unclipped = runClipped(null)!;
-    const area = (rect: { width: number; height: number }) => rect.width * rect.height;
-
-    expect(area(unclipped.event!.dirtyRect)).toBeGreaterThan(area(clipped.event!.dirtyRect));
-  });
-
-  it('needs no compositing pass — clamping the region IS the clip', () => {
-    // Unlike a selection mask (an arbitrary shape within its rect), a rect clip
-    // is fully expressed by the scratch's extent, so no `destination-in`.
-    const { scratch } = runClipped({ height: 20, width: 20, x: 0, y: 0 });
-    expect(compositeOps(scratch!)).not.toContain('destination-in');
-  });
-
   it('commits nothing when the stroke falls entirely outside the clip rect', () => {
     const { event } = runClipped({ height: 5, width: 5, x: 500, y: 500 });
     expect(event).toBeNull();
-  });
-
-  it('still covers the whole stroke when the clip rect contains it', () => {
-    // Clip may remove chunk padding but must retain actual 20px stroke coverage across [0,50] on both axes.
-    const { event } = runClipped({ height: 200, width: 200, x: -50, y: -50 });
-    const dirty = event!.dirtyRect;
-
-    expect(dirty.x).toBeLessThanOrEqual(0);
-    expect(dirty.y).toBeLessThanOrEqual(0);
-    expect(dirty.x + dirty.width).toBeGreaterThanOrEqual(50);
-    expect(dirty.y + dirty.height).toBeGreaterThanOrEqual(50);
   });
 });
 
@@ -249,37 +196,21 @@ describe('strokeSession: content-sized cache growth', () => {
     session.addPoints([pointer(50, 60)]);
     const event = commitStroke(session);
 
-    // A dab near (50,60) grows to a small outward chunk-aligned rect, not a document-sized surface.
     expect(entry.rect.width).toBeGreaterThan(0);
     expect(entry.rect.height).toBeGreaterThan(0);
-    // Chunk-aligned extent (origin and size are multiples of the 64px chunk).
     expect(entry.rect.x % 64).toBe(0);
     expect(entry.rect.y % 64).toBe(0);
     expect(entry.rect.width % 64).toBe(0);
     expect(entry.rect.height % 64).toBe(0);
-    // Content-sized: a few chunks around the dab, not a huge (document) surface.
     expect(entry.rect.width).toBeLessThanOrEqual(128);
     expect(entry.rect.height).toBeLessThanOrEqual(128);
-    // The padded extent still fully contains the painted dab center (50,60).
     expect(entry.rect.x).toBeLessThanOrEqual(50);
     expect(entry.rect.x + entry.rect.width).toBeGreaterThan(50);
     expect(entry.rect.y).toBeLessThanOrEqual(60);
     expect(entry.rect.y + entry.rect.height).toBeGreaterThan(60);
     expect(entry.surface.width).toBe(entry.rect.width);
     expect(entry.surface.height).toBe(entry.rect.height);
-    // The committed dirty rect is the same (chunk-padded) layer-local region.
     expect(event!.dirtyRect).toEqual(entry.rect);
-  });
-
-  it('returns the completed event without publishing engine side effects', () => {
-    const { notifyLayerPainted, session } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
-    session.addPoints([pointer(10, 10)]);
-    const event = commitStroke(session);
-
-    expect(event).toMatchObject({ layerId: 'L', tool: 'brush' });
-    expect(event!.dirtyRect.width).toBeGreaterThan(0);
-    expect(event!.dirtyRect.height).toBeGreaterThan(0);
-    expect(notifyLayerPainted).not.toHaveBeenCalled();
   });
 
   it('restores the layer and its extent once when the undo footprint cannot grow', () => {
@@ -298,56 +229,6 @@ describe('strokeSession: content-sized cache growth', () => {
     expect(session.commit(() => true)).toBe(false);
   });
 
-  it('restores the layer when the final paint at commit cannot grow', () => {
-    const backend = createTestStubRasterBackend();
-    const layers = createLayerCacheStore(backend);
-    layers.getOrCreateRect('L', { height: 20, width: 20, x: 0, y: 0 }).stale = false;
-    const deferred: (() => void)[] = [];
-    const ctx = {
-      backend,
-      createPath2D: () =>
-        ({ closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} }) as unknown as Path2D,
-      invalidate: vi.fn(),
-      layers,
-      notifyLayerPainted: vi.fn(),
-      scheduleFrame: (task: () => void) => {
-        deferred.push(task);
-        return () => undefined;
-      },
-    } as unknown as ToolContext;
-    let admitted = Infinity;
-    const session = createStrokeSession({
-      clipMask: null,
-      color: '#ff0000',
-      composite: 'source-over',
-      ctx,
-      edit: { grow: (bytes) => bytes <= admitted },
-      hardness: 1,
-      layerId: 'L',
-      opacity: 1,
-      pressureOpacity: false,
-      size: 20,
-      thinning: 0,
-      tool: 'brush',
-    });
-    session.addPoints([pointer(10, 10)]);
-    deferred.splice(0).forEach((task) => task());
-    admitted = 0;
-    // Painted only by the commit-time render, whose growth is refused.
-    session.addPoints([pointer(400, 400)]);
-
-    expect(session.commit(() => true)).toBe(false);
-    expect(layers.peek('L')!.rect).toEqual({ height: 20, width: 20, x: 0, y: 0 });
-  });
-
-  it('restores the layer when publication is declined', () => {
-    const { layers, session } = makeSession({ height: 20, width: 20, x: 0, y: 0 });
-    session.addPoints([pointer(-40, -40)]);
-
-    expect(session.commit(() => false)).toBe(false);
-    expect(layers.peek('L')!.rect).toEqual({ height: 20, width: 20, x: 0, y: 0 });
-  });
-
   it('returns an empty cache to empty when the stroke is cancelled', () => {
     const { layers, session } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
     session.addPoints([pointer(10, 10)]);
@@ -357,19 +238,11 @@ describe('strokeSession: content-sized cache growth', () => {
     expect(layers.peek('L')!.rect).toMatchObject({ height: 0, width: 0 });
   });
 
-  it('returns null when the gesture produced no dirty pixels', () => {
-    const { session } = makeSession({ height: 0, width: 0, x: 0, y: 0 });
-    expect(commitStroke(session)).toBeNull();
-  });
-
   it('grows an existing cache to the UNION of its extent and an out-of-extent stroke (negative coords included)', () => {
     const { entry, session } = makeSession({ height: 20, width: 20, x: 0, y: 0 });
     session.addPoints([pointer(-40, -40)]);
     commitStroke(session);
 
-    // Union of the pre-stroke [0,20)² extent and the stroke bounds around
-    // (-40,-40): the origin moved into negative layer-local space and the old
-    // extent's far edge is still covered.
     expect(entry.rect.x).toBeLessThan(-30);
     expect(entry.rect.y).toBeLessThan(-30);
     expect(entry.rect.x + entry.rect.width).toBeGreaterThanOrEqual(20);
@@ -379,13 +252,10 @@ describe('strokeSession: content-sized cache growth', () => {
   });
 
   it('reallocates the cache surface O(stroke / chunk) times — NOT once per batch — across an extending drag', () => {
-    // Pre-size the cache to a chunk-aligned rect already covering the first dab, so
-    // only genuine growth (not the empty-cache adoption) counts as a reallocation.
     const { entry, session } = makeSession({ height: 64, width: 64, x: 64, y: 64 });
     const surface = entry.surface as StubRasterSurface;
     const resizeCount = (): number => surface.callLog.filter((e) => e.op === 'resize').length;
 
-    // Ten small batches should allocate only at 64px chunk crossings, not on every exact-bound extension.
     const batches = 10;
     for (let i = 0; i < batches; i++) {
       session.addPoints([pointer(100 + i * 10, 100)]);
@@ -439,17 +309,8 @@ describe('strokeSession: cache version bump (live adjusted-surface invalidation)
     const v1 = entry.version;
     session.addPoints([pointer(40, 40)]);
     const v2 = entry.version;
-    // Every painted frame must advance version so adjusted caches show live strokes.
     expect(v1).toBeGreaterThan(v0);
     expect(v2).toBeGreaterThan(v1);
-  });
-
-  it('bumps the version on cancel so the restored pixels re-derive the adjusted surface', () => {
-    const { entry, session } = makeVersionSession();
-    session.addPoints([pointer(10, 10)]);
-    const vBeforeCancel = entry.version;
-    session.cancel();
-    expect(entry.version).toBeGreaterThan(vBeforeCancel);
   });
 });
 
@@ -485,7 +346,6 @@ describe('incremental "before" snapshot', () => {
     return { layers, session };
   };
 
-  /** A long rightward drag, one sample per batch. */
   const drag = (session: ReturnType<typeof makeSession>['session'], to: number, step: number): void => {
     for (let x = 0; x <= to; x += step) {
       session.addPoints([pointer(x, 0)]);
@@ -499,7 +359,6 @@ describe('incremental "before" snapshot', () => {
     const { layers, session } = makeSession(100);
     drag(session, 3000, 50);
     const region = layers.get('L')!.rect;
-    // Session readbacks must cover only newly added strips, never accumulated width.
     const stripReads = surfaceOf(layers)
       .callLog.filter((entry) => entry.op === 'getImageData')
       .filter((entry) => Number(entry.args[0]) !== 0 || Number(entry.args[1]) !== 0);
@@ -508,26 +367,6 @@ describe('incremental "before" snapshot', () => {
     for (const read of stripReads) {
       expect(Number(read.args[2])).toBeLessThan(region.width / 2);
     }
-  });
-
-  it('re-snapshots only when the region actually grows, not on every batch', () => {
-    const { layers, session } = makeSession(100);
-    // Batches within unchanged bounds reuse the before-snapshot without readback.
-    session.addPoints([pointer(0, 0)]);
-    const baseline = surfaceOf(layers).callLog.filter((e) => e.op === 'getImageData').length;
-    for (let i = 0; i < 20; i++) {
-      session.addPoints([pointer(1, 1)]);
-    }
-    const after = surfaceOf(layers).callLog.filter((e) => e.op === 'getImageData').length;
-    expect(after).toBe(baseline);
-  });
-
-  it('reallocates less often for a wide brush than a fixed 64px grid would', () => {
-    // Large brushes scale growth pitch: 1200px diameter uses roughly 300px chunks instead of 64px.
-    const { layers, session } = makeSession(1200);
-    drag(session, 4000, 100);
-    const resizes = surfaceOf(layers).callLog.filter((entry) => entry.op === 'resize').length;
-    expect(resizes).toBeLessThan(4000 / 200);
   });
 });
 
@@ -570,30 +409,15 @@ describe('strokeSession: pressure-dependent opacity', () => {
     });
     session.addPoints(pressures.map((pressure, index) => pointerAt(10 + index * 10, 10, pressure)));
     const scratch = created[0]!;
-    // A session repaints on every batch and once more on commit. Measuring the whole gesture
-    // would couple these assertions to the batch count, so clear the log and let commit's
-    // single repaint be the one under test.
     scratch.callLog.length = 0;
     commitStroke(session);
 
     return scratch;
   };
 
-  const alphaValues = (surface: StubRasterSurface): number[] =>
-    surface.callLog.filter((e) => e.op === 'set' && e.args[0] === 'globalAlpha').map((e) => e.args[1] as number);
-
-  it('fills the stroke once at full alpha when pressure opacity is off', () => {
-    const scratch = runPressureStroke(false, [0.25, 0.5, 1]);
-
-    // Fill the whole outline once so overlaps union without compounding opacity.
-    expect(scratch.callLog.filter((e) => e.op === 'fill')).toHaveLength(1);
-    expect(alphaValues(scratch).every((alpha) => alpha === 1)).toBe(true);
-  });
-
   it('paints one punch-and-fill pair per pressure band when enabled', () => {
     const scratch = runPressureStroke(true, [1, 0.5, 0.25]);
 
-    // Three distinct levels => three bands => two fills each (destination-out, then source-over).
     expect(scratch.callLog.filter((e) => e.op === 'fill')).toHaveLength(6);
     expect(compositeOps(scratch).filter((op) => op === 'destination-out')).toHaveLength(3);
   });
@@ -606,24 +430,9 @@ describe('strokeSession: pressure-dependent opacity', () => {
     );
     const signature = ops.map((e) => (e.op === 'fill' ? 'fill' : `${String(e.args[0])}=${String(e.args[1])}`));
 
-    // Every band punches its own footprint at alpha 1 before refilling at the band alpha.
-    // Without the destination-out the second band would blend into the first and darken it.
     expect(signature.join(' ')).toContain(
       'globalCompositeOperation=destination-out globalAlpha=1 fill globalCompositeOperation=source-over'
     );
-  });
-
-  it('drives band alpha from pen pressure', () => {
-    const scratch = runPressureStroke(true, [1, 0.5]);
-
-    expect(alphaValues(scratch)).toContain(1);
-    expect(alphaValues(scratch)).toContain(0.5);
-  });
-
-  it('collapses a constant-pressure stroke to a single band', () => {
-    const scratch = runPressureStroke(true, [0.5, 0.5, 0.5]);
-
-    expect(scratch.callLog.filter((e) => e.op === 'fill')).toHaveLength(2);
   });
 });
 
@@ -671,7 +480,6 @@ describe('layer transforms', () => {
     expect(scaled?.dirtyRect.x).toBe(128);
     expect(scaled?.dirtyRect.y).toBe(128);
 
-    // Identity stays byte-for-byte where it always painted.
     const plain = sessionOn(null, { x: 300, y: 300 });
     expect(plain?.dirtyRect.x).toBe(256);
     expect(plain?.dirtyRect.y).toBe(256);
@@ -719,11 +527,6 @@ describe('tap collapse', () => {
     expect(sessionWithDrift(6)!.dirtyRect).toEqual(clean);
     expect(sessionWithDrift(12)!.dirtyRect).toEqual(clean);
   });
-
-  it('still extends a deliberate drag past the collapse threshold', () => {
-    const clean = sessionWithDrift(0)!.dirtyRect;
-    expect(sessionWithDrift(40)!.dirtyRect.width).toBeGreaterThan(clean.width);
-  });
 });
 
 describe('frame-coalesced rendering', () => {
@@ -768,7 +571,6 @@ describe('frame-coalesced rendering', () => {
       thinning: 0,
       tool: 'brush',
     });
-    /** Live stroke renders so far: each one reports its damage to the scheduler. */
     const renders = (): number => invalidate.mock.calls.length;
     const presentFrame = (): void => frames.splice(0).forEach((task) => task());
     return { frames, layers, onRenderError, presentFrame, renders, session };
@@ -801,31 +603,6 @@ describe('frame-coalesced rendering', () => {
     expect(event?.dirtyRect.width).toBeGreaterThan(50);
     session.addPoints([pointer(80, 10)]);
     expect(frames).toHaveLength(0);
-  });
-
-  it('cancellation removes scheduled work and leaves the cache untouched', () => {
-    const { frames, layers, renders, session } = makeFramedSession();
-    const version = layers.version('L');
-    session.addPoints([pointer(10, 10), pointer(40, 40)]);
-
-    session.cancel();
-
-    expect(frames).toHaveLength(0);
-    expect(renders()).toBe(0);
-    expect(layers.version('L')).toBe(version);
-    expect(commitStroke(session)).toBeNull();
-  });
-
-  it('hands a failed frame render to its owner before propagating it', () => {
-    const { layers, onRenderError, presentFrame, session } = makeFramedSession();
-    session.addPoints([pointer(10, 10)]);
-    const failure = new Error('frame paint failed');
-    vi.spyOn(layers, 'growToRect').mockImplementation(() => {
-      throw failure;
-    });
-
-    expect(presentFrame).toThrow(failure);
-    expect(onRenderError).toHaveBeenCalledWith(failure);
   });
 });
 

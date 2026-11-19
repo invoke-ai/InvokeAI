@@ -22,7 +22,6 @@ vi.mock('@workbench/projects/library', () => ({
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
   useActiveProjectName: () => 'Project',
-  // No stored gallery values: the panel's default listing.
   useActiveProjectSelector: () => ({}),
   useWidgetValuesSelector: () => ({}),
 }));
@@ -136,7 +135,6 @@ const render = async (action: LayerContextAction, onSelect = vi.fn()) => {
   };
 };
 
-/** Presses each key in the parent menu; returns the highlighted item's name (or value) after each press. */
 const walkKeys = async (keys: readonly string[]): Promise<(string | undefined)[]> => {
   await interact(() => document.querySelector<HTMLElement>('[role="menu"]')!.focus());
   const highlighted: (string | undefined)[] = [];
@@ -161,7 +159,6 @@ describe('LayerSaveToBoardSubmenu', () => {
 
     expect(listingQuery().getObserversCount()).toBe(1);
     expect(document.querySelector('[data-value="board-none"]')?.textContent).toBe('widgets.gallery.uncategorized');
-    // A board the caller can only read is no destination.
     expect(document.querySelector('[data-value="board-read-only"]')).toBeNull();
 
     await interact(() => document.querySelector<HTMLElement>('[data-value="board-mine"]')!.click());

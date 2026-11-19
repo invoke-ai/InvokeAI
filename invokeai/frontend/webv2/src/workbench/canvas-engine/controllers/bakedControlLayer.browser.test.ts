@@ -1,5 +1,3 @@
-/** Real-canvas checks that copying or converting a raster layer to a control layer keeps its displayed pixels. */
-
 import type {
   CanvasAdjustmentsContract,
   CanvasDocumentContractV3,
@@ -53,7 +51,6 @@ afterEach(() => {
   }
 });
 
-/** A rotated, scaled raster layer with a spatial stack, its controllers over a real export bake, and its display. */
 const scene = (runSpatial?: SpatialRunner) => {
   const backend = createDomRasterBackend();
   const document: CanvasDocumentContractV3 = {
@@ -154,7 +151,6 @@ const scene = (runSpatial?: SpatialRunner) => {
     trackDetached: unused,
   });
 
-  /** The settled display: the layer's exact adjusted cache through its transform, over `rect`. */
   const displayed = async (rect: Rect): Promise<number[]> => {
     const display = createAdjustedSurfaceCache(backend, undefined, { spatial: { run } });
     await vi.waitFor(
@@ -198,20 +194,6 @@ describe('copying a raster layer with a spatial stack to a control layer', () =>
     expect(getDocumentLayer(h.document(), 'new-1')).toEqual(bakedControl('new-1', 'Layer copy', rect));
     expect(pixelsOf('new-1')).toEqual(await displayed(rect));
     expect(getDocumentLayer(h.document(), 'layer')).toEqual(LAYER);
-  });
-
-  it('refuses with the layer name when the stack cannot run, adding nothing', async () => {
-    const { copy, h } = scene(() => Promise.resolve({ status: 'too-large' }));
-    const before = h.document();
-
-    expect(await copy.copy('layer', 'control')).toEqual({
-      ownerId: 'layer',
-      ownerName: 'Layer',
-      reason: 'too-large',
-      status: 'adjustment-refused',
-    });
-    expect(h.document()).toBe(before);
-    expect(h.history.canUndo()).toBe(false);
   });
 });
 

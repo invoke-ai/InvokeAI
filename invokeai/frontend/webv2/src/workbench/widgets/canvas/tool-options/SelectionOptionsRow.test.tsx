@@ -16,7 +16,6 @@ import { SelectionActions } from './SelectionOptionsRow';
 
 interface CapturedButton {
   children?: ReactNode;
-  /** The row disables through `aria-disabled` so the reason tooltip and keyboard focus keep working. */
   'aria-disabled'?: boolean;
 }
 
@@ -25,7 +24,6 @@ const { activeProject, buttons, hasSelection, reasons, transformSession } = vi.h
   transformSession: { current: null as { layerId: string } | null },
   buttons: new Map<string, CapturedButton>(),
   hasSelection: { current: true },
-  /** Each action's disabled-reason tooltip, by its label. */
   reasons: new Map<string, ReactNode>(),
 }));
 

@@ -1,8 +1,4 @@
-/**
- * Resolve the active engine, flush paint uploads, compose the fresh snapshot, compile, and enqueue. Invalid
- * controls and unsupported hosted-provider regions block. Publish dedupe only after dispatch succeeds and report
- * failures as notices. A per-project in-flight guard prevents overlapping preparation.
- */
+/** Flush, compose, compile and enqueue; dedupe publishes only after dispatch, one run per project at a time. */
 
 import type {
   CanvasScalingSettings,
@@ -39,7 +35,7 @@ import type { CanvasInvocationFailure, CanvasInvocationNotice } from './canvasIn
 
 import { readCanvasScaling } from './canvasScaling';
 
-/** Carries a blocking layer out of composition, which aborts and rethrows it. */
+/** Composition aborts and rethrows this, carrying the blocking layer out. */
 class CanvasInputRefusal extends Error {
   constructor(readonly issue: CanvasInputIssue) {
     super(`Canvas input refused: ${issue.kind}.`);
@@ -51,11 +47,7 @@ class CanvasInputRefusal extends Error {
 export interface RunCanvasInvocationDeps {
   /** The active project id (also the in-flight guard key). */
   projectId: string;
-  /**
-   * The resolved result destination. Drives the compiled output node's
-   * `is_intermediate` flag (`destination === 'canvas'`) and the enqueued
-   * snapshot's destination, so a Canvas source can target the Gallery.
-   */
+  /** Drives the output node's `is_intermediate` and the snapshot's destination, so Canvas can target Gallery. */
   destination: ResultDestination;
   /** Capture and upload generation composites, releasing pixel resources on success or failure. */
   composeForGeneration: (options: ComposeForGenerationOptions) => Promise<ComposeForGenerationResult>;
@@ -77,7 +69,6 @@ export interface RunCanvasInvocationDeps {
   models?: readonly ModelConfig[];
   /** Remembered control-model picks, which resolve control layers left on automatic. */
   controlModelMemory: ControlModelMemory;
-  /** The project settings the compiler consults. */
   projectSettings: GenerationProjectSettings;
   /** Runtime-derived accelerator family recorded in generation metadata. */
   randDevice?: string;
@@ -88,7 +79,6 @@ export interface RunCanvasInvocationDeps {
   /** Persisted "scale before processing" policy, defaulted. */
   scaling: CanvasScalingSettings;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
-  /** Words a failure from the locale for its notice. */
   formatCanvasInvocationFailure: (failure: CanvasInvocationFailure) => CanvasInvocationNotice;
 }
 
@@ -100,7 +90,6 @@ const recordFailure = (
   notifications.add({ kind: 'error', ...formatCanvasInvocationFailure(failure) });
 };
 
-/** Whether composition uploads a layer, remembering what it contributes; a blocked layer aborts composition. */
 const admitLayer = <Verdict extends ControlLayerVerdict | RegionalLayerVerdict>(
   verdict: Verdict,
   layerId: string,
@@ -116,11 +105,7 @@ const admitLayer = <Verdict extends ControlLayerVerdict | RegionalLayerVerdict>(
   throw new CanvasInputRefusal(verdict.issue);
 };
 
-/**
- * Runs the canvas-invoke pipeline with injected dependencies. Never throws:
- * every failure is turned into a notice, and the in-flight guard is always
- * cleared. Returns when the graph has been dispatched (or the invoke aborted).
- */
+/** Never throws: failures become notices and the in-flight guard always clears. */
 export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promise<void> => {
   const { commands, inFlight, projectId } = deps;
   const inFlightKey = deps.inFlightKey ?? projectId;
@@ -152,15 +137,13 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
       model,
       models: deps.models,
     });
-    // What each accepted layer contributes, joined with its upload once composition reports it.
     const controlInputs = new Map<string, Omit<ControlLayerGraphInput, 'imageName'>>();
     const regionalInputs = new Map<string, Omit<RegionalGuidanceInput, 'maskImageName' | 'maskBounds'>>();
     const composed = await deps.composeForGeneration({
-      // Mode-union drift guard: `detectCanvasMode`'s facts/mode types must stay
-      // structurally identical to canvas-operations' `GenerationModeFacts` /
-      // `GenerationCompositeMode` — tsc fails here on drift in either direction.
-      // A hosted model takes the frame's pixels as they are, with no masked tail: bounds that overlap the frame with
-      // nothing visible inside it leave an empty frame, which it generates from text.
+      // Mode-union drift guard: `detectCanvasMode`'s facts/mode types must stay structurally identical to
+      // canvas-operations' `GenerationModeFacts` / `GenerationCompositeMode` — tsc fails here on drift in either
+      // direction. A hosted model takes the frame's pixels as they are, with no masked tail: bounds that overlap the
+      // frame with nothing visible inside it leave an empty frame, which it generates from text.
       detectMode: (facts) =>
         model.type === 'external_image_generator' && !facts.bboxHasContent ? 'txt2img' : detectCanvasMode(facts),
       shouldCompositeControlLayer: (layer) => admitLayer(judge.control(layer), layer.id, controlInputs),
@@ -249,7 +232,6 @@ registerAccountOwnedResource({
   name: 'canvas-invocation-guards',
 });
 
-/** Arguments for the thin command-layer {@link prepareCanvasInvocation}. */
 export interface PrepareCanvasInvocationArgs {
   projectId: string;
   /** The resolved result destination (Canvas staging vs. a durable Gallery image). */
@@ -258,32 +240,20 @@ export interface PrepareCanvasInvocationArgs {
   models?: readonly ModelConfig[];
   /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
   owner?: AccountScope;
-  /** Expanded by the caller before submitting. */
   expansion?: ExpandedPositivePrompts;
-  /** Invoke Front: the backend runs the batch ahead of the user's other pending work. */
   prepend?: boolean;
   projectSettings: GenerationProjectSettings;
-  /**
-   * The canvas widget's persisted values. The scaling policy is read here, in
-   * the lazily loaded orchestrator, so its reader stays out of the eager submit path.
-   */
+  /** Read here, in the lazy orchestrator, so the scaling reader stays out of the eager submit path. */
   canvasValues?: Record<string, unknown>;
   strength: number;
   signal?: AbortSignal;
-  /**
-   * Persisted compositing settings, already defaulted + clamped by the caller
-   * (`readCanvasCompositingSettings`). Falls back to legacy defaults when omitted.
-   */
+  /** Persisted compositing settings, already defaulted and clamped by the caller; legacy defaults when omitted. */
   compositing?: CanvasCompositingSettings;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
-  /** Words a failure from the locale for its notice. */
   formatCanvasInvocationFailure: RunCanvasInvocationDeps['formatCanvasInvocationFailure'];
 }
 
-/**
- * Settle after dispatch or reported failure so the active command keeps its preparing acknowledgement through the
- * entire pre-queue window.
- */
+/** Settles after dispatch or a reported failure, keeping the preparing acknowledgement until queued. */
 export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs): Promise<void> => {
   const owner = args.owner ?? captureAccountScope();
   if (!isAccountScopeCurrent(owner)) {

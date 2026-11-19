@@ -40,8 +40,8 @@ export const ClearSavedDataSettings = ({ description, label }: { description: st
   const openConfirm = useCallback(() => {
     setTyped('');
     setIsConfirmOpen(true);
-    // The count must be the server's now, not the one listed when the library last loaded (another tab may have
-    // created or deleted projects since); the listing on hand shows until the fresh one lands.
+    // The count must be the server's now, not the one listed when the library last loaded (another tab may have created
+    // or deleted projects since); the listing on hand shows until the fresh one lands.
     void refreshProjectLibrary();
   }, []);
   const closeConfirm = useCallback(() => setIsConfirmOpen(false), []);

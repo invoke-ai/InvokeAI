@@ -27,9 +27,9 @@ const sameTransform = (a: LayerTransform, b: LayerTransform): boolean =>
  * Where the last committed brush or eraser stroke ended on each layer, for Shift-click straight lines. Points are kept
  * layer-local, so a change of transform alone (a move, nudge, Fit to frame or transform parameter) carries them with
  * the layer. A change that rewrites the layer's content and transform together (crop, conversion, a baked float or
- * result) keeps the point where the content stays in the document, mapping it from the previous transform into the
- * new one. An applied Transform on a paint layer rewrites only its pixels, so it says where they went with
- * {@link rebase}. A point the new transform cannot hold is forgotten.
+ * result) keeps the point where the content stays in the document, mapping it from the previous transform into the new
+ * one. An applied Transform on a paint layer rewrites only its pixels, so it says where they went with {@link rebase}.
+ * A point the new transform cannot hold is forgotten.
  */
 export class PaintLineEndController implements PaintLineEnds {
   private readonly ends = new Map<string, LineEnd>();
@@ -75,8 +75,8 @@ export class PaintLineEndController implements PaintLineEnds {
   }
 
   /**
-   * The layer's pixels were redrawn through `from`, the transform they were shown at, into its current local space
-   * (an applied Transform on a paint layer); the point follows them.
+   * The layer's pixels were redrawn through `from`, the transform they were shown at, into its current local space (an
+   * applied Transform on a paint layer); the point follows them.
    */
   rebase(layerId: string, from: LayerTransform): void {
     this.onLayerChanged(layerId);

@@ -21,7 +21,6 @@ import { submitResolvedInvocation } from './invocationSubmit';
 export interface ActiveInvocationSubmissionArgs {
   commands: WorkbenchCommands;
   destinationOverride?: ResultDestination;
-  /** Words a failed Canvas preparation from the locale for its notice. */
   formatCanvasInvocationFailure: PrepareCanvasInvocationArgs['formatCanvasInvocationFailure'];
   formatUpscaleMetadataFailure: SubmitResolvedInvocationDeps['formatUpscaleMetadataFailure'];
   getModels: () => readonly ModelConfig[] | undefined;

@@ -39,7 +39,6 @@ export interface InvocationRoute {
   destinationLocked: boolean;
 }
 
-/** A canvas layer or the frame's content blocking the Canvas source, kept structured so the shell words it. */
 export interface CanvasInputValidationReason {
   canvasInputIssue: CanvasInputIssue;
 }

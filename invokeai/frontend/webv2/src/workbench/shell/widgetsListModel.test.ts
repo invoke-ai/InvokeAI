@@ -6,7 +6,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { canAddWidget } from './widgetsListModel';
 
 describe('canAddWidget', () => {
-  // Every row asks on every render; starting a chunk load there pulled whole widget bundles in with the list.
   it('answers for panels and status chips without loading any widget', () => {
     const preloads = vi.fn();
     const quiet = (widget: RegisteredWidget): RegisteredWidget => ({

@@ -73,8 +73,8 @@ type Point = { x: number; y: number };
 /**
  * The probe sits on top of everything, so hovering it is also a leave from whatever lies beneath (the card, say). The
  * browser recomputes hover in the next frame and re-enters that element; wait for it, or a close the leave scheduled
- * can fire first. Bounded by a second frame: by then the recomputation has run, and a step that never put the
- * pointer over the probe has nothing to re-enter.
+ * can fire first. Bounded by a second frame: by then the recomputation has run, and a step that never put the pointer
+ * over the probe has nothing to re-enter.
  */
 const pointerUncovered = (): Promise<void> =>
   new Promise<void>((resolve) => {

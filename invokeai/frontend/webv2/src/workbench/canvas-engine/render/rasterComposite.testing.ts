@@ -3,12 +3,11 @@ import type { Rect } from '@workbench/canvas-engine/types';
 
 /**
  * A noisy text layer the browser measures wider than its estimate. Estimated 240×100 (0.6 em per glyph); measured
- * 400×100. At scale 0.02 the 8×4 output samples the whole layer-local region, so noise adjusts 400×100 pixels where
- * the composite plan expected 240×100.
+ * 400×100. At scale 0.02 the 8×4 output samples the whole layer-local region, so noise adjusts 400×100 pixels where the
+ * composite plan expected 240×100.
  */
 export const MEASURED_NOISY_TEXT = {
   bbox: { height: 4, width: 8, x: 0, y: 0 } satisfies Rect,
-  /** Scratch pixels beyond the plan that rendering must reserve. */
   excessPixels: 400 * 100 - 240 * 100,
   layer: {
     adjustments: [
@@ -44,6 +43,5 @@ export const MEASURED_NOISY_TEXT = {
     type: 'raster',
   } satisfies CanvasRasterLayerContractV2,
   measured: { height: 100, width: 400, x: 0, y: 0 } satisfies Rect,
-  /** The scratch the plan reserves from the estimate. */
   plannedScratchPixels: 240 * 100,
 } as const;

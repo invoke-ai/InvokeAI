@@ -102,8 +102,7 @@ const createContext = (): ExternalGenerationRevealContext => ({
 });
 
 /**
- * Attach the composing bridge with the real reveal module (and through it the real Find in Gallery path), recording
- * each reveal run so a test can wait for all of them to settle.
+ * Attach the composing bridge with the real reveal module (and real Find in Gallery), recording runs to await settling.
  */
 const attach = (loadGate: Promise<void> = Promise.resolve()) => {
   const runs: Promise<unknown>[] = [];

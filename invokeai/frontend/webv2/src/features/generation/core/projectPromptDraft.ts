@@ -5,9 +5,8 @@ import { isCanonicalPromptTemplateSnapshot, sanitizePromptTemplateSnapshot } fro
 import { normalizeDynamicPromptsSettings } from './settings';
 
 /**
- * The prompt Generate and Upscale share, stored in Generate's values: the text, the template that wraps it, and how
- * it expands. They travel together because a shared prompt that generated differently on each surface would not be
- * shared.
+ * The prompt Generate and Upscale share, stored in Generate's values: the text, the template that wraps it, and how it
+ * expands. They travel together because a shared prompt that generated differently on each surface would not be shared.
  */
 export interface ProjectPromptDraft extends DynamicPromptsSettings {
   negativePrompt: string;

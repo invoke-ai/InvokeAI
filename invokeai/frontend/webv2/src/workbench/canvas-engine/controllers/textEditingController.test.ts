@@ -49,7 +49,6 @@ describe('TextEditingController', () => {
     expect(h.getSession()).toBeNull();
     expect(h.commitStructural).toHaveBeenCalledOnce();
     expect(h.commitStructural.mock.calls[0]?.[0]).toBe('Add text');
-    // The session's color is the active foreground at open, not a tool option.
     const forward = h.commitStructural.mock.calls[0]?.[1] as { layer?: { source?: { color?: string } } };
     expect(forward.layer?.source?.color).toBe('#123456');
   });

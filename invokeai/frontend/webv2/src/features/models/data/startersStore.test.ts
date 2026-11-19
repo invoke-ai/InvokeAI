@@ -17,7 +17,6 @@ describe('starters store', () => {
     const store = await import('./startersStore');
 
     const first = store.refreshStarters();
-    // Joining mid-flight shares the request and queues one trailing rerun.
     expect(store.refreshStarters()).toBe(first);
     await first;
     expect(store.getStartersSnapshot()).toMatchObject({ response, status: 'loaded' });

@@ -2,6 +2,7 @@ import type {
   BulkDeleteModelsResponse,
   BulkReidentifyModelsResponse,
   DeleteOrphanedModelsResponse,
+  EmptyModelCacheResponse,
   FoundModel,
   HFTokenStatus,
   HuggingFaceModels,
@@ -47,11 +48,8 @@ export interface Fp8StorageSupportRow {
 }
 
 /**
- * Which kinds of model FP8 Storage actually does something for. Static per backend build.
- *
- * Keyed by the loader key rather than the model type, because the answer differs along all three
- * parts: FLUX main implements the cast, FLUX ControlNet does not, and a GGUF main model must never be
- * re-encoded. A key the backend does not serve is not supported.
+ * The loader keys FP8 Storage does something for, static per backend build; the answer differs along all three parts
+ * (see `fp8StorageSupportStore`). A key the backend does not serve is not supported.
  */
 export const getFp8StorageSupport = (signal?: AbortSignal): Promise<Fp8StorageSupportRow[]> =>
   requestJson<Fp8StorageSupportRow[]>(`${MODELS_BASE}/fp8_storage_support`, { signal });
@@ -214,9 +212,8 @@ export const deleteOrphanedModels = (paths: string[], signal?: AbortSignal): Pro
     signal,
   });
 
-export const emptyModelCache = async (signal?: AbortSignal): Promise<void> => {
-  await request(`${MODELS_BASE}/empty_model_cache`, { method: 'POST', signal });
-};
+export const emptyModelCache = (signal?: AbortSignal): Promise<EmptyModelCacheResponse> =>
+  requestJson<EmptyModelCacheResponse>(`${MODELS_BASE}/empty_model_cache`, { method: 'POST', signal });
 
 /** External image-provider credentials (OpenAI, Gemini, ...). */
 

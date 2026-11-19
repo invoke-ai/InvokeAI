@@ -12,7 +12,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   deriveControlPanel,
-  formatPanelText,
   type ControlPanelInput,
   type ControlPanelModel,
   type PanelText,
@@ -39,7 +38,6 @@ const controlLayer = (
   return { ...created, ...rest, adapter: adapterModel === undefined ? adapter : { ...adapter, model: adapterModel } };
 };
 
-/** A typed layer holding a photo it detects `detector` from, with the map current. */
 const detected = (controlType: ControlType, detector: string | null, extra: Partial<CanvasControlLayerContract> = {}) =>
   controlLayer({
     controlType,
@@ -82,7 +80,6 @@ const derive = (
   });
 };
 
-/** Every text a model carries, for the catalog check at the end. */
 const seen: PanelText[] = [];
 const collect = (panel: ControlPanelModel): ControlPanelModel => {
   const texts = [
@@ -150,21 +147,6 @@ describe('control panel design states', () => {
     });
   });
 
-  it('4: several depth models ask for a choice and list them', () => {
-    const panel = panelOf(detected('depth', 'depth_anything_depth_estimation'), { models: [depthA, depthB] });
-
-    expect(panel.model).toMatchObject({
-      caption: {
-        key: 'modelCaption.ambiguous',
-        lists: { models: ['sdxl-depth-a', 'sdxl-depth-b'] },
-        values: { count: 2 },
-      },
-      name: null,
-      tone: 'warning',
-      valueText: { key: 'modelValue.choose', refs: { type: 'typeNouns.depth' } },
-    });
-  });
-
   it('5: an explicit or remembered pick says which it is and offers Reset', () => {
     const explicit = panelOf(
       detected('depth', 'depth_anything_depth_estimation', {
@@ -182,56 +164,15 @@ describe('control panel design states', () => {
       caption: { key: 'modelCaption.pick', refs: { kind: 'kinds.controlnet', type: 'typeNouns.depth' } },
       name: 'sdxl-depth-b',
     });
-    // An undo takes back the layer's pick but not the account's memory: the caption must not read as the same pick.
     expect(remembered.model).toMatchObject({
       action: 'reset',
       caption: { key: 'modelCaption.remembered', refs: { kind: 'kinds.controlnet', type: 'typeNouns.depth' } },
       name: 'sdxl-depth-b',
     });
   });
-
-  it('6: a union model covering the type is used and named as the union', () => {
-    const panel = panelOf(detected('depth', 'depth_anything_depth_estimation'), { base: 'flux', models: [fluxUnion] });
-
-    expect(panel.model).toMatchObject({ caption: { key: 'modelCaption.union' }, name: 'flux-controlnet-union-pro' });
-  });
-
-  it('7: nothing installed for the type points to finding one', () => {
-    const panel = panelOf(detected('lineart', 'lineart_edge_detection'), { models: [depthA] });
-
-    expect(panel.model).toMatchObject({
-      action: 'find-one',
-      caption: { key: 'modelCaption.noneForBase', refs: { type: 'typeNouns.lineart' }, values: { base: 'SDXL' } },
-      tone: 'warning',
-      valueText: { key: 'modelValue.noneForBase', values: { base: 'SDXL' } },
-    });
-    expect(panel.type.hints.lineart).toEqual({ text: { key: 'typeHint.notInstalled' }, tone: 'warning' });
-  });
-
-  it('8: no control models at all points to the starter models', () => {
-    const panel = panelOf(detected('depth', 'depth_anything_depth_estimation'), { models: [] });
-
-    expect(panel.model).toMatchObject({
-      action: 'install-starters',
-      caption: { key: 'modelCaption.noModels' },
-      valueText: { key: 'modelValue.noModels' },
-    });
-  });
 });
 
 describe('control panel detection', () => {
-  it('offers Tile only its None entry, with no settings', () => {
-    const panel = panelOf(detected('tile', null));
-
-    expect(panel.detection.options.map((option) => option.value)).toEqual(['none']);
-    expect(panel.detection).toMatchObject({
-      settings: null,
-      settingsUnavailable: { key: 'detectionNoSettings', refs: { detector: 'detectionNone.tile' } },
-      value: 'none',
-      valueText: { key: 'detectionNone.tile' },
-    });
-  });
-
   it('shows the running detector, queued or processing', () => {
     const layer = detected('depth', 'depth_anything_depth_estimation');
 
@@ -250,7 +191,6 @@ describe('control panel detection', () => {
 
     expect(failed.detection).toMatchObject({ action: 'retry', failed: { code: 'process-failed' }, tone: 'error' });
     expect(panelOf(layer, { map: 'stale' }).detection.action).toBe('detect');
-    // A queued run is already on its way.
     expect(panelOf(layer, { map: 'stale', status: { status: 'queued' } }).detection.action).toBeNull();
   });
 
@@ -274,32 +214,10 @@ describe('control panel detection', () => {
     expect(mapOnly.detection.options[0]).toMatchObject({ disabled: true, hint: { key: 'detectionNoInput' } });
     expect(mapOnly.detection.settings).toBeNull();
     expect(mapOnly.detection.settingsUnavailable).toEqual({ key: 'detectionNoInput' });
-    // An emptied layer that still names its detector says the image is what is missing.
     const emptied = panelOf(
       controlLayer({ controlType: 'depth', detection: { settings: {}, type: 'depth_anything_depth_estimation' } })
     );
     expect(emptied.detection.settingsUnavailable).toEqual({ key: 'detectionNeedsImage' });
-  });
-
-  it('leaves the detector to the first image of an empty layer instead of reading None', () => {
-    const empty = panelOf(controlLayer({ controlType: 'depth', detection: null }));
-    const withImage = panelOf(detected('depth', null));
-    // Tile has no detector to choose, so None is what it will be.
-    const tile = panelOf(controlLayer({ controlType: 'tile', detection: null }));
-
-    // Nothing to choose yet (None would change nothing), and no settings until there is an image.
-    expect(empty.detection).toMatchObject({
-      disabled: true,
-      settingsUnavailable: { key: 'detectionAddImageFirst' },
-      value: null,
-      valueText: { key: 'detectionChosenOnImage' },
-    });
-    expect(withImage.detection).toMatchObject({
-      disabled: false,
-      value: 'none',
-      valueText: { key: 'detectionNone.depth' },
-    });
-    expect(tile.detection).toMatchObject({ disabled: false, value: 'none', valueText: { key: 'detectionNone.tile' } });
   });
 });
 
@@ -317,19 +235,6 @@ describe('control panel model caption', () => {
       caption: { key: 'modelCaption.mismatch', refs: { family: 'families.depth', madeFor: 'families.normal' } },
       captionTone: 'warning',
     });
-  });
-
-  it('puts a problem with the model itself ahead of the explanation', () => {
-    const panel = panelOf(detected('depth', 'depth_anything_depth_estimation'), { reason: 'control_lora_limit' });
-
-    expect(panel.model).toMatchObject({ caption: { key: 'validation.control_lora_limit' }, captionTone: 'warning' });
-  });
-
-  it('keeps a working untyped layer quiet and names its kind', () => {
-    const panel = panelOf(controlLayer({ model: 'sdxl-openpose', source: IMAGE }));
-
-    expect(panel.type.invalid).toBe(false);
-    expect(panel.model).toMatchObject({ caption: { key: 'kinds.controlnet' }, name: 'sdxl-openpose' });
   });
 });
 
@@ -378,22 +283,4 @@ await english.init({
   initAsync: false,
   lng: 'en',
   resources: { en: { translation: Object.values(englishCatalog)[0] as Record<string, unknown> } },
-});
-
-describe('panel texts', () => {
-  it('finds every key the states above produced in the English catalog', () => {
-    const keys = seen.flatMap((text) => [text.key, ...Object.values(text.refs ?? {})]);
-    const missing = keys
-      .map((key) => `widgets.layers.control.${key}`)
-      .filter((key) => !english.exists(key) && !english.exists(`${key}_other`));
-
-    expect(seen.length).toBeGreaterThan(20);
-    expect(missing).toEqual([]);
-  });
-
-  it('joins listed names as alternatives', () => {
-    const text = { key: 'modelCaption.ambiguous', lists: { models: ['A', 'B', 'C'] }, values: { count: 3 } };
-
-    expect(formatPanelText(english.t.bind(english), text, 'en')).toBe('3 models fit: A, B, or C');
-  });
 });

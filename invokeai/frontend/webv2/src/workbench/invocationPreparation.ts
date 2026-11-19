@@ -21,9 +21,9 @@ const store = createExternalStoreCore<InvocationPreparationSnapshot>({ leases: E
 let nextLeaseToken = 1;
 
 /**
- * Single-flights a project's submission: acquire before the first await (lazy Canvas chunk, prompt expansion,
- * workflow generators) so a repeated invoke cannot submit the same captured settings twice. Canvas preparation
- * separately guards its own entry points.
+ * Single-flights a project's submission: acquire before the first await (lazy Canvas chunk, prompt expansion, workflow
+ * generators) so a repeated invoke cannot submit the same captured settings twice. Canvas preparation separately guards
+ * its own entry points.
  */
 export const beginInvocationPreparation = (projectId: string): InvocationPreparationLease | null => {
   const { leases } = store.getSnapshot();

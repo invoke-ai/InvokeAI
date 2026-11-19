@@ -90,9 +90,7 @@ describe('PromptTriggerPopover', () => {
     const messageBounds = message.getBoundingClientRect();
     const actionBounds = action.getBoundingClientRect();
 
-    // Measure the hover button box, not padded text, for alignment.
     expect(Math.abs(messageBounds.left - actionBounds.left)).toBeLessThanOrEqual(1);
-    // One `2.5` stack step, the same rhythm as the image-to-prompt popover.
     expect(actionBounds.top - messageBounds.bottom).toBeLessThanOrEqual(12);
   });
 });

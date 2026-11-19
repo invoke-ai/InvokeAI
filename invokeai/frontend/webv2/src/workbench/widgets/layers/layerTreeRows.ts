@@ -39,11 +39,7 @@ const rowFor = (vm: SemanticNode, expanded: boolean, posInSet: number, setSize: 
 
 const normalizeFilter = (filter: string | undefined): string => (filter ?? '').trim().toLocaleLowerCase();
 
-/**
- * The nodes a filter keeps: every node whose name matches, plus the groups above a match so the
- * match stays reachable. A kept group shows expanded when something kept sits beneath it; a
- * matching group with no kept descendant shows collapsed, since its children are not matches.
- */
+/** Matches plus the groups above them; a matching group with no kept descendant shows collapsed. */
 const filteredIds = (
   nodes: readonly SemanticNode[],
   filter: string
@@ -62,10 +58,7 @@ const filteredIds = (
   return { kept, open };
 };
 
-/**
- * Project each node once and preserve row identity while semantic state/placement/expansion remain unchanged so
- * unaffected rows skip renders.
- */
+/** Projects each node once, keeping row identity while its state is unchanged so rows skip renders. */
 export const buildLayerStackRows = (
   stacks: CanvasStackForests,
   expandedGroupIds: ReadonlySet<string>,
@@ -77,7 +70,7 @@ export const buildLayerStackRows = (
   const kept = filtered?.kept ?? null;
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const setSizeOf = (node: SemanticNode): number =>
-    node.parentId === null ? stacks[node.stack].length : (byId.get(node.parentId)?.childCount ?? 0);
+    node.parentId === null ? (stacks[node.stack]?.length ?? 0) : (byId.get(node.parentId)?.childCount ?? 0);
   const result = Object.fromEntries(
     LAYER_STACKS_TOP_FIRST.map((stack) => [
       stack,

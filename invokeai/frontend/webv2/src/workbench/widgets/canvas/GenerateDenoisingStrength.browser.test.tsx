@@ -15,7 +15,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const harness = vi.hoisted(() => ({ store: null as unknown as WorkbenchInternalStore }));
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
-// The real aggregate store behind the hooks the strength control reads.
 vi.mock('@workbench/WorkbenchContext', async () => {
   const { useSyncExternalStore } = await import('react');
   return {
@@ -35,7 +34,6 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-/** Stands in for the Render section that lays itself out around the strength slots. */
 const sectionRendered = vi.fn();
 const Section = ({ slots }: { slots: CanvasDenoisingStrength }) => {
   sectionRendered();
@@ -91,7 +89,6 @@ describe('GenerateDenoisingStrength', () => {
 
     expect(header.textContent).toBe('77%');
     expect(slider().getAttribute('aria-valuenow')).toBe('0.77');
-    // The draft commits after its debounce, and that commit does not re-render the section either.
     await vi.waitFor(() => expect(committedStrength()).toBeCloseTo(0.77), { timeout: 1_000 });
     expect(sectionRendered).toHaveBeenCalledTimes(rendersAtMount);
   });

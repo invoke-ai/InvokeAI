@@ -21,7 +21,6 @@ describe('gradient stop math', () => {
     expect(sampleGradientColor(BW, 0.5)).toBe('#808080ff');
     expect(sampleGradientColor(BW, -1)).toBe('#000000ff');
     expect(sampleGradientColor(BW, 2)).toBe('#ffffffff');
-    // Alpha interpolates too, and a #rrggbb stop counts as opaque.
     const translucent: GradientStop[] = [
       { color: '#ff000000', offset: 0 },
       { color: '#ff0000', offset: 1 },

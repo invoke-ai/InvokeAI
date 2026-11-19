@@ -30,9 +30,9 @@ export interface ControlLayerCheckContext {
 }
 
 /**
- * Before capabilities load every kind counts as supported, so resolution still finds models; validation then
- * reports `capabilities_unavailable` instead of a misleading missing model. Without a main model (`base` null) no
- * base restricts kinds either.
+ * Before capabilities load every kind counts as supported, so resolution still finds models; validation then reports
+ * `capabilities_unavailable` instead of a misleading missing model. Without a main model (`base` null) no base
+ * restricts kinds either.
  */
 export const createControlLayerCheckContext = (
   base: string | null,
@@ -53,10 +53,7 @@ export interface ControlLayerJudgement {
   skip: boolean;
 }
 
-/**
- * Judges control layers in generation order, as the invocation does: per-generation limits count only layers that
- * passed. The canvas input judge (Invoke readiness and the invocation) and the settings panel share it.
- */
+/** Per-generation limits count only layers that passed earlier in generation order. */
 export const createControlLayerSequence = (
   mainModel: MainModel,
   models: readonly ModelConfig[],
@@ -106,9 +103,9 @@ const getControlMapState = (layer: CanvasControlLayerContract): ControlMapState 
 };
 
 /**
- * One layer as the settings panel, the layer row and Invoke present it. With `earlier` (the contributing layers
- * above it) the reason includes per-generation limits, as Invoke judges it; without, it is the ambient warning.
- * Without a main model the layer resolves across every base and only resolution and detection give a reason.
+ * One layer as the settings panel, the layer row and Invoke present it. With `earlier` (the contributing layers above
+ * it) the reason includes per-generation limits, as Invoke judges it; without, it is the ambient warning. Without a
+ * main model the layer resolves across every base and only resolution and detection give a reason.
  */
 export const describeControlLayer = (
   layer: CanvasControlLayerContract,
