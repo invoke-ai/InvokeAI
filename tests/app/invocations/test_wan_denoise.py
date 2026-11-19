@@ -273,12 +273,25 @@ class TestWanDenoiseShapes:
         monkeypatch.setattr(
             torch.cuda,
             "get_device_properties",
-            lambda _device: MagicMock(total_memory=total_vram),
+            lambda _device: MagicMock(total_memory=total_vram, is_integrated=False),
         )
 
         working_mem_bytes = _get_wan_transformer_working_mem_bytes(torch.device("cuda"), enabled=True)
 
         assert working_mem_bytes == 22 * 2**30
+
+    def test_memory_optimization_uses_current_host_headroom_on_integrated_cuda(self, monkeypatch) -> None:
+        monkeypatch.setattr(torch.version, "hip", None)
+        monkeypatch.setattr("invokeai.app.invocations.wan.wan_denoise.device_is_integrated", lambda _device: True)
+        monkeypatch.setattr(
+            "invokeai.app.invocations.wan.wan_denoise.TorchDevice.memory_available_to_process",
+            classmethod(lambda _cls, _device: 28 * 2**30),
+        )
+        monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: 4 * 2**30)
+        monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _device: MagicMock(total_memory=64 * 2**30))
+
+        # 28 GiB available to the process minus 4 GiB allocated = 24 GiB host headroom.
+        assert _get_wan_transformer_working_mem_bytes(torch.device("cuda"), enabled=True) == 22 * 2**30
 
     def test_memory_optimization_does_not_change_cpu_or_disabled_loading(self) -> None:
         assert _get_wan_transformer_working_mem_bytes(torch.device("cpu"), enabled=True) is None

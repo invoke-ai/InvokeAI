@@ -20,7 +20,11 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import QwenVLEncoderField
 from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.load.model_cache.model_cache import MB, MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.load.model_cache.model_cache import (
+    MB,
+    MODEL_LOAD_LOCK,
+    integrated_cuda_admission_lock,
+)
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     AUTOCAST_MODULE_TYPE_MAPPING,
     BNB_LINEAR_TYPE_MAPPING,
@@ -523,7 +527,8 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
 
         # Three steps, each under the lock its kind of work requires (see MODEL_LOAD_LOCK), so that the process-global
         # lock is held no longer than necessary - while a writer holds it, or waits for it, every VRAM move on every
-        # worker stalls, and every reader delays every cold model construction:
+        # worker stalls, and every reader delays every cold model construction. The integrated-CUDA admission guard
+        # spans all three steps because the out-of-cache allocation competes with the cache's system-RAM residency.
         # 1. the offload is a VRAM move like any other (`load_state_dict(assign=True)` -> `register_parameter`), so it
         #    takes the read lock, acquired *before* the cache lock `make_room_in_vram` takes, per the lock-ordering
         #    contract;
@@ -542,37 +547,38 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         text_encoder: torch.nn.Module | None = None
         patches = ExitStack()
         try:
-            # A CPU execution device has no VRAM to make room in (recent bitsandbytes can quantize on the CPU).
-            if quantized_bytes > 0 and device.type != "cpu":
-                with MODEL_LOAD_LOCK.read_lock():
-                    vram_available = context.models.make_room_in_vram(quantized_bytes)
-                if vram_available < quantized_bytes:
-                    context.logger.warning(
-                        f"Only {max(vram_available, 0) / MB:.0f} MB of VRAM could be made available on {device} for "
-                        f"the {self.quantization}-quantized Qwen2.5-VL encoder (~{quantized_bytes / MB:.0f} MB); "
-                        "locked (in-use) models cannot be offloaded. The load may run out of memory."
+            with integrated_cuda_admission_lock(device):
+                # A CPU execution device has no VRAM to make room in (recent bitsandbytes can quantize on the CPU).
+                if quantized_bytes > 0 and device.type != "cpu":
+                    with MODEL_LOAD_LOCK.read_lock():
+                        vram_available = context.models.make_room_in_vram(quantized_bytes)
+                    if vram_available < quantized_bytes:
+                        context.logger.warning(
+                            f"Only {max(vram_available, 0) / MB:.0f} MB of VRAM could be made available on {device} for "
+                            f"the {self.quantization}-quantized Qwen2.5-VL encoder (~{quantized_bytes / MB:.0f} MB); "
+                            "locked (in-use) models cannot be offloaded. The load may run out of memory."
+                        )
+
+                model_config = Qwen2_5_VLConfig.from_pretrained(str(encoder_path), local_files_only=True)
+                state_dict = _read_checkpoint(encoder_path)
+
+                with MODEL_LOAD_LOCK.write_lock():
+                    text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                        None if state_dict is not None else str(encoder_path),
+                        config=model_config,
+                        state_dict=state_dict,
+                        quantization_config=bnb_config,
+                        device_map={"": device},
+                        dtype=torch.bfloat16,
+                        local_files_only=True,
                     )
 
-            model_config = Qwen2_5_VLConfig.from_pretrained(str(encoder_path), local_files_only=True)
-            state_dict = _read_checkpoint(encoder_path)
-
-            with MODEL_LOAD_LOCK.write_lock():
-                text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                    None if state_dict is not None else str(encoder_path),
-                    config=model_config,
-                    state_dict=state_dict,
-                    quantization_config=bnb_config,
-                    device_map={"": device},
-                    dtype=torch.bfloat16,
-                    local_files_only=True,
-                )
-
-            if self.qwen_vl_encoder.loras:
-                _make_bnb_layers_patchable(text_encoder)
-                # Quantized layers cannot be patched in place, and there are no cached weights to restore from.
-                self._apply_lora_patches(
-                    context, patches, text_encoder, device, cached_weights=None, force_sidecar_patching=True
-                )
+                if self.qwen_vl_encoder.loras:
+                    _make_bnb_layers_patchable(text_encoder)
+                    # Quantized layers cannot be patched in place, and there are no cached weights to restore from.
+                    self._apply_lora_patches(
+                        context, patches, text_encoder, device, cached_weights=None, force_sidecar_patching=True
+                    )
         except BaseException as exc:
             # A failed load (an OOM is the expected way) leaves the partially built model referenced only by the
             # in-flight traceback's frames. Without releasing it here its weights stay allocated until the session

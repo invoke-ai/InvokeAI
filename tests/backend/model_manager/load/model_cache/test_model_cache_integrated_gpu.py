@@ -21,6 +21,9 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_w
     CachedModelWithPartialLoad,
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    apply_custom_layers_to_model,
+)
 from invokeai.backend.util.devices import EmptyCacheOutcome, TorchDevice
 from tests.backend.model_manager.load.model_cache.cached_model.utils import DummyModule
 
@@ -175,6 +178,60 @@ def test_partial_loading_is_honoured_on_integrated_cuda(mock_logger: MagicMock):
         with _patch_integrated_cuda():
             cache.put("m", DummyModule())
         assert isinstance(cache._cached_models["m"].cached_model, CachedModelWithPartialLoad)
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_partial_load_refuses_when_required_weights_do_not_fit_and_can_retry(
+    mock_logger: MagicMock,
+):
+    """A minimum-weight shortfall raises before transfer and leaves the cache entry reusable."""
+    cache = _make_cuda_cache(mock_logger, enable_partial_loading=True)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            cache._offload_unlocked_models = MagicMock(return_value=0)  # type: ignore[method-assign]
+            cache._move_model_to_ram = MagicMock(return_value=0)  # type: ignore[method-assign]
+            cache._get_vram_available = MagicMock(return_value=0)  # type: ignore[method-assign]
+            move = MagicMock()
+            cache._move_model_to_vram = move  # type: ignore[method-assign]
+
+            with pytest.raises(torch.OutOfMemoryError, match="minimum required weights"):
+                cache.lock(entry, None)
+
+            assert move.call_count == 0
+            assert cache._cached_models["m"] is entry
+            assert not entry.is_locked
+
+            move.return_value = (0, False)
+            cache._get_vram_available.return_value = entry.cached_model.total_bytes() + 2 * 2**20
+            cache._release_allocator_blocks_for_reserve = MagicMock()  # type: ignore[method-assign]
+            assert cache.lock(entry, None)
+            cache.unlock(entry)
+            assert move.call_count == 1
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_partial_relock_with_no_required_weights_tolerates_negative_availability(
+    mock_logger: MagicMock,
+):
+    cache = _make_cuda_cache(mock_logger, enable_partial_loading=True)
+    try:
+        with _patch_integrated_cuda():
+            model = torch.nn.Sequential(torch.nn.Linear(2, 2))
+            apply_custom_layers_to_model(model)
+            cache.put("m", model)
+            entry = _entry(cache, "m")
+            cache._offload_unlocked_models = MagicMock(return_value=0)  # type: ignore[method-assign]
+            cache._move_model_to_ram = MagicMock(return_value=0)  # type: ignore[method-assign]
+            cache._get_vram_available = MagicMock(return_value=-1)  # type: ignore[method-assign]
+            cache._move_model_to_vram = MagicMock(return_value=(0, False))  # type: ignore[method-assign]
+            cache._release_allocator_blocks_for_reserve = MagicMock()  # type: ignore[method-assign]
+
+            assert cache.lock(entry, None)
+            cache.unlock(entry)
     finally:
         cache.shutdown()
 

@@ -429,6 +429,8 @@ def _drive(
     reservation: int = RESERVATION,
     free_vram: int | None = None,
     max_cache_vram_gb: float | None = None,
+    integrated_cuda: bool = False,
+    host_headroom: int | None = None,
 ) -> tuple["_Residency", "_Residency", list[tuple[str, int]], list[str]]:
     """Run `_load_branches` with both branches on a fake CUDA device of `total_vram` bytes.
 
@@ -442,6 +444,20 @@ def _drive(
     # the second lock actually meets.
     free = total_vram - (3 * GIB) // 2 - BRANCH_BYTES if free_vram is None else free_vram
     monkeypatch.setattr(torch.cuda, "mem_get_info", lambda _device: (free, total_vram))
+    monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr(
+        "invokeai.app.invocations.ideogram4.ideogram4_denoise.device_is_integrated",
+        lambda _device: integrated_cuda,
+    )
+    if integrated_cuda:
+        assert host_headroom is not None
+        cuda_allocated = 2 * GIB
+        monkeypatch.setattr(
+            TorchDevice,
+            "memory_available_to_process",
+            classmethod(lambda _cls, _device: host_headroom + cuda_allocated),
+        )
+        monkeypatch.setattr(torch.cuda, "memory_allocated", lambda _device: cuda_allocated)
     emptied: list[str] = []
     monkeypatch.setattr(TorchDevice, "empty_cache", staticmethod(lambda: emptied.append("empty_cache")))
 
@@ -563,6 +579,35 @@ def test_a_card_just_above_the_threshold_is_left_alone(monkeypatch) -> None:
     _cond, uncond, _calls, _emptied = _drive(monkeypatch, total_vram=26 * GIB)
 
     assert uncond.unloaded == []
+
+
+def test_integrated_cuda_low_host_headroom_caps_residency_even_with_a_large_device_total(monkeypatch) -> None:
+    """Integrated CUDA shares host RAM, so a large CUDA total must not make the pair look safe."""
+    host_headroom = 14 * GIB
+    _cond, uncond, calls, _emptied = _drive(
+        monkeypatch,
+        total_vram=128 * GIB,
+        integrated_cuda=True,
+        host_headroom=host_headroom,
+    )
+
+    target = host_headroom - 3 * GIB - RESERVATION
+    assert uncond.unloaded == [(BRANCH_BYTES - target, True)]
+    assert calls[1] == ("uncond", host_headroom - target)
+
+
+def test_integrated_cuda_with_room_for_the_pair_keeps_both_resident(monkeypatch) -> None:
+    """Adequate current host headroom leaves the pair uncapped even when CUDA total is irrelevant."""
+    _cond, uncond, calls, emptied = _drive(
+        monkeypatch,
+        total_vram=128 * GIB,
+        integrated_cuda=True,
+        host_headroom=20 * GIB,
+    )
+
+    assert uncond.unloaded == []
+    assert emptied == []
+    assert calls == [("cond", RESERVATION), ("uncond", RESERVATION)]
 
 
 def test_a_branch_already_below_the_target_is_not_touched(monkeypatch) -> None:

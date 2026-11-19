@@ -143,10 +143,13 @@ Invoke caches models in RAM and VRAM so it rarely loads them from disk, and size
 
 - **VRAM**: unless you set `max_cache_vram_gb`, Invoke measures the free VRAM before each load, taking into account
   what other programs use (with a ROCm build on Windows, the budget Windows grants Invoke).
-- **RAM**: unless you set `max_cache_ram_gb`, the cache gets half your system RAM minus 2GB. On a machine with an
-  NVIDIA, AMD or dedicated Intel GPU that is capped at the GPU's VRAM minus `device_working_mem_gb` (or at
-  `max_cache_vram_gb` if you set it), elsewhere at 32GB, and it is never below 4GB. The log shows the result at
-  startup: `Calculated model RAM cache size: … MB`.
+- **RAM**: unless you set `max_cache_ram_gb`, the cache gets half your system RAM minus 2GB. On a GPU with dedicated
+  memory that is capped at its VRAM minus `device_working_mem_gb` (or at `max_cache_vram_gb` if you set it). Shared-
+  memory GPUs, including integrated NVIDIA CUDA on Spark, use the same 32GB ceiling as CPU-only systems. The cap is
+  never below 4GB. The log shows the result at startup: `Calculated model RAM cache size: … MB`.
+
+Integrated-CUDA admission is coordinated within one InvokeAI process. Other processes can still consume shared RAM
+between the headroom check and allocation.
 
 For example, on a 32GB machine with no other heavy programs, `max_cache_ram_gb: 28` caches models aggressively, so
 they reload faster.

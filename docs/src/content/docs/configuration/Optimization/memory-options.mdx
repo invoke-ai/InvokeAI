@@ -35,7 +35,9 @@ around it; close games and other GPU programs while generating, and read the
 </MemoryOption>
 <MemoryOption id="low-vram-mode" title="Low-VRAM mode is already on">
 On NVIDIA, AMD and Intel GPUs, Invoke streams the layers of a model too large for your VRAM from RAM as they are needed.
-Nothing to turn on; [Low-VRAM mode](/configuration/optimization/low-vram-mode/) lists the settings that tune it.
+On integrated NVIDIA CUDA such as Spark, that memory is shared system RAM, so Invoke sizes it from current host
+headroom rather than CUDA's reported device total. Nothing to turn on; [Low-VRAM mode](/configuration/optimization/low-vram-mode/)
+lists the settings that tune it.
 </MemoryOption>
 <MemoryOption id="fp8-storage" title="Turn on FP8 Storage for full-precision models that don't fit">
 On NVIDIA, AMD and Intel GPUs (not Apple silicon or the CPU), with a full-precision model: a per-model setting in the

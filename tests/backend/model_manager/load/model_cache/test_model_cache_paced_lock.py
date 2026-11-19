@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
+import invokeai.backend.model_manager.load.model_cache.model_cache as model_cache_module
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
@@ -162,10 +163,12 @@ def test_lock_paced_yields_global_lock_to_waiting_writer():
     writer_thread.join(timeout=10)
 
 
-def _paced_wrapper(claim: MagicMock, cache: MagicMock) -> LoadedModelWithoutConfig:
+def _paced_wrapper(claim: MagicMock, cache: MagicMock, device: torch.device | None = None) -> LoadedModelWithoutConfig:
     record = MagicMock()
     record.awaiting_first_use = False
     record.cached_model.total_bytes.return_value = 1 << 20
+    if device is not None:
+        record.cached_model.compute_device = device
     cache.release_first_use_grace = None
     cache.register_first_use_hold = None
     return LoadedModelWithoutConfig(cache_record=record, cache=cache, first_use_claim=claim)
@@ -217,3 +220,120 @@ def test_paced_stream_failure_does_not_release_first_use_claim_synchronously():
 
     claim.release.assert_not_called()
     cache.unlock.assert_not_called()
+
+
+def _multi_pass_stream(device: torch.device) -> tuple[LoadedModelWithoutConfig, MagicMock, MagicMock]:
+    cache = MagicMock()
+    cache.release_first_use_grace = None
+    cache.register_first_use_hold = None
+    claim = MagicMock()
+    loaded = _paced_wrapper(claim, cache, device)
+    cache.lock.return_value = False
+    cache.continue_lock.side_effect = [False, True]
+    return loaded, cache, claim
+
+
+def test_integrated_cuda_paced_streams_serialize_across_passes(monkeypatch: pytest.MonkeyPatch):
+    """Integrated CUDA streams hold admission across every paced pass."""
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda device: device.index == 0)
+    first_pass_started = threading.Event()
+    second_admission_attempted = threading.Event()
+    allow_first_stream = threading.Event()
+    second_stream_entered = threading.Event()
+
+    class TrackedAdmissionLock:
+        def __init__(self) -> None:
+            self._lock = threading.RLock()
+
+        def __enter__(self):
+            if threading.current_thread().name == "second-stream":
+                second_admission_attempted.set()
+            return self._lock.__enter__()
+
+        def __exit__(self, *args):
+            return self._lock.__exit__(*args)
+
+    monkeypatch.setattr(model_cache_module, "_INTEGRATED_CUDA_ADMISSION_LOCK", TrackedAdmissionLock())
+
+    first, first_cache, _ = _multi_pass_stream(torch.device("cuda:0"))
+    second, second_cache, _ = _multi_pass_stream(torch.device("cuda:0"))
+
+    def first_lock(*args, **kwargs):
+        first_pass_started.set()
+        assert allow_first_stream.wait(timeout=10), "first stream was not released"
+        return False
+
+    first_cache.lock.side_effect = first_lock
+
+    def second_lock(*args, **kwargs):
+        second_stream_entered.set()
+        return False
+
+    second_cache.lock.side_effect = second_lock
+    errors: list[BaseException] = []
+
+    def run(loaded: LoadedModelWithoutConfig) -> None:
+        try:
+            loaded._lock_paced(None)
+        except BaseException as error:
+            errors.append(error)
+
+    first_thread = threading.Thread(target=run, args=(first,), daemon=True)
+    second_thread = threading.Thread(target=run, args=(second,), name="second-stream", daemon=True)
+    first_thread.start()
+    assert first_pass_started.wait(timeout=10), "first stream did not start"
+    second_thread.start()
+    assert second_admission_attempted.wait(timeout=10), "second stream did not attempt admission"
+    assert not second_stream_entered.is_set(), "integrated streams entered concurrently"
+    allow_first_stream.set()
+    first_thread.join(timeout=10)
+    second_thread.join(timeout=10)
+
+    assert not errors
+    assert first_cache.continue_lock.call_count == 2
+    assert second_stream_entered.is_set()
+    assert second_cache.continue_lock.call_count == 2
+
+
+def test_discrete_cuda_paced_stream_can_enter_while_another_stream_is_paced(monkeypatch: pytest.MonkeyPatch):
+    """Discrete CUDA keeps the existing cross-device concurrency."""
+    monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda device: device.index == 0)
+    first_pass_started = threading.Event()
+    allow_first_stream = threading.Event()
+    second_stream_entered = threading.Event()
+
+    first, first_cache, _ = _multi_pass_stream(torch.device("cuda:0"))
+    second, second_cache, _ = _multi_pass_stream(torch.device("cuda:1"))
+
+    def first_lock(*args, **kwargs):
+        first_pass_started.set()
+        assert allow_first_stream.wait(timeout=10), "first stream was not released"
+        return False
+
+    first_cache.lock.side_effect = first_lock
+
+    def second_lock(*args, **kwargs):
+        second_stream_entered.set()
+        return True
+
+    second_cache.lock.side_effect = second_lock
+    errors: list[BaseException] = []
+
+    def run(loaded: LoadedModelWithoutConfig) -> None:
+        try:
+            loaded._lock_paced(None)
+        except BaseException as error:
+            errors.append(error)
+
+    first_thread = threading.Thread(target=run, args=(first,), daemon=True)
+    second_thread = threading.Thread(target=run, args=(second,), daemon=True)
+    first_thread.start()
+    assert first_pass_started.wait(timeout=10), "first stream did not start"
+    second_thread.start()
+    assert second_stream_entered.wait(timeout=10), "discrete stream did not enter concurrently"
+    allow_first_stream.set()
+    first_thread.join(timeout=10)
+    second_thread.join(timeout=10)
+
+    assert not errors
+    assert second_cache.continue_lock.call_count == 0

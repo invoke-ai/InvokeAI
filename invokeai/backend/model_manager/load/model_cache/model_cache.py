@@ -514,6 +514,31 @@ def _is_integrated_cuda(device: torch.device) -> bool:
     return device.type == "cuda" and torch.version.hip is None and device_is_integrated(device) is True
 
 
+# shortcut: coordinates one process only; multi-process coordination requires a shared reservation.
+_INTEGRATED_CUDA_ADMISSION_LOCK = threading.RLock()
+
+
+@contextmanager
+def integrated_cuda_admission_lock(device: torch.device) -> Generator[None, None, None]:
+    """Serialize model admission on integrated native CUDA, where device memory is system RAM."""
+    if _is_integrated_cuda(device):
+        with _INTEGRATED_CUDA_ADMISSION_LOCK:
+            yield
+    else:
+        yield
+
+
+def _minimum_required_vram_bytes(cached_model: CachedModelWithPartialLoad) -> int:
+    """Return the still-off-device bytes that non-autocast modules require to run."""
+    state_dict = cached_model.model.state_dict()
+    keys_to_load: set[str] = set()
+    for key in cached_model._keys_in_modules_that_do_not_support_autocast:
+        if state_dict[key].device.type == cached_model.compute_device.type:
+            continue
+        keys_to_load.update(cached_model._aliases.get(key, (key,)))
+    return sum(cached_model._state_dict_bytes[key] for key in keys_to_load)
+
+
 class ModelCache:
     """A cache for managing models in memory.
 
@@ -2161,6 +2186,19 @@ class ModelCache:
                 f"Unloaded {vram_bytes_freed_from_own_model / MB:.2f}MB from the model being locked ({cache_entry.key})."
             )
 
+        if _is_integrated_cuda(cache_entry.cached_model.compute_device) and isinstance(
+            cache_entry.cached_model, CachedModelWithPartialLoad
+        ):
+            required_bytes = _minimum_required_vram_bytes(cache_entry.cached_model)
+            if required_bytes > max(vram_available, 0):
+                raise torch.OutOfMemoryError(
+                    f"Cannot load the minimum required weights for model '{cache_entry.key}' onto "
+                    f"{cache_entry.cached_model.compute_device}: they need {required_bytes / MB:.2f}MB but only "
+                    f"{max(vram_available, 0) / MB:.2f}MB is available. The device shares memory with the CPU, "
+                    "so proceeding would exhaust system memory. Free up RAM, use a smaller or more heavily "
+                    "quantized model, or lower `device_working_mem_gb`."
+                )
+
         if vram_available < 0 and stream_started_at is None:
             # The budget is still short after offloading everything offloadable: the model will run
             # with its minimum weight set streamed from RAM. Name what is occupying the device —
@@ -2188,7 +2226,10 @@ class ModelCache:
         # vram_available = int(model_vram_needed * 0.1)
         # We add 1 MB to the available VRAM to account for small errors in memory tracking (e.g. off-by-one). A fully
         # loaded model is much faster than a 95% loaded model.
-        model_bytes_loaded, truncated = self._move_model_to_vram(cache_entry, vram_available + MB, max_move_bytes)
+        move_budget = (
+            vram_available if _is_integrated_cuda(cache_entry.cached_model.compute_device) else vram_available + MB
+        )
+        model_bytes_loaded, truncated = self._move_model_to_vram(cache_entry, move_budget, max_move_bytes)
         if self._cached_models.get(cache_entry.key) is not cache_entry:
             # A record dropped earlier (see `lock`): no later drop reports the weights this put on the device.
             probe.dropped(self, cache_entry)

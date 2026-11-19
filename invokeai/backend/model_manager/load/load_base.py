@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
     VRAM_MOVE_PASS_BYTES,
     FirstUseClaim,
     ModelCache,
+    integrated_cuda_admission_lock,
 )
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 from invokeai.backend.util.logging import InvokeAILogger
@@ -161,26 +162,27 @@ class LoadedModelWithoutConfig:
         invocation's re-lock, once the interleaver unlocks.
         """
         stream_started_at = time.time()
-        with MODEL_LOAD_LOCK.read_lock():
-            settled = self._cache.lock(self._cache_record, working_mem_bytes, max_move_bytes=VRAM_MOVE_PASS_BYTES)
-        # Termination backstop: pathological interleavings (another thread's budget disagreeing
-        # with ours can unload what a pass just loaded) could in principle re-truncate forever.
-        # After comfortably more passes than the model's size can honestly require, run one final
-        # uncapped pass — with no cap, a pass can never report itself truncated, so it settles.
-        remaining_capped_passes = self._cache_record.cached_model.total_bytes() // VRAM_MOVE_PASS_BYTES + 8
-        while not settled:
-            remaining_capped_passes -= 1
+        with integrated_cuda_admission_lock(self.compute_device):
             with MODEL_LOAD_LOCK.read_lock():
-                settled = self._cache.continue_lock(
-                    self._cache_record,
-                    working_mem_bytes,
-                    max_move_bytes=VRAM_MOVE_PASS_BYTES if remaining_capped_passes > 0 else None,
-                    stream_started_at=stream_started_at,
-                )
-            if remaining_capped_passes <= 0:
-                # The uncapped pass settles by construction; guard against a regression in that
-                # invariant turning this loop into a spin.
-                assert settled, "uncapped continue_lock pass did not settle"
+                settled = self._cache.lock(self._cache_record, working_mem_bytes, max_move_bytes=VRAM_MOVE_PASS_BYTES)
+            # Termination backstop: pathological interleavings (another thread's budget disagreeing
+            # with ours can unload what a pass just loaded) could in principle re-truncate forever.
+            # After comfortably more passes than the model's size can honestly require, run one final
+            # uncapped pass — with no cap, a pass can never report itself truncated, so it settles.
+            remaining_capped_passes = self._cache_record.cached_model.total_bytes() // VRAM_MOVE_PASS_BYTES + 8
+            while not settled:
+                remaining_capped_passes -= 1
+                with MODEL_LOAD_LOCK.read_lock():
+                    settled = self._cache.continue_lock(
+                        self._cache_record,
+                        working_mem_bytes,
+                        max_move_bytes=VRAM_MOVE_PASS_BYTES if remaining_capped_passes > 0 else None,
+                        stream_started_at=stream_started_at,
+                    )
+                if remaining_capped_passes <= 0:
+                    # The uncapped pass settles by construction; guard against a regression in that
+                    # invariant turning this loop into a spin.
+                    assert settled, "uncapped continue_lock pass did not settle"
 
     def _lock_on_device(self, working_mem_bytes: Optional[int], *, offload_others: bool = False) -> None:
         """Lock the model onto its compute device and repair its required tensors there. Nothing stays locked if this
@@ -198,29 +200,30 @@ class LoadedModelWithoutConfig:
         run partly resident and its window fit no line. Locked models, a window's co-locks among them, stay.
         """
         observed = locked = False
-        probe.locking.append(self._cache)
-        try:
-            observed = probe.armed
-            if observed:
-                probe.lock_started(self._cache, self._cache_record)
-            if offload_others:
-                # The global load lock before the cache's own, as `_lock_paced` takes them: a move to RAM loads state
-                # dicts, which must not overlap a model construction.
-                with MODEL_LOAD_LOCK.read_lock():
-                    self._cache.offload_unlocked_models_from_vram(keep_cache_keys=(self._cache_record.key,))
-            self._lock_paced(working_mem_bytes)
-            locked = True
-            self._end_first_use_window()
-            self.repair_required_tensors_on_device()
-        except BaseException:
-            if locked:
-                self._cache.unlock(self._cache_record)
-                locked = False
-            raise
-        finally:
-            probe.locking.remove(self._cache)
-            if observed:
-                probe.lock_settled(self._cache, self._cache_record, locked)
+        with integrated_cuda_admission_lock(self.compute_device):
+            probe.locking.append(self._cache)
+            try:
+                observed = probe.armed
+                if observed:
+                    probe.lock_started(self._cache, self._cache_record)
+                if offload_others:
+                    # The global load lock before the cache's own, as `_lock_paced` takes them: a move to RAM loads state
+                    # dicts, which must not overlap a model construction.
+                    with MODEL_LOAD_LOCK.read_lock():
+                        self._cache.offload_unlocked_models_from_vram(keep_cache_keys=(self._cache_record.key,))
+                self._lock_paced(working_mem_bytes)
+                locked = True
+                self._end_first_use_window()
+                self.repair_required_tensors_on_device()
+            except BaseException:
+                if locked:
+                    self._cache.unlock(self._cache_record)
+                    locked = False
+                raise
+            finally:
+                probe.locking.remove(self._cache)
+                if observed:
+                    probe.lock_settled(self._cache, self._cache_record, locked)
 
     def _unlock(self) -> None:
         self._cache.unlock(self._cache_record)
@@ -340,8 +343,9 @@ class LoadedModelWithoutConfig:
         # lock to avoid being hijacked onto the `meta` device by a concurrent construction. This is
         # also called directly (outside __enter__/model_on_device) by some text-encoder invocations,
         # so the guard lives here rather than only at the call sites.
-        with MODEL_LOAD_LOCK.read_lock():
-            return cached_model.repair_required_tensors_on_compute_device()
+        with integrated_cuda_admission_lock(self.compute_device):
+            with MODEL_LOAD_LOCK.read_lock():
+                return cached_model.repair_required_tensors_on_compute_device()
 
     def unload_from_vram(self, vram_bytes_to_free: int, keep_required_weights_in_vram: bool = False) -> int:
         """Unload model weights through the cache's failure-safe path.

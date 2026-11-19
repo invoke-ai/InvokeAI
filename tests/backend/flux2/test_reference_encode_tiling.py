@@ -136,3 +136,35 @@ def test_an_untiled_encode_is_taken_only_where_it_fits_the_card(
         ref_image_extension.reference_encode_tile_size(pixels, vae, torch.device("cuda"), tiling="always")
         == REF_ENCODE_TILE_SIZE
     )
+
+
+def test_an_integrated_cuda_encode_uses_current_host_headroom(vae, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.version, "hip", None)
+    monkeypatch.setattr(ref_image_extension, "flux2_vae_attention_materializes", lambda *_: False)
+    monkeypatch.setattr(ref_image_extension, "device_is_integrated", lambda _device: True)
+    monkeypatch.setattr(
+        ref_image_extension.TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 18 * 2**30)
+    )
+    monkeypatch.setattr(ref_image_extension.torch.cuda, "memory_allocated", lambda _device: 10 * 2**30)
+    monkeypatch.setattr(
+        ref_image_extension.torch.cuda,
+        "get_device_properties",
+        lambda _device: type("Props", (), {"total_memory": 24 * 2**30})(),
+    )
+    estimate = WorkingMemoryEstimate(
+        estimator="vae.flux2",
+        version=1,
+        features={},
+        terms=(WorkingMemoryTerm("untiled encode", 4.1 * 2**30, True),),
+        source="test",
+    )
+    monkeypatch.setattr(ref_image_extension, "estimate_vae_working_memory_flux2", lambda **_: estimate)
+
+    # Host headroom is 8 GiB, so the 4.1 GiB estimate exceeds half; the 24 GiB card total would not.
+    pixels = torch.zeros(1, 3, 64, 64)
+    assert (
+        ref_image_extension.reference_encode_tile_size(
+            pixels, vae, torch.device("cuda"), tiling="if_attention_materializes"
+        )
+        == REF_ENCODE_TILE_SIZE
+    )

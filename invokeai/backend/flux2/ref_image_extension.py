@@ -23,7 +23,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux2.latent_norm import bn_normalize
 from invokeai.backend.flux2.sampling_utils import pack_flux2
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.devices import TorchDevice, device_is_integrated
 from invokeai.backend.util.vae_working_memory import (
     estimate_vae_working_memory_flux2,
     flux2_vae_attention_materializes,
@@ -82,12 +82,16 @@ def reference_encode_tile_size(
     """The tile size a reference encode runs at, or None for an untiled encode.
 
     ``"if_attention_materializes"`` encodes untiled unless the mid-block attention would materialize its score
-    matrix (ROCm, MPS) or the untiled peak would not fit the device (see UNTILED_REF_ENCODE_MAX_VRAM_FRACTION).
+    matrix (ROCm, MPS) or the untiled peak exceeds the available device memory budget (see
+    UNTILED_REF_ENCODE_MAX_VRAM_FRACTION).
     """
     if tiling == "always" or flux2_vae_attention_materializes(image_tensor, vae, device):
         return REF_ENCODE_TILE_SIZE
     if device.type == "cuda":
-        total_memory = torch.cuda.get_device_properties(device).total_memory
+        if torch.version.hip is None and device_is_integrated(device) is True:
+            total_memory = TorchDevice.memory_available_to_process(device) - torch.cuda.memory_allocated(device)
+        else:
+            total_memory = torch.cuda.get_device_properties(device).total_memory
     elif device.type == "xpu":
         total_memory = int(torch.xpu.get_device_properties(device).total_memory)
     else:
