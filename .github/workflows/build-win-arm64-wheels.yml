@@ -1,18 +1,17 @@
 # Builds the Windows ARM64 wheels that PyPI does not provide -- opencv-contrib-python, blake3 and tiktoken --
 # on GitHub's native ARM64 runner and publishes them, together with a flat index page, as assets of a
-# GitHub release. `pyproject.toml` resolves those three packages on Windows ARM64 from that page (the
-# `invoke-win-arm64-wheels` index), and the manual-install docs pass the same page to `--find-links`.
+# GitHub release. `pyproject.toml` points directly to ARM64 wheel assets; `uv.lock` records their hashes.
+# Manual-install docs pass the flat page to `--find-links`.
 #
 # Pull requests that change this workflow or its scripts build the wheels (a workflow only becomes dispatchable
 # once it is on the default branch, and a change to the recipe is exactly when a build should be proven) but
 # never publish them: the builds are not byte-reproducible, and the lockfile pins the published assets by hash,
 # so re-uploading over a tag would break every ARM64 install and `uv lock --locked` until the next re-lock.
 # Publishing is a deliberate act: dispatch the workflow with a NEW release tag (the input has no default), then
-# bump the tag in pyproject.toml's `invoke-win-arm64-wheels` index together with the matching `; sys_platform ==
-# 'win32' and platform_machine == 'ARM64'` pins and re-lock. Tags are immutable: every tagged Invoke release
-# locks the assets of the tag its pyproject named, so replacing an asset breaks those releases' installs. The
-# publish job never replaces one (scripts/win_arm64_wheels/plan_release_upload.py): it uploads only assets the
-# release lacks, skips ones already published with identical contents (so "Re-run failed jobs", which reuses this
+# update the tag in the direct ARM64 wheel URLs in pyproject.toml, then re-lock to record the new hashes. Tags are
+# immutable: every tagged Invoke release locks its URL/hash assets, so replacing one breaks that release's
+# installs. The publish job never replaces one (scripts/win_arm64_wheels/plan_release_upload.py): it uploads
+# only assets the release lacks, skips ones already published with identical contents (so "Re-run failed jobs", which reuses this
 # run's build artifacts, can finish an interrupted upload), and fails on any other difference -- which a new
 # dispatch against a published tag always is, because the builds differ. An upload that dies mid-asset can leave
 # an asset GitHub reports without a digest; the publish job refuses that too, so delete the asset by hand before
@@ -254,17 +253,16 @@ jobs:
           if [ "$release_exists" = false ]; then
             gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --latest=false \
               --title "Windows ARM64 wheels ($RELEASE_TAG)" \
-              --notes "Self-built win_arm64 wheels consumed by pyproject.toml's invoke-win-arm64-wheels index. Built by the build-win-arm64-wheels workflow; not a release of Invoke itself."
+              --notes "Self-built win_arm64 wheels pinned by pyproject.toml and available through the manual-install flat index. Built by the build-win-arm64-wheels workflow; not a release of Invoke itself."
           fi
           if [ -s upload.txt ]; then
             mapfile -t files < upload.txt
             gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${files[@]}"
           fi
 
-      - name: verify the page resolves like the lock and the docs use it
-        # Cross-platform resolution against the published page, exactly as `uv lock` (flat index) and
-        # `uv pip install --find-links` (manual install) consume it. `--no-build` fails if any pin would
-        # need an sdist, i.e. if a wheel is missing from the page or the page is not being served as HTML.
+      - name: verify the page resolves for manual installs
+        # `uv pip install --find-links` (manual installs) consumes the published page. The lock uses the same
+        # hash-pinned assets through direct URLs. `--no-build` fails if a manual-install pin needs an sdist.
         run: |
           uv pip compile reqs.txt --no-build --no-deps --python-version 3.12 --python-platform aarch64-pc-windows-msvc \
             --find-links "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/index.html"

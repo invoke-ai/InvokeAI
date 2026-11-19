@@ -16,7 +16,8 @@ Two platforms are covered:
   no ARM64 wheel locks fine and fails at install time on the user's machine. The windows-arm64 test job
   installs only the `test` extra; this check covers every torch extra and the install with none.
 
-So assert against the lockfile itself, which is the artifact users actually install from.
+The Windows check also ensures the marker-gated ARM64 wheels cannot replace PyPI's win_amd64 wheels.
+Assert against the lockfile itself, which is the artifact users actually install from.
 
 Usage: check_platform_locks.py [path/to/uv.lock] [--platform {aarch64,win_arm64}]   (needs `packaging`)
 """
@@ -39,6 +40,11 @@ REQUIRED = ("torch", "torchvision")
 NVIDIA_WIN_ARM64_REGISTRY = "https://pypi.nvidia.com/nvtorch_oot/"
 PYPI_REGISTRY = "https://pypi.org/simple"
 PYTORCH_CU130_REGISTRY = "https://download.pytorch.org/whl/cu130"
+WIN_ARM64_WHEEL_URLS = {
+    "blake3": "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/blake3-1.0.9-cp312-cp312-win_arm64.whl",
+    "opencv-contrib-python": "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/opencv_contrib_python-4.11.0.86-cp312-cp312-win_arm64.whl",
+    "tiktoken": "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/tiktoken-0.13.0-cp312-cp312-win_arm64.whl",
+}
 
 
 @dataclass(frozen=True)
@@ -365,6 +371,47 @@ def check_platform(lock: Lock, key: str) -> int:
     return 0
 
 
+def check_windows_arm64_wheel_routes(lock: Lock) -> list[str]:
+    """Each self-built ARM64 wheel must stay separate from PyPI's compatible Windows x64 package."""
+    windows = {
+        "sys_platform": "win32",
+        "platform_system": "Windows",
+        "os_name": "nt",
+        "implementation_name": "cpython",
+        "platform_python_implementation": "CPython",
+    }
+    problems: list[str] = []
+    for package_name, arm64_url in WIN_ARM64_WHEEL_URLS.items():
+        cases = (
+            ("win32/AMD64", "AMD64", {"registry": PYPI_REGISTRY}, "win_amd64"),
+            ("win32/ARM64", "ARM64", {"url": arm64_url}, "win_arm64"),
+        )
+        for name, machine, expected_source, wheel_platform in cases:
+            platform = Platform(
+                name,
+                "",
+                {**windows, "platform_machine": machine},
+                lambda tag, wheel_platform=wheel_platform: tag.platform == wheel_platform,
+            )
+            env = env_for(platform, "3.12")
+            candidates = [
+                package
+                for package in lock.by_name.get(package_name, [])
+                if not package.get("resolution-markers")
+                or any(matches(marker, env) for marker in package["resolution-markers"])
+            ]
+            if len(candidates) != 1:
+                problems.append(f"  [{package_name}] expected one locked package for {name}, found {len(candidates)}")
+                continue
+            package = candidates[0]
+            source = package.get("source")
+            if source != expected_source:
+                problems.append(f"  [{package_name}] {name} resolves from {source}, expected {expected_source}")
+            if not has_wheel(package, "3.12", platform, allow_pure=False):
+                problems.append(f"  [{package_name}] {name} has no {wheel_platform} wheel")
+    return problems
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check uv.lock for platforms the x64 test jobs cannot vouch for.")
     parser.add_argument("lock", nargs="?", default="uv.lock", type=Path)
@@ -374,7 +421,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"File not found: {args.lock}", file=sys.stderr)
         return 1
     lock = Lock(args.lock)
-    return max(check_platform(lock, key) for key in (args.platform or sorted(PLATFORMS)))
+    platform_result = max(check_platform(lock, key) for key in (args.platform or sorted(PLATFORMS)))
+    route_problems = check_windows_arm64_wheel_routes(lock)
+    if route_problems:
+        print("\nuv.lock routes self-built wheels incorrectly on Windows:")
+        print("\n".join(route_problems))
+        return 1
+    print("Windows self-built wheel routes OK")
+    return platform_result
 
 
 if __name__ == "__main__":

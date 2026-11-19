@@ -1,10 +1,10 @@
 """Write the flat (find-links style) index page for the Windows ARM64 wheel release.
 
-The page is uploaded as a release asset next to the wheels. ``pyproject.toml`` points the
-``invoke-win-arm64-wheels`` index at it, and the manual-install docs pass the same URL to
-``uv pip install --find-links``. Every link is absolute because the asset is served from a redirect
-target, so relative links would resolve against the wrong host, and carries ``#sha256=`` so installers
-verify what they download.
+The page is uploaded as a release asset next to the wheels for manual installs using
+``uv pip install --find-links``. ``pyproject.toml`` points to the same ARM64 wheel assets directly, and
+``uv.lock`` records their hashes. Every link is absolute because the asset is served from a redirect target,
+so relative links would resolve against the wrong host, and carries ``#sha256=`` so installers verify what
+they download.
 
 Usage: make_flat_index.py --repo owner/name --tag <release tag> wheel [wheel ...] > index.html
 """
