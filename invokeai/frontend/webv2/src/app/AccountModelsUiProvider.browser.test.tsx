@@ -15,6 +15,7 @@ import { DetailPane } from '@features/models/ui/manager/DetailPane';
 import { openModelDetail, setAddModelsQuery } from '@features/models/ui/uiStore';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -43,6 +44,8 @@ const preferences = vi.hoisted(() => ({ patch: vi.fn() }));
 vi.mock('@features/models/data/api', async (importOriginal) => ({
   ...(await importOriginal<typeof ModelsApi>()),
   ...api,
+  // The detail's identification check has nothing to report here.
+  getModelIdentification: () => Promise.resolve({ changed: false, proposed: null, refusal: null }),
 }));
 vi.mock('@features/models/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => capabilitiesApi.get(),
@@ -109,6 +112,8 @@ const clickButton = async (host: HTMLElement, label: string) => {
   });
 };
 
+const queryClient = new QueryClient();
+
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((resolvePromise) => {
@@ -126,7 +131,9 @@ describe('Account Models port on the Launchpad', () => {
     await act(async () => {
       root.render(
         <ChakraProvider value={system}>
-          <AccountModelsUiProvider>{children}</AccountModelsUiProvider>
+          <QueryClientProvider client={queryClient}>
+            <AccountModelsUiProvider>{children}</AccountModelsUiProvider>
+          </QueryClientProvider>
         </ChakraProvider>
       );
       await Promise.resolve();

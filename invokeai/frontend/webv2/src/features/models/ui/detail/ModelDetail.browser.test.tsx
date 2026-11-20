@@ -4,6 +4,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { type ModelsUiAdapter, ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -19,6 +20,10 @@ vi.mock('./DefaultSettingsSection', () => ({ DefaultSettingsSection: section('de
 vi.mock('./RelatedModelsSection', () => ({ RelatedModelsSection: section('related-models') }));
 vi.mock('./TriggerPhrasesEditor', () => ({ MemoizedTriggerPhrasesEditor: section('trigger-phrases') }));
 vi.mock('./WorkingMemorySection', () => ({ WorkingMemorySection: section('working-memory') }));
+vi.mock('@features/models/data/api', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getModelIdentification: () => Promise.resolve({ changed: false, proposed: null, refusal: null }),
+}));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ i18n: { resolvedLanguage: 'en' }, t: (key: string) => key }),
 }));
@@ -77,8 +82,10 @@ const MANAGER: ModelsUiAdapter = {
 describe('ModelDetail', () => {
   let host: HTMLDivElement;
   let root: Root;
+  let queryClient: QueryClient;
 
   beforeEach(() => {
+    queryClient = new QueryClient();
     accountLifecycle.activate('model-detail-test', ':user:model-detail-test');
     setModelsSnapshotForTests({ models: [MAIN], status: 'loaded' });
     host = document.createElement('div');
@@ -97,9 +104,11 @@ describe('ModelDetail', () => {
     act(() =>
       root.render(
         <ChakraProvider value={system}>
-          <ModelsUiProvider adapter={MANAGER}>
-            <ModelDetail key={modelKey} modelKey={modelKey} onRequestConfirm={ignoreConfirm} />
-          </ModelsUiProvider>
+          <QueryClientProvider client={queryClient}>
+            <ModelsUiProvider adapter={MANAGER}>
+              <ModelDetail key={modelKey} modelKey={modelKey} onRequestConfirm={ignoreConfirm} />
+            </ModelsUiProvider>
+          </QueryClientProvider>
         </ChakraProvider>
       )
     );

@@ -42,6 +42,7 @@ import { DefaultSettingsSection } from './DefaultSettingsSection';
 import { ExternalModelSection } from './ExternalModelSection';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from './ModelBadges';
 import { ModelEditForm } from './ModelEditForm';
+import { ModelIdentificationNotice } from './ModelIdentificationNotice';
 import { ModelImageUpload } from './ModelImageUpload';
 import { ModelSettingsMenuItems } from './ModelSettingsMenuItems';
 import { RelatedModelsSection } from './RelatedModelsSection';
@@ -349,6 +350,8 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
           onReidentify={canManageModels ? () => onRequestConfirm({ kind: 'reidentify', model }) : null}
         />
       ) : null}
+
+      {isEditing ? null : <ModelIdentificationNotice model={model} />}
 
       {isEditing ? (
         <ModelEditForm
