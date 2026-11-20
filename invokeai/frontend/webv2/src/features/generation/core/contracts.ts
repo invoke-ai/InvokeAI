@@ -95,6 +95,8 @@ export interface GenerationModelCatalogItem {
   variant?: string | null;
   roles?: readonly ModelRole[];
   hash?: string;
+  /** Registered, but its files are gone: listed in the library, never loadable. */
+  is_missing?: boolean;
   submodel_type?: string;
   trigger_phrases?: string[] | null;
   default_settings?: {

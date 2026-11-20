@@ -85,11 +85,18 @@ export const refreshModels = (owner: AccountScope = captureAccountScope()): Prom
           return;
         }
 
+        const missingKeys =
+          missingModels.length > 0 ? new Set(missingModels.map((model) => model.key)) : EMPTY_MISSING_KEYS;
+
         store.patchSnapshot({
-          ...withModels(models),
+          // Flagged on the entry itself, so every consumer of the catalog sees it, not only the library views.
+          ...withModels(
+            missingKeys.size > 0
+              ? models.map((model) => (missingKeys.has(model.key) ? { ...model, is_missing: true } : model))
+              : models
+          ),
           error: null,
-          missingModelKeys:
-            missingModels.length > 0 ? new Set(missingModels.map((model) => model.key)) : EMPTY_MISSING_KEYS,
+          missingModelKeys: missingKeys,
           modelsDir,
           status: 'loaded',
         });

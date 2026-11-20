@@ -45,6 +45,19 @@ describe('models store loading', () => {
     expect(api.listModels).toHaveBeenCalledTimes(2);
   });
 
+  it('flags a registered model whose files are gone on its catalog entry', async () => {
+    const a = { base: 'sdxl', key: 'a', name: 'A', type: 'main' };
+    const b = { base: 'sdxl', key: 'b', name: 'B', type: 'main' };
+    api.listModels.mockResolvedValueOnce([a, b]);
+    api.listMissingModels.mockResolvedValueOnce([b]);
+    const store = await import('./modelsStore');
+
+    await store.refreshModels();
+
+    expect(store.getModelsSnapshot().models).toEqual([a, { ...b, is_missing: true }]);
+    expect(store.getModelsSnapshot().modelsByKey.get('b')).toMatchObject({ is_missing: true });
+  });
+
   it('keeps the by-key index in lockstep with every models write', async () => {
     api.listModels.mockResolvedValueOnce([
       { base: 'sdxl', key: 'a', name: 'A', type: 'main' },

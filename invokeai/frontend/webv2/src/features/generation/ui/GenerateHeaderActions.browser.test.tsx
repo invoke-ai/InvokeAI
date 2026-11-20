@@ -75,15 +75,7 @@ const turbo: MainModelConfig = {
 
 const render = async (
   model: MainModelConfig,
-  {
-    catalog = [model],
-    missingKeys = new Set<string>(),
-    settings = {},
-  }: {
-    catalog?: readonly unknown[];
-    missingKeys?: ReadonlySet<string>;
-    settings?: Record<string, unknown>;
-  } = {}
+  { catalog = [model], settings = {} }: { catalog?: readonly unknown[]; settings?: Record<string, unknown> } = {}
 ) => {
   const values = createExternalStoreCore<Record<string, unknown>>({
     ...getDefaultGenerateSettings(model),
@@ -101,7 +93,7 @@ const render = async (
   const undoable = vi.fn();
   const adapter = {
     generateValues: values,
-    models: { catalog, getBaseLabel: () => 'SDXL', missingKeys },
+    models: { catalog, getBaseLabel: () => 'SDXL' },
     notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn(), undoable },
     presets: { includePrompts: true, presets: [], remove: vi.fn(), rename: vi.fn(), save: vi.fn() },
     project: { activeProjectId: 'project-1' },
@@ -270,7 +262,7 @@ describe('GenerateHeaderActions', () => {
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Steps 30 → 8. Left as is, not set for this model: Size, CFG, Scheduler, and VAE precision. ' +
-          'VAE is not installed or does not fit this model, so no default is applied for it.'
+          'VAE is missing, not installed or does not fit this model, so no default is applied for it.'
       );
   });
 
@@ -283,7 +275,7 @@ describe('GenerateHeaderActions', () => {
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Left as is, not set for this model: Size, Steps, CFG, Scheduler, and VAE precision ' +
-          'VAE only sets only VAE, which is not installed or does not fit it, so nothing is applied.'
+          'VAE only sets only VAE, which is missing, not installed or does not fit it, so nothing is applied.'
       );
   });
 
@@ -296,13 +288,13 @@ describe('GenerateHeaderActions', () => {
       .element(item('Apply model defaults'))
       .toHaveAccessibleDescription(
         'Left as is, not set for this model: Size, CFG, Scheduler, and VAE precision ' +
-          "Already using Steps only's defaults, except VAE, which is not installed or does not fit it."
+          "Already using Steps only's defaults, except VAE, which is missing, not installed or does not fit it."
       );
   });
 
   it('keeps a working encoder when the saved default encoder is registered but its file is missing', async () => {
     const t5 = (key: string, name: string) => ({ base: 'any', key, name, type: 't5_encoder' });
-    const saved = t5('saved-t5', 'Moved T5');
+    const saved = { ...t5('saved-t5', 'Moved T5'), is_missing: true };
     const working = t5('working-t5', 'Working T5');
     const flux: MainModelConfig = {
       base: 'flux',
@@ -314,7 +306,6 @@ describe('GenerateHeaderActions', () => {
     };
     const { patchGenerateSettings } = await render(flux, {
       catalog: [flux, saved, working],
-      missingKeys: new Set([saved.key]),
       settings: { t5EncoderModel: working },
     });
 

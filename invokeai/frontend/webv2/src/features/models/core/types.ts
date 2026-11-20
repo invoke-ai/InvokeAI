@@ -190,6 +190,8 @@ export interface ModelConfig {
   type: ModelTaxonomyType;
   format: ModelFileFormat;
   variant?: string | null;
+  /** Set by the library on a registered model whose files are gone; the backend never sends it. */
+  is_missing?: boolean;
   /** Other types these files serve as. The backend always sends it; older fixtures may omit it. */
   roles?: ModelRole[];
   prediction_type?: PredictionType | null;

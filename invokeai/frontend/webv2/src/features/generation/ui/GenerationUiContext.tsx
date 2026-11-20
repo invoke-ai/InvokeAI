@@ -106,8 +106,6 @@ export interface GenerationUiAdapter {
     getBaseColorPalette(base: string): string;
     getBaseLabel(base: string): string;
     getImageUrl(key: string): string;
-    /** Keys of registered models whose files are gone; they are listed but cannot load. */
-    missingKeys: ReadonlySet<string>;
     /** Absent when this session may not manage models. */
     openInModelManager?: (key: string) => void;
     openManager(options?: { modelType?: string }): void;

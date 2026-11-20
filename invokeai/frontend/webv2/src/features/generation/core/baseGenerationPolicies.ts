@@ -711,7 +711,7 @@ export const resolveModelDefaultVae = (
   }
 
   const vae = vaeModels.find(
-    (candidate) => candidate.key === key && isVaeCompatibleWithGenerateModel(model, candidate)
+    (candidate) => candidate.key === key && !candidate.is_missing && isVaeCompatibleWithGenerateModel(model, candidate)
   );
 
   return vae ? { kind: 'apply', vae } : { kind: 'missing', hasBundledVae };
@@ -1678,8 +1678,9 @@ export const isComponentCompatibleWithModel = (
 
 export type ModelDefaultComponents = Partial<Pick<GenerateSettings, DefaultComponentSlot['setting']>>;
 
+/** Registered and loadable: a model whose files moved is listed (`is_missing`) but a default cannot take it. */
 const isInstalled = (models: readonly ModelConfig[], selected: { key: string }): boolean =>
-  models.some((installed) => installed.key === selected.key);
+  models.some((installed) => installed.key === selected.key && !installed.is_missing);
 
 const isSlotOffered = (model: GenerateModelConfig, settings: GenerateSettings, setting: GenerateComponentValueKey) =>
   getComponentSectionPolicy(model, settings).slots.some((slotPolicy) => slotPolicy.key === setting);
@@ -1759,7 +1760,7 @@ export const getModelDefaultComponents = (
   let next = settings;
   let pending = Object.entries(stored ?? {}).flatMap(([persistenceKey, modelKey]) => {
     const slot = getDefaultComponentSlot(persistenceKey);
-    const candidate = models.find((installed) => installed.key === modelKey);
+    const candidate = models.find((installed) => installed.key === modelKey && !installed.is_missing);
 
     return slot && candidate && (slot.isMainModel ? isMainModelConfig(candidate) : isModelIdentifierConfig(candidate))
       ? [{ candidate, setting: slot.setting }]

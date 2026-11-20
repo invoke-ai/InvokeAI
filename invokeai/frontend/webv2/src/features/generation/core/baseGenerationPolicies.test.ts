@@ -1658,6 +1658,18 @@ describe("a main model's default components", () => {
     expect(isLossyModelSwitch(result)).toBe(false);
   });
 
+  it('takes no default whose files are missing on a switch, and replaces a pick that went missing', () => {
+    const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
+    const missingT5 = { ...t5Encoder, is_missing: true };
+    const picked = createSettings(createModel('sd-1'), { t5EncoderModel: otherT5 });
+
+    expect(switchTo(model, [missingT5]).settings.t5EncoderModel).toBeNull();
+    expect(switchTo(model, [missingT5, otherT5], picked).settings.t5EncoderModel).toBe(otherT5);
+    expect(switchTo(model, [t5Encoder, { ...otherT5, is_missing: true }], picked).settings.t5EncoderModel).toBe(
+      t5Encoder
+    );
+  });
+
   it('keeps a selection that already fits the new model', () => {
     const model = withDefaults('flux', { t5_encoder: t5Encoder.key });
     const current = createSettings(createModel('flux', { key: 'flux-other' }), { t5EncoderModel: otherT5 });
