@@ -30,11 +30,11 @@ import { galleryImageMetadataOptions, galleryKeys } from '@features/gallery/quer
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities';
+} from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 
 import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
 
@@ -198,7 +198,7 @@ describe('executeImageRecall', () => {
       )
       .mockResolvedValueOnce({ positive_prompt: 'recalled prompt' });
 
-    // Another reader started the read; recall joins it. Unmounting a real observer is covered by the hook's browser test.
+    // Another reader started the read and recall joins it; the hook's browser test covers unmounting an observer.
     void queryClient.prefetchQuery(galleryImageMetadataOptions(accountLifecycle.capture(), image.imageName));
     const recall = executeImageRecall({
       queryClient,

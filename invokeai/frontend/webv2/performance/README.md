@@ -11,7 +11,7 @@ Paths relative to the webv2 package. `pnpm test:performance:architecture` runs t
 
 The routine browser gate visits each fixture twice in fresh browser contexts. Both observations run the complete journey, required/inactive-widget checks, and semantic-ready waits. Resource budgets use the maximum of each metric; fixture counts and script source owners must agree between observations. Successful routine runs do not record traces or report timing statistics. On failure, the gate attempts one diagnostic trace for the failing fixture and retains the original failure.
 
-`pnpm test:performance:browser:profile` runs the full sampling plan from `performance/architecture-fixtures.json`: one warmup, one unscored trace, and five scored observations per fixture. Use it after the performance build for timing investigation and traces of every route. Baseline updates always use this plan, as does the routine command when the checked-in timing policy enables enforcement. Full profiles report timing medians and variance; routine reports identify `mode: resources` and omit those fields. Resource reference files contain only resource measurements and work with either mode.
+`pnpm test:performance:browser:profile` runs the full sampling plan from `performance/architecture-fixtures.json`: one warmup, one unscored trace, and five scored observations per fixture. Use it after the performance build for timing investigation and traces of every route. Baseline updates always use this plan. Full profiles report timing medians and variance; routine reports identify `mode: resources` and omit those fields. Resource reference files contain only resource measurements and work with either mode.
 
 ## Byte budgets
 
@@ -23,7 +23,7 @@ Baseline byte budgets record measurements only. Each byte ceiling is the lower o
 
 Reference modes:
 
-- PRs into `main` and merge groups targeting `main`: CI restores the exact base commit's measurements from the Actions cache (`WEBV2_PERF_REFERENCE_DIR`). On a cache miss it checks out that pinned base separately, installs its dependencies and Node version, builds once, and records both build and browser resources. Base budget failures still permit recording, but missing, malformed, incompatible, or incomplete measurements stop the job. Both reference files must come from that base; older cached or candidate measurements cannot substitute. Logs and reports name the exact base SHA. Candidate completion gates retain their normal strict checks.
+- PRs into `main` and merge groups targeting `main`: CI restores measurements of the exact base commit's inputs from the Actions cache (`WEBV2_PERF_REFERENCE_DIR`). Main records them on every push whose performance job produced both reference files. The cache key hashes the base's Git tree and blob IDs for this package, `invokeai/version/invokeai_version.py`, `.nvmrc`, the install action and `frontend-tests.yml`: a content hash, so commits that change none of them share one entry, and a change to any of them gets a new one. No prefix fallback exists. On a miss CI checks out that pinned base separately, installs its dependencies and Node version, builds once, and records both build and browser resources; a pull request keeps them for its next push onto the same base. Base budget failures still permit recording, but missing, malformed, incompatible, or incomplete measurements stop the job. Both reference files must measure that base's inputs; older cached or candidate measurements cannot substitute. Logs and reports name the key and the exact base SHA. Candidate completion gates retain their normal strict checks.
 - Local runs, pushes to `main`, stacked PRs without a reference: compare against committed measurements directly.
 - Every mode pins source-owner sets exactly: a module entering a route's initial graph fails at zero bytes.
 - Request counts have no allowance; cap is the lower of reference and committed counts.
@@ -32,8 +32,7 @@ Reference modes:
 ## Running
 
 - On a shared development machine, the [bounded local verification profile](../VERIFICATION.md#bounded-local-verification) caps Vitest workers while preserving the release chain. It does not relax the exclusive performance-run requirement below.
-- CI’s 30-minute job timeout covers completion, including the three-engine lifecycle smoke and cold exact-base measurements; completion has already reached about 19 minutes.
-- CI splits `check:release` between `lint:code` in the checks job and `check:release:tests` in the tests job. Architecture tests run in the complete unit suite; inventories are generated once and the performance build serves all subsequent browser journeys.
+- CI runs `lint:code` in the checks workflow and splits `check:release:tests` into parallel jobs of the tests workflow: unit tests and fixtures, the Chromium browser suite in two Vitest shards, the performance gates with the exact-base reference, and the production-build journeys (`pnpm test:journeys`). The performance and journey jobs each build; locally the performance build serves every later journey. Architecture tests run in the complete unit suite. The `frontend-webv2-tests` job is the required check and fails unless every other job succeeded.
 - `check:release` stops at the first failing gate; later gates did not run. In CI logs the failure sits at the tail, after passing test summaries.
 - Browser gate binds ports 4176 and 4177 (`INVOKEAI_PERFORMANCE_PORT`, `INVOKEAI_PERFORMANCE_BACKEND_PORT`). One performance gate per machine, nothing else building or testing.
 - One failing sample on a busy machine can be noise, "did not request required widgets" included. Rerun once on a quiet machine. Fails again: regression.
@@ -103,22 +102,27 @@ report includes every cycle, interaction min/median/p95/max and observed long-ta
 the interaction phase, including its warmup, and interaction latency includes automation overhead; neither is an INP measurement. Failure
 artifacts preserve the workload context. The workload is intentionally hard-coded to Gallery quick settings; other owners need their own journey before extending coverage.
 
-Sustained reports name the runner, engine version, platform, workload and sample policy. Timing distributions remain report-only; portal retirement is enforced:
-`browser-baseline.json` still requires 20 stable runs on a designated runner before timing enforcement. Local runs
-cannot satisfy that calibration policy. Existing byte ceilings, timing sampling and goldens are unchanged.
+Sustained reports name the runner, engine version, platform, workload and sample policy. Timing distributions are report-only; portal retirement is enforced.
+No gate compares timings, so `browser-baseline.json` must keep `timingPolicy.enforce` false.
 
 ## Browser lifecycle smoke
 
 `pnpm test:browser:smoke` creates a fresh production build, then uses the existing project-file preview/backend lifecycle.
-`check:release` runs `test:browser:smoke:browser` after its shared performance build, so completion and CI build once.
+`check:release` runs `test:browser:smoke:browser` after its shared performance build, so completion builds once; CI's journey job builds once for all three journeys.
 Use the raw `:browser` command only when the build is known current. Install engines using the locked package:
 `pnpm exec playwright install --with-deps chromium firefox webkit`. Ports default to 4180/4181; override
 `INVOKEAI_PROJECT_FILE_PORT` and `INVOKEAI_PROJECT_FILE_BACKEND_PORT` for an isolated focused run.
 
-The required localhost capabilities are IndexedDB and Web Locks. Each engine holds the initial fixture migration PUT before server dispatch, makes a new held prompt edit, and
-leaves for a neutral same-origin document immediately. Before any editor can reconcile it, the suite proves the
-committed journal has the new marker while the staged draft, held PUT bodies and server do not. Reopening must
-recover that marker. Each engine also verifies actual Canvas and layer-thumbnail fixture pixels, rejects an opaque
+The required localhost capabilities are IndexedDB and Web Locks. Each engine holds the initial fixture migration PUT before server dispatch and checks
+that this save staged the old document, then makes a new held prompt edit and leaves for a neutral same-origin
+document immediately. Before any editor can reconcile it, the suite checks where the edit is held and that the server
+lacks it; reopening must recover it. Chromium must hold it in the committed journal alone, with the staged draft and
+held PUT bodies still old, so its run proves journal-only recovery. In Firefox and WebKit, once unload cancels the held
+PUT, the queued `pagehide` save can continue: it stages the edit, retires its journal entry and may send it. Their runs
+prove only that the edit was durably held in the journal or the staged draft, was staged if sent, and survived the
+reload. Journal-only recovery is also covered by the scenarios in `src/workbench/projects/unloadJournal.scenarios.ts`,
+run on Chromium IndexedDB by `unloadJournal.scenarios.browser.test.ts`; that a save sends nothing until its draft
+write finishes is covered in `src/workbench/projects/durableSyncedPersistence.test.ts`. Each engine also verifies actual Canvas and layer-thumbnail fixture pixels, rejects an opaque
 checker-only thumbnail and empty Canvas, holds native animation-end delivery to prove retirement waits for the owner’s exit event, defers actual owner DOM removal by 100 ms to exercise the bounded React-removal grace, and injects retained portal DOM into the real sustained-workload collector.
 Engines must give duplicated tabs separate live editor sessions, release a closed tab's session lock, preserve edits
 across route re-entry after Launchpad owner/media readiness (all mounted cover images finish decoding), advance keyboard focus, and disable copy controls with an explanation when clipboard is
@@ -141,7 +145,7 @@ Document-navigation cancellation expectations are shared by smoke and release jo
 explicitly owned navigation through DOMContentLoaded, on the same origin's `/api/` requests or mock Socket.IO polling.
 All engines may cancel old-document reads and writes; WebKit may instead emit its exact native Fetch/XMLHttpRequest
 access-control-denial message. A canceled mutation is teardown evidence, never evidence of a successful save: the
-held-edit scenario separately proves journal-only recovery. HTTP 4xx/5xx responses, non-abort failures, cross-origin
+held-edit scenario separately checks where the edit was durably held and that reopening recovers it. HTTP 4xx/5xx responses, non-abort failures, cross-origin
 requests, asset failures, live-document mutations and unrelated runtime/console errors remain critical. Queue reader
 cancellations during route re-entry are limited to its actual read interface: status, current, next and item IDs (GET),
 then bounded item hydration (`items_by_ids`, read-only POST). Queue status GET cancellation is also recognized at the

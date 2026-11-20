@@ -20,8 +20,8 @@ export interface FrameDemandInput {
 }
 
 /**
- * Document-space bounds of a leaf's committed pixels: its persisted source bounds joined with any larger live
- * cache, through its effective matrix. Null when the leaf has no rasterizable source.
+ * Document-space bounds of a leaf's committed pixels: its persisted source bounds joined with any larger live cache,
+ * through its effective matrix. Null when the leaf has no rasterizable source.
  */
 export const committedLeafBounds = (
   leaf: SemanticLeaf,

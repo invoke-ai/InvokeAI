@@ -127,7 +127,6 @@ describe('relationships store', () => {
     await store.linkModels('a', 'b');
 
     expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['b'], b: ['a'] });
-    // The mutation evicted the stale GET, which unblocked the dedupe for a fresh one.
     expect(api.getRelatedModelKeys.mock.calls.filter(([key]) => key === 'a')).toHaveLength(2);
 
     await Promise.resolve();
@@ -220,7 +219,6 @@ describe('relationships store', () => {
     store.setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { a: [], b: [] } });
 
     const link = store.linkModels('a', 'b');
-    // The unlink is issued from the other side of the pair and settles first.
     await store.unlinkModels('b', 'a');
 
     resolveLink?.();
@@ -297,11 +295,9 @@ describe('relationships pruning from library snapshots', () => {
 
     store.setRelationshipsSnapshotForTests({ relatedKeysByModelKey: { a: ['b'], b: ['a'] } });
 
-    // First loaded snapshot only establishes the baseline.
     models.setModelsSnapshotForTests({ models: [model('b')], status: 'loaded' });
     expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['b'], b: ['a'] });
 
-    // A loading patch must not prune either.
     models.setModelsSnapshotForTests({ models: [], status: 'loading' });
     expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ a: ['b'], b: ['a'] });
   });
@@ -315,7 +311,6 @@ describe('relationships pruning from library snapshots', () => {
     models.setModelsSnapshotForTests({ models: [model('b')], status: 'loaded' });
     expect(store.getRelationshipsSnapshot().relatedKeysByModelKey).toEqual({ b: [] });
 
-    // Reinstalled: the library lists it again and a fetch succeeds.
     models.setModelsSnapshotForTests({ models: [model('a'), model('b')], status: 'loaded' });
     api.getRelatedModelKeys.mockResolvedValueOnce(['b']);
     await store.ensureRelatedModelKeysLoaded('a');

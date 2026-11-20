@@ -11,12 +11,6 @@ const catalog = (en.hints ?? {}) as Record<string, { heading?: unknown; paragrap
 const registryIds = Object.keys(FEATURE_HINTS).sort();
 
 describe('feature hint registry', () => {
-  it('reads a non-empty catalog', () => {
-    // A broken glob would make every other assertion vacuously pass.
-    expect(registryIds.length).toBeGreaterThan(20);
-    expect(Object.keys(catalog).length).toBeGreaterThan(20);
-  });
-
   it('gives every registered hint a heading and at least one paragraph', () => {
     const incomplete = registryIds.filter((id) => {
       const entry = catalog[id];

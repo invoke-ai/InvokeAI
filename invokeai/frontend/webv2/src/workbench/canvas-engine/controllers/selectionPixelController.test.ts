@@ -82,7 +82,6 @@ const createHarness = (
     mask: () => ({ rect: selectionRect, surface: mask }),
   } as unknown as SelectionState;
   const document = options.document ?? paintDocument();
-  // A mirror that never follows the reducer fails every publication's postconditions.
   const reducerDocument = options.mirrored === false ? { ...document } : document;
   const history = createHistory({ byteBudget: options.byteBudget });
   const ctx = createCanvasMutationContext({
@@ -134,7 +133,6 @@ const createHarness = (
     requestRasterization: calls.requestRasterization,
     selection,
   });
-  /** Every color a surface was filled with, in order. */
   const fillColors = () =>
     surfaces.flatMap((surface) =>
       surface.callLog
@@ -153,7 +151,6 @@ describe('SelectionPixelController', () => {
     expect(h.calls.markDirty).toHaveBeenCalledWith('paint');
     expect(h.calls.notifyPainted).toHaveBeenCalledWith('paint');
     expect(h.history.entries().past).toEqual(['Fill selection']);
-    // Before and after of the touched 2×2 region only.
     expect(h.history.byteSize()).toBe(2 * 2 * 4 * 2);
   });
 
@@ -197,7 +194,6 @@ describe('SelectionPixelController', () => {
     h.controller.run('fill');
 
     expect(h.layers.get('paint')!.rect).toEqual({ height: 2, width: 2, x: 0, y: 0 });
-    // The before pixels went back over the whole touched (grown) region before the crop.
     const restored = surface.callLog.filter((entry) => entry.op === 'putImageData').at(-1);
     expect(restored?.args.slice(1, 3)).toEqual([0, 0]);
     expect(h.calls.deleteDerived).toHaveBeenCalledWith('paint');
@@ -213,7 +209,6 @@ describe('SelectionPixelController', () => {
 
     h.controller.run('fill');
 
-    // The selection sits over the cached pixels at local (0, 0); the cache does not grow out to document (10, 5).
     expect(h.layers.get('paint')!.rect).toEqual({ height: 2, width: 2, x: 0, y: 0 });
     await h.history.undo();
     expect(h.applyImagePatch).toHaveBeenCalledWith('paint', { height: 2, width: 2, x: 0, y: 0 }, expect.anything());
@@ -352,7 +347,6 @@ describe('SelectionPixelController', () => {
       grow: vi.fn(() => true),
       layerId: 'paint',
     };
-    // The contract still has no bitmap; only the live 2×2 cache holds the strokes.
     const h = createHarness({
       beginPixelEdit: () => transaction,
       document: documentFrom([layerContract('paint', 'control')], 'paint'),

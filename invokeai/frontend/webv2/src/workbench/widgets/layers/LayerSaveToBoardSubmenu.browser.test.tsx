@@ -4,6 +4,7 @@ import type { GalleryBoard } from '@features/gallery';
 import { ChakraProvider, Menu, Portal } from '@chakra-ui/react';
 import { getGallerySettings } from '@features/gallery/contracts';
 import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { SaveIcon } from 'lucide-react';
@@ -22,7 +23,6 @@ vi.mock('@workbench/projects/library', () => ({
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
   useActiveProjectName: () => 'Project',
-  // No stored gallery values: the panel's default listing.
   useActiveProjectSelector: () => ({}),
   useWidgetValuesSelector: () => ({}),
 }));
@@ -101,7 +101,7 @@ const hover = async (target: HTMLElement): Promise<void> => {
 
 const render = async (action: LayerContextAction, onSelect = vi.fn()) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const listing = galleryBoardsOptions(getGalleryListingBoardsQuery(getGallerySettings({})));
+  const listing = galleryBoardsOptions(getGalleryListingBoardsQuery(getGallerySettings(resolvedValues({}))));
   queryClient.setQueryData(listing.queryKey, [board('mine', ['read', 'add_media']), board('read-only', ['read'])]);
   host = document.createElement('div');
   document.body.append(host);
@@ -136,7 +136,6 @@ const render = async (action: LayerContextAction, onSelect = vi.fn()) => {
   };
 };
 
-/** Presses each key in the parent menu; returns the highlighted item's name (or value) after each press. */
 const walkKeys = async (keys: readonly string[]): Promise<(string | undefined)[]> => {
   await interact(() => document.querySelector<HTMLElement>('[role="menu"]')!.focus());
   const highlighted: (string | undefined)[] = [];
@@ -161,7 +160,6 @@ describe('LayerSaveToBoardSubmenu', () => {
 
     expect(listingQuery().getObserversCount()).toBe(1);
     expect(document.querySelector('[data-value="board-none"]')?.textContent).toBe('widgets.gallery.uncategorized');
-    // A board the caller can only read is no destination.
     expect(document.querySelector('[data-value="board-read-only"]')).toBeNull();
 
     await interact(() => document.querySelector<HTMLElement>('[data-value="board-mine"]')!.click());

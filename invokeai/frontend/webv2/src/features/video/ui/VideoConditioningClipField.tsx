@@ -11,12 +11,10 @@ import { useTranslation } from 'react-i18next';
 import { useVideoUiActions } from './VideoUiContext';
 
 /**
- * The whole-modality conditioning slot: a clip whose soundtrack the model generates a picture for,
- * or whose picture it generates a soundtrack for. One slot with a role, not two slots, because
- * LTX-2 holds exactly one modality clean and samples the other. Start and end images can anchor the
- * generated picture in the soundtrack role only, so while they are set the picture role is closed.
- *
- * No trim bounds: the conditioning nodes consume the whole recording.
+ * The whole-modality conditioning slot: a clip whose soundtrack the model generates a picture for, or whose picture it
+ * generates a soundtrack for. One slot with a role, because LTX-2 holds exactly one modality clean and samples the
+ * other. Start and end images can anchor the generated picture in the soundtrack role only, so while they are set the
+ * picture role is closed. No trim bounds: the conditioning nodes consume the whole recording.
  */
 
 const DROP_ID = 'video-conditioning-clip';
@@ -80,14 +78,14 @@ export const VideoConditioningClipField = memo(
         if (item === null) {
           onChange(null);
         } else if (item.kind === 'video') {
-          // Read when the drop lands, not when it began: a frame picked meanwhile must not be cleared by a picture role.
+          // Read when the drop lands, not when it began: a frame picked meanwhile must not be cleared by a picture
+          // role.
           onChange(createVideoConditioningClip(item, { framesHeld: areFrameImagesHeld(readValues()) }));
         }
       },
       [onChange, readValues]
     );
-    // The whole premise of this field is what is inside the clip, so it gets the same way back to
-    // the gallery record that every other media slot has.
+    // Like every other media slot, the clip gets a way back to its gallery record.
     const videoName = conditioningClip?.clip.video_name;
     const handleFind = useCallback(() => {
       if (videoName !== undefined) {

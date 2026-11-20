@@ -245,7 +245,6 @@ describe('FontsPage', () => {
     await vi.waitFor(() => expect(viewport().scrollTop).toBe(800));
     await page.getByRole('button', { name: 'fonts.filterMenu', exact: true }).click();
     await page.getByRole('menuitemradio', { name: 'fonts.filters.my', exact: true }).click();
-    // The filtered list is a fresh viewport at the top, with its first row directly under the pinned chrome.
     await vi.waitFor(() => {
       expect(viewport().scrollTop).toBe(0);
       const firstRow = host.querySelector<HTMLElement>('[data-index="0"]');

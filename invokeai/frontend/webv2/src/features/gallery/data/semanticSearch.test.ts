@@ -63,8 +63,7 @@ describe('searchGallerySemantic', () => {
 
     const results = await searchGallerySemantic({ kind: 'text', query: 'surf' });
 
-    // Reading a video hit as an image sends the gallery to /images/i/<name>,
-    // which 404s — a ranked result that renders as a broken tile.
+    // Read as an image, a video hit goes to /images/i/<name>, which 404s: a ranked result rendered as a broken tile.
     expect(results).toEqual([
       { ref: { kind: 'video', name: 'clip.mp4' }, score: 0.9 },
       { ref: { kind: 'image', name: 'a.png' }, score: 0.5 },
@@ -188,8 +187,7 @@ describe('semantic page hydration', () => {
           { image_name: 'outside-after.png', score: 0.6 },
         ],
       })
-      // by-names returns DTOs in arbitrary order; rank order must win, and a
-      // name the hydration endpoint no longer knows is skipped.
+      // by-names returns DTOs in any order: rank order must win, and a name the hydration endpoint lost is skipped.
       .mockResolvedValueOnce([backendImage('second.png'), backendImage('first.png')]);
 
     const names = await listSemanticGalleryItemNames({ query: { kind: 'text', query: 'boats' } });
@@ -289,8 +287,7 @@ describe('semantic filter canonicalization', () => {
       canonicalizeGalleryItemsFilter({ ...baseFilter, semanticQuery: { kind: 'url', url: 'a.png' } }).semantic
     ).toEqual({ kind: 'url', url: 'a.png' });
 
-    // The label is presentation, not identity: relabeled drops of the same
-    // registered file canonicalize identically.
+    // The label is presentation, not identity: relabeled drops of the same registered file canonicalize identically.
     const withLabelA = canonicalizeGalleryItemsFilter({
       ...baseFilter,
       semanticQuery: { fileId: 'external-7', kind: 'file', label: 'a.png' },

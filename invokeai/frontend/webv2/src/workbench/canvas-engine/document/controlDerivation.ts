@@ -85,8 +85,8 @@ const inputRef = (input: CanvasPixelSourceContract | null): string => {
 };
 
 /**
- * Identifies what a detection run consumes: its input pixels and their frame, the detector with its settings, and
- * the type. Weight, name and painting on the derived map leave it unchanged, so they never stale a running job.
+ * Identifies what a detection run consumes: its input pixels and their frame, the detector with its settings, and the
+ * type. Weight, name and painting on the derived map leave it unchanged, so they never stale a running job.
  */
 export const controlDetectionInputKey = (layer: CanvasControlLayerContract): string =>
   canonicalJson([
@@ -109,8 +109,8 @@ export const detachControlDerivation = (layer: CanvasControlLayerContract): Canv
 };
 
 /**
- * Follows a bake of `bakedTransform` into the map's pixels (the layer transform then resets to identity) by moving
- * the original's frame with it. A frame the bake would shear cannot be kept, so the layer detaches instead.
+ * Follows a bake of `bakedTransform` into the map's pixels (the layer transform then resets to identity) by moving the
+ * original's frame with it. A frame the bake would shear cannot be kept, so the layer detaches instead.
  */
 export const rebaseControlOriginal = (
   layer: CanvasControlLayerContract,
@@ -168,8 +168,8 @@ export const withDetectedMap = (
 };
 
 /**
- * Detection "None": the original becomes the source again in its own frame. When that frame would shear, the map
- * stays as the as-is image and only the derivation is dropped.
+ * Detection "None": the original becomes the source again in its own frame. When that frame would shear, the map stays
+ * as the as-is image and only the derivation is dropped.
  */
 export const restoreControlOriginal = (layer: CanvasControlLayerContract): CanvasControlLayerContract => {
   if (layer.original === undefined) {

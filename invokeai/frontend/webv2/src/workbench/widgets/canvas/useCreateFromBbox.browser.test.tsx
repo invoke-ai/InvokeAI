@@ -38,7 +38,6 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 type Handle = ReturnType<typeof useCreateFromBbox>;
 const engine = { projectId: 'project-1' } as unknown as Parameters<typeof useCreateFromBbox>[0];
 
-/** Two probes stand in for the header's Frame menu and the canvas context menu, which each call the hook. */
 const Probe = ({ ref }: { ref: Ref<Handle> }) => {
   const handle = useCreateFromBbox(engine);
   useImperativeHandle(ref, () => handle, [handle]);

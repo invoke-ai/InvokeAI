@@ -30,6 +30,9 @@ describe('filterStarterModels', () => {
       'Detail Tweaker',
       'Juggernaut XL',
     ]);
+    expect(
+      filterStarterModels(mixedCase, { ...DEFAULT_STARTER_MODEL_FILTERS, sortDirection: 'desc' }, '').map((m) => m.name)
+    ).toEqual(['Juggernaut XL', 'Detail Tweaker', 'bright LoRA', 'Alpha FLUX']);
   });
 
   it('keeps catalog order under the catalog sort', () => {
@@ -74,24 +77,7 @@ describe('filterStarterModels', () => {
     expect(byBase('flux')).toEqual(['Alpha FLUX', 'TAEF1']);
   });
 
-  it('sorts by name in either direction', () => {
-    const byName = { ...DEFAULT_STARTER_MODEL_FILTERS, sortField: 'name' as const };
-
-    expect(filterStarterModels(catalog, byName, '').map((m) => m.name)).toEqual([
-      'Alpha FLUX',
-      'Detail Tweaker',
-      'Juggernaut XL',
-    ]);
-    expect(filterStarterModels(catalog, { ...byName, sortDirection: 'desc' as const }, '').map((m) => m.name)).toEqual([
-      'Juggernaut XL',
-      'Detail Tweaker',
-      'Alpha FLUX',
-    ]);
-  });
-
   it('sorts by base', () => {
-    // Note: label order and raw-id order coincide for every registry base, so
-    // this cannot distinguish the two — it pins the ordering, not the source.
     expect(
       filterStarterModels(catalog, { ...DEFAULT_STARTER_MODEL_FILTERS, sortField: 'base' as const }, '').map(
         (m) => m.base
@@ -100,7 +86,6 @@ describe('filterStarterModels', () => {
   });
 
   it('sorts unknown bases deterministically via their fallback labels', () => {
-    // 'zeta-arch' has no registry entry; its display label is "Zeta Arch".
     const withUnknown = [...catalog, createStarter({ base: 'zeta-arch', name: 'Zeta Model' })];
 
     expect(

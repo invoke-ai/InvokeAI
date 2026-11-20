@@ -1,6 +1,6 @@
 /**
- * Which layers take a finished shape as pixels. A leaf module, so the properties pane can ask without loading the
- * shape tool or its rasterizer.
+ * Which layers take a finished shape as pixels. A leaf module, so the properties pane can ask without loading the shape
+ * tool or its rasterizer.
  */
 
 import type { CanvasLayerContract, CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
@@ -8,8 +8,8 @@ import type { CanvasLayerContract, CanvasLayerSourceContract } from '@workbench/
 import { maskAsPaintSource } from '@workbench/canvas-engine/document/sources';
 
 /**
- * The paint pixels a shape draws into or cuts out of: a raster paint layer's source, or a mask's alpha viewed as
- * paint. Null for every other layer, which a drawn shape lands beside as a new shape layer instead.
+ * The paint pixels a shape draws into or cuts out of: a raster paint layer's source, or a mask's alpha viewed as paint.
+ * Null for every other layer, which a drawn shape lands beside as a new shape layer instead.
  */
 export const shapePaintSourceOf = (
   layer: CanvasLayerContract

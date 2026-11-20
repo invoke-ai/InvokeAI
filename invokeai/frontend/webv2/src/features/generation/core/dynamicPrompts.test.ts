@@ -28,7 +28,6 @@ describe('hasDynamicPromptSyntax', () => {
     expect(hasDynamicPromptSyntax(draft)).toBe(false);
     expect(hasDynamicPromptSyntax(`\`\`\`json\n${draft}\n\`\`\``)).toBe(false);
     expect(hasDynamicPromptSyntax('[{"caption": "a {red|green} ball"}]')).toBe(false);
-    // Braces that do not form JSON are still variants.
     expect(hasDynamicPromptSyntax('{"caption": a {red|green} ball}')).toBe(true);
     expect(hasDynamicPromptSyntax('a poster {"caption": "x"}')).toBe(true);
   });
@@ -43,7 +42,6 @@ describe('hasDynamicPromptSyntax', () => {
     expect(hasDynamicPromptSyntax('a __colou?__ __animals/[dc]ogs__ ball')).toBe(true);
   });
 
-  // # requires backend expansion even without braces.
   it('detects a comment', () => {
     expect(hasDynamicPromptSyntax('a red ball # for now')).toBe(true);
     expect(hasDynamicPromptSyntax('a red ball \\# for now')).toBe(true);
@@ -52,7 +50,6 @@ describe('hasDynamicPromptSyntax', () => {
   it('ignores prompts with neither a variant nor a wildcard', () => {
     expect(hasDynamicPromptSyntax('a red ball')).toBe(false);
     expect(hasDynamicPromptSyntax('unclosed { brace')).toBe(false);
-    // Disallow leading/trailing underscores in wildcard names so delimiters round-trip.
     expect(hasDynamicPromptSyntax('snake__case word')).toBe(false);
   });
 });
@@ -183,7 +180,6 @@ describe('getWildcardNameError', () => {
     expect(getWildcardNameError('')).toBe('empty');
     expect(getWildcardNameError('   ')).toBe('empty');
     expect(getWildcardNameError('colors list')).toBe('invalid');
-    // A leading or trailing underscore would run into the `__` delimiters.
     expect(getWildcardNameError('_colors')).toBe('invalid');
     expect(getWildcardNameError('colors_')).toBe('invalid');
     expect(getWildcardNameError('a'.repeat(129))).toBe('tooLong');
@@ -208,7 +204,6 @@ describe('matchesKnownWildcard', () => {
     expect(matchesKnownWildcard('colo*', CATALOG)).toBe(true);
     expect(matchesKnownWildcard('*s', CATALOG)).toBe(true);
     expect(matchesKnownWildcard('animals/*', CATALOG)).toBe(true);
-    // `*` is an unanchored run of anything, `/` included — as on the backend.
     expect(matchesKnownWildcard('*/dogs', CATALOG)).toBe(true);
     expect(matchesKnownWildcard('*', CATALOG)).toBe(true);
     expect(matchesKnownWildcard('nope/*', CATALOG)).toBe(false);
@@ -239,11 +234,9 @@ describe('matchesKnownWildcard', () => {
   it('takes the interior runs in order', () => {
     expect(matchesKnownWildcard('a*b*c', new Set(['axbxc']))).toBe(true);
     expect(matchesKnownWildcard('a*b*c', new Set(['axcxb']))).toBe(false);
-    // Adjacent stars collapse: `**` means what `*` means.
     expect(matchesKnownWildcard('a**c', new Set(['abc']))).toBe(true);
   });
 
-  // Avoid regex backtracking on user-entered repeated stars.
   it('does not backtrack on a path full of stars', () => {
     const names = new Set(Array.from({ length: 50 }, (_, index) => `colours/warm-autumn-palette-${index}`));
     const started = performance.now();
@@ -254,7 +247,6 @@ describe('matchesKnownWildcard', () => {
 });
 
 describe('normalizeWildcardValues', () => {
-  // Normalize ingress so storage, export, and reimport agree.
   it('drops blank lines and trims the rest', () => {
     expect(normalizeWildcardValues(['red', '', '  green  ', '   ', 'blue'])).toEqual(['red', 'green', 'blue']);
   });
@@ -263,7 +255,6 @@ describe('normalizeWildcardValues', () => {
     expect(normalizeWildcardValues(['red', 'green'])).toEqual(['red', 'green']);
   });
 
-  // # starts an unescapable comment, including inside a value such as red#blue.
   it('drops a comment, and the value that is nothing but one', () => {
     expect(normalizeWildcardValues(['poster #1', 'red # a colour', '#ff0000 glow', 'blue'])).toEqual([
       'poster',

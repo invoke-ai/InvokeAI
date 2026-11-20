@@ -32,12 +32,10 @@ await i18n.use(initReactI18next).init({
 let host: HTMLDivElement;
 let root: Root;
 
-/** A page load that marked a launch into the editor and has not rendered it yet. */
 const launchIntoEditor = () => {
   expect(beginStartupLaunch()).toBe(true);
   openStartupLaunch('project-1');
 };
-/** What the next launch decides: false when the mark made it stay home. */
 const nextLaunchProceeds = (): boolean => {
   const proceeds = beginStartupLaunch();
   settleStartupLaunch();

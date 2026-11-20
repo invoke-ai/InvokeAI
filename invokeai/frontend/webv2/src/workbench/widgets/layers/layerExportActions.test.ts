@@ -5,6 +5,7 @@ import {
   galleryKeys,
   getGalleryListingBoardsQuery,
 } from '@features/gallery/queries';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
@@ -47,7 +48,6 @@ interface ServerBoard {
   imageCount?: number;
 }
 
-/** The board endpoints as the server answers them; every other request answers an empty total. */
 const serveBoards = (initial: ServerBoard[]) => {
   let boards = initial;
   const listings: URLSearchParams[] = [];
@@ -78,7 +78,6 @@ const serveBoards = (initial: ServerBoard[]) => {
   );
 
   return {
-    /** Reads of the listing of every readable board, archived included. */
     destinationReads: () => listings.filter((params) => params.get('include_archived') === 'true').length,
     listingReads: () => listings.length,
     setBoards: (next: ServerBoard[]) => {
@@ -92,7 +91,6 @@ const createClient = () => new QueryClient({ defaultOptions: { queries: { gcTime
 const exportsPixels = () =>
   vi.fn(() => Promise.resolve({ blob: new Blob(['pixels'], { type: 'image/png' }), status: 'ok' as const }));
 
-/** An item list the Gallery panel read for `boardId`, fresh for its 60-second stale time. */
 const seedItemList = (client: QueryClient, boardId: string) => {
   const key = galleryKeys.items(
     captureAccountScope(),
@@ -114,9 +112,11 @@ describe('saveLayerToBoard', () => {
       { actions: ['read', 'add_media'], archived: true, id: 'old' },
     ]);
     const client = createClient();
-    // A warm Gallery: the listing of every readable board, the panel's own listing (observed) and an item list.
     await client.fetchQuery(galleryBoardsOptions({ includeArchived: true }));
-    const panel = new QueryObserver(client, galleryBoardsOptions(getGalleryListingBoardsQuery(getGallerySettings({}))));
+    const panel = new QueryObserver(
+      client,
+      galleryBoardsOptions(getGalleryListingBoardsQuery(getGallerySettings(resolvedValues({}))))
+    );
     const unsubscribe = panel.subscribe(() => undefined);
     await vi.waitFor(() => expect(panel.getCurrentResult().data?.some((board) => board.id === 'board-7')).toBe(true));
     const itemList = seedItemList(client, 'board-7');
@@ -142,7 +142,6 @@ describe('saveLayerToBoard', () => {
     expect(itemList()?.isInvalidated).toBe(true);
     unsubscribe();
 
-    // An archived board chosen on purpose is a destination too.
     await expect(saveLayerToBoard('layer-a', 'old', { client, exportLayer, upload })).resolves.toBe('saved');
     expect(upload).toHaveBeenLastCalledWith(expect.any(File), 'old', { signal: owner.signal });
   });
@@ -172,7 +171,6 @@ describe('saveLayerToBoard', () => {
     await client.fetchQuery(galleryBoardsOptions({ includeArchived: true }));
     const itemList = seedItemList(client, 'shared');
     const exportLayer = exportsPixels();
-    // Access dropped to view-only after the listing was read: the server refuses the upload.
     server.setBoards([{ actions: ['read'], id: 'shared' }]);
     const refusal = new ApiError('You cannot add to this board', 403);
     const upload = vi.fn(() => Promise.reject(refusal));
@@ -183,7 +181,6 @@ describe('saveLayerToBoard', () => {
     await vi.waitFor(() => expect(client.isFetching()).toBe(0));
     expect(itemList()?.isInvalidated).toBe(true);
 
-    // The next save is judged from the listing read again: refused before anything is baked or sent.
     await expect(saveLayerToBoard('layer-a', 'shared', { client, exportLayer, upload })).resolves.toBe(
       'board-view-only'
     );

@@ -1,8 +1,3 @@
-/**
- * Bridge clipboard images and engine Blob/ImageData on the widget side; inject dependencies for tests without real
- * clipboard/canvas access.
- */
-
 import type { CanvasSelectionCapability } from '@workbench/canvas-engine/api';
 
 import { type ClipboardAccess, ClipboardUnavailableError, readClipboardItems } from '@platform/browser/clipboard';
@@ -10,12 +5,7 @@ import { type ClipboardAccess, ClipboardUnavailableError, readClipboardItems } f
 /** MIME types accepted from the clipboard, best first. */
 const IMAGE_TYPES = ['image/png', 'image/webp', 'image/jpeg'] as const;
 
-/**
- * The first image on the clipboard, or `null` when it holds none or cannot be read (permission refused, document not
- * focused): a paste that finds nothing is an ordinary outcome. Rejects with `ClipboardUnavailableError` when the
- * browser has no clipboard API (plain HTTP), so paste can say why, and with the item's own error when an image it
- * lists cannot be retrieved.
- */
+/** The first clipboard image, or null when none is readable; rejects `ClipboardUnavailableError` without the API. */
 export const readClipboardImage = async (deps: ClipboardAccess = {}): Promise<Blob | null> => {
   let items: readonly ClipboardItem[];
   try {
@@ -78,12 +68,7 @@ export const decodeImageBlob = async (blob: Blob, deps: DecodeImageBlobDeps = {}
   }
 };
 
-/**
- * Copies the selected pixels with `write`, and for a cut then removes them from the layer. A cut asks first whether
- * the removal could run, so one the engine refuses (it says why) writes nothing to the clipboard rather than turning
- * into a copy. Resolves without writing when there is nothing selected to copy; a failed write rejects before
- * anything is removed.
- */
+/** Copies the selection; a cut checks the removal can run first, so a refused cut writes nothing. */
 export const copyCanvasSelection = async (
   selection: Pick<CanvasSelectionCapability, 'admitSelectionErase' | 'eraseSelection' | 'exportSelectionBlob'>,
   cut: boolean,

@@ -348,8 +348,8 @@ const parseInvocationSchema = (schema: JsonObject, schemas: JsonObject): Invocat
       continue;
     }
 
-    // Retain internal metadata/board inputs for edges and Linear controls. Exclude node attributes; queue routing
-    // still determines final result boards.
+    // Retain internal metadata/board inputs for edges and Linear controls. Exclude node attributes; queue routing still
+    // determines final result boards.
     const isInternal = rawProperty.field_kind === 'internal';
 
     if (rawProperty.field_kind !== 'input' && !isInternal) {
@@ -505,9 +505,9 @@ export const useInvocationTemplatesSelector = store.useSelector;
 export const getInvocationTemplatesSnapshot = (): InvocationTemplatesSnapshot => store.getSnapshot();
 
 /**
- * Moves a freshly parsed document's nodes to the loaded templates before it enters the project, so an outdated
- * workflow opens current, and words what the update could not keep. A document loaded before templates arrive is
- * left as is; the editor's update actions cover it later.
+ * Moves a freshly parsed document's nodes to the loaded templates before it enters the project, so an outdated workflow
+ * opens current, and words what the update could not keep. A document loaded before templates arrive is left as is; the
+ * editor's update actions cover it later.
  */
 export const updateLoadedWorkflowNodes = (
   document: ProjectGraphState,

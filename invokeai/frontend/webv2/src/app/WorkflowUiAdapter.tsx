@@ -47,8 +47,8 @@ const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
 });
 
 /**
- * The active project's own persistence, read from the same sync service the conflict banner uses. "Saved" means
- * the server acknowledged the document; a pending push with browser recovery is still only local.
+ * The active project's own persistence, read from the same sync service the conflict banner uses. "Saved" means the
+ * server acknowledged the document; a pending push with browser recovery is still only local.
  */
 const selectProjectPersistence = ([workbench, sync]: readonly [
   WorkbenchSnapshot,

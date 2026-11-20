@@ -42,8 +42,8 @@ export const getCapabilities = (session: AuthSession): Capabilities => {
     canManageModels: isAdmin,
     canManageNodes: isAdmin,
     canManageSharedFonts: isAdmin,
-    // Matches the routers' `AdminUserOrDefault`: everyone qualifies in
-    // single-user mode, only admins once multiuser is on.
+    // Matches the routers' `AdminUserOrDefault`: everyone qualifies in single-user mode, only admins once multiuser is
+    // on.
     canManagePromptTemplates: isAdmin,
     // Offer admin edits only for shared prompts to avoid accidental edits to another user's private content.
     canManageSharedSystemPrompts: isAdmin,

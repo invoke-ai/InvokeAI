@@ -9,8 +9,8 @@ import { attachExternalGenerationReveal } from '@workbench/image-actions/recallP
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 
 /**
- * App-owned composition: uploads and own-account socket completions refresh the Gallery in visible tabs.
- * Only external origins whose batch asked for reveal can change Gallery selection.
+ * App-owned composition: uploads and own-account socket completions refresh the Gallery in visible tabs. Only external
+ * origins whose batch asked for reveal can change Gallery selection.
  */
 export const GalleryRealtimeRuntime = () => {
   const queryClient = useQueryClient();

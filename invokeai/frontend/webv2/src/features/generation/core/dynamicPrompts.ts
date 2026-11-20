@@ -420,8 +420,8 @@ export interface GenerateSubmissionPlan {
 
 /**
  * The prompts and seeds a submission sends. `expandedPositivePrompts` are what the host expanded the merged positive
- * prompt into; they count only when dynamic prompts are on and that prompt has their syntax, so templates that introduce
- * syntax count too. With dynamic prompts off the prompt is sent as typed.
+ * prompt into; they count only when dynamic prompts are on and that prompt has their syntax, so templates that
+ * introduce syntax count too. With dynamic prompts off the prompt is sent as typed.
  */
 export const planGenerateSubmission = (
   source: GenerateSubmissionSource,

@@ -40,7 +40,6 @@ import { ApiError } from '@platform/transport/http';
 
 const GALLERY_REFRESH_COALESCE_MS = 400;
 const SAFETY_SWEEP_INTERVAL_MS = 30_000;
-/** Node-level detail supports the terminal queue-item failure the history owner records. */
 const coordinatorLogger = createLogger({ area: 'coordinator', namespace: 'queue' });
 
 const TERMINAL_EVENT_BUFFER_LIMIT = 256;
@@ -50,10 +49,7 @@ const PROGRESS_EVENT_BUFFER_ITEM_LIMIT = 64;
 const BACKEND_READ_CONCURRENCY = 16;
 const FRAME_GATES_PER_WAIT_LIMIT = 64;
 
-/**
- * App injects Models' model-load activity sink so Queue can report socket-derived activity without importing its
- * owner.
- */
+/** Injected by App so Queue reports model-load activity without importing Models. */
 export interface QueueModelLoadPort {
   completed(payload: unknown): void;
   reset(): void;
@@ -61,7 +57,6 @@ export interface QueueModelLoadPort {
 }
 
 export interface QueueNodeExecutionPort {
-  /** Forgets every node and the origin of the run they belonged to. */
   clearAll(): void;
   /** Names the project workflow whose run the store now reflects; null when it cannot be attributed. */
   setOrigin(origin: QueueRunOrigin | null): void;
@@ -100,21 +95,13 @@ export type QueueCoordinatorBackendPort = Pick<
 export interface QueueCoordinatorCallbacks {
   /** Fired when one backend item in a local batch completes, before the whole local batch necessarily settles. */
   onBackendItemComplete?(localQueueItemId: string, backendItemId: number): void | Promise<void>;
-  /** Fired when one backend item in a local batch is canceled. */
   onBackendItemCancelled?(localQueueItemId: string, backendItemId: number): void;
-  /**
-   * Fired once per slot when its first progress frame of its own arrives: what live surfaces wait for before they
-   * leave the previous slot's result.
-   */
+  /** Once per slot, on its own first progress frame; live surfaces wait for it before leaving the previous result. */
   onFirstProgressFrame?(target: QueueItemProgressTarget): void;
-  /** Coalesced signal that completed generations may have added gallery images. */
   onGalleryRefresh(): void;
 }
 
-/**
- * Why a backend item failed: the error the backend reported, a failure it gave no reason for, or the item vanishing
- * from the queue (a clear deletes rows without a terminal event).
- */
+/** `removed`: the item vanished from the queue (a clear deletes rows without a terminal event). */
 export type QueueItemFailureCause = 'removed' | 'reported' | 'unexplained';
 
 type TerminalOutcome =
@@ -122,7 +109,6 @@ type TerminalOutcome =
   | { cause: QueueItemFailureCause; error: string; status: 'failed' }
   | { status: 'canceled' };
 
-/** Thrown by `waitForResults` when the backend reports the run was canceled. */
 export class QueueItemCancelledError extends Error {
   constructor(localQueueItemId: string) {
     super(`Queue item ${localQueueItemId} was canceled.`);
@@ -130,11 +116,7 @@ export class QueueItemCancelledError extends Error {
   }
 }
 
-/**
- * Thrown by `waitForResults` when backend items of the run failed. `message` and `failure` describe a representative
- * failure; `failedBackendItemIds` names every item that genuinely failed, so the failure notice can show and retry
- * them all. Empty when the run's items only vanished (`failure: 'removed'`).
- */
+/** `failedBackendItemIds` names every genuinely failed item; empty when items only vanished (`failure: 'removed'`). */
 export class QueueItemFailedError extends Error {
   readonly failedBackendItemIds: readonly number[];
   readonly failure: QueueItemFailureCause;
@@ -161,7 +143,6 @@ export interface ReconcileInput {
   status: 'pending' | 'running';
   backendItemIds?: number[];
   backendBatchId?: string;
-  /** Persisted compiled graph contains a Call Saved Workflow node. */
   hasWorkflowCall?: boolean;
   origin?: QueueRunOrigin;
 }
@@ -169,11 +150,9 @@ export interface ReconcileInput {
 export type ReconcileOutcome =
   /** A pending item the backend already accepted before the reload; do not re-enqueue. */
   | { kind: 'adopted'; backendItemIds: number[]; backendBatchId?: string; missingBackendItemIds?: number[] }
-  /** A running item whose backend items were found again; its results are awaitable. */
   | { kind: 'resumed'; backendItemIds?: number[]; missingBackendItemIds?: number[] }
   /** A running item whose backend items no longer exist (queue cleared or pruned). */
   | { kind: 'missing'; backendItemIds?: number[]; backendBatchId?: string }
-  /** A pending item the backend has never seen; submit it normally. */
   | { kind: 'enqueue' };
 
 export interface CancelRunRequest {
@@ -187,18 +166,12 @@ export interface QueueCoordinator {
   dispose(): void;
   /** Reconcile persisted work with backend items to avoid duplicate submission or orphaned runs after reload. */
   reconcile(items: ReconcileInput[]): Promise<Map<string, ReconcileOutcome>>;
-  /** Enqueue a generate batch and track its backend items for event-driven settlement. */
   submitGenerate(localQueueItemId: string, request: QueueEnqueueGenerateRequest): Promise<QueueEnqueueResult>;
-  /** Enqueue a compiled workflow graph and track its backend items the same way. */
   submitWorkflow(
     localQueueItemId: string,
     request: QueueEnqueueWorkflowRequest,
     origin?: QueueRunOrigin
   ): Promise<QueueEnqueueResult>;
-  /**
-   * Await every backend item's terminal state via sockets and safety sweeps; return images or throw
-   * failure/cancellation.
-   */
   waitForResults(
     localQueueItemId: string,
     queuedAt: string,
@@ -226,7 +199,6 @@ interface RunProgressState {
 
 interface WaitState {
   frameGates: Map<number, { revision: number | null; sessionId: string }>;
-  /** The slot has shown a frame of its own in its current leg. */
   hasOwnFrame: boolean;
   hasWorkflowCall: boolean;
   localQueueItemId: string;
@@ -262,7 +234,6 @@ const toTerminalOutcome = (
 export const createQueueCoordinator = (
   callbacks: QueueCoordinatorCallbacks,
   options: {
-    /** One adapter owns Queue HTTP commands and realtime events. */
     backend: QueueCoordinatorBackendPort;
     activeProgressTarget?: ActiveProgressTargetSink;
     galleryRefreshCoalesceMs?: number;
@@ -306,23 +277,12 @@ export const createQueueCoordinator = (
       }
     }
   };
-  /**
-   * Terminal events that arrived for items nobody tracks yet. Closes the race
-   * where a very fast generation finishes between `enqueue_batch` resolving
-   * and the run being registered.
-   */
+  /** Covers a fast generation finishing between `enqueue_batch` resolving and the run registering. */
   const recentTerminalOutcomes = new Map<number, TerminalOutcome>();
-  /**
-   * Node lifecycle events for items nobody tracks yet, replayed once the item
-   * is registered: a fast run's nodes start and finish while `enqueue_batch`
-   * is still resolving.
-   */
+  /** Replayed once the item registers: a fast run's nodes can start and finish while `enqueue_batch` resolves. */
   const pendingNodeEvents = new Map<number, NodeEvent[]>();
-  /** Latest preview for items whose enqueue response has not registered them yet. */
   const pendingProgressEvents = new Map<number, InvocationProgressEvent>();
-  /** Nodes each backend item has driven; settled with the item's terminal outcome. */
   const nodeIdsByBackendItem = new Map<number, Set<string>>();
-  /** The root backend item whose node events the execution store currently reflects. */
   let nodeExecutionRootItemId: number | null = null;
   let nodeExecutionRootItemSequence = 0;
   let nodeEventSequence = 0;
@@ -405,8 +365,7 @@ export const createQueueCoordinator = (
       state.activeBackendItemId !== undefined && !terminalBackendItemIds.has(state.activeBackendItemId)
         ? state.activeBackendItemId
         : undefined;
-    // activeItemIndex means "slot currently executing" — omitted while the
-    // item merely waits in the queue, so idle slots never present as live.
+    // Omitted while the item merely waits, so idle slots never present as live.
     const activeItemIndex =
       activeBackendItemId !== undefined
         ? Math.max(1, state.backendItemIds.indexOf(activeBackendItemId) + 1)
@@ -488,9 +447,7 @@ export const createQueueCoordinator = (
         return;
       }
       case 'completed':
-        // A called workflow's child lifecycle is represented by the visible
-        // Call Saved Workflow node. Only the root invocation may settle that
-        // node or replace its latest output.
+        // Only the root invocation may settle the visible Call Saved Workflow node or replace its output.
         waits.get(backendItemId)?.frameGates.delete(nodeEvent.event.item_id);
         if (backendItemId !== nodeEvent.event.item_id) {
           return;
@@ -579,7 +536,6 @@ export const createQueueCoordinator = (
     }
   };
 
-  /** Runs an enqueue call while buffering events that may land before its response registers the items. */
   const withSubmissionInFlight = async <T>(submit: () => Promise<T>): Promise<T> => {
     inFlightSubmissions += 1;
 
@@ -636,8 +592,7 @@ export const createQueueCoordinator = (
       const routingPromise = callbacks.onBackendItemComplete?.(wait.localQueueItemId, backendItemId);
 
       if (routingPromise) {
-        // Keep following until routing lands; terminal events precede finished-image selection by network round
-        // trips.
+        // Keep following until routing lands; terminal events precede finished-image selection by network round trips.
         activeProgressTarget.settle(progressTarget);
         const routing = Promise.resolve(routingPromise)
           .finally(releaseProgressSlot)
@@ -737,10 +692,7 @@ export const createQueueCoordinator = (
     publishRunProgress(localQueueItemId);
   };
 
-  /**
-   * Sweep on reconnect, visibility, and a slow interval. Requests during an active sweep guarantee a trailing pass
-   * after network recovery.
-   */
+  /** Requests during an active sweep guarantee a trailing pass after network recovery. */
   const sweep = async (): Promise<void> => {
     if (!isActive() || waits.size === 0) {
       return;
@@ -755,7 +707,6 @@ export const createQueueCoordinator = (
 
     try {
       await mapWithConcurrency([...waits.keys()], BACKEND_READ_CONCURRENCY, async (backendItemId) => {
-        // A slot that settled after the sweep began needs no read.
         if (!isActive() || !waits.has(backendItemId)) {
           return;
         }
@@ -786,10 +737,7 @@ export const createQueueCoordinator = (
     }
   };
 
-  /**
-   * Fetch current previews through the revision-gated live handler. Snapshot failure is nonfatal; replay or the
-   * next step can recover.
-   */
+  /** Snapshot failure is nonfatal; replay or the next step recovers. */
   const refreshProgressPreviews = async (): Promise<void> => {
     if (!isActive() || waits.size === 0 || !backend.readProgressPreviews) {
       return;
@@ -832,9 +780,7 @@ export const createQueueCoordinator = (
       if (wait && event.status === 'in_progress') {
         activeProgressTarget.set(getProgressImageTarget(wait.localQueueItemId, event.item_id));
       }
-      // Back to the queue (a workflow-call parent waiting on its child, a retry):
-      // whatever frames follow belong to a new leg, and after a backend restart
-      // their revisions start over.
+      // Back to the queue: later frames belong to a new leg, whose revisions restart after a backend restart.
       if (event.status === 'pending' || event.status === 'waiting') {
         if (wait && !wait.hasWorkflowCall) {
           wait.hasOwnFrame = false;
@@ -846,8 +792,7 @@ export const createQueueCoordinator = (
       return;
     }
 
-    // Root settlement clears its own wait's gates. Only child item statuses
-    // need the cross-wait lookup to remove their per-child preview gate.
+    // Root settlement clears its own gates; only child statuses need the cross-wait lookup.
     if (!waits.has(event.item_id)) {
       clearFrameGate(event.item_id);
     }
@@ -874,11 +819,7 @@ export const createQueueCoordinator = (
     }
   };
 
-  /**
-   * Whether a frame is older than one already shown for its backend item;
-   * records it as the newest when it is not. A new session on the same item
-   * starts over.
-   */
+  /** Records the frame as newest when it is not stale; a new session on the same item starts over. */
   const isStaleFrame = (event: InvocationProgressEvent): boolean => {
     const wait = waits.get(getTrackedBackendItemId(event));
     if (!wait) {
@@ -971,10 +912,7 @@ export const createQueueCoordinator = (
     }
   };
 
-  /**
-   * Clear transient node/model-load state on connection changes and reconcile on reconnect. Preserve followed
-   * slots/frames because backend runs continue offline.
-   */
+  /** Preserve followed slots and frames: backend runs continue offline. */
   const handleConnectionChange = (status: BackendConnectionStatus): void => {
     if (!isActive()) {
       return;
@@ -995,7 +933,6 @@ export const createQueueCoordinator = (
     }
   };
 
-  /** Attach generation listeners to the shared socket hub. */
   const connect = (): void => {
     if (!isActive() || isAttached) {
       return;
@@ -1028,11 +965,9 @@ export const createQueueCoordinator = (
       })
     );
 
-    // Fires synchronously with the current status, so attaching after the hub
-    // has already connected still triggers the initial clear + sweep.
+    // Fires synchronously with the current status, so a late attach still clears and sweeps.
     detachers.push(backend.onConnectionChange(handleConnectionChange));
 
-    // Sweep when the tab becomes visible instead of waiting for socket reconnect backoff.
     if (typeof document !== 'undefined') {
       const visibilityDocument = document;
       const handleVisibilityChange = (): void => {
@@ -1051,7 +986,7 @@ export const createQueueCoordinator = (
     }, sweepIntervalMs);
   };
 
-  /** Detach generation listeners; the hub keeps the socket alive. */
+  /** The hub keeps the socket alive. */
   const dispose = (): void => {
     isDisposed = true;
     activeProgressTarget.clear();
@@ -1076,8 +1011,7 @@ export const createQueueCoordinator = (
       sweepTimer = null;
     }
 
-    // Dispose settles local waiters as cancelled without backend side effects; later coordinators can re-adopt
-    // continuing runs.
+    // Settles local waiters as cancelled without backend side effects; later coordinators can re-adopt.
     for (const wait of waits.values()) {
       wait.settle({ status: 'canceled' });
     }
@@ -1147,9 +1081,7 @@ export const createQueueCoordinator = (
       );
 
       if (foundBackendItems.length === 0) {
-        // A pending item with no backend trace was never accepted and is safe
-        // to submit; a running item with (partially) vanished backend items is
-        // unrecoverable.
+        // No backend trace: never accepted, safe to submit; a running one whose items vanished is unrecoverable.
         outcomes.set(
           item.id,
           item.status === 'pending' && !item.backendItemIds?.length
@@ -1191,13 +1123,11 @@ export const createQueueCoordinator = (
       );
     }
 
-    // Fetch a preview for re-adopted runs rather than waiting for the next socket step.
     void refreshProgressPreviews();
 
     return outcomes;
   };
 
-  /** Start tracking the accepted backend items. */
   const adoptEnqueueResult = (
     localQueueItemId: string,
     result: QueueEnqueueResult,
@@ -1269,9 +1199,7 @@ export const createQueueCoordinator = (
       const failure = outcomes.find(isGenuineFailure) ?? outcomes.find((outcome) => outcome.status === 'failed');
 
       if (failure?.status === 'failed') {
-        // The failed status ends routing; let completed siblings' results land first. No timeout bounds this: it waits
-        // on the same result reads the success path awaits, and a route started before dispose still finishes or
-        // fails with its request (unstarted routes are released when the runtime goes inactive).
+        // Let completed siblings' results land first; no timeout: it waits on the same reads as the success path.
         await Promise.all(run.pendingRouting);
         throw new QueueItemFailedError(failedBackendItemIds, failure.error, failure.cause);
       }
