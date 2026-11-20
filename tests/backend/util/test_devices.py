@@ -88,7 +88,7 @@ def test_host_memory_available_clamps_nested_cgroup_limit(monkeypatch):
 
     def read_text(path):
         try:
-            return files[str(path)]
+            return files[path.as_posix()]
         except KeyError as exc:
             raise OSError from exc
 
@@ -107,7 +107,7 @@ def test_host_memory_available_ignores_unlimited_cgroup_and_swap(monkeypatch):
 
     def read_text(path):
         try:
-            return files[str(path)]
+            return files[path.as_posix()]
         except KeyError as exc:
             raise OSError from exc
 
@@ -128,7 +128,7 @@ def test_host_memory_available_clamps_to_finite_ancestor_when_leaf_is_unlimited(
 
     def read_text(path):
         try:
-            return files[str(path)]
+            return files[path.as_posix()]
         except KeyError as exc:
             raise OSError from exc
 

@@ -35,6 +35,8 @@ def test_maximum_allocation_limit_rejects_over_128_gib_before_cuda(monkeypatch):
 
 
 def test_allocation_limit_accepts_over_64_gib_without_allocating(monkeypatch, capsys):
+    monkeypatch.setattr(torch.version, "cuda", "12.8")
+    monkeypatch.setattr(torch.version, "hip", None)
     monkeypatch.setattr(probe.torch.cuda, "is_available", lambda: False)
     monkeypatch.setattr(probe.torch, "empty", lambda *args, **kwargs: pytest.fail("CUDA allocation should not start"))
     monkeypatch.setattr(probe.sys, "argv", ["probe", "--max-gb", "65"])
