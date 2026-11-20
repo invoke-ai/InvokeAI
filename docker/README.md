@@ -47,6 +47,8 @@ Compose publishes the port on the Docker host's loopback address by default. Onc
 
 To share the installation after setup, keep multi-user mode enabled. Set `HOST_INVOKEAI_IP` in `.env` to the host's LAN IP and run `./run.sh` again with the same data directory. For `docker run`, recreate the container with the volume containing your administrator and replace `127.0.0.1` in the port mapping with the host's LAN IP. If you use a reverse proxy, enable its route to Invoke only after setup.
 
+**Updating an existing Compose setup:** Compose publishes the port on `127.0.0.1` unless `HOST_INVOKEAI_IP` is set, so after you update, other devices can no longer connect. Create the administrator on the host first. Then set `HOST_INVOKEAI_IP` in `.env` to the host's LAN IP, or `0.0.0.0` for every interface, and run `./run.sh` again.
+
 >[!TIP]
 >When using the `run.sh` script, the container will continue running after Ctrl+C. To shut it down, use the `docker compose down` command.
 

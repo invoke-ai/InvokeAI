@@ -646,7 +646,8 @@ Occurs when:
   "setup_required": true,
   "multiuser_enabled": true,
   "strict_password_checking": true,
-  "admin_email": "admin@example.com"
+  "admin_email": null,
+  "has_single_user_work": true
 }
 ```
 
@@ -656,15 +657,20 @@ Occurs when:
   "setup_required": false,
   "multiuser_enabled": true,
   "strict_password_checking": true,
-  "admin_email": null
+  "admin_email": null,
+  "has_single_user_work": false
 }
 ```
 
 :::note
-`admin_email` is only populated while `setup_required` is `true` (to help locate the pre-seeded
-administrator account during initial setup). Once an admin has been created — and whenever
-multiuser mode is disabled — it is returned as `null` to avoid leaking administrator identity on
-public deployments.
+`admin_email` is `null` in both cases. The server fills it in only while `setup_required` is `true`, and setup is
+required only while no active administrator exists, so there is no address to return. Once an administrator exists,
+and whenever multiuser mode is disabled, it stays `null` so a public server does not reveal an administrator's
+address.
+
+`has_single_user_work` is `true` only while `setup_required` is `true` and the internal `system` account owns a
+Workbench project, a wildcard, a private prompt template or a private uploaded font. The setup screen then shows the
+**Your earlier work is kept** notice.
 :::
 
 

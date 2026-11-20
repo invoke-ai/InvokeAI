@@ -13,7 +13,11 @@ An older ROCm Compose service with a custom `INVOKEAI_ROOT` may have stored your
 
 ## Before upgrading a single-user installation
 
-InvokeAI now requires sign-in by default, including on localhost. If you previously worked without an account, finish queued jobs and save the Workbench projects, wildcards, private prompt templates and private fonts you want to use with your new account **before switching modes**. Create the first administrator while only you can reach the server. The [single-user upgrade instructions](/configuration/multi-user-mode/admin-guide/#upgrading-from-single-user-mode) cover export, private setup, import and recovery if you have already upgraded.
+InvokeAI now requires sign-in by default, including on localhost. If you previously worked without an account, finish queued jobs and save the Workbench projects, wildcards, private prompt templates and private fonts you want to use with your new account **before switching modes**. Create the first administrator while only you can reach the server: until it exists, anyone who can reach the server sees **Set up Invoke** and can claim the account. With `host: 0.0.0.0` in `invokeai.yaml`, that includes everyone on your network, so set it to `127.0.0.1` first. The [single-user upgrade instructions](/configuration/multi-user-mode/admin-guide/#upgrading-from-single-user-mode) cover export, private setup and import. If you have already upgraded, follow [these steps](/configuration/multi-user-mode/admin-guide/#if-you-have-already-upgraded) to bring your earlier work over.
+
+## Docker Compose network access
+
+After you update the Compose files, other devices can no longer connect to Invoke. To share it again, see [Run the Container](/configuration/docker/#run-the-container).
 
 ## The upgrade is one-way
 
@@ -56,6 +60,8 @@ Nothing you did in v7 after that start is in the backup. Images you generated in
 :::caution[Models installed in v7]
 v6 lists the models you installed in v7 as orphaned, and its **Sync Models** in the Model Manager offers to delete them. Keep them if you may go back to v7: the v7 database you set aside, `invokeai.db.v7`, still uses them.
 :::
+
+v7 adds `multiuser: true` to an `invokeai.yaml` that has no `multiuser` line, and v6.13 and later read it. So if you worked without an account before, they now ask you to sign in or create an administrator too. To work without accounts there, set `multiuser: false` and keep the server [local only](/configuration/multi-user-mode/admin-guide/#single-user-mode). v6.12 and earlier refuse to start with that file: copy `invokeai.yaml.bak`, which v7 saved next to it at its first start, to `invokeai.yaml`.
 
 ### MySQL and MariaDB
 
@@ -155,7 +161,7 @@ Steps 3 to 5 as commands:
 
 Use these steps in either direction. Each database has its own accounts and setup state.
 
-1. Before starting InvokeAI, disconnect external reverse proxy routes, tunnels and port forwards. Configure the server or Docker host to [listen only on loopback](/configuration/multi-user-mode/admin-guide/#verify-local-only-access). On releases that support accounts, explicitly enable sign-in with `multiuser: true` in `invokeai.yaml` and remove any `INVOKEAI_MULTIUSER=false` environment override, or set `INVOKEAI_MULTIUSER=true` in the server environment.
+1. Before starting InvokeAI, disconnect external reverse proxy routes, tunnels and port forwards. Configure the server or Docker host to [listen only on loopback](/configuration/multi-user-mode/admin-guide/#verify-local-only-access). On releases that support accounts, check that `invokeai.yaml` contains `multiuser: true` and remove any `INVOKEAI_MULTIUSER=false` environment override, or set `INVOKEAI_MULTIUSER=true` in the server environment. Without that line, v6.12 to v7.0.0-beta.2 start without sign-in. The current version adds the line to the end of the file when it starts. If it cannot, for example because the file is read-only, it logs a warning instead, so check that the line is there.
 2. Start the intended release and verify local-only access. Check that the database path in the startup log matches the file you restored, or the configured server database for MySQL or MariaDB. For Docker, also check that the data mount points to the restored data.
 3. For releases with accounts, open InvokeAI in a fresh browser session and confirm it requires sign-in. Sign in with an administrator from the active database, or complete first-administrator setup privately if that database predates setup. If setup appears when you expected an existing account, recheck the database and Docker mount. Restore network access only after verifying administrator sign-in and the expected data. For older releases without accounts, keep the server private or require authentication at a reverse proxy and allow remote access only through that proxy.
 

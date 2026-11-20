@@ -138,6 +138,10 @@ Use the standard `docker compose up` command, and generally the `docker compose`
 
 Open [http://localhost:9090](http://localhost:9090) on the Docker host or through the SSH tunnel above to create the administrator. To share the installation after setup, set `HOST_INVOKEAI_IP` in `.env` to the host's LAN IP and rerun the command you used to start the service with the same data directory.
 
+:::note[Updating an existing Compose setup]
+The supplied Compose file publishes the port on `127.0.0.1` unless `HOST_INVOKEAI_IP` is set, so after you update, other devices can no longer connect. Create the administrator on the Docker host first. Then set `HOST_INVOKEAI_IP` in `.env` to the host's LAN IP, or `0.0.0.0` for every interface, and start the service again.
+:::
+
 ## Troubleshooting / FAQ
 
 <details>

@@ -15,8 +15,8 @@ server:
   # The server's interpreter: <checkout>/.venv/Scripts/python.exe on Windows, <checkout>/.venv/bin/python on Linux.
   python: <python>
   # code_dir: <checkout> # the checkout the server runs; default: the checkout this tool runs from
-  # For a template whose invokeai.yaml omits multiuser, use env: {INVOKEAI_MULTIUSER: "false"} to allow
-  # local processes to access its database snapshot and shared resources during the run.
+  # The template must run single-user: set multiuser: false in its invokeai.yaml. env: {INVOKEAI_MULTIUSER: "false"}
+  # works only while that file has no multiuser line; starting the template's own server adds multiuser: true to it.
   env: {} # extra server environment, e.g. {HIP_VISIBLE_DEVICES: "0"} for ROCm
 
 defaults:
