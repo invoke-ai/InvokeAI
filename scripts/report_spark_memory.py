@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import json
 import os
 import platform
@@ -15,6 +16,8 @@ from typing import Any
 
 import psutil
 import torch
+
+from invokeai.backend.util.devices import _host_memory_available
 
 
 def _read_text(path: Path) -> str | None:
@@ -82,25 +85,85 @@ def _cuda_devices() -> list[dict[str, Any]]:
     return devices
 
 
-def _nvidia_smi() -> dict[str, str | int | None]:
-    executable = shutil.which("nvidia-smi")
-    if executable is None:
-        return {"available": 0, "gpu_memory_csv": None, "error": "nvidia-smi not found"}
+def _windows_memory() -> dict[str, int | str] | None:
+    if os.name != "nt":
+        return None
+
+    class PerformanceInformation(ctypes.Structure):
+        _fields_ = [
+            ("cb", ctypes.c_uint32),
+            ("commit_total", ctypes.c_size_t),
+            ("commit_limit", ctypes.c_size_t),
+            ("commit_peak", ctypes.c_size_t),
+            ("physical_total", ctypes.c_size_t),
+            ("physical_available", ctypes.c_size_t),
+            ("system_cache", ctypes.c_size_t),
+            ("kernel_total", ctypes.c_size_t),
+            ("kernel_paged", ctypes.c_size_t),
+            ("kernel_nonpaged", ctypes.c_size_t),
+            ("page_size", ctypes.c_size_t),
+            ("handle_count", ctypes.c_uint32),
+            ("process_count", ctypes.c_uint32),
+            ("thread_count", ctypes.c_uint32),
+        ]
+
+    try:
+        info = PerformanceInformation()
+        info.cb = ctypes.sizeof(info)
+        psapi = ctypes.WinDLL("psapi", use_last_error=True)
+        get_performance_info = psapi.GetPerformanceInfo
+        get_performance_info.argtypes = [ctypes.POINTER(PerformanceInformation), ctypes.c_uint32]
+        get_performance_info.restype = ctypes.c_int
+        if not get_performance_info(ctypes.byref(info), info.cb):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return {
+            "commit_total_bytes": info.commit_total * info.page_size,
+            "commit_limit_bytes": info.commit_limit * info.page_size,
+            "commit_peak_bytes": info.commit_peak * info.page_size,
+            "physical_total_bytes": info.physical_total * info.page_size,
+            "physical_available_bytes": info.physical_available * info.page_size,
+        }
+    except (AttributeError, OSError) as exc:
+        return {"error": str(exc)}
+
+
+def _run_nvidia_smi(executable: str, *arguments: str) -> dict[str, str | None]:
     try:
         result = subprocess.run(
-            [executable, "--query-gpu=name,memory.total,memory.used,memory.free", "--format=csv,noheader,nounits"],
+            [executable, *arguments],
             capture_output=True,
             text=True,
             timeout=5,
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return {"available": 1, "gpu_memory_csv": None, "error": str(exc)}
+        return {"output": None, "error": str(exc)}
+    return {
+        "output": result.stdout.strip() or None,
+        "error": result.stderr.strip() or None if result.returncode else None,
+    }
+
+
+def _nvidia_smi() -> dict[str, Any]:
+    executable = shutil.which("nvidia-smi")
+    if executable is None:
+        return {"available": 0, "gpu_memory_csv": None, "processes_csv": None, "full_output": None}
+    gpu = _run_nvidia_smi(
+        executable, "--query-gpu=name,memory.total,memory.used,memory.free", "--format=csv,noheader,nounits"
+    )
+    processes = _run_nvidia_smi(
+        executable, "--query-compute-apps=pid,process_name,used_memory", "--format=csv,noheader,nounits"
+    )
+    full = _run_nvidia_smi(executable)
     return {
         "available": 1,
-        "gpu_memory_csv": result.stdout.strip() or None,
+        "gpu_memory_csv": gpu["output"],
         "gpu_memory_fields": "name,memory.total,memory.used,memory.free (MiB)",
-        "error": result.stderr.strip() or None if result.returncode else None,
+        "processes_csv": processes["output"],
+        "full_output": full["output"],
+        "gpu_memory_error": gpu["error"],
+        "processes_error": processes["error"],
+        "full_output_error": full["error"],
     }
 
 
@@ -120,6 +183,7 @@ def build_report(label: str | None) -> dict[str, Any]:
         "system_memory": {
             "total_bytes": memory.total,
             "available_bytes": memory.available,
+            "effective_available_bytes": _host_memory_available(),
             "free_bytes": memory.free,
             "used_bytes": memory.used,
             "percent_used": memory.percent,
@@ -128,10 +192,11 @@ def build_report(label: str | None) -> dict[str, Any]:
             "swap_free_bytes": swap.free,
             "cgroup": _cgroup_memory(),
         },
+        "windows_memory": _windows_memory(),
         "report_process_rss_bytes": psutil.Process(os.getpid()).memory_info().rss,
         "cuda_devices": _cuda_devices(),
         "nvidia_smi": _nvidia_smi(),
-        "note": "No model tensors are allocated; CUDA queries may create a context. Process counters describe this reporter, not InvokeAI.",
+        "note": "No model tensors are allocated; CUDA queries may create a context. Torch/WDDM process counters describe this reporter; nvidia-smi and Windows commit counters are system-wide.",
     }
 
 
