@@ -115,8 +115,8 @@ describe('getZoomedOutMountViewport', () => {
   });
 
   it('counts the fit’s padding, which lowers the zoom it can land at', () => {
-    // 450 px less the toolbar's 56 px and XYFlow's 20 px on the right leaves 374 px, which shows 935 px of positions
-    // at the content zoom.
+    // 450 px less the toolbar's 56 px and XYFlow's 20 px on the right leaves 374 px, which shows 935 px of positions at
+    // the content zoom.
     expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 940, 0)], container)?.zoom).toBeLessThan(
       CONTENT_VISIBILITY_ZOOM
     );

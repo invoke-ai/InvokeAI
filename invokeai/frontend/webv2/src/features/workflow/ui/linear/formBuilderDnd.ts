@@ -26,11 +26,9 @@ export const parseFormDroppableId = (
   return null;
 };
 
-/** The id of `elementId`'s container, or null for the root element (which has no parent). */
 export const findFormParentId = (form: WorkflowForm, elementId: string): string | null =>
   form.elements[elementId]?.parentId ?? null;
 
-/** True when `candidateId` is `ancestorId` itself or nested anywhere under it. */
 export const isFormDescendantOrSelf = (form: WorkflowForm, ancestorId: string, candidateId: string): boolean => {
   if (ancestorId === candidateId) {
     return true;
@@ -76,8 +74,8 @@ const formContainerDepth = (form: WorkflowForm, containerId: string): number => 
 };
 
 /**
- * Choose deepest landing container, then prefer precise edge insertion at equal depth. Independent depth
- * calculation makes collision ordering irrelevant.
+ * Choose deepest landing container, then prefer precise edge insertion at equal depth. Independent depth calculation
+ * makes collision ordering irrelevant.
  */
 export const pickInnermostFormCollision = (collisions: { id: string }[], form: WorkflowForm): string | null => {
   if (collisions.length === 0) {
@@ -118,8 +116,8 @@ export const pickInnermostFormCollision = (collisions: { id: string }[], form: W
 };
 
 /**
- * Reject self, descendant, and unresolved drops before rendering affordances; reducer validation independently
- * enforces the same move constraints.
+ * Reject self, descendant, and unresolved drops before rendering affordances; reducer validation independently enforces
+ * the same move constraints.
  */
 export const resolveFormDrop = (
   form: WorkflowForm,

@@ -6,6 +6,7 @@ shared VAE's tiling settings survive the call.
 """
 
 from contextlib import contextmanager
+from unittest.mock import Mock
 
 import pytest
 import torch
@@ -26,6 +27,7 @@ class _LoadedVae:
 
     def __init__(self, vae: AutoencoderKLFlux2):
         self.model = vae
+        self.compute_device = torch.device("cpu")
 
     @contextmanager
     def model_on_device(self, *, working_memory: WorkingMemoryEstimate):
@@ -99,6 +101,40 @@ def test_the_shared_vae_keeps_its_own_tiling_settings(vae, image, monkeypatch: p
     _encode(vae, image)
 
     assert (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size) == before
+
+
+def test_conditional_reference_encode_uses_the_cpu_vae_in_an_accelerator_session(vae, monkeypatch):
+    real_encode = vae.encode
+
+    def encode(pixels, **kwargs):
+        assert pixels.device == torch.device("cpu")
+        assert pixels.dtype == vae.dtype
+        return real_encode(pixels, **kwargs)
+
+    attention_probe = Mock(wraps=ref_image_extension.flux2_vae_attention_materializes)
+    monkeypatch.setattr(ref_image_extension, "flux2_vae_attention_materializes", attention_probe)
+    monkeypatch.setattr(vae, "encode", encode)
+    monkeypatch.setattr(ref_image_extension.TorchDevice, "choose_torch_device", lambda: torch.device("meta"))
+
+    latents = _encode(vae, Image.new("RGB", (32, 32)), tiling="if_attention_materializes")
+
+    assert attention_probe.call_args.args[2] == torch.device("cpu")
+    assert latents.device == torch.device("cpu")
+    assert latents.shape == (1, 32, 4, 4)
+
+
+def test_tiled_reference_encode_prices_working_memory_on_the_cpu_vae(vae, monkeypatch):
+    real_estimate = ref_image_extension.estimate_vae_working_memory_flux2
+
+    def estimate(**kwargs):
+        assert kwargs["device"] == torch.device("cpu")
+        assert kwargs["tile_size"] == REF_ENCODE_TILE_SIZE
+        return real_estimate(**kwargs)
+
+    monkeypatch.setattr(ref_image_extension, "estimate_vae_working_memory_flux2", estimate)
+    monkeypatch.setattr(ref_image_extension.TorchDevice, "choose_torch_device", lambda: torch.device("meta"))
+
+    _encode(vae, Image.new("RGB", (32, 32)))
 
 
 @pytest.mark.parametrize(

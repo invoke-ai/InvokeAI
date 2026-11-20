@@ -1,7 +1,4 @@
-/**
- * Pure swipe physics for the preview carousel: gesture intent, finger-velocity estimation, edge resistance, and the
- * release decision. Offsets are stage-space pixels; negative moves the image left, revealing the next item.
- */
+/** Pure swipe physics; offsets are stage-space px, negative moves left to reveal the next item. */
 
 /** Travel that decides a touch; matches the touch drag sensor's tolerance, so a still-waiting drag yields on the same move. */
 export const SWIPE_SLOP_PX = 10;
@@ -83,11 +80,7 @@ export type SwipeRelease =
   | { direction: SwipeDirection; durationMs: number; kind: 'commit' }
   | { durationMs: number; kind: 'cancel' };
 
-/**
- * Decide a release: a flick toward an available neighbor, or a slow drag past the commit fraction, commits; anything
- * else, including a flick back toward the start, returns to rest. Settle time follows the finger's speed, so fast
- * flicks finish fast.
- */
+/** A flick toward a neighbor or a slow drag past the fraction commits; settle time follows finger speed. */
 export const resolveSwipeRelease = ({
   canNavigate,
   offset,

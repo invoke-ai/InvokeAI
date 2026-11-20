@@ -102,7 +102,6 @@ describe('model install event interpretation', () => {
     await vi.advanceTimersByTimeAsync(250);
     expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
 
-    // Started after the event, so its status is authoritative (e.g. resumed from another client).
     fresh.resolve([{ id: 9, source: 'org/model', status: 'downloading' }]);
     await vi.advanceTimersByTimeAsync(0);
     expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'downloading' }]);
@@ -162,7 +161,6 @@ describe('model install event interpretation', () => {
       stale.resolve([{ id: 9, source: 'org/model', status: 'downloading' }]);
       await vi.advanceTimersByTimeAsync(250);
 
-      // Every install event schedules a refresh that starts after it, so the stale snapshot never sticks.
       expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(2);
       expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: settledStatus }]);
     }
@@ -223,7 +221,6 @@ describe('model install event interpretation', () => {
     dependencies.listModelInstalls
       .mockReset()
       .mockReturnValueOnce(stale.promise)
-      // The trailing rerun and the event's scheduled refresh both fail.
       .mockRejectedValue(new Error('temporary list failure'));
 
     const store = await import('./installsStore');
@@ -231,9 +228,7 @@ describe('model install event interpretation', () => {
     void store.refreshInstalls();
 
     store.handleModelInstallSocketEvent('model_install_download_started', { id: 9, source: 'org/model' });
-    // Cancelling during download emits no event; the UI refreshes, joining the in-flight request.
     void store.refreshInstalls();
-    // The backend served the in-flight request after the cancel.
     stale.resolve([{ id: 9, source: 'org/model', status: 'cancelled' }]);
     await vi.advanceTimersByTimeAsync(250);
 
@@ -247,7 +242,6 @@ describe('model install event interpretation', () => {
     dependencies.listModelInstalls
       .mockReset()
       .mockReturnValueOnce(stale.promise)
-      // The trailing rerun and the event's scheduled refresh both fail.
       .mockRejectedValue(new Error('temporary list failure'));
 
     const store = await import('./installsStore');
@@ -255,7 +249,6 @@ describe('model install event interpretation', () => {
     void store.refreshInstalls();
 
     store.handleModelInstallSocketEvent('model_install_complete', { config: {}, id: 9, source: 'org/model' });
-    // Pruning settled jobs emits no event; the UI refreshes, joining the in-flight request.
     void store.refreshInstalls();
     stale.resolve([]);
     await vi.advanceTimersByTimeAsync(250);
@@ -277,7 +270,6 @@ describe('model install event interpretation', () => {
 
     store.addInstallJob({ id: 5, source: 'org/new', status: 'waiting' });
     store.handleModelInstallSocketEvent('model_install_complete', { config: {}, id: 5, source: 'org/new' });
-    // The backend served the request before the job existed.
     stale.resolve([]);
     await vi.advanceTimersByTimeAsync(250);
 
@@ -292,7 +284,6 @@ describe('model install event interpretation', () => {
     store.addInstallJob({ id: 9, source: 'org/model', status: 'running' });
 
     store.handleModelInstallSocketEvent('model_install_complete', { config: {}, id: 9, source: 'org/model' });
-    // The backend treats cancelling a completed job as a successful no-op.
     store.projectInstallCancelled(9);
     await vi.advanceTimersByTimeAsync(250);
 
@@ -311,7 +302,6 @@ describe('model install event interpretation', () => {
     store.addInstallJob({ id: 9, source: 'org/model', status: 'waiting' });
     void store.refreshInstalls();
 
-    // Cancelling a waiting job emits no event and the cancel route returns no job.
     store.projectInstallCancelled(9);
     expect(store.getInstallsSnapshot().jobs).toEqual([{ id: 9, source: 'org/model', status: 'cancelled' }]);
     void store.refreshInstalls();
@@ -351,7 +341,6 @@ describe('model install event interpretation', () => {
     store.addInstallJob({ id: 9, source: 'org/model', status: 'waiting' });
 
     if (cancelSource === 'cancel action') {
-      // DELETE succeeded before the worker observed cancellation; GET still returned an active row.
       store.replaceInstallJob({ id: 9, source: 'org/model', status: 'waiting' });
       store.projectInstallCancelled(9);
     } else {
@@ -378,7 +367,6 @@ describe('model install event interpretation', () => {
     store.addInstallJob({ id: 9, source: 'org/model', status: 'downloading' });
     void store.refreshInstalls();
 
-    // DELETE can succeed as a no-op after completion; GET returns the current completed row.
     store.replaceInstallJob({ id: 9, source: 'org/model', status: 'completed' });
     void store.refreshInstalls();
     stale.resolve([{ id: 9, source: 'org/model', status: 'downloading' }]);
@@ -544,7 +532,6 @@ describe('model install event interpretation', () => {
     store.addInstallJob({ id: 9, source: 'org/model', status: 'waiting' });
     const refresh = store.refreshInstalls();
 
-    // The download-start event was missed during reconnect; progress proves this job is downloading.
     store.handleModelInstallSocketEvent('model_install_download_progress', { bytes: 50, id: 9, total_bytes: 100 });
     stale.resolve([{ id: 9, source: 'org/model', status: 'waiting' }]);
     await refresh;
@@ -563,7 +550,6 @@ describe('model install event interpretation', () => {
     const store = await import('./installsStore');
     const refresh = store.refreshInstalls();
 
-    // Another client created this job; the first event seen here is a progress tick.
     store.handleModelInstallSocketEvent('model_install_download_progress', { bytes: 50, id: 9, total_bytes: 100 });
     stale.resolve([{ id: 9, source: 'org/model', status: 'waiting' }]);
     await refresh;
@@ -591,7 +577,6 @@ describe('model install event interpretation', () => {
       modelName: 'Installed Model',
       source: 'org/model',
     });
-    // Catalog refreshes ride the same coalescing window as the jobs list.
     expect(dependencies.refreshModels).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(250);
@@ -621,7 +606,6 @@ describe('model install event interpretation', () => {
       .mockReset()
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise)
-      // The join during the replacement flight queues a trailing rerun.
       .mockResolvedValueOnce([{ id: 2, source: 'new/account', status: 'waiting' }]);
 
     const store = await import('./installsStore');
@@ -669,16 +653,13 @@ describe('model install event interpretation', () => {
 
     const store = await import('./installsStore');
 
-    // First completion schedules the coalesced refresh, which starts and hangs.
     store.handleModelInstallSocketEvent('model_install_complete', { config: {}, id: 1, source: 'org/model' });
     await vi.advanceTimersByTimeAsync(250);
     expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(1);
 
-    // Second completion's refresh joins the in-flight request...
     store.handleModelInstallSocketEvent('model_install_complete', { config: {}, id: 1, source: 'org/model' });
     await vi.advanceTimersByTimeAsync(250);
 
-    // ...so when the stale response lands, one trailing re-fetch brings the fresh list.
     stale.resolve([{ id: 1, source: 'org/model', status: 'running' }]);
     await vi.advanceTimersByTimeAsync(0);
 
@@ -754,7 +735,6 @@ describe('install queue presentation state', () => {
     store.handleModelInstallSocketEvent('model_install_download_progress', { bytes: 0, id: 7, total_bytes: 1000 });
     vi.advanceTimersByTime(100);
     store.handleModelInstallSocketEvent('model_install_download_progress', { bytes: 50, id: 7, total_bytes: 1000 });
-    // Too soon for a second sample: the rate stays unknown rather than spiking.
     expect(store.getInstallProgress(7)?.bytesPerSecond).toBeNull();
 
     vi.advanceTimersByTime(900);

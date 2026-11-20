@@ -15,13 +15,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { VideoConditioningClipField } from './VideoConditioningClipField';
 
-/**
- * The role decides which half of the clip the model is given and which it generates -- the whole
- * difference between audio-to-video and video-to-audio. It reaches the panel through one Select
- * whose value is an array, so a wrong-shaped value shows the placeholder while the stored role
- * quietly stays whatever it was: a control that looks unset and generates the other mode.
- */
-
 const CLIP: VideoConditioningClip = {
   clip: { fps: 24, height: 704, numFrames: 96, video_name: 'clip.mp4', width: 1248 },
   fpsKnown: true,
@@ -29,7 +22,6 @@ const CLIP: VideoConditioningClip = {
 };
 
 const noop = vi.fn();
-/** The media slot reaches for the gallery adapter on render; nothing here exercises it. */
 const galleryAdapter = {
   ItemActionsProvider: ({ children }: { children: ReactNode }) => children,
   ImageContextMenu: () => null,
@@ -50,7 +42,6 @@ const galleryAdapter = {
   widgets: { openGallery: () => true, patchGalleryValues: noop },
 } as unknown as GalleryUiAdapter;
 
-/** The field reaches for find-in-gallery on render; nothing here exercises it. */
 const videoAdapter = {
   findInGallery: noop,
   getUploadBoardId: () => Promise.resolve('none'),
@@ -152,8 +143,6 @@ describe('the conditioning clip role control', () => {
     await mount(null);
     expect(host.textContent).toContain('Drop a clip to generate the other half of it.');
 
-    // A disabled slot has to explain itself: the reason is the only thing telling the user which
-    // of four other controls to clear.
     await mount(null, { reason: 'Clear the First Frame to use a conditioning clip.' });
     expect(host.textContent).toContain('Clear the First Frame to use a conditioning clip.');
   });

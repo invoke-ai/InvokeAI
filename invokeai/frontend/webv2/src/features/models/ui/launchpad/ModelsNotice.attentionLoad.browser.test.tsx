@@ -116,9 +116,7 @@ it('keeps the notice up when the attention count cannot load, without retrying o
   });
 
   await expect.element(page.getByText(i18n.t('models.launchpad.installsCheckFailed'))).toBeVisible();
-  // The rest of the notice is untouched: the bundle install is still offered.
   await expect.element(page.getByRole('button', { exact: true, name: 'Install SDXL' })).toBeVisible();
-  // A failed load is not retried behind the viewer's back.
   await act(
     () =>
       new Promise<void>((resolve) => {

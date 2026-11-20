@@ -23,7 +23,6 @@ export type FormElementMetaKey =
 
 export interface FormElementMeta {
   icon: LucideIcon;
-  /** Translation key of the element's display name. */
   labelKey: string;
 }
 

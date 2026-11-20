@@ -8,9 +8,14 @@ import {
   supportsExternalModelSettings,
   type ExternalModelSettingsModel,
 } from '@features/models/core/externalModelFields';
-import { isLinkableType } from '@features/models/core/relationships';
+import { isLinkableModel } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
-import { getModelSourceHref, getUnrecordedModelFact } from '@features/models/core/taxonomy';
+import {
+  getModelSourceHref,
+  getModelTypeLabel,
+  getModelVariantLabel,
+  getUnrecordedModelFact,
+} from '@features/models/core/taxonomy';
 import { supportsWorkingMemoryCalibration } from '@features/models/core/workingMemory';
 import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
 import {
@@ -47,7 +52,7 @@ import { WorkingMemorySection } from './WorkingMemorySection';
 
 const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
 
-type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'type'> & {
+type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'roles' | 'type'> & {
   hasCpuOnlySetting: boolean;
   hasTriggerPhrases: boolean;
 };
@@ -71,6 +76,7 @@ type ModelIdentityModel = Pick<
   | 'provider_id'
   | 'provider_model_id'
   | 'repo_variant'
+  | 'roles'
   | 'scale'
   | 'source'
   | 'source_type'
@@ -95,6 +101,7 @@ const selectModelShell = (snapshot: ModelsSnapshot, modelKey: string): ModelDeta
         hasCpuOnlySetting: supportsCpuOnlySetting(model),
         hasTriggerPhrases: model.trigger_phrases !== undefined && model.type !== 'control_lora',
         key: model.key,
+        roles: model.roles,
         type: model.type,
       }
     : null;
@@ -121,6 +128,7 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
         provider_id: model.provider_id,
         provider_model_id: model.provider_model_id,
         repo_variant: model.repo_variant,
+        roles: model.roles,
         scale: model.scale,
         source: model.source,
         source_type: model.source_type,
@@ -134,9 +142,9 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
 const selectDefaultSettingsModel = (snapshot: ModelsSnapshot, modelKey: string): DefaultSettingsModel | null => {
   const model = findModel(snapshot, modelKey);
 
-  // `base` and `format` are projected too: together with the type they are the loader key the backend
-  // answers the FP8 Storage question on, and all three parts change the answer. `variant` joins them
-  // for Generate's scheduler rules, which differ by variant within a base.
+  // `base` and `format` are projected too: together with the type they are the loader key the backend answers the FP8
+  // Storage question on, and all three parts change the answer. `variant` joins them for Generate's scheduler rules,
+  // which differ by variant within a base.
   return model
     ? {
         base: model.base,
@@ -233,7 +241,7 @@ export const ModelDetail = ({
         </>
       ) : null}
 
-      {isLinkableType(model.type) ? (
+      {isLinkableModel(model) ? (
         <>
           <Separator borderColor="border.subtle" />
           <RelatedModelsSectionContainer modelKey={model.key} />
@@ -497,9 +505,24 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
     (snapshot) => {
       const candidate = snapshot.modelsByKey.get(modelKey);
 
-      return candidate ? { base: candidate.base, key: candidate.key, type: candidate.type } : null;
+      return candidate
+        ? {
+            base: candidate.base,
+            key: candidate.key,
+            latent_channels: candidate.latent_channels,
+            roles: candidate.roles,
+            type: candidate.type,
+            variant: candidate.variant,
+          }
+        : null;
     },
-    (left, right) => left?.key === right?.key && left?.base === right?.base && left?.type === right?.type
+    (left, right) =>
+      left?.key === right?.key &&
+      left?.base === right?.base &&
+      left?.type === right?.type &&
+      left?.variant === right?.variant &&
+      left?.latent_channels === right?.latent_channels &&
+      left?.roles === right?.roles
   );
   const handleSectionError = useCallback(
     (message: string) => notify.error(t('models.modelManager'), message),
@@ -514,12 +537,12 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
 });
 
 const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: ModelIdentityModel }) => {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
   const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
   const pathDialog = useExitPresence(isPathDialogOpen);
-  // Managed models store paths relative to the models directory; show the
-  // resolved absolute path so it can be found on disk.
+  // Managed models store paths relative to the models directory; show the resolved absolute path so it can be found on
+  // disk.
   const fullPath = resolveModelAbsolutePath(model.path, modelsDir);
   // Allow repointing absolute-path installs, including missing files.
   const canUpdatePath = isAbsoluteModelPath(model.path) || isMissing;
@@ -528,6 +551,20 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
     { label: t('models.fileSize'), value: formatBytes(model.file_size) },
     { label: t('models.variant'), value: model.variant ?? '—' },
     { label: t('models.predictionType'), value: model.prediction_type ?? '—' },
+    ...(model.roles?.length
+      ? [
+          {
+            label: t('models.alsoUsableAs'),
+            value: new Intl.ListFormat(i18n.resolvedLanguage, { style: 'long', type: 'conjunction' }).format(
+              model.roles.map((role) =>
+                role.variant
+                  ? `${getModelTypeLabel(role.type)} · ${getModelVariantLabel(role.variant)}`
+                  : getModelTypeLabel(role.type)
+              )
+            ),
+          },
+        ]
+      : []),
     // Recorded by the probe for upscalers; an unrecorded one is explained by the notice above instead.
     ...(typeof model.scale === 'number'
       ? [{ label: t('models.nativeScale'), value: t('models.nativeScaleValue', { scale: model.scale }) }]

@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 
 import { computeFitBboxToLayers, computeFitBboxToMasks, fitRectToGrid, unionRenderableBounds } from './fitBbox';
 
-/** An axis-aligned image layer (no rotation): document bounds are `[x, y, w, h]`. */
 const imageLayer = (
   id: string,
   x: number,
@@ -90,8 +89,8 @@ describe('unionRenderableBounds', () => {
     const doc = docWith([
       imageLayer('a', 10, 20, 100, 100),
       imageLayer('b', 200, 200, 50, 50),
-      imageLayer('c', 500, 500, 40, 40, false), // disabled → excluded
-      inpaintMask('empty', 0, 0, null), // empty mask → excluded
+      imageLayer('c', 500, 500, 40, 40, false),
+      inpaintMask('empty', 0, 0, null),
     ]);
     expect(unionRenderableBounds(doc, () => true)).toEqual({ height: 230, width: 240, x: 10, y: 20 });
   });
@@ -115,7 +114,7 @@ describe('computeFitBboxToLayers', () => {
 describe('computeFitBboxToMasks', () => {
   it('fits only inpaint masks, padded then grid-snapped', () => {
     const doc = docWith([
-      imageLayer('a', 0, 0, 500, 500), // ignored (not a mask)
+      imageLayer('a', 0, 0, 500, 500),
       inpaintMask('m', 100, 100, { height: 40, imageName: 'm-img', width: 40 }),
     ]);
     // mask bounds {100,100,40,40} → blur 0 pads 8 → 92..148 → grid 8 outward → 88..152.
@@ -135,7 +134,6 @@ describe('computeFitBboxToMasks', () => {
     expect(computeFitBboxToMasks(doc, 8, 16)).toEqual({ height: 96, width: 96, x: 72, y: 72 });
   });
 
-  /** The frame holds the whole feathered mask: its bounds grown by the blur on every side. */
   const expectContainsFeather = (
     frame: { x: number; y: number; width: number; height: number } | null,
     mask: { x: number; y: number; width: number; height: number },
@@ -181,9 +179,7 @@ describe('computeFitBboxToMasks', () => {
   it('excludes regional-guidance masks (legacy fits inpaint_mask only)', () => {
     const regional = maskLayer('regional_guidance', 'rg', 400, 400, { height: 40, imageName: 'rg-img', width: 40 });
     const doc = docWith([regional, inpaintMask('m', 100, 100, { height: 40, imageName: 'm-img', width: 40 })]);
-    // Identical to the inpaint-only fit above: the regional mask contributes nothing.
     expect(computeFitBboxToMasks(doc, 8, 0)).toEqual({ height: 64, width: 64, x: 88, y: 88 });
-    // Regional masks alone ⇒ nothing to fit.
     expect(computeFitBboxToMasks(docWith([regional]), 8, 0)).toBeNull();
   });
 

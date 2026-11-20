@@ -14,9 +14,13 @@ import {
 /** Reuse the same field/template validation as NodeFieldControl, including connected inputs and authored bounds. */
 export const getInvalidFormFieldIds = (
   projectGraph: ProjectGraphState,
-  templates: InvocationTemplates
+  templates: InvocationTemplates,
+  templatesStatus: 'idle' | 'loading' | 'loaded' | 'error' = 'loaded'
 ): Set<string> => {
   const invalid = new Set<string>();
+  if (templatesStatus !== 'loaded') {
+    return invalid;
+  }
   const nodes = new Map(projectGraph.nodes.filter(isInvocationNode).map((node) => [node.id, node]));
   const edges = getResolvedWorkflowEdges(projectGraph.nodes, projectGraph.edges);
 

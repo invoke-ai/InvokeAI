@@ -45,7 +45,6 @@ export const toExtensionHotkeyDefinition = (hotkey: WidgetHotkeyContribution): H
   }
 
   // A floating window is not a region other widgets share: "while my region is focused" means "while my window is".
-  // It stays a focused-region shortcut, so floating a widget does not change which binding wins a shared key.
   if (scope === 'focused-region' && source?.region === 'floating') {
     return {
       ...hotkey,
@@ -61,11 +60,7 @@ export const toExtensionHotkeyDefinition = (hotkey: WidgetHotkeyContribution): H
   return null;
 };
 
-/**
- * One row per binding id. The catalog lists every shipped binding, mounted widget or not; a mounted widget registers
- * the same id (from each instance, and from companions such as Layers), whose translated title the row takes. Bindings
- * only a widget knows (an extension's) follow under that widget's category.
- */
+/** One row per binding id; a mounted widget's registration supplies the translated title. */
 export const mergeHotkeyCatalog = (
   firstParty: readonly HotkeyDefinition[],
   contributed: readonly HotkeyDefinition[]

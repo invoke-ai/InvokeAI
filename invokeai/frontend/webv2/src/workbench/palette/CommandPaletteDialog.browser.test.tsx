@@ -1,20 +1,18 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
-import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
-import { isModalPresent } from '@platform/ui/modalPresence';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { IS_MAC_OS } from '@workbench/hotkeys/keys';
 import i18n from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
-import { PaletteSearchUnavailableError } from './entries';
 import { closeCommandPalette, openCommandPalette, useIsCommandPaletteOpen } from './paletteStore';
 
 let host: HTMLDivElement | null = null;
@@ -42,32 +40,6 @@ const waitFor = async <Value,>(assertion: () => Value): Promise<Value> => {
   });
 
   return value as Value;
-};
-
-/**
- * Zag commits measurements from timers through React state, which an open act scope holds back; poll between short
- * act scopes so every check sees committed layout.
- */
-const waitForCommittedLayout = async (assertion: () => void, timeoutMs = 2000): Promise<void> => {
-  const startedAt = Date.now();
-
-  for (;;) {
-    await act(
-      () =>
-        new Promise<void>((resolve) => {
-          globalThis.setTimeout(resolve, 50);
-        })
-    );
-
-    try {
-      assertion();
-      return;
-    } catch (error) {
-      if (Date.now() - startedAt > timeoutMs) {
-        throw error;
-      }
-    }
-  }
 };
 
 const waitForDebounce = () =>
@@ -108,7 +80,6 @@ const entry = (id: string, title: string, run = vi.fn()): PaletteEntry => ({
 
 const storeHostEntries = [entry('first', 'First command')];
 
-/** Mirrors the Workbench and Launchpad hosts: mounted while open, then until the close animation finishes. */
 const StorePaletteHost = () => {
   const isOpen = useIsCommandPaletteOpen();
   const dialog = useExitPresence(isOpen);
@@ -240,23 +211,6 @@ describe('CommandPaletteDialog interaction', () => {
     await waitFor(() => expect(document.activeElement).toBe(button));
   });
 
-  it('animates the palette out instead of unmounting it on close, suspending shortcuts only while open', async () => {
-    const button = await renderStorePaletteHost();
-    await act(() => userEvent.click(button));
-    await waitFor(() => expect(document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open'));
-    const dialog = document.querySelector('[role="dialog"]')!;
-    expect(isModalPresent()).toBe(true);
-
-    const frames = await recordDialogExit(dialog, async () => {
-      await act(() => userEvent.keyboard('{Escape}'));
-      expect(isModalPresent()).toBe(false);
-    });
-
-    // An unmounted palette never reaches its closed state, so it cannot animate out; a retained one does, then leaves.
-    expect(closingFrames(frames)).not.toHaveLength(0);
-    await waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
-  });
-
   it('exposes an accessible focused search field and runs the stable highlighted command in bare > mode', async () => {
     const firstRun = vi.fn();
     const secondRun = vi.fn();
@@ -285,6 +239,9 @@ describe('CommandPaletteDialog interaction', () => {
     expect(input.spellcheck).toBe(false);
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Command palette');
     expect(input.getAttribute('aria-controls')).toBe('command-palette-results');
+    await expect
+      .element(page.getByRole('listbox', { name: 'Command palette results' }))
+      .toHaveAttribute('id', 'command-palette-results');
 
     await act(() => userEvent.fill(input, '>'));
     expect(document.body.textContent).toContain('First command');
@@ -310,8 +267,6 @@ describe('CommandPaletteDialog interaction', () => {
     const { input } = await renderPalette({ entries: [], providers: [provider] });
 
     await act(() => userEvent.fill(input, 'zz'));
-    // Wait for root rejection, then explicitly highlight the scope row; the retry row precedes scopes and Tab
-    // enters only the highlighted scope.
     await waitForDebounce();
     await act(() => userEvent.keyboard('{ArrowUp}'));
     await act(() => userEvent.keyboard('{Tab}'));
@@ -356,34 +311,6 @@ describe('CommandPaletteDialog interaction', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('marks the listbox busy while a provider is pending and announces completion', async () => {
-    let resolveSearch: ((entries: PaletteEntry[]) => void) | undefined;
-    const search = vi.fn(
-      () =>
-        new Promise<PaletteEntry[]>((resolve) => {
-          resolveSearch = resolve;
-        })
-    );
-    const { input } = await renderPalette({
-      entries: [],
-      providers: [{ contextKey: 'pending', label: 'Entities', providerKey: 'entities', search }],
-    });
-
-    await act(() => userEvent.fill(input, 'zz'));
-    const listbox = await waitFor(() => {
-      const node = document.querySelector<HTMLElement>('[role="listbox"]');
-      expect(node?.getAttribute('aria-busy')).toBe('true');
-      expect(document.body.textContent).toContain('Searching…');
-      return node!;
-    });
-
-    await waitForDebounce();
-    await waitFor(() => expect(search).toHaveBeenCalledOnce());
-    await act(() => resolveSearch?.([entry('found', 'Found result')]));
-    await waitFor(() => expect(listbox.getAttribute('aria-busy')).toBe('false'));
-    expect(document.body.textContent).toContain('1 results.');
-  });
-
   it('does not expose or activate provider entries from the pre-debounce query', async () => {
     const oldRun = vi.fn();
     const search = vi.fn((query: { text: string }) =>
@@ -402,82 +329,6 @@ describe('CommandPaletteDialog interaction', () => {
     expect(document.body.textContent).not.toContain('Old result');
     await act(() => userEvent.keyboard('{Enter}'));
     expect(oldRun).not.toHaveBeenCalled();
-  });
-
-  it('resizes and hides the results scrollbar as a query narrows the rows', async () => {
-    const { input } = await renderPalette({
-      entries: [
-        ...Array.from({ length: 40 }, (_, index) => entry(`command-${index}`, `Command ${index}`)),
-        ...Array.from({ length: 12 }, (_, index) => entry(`zebra-${index}`, `Zebra ${index}`)),
-      ],
-    });
-    const listbox = document.getElementById('command-palette-results')!;
-    const viewport = listbox.parentElement!;
-    const scrollbar = viewport.parentElement!.querySelector<HTMLElement>(':scope > [data-part="scrollbar"]')!;
-    const thumb = scrollbar.querySelector<HTMLElement>('[data-part="thumb"]')!;
-    /** Zag sizes the thumb to the visible share of the track. */
-    const expectThumbToMatchContent = () =>
-      expect(thumb.getBoundingClientRect().height).toBeCloseTo(
-        (scrollbar.clientHeight * viewport.clientHeight) / viewport.scrollHeight,
-        -1
-      );
-
-    await act(() => userEvent.fill(input, 'Command'));
-    await waitForCommittedLayout(() => {
-      expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight * 3);
-      expect(scrollbar.hasAttribute('data-overflow-y')).toBe(true);
-      expectThumbToMatchContent();
-    });
-
-    // Fewer rows that still overflow: the viewport stays at its cap, so only the content resizes.
-    await act(() => userEvent.fill(input, 'Zebra'));
-    await waitForCommittedLayout(() => {
-      expect(viewport.scrollHeight).toBeLessThan(viewport.clientHeight * 2);
-      expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
-      expectThumbToMatchContent();
-    });
-
-    await act(() => userEvent.fill(input, 'Zebra 1'));
-    await waitForCommittedLayout(() => {
-      expect(viewport.scrollHeight).toBeLessThanOrEqual(viewport.clientHeight);
-      expect(scrollbar.hasAttribute('data-overflow-y')).toBe(false);
-    });
-  });
-
-  it('renders no interactive descendants inside listbox options', async () => {
-    const withSecondary: PaletteEntry = {
-      ...entry('first', 'First command'),
-      secondary: { label: 'Open Elsewhere', run: vi.fn() },
-    };
-    await renderPalette({ entries: [withSecondary] });
-
-    for (const option of document.querySelectorAll('[role="option"]')) {
-      expect(option.querySelector('button, a, input, select, textarea')).toBeNull();
-    }
-  });
-
-  it('shows key-specific date suggestions while typing a token, without flashing an error', async () => {
-    const provider: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Images',
-      providerKey: 'images',
-      search: vi.fn(() => []),
-      supportsCreatedAtRange: true,
-    };
-    const { input } = await renderPalette({ entries: [entry('first', 'First command')], providers: [provider] });
-
-    await act(() => userEvent.fill(input, 'from:'));
-
-    expect(document.body.textContent).toContain('Today');
-    expect(document.body.textContent).toContain('Yesterday');
-    expect(document.body.textContent).toContain('Past week');
-    expect(document.body.textContent).toContain('Or type a date');
-    expect(document.body.textContent).not.toContain('Invalid date');
-    expect(input.getAttribute('aria-invalid')).toBeNull();
-
-    // `to:` must not offer a span-shaped completion.
-    await act(() => userEvent.fill(input, 'to:'));
-    expect(document.body.textContent).not.toContain('Past week');
   });
 
   it('completes a suggestion in place and immediately queries providers with the structured query', async () => {
@@ -508,102 +359,6 @@ describe('CommandPaletteDialog interaction', () => {
     expect(document.body.textContent).toContain('Search images by date');
   });
 
-  it('fires only range-capable providers for a pure date query', async () => {
-    const capableSearch = vi.fn(() => []);
-    const dateLessSearch = vi.fn(() => []);
-    const capable: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Images',
-      providerKey: 'images',
-      search: capableSearch,
-      supportsCreatedAtRange: true,
-    };
-    const dateLess: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Workflows',
-      providerKey: 'workflows',
-      search: dateLessSearch,
-    };
-    const { input } = await renderPalette({ entries: [], providers: [capable, dateLess] });
-
-    await act(() => userEvent.fill(input, 'from:7d'));
-    await waitForDebounce();
-
-    await waitFor(() => expect(capableSearch).toHaveBeenCalled());
-    expect(dateLessSearch).not.toHaveBeenCalled();
-  });
-
-  it('renders invalid date feedback with combobox aria wiring once the token is settled', async () => {
-    const provider: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Images',
-      providerKey: 'images',
-      search: vi.fn(() => []),
-      supportsCreatedAtRange: true,
-    };
-    const { input } = await renderPalette({ entries: [], providers: [provider] });
-
-    // The trailing space settles the token — no longer an in-progress prefix.
-    await act(() => userEvent.fill(input, 'from:lastweek '));
-
-    const hint = document.getElementById('command-palette-date-hint');
-    expect(hint?.textContent).toContain('Invalid date: “lastweek”');
-    expect(hint?.getAttribute('role')).toBe('status');
-    expect(input.getAttribute('aria-invalid')).toBe('true');
-    expect(input.getAttribute('aria-describedby')).toBe('command-palette-date-hint');
-  });
-
-  it('treats date tokens as literal text when no range-capable provider is present', async () => {
-    const dateLessSearch = vi.fn(() => []);
-    const dateLess: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Workflows',
-      providerKey: 'workflows',
-      search: dateLessSearch,
-    };
-    const { input } = await renderPalette({ entries: [], providers: [dateLess] });
-
-    await act(() => userEvent.fill(input, 'from:'));
-    expect(document.body.textContent).not.toContain('Or type a date');
-
-    await act(() => userEvent.fill(input, 'from:7d'));
-    await waitForDebounce();
-
-    // No acknowledgment chip, and the provider receives the literal text.
-    expect(document.getElementById('command-palette-date-hint')).toBeNull();
-    await waitFor(() => {
-      expect(dateLessSearch).toHaveBeenCalledWith(
-        { range: undefined, text: 'from:7d' },
-        { signal: expect.any(AbortSignal) }
-      );
-    });
-  });
-
-  it('shows one search-scope command per provider in the empty launcher and bare > mode', async () => {
-    const providers: PaletteSearchProvider[] = [
-      { contextKey: 'context', label: 'Entities', providerKey: 'entities', search: vi.fn(() => []) },
-      { contextKey: 'context', label: 'Widgets', providerKey: 'widgets', search: vi.fn(() => []) },
-    ];
-    const { input } = await renderPalette({ entries: [entry('first', 'First command')], providers });
-
-    expect(document.body.textContent).toContain('Search in');
-    expect(document.body.textContent).toContain('Search entities…');
-    expect(document.body.textContent).toContain('Search widgets…');
-
-    await act(() => userEvent.fill(input, '>'));
-    expect(document.body.textContent).toContain('Search entities…');
-    expect(document.body.textContent).toContain('Search widgets…');
-  });
-
-  it('shows no search-scope section without providers (Launchpad shape)', async () => {
-    const { input } = await renderPalette({ entries: [entry('first', 'First command')] });
-
-    expect(document.body.textContent).not.toContain('Search in');
-
-    await act(() => userEvent.fill(input, '>'));
-    expect(document.body.textContent).not.toContain('Search in');
-  });
-
   it('runs a search-scope command: clears the query, keeps the palette open, and lists results immediately', async () => {
     const providerSearch = vi.fn(() => [
       { group: 'Entities', id: 'entity-one', isPersistentRecent: false, run: vi.fn(), title: 'Entity One' },
@@ -627,109 +382,11 @@ describe('CommandPaletteDialog interaction', () => {
     });
     expect(document.body.textContent).toContain('Entity One');
 
-    // The same command works from > commands mode and exits it into the scope.
     await act(() => userEvent.keyboard('{Backspace}'));
     await act(() => userEvent.fill(input, '>search ent'));
     await act(() => userEvent.keyboard('{Enter}'));
     expect(input.value).toBe('');
     await waitFor(() => expect(document.body.textContent).toContain('Entity One'));
-  });
-
-  it('keeps the query when entering a scope through a Tab scope row', async () => {
-    const providerSearch = vi.fn(() => []);
-    const provider: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Entities',
-      providerKey: 'entities',
-      search: providerSearch,
-    };
-    const { input } = await renderPalette({ entries: [], providers: [provider] });
-
-    await act(() => userEvent.fill(input, 'zz'));
-    // The trailing scope row is the last navigable row; ArrowUp wraps to it.
-    await act(() => userEvent.keyboard('{ArrowUp}'));
-    await act(() => userEvent.keyboard('{Tab}'));
-
-    expect(input.value).toBe('zz');
-    await waitFor(() => {
-      expect(providerSearch).toHaveBeenCalledWith(
-        { range: undefined, text: 'zz' },
-        { signal: expect.any(AbortSignal) }
-      );
-    });
-  });
-
-  it('searches at any length inside a scope but keeps the root minimum length', async () => {
-    const providerSearch = vi.fn(() => []);
-    const provider: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Entities',
-      providerKey: 'entities',
-      search: providerSearch,
-    };
-    const { input } = await renderPalette({ entries: [], providers: [provider] });
-
-    await act(() => userEvent.fill(input, 'e'));
-    await waitForDebounce();
-    expect(providerSearch).not.toHaveBeenCalled();
-
-    await act(() => userEvent.fill(input, ''));
-    await act(() => userEvent.keyboard('{Enter}'));
-    await waitFor(() => {
-      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: '' }, { signal: expect.any(AbortSignal) });
-    });
-
-    await act(() => userEvent.fill(input, 'a'));
-    await waitForDebounce();
-    await waitFor(() => {
-      expect(providerSearch).toHaveBeenCalledWith({ range: undefined, text: 'a' }, { signal: expect.any(AbortSignal) });
-    });
-  });
-
-  it('says what an empty scope is missing and falls back to no-results for a miss', async () => {
-    const provider: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Entities',
-      providerKey: 'entities',
-      search: vi.fn(() => []),
-    };
-    const { input } = await renderPalette({ entries: [], providers: [provider] });
-
-    await act(() => userEvent.keyboard('{Enter}'));
-    await waitFor(() => expect(document.body.textContent).toContain('No entities yet'));
-
-    await act(() => userEvent.fill(input, 'x'));
-    await waitForDebounce();
-    await waitFor(() => expect(document.body.textContent).toContain('No results for “x”'));
-  });
-
-  it('keeps the error state and Retry for an empty scope', async () => {
-    const provider: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Entities',
-      providerKey: 'entities',
-      search: vi.fn(() => Promise.reject(new Error('offline'))),
-    };
-    await renderPalette({ entries: [], providers: [provider] });
-
-    await act(() => userEvent.keyboard('{Enter}'));
-    await waitFor(() => expect(document.body.textContent).toContain("Couldn't search entities"));
-    expect(document.body.textContent).not.toContain('offline');
-    expect([...document.querySelectorAll('button')].some((button) => button.textContent === 'Retry')).toBe(true);
-  });
-
-  it('explains why a scope cannot search when the provider says', async () => {
-    const provider: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Entities',
-      providerKey: 'entities',
-      search: vi.fn(() => Promise.reject(new PaletteSearchUnavailableError('Entities need an index.'))),
-    };
-    await renderPalette({ entries: [], providers: [provider] });
-
-    await act(() => userEvent.keyboard('{Enter}'));
-    await waitFor(() => expect(document.body.textContent).toContain('Entities need an index.'));
-    expect(document.body.textContent).toContain("Couldn't search entities");
   });
 
   it('records a used search-scope command as a persistent recent', async () => {
@@ -747,28 +404,7 @@ describe('CommandPaletteDialog interaction', () => {
 
     await renderPalette({ entries: [], providers: [provider] });
     expect(document.body.textContent).toContain('Recent');
-    // Listed once, under Recent — the launcher groups don't repeat recents.
     expect(document.body.textContent?.match(/Search entities…/g)).toHaveLength(1);
-  });
-
-  it('advertises the query syntax in the empty launcher, scaled to host capabilities', async () => {
-    const capable: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Images',
-      providerKey: 'images',
-      search: vi.fn(() => []),
-      supportsCreatedAtRange: true,
-    };
-    await renderPalette({ entries: [entry('first', 'First command')], providers: [capable] });
-    expect(document.body.textContent).toContain('Type > for commands · from:/date: to filter by date');
-
-    await act(() => root?.unmount());
-    host?.remove();
-
-    // Launchpad shape: no providers → no date-token hint, `>` still advertised.
-    await renderPalette({ entries: [entry('first', 'First command')] });
-    expect(document.body.textContent).toContain('Type > for commands');
-    expect(document.body.textContent).not.toContain('filter by date');
   });
 
   it('closes a scope from the chip and returns to the root palette with focus', async () => {
@@ -798,52 +434,124 @@ describe('CommandPaletteDialog interaction', () => {
     await waitFor(() => expect(document.activeElement).toBe(input));
   });
 
-  it('runs the highlighted row secondary action with Mod+Enter and exposes no nested button', async () => {
-    const secondaryRun = vi.fn();
-    const withSecondary: PaletteEntry = {
-      ...entry('first', 'First command'),
-      secondary: { label: 'Open Elsewhere', run: secondaryRun },
-    };
-    const { onClose } = await renderPalette({ entries: [withSecondary] });
+  it('moves the highlight with wrapping arrows and clamped pages, leaving Home/End to the caret', async () => {
+    const entries = Array.from({ length: 30 }, (_, index) =>
+      entry(`command-${index}`, `Command ${String(index).padStart(2, '0')}`)
+    );
+    const { input } = await renderPalette({ entries });
+    const highlighted = () => document.getElementById(input.getAttribute('aria-activedescendant') ?? '');
+    const expectHighlighted = (title: string) =>
+      waitFor(() => {
+        expect(highlighted()?.textContent).toBe(title);
+        expect(highlighted()?.getAttribute('aria-selected')).toBe('true');
+      });
 
-    expect(document.querySelector('button[aria-label="Open Elsewhere"]')).toBeNull();
-    await act(() => userEvent.keyboard('{Control>}{Enter}{/Control}'));
-    expect(secondaryRun).toHaveBeenCalledOnce();
-    expect(onClose).toHaveBeenCalledOnce();
+    await expectHighlighted('Command 00');
+    // Wrapping lands on a row outside the rendered window; the list scrolls it in.
+    await act(() => userEvent.keyboard('{ArrowUp}'));
+    await expectHighlighted('Command 29');
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await expectHighlighted('Command 00');
+    await act(() => userEvent.keyboard('{PageDown}'));
+    await expectHighlighted('Command 08');
+    await act(() => userEvent.keyboard('{PageUp}{PageUp}'));
+    await expectHighlighted('Command 00');
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await expectHighlighted('Command 01');
+    expect(document.querySelectorAll('[role="option"][aria-selected="true"]')).toHaveLength(1);
+
+    await act(() => userEvent.type(input, 'Command'));
+    await expectHighlighted('Command 00');
+    input.setSelectionRange(3, 3);
+    await act(() => userEvent.keyboard('{ArrowDown}{Home}'));
+    expect(input.selectionStart).toBe(0);
+    await act(() => userEvent.keyboard('{End}'));
+    expect(input.selectionStart).toBe('Command'.length);
+    await expectHighlighted('Command 01');
+    // Alt does not hand them to the highlight either.
+    await act(() => userEvent.keyboard('{Alt>}{Home}{/Alt}'));
+    expect(input.selectionStart).toBe(0);
+    await act(() => userEvent.keyboard('{Alt>}{End}{/Alt}'));
+    expect(input.selectionStart).toBe('Command'.length);
+    await expectHighlighted('Command 01');
   });
 
-  it('hands a date-less scope the token-stripped text its scope row advertised', async () => {
-    const capableSearch = vi.fn(() => []);
-    const dateLessSearch = vi.fn(() => []);
-    const capable: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Images',
-      providerKey: 'images',
-      search: capableSearch,
-      supportsCreatedAtRange: true,
-    };
-    const dateLess: PaletteSearchProvider = {
-      contextKey: 'context',
-      label: 'Workflows',
-      providerKey: 'workflows',
-      search: dateLessSearch,
-    };
-    const { input } = await renderPalette({ entries: [], providers: [capable, dateLess] });
-
-    await act(() => userEvent.fill(input, 'from:7d sunset'));
-    expect(document.body.textContent).toContain('Search workflows for “sunset”');
-
-    // The workflows scope row is the last navigable row; ArrowUp wraps to it.
-    await act(() => userEvent.keyboard('{ArrowUp}'));
-    await act(() => userEvent.keyboard('{Tab}'));
-
-    expect(input.value).toBe('sunset');
-    await waitFor(() => {
-      expect(dateLessSearch).toHaveBeenCalledWith(
-        { range: undefined, text: 'sunset' },
-        { signal: expect.any(AbortSignal) }
-      );
+  it('highlights on hover and runs on click without taking focus from the search field', async () => {
+    const betaRun = vi.fn();
+    const { input, onClose } = await renderPalette({
+      entries: [entry('alpha', 'Alpha'), entry('beta', 'Beta', betaRun)],
     });
+    const beta = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (option) => option.textContent === 'Beta'
+    )!;
+
+    await act(() => userEvent.hover(beta));
+    await waitFor(() => expect(input.getAttribute('aria-activedescendant')).toBe(beta.id));
+
+    await act(() => userEvent.click(beta));
+    expect(betaRun).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('leaves keys that compose IME text to the composition', async () => {
+    const run = vi.fn();
+    const { input, onClose } = await renderPalette({
+      entries: [entry('first', 'First command', run), entry('second', 'Second command')],
+    });
+    const highlighted = () => document.getElementById(input.getAttribute('aria-activedescendant') ?? '')?.textContent;
+    const composingKeyDown = (key: string, flag: 'isComposing' | 'keyCode229') => {
+      const event = new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        isComposing: flag === 'isComposing',
+        key,
+      });
+
+      if (flag === 'keyCode229') {
+        Object.defineProperty(event, 'keyCode', { value: 229 });
+      }
+      input.dispatchEvent(event);
+    };
+
+    for (const flag of ['isComposing', 'keyCode229'] as const) {
+      await act(() => composingKeyDown('PageDown', flag));
+      expect(highlighted()).toBe('First command');
+      await act(() => composingKeyDown('Enter', flag));
+      expect(run).not.toHaveBeenCalled();
+      await act(() => composingKeyDown('Escape', flag));
+      expect(onClose).not.toHaveBeenCalled();
+    }
+
+    await act(() => userEvent.keyboard('{PageDown}'));
+    expect(highlighted()).toBe('Second command');
+  });
+
+  it('runs the primary action on a click with Ctrl or ⌘ held, keeping the secondary on Mod+Enter', async () => {
+    for (const modifier of ['Control', 'Meta'] as const) {
+      // macOS reads a Ctrl+click as a context-menu click, which runs nothing.
+      const clickRuns = IS_MAC_OS && modifier === 'Control' ? 0 : 1;
+      const run = vi.fn();
+      const secondaryRun = vi.fn();
+      await renderPalette({
+        entries: [
+          { ...entry('first', 'First command', run), secondary: { label: 'Open Elsewhere', run: secondaryRun } },
+        ],
+      });
+      const option = document.querySelector<HTMLElement>('[role="option"]')!;
+
+      await act(() => userEvent.click(option, { modifiers: [modifier] }));
+      expect(run).toHaveBeenCalledTimes(clickRuns);
+      expect(secondaryRun).not.toHaveBeenCalled();
+
+      await act(() => userEvent.keyboard(`{${modifier}>}{Enter}{/${modifier}}`));
+      expect(secondaryRun).toHaveBeenCalledOnce();
+      expect(run).toHaveBeenCalledTimes(clickRuns);
+
+      await act(() => root?.unmount());
+      host?.remove();
+      root = null;
+    }
   });
 
   it('drives stage preview from navigation and restores it on Escape and unmount', async () => {

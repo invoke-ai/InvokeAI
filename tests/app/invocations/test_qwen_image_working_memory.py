@@ -211,15 +211,9 @@ class TestQwenImageWorkingMemory:
         posterior.mode.return_value = raw_latents
         mock_vae.encode.return_value.latent_dist = posterior
 
-        with (
-            patch(
-                "invokeai.app.invocations.qwen_image_image_to_latents.estimate_vae_working_memory_qwen_image",
-                return_value=1,
-            ),
-            patch(
-                "invokeai.app.invocations.qwen_image_image_to_latents.TorchDevice.choose_torch_device",
-                return_value=torch.device("cpu"),
-            ),
+        with patch(
+            "invokeai.app.invocations.qwen_image_image_to_latents.estimate_vae_working_memory_qwen_image",
+            return_value=1,
         ):
             latents = QwenImageImageToLatentsInvocation.vae_encode(
                 mock_vae_info, torch.zeros(1, 3, 8, 16, dtype=torch.float32)
@@ -838,18 +832,15 @@ class TestQwenImageVaeTiling:
         """
         vae_info = MagicMock()
         vae_info.model = vae
+        vae_info.compute_device = torch.device("cpu")
         cm = MagicMock()
         cm.__enter__ = MagicMock(return_value=(None, vae))
         cm.__exit__ = MagicMock(return_value=None)
         vae_info.model_on_device = MagicMock(return_value=cm)
 
-        with patch(
-            "invokeai.app.invocations.vae.qwen_image_image_to_latents.TorchDevice.choose_torch_device",
-            return_value=torch.device("cpu"),
-        ):
-            latents = QwenImageImageToLatentsInvocation.vae_encode(
-                vae_info, torch.zeros(1, 3, 256, 256), tiled=True, tile_size=tile_size
-            )
+        latents = QwenImageImageToLatentsInvocation.vae_encode(
+            vae_info, torch.zeros(1, 3, 256, 256), tiled=True, tile_size=tile_size
+        )
 
         assert latents.shape == (1, 16, 1, 32, 32)
         # And the shared module is left exactly as it was found.

@@ -45,7 +45,6 @@ beforeAll(async () => {
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-/** The structural engine over the real reducer and history; previews flush synchronously, as a settled frame would. */
 let stub: StructuralEngineStub;
 let unsubscribe: () => void = () => undefined;
 
@@ -68,7 +67,6 @@ const createStub = (selectedLayerId: string | null = 'r1'): void => {
   publish();
 };
 
-/** Records a blend-mode step from elsewhere (a hotkey, a script), as the user's history to undo. */
 const commitBlendMode = (id: string, blendMode: CanvasBlendMode): void => {
   const outcome = commitPreparedEdit(stub.engine, 'Blend mode', (model) =>
     model.prepare({ id, patch: { blendMode }, type: 'patch' })
@@ -79,7 +77,6 @@ const commitBlendMode = (id: string, blendMode: CanvasBlendMode): void => {
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-/** The row's engine surface: the stub's structural half plus an interaction store, unlocked unless `locked`. */
 const rowEngine = (locked: boolean) => ({
   ...stub.engine,
   exports: {},
@@ -138,7 +135,6 @@ describe('blend mode preview', () => {
     await userEvent.hover(option('Multiply'));
 
     await expect.poll(() => layer().blendMode).toBe('multiply');
-    // The trigger and checked option keep naming the committed mode while the canvas previews another.
     await expect.element(trigger()).toHaveTextContent('Normal');
     await expect.element(option('Normal')).toHaveAttribute('aria-selected', 'true');
 
@@ -221,7 +217,6 @@ describe('blend mode preview', () => {
     await userEvent.keyboard('{Escape}');
     await expect.poll(() => page.getByRole('option').query()).toBeNull();
 
-    // The undone step stays undone: the document, the undo stack and the redo stack agree.
     expect(layer().blendMode).toBe('normal');
     expect(stub.history.canUndo()).toBe(false);
     expect(stub.history.canRedo()).toBe(true);
@@ -275,7 +270,6 @@ describe('blend mode preview', () => {
     await userEvent.unhover(option('Multiply'));
     await userEvent.hover(trigger());
 
-    // Nothing was previewed on the undone document, so leaving the options previews nothing over it.
     await new Promise((resolve) => {
       setTimeout(resolve, 50);
     });
@@ -308,7 +302,6 @@ describe('opacity input', () => {
   const sliderTrigger = () => page.getByRole('button', { exact: true, name: 'Opacity slider' });
   const slider = () => page.getByRole('slider', { exact: true, name: 'Opacity' });
 
-  /** Opens the dropdown slider; `pointer` builds a mouse event at a fraction of the track. */
   const openSlider = async () => {
     await userEvent.click(sliderTrigger());
     await expect.element(slider()).toBeVisible();
@@ -407,7 +400,6 @@ describe('opacity input', () => {
       seen.push(layer().opacity);
     }
 
-    // Every step reaches the layer while nothing is recorded until the release.
     expect(new Set(seen.map((value) => value.toFixed(2))).size).toBe(4);
     expect(layer().opacity).toBeCloseTo(0.5, 1);
     await expect.element(opacityInput()).toHaveValue(String(Math.round(layer().opacity * 100)));
@@ -438,7 +430,6 @@ describe('opacity input', () => {
     expect(layer().opacity).toBe(atClose);
     expect(commits()).toHaveLength(1);
     expect(commits()[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: atClose } });
-    // Nothing is left pending for a later flush to record.
     await unmount();
     expect(commits()).toHaveLength(1);
     expect(stub.history.entries().past).toEqual(['Opacity']);

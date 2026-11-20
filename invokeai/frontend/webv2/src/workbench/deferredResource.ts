@@ -1,7 +1,6 @@
 /**
- * Set React use() settlement fields when loading completes so the first read can return synchronously. Native
- * promises otherwise suspend on first read, potentially triggering fallback throttling after the chunk is already
- * available.
+ * Set React use() settlement fields when loading completes so the first read can return synchronously. Native promises
+ * otherwise suspend on first read, potentially triggering fallback throttling after the chunk is already available.
  */
 interface TrackedThenable<T> extends Promise<T> {
   reason?: unknown;

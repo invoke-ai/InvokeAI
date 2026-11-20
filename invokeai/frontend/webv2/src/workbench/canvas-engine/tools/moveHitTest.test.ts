@@ -193,9 +193,8 @@ describe('hitTestLayer', () => {
   });
 
   it('accounts for rotation (90° about origin)', () => {
-    // Rotate a 20x40 image 90° clockwise about its origin: local (0,0)->(0,0),
-    // local (0,40) -> document (-40, 0). Document point (-10, 5) maps to a local
-    // point inside [0,20]x[0,40].
+    // Rotate a 20x40 image 90° clockwise about its origin: local (0,0)->(0,0), local (0,40) -> document (-40, 0).
+    // Document point (-10, 5) maps to a local point inside [0,20]x[0,40].
     const layer = imageLayer('a', { rotation: Math.PI / 2, width: 20, height: 40 });
     const d = doc([layer]);
     expect(hitTestLayer(layer, d, { x: -10, y: 5 })).toBe(true);
@@ -236,33 +235,26 @@ describe('layerOutlineCorners', () => {
 
 describe('live cache rect (freshly-painted, not-yet-flushed content)', () => {
   it('hitTestLayer misses an empty paint layer with no live rect', () => {
-    const layer = paintLayer('p'); // bitmap: null → empty persisted content
+    const layer = paintLayer('p');
     expect(hitTestLayer(layer, doc([layer]), { x: 30, y: 30 })).toBe(false);
   });
 
   it('hitTestLayer hits content present only in the live cache rect', () => {
-    const layer = paintLayer('p'); // persisted content still empty (unflushed stroke)
+    const layer = paintLayer('p');
     const liveRect = { height: 40, width: 40, x: 20, y: 20 };
-    // Inside the live rect: grabbable even though the contract bitmap is null.
     expect(hitTestLayer(layer, doc([layer]), { x: 30, y: 30 }, liveRect)).toBe(true);
-    // Outside the live rect: still a miss.
     expect(hitTestLayer(layer, doc([layer]), { x: 5, y: 5 }, liveRect)).toBe(false);
   });
 
   it('unions the live rect with persisted content (both contribute to the hit area)', () => {
-    const layer = paintLayer('p', { width: 10, height: 10 }); // persisted content [0,0,10,10]
+    const layer = paintLayer('p', { width: 10, height: 10 });
     const liveRect = { height: 10, width: 10, x: 40, y: 40 };
     expect(hitTestLayer(layer, doc([layer]), { x: 45, y: 45 }, liveRect)).toBe(true);
-    // The original persisted region is still hit-testable.
     expect(hitTestLayer(layer, doc([layer]), { x: 5, y: 5 }, liveRect)).toBe(true);
   });
 });
 
 describe('a layer erased to nothing behaves exactly like a brand-new one', () => {
-  /**
-   * Trimmed empty layers become null-bitmap sources, so bounds-derived move/transform affordances disappear like
-   * those of fresh layers.
-   */
   it('reports no hittable extent once its bitmap has been cleared', () => {
     const erased = paintLayer('erased');
     const fresh = paintLayer('fresh');

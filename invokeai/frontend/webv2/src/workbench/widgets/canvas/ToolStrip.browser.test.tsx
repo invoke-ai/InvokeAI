@@ -15,10 +15,8 @@ import { initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-/** The hotkeys the Canvas widget registered, as the workbench provides them; none unless a test installs some. */
 const workbench = vi.hoisted(() => ({ extensions: null as ExtensionRegistry | null }));
 
-// Saving the remap below would otherwise sync to a backend the browser tests do not run.
 vi.mock('@workbench/projects/api', async (importOriginal) => ({
   ...(await importOriginal<typeof projectsApi>()),
   setClientStateValue: async () => {},
@@ -36,7 +34,6 @@ import { ToolStrip } from './ToolStrip';
 
 type StripEngine = ComponentProps<typeof ToolStrip>['engine'];
 
-/** A live interaction-store double: real get/set/subscribe so the strip re-renders on changes. */
 const createFakeEngine = () => {
   const values = new Map<string, unknown>([
     ['activeTool', 'view'],
@@ -140,7 +137,6 @@ describe('tool strip family slots', () => {
       slot.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     });
     await expect.element(menu()).toBeVisible();
-    // The menu takes focus once it has registered its dismiss handlers.
     await expect.poll(() => document.activeElement?.getAttribute('role')).toBe('menu');
   };
 
@@ -177,8 +173,6 @@ describe('tool strip family slots', () => {
     await expect.element(menu()).toBeVisible();
     expect(shape.getAttribute('aria-expanded')).toBe('true');
 
-    // Pointer capture routes the moves and the release to the button; the
-    // coordinates say which entry they are over.
     const triangle = (await entry('Triangle').element()) as HTMLElement;
     const over = centre(triangle);
     await act(() => {
@@ -237,7 +231,6 @@ describe('tool strip family slots', () => {
       item.textContent?.trim()
     );
     expect(names).toEqual(['Rectangle', 'Ellipse', 'Triangle', 'Star', 'Polygon', 'Freehand']);
-    // Opens rightward, clear of the strip, starting level with the slot.
     const content = (await menu().element()) as HTMLElement;
     const strip = (await page.getByRole('toolbar').element()) as HTMLElement;
     await expect
@@ -252,7 +245,6 @@ describe('tool strip family slots', () => {
     expect(fake.shapeKind).toBe('ellipse');
     await expect.element(menu()).not.toBeInTheDocument();
 
-    // The slot now stands for the ellipse: reopen and the check moved with it.
     await openByContextMenu(shape);
     await expect.element(entry('Ellipse')).toHaveAttribute('aria-checked', 'true');
     await expect.element(entry('Rectangle')).toHaveAttribute('aria-checked', 'false');
@@ -279,7 +271,6 @@ describe('tool strip family slots', () => {
   it('opens from the keyboard with ArrowRight, navigates, selects, and ArrowLeft returns to the slot', async () => {
     const fake = await renderStrip();
     const shape = (await button('Shape').element()) as HTMLElement;
-    // Workbench hotkeys (ArrowRight nudges the selected layer) listen on window.
     const windowKeys: string[] = [];
     const recordKey = (event: KeyboardEvent) => windowKeys.push(event.key);
     window.addEventListener('keydown', recordKey);
@@ -338,10 +329,8 @@ describe('tool strip family slots', () => {
       const select = (await button('Marquee select').element()) as HTMLElement;
       await openByContextMenu(select);
       const lasso = (await page.getByRole('menuitemradio', { name: /^Lasso select/ }).element()) as HTMLElement;
-      // The keycap shows the remap, not the default L.
       expect(lasso.textContent).toBe('Lasso selectk');
 
-      // The workbench hotkeys listen on window; the chosen entry's press must not also run there.
       const windowKeys: string[] = [];
       const recordKey = (event: KeyboardEvent) => windowKeys.push(event.key);
       window.addEventListener('keydown', recordKey);
@@ -357,7 +346,6 @@ describe('tool strip family slots', () => {
     }
   });
 
-  /** Hover the slot fresh, so its tooltip opens with the current title. */
   const hoverSlot = async (slot: HTMLElement) => {
     await act(() => userEvent.unhover(slot));
     await act(() => userEvent.hover(slot));
@@ -389,7 +377,6 @@ describe('tool strip family slots', () => {
 
       await openByContextMenu(marquee);
       await act(() => userEvent.click(page.getByRole('menuitemradio', { name: /^Lasso select/ })));
-      // The lasso key was remapped from L to K; the title follows the effective binding.
       await hoverSlot((await button('Lasso select').element()) as HTMLElement);
       await expect.poll(tooltipText).toBe(`Lasso select (K)${LASSO_HELP}`);
     } finally {
@@ -413,7 +400,6 @@ describe('tool strip family slots', () => {
     await act(() => userEvent.click(entry('Lasso select')));
     expect(fake.activeTool).toBe('lasso');
 
-    // Leave the family and come back with a plain click: the slot restores lasso.
     await act(() => userEvent.click(button('Brush')));
     expect(fake.activeTool).toBe('brush');
     await act(() => userEvent.click(button('Lasso select')));
@@ -442,7 +428,6 @@ describe('tool strip family slots', () => {
       await expect.poll(tooltipText).toBe('Eraser (Q)');
       await hoverSlot((await button('Transform').element()) as HTMLElement);
       await expect.poll(tooltipText).toBe('Transform (Shift+T)');
-      // The frame tool's key is C, held or tapped, which its help line explains.
       await hoverSlot((await button('Generation frame').element()) as HTMLElement);
       await expect
         .poll(tooltipText)

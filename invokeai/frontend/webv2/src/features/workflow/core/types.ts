@@ -1,7 +1,4 @@
-/**
- * Editable legacy-compatible workflow documents compile only at invocation time so queued GraphContract snapshots
- * remain immutable.
- */
+/** Legacy-compatible documents compile only at invocation time, so queued GraphContract snapshots stay immutable. */
 
 import type { SeedMode } from '@platform/core/seed';
 
@@ -23,7 +20,6 @@ export interface FieldInputTemplate {
   required: boolean;
   /** Internal inputs are backend-provided but connectable; skip them when guessing an authored primary input. */
   fieldKind: 'input' | 'internal';
-  /** How the field receives data: only via edge, only direct value, or either. */
   input: 'connection' | 'direct' | 'any';
   default?: unknown;
   uiHidden: boolean;
@@ -83,9 +79,7 @@ export interface XYPosition {
 export interface WorkflowFieldInstance {
   name: string;
   label: string;
-  /** True when the label was explicitly changed by the user rather than generated from a template. */
   labelOverride?: boolean;
-  /** User override of the template's field description (shown in the Linear UI). */
   description?: string;
   /** True when the description was explicitly changed by the user, including clearing it. */
   descriptionOverride?: boolean;
@@ -114,14 +108,9 @@ export interface WorkflowInvocationNodeData {
   useCache: boolean;
   nodePack: string;
   inputs: Record<string, WorkflowFieldInstance>;
-  /** Persisted templates for fields exposed by the selected saved workflow. */
   dynamicInputTemplates?: Record<string, FieldInputTemplate>;
-  /** Runtime reconciliation state for the selected saved workflow. */
   callSavedWorkflowStatus?: 'loading' | 'ready' | 'error';
-  /**
-   * The saved workflow the dynamic inputs were built from, while that differs from the selection: set when another
-   * workflow is selected, gone once that workflow's signature replaces them. Absent means they belong to the selection.
-   */
+  /** The saved workflow the dynamic inputs came from while it differs from the selection; absent: the selection. */
   callSavedWorkflowFieldsFrom?: string;
 }
 
@@ -208,7 +197,6 @@ export interface NodeFieldFormElement {
   data: {
     fieldIdentifier: FieldIdentifier;
     showDescription: boolean;
-    /** Shows a randomize button beside numeric fields in the linear view. */
     showShuffle: boolean;
     /** The legacy editor's per-element settings, preserved verbatim; `showShuffle` is mirrored into it. */
     settings?: Record<string, unknown>;
@@ -252,7 +240,7 @@ export const isFormContainerElement = (
 ): element is ContainerFormElement | CollapsibleFormElement =>
   element?.type === 'container' || element?.type === 'collapsible';
 
-/** Branch per discriminant so TypeScript preserves each container variant's data correlation. */
+// Branch per discriminant so TypeScript preserves each container variant's data correlation.
 export const withFormContainerChildren = (
   element: ContainerFormElement | CollapsibleFormElement,
   children: string[]
@@ -261,7 +249,6 @@ export const withFormContainerChildren = (
     ? { ...element, data: { ...element.data, children } }
     : { ...element, data: { ...element.data, children } };
 
-/** The Linear UI description: a tree of form elements rooted in a column container. */
 export interface WorkflowForm {
   rootElementId: string;
   elements: Record<string, WorkflowFormElement>;
@@ -289,10 +276,7 @@ export interface ProjectGraphState extends WorkflowMetadata {
   updatedAt: string;
 }
 
-/**
- * The library template a project workflow was opened from or last explicitly saved to. Kept beside the document,
- * outside its edit history, so undoing an edit never undoes a save or restores an obsolete write target.
- */
+/** Kept outside the document's edit history, so undo never undoes a save or restores an obsolete write target. */
 export interface ProjectWorkflowSource {
   libraryWorkflowId: string;
   /** The template content revision loaded or last written; null when unknown (documents migrated from older schemas). */
@@ -309,7 +293,6 @@ export interface ProjectWorkflowRunPreview {
   completedAt: string;
 }
 
-/** One workflow a project owns: its editable document plus metadata that is not part of graph editing. */
 export interface ProjectWorkflowEntry {
   document: ProjectGraphState;
   source?: ProjectWorkflowSource;

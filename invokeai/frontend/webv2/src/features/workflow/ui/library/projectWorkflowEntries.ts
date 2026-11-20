@@ -14,7 +14,6 @@ import { isBundledLibraryWorkflowId } from '@features/workflow/queries';
  */
 
 export interface ProjectWorkflowLibraryEntry extends WorkflowLibraryEntry {
-  /** The project workflow the card stands for. */
   projectWorkflow: ProjectWorkflowEntry;
 }
 

@@ -32,10 +32,7 @@ type FormViewContext = {
 
 type FormLayout = 'row' | 'column';
 
-/**
- * Match Generate and Video collapsible sections (title bar over a lighter tray, hairlines between folded rows) while
- * keeping standalone fields, headings, and dividers at the standard 10 px (`gap="2.5"`) workflow rhythm.
- */
+// Match Generate and Video collapsible trays (hairlines between folded rows) while keeping 10 px standalone spacing.
 const ROOT_INSET = '1';
 const ROOT_HEADING_STYLES = {
   '&:not(:first-child)': { borderTopWidth: '1px', mx: `-${ROOT_INSET}`, pt: '3', px: ROOT_INSET },
@@ -92,13 +89,17 @@ export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphSta
   const { t } = useTranslation();
   const { widgets } = useWorkflowHostCommands();
   const { project } = useWorkflowUi();
+  const templatesStatus = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const projectId = useWorkflowProjectSelector((snapshot) => snapshot.id);
   const storedOpenSections = useWorkflowProjectSelector((snapshot) => snapshot.workflowValues?.formSectionsOpen);
   const rootChildren = getFormChildren(projectGraph.form);
   const root = projectGraph.form.elements[projectGraph.form.rootElementId];
   const layout = root?.type === 'container' ? root.data.layout : 'column';
-  const invalidFieldIds = useMemo(() => getInvalidFormFieldIds(projectGraph, templates), [projectGraph, templates]);
+  const invalidFieldIds = useMemo(
+    () => getInvalidFormFieldIds(projectGraph, templates, templatesStatus),
+    [projectGraph, templates, templatesStatus]
+  );
   const openSections = useMemo(
     () => getFormSectionOpenState({ formSectionsOpen: storedOpenSections }, projectGraph.id),
     [projectGraph.id, storedOpenSections]
@@ -113,9 +114,14 @@ export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphSta
       if (snapshot.id !== projectId || snapshot.projectGraph?.id !== projectGraph.id) {
         return;
       }
+      const validSectionIds = new Set(
+        Object.values(snapshot.projectGraph.form.elements)
+          .filter((element) => element.type === 'collapsible')
+          .map((element) => element.id)
+      );
       widgets.patchValues(
         'workflow',
-        updateFormSectionOpenState(snapshot.workflowValues, projectGraph.id, sectionId, open)
+        updateFormSectionOpenState(snapshot.workflowValues, projectGraph.id, sectionId, open, validSectionIds)
       );
     },
     [project, projectGraph.id, projectId, widgets]

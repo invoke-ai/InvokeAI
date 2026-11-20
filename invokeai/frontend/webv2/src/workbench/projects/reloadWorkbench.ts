@@ -73,8 +73,8 @@ export const reloadWorkbench = async ({
     if (result.error || result.hasPendingChanges || result.awaitsDecision) {
       throw new WorkbenchReloadError('unsaved', { cause: result.error });
     }
-    // Like project close, cross the paint barrier again after the push. The visible project is last so a held
-    // gesture cannot start there while another project's barrier is pending, then disappear into a reload.
+    // Like project close, cross the paint barrier again after the push. The visible project is last so a held gesture
+    // cannot start there while another project's barrier is pending, then disappear into a reload.
     const { activeProject, projects } = store.getSnapshot();
     const ids = projects
       .map((project) => project.id)

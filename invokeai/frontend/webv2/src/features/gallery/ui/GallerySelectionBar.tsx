@@ -39,8 +39,7 @@ export const GallerySelectionBar = () => {
   }, [loadedItems, selectedItemKeys]);
   const hasUnloadedMembers = loadedSelection.length < selectionCount;
 
-  // Star acts on the whole selection: only "unstar all" when every selected
-  // item is already starred, matching the `.` hotkey.
+  // Star acts on the whole selection: "unstar all" only when every selected item is starred, matching the `.` hotkey.
   const shouldStar = useGallerySelectionStarred(selectedItemRefs, loadedItems);
 
   const moveTargets = useMemo(
@@ -78,9 +77,9 @@ export const GallerySelectionBar = () => {
   );
   const handleRemoveFromBoard = useCallback(() => handleMoveToBoard('none'), [handleMoveToBoard]);
   const primaryItemKey = gallery.primarySelectedItemKey;
-  // The bar leaves with the selection, taking the focused Clear button along: focus goes to the grid first, to the
-  // tile that was primary where it is listed, else the grid's tab stop, else its first tile in view. Not the click
-  // handler itself: the command takes an optional project, which the click event would fill.
+  // The bar leaves with the selection, taking the focused Clear button along: focus goes to the grid first, to the tile
+  // that was primary where it is listed, else the grid's tab stop, else its first tile in view. Not the click handler
+  // itself: the command takes an optional project, which the click event would fill.
   const handleClear = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       let scope = event.currentTarget.parentElement;

@@ -36,9 +36,9 @@ export interface WorkflowCardContextMenuProps {
 
 /**
  * A card's or row's actions menu, for the workflow it was raised on whether or not that is the selection. Naming the
- * card (or its More button) as the trigger makes the menu a nested layer of the library dialog: the dialog's focus
- * trap then lets the menu keep focus, and closing returns it there. A pointer point is a fixed rect; a More button
- * anchors the menu itself, so the menu follows it as the collection scrolls.
+ * card (or its More button) as the trigger makes the menu a nested layer of the library dialog: the dialog's focus trap
+ * then lets the menu keep focus, and closing returns it there. A pointer point is a fixed rect; a More button anchors
+ * the menu itself, so the menu follows it as the collection scrolls.
  */
 export const WorkflowCardContextMenu = ({ anchor, children, target, onClose }: WorkflowCardContextMenuProps) => {
   /*
@@ -130,7 +130,6 @@ export interface WorkflowLibraryContextMenuProps {
   isReadOnly: boolean;
   projectWorkflows: readonly ProjectWorkflowEntry[];
   target: WorkflowContextMenuTarget | null;
-  /** The shell closes the library when a fork takes the user to a new project. */
   onClose: () => void;
   onDeleted: (workflowId: string) => void;
   onDuplicated: (workflowId: string) => void;

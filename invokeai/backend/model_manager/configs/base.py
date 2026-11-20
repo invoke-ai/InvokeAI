@@ -10,7 +10,7 @@ from typing import (
     Type,
 )
 
-from pydantic import BaseModel, ConfigDict, Field, Tag, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, Tag, ValidationError, field_validator
 from pydantic_core import PydanticUndefined
 
 from invokeai.app.util.misc import uuid_string
@@ -26,6 +26,24 @@ from invokeai.backend.model_manager.taxonomy import (
 
 if TYPE_CHECKING:
     pass
+
+
+class ModelRole(BaseModel):
+    """Another model type a model's files serve as, beside the type its record is filed under. Set by identification."""
+
+    # Not extra="forbid": roles are persisted, and a field added later must not make an older build drop the record.
+    model_config = ConfigDict(
+        frozen=True,
+        json_schema_serialization_defaults_required=True,
+        json_schema_mode_override="serialization",
+    )
+
+    type: ModelType
+    format: ModelFormat | None = Field(
+        default=None,
+        description="The format the model loads in for this role, when it differs from the record's format",
+    )
+    variant: AnyVariant | None = Field(default=None, description="The variant the model serves as in this role")
 
 
 class Config_Base(ABC, BaseModel):
@@ -97,6 +115,32 @@ class Config_Base(ABC, BaseModel):
         default=None,
         description="Url for image to preview model",
     )
+    roles: list[ModelRole] = Field(
+        default_factory=list,
+        description="Other model types this model serves as, besides `type`. Derived from its files at identification; "
+        "re-identify to refresh.",
+    )
+    _role_of: ModelType | None = PrivateAttr(default=None)
+
+    @field_validator("roles", mode="before")
+    @classmethod
+    def _drop_unreadable_roles(cls, v: Any) -> Any:
+        # Roles are derived and Re-identify recomputes them, so a role this build cannot read (a type or variant added
+        # by a newer one) is dropped rather than failing the whole record.
+        if not isinstance(v, (list, tuple)):
+            return v
+        readable: list[ModelRole] = []
+        for item in v:
+            try:
+                readable.append(item if isinstance(item, ModelRole) else ModelRole.model_validate(item))
+            except ValidationError:
+                continue
+        return readable
+
+    @property
+    def role_of(self) -> ModelType | None:
+        """For a role view (see `configs.roles.view_as`): the type of the record it was made from. None for a stored record."""
+        return self._role_of
 
     CONFIG_CLASSES: ClassVar[set[Type["Config_Base"]]] = set()
     """Set of all non-abstract subclasses of Config_Base, for use during model probing. In other words, this is the set

@@ -806,8 +806,7 @@ describe('Call Saved Workflow dynamic fields', () => {
 });
 
 describe('Call Saved Workflow labels across a reload', () => {
-  // Preserve labelOverride through reload so dynamic-template reconciliation and autosave cannot erase user
-  // labels.
+  // Preserve labelOverride through reload so dynamic-template reconciliation and autosave cannot erase user labels.
   it('keeps a user label when a template-less parent is saved and reloaded', () => {
     const callNode = buildInvocationNode(callSavedWorkflowTemplate, { x: 0, y: 0 });
 
@@ -834,7 +833,7 @@ describe('Call Saved Workflow labels across a reload', () => {
     child = projectGraphReducer(child, { content: 'Inputs', elementType: 'collapsible', type: 'addFormElement' });
     const childSection = Object.values(child.form.elements).find((element) => element.type === 'collapsible')!;
     const childFields = Object.values(child.form.elements).filter((element) => element.type === 'node-field');
-    for (const [index, element] of childFields.entries()) {
+    for (const [index, element] of [...childFields].reverse().entries()) {
       child = projectGraphReducer(child, {
         elementId: element.id,
         index,
@@ -844,7 +843,7 @@ describe('Call Saved Workflow labels across a reload', () => {
     }
 
     const fields = getSavedWorkflowDynamicFields(child, templates);
-    expect(fields.map((item) => item.fieldName)).toEqual([dynamicFieldName('a'), dynamicFieldName('b')]);
+    expect(fields.map((item) => item.fieldName)).toEqual([dynamicFieldName('b'), dynamicFieldName('a')]);
 
     const callNode = buildInvocationNode(callSavedWorkflowTemplate, { x: 0, y: 0 });
     callNode.id = 'call-1';
@@ -878,6 +877,6 @@ describe('Call Saved Workflow labels across a reload', () => {
     expect(updatedSection?.type === 'collapsible' && updatedSection.data.children).toHaveLength(1);
     const survivingId = updatedSection?.type === 'collapsible' ? updatedSection.data.children[0]! : '';
     const surviving = pruned.form.elements[survivingId];
-    expect(surviving?.type === 'node-field' && surviving.data.fieldIdentifier.fieldName).toBe(dynamicFieldName('a'));
+    expect(surviving?.type === 'node-field' && surviving.data.fieldIdentifier.fieldName).toBe(dynamicFieldName('b'));
   });
 });

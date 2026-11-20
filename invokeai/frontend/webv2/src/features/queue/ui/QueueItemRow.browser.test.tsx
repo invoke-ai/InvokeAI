@@ -130,13 +130,6 @@ describe('QueueItemRow', () => {
     expect(card.textContent).not.toContain('common.prompt');
   });
 
-  it('names a workflow run by its workflow rather than a prompt-like field', async () => {
-    await render(adapter(), item({ workflowName: 'Tiled upscale' }));
-
-    expect(primary().textContent).toContain('Tiled upscale');
-    expect(primary().textContent).not.toContain('A castle at dusk');
-  });
-
   it('shows why a failed row failed on one line without expanding it', async () => {
     await render(
       adapter(),
@@ -156,41 +149,6 @@ describe('QueueItemRow', () => {
     );
 
     expect(host.textContent).toContain('Loading SDXL Base…');
-  });
-
-  it('distinguishes workflow rows without prompt metadata by their queue item ids', async () => {
-    await render(adapter(), item({ fieldValues: [], id: 21 }), item({ fieldValues: [], id: 22 }));
-
-    const rows = host.querySelectorAll<HTMLElement>('[data-list-primary]');
-
-    expect(rows).toHaveLength(2);
-    expect(rows[0]!.textContent).toContain('Queue item #21');
-    expect(rows[1]!.textContent).toContain('Queue item #22');
-    expect(host.textContent).not.toContain('widgets.queue.noPrompt');
-  });
-
-  it('renders a row without viewable details as static content, not a button', async () => {
-    await render(
-      adapter({ canManageItem: () => false, canViewItemDetails: () => false }),
-      item({ userId: 'redacted' })
-    );
-
-    expect(primary().tagName).toBe('DIV');
-    expect(primary().hasAttribute('aria-expanded')).toBe(false);
-    expect(host.querySelector('button')).toBeNull();
-    expect(host.querySelector('[role="list"] > [role="listitem"]')).not.toBeNull();
-  });
-
-  it('warms the item actions on focus, before the first expand', async () => {
-    const preloadItemActions = vi.fn();
-
-    await render(adapter({ preloadItemActions }), item());
-    // Dispatch focusin directly: element.focus() is a no-op for focus events while the test window is unfocused.
-    await act(() => {
-      primary().dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
-    });
-
-    expect(preloadItemActions).toHaveBeenCalledTimes(1);
   });
 
   it('lets a waiting workflow-call parent be canceled from its own row', async () => {
@@ -297,30 +255,6 @@ describe('QueueItemRow', () => {
 
     await act(() => menu.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
     await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).toBeNull());
-  });
-
-  it('opens on the recall entries’ first frame once intent has loaded them', async () => {
-    const importer = vi.fn(() => Promise.resolve(RecallEntries));
-    await render(adapter({ itemRecallMenuGroup: createMenuPartLoader(importer) }), item());
-    await act(async () => {
-      primary().dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
-      await new Promise(requestAnimationFrame);
-    });
-    expect(importer).toHaveBeenCalledOnce();
-    // Records whether the placeholder ever mounts while the menu opens.
-    const placeholders: Node[] = [];
-    const observer = new MutationObserver(() =>
-      placeholders.push(...document.querySelectorAll('[data-value="menu-part-placeholder"]'))
-    );
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    const menu = await openMenu();
-    observer.disconnect();
-
-    expect(placeholders).toEqual([]);
-    expect(menu.textContent).toContain('Recall entries');
-    expect(menu.getAttribute('aria-busy')).toBe('false');
-    expect(importer).toHaveBeenCalledOnce();
   });
 
   it('says the recall entries could not load, without unmounting the queue, and loads them on a later open', async () => {

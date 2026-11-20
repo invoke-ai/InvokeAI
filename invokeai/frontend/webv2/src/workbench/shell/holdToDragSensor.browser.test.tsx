@@ -52,12 +52,10 @@ const mouse = (type: string, target: EventTarget, clientX: number, clientY: numb
   target.dispatchEvent(new MouseEvent(type, { bubbles: true, button, cancelable: true, clientX, clientY }));
 };
 
-/** Mount useDraggable below DndContext so it receives the provider rather than default context. */
 const DraggableTile = ({ onClick, pannable }: { onClick: () => void; pannable: boolean }) => {
   const { listeners, setNodeRef } = useDraggable({ id: 'tile' });
 
   return (
-    // A button like the filmstrip thumb the sensor also serves.
     <button
       ref={setNodeRef}
       {...listeners}
@@ -93,8 +91,7 @@ const renderHarness = async (options?: { pannable?: boolean }) => {
         onDragEnd={events.onDragEnd}
         onDragStart={events.onDragStart}
       >
-        {/* The scroll container makes the tile touch-pannable, which is what the
-            hold gate arbitrates; `touch-action: none` opts the tile out of it. */}
+        {/* The scroll container makes the tile touch-pannable; `touch-action: none` opts it out of the hold gate. */}
         <div style={{ height: 300, overflow: 'auto', width: 300 }}>
           <DraggableTile onClick={events.onClick} pannable={pannable} />
         </div>
@@ -125,13 +122,11 @@ describe('HoldToDragSensor touch gate', () => {
     const { events, tile } = await renderHarness();
 
     await interact(() => pointer('pointerdown', tile(), 150, 150));
-    // Moved beyond the tolerance well before the hold delay elapses.
     await interact(() => pointer('pointermove', document, 150, 190));
 
     expect(events.onDragStart).not.toHaveBeenCalled();
     expect(tile().getAttribute('data-drag-armed')).toBeNull();
 
-    // The gate is spent: nothing activates later, however long the finger stays.
     await wait(HOLD_ELAPSED_MS);
     await interact(() => pointer('pointermove', document, 150, 220));
 
@@ -145,7 +140,6 @@ describe('HoldToDragSensor touch gate', () => {
     await interact(() => pointer('pointerdown', tile(), 150, 150));
     await wait(HOLD_ELAPSED_MS);
 
-    // The armed cue is the visual half of the gate: hold complete, move to drag.
     expect(tile().getAttribute('data-drag-armed')).toBe('true');
 
     await interact(() => pointer('pointermove', document, 170, 150));
@@ -159,8 +153,6 @@ describe('HoldToDragSensor touch gate', () => {
   });
 
   it('holds the browser pan off from arming onward, but not during the hold', async () => {
-    // After arming, prevent native pan before its threshold wins; during the hold preserve scrolling. A cancelable
-    // event covers the handler's preventDefault path.
     const { events, tile } = await renderHarness();
 
     const touchMove = () => {
@@ -171,19 +163,16 @@ describe('HoldToDragSensor touch gate', () => {
 
     await interact(() => pointer('pointerdown', tile(), 150, 150));
 
-    // Waiting: the browser must stay free to pan (an early move is a scroll).
     expect(touchMove().defaultPrevented).toBe(false);
 
     await wait(HOLD_ELAPSED_MS);
     expect(tile().getAttribute('data-drag-armed')).toBe('true');
 
-    // Armed: the pan is held off so the scroll-slop cannot steal the drag.
     expect(touchMove().defaultPrevented).toBe(true);
 
     await interact(() => pointer('pointermove', document, 170, 150));
     expect(events.onDragStart).toHaveBeenCalledTimes(1);
 
-    // Active: still held off, as before.
     expect(touchMove().defaultPrevented).toBe(true);
 
     // End the gesture so the sensor cannot leak into the next test in this page.
@@ -191,7 +180,6 @@ describe('HoldToDragSensor touch gate', () => {
   });
 
   it('treats a motionless armed hold that lifts as an ordinary tap', async () => {
-    // A motionless hold must remain a tap; timer-only activation would swallow selection.
     const { events, tile } = await renderHarness();
 
     await interact(() => pointer('pointerdown', tile(), 150, 150));
@@ -204,7 +192,6 @@ describe('HoldToDragSensor touch gate', () => {
 
     expect(events.onDragStart).not.toHaveBeenCalled();
     expect(tile().getAttribute('data-drag-armed')).toBeNull();
-    // The tap still selects: nothing activated, so the click is not swallowed.
     expect(events.onClick).toHaveBeenCalledOnce();
   });
 
@@ -216,8 +203,8 @@ describe('HoldToDragSensor touch gate', () => {
     await interact(() => pointer('pointermove', document, 170, 150));
     expect(events.onDragStart).toHaveBeenCalledTimes(1);
 
-    // The click must land within the 50ms post-lift window the swallow covers,
-    // exactly as a browser's compat click after a touch lift would.
+    // The click must land within the 50ms post-lift window the swallow covers, exactly as a browser's compat click
+    // after a touch lift would.
     await interact(() => {
       pointer('pointerup', document, 170, 150);
       tile().dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
@@ -228,7 +215,6 @@ describe('HoldToDragSensor touch gate', () => {
   });
 
   it('releases the gesture on pointercancel and accepts a new one', async () => {
-    // Native pan cancellation must end the gesture and clear dnd-kit's activation guard for later drags.
     const { events, tile } = await renderHarness();
 
     await interact(() => pointer('pointerdown', tile(), 150, 150));
@@ -239,22 +225,18 @@ describe('HoldToDragSensor touch gate', () => {
     await interact(() => pointer('pointercancel', document, 170, 150));
     expect(events.onDragCancel).toHaveBeenCalledTimes(1);
 
-    // A fresh gesture must still work: the pointercancel did not brick the context.
     await interact(() => pointer('pointerdown', tile(), 150, 150));
     await wait(HOLD_ELAPSED_MS);
     await interact(() => pointer('pointermove', document, 170, 150));
 
     expect(events.onDragStart).toHaveBeenCalledTimes(2);
 
-    // End the gesture: a sensor left mid-drag outlives the unmounted harness
-    // (its listeners are on the shared window/document) and would leak into
-    // the next test in this page.
+    // End the gesture: a sensor left mid-drag outlives the unmounted harness (its listeners are on the shared
+    // window/document) and would leak into the next test in this page.
     await interact(() => pointer('pointerup', document, 170, 150));
   });
 
   it('cancels the hold when a second finger lands', async () => {
-    // A second finger during the hold is pinch or scroll intent; the armed
-    // gesture must not hijack the subsequent two-finger scroll.
     const { events, tile } = await renderHarness();
 
     await interact(() => pointer('pointerdown', tile(), 150, 150));
@@ -275,7 +257,6 @@ describe('HoldToDragSensor touch gate', () => {
     await wait(HOLD_ELAPSED_MS);
     expect(tile().getAttribute('data-drag-armed')).toBe('true');
 
-    // Allow long-press menus and disarm dragging when menu intent wins.
     const menuWhileArmed = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
     await interact(() => window.dispatchEvent(menuWhileArmed));
 
@@ -285,7 +266,6 @@ describe('HoldToDragSensor touch gate', () => {
     await interact(() => pointer('pointermove', document, 170, 150));
     expect(events.onDragStart).not.toHaveBeenCalled();
 
-    // While the drag is live, the native menu is suppressed as with stock sensors.
     await interact(() => pointer('pointerdown', tile(), 150, 150));
     await wait(HOLD_ELAPSED_MS);
     await interact(() => pointer('pointermove', document, 170, 150));
@@ -303,7 +283,6 @@ describe('HoldToDragSensor touch gate', () => {
   it('activates immediately by distance on a surface that cannot pan', async () => {
     const { events, tile } = await renderHarness({ pannable: false });
 
-    // touch-action:none needs no hold because native pan cannot compete.
     await interact(() => pointer('pointerdown', tile(), 150, 150));
     await interact(() => pointer('pointermove', document, 170, 150));
 
@@ -332,7 +311,6 @@ describe('PrimaryMouseSensor button guard', () => {
   it('starts drags for the primary button only', async () => {
     const { events, tile } = await renderHarness();
 
-    // Reject all auxiliary buttons; stock MouseSensor rejects only the right button.
     await interact(() => mouse('mousedown', tile(), 150, 150, 1));
     await interact(() => mouse('mousemove', document, 170, 150));
 

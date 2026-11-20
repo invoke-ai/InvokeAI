@@ -1,3 +1,4 @@
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -9,7 +10,7 @@ import {
 
 describe('board panel sections', () => {
   it('starts other users’ boards collapsed, even for a panel that saved its collapsed groups before', () => {
-    const settings = getGallerySettings({ collapsedBoardSections: ['dates'] });
+    const settings = getGallerySettings(resolvedValues({ collapsedBoardSections: ['dates'] }));
 
     expect(isGalleryBoardSectionOpen(settings, 'other-users')).toBe(false);
     expect(isGalleryBoardSectionOpen(settings, 'shared')).toBe(true);
@@ -17,10 +18,14 @@ describe('board panel sections', () => {
   });
 
   it('records the groups that start collapsed as opened, and the rest as collapsed', () => {
-    const settings = getGallerySettings({});
+    const settings = getGallerySettings(resolvedValues({}));
 
-    const opened = getGallerySettings({ ...settings, ...toggleGalleryBoardSection(settings, 'other-users', true) });
-    const closed = getGallerySettings({ ...opened, ...toggleGalleryBoardSection(opened, 'shared', false) });
+    const opened = getGallerySettings(
+      resolvedValues({ ...settings, ...toggleGalleryBoardSection(settings, 'other-users', true) })
+    );
+    const closed = getGallerySettings(
+      resolvedValues({ ...opened, ...toggleGalleryBoardSection(opened, 'shared', false) })
+    );
 
     expect(isGalleryBoardSectionOpen(opened, 'other-users')).toBe(true);
     expect(isGalleryBoardSectionOpen(closed, 'shared')).toBe(false);
@@ -30,22 +35,24 @@ describe('board panel sections', () => {
 
 describe('project groups under Other projects', () => {
   it('starts with every group expanded', () => {
-    expect(getGallerySettings({}).collapsedProjectGroupIds).toEqual([]);
+    expect(getGallerySettings(resolvedValues({})).collapsedProjectGroupIds).toEqual([]);
   });
 
   it('keeps distinct project ids only, dropping anything that is not a string', () => {
-    const settings = getGallerySettings({ collapsedProjectGroupIds: ['a', 7, null, 'b', 'a', { id: 'c' }] });
+    const settings = getGallerySettings(
+      resolvedValues({ collapsedProjectGroupIds: ['a', 7, null, 'b', 'a', { id: 'c' }] })
+    );
 
     expect(settings.collapsedProjectGroupIds).toEqual(['b', 'a']);
-    expect(getGallerySettings({ collapsedProjectGroupIds: 'a' }).collapsedProjectGroupIds).toEqual([]);
+    expect(getGallerySettings(resolvedValues({ collapsedProjectGroupIds: 'a' })).collapsedProjectGroupIds).toEqual([]);
   });
 
   it('remembers at most 200 groups, keeping the most recently collapsed', () => {
     const ids = Array.from({ length: 205 }, (_, index) => `project-${String(index)}`);
 
-    const stored = getGallerySettings({ collapsedProjectGroupIds: ids }).collapsedProjectGroupIds;
+    const stored = getGallerySettings(resolvedValues({ collapsedProjectGroupIds: ids })).collapsedProjectGroupIds;
     const collapsedOneMore = toggleGalleryProjectGroup(
-      getGallerySettings({ collapsedProjectGroupIds: ids }),
+      getGallerySettings(resolvedValues({ collapsedProjectGroupIds: ids })),
       'new',
       false
     );
@@ -63,7 +70,7 @@ describe('project groups under Other projects', () => {
     ids.push('project-7', 'project-49995');
 
     const started = performance.now();
-    const stored = getGallerySettings({ collapsedProjectGroupIds: ids }).collapsedProjectGroupIds;
+    const stored = getGallerySettings(resolvedValues({ collapsedProjectGroupIds: ids })).collapsedProjectGroupIds;
     const elapsedMs = performance.now() - started;
 
     expect(stored).toHaveLength(200);
@@ -74,7 +81,7 @@ describe('project groups under Other projects', () => {
   });
 
   it('collapses and expands one group without touching the others', () => {
-    const settings = getGallerySettings({ collapsedProjectGroupIds: ['a'] });
+    const settings = getGallerySettings(resolvedValues({ collapsedProjectGroupIds: ['a'] }));
 
     expect(toggleGalleryProjectGroup(settings, 'b', false).collapsedProjectGroupIds).toEqual(['a', 'b']);
     expect(toggleGalleryProjectGroup(settings, 'a', true).collapsedProjectGroupIds).toEqual([]);
@@ -83,9 +90,9 @@ describe('project groups under Other projects', () => {
 
 describe('search scope', () => {
   it('searches the selected board unless all boards were chosen', () => {
-    expect(getGallerySettings({}).searchScope).toBe('board');
-    expect(getGallerySettings({ searchScope: 'all' }).searchScope).toBe('all');
-    expect(getGallerySettings({ searchScope: 'everywhere' }).searchScope).toBe('board');
-    expect(getGallerySettings({ searchScope: null }).searchScope).toBe('board');
+    expect(getGallerySettings(resolvedValues({})).searchScope).toBe('board');
+    expect(getGallerySettings(resolvedValues({ searchScope: 'all' })).searchScope).toBe('all');
+    expect(getGallerySettings(resolvedValues({ searchScope: 'everywhere' })).searchScope).toBe('board');
+    expect(getGallerySettings(resolvedValues({ searchScope: null })).searchScope).toBe('board');
   });
 });

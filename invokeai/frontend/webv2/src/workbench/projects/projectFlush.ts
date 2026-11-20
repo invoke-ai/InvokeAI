@@ -1,6 +1,6 @@
 /**
- * Nonthrowing completion does not imply acknowledgement. This standalone outcome type avoids a library/sync
- * dependency cycle.
+ * Nonthrowing completion does not imply acknowledgement. This standalone outcome type avoids a library/sync dependency
+ * cycle.
  */
 
 /** The document the push was carrying, so a caller can compare it with what the engine recorded. */

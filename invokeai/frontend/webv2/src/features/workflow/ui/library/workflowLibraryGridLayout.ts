@@ -7,8 +7,8 @@ import type { WorkflowLibraryCardSize } from './workflowThumbnail';
 
 /**
  * Column count and virtualizer bounds for the library grid. The browse store retains at most 60 consecutive metadata
- * positions and enriches at most 48 demanded identities, visible cards first (`libraryBrowseStore.ts`); every
- * column count must keep the rows a capped viewport can show inside both.
+ * positions and enriches at most 48 demanded identities, visible cards first (`libraryBrowseStore.ts`); every column
+ * count must keep the rows a capped viewport can show inside both.
  */
 
 /** The tallest viewport, in estimated rows, at one to three columns. */
@@ -44,8 +44,8 @@ export interface WorkflowLibraryGridBounds {
 
 /**
  * Up to four columns keep two overscan rows; five and six keep one so the viewport still spans several rows. With
- * `maxViewportRows` R and overscan O at C columns, (R + 1) × C visible cards fit the demand bound and
- * (R + 1 + 2O) × C positions fit the metadata window: six columns allow 7 rows (48 visible, 60 resident).
+ * `maxViewportRows` R and overscan O at C columns, (R + 1) × C visible cards fit the demand bound and (R + 1 + 2O) × C
+ * positions fit the metadata window: six columns allow 7 rows (48 visible, 60 resident).
  */
 export const getWorkflowLibraryGridBounds = (columns: number): WorkflowLibraryGridBounds => {
   const overscanRows = columns >= 5 ? 1 : 2;

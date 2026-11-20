@@ -3,7 +3,6 @@ import { createPaintTool } from '@workbench/canvas-engine/tools/paintTool';
 
 import type { Tool } from './tool';
 
-/** Creates a fresh brush tool with its own gesture state. */
 export const createBrushTool = (): Tool =>
   createPaintTool({
     color: (ctx) => ctx.stores.brushOptions.get().color,

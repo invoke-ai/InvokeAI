@@ -46,7 +46,6 @@ describe('detectCanvasMode', () => {
     });
 
     it('stays txt2img for a new canvas seeded with only an empty inpaint mask', () => {
-      // Default empty masks are not active inpaint content.
       expect(detectCanvasMode(input({ contentBounds: null, hasActiveInpaintMask: false }))).toBe('txt2img');
     });
   });

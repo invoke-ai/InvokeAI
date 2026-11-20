@@ -129,9 +129,8 @@ describe('GalleryTileFrame', () => {
 
     await act(() => frame.querySelector('button')?.focus());
 
-    // The focus reveal comes from the frame's own css while the caller's opacity still applies, so the caller's css
-    // was composed rather than substituted.
-    // The reveal fades in.
+    // The focus reveal comes from the frame's own css while the caller's opacity still applies, so the caller's css was
+    // composed rather than substituted. The reveal fades in.
     await vi.waitFor(() => expect(badge && getComputedStyle(badge).opacity).toBe('1'));
     expect(getComputedStyle(frame).opacity).toBe('0.5');
     // The focus ring is drawn on the media box, not the square cell.

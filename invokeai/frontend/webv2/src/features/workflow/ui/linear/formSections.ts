@@ -19,14 +19,19 @@ export const updateFormSectionOpenState = (
   workflowValues: Record<string, unknown> | undefined,
   workflowId: string,
   sectionId: string,
-  open: boolean
+  open: boolean,
+  validSectionIds?: ReadonlySet<string>
 ): Record<string, unknown> => {
   const stored = workflowValues?.[SECTION_STATE_KEY];
   const all = isRecord(stored) ? stored : {};
+  const previous = getFormSectionOpenState(workflowValues, workflowId);
+  const retained = validSectionIds
+    ? Object.fromEntries(Object.entries(previous).filter(([id]) => validSectionIds.has(id)))
+    : previous;
   return {
     [SECTION_STATE_KEY]: {
       ...all,
-      [workflowId]: { ...getFormSectionOpenState(workflowValues, workflowId), [sectionId]: open },
+      [workflowId]: { ...retained, [sectionId]: open },
     },
   };
 };

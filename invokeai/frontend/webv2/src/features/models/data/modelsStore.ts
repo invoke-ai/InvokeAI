@@ -21,7 +21,6 @@ export interface ModelsSnapshot {
   models: ModelConfig[];
   /** Same models keyed for point lookups; always derived from `models`. */
   modelsByKey: ReadonlyMap<string, ModelConfig>;
-  /** Keys of models whose files are missing on disk. */
   missingModelKeys: ReadonlySet<string>;
   /** Bumped when a model's cover image changes; cache-busts thumbnail URLs. */
   coverImageVersions: Readonly<Record<string, number>>;

@@ -18,7 +18,6 @@ const IMAGE_OFF_PLACEHOLDER = <Icon as={ImageOffIcon} w="4" h="4" />;
 export const QueueItemThumbnail = ({
   imageName,
   liveImage,
-  // seed,
   boxSize = '8',
   rounded = 'md',
 }: {

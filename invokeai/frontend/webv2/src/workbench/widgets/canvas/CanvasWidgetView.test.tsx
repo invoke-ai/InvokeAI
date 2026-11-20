@@ -40,7 +40,7 @@ vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => () => undefined,
 }));
 vi.mock('@features/queue', () => ({ useQueueItemProgressImage: () => null }));
-vi.mock('./engineStoreHooks', () => ({ useCanvasOperation: () => null }));
+vi.mock('./engineStoreHooks', () => ({ useCanvasOperation: () => null, useVectorEditSession: () => null }));
 vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
 vi.mock('./useCanvasGallerySave', () => ({
   useCanvasGallerySave: () => ({ isSaving: false, save: () => undefined }),

@@ -9,10 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { cropAllLayersToFrame, getCropAllUnavailableReasonKey } from './canvasContextMenu';
 
-/**
- * Canvas-menu action that crops every unlocked layer to the frame as one undo step and reports the count. While it
- * cannot run it stays reachable by keyboard and says why.
- */
+/** Canvas-menu action that crops every unlocked layer to the frame as one undo step and reports the count. */
 export const CanvasCropAllLayersMenuItem = ({
   documentEditingLocked,
   layers,

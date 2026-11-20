@@ -123,7 +123,6 @@ describe('editor notification actions', () => {
     failed.context.retryQueueItem({ itemIds: [43] });
 
     await vi.waitFor(() => expect(failed.store.getSnapshot().notifications).toHaveLength(1));
-    // Recorded as keys and values, so the notice follows the language.
     expect(queued.store.getSnapshot().notifications[0]).toMatchObject({
       actions: [{ itemId: 99, kind: 'reveal-queue-item' }],
       kind: 'success',
@@ -142,7 +141,6 @@ describe('editor notification actions', () => {
       message: 'Queue item 43 not found',
       titleKey: 'widgets.queue.retryFailed',
     });
-    // A failed attempt may be tried again; a done one is not offered again.
     expect(failed.context.canRetryQueueItem([43])).toBe(true);
     expect(queued.context.canRetryQueueItem([41])).toBe(false);
   });
@@ -166,9 +164,7 @@ describe('editor notification actions', () => {
       actions: [{ itemId: 101, kind: 'reveal-queue-item' }],
       message: '4 queue items were queued again from their saved sessions.',
     });
-    // Several items asked for are counted, not named by the first.
     expect(report?.messageValues).toEqual({ count: 4 });
-    // The notice that offered the retry no longer does.
     expect(failure).not.toHaveProperty('actions');
   });
 
