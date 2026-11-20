@@ -32,7 +32,7 @@ vi.mock('@workbench/widgets/layers/layerCommands', async (importOriginal) => ({
 
 import { CANVAS_HEADER_HOTKEYS } from './canvasHeaderCommands';
 import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
-import { CANVAS_COMPANION_HOTKEYS, reportMergeDownRefusal } from './canvasToolCommands';
+import { CANVAS_COMPANION_HOTKEYS, type HotkeyTableEntry, reportMergeDownRefusal } from './canvasToolCommands';
 
 const rasterLayer = (id: string, overrides: Partial<CanvasLayerContract> = {}): CanvasLayerContract =>
   ({
@@ -473,13 +473,18 @@ describe('new raster layer', () => {
 describe('registration tables', () => {
   const allEntries = [...CANVAS_COMPANION_HOTKEYS, ...CANVAS_ONLY_HOTKEYS, ...CANVAS_HEADER_HOTKEYS];
 
-  it('mirrors every registered key in the hotkey catalog with the same defaults, under Canvas', () => {
+  it('mirrors registered defaults and repeat policy in the Canvas catalog', () => {
     const catalogDefaults = Object.fromEntries(
       firstPartyHotkeyCatalog
         .filter((hotkey) => hotkey.category === 'canvas')
-        .map((hotkey) => [hotkey.id, hotkey.defaultKeys])
+        .map((hotkey) => [hotkey.id, { defaultKeys: hotkey.defaultKeys, ignoreRepeat: hotkey.ignoreRepeat }])
     );
-    const registeredDefaults = Object.fromEntries(allEntries.map(([id, , keys]) => [id, [...keys]]));
+    const registeredDefaults = Object.fromEntries(
+      (allEntries as readonly HotkeyTableEntry[]).map(([id, , keys, options]) => [
+        id,
+        { defaultKeys: [...keys], ignoreRepeat: options?.ignoreRepeat },
+      ])
+    );
 
     expect(registeredDefaults).toEqual(catalogDefaults);
   });

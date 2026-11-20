@@ -67,7 +67,7 @@ export const CANVAS_ONLY_HOTKEYS = [
   ['canvas.nudgeUpLarge', 'widgets.canvas.commands.nudgeUpLarge', ['shift+arrowup']],
   ['canvas.nudgeDownLarge', 'widgets.canvas.commands.nudgeDownLarge', ['shift+arrowdown']],
   // Mod+Shift+N is reserved by browsers; creation stays unbound until customized.
-  ['canvas.newRasterLayer', 'widgets.canvas.commands.newRasterLayer', []],
+  ['canvas.newRasterLayer', 'widgets.canvas.commands.newRasterLayer', [], { ignoreRepeat: true }],
   ['canvas.duplicateLayer', 'widgets.canvas.commands.duplicateLayer', ['mod+j']],
   ['canvas.groupLayers', 'widgets.canvas.commands.groupLayers', ['mod+g']],
   ['canvas.ungroupLayers', 'widgets.canvas.commands.ungroupLayers', ['mod+shift+g']],

@@ -48,13 +48,14 @@ describe('firstPartyHotkeyCatalog', () => {
       resolveHotkey({
         context: { ...context, ...overrides },
         event: { target: null } as KeyboardEvent,
-        hotkeys: [applyCustomHotkeys(definition, customHotkeys)],
-        matchedKey: 'shift+n',
+        hotkeys: firstPartyHotkeyCatalog.map((hotkey) => applyCustomHotkeys(hotkey, customHotkeys)),
+        matchedKey: 'alt+shift+n',
       });
 
+    expect(definition.defaultKeys).toEqual([]);
     expect(definition.allowInEditable).toBe(false);
     expect(resolve({})).toBeNull();
-    const custom = { 'canvas.newRasterLayer': ['shift+n'] };
+    const custom = { 'canvas.newRasterLayer': ['alt+shift+n'] };
     expect(resolve(custom)?.commandId).toBe('canvas.newRasterLayer');
     expect(resolve(custom, { activeWidgetTypeId: 'gallery' })).toBeNull();
     expect(resolve(custom, { isModalPresent: true })).toBeNull();
