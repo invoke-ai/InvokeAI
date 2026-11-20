@@ -1,7 +1,7 @@
 ---
 title: Low-VRAM mode
 description: How Invoke runs models larger than your GPU's memory, the invokeai.yaml settings that tune it, and what to do when you still run out of memory.
-lastUpdated: 2026-10-26
+lastUpdated: 2026-11-19
 sidebar:
   order: 2
 ---
@@ -82,10 +82,11 @@ none of them.
 | `device_working_mem_gb` | `3` | You get out-of-memory errors during generation. | More working memory leaves less VRAM for model layers, so more of them stream from RAM. |
 | `reserve_vram_gb` | `0` | Another GPU program needs VRAM that Invoke should leave alone. | Models are offloaded or partially loaded sooner. |
 | `max_cache_vram_gb` | unset: measured | You want Invoke to use less VRAM than it could. | Invoke stops measuring the GPU, so VRAM other programs use is not seen. |
-| `max_cache_ram_gb` | unset: half your RAM minus 2 GB, within limits | You want more inactive models kept in RAM, or Invoke to use less RAM. | More: faster reloads, more RAM in use. |
-| `keep_ram_copy_of_weights` | `true` | RAM is consistently tight. | Off: lower average RAM use, slower model switching and LoRA patching. |
-| `offload_on_architecture_switch` | `true` | You alternate between model architectures that fit in VRAM together. | Off: other architectures' models stay in VRAM until a load needs the room. |
-| `clear_vram_after_session` | `false` | A generation that runs fine once runs out of memory, or slows down sharply, when repeated. | A few seconds per queue item to reload models from RAM. |
+| `max_cache_ram_gb` | unset: half your RAM minus 2 GB, within limits; Spark uses its shared pool | You want more model weights cached, or Invoke to use less shared memory. | More can keep models warm longer, but uses more shared memory. |
+| `model_cache_keep_alive_min` | `0` (keep models indefinitely) | Another app needs shared memory after Invoke is idle. | After the timeout, the next model use reloads its weights. |
+| `keep_ram_copy_of_weights` | `auto` (`false` on integrated CUDA, `true` elsewhere) | You want a speed-for-memory choice on an integrated CUDA GPU. | `true` keeps a duplicate CPU shadow and speeds switching and LoRA patching; `false` lowers shared-memory pressure. |
+| `offload_on_architecture_switch` | `true` | You alternate between model architectures that fit in VRAM together. | On separate-memory GPUs, models move to RAM; on integrated CUDA, models stay warm until the cache budget or shared-memory pressure requires eviction. |
+| `clear_vram_after_session` | `false` | A generation that runs fine once runs out of memory, or slows down sharply, when repeated. On integrated CUDA, it can unload the duplicate CUDA copy when `keep_ram_copy_of_weights` is enabled. | A few seconds per queue item to reload models from RAM. The physical-memory effect on integrated CUDA is hardware-dependent. |
 | `pytorch_cuda_alloc_conf` | unset | You want to tune peak reserved VRAM, for example with `backend:cudaMallocAsync`. | The best value depends on the GPU, driver and CUDA version: test it. |
 | `auto_tiled_decode` | `true` | You never want a decode tiled unless you ask for it. | Decodes too large for the card run out of memory. |
 | `force_tiled_decode` | `false` | You want every supported decode and encode tiled. | Slower, and not pixel-identical to an untiled decode. |
@@ -143,10 +144,16 @@ Invoke caches models in RAM and VRAM so it rarely loads them from disk, and size
 
 - **VRAM**: unless you set `max_cache_vram_gb`, Invoke measures the free VRAM before each load, taking into account
   what other programs use (with a ROCm build on Windows, the budget Windows grants Invoke).
-- **RAM**: unless you set `max_cache_ram_gb`, the cache gets half your system RAM minus 2GB. On a machine with an
-  NVIDIA, AMD or dedicated Intel GPU that is capped at the GPU's VRAM minus `device_working_mem_gb` (or at
-  `max_cache_vram_gb` if you set it), elsewhere at 32GB, and it is never below 4GB. The log shows the result at
-  startup: `Calculated model RAM cache size: … MB`.
+- **RAM**: unless you set `max_cache_ram_gb`, the cache gets half your system RAM minus 2GB. On a GPU with dedicated
+  memory that is capped at its VRAM minus `device_working_mem_gb` (or at `max_cache_vram_gb` if you set it). Native
+  integrated CUDA uses the CUDA-reported shared pool, less `device_working_mem_gb`, rather than the generic 32GB
+  ceiling. The cap is never below 4GB for the automatic limit. On integrated CUDA, this budget counts cached model
+  weights even while they are CUDA-resident; it is a capacity limit, not a report of memory already allocated. When a
+  model load needs capacity, dynamic memory-pressure checks evict idle Spark models. The log shows the result at startup:
+  `Calculated model RAM cache size: … MB`.
+
+Integrated-CUDA admission is coordinated within one InvokeAI process. Other processes can still consume shared RAM
+between the headroom check and allocation.
 
 For example, on a 32GB machine with no other heavy programs, `max_cache_ram_gb: 28` caches models aggressively, so
 they reload faster.
@@ -157,12 +164,25 @@ they reload faster.
 </details>
 
 <details>
+<summary><span>`model_cache_keep_alive_min`: release models after idle time</span></summary>
+
+The default `0` keeps cached models indefinitely. Set a positive number of minutes to drop unlocked model entries after
+that long without model-cache activity. On integrated CUDA, the entries are dropped from the cache instead of moved to CPU
+RAM, so another program can use the shared memory. The next Invoke use reloads the model weights.
+
+```yaml
+model_cache_keep_alive_min: 10
+```
+
+</details>
+
+<details>
 <summary><span>`keep_ram_copy_of_weights`: a RAM copy of loaded models</span></summary>
 
-On by default: Invoke keeps a RAM copy of every model's weights while the model is in VRAM, which makes switching
-models and patching LoRAs faster. Turning it off lowers the average RAM use (the peak likely stays the same), at the
-cost of slower model switching and LoRA patching. On integrated Intel GPUs the setting is ignored, and the log says so
-once.
+Automatic by default: Invoke keeps a RAM copy on devices with separate VRAM, but omits the duplicate shadow on
+integrated CUDA because both copies consume the shared memory pool. Set it to `true` on Spark when faster switching
+and LoRA patching are worth the extra shared-memory pressure. Set it to `false` to force the memory-first behavior on
+any device. Integrated Intel GPUs still ignore the setting and log that choice once.
 
 ```yaml
 keep_ram_copy_of_weights: false
@@ -174,9 +194,11 @@ keep_ram_copy_of_weights: false
 <summary><span>`offload_on_architecture_switch`: switching between model architectures</span></summary>
 
 When a generation uses main models of another architecture than the previous one on the same GPU (say, FLUX.1 after
-SDXL), Invoke first moves every model the new generation does not use from VRAM to RAM. Models both use, such as a
-shared VAE or text encoder, stay. Moving models back costs a few seconds per switch, more with
-`keep_ram_copy_of_weights: false`. If you alternate between architectures that fit in VRAM together, turn it off:
+SDXL), Invoke moves models the new generation does not use from VRAM to RAM on GPUs with separate memory. Models both use,
+such as a shared VAE or text encoder, stay. On integrated CUDA with the default `keep_ram_copy_of_weights: false`,
+architecture switches leave unlocked models warm; the cache drops them when its capacity or shared-memory headroom requires it. With
+`keep_ram_copy_of_weights: true`, architecture switches can move models to RAM and retain the CPU copy. If you alternate
+between architectures that fit in VRAM together, turn it off:
 
 ```yaml
 offload_on_architecture_switch: false
@@ -187,11 +209,13 @@ offload_on_architecture_switch: false
 <details>
 <summary><span>`clear_vram_after_session`: clearing VRAM after every generation</span></summary>
 
-After every queue item (every image of a batch), Invoke moves the models it holds in VRAM to RAM and hands the freed
-memory back to the GPU driver. The models stay cached in RAM, so each queue item then costs a few seconds to reload
-them, not a load from disk; with `keep_ram_copy_of_weights: false` also the time to copy them back to RAM. With several
-GPUs, handing the memory back briefly holds up a generation running on another GPU. On the CPU, Apple silicon and
-integrated Intel GPUs, whose VRAM is system memory, it changes nothing.
+After every queue item (every image of a batch), Invoke moves models it holds in separate VRAM to RAM and hands the
+freed memory back to the GPU driver. The models stay cached in RAM, so each queue item then costs a few seconds to
+reload them, not a load from disk; with `keep_ram_copy_of_weights: false` also the time to copy them back to RAM. On
+integrated NVIDIA CUDA, this can unload the duplicate CUDA copy only when `keep_ram_copy_of_weights` is `true`.
+With the automatic or `false` setting, integrated CUDA has no separate device pool to return. Physical system-memory
+effects remain hardware-dependent and unverified on Spark.
+With several GPUs, handing the memory back briefly holds up a generation running on another GPU.
 
 ```yaml
 clear_vram_after_session: true
@@ -412,4 +436,13 @@ code in hex) in `eventvwr.msc`.
 
 - Make sure the disk has room for the page file to grow. Watch disk usage while Invoke runs: if it climbs to near 100%
   before the crash, this is very likely the cause. Free up disk space.
-- Make sure the page file is set to **System managed size** (the default), not a custom size, so it grows as needed.
+- Keep the page file **System managed** (the default) so Windows can grow it as needed. Large CUDA allocations on RTX Spark
+  can still hit the commit limit; see the note below.
+
+:::note[Windows on ARM64 (RTX Spark)]
+Windows can run out of system commit before CUDA exhausts the Spark GPU memory budget. A [reply on NVIDIA's Developer Forum](https://forums.developer.nvidia.com/t/rtx-spark-on-windows-cuda-allocations-consume-system-commit-even-with-96-gib-dedicated-gpu-memory/386453/6)
+says an NVIDIA Spark engineer confirmed this behavior. For one 128 GB Spark configured with 96 GiB for the GPU, the reply
+reports that a fixed page file of **98,304 MB** (initial and maximum size) resolved commit-limit failures. Treat this as a
+configuration-specific workaround, not a universal Invoke requirement: required commit headroom depends on the GPU/CPU
+memory split and other processes. A larger page file raises Windows' commit limit; it does not add physical GPU memory.
+:::

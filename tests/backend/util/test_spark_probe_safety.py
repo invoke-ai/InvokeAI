@@ -27,11 +27,20 @@ def test_nvidia_cuda_gate_accepts_cuda(monkeypatch):
     probe._require_nvidia_cuda()
 
 
-def test_maximum_allocation_limit_is_rejected_before_cuda(monkeypatch):
+def test_maximum_allocation_limit_rejects_over_128_gib_before_cuda(monkeypatch):
     monkeypatch.setattr(probe.torch.cuda, "is_available", lambda: pytest.fail("CUDA should not be checked"))
+    monkeypatch.setattr(probe.sys, "argv", ["probe", "--max-gb", "129"])
+    with pytest.raises(SystemExit):
+        probe.main()
+
+
+def test_allocation_limit_accepts_over_64_gib_without_allocating(monkeypatch, capsys):
+    monkeypatch.setattr(probe.torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(probe.torch, "empty", lambda *args, **kwargs: pytest.fail("CUDA allocation should not start"))
     monkeypatch.setattr(probe.sys, "argv", ["probe", "--max-gb", "65"])
     with pytest.raises(SystemExit):
         probe.main()
+    assert "CUDA is unavailable" in capsys.readouterr().err
 
 
 def test_report_exposes_effective_host_availability(monkeypatch):
@@ -220,3 +229,24 @@ def test_probe_handles_interrupt_during_cleanup(monkeypatch, capsys):
     assert output["stop_reason"] == "interrupted"
     assert output["after_cleanup_report"] == {"label": "after-allocation-probe"}
     assert empty_calls == 2
+
+
+def test_probe_reports_initial_sample_failure_and_cleans_up(monkeypatch, capsys):
+    monkeypatch.setattr(probe.torch.version, "cuda", "12.8")
+    monkeypatch.setattr(probe.torch.version, "hip", None)
+    monkeypatch.setattr(probe.torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(probe, "device_is_integrated", lambda _: True)
+    monkeypatch.setattr(probe.torch.cuda, "get_device_name", lambda _: "test")
+    monkeypatch.setattr(probe.torch.cuda, "empty_cache", lambda: None)
+    monkeypatch.setattr(probe.torch.cuda, "synchronize", lambda _: None)
+    monkeypatch.setattr(probe, "build_report", lambda label: {"label": label})
+    monkeypatch.setattr(probe, "_sample", lambda *_args: (_ for _ in ()).throw(RuntimeError("sample failed")))
+    monkeypatch.setattr(probe.sys, "argv", ["probe", "--max-gb", "1", "--min-host-available-gb", "0"])
+
+    assert probe.main() == 1
+    output = json.loads(capsys.readouterr().out)
+    assert output["stop_reason"] == "probe_error"
+    assert output["error"] == "RuntimeError('sample failed')"
+    assert output["samples"] == []
+    assert output["after_cleanup_report"] == {"label": "after-allocation-probe"}
+    assert output["cleanup_error"] is None

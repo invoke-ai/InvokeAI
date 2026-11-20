@@ -93,7 +93,7 @@ def _stop_reason(sample: dict[str, Any], min_host_available: int, min_commit_fre
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--max-gb", required=True, type=float, help="Hard cap on additional allocation (0-64 GiB)")
+    parser.add_argument("--max-gb", required=True, type=float, help="Hard cap on additional allocation (0-128 GiB)")
     parser.add_argument("--min-host-available-gb", type=float, default=16.0)
     parser.add_argument("--min-windows-commit-free-gb", type=float, default=8.0)
     parser.add_argument("--device-index", type=int, default=0)
@@ -101,13 +101,13 @@ def main() -> int:
     args = parser.parse_args()
     if (
         not math.isfinite(args.max_gb)
-        or not 0 < args.max_gb <= 64
+        or not 0 < args.max_gb <= 128
         or not math.isfinite(args.min_host_available_gb)
         or not 0 <= args.min_host_available_gb
         or not math.isfinite(args.min_windows_commit_free_gb)
         or not 0 <= args.min_windows_commit_free_gb
     ):
-        parser.error("--max-gb must be in (0, 64]; memory headroom limits must be nonnegative")
+        parser.error("--max-gb must be in (0, 128]; memory headroom limits must be nonnegative")
     if args.device_index < 0:
         parser.error("--device-index must be nonnegative")
     try:
@@ -139,10 +139,9 @@ def main() -> int:
         error: str | None = f"Could not capture initial report: {exc!r}"
     else:
         error = None
-    initial_sample = _sample(device, 0)
     chunks: list[torch.Tensor] = []
-    samples: list[dict[str, Any]] = [initial_sample]
-    stop_reason = _stop_reason(initial_sample, min_host_available, min_commit_free)
+    samples: list[dict[str, Any]] = []
+    stop_reason: str | None = None
     cleanup_error: str | None = None
     chunk: torch.Tensor | None = None
     started = time.monotonic()
@@ -152,6 +151,9 @@ def main() -> int:
     held_bytes = 0
     try:
         try:
+            initial_sample = _sample(device, 0)
+            samples.append(initial_sample)
+            stop_reason = _stop_reason(initial_sample, min_host_available, min_commit_free)
             for index in range(max_chunks):
                 safety_sample = _sample(device, len(chunks) * CHUNK_BYTES)
                 stop_reason = _stop_reason(safety_sample, min_host_available, min_commit_free)

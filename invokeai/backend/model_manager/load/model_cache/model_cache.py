@@ -440,6 +440,18 @@ def synchronized(method: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
+def integrated_cuda_synchronized(method: Callable[..., Any]) -> Callable[..., Any]:
+    """Acquire integrated-CUDA admission before the cache lock for transfer entry points."""
+    synchronized_method = synchronized(method)
+
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with integrated_cuda_admission_lock(self._execution_device):
+            return synchronized_method(self, *args, **kwargs)
+
+    return wrapper
+
+
 def record_activity(method: Callable[..., Any]) -> Callable[..., Any]:
     """A decorator that records activity after a method completes successfully.
 
@@ -2400,7 +2412,7 @@ class ModelCache:
             self._delete_cache_entry(cache_entry)
             raise
 
-    @synchronized
+    @integrated_cuda_synchronized
     def unload_model_from_vram(
         self,
         cache_entry: CacheRecord,
@@ -2569,8 +2581,8 @@ class ModelCache:
         #    that most OSes have some amount of disk caching, which we still benefit from if there is excess memory,
         #    even if we drop models from the cache.)
         #    - On systems without a CUDA device, the upper bound is 32GB.
-        #    - On systems with dedicated CUDA, the upper bound is 1x the amount of VRAM (less the working memory).
-        #      Integrated CUDA uses the host-RAM path because its reported total is shared system memory.
+        #    - On systems with CUDA, the upper bound is 1x the device-reported pool (less working memory).
+        #      For integrated CUDA, that pool is shared with the host and bounds both cache and device use.
         # 3. Absolute minimum of 4GB.
 
         # NOTE(ryand): We explored dynamically adjusting the RAM cache size based on memory pressure (using psutil), but
@@ -2591,8 +2603,16 @@ class ModelCache:
         # so this deliberately does not go through TorchDevice.xpu_mem_get_info(), whose first tier
         # is the context-creating mem_get_info() call.
         total_vram_bytes: int | None = None
-        if self._execution_device.type == "cuda" and device_has_dedicated_vram(self._execution_device):
-            total_vram_bytes = torch.cuda.get_device_properties(self._execution_device).total_memory
+        if self._execution_device.type == "cuda":
+            integrated_cuda = _is_integrated_cuda(self._execution_device)
+            properties = torch.cuda.get_device_properties(self._execution_device)
+            if integrated_cuda:
+                total_vram_bytes = properties.total_memory
+                if self._max_vram_cache_size_gb is not None:
+                    total_vram_bytes = min(total_vram_bytes, int(self._max_vram_cache_size_gb * GB))
+                    return max(total_vram_bytes - int(self._execution_device_working_mem_gb * GB), 0)
+                return max(total_vram_bytes - int(self._execution_device_working_mem_gb * GB), MIN_RAM_CACHE_BYTES)
+            total_vram_bytes = properties.total_memory
         elif self._execution_device.type == "xpu" and device_has_dedicated_vram(self._execution_device):
             # A total of 0 means "unknown" (the device couldn't report total_memory). Treat it like
             # the CPU case (None) so the RAM heuristic below doesn't compute a negative cache cap.
@@ -2745,7 +2765,11 @@ class ModelCache:
                 continue
             if integrated_cuda:
                 # UMA CPU-resident weights still consume the same physical pool as CUDA allocations.
-                cache_entry_bytes_freed = cache_entry.cached_model.total_bytes()
+                cache_entry_bytes_freed = 0
+                if cache_entry.cached_model.cur_vram_bytes() > 0:
+                    cache_entry_bytes_freed = self._move_model_to_ram(
+                        cache_entry, cache_entry.cached_model.cur_vram_bytes()
+                    )
                 self._delete_cache_entry(cache_entry)
                 del cache_entry
                 models_cleared += 1
@@ -3134,6 +3158,11 @@ class ModelCache:
         # itself idempotent, but the budget debit is not).
         if self._cached_models.get(cache_entry.key) is not cache_entry:
             return
+        if cache_entry.live_handles:
+            cache_entry.detached = True
+            self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
+            del self._cached_models[cache_entry.key]
+            return
         # Armed or not: the weights may die during a later calibration window.
         probe.dropped(self, cache_entry)
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
@@ -3147,6 +3176,24 @@ class ModelCache:
         # released via the store above). Captured before release_shared_weights() flips the flag.
         if self._ram_budget is not None and not uses_shared:
             self._ram_budget.remove_non_shared(total_bytes, cache=self)
+
+    def _register_loaded_model_handle(self, cache_entry: CacheRecord, handle: Any) -> bool:
+        if not _is_integrated_cuda(self._execution_device):
+            return False
+        cache_entry.live_handles.add(handle)
+        return True
+
+    def _release_loaded_model_handle(self, cache_entry: CacheRecord) -> None:
+        with self._lock:
+            if not cache_entry.detached or any(cache_entry.live_handles):
+                return
+            cache_entry.detached = False
+            probe.dropped(self, cache_entry)
+            uses_shared = cache_entry.cached_model.uses_shared_weights
+            total_bytes = cache_entry.cached_model.total_bytes()
+            cache_entry.cached_model.release_shared_weights()
+            if self._ram_budget is not None and not uses_shared:
+                self._ram_budget.remove_non_shared(total_bytes, cache=self)
 
     def _notify_models_cleared(
         self,
@@ -3233,7 +3280,7 @@ class ModelCache:
             TorchDevice.empty_cache()
         return len(dropped)
 
-    @synchronized
+    @integrated_cuda_synchronized
     def make_room_in_vram(self, vram_bytes_needed: int, working_mem_bytes: Optional[int] = None) -> int:
         """Offload unlocked models from VRAM to RAM until `vram_bytes_needed` bytes are free on the execution device.
 
@@ -3268,7 +3315,7 @@ class ModelCache:
         self._offload_unlocked_models(vram_bytes_needed, vram_available_fn=vram_available)
         return vram_available()
 
-    @synchronized
+    @integrated_cuda_synchronized
     def offload_model_from_vram(self, model_key: str) -> int:
         """Move a model (and its submodels) from VRAM to RAM without dropping it from the cache.
 
@@ -3282,7 +3329,7 @@ class ModelCache:
         prefix = f"{model_key}:"
         return self._offload_entries_from_vram(lambda key: key == model_key or key.startswith(prefix))
 
-    @synchronized
+    @integrated_cuda_synchronized
     def offload_models_from_vram_except(self, keep_model_keys: Collection[str]) -> int:
         """Move every model whose key is not in `keep_model_keys` from VRAM to RAM, keeping it cached.
 
@@ -3300,7 +3347,7 @@ class ModelCache:
         keep = set(keep_model_keys)
         return self._offload_entries_from_vram(lambda key: key.split(":", 1)[0] not in keep)
 
-    @synchronized
+    @integrated_cuda_synchronized
     def offload_unlocked_models_from_vram(self, keep_cache_keys: Collection[str] = ()) -> int:
         """Move every unlocked entry but those in `keep_cache_keys` from VRAM to RAM whole, keeping it cached.
 

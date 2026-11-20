@@ -67,6 +67,7 @@ def test_integrated_cuda_cache_cap_is_clamped_by_host_headroom(monkeypatch: pyte
         monkeypatch.setattr(model_cache_module, "_is_integrated_cuda", lambda _device: True)
         monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 80 * GB))
         monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 10 * GB)
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
 
         assert cache._get_vram_available(0) == pytest.approx(69.9 * GB)
     finally:
@@ -94,6 +95,7 @@ def test_integrated_cuda_physical_and_cache_availability_share_host_headroom(
         monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: False)
         monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 13 * GB))
         monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 3 * GB)
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
         working = 2 * GB
 
         expected_cache = (8.0 if cap_gb is None else 3.0) * GB
@@ -112,6 +114,7 @@ def test_integrated_cuda_reserve_decision_uses_host_headroom(monkeypatch: pytest
         monkeypatch.setattr(model_cache_module, "device_has_dedicated_vram", lambda _device: False)
         monkeypatch.setattr(TorchDevice, "memory_available_to_process", classmethod(lambda _cls, _device: 13 * GB))
         monkeypatch.setattr(cache, "_get_vram_in_use", lambda: 3 * GB)
+        monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
         monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda *_: pytest.fail("CUDA free used")))
         monkeypatch.setattr(cache, "_get_reclaimable_allocator_bytes", lambda: 0)
         monkeypatch.setattr(TorchDevice, "empty_cache", classmethod(lambda _cls, force=False: calls.append(force)))

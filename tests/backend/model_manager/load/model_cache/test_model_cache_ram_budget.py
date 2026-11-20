@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, call, patch
 import pytest
 import torch
 
+from invokeai.app.services.model_manager.model_manager_default import _calc_global_ram_budget_bytes
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
@@ -2532,6 +2533,26 @@ def test_headroom_clamps_summed_multi_gpu_budget():
     clamped = min(summed, headroom)
     assert clamped == headroom < summed
     assert clamped == 46 * GB
+
+
+def test_integrated_only_global_budget_does_not_sum_shared_pools():
+    caches = [
+        MagicMock(execution_device="cuda:0", local_ram_cache_size_bytes=7 * GB),
+        MagicMock(execution_device="cuda:1", local_ram_cache_size_bytes=7 * GB),
+    ]
+    with patch("invokeai.app.services.model_manager.model_manager_default._is_integrated_cuda", return_value=True):
+        assert _calc_global_ram_budget_bytes(caches, None, 46 * GB) == 7 * GB
+
+
+def test_global_budget_keeps_explicit_cap_and_mixed_devices_conservative():
+    integrated = MagicMock(execution_device="cuda:0", local_ram_cache_size_bytes=7 * GB)
+    dedicated = MagicMock(execution_device="cuda:1", local_ram_cache_size_bytes=20 * GB)
+    with patch(
+        "invokeai.app.services.model_manager.model_manager_default._is_integrated_cuda",
+        side_effect=lambda device: device == "cuda:0",
+    ):
+        assert _calc_global_ram_budget_bytes([integrated, dedicated], None, 10 * GB) == 10 * GB
+        assert _calc_global_ram_budget_bytes([integrated, dedicated], 5.0, 10 * GB) == 5 * GB
 
 
 def test_cache_stats_reflect_shared_global_budget(mock_logger):

@@ -78,6 +78,11 @@ class LoadedModelWithoutConfig:
         # reference — its hold is released on the first lock (_end_first_use_window) or, if this
         # wrapper is dropped un-entered, by the claim's own finalizer when it dies with us.
         self._first_use_claim = first_use_claim
+        if cache is not None and hasattr(cache, "_register_loaded_model_handle"):
+            registered = cache._register_loaded_model_handle(cache_record, self)
+            if registered:
+                handle_finalizer = finalize(self, cache._release_loaded_model_handle, cache_record)
+                handle_finalizer.atexit = False
         # Fallback for a record obtained through plain get() (or by a caller that could not get a
         # claim): arm the hold here instead. The instructions between that get() returning and
         # this constructor are then unshielded — an eviction landing exactly there is the
@@ -354,12 +359,13 @@ class LoadedModelWithoutConfig:
         alive while unloading; the cache entry can be evicted independently.
         Full-load-only entries ignore the requested byte count and unload all weights.
         """
-        with MODEL_LOAD_LOCK.read_lock():
-            return self._cache.unload_model_from_vram(
-                self._cache_record,
-                vram_bytes_to_free,
-                keep_required_weights_in_vram=keep_required_weights_in_vram,
-            )
+        with integrated_cuda_admission_lock(self.compute_device):
+            with MODEL_LOAD_LOCK.read_lock():
+                return self._cache.unload_model_from_vram(
+                    self._cache_record,
+                    vram_bytes_to_free,
+                    keep_required_weights_in_vram=keep_required_weights_in_vram,
+                )
 
 
 class LoadedModel(LoadedModelWithoutConfig):

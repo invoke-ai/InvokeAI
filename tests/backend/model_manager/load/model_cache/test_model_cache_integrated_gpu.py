@@ -6,7 +6,9 @@ on so device residency remains bounded. Both are driven through `put()` with the
 integrated-GPU probe stubbed, so no Intel hardware is required.
 """
 
+import gc
 import logging
+import threading
 from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -14,13 +16,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 import torch
 
+from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_only_full_load import (
     CachedModelOnlyFullLoad,
 )
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache, integrated_cuda_admission_lock
+from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
@@ -90,6 +94,7 @@ def _make_cuda_cache(
     enable_partial_loading: bool = False,
     keep_ram_copy: bool = True,
     max_vram_cache_size_gb: float | None = None,
+    ram_budget: RamBudget | None = None,
 ) -> ModelCache:
     with _patch_integrated_cuda():
         return ModelCache(
@@ -101,6 +106,7 @@ def _make_cuda_cache(
             storage_device="cpu",
             logger=logger,
             shared_cpu_weights=None,
+            ram_budget=ram_budget,
         )
 
 
@@ -270,6 +276,26 @@ def test_full_load_without_a_ram_copy_moves_weights_instead_of_copying():
     assert {id(p) for p in dropped.model.parameters()} == before
 
 
+def test_native_integrated_cuda_ram_capacity_uses_shared_pool(mock_logger: MagicMock):
+    with patch("invokeai.backend.model_manager.load.model_cache.model_cache.psutil.virtual_memory") as virtual_memory:
+        virtual_memory.return_value.total = 128 * 2**30
+        cache = _make_cuda_cache(mock_logger)
+    try:
+        assert cache.local_ram_cache_size_bytes == 7 * 2**30
+    finally:
+        cache.shutdown()
+
+
+def test_native_integrated_cuda_ram_capacity_honors_vram_cap(mock_logger: MagicMock):
+    with patch("invokeai.backend.model_manager.load.model_cache.model_cache.psutil.virtual_memory") as virtual_memory:
+        virtual_memory.return_value.total = 128 * 2**30
+        cache = _make_cuda_cache(mock_logger, max_vram_cache_size_gb=4.0)
+    try:
+        assert cache.local_ram_cache_size_bytes == 3 * 2**30
+    finally:
+        cache.shutdown()
+
+
 def _entry(cache: ModelCache, key: str):
     return cache._cached_models[key]
 
@@ -396,6 +422,97 @@ def test_integrated_cuda_pressure_drops_idle_model(mock_logger: MagicMock):
         cache.shutdown()
 
 
+def test_integrated_cuda_eviction_unloads_model_held_by_stale_handle(mock_logger: MagicMock):
+    budget = RamBudget(max_bytes=2**30, shared_store=None)
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False, ram_budget=budget)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            entry.cached_model._is_in_vram = True
+            model_bytes = entry.cached_model.total_bytes()
+            with patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN):
+                cache._offload_unlocked_models(model_bytes, vram_available_fn=lambda: 0)
+        assert "m" not in cache._cached_models
+        assert loaded.resident_weight_bytes == 0
+        assert cache._get_ram_in_use() == entry.cached_model.total_bytes()
+        assert budget.total_in_use() == entry.cached_model.total_bytes()
+        assert entry.detached
+        del loaded, entry
+        gc.collect()
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_cpu_only_entry_keeps_budget_while_handle_lives(mock_logger: MagicMock):
+    budget = RamBudget(max_bytes=2**30, shared_store=None)
+    cache = _make_cuda_cache(mock_logger, keep_ram_copy=False, ram_budget=budget)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            entry.cached_model._compute_device = torch.device("cpu")
+            loaded = LoadedModelWithoutConfig(entry, cache)
+            loaded._end_first_use_window()
+            entry.awaiting_first_use = False
+            model_bytes = entry.cached_model.total_bytes()
+            cache._offload_unlocked_models(model_bytes, vram_available_fn=lambda: 0)
+        assert "m" not in cache._cached_models
+        assert budget.total_in_use() == model_bytes
+        del loaded, entry
+        gc.collect()
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_eviction_credits_actual_partial_residency(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger, enable_partial_loading=True, keep_ram_copy=False)
+    try:
+        with _patch_integrated_cuda():
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            entry.awaiting_first_use = False
+            total_bytes = entry.cached_model.total_bytes()
+            resident_bytes = total_bytes // 2
+            entry.cached_model.cur_vram_bytes = lambda: resident_bytes  # type: ignore[method-assign]
+            with (
+                patch.object(cache, "_move_model_to_ram", return_value=resident_bytes),
+                patch.object(cache, "_notify_models_cleared") as notify,
+                patch.object(TorchDevice, "empty_cache", return_value=EmptyCacheOutcome.RAN),
+            ):
+                assert cache._offload_unlocked_models(total_bytes, vram_available_fn=lambda: 0) == resident_bytes
+        notify.assert_called_once_with(
+            models_cleared=1,
+            bytes_requested=total_bytes,
+            bytes_freed=resident_bytes,
+            cumulative_stats=True,
+        )
+    finally:
+        cache.shutdown()
+
+
+def test_integrated_cuda_public_offload_waits_for_admission(mock_logger: MagicMock):
+    cache = _make_cuda_cache(mock_logger)
+    entered = threading.Event()
+    finished = threading.Event()
+    try:
+        with _patch_integrated_cuda(), integrated_cuda_admission_lock(torch.device("cuda:0")):
+            cache._offload_entries_from_vram = MagicMock(side_effect=lambda _select: entered.set())  # type: ignore[method-assign]
+            thread = threading.Thread(target=lambda: (cache.offload_models_from_vram_except(set()), finished.set()))
+            thread.start()
+            assert not entered.wait(timeout=0.1)
+        assert entered.wait(timeout=2)
+        assert finished.wait(timeout=2)
+        thread.join(timeout=2)
+    finally:
+        cache.shutdown()
+
+
 def test_integrated_cuda_pressure_preserves_locked_and_first_use_entries(mock_logger: MagicMock):
     cache = _make_cuda_cache(mock_logger, keep_ram_copy=False)
     try:
@@ -442,7 +559,7 @@ def test_integrated_cuda_pressure_batches_cleanup_and_drops_cpu_resident_entries
         notify.assert_called_once_with(
             models_cleared=2,
             bytes_requested=bytes_requested,
-            bytes_freed=bytes_requested,
+            bytes_freed=cuda_entry.cached_model.total_bytes(),
             cumulative_stats=True,
         )
         collect.assert_called_once()
