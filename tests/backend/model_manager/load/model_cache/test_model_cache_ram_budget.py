@@ -102,6 +102,41 @@ def test_shared_model_counts_once_in_global_budget(mock_logger):
         cache_b.shutdown()
 
 
+def test_matching_put_releases_pin_if_injection_fails_after_peer_eviction(mock_logger, monkeypatch):
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=8 * 8 * 4, shared_store=store)
+    source = _make_cache(store, budget, mock_logger)
+    dest = _make_cache(store, budget, mock_logger)
+    try:
+        source.put("m", torch.nn.Linear(8, 8, bias=False))
+        _use_and_release(source, "m")
+        canonical = store.peek("m")
+        assert canonical is not None
+        adopted = torch.nn.Linear(8, 8, bias=False)
+        adopted.load_state_dict(canonical, assign=True)
+
+        # Even a zero-byte reservation must attempt eviction when the budget is over its cap.
+        budget.add_non_shared(1)
+
+        def fail_injection(model):
+            with pytest.raises(IndexError):
+                source.get("m")
+            assert store.peek("m") is canonical
+            raise RuntimeError("custom-layer injection failed")
+
+        monkeypatch.setattr(model_cache_module, "apply_custom_layers_to_model", fail_injection)
+        with pytest.raises(RuntimeError, match="custom-layer injection failed"):
+            dest.put("m", adopted)
+
+        with pytest.raises(IndexError):
+            dest.get("m")
+        assert store.peek("m") is None
+        assert budget.total_in_use() == 1
+    finally:
+        source.shutdown()
+        dest.shutdown()
+
+
 def _collect_until(predicate, attempts: int = 5) -> bool:
     """gc.collect() until predicate() holds - finalizer chains can need more than one pass."""
     for _ in range(attempts):
