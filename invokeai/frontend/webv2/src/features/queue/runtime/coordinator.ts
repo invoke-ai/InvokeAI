@@ -38,6 +38,8 @@ import { createLogger } from '@platform/logging/logger';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 
+import { parseRemoteModelTransferProgress } from './remoteModelTransferToasts';
+
 const GALLERY_REFRESH_COALESCE_MS = 400;
 const SAFETY_SWEEP_INTERVAL_MS = 30_000;
 const coordinatorLogger = createLogger({ area: 'coordinator', namespace: 'queue' });
@@ -854,6 +856,11 @@ export const createQueueCoordinator = (
 
   const handleProgress = (event: InvocationProgressEvent): void => {
     if (!isActive()) {
+      return;
+    }
+
+    // Transfer notifications are handled separately from generation progress.
+    if (parseRemoteModelTransferProgress(event.message)) {
       return;
     }
 

@@ -100,16 +100,28 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       exportProject,
       gallery: {
         ...gallery,
-        selectItem: (item, selectionPage) =>
-          selectionPage === undefined ? gallery.selectItem(item) : gallery.selectItem(item, undefined, selectionPage),
-        setItemMultiSelection: (itemKeys, primaryItem, selectionPage) =>
-          selectionPage === undefined
+        selectItem: (item, selectionPage) => {
+          livePreview.showSaved();
+          return selectionPage === undefined
+            ? gallery.selectItem(item)
+            : gallery.selectItem(item, undefined, selectionPage);
+        },
+        selectImage: (image) => {
+          livePreview.showSaved();
+          gallery.selectImage(image);
+        },
+        setItemMultiSelection: (itemKeys, primaryItem, selectionPage) => {
+          livePreview.showSaved();
+          return selectionPage === undefined
             ? gallery.setItemMultiSelection(itemKeys, primaryItem)
-            : gallery.setItemMultiSelection(itemKeys, primaryItem, undefined, selectionPage),
-        toggleItemSelection: (item, nextPrimaryItem, selectionPage) =>
-          selectionPage === undefined
+            : gallery.setItemMultiSelection(itemKeys, primaryItem, undefined, selectionPage);
+        },
+        toggleItemSelection: (item, nextPrimaryItem, selectionPage) => {
+          livePreview.showSaved();
+          return selectionPage === undefined
             ? gallery.toggleItemSelection(item, nextPrimaryItem)
-            : gallery.toggleItemSelection(item, nextPrimaryItem, undefined, selectionPage),
+            : gallery.toggleItemSelection(item, nextPrimaryItem, undefined, selectionPage);
+        },
         updateSettings: (settings, targetProjectId) => {
           if (!isAccountScopeCurrent(accountScope)) {
             return;

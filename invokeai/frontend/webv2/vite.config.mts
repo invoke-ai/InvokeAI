@@ -147,6 +147,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
   '/workbench/widgets/layers/layerTypeIcon.ts',
   '/platform/ui/ScrollableMenuContent.tsx',
+  // The boot progress rail and lazy Queue UI share this hook; avoid a standalone editor startup chunk.
+  '/workbench/queue-integration/useActiveQueueProgress.ts',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
   '/features/generation/core/prompt/attention.ts',
@@ -228,8 +230,13 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/features/queue/data/progressImageStore.ts',
   '/features/queue/data/progressStore.ts',
   '/features/queue/data/realtimeRuntime.ts',
+  // The submission-time Remote Workers graph belongs with the eager queue runtime, not its own request.
+  '/features/queue/data/remoteWorkersGraphContract.ts',
+  '/features/queue/data/remoteWorkersGraph.ts',
+  '/features/queue/data/remoteWorkersStore.ts',
   '/features/queue/publicApi.ts',
   '/features/queue/runtime.ts',
+  '/features/queue/runtime/remoteModelTransferToasts.ts',
   '/features/queue/runtime/cancelRequests.ts',
   '/features/queue/runtime/coordinator.ts',
   '/features/queue/runtime/deliveryClaims.ts',

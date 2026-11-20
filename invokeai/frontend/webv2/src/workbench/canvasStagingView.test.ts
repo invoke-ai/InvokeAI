@@ -142,7 +142,7 @@ describe('canvas staging view', () => {
     expect(getCanvasQueuePlaceholderSlots(canvas, queueItems)).toEqual([
       { ...placeholder('q-pending', 1), height: 384, width: 640, x: 8, y: 9 },
       { ...placeholder('q-pending', 2), height: 384, width: 640, x: 8, y: 9 },
-      { ...placeholder('q-running', 3), height: 256, width: 512, x: 1, y: 2 },
+      { ...placeholder('q-running', 3), backendItemId: 13, height: 256, width: 512, x: 1, y: 2 },
     ]);
     expect(canvas.stagingArea.pendingImages).toEqual([]);
   });
@@ -223,6 +223,11 @@ describe('canvas staging view', () => {
           : `placeholder:${slot.queueItemId}:${slot.itemIndex}`
       )
     ).toEqual(['candidate:q-first:1', 'placeholder:q-first:2', 'placeholder:q-second:1']);
+    expect(
+      getCanvasStagingSlots(canvas, queueItems).flatMap((slot) =>
+        slot.kind === 'placeholder' ? [slot.backendItemId] : []
+      )
+    ).toEqual([12, undefined]);
   });
 
   it('places a candidate at its placement and a placeholder at its submitted rect, wherever the bbox is now', () => {

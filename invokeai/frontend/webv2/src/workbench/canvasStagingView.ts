@@ -5,6 +5,7 @@ import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '
 
 /** A result still generating. `x`/`y`/`width`/`height` are where it lands: the rect its run was submitted with. */
 export interface CanvasQueuePlaceholderSlot {
+  backendItemId?: number;
   height: number;
   id: string;
   itemIndex: number;
@@ -107,13 +108,17 @@ const createCandidateSlot = (candidate: CanvasStagingCandidateContract, itemInde
   width: candidate.width,
 });
 
-const createPlaceholderSlot = (item: QueueItem, itemIndex: number): CanvasQueuePlaceholderSlot => ({
-  ...getSubmittedRect(item),
-  id: `${item.id}:${itemIndex - 1}`,
-  itemIndex,
-  kind: 'placeholder',
-  queueItemId: item.id,
-});
+const createPlaceholderSlot = (item: QueueItem, itemIndex: number): CanvasQueuePlaceholderSlot => {
+  const backendItemId = item.backendItemIds?.[itemIndex - 1];
+  return {
+    ...getSubmittedRect(item),
+    ...(backendItemId === undefined ? {} : { backendItemId }),
+    id: `${item.id}:${itemIndex - 1}`,
+    itemIndex,
+    kind: 'placeholder',
+    queueItemId: item.id,
+  };
+};
 
 /** Where a slot's result lands in document space: a candidate's placement, a placeholder's submitted rect. */
 export const getCanvasStagingSlotRect = (slot: CanvasStagingSlot): Rect =>
