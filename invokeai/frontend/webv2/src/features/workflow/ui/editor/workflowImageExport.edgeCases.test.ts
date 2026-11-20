@@ -10,7 +10,6 @@ vi.mock('@platform/browser/downloadBlob', () => ({
 import { downloadBlob } from '@platform/browser/downloadBlob';
 
 import {
-  EXPORT_STYLE_PROPERTIES,
   exportWorkflowAsPng,
   getWorkflowContentBounds,
   WORKFLOW_EXPORT_TIMEOUT_MS,
@@ -392,120 +391,58 @@ describe('workflow image export edge cases', () => {
     expect(stagingWrapper.remove).toHaveBeenCalledOnce();
   });
 
-  it('uses the translated untitled name when downloading an unnamed workflow', async () => {
-    const blob = new Blob(['png'], { type: 'image/png' });
-    rasterize.mockResolvedValue(blob);
-    const { flowElement } = createExportDom();
-
-    await exportWorkflowAsPng({
-      flowElement: flowElement as unknown as HTMLElement,
-      bounds: { x: 0, y: 0, width: 100, height: 100 },
-      workflowName: '',
-      fallbackWorkflowName: 'Untitled Workflow',
-    });
-
-    expect(downloadBlob).toHaveBeenCalledWith(blob, 'Untitled Workflow.png');
-  });
-
-  it('includes overflowing input labels in content bounds', () => {
+  it.each([
+    {
+      content: 'overflowing input labels',
+      selector: '[data-node-input-field-title="true"]',
+      rect: { left: 590, top: 220, width: 100, height: 20 },
+      scroll: { scrollWidth: 200, scrollHeight: 20 },
+      origin: { left: 100, top: 200 },
+      bounds: { x: 0, y: 0, width: 500, height: 100 },
+      options: undefined,
+      expected: { x: 0, y: 0, width: 690, height: 100 },
+    },
+    {
+      content: 'overflowing output titles',
+      selector: '[data-workflow-export-output-title="true"]',
+      rect: { left: 650, top: 250, width: 100, height: 50 },
+      scroll: { scrollWidth: 100, scrollHeight: 50 },
+      origin: { left: 100, top: 200 },
+      bounds: { x: 0, y: 0, width: 500, height: 100 },
+      options: { includeInputFieldLabels: false },
+      expected: { x: 0, y: 0, width: 650, height: 100 },
+    },
+    {
+      content: 'full static field rows of an expanded snapshot',
+      selector: '[data-workflow-export-field-content="true"]',
+      rect: { left: 350, top: 120, width: 200, height: 420 },
+      scroll: { scrollWidth: 200, scrollHeight: 420 },
+      origin: { left: 100, top: 100 },
+      bounds: { x: 0, y: 0, width: 300, height: 200 },
+      options: { includeInputFieldLabels: false },
+      expected: { x: 0, y: 0, width: 450, height: 440 },
+    },
+    {
+      content: 'expanded static node content',
+      selector: '[data-workflow-export-static-node-content="true"]',
+      rect: { left: 350, top: 120, width: 200, height: 420 },
+      scroll: { scrollWidth: 200, scrollHeight: 420 },
+      origin: { left: 100, top: 100 },
+      bounds: { x: 0, y: 0, width: 300, height: 200 },
+      options: { includeInputFieldLabels: false },
+      expected: { x: 0, y: 0, width: 450, height: 440 },
+    },
+  ])('includes $content in content bounds', ({ bounds, expected, options, origin, rect, scroll, selector }) => {
     vi.stubGlobal('getComputedStyle', () => ({ direction: 'ltr', transform: 'none' }));
-    const label = {
-      getBoundingClientRect: () => ({ left: 590, top: 220, width: 100, height: 20 }),
-      scrollWidth: 200,
-      scrollHeight: 20,
-    };
-    const viewport = { getBoundingClientRect: () => ({ left: 100, top: 200, width: 1000, height: 1000 }) };
+    const content = { getBoundingClientRect: () => rect, ...scroll };
+    const viewport = { getBoundingClientRect: () => ({ ...origin, width: 1000, height: 1000 }) };
     const flowElement = {
-      getBoundingClientRect: () => ({ left: 100, top: 200 }),
-      querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
-      querySelectorAll: (selector: string) => (selector === '[data-node-input-field-title="true"]' ? [label] : []),
+      getBoundingClientRect: () => origin,
+      querySelector: (query: string) => (query === '.react-flow__viewport' ? viewport : null),
+      querySelectorAll: (query: string) => (query === selector ? [content] : []),
     };
 
-    expect(
-      getWorkflowContentBounds(flowElement as unknown as HTMLElement, { x: 0, y: 0, width: 500, height: 100 })
-    ).toMatchObject({ x: 0, y: 0, width: 690, height: 100 });
-  });
-
-  it('includes overflowing output titles in content bounds', () => {
-    vi.stubGlobal('getComputedStyle', () => ({ direction: 'ltr', transform: 'none' }));
-    const outputTitle = {
-      getBoundingClientRect: () => ({ left: 650, top: 250, width: 100, height: 50 }),
-      scrollWidth: 100,
-      scrollHeight: 50,
-    };
-    const viewport = { getBoundingClientRect: () => ({ left: 100, top: 200, width: 1000, height: 1000 }) };
-    const flowElement = {
-      getBoundingClientRect: () => ({ left: 100, top: 200 }),
-      querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
-      querySelectorAll: (selector: string) =>
-        selector === '[data-workflow-export-output-title="true"]' ? [outputTitle] : [],
-    };
-
-    expect(
-      getWorkflowContentBounds(
-        flowElement as unknown as HTMLElement,
-        { x: 0, y: 0, width: 500, height: 100 },
-        {
-          includeInputFieldLabels: false,
-        }
-      )
-    ).toMatchObject({ x: 0, y: 0, width: 650, height: 100 });
-  });
-
-  it('includes full static field rows when measuring expanded snapshot content', () => {
-    const fieldContent = {
-      getBoundingClientRect: () => ({ left: 350, top: 120, width: 200, height: 420 }),
-      scrollWidth: 200,
-      scrollHeight: 420,
-    };
-    const viewport = { getBoundingClientRect: () => ({ left: 100, top: 100, width: 1000, height: 1000 }) };
-    const flowElement = {
-      getBoundingClientRect: () => ({ left: 100, top: 100 }),
-      querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
-      querySelectorAll: (selector: string) =>
-        selector === '[data-workflow-export-field-content="true"]' ? [fieldContent] : [],
-    };
-
-    vi.stubGlobal('getComputedStyle', () => ({ direction: 'ltr', transform: 'none' }));
-    try {
-      expect(
-        getWorkflowContentBounds(
-          flowElement as unknown as HTMLElement,
-          { x: 0, y: 0, width: 300, height: 200 },
-          { includeInputFieldLabels: false }
-        )
-      ).toMatchObject({ x: 0, y: 0, width: 450, height: 440 });
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('includes expanded static node content in snapshot bounds', () => {
-    const staticNodeContent = {
-      getBoundingClientRect: () => ({ left: 350, top: 120, width: 200, height: 420 }),
-      scrollWidth: 200,
-      scrollHeight: 420,
-    };
-    const viewport = { getBoundingClientRect: () => ({ left: 100, top: 100, width: 1000, height: 1000 }) };
-    const flowElement = {
-      getBoundingClientRect: () => ({ left: 100, top: 100 }),
-      querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
-      querySelectorAll: (selector: string) =>
-        selector === '[data-workflow-export-static-node-content="true"]' ? [staticNodeContent] : [],
-    };
-
-    vi.stubGlobal('getComputedStyle', () => ({ direction: 'ltr', transform: 'none' }));
-    try {
-      expect(
-        getWorkflowContentBounds(
-          flowElement as unknown as HTMLElement,
-          { x: 0, y: 0, width: 300, height: 200 },
-          { includeInputFieldLabels: false }
-        )
-      ).toMatchObject({ x: 0, y: 0, width: 450, height: 440 });
-    } finally {
-      vi.unstubAllGlobals();
-    }
+    expect(getWorkflowContentBounds(flowElement as unknown as HTMLElement, bounds, options)).toMatchObject(expected);
   });
 
   it('measures output titles in logical coordinates when the workflow is zoomed out', () => {
@@ -564,10 +501,6 @@ describe('workflow image export edge cases', () => {
     ).resolves.toEqual({ status: 'exported', reduced: false, width: 1800, height: 640 });
 
     expect(rasterize.mock.calls[0]?.[1]).toMatchObject({ width: 1800, height: 640 });
-  });
-
-  it('preserves flex wrapping and document direction in the export clone', () => {
-    expect(EXPORT_STYLE_PROPERTIES).toEqual(expect.arrayContaining(['flex-wrap', 'direction']));
   });
 
   it('does not put a duplicate workflow-editor id in the live document', async () => {

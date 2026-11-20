@@ -1,5 +1,3 @@
-/** Cover every supported graph builder explicitly. */
-
 import { describe, expect, it } from 'vitest';
 
 import { isSupportedGenerateBase, SUPPORTED_GENERATE_BASES } from './supportedBases';
@@ -28,7 +26,6 @@ describe('SUPPORTED_GENERATE_BASES', () => {
   });
 
   it('excludes architectures the backend serves but this build cannot generate with', () => {
-    // Refiner/video-only capability rows are not image graph support.
     expect(isSupportedGenerateBase('sdxl-refiner')).toBe(false);
     expect(isSupportedGenerateBase('minimax-h3')).toBe(false);
   });

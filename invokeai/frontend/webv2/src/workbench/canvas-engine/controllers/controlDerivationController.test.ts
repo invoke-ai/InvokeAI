@@ -92,7 +92,6 @@ const createHarness = (
     isLayerSessionHeld: () => fake.sessionHeld,
   });
   const live = (): CanvasControlLayerContract => getDocumentLayer(h.document(), layer.id) as CanvasControlLayerContract;
-  /** Commits `patch` against the live layer, as the coordinator's intents do. */
   const patch = (label: string, change: Partial<CanvasControlLayerContract>, coalesceKey?: string) =>
     controller.commitControlLayerPatch({ coalesceKey, expected: live(), label, next: { ...live(), ...change } });
   const makeDurable = vi.fn(() => Promise.resolve());
@@ -213,7 +212,6 @@ describe('ControlDerivationController.commitControlMap', () => {
     expect(h.history.entries().past).toEqual(['Set control type']);
     expect(h.layers.get('control')?.rect).toEqual(MAP_RECT);
     expect(h.discardPersisted).toHaveBeenCalledWith('control');
-    // The patch routed as a user edit; the background map did not.
     expect(h.committedEdits).toHaveLength(1);
 
     await h.history.undo();
@@ -381,9 +379,7 @@ describe('ControlDerivationController.commitControlMap', () => {
 });
 
 describe('ControlDerivationController pairing record', () => {
-  // The record's before-pixels have no other observable owner once their entry is gone; read it directly.
   const recorded = (h: ReturnType<typeof createHarness>) => h.controller['last'];
-  /** Another owner's step, as a brush stroke or a move would publish. */
   const publishForeignEntry = (h: ReturnType<typeof createHarness>) =>
     h.history.admit(256)!.publish({
       bytes: 256,

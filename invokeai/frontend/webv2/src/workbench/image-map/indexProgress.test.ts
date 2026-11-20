@@ -60,8 +60,7 @@ describe('index progress arithmetic', () => {
   });
 
   it('holds the announced value below full while anything is outstanding', () => {
-    // 99.7% rounds to 100, which tells a screen reader the run is done with
-    // 300 images still queued.
+    // 99.7% rounds to 100, which tells a screen reader the run is done with 300 images still queued.
     expect(getDisplayPercent(counts({ embedded: 99_700, failed: 0, pending: 300, total: 100_000 }))).toBe(99);
     expect(getDisplayPercent(counts({ embedded: 100_000, failed: 0, pending: 0, total: 100_000 }))).toBe(100);
   });
@@ -135,9 +134,8 @@ describe('describeIndexProgress', () => {
   it('states how long the index has stood still, and claims nothing more', () => {
     const stale = describeIndexProgress(counts(), t, STALE_AFTER_MS);
 
-    // Not "paused while the queue is busy": the indexer waiting out a
-    // generation and the indexer having died look identical from here, and
-    // the first is routine, so neither may be asserted.
+    // Not "paused while the queue is busy": the indexer waiting out a generation and the indexer having died look
+    // identical from here, and the first is routine, so neither may be asserted.
     expect(stale.stale).toBe('No progress reported for 2m 00s');
   });
 

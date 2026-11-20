@@ -72,7 +72,6 @@ describe('GeneratedResultController control derivation', () => {
     const replaced = getDocumentLayer(h.document(), 'control');
     expect(replaced).toMatchObject({ controlType: 'depth', detection: null });
     expect(replaced).not.toHaveProperty('original');
-    // Not map-only: the result itself is what a later detection runs on.
     expect(replaced).not.toHaveProperty('filter');
     await h.history.undo();
     expect(getDocumentLayer(h.document(), 'control')).toEqual(derivedControl);

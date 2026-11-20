@@ -650,6 +650,7 @@
         "type": "core_metadata",
         "width": 768,
         "clip_skip": 0,
+        "ref_images": [],
         "strength": 0.6,
         "control_layers": [],
         "controlnets": [],
@@ -976,6 +977,7 @@
         "type": "core_metadata",
         "width": 768,
         "clip_skip": 0,
+        "ref_images": [],
         "control_layers": [],
         "controlnets": [],
         "t2iAdapters": [],
@@ -1625,6 +1627,7 @@
           "hash": "blake3:pup"
         },
         "clip_skip": 0,
+        "ref_images": [],
         "control_layers": [],
         "controlnets": [],
         "t2iAdapters": [],

@@ -8,10 +8,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PersistenceController } from './persistenceController';
 
-/** Debounce timers that never fire, so only a barrier flushes. */
 const idleTimers: BitmapStoreTimers = { clearTimeout: () => undefined, setTimeout: () => 0 };
 
-/** A real bitmap store over two paint layers whose uploads the test resolves. */
 const createPersistence = () => {
   const surface = createTestStubRasterBackend().createSurface(4, 4);
   const sources = new Map<string, CanvasLayerSourceContract>([
@@ -40,7 +38,6 @@ const createPersistence = () => {
       ),
   });
   const controller = new PersistenceController(store);
-  /** Settles every upload started so far. */
   const settleUploads = async (): Promise<void> => {
     await vi.waitFor(() => expect(uploads.length).toBeGreaterThan(0));
     for (const upload of uploads.splice(0)) {

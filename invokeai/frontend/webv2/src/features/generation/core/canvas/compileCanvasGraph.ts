@@ -1,8 +1,4 @@
-/**
- * Pure canvas compiler over uploaded inputs. Resize through the processing grid and restore the bbox; hosted
- * providers are asked for one of their own sizes, take the bbox composite for edits, and have their result restored
- * to the bbox; reject unsupported modes.
- */
+/** Pure canvas compiler over uploaded inputs: resize through the processing grid, then restore the bbox. */
 
 import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
@@ -61,10 +57,7 @@ import {
 import { type CanvasSize, resolveCanvasProcessingSize } from './canvasProcessingSize';
 import { isAnimaInpaintAdapterModel } from './controlValidation';
 
-/**
- * SD-3, FLUX, FLUX.2, FLUX.3 and MOSS-Image use start = 1 - strength^0.2; MOSS-Image clips its shifted schedule in
- * sigma space like FLUX.2. FLUX Fill always starts at 0; other bases use 1 - strength.
- */
+/** SD-3, FLUX, FLUX.2, FLUX.3 and MOSS-Image start at 1 - strength^0.2; FLUX Fill at 0; others at 1 - strength. */
 const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): number => {
   if (model.base === 'flux' && model.variant === 'dev_fill') {
     return 0;
@@ -88,21 +81,15 @@ const setCanvasDenoisingRange = (
   Object.assign(denoise, getBaseDenoisingRange(settings, model, canvasDenoisingStart(model, strength)));
 };
 
-/** True for the image-referencing modes (everything but pure txt2img). */
 const isImageMode = (mode: CompileCanvasGraphInput['mode']): boolean => mode !== 'txt2img';
 
 const sizesMatch = (left: CanvasSize, right: CanvasSize): boolean =>
   left.width === right.width && left.height === right.height;
 
-/** Whether an Anima inpaint/outpaint graph gets the adapter: it is switched on and picked, and the base is Anima. */
 const hasAnimaInpaintAdapter = (model: GenerateModelConfig, settings: GenerateSettings): boolean =>
   model.base === 'anima' && settings.animaInpaintAdapterEnabled && settings.animaInpaintAdapterModel !== null;
 
-/**
- * The legacy PiD guards (`buildSDXLGraph.ts:192–205`, repeated in the other builders): only the txt2img and img2img
- * graphs decode through PiD, and Scale Before Processing must leave the bbox alone because PiD already decodes at
- * 4× the generation size.
- */
+/** Legacy PiD guards: only txt2img/img2img decode through PiD, and Scale Before Processing must leave the bbox. */
 const getCanvasPidValidationReasons = (input: CompileCanvasGraphInput, processingSize: CanvasSize): string[] => {
   const { bbox, mode, model, settings } = input;
   const reasons: string[] = [];
@@ -192,14 +179,12 @@ export const getCanvasValidationReasons = (input: CompileCanvasGraphInput, proce
     }
   }
 
-  // Inpaint always needs a mask (an active inpaint mask defines the region);
-  // outpaint derives its mask from the raster alpha, so its mask is optional.
+  // Outpaint derives its mask from raster alpha, so only inpaint requires one.
   if (mode === 'inpaint' && !maskImageName) {
     reasons.push('Canvas inpainting requires an inpaint mask.');
   }
 
-  // A layout is built around the global prompt, so regions around a blank one are refused. A mask with pixels in the
-  // bbox has an area to place.
+  // A layout is built around the global prompt, so regions around a blank one are refused.
   const layoutPromptReason = getLayoutPromptRejectionReason({
     base: model.base,
     prompt: getEffectivePrompts(settings).positivePrompt,
@@ -224,7 +209,6 @@ const withProcessingDimensions = (settings: GenerateSettings, processingSize: Ca
 const findMetadataNode = (graph: BackendGraphContract): BackendInvocationContract | undefined =>
   Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
 
-/** Resizes a model-grid processing output back to the bbox's exact final footprint. */
 const resizeCanvasOutputToBbox = (
   graph: BackendGraphContract,
   bbox: CompileCanvasGraphInput['bbox'],
@@ -237,8 +221,7 @@ const resizeCanvasOutputToBbox = (
     return;
   }
 
-  // Retarget PiD Fit's resize so the output is resampled once, straight to the bbox (legacy parity), rather
-  // than through the processing size.
+  // Retarget PiD Fit's resize straight to the bbox so the output is resampled once (legacy parity).
   const terminalResize = graph.nodes.canvas_output;
   if (isPidFit && terminalResize?.type === 'img_resize') {
     terminalResize.width = bbox.width;
@@ -256,12 +239,7 @@ const resizeCanvasOutputToBbox = (
   addEdge(graph, retired, 'image', output, 'image');
 };
 
-/**
- * Hosted nodes return an image collection; restore each image to the bbox with its own provider metadata. A
- * text-to-image result at another aspect ratio is scaled to cover the bbox and center-cropped, never stretched.
- * Scaling before cropping keeps the crop centered when a provider answers at another scale of the requested shape
- * (named sizes such as Gemini's `2K`). An edit result is resized plainly, undoing its init image's resize.
- */
+/** Results at another aspect ratio are cover-scaled and center-cropped, never stretched; edits resize plainly. */
 const restoreExternalCanvasOutputToBbox = (
   graph: BackendGraphContract,
   input: Pick<CompileCanvasGraphInput, 'bbox' | 'destination'> & { mode: 'txt2img' | 'img2img' },
@@ -319,7 +297,6 @@ const resizeExternalInitImage = (graph: BackendGraphContract, imageName: string,
   );
 };
 
-/** Keeps saved-image metadata aligned to the bbox footprint, not the internal processing size. */
 const setCanvasMetadataDimensions = (graph: BackendGraphContract, bbox: CompileCanvasGraphInput['bbox']): void => {
   const metadata = findMetadataNode(graph);
   if (metadata) {
@@ -431,7 +408,6 @@ const addEncodeNode = (
   return encode;
 };
 
-/** Encodes with the VAE the family decodes with and feeds the latents to its denoise. */
 const connectEncode = (family: FamilyGraph, latents: FamilyLatentSpace, encode: BackendInvocationContract): void => {
   addEdge(family.graph, latents.vae.node, latents.vae.field, encode, 'vae');
   addEdge(family.graph, encode, 'latents', family.denoise, 'latents');
@@ -452,7 +428,6 @@ const addInputResizeNode = (
     width: processingSize.width,
   });
 
-/** The family's latent space, for the image modes that encode into it (throws when the family has none). */
 const requireLatents = (family: FamilyGraph, model: GenerateModelConfig): FamilyLatentSpace => {
   if (!family.latents) {
     throw new Error(`Canvas generation is not supported for ${model.name}.`);
@@ -460,7 +435,6 @@ const requireLatents = (family: FamilyGraph, model: GenerateModelConfig): Family
   return family.latents;
 };
 
-/** Grafts the image-to-latents encode path onto a freshly built base graph (img2img). */
 const graftImageToImage = (
   family: FamilyGraph,
   model: GenerateModelConfig,
@@ -471,8 +445,7 @@ const graftImageToImage = (
 ): void => {
   const { graph } = family;
   const latents = requireLatents(family, model);
-  // The source image is encoded at the size the graph denoises at. That is the processing size, except under
-  // native PiD, which denoises at a quarter of it and decodes straight back up (legacy `addPidImageToImageNative`).
+  // Native PiD denoises at a quarter of the processing size (legacy `addPidImageToImageNative`).
   const encodeSize = family.denoiseSize;
   const needsResize = !sizesMatch(bbox, encodeSize);
   const encode = addEncodeNode(graph, latents, model, settings, needsResize ? null : compositeImageName);
@@ -519,11 +492,8 @@ const addInfillNode = (
 };
 
 /**
- * Anima's 4-channel ControlNet-LLLite inpaint adapter: it conditions on the raster image and the region to inpaint
- * (legacy `addInpaint.ts` / `addOutpaint.ts`). The canvas mask is white = keep, the adapter expects white =
- * inpaint, so `img_lerp` with `min: 255, max: 0` inverts it first. The adapter joins the control layers' collector;
- * `anima_denoise` applies each LLLite model once, and control layers admit only 3-channel models, so they never
- * collide.
+ * Anima's LLLite inpaint adapter expects white = inpaint, so `img_lerp` inverts the white = keep canvas mask.
+ * Control layers admit only 3-channel models, so sharing their collector never collides.
  */
 const addAnimaInpaintAdapter = (
   graph: BackendGraphContract,
@@ -567,10 +537,7 @@ const addAnimaInpaintAdapter = (
   }
 };
 
-/**
- * outputOnlyMaskedRegions selects transparent output versus compositing with the original. Returns what the
- * inpaint-conditioned adapters read.
- */
+/** Returns what the inpaint-conditioned adapters read. */
 const graftMaskTail = (
   family: FamilyGraph,
   args: {
@@ -583,7 +550,6 @@ const graftMaskTail = (
     bbox: CompileCanvasGraphInput['bbox'];
     processingSize: CanvasSize;
     gradientImageEdge?: { node: BackendInvocationContract; field: string };
-    /** Either a fixed mask image field or an edge-fed source node. */
     gradientMaskImage?: { image_name: string };
     gradientMaskEdge?: { node: BackendInvocationContract; field: string };
     /** The raster image the inpaint-conditioned adapters read; the composite itself when absent. */
@@ -624,7 +590,6 @@ const graftMaskTail = (
   }
   addEdge(graph, gradientMask, 'denoise_mask', denoise, 'denoise_mask');
 
-  // The image before any noise is added, and the mask the denoise limits itself to, both at processing size.
   const inpaint: CanvasInpaintSources = {
     image: args.adapterImageEdge ?? { image_name: initialImageName },
     mask: args.gradientMaskEdge ?? (args.gradientMaskImage as { image_name: string }),
@@ -689,7 +654,6 @@ const graftMaskTail = (
   return inpaint;
 };
 
-/** Optionally inserts an `img_noise` node before encode; returns the node feeding `i2l.image`. */
 const addNoiseBeforeEncode = (
   graph: BackendGraphContract,
   imageName: string,
@@ -698,7 +662,6 @@ const addNoiseBeforeEncode = (
   noiseMaskSourceNode: BackendInvocationContract | null = null
 ): { imageField?: { image_name: string }; edgeFrom?: BackendInvocationContract } => {
   if (!noiseMaskImageName) {
-    // No noise mask: encode reads the (infilled) initial image directly.
     return imageSourceNode ? { edgeFrom: imageSourceNode } : { imageField: { image_name: imageName } };
   }
   const noise = addNode(graph, {
@@ -720,7 +683,6 @@ const addNoiseBeforeEncode = (
   return { edgeFrom: noise };
 };
 
-/** Grafts the inpaint pipeline (content covers the bbox, an inpaint mask restricts it). */
 const graftInpaint = (
   family: FamilyGraph,
   input: CompileCanvasGraphInput,
@@ -783,7 +745,6 @@ const graftInpaint = (
   return inpaint;
 };
 
-/** Grafts the outpaint pipeline (bbox extends past content / has transparent holes). */
 const graftOutpaint = (
   family: FamilyGraph,
   input: CompileCanvasGraphInput,
@@ -799,7 +760,6 @@ const graftOutpaint = (
 
   setCanvasDenoisingRange(denoise, model, input.settings, strength);
 
-  // Infill the transparent region before encode (legacy `getInfill`).
   const infill = addInfillNode(graph, compositing.infillMethod, compositing);
   const initialResize = needsResize
     ? addInputResizeNode(graph, 'canvas_resize_initial_to_processing', initialImageName, processingSize)
@@ -810,8 +770,7 @@ const graftOutpaint = (
     infill.image = { image_name: initialImageName };
   }
 
-  // Derive the mask from image alpha (transparent means generate), combining an explicit inpaint mask when
-  // present.
+  // Derive the mask from image alpha (transparent means generate), combining an explicit inpaint mask when present.
   const alphaToMask = addNode(graph, {
     id: 'image_alpha_to_mask',
     image: { image_name: initialImageName },
@@ -883,9 +842,7 @@ interface LayoutRegionElement {
 }
 
 interface AddLayoutRegionsOptions {
-  /** The generation bbox the regions' mask bounds are measured in. */
   bbox: Pick<Rect, 'width' | 'height'>;
-  /** The roles the base distinguishes. */
   layoutKinds: readonly RegionalLayoutKind[];
   regions: readonly RegionalGuidanceInput[];
 }
@@ -921,11 +878,7 @@ const toLayoutElement = (
   };
 };
 
-/**
- * MOSS-Image regions: each becomes a box around its mask, scaled from bbox pixels to the size the denoiser generates
- * (which PiD can shrink below the processing size) and clamped to it. The base graph's `layout_prompt` node assembles
- * them with the global prompt at run time; regions the layout cannot place are left out.
- */
+/** Boxes scale to the denoiser's size (PiD can shrink it); regions the layout cannot place are left out. */
 const addMossImageLayoutRegions = (family: FamilyGraph, options: AddLayoutRegionsOptions): void => {
   const { layoutPrompt } = family;
   if (!layoutPrompt) {
@@ -959,7 +912,6 @@ const toGridBox = (bounds: Rect, bbox: Pick<Rect, 'width' | 'height'>): GridBox 
   return yMax > yMin && xMax > xMin ? [yMin, xMin, yMax, xMax] : null;
 };
 
-/** One element of the `ideogram4_caption_builder` node's `regions` input. */
 interface Ideogram4RegionElement {
   prompt: string;
   bbox: GridBox;
@@ -977,13 +929,7 @@ const toIdeogram4Region = (
   return bbox ? { bbox, prompt } : null;
 };
 
-/**
- * Ideogram 4 regions: each becomes an object element of the structured caption, boxed around its mask. The output is
- * the bbox, resized, so boxes are normalized to the bbox rather than the denoise size. The base graph's
- * `caption_builder` assembles the caption around the global prompt at run time, so batch prompt variation still flows
- * through `positive_prompt`, and core metadata already records its output. Regions the caption cannot place are left
- * out, and without any the graph stays untouched.
- */
+/** Boxes normalize to the bbox, since the output is the resized bbox; `caption_builder` assembles at run time. */
 const addIdeogram4Regions = (family: FamilyGraph, options: AddLayoutRegionsOptions): void => {
   const captionBuilder = family.layoutPrompt;
   if (!captionBuilder) {
@@ -995,7 +941,6 @@ const addIdeogram4Regions = (family: FamilyGraph, options: AddLayoutRegionsOptio
   }
 };
 
-/** One element of the `flux3_layout_prompt` node's `regions` input. */
 interface Flux3RegionElement {
   desc: string;
   bbox: GridBox;
@@ -1011,13 +956,7 @@ const toFlux3Region = (region: RegionalGuidanceInput, options: AddLayoutRegionsO
   return bbox && Math.max(...bbox) > 1 ? { bbox, desc } : null;
 };
 
-/**
- * FLUX.3 regions: each becomes a row of the box table that ends the caption, boxed around its mask and normalized to
- * the bbox like Ideogram 4's. The base graph's `layout_prompt` appends them at run time, as object rows or, when the
- * builder wired reference images, as edit rows for the output; core metadata then records the caption encoded. Regions
- * the table cannot place are left out, and without any the graph stays untouched. With the prompt upsampler on, the
- * `prompt_upsampler` node takes the layout node's place and the same elements.
- */
+/** Normalized to the bbox like Ideogram 4's; with the upsampler on, `prompt_upsampler` replaces the layout node. */
 const addFlux3LayoutRegions = (family: FamilyGraph, options: AddLayoutRegionsOptions): void => {
   const { graph, layoutPrompt } = family;
   if (!layoutPrompt) {
@@ -1035,7 +974,6 @@ const addFlux3LayoutRegions = (family: FamilyGraph, options: AddLayoutRegionsOpt
   }
 };
 
-/** Each layout base places its regions through its own prompt node. */
 const LAYOUT_REGION_GRAFTS: Record<
   LayoutRegionalGuidanceBase,
   (family: FamilyGraph, options: AddLayoutRegionsOptions) => void
@@ -1045,7 +983,6 @@ const LAYOUT_REGION_GRAFTS: Record<
   'moss-image': addMossImageLayoutRegions,
 };
 
-/** Throw the first validation reason. */
 export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanvasGraph => {
   const { bbox, compositeImageName, destination, mode, model, projectSettings, strength } = input;
   const processingSize = resolveCanvasProcessingSize(model, input.settings.pidMode, bbox, input.scaling);
@@ -1060,7 +997,6 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     throw new Error(validationReasons[0]);
   }
 
-  // Canvas outputs are intermediate; gallery outputs are durable.
   const outputIsIntermediate = destination === 'canvas';
   const runtimeProjectSettings = {
     ...projectSettings,
@@ -1073,8 +1009,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
       throw new Error(`${model.name} does not support ${mode}ing on the canvas.`);
     }
 
-    // The provider is asked for the processing size, one of its own sizes, and the returned whole image is restored
-    // to the exact bbox footprint before staging or saving. No local denoising strength applies.
+    // The provider's result is restored to the exact bbox footprint; no local denoising strength applies.
     const backendGraph = buildExternalGraph(
       settings,
       model,
@@ -1109,7 +1044,6 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   const backendGraph = family.graph;
   const { compositing } = input;
 
-  // Validation above guarantees the composite/mask images required per mode.
   let inpaint: CanvasInpaintSources | undefined;
   if (mode === 'img2img') {
     graftImageToImage(family, model, settings, compositeImageName as string, strength, bbox);
@@ -1119,8 +1053,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     inpaint = graftOutpaint(family, input, compositing, processingSize);
   }
 
-  // Every mode accepts already-resolved, separately uploaded control inputs; inpaint and outpaint also hand the
-  // adapters what they regenerate.
+  // Inpaint and outpaint also hand the control adapters what they regenerate.
   if (input.controlLayers && input.controlLayers.length > 0) {
     addControlLayers(backendGraph, {
       base: model.base as SupportedGenerateBase,

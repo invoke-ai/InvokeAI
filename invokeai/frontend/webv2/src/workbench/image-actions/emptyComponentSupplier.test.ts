@@ -17,7 +17,6 @@ import type {
   SupportedGenerateBase,
 } from '@features/generation/core/baseGenerationPolicies';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import {
   getComponentPolicyContext,
   getComponentSectionPolicy,
@@ -33,6 +32,7 @@ import {
 } from '@features/generation/core/graphCoverage.testing';
 import { compileGenerateGraph } from '@features/generation/graph';
 import { getGenerationUiPolicy } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import { generateRecordCases, PROJECT_SETTINGS } from './imageRecordCases.testing';

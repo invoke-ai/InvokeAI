@@ -38,16 +38,9 @@ import {
 export const getUpscaleDenoisingStart = (creativity: number): number => ((creativity * -1 + 10) * 4.99) / 100;
 
 /**
- * The start an index-clipping node needs to enter where a value-clipping one would.
- *
- * Creativity is defined by where FLUX enters: `flux_denoise` clips the schedule by *value*, so a start
- * of 0.499 enters at sigma 0.501 whatever the shift or step count. Z-Image, Anima, Krea-2 and Qwen Image
- * clip by *index* instead, so the same number enters far noisier there -- 0.499 starts Z-Image at sigma
- * 0.78. Given the node's own `sigmas` (`indexClipping.sigmas`), this picks the step `i` whose sigma is
- * nearest `1 - valueStart`. Z-Image and Anima begin at `i = int(start * steps)`, so the start aims at the
- * middle of that step, where float error in the node's product cannot floor it one step short. Krea-2 and
- * Qwen Image round instead, half to even, so their start is the step itself. This goes away when those
- * nodes clip by value; `test_upscale_index_clipped_starts.py` fails when they do.
+ * Creativity is defined by FLUX's value clipping; index-clipping nodes would enter far noisier at the same start.
+ * Floor nodes aim mid-step so float error cannot drop a step; rounding nodes take the step itself.
+ * Obsolete once those nodes clip by value; `test_upscale_index_clipped_starts.py` fails when they do.
  */
 export const getIndexClippedDenoisingStart = (
   valueStart: number,
@@ -91,11 +84,7 @@ export const getUpscaleControlNetValues = (structure: number) => {
   };
 };
 
-/**
- * Z-Image takes one control, not SD's pair. At Structure 0 it sits at the bottom of the adapter's
- * recommended 0.65-0.80 and lets go for the last quarter of the pass, where the detail is drawn;
- * the slider runs it from a light early nudge (0.3, first half) to holding the whole pass at 1.0.
- */
+/** Structure 0 sits at the adapter's recommended 0.65 and releases the last quarter; 1 holds the pass at 1.0. */
 export const getZImageTileControlValues = (structure: number) => ({
   beginStepPercent: 0,
   controlContextScale: 0.65 + structure * 0.035,
@@ -157,42 +146,27 @@ const addUpscaleMetadata = (
   addEdge(graph, metadata, 'metadata', output, 'metadata');
 };
 
-/**
- * Everything the second pass needs, once the frame has been enlarged.
- *
- * The prefix — prompts, seed, Spandrel, unsharp — is identical for every architecture, so it is
- * built once and handed over. What differs is the model loader, the conditioning, the VAE ends and
- * whether anything anchors the pass to the enlarged frame.
- */
+/** The shared prefix (prompts, seed, Spandrel, unsharp) is built once; builders add loader, conditioning and VAE. */
 interface UpscalePathContext {
   graph: BackendGraphContract;
   settings: UpscaleWidgetValues;
   model: MainModelConfig;
-  /** The encoders this main model reads. A field it has no slot for is null here, whatever the widget holds. */
+  /** A field this main model has no slot for is null here, whatever the widget holds. */
   components: ReturnType<typeof activeUpscaleComponents>;
   destination: ResultDestination;
   projectSettings: UpscaleProjectSettings;
   positivePrompt: BackendInvocationContract;
   negativePrompt: BackendInvocationContract;
   seed: BackendInvocationContract;
-  /**
-   * The enlarged image, at whatever size Spandrel produced. That is not always `denoiseSize`: a
-   * model that does not enlarge makes Spandrel ignore the scale. See `fitFrameToDenoiseSize`.
-   */
+  /** Not always `denoiseSize`: Spandrel ignores the scale for a model that does not enlarge. */
   frame: BackendInvocationContract;
-  /** The frame size the second pass will run at, already floored to the architecture's grid. */
   denoiseSize: { width: number; height: number };
-  /** Where the pass starts, already translated into this architecture's denoise node's terms. */
   denoisingStart: number;
 }
 
 interface UpscalePathResult {
-  /** The node whose image is the result; the caller hangs metadata off it. */
   output: BackendInvocationContract;
-  /**
-   * The image the pass encoded, which the result matches in size: Spandrel's frame, or the one
-   * resized to the denoise size. The metadata records its size, so Recall restores the real one.
-   */
+  /** Spandrel's frame or its resize; metadata records its size, so Recall restores the real one. */
   frame: BackendInvocationContract;
   /** Names the pass in the queue, so "multi-diffusion" is not claimed where none runs. */
   title: string;
@@ -200,15 +174,7 @@ interface UpscalePathResult {
 
 type UpscalePathBuilder = (context: UpscalePathContext) => UpscalePathResult;
 
-/**
- * Resize the frame to the size a builder states as a literal on its denoise node.
- *
- * The literal is computed from the scale, but Spandrel ignores the scale for a model that does not
- * enlarge (a 1x restoration model), and it rounds to a multiple of 8 where `flux_denoise` and
- * `z_image_denoise` take multiples of 16. Either way the latents would disagree with the node's size,
- * and the pass would fail -- after the upscale has run. SD needs none of this: its sizes follow the
- * frame through edges.
- */
+/** Spandrel ignores scale for 1x models and rounds to 8 where nodes need 16; a mismatch fails after upscaling. */
 const fitFrameToDenoiseSize = (
   graph: BackendGraphContract,
   frame: BackendInvocationContract,
@@ -375,11 +341,7 @@ const buildSdUpscalePath: UpscalePathBuilder = ({
   return { frame, output, title: `${model.name} multi-diffusion upscale` };
 };
 
-/**
- * FLUX.1 has no tile ControlNet, so the second pass is anchored only by where it starts on the
- * schedule. Both VAE ends tile: the frame handed to `i2l` is the largest in the graph, and an
- * untiled encode of it does not fit on consumer hardware.
- */
+/** No tile ControlNet: anchored only by its start. Both VAE ends tile; an untiled encode exceeds consumer GPUs. */
 const buildFluxUpscalePath: UpscalePathBuilder = ({
   graph,
   settings,
@@ -456,11 +418,7 @@ const buildFluxUpscalePath: UpscalePathBuilder = ({
   return { frame: fitted, output, title: `${model.name} upscale` };
 };
 
-/**
- * FLUX.2 runs the pass whole like FLUX.1, both VAE ends tiled. Klein and [dev] differ in their loader, text
- * encoder and LoRA loader. As in Generate, CFG stays off and the slider drives the guidance [dev] is distilled
- * on; Klein ignores it.
- */
+/** As in Generate, CFG stays off and the slider drives [dev]'s distilled guidance; Klein ignores it. */
 const buildFlux2UpscalePath: UpscalePathBuilder = ({
   graph,
   settings,
@@ -560,12 +518,7 @@ const buildFlux2UpscalePath: UpscalePathBuilder = ({
   return { frame: fitted, output, title: `${model.name} upscale` };
 };
 
-/**
- * Z-Image runs the pass whole like FLUX.1, both VAE ends tiled. Its tile ControlNet is optional: a
- * pass that does not tile has no seams to hold together, so the ControlNet only lets Structure pull
- * the result back toward the enlarged frame. The ControlNet encodes that frame inside the denoise,
- * at the same size as `i2l` does, so it is tiled the same way.
- */
+/** The tile ControlNet is optional (no tiles, no seams); it encodes the frame like `i2l`, so tiles the same way. */
 const buildZImageUpscalePath: UpscalePathBuilder = ({
   graph,
   settings,
@@ -659,11 +612,7 @@ const buildZImageUpscalePath: UpscalePathBuilder = ({
   return { frame: fitted, output, title: `${model.name} upscale` };
 };
 
-/**
- * Anima has no tile ControlNet (only LLLite adapters), so like FLUX.1 the pass is anchored by where
- * it starts. Its decode has no tiling switch: `anima_l2i` tiles on its own once an untiled decode
- * would take most of the card.
- */
+/** No tile ControlNet (only LLLite). `anima_l2i` tiles on its own once an untiled decode would fill the card. */
 const buildAnimaUpscalePath: UpscalePathBuilder = ({
   graph,
   settings,
@@ -740,11 +689,7 @@ const buildAnimaUpscalePath: UpscalePathBuilder = ({
   return { frame: fitted, output, title: `${model.name} upscale` };
 };
 
-/**
- * Krea-2 runs the pass whole like FLUX.1, both VAE ends tiled. It encodes and decodes with the
- * Qwen-Image VAE through that family's nodes, as Generate and Canvas do. `krea2_denoise` picks its own
- * shift, fixed for Turbo and by size for Raw, so the graph sends none.
- */
+/** Uses the Qwen-Image VAE nodes, as Generate does. `krea2_denoise` picks its own shift, so none is sent. */
 const buildKrea2UpscalePath: UpscalePathBuilder = ({
   graph,
   settings,
@@ -820,11 +765,7 @@ const buildKrea2UpscalePath: UpscalePathBuilder = ({
   return { frame: fitted, output, title: `${model.name} upscale` };
 };
 
-/**
- * Qwen Image runs the pass whole like FLUX.1, through the VAE nodes Krea-2 uses, tiled at both ends. The graph
- * sends no shift, so `qwen_image_denoise` keeps its dynamic one, held past 8192 tokens, which is the schedule
- * Creativity is translated against. Validation refuses Edit models, which would run against a blank reference.
- */
+/** No shift is sent, so `qwen_image_denoise` keeps its dynamic one, which Creativity is translated against. */
 const buildQwenImageUpscalePath: UpscalePathBuilder = ({
   graph,
   settings,
@@ -899,11 +840,7 @@ const buildQwenImageUpscalePath: UpscalePathBuilder = ({
   return { frame: fitted, output, title: `${model.name} upscale` };
 };
 
-/**
- * Z-Image's, Anima's, Krea-2's, Qwen Image's and MOSS-Image's text encoders take their encoders on named fields.
- * All but Qwen Image's and MOSS-Image's hand the denoise a collected list; theirs take the one conditioning. The
- * negative branch exists only where the caller decided it is read.
- */
+/** Qwen Image's and MOSS-Image's denoise take one conditioning; the others a collected list. */
 const addPromptConditioning = (
   graph: BackendGraphContract,
   {
@@ -947,10 +884,8 @@ const addPromptConditioning = (
 };
 
 /**
- * MOSS-Image runs the pass whole like FLUX.2, whose VAE it shares: `moss_image_denoise` takes and returns the FLUX.2
- * VAE's raw latent layout, so the FLUX.2 encode and decode nodes, tiled at both ends, work on either side of it. It
- * clips by sigma value like FLUX. It has no LoRA loader and no tile ControlNet, so the pass is anchored only by where
- * it starts. Generate's layout prompt is left out: it only turns a layout draft or canvas regions into the prompt.
+ * `moss_image_denoise` uses the FLUX.2 VAE's raw latent layout, so FLUX.2's tiled encode/decode nodes fit.
+ * Generate's layout prompt is left out: it only compiles layout drafts or canvas regions.
  */
 const buildMossImageUpscalePath: UpscalePathBuilder = ({
   graph,
@@ -998,7 +933,6 @@ const buildMossImageUpscalePath: UpscalePathBuilder = ({
   });
 
   addPromptConditioning(graph, {
-    // The denoise takes the one conditioning, not a collected list.
     collect: false,
     denoise,
     encoderFields: [{ field: 'qwen3_5_encoder', source: modelLoader }],
@@ -1021,10 +955,7 @@ const buildMossImageUpscalePath: UpscalePathBuilder = ({
   return { frame: fitted, output, title: `${model.name} upscale` };
 };
 
-/**
- * Keyed by the same bases as `UPSCALE_ARCHITECTURES`, and `satisfies` makes that a compile error to
- * break: declaring an architecture supported without giving it a builder will not type-check.
- */
+/** `satisfies` makes a supported architecture without a builder a type error. */
 const UPSCALE_PATH_BUILDERS = {
   anima: buildAnimaUpscalePath,
   flux: buildFluxUpscalePath,
@@ -1040,24 +971,15 @@ const UPSCALE_PATH_BUILDERS = {
 export interface ModelOnlyUpscaleRequest {
   image: ImageWithDims;
   upscaleModel: SpandrelModelConfig;
-  /**
-   * A Scale runs the upscaler until it reaches it; `'native'` runs the model once, at its own scale, sized as that Scale
-   * would be when it is recorded and left unsized when it is not.
-   */
+  /** `'native'` runs the model once at its own scale. */
   scale: number | 'native';
   destination: ResultDestination;
-  /** The source image's metadata, copied into the result's; null when the source has none. */
   sourceMetadata: Record<string, unknown> | null;
 }
 
 /**
- * The upscaler alone, with no main model or detail pass: the Upscale widget's Model only mode at its Scale, and the
- * image menu's one-click upscale at one of its factors or the model's native scale.
- *
- * The result carries the source image's metadata, so Recall and Remix restore how the source was made, plus what the
- * upscale did. It sits on the output node as a literal rather than in a `core_metadata` node, which would validate the
- * copied keys against today's fields (an older image's model record fails that) and stamp today's `metadata_version`
- * over the source's.
+ * The upscaler alone. Source metadata sits on the output node as a literal: a `core_metadata` node would
+ * validate old keys against today's fields and overwrite the source's `metadata_version`.
  */
 export const compileModelOnlyUpscaleGraph = ({
   destination,
@@ -1093,8 +1015,7 @@ export const compileModelOnlyUpscaleGraph = ({
     image_to_image_model: toModelIdentifier(upscaleModel),
     is_intermediate: destination === 'canvas',
     metadata,
-    // Matches the Refine graph's first pass, so both modes size a result alike. Only an upscaler of unknown native
-    // scale runs a plain pass: there is no factor to give the autoscale node.
+    // Matches the Refine graph's first pass; only an upscaler of unknown native scale runs a plain pass.
     ...(upscaleScale === null
       ? { type: 'spandrel_image_to_image' }
       : { fit_to_multiple_of_8: true, scale: upscaleScale, type: 'spandrel_image_to_image_autoscale' }),
@@ -1112,10 +1033,7 @@ export const compileModelOnlyUpscaleGraph = ({
   };
 };
 
-/**
- * `sourceMetadata` is read only in Model only mode: the input image's metadata, which that mode copies into the
- * result's.
- */
+/** `sourceMetadata` is read only in Model only mode. */
 export const compileUpscaleGraph = (
   settings: UpscaleWidgetValues,
   destination: ResultDestination,

@@ -24,7 +24,6 @@ import type {
 } from '@features/generation/core/baseGenerationPolicies';
 import type { CompileCanvasGraphInput } from '@features/generation/core/canvas/types';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import {
   getComponentSectionPolicy,
   getFlux2ComponentSource,
@@ -45,8 +44,9 @@ import {
   getGenerationUiPolicy,
   getSchedulerOptions,
   isVaeCompatibleWithGenerateModel,
-  withAddedReferenceImages,
+  addReferenceImages,
 } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { describe, expect, it } from 'vitest';
 
@@ -481,9 +481,13 @@ const VARIATIONS = {
   },
   referenceImages: ({ model, settings }) => {
     const [first, ...rest] = settings.referenceImages;
-    const added = withAddedReferenceImages(model, [], settings.referenceImages, [
-      { id: 'gate-reference', image: REFERENCE_ASSET },
-    ]);
+    const added = addReferenceImages({
+      additions: [{ id: 'gate-reference', image: REFERENCE_ASSET }],
+      mode: 'keep',
+      model,
+      models: [],
+      referenceImages: settings.referenceImages,
+    }).referenceImages;
 
     return first ? [added, [], [{ ...first, isEnabled: !first.isEnabled }, ...rest]] : [added];
   },

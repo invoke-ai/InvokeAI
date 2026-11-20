@@ -326,6 +326,7 @@
         "qwen_image_quantization": "none",
         "qwen_image_shift": "auto",
         "clip_skip": 0,
+        "ref_images": [],
         "strength": 0.6,
         "control_layers": [
           {
@@ -753,6 +754,7 @@
         "qwen_image_quantization": "none",
         "qwen_image_shift": "auto",
         "clip_skip": 0,
+        "ref_images": [],
         "strength": 0.6,
         "control_layers": [
           {
@@ -1226,6 +1228,7 @@
         "qwen_image_quantization": "none",
         "qwen_image_shift": "auto",
         "clip_skip": 0,
+        "ref_images": [],
         "strength": 0.6,
         "control_layers": [
           {
@@ -1602,6 +1605,7 @@
         "qwen_image_quantization": "none",
         "qwen_image_shift": "auto",
         "clip_skip": 0,
+        "ref_images": [],
         "control_layers": [
           {
             "begin_step_percent": 0,

@@ -67,18 +67,14 @@ import { flowThemeCss, getFlowColorMode } from './flowTheme';
 import { formatWorkflowPreviewValue, getWorkflowNodeSummary } from './nodeSummaries';
 
 /**
- * The library preview's graph of a saved workflow document (`buildWorkflowPreviewModel`): compact title chips, opened
- * simplified when anything folds, at a readable zoom. Selecting a node opens a card beside it and lights its
- * connections. Selection and find matches reach nodes and edges through a keyed store, so a change re-renders only the
- * nodes whose emphasis changes; dimming the rest is the container's CSS.
+ * The library preview's graph of a saved workflow. Selection and find matches reach nodes through a keyed store, so a
+ * change re-renders only the nodes whose emphasis changes; dimming the rest is the container's CSS.
  */
 
 export interface WorkflowDocumentGraphHandle {
   /** Closes the node card; false when none was open, so Escape can go on to leave the preview. */
   closeNodeCard: () => boolean;
-  /** Emphasises the nodes matching a title or type id; a blank query clears it. */
   find: (query: string) => void;
-  /** Centres the next match after the current one. */
   revealNextMatch: () => void;
 }
 
@@ -88,25 +84,18 @@ export interface WorkflowDocumentGraphProps {
   model: WorkflowPreviewModel;
   /** The same drawing laid out at other metrics (a wider chip), handed the last such layout to keep what it can. */
   relayout: (metrics: WorkflowPreviewMetrics, previous: WorkflowPreviewModel | null) => WorkflowPreviewModel;
-  /** Nodes with a model requirement this server has not resolved. */
   needsModel: ReadonlySet<string>;
   /** A node to open selected, its card showing (an input's node, from the Inputs view). */
   initialNodeId?: string | null;
-  /**
-   * Whether the initial node's card takes focus (default). A card carried over from a previous drawing takes it only
-   * when focus was lost with that drawing.
-   */
+  /** Defaults to true; a card carried over from a previous drawing takes focus only if focus was lost with it. */
   focusInitialCard?: boolean;
-  /** Hears which node's card is open, as it opens and closes. */
   onCardChange?: (nodeId: string | null) => void;
-  /** Hears how many drawn nodes match the find query, whenever the query or the drawn nodes change. */
   onMatchCountChange?: (count: number) => void;
   /** Where a compiled source's fields were set ("Generate → Steps"); the node card links each to its setting. */
   fieldSources?: WorkflowPreviewFieldSources;
 }
 
 export interface WorkflowPreviewFieldSources {
-  /** The setting a field's value comes from, or null. */
   describe: (nodeId: string, fieldName: string) => string | null;
   /** Goes to the settings; the graph's host closes. */
   onSelect: () => void;
@@ -134,9 +123,7 @@ type PreviewFlowEdge = FlowEdge<PreviewEdgeData, 'preview'>;
 const { nodeHeight: NODE_HEIGHT, pillHeight: PILL_HEIGHT } = WORKFLOW_PREVIEW_METRICS;
 /** A chip's title sits inside 10px of padding and a border of up to 2px on each side. */
 const CHIP_TITLE_INSET = 24;
-/** The smallest a chip's title may appear on screen. */
 const MIN_TITLE_PX = 10;
-/** Chip titles are the `md` size: 0.75rem. */
 const TITLE_REM = 0.75;
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 2;
@@ -145,23 +132,17 @@ const FIT_PADDING = 0.04;
 const ROW_SPREAD_SHARE = 0.6;
 const MAX_ROW_STRETCH = 2.5;
 const MINIMAP_STYLE = { height: 80, margin: 0, position: 'static', width: 128 } as const;
-/** The gap left before the graph's start when it opens at the readable zoom rather than fitted. */
 const START_INSET = 24;
 /** Edges into one chip meet it this far apart, ordered as their sources sit, within a band this tall. */
 const ENTRY_STEP = 6;
 const ENTRY_SPAN = 24;
-/** Between a control and the nodes fitted beside it. */
 const CONTROL_GAP = 8;
 const CARD_WIDTH = 300;
 const CARD_GAP = 12;
 const CARD_MARGIN = 8;
-/**
- * The stage's controls sit over the graph; an open node card sits over them, in the same layer, so its chips and Close
- * are never under a control (it is placed clear of them where it can be).
- */
+/** An open node card shares the controls' layer, so its chips and Close are never under a control. */
 const OVERLAY_Z = 5;
 const CARD_Z = 6;
-/** The height a card is placed for until it has been measured. */
 const CARD_ESTIMATED_HEIGHT = 300;
 const ZOOM_STEP_DURATION = 150;
 const REVEAL_DURATION = 200;
@@ -188,17 +169,13 @@ const getReadableZoom = () => {
 const prefersReducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
 const motion = (duration: number) => (prefersReducedMotion() ? 0 : duration);
 
-/**
- * A node's flow box: its chip. Edges meet the chip's middle, so the pills it stacks above it sit outside the box
- * xyflow measures and draws to.
- */
+/** The chip: edges meet its middle, so the pills stacked above sit outside the box xyflow measures. */
 const getChipBox = (layout: WorkflowPreviewLayout, id: string) => {
   const { x, y } = layout.positions[id] ?? { x: 0, y: 0 };
 
   return { height: NODE_HEIGHT, width: layout.nodeWidth, x, y };
 };
 
-/** What a node takes up on the stage: its chip and the pills above it. */
 const getNodeBox = (layout: WorkflowPreviewLayout, id: string) => {
   const chip = getChipBox(layout, id);
   const pillsHeight = (layout.pills[id]?.length ?? 0) * PILL_HEIGHT;
@@ -226,7 +203,6 @@ const getLayoutBounds = (layout: WorkflowPreviewLayout) => {
     : { height: maxY - minY, width: maxX - minX, x: minX, y: minY };
 };
 
-/** The stage's bands the controls cover: the legend along the top, zoom and the node count along the bottom. */
 interface StageArea {
   width: number;
   height: number;
@@ -234,10 +210,7 @@ interface StageArea {
   bottom: number;
 }
 
-/**
- * The stage, less the bands its controls cover (`[data-preview-overlay]` above or below its middle) and a gap, so a
- * graph fitted or started in what is left never sits under a control.
- */
+/** The stage less the bands its controls cover and a gap, so a fitted graph never sits under a control. */
 const measureStageArea = (stage: HTMLElement): StageArea => {
   const box = stage.getBoundingClientRect();
   let top = 0;
@@ -260,7 +233,6 @@ const measureStageArea = (stage: HTMLElement): StageArea => {
   return { bottom, height: stage.clientHeight, top, width: stage.clientWidth };
 };
 
-/** The whole layout, fitted into the stage's open area. */
 const getFittedViewport = (bounds: ReturnType<typeof getLayoutBounds>, area: StageArea) => {
   const open = Math.max(1, area.height - area.top - area.bottom);
   const fitted = getViewportForBounds(bounds, area.width, open, MIN_ZOOM, 1, FIT_PADDING);
@@ -268,10 +240,7 @@ const getFittedViewport = (bounds: ReturnType<typeof getLayoutBounds>, area: Sta
   return { ...fitted, y: fitted.y + area.top };
 };
 
-/**
- * Fitted when that keeps titles readable; otherwise the readable zoom, starting at the graph's left edge (and its top,
- * when it is also too tall), with the minimap for the rest. Either way clear of the controls.
- */
+/** Fitted when titles stay readable; otherwise the readable zoom from the graph's top-left, with the minimap. */
 const getOpeningViewport = (
   layout: WorkflowPreviewLayout,
   area: StageArea
@@ -369,7 +338,6 @@ const PreviewChip = memo(function PreviewChip({ id, data }: NodeProps<ChipNode>)
   const emphasis = useEmphasis(id);
   const { needsModel, node, pills, summary } = data;
 
-  // The flow node is the chip, so edges meet its middle; the pills stack above it, outside the box xyflow measures.
   return (
     <Box data-emphasis={emphasis} data-preview-node={id} h="full" position="relative" w="full">
       {pills.length > 0 ? (
@@ -570,7 +538,6 @@ const Legend = ({ exposed, needsModel, result }: { exposed: boolean; needsModel:
   );
 };
 
-/** A From or To chip: selects that neighbour and brings it into view. */
 const NeighbourChip = ({
   nodeId,
   title,
@@ -605,16 +572,10 @@ const overlapArea = (a: Rect, b: Rect) =>
   Math.max(0, Math.min(a.left + a.width, b.left + b.width) - Math.max(a.left, b.left)) *
   Math.max(0, Math.min(a.top + a.height, b.top + b.height) - Math.max(a.top, b.top));
 
-/**
- * Covering its own node, even a strip of it (a card clamped into the stage), costs far more than covering the rest: the
- * card describes that node.
- */
+/** Covering its own node, even a strip of it, costs far more than covering the rest. */
 const OWN_NODE_WEIGHT = 50;
 
-/**
- * Where a node's card goes: beside the node, right or left, else below or above it, whichever covers the least of the
- * drawn nodes (its own node most of all) and of the stage's controls, kept inside the stage.
- */
+/** Beside, below or above the node, whichever covers least of the nodes (its own most) and controls, in the stage. */
 const placeCard = (
   layout: WorkflowPreviewLayout,
   nodeId: string,
@@ -669,7 +630,6 @@ const NodeCard = ({
   layout: WorkflowPreviewLayout;
   model: WorkflowPreviewModel;
   needsModel: boolean;
-  /** A node the layout draws. */
   node: WorkflowPreviewNode;
   onClose: () => void;
   onShowNode: (nodeId: string) => void;
@@ -682,8 +642,7 @@ const NodeCard = ({
   const height = useStore((state) => state.height);
   const nodeId = node.id;
   const neighbours = layout.neighbours[nodeId] ?? { sources: [], targets: [] };
-  // Placed for its real height and the controls' boxes once measured (before paint), so a long note does not run over
-  // the node and the card keeps clear of the controls where it can. A live source's new values measure again.
+  // Placed for its measured height and the controls' boxes before paint; a live source's new values measure again.
   const [measured, setMeasured] = useState<{ controls: readonly Rect[]; height: number; nodeId: string } | null>(null);
   const isMeasured = measured?.nodeId === nodeId;
   const { left, top } = placeCard(
@@ -849,10 +808,7 @@ const NodeCard = ({
 
 const StyledMiniMap = chakra(MiniMap);
 
-/**
- * The chip's second line: what the node's type says about its values, else where its model stands, else its first
- * exposed input with a short value. An unknown node shows its type id: as its title when unlabelled, else here.
- */
+/** Type-specific value summary, else model state, else a short exposed input; an unknown node shows its type id. */
 const getChipSummary = (node: WorkflowPreviewNode, needsModel: boolean, t: TFunction): string | null => {
   if (node.isUnknown) {
     return node.title === node.type ? t('workflowLibrary.preview.nodePackMissing') : node.type;
@@ -877,7 +833,6 @@ const getChipSummary = (node: WorkflowPreviewNode, needsModel: boolean, t: TFunc
     : null;
 };
 
-/** The layout with its rows spread `stretch` times further apart, keeping each chip's height and its pills. */
 const stretchRows = (layout: WorkflowPreviewLayout, stretch: number): WorkflowPreviewLayout =>
   stretch === 1
     ? layout
@@ -888,16 +843,12 @@ const stretchRows = (layout: WorkflowPreviewLayout, stretch: number): WorkflowPr
         ),
       };
 
-/**
- * How far to spread a simplified graph's rows: a wide, short layered graph fitted to the stage would leave most of its
- * height empty and its edges bunched, so rows spread until the graph takes `ROW_SPREAD_SHARE` of it.
- */
+/** A wide, short layered graph fitted to the stage leaves its height empty, so rows spread to `ROW_SPREAD_SHARE`. */
 const getRowStretch = (layout: WorkflowPreviewLayout, zoom: number, stageHeight: number) => {
   const tops = layout.nodeIds.map((id) => layout.positions[id]!.y);
   const highest = Math.min(...tops);
   const span = Math.max(...tops) - highest;
 
-  // Spread, the chips span `span * stretch`, below the pills over the highest one and above the lowest one's height.
   return span <= 0
     ? 1
     : Math.min(MAX_ROW_STRETCH, Math.max(1, ((stageHeight * ROW_SPREAD_SHARE) / zoom - NODE_HEIGHT - highest) / span));
@@ -937,7 +888,6 @@ const keepUnchanged = <Item extends { id: string }>(
   });
 };
 
-/** The same items, in the same order. */
 const isSameItems = <Item,>(a: readonly Item[], b: readonly Item[]) =>
   a.length === b.length && a.every((item, index) => item === b[index]);
 
@@ -960,10 +910,7 @@ const isSameEdge = (a: PreviewFlowEdge, b: PreviewFlowEdge) =>
   a.data?.isRerouted === b.data?.isRerouted &&
   a.data?.entryOffset === b.data?.entryOffset;
 
-/**
- * Where each edge meets its target, as an offset from the chip's middle: a chip fed by several nodes takes them a few
- * px apart, top to bottom as their sources sit, rather than at one point, so they arrive without crossing there.
- */
+/** Offsets from the chip's middle, so a chip's several inputs arrive a few px apart in source order, not crossing. */
 const getEntryOffsets = (layout: WorkflowPreviewLayout): Map<string, number> => {
   const byTarget = new Map<string, WorkflowPreviewLayout['edges'][number][]>();
 
@@ -985,7 +932,6 @@ const getEntryOffsets = (layout: WorkflowPreviewLayout): Map<string, number> => 
   return offsets;
 };
 
-/** The widest of the titles, set as a chip sets them, in px. */
 const measureTitlesWidth = (titles: readonly string[], stage: HTMLElement) => {
   const context = document.createElement('canvas').getContext('2d');
 
@@ -1012,10 +958,7 @@ const GraphView = ({
   onMatchCountChange,
 }: WorkflowDocumentGraphProps) => {
   const { t } = useTranslation();
-  /**
-   * The drawing's chip width, chosen as it opens (`handleInit`), when the stage's size is known; the drawing is that
-   * model laid out at that width, again for each new value of a live source.
-   */
+  /** Chosen as it opens (`handleInit`), once the stage size is known; the drawing is the model laid out at it. */
   const [chipWidth, setChipWidth] = useState(sourceModel.all.nodeWidth);
   const [laidOut, setLaidOut] = useState({ model: sourceModel, source: sourceModel, width: chipWidth });
   let model = laidOut.model;
@@ -1026,7 +969,6 @@ const GraphView = ({
         : relayout(getWorkflowPreviewMetrics(chipWidth), laidOut.width === chipWidth ? laidOut.model : null);
     setLaidOut({ model, source: sourceModel, width: chipWidth });
   }
-  // A node asked for that this document does not have opens nothing.
   const startNodeId = initialNodeId !== null && model.nodes.has(initialNodeId) ? initialNodeId : null;
   const themeId = useWorkflowPreferencesSelector((preferences) => preferences.themeId);
   const flow = useReactFlow();
@@ -1099,10 +1041,7 @@ const GraphView = ({
       type: 'preview',
     }));
   }, [layout, model, t]);
-  /**
-   * The chips and edges handed to the flow keep their identity while nothing they show changed, so a live source's
-   * recompile re-renders only the chips whose values, pills or markers did (the model keeps unchanged nodes' identity).
-   */
+  /** Keeps identity of chips and edges whose content did not change, so a recompile re-renders only changed ones. */
   const [drawn, setDrawn] = useState({ edges: builtEdges, nodes: builtNodes });
   let { edges, nodes } = drawn;
   const keptNodes = keepUnchanged(drawn.nodes, builtNodes, isSameChip);
@@ -1121,7 +1060,6 @@ const GraphView = ({
     [t]
   );
 
-  /** Writes one emphasis map over the previous one, notifying only the nodes and edges that change. */
   const applyEmphasis = useCallback(
     (next: ReadonlyMap<string, Emphasis>) => {
       for (const [key] of emphasis.entries()) {
@@ -1207,10 +1145,7 @@ const GraphView = ({
     [centreOn, layout, openCard]
   );
 
-  /**
-   * Opens a layout at its fitted or readable zoom, spreading a simplified graph's rows to the stage's height first, and
-   * returns the layout as drawn.
-   */
+  /** Opens a layout at its fitted or readable zoom, first spreading a simplified graph's rows; returns it as drawn. */
   const applyOpeningViewport = useCallback(
     (base: WorkflowPreviewLayout, instance: Pick<ReactFlowInstance, 'setViewport'>, isFullView: boolean) => {
       const element = containerRef.current;
@@ -1236,10 +1171,6 @@ const GraphView = ({
     },
     []
   );
-  /**
-   * The chip width for this drawing: wide enough for its longest title where the stage leaves the room (the graph
-   * still fitted at a legible zoom), one width for every chip so columns stay aligned.
-   */
   const chooseChipWidth = useCallback(
     (stage: HTMLElement) => {
       const area = measureStageArea(stage);
@@ -1410,7 +1341,6 @@ const GraphView = ({
                 pannable
                 rounded="md"
                 shadow="sm"
-                // Laid out in this panel, above the node count, rather than as a corner panel of its own.
                 style={MINIMAP_STYLE}
                 zoomable
               />

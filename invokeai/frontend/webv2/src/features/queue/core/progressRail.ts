@@ -72,7 +72,6 @@ export const selectProjectProgressItemIds = (
     }
   }
 
-  // `activeItemIds` arrives sorted, so filtering preserves a stable
-  // left-to-right segment order across frames.
+  // `activeItemIds` arrives sorted, so filtering preserves a stable left-to-right segment order across frames.
   return activeItemIds.filter((itemId) => projectItemIds.has(itemId));
 };

@@ -18,11 +18,9 @@ const placed = (rect: Rect): PlacedSurface => ({
   surface: backend.createSurface(Math.max(0, rect.width), Math.max(0, rect.height)),
 });
 
-/** A layer matrix from the usual transform fields. */
 const matrixOf = (t: { x?: number; y?: number; rotation?: number; scaleX?: number; scaleY?: number }) =>
   fromTRS({ x: t.x ?? 0, y: t.y ?? 0 }, t.rotation ?? 0, t.scaleX ?? 1, t.scaleY ?? t.scaleX ?? 1);
 
-/** Rounds a matrix's components so exact trig comparisons stay readable. */
 const rounded = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 describe('documentDeltaToLocal', () => {
@@ -41,8 +39,6 @@ describe('documentDeltaToLocal', () => {
   });
 
   it('un-rotates by the layer rotation', () => {
-    // The layer is rotated a quarter turn, so dragging right in document space
-    // must move the pixels "up" in the layer's own frame.
     const local = documentDeltaToLocal(matrixOf({ rotation: Math.PI / 2 }), { x: 10, y: 0 });
     expect(rounded(local.x)).toBe(0);
     expect(rounded(local.y)).toBe(-10);
@@ -86,7 +82,6 @@ describe('liftSelectedPixels', () => {
       mask: placed({ height: 30, width: 30, x: 20, y: 20 }),
     });
     expect(lifted?.pixels.rect).toEqual({ height: 30, width: 30, x: 20, y: 20 });
-    // The stencil covers exactly the same region, so the cut and the copy agree.
     expect(lifted?.localMask.rect).toEqual(lifted?.pixels.rect);
   });
 
@@ -97,7 +92,6 @@ describe('liftSelectedPixels', () => {
       layerMatrix: identity(),
       mask: placed({ height: 50, width: 50, x: 80, y: 80 }),
     });
-    // The selection runs off the layer's right/bottom edge.
     expect(lifted?.pixels.rect).toEqual({ height: 20, width: 20, x: 80, y: 80 });
   });
 
@@ -129,8 +123,8 @@ describe('liftSelectedPixels', () => {
       layerMatrix: matrixOf({ rotation: Math.PI / 2 }),
       mask: placed({ height: 20, width: 10, x: 30, y: 40 }),
     });
-    // Quarter-turn mapping swaps axes into local [40,60]x[-40,-30]. Outward rounding may add a harmless
-    // transparent pixel at floating-point edges.
+    // Quarter-turn mapping swaps axes into local [40,60]x[-40,-30]. Outward rounding may add a harmless transparent
+    // pixel at floating-point edges.
     const rect = lifted!.pixels.rect;
     expect(rect.x).toBe(40);
     expect(rect.width).toBe(20);

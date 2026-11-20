@@ -65,9 +65,8 @@ afterEach(async () => {
 });
 
 /**
- * The stage is 400×300 with a 200×150 content box centred in it, so the content
- * box's origin sits at (100, 75) in stage space. Coordinates below are given in
- * stage space and converted to client space against the live rect.
+ * The stage is 400×300 with a 200×150 content box centred in it, so the content box's origin sits at (100, 75) in stage
+ * space. Coordinates below are given in stage space and converted to client space against the live rect.
  */
 const mountHarness = async ({
   controlsRef,
@@ -118,7 +117,6 @@ const touch = (
   );
 };
 
-/** Two fingers down, 100px apart, centred on the content box's centre. */
 const startPinch = (stage: HTMLElement): void => {
   touch(stage, 'pointerdown', 1, 150, 150, { isPrimary: true });
   touch(stage, 'pointerdown', 2, 250, 150);
@@ -194,7 +192,6 @@ describe('usePreviewLoupe', () => {
     });
     await interact(() => touch(stage, 'pointerup', 2, 350, 150));
 
-    // Continue panning from the remaining finger's current position after pinch.
     await interact(() => touch(stage, 'pointermove', 1, 70, 160));
 
     expect(content.style.transform).toBe('translate(-180px, -140px) scale(3)');
@@ -203,7 +200,6 @@ describe('usePreviewLoupe', () => {
   it('does not pair a finger whose release was never seen with the next touch', async () => {
     const { content, stage } = await mountHarness();
 
-    // Clear missed pointer endings on the next first touch to prevent phantom pinches.
     await interact(() => touch(stage, 'pointerdown', 1, 150, 150, { isPrimary: true }));
     await interact(() => touch(stage, 'pointerdown', 2, 250, 150, { isPrimary: true }));
     await interact(() => touch(stage, 'pointermove', 2, 350, 150));
@@ -215,7 +211,6 @@ describe('usePreviewLoupe', () => {
     const { content, stage } = await mountHarness();
 
     await interact(() => touch(stage, 'pointerdown', 1, 150, 150, { isPrimary: true }));
-    // Track off-stage positions so pinch separation reflects actual finger distance.
     await interact(() => touch(stage, 'pointermove', 1, 50, 150, { target: document.body }));
     await interact(() => touch(stage, 'pointerdown', 2, 250, 150));
     await interact(() => {
@@ -235,7 +230,6 @@ describe('usePreviewLoupe', () => {
       touch(stage, 'pointermove', 2, 350, 150);
     });
     await interact(() => touch(stage, 'pointerup', 2, 350, 150));
-    // End panning on releases outside the stage to prevent unrelated later movement from dragging media.
     await interact(() => touch(stage, 'pointerup', 1, 50, 150, { target: document.body }));
     const transformAtRelease = content.style.transform;
 
@@ -264,8 +258,6 @@ describe('usePreviewLoupe across image swaps', () => {
     );
     expect(content.style.transform).not.toBe('');
 
-    // A new source with a different natural width: the reset scheduled for it
-    // must survive the gesture math changing identity.
     await interact(() => root?.render(<Harness naturalWidth={400} token="b" />));
     await interact(() => undefined);
 
@@ -289,7 +281,6 @@ const wheelAt = (stage: HTMLElement, deltaY: number, { ctrlKey = false }: { ctrl
   );
 };
 
-/** The wheel delta that takes actual zoom from `from` to `to`, unsnapped. */
 const deltaBetween = (from: number, to: number): number => -Math.log(to / from) / WHEEL_ZOOM_STEP;
 
 describe('usePreviewLoupe below fit', () => {
@@ -379,7 +370,6 @@ describe('usePreviewLoupe wheel snapping', () => {
   it('starts a new wheel gesture from 100% after a pause, releasing the movement left over on it', async () => {
     const { content, stage } = await mountHarness({ naturalWidth: 400 });
 
-    // Rests on 100% with the wheel asking for 101%.
     await interact(() => wheelAt(stage, deltaBetween(0.5, 1.01)));
     expect(content.style.transform).toContain('scale(2)');
 

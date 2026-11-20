@@ -60,7 +60,6 @@ describe('createAdjustedSurfaceCache', () => {
     const stub = first as StubRasterSurface;
     expect(drawImageCount(stub)).toBe(1);
 
-    // Same version + key: reuse the same surface, no rebuild.
     const second = cache.get('a', entry, BRIGHTEN);
     expect(second).toBe(first);
     expect(drawImageCount(stub)).toBe(1);
@@ -75,7 +74,6 @@ describe('createAdjustedSurfaceCache', () => {
 
     const first = cache.get('a', entry, BRIGHTEN) as StubRasterSurface;
     expect(drawImageCount(first)).toBe(1);
-    // Different adjustments → rebuild (draws again into the reused surface).
     cache.get('a', entry, CONTRAST);
     expect(drawImageCount(first)).toBe(2);
   });
@@ -91,13 +89,11 @@ describe('createAdjustedSurfaceCache', () => {
     expect(drawImageCount(surfaceA)).toBe(1);
     expect(drawImageCount(surfaceB)).toBe(1);
 
-    // Layer 'a' is edited: its cache version bumps → its adjusted surface rebuilds.
     const editedA = makeEntry('a', surfaceA, 1);
     const rebuiltA = cache.get('a', editedA, BRIGHTEN) as StubRasterSurface;
     expect(rebuiltA).not.toBe(surfaceA);
     expect(drawImageCount(rebuiltA)).toBe(1);
 
-    // Layer 'b' is untouched (same version) → reused, no rebuild.
     const reusedB = cache.get('b', entryB, BRIGHTEN);
     expect(reusedB).toBe(surfaceB);
     expect(drawImageCount(surfaceB)).toBe(1);
@@ -109,10 +105,8 @@ describe('createAdjustedSurfaceCache', () => {
     const entry = makeEntry('a', backend.createSurface(10, 10));
     cache.get('a', entry, BRIGHTEN);
     expect(cache.size()).toBe(1);
-    // Reverting to identity clears the slot.
     expect(cache.get('a', entry, undefined)).toBeNull();
     expect(cache.size()).toBe(0);
-    // Re-cache then delete.
     cache.get('a', entry, BRIGHTEN);
     cache.delete('a');
     expect(cache.size()).toBe(0);
@@ -127,7 +121,6 @@ describe('spatial stacks', () => {
     { amount, id: 'cl', isEnabled: true, size: 40, type: 'clarity' },
   ];
 
-  /** An executor whose jobs settle when the test says; an `ok` job's pixels all become its 1-based job number. */
   const createManualExecutor = () => {
     const jobs: { steps: SpatialExecutorJob['steps']; settle: (status: SpatialExecutorResult['status']) => void }[] =
       [];
@@ -183,7 +176,6 @@ describe('spatial stacks', () => {
     return { cache, derived, entry, jobs: manual.jobs, layers, service, settled, show, statuses };
   };
 
-  /** The first byte of the last whole-surface write: 0 for a per-pixel interim, a job number for a result. */
   const shownTag = (surface: StubRasterSurface): number => {
     const writes = surface.callLog.filter(
       (call) => call.op === 'putImageData' && (call.args[0] as ImageData).width === W && call.args[1] === 0
@@ -390,7 +382,6 @@ describe('spatial stacks', () => {
     h.show(clarity(50));
     expect(h.jobs).toHaveLength(1);
 
-    // Too large depends on the content alone, so scrubbing the stack never reads the source back for another job.
     const reads = sourceReads(surface).length;
     h.show(clarity(60));
     h.show(clarity(70));
@@ -398,7 +389,6 @@ describe('spatial stacks', () => {
     expect(sourceReads(surface)).toHaveLength(reads);
     expect(h.statuses.at(-1)).toBe('too-large');
 
-    // New content may fit.
     h.layers.publishPixels('L');
     h.show(clarity(70));
     expect(h.statuses.at(-1)).toBe('computing');
@@ -408,7 +398,6 @@ describe('spatial stacks', () => {
     await flush();
     expect(h.statuses.at(-1)).toBe('error');
     expect(h.settled).toEqual([]);
-    // An error belongs to its stack: a parameter change retries at once.
     h.show(clarity(80));
     expect(h.jobs).toHaveLength(3);
 
@@ -426,7 +415,6 @@ describe('spatial stacks', () => {
       ...clarity(amount),
     ];
     const surface = h.show(stack(0.2));
-    // Edited while the job runs: the shown pixels wait for a result that will not come.
     h.show(stack(0.4));
     const reads = sourceReads(surface).length;
     h.jobs[0]!.settle('too-large');
@@ -435,7 +423,6 @@ describe('spatial stacks', () => {
     expect(sourceReads(surface).slice(reads)).toEqual([[0, 0, W, H]]);
     expect(h.settled).toEqual(['L']);
 
-    // A per-pixel edit repaints at once; a spatial one changes nothing.
     h.show(stack(0.6));
     expect(sourceReads(surface).slice(reads)).toEqual([
       [0, 0, W, H],

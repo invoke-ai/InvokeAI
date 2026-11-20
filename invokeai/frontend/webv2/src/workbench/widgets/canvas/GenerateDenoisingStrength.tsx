@@ -41,11 +41,7 @@ const useStrengthDraft = (): StrengthDraft => {
   return draft;
 };
 
-/**
- * Owns the strength draft: persists it in canvas widget values after a debounce and flushes it with the Generate
- * form before invocation. Its `children` keep their element identity across draft changes, so a scrub re-renders
- * only the summary and field that read the draft, not the section laid out around them.
- */
+/** Owns the strength draft; `children` keep element identity so a scrub re-renders only draft readers. */
 const StrengthDraftProvider = ({ children }: { children: ReactNode }) => {
   const { widgets } = useWorkbenchCommands();
   const projectId = useActiveProjectSelector((project) => project.id);

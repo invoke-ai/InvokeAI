@@ -48,12 +48,7 @@ import {
 import { getMissingNodePacks } from './WorkflowRequirementsList';
 import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowLibraryCardSizeContext } from './workflowThumbnail';
 
-/**
- * What the grid renders from: the mounted rows and the visible range, never the scroll offset, so scrolling within a
- * row re-renders nothing and only crossing a row boundary or a measurement does. Scroll start and stop count only
- * while a restoration waits for scrolling to settle. The methods, the element cache and the instance are stable
- * across snapshots.
- */
+/** Rendered from rows and visible range, not scroll offset, so only crossing a row boundary re-renders. */
 type GridVirtualizer = Virtualizer<HTMLDivElement, Element>;
 
 const selectVirtualizerView = (
@@ -89,9 +84,8 @@ const selectVirtualizerView = (
 });
 
 /**
- * A card's height below its image at the default 16px root size: borders, body padding, title and facts rows, and
- * the row's bottom gap come to 78px; the 3:2 image is 2px narrower than the card. Rounding down keeps the estimate
- * a lower bound, so a viewport capped at N estimated rows never spans more than N + 1 real ones.
+ * Below-image chrome at a 16px root is 78px; rounding down keeps the estimate a lower bound, so a viewport capped at N
+ * estimated rows never spans more than N + 1 real ones.
  */
 const ROW_CHROME_PX = 76;
 const NO_MISSING_COUNTS: ReadonlyMap<string, number> = new Map();
@@ -103,9 +97,8 @@ const GRID_CSS = {
   },
 } as const;
 /**
- * The scroll area writes its overflow offsets as inherited custom properties on the viewport at every scroll event,
- * which restyles every element below it. The grid uses none of them; pinning them on the content wrapper stops that
- * restyle at the wrapper, which dominated scrolling (about half the main thread) before.
+ * The scroll area writes inherited custom properties on its viewport every scroll, restyling everything below; pinning
+ * them here stops that restyle, which took about half the main thread while scrolling.
  */
 const CONTENT_PROPS = {
   css: {
@@ -117,10 +110,8 @@ const CONTENT_PROPS = {
 };
 
 export interface WorkflowLibraryGridProps {
-  /** The project's active workflow, marked on its card in the This-project view. */
   activeWorkflowId?: string | null;
   entries: readonly WorkflowLibraryEntry[];
-  /** What an empty result says; defaults to no matches for the filters. */
   emptyMessage?: string;
   window?: {
     startIndex: number;
@@ -128,14 +119,9 @@ export interface WorkflowLibraryGridProps {
     filter: WorkflowLibraryBrowseSnapshot['filter'];
   };
   error: string | null;
-  /**
-   * Under the preview stage: the grid keeps its layout and scroll position, and its demand stays on the positions it
-   * showed, so a preview stepping elsewhere in the results does not pull the window back.
-   */
+  /** Under the preview stage; demand stays on the positions shown, so stepping the preview does not pull the window. */
   isHidden?: boolean;
-  /** What has the actions menu open, so that tile's control can name it. */
   openMenuAnchor?: WorkflowCardMenuAnchor | null;
-  /** Project workflows reuse the grid but have no library visibility state. */
   showVisibilityStatus?: boolean;
   /** Missing-model counts by workflow id; absent ids render no badge. */
   missingCounts?: ReadonlyMap<string, number>;
@@ -144,7 +130,6 @@ export interface WorkflowLibraryGridProps {
   status: WorkflowLibraryBrowseSnapshot['status'];
   onContextMenu: WorkflowCardContextMenuHandler;
   onOpen: (workflowId: string) => void;
-  /** Offers a Preview quick action on each card; absent hides it. */
   onPreview?: (workflowId: string) => void;
   onSelect: (workflowId: string) => void;
 }
@@ -172,7 +157,6 @@ export const WorkflowLibraryGrid = ({
   const cardSize = use(WorkflowLibraryCardSizeContext);
   const templatesSnapshot = useInvocationTemplatesSnapshot();
   const templates = templatesSnapshot.status === 'loaded' ? templatesSnapshot.templates : null;
-  // Only library cards mark templates the project holds; the project view is that collection.
   const isProjectCollection = browseWindow === undefined;
   const linkedTemplates = useLinkedLibraryTemplates(isProjectCollection);
 
@@ -226,7 +210,6 @@ export const WorkflowLibraryGrid = ({
       selectVirtualizerView(restorePending.current, instance, snapshot),
     []
   );
-  /** The card or menu button that last held focus in the grid, to hand focus to its remount. */
   const lastFocused = useRef<{ element: HTMLElement; id: string; menu: boolean } | null>(null);
   const retainFocus = useCallback(() => {
     const last = lastFocused.current;
@@ -369,9 +352,8 @@ export const WorkflowLibraryGrid = ({
       measureElement(element);
     }
   }, [measureElement, elementsCache, instance, rowHeight]);
-  // Measure the mounted width before the first paint rather than waiting for the observer's first report: Chromium can
-  // hold back a report that misses its frame's resize-observer depth limit until some later rendering update, and
-  // until the width is known the grid demands nothing (a returning grid would sit on placeholders).
+  // Measure before first paint: Chromium can hold back a resize-observer report past its depth limit, and until the
+  // width is known the grid demands nothing.
   useLayoutEffect(() => {
     setWidth(viewportRef.current?.clientWidth ?? 0);
   }, []);
@@ -403,8 +385,8 @@ export const WorkflowLibraryGrid = ({
     ) {
       return;
     }
-    // Wait for resident metadata and the committed sizer before starting an index command.
-    // A command against an empty sizer can otherwise outlive cancellation through its pending clamp retry.
+    // Wait for resident metadata and the committed sizer before starting an index command. A command against an empty
+    // sizer can otherwise outlive cancellation through its pending clamp retry.
     if (positionedAt.current?.row !== restoreRow || positionedAt.current.width !== width) {
       positionedAt.current = { row: restoreRow, width };
       virtualizer.scrollToIndex(restoreRow, { align: 'start' });
@@ -415,7 +397,6 @@ export const WorkflowLibraryGrid = ({
     if (!element) {
       return;
     }
-    // Translate the logical anchor using the rendered row, including its actual responsive height and gap.
     const rect = element.getBoundingClientRect();
     if (rect.height === 0) {
       return;
@@ -595,8 +576,7 @@ export const WorkflowLibraryGrid = ({
           return;
         }
         event.preventDefault();
-        // A keyboard-raised menu (Shift+F10, the Menu key) carries no pointer position; anchor it inside the card
-        // instead of at the viewport corner.
+        // A keyboard-raised menu has no pointer position; anchor it inside the card, not at the viewport corner.
         const rect = document.getElementById(getWorkflowLibraryCardId(id))?.getBoundingClientRect();
         handleContextMenu(
           id,
@@ -662,7 +642,6 @@ export const WorkflowLibraryGrid = ({
       {browseWindow && width > 0 ? <WorkflowLibraryDemand key={demandKey} ids={ids} start={first} end={last} /> : null}
       <Box display="flex" flexDirection="column" gap="3" minW="0" pr="2" w="full">
         {hasEntries && error ? (
-          // Keep recovery within the viewport even for a failed distant range.
           <Text
             role="alert"
             position="sticky"
@@ -757,10 +736,7 @@ const GRID_ROW_CSS: SystemStyleObject = {
   w: 'full',
 };
 
-/**
- * A virtual row. Its offset and column count go in the style attribute: as style props, every new offset would add a
- * CSS rule while scrolling, and each insertion restyles the whole document.
- */
+/** Offset and columns go in the style attribute: style props would add a CSS rule per offset while scrolling. */
 const GridRow = ({
   children,
   columns,
@@ -786,7 +762,6 @@ const GridRow = ({
   );
 };
 
-/** A position whose metadata is not resident yet, as tall as a card. */
 const GridPlaceholder = ({ height }: { height: number }) => {
   const style = useMemo(() => ({ height: `${height}px` }), [height]);
 

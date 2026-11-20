@@ -10,7 +10,6 @@ import {
 } from '@workbench/canvas-engine/render/spatial/spatialAdjustmentService';
 import { afterEach, describe, expect, it } from 'vitest';
 
-/** Deterministic mulberry32 so the image is identical on every run. */
 const seeded = (seed: number) => () => {
   seed = (seed + 0x6d2b79f5) | 0;
   let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
@@ -18,7 +17,6 @@ const seeded = (seed: number) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 
-/** Smooth gradients plus noise, with a transparent border, a transparent hole and soft alpha in between. */
 const createImage = (width: number, height: number): Uint8ClampedArray => {
   const random = seeded(0x5eed);
   const pixels = new Uint8ClampedArray(width * height * 4);
@@ -76,7 +74,6 @@ describe('spatial adjustment worker', () => {
     if (result.status !== 'ok') {
       return;
     }
-    // Zero copy: the caller's buffer moved to the worker and a different one came back.
     expect(transferred.byteLength).toBe(0);
     expect(result.pixels).toEqual(expected);
     expect(result.pixels).not.toEqual(input);
@@ -96,7 +93,6 @@ describe('spatial adjustment worker', () => {
     const first = job('first', createImage(32, 32));
     const detached = createImage(32, 32);
     const broken = job('broken', detached);
-    // Contrary to the contract, the caller transfers the queued job's buffer elsewhere.
     structuredClone(detached.buffer, { transfer: [detached.buffer] });
     const after = job('after', createImage(32, 32));
 

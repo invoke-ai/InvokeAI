@@ -6,7 +6,6 @@
 
 import type { BackendGraphContract } from '@features/generation/contracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { RECORDED_COMPONENT_FIELDS } from '@features/generation/core/graphBuilder';
 import {
   generateGraphCases,
@@ -14,6 +13,7 @@ import {
   tunedSettingsFor,
 } from '@features/generation/core/graphCoverage.testing';
 import { compileGenerateGraph, getRecordedComponents } from '@features/generation/graph';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { compileUpscaleGraph } from '@features/upscale/core/graph';
 import { CASES as UPSCALE_CASES, valuesForCase } from '@features/upscale/core/upscaleGraphCoverage.testing';
 import { describe, expect, it } from 'vitest';

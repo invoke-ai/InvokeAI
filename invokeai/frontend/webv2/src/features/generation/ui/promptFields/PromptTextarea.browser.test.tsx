@@ -80,14 +80,12 @@ const mirrorLines = () => {
   return linesIn(mirror().getBoundingClientRect().height - px(computed.paddingTop) - px(computed.paddingBottom));
 };
 
-/** The textarea's padding box, from its fractional border box. */
 const paddingBoxWidth = () => {
   const computed = getComputedStyle(textarea());
 
   return textarea().getBoundingClientRect().width - px(computed.borderLeftWidth) - px(computed.borderRightWidth);
 };
 
-/** Renders the prefix of WORDS whose wrap edge sits half a pixel from a .5 padding-box width, at that width. */
 const renderAtHalfPixelEdge = async (side: HalfPixelWrapSide) => {
   await render(WORDS.join(' '), 600);
   const edge = findHalfPixelWrapEdge(textarea(), WORDS, side);

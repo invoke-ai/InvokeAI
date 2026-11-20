@@ -48,7 +48,6 @@ describe('install row status', () => {
         })
       )
     ).toBe('unauthorized');
-    // Path segments and file names must not read as credential failures.
     expect(
       getInstallRowStatus(job({ error: 'No such file: /models/gated/model-401.safetensors', id: 1, status: 'error' }))
     ).toBe('failed');

@@ -27,7 +27,6 @@ const referenceImage = (id: string): RegionalGuidanceReferenceImage => ({
   isEnabled: true,
 });
 
-/** regional: rg1[ref1, ref2], rg2 · raster: r1 */
 const stacks = () =>
   buildLayerStackRows(
     documentFrom([
@@ -155,7 +154,6 @@ describe('group-owned adjustment rows', () => {
 
 describe('tree guides', () => {
   const invert = (id: string): CanvasAdjustmentEntry => ({ id, isEnabled: true, type: 'invert' });
-  /** top[a1] · g1[ga1]{ m1[x1, x2], m3, g2{ deep } } · bottom */
   const treeStacks = (expandedGroups: ReadonlySet<string>, filter?: string) =>
     buildLayerStackRows(
       documentFrom([
@@ -195,7 +193,6 @@ describe('tree guides', () => {
       m3: '├',
       top: '╷',
     });
-    // Rows follow tree order, so every line runs unbroken from its stem to its last branch.
     expect(keys(rows)).toEqual([
       'header:raster',
       'top',

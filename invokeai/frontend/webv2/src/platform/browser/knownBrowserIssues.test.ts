@@ -77,36 +77,26 @@ const SAFARI_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15';
 
 describe('known browser issues', () => {
-  it('accepts an exact canvas pixel readback', () => {
-    expect(getDetectedIssueIds(createTestEnvironment())).toEqual([]);
-  });
-
-  it('detects a modified RGB byte', () => {
-    expect(getDetectedIssueIds(createTestEnvironment({ mutateReadback: noisyReadback }))).toEqual([
-      'canvas-readback-integrity',
-    ]);
-  });
-
-  it('detects a modified alpha byte', () => {
-    const environment = createTestEnvironment({
-      mutateReadback: (pixels) => {
-        pixels[3] = 254;
+  it.each<[string, TestEnvironmentOptions, readonly string[]]>([
+    ['accepts an exact canvas pixel readback', {}, []],
+    ['detects a modified RGB byte', { mutateReadback: noisyReadback }, ['canvas-readback-integrity']],
+    [
+      'detects a modified alpha byte',
+      {
+        mutateReadback: (pixels) => {
+          pixels[3] = 254;
+        },
       },
-    });
-
-    expect(getDetectedIssueIds(environment)).toEqual(['canvas-readback-integrity']);
-  });
-
-  it('detects an unavailable 2D context', () => {
-    expect(getDetectedIssueIds(createTestEnvironment({ isContextAvailable: false }))).toEqual([
-      'canvas-readback-integrity',
-    ]);
-  });
-
-  it('detects a blocked canvas readback', () => {
-    expect(getDetectedIssueIds(createTestEnvironment({ readbackError: new Error('Canvas readback blocked') }))).toEqual(
-      ['canvas-readback-integrity']
-    );
+      ['canvas-readback-integrity'],
+    ],
+    ['detects an unavailable 2D context', { isContextAvailable: false }, ['canvas-readback-integrity']],
+    [
+      'detects a blocked canvas readback',
+      { readbackError: new Error('Canvas readback blocked') },
+      ['canvas-readback-integrity'],
+    ],
+  ])('%s', (_label, options, expected) => {
+    expect(getDetectedIssueIds(createTestEnvironment(options))).toEqual(expected);
   });
 
   it('returns registry metadata without the detector', () => {
@@ -122,20 +112,21 @@ describe('known browser issues', () => {
     });
   });
 
-  it('shows Brave users only the Shields instruction plus the generic fallback', () => {
-    expect(getWorkaroundIds('brave')).toEqual(['brave', 'other-browser']);
-  });
-
-  it('shows Firefox users the canvas permission instruction instead of the Helium flag', () => {
-    expect(getWorkaroundIds('firefox')).toEqual(['firefox', 'other-browser']);
-  });
-
-  it('keeps the Helium flag for Chromium builds that cannot be told apart from Helium', () => {
-    expect(getWorkaroundIds('chromium')).toEqual(['helium', 'other-browser']);
-  });
-
-  it('shows only the generic instruction elsewhere', () => {
-    expect(getWorkaroundIds('other')).toEqual(['other-browser']);
+  it.each<[string, BrowserFamily, readonly string[]]>([
+    ['shows Brave users only the Shields instruction plus the generic fallback', 'brave', ['brave', 'other-browser']],
+    [
+      'shows Firefox users the canvas permission instruction instead of the Helium flag',
+      'firefox',
+      ['firefox', 'other-browser'],
+    ],
+    [
+      'keeps the Helium flag for Chromium builds that cannot be told apart from Helium',
+      'chromium',
+      ['helium', 'other-browser'],
+    ],
+    ['shows only the generic instruction elsewhere', 'other', ['other-browser']],
+  ])('%s', (_label, browserFamily, expected) => {
+    expect(getWorkaroundIds(browserFamily)).toEqual(expected);
   });
 
   it('detects the plain-HTTP limits whenever Web Locks are unavailable, and only then', () => {

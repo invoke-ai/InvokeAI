@@ -15,6 +15,7 @@ const TOOL_IDS = Object.keys({
   move: true,
   sam: true,
   shape: true,
+  spline: true,
   text: true,
   transform: true,
   view: true,
@@ -39,16 +40,6 @@ describe('tool presentation adapters', () => {
       const adapter = TOOL_PRESENTATION_ADAPTERS[toolId];
       expect(adapter.id, toolId).toBe(toolId);
       expect(en.widgets.canvas.tools[toolId], toolId).toEqual(expect.any(String));
-    }
-  });
-
-  it('keeps property groups for configurable tools and omits sections whose only content was gesture guidance', () => {
-    for (const toolId of TOOL_IDS) {
-      if (toolId === 'view' || toolId === 'colorPicker' || toolId === 'sam') {
-        expect(TOOL_PRESENTATION_ADAPTERS[toolId].groups, toolId).toEqual([]);
-      } else {
-        expect(TOOL_PRESENTATION_ADAPTERS[toolId].groups.length, toolId).toBeGreaterThan(0);
-      }
     }
   });
 

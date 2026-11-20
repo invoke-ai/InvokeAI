@@ -35,8 +35,6 @@ describe('toExtensionHotkeyDefinition', () => {
       kind: 'focused-region',
       region: 'right',
     });
-    // A window is not a region other widgets share, so the shortcut follows this instance — still as a
-    // focused-region shortcut, at that priority.
     expect(toExtensionHotkeyDefinition({ ...contribution, source: floating })?.scope).toEqual({
       floatingInstanceId: 'alpha',
       kind: 'focused-region',

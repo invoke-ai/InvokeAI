@@ -14,16 +14,12 @@ const note = (overrides: Partial<WorkbenchNotification>): WorkbenchNotification 
 });
 
 describe('shouldToastNotification', () => {
-  it('toasts enqueue notifications when the preference is on', () => {
-    expect(shouldToastNotification(note({ category: 'enqueue' }), { notifyOnEnqueue: true })).toBe(true);
-  });
-
-  it('suppresses enqueue toasts when the preference is off', () => {
-    expect(shouldToastNotification(note({ category: 'enqueue' }), { notifyOnEnqueue: false })).toBe(false);
-  });
-
-  it('always toasts uncategorized notifications', () => {
-    expect(shouldToastNotification(note({ kind: 'error', title: 'Error' }), { notifyOnEnqueue: false })).toBe(true);
+  it.each([
+    ['toasts enqueue notifications when the preference is on', note({ category: 'enqueue' }), true, true],
+    ['suppresses enqueue toasts when the preference is off', note({ category: 'enqueue' }), false, false],
+    ['always toasts uncategorized notifications', note({ kind: 'error', title: 'Error' }), false, true],
+  ])('%s', (_, notification, notifyOnEnqueue, expected) => {
+    expect(shouldToastNotification(notification, { notifyOnEnqueue })).toBe(expected);
   });
 });
 

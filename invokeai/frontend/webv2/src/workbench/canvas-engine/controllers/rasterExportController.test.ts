@@ -92,7 +92,6 @@ describe('RasterExportController budget', () => {
       version: 3,
       width: 100,
     };
-    // One lease per reservation: the layer-local adjusted copy's, then the baked surface's.
     const leases: ReturnType<typeof vi.fn>[] = [];
     const reserve = vi.fn((_bytes: number) => {
       const release = vi.fn();
@@ -152,7 +151,6 @@ describe('RasterExportController budget', () => {
       version: 3,
       width: 100,
     };
-    // One lease per reservation: the layer-local adjusted copy's, then the baked surface's.
     const leases: ReturnType<typeof vi.fn>[] = [];
     const reserve = vi.fn((_bytes: number) => {
       const release = vi.fn();
@@ -174,7 +172,6 @@ describe('RasterExportController budget', () => {
 
     const result = await controller.baked('layer');
     expect(result.status).toBe('ok');
-    // The stack adjusts a layer-local copy (surface + ImageData) before the transform draws the baked surface.
     expect(reserve.mock.calls).toEqual([[80_000], [40_000]]);
     const [adjustedCopy, baked] = leases;
     expect(adjustedCopy).toHaveBeenCalledOnce();

@@ -40,10 +40,7 @@ import {
   DEFAULT_TEXTURE_SIZE,
 } from './layerOps';
 
-/**
- * Edit adjustment subrows through whole-stack patch-config. Preview gestures live and commit once; tree rows own
- * enable/remove/reorder.
- */
+/** Edits subrows through whole-stack patch-config; gestures preview live and commit once. */
 
 export type AdjustmentsEngine = CanvasStructuralEngine & CanvasPreparedEngine & AdjustmentStatusEngine;
 
@@ -78,7 +75,6 @@ const IDENTITY_CURVE: [number, number][] = [
   [255, 255],
 ];
 
-/** The fields a gesture changes on one entry. */
 type EntryPatch = Record<string, unknown>;
 
 const withPatch = (entries: readonly CanvasAdjustmentEntry[], id: string, patch: EntryPatch): CanvasAdjustmentEntry[] =>
@@ -116,9 +112,7 @@ const AdjustmentEntryEditor = ({
 }) => {
   const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const { t } = useTranslation();
-  // Previews patch the gesture's fields onto the live stack. The engine's preview session holds the stack as the
-  // gesture found it and ends the gesture when an undo or an edit from elsewhere lands, so the next preview starts
-  // from the changed stack and the commit records from where that session began.
+  // Previews patch the gesture's fields onto the live stack.
   const configOf = useCallback(
     (adjustments: CanvasAdjustmentEntry[]) =>
       layer.type === 'group'

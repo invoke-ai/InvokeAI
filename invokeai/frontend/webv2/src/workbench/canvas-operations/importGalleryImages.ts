@@ -14,13 +14,13 @@ import type { CanvasRecallPlan, CanvasRecallTarget } from '@workbench/image-acti
 import type { Project } from '@workbench/projectContracts';
 
 import { galleryImageUrls } from '@features/gallery/utility';
-import { getArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
 import {
   calculateNewSize,
   getGenerationDimensions,
   isArchitectureDescribed,
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
+import { getArchitectureCapabilitiesSnapshot } from '@features/models/architecturesStore';
 import { createItemId } from '@platform/browser/randomUuid';
 import { mapWithConcurrency } from '@platform/core/concurrency';
 import {

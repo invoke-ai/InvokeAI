@@ -69,7 +69,7 @@ is also the fallback written when the remux fails, so a record is never lost to 
 
 ## The record: `invokeai_metadata`
 
-A flat JSON object, the output of the `core_metadata` node. Video is a *profile* of the same
+A flat JSON object emitted either by the `core_metadata` node (in linear/canvas graphs) or directly by any denoise invocation (`*denoise*` nodes inherit `WithMetadata` and emit `metadata` on their output, merging any upstream `metadata` input with the node's own sampling, model, LoRA, ControlNet, T2I-Adapter, and reference image fields via `build_denoise_metadata()`). In Stage 1, prompts, standalone text encoders, and conditioning modifiers are not automatically extracted from incoming conditioning edges; workflows record those fields through upstream metadata nodes such as `core_metadata` or `metadata_item_linked`. Custom node workflows can wire a denoise node's `metadata` output straight into the decode (`*_l2i` / `*_latents_to_video`) node without a `core_metadata` node. Video is a *profile* of the same
 record as images, discriminated by `generation_mode`, not a second format. Every key is
 optional; readers ignore keys they do not know and never reject a record for having them.
 
@@ -79,7 +79,7 @@ Common shapes:
 ModelIdentifier = { key, hash, name, base, type, submodel_type? }
 ImageRef        = { image_name }
 VideoRef        = { video_name }
-LoRA            = { model: ModelIdentifier, weight }
+LoRA            = { model: ModelIdentifier, weight, target?: "high" | "low" | "both", low_noise_weight? }
 H3Reference     = { kind: "image" | "video", image_name?, video_name?, detail?, conditioning?, start_frame?, end_frame? }
 ```
 
@@ -87,7 +87,7 @@ H3Reference     = { kind: "image" | "video", image_name?, video_name?, detail?, 
 
 | Key | Type | Meaning |
 |---|---|---|
-| `metadata_version` | semver string | The record schema version, currently `1.3.0`. Absent on records written before versioning; they are read with the same rules plus the aliases listed below. |
+| `metadata_version` | semver string | The record schema version, currently `1.4.0`. Absent on records written before versioning; they are read with the same rules plus the aliases listed below. |
 | `app_version` | string | The InvokeAI release that wrote the record. Informational. |
 
 The version is over the **record**, not the node that writes it. A **minor** bump adds keys or
@@ -102,12 +102,15 @@ The current value is `CORE_METADATA_VERSION` in `invokeai/app/invocations/metada
 |---|---|
 | `generation_mode` | string. Video values: `wan_t2v`, `wan_i2v`, `wan_interpolate`, `wan_extend_video`, `minimax_h3_t2v`, `minimax_h3_i2v`, `minimax_h3_lf2v`, `minimax_h3_flf2v`, `minimax_h3_extend_video`, `minimax_h3_ref2v`. A record is video metadata iff this is one of them. |
 | `positive_prompt`, `negative_prompt` | string; `negative_prompt` is absent for MiniMax H3, which has no CFG |
+| `positive_prompts`, `negative_prompts` | `string[]`: complete list of prompts when multiple conditionings are collected, e.g. via `Collect` node |
+| `positive_style_prompt`, `negative_style_prompt` | `string`: SDXL style prompts |
 | `seed`, `steps` | integer |
-| `cfg_scale` | number (Wan only) |
+| `cfg_scale` | number \| number[] |
+| `hidiffusion_auto_ratios` | boolean: whether HiDiffusion automatically chooses `t1` and `t2` ratios |
 | `width`, `height` | integer |
 | `model` | `ModelIdentifier`: the main (transformer) model |
 | `vae` | `ModelIdentifier`: the VAE the graph loads; absent when the main model or a component source supplies it |
-| `loras` | `LoRA[]`: the LoRAs the graph loaded, in order; absent when none ran |
+| `loras` | `LoRA[]`: the LoRAs the graph loaded, in order; absent when none ran. On Wan, entries include optional `target` (`"high"`, `"low"`, or `"both"`) and `low_noise_weight` when high/low expert weights differ |
 
 ### Image profile
 
@@ -176,12 +179,13 @@ same key names from an external process, with models given by name.
 
 ## Evolving the record
 
-1. Add a typed `Optional` field to `CoreMetadataInvocation` under its canonical name, stamp it from
+1. Register the key in `CORE_METADATA_REGISTRY` in `invokeai/app/invocations/metadata_constants.py` with its `MetadataType` (`T.STRING`, `T.INTEGER`, `T.FLOAT`, `T.MODEL`, `T.VAE`, etc.). This automatically derives workflow metadata extraction literals (`CORE_LABELS*`) and ensures model identifiers are unwrapped for frontend recall.
+2. Add a typed `Optional` field to `CoreMetadataInvocation` under its canonical name, stamp it from
    the graph builder, and read it in the recall mappers. In the image profile a component model is not stamped
    by hand: `addMetadata` reads it from the loader nodes the builder has added, through `RECORDED_COMPONENT_FIELDS`
    (`invokeai/frontend/webv2/src/features/generation/core/graphBuilder.ts`), so a new loader field
    needs an entry there. The video profile still lists its components by hand.
-2. Give the key an entry in the recall contract of each profile that writes it:
+3. Give the key an entry in the recall contract of each profile that writes it:
    `IMAGE_RECALL_CONTRACT` (`invokeai/frontend/webv2/src/workbench/image-actions/imageRecallContract.test.ts`)
    and its video twin, `videoRecallContract.test.ts` beside it. A contract test fails for a key without an
    entry that the coverage fixtures' graphs write; a key written only under some setting needs that setting off
@@ -191,6 +195,6 @@ same key names from an external process, with models given by name.
    The write side has its own gate beside the recall contracts, `invokeai/frontend/webv2/src/workbench/image-actions/imageRecordWriteGate.test.ts`: a
    `GenerateSettings` key that changes the compiled graph, in Generate or in any Canvas mode, must change the
    record, so a setting that reaches inference unrecorded fails before recall can miss it.
-3. Bump `CORE_METADATA_VERSION`'s minor component. Bump the major only for a rename, removal or
+4. Bump `CORE_METADATA_VERSION`'s minor component. Bump the major only for a rename, removal or
    type change, and add the old spelling to the readers' alias table.
-4. Update the tables on this page.
+5. Update the tables on this page.
