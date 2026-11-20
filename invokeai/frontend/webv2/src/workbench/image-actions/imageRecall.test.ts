@@ -2352,6 +2352,94 @@ describe('recall onto a panel holding unused standalone components', () => {
     expect(failures).toEqual([]);
   });
 
+  describe('records of writers that left out what they used', () => {
+    const recallStripped = (
+      model: GenerateModelConfig,
+      recorded: GenerateSettings,
+      panel: GenerateSettings,
+      stripped: readonly string[],
+      appVersion: string
+    ) => {
+      const original = compileGenerateGraph(recorded, model, 'gallery', PROJECT_SETTINGS).backendGraph;
+      const metadata: Record<string, unknown> = {
+        ...Object.values(original.nodes).find((node) => node.type === 'core_metadata'),
+        app_version: appVersion,
+      };
+
+      for (const key of stripped) {
+        delete metadata[key];
+      }
+
+      const catalogs = [recallCatalogFor(model, recorded), recallCatalogFor(model, panel)];
+
+      return buildImageRecallSettings({
+        currentValues: createValues({ ...panel, model, modelKey: model.key }),
+        image,
+        kind: 'all',
+        metadata,
+        models: catalogs.flatMap((catalog) => catalog.models),
+        supportedModels: [model],
+        vaeModels: catalogs.flatMap((catalog) => catalog.vaeModels),
+      })!.values;
+    };
+
+    // v6.10.0rc1 sent `qwen3_source_model` to the loader but never recorded it.
+    it.each([
+      ['6.10.0rc1', true],
+      ['6.10.0rc2', false],
+    ] as const)('keeps the source a split Z-Image panel selected for a %s record', (appVersion, keeps) => {
+      const { model, settings } = satisfiedSettingsFor('z-image', {
+        label: 'gguf',
+        overrides: { format: 'gguf_quantized' },
+      });
+      const source = {
+        ...model,
+        format: 'diffusers',
+        key: 'z-image-source',
+        name: 'Z-Image source',
+      } as MainModelConfig;
+      const panel = { ...settings, componentSourceModel: source, qwen3EncoderModel: null, vae: null };
+      const values = recallStripped(model, panel, panel, ['qwen3_source'], appVersion);
+
+      expect(values.componentSourceModel?.key ?? null).toBe(keeps ? source.key : null);
+    });
+
+    // The legacy SD 3 builder passed standalone encoders to the loader and recorded none of them.
+    it.each([
+      ['6.14.4', true],
+      ['7.0.0-alpha.4', true],
+      ['7.0.0-beta.2', false],
+    ] as const)('keeps the standalone SD 3 encoders for a %s record', (appVersion, keeps) => {
+      const shape = { label: 'diffusers', overrides: { format: 'diffusers' } };
+      const { model } = satisfiedSettingsFor('sd-3', shape);
+      const { settings: filled } = fullyFilledSettingsFor('sd-3', shape);
+      const encoders = ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel'] as const;
+      const recorded = { ...filled, ...Object.fromEntries(encoders.map((key) => [key, null])) } as GenerateSettings;
+      const values = recallStripped(model, recorded, filled, [], appVersion);
+
+      expect(encoders.every((key) => filled[key] !== null)).toBe(true);
+      expect(encoders.map((key) => values[key]?.key ?? null)).toEqual(
+        encoders.map((key) => (keeps ? filled[key]!.key : null))
+      );
+    });
+
+    it.each(['krea-2', 'qwen-image-2-1'] as const)(
+      'clears the Vision Tower a %s panel holds when the recorded run used none',
+      (base) => {
+        const { model, settings } = satisfiedSettingsFor(base, {
+          ggufEncoder: true,
+          label: 'standalone-gguf-encoder',
+          overrides: { format: 'gguf_quantized' },
+        });
+        const { original, rebuilt } = roundTrip(model, { ...settings, qwen3VLVisionTowerModel: null }, settings);
+
+        expect(settings.qwen3VLVisionTowerModel).toBeTruthy();
+        expect(original).not.toHaveProperty('qwen3_vl_vision_tower');
+        expect(rebuilt).toEqual(original);
+      }
+    );
+  });
+
   describe('a recorded source that is not installed', () => {
     const recallWithoutSource = (base: 'qwen-image' | 'z-image') => {
       const shape = { label: 'diffusers', overrides: { format: 'diffusers' } };

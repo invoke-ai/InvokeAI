@@ -976,15 +976,65 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
 
 /**
  * Settings no model supplies while empty that graph-run records name whenever the base's loader used them: a record
- * naming the model but not them used none, so a panel pick would change the rerun. Z-Image records of v6.10.0rc1 did
- * not name `qwen3_source`. FLUX.2 is left to the model transition, which drops a stored source wherever its graph
- * would read none; dev records before 7.0 never named `mistral_source`, so its absence proves nothing there.
+ * naming the model but not them used none, so a panel pick would change the rerun. FLUX.2 is left to the model
+ * transition, which drops a stored source wherever its graph would read none; dev records before 7.0 never named
+ * `mistral_source`, so its absence proves nothing there. The Vision Tower is sent only beside a GGUF encoder that
+ * takes one, so a record without it ran without.
  */
 const SETTINGS_RECORDED_WHEN_LOADED: Partial<Record<string, readonly RecalledComponentSetting[]>> = {
+  'krea-2': ['qwen3VLVisionTowerModel'],
   'qwen-image': ['componentSourceModel'],
+  'qwen-image-2-1': ['qwen3VLVisionTowerModel'],
   wan: ['componentSourceModel', 'wanLowNoiseModel'],
   'z-image': ['componentSourceModel'],
 };
+
+/**
+ * Writers that passed a component to their loader without recording it, so its absence from their records proves
+ * nothing. A record names the writer through `app_version`; one without it is the current writer's.
+ */
+const UNRECORDING_WRITERS: readonly {
+  base: string;
+  /** The first version that recorded the settings. */
+  recordedFrom: string;
+  settings: readonly RecalledComponentSetting[];
+}[] = [
+  // v6.10.0rc1 sent `qwen3_source_model` to the loader but never wrote `qwen3_source`.
+  { base: 'z-image', recordedFrom: '6.10.0rc2', settings: ['componentSourceModel'] },
+  // The legacy frontend passed standalone T5 and CLIP encoders to the loader and wrote none of them; webv2 recorded
+  // them from 7.0.0-beta.2.
+  { base: 'sd-3', recordedFrom: '7.0.0-beta.2', settings: ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel'] },
+];
+
+const PRE_RELEASE_RANK: Record<string, number> = { a: 0, alpha: 0, b: 1, beta: 1, rc: 2 };
+
+/** Orders `major.minor.patch` with an optional `a`/`alpha`/`b`/`beta`/`rc` number; a final release sorts last. */
+const parseAppVersion = (version: string | null): number[] | null => {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:[.-]?(alpha|beta|rc|a|b)[.-]?(\d+))?/.exec(version ?? '');
+
+  if (!match) {
+    return null;
+  }
+
+  const [, major, minor, patch, stage, number] = match;
+
+  return [+major!, +minor!, +patch!, stage ? PRE_RELEASE_RANK[stage]! : 3, +(number ?? 0)];
+};
+
+const isWriterBefore = (metadata: unknown, version: string): boolean => {
+  const written = parseAppVersion(getString(metadata, 'app_version'));
+  const first = parseAppVersion(version)!;
+  const differing = written?.findIndex((part, index) => part !== first[index]) ?? -1;
+
+  return differing >= 0 && written![differing]! < first[differing]!;
+};
+
+/** Whether a record's writer may have used `setting` of a `base` model without recording it. */
+const mayHaveOmittedSetting = (metadata: unknown, base: string, setting: RecalledComponentSetting): boolean =>
+  UNRECORDING_WRITERS.some(
+    (writer) =>
+      writer.base === base && writer.settings.includes(setting) && isWriterBefore(metadata, writer.recordedFrom)
+  );
 
 const getRecalledComponent = (
   metadata: unknown,
@@ -1611,8 +1661,11 @@ export const buildImageRecallSettings = ({
     // is gone leaves the panel's, and with it the question whether the source still supplies the VAE.
     const judgedModel = model && recordsGraphRun(metadata) ? model : undefined;
     const { componentSourceModel } = componentPatch;
+    // A writer that may have used a source without recording it leaves the question open, like an unresolved one.
     const recordedSource = !recordsComponent('componentSourceModel')
-      ? null
+      ? judgedModel && mayHaveOmittedSetting(metadata, judgedModel.base, 'componentSourceModel')
+        ? ('unresolved' as const)
+        : null
       : !fittingSettings.includes('componentSourceModel')
         ? ('unresolved' as const)
         : isMainModelConfig(componentSourceModel)
@@ -1631,14 +1684,14 @@ export const buildImageRecallSettings = ({
     const suppliedByRecord = judgedModel
       ? getComponentSlotsSuppliedByRecord(judgedModel, recordedSource, survivingEncoders)
       : [];
+    const isProvenUnused = (setting: RecalledComponentSetting): boolean =>
+      !recordsComponent(setting) && !(judgedModel && mayHaveOmittedSetting(metadata, judgedModel.base, setting));
     const clearedSettings = [
       ...suppliedByRecord.filter(
         (key): key is RecalledComponentSetting & typeof key =>
-          key !== 'vae' && !recordsComponent(key as RecalledComponentSetting)
+          key !== 'vae' && isProvenUnused(key as RecalledComponentSetting)
       ),
-      ...((judgedModel && SETTINGS_RECORDED_WHEN_LOADED[judgedModel.base]) ?? []).filter(
-        (setting) => !recordsComponent(setting)
-      ),
+      ...((judgedModel && SETTINGS_RECORDED_WHEN_LOADED[judgedModel.base]) ?? []).filter(isProvenUnused),
     ];
 
     for (const setting of clearedSettings) {
