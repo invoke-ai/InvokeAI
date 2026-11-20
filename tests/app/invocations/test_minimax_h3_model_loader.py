@@ -10,6 +10,7 @@ actionable message instead of an opaque loader stack trace minutes later.
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import ValidationError
 
 from invokeai.app.invocations.minimax_h3.minimax_h3_model_loader import MiniMaxH3ModelLoaderInvocation
 from invokeai.app.invocations.model import ModelIdentifierField
@@ -101,3 +102,33 @@ def test_variant_stamp_is_none_for_untyped_configs():
     node = MiniMaxH3ModelLoaderInvocation(id="loader", model=_identifier())
     output = node.invoke(_context(_config()))
     assert output.transformer.variant is None
+
+
+@pytest.mark.parametrize(
+    "detected, override",
+    [(MiniMaxH3VariantType.FL2VA, "ref2va"), (MiniMaxH3VariantType.REF2VA, "fl2va")],
+)
+@pytest.mark.parametrize("use_checkpoint", [False, True])
+def test_task_variant_override_takes_precedence(detected, override, use_checkpoint):
+    main = _config()
+    checkpoint = _config(format_=ModelFormat.Checkpoint)
+    selected = checkpoint if use_checkpoint else main
+    selected.variant = detected
+    kwargs = {"transformer_model": _identifier("h3-ckpt")} if use_checkpoint else {}
+    node = MiniMaxH3ModelLoaderInvocation(id="loader", model=_identifier(), task_variant_override=override, **kwargs)
+    output = node.invoke(_context_with_override(main, checkpoint))
+    assert output.transformer.variant == override
+    assert output.transformer.transformer.key == ("h3-ckpt" if use_checkpoint else "h3-main")
+    assert selected.variant == detected
+
+
+def test_explicit_none_preserves_detected_variant():
+    main = _config()
+    main.variant = MiniMaxH3VariantType.FL2VA
+    node = MiniMaxH3ModelLoaderInvocation(id="loader", model=_identifier(), task_variant_override=None)
+    assert node.invoke(_context(main)).transformer.variant == "fl2va"
+
+
+def test_invalid_task_variant_override_is_rejected():
+    with pytest.raises(ValidationError):
+        MiniMaxH3ModelLoaderInvocation(id="loader", model=_identifier(), task_variant_override="invalid")

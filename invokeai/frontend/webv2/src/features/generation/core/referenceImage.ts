@@ -79,9 +79,9 @@ export const generatedImageToReferenceImage = (
 });
 
 /**
- * Accepts canonical legacy data, pre-crop `{ image_name, width, height }`, and
- * webv2's former flat `GeneratedImageContract`. Flat webv2 crops are necessarily
- * migrated as a new original because their previous original was not retained.
+ * Accepts canonical legacy data, pre-crop `{ image_name, width, height }`, and webv2's former flat
+ * `GeneratedImageContract`. Flat webv2 crops are necessarily migrated as a new original because their previous original
+ * was not retained.
  */
 export const normalizeCroppableImage = (value: unknown): CroppableImageWithDims | null => {
   const flat = normalizeFlatImage(value);
@@ -204,8 +204,8 @@ export const getEnabledReferenceImages = <T extends GenerateReferenceImageConfig
 const NO_PROMPT_TAGS: ReadonlyMap<string, string> = new Map();
 
 /**
- * Tags a FLUX.3 prompt uses to name each reference, keyed by reference id. The model numbers its references by
- * their 0-based position in the denoiser input, so disabled and empty cards take no number.
+ * Tags a FLUX.3 prompt uses to name each reference, keyed by reference id. The model numbers its references by their
+ * 0-based position in the denoiser input, so disabled and empty cards take no number.
  */
 export const getReferenceImagePromptTags = (
   base: string | undefined,
@@ -220,8 +220,7 @@ export const getReferenceImagePromptTags = (
       )
     : NO_PROMPT_TAGS;
 
-// ---- Crop-box geometry for the reference image crop editor -------------------------------------------------------
-// Boxes are percentages of the original image, so an aspect ratio (width / height in pixels) becomes a width% per
+// Crop-editor boxes are percentages of the original image, so an aspect ratio (width / height in pixels) becomes a width% per
 // height% factor through the image's own proportions.
 
 export type ReferenceCropAspectRatioId = 'free' | '16:9' | '3:2' | '4:3' | '1:1' | '3:4' | '2:3' | '9:16';
@@ -287,8 +286,8 @@ export const matchReferenceCropAspectRatio = (
 };
 
 /**
- * A box of `pctRatio` whose width is at most `width`, at least the minimum edge, and that fits the image: the larger
- * of the minimum edges wins, and overflow shrinks the box rather than breaking the ratio.
+ * A box of `pctRatio` whose width is at most `width`, at least the minimum edge, and that fits the image: the larger of
+ * the minimum edges wins, and overflow shrinks the box rather than breaking the ratio.
  */
 const fitRatioBox = (
   width: number,
@@ -310,8 +309,8 @@ const placeAround = (cx: number, cy: number, size: { height: number; width: numb
 });
 
 /**
- * Applies a preset to an existing box: the area and center are preserved where the image allows, as the legacy
- * cropper did, so switching presets reshapes rather than relocates the crop. A null ratio returns the box as is.
+ * Applies a preset to an existing box: the area and center are preserved where the image allows, as the legacy cropper
+ * did, so switching presets reshapes rather than relocates the crop. A null ratio returns the box as is.
  */
 export const constrainReferenceCropBox = (
   box: ReferenceImageCropBoxPct,
@@ -410,7 +409,6 @@ const resolveRatioDrag = (
   };
 };
 
-/** The box after moving the pointer to `point` during `drag`. */
 export const resolveReferenceCropDrag = (
   drag: ReferenceCropDrag,
   point: { x: number; y: number },

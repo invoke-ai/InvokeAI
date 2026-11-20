@@ -1,7 +1,7 @@
 /**
- * Display-only control transparency matches legacy LightnessToAlphaFilter: alpha becomes min(existing alpha, (min
- * RGB + max RGB)/2), dropping dark backgrounds. Generation omits this effect and composites the control image at
- * full opacity.
+ * Display-only control transparency matches legacy LightnessToAlphaFilter: alpha becomes min(existing alpha, (min RGB +
+ * max RGB)/2), dropping dark backgrounds. Generation omits this effect and composites the control image at full
+ * opacity.
  */
 
 import type { RasterBackend, RasterSurface } from './raster';

@@ -9,7 +9,6 @@ const { getProjectLibrary, refreshProjectLibrary } = vi.hoisted(() => ({
   refreshProjectLibrary: vi.fn(() => Promise.resolve()),
 }));
 
-// The real compatibility rule stays; only the library's store and fetch are replaced.
 vi.mock('@workbench/projects/library', async (importOriginal) => ({
   ...(await importOriginal<typeof libraryModule>()),
   getProjectLibrary,
@@ -72,7 +71,6 @@ describe('createProjectsProvider', () => {
       searchContext()
     );
 
-    // The open project the library has not listed yet has no known creation date.
     expect(entries.map((entry) => entry.title)).toEqual(['Neon City Keyframes']);
   });
 

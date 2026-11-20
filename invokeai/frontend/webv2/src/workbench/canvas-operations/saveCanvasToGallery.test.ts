@@ -1,5 +1,10 @@
 import type { GalleryBoard, GalleryBoardAction } from '@features/gallery/contracts';
-import type { GenerateModelConfig, GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
+import type {
+  GenerateLora,
+  GenerateModelConfig,
+  GenerateWidgetValues,
+  MainModelConfig,
+} from '@features/generation/contracts';
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
 import type { RasterCompositeExportResult } from '@workbench/canvas-engine/exportRasterComposite';
@@ -348,6 +353,23 @@ describe('saveCanvasToGallery', () => {
     });
   });
 
+  it('records the compositing the user default resolves to when the project pins none', async () => {
+    const harness = createHarness();
+
+    await saveCanvasToGallery({
+      engine: harness.engine,
+      getProject: harness.getProject,
+      project: harness.project,
+      region: 'canvas',
+      scopedDefaults: { canvas: { outputOnlyMaskedRegions: false } },
+      uploadImage: harness.uploadImage,
+    });
+
+    expect(harness.uploadImage.mock.calls[0]?.[1]?.metadata).toMatchObject({
+      canvas_v3_metadata: { settings: { compositing: { outputOnlyMaskedRegions: false } } },
+    });
+  });
+
   it.each(['closed-project', 'mismatched-document', 'expired-account'] as const)(
     'does not upload a %s after pending paint uploads finish',
     async (reason) => {
@@ -577,6 +599,125 @@ describe('saveCanvasToGallery', () => {
 
     await expect(save).resolves.toEqual({ status: 'stale' });
     expect(harness.uploadImage).not.toHaveBeenCalled();
+  });
+
+  it('forwards optional Wan LoRA target and distinct low_noise_weight for dual-expert models and omits low_noise_weight on ti2v_5b', async () => {
+    const wanA14b: MainModelConfig = {
+      base: 'wan',
+      key: 'wan-a14b',
+      name: 'Wan A14B',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+    const wan5b: MainModelConfig = {
+      base: 'wan',
+      key: 'wan-5b',
+      name: 'Wan TI2V 5B',
+      type: 'main',
+      variant: 'ti2v_5b',
+    };
+    const loras: GenerateLora[] = [
+      {
+        isEnabled: true,
+        model: { base: 'wan', key: 'lora-plain', name: 'Plain', type: 'lora' },
+        weight: 0.7,
+      },
+      {
+        isEnabled: true,
+        model: { base: 'wan', key: 'lora-high', name: 'High', type: 'lora' },
+        target: 'high',
+        weight: 0.9,
+      },
+      {
+        isEnabled: false,
+        lowNoiseWeight: 0.4,
+        model: { base: 'wan', key: 'lora-dual', name: 'Dual', type: 'lora' },
+        target: 'both',
+        weight: 0.8,
+      },
+      {
+        isEnabled: true,
+        lowNoiseWeight: 0.8,
+        model: { base: 'wan', key: 'lora-equal', name: 'Equal', type: 'lora' },
+        target: 'both',
+        weight: 0.8,
+      },
+    ];
+    const harness = createHarness({
+      project: createProject('board-1', { loras, model: wanA14b, modelKey: wanA14b.key }),
+    });
+
+    await expect(
+      saveCanvasToGallery({
+        engine: harness.engine,
+        getProject: harness.getProject,
+        project: harness.project,
+        region: 'canvas',
+        scopedDefaults: {},
+        uploadImage: harness.uploadImage,
+      })
+    ).resolves.toEqual({ boardId: 'board-1', imageName: 'saved.png', status: 'saved' });
+
+    const a14bMetadata = harness.uploadImage.mock.calls[0]?.[1]?.metadata as Record<string, unknown>;
+    expect(a14bMetadata.loras).toEqual([
+      { isEnabled: true, model: { base: 'wan', key: 'lora-plain', name: 'Plain', type: 'lora' }, weight: 0.7 },
+      {
+        isEnabled: true,
+        model: { base: 'wan', key: 'lora-high', name: 'High', type: 'lora' },
+        target: 'high',
+        weight: 0.9,
+      },
+      {
+        isEnabled: false,
+        low_noise_weight: 0.4,
+        model: { base: 'wan', key: 'lora-dual', name: 'Dual', type: 'lora' },
+        target: 'both',
+        weight: 0.8,
+      },
+      {
+        isEnabled: true,
+        model: { base: 'wan', key: 'lora-equal', name: 'Equal', type: 'lora' },
+        target: 'both',
+        weight: 0.8,
+      },
+    ]);
+
+    const ti2vHarness = createHarness({
+      project: createProject('board-1', { loras, model: wan5b, modelKey: wan5b.key }),
+    });
+    await expect(
+      saveCanvasToGallery({
+        engine: ti2vHarness.engine,
+        getProject: ti2vHarness.getProject,
+        project: ti2vHarness.project,
+        region: 'canvas',
+        scopedDefaults: {},
+        uploadImage: ti2vHarness.uploadImage,
+      })
+    ).resolves.toEqual({ boardId: 'board-1', imageName: 'saved.png', status: 'saved' });
+
+    const ti2vMetadata = ti2vHarness.uploadImage.mock.calls[0]?.[1]?.metadata as Record<string, unknown>;
+    expect(ti2vMetadata.loras).toEqual([
+      { isEnabled: true, model: { base: 'wan', key: 'lora-plain', name: 'Plain', type: 'lora' }, weight: 0.7 },
+      {
+        isEnabled: true,
+        model: { base: 'wan', key: 'lora-high', name: 'High', type: 'lora' },
+        target: 'high',
+        weight: 0.9,
+      },
+      {
+        isEnabled: false,
+        model: { base: 'wan', key: 'lora-dual', name: 'Dual', type: 'lora' },
+        target: 'both',
+        weight: 0.8,
+      },
+      {
+        isEnabled: true,
+        model: { base: 'wan', key: 'lora-equal', name: 'Equal', type: 'lora' },
+        target: 'both',
+        weight: 0.8,
+      },
+    ]);
   });
 });
 

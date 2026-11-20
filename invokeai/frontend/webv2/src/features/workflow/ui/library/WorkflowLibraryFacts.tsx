@@ -20,8 +20,8 @@ const READINESS_COLOR: Record<WorkflowLibraryReadiness, string> = {
 };
 
 /**
- * Fact text in the readiness hue, pulled 30% toward the foreground: darker on light themes and lighter on dark ones,
- * so 10px text keeps 4.5:1 on the muted and emphasized fills of hovered and selected cards. The dot keeps the pure hue.
+ * Fact text in the readiness hue, pulled 30% toward the foreground: darker on light themes and lighter on dark ones, so
+ * 10px text keeps 4.5:1 on the muted and emphasized fills of hovered and selected cards. The dot keeps the pure hue.
  */
 const READINESS_TEXT_COLOR: Record<Exclude<WorkflowLibraryReadiness, 'ready'>, string> = {
   models: 'color-mix(in oklab, {colors.fg.warning} 70%, {colors.fg})',
@@ -84,8 +84,8 @@ export const getWorkflowLibraryEntryFacts = (
 };
 
 /**
- * On an accent fill (the selected list row) every readiness hue measures under 1.4:1, so the dot sits on a 2px ring
- * of the panel colour, against which each hue keeps at least 3:1 in every theme, and the fact text takes the row's.
+ * On an accent fill (the selected list row) every readiness hue measures under 1.4:1, so the dot sits on a 2px ring of
+ * the panel colour, against which each hue keeps at least 3:1 in every theme, and the fact text takes the row's.
  */
 const ON_ACCENT_DOT_RING = '0 0 0 2px {colors.bg.panel}';
 

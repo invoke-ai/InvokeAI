@@ -125,7 +125,6 @@ export const PromptTemplateEditor = ({
         saved = await catalog.create(nextDraft);
       }
     } catch (caught) {
-      // Unwrap raw ApiError bodies for display.
       setError(getApiErrorMessage(caught, t('widgets.generate.promptTemplates.couldNotSave')));
       return;
     } finally {

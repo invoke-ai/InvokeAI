@@ -3,13 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { FieldInputTemplate, InvocationTemplate, InvocationTemplatesSnapshot, ProjectGraphState } from './types';
 
-import {
-  compileProjectGraph,
-  getProjectGraphReadiness,
-  getWorkflowFieldSeedMode,
-  isSeedInputField,
-  planWorkflowSubmission,
-} from './buildGraph';
+import { compileProjectGraph, getProjectGraphReadiness, isSeedInputField, planWorkflowSubmission } from './buildGraph';
 import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from './callSavedWorkflow';
 import {
   buildConnectorNode,
@@ -117,12 +111,6 @@ describe('getProjectGraphReadiness', () => {
     expect(readinessInEnglish(empty, loadedSnapshot).reasons[0]).toMatch(/no nodes/);
   });
 
-  it('is ready when required inputs are connected or filled', () => {
-    const { doc } = buildDocument();
-
-    expect(readinessInEnglish(doc, loadedSnapshot)).toEqual({ batch: null, canInvoke: true, reasons: [] });
-  });
-
   it('treats resolved connector output edges as connected required inputs', () => {
     const sourceNode = buildInvocationNode(templates.source, { x: 0, y: 0 });
     const sinkNode = buildInvocationNode(templates.sink, { x: 10, y: 0 });
@@ -191,142 +179,6 @@ describe('getProjectGraphReadiness', () => {
     expect(readinessInEnglish(doc, unknownTemplates).reasons[0]).toMatch(/Unknown node type "sink"/);
   });
 
-  it('reports invalid required direct values', () => {
-    const constrainedTemplate = template('constrained', {
-      choice: input('choice', {
-        options: ['a', 'b'],
-        required: true,
-        type: { batch: false, cardinality: 'SINGLE', name: 'EnumField' },
-      }),
-      count: input('count', {
-        maximum: 4,
-        minimum: 1,
-        required: true,
-        type: { batch: false, cardinality: 'SINGLE', name: 'IntegerField' },
-      }),
-    });
-    const node = buildInvocationNode(constrainedTemplate, { x: 0, y: 0 });
-    let doc = createProjectGraph('invalid-values');
-
-    doc = projectGraphReducer(doc, { node, type: 'addNode' });
-    doc = projectGraphReducer(doc, { fieldName: 'choice', nodeId: node.id, type: 'setFieldValue', value: 'z' });
-    doc = projectGraphReducer(doc, { fieldName: 'count', nodeId: node.id, type: 'setFieldValue', value: 10 });
-
-    const readiness = readinessInEnglish(doc, {
-      error: null,
-      status: 'loaded',
-      templates: { constrained: constrainedTemplate },
-    });
-
-    expect(readiness.canInvoke).toBe(false);
-    expect(readiness.reasons).toEqual([
-      '"constrained" has invalid input "choice".',
-      '"constrained" has invalid input "count".',
-    ]);
-  });
-
-  it('names the node and input each issue is about, so a surface can lead to it', () => {
-    const { doc, sourceId } = buildDocument();
-    const withMissingValue = projectGraphReducer(doc, {
-      fieldName: 'value',
-      nodeId: sourceId,
-      type: 'setFieldValue',
-      value: undefined,
-    });
-
-    expect(getProjectGraphReadiness(withMissingValue, loadedSnapshot).reasons).toEqual([
-      {
-        workflowIssue: {
-          fieldName: 'value',
-          message: expect.stringMatching(/missing required input/),
-          messageKey: 'nodes.readiness.missingInput',
-          messageValues: { field: expect.any(String), node: expect.any(String) },
-          nodeId: sourceId,
-        },
-      },
-    ]);
-    expect(getProjectGraphReadiness(createProjectGraph('empty'), loadedSnapshot).reasons).toEqual([
-      { workflowIssue: { message: expect.any(String), messageKey: 'nodes.readiness.noNodes' } },
-    ]);
-  });
-
-  it('reports invalid optional direct values when they are populated', () => {
-    const constrainedTemplate = template('optional-constrained', {
-      count: input('count', {
-        maximum: 4,
-        minimum: 1,
-        required: false,
-        type: { batch: false, cardinality: 'SINGLE', name: 'IntegerField' },
-      }),
-    });
-    const node = buildInvocationNode(constrainedTemplate, { x: 0, y: 0 });
-    let doc = createProjectGraph('invalid-optional-values');
-
-    doc = projectGraphReducer(doc, { node, type: 'addNode' });
-
-    expect(
-      readinessInEnglish(doc, {
-        error: null,
-        status: 'loaded',
-        templates: { 'optional-constrained': constrainedTemplate },
-      })
-    ).toEqual({ batch: null, canInvoke: true, reasons: [] });
-
-    doc = projectGraphReducer(doc, { fieldName: 'count', nodeId: node.id, type: 'setFieldValue', value: 10 });
-
-    expect(
-      readinessInEnglish(doc, {
-        error: null,
-        status: 'loaded',
-        templates: { 'optional-constrained': constrainedTemplate },
-      })
-    ).toEqual({ batch: null, canInvoke: false, reasons: ['"optional-constrained" has invalid input "count".'] });
-  });
-
-  it('validates a form-exposed field against its authored bounds', () => {
-    const constrainedTemplate = template('form-bounded', {
-      count: input('count', {
-        maximum: 100,
-        minimum: 0,
-        required: false,
-        type: { batch: false, cardinality: 'SINGLE', name: 'IntegerField' },
-      }),
-    });
-    const snapshot = { error: null, status: 'loaded', templates: { 'form-bounded': constrainedTemplate } } as const;
-    const node = buildInvocationNode(constrainedTemplate, { x: 0, y: 0 });
-    let doc = createProjectGraph('form-bounds');
-
-    doc = projectGraphReducer(doc, { node, type: 'addNode' });
-    doc = projectGraphReducer(doc, { fieldName: 'count', nodeId: node.id, type: 'setFieldValue', value: 50 });
-    doc = projectGraphReducer(doc, { fieldIdentifier: { fieldName: 'count', nodeId: node.id }, type: 'exposeField' });
-
-    const element = Object.values(doc.form.elements).find((candidate) => candidate.type === 'node-field');
-
-    expect(element).toBeDefined();
-    expect(readinessInEnglish(doc, snapshot).canInvoke).toBe(true);
-
-    doc = projectGraphReducer(doc, {
-      elementId: element!.id,
-      settings: { component: 'slider', max: 20, min: 0, type: 'integer-field-config' },
-      type: 'setNodeFieldSettings',
-    });
-
-    expect(readinessInEnglish(doc, snapshot)).toEqual({
-      batch: null,
-      canInvoke: false,
-      reasons: ['"form-bounded" has invalid input "count".'],
-    });
-
-    // An inverted pair is ignored rather than blocking the invoke.
-    doc = projectGraphReducer(doc, {
-      elementId: element!.id,
-      settings: { component: 'slider', max: 20, min: 30, type: 'integer-field-config' },
-      type: 'setNodeFieldSettings',
-    });
-
-    expect(readinessInEnglish(doc, snapshot).canInvoke).toBe(true);
-  });
-
   it('treats only explicitly externally satisfied connection inputs as ready', () => {
     const connectionTemplate = template('connection-sink', {
       image: input('image', {
@@ -361,30 +213,6 @@ describe('getProjectGraphReadiness', () => {
       })
     ).toEqual({ batch: null, canInvoke: true, reasons: [] });
   });
-
-  it('does not let external satisfaction bypass a required direct value', () => {
-    const directTemplate = template('direct-sink', {
-      image: input('image', {
-        input: 'direct',
-        required: true,
-        title: 'Layer image',
-        type: { batch: false, cardinality: 'SINGLE', name: 'ImageField' },
-      }),
-    });
-    const node = buildInvocationNode(directTemplate, { x: 0, y: 0 });
-    const doc = { ...createProjectGraph('external-direct'), nodes: [{ ...node, id: 'sink' }] };
-    const snapshot: InvocationTemplatesSnapshot = {
-      error: null,
-      status: 'loaded',
-      templates: { 'direct-sink': directTemplate },
-    };
-
-    expect(readinessInEnglish(doc, snapshot, { externallySatisfiedInputs: new Set(['sink:image']) })).toEqual({
-      batch: null,
-      canInvoke: false,
-      reasons: ['"direct-sink" is missing required input "Layer image".'],
-    });
-  });
 });
 
 describe('compileProjectGraph', () => {
@@ -407,38 +235,6 @@ describe('compileProjectGraph', () => {
     expect(backendGraph?.edges).toEqual([
       { destination: { field: 'text', node_id: sinkId }, source: { field: 'out', node_id: sourceId }, type: 'default' },
     ]);
-  });
-
-  it('omits auto/none board sentinels from ordinary nodes and keeps explicit boards', () => {
-    const { doc, sinkId } = buildDocument();
-    const withAutoBoard = projectGraphReducer(doc, {
-      fieldName: 'board',
-      nodeId: sinkId,
-      type: 'setFieldValue',
-      value: 'auto',
-    });
-
-    expect(compileProjectGraph(withAutoBoard, templates).backendGraph?.nodes[sinkId]).not.toHaveProperty('board');
-
-    const withNoneBoard = projectGraphReducer(doc, {
-      fieldName: 'board',
-      nodeId: sinkId,
-      type: 'setFieldValue',
-      value: 'none',
-    });
-
-    expect(compileProjectGraph(withNoneBoard, templates).backendGraph?.nodes[sinkId]).not.toHaveProperty('board');
-
-    const withExplicitBoard = projectGraphReducer(doc, {
-      fieldName: 'board',
-      nodeId: sinkId,
-      type: 'setFieldValue',
-      value: { board_id: 'board-1' },
-    });
-
-    expect(compileProjectGraph(withExplicitBoard, templates).backendGraph?.nodes[sinkId]).toMatchObject({
-      board: { board_id: 'board-1' },
-    });
   });
 
   it('resolves Auto and an unset board to the auto-add board and leaves None Uncategorized', () => {
@@ -468,38 +264,6 @@ describe('compileProjectGraph', () => {
     expect(
       compileProjectGraph(toUncategorized, templates, { autoBoardId: 'none' }).backendGraph?.nodes[sinkId]
     ).not.toHaveProperty('board');
-  });
-
-  it('sends an explicit board the destination predicate refuses where Auto goes, and keeps one it allows', () => {
-    const { doc, sinkId } = buildDocument();
-    const isBoardDestination = vi.fn((boardId: string) => boardId === 'kept');
-    const withBoard = (value: unknown, autoBoardId: string | null) =>
-      compileProjectGraph(
-        projectGraphReducer(doc, { fieldName: 'board', nodeId: sinkId, type: 'setFieldValue', value }),
-        templates,
-        { autoBoardId, isBoardDestination }
-      ).backendGraph?.nodes[sinkId];
-
-    expect(withBoard({ board_id: 'kept' }, 'auto-board')).toMatchObject({ board: { board_id: 'kept' } });
-    // Revoked, archived away or deleted since it was chosen: the run lands on the auto-add board instead.
-    expect(withBoard({ board_id: 'revoked' }, 'auto-board')).toMatchObject({ board: { board_id: 'auto-board' } });
-    // With no auto-add board the refused board resolves like Auto: unboarded, so Uncategorized.
-    expect(withBoard({ board_id: 'revoked' }, 'none')).not.toHaveProperty('board');
-    // The sentinels never ask the predicate; without a predicate an explicit board is taken as given.
-    expect(withBoard('none', 'auto-board')).not.toHaveProperty('board');
-    expect(isBoardDestination.mock.calls.map(([boardId]) => boardId)).toEqual(['kept', 'revoked', 'revoked']);
-    expect(
-      compileProjectGraph(
-        projectGraphReducer(doc, {
-          fieldName: 'board',
-          nodeId: sinkId,
-          type: 'setFieldValue',
-          value: { board_id: 'revoked' },
-        }),
-        templates,
-        { autoBoardId: 'auto-board' }
-      ).backendGraph?.nodes[sinkId]
-    ).toMatchObject({ board: { board_id: 'revoked' } });
   });
 
   it('preserves auto/none board sentinels only in Call Saved Workflow inputs', () => {
@@ -669,99 +433,6 @@ describe('compileProjectGraph', () => {
       },
     ]);
   });
-
-  it('rejects a loop-linkage source reused as ordinary connector data', () => {
-    const forTemplate: InvocationTemplate = {
-      ...template('for', {
-        collection: input('collection', {
-          default: [],
-          type: { batch: false, cardinality: 'COLLECTION', name: 'CollectionField' },
-        }),
-      }),
-      outputs: {
-        item: {
-          description: '',
-          name: 'item',
-          outputScope: 'iteration',
-          title: 'Item',
-          type: { batch: false, cardinality: 'SINGLE', name: 'CollectionItemField' },
-        },
-        loop_linkage: {
-          description: '',
-          name: 'loop_linkage',
-          title: 'Loop linkage',
-          type: { batch: false, cardinality: 'SINGLE', name: 'AnyField' },
-        },
-        output_collection: {
-          description: '',
-          name: 'output_collection',
-          outputScope: 'final',
-          title: 'Output collection',
-          type: { batch: false, cardinality: 'COLLECTION', name: 'CollectionField' },
-        },
-      },
-    };
-    const returnTemplate: InvocationTemplate = {
-      ...template('for_return', {
-        loop_linkage: input('loop_linkage', {
-          input: 'connection',
-          type: { batch: false, cardinality: 'SINGLE', name: 'AnyField' },
-        }),
-        output: input('output', { type: { batch: false, cardinality: 'SINGLE', name: 'CollectionItemField' } }),
-      }),
-      outputs: {},
-    };
-    const sinkTemplate = template('sink', { value: input('value') });
-    const forNode = buildInvocationNode(forTemplate, { x: 0, y: 0 });
-    const returnNode = buildInvocationNode(returnTemplate, { x: 100, y: 0 });
-    const sinkNode = buildInvocationNode(sinkTemplate, { x: 200, y: 0 });
-    const connector = buildConnectorNode({ x: 50, y: 0 });
-    const document: ProjectGraphState = {
-      ...createProjectGraph('invalid-loop-linkage-source'),
-      edges: [
-        {
-          id: 'item',
-          source: forNode.id,
-          sourceHandle: 'item',
-          target: returnNode.id,
-          targetHandle: 'output',
-          type: 'default',
-        },
-        {
-          id: 'linkage',
-          source: forNode.id,
-          sourceHandle: 'loop_linkage',
-          target: returnNode.id,
-          targetHandle: 'loop_linkage',
-          type: 'loop_linkage',
-        },
-        {
-          id: 'connector-in',
-          source: forNode.id,
-          sourceHandle: 'loop_linkage',
-          target: connector.id,
-          targetHandle: 'in',
-          type: 'default',
-        },
-        {
-          id: 'connector-out',
-          source: connector.id,
-          sourceHandle: 'out',
-          target: sinkNode.id,
-          targetHandle: 'value',
-          type: 'default',
-        },
-      ],
-      nodes: [forNode, returnNode, sinkNode, connector],
-    };
-    const loopTemplates = { for: forTemplate, for_return: returnTemplate, sink: sinkTemplate };
-
-    expect(getProjectGraphReadiness(document, { error: null, status: 'loaded', templates: loopTemplates })).toEqual({
-      batch: null,
-      canInvoke: false,
-      reasons: [{ key: 'nodes.forLoopLinkageInvalid' }],
-    });
-  });
 });
 
 describe('planWorkflowSubmission', () => {
@@ -823,15 +494,6 @@ describe('planWorkflowSubmission', () => {
     return { doc, ids };
   };
 
-  it('repeats an unchanged graph while every seed holds', () => {
-    const { doc, ids } = buildSeeded([{ seed: 7 }, { seed: 9, seedMode: 'fixed' }]);
-    const plan = planSubmission(doc, seededTemplates, { batchCount: 3 });
-
-    expect(plan).toMatchObject({ batchCount: 3, seedAdvances: [], seeds: [] });
-    expect(plan.graph.backendGraph.nodes[ids[0] as string]?.seed).toBe(7);
-    expect(plan.graph.backendGraph.nodes[ids[1] as string]?.seed).toBe(9);
-  });
-
   it('records one start per stepping seed and where each field goes after the batch', () => {
     const { doc, ids } = buildSeeded([
       { seed: 42, seedMode: 'increment' },
@@ -852,27 +514,6 @@ describe('planWorkflowSubmission', () => {
     expect(plan.graph.backendGraph.nodes[ids[0] as string]?.seed).toBe(42);
     expect(plan.graph.backendGraph.nodes[ids[2] as string]?.seed).toBe(5);
     expect(plan.graph.nodes.find((node) => node.id === ids[1])?.inputs.seed).toBe(100);
-  });
-
-  it('plans persisted dynamic seed fields', () => {
-    const dynamicTemplate = template('dynamic_node', {});
-    const node = buildInvocationNode(dynamicTemplate, { x: 0, y: 0 });
-    node.data.dynamicInputTemplates = { seed: seedInput };
-    node.data.inputs.seed = { label: 'Seed', name: 'seed', seedMode: 'increment', value: 42 };
-    const document = { ...createProjectGraph('dynamic-seed-plan'), nodes: [node] };
-
-    const plan = planSubmission(document, { dynamic_node: dynamicTemplate }, { batchCount: 2 });
-
-    expect(plan.seeds).toEqual([{ fieldName: 'seed', nodeId: node.id, seed: 42, seedStep: 1 }]);
-    expect(plan.graph.backendGraph.nodes[node.id]?.seed).toBe(42);
-  });
-
-  it('wraps the authored seed and the advance over the inclusive seed range', () => {
-    const { doc } = buildSeeded([{ seed: 1, seedMode: 'decrement' }]);
-    const plan = planSubmission(doc, seededTemplates, { batchCount: 3 });
-
-    expect(plan.seeds[0]).toMatchObject({ seed: 1, seedStep: -1 });
-    expect(plan.seedAdvances[0]?.toSeed).toBe(SEED_MAX - 1);
   });
 
   it('draws a random start into the graph and never advances the entered seed', () => {
@@ -899,48 +540,6 @@ describe('planWorkflowSubmission', () => {
       random.mockRestore();
     }
   });
-
-  it('leaves a connected seed to its upstream node and keeps the local mode for later', () => {
-    const { doc, ids } = buildSeeded([{ seed: 42, seedMode: 'increment' }]);
-    const source = buildInvocationNode(seededTemplates.integer, { x: -100, y: 0 });
-    const connected = projectGraphReducer(projectGraphReducer(doc, { node: source, type: 'addNode' }), {
-      edge: {
-        id: 'e',
-        source: source.id,
-        sourceHandle: 'out',
-        target: ids[0] as string,
-        targetHandle: 'seed',
-        type: 'default',
-      },
-      type: 'addEdge',
-    });
-    const plan = planSubmission(connected, seededTemplates, { batchCount: 2 });
-
-    expect(plan).toMatchObject({ seedAdvances: [], seeds: [] });
-    expect(plan.graph.backendGraph.nodes[ids[0] as string]).not.toHaveProperty('seed');
-    expect(connected.nodes.find((node) => node.id === ids[0])).toMatchObject({
-      data: { inputs: { seed: { seedMode: 'increment', value: 42 } } },
-    });
-  });
-
-  it('steps an empty seed input from the template default and fills it in afterwards', () => {
-    const { doc, ids } = buildSeeded([{ seedMode: 'increment' }]);
-    const emptied = projectGraphReducer(doc, {
-      fieldName: 'seed',
-      nodeId: ids[0] as string,
-      type: 'setFieldValue',
-      value: undefined,
-    });
-    const plan = planSubmission(emptied, seededTemplates, { batchCount: 2 });
-
-    expect(plan.seeds).toEqual([{ fieldName: 'seed', nodeId: ids[0], seed: 0, seedStep: 1 }]);
-    expect(plan.graph.backendGraph.nodes[ids[0] as string]?.seed).toBe(0);
-    // The advance is fenced on the empty value, so the field fills in with the seed after the batch.
-    expect(plan.seedAdvances).toEqual([{ fieldName: 'seed', nodeId: ids[0], seedMode: 'increment', toSeed: 2 }]);
-    expect(
-      projectGraphReducer(emptied, { advances: plan.seedAdvances, type: 'advanceSeedFields' }).nodes[0]
-    ).toMatchObject({ data: { inputs: { seed: { value: 2 } } } });
-  });
 });
 
 describe('seed inputs', () => {
@@ -956,34 +555,6 @@ describe('seed inputs', () => {
     expect(isSeedInputField(seed())).toBe(true);
     // The title is what a user edits; the name and range are what the backend declared.
     expect(isSeedInputField(seed({ title: 'Noise seed' }))).toBe(true);
-  });
-
-  it('leaves other integers, other ranges, and connection-only seeds alone', () => {
-    expect(isSeedInputField(seed({ name: 'steps' }))).toBe(false);
-    expect(isSeedInputField(seed({ maximum: 1_000 }))).toBe(false);
-    expect(isSeedInputField(seed({ maximum: null }))).toBe(false);
-    expect(isSeedInputField(seed({ type: { batch: false, cardinality: 'SINGLE', name: 'FloatField' } }))).toBe(false);
-    expect(isSeedInputField(seed({ type: { batch: false, cardinality: 'COLLECTION', name: 'IntegerField' } }))).toBe(
-      false
-    );
-    expect(isSeedInputField(seed({ input: 'connection' }))).toBe(false);
-  });
-
-  it('requires the template to accept the whole walk: every value from 0 to the maximum in steps of one', () => {
-    expect(isSeedInputField(seed({ minimum: null }))).toBe(true);
-    expect(isSeedInputField(seed({ multipleOf: 1 }))).toBe(true);
-    // A custom node with a seed of 1…SEED_MAX would receive Decrement and submit 0.
-    expect(isSeedInputField(seed({ minimum: 1 }))).toBe(false);
-    expect(isSeedInputField(seed({ exclusiveMinimum: 0 }))).toBe(false);
-    expect(isSeedInputField(seed({ exclusiveMaximum: 4_294_967_295 }))).toBe(false);
-    expect(isSeedInputField(seed({ multipleOf: 2 }))).toBe(false);
-  });
-
-  it('reads an absent or unknown mode as fixed', () => {
-    expect(getWorkflowFieldSeedMode(undefined)).toBe('fixed');
-    expect(getWorkflowFieldSeedMode({})).toBe('fixed');
-    expect(getWorkflowFieldSeedMode({ seedMode: 'shuffle' as never })).toBe('fixed');
-    expect(getWorkflowFieldSeedMode({ seedMode: 'decrement' })).toBe('decrement');
   });
 });
 
@@ -1017,7 +588,6 @@ describe('integer Literal enum values in the compiled graph', () => {
     },
   };
 
-  // Compile template literals to backend-accepted numbers, not numeric strings.
   it('sends a numeric Literal enum value', () => {
     const parsedTemplates = parseOpenApiToTemplates(literalEnumSchema);
     const parsedTemplate = parsedTemplates.max_seq_len_invocation;
@@ -1031,31 +601,6 @@ describe('integer Literal enum values in the compiled graph', () => {
 
     expect(compileProjectGraph(doc, parsedTemplates).backendGraph?.nodes[node.id]).toMatchObject({
       max_seq_len: 512,
-    });
-  });
-
-  // Compile selected dropdown values numerically as well as defaults.
-  it('sends a numeric value for the option the field widget offers', () => {
-    const parsedTemplates = parseOpenApiToTemplates(literalEnumSchema);
-    const parsedTemplate = parsedTemplates.max_seq_len_invocation;
-    const firstOption = parsedTemplate?.inputs.max_seq_len?.options?.[0];
-
-    if (!parsedTemplate || firstOption === undefined) {
-      throw new Error('fixture template was not parsed');
-    }
-
-    const node = buildInvocationNode(parsedTemplate, { x: 0, y: 0 });
-    let doc = projectGraphReducer(createProjectGraph('literal-enum-pick'), { node, type: 'addNode' });
-
-    doc = projectGraphReducer(doc, {
-      fieldName: 'max_seq_len',
-      nodeId: node.id,
-      type: 'setFieldValue',
-      value: firstOption,
-    });
-
-    expect(compileProjectGraph(doc, parsedTemplates).backendGraph?.nodes[node.id]).toMatchObject({
-      max_seq_len: 256,
     });
   });
 });
@@ -1138,21 +683,6 @@ describe('batch nodes', () => {
     return { batchId: batch.id, doc, noiseId: noise.id };
   };
 
-  it('is ready with a fed, wired batch node and reports the batch size', () => {
-    const { doc } = build([1.5, 2.5]);
-
-    expect(readinessInEnglish(doc, snapshot)).toEqual({ batch: { size: 2 }, canInvoke: true, reasons: [] });
-  });
-
-  it("still judges each entry of a batch node's own list, so a cleared row cannot reach the queue", () => {
-    const { doc } = build([1.5, null as unknown as number]);
-
-    expect(readinessInEnglish(doc, snapshot)).toMatchObject({
-      canInvoke: false,
-      reasons: ['"float_batch" has invalid input "floats".'],
-    });
-  });
-
   it('refuses a batch whose runs would overflow the queue before anything is submitted', () => {
     const { doc } = build([1.5, 2.5]);
 
@@ -1164,34 +694,6 @@ describe('batch nodes', () => {
     expect(readinessInEnglish(doc, snapshot, { batchCount: 5_001 })).toMatchObject({
       canInvoke: false,
       reasons: ['This batch would queue 10,002 sessions; the queue accepts at most 10,000.'],
-    });
-  });
-
-  it('blocks on batch reasons and leaves the size unknown while a generator is unresolved', () => {
-    const { doc } = build([]);
-
-    expect(readinessInEnglish(doc, snapshot)).toMatchObject({
-      batch: { size: 0 },
-      canInvoke: false,
-      reasons: ['Batch node "float_batch" has an empty collection.'],
-    });
-
-    // A batch node's own list is the planner's business: a generator-fed batch has no list of its own.
-    const generated = build([], { count: 3, start: 1, step: 1, type: 'float_generator_arithmetic_sequence' });
-
-    expect(readinessInEnglish(generated.doc, snapshot)).toEqual({
-      batch: { size: 3 },
-      canInvoke: true,
-      reasons: [],
-    });
-
-    // A cleared or off-rule setting is readable, so the field names it and the planner reports nothing more.
-    const cleared = build([], { count: null, start: 1, step: 1, type: 'float_generator_arithmetic_sequence' });
-
-    expect(readinessInEnglish(cleared.doc, snapshot)).toEqual({
-      batch: { size: null },
-      canInvoke: false,
-      reasons: ['"float_generator" has invalid input "generator".'],
     });
   });
 

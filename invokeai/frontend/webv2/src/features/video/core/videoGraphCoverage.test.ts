@@ -33,8 +33,8 @@ describe('video graph coverage', () => {
   });
 
   it('compiles at least one case for every registered variant', () => {
-    // The selectability filter in `cases` drops shapes the panel refuses; a variant it drops entirely
-    // would leave this suite silently covering nothing for it.
+    // The selectability filter in `cases` drops shapes the panel refuses; a variant it drops entirely would leave this
+    // suite silently covering nothing for it.
     const covered = new Set(cases.map((testCase) => `${testCase.base}/${testCase.variant}`));
     const registered = SUPPORTED_VIDEO_BASES.flatMap((base) =>
       Object.keys(VIDEO_GENERATION[base].variants).map((variant) => `${base}/${variant}`)
@@ -88,8 +88,8 @@ describe('video graph coverage', () => {
         const { literals } = fieldsFor(node.type);
 
         for (const [field, value] of Object.entries(node)) {
-          // `id` and `type` address the node rather than feed it, and an undefined value is not
-          // serialized into the request at all — the builders use it to mean "leave the default".
+          // `id` and `type` address the node rather than feed it, and an undefined value is not serialized into the
+          // request at all — the builders use it to mean "leave the default".
           if (field === 'id' || field === 'type' || value === undefined) {
             continue;
           }
@@ -97,9 +97,6 @@ describe('video graph coverage', () => {
           const values = literals.get(field) ?? new Map<string, unknown>();
           literals.set(field, values);
 
-          // Scalars only: the object-valued inputs are model identifiers and media fields built
-          // from this file's synthetic fixtures, so validating them would assert something about
-          // the fixture rather than about the contract.
           if (value === null || typeof value !== 'object') {
             values.set(JSON.stringify(value), value);
           }
@@ -109,9 +106,9 @@ describe('video graph coverage', () => {
       for (const edge of graph.edges) {
         fieldsFor(graph.nodes[edge.source.node_id]!.type).outputs.add(edge.source.field);
         fieldsFor(graph.nodes[edge.destination.node_id]!.type).inputs.add(edge.destination.field);
-        // The connection itself, by node TYPE, so the Python side can ask the backend whether the
-        // two field types are actually compatible. Field names alone are not enough: a float wired
-        // into an int is two valid names and a graph the queue refuses at enqueue.
+        // The connection itself, by node TYPE, so the Python side can ask the backend whether the two field types are
+        // actually compatible. Field names alone are not enough: a float wired into an int is two valid names and a
+        // graph the queue refuses at enqueue.
         connections.add(
           [
             graph.nodes[edge.source.node_id]!.type,

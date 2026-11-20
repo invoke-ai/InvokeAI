@@ -88,12 +88,14 @@ describe('Picker', () => {
       groups = FRUIT_GROUPS,
       isCompact,
       onSelect = vi.fn(),
+      pending,
       selectedId = null,
       status,
     }: {
       groups?: PickerGroup<Fruit>[];
       isCompact?: boolean;
       onSelect?: (fruit: Fruit) => void;
+      pending?: PickerStatus;
       selectedId?: string | null;
       status?: PickerStatus;
     } = {}
@@ -112,6 +114,7 @@ describe('Picker', () => {
               isMatch={isMatch}
               listLabel={`Fruit ${index}`}
               noMatchesMessage="No fruit matches"
+              pending={pending}
               renderOption={renderOption}
               searchPlaceholder={`Search fruit ${index}`}
               selectedId={selectedId}
@@ -248,6 +251,39 @@ describe('Picker', () => {
     await act(() => userEvent.type(search(), 'kiwi'));
     await expect.poll(statusText).toBe('No fruit matches');
     expect(search().getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('reports options still to come beside the listed ones, for no options and for an unmatched search', async () => {
+    const statusText = () => host.querySelector('[role="status"]')?.textContent;
+    const options = () => host.querySelectorAll('[role="option"]').length;
+
+    await renderPickers(1, { pending: { message: 'Checking more fruit' } });
+    expect(options()).toBeGreaterThan(0);
+    expect(statusText()).toBe('Checking more fruit');
+
+    await act(() => userEvent.type(search(), 'kiwi'));
+    await expect.poll(options).toBe(0);
+    expect(statusText()).toBe('Checking more fruit');
+
+    await act(() => root.unmount());
+    root = createRoot(host);
+    await renderPickers(1, { groups: [], pending: { message: 'Checking more fruit' } });
+    expect(statusText()).toBe('Checking more fruit');
+  });
+
+  it('offers a retry for options that failed to load and keeps focus in the picker', async () => {
+    const onRetry = vi.fn();
+
+    await renderPickers(1, { pending: { isError: true, message: 'More fruit failed to load', onRetry } });
+    expect(host.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('More fruit failed to load');
+
+    const retry = [...host.querySelectorAll('button')].find((button) => button.textContent === 'common.retry')!;
+    retry.focus();
+    await act(() => retry.click());
+    expect(onRetry).toHaveBeenCalledOnce();
+    // The retry's loading status replaces the button; focus must not fall to the page.
+    expect(document.activeElement).toBe(search());
   });
 
   const viewportOf = (element: Element) => element.closest<HTMLElement>('[data-part="viewport"]')!;

@@ -311,8 +311,7 @@ describe('auto invocation route switching on widget reveal', () => {
 
     const before = state;
 
-    // Bound to `onPointerDownCapture`, so this fires on every scroll and click
-    // inside the window, not just on a raise.
+    // Bound to `onPointerDownCapture`, so this fires on every scroll and click inside the window, not just on a raise.
     state = workbenchReducer(state, { instanceId: 'upscale', type: 'raiseFloatingWidget' });
 
     expect(state).toBe(before);

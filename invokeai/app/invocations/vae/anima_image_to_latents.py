@@ -27,7 +27,6 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.qwen_image_vae import (
     QWEN_IMAGE_VAE_MIN_TILE_SIZE,
     as_qwen_image_vae,
@@ -92,7 +91,7 @@ class AnimaImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
             vae = as_qwen_image_vae(vae)
 
             vae_dtype = next(iter(vae.parameters())).dtype
-            image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
+            image_tensor = image_tensor.to(device=vae_info.compute_device, dtype=vae_dtype)
 
             # The cached VAE instance is shared with the decode invocation, which may have enabled
             # tiling. That used to be handled by switching tiling off here and leaving it off, which

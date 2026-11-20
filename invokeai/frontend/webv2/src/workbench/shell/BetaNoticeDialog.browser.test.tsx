@@ -74,7 +74,6 @@ describe('BetaNoticeDialog', () => {
   });
 
   it('waits for preferences, then shows once with focus on the dismiss action, and records the acknowledgement', async () => {
-    // Not before the account's preferences are known: an acknowledged account must not see it flash.
     expect(document.querySelector('[role="alertdialog"]')).toBeNull();
 
     await setSnapshot({ preferences: { betaNoticeAcknowledged: false }, status: 'ready' });

@@ -73,8 +73,8 @@ describe('widget implementation resource rendering', () => {
     const resource = createWidgetImplementationResource('test', loader);
 
     await renderResource(resource);
-    // i18n is not initialized under test, so `t()` returns raw keys — assert on
-    // the fallback's structure rather than its copy.
+    // i18n is not initialized under test, so `t()` returns raw keys — assert on the fallback's structure rather than
+    // its copy.
     await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
     expect(host?.textContent).toContain('test');
 

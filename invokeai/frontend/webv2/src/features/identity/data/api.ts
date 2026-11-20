@@ -69,8 +69,8 @@ export const logout = (): Promise<{ success: boolean }> =>
   apiFetchJson<{ success: boolean }>(`${AUTH_BASE}/logout`, { method: 'POST' });
 
 /**
- * Restore the media cookie for stored-token sessions before elements load; they cannot send bearer headers.
- * Single-user backends safely no-op.
+ * Restore the media cookie for stored-token sessions before elements load; they cannot send bearer headers. Single-user
+ * backends safely no-op.
  */
 export const refreshMediaCookie = (signal?: AbortSignal): Promise<{ success: boolean }> =>
   apiFetchJson<{ success: boolean }>(`${AUTH_BASE}/media-cookie`, { method: 'POST', signal });

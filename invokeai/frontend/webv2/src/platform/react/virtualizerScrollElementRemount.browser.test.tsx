@@ -96,8 +96,8 @@ describe('useVirtualizer scroll element remount', () => {
   };
 
   it('still exposes the private virtual-core members the local patch reads', async () => {
-    // patches/react-hook-tanstack-virtual.patch reads these members. If upstream renames one, the reconcile
-    // quietly stops running, and the tests below still pass because they set these members themselves.
+    // patches/react-hook-tanstack-virtual.patch reads these members. If upstream renames one, the reconcile quietly
+    // stops running, and the tests below still pass because they set these members themselves.
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -111,8 +111,8 @@ describe('useVirtualizer scroll element remount', () => {
   });
 
   it('does not consume a programmatic scroll\u2019s pending write while reconciling', async () => {
-    // Clearing the pending write would make its scroll event match the reconciled offset and be dropped as
-    // spurious, leaving scrolling state and an in-flight scrollToIndex without it.
+    // Clearing the pending write would make its scroll event match the reconciled offset and be dropped as spurious,
+    // leaving scrolling state and an in-flight scrollToIndex without it.
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -136,8 +136,8 @@ describe('useVirtualizer scroll element remount', () => {
   });
 
   it('keeps a held scroll correction instead of reconciling it away', async () => {
-    // While a correction is held, the layout offset differs from the element by it on purpose; adopting the
-    // element's offset would drop the correction and shift the rows under the reader.
+    // While a correction is held, the layout offset differs from the element by it on purpose; adopting the element's
+    // offset would drop the correction and shift the rows under the reader.
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);

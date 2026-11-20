@@ -1,4 +1,4 @@
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -177,7 +177,6 @@ describe('getControlValidationReason', () => {
   it.each(['klein_4b', 'klein_9b', 'klein_9b_base', undefined])(
     'refuses the FLUX.2 control on variant %s before asking for a model or valid values',
     (mainVariant) => {
-      // Capabilities are per base, so the variant is the policy's to judge; the denoise refuses everything but dev.
       const klein = {
         adapterModel: { base: 'flux2', type: 'controlnet' },
         beginEndStepPct: [0, 1] as [number, number],
@@ -266,7 +265,6 @@ describe('Anima ControlNet-LLLite validation', () => {
     expect(isAnimaInpaintAdapterModel({ ...adapter, cond_in_channels: 3 })).toBe(false);
     expect(isAnimaInpaintAdapterModel({ ...adapter, base: 'sdxl' })).toBe(false);
     expect(isAnimaInpaintAdapterModel({ ...adapter, type: 'lora' })).toBe(false);
-    // The two slots partition the installed Anima LLLite models.
     expect(isControlModelUsableForKind(adapter, 'anima_lllite')).toBe(false);
     expect(isControlModelUsableForKind({ ...adapter, cond_in_channels: 3 }, 'anima_lllite')).toBe(true);
   });
@@ -277,7 +275,6 @@ describe('Anima ControlNet-LLLite validation', () => {
     expect(isControlModelUsableForKind({ ...control, cond_in_channels: 4 }, 'anima_lllite')).toBe(false);
     expect(isControlModelUsableForKind({ ...control, cond_in_channels: null }, 'anima_lllite')).toBe(false);
     expect(isControlModelUsableForKind({ ...control, type: 'lora' }, 'anima_lllite')).toBe(false);
-    // Channel count is LLLite policy only.
     expect(isControlModelUsableForKind({ base: 'sdxl', type: 'controlnet' }, 'controlnet')).toBe(true);
   });
 });
@@ -364,7 +361,6 @@ describe('createControlValidationSequence', () => {
     expect(generate(qwen)).toBeNull();
     expect(generate(qwen)).toBe('qwen_image_control_limit');
 
-    // A refused layer claims no slot, so every layer on an Edit model reports the same reason.
     const edit = createControlValidationSequence({ base: 'qwen-image', variant: 'edit' });
     expect(edit(qwen)).toBe('qwen_image_edit_control');
     expect(edit(qwen)).toBe('qwen_image_edit_control');
@@ -381,7 +377,6 @@ describe('createControlValidationSequence', () => {
     expect(generate(flux2)).toBeNull();
     expect(generate(flux2)).toBe('flux2_control_limit');
 
-    // A refused layer claims no slot, so every layer on a Klein model reports the same reason.
     const klein = createControlValidationSequence({ base: 'flux2', variant: 'klein_9b' });
     expect(klein(flux2)).toBe('flux2_klein_control');
     expect(klein(flux2)).toBe('flux2_klein_control');

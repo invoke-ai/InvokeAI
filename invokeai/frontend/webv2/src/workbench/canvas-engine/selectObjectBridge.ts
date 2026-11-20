@@ -31,8 +31,8 @@ export interface SelectObjectBridge {
 }
 
 /**
- * SAM bridge validates decoded dimensions against requested mask bounds and reports tagged errors. Start
- * eligibility mirrors UI refusals and provides transformed document bounds.
+ * SAM bridge validates decoded dimensions against requested mask bounds and reports tagged errors. Start eligibility
+ * mirrors UI refusals and provides transformed document bounds.
  */
 export const createSelectObjectBridge = (deps: CreateSelectObjectBridgeDeps): SelectObjectBridge => ({
   decodeSelectObjectPreview: async (result, signal) => {

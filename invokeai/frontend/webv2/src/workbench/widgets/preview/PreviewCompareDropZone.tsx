@@ -6,10 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { PREVIEW_COMPARE_DROP_DATA, PREVIEW_COMPARE_DROP_ID } from './previewCompareDnd';
 
-/**
- * Show comparison drop targets for image-only drags; reject the first item if already displayed so self-comparison
- * cannot pause live-follow.
- */
+/** Image-only drags; the first item is refused if shown, so self-comparison cannot pause live-follow. */
 export const PreviewCompareDropZone = ({ currentImageName }: { currentImageName: string | null }) => {
   const { t } = useTranslation();
   const { active } = useDndContext();

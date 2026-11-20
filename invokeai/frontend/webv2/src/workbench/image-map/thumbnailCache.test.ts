@@ -34,8 +34,7 @@ describe('image map thumbnail cache', () => {
   });
 
   it('resolves a video through its own namespace rather than the image one', async () => {
-    // Same name in both namespaces: without the kind, the video's hover card
-    // would show the image's thumbnail.
+    // Same name in both namespaces: without the kind, the video's hover card would show the image's thumbnail.
     mocks.resolve.mockImplementation((ref: { kind: string; name: string }) =>
       Promise.resolve({ durationSeconds: 2.5, kind: ref.kind, thumbnailUrl: `/thumbs/${ref.kind}/${ref.name}` })
     );
@@ -60,8 +59,7 @@ describe('image map thumbnail cache', () => {
     await expect(getThumbnailUrl({ kind: 'image', name: 'gone.png' })).resolves.toBeNull();
     expect(mocks.resolve).toHaveBeenCalledTimes(1);
 
-    // A backend hiccup is not an answer about this item: caching it would
-    // blank that point's preview for the rest of the session.
+    // A backend hiccup is no answer about this item: caching it would blank that point's preview for the session.
     mocks.resolve.mockRejectedValue(new ApiError('boom', 500));
 
     await expect(getThumbnailUrl({ kind: 'image', name: 'flaky.png' })).resolves.toBeNull();
@@ -73,8 +71,7 @@ describe('image map thumbnail cache', () => {
     mocks.resolve.mockResolvedValue({ kind: 'image', thumbnailUrl: '/thumbs/user-a.png' });
     await getThumbnailUrl({ kind: 'image', name: 'a.png' });
 
-    // A request still in flight when the account switches must not seed the
-    // next account's cache.
+    // A request still in flight when the account switches must not seed the next account's cache.
     let resolveLate: (item: { kind: string; thumbnailUrl: string }) => void = () => {};
     mocks.resolve.mockImplementation(
       () =>

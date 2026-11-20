@@ -6,12 +6,11 @@ import { indexStacks, type CanvasDocumentIndex } from './documentIndex';
 import { insertNodes, isGroupNode } from './documentTree';
 
 /**
- * Where new nodes land in their stack, captured once against the document the caller saw.
- * Resolution is exact and in this order: before a surviving `beforeId` under its current parent,
- * after a surviving `afterId` under its current parent, at the top of the surviving captured
- * parent, at the top of the nearest surviving group on the captured parent path, at the top of
- * the stack. Ids that no longer belong to `stack` count as gone. The reducer refuses an anchor
- * from another project; a structural commit refuses one captured at an older edit revision.
+ * Where new nodes land in their stack, captured once against the document the caller saw. Resolution is exact and in
+ * this order: before a surviving `beforeId` under its current parent, after a surviving `afterId` under its current
+ * parent, at the top of the surviving captured parent, at the top of the nearest surviving group on the captured parent
+ * path, at the top of the stack. Ids that no longer belong to `stack` count as gone. The reducer refuses an anchor from
+ * another project; a structural commit refuses one captured at an older edit revision.
  */
 export interface CanvasNodeInsertionAnchor {
   readonly projectId: string;
@@ -70,7 +69,7 @@ export const captureInsertionAnchor = (
   if (above && above.stack === stack) {
     const siblings =
       above.parentId === null
-        ? stacks[stack]
+        ? (stacks[stack] ?? [])
         : (index.byId.get(above.parentId)!.node as { children: CanvasNodeContract[] }).children;
     return {
       afterId: siblings[above.siblingIndex - 1]?.id ?? null,
@@ -83,7 +82,7 @@ export const captureInsertionAnchor = (
   }
   return {
     afterId: null,
-    beforeId: stacks[stack][0]?.id ?? null,
+    beforeId: stacks[stack]?.[0]?.id ?? null,
     capturedEditRevision: editRevision,
     parentPath: [],
     projectId,
@@ -105,7 +104,7 @@ export const captureRestoreAnchor = (
   }
   const siblings =
     entry.parentId === null
-      ? stacks[entry.stack]
+      ? (stacks[entry.stack] ?? [])
       : (index.byId.get(entry.parentId)!.node as { children: CanvasNodeContract[] }).children;
   return {
     afterId: siblings[entry.siblingIndex - 1]?.id ?? null,

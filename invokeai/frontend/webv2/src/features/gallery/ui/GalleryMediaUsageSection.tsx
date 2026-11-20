@@ -19,9 +19,8 @@ import { GalleryMediaUsageChecking } from './GalleryMediaUsagePanel';
 const KEY = 'widgets.gallery.deleteInUse';
 
 /**
- * The summary line. It counts what the check counted: the requested items, or for a board the items deleting it
- * takes, which can be fewer than the board shows when it holds media of other accounts. One checked item needs no
- * count.
+ * The summary line. It counts what the check counted: the requested items, or for a board the items deleting it takes,
+ * which can be fewer than the board shows when it holds media of other accounts. One checked item needs no count.
  */
 const getSummary = (t: TFunction, report: GalleryMediaUsageReport): string => {
   const { checkedCount: total, inUseCount: count, onlyImages, scope } = report;

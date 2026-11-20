@@ -34,8 +34,8 @@ export const resolveRandDeviceMetadata = (useCpuNoise: boolean, options: readonl
 };
 
 /**
- * Disambiguate duplicate device names with backend-order 1-based suffixes across all installed accelerators,
- * including disabled ones.
+ * Disambiguate duplicate device names with backend-order 1-based suffixes across all installed accelerators, including
+ * disabled ones.
  */
 export const getDeviceNameLabels = (options: readonly GenerationDeviceOption[]): Record<string, string> => {
   const nameCounts = new Map<string, number>();

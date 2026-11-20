@@ -806,8 +806,7 @@ describe('Call Saved Workflow dynamic fields', () => {
 });
 
 describe('Call Saved Workflow labels across a reload', () => {
-  // Preserve labelOverride through reload so dynamic-template reconciliation and autosave cannot erase user
-  // labels.
+  // Preserve labelOverride through reload so dynamic-template reconciliation and autosave cannot erase user labels.
   it('keeps a user label when a template-less parent is saved and reloaded', () => {
     const callNode = buildInvocationNode(callSavedWorkflowTemplate, { x: 0, y: 0 });
 

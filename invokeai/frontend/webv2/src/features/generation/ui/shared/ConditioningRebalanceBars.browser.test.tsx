@@ -4,7 +4,6 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
 
 import { ConditioningRebalanceBars } from './ConditioningRebalanceBars';
 
@@ -17,7 +16,6 @@ const onCommit = vi.fn();
 const onPreview = vi.fn();
 
 const TAP_COUNT = 12;
-/** All weights at 1.0, so `getRebalanceBarScale` reports the nominal ceiling. */
 const FLAT_WEIGHTS = Array.from({ length: TAP_COUNT }, () => 1);
 const SCALE = 8;
 
@@ -56,7 +54,6 @@ const interact = async (run: () => void) => {
   });
 };
 
-/** Pointer coordinates that land on `index`'s column at `weight` on the track. */
 const pointAt = (track: HTMLElement, index: number, weight: number) => {
   const rect = track.getBoundingClientRect();
 
@@ -69,21 +66,6 @@ const pointAt = (track: HTMLElement, index: number, weight: number) => {
 const lastPreview = (): number[] => (onPreview.mock.calls.at(-1)?.[0] as number[] | null) ?? [];
 
 const lastCommit = (): number[] => (onCommit.mock.calls.at(-1)?.[0] as number[] | undefined) ?? [];
-
-/** Reset real pointer and scroll state to prevent interference from synthetic events. */
-const resetPointerAndScroll = async (): Promise<void> => {
-  const parking = document.createElement('div');
-
-  parking.style.cssText = 'position:fixed;right:0;bottom:0;width:2px;height:2px;z-index:2147483647';
-  document.body.append(parking);
-
-  await act(async () => {
-    await userEvent.hover(parking);
-  });
-
-  parking.remove();
-  window.scrollTo(0, 0);
-};
 
 beforeEach(() => {
   host = document.createElement('div');
@@ -99,7 +81,7 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
-  await resetPointerAndScroll();
+  window.scrollTo(0, 0);
 });
 
 describe('ConditioningRebalanceBars', () => {
@@ -137,7 +119,6 @@ describe('ConditioningRebalanceBars', () => {
       track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...target }));
     });
 
-    // Assert value ranges independently of incidental padding/border pixel mapping.
     const previewed = lastPreview()[3] ?? 0;
 
     expect(previewed).toBeGreaterThan(REBALANCE_NEUTRAL_WEIGHT);
@@ -149,7 +130,6 @@ describe('ConditioningRebalanceBars', () => {
 
     expect(onPreview).toHaveBeenLastCalledWith(null);
     expect(onCommit).toHaveBeenCalledOnce();
-    // What matters is that the release commits exactly what was last previewed.
     expect(lastCommit()[3]).toBe(previewed);
   });
 
@@ -159,7 +139,6 @@ describe('ConditioningRebalanceBars', () => {
     await interact(() => {
       track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(track, 0, 0) }));
     });
-    // One large pointer move must interpolate unsampled columns.
     await interact(() => window.dispatchEvent(new PointerEvent('pointermove', pointAt(track, 11, 8))));
 
     const painted = lastPreview();

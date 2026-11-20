@@ -25,7 +25,6 @@ describe('resolveDynamicPrompts', () => {
     expect(parseDynamicPrompts).toHaveBeenCalledTimes(1);
   });
 
-  // Invalidated infinite-stale cache entries must refetch.
   it('re-expands after the wildcard catalog is invalidated', async () => {
     await expect(resolveDynamicPrompts(queryClient, request)).resolves.toMatchObject({ prompts: ['a red ball'] });
 

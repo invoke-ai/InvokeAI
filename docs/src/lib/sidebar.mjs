@@ -26,11 +26,16 @@ export const parentDirectory = (id) => id.slice(0, Math.max(id.lastIndexOf('/'),
 
 /**
  * Maps a sidebar link's href to the English docs page id, removing the deployment base path and any locale: a
- * translation mirrors its English file's name and directory, so English data drives every locale's sidebar.
+ * translation mirrors its English file's name and directory, so English data drives every locale's sidebar. The site
+ * root itself maps to 'index', the id `generateDocsId` gives the root `index.mdx` (only a trailing `/index` drops).
  * @param {string} baseUrl
  * @returns {(href: string) => string}
  */
-export const makeHrefToId = (baseUrl) => (href) => trimSlashes(splitSitePath(href, baseUrl)?.path ?? href);
+export const makeHrefToId = (baseUrl) => (href) => {
+  const path = splitSitePath(href, baseUrl)?.path;
+  if (path === undefined) return trimSlashes(href);
+  return path === '/' ? 'index' : trimSlashes(path);
+};
 
 /**
  * A docs file's directory as a URL path, e.g. `src/content/docs/Users Guide/03.Models/x.mdx` -> `users-guide/models`.

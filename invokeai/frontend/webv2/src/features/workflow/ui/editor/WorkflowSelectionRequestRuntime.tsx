@@ -32,8 +32,8 @@ const isAwaitingTemplate = (internal: InternalNode<WorkflowFlowNode>, templates:
 
 /**
  * The bounds of exactly the target nodes once the flow shows them at their positions with their templates, measured
- * unless the graph is large; null while the flow still shows another document, an older position, a placeholder
- * card, or unmeasured nodes.
+ * unless the graph is large; null while the flow still shows another document, an older position, a placeholder card,
+ * or unmeasured nodes.
  */
 const getWorkflowFitBounds = (
   nodeLookup: ReadonlyMap<string, InternalNode<WorkflowFlowNode>>,
@@ -142,8 +142,8 @@ export const WorkflowSelectionRequestRuntime = ({
       ? request.nodes
       : null;
   };
-  // Each target is released before fitting: a zero-duration fit updates the flow store synchronously, which
-  // re-enters here.
+  // Each target is released before fitting: a zero-duration fit updates the flow store synchronously, which re-enters
+  // here.
   const fitReadyTargets = useEffectEvent(() => {
     settleFrame.current = null;
 
@@ -163,9 +163,9 @@ export const WorkflowSelectionRequestRuntime = ({
       void fitWorkflowBounds(flowInstance, requestBounds, store.getState(), reduceMotion ? 0 : 300);
     }
   });
-  // Targets are the document's nodes; the flow shows them only after React commits the rebuilt model (and, for a
-  // large graph, its full mount). Rebuilt nodes keep their previous measured size until the resize observer runs,
-  // so a ready target is fitted two frames later, from bounds read again then.
+  // Targets are the document's nodes; the flow shows them only after React commits the rebuilt model (and, for a large
+  // graph, its full mount). Rebuilt nodes keep their previous measured size until the resize observer runs, so a ready
+  // target is fitted two frames later, from bounds read again then.
   const applyRequestedFit = useEffectEvent(() => {
     const { transform } = store.getState();
 

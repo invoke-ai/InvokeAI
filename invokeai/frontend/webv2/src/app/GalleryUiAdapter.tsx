@@ -84,8 +84,8 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const exportProject = useExportLibraryProject();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const { focusFloating, focusRegion } = useWorkbenchFocus();
-  // Only what the gallery needs to label other projects' boards, compared structurally: every autosave ack and
-  // library refresh rebuilds the summaries, and the gallery must not re-render for cover or timestamp churn.
+  // Only what the gallery needs to label other projects' boards, compared structurally: every autosave ack and library
+  // refresh rebuilds the summaries, and the gallery must not re-render for cover or timestamp churn.
   const projects = useProjectLibrarySelector(selectGalleryProjects, areGalleryProjectsEqual);
   const store = useWorkbenchInternalStore();
   const persistence = useWorkbenchPersistenceService();
@@ -143,9 +143,9 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       noteBoardBrowsed: (boardId) => {
         const values = getGalleryValues(queries.getProject(projectId), queries.getSnapshot().scopedDefaults);
 
-        // Once per account, for a project that followed the selected board as earlier builds did by default (it
-        // stored 'follow', now read as the default destination): say that browsing no longer moves results, the first
-        // time the user browses away from where they go.
+        // Once per account, for a project that followed the selected board as earlier builds did by default (it stored
+        // 'follow', now read as the default destination): say that browsing no longer moves results, the first time the
+        // user browses away from where they go.
         if (
           isLegacyFollowAutoAdd(values) &&
           !getGallerySettings(values).followSelectedBoard &&
@@ -202,8 +202,8 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       projectId,
       projectName,
       projects,
-      // A board created in or moved into a project needs the project to exist on the server, which a new project
-      // does only after its first save; the canvas path makes the same request before its first write.
+      // A board created in or moved into a project needs the project to exist on the server, which a new project does
+      // only after its first save; the canvas path makes the same request before its first write.
       ensureProjectOnServer: async () => {
         const project = store.getState().projects.find((candidate) => candidate.id === projectId);
 

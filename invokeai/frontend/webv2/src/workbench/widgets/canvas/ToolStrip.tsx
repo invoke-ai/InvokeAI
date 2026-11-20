@@ -23,6 +23,7 @@ import {
   ScanIcon,
   SquareDashedMousePointerIcon,
   TypeIcon,
+  SplinePointerIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, type ElementType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -113,10 +114,7 @@ const ShapeFamilyButton = ({ engine, hotkey }: { engine: ToolStripEngine; hotkey
   );
 };
 
-/**
- * A tool's effective bindings, remaps included, from the hotkeys the canvas widget registered; none outside a
- * workbench or while unbound.
- */
+/** A tool's effective bindings from the canvas widget's registered hotkeys; none outside a workbench. */
 const toolHotkeys = (
   definitions: readonly HotkeyDefinition[],
   customHotkeys: Record<string, string[]>,
@@ -180,17 +178,10 @@ const SelectFamilyButton = ({ engine }: { engine: ToolStripEngine }) => {
   );
 };
 
-/**
- * Clears the center region's floating chrome, whose inset already includes the
- * gap below the islands. Outside the center the variable is undefined and the
- * strip falls back to its own top margin.
- */
+/** Clears the center region's floating chrome, whose inset already includes the gap below the islands. */
 const TOOL_STRIP_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 
-/**
- * Color picking stays a hold (Alt) or a key (I) rather than a strip button. Every tool stays available while a
- * generation runs or its results wait for review.
- */
+/** Every tool stays available while a generation runs or its results wait for review. */
 const ToolStripRoot = ({ engine }: { engine: ToolStripEngine }) => {
   const { t } = useTranslation();
   const hotkeyDefinitions = useExtensionHotkeyDefinitions();
@@ -260,6 +251,13 @@ const ToolStripRoot = ({ engine }: { engine: ToolStripEngine }) => {
           toolId="text"
         />
         <SelectFamilyButton engine={engine} />
+        <ToolStripButton
+          engine={engine}
+          hotkey={hotkeyFor('canvas.tool.spline')}
+          icon={SplinePointerIcon}
+          label={t('widgets.canvas.tools.spline')}
+          toolId="spline"
+        />
       </Toolbar>
     </Box>
   );

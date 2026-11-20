@@ -3,46 +3,51 @@ import { describe, expect, it } from 'vitest';
 import { getInvokeIconMode } from './invokeButtonModel';
 
 describe('getInvokeIconMode', () => {
-  it('shows play when the queue is idle', () => {
-    expect(getInvokeIconMode({ hasOpenWork: false, isFrontHeld: false, isHovered: false, progress: null })).toEqual({
-      mode: 'play',
-    });
-  });
-
-  it('shows progress while running and not hovered', () => {
-    expect(getInvokeIconMode({ hasOpenWork: true, isFrontHeld: false, isHovered: false, progress: 0.4 })).toEqual({
-      mode: 'progress',
-      value: 0.4,
-    });
-  });
-
-  it('shows indeterminate progress while running before the first progress event', () => {
-    expect(getInvokeIconMode({ hasOpenWork: true, isFrontHeld: false, isHovered: false, progress: null })).toEqual({
-      mode: 'progress',
-      value: null,
-    });
-  });
-
-  it('reverts to play on hover so queueing more work reads as available', () => {
-    expect(getInvokeIconMode({ hasOpenWork: true, isFrontHeld: false, isHovered: true, progress: 0.4 })).toEqual({
-      mode: 'play',
-    });
-  });
-
-  it('shows the front-of-queue glyph only while Shift is held over a hovered or focused button', () => {
-    expect(getInvokeIconMode({ hasOpenWork: false, isFrontHeld: true, isHovered: true, progress: null })).toEqual({
-      mode: 'front',
-    });
-    expect(getInvokeIconMode({ hasOpenWork: true, isFrontHeld: true, isHovered: true, progress: 0.4 })).toEqual({
-      mode: 'front',
-    });
-    // Not hovered: an idle button keeps play, a running one keeps its progress.
-    expect(getInvokeIconMode({ hasOpenWork: false, isFrontHeld: true, isHovered: false, progress: null })).toEqual({
-      mode: 'play',
-    });
-    expect(getInvokeIconMode({ hasOpenWork: true, isFrontHeld: true, isHovered: false, progress: 0.4 })).toEqual({
-      mode: 'progress',
-      value: 0.4,
-    });
+  it.each([
+    ['shows play when the queue is idle', false, false, false, null, { mode: 'play' }],
+    ['shows progress while running and not hovered', true, false, false, 0.4, { mode: 'progress', value: 0.4 }],
+    [
+      'shows indeterminate progress while running before the first progress event',
+      true,
+      false,
+      false,
+      null,
+      { mode: 'progress', value: null },
+    ],
+    ['reverts to play on hover so queueing more work reads as available', true, false, true, 0.4, { mode: 'play' }],
+    [
+      'shows the front-of-queue glyph while Shift is held over an idle button',
+      false,
+      true,
+      true,
+      null,
+      { mode: 'front' },
+    ],
+    [
+      'shows the front-of-queue glyph while Shift is held over a running button',
+      true,
+      true,
+      true,
+      0.4,
+      { mode: 'front' },
+    ],
+    [
+      'keeps play for an idle button that is not hovered while Shift is held',
+      false,
+      true,
+      false,
+      null,
+      { mode: 'play' },
+    ],
+    [
+      'keeps progress for a running button that is not hovered while Shift is held',
+      true,
+      true,
+      false,
+      0.4,
+      { mode: 'progress', value: 0.4 },
+    ],
+  ])('%s', (_, hasOpenWork, isFrontHeld, isHovered, progress, expected) => {
+    expect(getInvokeIconMode({ hasOpenWork, isFrontHeld, isHovered, progress })).toEqual(expected);
   });
 });

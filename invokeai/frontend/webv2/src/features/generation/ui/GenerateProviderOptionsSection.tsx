@@ -96,8 +96,8 @@ export const GenerateProviderOptionsSection = ({
     return null;
   }
 
-  // Count decisions away from the provider defaults (what the options hold while the provider decides), as the
-  // Advanced section does.
+  // Count decisions away from the provider defaults (what the options hold while the provider decides), as the Advanced
+  // section does.
   const defaults = getDefaultGenerateSettings(selectedModel);
   const overrideCount = optionKeys.filter((key) => settings[key] !== defaults[key]).length;
   const resetToProviderDefaults = () => onCommit(Object.fromEntries(optionKeys.map((key) => [key, defaults[key]])));

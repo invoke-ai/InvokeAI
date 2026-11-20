@@ -28,7 +28,6 @@ describe('getWorkflowLibraryGridColumns', () => {
         expect(getWorkflowLibraryCardWidth(width, columns)).toBeGreaterThanOrEqual(minimum);
       }
       if (columns < MAX_GRID_COLUMNS) {
-        // One more column would not have fitted.
         expect(getWorkflowLibraryCardWidth(width, columns + 1)).toBeLessThan(minimum);
       }
     }
