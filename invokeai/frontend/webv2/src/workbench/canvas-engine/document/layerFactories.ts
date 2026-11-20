@@ -31,12 +31,7 @@ type MaskLayerKind = 'inpaint_mask' | 'regional_guidance';
 
 const firstColorIndex = { inpaint_mask: 0, regional_guidance: 1 };
 const nextColorIndex = { ...firstColorIndex };
-registerAccountOwnedResource({
-  clear: () => {
-    Object.assign(nextColorIndex, firstColorIndex);
-  },
-  name: 'canvas-mask-fill-colors',
-});
+let isColorResetRegistered = false;
 
 export const DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR = MASK_FILL_COLORS[1];
 
@@ -44,6 +39,16 @@ export const nextMaskFillColor = (kind: MaskLayerKind, offset = 0): string =>
   MASK_FILL_COLORS[(nextColorIndex[kind] + offset) % MASK_FILL_COLORS.length]!;
 
 export const advanceMaskFillColors = (kind: MaskLayerKind, count = 1): void => {
+  // Register on first advance: a top-level call would keep this module in every bundle that imports the Canvas API.
+  if (!isColorResetRegistered) {
+    isColorResetRegistered = true;
+    registerAccountOwnedResource({
+      clear: () => {
+        Object.assign(nextColorIndex, firstColorIndex);
+      },
+      name: 'canvas-mask-fill-colors',
+    });
+  }
   nextColorIndex[kind] = (nextColorIndex[kind] + count) % MASK_FILL_COLORS.length;
 };
 
