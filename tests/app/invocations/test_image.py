@@ -79,15 +79,28 @@ def test_mask_from_alpha_uses_the_alpha_channel() -> None:
     assert _invoke_mask_from_alpha(input_image, invert=True) == [255, 127, 0]
 
 
-def test_mask_from_alpha_treats_an_image_without_alpha_as_opaque() -> None:
-    rgb_image = Image.new("RGB", (3, 1))
-    rgb_image.putdata([(255, 0, 0), (0, 255, 0), (0, 0, 64)])
-    grayscale_image = Image.new("L", (3, 1))
-    grayscale_image.putdata([0, 64, 200])
+def test_mask_from_alpha_uses_the_alpha_channel_of_a_grayscale_image_with_alpha() -> None:
+    input_image = Image.new("LA", (3, 1))
+    input_image.putdata([(10, 0), (10, 128), (10, 255)])
 
-    assert _invoke_mask_from_alpha(rgb_image) == [255, 255, 255]
-    assert _invoke_mask_from_alpha(rgb_image, invert=True) == [0, 0, 0]
-    assert _invoke_mask_from_alpha(grayscale_image) == [255, 255, 255]
+    assert _invoke_mask_from_alpha(input_image) == [0, 128, 255]
+    assert _invoke_mask_from_alpha(input_image, invert=True) == [255, 127, 0]
+
+
+def test_mask_from_alpha_uses_a_grayscale_image_as_the_mask() -> None:
+    input_image = Image.new("L", (3, 1))
+    input_image.putdata([0, 64, 200])
+
+    assert _invoke_mask_from_alpha(input_image) == [0, 64, 200]
+    assert _invoke_mask_from_alpha(input_image, invert=True) == [255, 191, 55]
+
+
+def test_mask_from_alpha_treats_an_rgb_image_as_opaque() -> None:
+    input_image = Image.new("RGB", (3, 1))
+    input_image.putdata([(255, 0, 0), (0, 255, 0), (0, 0, 64)])
+
+    assert _invoke_mask_from_alpha(input_image) == [255, 255, 255]
+    assert _invoke_mask_from_alpha(input_image, invert=True) == [0, 0, 0]
 
 
 def test_mask_from_alpha_uses_palette_transparency() -> None:

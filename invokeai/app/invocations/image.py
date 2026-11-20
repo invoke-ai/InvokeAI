@@ -239,11 +239,16 @@ class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
     invert: bool = InputField(default=False, description="Whether or not to invert the mask")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        # Converting gives an image without an alpha channel a fully opaque one. Its last band is a color or
-        # palette channel, not alpha.
-        image = context.images.get_pil(self.image.image_name, mode="RGBA")
+        image = context.images.get_pil(self.image.image_name)
 
-        image_mask = image.getchannel("A")
+        if image.mode == "L":
+            # A grayscale image is already a mask, so use it as is.
+            image_mask = image
+        else:
+            # Converting gives an image without an alpha channel a fully opaque one. Its last band is a color or
+            # palette channel, not alpha.
+            image_mask = image.convert("RGBA").getchannel("A")
+
         if self.invert:
             image_mask = ImageOps.invert(image_mask)
 
