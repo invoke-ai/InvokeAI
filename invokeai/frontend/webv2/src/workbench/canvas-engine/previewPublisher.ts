@@ -77,9 +77,8 @@ const dataUrlToBlob = (dataUrl: string): Blob => {
 };
 
 /**
- * Staged and filter previews token-guard async decodes against newer sets/clears. Filters also recheck layer
- * existence and export guards after decode. Typed-filter dimension mismatches are contract errors, not silent
- * stale results.
+ * Staged and filter previews token-guard async decodes against newer sets/clears. Filters also recheck layer existence
+ * and export guards after decode. Typed-filter dimension mismatches are contract errors, not silent stale results.
  */
 export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): PreviewPublisher => {
   const { previews } = deps;
@@ -115,9 +114,8 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
     isCurrent?: () => boolean
   ): Promise<{ surface: RasterSurface; width: number; height: number }> => {
     const blob = useStagedBlobCache ? await stagedPreviewBlobs.get(imageName) : await deps.resolveImage(imageName);
-    // Blob resolution is an async boundary. A rapid selection change may
-    // supersede this request while it waits; do not spend a full bitmap
-    // decode on a candidate that can no longer be published.
+    // Blob resolution is an async boundary. A rapid selection change may supersede this request while it waits; do not
+    // spend a full bitmap decode on a candidate that can no longer be published.
     if (isCurrent && !isCurrent()) {
       throw new Error('Staged preview request was superseded before decode.');
     }
@@ -131,8 +129,8 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
             stagedImageDecodes.delete(imageName);
           }
         };
-        // The awaiting caller owns rejection handling; this side chain only
-        // bounds the coalescing map to the lifetime of the decode.
+        // The awaiting caller owns rejection handling; this side chain only bounds the coalescing map to the lifetime
+        // of the decode.
         void pendingDecode.then(forget, forget);
       }
     }
@@ -146,8 +144,8 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
     if ('imageName' in input) {
       return { ...(await decodeNamedImage(input.imageName, true, isCurrent)), placement };
     }
-    // Progress frames are low-resolution latents of the submitted region. They decode at their own size, which is
-    // small even for an upscale whose output rect is large; the compositor scales them into the rect.
+    // Progress frames are low-resolution latents of the submitted region. They decode at their own size, which is small
+    // even for an upscale whose output rect is large; the compositor scales them into the rect.
     const decoded = await deps.decodeBlob(dataUrlToBlob(input.dataUrl));
     return { height: decoded.decodedHeight, placement, surface: decoded.surface, width: decoded.decodedWidth };
   };
@@ -256,8 +254,8 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
           }
         })
         .catch(() => {
-          // A transient decode failure leaves any prior preview untouched rather
-          // than blanking the canvas; the next selection re-drives a decode.
+          // A transient decode failure leaves any prior preview untouched rather than blanking the canvas; the next
+          // selection re-drives a decode.
         });
     },
   };

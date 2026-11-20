@@ -6,9 +6,9 @@ const TOGGLE_HOVER_STYLES = { color: 'fg' } as const;
 const TOGGLE_DISABLED_STYLES = { cursor: 'default' } as const;
 
 /**
- * One project's boards under Other projects, behind a disclosure named by the project. While the board search has
- * text the group shows its matches whatever its saved state, so a search never hides one; the saved state is left
- * as it is. A collapsed group renders no rows: the boards panel is not virtualized.
+ * One project's boards under Other projects, behind a disclosure named by the project. While the board search has text
+ * the group shows its matches whatever its saved state, so a search never hides one; the saved state is left as it is.
+ * A collapsed group renders no rows: the boards panel is not virtualized.
  */
 export const GalleryProjectGroup = ({
   children,

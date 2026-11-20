@@ -1,11 +1,11 @@
-import type { ArchitectureCapabilitiesRow } from '@features/generation/core/architectureCapabilities';
 import type { ModelConfig } from '@features/models';
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
 import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
 import { GenerationUiProvider, type GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { UpscaleWidgetView } from '@features/upscale/ui/UpscaleWidgetView';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -48,7 +48,7 @@ let store: WorkbenchInternalStore;
 let host: HTMLDivElement;
 let root: Root;
 
-vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
+vi.mock('@features/models/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => getArchitectureCapabilities(),
 }));
 vi.mock('react-i18next', () => {

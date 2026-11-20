@@ -266,10 +266,10 @@ type SendAsControlEngine = GalleryImportEngine & {
 };
 
 /**
- * Uses a gallery image as a control layer's image. The selected control layer takes it when that layer has no image
- * yet and the project is the one on the live canvas (`filled`, detected like any replaced image); otherwise a new
- * control layer holds it (`created`), as the canvas import makes it. Every refusal of either path is reported, and a
- * `project` older than the latest document is `stale-document`.
+ * Uses a gallery image as a control layer's image. The selected control layer takes it when that layer has no image yet
+ * and the project is the one on the live canvas (`filled`, detected like any replaced image); otherwise a new control
+ * layer holds it (`created`), as the canvas import makes it. Every refusal of either path is reported, and a `project`
+ * older than the latest document is `stale-document`.
  */
 export const sendGalleryImageAsControl = async (options: {
   applyCanvasMutation: (projectId: string, mutation: CanvasProjectMutation) => boolean | void;

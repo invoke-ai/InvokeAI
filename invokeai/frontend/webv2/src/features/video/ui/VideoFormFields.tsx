@@ -32,8 +32,8 @@ const getRecallRevert = (before: VideoPrompts, written: VideoPrompts, current: V
   );
 
 /**
- * Video prompts are independent of the shared image-generation draft. Compare content because patches recreate
- * values and remounts would lose autocomplete state.
+ * Video prompts are independent of the shared image-generation draft. Compare content because patches recreate values
+ * and remounts would lose autocomplete state.
  */
 export const VideoPromptFields = memo(
   function VideoPromptFields({
@@ -74,8 +74,8 @@ export const VideoPromptFields = memo(
   }) {
     const { t } = useTranslation();
     const { notifications, readValues } = useVideoUiActions();
-    // The positive prompt also lands in the prompt box as an edit (Ctrl+Z); replacing the negative prompt as well
-    // needs the toast's Undo.
+    // The positive prompt also lands in the prompt box as an edit (Ctrl+Z); replacing the negative prompt as well needs
+    // the toast's Undo.
     const handleUsePrompt = useCallback(
       (prompt: PromptHistoryItem) => {
         // A hidden negative prompt is not this model's to replace.

@@ -51,8 +51,8 @@ export const projectNeedsWorkflowHost = (project: WidgetHostProject): boolean =>
 const WidgetHost = ({ widget }: { widget: ReturnType<typeof getWidgetHosts>[number] }) => {
   const Host = use(widget.host!.load());
 
-  // Host is the deferred resource's stable cached export; React Compiler misidentifies a direct use() result as a
-  // new component.
+  // Host is the deferred resource's stable cached export; React Compiler misidentifies a direct use() result as a new
+  // component.
   // eslint-disable-next-line react/static-components
   return <Host />;
 };

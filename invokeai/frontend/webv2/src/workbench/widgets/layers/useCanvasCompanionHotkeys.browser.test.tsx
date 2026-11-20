@@ -21,11 +21,6 @@ import { userEvent } from 'vitest/browser';
 
 import { useCanvasCompanionHotkeys, type CanvasCompanionEngine } from './useCanvasCompanionHotkeys';
 
-/**
- * The companion keys under the real hotkey runtime, focus provider, store and extension registry: a key pressed
- * with focus in the Layers widget reaches the canvas engine. Only context plumbing and first-party commands, which
- * need the whole application, are replaced.
- */
 const mocks = vi.hoisted(() => ({
   extensions: null as unknown as ExtensionRegistry,
   store: null as unknown as WorkbenchInternalStore,
@@ -39,7 +34,6 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchCommands: () => mocks.store.commands,
   useWorkbenchExtensions: () => mocks.extensions,
   useWorkbenchInternalStore: () => mocks.store,
-  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
   useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => mocks.store.queries,
   useWorkbenchSubscription: () => mocks.store.subscribe,
@@ -56,7 +50,6 @@ const createEngine = () => ({
   tools: { setTool: vi.fn(), stepBrushSize: vi.fn() },
 });
 
-/** The Layers widget's frame as the shell renders it, registering through a widget runtime bound to its source. */
 const LayersFrame = ({ engine }: { engine: ReturnType<typeof createEngine> }) => {
   const [runtime] = useState(() => {
     const source: WidgetContributionSource = {

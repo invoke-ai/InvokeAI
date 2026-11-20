@@ -41,22 +41,19 @@ import { useGalleryDestination } from './useGalleryDestination';
 const SCROLL_CONTENT_PROPS = { py: '1' } as const;
 const CREATE_ROW_COVER = <BoardCoverIcon icon={PlusIcon} />;
 
-/** Where a new board goes: the open project or the Library. */
 type CreateTier = 'library' | 'project';
 
 export const GalleryBoardsPanel = () => {
   const { t } = useTranslation();
   const { actions, boardsState, gallery, projectId, projectName, projectNames, region } = useGalleryWidget();
-  // Boards move between tiers by dragging only inside the workbench's drag context; elsewhere, by their menu.
+  // Board drags work only inside the workbench's drag context; elsewhere, use the menu.
   const canDragBoards = use(GalleryDragScope);
   const [searchTerm, setSearchTerm] = useState('');
-  // The tier whose "+" asked for a name; the dialog it opens creates there.
   const [createDialogTier, setCreateDialogTier] = useState<CreateTier | null>(null);
   const [boardMenuTarget, setBoardMenuTarget] = useState<GalleryBoardMenuTarget | null>(null);
   const boardsViewportRef = useRef<HTMLDivElement>(null);
 
-  // The shell keeps the gallery mounted across layout switches, and a scroll
-  // container that stops being rendered loses its offset outright.
+  // The shell keeps the gallery mounted across layouts; a container that stops rendering loses its offset.
   usePreservedScrollOffset(boardsViewportRef);
 
   const { showArchivedBoards, showDateBoards, showOtherProjectBoards } = gallery.settings;
@@ -113,20 +110,17 @@ export const GalleryBoardsPanel = () => {
     [createBoardIn, groups.canCreateFromSearch, trimmedSearchTerm]
   );
 
-  // Enter creates only with no matches, avoiding accidental near-duplicate boards; it takes the project's row,
-  // the first of the two the typed name offers.
+  // Enter creates only with no matches, avoiding accidental near-duplicates.
   const handleSubmitSearch = useCallback(() => {
     if (!groups.hasAnyMatch) {
       createBoardFromSearch('project');
     }
   }, [createBoardFromSearch, groups.hasAnyMatch]);
 
-  // A "+" asks for the name in a dialog, started from whatever is typed so a search that found nothing is not lost.
   const handleAddProjectBoard = useCallback(() => setCreateDialogTier('project'), []);
   const handleAddLibraryBoard = useCallback(() => setCreateDialogTier('library'), []);
   const closeCreateDialog = useCallback(() => setCreateDialogTier(null), []);
-  // The dialog keeps the typed name while its submit is pending, and keeps it on a failure the action has already
-  // reported, which it learns of as a rejection; the search is cleared only once the board exists.
+  // The search is cleared only once the board exists; a reported failure keeps the typed name.
   const handleCreateDialogSubmit = useCallback(
     async (name: string) => {
       if (!(await createBoardIn(name, createDialogTier ?? 'project'))) {
@@ -178,12 +172,10 @@ export const GalleryBoardsPanel = () => {
       actions.updateSettings(toggleGalleryProjectGroup(gallery.settings, groupProjectId, isOpen)),
     [actions, gallery.settings]
   );
-  // Without the backend's list, the placeholder Uncategorized row (and "no matches") would claim there is nothing
-  // else; the failure takes the rows' place instead. While it loads, the fixed rows alone would read as empty tiers.
+  // Without the backend's list the fixed rows would read as empty tiers, so the failure takes their place.
   const isBoardListUnavailable = boardsState.status === 'error';
   const isBoardListSettled = boardsState.status !== 'loading' && !isBoardListUnavailable;
   const focusBoardList = useCallback(() => focusVisibleOperable(boardsViewportRef.current), []);
-  // A board's row wherever it is now: a move remounts it under its new tier. Without one, the list keeps focus.
   const focusBoardRow = useCallback(
     (boardId: string) => {
       const row = boardsViewportRef.current?.querySelector<HTMLElement>(
@@ -198,8 +190,7 @@ export const GalleryBoardsPanel = () => {
     },
     [focusBoardList]
   );
-  // A move or archive from the menu takes the row away while the menu still holds focus, and with it the button the
-  // menu would hand focus back to; once it closes, focus goes to the board's row wherever it now is.
+  // A move or archive takes the row away with the menu's focus target; focus then goes to the row wherever it now is.
   const relocatingBoardIdRef = useRef<string | null>(null);
   const handleBoardRelocated = useCallback((boardId: string) => {
     relocatingBoardIdRef.current = boardId;
@@ -219,8 +210,7 @@ export const GalleryBoardsPanel = () => {
       return;
     }
 
-    // The menu has no trigger of its own to hand focus back to (it opens at the pointer or beside the row's ⋮): a
-    // dismissal returns focus to the row's ⋮, and a dialog the menu opens returns it there when it closes.
+    // The menu has no trigger of its own, so focus returns to the row's ⋮.
     const actionsButton =
       menuBoardId === null
         ? null
@@ -235,8 +225,7 @@ export const GalleryBoardsPanel = () => {
     }
   }, [boardMenuTarget, focusBoardRow]);
 
-  // Where new results go, as submissions decide it: a board that refuses them (someone else's, view-only, or gone)
-  // sends them to the inbox, whose row says so and names it.
+  // A board that refuses results sends them to the inbox, whose row says so.
   const destination = useGalleryDestination(gallery);
   const refusedBoard =
     destination.refusedBoardId === null ? undefined : destination.getBoard(destination.refusedBoardId);
@@ -262,7 +251,6 @@ export const GalleryBoardsPanel = () => {
       onSelectBoard={handleSelectBoard}
     />
   );
-  // A typed name no board has is offered in both tiers, so the choice is made where the board will show.
   const renderCreateRow = (tier: CreateTier) =>
     groups.canCreateFromSearch ? (
       <GalleryBoardRowShell
@@ -272,8 +260,7 @@ export const GalleryBoardsPanel = () => {
         onSelect={tier === 'project' ? createProjectBoardFromSearch : createLibraryBoardFromSearch}
       />
     ) : null;
-  // A dragged board moves to whichever tier it is dropped on. Every tier is the caller's own: other people's boards are
-  // listed apart, never under a project of theirs.
+  // Every tier is the caller's own: other people's boards are listed apart.
   const renderDropTier = (tierProjectId: string | null, label: string, content: ReactNode) =>
     canDragBoards ? (
       <GalleryBoardTierDropZone dropScope={region} label={label} projectId={tierProjectId}>
@@ -282,7 +269,6 @@ export const GalleryBoardsPanel = () => {
     ) : (
       content
     );
-  // One line, shown while a tier holds only its fixed row, so the two tiers explain themselves once.
   const renderHint = (text: string) =>
     trimmedSearchTerm ? null : (
       <Text color="fg.muted" fontSize="xs" pe="2" ps="2" py="1">
@@ -291,8 +277,7 @@ export const GalleryBoardsPanel = () => {
     );
   const projectBoards = isBoardListUnavailable ? [] : groups.projectBoards;
   const libraryBoards = isBoardListUnavailable ? [] : groups.libraryBoards;
-  // Each tier counts its boards, the project's inbox among them; Uncategorized is where media on no board shows, not
-  // a board.
+  // Uncategorized is where media on no board shows, not a board.
   const countBoards = (boards: GalleryBoard[]) => boards.filter((board) => board.kind === 'board').length;
 
   return (
@@ -398,7 +383,7 @@ export const GalleryBoardsPanel = () => {
                         onToggle={handleToggleProjectGroup}
                       >
                         {group.boards.map((board) =>
-                          // Every other project's inbox is called "Inbox"; assistive tech needs the project in the name.
+                          // Every other project's inbox is "Inbox"; assistive tech needs the project in the name.
                           renderRow(
                             board,
                             board.isInbox ? t('widgets.gallery.inboxOf', { project: group.label }) : undefined
@@ -475,11 +460,7 @@ export const GalleryBoardsPanel = () => {
   );
 };
 
-/**
- * A project's boards, or the Library's, as the place a dragged board lands: anywhere on them, heading and rows alike,
- * so a collapsed section still takes one. It marks itself only while one of this gallery's boards from elsewhere is
- * being dragged.
- */
+/** Anywhere on the tier takes the drop, so a collapsed section still does. */
 const GalleryBoardTierDropZone = ({
   children,
   dropScope,
@@ -487,9 +468,8 @@ const GalleryBoardTierDropZone = ({
   projectId,
 }: {
   children: ReactNode;
-  /** The gallery it is in; another gallery's dragged boards neither land on it nor see it highlighted. */
+  /** Another gallery's dragged boards neither land on it nor see it highlighted. */
   dropScope: string;
-  /** What the move's notice calls the destination. */
   label: string;
   projectId: string | null;
 }) => {
@@ -504,7 +484,7 @@ const GalleryBoardTierDropZone = ({
   return (
     <Box
       ref={setNodeRef}
-      // Outlines, as on a row taking items, so the highlight cannot reflow the list under the pointer.
+      // Outlines, so the highlight cannot reflow the list under the pointer.
       bg={canDrop && isOver ? 'accent.muted' : undefined}
       outline={canDrop ? (isOver ? '2px solid' : '1px dashed') : undefined}
       outlineColor={canDrop ? 'accent.solid' : undefined}

@@ -168,8 +168,8 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
         isCollapsed: true,
         sizePx: 180,
       }),
-      // Keep Gallery placed in Compose so migrated gallery presets remain reachable without the add-widget path
-      // warming Canvas.
+      // Keep Gallery placed in Compose so migrated gallery presets remain reachable without the add-widget path warming
+      // Canvas.
       center: createRegion({
         activeInstanceId: 'preview',
         instanceIds: ['preview', 'gallery:center'],

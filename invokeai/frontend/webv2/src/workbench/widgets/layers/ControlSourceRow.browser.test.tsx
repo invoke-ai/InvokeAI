@@ -25,7 +25,6 @@ import { ControlLayerSettings } from './ControlLayerSettings';
 const harness = vi.hoisted(() => ({
   canvasUploads: [] as { category: unknown; project: unknown }[],
   galleryUploads: [] as File[],
-  /** Holds the gallery upload until a test releases it. */
   release: null as (() => void) | null,
 }));
 
@@ -135,7 +134,6 @@ const render = async (layer: CanvasControlLayerContract) => {
   engine = engineWith([layer]);
   await settle(() => root?.render(view(layer)));
 };
-/** The document now holds `layer`, as after the intent landed. */
 const rerender = (layer: CanvasControlLayerContract) => settle(() => root?.render(view(layer)));
 
 afterEach(async () => {
@@ -165,7 +163,6 @@ describe('Control layer Image row', () => {
     await settle();
 
     expect(harness.galleryUploads.map((file) => file.name)).toEqual(['portrait.png']);
-    // The pressed action shows its progress; the others wait for it.
     await expect.element(button('Upload')).toHaveAttribute('data-loading');
     await expect.element(button('Frame')).toBeDisabled();
     await expect.element(button('Draw')).toBeDisabled();
@@ -233,7 +230,6 @@ describe('Control layer Image row', () => {
 
       expect(intents).toEqual([]);
       expect(created).not.toHaveBeenCalled();
-      // The row is ready for the next action.
       await expect.element(button('Upload')).not.toHaveAttribute('data-loading');
     } finally {
       created.mockRestore();
@@ -259,7 +255,6 @@ describe('Control layer Image row', () => {
     await settle();
 
     expect(intents).toEqual([{ kind: 'draw' }]);
-    // Drawing empties the image: the empty actions take the place of the Replace menu, and focus with them.
     await rerender(empty);
     expect(imageRow().element().contains(document.activeElement)).toBe(true);
     expect(document.activeElement?.textContent).toBe('Upload');

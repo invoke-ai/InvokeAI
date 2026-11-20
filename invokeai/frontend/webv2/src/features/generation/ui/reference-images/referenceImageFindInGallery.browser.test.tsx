@@ -12,7 +12,6 @@ import { userEvent } from 'vitest/browser';
 
 import { ReferenceImageRow } from './ReferenceImageRow';
 
-/** Crop intermediates have separate identities and stay out of the gallery; retain the original for reveal. */
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -110,7 +109,6 @@ describe('reference image find in gallery', () => {
   it('reveals the original image a crop was taken from, not the crop upload, from the row menu', async () => {
     await renderRow(CROPPED_REFERENCE);
 
-    // The tile shows the crop, marked as cropped, which is what makes this worth pinning.
     expect(host!.querySelector('img')?.src).toContain('crop-intermediate.png');
     expect(host!.querySelector('[data-cropped]')).not.toBeNull();
     expect(host!.querySelector('[data-list-primary]')?.textContent).toContain('128 × 128 · cropped');
@@ -125,7 +123,6 @@ describe('reference image find in gallery', () => {
     await renderRow({ ...CROPPED_IP_ADAPTER, isEnabled: false }, SDXL);
 
     await openMenu();
-    // Locate stays enabled for disabled references because it does not edit generation.
     expect(menuItem('find-in-gallery')?.hasAttribute('data-disabled')).toBe(false);
     expect(menuItem('crop')?.hasAttribute('data-disabled')).toBe(true);
     expect(menuItem('use-size')?.hasAttribute('data-disabled')).toBe(true);

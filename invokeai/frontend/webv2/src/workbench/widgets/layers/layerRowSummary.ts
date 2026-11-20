@@ -5,6 +5,8 @@ import { getControlImageState } from '@workbench/canvasLayerContent';
 
 export const layerRowSummary = (layer: CanvasLayerContract, t: TFunction): string => {
   switch (layer.type) {
+    case 'vector':
+      return t('widgets.layers.summary.vectorPaths', { count: layer.paths.length });
     case 'raster': {
       const parts = [t(`widgets.layers.types.${layer.source.type === 'image' ? 'image' : layer.source.type}`)];
       if (layer.blendMode !== 'normal') {

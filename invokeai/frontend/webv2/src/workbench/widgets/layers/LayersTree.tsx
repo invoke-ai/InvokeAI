@@ -46,6 +46,7 @@ import {
   type ProjectedChildRow,
 } from './layerChildRows';
 import { clearLayerChildSelection, selectLayerChild, useLayerChildSelection } from './layerChildSelection';
+import { deleteLayers, layerCommandTargets, useLayerCommandDeps } from './layerCommands';
 import { enabledToggleLabel } from './layerContextActions';
 import { copyLayerToClipboard } from './layerExportActions';
 import { createAdjustmentId, createNoiseSeed } from './layerOps';
@@ -113,7 +114,6 @@ interface LayersTreeProps {
   stacks: LayerStackRowsByKind;
 }
 
-/** Which half of the row under the pointer it sits in. */
 /** Use a group's middle drop band to enter it, including empty groups; leaves split at their midpoint. */
 const edgeOf = (
   rect: { top: number; height: number } | undefined,
@@ -146,10 +146,7 @@ const reparentCommandForTarget = (target: LayerDropTarget): ReparentCommand => (
 const isMenuKey = (event: KeyboardEvent<HTMLElement>): boolean =>
   event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey);
 
-/**
- * A keyboard-opened menu anchors where a right-click would: a point, at the rendered item's bottom-left corner. A point
- * keeps it a context menu, without the arrow a menu anchored to a box gets.
- */
+/** A keyboard-opened menu anchors at a point, as a right-click does, so it shows no arrow. */
 const anchorOfItem = (host: HTMLElement | null, key: string): LayerSurfaceAnchor | null => {
   const rect = host?.querySelector<HTMLElement>(`[data-layer-row-id="${CSS.escape(key)}"]`)?.getBoundingClientRect();
   return rect ? anchorFromPoint(rect.left, rect.bottom) : null;
@@ -159,18 +156,14 @@ const anchorOfItem = (host: HTMLElement | null, key: string): LayerSurfaceAnchor
 const VirtualSlot = ({ children, size, start }: { children: ReactNode; size: number; start: number }) => {
   const style = useMemo(() => ({ height: size, top: start }), [size, start]);
   return (
-    // Absolute children ignore the container's padding; the slot carries the
-    // panel-edge inset itself, and the indicator and pinned header match it.
+    // Absolute children ignore the container's padding; the slot carries the panel-edge inset itself, and the indicator
+    // and pinned header match it.
     <Box left="1.5" position="absolute" right="1.5" role="presentation" style={style}>
       {children}
     </Box>
   );
 };
 
-/**
- * Own subscriptions and commits in one virtualized tree with fixed rows, shared drag/menu hosts, and one roving
- * tab stop.
- */
 export const LayersTree = ({
   degraded,
   dispatch,
@@ -184,6 +177,7 @@ export const LayersTree = ({
 }: LayersTreeProps) => {
   const { t } = useTranslation();
   const commitPrepared = usePreparedCommit(engine);
+  const layerCommands = useLayerCommandDeps(engine);
   const propertiesRequest = useCurrentLayerPropertiesRequest();
   const operation = useCanvasOperation(engine);
   const operationLayerId = operation.status === 'active' ? operation.identity.layerId : null;
@@ -318,6 +312,7 @@ export const LayersTree = ({
     document,
     editingLocked,
     engine,
+    layerCommands,
     onRevealProperties,
     panel,
     panelRows,
@@ -335,6 +330,7 @@ export const LayersTree = ({
       document,
       editingLocked,
       engine,
+      layerCommands,
       onRevealProperties,
       panel,
       panelRows,
@@ -365,8 +361,8 @@ export const LayersTree = ({
     const { commitPrepared: commit } = latest.current;
     return commit(label, (model) => model.prepare(command));
   }, []);
-  // A child row's command is built from the engine's document inside the commit: a preview gesture open
-  // elsewhere has ended and been restored by then, so the row's siblings carry committed values, not previewed ones.
+  // A child row's command is built from the engine's document inside the commit: a preview gesture open elsewhere has
+  // ended and been restored by then, so the row's siblings carry committed values, not previewed ones.
   const runChildStructural = useCallback((label: string, child: ProjectedChildRow, action: LayerChildRowAction) => {
     const { commitPrepared: commit } = latest.current;
     return commit(label, (model) => {
@@ -388,8 +384,7 @@ export const LayersTree = ({
   const selectChildRow = useCallback(
     (child: Pick<ProjectedChildRow, 'itemId' | 'key' | 'layerId'>, reveal: boolean) => {
       const { dispatch: send, panel: current, projectId: project } = latest.current;
-      // The owner becomes the single selected layer, published before the
-      // dispatch so reconciliation keeps it.
+      // The owner becomes the single selected layer, published before the dispatch so reconciliation keeps it.
       publishLayerPanelSelection({ primaryId: child.layerId, projectId: project, selectedIds: [child.layerId] });
       panelSelectedPrimary.current = child.layerId;
       if (current.primaryId !== child.layerId) {
@@ -404,14 +399,13 @@ export const LayersTree = ({
     []
   );
 
-  // A drop or menu move; one that changes owner carries the sub-selection and focus to the item's new row,
-  // opening the groups and child rows that would hide it. The row exists only after the commit renders, so the
-  // focus effect scrolls to and focuses it then.
+  // A drop or menu move; one that changes owner carries the sub-selection and focus to the item's new row, opening the
+  // groups and child rows that would hide it. The row exists only after the commit renders, so the focus effect scrolls
+  // to and focuses it then.
   const commitChildMove = useCallback(
     (child: ProjectedChildRow, target: LayerChildDropTarget) => {
       const { commitPrepared: commit } = latest.current;
       const { layerId } = target;
-      // Built from the engine's document inside the commit, like the other child-row commands.
       const outcome = commit(t(layerChildMoveLabelKey(child, layerId)), (model) => {
         const command = layerChildDropCommand(model.document, child, target);
         return command ? model.prepare(command) : { status: 'unchanged' };
@@ -437,17 +431,12 @@ export const LayersTree = ({
   // After deletion, focus the nearest surviving row below, otherwise above.
   const removeRows = useCallback(
     (key: string) => {
-      const { document: currentDocument, engine: currentEngine, panel: current, visibleRowIds: rows } = latest.current;
+      const { document: currentDocument, layerCommands, panel: current, visibleRowIds: rows } = latest.current;
       const vm = lookupDocumentNodeState(currentDocument, key);
       if (!vm) {
         return;
       }
-      // The menu's rule: the selection when the row is part of it, else the row alone.
-      const ids = current.selectedIds.includes(key) ? current.selectedIds : [key];
-      // A stray key on a locked row is ignored, as the menu disables its Delete.
-      if (currentEngine?.document.model()?.refusalFor({ ids, type: 'remove' })) {
-        return;
-      }
+      const ids = layerCommandTargets(current.selectedIds, key);
       const removed = new Set(ids);
       const survives = (id: string): boolean => {
         const state = lookupDocumentNodeState(currentDocument, id);
@@ -455,15 +444,12 @@ export const LayersTree = ({
       };
       const index = rows.indexOf(key);
       const next = rows.slice(index + 1).find(survives) ?? rows.slice(0, Math.max(0, index)).reverse().find(survives);
-      const outcome = runStructural(
-        t(ids.length > 1 ? 'widgets.layers.actions.deleteSelected' : 'widgets.layers.actions.delete'),
-        { ids, type: 'remove' }
-      );
-      if (outcome.status === 'committed' && next) {
+      // A locked row's Delete is a quiet no-op, as the menu disables its Delete.
+      if (deleteLayers(layerCommands, ids) === 'committed' && next) {
         focusItem(next);
       }
     },
-    [focusItem, runStructural, t]
+    [focusItem]
   );
 
   const commands = useMemo<LayerRowCommands>(
@@ -574,7 +560,7 @@ export const LayersTree = ({
             const parent = lookupDocumentNodeState(currentDocument, vm.parentId)!;
             const grandSiblings =
               parent.parentId === null
-                ? currentDocument.stacks[parent.stack]
+                ? (currentDocument.stacks[parent.stack] ?? [])
                 : (getDocumentNode(currentDocument, parent.parentId) as { children: readonly { id: string }[] })
                     .children;
             const beforeId = grandSiblings[parent.siblingIndex + 1]?.id ?? null;
@@ -588,7 +574,7 @@ export const LayersTree = ({
           }
           const siblings =
             vm.parentId === null
-              ? currentDocument.stacks[vm.stack]
+              ? (currentDocument.stacks[vm.stack] ?? [])
               : (getDocumentNode(currentDocument, vm.parentId) as { children: readonly { id: string; type: string }[] })
                   .children;
           const above = siblings[vm.siblingIndex - 1];
@@ -721,8 +707,8 @@ export const LayersTree = ({
     }
   }, []);
 
-  // A primary that changed outside the panel (canvas, undo, a new layer) is scrolled into view once,
-  // as soon as it has a row; later list changes leave the scroll position alone.
+  // A primary that changed outside the panel (canvas, undo, a new layer) is scrolled into view once, as soon as it has
+  // a row; later list changes leave the scroll position alone.
   useLayoutEffect(() => {
     if (!primaryId || revealedPrimary.current === primaryId) {
       return;
@@ -739,8 +725,8 @@ export const LayersTree = ({
     }
   }, [primaryId, rowIndexByKey]);
 
-  // Reveal external Properties requests, scroll after render, and open once; discard requests for removed nodes
-  // and, while an operation runs, for any layer but its target: the operation's panel supersedes them.
+  // Reveal external Properties requests, scroll after render, and open once; discard requests for removed nodes and,
+  // while an operation runs, for any layer but its target: the operation's panel supersedes them.
   useLayoutEffect(() => {
     if (!propertiesRequest) {
       pendingProperties.current = null;
@@ -858,8 +844,8 @@ export const LayersTree = ({
               ? overChild.kind === 'reference-image'
               : container.data.current?.stack === 'regional_guidance';
           }
-          // Adjustments land among any raster owner's adjustment rows (below its region row), or on a raster
-          // layer or group row to append; the drop plan asks the model about locks.
+          // Adjustments land among any raster owner's adjustment rows (below its region row), or on a raster layer or
+          // group row to append; the drop plan asks the model about locks.
           if (overChild) {
             return isOrderedChildKind(overChild.kind) || overChild.kind === 'layer-region';
           }
@@ -1005,8 +991,8 @@ export const LayersTree = ({
       rows: stacks[drag.stack].rows,
     });
   }, [drag, stacks]);
-  // Cache drag validation by semantic move rather than equivalent visual gaps; clear on completion and revalidate
-  // the prepared landing against the latest document.
+  // Cache drag validation by semantic move rather than equivalent visual gaps; clear on completion and revalidate the
+  // prepared landing against the latest document.
   const refusalCommandKey = target ? JSON.stringify(reparentCommandForTarget(target)) : null;
   const refusal = useMemo(
     () =>
@@ -1208,8 +1194,8 @@ export const LayersTree = ({
             w="full"
           >
             {virtualItems.map((item) => {
-              // The window applies a changed key set one commit late; a slot draws the row its key
-              // names, never the row at its index, so no node is relabelled in between.
+              // The window applies a changed key set one commit late; a slot draws the row its key names, never the row
+              // at its index, so no node is relabelled in between.
               const rowIndex = rowIndexByKey.get(String(item.key));
               const panelRow = rowIndex === undefined ? undefined : panelRows[rowIndex];
               if (!panelRow) {

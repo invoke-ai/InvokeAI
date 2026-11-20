@@ -47,7 +47,6 @@ describe('areModelsEquivalent', () => {
   });
 
   it('separates models the prompt editors would render differently', () => {
-    // Compare model metadata beyond key; prompt affordances can change under the same catalog identity.
     expect(areModelsEquivalent(model(), model({ key: 'model-b' }))).toBe(false);
     expect(areModelsEquivalent(model(), model({ base: 'sd-1' }))).toBe(false);
     expect(areModelsEquivalent(model(), model({ name: 'Model B' }))).toBe(false);
@@ -78,7 +77,6 @@ describe('areLorasEquivalent', () => {
 
 describe('areInputImagesEquivalent', () => {
   it('separates images by dimensions as well as by name', () => {
-    // Include dimensions in equality so same-name image updates recompute preflight estimates.
     expect(areInputImagesEquivalent(image(), image())).toBe(true);
     expect(areInputImagesEquivalent(image(), image({ width: 1024 }))).toBe(false);
     expect(areInputImagesEquivalent(image(), image({ height: 1024 }))).toBe(false);

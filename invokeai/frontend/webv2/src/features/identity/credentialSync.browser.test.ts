@@ -6,8 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type * as sessionModule from './session';
 
 /**
- * Two documents sharing real browser storage: this page is the tab under test, and a same-origin frame stands in for
- * a second tab. The frame's writes reach this page as genuine `storage` events.
+ * Two documents sharing real browser storage: this page is the tab under test, and a same-origin frame stands in for a
+ * second tab. The frame's writes reach this page as genuine `storage` events.
  */
 
 const TOKEN_KEY = 'auth_token';

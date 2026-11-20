@@ -6,10 +6,7 @@ const INITIAL_SNAPSHOT = { isOpen: false };
 
 export const widgetsDialogStore = createExternalStore<{ isOpen: boolean }>(INITIAL_SNAPSHOT);
 
-/**
- * Where focus goes when the dialog closes. Openers name a control that outlives them (the app menu's trigger, a rail's
- * menu trigger), since the menu item that opened the dialog is gone by then.
- */
+/** Where focus goes on close: a control that outlives the menu item that opened the dialog. */
 let returnFocusTarget: (() => HTMLElement | null) | null = null;
 
 registerAccountOwnedResource({

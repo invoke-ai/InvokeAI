@@ -107,8 +107,9 @@ jobs:
             # A per-test timeout turns a hang into a failure with a traceback, so pytest still reaches its summary
             # inside the job timeout.
             pytest-args: '--timeout=600'
-            # About 1.6x the slowest measured job (37 min, 31 of them pytest; another run took 28).
-            timeout-minutes: 60
+            # The latest main-synced run reached 98% before hitting the 60-minute job limit.
+            # Keep the per-test timeout and allow the suite 15 more minutes to report its result.
+            timeout-minutes: 75
     name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
     # Per platform: expected run time is 8-14 min on linux and macos. See the matrix for windows.
@@ -167,11 +168,13 @@ jobs:
               # Cross-stack generation contracts: the frontend writes these, Python validates them
               # against the invocation and architecture registries. A frontend-only change that
               # regenerates one would otherwise pass vitest while skipping the backend half.
-              # `__fixtures__/` does not exist yet -- it arrives with the graph-builder fixtures.
-              # A pattern matching nothing costs nothing here, and listing it now means the branch
-              # that adds the directory does not also have to remember to add this line.
+              # Generation's `__fixtures__/` does not exist yet -- it arrives with the graph-builder
+              # fixtures. A pattern matching nothing costs nothing here, and listing it now means the
+              # branch that adds the directory does not also have to remember to add this line.
               - 'invokeai/frontend/webv2/src/features/generation/core/__snapshots__/**'
               - 'invokeai/frontend/webv2/src/features/generation/core/__fixtures__/**'
+              # test_capabilities_fixture.py pins the served architecture table fixture to the backend.
+              - 'invokeai/frontend/webv2/src/features/models/core/__fixtures__/**'
               - 'invokeai/frontend/webv2/src/features/video/core/__snapshots__/**'
               - 'invokeai/frontend/webv2/src/features/upscale/core/__snapshots__/**'
               # test_shared_numerical_fixtures.py checks the Python image adjustments against the

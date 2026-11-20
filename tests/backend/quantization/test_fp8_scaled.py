@@ -1,6 +1,7 @@
 import contextlib
 import json
 import logging
+import weakref
 from unittest import mock
 
 import pytest
@@ -24,6 +25,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     find_torchao_fp8_problem,
+    fold_transient_bytes,
     forget_inconclusive_fp8_matmul_probe,
     is_matmul_usable_scale,
     is_scale_metadata_key,
@@ -957,6 +959,64 @@ class TestFoldInSlabs:
             dequantize_fp8_scaled(sd, {"lin": Fp8ScaledLayer(weight_scale=scale)}, torch.bfloat16)
 
         assert max(event.cpu_memory_usage for event in profiler.events()) == result_bytes
+
+    @pytest.mark.parametrize(
+        "scale",
+        [
+            pytest.param(torch.tensor(0.37), id="per_tensor"),
+            pytest.param(torch.rand(256) + 0.5, id="per_row"),
+            pytest.param(torch.rand(16, 4) + 0.5, id="row_and_column_blocks"),
+            pytest.param(torch.rand(256, 16) + 0.5, id="column_blocks"),
+        ],
+    )
+    @pytest.mark.parametrize("slab_elements", [None, 8 * 512], ids=["whole", "slabs"])
+    def test_the_transient_a_loader_reserves_for_covers_what_the_fold_holds(
+        self, monkeypatch: pytest.MonkeyPatch, scale: torch.Tensor, slab_elements: int | None
+    ) -> None:
+        """`fold_transient_bytes` is what a loader adds to its reservation for the layer in flight, so it must not fall
+        short of the live bytes the fold allocates beyond its result. Counted by storage, from allocation until the
+        last tensor on it dies. In slabs it is exact; folded whole it is over by the result, which does not yet exist
+        while the multiply holds its two float32 copies."""
+        from torch.utils._python_dispatch import TorchDispatchMode
+        from torch.utils._pytree import tree_leaves
+
+        class LiveBytes(TorchDispatchMode):
+            def __init__(self) -> None:
+                super().__init__()
+                self.live = 0
+                self.peak = 0
+
+            def _free(self, size: int) -> None:
+                self.live -= size
+
+            def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+                kwargs = kwargs or {}
+                inputs = {t.untyped_storage().data_ptr() for t in tree_leaves((args, kwargs)) if torch.is_tensor(t)}
+                out = func(*args, **kwargs)
+                for tensor in tree_leaves(out):
+                    storage = tensor.untyped_storage() if torch.is_tensor(tensor) else None
+                    if storage is None or storage.nbytes() == 0 or storage.data_ptr() in inputs:
+                        continue
+                    inputs.add(storage.data_ptr())
+                    self.live += storage.nbytes()
+                    self.peak = max(self.peak, self.live)
+                    weakref.finalize(tensor, self._free, storage.nbytes())
+                return out
+
+        if slab_elements is not None:
+            monkeypatch.setattr(fp8_scaled, "_FOLD_SLAB_ELEMENTS", slab_elements)
+        sd = {"lin.weight": torch.randn(256, 512).to(FP8_DTYPE)}
+        bound = fold_transient_bytes(torch.empty(256, 512, dtype=FP8_DTYPE, device="meta"), scale)
+
+        with LiveBytes() as live:
+            dequantize_fp8_scaled(sd, {"lin": Fp8ScaledLayer(weight_scale=scale)}, torch.bfloat16)
+
+        beyond_result = live.peak - 256 * 512 * torch.bfloat16.itemsize
+        assert beyond_result > 0, "the tracker saw no allocation, so the comparison would pass vacuously"
+        if slab_elements is None:
+            assert beyond_result <= bound
+        else:
+            assert beyond_result == bound
 
     def test_a_block_scale_that_does_not_tile_the_rows_names_the_layer(self) -> None:
         # Left to the multiply: "The size of tensor a (39) must match the size of tensor b (36)", naming nothing.

@@ -204,7 +204,6 @@ describe('exportRasterComposite', () => {
 
   describe('a noisy text layer whose measured bounds exceed the estimate', () => {
     const { bbox, layer, measured, plannedScratchPixels } = MEASURED_NOISY_TEXT;
-    /** Instruments allocation and reservation; `uncovered` lists allocations made beyond outstanding reservations. */
     const measuredDeps = () => {
       const stub = createTestStubRasterBackend();
       const layerSurface = stub.createSurface(measured.width, measured.height);
@@ -244,7 +243,6 @@ describe('exportRasterComposite', () => {
         status: 'ok',
       });
 
-      // The measured 400×100 scratch and its ImageData were allocated, each within outstanding reservations.
       expect(allocatedBytes()).toBeGreaterThanOrEqual(
         (bbox.width * bbox.height + measured.width * measured.height * 2) * 4
       );
@@ -253,7 +251,6 @@ describe('exportRasterComposite', () => {
 
     it('refuses as over-budget instead of allocating past its reservation', async () => {
       const { allocatedBytes, deps, releaseLayer } = measuredDeps();
-      // Output, plus the planned scratch surface and its ImageData.
       const upFrontBytes = (bbox.width * bbox.height + plannedScratchPixels * 2) * 4;
       const memory = new RasterMemoryBudgetController({ budgetBytes: upFrontBytes });
       deps.reserve = (bytes) => memory.reserveOperation(bytes, { purpose: 'raster-export' });
@@ -262,7 +259,6 @@ describe('exportRasterComposite', () => {
         status: 'over-budget',
       });
 
-      // Only the output surface was allocated; the layer lease and every reservation are released.
       expect(allocatedBytes()).toBe(bbox.width * bbox.height * 4);
       expect(releaseLayer).toHaveBeenCalledOnce();
       expect(memory.snapshot().reservedBytes).toBe(0);
@@ -271,7 +267,6 @@ describe('exportRasterComposite', () => {
 
   describe('spatial adjustments', () => {
     const CLARITY = [{ amount: 50, id: 'clarity', isEnabled: true, size: 10, type: 'clarity' as const }];
-    /** A 64×32 image layer at (-4, 8); a 4×4 bbox samples a sliver of it. */
     const spatialLayer = (adjustments = CLARITY): CanvasLayerContract => ({
       ...(rasterLayer('portrait') as CanvasRasterLayerContractV2),
       adjustments,
@@ -296,7 +291,6 @@ describe('exportRasterComposite', () => {
       });
 
       expect(reserve).toHaveBeenCalledExactlyOnceWith((4 * 4 + 64 * 32 * 2) * 4);
-      // The job reads all of the layer, not the sampled region.
       expect(runSpatial).toHaveBeenCalledOnce();
       expect(runSpatial.mock.calls[0]![0]).toMatchObject({ height: 32, priority: 'now', width: 64 });
     });

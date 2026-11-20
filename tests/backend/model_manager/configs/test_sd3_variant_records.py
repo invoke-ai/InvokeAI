@@ -9,7 +9,7 @@ import pytest
 
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.lora import LoRA_Diffusers_SD3_Config, LoRA_LyCORIS_SD3_Config
-from invokeai.backend.model_manager.configs.main import Main_Diffusers_SD3_Config
+from invokeai.backend.model_manager.configs.main import Main_Diffusers_SD3_Config, Main_GGUF_SD3_Config
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, SD3VariantType
 
 _COMMON = {
@@ -27,6 +27,7 @@ _COMMON = {
     "config",
     [
         Main_Diffusers_SD3_Config(**_COMMON, repo_variant=ModelRepoVariant.Default, variant=SD3VariantType.Large),
+        Main_GGUF_SD3_Config(**_COMMON, variant=SD3VariantType.Medium),
         LoRA_LyCORIS_SD3_Config(**_COMMON, variant=SD3VariantType.Medium),
         LoRA_Diffusers_SD3_Config(**_COMMON, variant=SD3VariantType.Medium),
     ],

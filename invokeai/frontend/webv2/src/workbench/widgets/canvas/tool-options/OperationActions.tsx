@@ -24,14 +24,7 @@ export interface OperationRunAction {
   onRun(): void;
 }
 
-/**
- * The verbs of a running canvas operation, one row after its form's groups: Reset at the start; Cancel, the manual run
- * and Apply (with its save-as menu) at the end. Status and errors live in the Operation section, not here.
- *
- * A retry's run button leaves the row once its run succeeds. When the button leaves while it has focus, or leaves after
- * a run that began while it had focus and nothing took focus since it went disabled, focus moves to Apply, or to Cancel
- * while Apply is disabled, so a keyboard user is not left on the page body.
- */
+/** A running operation's verbs; a vanishing focused run button hands focus to Apply, or Cancel. */
 export const OperationActions = ({
   applying,
   canApply,
@@ -105,10 +98,8 @@ export const OperationActions = ({
   );
   return (
     <Flex align="center" gap="1" minW="0" w="full">
-      {/*
-        Tighter padding keeps the row on one line down to a 280 px floating pane; past that, only the run button
-        gives way, truncating its label, so every verb stays visible.
-      */}
+      {/* Tighter padding keeps the row on one line down to a 280 px floating pane; past that, only the run button gives
+          way, truncating its label, so every verb stays visible. */}
       <Button disabled={!canReset} flexShrink={0} px="2" variant="ghost" onClick={onReset}>
         {t('common.reset')}
       </Button>

@@ -53,8 +53,6 @@ describe('collectCompositedGroups', () => {
     expect([...composited.keys()]).toEqual(['faded', 'mult', 'identity']);
     expect(composited.get('faded')).toEqual(facts([], { opacity: 0.5 }));
     expect(composited.get('mult')).toEqual(facts([], { blendMode: 'multiply' }));
-    // An identity stack contributes nothing: the scope keeps an EMPTY stack so
-    // renderers can skip the pixel pass, but the opacity still isolates it.
     expect(composited.get('identity')).toEqual(facts([], { opacity: 0.25 }));
   });
 });

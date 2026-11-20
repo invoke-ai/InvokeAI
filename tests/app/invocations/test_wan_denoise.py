@@ -10,7 +10,6 @@ runner. End-to-end tests against real Wan checkpoints are gated behind
 from __future__ import annotations
 
 import gc
-import os
 import weakref
 from collections import Counter
 from contextlib import contextmanager
@@ -800,17 +799,6 @@ class TestWanDenoiseDualExpert:
         assert len(low.timesteps_seen) > 0
         assert all(count == 1 for count in Counter(high.timesteps_seen).values())
         assert all(count == 2 for count in Counter(low.timesteps_seen).values())
-
-
-@pytest.mark.skipif(
-    os.environ.get("INVOKEAI_HEAVY_TESTS") != "1",
-    reason="End-to-end test requires real Wan weights and CUDA; opt in with INVOKEAI_HEAVY_TESTS=1",
-)
-class TestWanDenoiseHeavy:
-    """Placeholder for a real-weights smoke test once CUDA is available."""
-
-    def test_real_ti2v_5b_runs(self) -> None:
-        pytest.skip("Heavy test stub — implement once a TI2V-5B checkpoint is installable.")
 
 
 class TestWanDenoiseRefImage:

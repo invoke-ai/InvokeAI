@@ -8,13 +8,7 @@ import { useTranslation } from 'react-i18next';
 
 import { getBatchCount, isBatchCountFixed } from './useInvocationState';
 
-/**
- * Invoke's rounded corners overlap this field. The input, the field's visible frame, runs one control radius past the
- * root beneath them and has no facing edge, so its top and bottom borders reach Invoke's straight edges in every state
- * (hover, focus, invalid) in the color the input itself draws. A zero width rather than a transparent color, because
- * state colors would repaint that edge inside an outline Invoke. The root keeps its width and the steppers stay
- * anchored to it, so layout is unchanged.
- */
+/** Invoke's corners overlap this field; a zero-width edge, not a transparent one, so state colors cannot repaint it. */
 const RUN_UNDER_INVOKE_CSS = {
   '& input': { borderInlineEndWidth: '0', width: 'calc(100% + {radii.control})' },
 } as const;

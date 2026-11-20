@@ -30,7 +30,6 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-/** The menu reads the real store and drives a real engine over real decoded pixels. */
 const harness = vi.hoisted(() => ({
   engine: null as CanvasEngine | null,
   store: null as ReturnType<typeof createWorkbenchStore> | null,
@@ -87,10 +86,6 @@ const maskLayer = (id: string, overrides: Partial<CanvasLayerContract> = {}): Ca
     ...overrides,
   } as Partial<CanvasLayerContract>);
 
-/**
- * Renders the Layers panel's layer menu over a real engine for `nodes`, with `selectedIds` selected in the panel (the
- * first as primary), returning a way to open it on a layer. Images named in `unreadable` no longer exist.
- */
 const renderMenu = async (
   nodes: CanvasNodeContract[],
   selectedIds: readonly string[] = [],
@@ -236,8 +231,8 @@ describe('Layers context menu over a real engine', () => {
     const description = document.getElementById(regenerate.getAttribute('aria-describedby')!)!;
     const width = menu.getBoundingClientRect().width;
     description.textContent = '';
-    // The description is about as wide as the widest label; which of the two is wider depends on the font, so allow
-    // it a few pixels rather than none.
+    // The description is about as wide as the widest label; which of the two is wider depends on the font, so allow it
+    // a few pixels rather than none.
     expect(width - menu.getBoundingClientRect().width).toBeLessThan(8);
   });
 
@@ -281,7 +276,6 @@ describe('generation and canvas visibility in the layer menus', () => {
 
     await openMenu('mask');
     expect(labels()).toContain('Show on canvas');
-    // From the keyboard, as the row's controls are reached.
     const exclude = window.document.querySelector<HTMLElement>('[role="menuitem"][data-value="toggle-visibility"]')!;
     expect(exclude.textContent).toBe('Exclude from generation');
     for (let step = 0; step < 30 && !exclude.hasAttribute('data-highlighted'); step += 1) {
@@ -362,5 +356,69 @@ describe('generation and canvas visibility in the layer menus', () => {
     await act(() => item(expected[0]).click());
     await vi.waitFor(() => expect(nodeOf(document_, 'G').isEnabled).toBe(false));
     expect(engine.history.getEntries().past).toEqual([expected[0]]);
+  });
+});
+
+describe('group menu commands follow the document model', () => {
+  /** Opens the group menu on `groupId` over a real engine for `nodes`. */
+  const openGroupMenu = async (nodes: CanvasNodeContract[], groupId: string, selectedIds: readonly string[] = []) => {
+    const harnessed = await renderMenu(nodes, selectedIds);
+    const group = getDocumentIndex(harnessed.document()).byId.get(groupId)!.node as CanvasGroupContract;
+    await act(() =>
+      root!.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <LayerGroupContextMenu
+              anchor={{ height: 1, width: 1, x: 40, y: 40 }}
+              editingLocked={false}
+              engine={harnessed.engine}
+              group={group}
+              stack="raster"
+              onClose={() => undefined}
+            />
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
+    await expect.element(page.getByRole('menu')).toBeVisible();
+    return harnessed;
+  };
+  const disabled = (name: string) => item(name).element().getAttribute('aria-disabled') === 'true';
+  const commandStates = () => ({
+    delete: disabled('Delete group'),
+    duplicate: disabled('Duplicate group'),
+    ungroup: disabled('Ungroup'),
+  });
+
+  it('offers every command on an unlocked group', async () => {
+    await openGroupMenu([groupContract('G', [imageLayer('child')])], 'G');
+    expect(commandStates()).toEqual({ delete: false, duplicate: false, ungroup: false });
+  });
+
+  it('keeps a locked group whole, yet copies it beside itself', async () => {
+    const { document, engine } = await openGroupMenu(
+      [groupContract('G', [imageLayer('child')], { isLocked: true })],
+      'G'
+    );
+    expect(commandStates()).toEqual({ delete: true, duplicate: false, ungroup: true });
+
+    await act(() => item('Duplicate group').click());
+    await vi.waitFor(() => expect(engine.history.getEntries().past).toEqual(['Duplicate group']));
+    expect(document().stacks.raster.map((node) => [node.name, node.isLocked])).toEqual([
+      ['G copy', true],
+      ['G', true],
+    ]);
+  });
+
+  it('copies nothing into the locked group around a group', async () => {
+    await openGroupMenu([groupContract('L', [groupContract('H', [imageLayer('child')])], { isLocked: true })], 'H');
+    expect(commandStates()).toEqual({ delete: true, duplicate: true, ungroup: true });
+  });
+
+  it('names a group selected with its own child as the group, in the menu and in history', async () => {
+    const { engine } = await openGroupMenu([groupContract('G', [imageLayer('child')])], 'G', ['G', 'child']);
+
+    await act(() => item('Delete group').click());
+    await vi.waitFor(() => expect(engine.history.getEntries().past).toEqual(['Delete group']));
   });
 });

@@ -3059,8 +3059,6 @@ def test_nested_if_literal_condition_activates_selected_branch():
     graph.add_edge(create_edge("outer_if", "value", "sink", "a"))
 
     state = GraphExecutionState(graph=graph)
-    assert not state._can_use_fresh_flat_if_activation()
-
     executed_source_ids = execute_all_nodes(state)
 
     assert state.is_complete(), (
@@ -5015,6 +5013,31 @@ def test_graph_collector_reuses_outer_collection_input_for_each_nested_iterator_
     assert collect_results == [[100, 0, 1], [100, 10, 11]]
 
 
+def test_graph_collector_broadcasts_root_item_into_each_nested_iterator_group():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="outer_range", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="outer_iter"))
+    graph.add_node(IntegerCollectionFromItemTestInvocation(id="inner_collection"))
+    graph.add_node(IterateInvocation(id="inner_iter"))
+    graph.add_node(AddInvocation(id="inner_item", b=0))
+    graph.add_node(AddInvocation(id="root_item", a=100, b=0))
+    graph.add_node(CollectInvocation(id="collect"))
+
+    graph.add_edge(create_edge("outer_range", "collection", "outer_iter", "collection"))
+    graph.add_edge(create_edge("outer_iter", "item", "inner_collection", "value"))
+    graph.add_edge(create_edge("inner_collection", "collection", "inner_iter", "collection"))
+    graph.add_edge(create_edge("inner_iter", "item", "inner_item", "a"))
+    graph.add_edge(create_edge("inner_item", "value", "collect", "item"))
+    graph.add_edge(create_edge("root_item", "value", "collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+    execute_all_nodes(state)
+
+    collect_ids = state.source_prepared_mapping["collect"]
+    assert len(collect_ids) == 2
+    assert sorted(state.results[node_id].collection for node_id in collect_ids) == [[100, 0, 1], [100, 10, 11]]
+
+
 def test_graph_collector_nested_under_three_iterators_preserves_outer_iteration_paths():
     graph = Graph()
 
@@ -5214,7 +5237,7 @@ def test_if_invocation_output_connects_to_downstream_input():
         (False, "false_values", "true_values", ["false-a"]),
     ],
 )
-def test_if_output_iterates_only_selected_collection_branch(
+def test_if_output_iterates_selected_collection_with_eager_branch_producers(
     condition: bool, selected_node_id: str, unselected_node_id: str, expected_values: list[str]
 ):
     graph = Graph()
@@ -5235,73 +5258,7 @@ def test_if_output_iterates_only_selected_collection_branch(
     assert len(collect_exec_ids) == 1
     assert state.results[next(iter(collect_exec_ids))].collection == expected_values
     assert selected_node_id in executed_node_ids
-    assert unselected_node_id not in executed_node_ids
-
-
-@pytest.mark.xfail(strict=True, reason="Legacy eager If-node execution should no longer occur")
-def test_if_graph_current_behavior_executes_both_branches_and_shared_ancestors():
-    graph = Graph()
-    graph.add_node(BooleanInvocation(id="condition", value=True))
-    graph.add_node(PromptTestInvocation(id="shared", prompt="shared value"))
-    graph.add_node(PromptTestInvocation(id="true_mid"))
-    graph.add_node(PromptTestInvocation(id="true_leaf"))
-    graph.add_node(PromptTestInvocation(id="false_mid"))
-    graph.add_node(PromptTestInvocation(id="false_leaf"))
-    graph.add_node(PromptTestInvocation(id="side_consumer"))
-    graph.add_node(IfInvocation(id="if"))
-    graph.add_node(PromptTestInvocation(id="selected_output"))
-
-    graph.add_edge(create_edge("condition", "value", "if", "condition"))
-    graph.add_edge(create_edge("shared", "prompt", "true_mid", "prompt"))
-    graph.add_edge(create_edge("true_mid", "prompt", "true_leaf", "prompt"))
-    graph.add_edge(create_edge("true_leaf", "prompt", "if", "true_input"))
-    graph.add_edge(create_edge("shared", "prompt", "false_mid", "prompt"))
-    graph.add_edge(create_edge("false_mid", "prompt", "false_leaf", "prompt"))
-    graph.add_edge(create_edge("false_leaf", "prompt", "if", "false_input"))
-    graph.add_edge(create_edge("shared", "prompt", "side_consumer", "prompt"))
-    graph.add_edge(create_edge("if", "value", "selected_output", "prompt"))
-
-    g = GraphExecutionState(graph=graph)
-    executed_source_ids = execute_all_nodes(g)
-
-    assert set(executed_source_ids) == {
-        "condition",
-        "shared",
-        "true_mid",
-        "true_leaf",
-        "false_mid",
-        "false_leaf",
-        "side_consumer",
-        "if",
-        "selected_output",
-    }
-    assert executed_source_ids.count("false_mid") == 1
-    assert executed_source_ids.count("false_leaf") == 1
-
-    prepared_selected_output_id = next(iter(g.source_prepared_mapping["selected_output"]))
-    assert g.results[prepared_selected_output_id].prompt == "shared value"
-
-
-@pytest.mark.xfail(strict=True, reason="Legacy eager If-node execution should no longer occur")
-def test_if_graph_current_behavior_executes_both_simple_branches():
-    graph = Graph()
-    graph.add_node(BooleanInvocation(id="condition", value=True))
-    graph.add_node(PromptTestInvocation(id="true_value", prompt="true branch"))
-    graph.add_node(PromptTestInvocation(id="false_value", prompt="false branch"))
-    graph.add_node(IfInvocation(id="if"))
-    graph.add_node(PromptTestInvocation(id="selected_output"))
-
-    graph.add_edge(create_edge("condition", "value", "if", "condition"))
-    graph.add_edge(create_edge("true_value", "prompt", "if", "true_input"))
-    graph.add_edge(create_edge("false_value", "prompt", "if", "false_input"))
-    graph.add_edge(create_edge("if", "value", "selected_output", "prompt"))
-
-    g = GraphExecutionState(graph=graph)
-    executed_source_ids = execute_all_nodes(g)
-
-    assert set(executed_source_ids) == {"condition", "true_value", "false_value", "if", "selected_output"}
-    prepared_selected_output_id = next(iter(g.source_prepared_mapping["selected_output"]))
-    assert g.results[prepared_selected_output_id].prompt == "true branch"
+    assert unselected_node_id in executed_node_ids
 
 
 def test_if_graph_optimized_behavior_executes_only_selected_simple_branch_and_records_history():
@@ -5505,7 +5462,7 @@ def test_if_graph_optimized_behavior_skips_unselected_branch_but_keeps_shared_an
     assert "false_leaf" not in executed_source_ids
 
 
-def test_if_graph_optimized_behavior_skips_distant_unselected_ancestors_only_when_exclusive():
+def test_if_graph_external_branch_consumer_makes_if_eager():
     graph = Graph()
     graph.add_node(BooleanInvocation(id="condition", value=False))
     graph.add_node(PromptTestInvocation(id="shared_root", prompt="shared value"))
@@ -5534,13 +5491,15 @@ def test_if_graph_optimized_behavior_skips_distant_unselected_ancestors_only_whe
         "condition",
         "shared_root",
         "true_shared_mid",
+        "true_exclusive_leaf",
         "false_mid",
         "false_leaf",
         "shared_observer",
         "if",
         "selected_output",
     }
-    assert "true_exclusive_leaf" not in executed_source_ids
+    selected_output_id = next(iter(g.source_prepared_mapping["selected_output"]))
+    assert g.results[selected_output_id].prompt == "shared value"
 
 
 def test_if_graph_optimized_behavior_allows_selected_missing_branch_input():
@@ -5563,7 +5522,7 @@ def test_if_graph_optimized_behavior_allows_selected_missing_branch_input():
     assert "true_value" not in executed_source_ids
 
 
-def test_if_graph_optimized_behavior_does_not_cross_defer_independent_ifs():
+def test_independent_ifs_eagerly_run_both_branches():
     graph = Graph()
     graph.add_node(BooleanInvocation(id="condition_a", value=True))
     graph.add_node(BooleanInvocation(id="condition_b", value=False))
@@ -5593,16 +5552,16 @@ def test_if_graph_optimized_behavior_does_not_cross_defer_independent_ifs():
         "condition_a",
         "condition_b",
         "true_a",
+        "false_a",
+        "true_b",
         "false_b",
         "if_a",
         "if_b",
         "collect",
     }
-    assert "false_a" not in executed_source_ids
-    assert "true_b" not in executed_source_ids
 
 
-def test_if_graph_optimized_behavior_supports_nested_ifs():
+def test_nested_ifs_eagerly_run_both_branches():
     graph = Graph()
     graph.add_node(BooleanInvocation(id="outer_condition", value=True))
     graph.add_node(BooleanInvocation(id="inner_condition", value=False))
@@ -5629,13 +5588,13 @@ def test_if_graph_optimized_behavior_supports_nested_ifs():
     assert set(executed_source_ids) == {
         "outer_condition",
         "inner_condition",
+        "inner_true",
         "inner_false",
+        "outer_false",
         "inner_if",
         "outer_if",
         "selected_output",
     }
-    assert "inner_true" not in executed_source_ids
-    assert "outer_false" not in executed_source_ids
 
 
 def test_if_graph_optimized_behavior_prunes_branches_per_iteration():
@@ -5695,7 +5654,7 @@ def test_if_graph_optimized_behavior_handles_empty_iteration():
     assert g.is_complete()
 
 
-def test_if_graph_optimized_behavior_keeps_shared_live_consumers_per_iteration():
+def test_if_external_branch_consumer_makes_all_iteration_branches_eager():
     graph = Graph()
     graph.add_node(BooleanCollectionInvocation(id="conditions", collection=[True, False, False]))
     graph.add_node(IterateInvocation(id="condition_iter"))
@@ -5729,8 +5688,8 @@ def test_if_graph_optimized_behavior_keeps_shared_live_consumers_per_iteration()
     assert executed_source_ids.count("condition_iter") == 3
     assert executed_source_ids.count("shared_branch") == 3
     assert executed_source_ids.count("observer") == 3
-    assert executed_source_ids.count("true_leaf") == 1
-    assert executed_source_ids.count("false_branch") == 2
+    assert executed_source_ids.count("true_leaf") == 3
+    assert executed_source_ids.count("false_branch") == 3
     assert g.is_complete()
 
 
@@ -5754,12 +5713,12 @@ def test_if_graph_optimized_behavior_keeps_shared_live_consumers_per_iteration()
         pytest.param(
             False,
             ["shared"],
-            {"condition", "shared_item", "shared_collect", "if", "selected_output"},
+            {"condition", "shared_item", "true_item", "shared_collect", "true_collect", "if", "selected_output"},
             id="false-branch",
         ),
     ],
 )
-def test_if_graph_optimized_behavior_handles_selected_branch_with_shared_ancestor(
+def test_if_collect_branches_eagerly_evaluate_shared_ancestor(
     condition: bool, expected_value: list[str], expected_source_ids: set[str]
 ):
     graph = Graph()
@@ -5834,7 +5793,7 @@ def test_get_collect_iteration_mapping_groups_ignores_skipped_prepared_exec_node
 
     mappings = g._materializer()._get_collect_iteration_mapping_groups(graph._get_input_edges("collect"))
 
-    assert mappings == [((), [("parent", active_exec_id)])]
+    assert mappings == [((), (), [("parent", active_exec_id)])]
 
 
 def test_get_iteration_node_ignores_skipped_prepared_exec_nodes():

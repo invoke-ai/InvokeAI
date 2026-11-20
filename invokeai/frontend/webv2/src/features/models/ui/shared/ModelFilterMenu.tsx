@@ -77,8 +77,7 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
   const isAllTypes = typeAllChecked ?? typeFilter === null;
   const sortLabelKey = sortFields.find((option) => option.field === sortField)?.labelKey;
   const sortDirectionLabel = sortDirection === 'asc' ? t('common.asc') : t('common.desc');
-  // `default` is the catalog's own order, so a direction on it would name
-  // something the user cannot act on.
+  // `default` is the catalog's own order, so a direction on it would name something the user cannot act on.
   const sortSummary = sortLabelKey
     ? sortField === 'default'
       ? t(sortLabelKey)

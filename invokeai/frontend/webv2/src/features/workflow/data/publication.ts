@@ -17,9 +17,8 @@ import {
 import { invalidateWorkflowLibraryCache } from './libraryCache';
 
 /**
- * The one way a project workflow reaches the library. A publication captures everything it needs up front, refuses
- * to overlap another for the same workflow, keeps its captured request and reserved id across retryable failures,
- * and reconciles an ambiguous answer against the destination record before sending again.
+ * The one way a project workflow reaches the library: no overlap per workflow, the captured request and reserved id
+ * survive retryable failures, and an ambiguous answer is reconciled before resending.
  */
 
 export type WorkflowPublicationDestination =
@@ -50,7 +49,6 @@ export type WorkflowPublicationResult =
   | { status: 'conflict'; libraryWorkflowId: string; currentRevision: number | null }
   /** The destination cannot be written: it is gone, someone else's, or bundled. Saving as new still works. */
   | { status: 'unavailable'; libraryWorkflowId: string; reason: 'missing' | 'forbidden' | 'bundled' }
-  /** The server rejected the content itself. */
   | { status: 'invalid'; message: string }
   /** The template exists privately, but the requested visibility change did not settle. */
   | {
@@ -63,7 +61,6 @@ export type WorkflowPublicationResult =
   | { status: 'failed'; message: string; retry: () => Promise<WorkflowPublicationResult> }
   /** The account changed underneath the publication; nothing more will be reported. */
   | { status: 'cancelled' }
-  /** Another publication of the same workflow is still running. */
   | { status: 'busy' };
 
 export interface WorkflowPublicationDeps {
@@ -157,7 +154,6 @@ const toRefusalResult = (
 
 export interface WorkflowPublicationController {
   publish(request: WorkflowPublicationRequest): Promise<WorkflowPublicationResult>;
-  /** True while a publication of that workflow is in flight. */
   isPublishing(projectId: string, workflowId: string): boolean;
   /** Advances whenever the in-flight set changes; a stable snapshot for `useSyncExternalStore`. */
   getVersion(): number;
@@ -258,8 +254,7 @@ export const createWorkflowPublicationController = (
     const attempt = (): Promise<WorkflowPublicationResult> =>
       settle(request, async () => {
         try {
-          // The server matches a resend against the record the first send made, so a lost response never
-          // creates a second template.
+          // The server matches a resend against the first send's record, so a lost response never makes a second one.
           const record = await deps.createRecord(
             { ...request.workflow, name },
             { reservedId, signal: request.owner.signal }
@@ -298,8 +293,8 @@ export const createWorkflowPublicationController = (
   };
 
   const update = (request: WorkflowPublicationRequest, libraryWorkflowId: string, expectedRevision: number) => {
-    // The template keeps its own name: an update replaces its content, and the project workflow's name stays
-    // with the project. The content is fixed by the first read so a resend carries exactly what was sent before.
+    // The template keeps its own name: an update replaces its content, and the project workflow's name stays with the
+    // project. The content is fixed by the first read so a resend carries exactly what was sent before.
     let content: Record<string, unknown> | null = null;
 
     const send = async (record: WorkflowRecordDTO): Promise<WorkflowPublicationResult> => {
@@ -320,9 +315,8 @@ export const createWorkflowPublicationController = (
     };
 
     /**
-     * Every attempt starts from the live record. The first read supplies the template's name; a read before a
-     * resend tells whether the lost answer applied the write (the revision advanced by exactly one to this
-     * content), left it untouched, or whether someone else moved the template.
+     * Every attempt starts from the live record; before a resend it tells whether the lost answer applied (revision
+     * advanced by exactly one to this content), did not, or someone else moved the template.
      */
     const attempt = (): Promise<WorkflowPublicationResult> =>
       settle(request, async () => {
