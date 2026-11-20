@@ -4,7 +4,6 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
 
 import { ConditioningRebalanceBars } from './ConditioningRebalanceBars';
 
@@ -68,21 +67,6 @@ const lastPreview = (): number[] => (onPreview.mock.calls.at(-1)?.[0] as number[
 
 const lastCommit = (): number[] => (onCommit.mock.calls.at(-1)?.[0] as number[] | undefined) ?? [];
 
-/** Reset real pointer and scroll state to prevent interference from synthetic events. */
-const resetPointerAndScroll = async (): Promise<void> => {
-  const parking = document.createElement('div');
-
-  parking.style.cssText = 'position:fixed;right:0;bottom:0;width:2px;height:2px;z-index:2147483647';
-  document.body.append(parking);
-
-  await act(async () => {
-    await userEvent.hover(parking);
-  });
-
-  parking.remove();
-  window.scrollTo(0, 0);
-};
-
 beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
@@ -97,7 +81,7 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
-  await resetPointerAndScroll();
+  window.scrollTo(0, 0);
 });
 
 describe('ConditioningRebalanceBars', () => {
