@@ -33,6 +33,7 @@ from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
 from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+from invokeai.backend.patches.lora_conversions.dora_magnitude_keys import DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.util.logging import InvokeAILogger
@@ -59,7 +60,9 @@ _DOUBLE_BLOCK_RE = re.compile(r"^double_blocks\.(\d+)\.(.+)$")
 _SINGLE_BLOCK_RE = re.compile(r"^single_blocks\.(\d+)\.(.+)$")
 
 # Weight key suffixes used by PEFT LoRA in BFL format.
-_BFL_PEFT_LORA_SUFFIXES = ("lora_A.weight", "lora_B.weight")
+_BFL_PEFT_LORA_SUFFIXES = ("lora_A.weight", "lora_B.weight") + tuple(
+    suffix.removeprefix(".") for suffix in DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY if suffix != ".dora_scale"
+)
 
 # Weight key suffixes used by LyCORIS algorithms (LoKR, LoHA, etc.) in BFL format.
 # These are single-component suffixes (no dot), unlike the two-component PEFT suffixes.
@@ -207,6 +210,8 @@ def lora_model_from_flux_bfl_peft_state_dict(
             grouped_state_dict[layer_name]["lora_down.weight"] = value
         elif suffix == "lora_B.weight":
             grouped_state_dict[layer_name]["lora_up.weight"] = value
+        elif f".{suffix}" in DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY:
+            grouped_state_dict[layer_name][DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY[f".{suffix}"]] = value
         else:
             grouped_state_dict[layer_name][suffix] = value
 
@@ -252,6 +257,8 @@ def lora_model_from_flux2_bfl_peft_state_dict(
             grouped_state_dict[layer_name]["lora_down.weight"] = value
         elif suffix == "lora_B.weight":
             grouped_state_dict[layer_name]["lora_up.weight"] = value
+        elif f".{suffix}" in DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY:
+            grouped_state_dict[layer_name][DORA_MAGNITUDE_SUFFIX_TO_VALUE_KEY[f".{suffix}"]] = value
         else:
             grouped_state_dict[layer_name][suffix] = value
 

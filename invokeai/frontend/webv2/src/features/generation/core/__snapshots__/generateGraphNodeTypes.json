@@ -300,6 +300,10 @@
           "qwen3VLEncoderModel",
           "vae"
         ],
+        "standalone-gguf-encoder": [
+          "qwen3VLEncoderModel",
+          "vae"
+        ],
         "diffusers-with-edit-references": []
       },
       "nodeTypes": [
@@ -1904,6 +1908,7 @@
         ],
         "model": [],
         "qwen3_vl_encoder_model": [],
+        "qwen3_vl_vision_tower_model": [],
         "use_cache": [
           true
         ],

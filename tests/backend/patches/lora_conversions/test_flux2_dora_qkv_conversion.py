@@ -160,8 +160,8 @@ def test_explicit_output_magnitude_vector_stays_output_axis(dora_values: dict[st
 @pytest.mark.parametrize(
     "packed,axis", [("int8", "output"), ("nvfp4", "output"), ("int8", "input"), ("nvfp4", "input")]
 )
-def test_converted_dora_retains_packed_sidecar_refusal_and_cleanup(packed: str, axis: str) -> None:
-    """Conversion support does not imply packed-base support: sidecars expose only meta base weights."""
+def test_converted_dora_on_packed_qkv_and_cleanup(packed: str, axis: str) -> None:
+    """Test packed QKV patching; NVFP4 is a synthetic base for this FLUX.2 test."""
     values = {
         "lora_up.weight": torch.ones(384, 2),
         "lora_down.weight": torch.ones(2, 64),
@@ -188,7 +188,22 @@ def test_converted_dora_retains_packed_sidecar_refusal_and_cleanup(packed: str, 
     # This is the decision and patch setup used by FLUX2DenoiseInvocation.
     force_sidecar = requires_sidecar_patching(model, ModelFormat.Checkpoint)
     assert force_sidecar
-    with pytest.raises(RuntimeError, match="base model quantization format.*not compatible with DoRA"):
+    if axis == "input":
+        with pytest.raises(RuntimeError, match="Fused input-axis DoRA requires ordinary floating-point Q/K/V weights"):
+            with LayerPatcher.apply_smart_model_patches(
+                model=model,
+                patches=[(patch, 0.7)],
+                prefix=FLUX_LORA_TRANSFORMER_PREFIX,
+                dtype=torch.float32,
+                force_sidecar_patching=force_sidecar,
+            ):
+                model(x)
+    else:
+        # Both packed fixtures decode to ones. Build the full fused result independently of the split.
+        base = torch.ones(384, 64)
+        direction = base + values["lora_up.weight"] @ values["lora_down.weight"]
+        normalized = values["dora_scale"] * direction / direction.norm(dim=1, keepdim=True)
+        expected = torch.nn.functional.linear(x, base + 0.7 * (normalized - base))
         with LayerPatcher.apply_smart_model_patches(
             model=model,
             patches=[(patch, 0.7)],
@@ -196,7 +211,7 @@ def test_converted_dora_retains_packed_sidecar_refusal_and_cleanup(packed: str, 
             dtype=torch.float32,
             force_sidecar_patching=force_sidecar,
         ):
-            model(x)
+            torch.testing.assert_close(model(x), expected, rtol=1e-5, atol=1e-5)
     assert all(attention[name].get_num_patches() == 0 for name in model.names)
     for name, value in model.state_dict().items():
         torch.testing.assert_close(value.float(), original[name].float(), rtol=0, atol=0)

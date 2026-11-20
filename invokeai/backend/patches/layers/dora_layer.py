@@ -109,8 +109,14 @@ class DoRALayer(LoRALayerBase):
     def get_weight(self, orig_weight: torch.Tensor) -> torch.Tensor:
         orig_weight = cast_to_device(orig_weight, self.up.device)
 
+        # Form the direction and residual in float32 so low-precision rounding cannot erase a small update.
+        up, down = self.up, self.down
+        if orig_weight.dtype in (torch.float16, torch.bfloat16) or up.dtype in (torch.float16, torch.bfloat16):
+            orig_weight = orig_weight.float()
+            up, down = up.float(), down.float()
+
         # Note: Variable names (e.g. delta_v) are based on the paper.
-        delta_v = self.up.reshape(self.up.shape[0], -1) @ self.down.reshape(self.down.shape[0], -1)
+        delta_v = up.reshape(up.shape[0], -1) @ down.reshape(down.shape[0], -1)
         delta_v = delta_v.reshape(orig_weight.shape)
 
         delta_v = delta_v * self.scale()
@@ -145,6 +151,9 @@ class DoRALayer(LoRALayerBase):
         return out_weight - orig_weight
 
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        if self.direction_norm is not None:
+            # Keep the cached factors' precision; get_weight promotes them only while computing the residual.
+            dtype = None
         super().to(device=device, dtype=dtype)
         self.up = self.up.to(device=device, dtype=dtype)
         self.down = self.down.to(device=device, dtype=dtype)

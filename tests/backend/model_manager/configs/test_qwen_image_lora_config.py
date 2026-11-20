@@ -14,7 +14,11 @@ import torch
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_FLUX_Config, LoRA_LyCORIS_QwenImage_Config
-from invokeai.backend.model_manager.taxonomy import ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils import (
+    lora_model_from_qwen_image_state_dict,
+)
 
 # Every Linear in a Qwen-Image transformer block, with its (in, out) features.
 _QWEN_IMAGE_BLOCK_LINEARS = {
@@ -226,15 +230,18 @@ def test_a_prefixed_lora_without_a_qwen_image_only_module_is_not_claimed(
         LoRA_LyCORIS_QwenImage_Config.from_model_on_disk(_make_mod(path, _lora(layers)), _overrides(path))
 
 
-def test_a_prefixed_peft_dora_is_not_claimed(tmp_path: Path) -> None:
-    """PEFT DoRA magnitudes are not mapped yet, so claiming the file would install a LoRA that fails to apply."""
+def test_a_prefixed_peft_dora_is_claimed_and_loads_as_dora(tmp_path: Path) -> None:
     sd = _qwen_image_lora("base_model.model.")
     for key in [key for key in sd if key.endswith(".lora_B.weight")]:
         sd[key.removesuffix(".lora_B.weight") + ".lora_magnitude_vector"] = _z(sd[key].shape[0])
     path = tmp_path / "adapter_model.safetensors"
 
-    with pytest.raises(NotAMatchError):
-        LoRA_LyCORIS_QwenImage_Config.from_model_on_disk(_make_mod(path, sd), _overrides(path))
+    config = LoRA_LyCORIS_QwenImage_Config.from_model_on_disk(_make_mod(path, sd), _overrides(path))
+
+    assert config.base == BaseModelType.QwenImage
+    layers = lora_model_from_qwen_image_state_dict(sd).layers
+    assert len(layers) == len(_QWEN_IMAGE_BLOCK_LINEARS) * 2
+    assert all(isinstance(layer, DoRALayer) for layer in layers.values())
 
 
 def _lokr_layers(prefix: str, *, factorized_w1: bool = False) -> dict[str, torch.Tensor]:

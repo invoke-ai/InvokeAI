@@ -1,12 +1,19 @@
-from contextlib import contextmanager
+import re
+from contextlib import ExitStack, contextmanager
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 import torch
 
 from invokeai.app.invocations.flux2.flux2_denoise import Flux2DenoiseInvocation
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
+    apply_custom_layers_to_model,
+)
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
+from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
     convert_bfl_lora_patch_to_diffusers,
 )
@@ -216,10 +223,10 @@ def test_binding_failure_restores_prior_adapter_and_releases_cache_pins(tmp_path
     context = SimpleNamespace(
         models=SimpleNamespace(load=lambda _: SimpleNamespace(model=patch, model_in_ram=model_in_ram))
     )
-    good = list(Flux2DenoiseInvocation._lora_iterator(invocation, context))[0]
     bad, _ = load_adapter(tmp_path, "input", "base_model.model.", torch.bfloat16)
     next(iter(bad.layers.values())).layer.down = torch.ones(2, 8, dtype=torch.bfloat16)
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError), ExitStack() as stack:
+        good = Flux2DenoiseInvocation._materialize_lora_patches(invocation, context, stack)[0]
         with LayerPatcher.apply_smart_model_patches(
             model=model,
             patches=[good, (bad, 0.7, model_in_ram())],
@@ -234,3 +241,137 @@ def test_binding_failure_restores_prior_adapter_and_releases_cache_pins(tmp_path
         torch.testing.assert_close(value, original[key], atol=0, rtol=0)
     assert all(module.get_num_patches() == 0 for module in attention.values())
     torch.testing.assert_close(model(x), baseline, atol=0, rtol=0)
+
+
+@pytest.mark.parametrize("missing", ["to_q", "to_k", "to_v"])
+@pytest.mark.parametrize("suppress", [False, True])
+@torch.no_grad()
+def test_missing_fused_projection_skips_group_and_applies_other_layers(tmp_path, monkeypatch, missing, suppress):
+    patch, _ = load_adapter(tmp_path, "input", "kohya", torch.float32)
+    patch = convert_bfl_lora_patch_to_diffusers(patch)
+    model = SplitAttention(35)
+    attention = model.transformer_blocks[0]["attn"]
+    del attention[missing]
+    logger = MagicMock()
+    monkeypatch.setattr("invokeai.backend.patches.layer_patcher.InvokeAILogger.get_logger", lambda _: logger)
+    original = {name: module.weight.clone() for name, module in attention.items()}
+    pattern = re.compile("transformer_blocks") if suppress else None
+
+    with LayerPatcher.apply_smart_model_patches(
+        model=model,
+        patches=[(patch, 0.7)],
+        prefix=FLUX_LORA_TRANSFORMER_PREFIX,
+        dtype=torch.float32,
+        force_direct_patching=True,
+        suppress_warning_layers=pattern,
+    ):
+        for name in set(model.names[:3]) - {missing}:
+            torch.testing.assert_close(attention[name].weight, original[name], rtol=0, atol=0)
+        assert not torch.equal(attention["add_q_proj"].weight, original["add_q_proj"])
+    assert logger.warning.call_count == (0 if suppress else 1)
+    for name, module in attention.items():
+        torch.testing.assert_close(module.weight, original[name], rtol=0, atol=0)
+
+
+@pytest.mark.parametrize("storage", [torch.bfloat16, torch.float32])
+@torch.no_grad()
+def test_bfloat16_fused_input_sidecar_retains_small_direction_residual(storage):
+    # The low-precision forward is the behavior under test; the reference constructs the fused residual in float32.
+    model = _SplitQKV("img", 7).to(dtype=torch.bfloat16)
+    attention = model.transformer_blocks[0]["attn"]
+    for module in attention.values():
+        module.weight.fill_(1)
+        module.bias.zero_()
+    apply_custom_layers_to_model(model)
+    up = torch.full((12, 1), 0.001953125 if storage == torch.bfloat16 else 0.251, dtype=storage)
+    up[::2] *= -1
+    down = torch.zeros(1, 7, dtype=storage)
+    down[0, 0] = 1
+    magnitude = torch.full((1, 7), 3.46875 if storage == torch.bfloat16 else 3.47, dtype=storage)
+    patch = convert_bfl_lora_patch_to_diffusers(
+        ModelPatchRaw(
+            {f"{FLUX_LORA_TRANSFORMER_PREFIX}double_blocks.0.img_attn.qkv": DoRALayer(up, down, magnitude, None, None)}
+        )
+    )
+    base = torch.ones(12, 7)
+    direction = base + up.float() @ down.float()
+    residual = magnitude.float() * direction / direction.norm(dim=0, keepdim=True) - base
+    x = torch.tensor([[1, -1, 0, 0, 0, 0, 0]], dtype=torch.bfloat16)
+    expected = torch.nn.functional.linear(x, residual.to(torch.bfloat16))
+    assert expected.abs().min() > 0
+    with LayerPatcher.apply_smart_model_patches(
+        model=model,
+        patches=[(patch, 1.0)],
+        prefix=FLUX_LORA_TRANSFORMER_PREFIX,
+        dtype=torch.bfloat16,
+        force_sidecar_patching=True,
+    ):
+        torch.testing.assert_close(model(x), expected, rtol=0, atol=1e-5)
+
+
+@pytest.mark.parametrize("sidecar", [False, True])
+@pytest.mark.parametrize("wrapper", ["none", "swapped", "merged"])
+@torch.no_grad()
+def test_flux2_overlapping_applications_do_not_mutate_cached_adapter(tmp_path, sidecar, wrapper):
+    patch, _ = load_adapter(tmp_path, "input", "kohya", torch.bfloat16)
+    # A diffusers-named layer passes through the converter unchanged, as do simple BFL renames.
+    shared = DoRALayer(
+        torch.ones(4, 2, dtype=torch.bfloat16),
+        torch.ones(2, 7, dtype=torch.bfloat16),
+        torch.ones(4, 1, dtype=torch.bfloat16),
+        None,
+        None,
+        magnitude_is_out_dim=True,
+    )
+    layer = shared
+    if wrapper == "swapped":
+        layer = SwappedHalvesLayerPatch(shared)
+    elif wrapper == "merged":
+        layer = MergedLayerPatch([shared], [Range(0, 4)])
+    key = f"{FLUX_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_q"
+    patch.layers[key] = layer
+    original_up = shared.up
+    original_size = patch.calc_size()
+    active = []
+
+    @contextmanager
+    def pin():
+        active.append(True)
+        try:
+            yield patch
+        finally:
+            active.pop()
+
+    context = SimpleNamespace(models=SimpleNamespace(load=lambda _: SimpleNamespace(model=patch, model_in_ram=pin)))
+    invocation = SimpleNamespace(transformer=SimpleNamespace(loras=[SimpleNamespace(lora="adapter", weight=0.5)]))
+    first, second = SplitAttention(1), SplitAttention(2)
+    args = {
+        "prefix": FLUX_LORA_TRANSFORMER_PREFIX,
+        "dtype": torch.float32,
+        "force_sidecar_patching": sidecar,
+        "force_direct_patching": not sidecar,
+    }
+    with ExitStack() as first_stack:
+        patches = Flux2DenoiseInvocation._materialize_lora_patches(invocation, context, first_stack)
+        [(leaf, _, _)] = LayerPatcher._leaf_placements(patches[0][0].layers[key])
+        assert leaf is not shared and leaf.up is original_up
+        first_stack.enter_context(LayerPatcher.apply_smart_model_patches(model=first, patches=patches, **args))
+        if not sidecar:
+            assert leaf.up is original_up and leaf.down is shared.down
+        assert shared.up is original_up and shared.up.dtype == torch.bfloat16
+        with pytest.raises(RuntimeError, match="cancelled"), ExitStack() as second_stack:
+            patches = Flux2DenoiseInvocation._materialize_lora_patches(invocation, context, second_stack)
+            second_stack.enter_context(LayerPatcher.apply_smart_model_patches(model=second, patches=patches, **args))
+            assert len(active) == 2
+            assert shared.up is original_up and shared.up.dtype == torch.bfloat16
+            assert patch.calc_size() == original_size
+            raise RuntimeError("cancelled")
+        assert len(active) == 1
+        assert shared.up is original_up
+    assert not active
+    assert shared.up is original_up
+    assert all(
+        module.get_num_patches() == 0
+        for model in (first, second)
+        for module in model.transformer_blocks[0]["attn"].values()
+    )

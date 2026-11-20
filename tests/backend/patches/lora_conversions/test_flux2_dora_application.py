@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -123,14 +123,18 @@ def test_loader_iterator_and_patcher_match_fused_formula_across_bases(tmp_path: 
             lora.weight = strength
             expected = fused_expected(model, factors, x, strength, axis)
             try:
-                with LayerPatcher.apply_smart_model_patches(
-                    model=model,
-                    patches=Flux2DenoiseInvocation._lora_iterator(invocation, context),
-                    prefix=FLUX_LORA_TRANSFORMER_PREFIX,
-                    dtype=torch.float32,
-                    force_direct_patching=not sidecar,
-                    force_sidecar_patching=sidecar,
-                ):
+                with ExitStack() as stack:
+                    patches = Flux2DenoiseInvocation._materialize_lora_patches(invocation, context, stack)
+                    stack.enter_context(
+                        LayerPatcher.apply_smart_model_patches(
+                            model=model,
+                            patches=patches,
+                            prefix=FLUX_LORA_TRANSFORMER_PREFIX,
+                            dtype=torch.float32,
+                            force_direct_patching=not sidecar,
+                            force_sidecar_patching=sidecar,
+                        )
+                    )
                     assert pinned
                     torch.testing.assert_close(model(x), expected, atol=4e-6, rtol=4e-6)
                     if fail:
