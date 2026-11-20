@@ -23,6 +23,8 @@ from PIL import Image
 
 import invokeai.backend.flux.extensions.kontext_extension as kontext_extension
 from invokeai.backend.flux.extensions.kontext_extension import KontextExtension
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+from invokeai.backend.quantization.sdnq.utils import SDNQQuantizationType
 
 
 def _tiny_vae() -> AutoencoderKL:
@@ -83,6 +85,34 @@ def _reference_image(edge: int = 64) -> Image.Image:
     torch.manual_seed(0)
     pixels = (torch.rand(edge, edge, 3) * 255).byte().numpy()
     return Image.fromarray(pixels, mode="RGB")
+
+
+class TestAnSdnqVae:
+    def test_the_reference_is_encoded_in_the_dtype_the_packed_weights_compute_in(self):
+        """An SDNQ VAE can lead with a packed int8 weight; the image must not be cast to that."""
+        vae = _tiny_vae()
+        weight = vae.encoder.conv_in.weight
+        packed = SDNQTensor(
+            data=torch.zeros(weight.shape[0], weight[0].numel(), dtype=torch.int8),
+            quantization_type=SDNQQuantizationType.INT8_SYM,
+            tensor_shape=weight.shape,
+            compute_dtype=torch.bfloat16,
+            scale=torch.ones(weight.shape[0], 1),
+        )
+        vae.encoder.conv_in.weight = torch.nn.Parameter(packed, requires_grad=False)
+        seen: list[torch.dtype] = []
+
+        def encode(x, return_dict=True):
+            seen.append(x.dtype)
+            distribution = MagicMock()
+            distribution.mode.return_value = torch.zeros(1, 16, 8, 8)
+            return MagicMock(latent_dist=distribution)
+
+        vae.encode = encode
+
+        _extension(vae, _reference_image())
+
+        assert seen == [torch.bfloat16]
 
 
 def test_cpu_vae_encodes_kontext_before_moving_conditioning_to_the_transformer(monkeypatch):

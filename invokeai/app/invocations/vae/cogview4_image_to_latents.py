@@ -16,7 +16,7 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_cogview4
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_cogview4, vae_compute_dtype
 
 # TODO(ryand): This is effectively a copy of SD3ImageToLatentsInvocation and a subset of ImageToLatentsInvocation. We
 # should refactor to avoid this duplication.
@@ -47,11 +47,12 @@ class CogView4ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
 
             vae.disable_tiling()
 
-            image_tensor = image_tensor.to(device=vae_info.compute_device, dtype=vae.dtype)
+            vae_dtype = vae_compute_dtype(vae)
+            image_tensor = image_tensor.to(device=vae_info.compute_device, dtype=vae_dtype)
             with torch.inference_mode():
                 image_tensor_dist = vae.encode(image_tensor).latent_dist
                 # TODO: Use seed to make sampling reproducible.
-                latents: torch.Tensor = image_tensor_dist.sample().to(dtype=vae.dtype)
+                latents: torch.Tensor = image_tensor_dist.sample().to(dtype=vae_dtype)
 
             latents = vae.config.scaling_factor * latents
 

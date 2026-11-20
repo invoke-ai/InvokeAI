@@ -30,7 +30,11 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.quantization.fp8_scaled import reject_quantized_side_channel
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
-from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
+from invokeai.backend.quantization.sdnq.loaders import (
+    cast_unpacked_floats,
+    raise_on_incomplete_sdnq_load,
+    sdnq_sd_loader,
+)
 from invokeai.backend.sd3.vae import get_sd3_vae_diffusers_config
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras
 
@@ -270,7 +274,7 @@ class VAELoader(GenericDiffusersLoader):
 
         # Check if this is an SDNQ-quantized VAE folder
         if model_path.is_dir() and _is_sdnq_vae_folder(model_path):
-            return self._load_sdnq_vae(model_path)
+            return self._load_sdnq_vae(model_path, config)
 
         if isinstance(config, VAE_Diffusers_QwenImage21_Config):
             from diffusers import AutoencoderKLQwenImage21
@@ -533,8 +537,11 @@ class VAELoader(GenericDiffusersLoader):
 
     # NOTE: keep the `.eval()` at the end of this method in step with `_load_qwen_image_vae` above —
     # both build the module by hand instead of via `from_pretrained`, which would have done it.
-    def _load_sdnq_vae(self, model_path: Path) -> AnyModel:
+    def _load_sdnq_vae(self, model_path: Path, config: AnyModelConfig) -> AnyModel:
         """Load SDNQ-quantized VAE with on-the-fly dequantization."""
+        # A FLUX autoencoder is broken in float16, which `precision: auto` picks on CUDA and MPS: it dequantizes to the
+        # dtype every other FLUX.1 VAE path uses (the Z-Image decode shares this autoencoder).
+        compute_dtype = self._torch_dtype_avoiding_float16() if config.base == BaseModelType.Flux else self._torch_dtype
         # Find the safetensors source. Prefer a single canonical file; otherwise hand the whole
         # directory to sdnq_sd_loader, which merges arbitrarily named / sharded safetensors files.
         model_file = model_path / "diffusion_pytorch_model.safetensors"
@@ -543,7 +550,8 @@ class VAELoader(GenericDiffusersLoader):
         source = model_file if model_file.exists() else model_path
 
         # Load SDNQ state dict
-        sd = sdnq_sd_loader(source, compute_dtype=self._torch_dtype)
+        sd = sdnq_sd_loader(source, compute_dtype=compute_dtype)
+        cast_unpacked_floats(sd, compute_dtype)
 
         # Create empty model from config
         with accelerate.init_empty_weights():

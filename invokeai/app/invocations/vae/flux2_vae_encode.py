@@ -21,7 +21,7 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_t
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
 from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_vae_tiling
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2, vae_compute_dtype
 
 
 @invocation(
@@ -101,7 +101,7 @@ class Flux2VaeEncodeInvocation(BaseInvocation):
         )
 
         with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
-            vae_dtype = next(iter(vae.parameters())).dtype
+            vae_dtype = vae_compute_dtype(vae)
             image_tensor = image_tensor.to(device=device, dtype=vae_dtype)
 
             # The VAE is the cache's shared instance, so its tiling state is set for this encode only.

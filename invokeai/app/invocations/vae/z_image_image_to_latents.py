@@ -17,7 +17,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_vae_tiling
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux, vae_compute_dtype
 
 
 @invocation(
@@ -80,7 +80,7 @@ class ZImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
                     f"Expected AutoencoderKL, got {type(vae).__name__}. VAE model type changed unexpectedly after loading."
                 )
 
-            vae_dtype = next(iter(vae.parameters())).dtype
+            vae_dtype = vae_compute_dtype(vae)
             # The VAE's own device, as in the decode nodes: a cpu_only VAE (or another worker's GPU)
             # is not the session device, and encoding there would fail or run on the wrong card (#9373).
             image_tensor = image_tensor.to(device=vae_info.compute_device, dtype=vae_dtype)
@@ -91,7 +91,7 @@ class ZImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
             with torch.inference_mode(), scoped_vae_tiling(vae, effective_tile_size):
                 latent_dist = vae.encode(image_tensor).latent_dist
                 latents: torch.Tensor = (latent_dist.mode() if deterministic else latent_dist.sample()).to(
-                    dtype=vae.dtype
+                    dtype=vae_dtype
                 )
 
             # Apply scaling_factor and shift_factor from VAE config.

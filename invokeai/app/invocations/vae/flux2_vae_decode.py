@@ -23,7 +23,11 @@ from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
 from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_vae_tiling
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2, should_pretile_vae_decode
+from invokeai.backend.util.vae_working_memory import (
+    estimate_vae_working_memory_flux2,
+    should_pretile_vae_decode,
+    vae_compute_dtype,
+)
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
 
 
@@ -89,7 +93,7 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             estimated_working_memory = estimate(use_tiling)
 
         with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
-            vae_dtype = next(iter(vae.parameters())).dtype
+            vae_dtype = vae_compute_dtype(vae)
             # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
             # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
             # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
