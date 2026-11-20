@@ -730,6 +730,40 @@ describe('durable project persistence', () => {
     );
   });
 
+  it('sends an edit to the server only after its draft write has finished', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    api.records.set(project.id, toRecord(project));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const backingStore = createMemoryProjectDraftStore();
+    let held: Promise<void> | null = null;
+    let finishWrite!: () => void;
+    const stage = vi.fn(async (input: Parameters<ProjectDraftStore['stage']>[0]) => {
+      await held;
+      return backingStore.stage(input);
+    });
+    const service = createService(owner, api, { ...backingStore, stage });
+    const loaded = await service.loadWorkbench();
+    held = new Promise((resolve) => {
+      finishWrite = resolve;
+    });
+    stage.mockClear();
+
+    const saved = service.saveWorkbench(stateWith([{ ...loaded.state.projects[0]!, name: 'Renamed' }]));
+    await vi.waitFor(() => expect(stage).toHaveBeenCalledOnce());
+    expect(api.updateProject).not.toHaveBeenCalled();
+    finishWrite();
+    await saved;
+
+    expect(api.updateProject).toHaveBeenCalledOnce();
+    expect(api.records.get(project.id)?.name).toBe('Renamed');
+  });
+
   it('continues the authoritative save when browser draft storage is unavailable', async () => {
     const owner = captureAccountScope();
     const api = createApi();
