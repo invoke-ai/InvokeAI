@@ -1791,6 +1791,35 @@ describe("a main model's default components", () => {
     expect(getModelDefaultComponents(sdnq, createSettings(sdnq), installed)).toEqual({});
   });
 
+  it.each([
+    ['ideogram-4', 'ideogram4_unconditional_model'],
+    ['wan', 'component_source'],
+    ['qwen-image', 'component_source'],
+  ])('offers and fills no %s default for the %s a Diffusers pipeline never loads', (base, persistenceKey) => {
+    const main = (key: string, format: string) =>
+      ({
+        base,
+        format,
+        key,
+        name: key,
+        type: 'main',
+        ...(base === 'wan' ? { variant: 't2v_a14b' } : {}),
+      }) as MainModelConfig;
+    const other = main('other', 'diffusers');
+    const installed = [other] as ComponentModelConfig[];
+    const offered = (model: GenerateModelConfig) =>
+      getDefaultComponentSlotPolicies(model, installed).map((slot) => slot.persistenceKey);
+    const diffusers = {
+      ...main('pipeline', 'diffusers'),
+      default_settings: { components: { [persistenceKey]: 'other' } },
+    };
+    const singleFile = { ...main('single-file', 'gguf_quantized'), default_settings: diffusers.default_settings };
+
+    expect(offered(singleFile)).toContain(persistenceKey);
+    expect(offered(diffusers)).not.toContain(persistenceKey);
+    expect(getModelDefaultComponents(diffusers, createSettings(diffusers), installed)).toEqual({});
+  });
+
   it('prunes a stored vision tower once the encoder it hangs on is gone, or no longer opens it', () => {
     const gguf = {
       base: 'any',
@@ -1871,6 +1900,56 @@ describe("a main model's default components", () => {
       expect(slot.filter(high as never)).toBe(false);
       expect(slot.filter(wan('pipeline', { format: 'diffusers' }) as never)).toBe(false);
       expect(slot.filter(wan('other-variant', { variant: 'i2v_a14b' }) as never)).toBe(false);
+    });
+
+    it("refuses two experts the loader's tags name for the same role, and accepts untagged ones", () => {
+      const tagged = (key: string, expert: string) => wan(key, { expert });
+      const slotOf = (main: GenerateModelConfig) => offered(main, [main])!;
+
+      expect(slotOf(tagged('high-a', 'high')).filter(tagged('high-b', 'high') as never)).toBe(false);
+      expect(slotOf(tagged('low-a', 'low')).filter(tagged('low-b', 'low') as never)).toBe(false);
+      expect(slotOf(tagged('high-a', 'high')).filter(tagged('low-b', 'low') as never)).toBe(true);
+      expect(slotOf(tagged('none-a', 'none')).filter(tagged('none-b', 'none') as never)).toBe(true);
+      expect(slotOf(tagged('high-a', 'high')).filter(wan('untagged') as never)).toBe(true);
+    });
+
+    it('reports a saved expert the loader would reject, which the picker no longer lists', () => {
+      const pipeline = wan('pipeline', { format: 'diffusers' });
+      const reasons = (expert: unknown) =>
+        getGenerationValidationReasons(
+          high,
+          createSettings(high, { componentSourceModel: pipeline, wanLowNoiseModel: expert as never })
+        );
+
+      expect(reasons(null)).toEqual([]);
+      expect(reasons(low)).toEqual([]);
+      expect(reasons(pipeline)).toEqual([
+        'The selected low-noise expert is not a different single-file model of this variant. Select one or clear it.',
+      ]);
+    });
+
+    it('lets a Diffusers component source supply the VAE only when its VAE width fits the model', () => {
+      const a14bPipeline = wan('a14b-pipeline', { format: 'diffusers' });
+      const smallPipeline = wan('small-pipeline', { format: 'diffusers', variant: 'ti2v_5b' });
+      const wanVae = {
+        base: 'wan',
+        key: 'wan-vae-16',
+        latent_channels: 16,
+        name: 'Wan VAE',
+        type: 'vae',
+      } as VaeModelConfig;
+      const reasons = (source: unknown, vae: VaeModelConfig | null = null) =>
+        getGenerationValidationReasons(
+          high,
+          createSettings(high, { componentSourceModel: source as never, vae, wanT5EncoderModel: null })
+        );
+
+      expect(reasons(a14bPipeline)).toEqual([]);
+      // The source still supplies the text encoder beside a VAE that fits.
+      expect(reasons(smallPipeline, wanVae)).toEqual([]);
+      expect(reasons(smallPipeline)).toEqual([
+        'Generate needs a VAE for Wan models: a component source supplies one only when it is the same variant family.',
+      ]);
     });
 
     it('is no default of a Diffusers or TI2V-5B model, whose loader ignores or reads the pair itself', () => {

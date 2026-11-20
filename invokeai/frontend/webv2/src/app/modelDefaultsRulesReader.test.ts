@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { startModelDefaultsRulesReader } from './modelDefaultsRulesReader';
 
 // The served table is seeded directly; the store that fetches it is the one thing stood in for.
-vi.mock('@features/generation/runtime', () => ({
+vi.mock('@features/models/architecturesStore', () => ({
   ensureArchitectureCapabilitiesLoaded: () => Promise.resolve(),
   getArchitectureCapabilitiesSnapshot: () => ({ revision: 1, status: 'loaded' }),
   subscribeArchitectureCapabilities: () => () => undefined,

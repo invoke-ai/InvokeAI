@@ -57,9 +57,15 @@ export const hasWanLowNoiseSlot = (model: GenerateModelConfig): boolean =>
   WAN_SINGLE_FILE_FORMATS.includes(model.format) &&
   model.variant !== 'ti2v_5b';
 
+const isSameWanExpertTag = (first: unknown, second: unknown): boolean =>
+  (first === 'high' || first === 'low') && first === second;
+
+/** The probe's filename tag of a single-file Wan expert; `none` or absent when the name says nothing. */
+const getWanExpertTag = (model: object): unknown => (model as { expert?: unknown }).expert;
+
 /**
  * What `wan_model_loader` accepts as the low-noise expert of `model`: another single-file Wan model of the same
- * variant, never the main model itself, and no Diffusers pipeline.
+ * variant, never the main model itself, no Diffusers pipeline, and not tagged for the role `model` is tagged for.
  */
 export const isWanLowNoiseExpertFor =
   (model: GenerateModelConfig): GenerateComponentFilter =>
@@ -69,7 +75,16 @@ export const isWanLowNoiseExpertFor =
     candidate.base === 'wan' &&
     candidate.key !== (model as { key?: string }).key &&
     WAN_SINGLE_FILE_FORMATS.includes(candidate.format) &&
-    (candidate.variant ?? null) === (model.variant ?? null);
+    (candidate.variant ?? null) === (model.variant ?? null) &&
+    !isSameWanExpertTag(getWanExpertTag(model), getWanExpertTag(candidate));
+
+/**
+ * Whether the Wan loader takes the VAE from a Diffusers `source` beside `model`: TI2V-5B decodes with the 48-channel
+ * VAE and the A14B variants with the 16-channel one, so both must be on the same side. The source may still supply just
+ * the text encoder beside a standalone VAE.
+ */
+export const doesWanSourceSupplyVae = (model: GenerateModelConfig, source: GenerateComponentCandidate): boolean =>
+  (model.variant === 'ti2v_5b') === (source.variant === 'ti2v_5b');
 
 export const isSelfContainedSDNQFlux1Pipeline = (model: GenerateComponentCandidate): boolean =>
   hasSubmodels(model, SDNQ_FLUX1_COMPONENTS);

@@ -1,6 +1,6 @@
 import type { GalleryImage } from '@features/gallery';
 import type * as GalleryBackendModule from '@features/gallery/data/backend';
-import type { GenerateModelConfig } from '@features/generation/contracts';
+import type { GenerateModelConfig, GenerateWidgetValues } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
@@ -818,6 +818,56 @@ describe('executeImageRecall', () => {
     expect(galleryApi.galleryImages.metadata).not.toHaveBeenCalled();
     expect(oldCommands.setSettings).not.toHaveBeenCalled();
     expect(oldCommands.add).not.toHaveBeenCalled();
+  });
+
+  describe('in a fresh project whose model stores default components', () => {
+    const q21 = {
+      base: 'qwen-image-2-1',
+      default_settings: { components: { qwen3_vl_encoder: 'q21-encoder' } },
+      format: 'diffusers',
+      key: 'q21-main',
+      name: 'Qwen-Image-2.1',
+      type: 'main',
+      variant: 'qwen_image_21_base',
+    } as unknown as ModelConfig;
+    const encoder = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'q21-encoder',
+      name: 'External encoder',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    } as unknown as ModelConfig;
+    const recallInto = async (kind: 'prompts' | 'remix', metadata: Record<string, unknown>) => {
+      const { commands, setSettings } = createCommands();
+
+      galleryApi.galleryImages.metadata.mockResolvedValue(metadata);
+      await executeImageRecall({
+        queryClient,
+        t,
+        commands,
+        // Never initialised: nothing but a model key, so the values are synthesised.
+        getGenerateValues: () => ({ modelKey: q21.key }),
+        image,
+        kind,
+        models: [q21, encoder],
+        projectId: 'project-1',
+      });
+
+      return (setSettings.mock.calls[0]![0] as GenerateWidgetValues).qwen3VLEncoderModel;
+    };
+
+    it('lets a remix of an image made with the bundled encoder keep the bundled one', async () => {
+      await expect(
+        recallInto('remix', { generation_mode: 'txt2img', model: { key: q21.key }, positive_prompt: 'bundled' })
+      ).resolves.toBeNull();
+    });
+
+    it('still fills the saved default when the recall does not touch the model', async () => {
+      await expect(recallInto('prompts', { positive_prompt: 'prompt only' })).resolves.toMatchObject({
+        key: encoder.key,
+      });
+    });
   });
 });
 

@@ -334,6 +334,32 @@ describe('default components', () => {
     expect(getApplyModelDefaultsPlan(settings, flux, catalog).missingComponents).toEqual(['clipEmbedModel']);
   });
 
+  it('names a default encoder that is installed but no longer fits, instead of reporting no defaults', () => {
+    // An 8B encoder stored as the default, then reclassified as 4B: Qwen-Image-2.1 conditions on the 8B one.
+    const encoder: ComponentModelConfig = {
+      base: 'any',
+      format: 'checkpoint',
+      key: 'reclassified',
+      name: 'Reclassified encoder',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_4b',
+    };
+    const model: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      default_settings: { components: { qwen3_vl_encoder: encoder.key } },
+      format: 'gguf_quantized',
+      key: 'q21',
+      name: 'Qwen-Image-2.1',
+      type: 'main',
+    };
+    const current = getDefaultGenerateSettings(model);
+    const plan = getApplyModelDefaultsPlan(current, model, [encoder]);
+
+    expect(plan.patch).toEqual({});
+    expect(plan.defined).toEqual([]);
+    expect(plan.missingComponents).toEqual(['qwen3VLEncoderModel']);
+  });
+
   it('names a missing vision tower beside its installed encoder, and lists a missing VAE with the components', () => {
     const encoder: ComponentModelConfig = {
       base: 'any',

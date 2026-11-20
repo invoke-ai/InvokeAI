@@ -261,7 +261,10 @@ export const getCurrentGenerateValues = ({
   generateValues,
   models,
   supportedModels,
+  fillDefaults = true,
 }: {
+  /** False for a recall that reads the image first: its model, not the fallback's, decides the defaults. */
+  fillDefaults?: boolean;
   generateValues: Record<string, unknown>;
   models: readonly ComponentModelConfig[];
   supportedModels: GenerateModelConfig[];
@@ -293,7 +296,7 @@ export const getCurrentGenerateValues = ({
 
   // The model's default components and VAE fill in as they do when Generate itself picks the first model: once the
   // values persist with a model, nothing fills them again.
-  return { ...initial, ...getModelDefaultFills(fallbackModel, initial, models) };
+  return fillDefaults ? { ...initial, ...getModelDefaultFills(fallbackModel, initial, models) } : initial;
 };
 
 let canvasRecallHolder: { owner: AccountScope } | null = null;
@@ -368,8 +371,16 @@ export const executeImageRecall = async ({
       return false;
     }
 
+    // A recall of the model reads the image before any default fills a slot, or it would take the default for a pick
+    // the image never made.
+    const recallsModel = kind === 'all' || kind === 'remix';
     const readGenerateValues = () =>
-      getCurrentGenerateValues({ generateValues: getGenerateValues(), models, supportedModels });
+      getCurrentGenerateValues({
+        fillDefaults: !recallsModel,
+        generateValues: getGenerateValues(),
+        models,
+        supportedModels,
+      });
     const missingValuesNotice = () =>
       commands.notifications.add({
         kind: 'info',
@@ -501,6 +512,11 @@ export const executeImageRecall = async ({
         title: t('widgets.gallery.itemActions.recall.nothingRecalled'),
       });
       return false;
+    }
+
+    // An image that names no model leaves the fallback model of a fresh project, which takes its defaults after all.
+    if (recallsModel && !result.fields.includes('model') && !normalizeGenerateWidgetValues(getGenerateValues())) {
+      result.values = { ...result.values, ...getModelDefaultFills(result.values.model, result.values, models) };
     }
 
     if (result.fields.includes('referenceImages') && result.values.referenceImages.length > 0) {

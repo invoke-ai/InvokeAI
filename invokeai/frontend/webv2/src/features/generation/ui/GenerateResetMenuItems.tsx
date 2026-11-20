@@ -2,6 +2,7 @@
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import { MenuActionItem } from '@platform/ui/Menu';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { flushGenerateDrafts } from './generateDraftRegistry';
@@ -35,7 +36,9 @@ export const GenerateResetMenuItems = ({
   const { i18n, t } = useTranslation();
   const locale = i18n.resolvedLanguage;
   const ui = useGenerationUi();
-  const models = ui.models.catalog;
+  const { catalog, missingKeys } = ui.models;
+  // A default whose file is gone would fail the next load, so it counts as not installed.
+  const models = useMemo(() => catalog.filter((model) => !missingKeys.has(model.key)), [catalog, missingKeys]);
   const projectId = ui.project.activeProjectId;
   const items = useGenerateValues(
     (values): { apply: MenuItemState; reset: MenuItemState } | null => {

@@ -54,6 +54,7 @@ import {
   isIdeogram4UnconditionalBranch,
   isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
+  doesWanSourceSupplyVae,
   hasWanLowNoiseSlot,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeAcceptedByBase,
@@ -1002,6 +1003,8 @@ const wanLowNoiseSlot = (helpText: string): ComponentSlotPolicy =>
     // The loader pairs a single-file A14B model with a different single-file expert of its variant.
     filter: (candidate, ctx) =>
       ctx.model.type !== 'external_image_generator' && isWanLowNoiseExpertFor(ctx.model)(candidate),
+    incompatibleMessage:
+      'The selected low-noise expert is not a different single-file model of this variant. Select one or clear it.',
   });
 
 const ideogram4UnconditionalSlot = (helpText: string): ComponentSlotPolicy =>
@@ -1138,6 +1141,15 @@ export const getAutoFlux2ComponentSourceModel = (
 const isBundledOrDiffusersSourceSatisfied = (ctx: ComponentPolicyContext): boolean =>
   ctx.model.type !== 'external_image_generator' &&
   (isBundledMainForBase(ctx.model.base)(ctx.model) || hasCompatibleComponentSource(ctx));
+
+/** A Diffusers pipeline loads its own components, so the loader reads no component source or second transformer. */
+const isDiffusersPipeline = (ctx: ComponentPolicyContext): boolean => ctx.model.format === 'diffusers';
+
+/** Whether a Diffusers component source of a single-file Wan model supplies the VAE: the loader needs its width to fit. */
+const hasWanSourceVae = (ctx: ComponentPolicyContext): boolean =>
+  ctx.model.type !== 'external_image_generator' &&
+  hasCompatibleComponentSource(ctx) &&
+  doesWanSourceSupplyVae(ctx.model, ctx.settings.componentSourceModel!);
 
 /** Shared by the picker, invocation readiness and graph preflight so their requirements cannot drift. */
 export const getComponentSlotIssue = (slotPolicy: ComponentSlotPolicy, ctx: ComponentPolicyContext): string | null => {
@@ -1302,10 +1314,13 @@ const getBaseComponentSectionPolicy = (
     }
     case 'qwen-image':
       return createPolicy(model.format !== 'diffusers', [
-        componentSourceSlot(
-          (candidate) => isDiffusersMainForBase('qwen-image')(candidate),
-          'For non-Diffusers Qwen Image models, select this or provide separate VAE and Qwen VL models.'
-        ),
+        {
+          ...componentSourceSlot(
+            (candidate) => isDiffusersMainForBase('qwen-image')(candidate),
+            'For non-Diffusers Qwen Image models, select this or provide separate VAE and Qwen VL models.'
+          ),
+          neverLoaded: isDiffusersPipeline,
+        },
         {
           ...qwenVlEncoderSlot('Optional override, or required with a non-Diffusers model and no component source.'),
           required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
@@ -1472,6 +1487,7 @@ const getBaseComponentSectionPolicy = (
             'The second transformer branch. Required for single-file Ideogram 4 models, which hold ' +
               'only the conditional branch.'
           ),
+          neverLoaded: isDiffusersPipeline,
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs the unconditional transformer for single-file Ideogram 4 models.',
         },
@@ -1496,14 +1512,19 @@ const getBaseComponentSectionPolicy = (
       ]);
     case 'wan':
       return createPolicy(model.format !== 'diffusers', [
-        componentSourceSlot(
-          (candidate) => isDiffusersMainForBase('wan')(candidate),
-          'Select a Diffusers Wan model to provide VAE and text-encoder components.'
-        ),
         {
-          ...vaeSlot('Required unless a Diffusers component source is available.', isAcceptedVae),
-          required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
-          missingMessage: 'Generate needs a VAE for Wan models.',
+          ...componentSourceSlot(
+            (candidate) => isDiffusersMainForBase('wan')(candidate),
+            'Select a Diffusers Wan model to provide VAE and text-encoder components. Its VAE is used only when it ' +
+              'is a TI2V-5B pipeline for a TI2V-5B model, or an A14B one for an A14B model.'
+          ),
+          neverLoaded: isDiffusersPipeline,
+        },
+        {
+          ...vaeSlot('Required unless a matching Diffusers component source is available.', isAcceptedVae),
+          required: (ctx) => !(isBundledMainForBase('wan')(ctx.model) || hasWanSourceVae(ctx)),
+          missingMessage:
+            'Generate needs a VAE for Wan models: a component source supplies one only when it is the same variant family.',
         },
         {
           ...wanT5EncoderSlot('Required unless a Diffusers component source is available.'),
@@ -1673,8 +1694,9 @@ const isSlotLoaded = (model: GenerateModelConfig, settings: GenerateSettings, se
 };
 
 /**
- * The default components the model stores for slots it offers whose model is no longer installed, judged beside the
- * defaults that are installed (a vision tower is offered once its encoder default is).
+ * The default components the model stores for slots it offers that Apply cannot take: the model is not installed, or
+ * it does not fit the slot (an encoder reclassified to another size). Judged beside the defaults that are taken (a
+ * vision tower is offered once its encoder default is).
  */
 export const getMissingDefaultComponents = (
   model: GenerateModelConfig,
@@ -1683,7 +1705,8 @@ export const getMissingDefaultComponents = (
   const stored = (model.default_settings as { components?: Record<string, string> | null } | null | undefined)
     ?.components;
   const defaults = getDefaultGenerateSettings(model);
-  const settings = { ...defaults, ...getModelDefaultComponents(model, defaults, models) };
+  const taken = getModelDefaultComponents(model, defaults, models);
+  const settings = { ...defaults, ...taken };
   const context = getComponentPolicyContext(model, settings);
   const loaded = new Set(
     getComponentSectionPolicy(model, settings)
@@ -1694,7 +1717,7 @@ export const getMissingDefaultComponents = (
   return Object.entries(stored ?? {}).flatMap(([persistenceKey, modelKey]) => {
     const slot = getDefaultComponentSlot(persistenceKey);
 
-    return slot && !isInstalled(models, { key: modelKey }) && loaded.has(slot.setting) ? [slot.setting] : [];
+    return slot && loaded.has(slot.setting) && taken[slot.setting]?.key !== modelKey ? [slot.setting] : [];
   });
 };
 

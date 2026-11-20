@@ -240,6 +240,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     getGenerationSelectedGalleryImage(getProjectWidgetValues(activeProject, 'gallery'))
   );
   const modelsCatalog = useModelsSelector((snapshot) => snapshot.models);
+  const modelsMissingKeys = useModelsSelector((snapshot) => snapshot.missingModelKeys);
   const modelsError = useModelsSelector((snapshot) => snapshot.error);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const { generation, notifications } = useWorkbenchCommands();
@@ -295,12 +296,13 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       getBaseColorPalette: getModelBaseColorPalette,
       getBaseLabel: getModelBaseLabel,
       getImageUrl: getModelImageUrl,
+      missingKeys: modelsMissingKeys,
       openInModelManager: openInModelManager ?? undefined,
       openManager: (options) => openModelManager({ modelType: options?.modelType, projectId: project.activeProjectId }),
       readCatalog: () => getModelsSnapshot().models,
       status: modelsStatus,
     }),
-    [modelsCatalog, modelsError, modelsStatus, openInModelManager, project.activeProjectId]
+    [modelsCatalog, modelsError, modelsMissingKeys, modelsStatus, openInModelManager, project.activeProjectId]
   );
   const notificationsGroup = useMemo<GenerationUiAdapter['notifications']>(
     () => ({
