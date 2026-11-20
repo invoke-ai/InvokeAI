@@ -1,7 +1,7 @@
 /**
  * The asynchronous display of spatially adjusted pixels, shared by layers (`adjustedSurfaceCache.ts`) and groups
- * (`groupSurfaceCache.ts`). Each owner shows an interim until its stack's evaluation lands from the spatial worker;
- * the canvas-engine ARCHITECTURE "Spatial adjustments" section states the interim, install and scheduling rules.
+ * (`groupSurfaceCache.ts`). Each owner shows an interim until its stack's evaluation lands from the spatial worker; the
+ * canvas-engine ARCHITECTURE "Spatial adjustments" section states the interim, install and scheduling rules.
  */
 
 import type { CanvasAdjustmentsContract } from '@workbench/canvas-engine/contracts';
@@ -56,8 +56,8 @@ export interface SpatialDisplayTarget {
   /** Where the source's (0,0) sits in the stack's reference space. */
   readonly origin: AdjustmentOrigin;
   /**
-   * Why no job may start yet: a `placeholder` source with no real pixels (reported idle), or `inputs` whose own
-   * spatial results are still computing (reported computing).
+   * Why no job may start yet: a `placeholder` source with no real pixels (reported idle), or `inputs` whose own spatial
+   * results are still computing (reported computing).
    */
   readonly hold: 'placeholder' | 'inputs' | null;
   /** The source's current version, or null once the owner no longer draws from `source`. */
@@ -82,7 +82,6 @@ interface SpatialJob extends TargetKey {
 }
 
 interface SpatialSlot {
-  /** The latest display request. */
   target: SpatialDisplayTarget | null;
   /** Source version the surface's pixels reflect; null until this slot painted the surface. */
   shownVersion: number | null;
@@ -105,16 +104,15 @@ interface SpatialFailure extends TargetKey {
 /** Per-owner spatial display state returned by {@link createSpatialDisplay}. */
 export interface SpatialDisplay {
   /**
-   * Brings `surface` to the interim for `target`: a parameter change keeps the shown pixels, known damage is
-   * re-patched with the per-pixel part only, and anything else (or `reusable` false) repaints the whole surface
-   * per-pixel. Returns whether it repainted the whole surface.
+   * Brings `surface` to the interim for `target`: a parameter change keeps the shown pixels, known damage is re-patched
+   * with the per-pixel part only, and anything else (or `reusable` false) repaints the whole surface per-pixel. Returns
+   * whether it repainted the whole surface.
    */
   paintInterim(ownerId: string, surface: RasterSurface, reusable: boolean, target: SpatialDisplayTarget): boolean;
   /** Records `target` as the owner's latest request and schedules a job toward it. */
   request(ownerId: string, target: SpatialDisplayTarget, rebuilt: boolean): void;
   /** Whether the owner shows the installed result for exactly `target`. */
   isExact(ownerId: string, target: TargetKey): boolean;
-  /** How final the owner's displayed pixels are for `target`. */
   state(ownerId: string, target: TargetKey): DisplayedPixelsState;
   status(ownerId: string): AdjustedSurfaceStatus | null;
   /** Forgets an owner, abandoning its job and clearing its status; false when it had no state. */
@@ -182,8 +180,8 @@ export const paintAdjustedRegion = (
 };
 
 /**
- * Creates the state machine; `slotKeyPrefix` keeps owners of different kinds from superseding each other's queued
- * jobs in the shared service.
+ * Creates the state machine; `slotKeyPrefix` keeps owners of different kinds from superseding each other's queued jobs
+ * in the shared service.
  */
 export const createSpatialDisplay = (options: SpatialDisplayOptions, slotKeyPrefix: string): SpatialDisplay => {
   const slots = new Map<string, SpatialSlot>();
@@ -278,8 +276,8 @@ export const createSpatialDisplay = (options: SpatialDisplayOptions, slotKeyPref
     slot.shown.key === slot.target.key;
 
   /**
-   * Writes a result only when it is newer than the shown one, came from the same source surface and from a version
-   * at or before the shown one whose later damage is known; that damage is then re-patched per-pixel.
+   * Writes a result only when it is newer than the shown one, came from the same source surface and from a version at
+   * or before the shown one whose later damage is known; that damage is then re-patched per-pixel.
    */
   const install = (slot: SpatialSlot, job: SpatialJob, pixels: Uint8ClampedArray): boolean => {
     const target = slot.target;

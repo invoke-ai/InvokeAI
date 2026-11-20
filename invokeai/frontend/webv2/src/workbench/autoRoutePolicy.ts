@@ -136,8 +136,8 @@ const CANVAS_EDIT_CONFIDENCE = {
   setCanvasBbox: 'high',
   setCanvasLayerPositions: 'high',
   setCanvasLayersEnabled: 'conditional',
-  // Display-only: hiding an overlay changes nothing about the generated image,
-  // so it must never re-route the invoke target.
+  // Display-only: hiding an overlay changes nothing about the generated image, so it must never re-route the invoke
+  // target.
   setCanvasLayersHidden: 'none',
   setCanvasSelectedLayer: 'none',
   setCanvasStagingAutoSwitch: 'none',

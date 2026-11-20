@@ -26,7 +26,6 @@ vi.mock('@features/models/data/modelsStore', () => ({
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
-/** The picker's own view is covered by its tests; a pick here hands over an item whose full image is a data URL. */
 const PICKED_PNG =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 vi.mock('@features/gallery/ui/picker/GalleryPickerPopover', async (importOriginal) => ({

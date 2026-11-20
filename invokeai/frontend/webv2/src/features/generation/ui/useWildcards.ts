@@ -16,7 +16,6 @@ import { getApiErrorMessage } from '@platform/transport/http';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
-/** One write, as `applyWrites` will perform it. */
 export interface WildcardWrite {
   name: string;
   values: string[];

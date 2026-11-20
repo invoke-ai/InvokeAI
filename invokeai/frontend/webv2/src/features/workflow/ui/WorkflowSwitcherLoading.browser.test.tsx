@@ -102,6 +102,7 @@ describe('the workflow switcher while its scrolling list loads', () => {
   const menu = () => document.querySelector<HTMLElement>('[role="menu"]');
   const choices = () => [...document.querySelectorAll('[role="menuitemradio"]')].map((item) => item.textContent);
   const themedList = () => menu()?.querySelector('[data-scope="scroll-area"]') ?? null;
+  const VIEWPORT = '[data-scope="scroll-area"][data-part="viewport"]';
   const library = () => document.querySelector<HTMLElement>('[data-value="workflow-library"]')!;
   const openMenu = async () => {
     await act(() => userEvent.click(trigger()));
@@ -139,8 +140,24 @@ describe('the workflow switcher while its scrolling list loads', () => {
     setWorkflowLibraryOpen(false);
     await openMenu();
     const before = library().getBoundingClientRect().top;
+    // Zag makes the viewport a tab stop until it measures its scrollbars, which can be between two polls; record the
+    // viewport's tabindex as it is inserted instead.
+    const insertedViewportTabIndexes: (string | null)[] = [];
+    const insertions = new MutationObserver((records) => {
+      for (const node of records.flatMap((record) => [...record.addedNodes])) {
+        if (node instanceof Element) {
+          const viewport = node.matches(VIEWPORT) ? node : node.querySelector(VIEWPORT);
+          if (viewport) {
+            insertedViewportTabIndexes.push(viewport.getAttribute('tabindex'));
+          }
+        }
+      }
+    });
+    insertions.observe(menu()!, { childList: true, subtree: true });
+    onTestFinished(() => insertions.disconnect());
     await act(() => scrollableChunk.release());
     await vi.waitFor(() => expect(themedList()).not.toBeNull(), { timeout: 8000 });
+    expect(insertedViewportTabIndexes).toEqual([null]);
     expect(library().getBoundingClientRect().top).toBe(before);
     expect(await auditAccessibility(menu()!)).toEqual([]);
     expect(menu()!.contains(document.activeElement)).toBe(true);

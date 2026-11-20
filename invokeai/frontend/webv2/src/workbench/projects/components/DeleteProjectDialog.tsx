@@ -8,9 +8,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Deleting a project also decides what happens to the boards it holds. The inbox always goes with it; the choice
- * is offered only when there are other boards, with their names and what they hold, so the safe default — keeping
- * them in the Library — is never a surprise and the destructive one says what it costs.
+ * Deleting a project also decides what happens to the boards it holds. The inbox always goes with it; the choice is
+ * offered only when there are other boards, with their names and what they hold, so the safe default — keeping them in
+ * the Library — is never a surprise and the destructive one says what it costs.
  */
 export const DeleteProjectDialog = ({
   body,
@@ -30,8 +30,8 @@ export const DeleteProjectDialog = ({
 }) => {
   const { t } = useTranslation();
   const [boards, setBoards] = useState<DeleteProjectBoards>('release');
-  // Each opening starts from the safe choice again, set as it opens rather than once the last one finished closing:
-  // a dialog reopened during that exit, for this project or another, must not inherit a destructive choice.
+  // Each opening starts from the safe choice again, set as it opens rather than once the last one finished closing: a
+  // dialog reopened during that exit, for this project or another, must not inherit a destructive choice.
   const [choiceOpenFor, setChoiceOpenFor] = useState<string | null>(null);
   const openFor = isOpen ? projectId : null;
   if (openFor !== choiceOpenFor) {

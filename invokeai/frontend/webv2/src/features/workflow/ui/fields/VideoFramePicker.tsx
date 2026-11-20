@@ -52,8 +52,8 @@ const FieldFrameSeek = ({ time, video }: { time: number; video: HTMLVideoElement
 
 /**
  * A player that follows the field: it opens on the field's frame and returns to it whenever the field changes, while
- * playing, looping and scrubbing leave the field alone. "Use this frame" commits the frame the player is paused on.
- * Key it by the source: its media state belongs to one video.
+ * playing, looping and scrubbing leave the field alone. "Use this frame" commits the frame the player is paused on. Key
+ * it by the source: its media state belongs to one video.
  */
 export const VideoFramePicker = ({
   fieldValue,
@@ -95,8 +95,8 @@ export const VideoFramePicker = ({
     [hasMediaError, t]
   );
   const canUseFrame = pausedFrame !== null && pausedFrame !== resolvedIndex;
-  // Unavailable rather than disabled: a commit makes the button unavailable while it holds focus, and a disabled
-  // button would drop that focus to the page.
+  // Unavailable rather than disabled: a commit makes the button unavailable while it holds focus, and a disabled button
+  // would drop that focus to the page.
   const unavailable = useUnavailableControl(canUseFrame ? undefined : t('nodes.useThisFrameUnavailable'), undefined);
   // Read from the element, not the last event, so the commit is the frame on screen.
   const commitPlayerFrame = useCallback(() => {

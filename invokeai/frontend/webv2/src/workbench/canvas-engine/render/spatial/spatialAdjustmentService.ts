@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Runs spatial adjustment evaluations off the main thread, one at a time, with raster-memory accounting. This is
- * the only spatial module production code imports: the kernels load inside the worker, never in a page chunk.
+ * Runs spatial adjustment evaluations off the main thread, one at a time, with raster-memory accounting. This is the
+ * only spatial module production code imports: the kernels load inside the worker, never in a page chunk.
  */
 
 import type { RasterMemoryReservationResult } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';

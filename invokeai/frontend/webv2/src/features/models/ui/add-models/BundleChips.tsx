@@ -8,7 +8,6 @@ import { Scrollable } from '@platform/ui/Scrollable';
 import { CheckIcon, FolderIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-/** Horizontal row of bundle filters. */
 export const BundleChips = ({
   bundles,
   onSelect,

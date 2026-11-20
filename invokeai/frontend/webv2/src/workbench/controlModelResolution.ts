@@ -14,8 +14,8 @@ export type ControlModelMemory = Readonly<Record<string, string>>;
 export const controlModelMemoryKey = (base: string, type: ControlType): string => `${base}:${type}`;
 
 /**
- * Why no model drives a layer; validation reports it in place of `missing_model`. `missing_type`: no type and no
- * model, so the layer contributes nothing. `missing_model`: an untyped layer names a model that is not installed.
+ * Why no model drives a layer; validation reports it in place of `missing_model`. `missing_type`: no type and no model,
+ * so the layer contributes nothing. `missing_model`: an untyped layer names a model that is not installed.
  */
 export type ControlModelUnresolvedReason =
   | 'missing_type'
@@ -26,10 +26,10 @@ export type ControlModelUnresolvedReason =
 
 export interface ControlModelResolution {
   /**
-   * `explicit`: the layer's own pick. `remembered`: the last pick for this base and type, still among `candidates`;
-   * it applies to every layer of that base and type without an explicit pick. `only`: the one model made for the
-   * type. `union`: the one union model covering it. `ask`: several fit. `missing`: none fit. `none`: the layer has
-   * no type, so its stored adapter applies as it is.
+   * `explicit`: the layer's own pick. `remembered`: the last pick for this base and type, still among `candidates`; it
+   * applies to every layer of that base and type without an explicit pick. `only`: the one model made for the type.
+   * `union`: the one union model covering it. `ask`: several fit. `missing`: none fit. `none`: the layer has no type,
+   * so its stored adapter applies as it is.
    */
   how: 'explicit' | 'remembered' | 'only' | 'union' | 'ask' | 'missing' | 'none';
   model: ModelConfig | null;
@@ -42,8 +42,8 @@ export interface ControlModelResolution {
   /** Every model the layer could run on this base, whatever it was made for, typed or not. */
   usable: readonly ModelConfig[];
   /**
-   * Whether the model was made for (or, as a union, covers) the family the detector produces; false when it only
-   * shares the type's purpose (a normal-map model on a depth layer), and for untyped or unresolved layers.
+   * Whether the model was made for (or, as a union, covers) the family the detector produces; false when it only shares
+   * the type's purpose (a normal-map model on a depth layer), and for untyped or unresolved layers.
    */
   familyMatch: boolean;
   /** FLUX InstantX Union mode for this type's family; null for every other model. */
@@ -92,10 +92,10 @@ const collectCandidates = (
 };
 
 /**
- * Which model drives a control layer: an explicit pick for this base, the remembered pick for (base, type), the
- * only model made for the type, a choice between several, the one covering union model, or none. A pick made for
- * another base is ignored, not cleared, so switching back restores it. An untyped layer runs its stored adapter as
- * it is; its `usable` still lists every model it could run on the base, for a direct pick.
+ * Which model drives a control layer: an explicit pick for this base, the remembered pick for (base, type), the only
+ * model made for the type, a choice between several, the one covering union model, or none. A pick made for another
+ * base is ignored, not cleared, so switching back restores it. An untyped layer runs its stored adapter as it is; its
+ * `usable` still lists every model it could run on the base, for a direct pick.
  */
 export const resolveControlModel = (input: {
   layer: Pick<CanvasControlLayerContract, 'controlType' | 'detection' | 'adapter'>;
@@ -171,10 +171,10 @@ export const resolveControlModel = (input: {
 };
 
 /**
- * Whether picking `model` should become the remembered pick for the layer's base and type. The memory is keyed by
- * base and type and drives every unpicked layer of both, whatever their detector, so only a usable model made for
- * the type's primary family, or a union covering it, is remembered. A pick for a secondary family (normal under
- * Depth, MLSD under Edges, face under Pose), or one nothing identifies, stays this layer's own.
+ * Whether picking `model` should become the remembered pick for the layer's base and type. The memory is keyed by base
+ * and type and drives every unpicked layer of both, whatever their detector, so only a usable model made for the type's
+ * primary family, or a union covering it, is remembered. A pick for a secondary family (normal under Depth, MLSD under
+ * Edges, face under Pose), or one nothing identifies, stays this layer's own.
  */
 export const isRememberableControlPick = (resolution: ControlModelResolution, model: ModelConfig): boolean => {
   if (!resolution.controlType || !resolution.usable.some((usable) => usable.key === model.key)) {

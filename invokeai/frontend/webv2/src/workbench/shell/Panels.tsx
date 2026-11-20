@@ -18,20 +18,15 @@ import {
 
 type PanelRegion = Exclude<WidgetRegion, 'center'>;
 
-/** Left panel — hosts the active registered widget panel view. */
 export const LeftPanel = ({ instanceId }: { instanceId: WidgetInstanceId }) => (
   <WidgetPanelSlot instanceId={instanceId} region="left" />
 );
 
-/** Right panel — hosts the active registered widget panel view. */
 export const RightPanel = ({ instanceId }: { instanceId: WidgetInstanceId }) => (
   <WidgetPanelSlot instanceId={instanceId} region="right" />
 );
 
-/**
- * Keep previously shown panels mounted to preserve scroll, selection, and virtualization across presets that
- * replace region membership.
- */
+/** Keeps shown panels mounted to preserve scroll, selection and virtualization across presets. */
 export const WidgetPanelSlot = ({ instanceId, region }: { instanceId: WidgetInstanceId; region: PanelRegion }) => {
   const projectId = useActiveProjectId();
   const activeIdsElsewhere = useActiveProjectSelector(

@@ -2,9 +2,13 @@ import type { QueueGenerationMeta } from '@features/queue/contracts';
 import type { ImageRecallKind } from '@workbench/image-actions';
 
 import { createGenerateFormValuesSelector } from '@features/generation/react';
-import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
-import { hasArchitectureCapabilities, isSupportedGenerateModel } from '@features/generation/settings';
+import { isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
+import {
+  getArchitectureCapabilitiesSnapshot,
+  subscribeArchitectureCapabilities,
+} from '@features/models/architecturesStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, getCurrentGenerateValues } from '@workbench/image-actions';
@@ -33,8 +37,8 @@ const selectGenerateValues = createGenerateFormValuesSelector();
 const NO_REASONS: QueueRecallAvailability['reasons'] = {};
 
 /**
- * What an item's recall menus offer, and the recall itself. Mount it only for the item whose menu or details are
- * open: it reads the durable snapshot and loads the model catalog.
+ * What an item's recall menus offer, and the recall itself. Mount it only for the item whose menu or details are open:
+ * it reads the durable snapshot and loads the model catalog.
  */
 export const useQueueItemRecall = (
   origin: string | null | undefined,

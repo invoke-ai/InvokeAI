@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -105,6 +105,14 @@ class MiniMaxH3ModelLoaderInvocation(BaseInvocation):
         title="Text Encoder (single file)",
     )
 
+    task_variant_override: Optional[Literal["fl2va", "ref2va"]] = InputField(
+        default=None,
+        description="Override the detected transformer task variant for this invocation. "
+        "The denoiser still validates conditioning against the selected variant.",
+        input=Input.Direct,
+        title="Task Variant Override",
+    )
+
     def invoke(self, context: InvocationContext) -> MiniMaxH3ModelLoaderOutput:
         if not context.models.exists(self.model.key):
             raise ValueError(f"Unknown model: {self.model.key}")
@@ -142,6 +150,8 @@ class MiniMaxH3ModelLoaderInvocation(BaseInvocation):
         # without references) instead of silently producing degraded output.
         variant = getattr(transformer_config, "variant", None)
         transformer_variant = variant.value if isinstance(variant, MiniMaxH3VariantType) else None
+        if self.task_variant_override is not None:
+            transformer_variant = self.task_variant_override
         tokenizer = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
         processor = self.model.model_copy(update={"submodel_type": SubModelType.Processor})
         if self.text_encoder_model is not None:

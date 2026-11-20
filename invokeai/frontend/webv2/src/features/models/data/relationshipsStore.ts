@@ -25,9 +25,8 @@ const EMPTY_RELATIONSHIPS_SNAPSHOT: ModelRelationshipsSnapshot = { relatedKeysBy
 const store = createExternalStore<ModelRelationshipsSnapshot>(EMPTY_RELATIONSHIPS_SNAPSHOT);
 
 /**
- * A fetch may only write its result while it is still the promise in this map.
- * Evicting a key therefore both invalidates its inflight GET and unblocks the
- * dedupe so a follow-up fetch genuinely starts.
+ * A fetch may only write its result while it is still the promise in this map. Evicting a key therefore both
+ * invalidates its inflight GET and unblocks the dedupe so a follow-up fetch genuinely starts.
  */
 const inflightByKey = new Map<string, Promise<void>>();
 
@@ -83,8 +82,8 @@ const pruneAgainstLibrary = (): void => {
 };
 
 subscribeModels(pruneAgainstLibrary);
-// The library may already be loaded when this lazy module first evaluates;
-// seed the baseline now so the very next delete still prunes.
+// The library may already be loaded when this lazy module first evaluates; seed the baseline now so the very next
+// delete still prunes.
 pruneAgainstLibrary();
 
 const setEntry = (modelKey: string, keys: readonly string[]): void => {
@@ -111,8 +110,7 @@ const fetchRelatedKeys = (modelKey: string): Promise<void> => {
       }
     })
     .catch((error: unknown) => {
-      // Set an empty entry to stop spinners while rejecting for error-aware callers; superseded fetches write
-      // nothing.
+      // Set an empty entry to stop spinners while rejecting for error-aware callers; superseded fetches write nothing.
       if (isAccountScopeCurrent(owner) && inflightByKey.get(modelKey) === fetch) {
         failedFetchKeys.add(modelKey);
 
@@ -133,8 +131,8 @@ const fetchRelatedKeys = (modelKey: string): Promise<void> => {
 };
 
 /**
- * Fetch once per key; concurrent callers share one request. Cache-first,
- * except that a key whose last fetch failed is revalidated on the next call.
+ * Fetch once per key; concurrent callers share one request. Cache-first, except that a key whose last fetch failed is
+ * revalidated on the next call.
  */
 export const ensureRelatedModelKeysLoaded = (modelKey: string): Promise<void> => {
   if (store.getSnapshot().relatedKeysByModelKey[modelKey] !== undefined && !failedFetchKeys.has(modelKey)) {
@@ -172,8 +170,8 @@ const patchBothDirections = (modelKey: string, otherKey: string, patch: EntryPat
 };
 
 /**
- * Patch existing entries, but invalidate and refetch GETs started before mutation so stale responses cannot erase
- * new links.
+ * Patch existing entries, but invalidate and refetch GETs started before mutation so stale responses cannot erase new
+ * links.
  */
 const commitMutation = (modelKey: string, otherKey: string, patch: EntryPatch): void => {
   // A response that outlived its models' deletion must not resurrect them.

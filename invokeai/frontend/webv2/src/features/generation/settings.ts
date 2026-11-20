@@ -16,6 +16,7 @@ export {
   getGenerateValuesRevertPatch,
   isAspectRatioLocked,
   isFluxDypePreset,
+  isGenerateLora,
   isIdeogram4SamplerPreset,
   isGenerateModelConfig,
   isLoraCompatibleWithModel,
@@ -25,6 +26,7 @@ export {
   isQwenImageEncoderQuantization,
   isValidMossImageSkipLayers,
   isVaeModelConfig,
+  isWanLoraTarget,
   isWanLoraTargetingMain,
   MAX_FLUX_DYPE_EXPONENT,
   MAX_FLUX_DYPE_SCALE,
@@ -40,6 +42,7 @@ export {
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
   normalizeDynamicPromptsSettings,
+  normalizeGenerateLora,
   normalizeGenerateSettings,
   normalizeMossImageSkipLayers,
   normalizeGenerateWidgetValues,
@@ -52,7 +55,7 @@ export {
   createReferenceImageId,
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
-  withAddedReferenceImages,
+  addReferenceImages,
   getGenerateModelSelectionResult,
   isComponentCompatibleWithModel,
   getDimensionGrid,
@@ -60,9 +63,8 @@ export {
   getGenerateInvocationIssues,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
-  getMaxReferenceImages,
   getPromptHistoryRecallPatch,
-  getReferenceImageLimit,
+  getReferenceImageRoom,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
   getRecallDefaultVae,
@@ -71,7 +73,6 @@ export {
   isGenerateModelSelectable,
   isKnownScheduler,
   isLossyModelSwitch,
-  isReferenceImageSupported,
   isSupportedGenerateModel,
   takesReferenceImages,
   NO_GENERATE_MODEL_ISSUE,
@@ -89,7 +90,6 @@ export {
   type GenerationIssue,
   type GenerationIssueFix,
 } from './core/generationIssues';
-export { hasArchitectureCapabilities } from './core/architectureCapabilities';
 export {
   describeExternalCanvasRefusal,
   GEMINI_TEMPERATURE_MAX,
@@ -122,6 +122,7 @@ export {
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
+  servesAsType,
 } from './core/componentCompatibility';
 export {
   getLockedAspectRatioSettings,

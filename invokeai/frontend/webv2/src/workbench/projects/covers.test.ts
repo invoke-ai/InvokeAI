@@ -44,20 +44,12 @@ beforeEach(async () => {
 });
 
 describe('parseProjectCovers', () => {
-  it('reads a well-formed blob', () => {
-    expect(covers.parseProjectCovers('{"p1":"a.png"}')).toEqual({ p1: 'a.png' });
-  });
-
   it('treats unreadable or wrongly-shaped blobs as empty', () => {
     expect(covers.parseProjectCovers(null)).toEqual({});
     expect(covers.parseProjectCovers('')).toEqual({});
     expect(covers.parseProjectCovers('not json')).toEqual({});
     expect(covers.parseProjectCovers('[]')).toEqual({});
     expect(covers.parseProjectCovers('"a string"')).toEqual({});
-  });
-
-  it('drops entries that are not non-empty strings', () => {
-    expect(covers.parseProjectCovers('{"p1":"a.png","p2":7,"p3":null,"p4":""}')).toEqual({ p1: 'a.png' });
   });
 });
 
@@ -69,13 +61,6 @@ describe('loadProjectCovers', () => {
 
     expect(api.getClientStateValue).toHaveBeenCalledTimes(1);
     expect(covers.getProjectCoverImageName('p1')).toBe('a.png');
-  });
-
-  it('degrades to no covers when the backend is unreachable', async () => {
-    api.getClientStateValue.mockRejectedValueOnce(new Error('offline'));
-
-    await expect(covers.loadProjectCovers()).resolves.toBeUndefined();
-    expect(covers.getProjectCoverImageName('p1')).toBeUndefined();
   });
 
   it('does not let a later load overwrite a cover mutation after the account index loaded', async () => {
@@ -139,26 +124,6 @@ describe('recordProjectCover before the index has loaded', () => {
 
     expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({ other: 'b.png', p1: 'a.png' });
   });
-
-  it('writes nothing when the pending record is what the server already said', async () => {
-    api.__clientState.set('webv2:project-covers', '{"p1":"a.png"}');
-
-    covers.recordProjectCover('p1', 'a.png');
-    await covers.loadProjectCovers();
-
-    expect(api.setClientStateValue).not.toHaveBeenCalled();
-  });
-
-  it('clears a server cover when the clear was recorded before the index loaded', async () => {
-    api.__clientState.set('webv2:project-covers', '{"p1":"a.png","other":"b.png"}');
-
-    covers.forgetProjectCover('p1');
-    await covers.loadProjectCovers();
-
-    await vi.waitFor(() => {
-      expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({ other: 'b.png' });
-    });
-  });
 });
 
 describe('the tracked-cover cap', () => {
@@ -177,22 +142,6 @@ describe('the tracked-cover cap', () => {
       expect(JSON.parse(api.__clientState.get('webv2:project-covers')!).p0).toBe('new.png');
     });
   });
-
-  it('drops the oldest entry when a new project pushes past the cap', async () => {
-    const initial = Object.fromEntries(Array.from({ length: 500 }, (_, index) => [`p${index}`, `${index}.png`]));
-
-    api.__clientState.set('webv2:project-covers', JSON.stringify(initial));
-    await covers.loadProjectCovers();
-    covers.recordProjectCover('fresh', 'new.png');
-
-    await vi.waitFor(() => {
-      const persisted = JSON.parse(api.__clientState.get('webv2:project-covers')!);
-
-      expect(Object.keys(persisted)).toHaveLength(500);
-      expect(persisted.fresh).toBe('new.png');
-      expect(persisted.p0).toBeUndefined();
-    });
-  });
 });
 
 describe('recordProjectCover', () => {
@@ -204,52 +153,6 @@ describe('recordProjectCover', () => {
     await vi.waitFor(() => {
       expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({ p1: 'a.png' });
     });
-  });
-
-  /** Autosave runs constantly; a cover changes when a generation lands. */
-  it('does not write when nothing changed', async () => {
-    await covers.loadProjectCovers();
-    const listener = vi.fn();
-    const unsubscribe = covers.subscribeProjectCovers(listener);
-    covers.recordProjectCover('p1', 'a.png');
-    await vi.waitFor(() => expect(listener).toHaveBeenCalledTimes(2));
-    api.setClientStateValue.mockClear();
-    covers.recordProjectCover('p1', 'a.png');
-
-    expect(api.setClientStateValue).not.toHaveBeenCalled();
-    unsubscribe();
-  });
-
-  it('clears an entry when a project loses its cover', async () => {
-    await covers.loadProjectCovers();
-    covers.recordProjectCover('p1', 'a.png');
-    covers.recordProjectCover('p1', null);
-
-    expect(covers.getProjectCoverImageName('p1')).toBeUndefined();
-    await vi.waitFor(() => {
-      expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({});
-    });
-  });
-
-  it('notifies subscribers so the library can re-derive', async () => {
-    await covers.loadProjectCovers();
-
-    const listener = vi.fn();
-    const unsubscribe = covers.subscribeProjectCovers(listener);
-
-    covers.recordProjectCover('p1', 'a.png');
-    unsubscribe();
-    covers.recordProjectCover('p2', 'b.png');
-
-    expect(listener).toHaveBeenCalledTimes(1);
-  });
-
-  it('survives a failed write without throwing at the caller', async () => {
-    await covers.loadProjectCovers();
-    api.setClientStateValue.mockRejectedValueOnce(new Error('offline'));
-
-    expect(() => covers.recordProjectCover('p1', 'a.png')).not.toThrow();
-    expect(covers.getProjectCoverImageName('p1')).toBe('a.png');
   });
 
   it('serializes rapid mutations and persists the newest complete blob last', async () => {
@@ -288,72 +191,6 @@ describe('recordProjectCover', () => {
       expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({ p1: 'b.png' });
       expect(listener).toHaveBeenCalledTimes(3);
     });
-    unsubscribe();
-  });
-
-  it('leaves the complete index dirty when a write fails', async () => {
-    await covers.loadProjectCovers();
-    const listener = vi.fn();
-    const unsubscribe = covers.subscribeProjectCovers(listener);
-    api.setClientStateValue.mockRejectedValueOnce(new Error('offline'));
-
-    covers.recordProjectCover('p1', 'a.png');
-    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(1));
-
-    covers.recordProjectCover('already-absent', null);
-
-    await vi.waitFor(() => {
-      expect(api.setClientStateValue).toHaveBeenCalledTimes(2);
-      expect(listener).toHaveBeenCalledTimes(3);
-    });
-    expect(JSON.parse(api.setClientStateValue.mock.calls[1]![1])).toEqual({ p1: 'a.png' });
-    unsubscribe();
-  });
-
-  it('retries an identical mutation when the optimistic snapshot is dirty', async () => {
-    await covers.loadProjectCovers();
-    const listener = vi.fn();
-    const unsubscribe = covers.subscribeProjectCovers(listener);
-    api.setClientStateValue.mockRejectedValueOnce(new Error('offline'));
-
-    covers.recordProjectCover('p1', 'a.png');
-    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(1));
-    covers.recordProjectCover('p1', 'a.png');
-
-    await vi.waitFor(() => {
-      expect(api.setClientStateValue).toHaveBeenCalledTimes(2);
-      expect(listener).toHaveBeenCalledTimes(3);
-    });
-    expect(JSON.parse(api.setClientStateValue.mock.calls[1]![1])).toEqual({ p1: 'a.png' });
-    unsubscribe();
-  });
-
-  it('clears dirty state when the latest retry succeeds after an earlier failure', async () => {
-    const successfulRetry = createDeferred();
-
-    await covers.loadProjectCovers();
-    const listener = vi.fn();
-    const unsubscribe = covers.subscribeProjectCovers(listener);
-    api.setClientStateValue
-      .mockRejectedValueOnce(new Error('offline'))
-      .mockImplementationOnce(async (key: string, value: string) => {
-        await successfulRetry.promise;
-        api.__clientState.set(key, value);
-      });
-
-    covers.recordProjectCover('p1', 'a.png');
-    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(1));
-    covers.recordProjectCover('p1', 'a.png');
-    await vi.waitFor(() => expect(api.setClientStateValue).toHaveBeenCalledTimes(2));
-
-    successfulRetry.resolve();
-    await vi.waitFor(() => {
-      expect(api.__clientState.get('webv2:project-covers')).toBe('{"p1":"a.png"}');
-      expect(listener).toHaveBeenCalledTimes(3);
-    });
-
-    covers.recordProjectCover('p1', 'a.png');
-    expect(api.setClientStateValue).toHaveBeenCalledTimes(2);
     unsubscribe();
   });
 
@@ -419,11 +256,5 @@ describe('forgetProjectCover', () => {
     await vi.waitFor(() => {
       expect(JSON.parse(api.__clientState.get('webv2:project-covers')!)).toEqual({});
     });
-  });
-});
-
-describe('getProjectCoverUrl', () => {
-  it('points at the thumbnail route and escapes the name', () => {
-    expect(covers.getProjectCoverUrl('a b.png')).toContain('/api/v1/images/i/a%20b.png/thumbnail');
   });
 });

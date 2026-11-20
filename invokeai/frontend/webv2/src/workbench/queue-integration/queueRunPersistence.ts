@@ -51,13 +51,13 @@ export const withQueueRecallCache = <T extends Pick<QueueRunJournal, 'record' | 
 type RunProject = Pick<Project, 'queue'>;
 
 /**
- * The library template whose `last_run_at` a routed result should bump: the run must have just turned completed
- * (a cancelled run, or a second routing of the same completion, bumps nothing) and come from a project workflow
- * linked to a library template when queued. Older snapshots without a captured binding skip this bookkeeping.
- * Dependency-free so editor boot never loads workflow data; the caller drops bundled templates once it loads.
- * On a multiuser server (`viewerUserId` set) a template whose recorded
- * owner is another account is skipped; a link without a recorded owner is sent, and the server refuses it (403)
- * unless the caller owns the template or is an administrator, whose run then bumps the owner's row.
+ * The library template whose `last_run_at` a routed result should bump: the run must have just turned completed (a
+ * cancelled run, or a second routing of the same completion, bumps nothing) and come from a project workflow linked to
+ * a library template when queued. Older snapshots without a captured binding skip this bookkeeping. Dependency-free so
+ * editor boot never loads workflow data; the caller drops bundled templates once it loads. On a multiuser server
+ * (`viewerUserId` set) a template whose recorded owner is another account is skipped; a link without a recorded owner
+ * is sent, and the server refuses it (403) unless the caller owns the template or is an administrator, whose run then
+ * bumps the owner's row.
  */
 export const getCompletedLibraryWorkflowRun = (
   before: RunProject | undefined,
@@ -104,8 +104,8 @@ export interface LibraryWorkflowRunTouchOptions {
 
 /**
  * Routes a run's results, then marks the template it ran from as run (fire and forget). Ordering by last run is a
- * convenience: nothing here can throw into the queue path, and a failed or stale request is dropped. The workflow
- * data module loads only for a completed linked run, so it stays out of the editor's startup bundle.
+ * convenience: nothing here can throw into the queue path, and a failed or stale request is dropped. The workflow data
+ * module loads only for a completed linked run, so it stays out of the editor's startup bundle.
  */
 export const withLibraryWorkflowRunTouch =
   <Payload extends { projectId: string; queueItemId: string }>(

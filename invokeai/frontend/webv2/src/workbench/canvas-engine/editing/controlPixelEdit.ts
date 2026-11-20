@@ -52,9 +52,9 @@ export const isLeafPixelEditEligible = (leaf: SemanticLeaf | null | undefined): 
 
 /**
  * `leafEditRefusal` for edits that write pixels (brush, eraser, shapes, selection Fill/Erase), which also refuse a leaf
- * hidden on the canvas only: its pixels would change unseen. Moves and transforms keep `leafEditRefusal`. It lives
- * with the pixel-edit policy rather than `document/layerEligibility.ts` because only lazily loaded editing code uses
- * it, and that module ships in the editor's initial chunk.
+ * hidden on the canvas only: its pixels would change unseen. Moves and transforms keep `leafEditRefusal`. It lives with
+ * the pixel-edit policy rather than `document/layerEligibility.ts` because only lazily loaded editing code uses it, and
+ * that module ships in the editor's initial chunk.
  */
 export const leafPaintRefusal = (
   leaf: SemanticLeaf
@@ -150,10 +150,9 @@ export const buildMaterializedPixelLayer = (layer: PixelEditableLayer, rect: Rec
     return rebaseControlOriginal(materialized, layer.transform);
   }
   if (materialized.type === 'raster') {
-    // Raster adjustments are applied before the layer transform by the normal
-    // compositor. Materialization bakes those displayed pixels so the eraser
-    // edits exactly what the user sees; retaining the metadata would apply the
-    // same adjustments a second time to the resulting paint source.
+    // Raster adjustments are applied before the layer transform by the normal compositor. Materialization bakes those
+    // displayed pixels so the eraser edits exactly what the user sees; retaining the metadata would apply the same
+    // adjustments a second time to the resulting paint source.
     delete materialized.adjustments;
   }
   return materialized;
@@ -178,10 +177,9 @@ export const bakePixelEditSurface = ({
   const ctx = surface.ctx;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, rect.width, rect.height);
-  // Materialization commits the layer transform into the document's native
-  // pixel grid. Match the compositor's canonical 1× policy (nearest-neighbor)
-  // so starting an edit does not blur otherwise untouched transformed pixels.
-  // Viewport downscaling may still smooth this canonical result afterwards.
+  // Materialization commits the layer transform into the document's native pixel grid. Match the compositor's canonical
+  // 1× policy (nearest-neighbor) so starting an edit does not blur otherwise untouched transformed pixels. Viewport
+  // downscaling may still smooth this canonical result afterwards.
   ctx.imageSmoothingEnabled = false;
   ctx.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e - rect.x, matrix.f - rect.y);
   ctx.drawImage(source.canvas, sourceRect.x, sourceRect.y);

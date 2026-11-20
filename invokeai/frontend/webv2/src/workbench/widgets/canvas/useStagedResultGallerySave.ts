@@ -32,12 +32,7 @@ interface SaveOrigin {
   project: Project;
 }
 
-/**
- * Save a staged canvas result to the Gallery and say where it went. The account and project are captured when the
- * save starts and every toast action is fenced to them: nothing runs for an account that has since signed out, and
- * "Show in Gallery" acts only while the project is still open. It reveals the item in a Gallery panel and leaves
- * the center (the Canvas under review) where it is.
- */
+/** Saves a staged result to the Gallery; toast actions are fenced to the account and project at start. */
 export const useStagedResultGallerySave = (
   imageName: string | null
 ): { isSaving: boolean; save: (imageName: string) => Promise<void> } => {

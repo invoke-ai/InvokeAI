@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 
 import { areVideoValuesEqual } from './videoComparators';
 
-/** Missing comparator fields suppress edits; cover each independently editable value. */
 describe('areVideoValuesEqual', () => {
   const fl2vaBase: MainModelConfig = {
     base: 'minimax-h3',
@@ -16,6 +15,12 @@ describe('areVideoValuesEqual', () => {
     variant: 'fl2va',
   };
   const values = createDefaultVideoWidgetValues();
+
+  it('counts an explicit task override as nondefault even when it matches the catalog', () => {
+    const defaults = { ...createDefaultVideoWidgetValues([fl2vaBase]), model: fl2vaBase };
+    expect(areVideoValuesEqual(defaults, { ...defaults, h3TaskOverride: 'fl2va' })).toBe(false);
+    expect(areVideoValuesEqual(defaults, { ...defaults, model: { ...fl2vaBase, variant: 'ref2va' } })).toBe(false);
+  });
 
   it('treats the hybrid quality base and its start block as part of the values', () => {
     expect(areVideoValuesEqual(values, { ...values })).toBe(true);

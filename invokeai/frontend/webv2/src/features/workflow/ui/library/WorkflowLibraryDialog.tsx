@@ -91,19 +91,14 @@ const CONTENT_CSS: SystemStyleObject = {
   },
 };
 /**
- * Wide (`WORKFLOW_LIBRARY_WIDE`): the body is one grid, matching the artboard. The places rail and the detail rail
- * are flush full-height columns from under the header to the dialog's bottom edge, each separated by a 1px border;
- * the toolbar, result line and cards share the centre column between them. The centre and panes boxes dissolve
- * (`display: contents`) so their parts become the grid's items, and the body is the container the cards and detail
- * rail lay out against (`workflow-library-content`); a body too short for them scrolls as a whole.
+ * Wide: one body grid with the rails as full-height columns; the centre and panes boxes are `display: contents`, so
+ * their parts are grid items. The body is the `workflow-library-content` container and scrolls when too short.
  */
 const BODY_CSS: SystemStyleObject = {
   display: 'flex',
-  // Preview mode: the stage covers the places rail and the collection, which stay laid out (scroll positions, the
-  // column widths the detail rail keeps) but leave the tab order and the accessibility tree.
+  // Preview: the stage covers the rail and collection, which stay laid out but leave the tab order and a11y tree.
   '&[data-previewing] > [data-library-rail-slot], &[data-previewing] [data-workflow-library-toolbar], &[data-previewing] [data-workflow-library-results], &[data-previewing] [data-workflow-library-collection]':
     { visibility: 'hidden' },
-  // Narrow, the stage takes the toolbar's height too; the collection under it keeps its own.
   [WORKFLOW_LIBRARY_NARROW]: {
     '&[data-previewing] [data-workflow-library-toolbar], &[data-previewing] [data-workflow-library-results]': {
       display: 'none',
@@ -127,10 +122,7 @@ const RAIL_SLOT_CSS: SystemStyleObject = {
   [WORKFLOW_LIBRARY_NARROW]: { display: 'none' },
   [WORKFLOW_LIBRARY_WIDE]: { gridArea: 'rail' },
 };
-/**
- * Narrow (`WORKFLOW_LIBRARY_NARROW`): the centre column is the container the cards and the sheet lay out against, and
- * it scrolls when they cannot share its height; the places rail gives way to the toolbar's select and Tags button.
- */
+/** Narrow: the centre column is the cards' and sheet's container, and scrolls when they cannot share its height. */
 const CENTRE_CSS: SystemStyleObject = {
   containerName: 'workflow-library-content',
   containerType: 'size',
@@ -142,8 +134,7 @@ const CENTRE_CSS: SystemStyleObject = {
   minW: '0',
   overflowY: 'auto',
   p: '3',
-  // When the column scrolls (a flow layout), scrolling into view keeps clear of its padding and of the sheet's sticky
-  // summary.
+  // When the column scrolls (a flow layout), scrolling into view clears its padding and the sheet's sticky summary.
   [WORKFLOW_LIBRARY_NARROW]: { scrollPaddingBottom: '6rem', scrollPaddingTop: '3' },
   [WORKFLOW_LIBRARY_WIDE]: { containerType: 'normal', display: 'contents' },
 };
@@ -159,7 +150,6 @@ const SORT_LABEL_KEYS: Record<WorkflowLibrarySort | ProjectWorkflowSort, string>
   updated: 'workflowLibrary.sortUpdated',
 };
 
-/** What a direction means for a key: dates newest or oldest first, names A to Z, the project's order or reversed. */
 const getDirectionLabelKey = (sort: WorkflowLibrarySort | ProjectWorkflowSort, direction: 'asc' | 'desc') => {
   if (sort === 'name') {
     return direction === 'asc' ? 'workflowLibrary.sortAToZ' : 'workflowLibrary.sortZToA';
@@ -174,7 +164,6 @@ const getDirectionLabelKey = (sort: WorkflowLibrarySort | ProjectWorkflowSort, d
 
 const flipDirection = (direction: 'asc' | 'desc') => (direction === 'asc' ? 'desc' : 'asc');
 
-/** The date a list row shows: the one the current order sorts by, else when the workflow last changed. */
 const TRAILING_FIELDS: Partial<Record<WorkflowLibrarySort | ProjectWorkflowSort, WorkflowLibraryListTrailingField>> = {
   created: 'created_at',
   lastRun: 'last_run_at',
@@ -189,10 +178,7 @@ const PLACE_EMPTY_KEYS: Partial<Record<WorkflowLibraryTab, string>> = {
 
 const EMPTY_PROJECT_ENTRIES: ReturnType<typeof toProjectWorkflowLibraryEntries> = [];
 
-/**
- * Only what the shell lays out: the filter (for the toolbar's order), the rail's totals and tag counts. Entries, range
- * windows, enrichment and selected pins belong to `WorkflowLibraryBrowsePanes`, so they never re-render the shell.
- */
+/** Shell fields only: entries, windows and enrichment stay in `WorkflowLibraryBrowsePanes`, off the shell's renders. */
 const selectShell = (snapshot: WorkflowLibraryBrowseSnapshot) => ({
   filter: snapshot.filter,
   placeTotals: snapshot.placeTotals,
@@ -206,11 +192,7 @@ const selectLibraryNavigation = (snapshot: ReturnType<typeof workflowUiStore.get
   tab: snapshot.libraryTab,
 });
 
-/**
- * Mounted while a template place shows: on opening, or on leaving This project. It applies the opening filter, and on
- * leaving (closing, or switching to This project) drops the search and tags from the listing, so the next opening
- * never paints a filtered view first. The project view never loads library pages.
- */
+/** Applies the opening filter; on leaving, drops search and tags so the next opening never paints them first. */
 const WorkflowLibraryBrowseSession = ({
   opening,
   onLeave,
@@ -220,7 +202,6 @@ const WorkflowLibraryBrowseSession = ({
   onLeave: () => void;
 }) => {
   useMountEffect(() => {
-    // While it holds the listing, a recorded open or run refreshes the view on screen at once.
     const release = holdWorkflowLibraryBrowse();
     void ensureWorkflowLibraryBrowseLoaded(opening);
 
@@ -234,11 +215,7 @@ const WorkflowLibraryBrowseSession = ({
   return null;
 };
 
-/**
- * Once per opening: the rail's place totals, leaving out the place whose unfiltered first page counts it anyway, and,
- * only when the library opened on My library, the switch to Templates for an account with no workflows of its own
- * (unless the user moved or filtered meanwhile).
- */
+/** Once per opening: rail totals, and on My library the switch to Templates for an account with no workflows. */
 const WorkflowLibraryOpeningSession = ({
   opening,
   place,
@@ -305,12 +282,8 @@ export const WorkflowLibraryDialog = ({
   const thumbnailFit = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibraryThumbnailFit);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
   const [removedWorkflowId, setRemovedWorkflowId] = useState<string | null>(null);
-  /**
-   * Preview mode, for the life of this opening: the workflow it opened on and the control that opened it, which takes
-   * focus back on leaving. Closing clears it (below), since the persistent shell would otherwise reopen on it.
-   */
+  /** The opened workflow and its opener (focus returns there); cleared on close, or the shell would reopen on it. */
   const [preview, setPreview] = useState<{ opener: HTMLElement | null; workflowId: string } | null>(null);
-  // Graph or Inputs: the stage opens on Graph and keeps the choice until the library closes.
   const [previewView, setPreviewView] = useState<WorkflowPreviewView>('nodes');
   // However the library closes (its own controls, the copy question, the host), it reopens on the collection, on Graph.
   if (!isOpen && (preview !== null || previewView !== 'nodes')) {
@@ -319,8 +292,7 @@ export const WorkflowLibraryDialog = ({
   }
   const contentRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<WorkflowLibraryPreviewStageHandle | null>(null);
-  // A card's or row's actions menu acts on the workflow it was raised for and leaves the selection alone. The anchor
-  // says where it is open; the target outlives it, for focus return and the dialogs its items open.
+  // The target outlives the anchor, for focus return and the dialogs its items open.
   const [contextMenuAnchor, setContextMenuAnchor] = useState<WorkflowCardMenuAnchor | null>(null);
   const [contextMenuTarget, setContextMenuTarget] = useState<WorkflowContextMenuTarget | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -337,8 +309,6 @@ export const WorkflowLibraryDialog = ({
     }
   }, []);
   const closeDialog = useCallback(() => {
-    // Closing the library removes its preview immediately; the parent surface is leaving too. The search it would
-    // have applied is cleared with the rest of the query.
     cancelPendingSearch();
     setContextMenuAnchor(null);
     onOpenChange(false);
@@ -346,7 +316,6 @@ export const WorkflowLibraryDialog = ({
   const { loadPhase, open } = useOpenLibraryWorkflow(closeDialog);
   const isLoadPending = loadPhase !== 'idle';
 
-  // This project filters and orders locally; the template places' results are the server's.
   const projectEntries = useMemo(
     () =>
       isProjectTab
@@ -362,8 +331,7 @@ export const WorkflowLibraryDialog = ({
   );
   const projectTagCounts = useMemo(() => countProjectWorkflowTags(projectWorkflows), [projectWorkflows]);
 
-  // A menu whose workflow left the view (a filter, a removal, a window that moved on) has nothing to act on: close it.
-  // The template places hold their entries in the browse store; only this flag reaches the shell.
+  // A menu whose workflow left the view has nothing to act on: close it.
   const contextMenuWorkflowId = contextMenuAnchor?.workflowId ?? null;
   const isLibraryMenuTargetShown = useWorkflowLibraryBrowseSelector(
     (snapshot) =>
@@ -384,8 +352,7 @@ export const WorkflowLibraryDialog = ({
   // The project selection belongs to the project it was made in; another project starts from its active workflow.
   const projectSelectionId = selection?.projectId === projectId ? selection.workflowId : null;
 
-  // The order the toolbar shows. Before a template place's first listing the store still holds another place's
-  // filter, so the account's stored order stands in for it.
+  // Before a template place's first listing the store holds another place's filter, so the stored order stands in.
   const libraryOrder = getWorkflowLibraryOrder(
     !isProjectTab && filter.place === tab
       ? filter
@@ -422,12 +389,10 @@ export const WorkflowLibraryDialog = ({
     [isLoadPending, onOpenChange, closeDialog]
   );
   const getInitialFocus = useCallback(() => searchInputRef.current, []);
-  // Escape inside an expanded detail sheet collapses the sheet (its own handler) instead of closing the library; in
-  // preview mode it closes a node card, else leaves the preview. Only the next Escape closes the library.
+  // Escape collapses an expanded sheet, else closes a node card, else leaves preview; only then closes the library.
   const handleEscapeKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      // One keypress can arrive twice (StrictMode registers the open dialog's layer twice); only the first acts, and the
-      // default it prevented keeps the second from closing the library.
+      // StrictMode registers the dialog's layer twice; the first Escape acts and its preventDefault stops the next.
       if (event.defaultPrevented) {
         return;
       }
@@ -449,8 +414,7 @@ export const WorkflowLibraryDialog = ({
     }
   }, []);
 
-  // Previewing selects the workflow, so the rail describes what the stage shows. The stage takes focus from the
-  // control that asked, which the collection's hiding would otherwise drop to the document.
+  // The stage takes focus from the asking control, which hiding the collection would otherwise drop to the document.
   const enterPreview = useCallback(
     (workflowId: string, view?: WorkflowPreviewView) => {
       const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -473,8 +437,7 @@ export const WorkflowLibraryDialog = ({
     },
     [isProjectTab, projectId]
   );
-  // Back to the collection as it was. Focus returns to the control that opened the preview while it still shows that
-  // workflow; after stepping, to the card or row now selected.
+  // Focus returns to the opener while it shows that workflow; after stepping, to the selected card or row.
   const leavePreview = useCallback(
     (workflowId: string | null) => {
       const opener = preview?.opener ?? null;
@@ -513,7 +476,6 @@ export const WorkflowLibraryDialog = ({
       setWorkflowLibrarySearch(value);
       cancelPendingSearch();
 
-      // This project filters as you type; template places ask the server once typing pauses.
       if (!isProjectTab) {
         searchTimerRef.current = setTimeout(() => {
           searchTimerRef.current = null;
@@ -565,7 +527,6 @@ export const WorkflowLibraryDialog = ({
 
       const next = LIBRARY_SORTS.find((key) => key === value);
 
-      // Only My library and Shared offer a choice; a new key starts in its natural direction.
       if (next && (tab === 'user' || tab === 'shared')) {
         const direction = getWorkflowLibrarySortDefaultDirection(next);
 
@@ -610,7 +571,6 @@ export const WorkflowLibraryDialog = ({
     [createWorkflow, projectId]
   );
 
-  // The first copy is added directly; with one already in the project, the host asks what opening should do.
   const handleOpenItem = useCallback(
     (item: WorkflowLibraryListItem) => {
       if (planLibraryWorkflowOpen(projectWorkflows, item.workflow_id).kind === 'choose') {
@@ -633,7 +593,6 @@ export const WorkflowLibraryDialog = ({
     [handleOpenItem]
   );
 
-  // Deleting another workflow, from its card's menu, keeps the selection.
   const handleDeleted = useCallback((workflowId: string) => {
     setRemovedWorkflowId(workflowId);
     setSelectedWorkflowId((current) => (current === workflowId ? null : current));
@@ -643,7 +602,6 @@ export const WorkflowLibraryDialog = ({
     (workflowId: string, anchor: WorkflowCardMenuAnchor) => {
       const target = { triggerId: anchor.kind === 'trigger' ? anchor.triggerId : null, workflowId };
 
-      // The menu button that opened the menu closes it again.
       if (
         anchor.kind === 'trigger' &&
         contextMenuAnchor?.kind === 'trigger' &&
@@ -653,8 +611,7 @@ export const WorkflowLibraryDialog = ({
         return;
       }
 
-      // An open menu does not follow a new anchor: close it and reopen it at the new point once that close has
-      // rendered, as a native menu relocates. The closing menu keeps its own workflow's items and focus return.
+      // An open menu does not follow a new anchor: close it, then reopen at the new point once that close renders.
       if (contextMenuAnchor) {
         setContextMenuAnchor(null);
         requestAnimationFrame(() => {
@@ -686,10 +643,8 @@ export const WorkflowLibraryDialog = ({
     [query, sort, sortDirection, tab]
   );
 
-  // The result line counts what the grid can show: every match on This project, the server's total elsewhere. The
-  // missing-model count is exact only while every match is resident, so a partial window shows none.
+  // The missing-model count is exact only while every match is resident, so a partial window shows none.
   const tagsText = query.tags.length > 0 ? tagListFormat.format(query.tags) : '';
-  // With no search or tags, an empty place says why, rather than that nothing matched.
   const emptyKey = query.search || query.tags.length > 0 ? undefined : PLACE_EMPTY_KEYS[tab];
   const emptyMessage = emptyKey ? t(emptyKey) : undefined;
 

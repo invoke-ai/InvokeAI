@@ -2,9 +2,7 @@
 
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-/** How the drag modifiers shape the rect. */
 export interface DragRectConstraints {
-  /** Equal width and height. */
   square: boolean;
   /** The press point is the rect's centre rather than a corner. */
   fromCenter: boolean;

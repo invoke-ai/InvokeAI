@@ -110,8 +110,8 @@ export class PreviewStateController {
     return this.stagedRegions;
   }
   /**
-   * Replaces the pending-result outlines, each rect once (results of one run share it; selected when any of them
-   * is) with the selected one last so an overlap never hides it. False when unchanged: nothing needs repainting.
+   * Replaces the pending-result outlines, each rect once (results of one run share it; selected when any of them is)
+   * with the selected one last so an overlap never hides it. False when unchanged: nothing needs repainting.
    */
   setStagedRegions(regions: readonly StagedRegionState[]): boolean {
     const next = normalizeRegions(regions);

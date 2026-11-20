@@ -1,13 +1,12 @@
 import type { GallerySettings } from '@features/gallery/contracts';
+import type { ResolvedValues } from '@platform/core/resolvedValues';
 import type { SettingFieldProps, SettingLayer } from '@platform/ui/settings/contracts';
 
 import { getGallerySettings } from '@features/gallery/contracts';
 import { SettingControl } from '@platform/ui/settings/SettingControl';
-import { useLayeredSetting } from '@workbench/settings/useLayeredSetting';
+import { readBuiltIn, useLayeredSetting } from '@workbench/settings/useLayeredSetting';
 import { useOptionalWorkbenchCommands, useOptionalWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
-
-const EMPTY = {};
 
 /** Settings that reorder or repaginate the grid, so a paginated gallery starts again at its first page. */
 const RESETS_PAGE = new Set(['imageOrderDir', 'paginationMode']);
@@ -48,14 +47,14 @@ export const Field = ({ field, surface, target }: SettingFieldProps) => {
   const read = useMemo(
     () =>
       isImageSize
-        ? (values: Readonly<Record<string, unknown>>) => 100 - getGallerySettings(values).imageDensityPercent
-        : (values: Readonly<Record<string, unknown>>) => {
+        ? (values: ResolvedValues) => 100 - getGallerySettings(values).imageDensityPercent
+        : (values: ResolvedValues) => {
             const value = getGallerySettings(values)[field.id as keyof GallerySettings];
             return typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string' ? value : null;
           },
     [field.id, isImageSize]
   );
-  const { disabled, layer, set, value } = useLayeredSetting('gallery', key, target, read, read(EMPTY), field);
+  const { disabled, layer, set, value } = useLayeredSetting('gallery', key, target, read, readBuiltIn(read), field);
   const commands = useOptionalWorkbenchCommands();
   const queries = useOptionalWorkbenchQueries();
   const projectId = target?.projectId;

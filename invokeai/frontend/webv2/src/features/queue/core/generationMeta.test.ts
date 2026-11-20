@@ -22,8 +22,7 @@ describe('extractGenerationMeta', () => {
   });
 
   it('keeps an empty positive prompt empty instead of promoting the negative', () => {
-    // Preserve empty named positive prompts; positional scanning must not misread negative text as the video
-    // subject.
+    // Preserve empty named positive prompts; positional scanning must not misread negative text as the video subject.
     const meta = extractGenerationMeta(
       item([field('seed', 7), field('positive_prompt', ''), field('negative_prompt', 'blurry, low quality')])
     );

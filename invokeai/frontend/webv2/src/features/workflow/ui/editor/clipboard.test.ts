@@ -185,7 +185,6 @@ describe('workflow clipboard', () => {
 
     expect(nodes).toHaveLength(2);
     expect(edges).toHaveLength(1);
-    // The clipboard still holds the single copied node.
     expect(buildPasteElements().nodes).toHaveLength(1);
   });
 

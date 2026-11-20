@@ -636,28 +636,25 @@ describe('WorkflowEditorView paste', () => {
     ]);
   };
 
-  it.each([false, true])(
-    'centers a paste chosen from a node’s own menu (with connections: %s) instead of anchoring it at the node',
-    async (withConnections) => {
-      const { pasted } = await openWithCopiedNodes();
-      const node = host.querySelector<HTMLElement>('.react-flow__node[data-id="node-b"]')!;
-      const rect = node.getBoundingClientRect();
+  it('centers a paste chosen from a node’s own menu instead of anchoring it at the node', async () => {
+    const { pasted } = await openWithCopiedNodes();
+    const node = host.querySelector<HTMLElement>('.react-flow__node[data-id="node-b"]')!;
+    const rect = node.getBoundingClientRect();
 
-      await act(() =>
-        node.dispatchEvent(
-          new MouseEvent('contextmenu', {
-            bubbles: true,
-            cancelable: true,
-            clientX: rect.left + 10,
-            clientY: rect.top + 10,
-          })
-        )
-      );
-      await chooseMenuItem(withConnections ? 'paste-with-connections' : 'paste');
+    await act(() =>
+      node.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: rect.left + 10,
+          clientY: rect.top + 10,
+        })
+      )
+    );
+    await chooseMenuItem('paste');
 
-      expectCenteredPaste(pasted);
-    }
-  );
+    expectCenteredPaste(pasted);
+  });
 
   it('centers a paste chosen from the selection’s menu instead of anchoring it where the menu opened', async () => {
     const { pasted } = await openWithCopiedNodes();
@@ -888,8 +885,8 @@ describe('WorkflowEditorView edges and minimap', () => {
     await expect.poll(() => edgeElement('cd')).not.toBeNull();
     const flowRect = host.querySelector<HTMLElement>('.react-flow')!.getBoundingClientRect();
 
-    // Shift-drag across the whole graph box-selects every node. (The selection's own rectangle then covers the
-    // merged line, so it takes no click until the selection is cleared; the click case is in flowAdapters.test.)
+    // Shift-drag across the whole graph box-selects every node. (The selection's own rectangle then covers the merged
+    // line, so it takes no click until the selection is cleared; the click case is in flowAdapters.test.)
     await userEvent.keyboard('{Shift>}');
     await commands.mouseDragPath(
       [

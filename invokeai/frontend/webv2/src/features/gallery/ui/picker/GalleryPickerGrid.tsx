@@ -321,9 +321,8 @@ export const GalleryPickerGrid = ({
     measure();
   }, [columnCount, measure, rowPitch]);
 
-  // Reveal the highlight when it is placed, its listing changes, or a reflow moves its row. A later count update or
-  // insert must not pull a pointer-scrolled view back to it; a highlight past the known count is revealed once the
-  // count reaches it.
+  // Reveal the highlight when placed, when its listing changes, or when a reflow moves its row. A later count update
+  // or insert must not pull a pointer-scrolled view back; a highlight past the known count shows once it is reached.
   const revealedActiveRef = useRef<string | null>(null);
   useLayoutEffect(() => {
     const active = `${activePlacement}\n${columnCount}`;

@@ -74,7 +74,6 @@ const DropMonitor = ({
   return null;
 };
 
-/** `currentImageName` is what the frame is showing; the thumb drags `dragged.png`. */
 const renderHarness = async (currentImageName: string | null = null) => {
   const onDrop = vi.fn();
   const Harness = () => {
@@ -153,8 +152,6 @@ describe('PreviewCompareDropZone', () => {
   });
 
   it('offers no ring, and arms nothing, when the drag is the previewed image', async () => {
-    // Comparing an image with itself does nothing visible but still pauses
-    // live-follow, so the affordance has to be absent rather than merely inert.
     const { onDrop } = await renderHarness('dragged.png');
     const thumb = document.querySelector<HTMLElement>('[data-testid="thumb"]')!;
 

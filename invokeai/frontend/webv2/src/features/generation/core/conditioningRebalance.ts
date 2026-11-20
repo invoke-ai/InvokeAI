@@ -1,8 +1,8 @@
 /** Twelve elementwise gains, ordered from shallow to deep encoder taps. */
 
 /**
- * The encoder layers tapped into the conditioning, shallow to deep.
- * Source of truth: `KREA2_SELECT_LAYERS` in `invokeai/backend/krea2/sampling_utils.py`.
+ * The encoder layers tapped into the conditioning, shallow to deep. Source of truth: `KREA2_SELECT_LAYERS` in
+ * `invokeai/backend/krea2/sampling_utils.py`.
  */
 export const KREA2_TAP_LAYERS: readonly number[] = [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35];
 
@@ -75,7 +75,6 @@ const clampWeight = (weight: number, scale: number): number => Math.min(scale, M
 export const getRebalanceBarScale = (weights: readonly number[]): number =>
   weights.reduce((scale, weight) => Math.max(scale, weight), REBALANCE_WEIGHT_TRACK_MAX);
 
-/** Puts an arbitrary weight onto the step grid and inside the track. */
 export const snapRebalanceWeight = (weight: number, scale: number): number => snapWeight(clampWeight(weight, scale));
 
 /** Pointer position to weight. `fractionFromTop` is 0 at the track's top edge, 1 at its bottom. */

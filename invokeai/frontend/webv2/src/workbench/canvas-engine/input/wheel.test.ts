@@ -52,12 +52,10 @@ describe('wheel handler: ctrl+wheel brush size step', () => {
   it('inverts the step direction when the invert-scroll preference is on', () => {
     const grow = createHarness(toolWithId('brush'), true);
     grow.handler(makeWheelEvent(-100, { ctrlKey: true }));
-    // Wheel-up normally grows (+1); inverted, it shrinks (-1).
     expect(grow.stepActiveBrushSize).toHaveBeenCalledWith(-1);
 
     const shrink = createHarness(toolWithId('eraser'), true);
     shrink.handler(makeWheelEvent(100, { ctrlKey: true }));
-    // Wheel-down normally shrinks (-1); inverted, it grows (+1).
     expect(shrink.stepActiveBrushSize).toHaveBeenCalledWith(1);
   });
 

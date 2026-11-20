@@ -1,5 +1,8 @@
-from typing import Any, Literal, Optional, Union
+import json
+from collections.abc import Hashable
+from typing import Any, Literal, Optional, Sequence, Union
 
+import torch
 from pydantic import BaseModel, ConfigDict, Field
 
 from invokeai.app.invocations.baseinvocation import (
@@ -9,17 +12,33 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
     InputField,
+    LatentsField,
     MetadataField,
     OutputField,
+    TensorField,
     UIType,
     VideoField,
 )
-from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.app.invocations.primitives import StringOutput
+from invokeai.app.invocations.metadata_constants import (
+    CORE_MODEL_LABELS as CORE_MODEL_LABELS,
+)
+from invokeai.app.invocations.metadata_constants import (
+    CUSTOM_LABEL as CUSTOM_LABEL,
+)
+from invokeai.app.invocations.model import (
+    ModelIdentifierField,
+    PiDDecoderField,
+    TransformerField,
+    UNetField,
+    VAEField,
+    WanTransformerField,
+)
+from invokeai.app.invocations.primitives import LatentsOutput, StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
 from invokeai.version.invokeai_version import __version__
@@ -35,6 +54,14 @@ class LoRAMetadataField(BaseModel):
 
     model: ModelIdentifierField = Field(description=FieldDescriptions.lora_model)
     weight: float = Field(description=FieldDescriptions.lora_weight)
+    target: Optional[Literal["high", "low", "both"]] = Field(
+        default=None,
+        description="Target expert for dual-expert models (e.g., Wan 2.2 A14B): 'high', 'low', or 'both'",
+    )
+    low_noise_weight: Optional[float] = Field(
+        default=None,
+        description="Weight for the low-noise expert when target is 'both' and it differs from the high-noise weight",
+    )
 
 
 class IPAdapterMetadataField(BaseModel):
@@ -87,15 +114,161 @@ class MetadataItemOutput(BaseInvocationOutput):
     item: MetadataItemField = OutputField(description="Metadata Item")
 
 
-@invocation("metadata_item", title="Metadata Item", tags=["metadata"], category="metadata", version="1.0.1")
+_SUBMODEL_WRAPPER_ATTRS: tuple[str, ...] = (
+    "vae",
+    "text_encoder",
+    "unet",
+    "transformer",
+    "decoder",
+    "vocoder",
+    "latent_upsampler",
+)
+
+_WAN_TRANSFORMER_DICT_KEYS: frozenset[str] = frozenset(
+    {"transformer", "transformer_low_noise", "loras", "loras_low_noise", "boundary_ratio"}
+)
+
+_PRESERVE_TRUTHY_FIELDS: tuple[str, ...] = ("loras", "loras_low_noise", "seamless_axes", "skipped_layers")
+_PRESERVE_NOT_NONE_FIELDS: tuple[str, ...] = (
+    "transformer_low_noise",
+    "boundary_ratio",
+    "variant",
+    "adaln_overlay",
+    "processor",
+    "connectors",
+    "vision_tower",
+    "freeu_config",
+)
+
+# (primary_key, allowed_keys, preserve_when_custom_keys)
+_WRAPPER_DICT_SPECS: tuple[tuple[str, frozenset[str], tuple[str, ...]], ...] = (
+    (
+        "text_encoder",
+        frozenset({"tokenizer", "processor", "text_encoder", "vision_tower", "connectors", "loras", "skipped_layers"}),
+        ("loras", "processor", "connectors", "vision_tower", "skipped_layers"),
+    ),
+    ("clip", frozenset({"tokenizer", "clip", "loras", "skipped_layers"}), ("loras", "skipped_layers")),
+    ("vae", frozenset({"vae", "seamless_axes"}), ("seamless_axes",)),
+    (
+        "transformer",
+        frozenset({"transformer", "loras", "variant", "adaln_overlay"}),
+        ("loras", "variant", "adaln_overlay"),
+    ),
+    (
+        "unet",
+        frozenset({"unet", "scheduler", "loras", "seamless_axes", "freeu_config"}),
+        ("loras", "seamless_axes", "freeu_config"),
+    ),
+    ("decoder", frozenset({"decoder"}), ()),
+    ("vocoder", frozenset({"vocoder"}), ()),
+    ("latent_upsampler", frozenset({"latent_upsampler"}), ()),
+)
+
+
+def _is_model_identifier_value(val: Any) -> bool:
+    return isinstance(val, ModelIdentifierField) or (isinstance(val, dict) and "key" in val)
+
+
+def _has_preservable_wrapper_fields(val: Any, keys: Optional[Sequence[str]] = None) -> bool:
+    if isinstance(val, dict):
+        check_keys = keys if keys is not None else (*_PRESERVE_TRUTHY_FIELDS, *_PRESERVE_NOT_NONE_FIELDS)
+        for k in check_keys:
+            if k not in val:
+                continue
+            v = val[k]
+            if k in _PRESERVE_NOT_NONE_FIELDS:
+                if v is not None:
+                    return True
+            elif v:
+                return True
+        return False
+
+    for attr in _PRESERVE_TRUTHY_FIELDS:
+        if getattr(val, attr, None):
+            return True
+    for attr in _PRESERVE_NOT_NONE_FIELDS:
+        if getattr(val, attr, None) is not None:
+            return True
+    return False
+
+
+def unwrap_metadata_value(val: Any, label: Optional[str] = None) -> Any:
+    """Unwrap model loader submodel fields (VAEField, encoder fields, UNetField, TransformerField, PiDDecoderField)
+    into their inner ModelIdentifierField (or ModelIdentifierField-shaped dict) when stored in metadata.
+
+    For core model labels (e.g. 'model', 'vae', 'clip_l_model'), wrappers are always unwrapped so gallery recall
+    can find the top-level 'key'. For custom labels (e.g. user-named labels or CUSTOM_LABEL), outer wrappers with
+    LoRAs or non-default submodel/routing/config fields are preserved so user modifications are not discarded.
+    """
+    is_custom = label not in CORE_MODEL_LABELS
+    if isinstance(val, UNetField):
+        if is_custom and _has_preservable_wrapper_fields(val):
+            return val
+        return val.unet
+    if isinstance(val, (TransformerField, WanTransformerField)):
+        if is_custom and _has_preservable_wrapper_fields(val):
+            return val
+        if isinstance(val, WanTransformerField) and label == "wan_transformer_low_noise":
+            return val.transformer_low_noise
+        return val.transformer
+    if isinstance(val, VAEField):
+        if is_custom and _has_preservable_wrapper_fields(val):
+            return val
+        return val.vae
+    if isinstance(val, PiDDecoderField):
+        return val.decoder
+    if isinstance(val, BaseModel) and not isinstance(val, ModelIdentifierField):
+        for attr in ("text_encoder", "clip", "transformer", "unet", "vae", "decoder", "vocoder", "latent_upsampler"):
+            if hasattr(val, attr):
+                if is_custom and _has_preservable_wrapper_fields(val):
+                    return val
+                inner = getattr(val, attr)
+                if _is_model_identifier_value(inner):
+                    return inner
+    elif isinstance(val, dict) and "key" not in val and "image_name" not in val and "video_name" not in val:
+        keys = set(val.keys())
+        if keys.issubset(_WAN_TRANSFORMER_DICT_KEYS) and "transformer" in val:
+            if is_custom and _has_preservable_wrapper_fields(
+                val, ("loras", "loras_low_noise", "transformer_low_noise", "boundary_ratio")
+            ):
+                return val
+            if label == "wan_transformer_low_noise":
+                inner = val.get("transformer_low_noise")
+                if inner is None:
+                    return None
+                if _is_model_identifier_value(inner):
+                    return inner
+                return val
+            inner = val["transformer"]
+            if _is_model_identifier_value(inner):
+                return inner
+        for primary_key, allowed_keys, preserve_keys in _WRAPPER_DICT_SPECS:
+            if primary_key in val and keys.issubset(allowed_keys):
+                if is_custom and _has_preservable_wrapper_fields(val, preserve_keys):
+                    return val
+                inner = val[primary_key]
+                if _is_model_identifier_value(inner):
+                    return inner
+    return val
+
+
+@invocation("metadata_item", title="Metadata Item", tags=["metadata"], category="metadata", version="1.1.0")
 class MetadataItemInvocation(BaseInvocation):
     """Used to create an arbitrary metadata item. Provide "label" and make a connection to "value" to store that data as the value."""
 
     label: str = InputField(description=FieldDescriptions.metadata_item_label)
     value: Any = InputField(description=FieldDescriptions.metadata_item_value, ui_type=UIType.Any)
 
+    def _validate_invoke_fields(self) -> None:
+        if "value" not in self.model_fields_set:
+            super()._validate_invoke_fields()
+        elif self.label is None:
+            super()._validate_invoke_fields()
+
     def invoke(self, context: InvocationContext) -> MetadataItemOutput:
-        return MetadataItemOutput(item=MetadataItemField(label=self.label, value=self.value))
+        return MetadataItemOutput(
+            item=MetadataItemField(label=self.label, value=unwrap_metadata_value(self.value, label=self.label))
+        )
 
 
 @invocation_output("metadata_output")
@@ -103,7 +276,29 @@ class MetadataOutput(BaseInvocationOutput):
     metadata: MetadataField = OutputField(description="Metadata Dict")
 
 
-@invocation("metadata", title="Metadata", tags=["metadata"], category="metadata", version="1.0.1")
+@invocation_output("latents_meta_output")
+class LatentsMetaOutput(LatentsOutput, MetadataOutput):
+    """Base class for invocations that output latents with metadata"""
+
+    @classmethod
+    def build(
+        cls,
+        latents_name: str,
+        latents: torch.Tensor,
+        seed: Optional[int] = None,
+        metadata: Optional[MetadataField] = None,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+    ) -> "LatentsMetaOutput":
+        return cls(
+            latents=LatentsField(latents_name=latents_name, seed=seed),
+            width=width if width is not None else latents.shape[-1] * LATENT_SCALE_FACTOR,
+            height=height if height is not None else latents.shape[-2] * LATENT_SCALE_FACTOR,
+            metadata=metadata or MetadataField.model_validate({}),
+        )
+
+
+@invocation("metadata", title="Metadata", tags=["metadata"], category="metadata", version="1.1.0")
 class MetadataInvocation(BaseInvocation):
     """Takes a MetadataItem or collection of MetadataItems and outputs a MetadataDict."""
 
@@ -114,13 +309,13 @@ class MetadataInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> MetadataOutput:
         if isinstance(self.items, MetadataItemField):
             # single metadata item
-            data = {self.items.label: self.items.value}
+            data = {self.items.label: self.items.value} if self.items.value is not None else {}
         else:
             # collection of metadata items
-            data = {item.label: item.value for item in self.items}
+            data = {item.label: item.value for item in self.items if item.value is not None}
 
         # add app version
-        data.update({"app_version": __version__})
+        data.update({"app_version": __version__, "metadata_version": CORE_METADATA_VERSION})
         return MetadataOutput(metadata=MetadataField.model_validate(data))
 
 
@@ -237,7 +432,297 @@ class MiniMaxH3ReferenceMetadataField(BaseModel):
 # other 1.x, ignoring unknown keys); a major bump renames, removes or retypes one. A record
 # without the key predates versioning and is read with the same rules. Documented, with the
 # field table, in docs/development/Architecture/media-metadata.
-CORE_METADATA_VERSION = "1.2.0"
+CORE_METADATA_VERSION = "1.3.0"
+
+
+def _serialize_lora_entry(
+    lora_model: Any,
+    weight: float,
+    target: Optional[Literal["high", "low", "both"]] = None,
+    low_noise_weight: Optional[float] = None,
+) -> dict[str, Any]:
+    if isinstance(lora_model, ModelIdentifierField):
+        return LoRAMetadataField(
+            model=lora_model,
+            weight=weight,
+            target=target,
+            low_noise_weight=low_noise_weight,
+        ).model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
+    entry: dict[str, Any] = {"model": lora_model, "weight": weight}
+    if target is not None:
+        entry["target"] = target
+    if low_noise_weight is not None:
+        entry["low_noise_weight"] = low_noise_weight
+    return entry
+
+
+def _lora_dedup_key(lora: Any) -> Any:
+    """Return a hashable deduplication key for ModelIdentifierField, dict, or fallback LoRA values."""
+    if isinstance(lora, dict):
+        key = lora.get("key")
+        if key is not None:
+            return key
+        return json.dumps(lora, sort_keys=True, default=str)
+    key = getattr(lora, "key", None)
+    if key is not None:
+        return key
+    return lora if isinstance(lora, Hashable) else id(lora)
+
+
+def serialize_lora_metadata(*lora_lists: Optional[Sequence[Any]]) -> list[dict[str, Any]]:
+    """Serialize and deduplicate LoRA field sequences into metadata dictionaries."""
+    seen: set[tuple[Any, float]] = set()
+    result: list[dict[str, Any]] = []
+    for lora_list in lora_lists:
+        if not lora_list:
+            continue
+        for item in lora_list:
+            key = _lora_dedup_key(item.lora)
+            ident = (key, item.weight)
+            if ident in seen:
+                continue
+            seen.add(ident)
+            result.append(_serialize_lora_entry(item.lora, item.weight))
+    return result
+
+
+def serialize_wan_lora_metadata(
+    high_loras: Optional[Sequence[Any]],
+    low_loras: Optional[Sequence[Any]],
+) -> list[dict[str, Any]]:
+    """Serialize Wan high/low expert LoRA lists into one metadata entry per unique LoRA key."""
+    high_by_key: dict[Any, Any] = {}
+    for item in high_loras or ():
+        key = _lora_dedup_key(item.lora)
+        if key not in high_by_key:
+            high_by_key[key] = item
+
+    low_by_key: dict[Any, Any] = {}
+    for item in low_loras or ():
+        key = _lora_dedup_key(item.lora)
+        if key not in low_by_key:
+            low_by_key[key] = item
+
+    result: list[dict[str, Any]] = []
+    for key, high_item in high_by_key.items():
+        low_item = low_by_key.get(key)
+        if low_item is None:
+            result.append(_serialize_lora_entry(high_item.lora, high_item.weight, target="high"))
+        elif high_item.weight == low_item.weight:
+            result.append(_serialize_lora_entry(high_item.lora, high_item.weight, target="both"))
+        else:
+            result.append(
+                _serialize_lora_entry(
+                    high_item.lora,
+                    high_item.weight,
+                    target="both",
+                    low_noise_weight=low_item.weight,
+                )
+            )
+
+    for key, low_item in low_by_key.items():
+        if key not in high_by_key:
+            result.append(_serialize_lora_entry(low_item.lora, low_item.weight, target="low"))
+
+    return result
+
+
+def serialize_adapter_metadata(item_or_items: Any) -> list[Any]:
+    """Normalize a single adapter field or list of adapter fields into serialized metadata dicts."""
+    if item_or_items is None:
+        return []
+    items = item_or_items if isinstance(item_or_items, list) else [item_or_items]
+    return [
+        item.model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
+        if hasattr(item, "model_dump")
+        else item
+        for item in items
+    ]
+
+
+def serialize_ip_adapter_ref_images(
+    ip_adapter: Any,
+    context: Optional[Any] = None,
+    default_width: int = 1024,
+    default_height: int = 1024,
+) -> list[dict[str, Any]]:
+    """Serialize IP-Adapter inputs into v7 GenerateReferenceImage metadata entries (`ref_images`)."""
+    if ip_adapter is None:
+        return []
+    items = ip_adapter if isinstance(ip_adapter, list) else [ip_adapter]
+    ref_images: list[dict[str, Any]] = []
+    idx = 0
+    for item in items:
+        raw_image = item.get("image") if isinstance(item, dict) else getattr(item, "image", None)
+        if raw_image is None:
+            raw_image_name = item.get("image_name") if isinstance(item, dict) else getattr(item, "image_name", None)
+            if raw_image_name:
+                raw_image = {"image_name": raw_image_name}
+            else:
+                continue
+        img_list = raw_image if isinstance(raw_image, list) else [raw_image]
+        ip_adapter_model = (
+            item.get("ip_adapter_model") if isinstance(item, dict) else getattr(item, "ip_adapter_model", None)
+        )
+        image_encoder_model = (
+            item.get("image_encoder_model") if isinstance(item, dict) else getattr(item, "image_encoder_model", None)
+        )
+        if hasattr(ip_adapter_model, "model_dump"):
+            model_dict = ip_adapter_model.model_dump(exclude_none=True, exclude={"id", "is_intermediate", "use_cache"})
+        elif isinstance(ip_adapter_model, dict):
+            model_dict = dict(ip_adapter_model)
+            model_dict.setdefault("type", "ip_adapter")
+        else:
+            model_dict = {}
+
+        explicit_cvm = (
+            item.get("clip_vision_model") if isinstance(item, dict) else getattr(item, "clip_vision_model", None)
+        )
+        if explicit_cvm in ("ViT-H", "ViT-G", "ViT-L"):
+            clip_vision_model = explicit_cvm
+        else:
+            enc_name = (
+                image_encoder_model.get("name", "")
+                if isinstance(image_encoder_model, dict)
+                else getattr(image_encoder_model, "name", "")
+            ) or ""
+            enc_lower = str(enc_name).lower()
+            if "vit-l" in enc_lower or "large" in enc_lower:
+                clip_vision_model = "ViT-L"
+            elif "sdxl" in enc_lower or "vit-g" in enc_lower:
+                clip_vision_model = "ViT-G"
+            else:
+                clip_vision_model = "ViT-H"
+
+        method = (item.get("method") if isinstance(item, dict) else getattr(item, "method", None)) or "full"
+        has_weight = ("weight" in item) if isinstance(item, dict) else hasattr(item, "weight")
+        has_strength = ("strength" in item) if isinstance(item, dict) else hasattr(item, "strength")
+        if has_weight:
+            raw_weight = item["weight"] if isinstance(item, dict) else item.weight
+        elif has_strength:
+            raw_weight = item["strength"] if isinstance(item, dict) else item.strength
+            if raw_weight is not None and float(raw_weight) <= 0.0:
+                continue
+        else:
+            raw_weight = 1.0
+        if isinstance(raw_weight, (list, tuple)):
+            weight: Union[float, list[float]] = [float(w) for w in raw_weight]
+        else:
+            weight = float(raw_weight)
+        begin_step_percent = float(
+            item.get("begin_step_percent", 0.0) if isinstance(item, dict) else getattr(item, "begin_step_percent", 0.0)
+        )
+        end_step_percent = float(
+            item.get("end_step_percent", 1.0) if isinstance(item, dict) else getattr(item, "end_step_percent", 1.0)
+        )
+
+        raw_mask = item.get("mask") if isinstance(item, dict) else getattr(item, "mask", None)
+        serialized_mask = None
+        if raw_mask is not None:
+            # Ephemeral tensor masks (TensorField) are runtime-only and must not be serialized into metadata.
+            is_tensor_mask = (
+                isinstance(raw_mask, TensorField)
+                or getattr(raw_mask, "tensor_name", None) is not None
+                or (isinstance(raw_mask, dict) and "tensor_name" in raw_mask)
+            )
+            if not is_tensor_mask:
+                if hasattr(raw_mask, "model_dump"):
+                    serialized_mask = raw_mask.model_dump(exclude_none=True)
+                elif isinstance(raw_mask, dict):
+                    serialized_mask = dict(raw_mask)
+                else:
+                    serialized_mask = raw_mask
+
+        for img in img_list:
+            img_name = img.get("image_name") if isinstance(img, dict) else getattr(img, "image_name", None)
+            if not img_name:
+                continue
+            img_width, img_height = int(default_width), int(default_height)
+            if context is not None:
+                try:
+                    dto = context.images.get_dto(img_name)
+                    dto_w = getattr(dto, "width", None)
+                    dto_h = getattr(dto, "height", None)
+                    if isinstance(dto_w, int) and dto_w > 0 and isinstance(dto_h, int) and dto_h > 0:
+                        img_width, img_height = int(dto_w), int(dto_h)
+                except Exception:
+                    pass
+            idx += 1
+            config_entry: dict[str, Any] = {
+                "type": "ip_adapter",
+                "image": {
+                    "original": {
+                        "image": {
+                            "image_name": img_name,
+                            "width": img_width,
+                            "height": img_height,
+                        }
+                    }
+                },
+                "model": model_dict,
+                "clipVisionModel": clip_vision_model,
+                "method": method,
+                "weight": weight,
+                "beginEndStepPct": [begin_step_percent, end_step_percent],
+            }
+            if serialized_mask is not None:
+                config_entry["mask"] = serialized_mask
+            ref_images.append(
+                {
+                    "id": f"ip_adapter_{idx}",
+                    "isEnabled": True,
+                    "config": config_entry,
+                }
+            )
+    return ref_images
+
+
+def _ref_image_dedup_key(entry: Any) -> Optional[tuple[Any, Any, Any]]:
+    if not isinstance(entry, dict):
+        return None
+    cfg = entry.get("config")
+    if not isinstance(cfg, dict):
+        return None
+    cfg_type = cfg.get("type")
+    img = cfg.get("image")
+    image_name = None
+    if isinstance(img, dict):
+        crop = img.get("crop")
+        orig = img.get("original")
+        if isinstance(crop, dict) and isinstance(crop.get("image"), dict):
+            image_name = crop["image"].get("image_name")
+        if not image_name and isinstance(orig, dict) and isinstance(orig.get("image"), dict):
+            image_name = orig["image"].get("image_name")
+        if not image_name:
+            image_name = img.get("image_name")
+    if not image_name:
+        return None
+    model = cfg.get("model")
+    model_key = model.get("key") if isinstance(model, dict) else getattr(model, "key", None)
+    return (cfg_type, image_name, model_key)
+
+
+def build_denoise_metadata(existing: Optional[MetadataField], updates: dict[str, Any]) -> MetadataField:
+    """Build a new MetadataField by copying existing metadata and merging denoise updates without mutating input."""
+    md: dict[str, Any] = {} if existing is None else existing.root.copy()
+    existing_gen_mode = md.get("generation_mode")
+    md.update(updates)
+    if existing_gen_mode is not None and "generation_mode" in updates:
+        md["generation_mode"] = existing_gen_mode
+
+    # Denoise execution lists must be authoritative to the executing denoise node.
+    authoritative_lists = ("loras", "controlnets", "t2iAdapters", "ref_images")
+    for key in authoritative_lists:
+        if key in updates:
+            md[key] = updates[key]
+            if key == "controlnets":
+                md.pop("control_layers", None)
+            elif key == "ref_images":
+                md.pop("ipAdapters", None)
+
+    md["app_version"] = __version__
+    md.setdefault("metadata_version", CORE_METADATA_VERSION)
+    return MetadataField.model_validate(md)
 
 
 @invocation(
@@ -245,7 +730,7 @@ CORE_METADATA_VERSION = "1.2.0"
     title="Core Metadata",
     tags=["metadata"],
     category="metadata",
-    version="2.9.0",
+    version="2.10.0",
     classification=Classification.Internal,
 )
 class CoreMetadataInvocation(BaseInvocation):
@@ -261,7 +746,9 @@ class CoreMetadataInvocation(BaseInvocation):
     height: Optional[int] = InputField(default=None, description="The height parameter")
     seed: Optional[int] = InputField(default=None, description="The seed used for noise generation")
     rand_device: Optional[str] = InputField(default=None, description="The device used for random number generation")
-    cfg_scale: Optional[float] = InputField(default=None, description="The classifier-free guidance scale parameter")
+    cfg_scale: Optional[float | list[float]] = InputField(
+        default=None, description="The classifier-free guidance scale parameter (scalar or per-step schedule)"
+    )
     cfg_rescale_multiplier: Optional[float] = InputField(
         default=None, description=FieldDescriptions.cfg_rescale_multiplier
     )
