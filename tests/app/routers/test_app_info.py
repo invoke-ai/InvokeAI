@@ -434,9 +434,10 @@ def test_saving_generation_settings_preserves_the_authentication_choice_in_yaml(
 
     assert response.status_code == 200
     assert response.json()["config"]["multiuser"] is False
-    assert yaml.safe_load(config_path.read_text()) == {**settings, "max_queue_history": 12}
+    file_choice = file_multiuser is not False
+    assert yaml.safe_load(config_path.read_text()) == {**settings, "multiuser": file_choice, "max_queue_history": 12}
     monkeypatch.delenv("INVOKEAI_MULTIUSER")
-    assert load_config_from_root(tmp_path).multiuser is (file_multiuser is not False)
+    assert load_config_from_root(tmp_path).multiuser is file_choice
 
 
 def test_update_runtime_config_rejects_invalid_generation_device(

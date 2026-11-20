@@ -436,9 +436,8 @@ class InvokeAIAppConfig(BaseSettings):
                 exclude_none=True if as_example else False,
                 exclude={"schema_version", "legacy_models_yaml_path"},
             )
-            # Older releases default to single-user mode. Preserve an explicit true to keep sign-in on rollback.
-            if "multiuser" in self.model_fields_set:
-                config_dict["multiuser"] = self.multiuser
+            # Older releases default to single-user mode, so always state the choice: a rollback then keeps sign-in on.
+            config_dict["multiuser"] = self.multiuser
 
             if as_example:
                 file.write("# This is an example file with default and example settings.\n")
@@ -796,6 +795,34 @@ def load_config_from_root(root: Path) -> InvokeAIAppConfig:
     return config
 
 
+def _state_multiuser_in_config_file(config_path: Path, multiuser: bool) -> None:
+    """Append `multiuser` to a config file that does not state it, leaving the existing text untouched."""
+    # Older releases default to single-user mode, so state the choice once: a rollback then keeps sign-in on.
+    encoding = locale.getpreferredencoding()
+    try:
+        text = config_path.read_text(encoding=encoding)
+        settings = yaml.safe_load(text)
+        if not isinstance(settings, dict) or "multiuser" in settings:
+            return
+        addition = ("" if text.endswith("\n") else "\n") + yaml.safe_dump({"multiuser": multiuser})
+        try:
+            safe = yaml.safe_load(text + addition) == {**settings, "multiuser": multiuser}
+        except yaml.YAMLError:
+            safe = False
+        if safe:
+            with open(config_path, "at", encoding=encoding) as file:
+                file.write(addition)
+            return
+        reason = "appending a line would change how the file reads"
+    except OSError as e:
+        reason = str(e)
+    logger.warning(
+        "Unable to add the multiuser setting to %s (%s); an older release would start without sign-in",
+        config_path,
+        reason,
+    )
+
+
 @lru_cache(maxsize=1)
 def get_config() -> InvokeAIAppConfig:
     """Get the global singleton app config.
@@ -867,6 +894,7 @@ def get_config() -> InvokeAIAppConfig:
 
     if config.config_file_path.exists():
         config_from_file = load_and_migrate_config(config.config_file_path)
+        _state_multiuser_in_config_file(config.config_file_path, config_from_file.multiuser)
         # Clobbering here will overwrite any settings that were set via environment variables
         config.update_config(config_from_file, clobber=False)
     else:
