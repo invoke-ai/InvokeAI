@@ -24,10 +24,9 @@ import {
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
 /**
- * Drops recalled reference images whose files are not in the gallery, reporting
- * each one. Entries the project already had are trusted as-is, so an `append`
- * never removes anything. When nothing recalled survives, the project keeps
- * the list it had instead of committing an empty replacement.
+ * Drops recalled reference images whose files are not in the gallery, reporting each one. Entries the project already
+ * had are trusted as-is, so an `append` never removes anything. When nothing recalled survives, the project keeps the
+ * list it had instead of committing an empty replacement.
  */
 const verifyRecalledReferenceImages = async (
   result: RecallParametersResult,

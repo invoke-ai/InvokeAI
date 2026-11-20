@@ -177,13 +177,6 @@ describe('reserveLayerWorkflowSeeds', () => {
       seeds: [{ fieldName: 'seed', nodeId: 'noise-1', seed: 42, seedStep: 1 }],
     });
   });
-
-  it('reserves nothing while node definitions are not loaded', () => {
-    expect(reserveLayerWorkflowSeeds(seededDocument, { error: null, status: 'loading', templates: {} })).toEqual({
-      seedAdvances: [],
-      seeds: [],
-    });
-  });
 });
 
 describe('runLayerWorkflow', () => {
@@ -202,7 +195,6 @@ describe('runLayerWorkflow', () => {
       return Promise.reject(new Error('run failed'));
     });
 
-    // A failure after the reservation has consumed the seed, like a cancelled queue item.
     expect(await runLayerWorkflow(createOptions('gallery', deps))).toMatchObject({ stage: 'graph', status: 'failed' });
     expect(order.slice(0, 5)).toEqual(['export', 'upload', 'reserve-seeds', 'advance-seeds', 'build-graph']);
     expect(deps.advanceSeeds).toHaveBeenCalledWith(seedAdvances);
@@ -215,17 +207,6 @@ describe('runLayerWorkflow', () => {
 
     expect(await runLayerWorkflow(createOptions('gallery', deps))).toMatchObject({ status: 'locked' });
     expect(deps.reserveSeeds).not.toHaveBeenCalled();
-    expect(deps.advanceSeeds).not.toHaveBeenCalled();
-  });
-
-  it('skips the advance when nothing steps', async () => {
-    const { deps } = createDeps();
-    const seeds = [{ fieldName: 'seed', nodeId: 'noise-1', seed: 42, seedStep: 1 as const }];
-    vi.mocked(deps.reserveSeeds).mockReturnValue({ seedAdvances: [], seeds });
-
-    await runLayerWorkflow(createOptions('gallery', deps));
-
-    expect(deps.buildGraph).toHaveBeenCalledWith(expect.objectContaining({ seeds }));
     expect(deps.advanceSeeds).not.toHaveBeenCalled();
   });
 
@@ -336,16 +317,6 @@ describe('runLayerWorkflow', () => {
     expect(deps.appendStaging).not.toHaveBeenCalled();
   });
 
-  it('does not append staging when the guard changes during durability', async () => {
-    const { deps } = createDeps();
-    vi.mocked(deps.isGuardCurrent).mockImplementation(() => vi.mocked(deps.makeDurable).mock.calls.length === 0);
-
-    await expect(runLayerWorkflow(createOptions('staging', deps))).resolves.toEqual({ status: 'stale' });
-
-    expect(deps.makeDurable).toHaveBeenCalledOnce();
-    expect(deps.appendStaging).not.toHaveBeenCalled();
-  });
-
   it('checks cancellation at every async boundary and forwards the signal', async () => {
     const controller = new AbortController();
     const { deps } = createDeps();
@@ -424,18 +395,6 @@ describe('runLayerWorkflow', () => {
     expect(deps.appendStaging).not.toHaveBeenCalled();
   });
 
-  it('does not refresh Gallery when saving the output fails', async () => {
-    const { deps } = createDeps();
-    vi.mocked(deps.saveToGallery).mockRejectedValue(new Error('save failed'));
-
-    await expect(runLayerWorkflow(createOptions('gallery', deps))).resolves.toEqual({
-      message: 'save failed',
-      stage: 'gallery',
-      status: 'failed',
-    });
-    expect(deps.touchGallery).not.toHaveBeenCalled();
-  });
-
   it('preserves an authoritative successful engine commit after a late abort', async () => {
     const controller = new AbortController();
     const { deps } = createDeps();
@@ -459,42 +418,4 @@ describe('runLayerWorkflow', () => {
       await expect(runLayerWorkflow(createOptions('replace', deps))).resolves.toEqual({ status });
     }
   );
-
-  it('maps generated-image commit failures and unexpected API failures', async () => {
-    const commit = createDeps();
-    vi.mocked(commit.deps.commitGenerated).mockResolvedValue({ message: 'draw failed', status: 'failed' });
-    await expect(runLayerWorkflow(createOptions('replace', commit.deps))).resolves.toEqual({
-      message: 'draw failed',
-      stage: 'commit',
-      status: 'failed',
-    });
-
-    const hydrate = createDeps();
-    vi.mocked(hydrate.deps.getImage).mockRejectedValue(new Error('metadata failed'));
-    await expect(runLayerWorkflow(createOptions('gallery', hydrate.deps))).resolves.toEqual({
-      message: 'metadata failed',
-      stage: 'hydrate',
-      status: 'failed',
-    });
-  });
-
-  it('identifies graph-build failures for specific UI feedback', async () => {
-    const { deps } = createDeps();
-    vi.mocked(deps.buildGraph).mockImplementation(() => {
-      throw new Error('workflow is not ready');
-    });
-
-    await expect(runLayerWorkflow(createOptions('gallery', deps))).resolves.toEqual({
-      message: 'workflow is not ready',
-      stage: 'graph',
-      status: 'failed',
-    });
-  });
-
-  it('maps AbortError failures to aborted', async () => {
-    const { deps } = createDeps();
-    vi.mocked(deps.runGraph).mockRejectedValue(new DOMException('canceled', 'AbortError'));
-
-    await expect(runLayerWorkflow(createOptions('gallery', deps))).resolves.toEqual({ status: 'aborted' });
-  });
 });

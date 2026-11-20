@@ -93,7 +93,6 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
 };
 
 interface WorkbenchSettingsSnapshot {
-  /** Account-scope storage key these preferences were hydrated for; null until a load succeeds. */
   hydratedStorageKey: string | null;
   preferences: WorkbenchPreferences;
   scope: 'global' | 'user';
@@ -163,10 +162,7 @@ const isProjectSortId = (value: unknown): value is ProjectSortId =>
 const isWorkflowLibrarySortId = (value: unknown): value is WorkflowLibrarySortId =>
   value === 'updated' || value === 'opened' || value === 'created' || value === 'name' || value === 'lastRun';
 
-/**
- * A stored direction, or the stored key's natural one (dates newest first, names A to Z): accounts that chose a key
- * before directions existed keep the order they had.
- */
+/** Accounts that chose a key before directions existed keep its natural order. */
 const normalizeWorkflowLibrarySortDirection = (direction: unknown, sort: WorkflowLibrarySortId) =>
   direction === 'asc' || direction === 'desc' ? direction : sort === 'name' ? 'asc' : 'desc';
 
@@ -202,10 +198,6 @@ const normalizeGenerateSectionsOpen = (values: unknown): Record<string, boolean>
   );
 };
 
-/**
- * Validate record shape here; generation validates weight grammar when reading, preserving Launchpad's bundle
- * boundary.
- */
 const normalizeRebalancePresets = (values: unknown): StoredRebalancePreset[] => {
   if (!Array.isArray(values)) {
     return [];
@@ -241,7 +233,6 @@ const normalizeRebalancePresets = (values: unknown): StoredRebalancePreset[] => 
   return presets;
 };
 
-/** Shape-only, like {@link normalizeRebalancePresets}: the generation feature re-normalizes `values` on apply. */
 const normalizeGeneratePresets = (values: unknown): StoredGeneratePreset[] => {
   if (!Array.isArray(values)) {
     return [];
@@ -277,10 +268,7 @@ const normalizeGeneratePresets = (values: unknown): StoredGeneratePreset[] => {
   return presets;
 };
 
-/**
- * `${base}:${controlType}`. The control types are spelled out because importing them from the canvas engine would
- * pull it into Launchpad's bundle; a store test keeps the list in step with `CONTROL_TYPES`.
- */
+/** Spelled out to keep the canvas engine out of Launchpad's bundle; a store test keeps it in step with `CONTROL_TYPES`. */
 const CONTROL_MODEL_MEMORY_KEY = /^[^:]+:(?:pose|depth|edges|softedge|lineart|sketch|color|tile)$/;
 const CONTROL_MODEL_MEMORY_MAX_ENTRIES = 256;
 const CONTROL_MODEL_KEY_MAX_LENGTH = 255;
@@ -307,11 +295,7 @@ const isStoredAspectRatioPreset = (entry: unknown): entry is StoredAspectRatioPr
   );
 };
 
-/**
- * Shape-only, like {@link normalizeRebalancePresets}: generation drops ratios it cannot use when reading them, so a
- * newer build's wider rules survive this one's writes. An already-valid list comes back as is, keeping its identity
- * across unrelated preference patches.
- */
+/** Shape-only, so a newer build's wider ratio rules survive this one's writes; a valid list keeps its identity. */
 const normalizeAspectRatioPresetRecords = (values: unknown): StoredAspectRatioPreset[] => {
   if (!Array.isArray(values)) {
     return DEFAULT_PREFERENCES.aspectRatioPresets;
@@ -330,13 +314,9 @@ const normalizeAspectRatioPresetRecords = (values: unknown): StoredAspectRatioPr
   return kept.length === values.length ? (values as StoredAspectRatioPreset[]) : kept;
 };
 
-/** The tools `canvasToolMemory` may hold; canvas normalizes each one's fields on read. */
 const CANVAS_TOOL_MEMORY_KEYS = ['brush', 'eraser', 'shape', 'text'] as const;
 
-/**
- * Keeps only the known tools' plain records, so the synced blob cannot grow with stray keys. An already-valid record
- * comes back as is, keeping its identity across unrelated preference patches.
- */
+/** Known tools only, so the synced blob cannot grow; a valid record keeps its identity. */
 const normalizeCanvasToolMemoryRecord = (value: unknown): Readonly<Record<string, unknown>> => {
   if (!isPlainRecord(value)) {
     return DEFAULT_PREFERENCES.canvasToolMemory;
@@ -350,11 +330,7 @@ const normalizeCanvasToolMemoryRecord = (value: unknown): Readonly<Record<string
   );
 };
 
-/**
- * Keeps each owner's layerable keys (`getLayeredKeys`): a key no owner layers, or an owner nobody knows, is dropped,
- * so nothing stray reaches resolution. Owners normalize their values on read. An already-clean record comes back as
- * is, so resolved widget values keep their identity across unrelated preference patches.
- */
+/** Drops keys no owner layers; a clean record keeps its identity so resolved widget values stay stable. */
 const normalizeScopedDefaults = (value: unknown): ScopedDefaults => {
   if (!isPlainRecord(value)) {
     return DEFAULT_PREFERENCES.scopedDefaults;
@@ -381,11 +357,7 @@ const normalizeScopedDefaults = (value: unknown): ScopedDefaults => {
   return changed ? kept : (value as ScopedDefaults);
 };
 
-/**
- * Keeps well-formed entries, the newest {@link CONTROL_MODEL_MEMORY_MAX_ENTRIES} (a pick is re-inserted last), so the
- * synced blob stays bounded. An already-valid record comes back as is, so patching another preference keeps its
- * identity and does not re-run selectors that read it (Invoke readiness).
- */
+/** Keeps the newest entries so the synced blob stays bounded; a valid record keeps its identity. */
 const normalizeControlModelMemory = (values: unknown): Record<string, string> => {
   if (!values || typeof values !== 'object' || Array.isArray(values)) {
     return {};
@@ -593,11 +565,7 @@ const parsePreferences = (raw: string | null): WorkbenchPreferences | null => {
   }
 };
 
-/**
- * The localStorage payload: preferences plus a dirty marker for edits that
- * never reached the backend. A pending local copy outranks the server at the
- * next load, so going offline cannot silently revert a change.
- */
+/** A pending local copy outranks the server at the next load, so going offline cannot silently revert a change. */
 interface StoredSettings {
   preferences: WorkbenchPreferences;
   pendingPush?: boolean;
@@ -743,11 +711,7 @@ const resolveSettings = async (
 
 const settingsLoad = createSingleFlight<WorkbenchPreferences>();
 
-/**
- * Resolve settings once per account scope (a sign-in/out switches scope and
- * reloads); later calls return the snapshot. Offline, the local copy serves
- * and the next load retries the backend.
- */
+/** Once per account scope; offline, the local copy serves and the next load retries the backend. */
 export const loadWorkbenchSettings = (): Promise<WorkbenchPreferences> => {
   const owner = captureAccountScope();
   const storageSuffix = owner.accountId === null ? getUserStorageScope() : owner.storageSuffix;
@@ -813,10 +777,8 @@ export const useWorkbenchPreferenceSelector = <Selected>(
 
 export const getWorkbenchPreferences = (): WorkbenchPreferences => store.getSnapshot().preferences;
 
-/** Whether the preferences read are the account's, hydrated, rather than the defaults that stand in until then. */
 export const areWorkbenchPreferencesReady = (): boolean => store.getSnapshot().status === 'ready';
 
-/** Non-React runtimes use this to keep infrastructure configuration current. */
 export const subscribeWorkbenchPreferences = (listener: (preferences: WorkbenchPreferences) => void): (() => void) => {
   listener(store.getSnapshot().preferences);
 
@@ -864,7 +826,6 @@ export const patchWorkbenchPreferences = async (preferences: Partial<WorkbenchPr
   });
 };
 
-/** Remembers (or, with null, forgets) the control model picked for `key` (see `controlModelMemoryKey`). */
 export const patchControlModelMemory = (key: string, modelKey: string | null): Promise<void> => {
   const controlModelMemory = { ...store.getSnapshot().preferences.controlModelMemory };
   delete controlModelMemory[key];
@@ -874,7 +835,6 @@ export const patchControlModelMemory = (key: string, modelKey: string | null): P
   return patchWorkbenchPreferences({ controlModelMemory });
 };
 
-/** Sets the user's defaults for `values`' keys under `ownerId`, keeping the owner's other defaults. */
 export const patchScopedDefault = (ownerId: string, values: Readonly<Record<string, unknown>>): Promise<void> => {
   const { scopedDefaults } = store.getSnapshot().preferences;
   return patchWorkbenchPreferences({
@@ -882,7 +842,6 @@ export const patchScopedDefault = (ownerId: string, values: Readonly<Record<stri
   });
 };
 
-/** Forgets the user's defaults for `keys` under `ownerId`; an owner left with none is dropped. */
 export const clearScopedDefault = (ownerId: string, keys: readonly string[]): Promise<void> => {
   const { scopedDefaults } = store.getSnapshot().preferences;
   const current = scopedDefaults[ownerId];

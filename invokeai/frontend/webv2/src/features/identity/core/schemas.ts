@@ -19,9 +19,8 @@ export const getPasswordStrength = (password: string): PasswordStrength => {
 export const PASSWORD_RULES_HINT = 'At least 8 characters, with an uppercase letter, a lowercase letter, and a digit.';
 
 /**
- * Deliberately lenient: the backend accepts special-use domains (`@localhost`,
- * `.local`) for development setups, so the form only catches obvious mistakes
- * and leaves real validation to the server.
+ * Deliberately lenient: the backend accepts special-use domains (`@localhost`, `.local`) for development setups, so the
+ * form only catches obvious mistakes and leaves real validation to the server.
  */
 const emailSchema = z
   .string()

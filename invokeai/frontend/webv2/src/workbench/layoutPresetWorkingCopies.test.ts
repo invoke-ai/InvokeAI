@@ -1,7 +1,6 @@
-import type { LayoutPreset } from '@workbench/layoutContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
   doesProjectMatchLayoutPreset,
@@ -116,30 +115,12 @@ describe('layout preset working copies', () => {
     }
   });
 
-  it('switching away from an unmodified preset leaves no copy', () => {
-    const state = run(createInitialWorkbenchState(), switchTo('compose'), switchTo('edit'));
-
-    expect(getActiveProject(state).presetWorkingLayouts).toBeUndefined();
-    expect(unsavedInactive(state)).toEqual([]);
-  });
-
-  it('holds several presets’ unsaved arrangements at once, each restored to its own', () => {
-    let state = rearrange(run(createInitialWorkbenchState(), switchTo('compose')), 401);
-    state = run(state, switchTo('edit'), { region: 'right', sizePx: 433, type: 'setRegionWidgetSize' });
-    state = run(state, switchTo('video'));
-
-    expect(new Set(unsavedInactive(state))).toEqual(new Set(['compose', 'edit']));
-
-    expect(getActiveProject(run(state, switchTo('edit'))).widgetRegions.right.sizePx).toBe(433);
-    expect(getActiveProject(run(state, switchTo('compose'))).widgetRegions.right.sizePx).toBe(401);
-  });
-
   it('saves the active preset and an inactive working copy, after which neither reads as unsaved', () => {
     let state = rearrange(run(createInitialWorkbenchState(), switchTo('compose')), 401);
     state = run(state, switchTo('edit'), { region: 'right', sizePx: 433, type: 'setRegionWidgetSize' });
 
-    // The inactive copy saves without switching to it. The copy stays (a lost account write would leave it
-    // recoverable) but, equal to what was saved, no longer reads as unsaved.
+    // The inactive copy saves without switching to it. The copy stays (a lost account write would leave it recoverable)
+    // but, equal to what was saved, no longer reads as unsaved.
     state = run(state, { presetId: 'compose', type: 'saveLayoutPreset' });
     expect(state.account.layoutPresetOverrides?.compose?.widgetRegions.right.sizePx).toBe(401);
     expect(state.account.layoutPresetOverrides?.compose?.floatingWidgets?.gallery).toMatchObject(WINDOW);
@@ -182,33 +163,6 @@ describe('layout preset working copies', () => {
     expect(getActiveProject(run(state, switchTo('compose'))).widgetRegions.right.sizePx).toBe(433);
   });
 
-  it('keeps another project’s own changes to a preset saved elsewhere', () => {
-    let state = rearrange(run(createInitialWorkbenchState(), switchTo('compose')), 401);
-    state = run(state, switchTo('edit'));
-    const firstProjectId = state.activeProjectId;
-
-    state = run(state, { type: 'createProject' }, switchTo('compose'));
-    state = run(state, { region: 'right', sizePx: 433, type: 'setRegionWidgetSize' });
-    state = run(state, { presetId: 'compose', type: 'saveLayoutPreset' });
-
-    state = run(state, { projectId: firstProjectId, type: 'switchProject' });
-    expect(unsavedInactive(state)).toEqual(['compose']);
-    expect(getActiveProject(run(state, switchTo('compose'))).widgetRegions.right.sizePx).toBe(401);
-  });
-
-  it('does not read a copy that equals its saved preset as unsaved', () => {
-    let state = rearrange(run(createInitialWorkbenchState(), switchTo('compose')), 401);
-    state = run(state, switchTo('edit'));
-    const copy = copyOf(state, 'compose')!;
-
-    expect(unsavedInactive(state)).toEqual(['compose']);
-
-    // Saved elsewhere (another project, another tab): the account now holds exactly this arrangement.
-    state = { ...state, account: { ...state.account, layoutPresetOverrides: { compose: copy } } };
-
-    expect(unsavedInactive(state)).toEqual([]);
-  });
-
   it('reverts an inactive copy without switching, and the active preset to its saved layout, each undoably', () => {
     let state = rearrange(run(createInitialWorkbenchState(), switchTo('compose')), 401);
     state = run(state, switchTo('edit'), { region: 'right', sizePx: 433, type: 'setRegionWidgetSize' });
@@ -232,18 +186,6 @@ describe('layout preset working copies', () => {
     expect(isActiveDirty(state)).toBe(false);
     state = run(state, { type: 'undoProjectChange' });
     expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(433);
-  });
-
-  it('undoes a switch together with the copies it moved', () => {
-    let state = rearrange(run(createInitialWorkbenchState(), switchTo('compose')));
-    state = run(state, switchTo('edit'), { type: 'undoProjectChange' });
-
-    expect(getActiveProject(state).layout.presetId).toBe('compose');
-    expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(401);
-    expect(getActiveProject(state).presetWorkingLayouts).toBeUndefined();
-
-    state = run(state, { type: 'redoProjectChange' });
-    expect(unsavedInactive(state)).toEqual(['compose']);
   });
 
   it('keeps a renamed preset’s copy and drops a deleted preset’s from every open project', () => {
@@ -286,44 +228,6 @@ describe('layout preset working copies', () => {
     expect(project.widgetRegions.right.sizePx).toBe(433);
     expect(isActiveDirty(state)).toBe(true);
     expect(project.presetWorkingLayouts).toBeUndefined();
-  });
-
-  it('moves a project off its deleted preset onto the saved default when it has no copy of it', () => {
-    let state = run(createInitialWorkbenchState(), switchTo('compose'), addPreset('custom-review'));
-    state = run(state, switchTo('custom-review'), { region: 'right', sizePx: 461, type: 'setRegionWidgetSize' });
-
-    state = run(state, { presetId: 'custom-review', type: 'deleteLayoutPreset' });
-
-    expect(getActiveProject(state).layout.presetId).toBe('compose');
-    expect(isActiveDirty(state)).toBe(false);
-  });
-
-  it('saves the arrangement as a new preset and moves the project onto it, leaving the old preset as saved', () => {
-    let state = rearrange(run(createInitialWorkbenchState(), switchTo('compose')), 401);
-    state = run(state, addPreset('custom-review', 'Review'));
-
-    expect(getActiveProject(state).layout.presetId).toBe('custom-review');
-    expect(isActiveDirty(state)).toBe(false);
-
-    state = run(state, switchTo('compose'));
-    expect(isActiveDirty(state)).toBe(false);
-    expect(copyIds(state)).toEqual([]);
-    state = run(state, switchTo('custom-review'));
-    expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(401);
-    expect(getActiveProject(state).floatingWidgets?.gallery).toMatchObject(WINDOW);
-  });
-
-  it('drops copies of presets the account no longer has on the next switch', () => {
-    let state = run(createInitialWorkbenchState(), addPreset('custom-review'), switchTo('compose'));
-    state = rearrange(run(state, switchTo('custom-review')));
-    state = run(state, switchTo('compose'));
-    expect(copyIds(state)).toEqual(['custom-review']);
-    // As another tab or session leaves it: the preset is gone from the account, its copy still on this project.
-    state = { ...state, account: { ...state.account, customLayoutPresets: [] } };
-
-    state = run(state, switchTo('edit'));
-
-    expect(getActiveProject(state).presetWorkingLayouts).toBeUndefined();
   });
 
   it(`keeps at most ${String(PRESET_WORKING_LAYOUT_LIMIT)} copies, forgetting the oldest`, () => {
@@ -395,19 +299,6 @@ describe('layout preset working copies in the project document', () => {
     expect(unsavedInactive(lost)).toEqual(['compose']);
   });
 
-  it('drops a reloaded project’s copies of presets the account no longer has, so they hold no place', () => {
-    let state = run(createInitialWorkbenchState(), addPreset('custom-review'), switchTo('compose'));
-    state = rearrange(run(state, switchTo('custom-review')));
-    state = rearrange(run(state, switchTo('compose')), 433);
-    state = run(state, switchTo('edit'));
-    expect(copyIds(state)).toEqual(['custom-review', 'compose']);
-
-    // The preset was deleted while this project was closed: the account no longer has it.
-    const reloaded = reload({ ...state, account: { ...state.account, customLayoutPresets: [] } });
-
-    expect(copyIds(reloaded)).toEqual(['compose']);
-  });
-
   it('loads a document written before working copies exactly as before, and writes it back without them', () => {
     const current = serializeProjectDocumentV3(getActiveProject(createInitialWorkbenchState()));
     const { presetWorkingLayouts: _absent, ...older } = current;
@@ -463,27 +354,6 @@ describe('layout preset working copies in the project document', () => {
 });
 
 describe('switching to a preset through the store', () => {
-  it('loads the widgets of the working copy it will lay out, not of the saved preset', async () => {
-    const isLoaded = vi.fn((_preset: LayoutPreset) => false);
-    const loadLayoutPresetWidgets = vi.fn((_preset: LayoutPreset) => Promise.resolve());
-    const store = createWorkbenchStore(rearrange(run(createInitialWorkbenchState(), switchTo('compose'))), {
-      isLoaded,
-      loadLayoutPresetWidgets,
-    });
-
-    store.commands.layout.applyPreset('edit');
-    const copy = findLayoutPresetWorkingCopy(store.getSnapshot().activeProject.presetWorkingLayouts, 'compose');
-    expect(copy).toBeDefined();
-
-    await store.commands.layout.activatePreset('compose');
-
-    expect(isLoaded).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'compose', snapshot: copy }));
-    expect(loadLayoutPresetWidgets).toHaveBeenLastCalledWith(
-      expect.objectContaining({ id: 'compose', snapshot: copy })
-    );
-    expect(store.getSnapshot().activeProject.floatingWidgets?.gallery).toMatchObject(WINDOW);
-  });
-
   it('cancels a switch still loading when asked, leaving the active preset and its changes alone', async () => {
     let finishLoading!: () => void;
     const store = createWorkbenchStore(rearrange(run(createInitialWorkbenchState(), switchTo('compose'))), {

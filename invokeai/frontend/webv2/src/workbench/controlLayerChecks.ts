@@ -1,5 +1,5 @@
 import type { ModelConfig } from '@features/models';
-import type { CanvasControlLayerContract, CanvasLayerContract } from '@workbench/canvas-engine/api';
+import type { CanvasControlLayerContract } from '@workbench/canvas-engine/api';
 
 import {
   createControlValidationSequence,
@@ -7,9 +7,9 @@ import {
   type ControlAdapterKind,
   type ControlValidationReason,
 } from '@features/generation/graph';
-import { hasArchitectureCapabilities } from '@features/generation/settings';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 import { getControlDetectionInput, isControlMapCurrent, needsControlDetection } from '@workbench/canvas-engine/api';
-import { hasControlLayerContent, isCompositableControlLayer } from '@workbench/canvasLayerContent';
+import { hasControlLayerContent } from '@workbench/canvasLayerContent';
 
 import { resolveControlModel, type ControlModelMemory, type ControlModelResolution } from './controlModelResolution';
 
@@ -30,9 +30,9 @@ export interface ControlLayerCheckContext {
 }
 
 /**
- * Before capabilities load every kind counts as supported, so resolution still finds models; validation then
- * reports `capabilities_unavailable` instead of a misleading missing model. Without a main model (`base` null) no
- * base restricts kinds either.
+ * Before capabilities load every kind counts as supported, so resolution still finds models; validation then reports
+ * `capabilities_unavailable` instead of a misleading missing model. Without a main model (`base` null) no base
+ * restricts kinds either.
  */
 export const createControlLayerCheckContext = (
   base: string | null,
@@ -53,10 +53,7 @@ export interface ControlLayerJudgement {
   skip: boolean;
 }
 
-/**
- * Judges control layers in generation order, as the invocation does: per-generation limits count only layers that
- * passed. Invoke readiness, the settings panel and the invocation collector share it.
- */
+/** Per-generation limits count only layers that passed earlier in generation order. */
 export const createControlLayerSequence = (
   mainModel: MainModel,
   models: readonly ModelConfig[],
@@ -86,32 +83,6 @@ export const createControlLayerSequence = (
 };
 
 /**
- * Validate the same enabled, content-bearing layers as createControlLayerCollector; invalid layers do not consume
- * per-generation limits, and layers without a type or model are left out.
- */
-export const getBlockingControlLayerIssues = (params: {
-  layers: readonly CanvasLayerContract[];
-  mainModel: MainModel;
-  models: readonly ModelConfig[];
-  context?: ControlLayerCheckContext;
-}): ControlLayerIssue[] => {
-  const { layers, mainModel, models } = params;
-  const judge = createControlLayerSequence(mainModel, models, params.context);
-  const issues: ControlLayerIssue[] = [];
-
-  for (const layer of layers) {
-    if (!isCompositableControlLayer(layer)) {
-      continue;
-    }
-    const { reason, skip } = judge(layer);
-    if (reason && !skip) {
-      issues.push({ code: reason, layerId: layer.id, layerName: layer.name });
-    }
-  }
-  return issues;
-};
-
-/**
  * Where a layer's control map stands. `empty`: no pixels yet. `none`: no type or no detection, so the pixels are the
  * map. `current`: the map matches its detection. `stale`: detection must run again. `no-input`: the map is all the
  * layer has, so it cannot be detected again until its image is replaced.
@@ -132,9 +103,9 @@ const getControlMapState = (layer: CanvasControlLayerContract): ControlMapState 
 };
 
 /**
- * One layer as the settings panel, the layer row and Invoke present it. With `earlier` (the contributing layers
- * above it) the reason includes per-generation limits, as Invoke judges it; without, it is the ambient warning.
- * Without a main model the layer resolves across every base and only resolution and detection give a reason.
+ * One layer as the settings panel, the layer row and Invoke present it. With `earlier` (the contributing layers above
+ * it) the reason includes per-generation limits, as Invoke judges it; without, it is the ambient warning. Without a
+ * main model the layer resolves across every base and only resolution and detection give a reason.
  */
 export const describeControlLayer = (
   layer: CanvasControlLayerContract,

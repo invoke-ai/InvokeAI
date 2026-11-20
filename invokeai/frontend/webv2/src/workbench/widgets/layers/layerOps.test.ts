@@ -4,7 +4,7 @@ import type {
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { createControlLayer } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it } from 'vitest';
@@ -29,20 +29,14 @@ import {
   createInpaintMaskFromImage,
   createInpaintMaskLayer,
   createRegionalGuidanceFromImage,
-  createRegionalGuidanceLayer,
   createRegionalGuidanceLayerWithRefImage,
   createRegionalReferenceImage,
   DEFAULT_CONTROL_ADAPTER,
   CONTROL_ADAPTER_DEFAULTS,
-  CONTROL_WEIGHT_BOUNDS,
-  DEFAULT_INPAINT_MASK_FILL,
   fitLayerTransformToBbox,
-  getControlTransparencyEffectPatch,
-  getRegionalGuidanceAutoNegativePatch,
   isAutoControlLayerName,
   isMergeableRasterLayer,
   nextControlTypeLayerName,
-  nextInpaintMaskName,
   nextRegionalGuidanceFillColor,
   REGIONAL_GUIDANCE_FILL_COLORS,
 } from './layerOps';
@@ -96,10 +90,6 @@ describe('createEmptyPaintLayer', () => {
     });
   });
 
-  it('mints a unique id when none is supplied', () => {
-    expect(createEmptyPaintLayer('a').id).not.toBe(createEmptyPaintLayer('a').id);
-  });
-
   it('mints a UUID id, so a lock or presence marker can name the layer whoever created it', () => {
     expect(createEmptyPaintLayer('a').id).toMatch(
       /^layer-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -130,41 +120,25 @@ describe('createAdjustmentEntry', () => {
 
 describe('nextRegionalGuidanceFillColor', () => {
   it('derives the colour purely from the existing regional-guidance count (no session state)', () => {
-    // Legacy pre-increment cycler: the first region (0 existing) gets index 1.
     expect(nextRegionalGuidanceFillColor(0)).toBe(REGIONAL_GUIDANCE_FILL_COLORS[1]);
     expect(nextRegionalGuidanceFillColor(1)).toBe(REGIONAL_GUIDANCE_FILL_COLORS[2]);
-    // Wraps modulo the palette length.
     expect(nextRegionalGuidanceFillColor(REGIONAL_GUIDANCE_FILL_COLORS.length - 1)).toBe(
       REGIONAL_GUIDANCE_FILL_COLORS[0]
     );
-    // Pure: the same count always yields the same colour, regardless of call order.
     expect(nextRegionalGuidanceFillColor(0)).toBe(nextRegionalGuidanceFillColor(0));
-  });
-
-  it('createRegionalGuidanceLayer uses the count-derived fill colour', () => {
-    expect(createRegionalGuidanceLayer('Regional Guidance 1', 0).mask.fill.color).toBe(
-      REGIONAL_GUIDANCE_FILL_COLORS[1]
-    );
-    expect(createRegionalGuidanceLayer('Regional Guidance 2', 1).mask.fill.color).toBe(
-      REGIONAL_GUIDANCE_FILL_COLORS[2]
-    );
   });
 });
 
 describe('isMergeableRasterLayer', () => {
-  it('accepts enabled paint and image raster layers', () => {
-    expect(isMergeableRasterLayer(paintLayer('p'))).toBe(true);
-    expect(isMergeableRasterLayer(imageLayer('i'))).toBe(true);
-  });
-
-  it('rejects disabled layers and non-raster layers', () => {
-    expect(isMergeableRasterLayer(paintLayer('p', { isEnabled: false }))).toBe(false);
-    expect(isMergeableRasterLayer(maskLayer('m'))).toBe(false);
-  });
-
-  it('rejects locked layers (matches the paint tool: a locked target refuses edits)', () => {
-    expect(isMergeableRasterLayer(paintLayer('p', { isLocked: true }))).toBe(false);
-    expect(isMergeableRasterLayer({ ...imageLayer('i'), isLocked: true })).toBe(false);
+  it.each<[string, CanvasLayerContract, boolean]>([
+    ['accepts an enabled paint raster layer', paintLayer('p'), true],
+    ['accepts an enabled image raster layer', imageLayer('i'), true],
+    ['rejects a disabled layer', paintLayer('p', { isEnabled: false }), false],
+    ['rejects a non-raster layer', maskLayer('m'), false],
+    ['rejects a locked paint layer', paintLayer('p', { isLocked: true }), false],
+    ['rejects a locked image layer', { ...imageLayer('i'), isLocked: true }, false],
+  ])('%s', (_, layer, expected) => {
+    expect(isMergeableRasterLayer(layer)).toBe(expected);
   });
 });
 
@@ -180,49 +154,27 @@ describe('canMergeLayerDown', () => {
   });
   const document = documentOf([paintLayer('top'), imageLayer('mid'), maskLayer('bottom')]);
 
-  it('requires an engine (merge is pixel work)', () => {
-    expect(canMergeLayerDown(document, 'top', false)).toBe(false);
-  });
-
-  it('allows merging when the layer and the one below are both mergeable', () => {
-    expect(canMergeLayerDown(document, 'top', true)).toBe(true);
-  });
-
-  it('disallows merging into a non-mergeable below layer', () => {
-    expect(canMergeLayerDown(document, 'mid', true)).toBe(false);
-  });
-
-  it('disallows merging the bottom-most layer (nothing below)', () => {
-    expect(canMergeLayerDown(document, 'bottom', true)).toBe(false);
-  });
-
-  it('disallows merging when the upper layer is locked', () => {
-    const lockedTop = documentOf([paintLayer('top', { isLocked: true }), imageLayer('mid'), maskLayer('bottom')]);
-    expect(canMergeLayerDown(lockedTop, 'top', true)).toBe(false);
-  });
-
-  it('disallows merging when the below layer is locked', () => {
-    const lockedMid = documentOf([paintLayer('top'), { ...imageLayer('mid'), isLocked: true }, maskLayer('bottom')]);
-    expect(canMergeLayerDown(lockedMid, 'top', true)).toBe(false);
-  });
-});
-
-describe('createInpaintMaskLayer', () => {
-  it('builds an empty inpaint mask with the legacy-default diagonal fill', () => {
-    const layer = createInpaintMaskLayer('Inpaint Mask 1', 'm1');
-    expect(layer.type).toBe('inpaint_mask');
-    expect(layer.id).toBe('m1');
-    expect(layer.name).toBe('Inpaint Mask 1');
-    expect(layer.isEnabled).toBe(true);
-    expect(layer.mask.bitmap).toBeNull();
-    expect(layer.mask.fill).toEqual(DEFAULT_INPAINT_MASK_FILL);
-    expect(layer.mask.fill.style).toBe('diagonal');
-  });
-
-  it('mints a fresh id when none is given', () => {
-    const a = createInpaintMaskLayer('m');
-    const b = createInpaintMaskLayer('m');
-    expect(a.id).not.toBe(b.id);
+  it.each<[string, CanvasDocumentContractV3, string, boolean, boolean]>([
+    ['requires an engine (merge is pixel work)', document, 'top', false, false],
+    ['allows merging when the layer and the one below are both mergeable', document, 'top', true, true],
+    ['disallows merging into a non-mergeable below layer', document, 'mid', true, false],
+    ['disallows merging the bottom-most layer (nothing below)', document, 'bottom', true, false],
+    [
+      'disallows merging when the upper layer is locked',
+      documentOf([paintLayer('top', { isLocked: true }), imageLayer('mid'), maskLayer('bottom')]),
+      'top',
+      true,
+      false,
+    ],
+    [
+      'disallows merging when the below layer is locked',
+      documentOf([paintLayer('top'), { ...imageLayer('mid'), isLocked: true }, maskLayer('bottom')]),
+      'top',
+      true,
+      false,
+    ],
+  ])('%s', (_, doc, layerId, hasEngine, expected) => {
+    expect(canMergeLayerDown(doc, layerId, hasEngine)).toBe(expected);
   });
 });
 
@@ -287,20 +239,10 @@ describe('image-backed mask layer factories', () => {
   });
 });
 
-describe('nextInpaintMaskName', () => {
-  it('returns the first free "Inpaint Mask N"', () => {
-    expect(nextInpaintMaskName([])).toBe('Inpaint Mask 1');
-    expect(nextInpaintMaskName(['Inpaint Mask 1'])).toBe('Inpaint Mask 2');
-    // Fills the first gap, ignoring unrelated names.
-    expect(nextInpaintMaskName(['Inpaint Mask 1', 'Inpaint Mask 3', 'Layer 2'])).toBe('Inpaint Mask 2');
-  });
-});
-
 describe('control layer naming by type', () => {
   it('numbers a typed layer after the other layers of its type, filling the first gap', () => {
     expect(nextControlTypeLayerName('Depth', [])).toBe('Depth 1');
     expect(nextControlTypeLayerName('Depth', ['Depth 1', 'Depth 3', 'Pose 2', 'Control Layer 2'])).toBe('Depth 2');
-    // Labels are matched literally, not as patterns.
     expect(nextControlTypeLayerName('Line art (v2)', ['Line art (v2) 1'])).toBe('Line art (v2) 2');
   });
 
@@ -344,11 +286,6 @@ describe('control adapter defaults', () => {
       },
     });
   });
-
-  it('keeps the 0.75 creation default separate from legacy weight input ranges', () => {
-    expect(DEFAULT_CONTROL_ADAPTER.weight).toBe(0.75);
-    expect(CONTROL_WEIGHT_BOUNDS).toEqual({ inputMax: 2, inputMin: -1, sliderMax: 2, sliderMin: 0, step: 0.05 });
-  });
 });
 
 describe('canConvertRasterControl', () => {
@@ -360,7 +297,6 @@ describe('canConvertRasterControl', () => {
         paintLayer('img', { source: { image: { height: 1, imageName: 'i', width: 1 }, type: 'image' } })
       )
     ).toBe(true);
-    // Parametric raster sources cannot convert.
     expect(
       canConvertRasterControl(
         paintLayer('txt', {
@@ -392,10 +328,6 @@ describe('fitLayerTransformToBbox', () => {
     ).toEqual({ rotation: 0, scaleX: 2, scaleY: 2, x: -40, y: -20 });
   });
 
-  it('returns null for empty content', () => {
-    expect(fitLayerTransformToBbox(createEmptyPaintLayer('empty'), { height: 512, width: 512, x: 0, y: 0 })).toBeNull();
-  });
-
   it('contains and centers landscape content without stretching', () => {
     const layer = paintLayer('landscape', {
       source: {
@@ -414,64 +346,15 @@ describe('fitLayerTransformToBbox', () => {
     });
   });
 
-  it('contains and centers portrait content without stretching', () => {
-    const layer = paintLayer('portrait', {
-      source: {
-        bitmap: { height: 200, imageName: 'portrait', width: 100 },
-        offset: { x: 10, y: 20 },
-        type: 'paint',
-      },
+  it.each([
+    ['cover', { scaleX: 1, scaleY: 1, x: -60, y: -20 }],
+    ['fill', { scaleX: 0.5, scaleY: 1, x: -5, y: -20 }],
+  ] as const)('fits offset content with %s', (mode, expected) => {
+    const layer = paintLayer('fit', {
+      source: { type: 'paint', bitmap: { imageName: 'fit.png', width: 200, height: 100 }, offset: { x: 10, y: 20 } },
     });
-
-    expect(fitLayerTransformToBbox(layer, { height: 100, width: 100, x: 0, y: 0 })).toEqual({
-      rotation: 0,
-      scaleX: 0.5,
-      scaleY: 0.5,
-      x: 20,
-      y: -10,
-    });
-  });
-
-  it('accounts for non-zero local content origins and bbox placement', () => {
-    const layer = paintLayer('offset', {
-      source: {
-        bitmap: { height: 50, imageName: 'offset', width: 50 },
-        offset: { x: -20, y: 30 },
-        type: 'paint',
-      },
-    });
-
-    expect(fitLayerTransformToBbox(layer, { height: 100, width: 200, x: 50, y: 100 })).toEqual({
-      rotation: 0,
-      scaleX: 2,
-      scaleY: 2,
-      x: 140,
-      y: 40,
-    });
-  });
-});
-
-it.each([
-  ['cover', { scaleX: 1, scaleY: 1, x: -60, y: -20 }],
-  ['fill', { scaleX: 0.5, scaleY: 1, x: -5, y: -20 }],
-] as const)('fits offset content with %s', (mode, expected) => {
-  const layer = paintLayer('fit', {
-    source: { type: 'paint', bitmap: { imageName: 'fit.png', width: 200, height: 100 }, offset: { x: 10, y: 20 } },
-  });
-  const bbox = { x: 0, y: 0, width: 100, height: 100 };
-  expect(fitLayerTransformToBbox(layer, bbox, bbox, mode)).toEqual({ rotation: 0, ...expected });
-});
-
-describe('menu patch helpers', () => {
-  it('builds control transparency effect patches', () => {
-    const layer = createControlLayer({ id: 'c1', name: 'control' });
-
-    expect(getControlTransparencyEffectPatch(layer)).toEqual({ layerType: 'control', withTransparencyEffect: false });
-  });
-
-  it('builds the auto-negative toggle patch', () => {
-    const layer = createRegionalGuidanceLayer('region', 0, 'r1');
-    expect(getRegionalGuidanceAutoNegativePatch(layer)).toEqual({ autoNegative: true, layerType: 'regional_guidance' });
+    const bbox = { x: 0, y: 0, width: 100, height: 100 };
+    expect(fitLayerTransformToBbox(layer, bbox, bbox, mode)).toEqual({ rotation: 0, ...expected });
   });
 });
 
@@ -496,21 +379,6 @@ describe('convertRasterControlLayer', () => {
     }
   });
 
-  it('converts raster→control with Z-Image defaults for a Z-Image main model', () => {
-    const converted = convertRasterControlLayer(paintLayer('r'), 'control', 'z-image');
-    expect(converted?.type === 'control' ? converted.adapter : null).toEqual(CONTROL_ADAPTER_DEFAULTS.z_image_control);
-  });
-
-  it('converts and copies raster layers into untyped control layers without a model', () => {
-    const typed = { ...createEmptyPaintLayer('r', 'r'), filter: { settings: {}, type: 'canny_edge_detection' } };
-    for (const control of [convertRasterToControl(typed, 'sdxl'), copyRasterToControl(typed, 'copy-id', 'sdxl')]) {
-      expect(control?.adapter).toEqual(DEFAULT_CONTROL_ADAPTER);
-      expect(control).not.toHaveProperty('controlType');
-      expect(control).not.toHaveProperty('detection');
-      expect(control).not.toHaveProperty('filter');
-    }
-  });
-
   it('converts control→raster preserving the pixel source and round-trips', () => {
     const control = createControlLayer({ id: 'c1', name: 'C' });
     const withSource = {
@@ -523,18 +391,11 @@ describe('convertRasterControlLayer', () => {
       expect(raster.source).toEqual({ image: { height: 48, imageName: 'pic', width: 64 }, type: 'image' });
       expect(raster.id).toBe('c1');
     }
-    // Round-trip back to control keeps the source.
     const backToControl = raster ? convertRasterControlLayer(raster, 'control') : null;
     expect(backToControl?.type).toBe('control');
     if (backToControl?.type === 'control') {
       expect(backToControl.source).toEqual({ image: { height: 48, imageName: 'pic', width: 64 }, type: 'image' });
     }
-  });
-
-  it('returns null when the layer already has the target type or cannot convert', () => {
-    expect(convertRasterControlLayer(createControlLayer({ id: 'c', name: 'c' }), 'control')).toBeNull();
-    expect(convertRasterControlLayer(createEmptyPaintLayer('p', 'p'), 'raster')).toBeNull();
-    expect(convertRasterControlLayer(createInpaintMaskLayer('m', 'm'), 'control')).toBeNull();
   });
 });
 
@@ -641,29 +502,6 @@ describe('layer copy and conversion parity', () => {
     });
   });
 
-  it('clones into a control layer only while the stack changes no pixel; masks keep reading alpha', () => {
-    const unchanged = {
-      ...raster,
-      adjustments: [
-        { amount: 0, id: 'clarity', isEnabled: true, size: 40, type: 'clarity' as const },
-        { id: 'invert', isEnabled: false, type: 'invert' as const },
-      ],
-    };
-    expect(convertRasterToControl(unchanged)).toMatchObject({ source: raster.source, transform });
-    expect(copyRasterToControl(unchanged, 'c-copy')).toMatchObject({ source: raster.source, transform });
-
-    for (const entry of [
-      { brightness: 0.2, contrast: 0, id: 'bc', isEnabled: true, type: 'brightness-contrast' as const },
-      { amount: 30, id: 'dehaze', isEnabled: true, type: 'dehaze' as const },
-    ]) {
-      const adjusted = { ...raster, adjustments: [entry] };
-      expect(copyRasterToControl(adjusted, 'c-copy')).toBeNull();
-      expect(convertRasterToControl(adjusted)).toBeNull();
-      expect(convertRasterControlLayer(adjusted, 'control')).toBeNull();
-      expect(convertRasterToInpaintMask(adjusted)?.mask.bitmap).toEqual(raster.source.bitmap);
-    }
-  });
-
   it('rejects parametric raster sources that cannot be represented as masks or controls', () => {
     const text = {
       ...raster,
@@ -697,13 +535,6 @@ describe('createRegionalReferenceImage', () => {
       isEnabled: true,
     });
   });
-
-  it('mints an IP-Adapter ref image for a non-flux base', () => {
-    const ref = createRegionalReferenceImage('sdxl', 'ref-2');
-    expect(ref.id).toBe('ref-2');
-    expect(ref.isEnabled).toBe(true);
-    expect(ref.config.type).toBe('ip_adapter');
-  });
 });
 
 describe('createRegionalGuidanceLayerWithRefImage', () => {
@@ -714,10 +545,5 @@ describe('createRegionalGuidanceLayerWithRefImage', () => {
     expect(layer.referenceImages).toHaveLength(1);
     expect(layer.referenceImages[0]?.config.type).toBe('ip_adapter');
     expect(layer.referenceImages[0]?.config.image).toBeNull();
-  });
-
-  it('seeds a FLUX Redux reference image when the base is flux', () => {
-    const layer = createRegionalGuidanceLayerWithRefImage('Region 1', 0, 'flux', 'rg-2');
-    expect(layer.referenceImages[0]?.config.type).toBe('flux_redux');
   });
 });

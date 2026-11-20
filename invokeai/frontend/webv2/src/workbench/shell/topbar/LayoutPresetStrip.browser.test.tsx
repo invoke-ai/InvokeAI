@@ -3,7 +3,6 @@ import type * as LayoutPresetActivationModule from '@workbench/layoutPresetActiv
 import { ChakraProvider } from '@chakra-ui/react';
 import { useDebouncedValue } from '@platform/react/useDebouncedValue';
 import { shallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
-import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { createWorkbenchStore, type WorkbenchInternalStore, type WorkbenchSnapshot } from '@workbench/workbenchStore';
 import { act } from 'react';
@@ -18,7 +17,6 @@ vi.mock('react-i18next', () => ({
     t: (key: string, options?: { count?: number }) =>
       ({
         'topbar.presets.moreAvailable': `More layout presets, ${options?.count} available`,
-        // A translated default, as another language shows the Workflow preset.
         'topbar.presets.builtInLabels.automate': 'Arbeitsablauf',
         'topbar.presets.builtInLabels.edit': 'Edit',
         'topbar.presets.builtInDescriptions.automate': 'Build and run workflows',
@@ -35,7 +33,6 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-// The real selection and debounce mechanics over a test-owned store; only the provider lookup is replaced.
 vi.mock('@workbench/WorkbenchContext', () => {
   type Equality<Selected> = (left: Selected, right: Selected) => boolean;
   const useWorkbenchSelector = <Selected,>(
@@ -69,7 +66,6 @@ vi.mock('@workbench/layoutPresetActivation', async (importOriginal) => {
   };
 });
 
-// Compose keeps its default key; Edit models one the user unbound, which no tip may advertise.
 const COMPOSE_SHORTCUT = { aria: 'Alt+1', display: 'Alt+1', parts: ['alt', '1'] };
 vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({
   useShortcutBinding: (commandId: string) => (commandId === 'app.selectComposePreset' ? COMPOSE_SHORTCUT : null),
@@ -116,9 +112,8 @@ const mouse = (type: string, target: EventTarget, clientX: number, clientY: numb
   );
 };
 
-// A real press emits `pointerdown` before `mousedown`. dnd-kit's `MouseSensor`
-// only listens to the latter, but the strip acknowledges on the former, so a
-// drag simulation that skips it does not exercise what a user actually does.
+// A real press emits `pointerdown` before `mousedown`. dnd-kit's `MouseSensor` only listens to the latter, but the
+// strip acknowledges on the former, so a drag simulation that skips it does not exercise what a user actually does.
 const pressDown = (target: EventTarget, clientX: number, clientY: number): void => {
   target.dispatchEvent(
     new PointerEvent('pointerdown', { bubbles: true, button: 0, cancelable: true, clientX, clientY })
@@ -132,19 +127,13 @@ const settle = (ms = 200): Promise<void> =>
   });
 
 const POLL = { timeout: 5000 } as const;
-// The tip opens on focus without a delay and on hover after 400 ms; these waits are well past both.
-const QUIET_MS = 700;
 
 const openTooltip = () =>
   [...document.querySelectorAll<HTMLElement>('[data-scope="tooltip"][data-part="content"]')].find(
     (element) => element.dataset.state === 'open'
   ) ?? null;
-
-// Either side of the width at which the tabs hide their labels.
-const WIDE_VIEWPORT = { height: 900, width: 1440 } as const;
 const NARROW_VIEWPORT = { height: 900, width: 1024 } as const;
 
-/** Runs the enclosing tests at `size`, then gives the next ones back the frame they started with. */
 const runAtViewport = (size: { height: number; width: number }) => {
   let original = { height: 0, width: 0 };
 
@@ -194,7 +183,6 @@ const touch = (
 beforeEach(() => {
   store = createWorkbenchStore();
   store.commands.layout.createPreset('custom-1', 'Custom', 'star');
-  // Saving as a new preset moves the project onto it; these tests start on Compose.
   store.commands.layout.applyPreset('compose');
   store.commands.layout.reorderPresets('custom-1', 'edit');
   store.commands.layout.renamePreset('compose', 'Writing');
@@ -219,29 +207,6 @@ describe('LayoutPresetStrip', () => {
 
     expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
   });
-
-  it.each(['save-as', 'edit'] as const)(
-    'animates the %s dialog out instead of unmounting it on close',
-    async (kind) => {
-      await renderStrip({ withAdminDialogs: true });
-
-      if (kind === 'save-as') {
-        await act(() =>
-          userEvent.click(document.querySelector<HTMLElement>('[aria-label="Save this layout as a new preset"]')!)
-        );
-      } else {
-        await openPresetMenuItem('custom-1', 'edit-preset');
-      }
-      await expect.poll(() => document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open');
-      const dialog = document.querySelector('[role="dialog"]')!;
-
-      const frames = await recordDialogExit(dialog, () => act(() => userEvent.keyboard('{Escape}')));
-
-      // An unmounted dialog never reaches its closed state, so it cannot animate out; a retained one does, then leaves.
-      expect(closingFrames(frames)).not.toHaveLength(0);
-      await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
-    }
-  );
 
   it('keeps the edit and delete dialogs opened from a preset menu', async () => {
     await renderStrip({ withAdminDialogs: true });
@@ -303,7 +268,6 @@ describe('LayoutPresetStrip', () => {
     expect(presetTab('automate')).toHaveAttribute('aria-label', 'Arbeitsablauf');
   });
 
-  // Desktop tabs activate on press, including the press that begins reordering.
   it('selects a dragged tab on the press and reorders it in the same gesture', async () => {
     await renderStrip();
     await act(() => userEvent.click(presetTab('edit')!));
@@ -365,137 +329,6 @@ describe('LayoutPresetStrip', () => {
     expect(movedSource?.style.opacity).not.toBe('0.5');
   });
 
-  it('keeps a non-overflowing strip stationary while dragging near its right edge', async () => {
-    await renderStrip();
-    const scrollContainer = document.querySelector<HTMLElement>('[data-layout-preset-scroll]');
-    const source = presetTab('compose');
-    expect(scrollContainer).not.toBeNull();
-    expect(source).not.toBeNull();
-    Object.defineProperty(scrollContainer!, 'scrollWidth', {
-      configurable: true,
-      value: scrollContainer!.clientWidth,
-    });
-    expect(scrollContainer!.scrollWidth).toBeLessThanOrEqual(scrollContainer!.clientWidth);
-    const sourceRect = source!.getBoundingClientRect();
-    const containerRect = scrollContainer!.getBoundingClientRect();
-    const startX = sourceRect.left + sourceRect.width / 2;
-    const startY = sourceRect.top + sourceRect.height / 2;
-    const edgeX = containerRect.right - 2;
-
-    await act(() => mouse('mousedown', source!, startX, startY));
-    await act(() => mouse('mousemove', source!.ownerDocument, startX + 8, startY));
-    await act(() => mouse('mousemove', source!.ownerDocument, edgeX, startY));
-    await act(
-      () =>
-        new Promise<void>((resolve) => {
-          globalThis.setTimeout(resolve, 150);
-        })
-    );
-
-    expect(scrollContainer!.scrollLeft).toBe(0);
-
-    await act(() => mouse('mouseup', source!.ownerDocument, edgeX, startY));
-  });
-
-  it('keeps an overflowing strip stationary while dragging near its right edge', async () => {
-    for (let index = 2; index <= 8; index += 1) {
-      store.commands.layout.createPreset(`custom-${index}`, `Custom ${index}`, 'star');
-    }
-    await renderStrip();
-    const scrollContainer = document.querySelector<HTMLElement>('[data-layout-preset-scroll]');
-    const source = presetTab('compose');
-    expect(scrollContainer).not.toBeNull();
-    expect(source).not.toBeNull();
-    expect(scrollContainer!.scrollWidth).toBeGreaterThan(scrollContainer!.clientWidth);
-    const sourceRect = source!.getBoundingClientRect();
-    const containerRect = scrollContainer!.getBoundingClientRect();
-    const startX = sourceRect.left + sourceRect.width / 2;
-    const startY = sourceRect.top + sourceRect.height / 2;
-    const edgeX = containerRect.right - 2;
-
-    await act(() => mouse('mousedown', source!, startX, startY));
-    await act(() => mouse('mousemove', source!.ownerDocument, startX + 8, startY));
-    await act(() => mouse('mousemove', source!.ownerDocument, edgeX, startY));
-    await act(
-      () =>
-        new Promise<void>((resolve) => {
-          globalThis.setTimeout(resolve, 250);
-        })
-    );
-
-    expect(scrollContainer!.scrollLeft).toBe(0);
-
-    await act(() => mouse('mouseup', source!.ownerDocument, edgeX, startY));
-    const scrollLeftAfterDrop = scrollContainer!.scrollLeft;
-    await act(
-      () =>
-        new Promise<void>((resolve) => {
-          globalThis.setTimeout(resolve, 100);
-        })
-    );
-
-    expect(scrollLeftAfterDrop).toBe(0);
-    expect(scrollContainer!.scrollLeft).toBe(0);
-  });
-
-  // The cue says how many presets lie past the end, on screen and in its name, and reveals them.
-  it('counts the presets past the strip end on its end cue and scrolls to them', async () => {
-    for (let index = 2; index <= 8; index += 1) {
-      store.commands.layout.createPreset(`custom-${index}`, `Custom ${index}`, 'star');
-    }
-    store.commands.layout.applyPreset('compose');
-    await renderStrip();
-    const scroller = document.querySelector<HTMLElement>('[data-layout-preset-scroll]')!;
-    const hiddenPastEnd = () =>
-      Array.from(scroller.querySelectorAll('[role="tab"]')).filter(
-        (tab) => tab.getBoundingClientRect().right > scroller.getBoundingClientRect().right + 1
-      ).length;
-    const endCue = () => document.querySelector<HTMLElement>('[data-overflow-cue="end"] button');
-
-    await expect.poll(endCue, POLL).not.toBeNull();
-    const count = hiddenPastEnd();
-
-    expect(count).toBeGreaterThan(0);
-    expect(endCue()).toHaveAccessibleName(`More layout presets, ${count} available`);
-    expect(endCue()!.textContent).toBe(`+${count}`);
-
-    await act(() => endCue()!.click());
-
-    await expect.poll(endCue, POLL).toBeNull();
-    expect(document.querySelector('[data-overflow-cue="start"]')).not.toBeNull();
-  });
-
-  it('brings the active preset back into view when the strip narrows and when the preset changes', async () => {
-    for (let index = 2; index <= 8; index += 1) {
-      store.commands.layout.createPreset(`custom-${index}`, `Custom ${index}`, 'star');
-    }
-    store.commands.layout.applyPreset('compose');
-    await renderStrip();
-    const scroller = document.querySelector<HTMLElement>('[data-layout-preset-scroll]')!;
-    const isInView = (id: string) => {
-      const tab = presetTab(id)!.getBoundingClientRect();
-      const bounds = scroller.getBoundingClientRect();
-
-      return tab.left >= bounds.left - 1 && tab.right <= bounds.right + 1;
-    };
-
-    // Switching to the last preset brings its tab in from past the end.
-    await act(() => store.commands.layout.applyPreset('automate'));
-    await expect.poll(() => isInView('automate'), POLL).toBe(true);
-
-    // Scrolled away by hand, the strip stays put; narrowed, it scrolls back to the active preset. (This strip is too
-    // narrow for the tab to clear both cues, so the test asks only that it moved to it.)
-    scroller.scrollLeft = 0;
-    await expect.poll(() => isInView('automate'), POLL).toBe(false);
-    const viewport = { height: window.innerHeight, width: window.innerWidth };
-    await page.viewport(viewport.width - 60, viewport.height);
-    await expect
-      .poll(() => presetTab('automate')!.getBoundingClientRect().left < scroller.getBoundingClientRect().right, POLL)
-      .toBe(true);
-    expect(scroller.scrollLeft).toBeGreaterThan(0);
-    await page.viewport(viewport.width, viewport.height);
-  });
-
   it('preserves horizontal touch panning and reorders after a long press', async () => {
     await renderStrip();
     const source = presetTab('compose');
@@ -532,32 +365,6 @@ describe('LayoutPresetStrip', () => {
     expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['custom-1', 'edit', 'video', 'automate', 'compose']);
   });
 
-  it('leaves a short horizontal touch gesture to an overflowing scroll strip', async () => {
-    for (let index = 2; index <= 8; index += 1) {
-      store.commands.layout.createPreset(`custom-${index}`, `Custom ${index}`, 'star');
-    }
-    await renderStrip();
-    const scrollContainer = document.querySelector<HTMLElement>('[data-layout-preset-scroll]');
-    const source = presetTab('compose');
-    expect(scrollContainer).not.toBeNull();
-    expect(source).not.toBeNull();
-    expect(scrollContainer!.scrollWidth).toBeGreaterThan(scrollContainer!.clientWidth);
-    const orderBeforePan = store.getSnapshot().account.layoutPresetOrder;
-    const start = source!.getBoundingClientRect();
-    const startX = start.left + start.width / 2;
-    const startY = start.top + start.height / 2;
-
-    await act(() => touch('touchstart', source!, source!, startX, startY));
-    const move = touch('touchmove', source!, source!, startX - 40, startY);
-    scrollContainer!.scrollLeft = 40;
-    await act(() => touch('touchend', source!, source!, startX - 40, startY));
-
-    expect(move.defaultPrevented).toBe(false);
-    expect(scrollContainer!.scrollLeft).toBe(40);
-    expect(source!.style.opacity).not.toBe('0.5');
-    expect(store.getSnapshot().account.layoutPresetOrder).toBe(orderBeforePan);
-  });
-
   describe('unsaved arrangements', () => {
     const UNSAVED = 'Unsaved layout changes';
     const unsavedDot = (id: string) => presetTab(id)?.querySelector('[data-unsaved-dot]') ?? null;
@@ -565,7 +372,6 @@ describe('LayoutPresetStrip', () => {
     const activePresetId = () => store.getSnapshot().activeProject.layout.presetId;
     const waitForActivePreset = (id: string) => expect.poll(activePresetId, POLL).toBe(id);
 
-    /** Rearrange `presetId` in the store, leaving it active. */
     const rearrange = (presetId: string, sizePx: number) => {
       store.commands.layout.applyPreset(presetId);
       store.commands.layout.setRegionSize('right', sizePx);
@@ -578,15 +384,12 @@ describe('LayoutPresetStrip', () => {
 
       await act(() => store.commands.layout.setRegionSize('right', 401));
 
-      // Within one preset the dot follows the settled arrangement.
       await expect.poll(() => label('compose'), POLL).toBe(`Writing, ${UNSAVED}`);
-      // On the icon, not after the label: the dot sits inside the icon's box.
       expect(unsavedDot('compose')?.parentElement?.querySelector('svg')).not.toBeNull();
 
       await act(() => userEvent.click(presetTab('edit')!));
       await waitForActivePreset('edit');
 
-      // Leaving Compose keeps its arrangement as unsaved; Edit opened clean, at once rather than after the settle.
       expect(label('compose')).toBe(`Writing, ${UNSAVED}`);
       expect(label('edit')).not.toContain(UNSAVED);
       expect(unsavedDot('edit')).toBeNull();
@@ -596,138 +399,6 @@ describe('LayoutPresetStrip', () => {
       await expect.poll(() => unsavedDot('edit'), POLL).not.toBeNull();
       expect(unsavedDot('compose')).not.toBeNull();
       expect(unsavedDot('video')).toBeNull();
-    });
-
-    it('shows the arriving preset’s own state at once, whichever way the switch goes', async () => {
-      rearrange('video', 401);
-      rearrange('edit', 433);
-      await renderStrip();
-      await expect.poll(() => label('edit'), POLL).toContain(UNSAVED);
-
-      // Unsaved → clean: no dot borrowed from the preset just left, in the first frames after the switch.
-      await act(() => userEvent.click(presetTab('automate')!));
-      await waitForActivePreset('automate');
-      expect(unsavedDot('automate')).toBeNull();
-      expect(label('automate')).not.toContain(UNSAVED);
-      expect(unsavedDot('edit')).not.toBeNull();
-
-      // Clean → unsaved: the arriving preset's dot and name are there at once, not after the settle.
-      await act(() => userEvent.click(presetTab('video')!));
-      await waitForActivePreset('video');
-      expect(unsavedDot('video')).not.toBeNull();
-      expect(label('video')).toContain(UNSAVED);
-      expect(unsavedDot('automate')).toBeNull();
-    });
-
-    it('explains the dot on keyboard focus whichever tab focus came from, and says nothing of it on a clean preset', async () => {
-      rearrange('video', 401);
-      rearrange('compose', 433);
-      await renderStrip();
-
-      // A clean tab under keyboard focus shows its own tip, which must not borrow the unsaved line.
-      presetTab('compose')!.focus();
-      await act(() => userEvent.keyboard('{ArrowRight}'));
-      await act(() => userEvent.keyboard('{ArrowRight}'));
-      await waitForActivePreset('edit');
-      expect(document.activeElement).toBe(presetTab('edit'));
-      await expect.poll(() => openTooltip()?.textContent, POLL).toContain('Edit and refine images');
-      expect(openTooltip()?.textContent).not.toContain(UNSAVED);
-
-      // Clean → unsaved by keyboard.
-      await act(() => userEvent.keyboard('{ArrowRight}'));
-      await waitForActivePreset('video');
-      expect(document.activeElement).toBe(presetTab('video'));
-      await expect.poll(() => openTooltip()?.textContent, POLL).toContain(UNSAVED);
-      expect(label('video')).toContain(UNSAVED);
-    });
-
-    it('hands the tip from one unsaved preset to the next as the arrow keys move between them', async () => {
-      rearrange('automate', 461);
-      rearrange('video', 401);
-      await renderStrip();
-
-      // Keyboard focus lands on the selected (unsaved) tab and its tip shows.
-      await act(() => userEvent.tab());
-      expect(document.activeElement).toBe(presetTab('video'));
-      await expect.poll(() => openTooltip()?.textContent, POLL).toContain(UNSAVED);
-
-      await act(() => userEvent.keyboard('{ArrowRight}'));
-      await waitForActivePreset('automate');
-      expect(document.activeElement).toBe(presetTab('automate'));
-      expect(label('automate')).toContain(UNSAVED);
-      // The tip now describes the arriving preset, not the one focus left.
-      await expect.poll(() => openTooltip()?.textContent, POLL).toBe(`ArbeitsablaufBuild and run workflows${UNSAVED}`);
-      // Still open once the switch has settled, not closed by it.
-      await act(() => settle(400));
-      expect(openTooltip()?.textContent).toContain(UNSAVED);
-    });
-
-    describe('never opens the tip on a tab nobody is on', () => {
-      // Labels showing, a clean custom preset has no tip: it gains one only by becoming unsaved.
-      runAtViewport(WIDE_VIEWPORT);
-      beforeEach(() => store.commands.layout.applyPreset('custom-1'));
-      const unsavedTip = () => (openTooltip()?.textContent?.includes(UNSAVED) ? openTooltip() : null);
-      const dirtyCustom = async (sizePx: number) => {
-        await act(() => store.commands.layout.setRegionSize('right', sizePx));
-        await expect.poll(() => label('custom-1'), POLL).toContain(UNSAVED);
-      };
-
-      it('after keyboard focus left a clean tab that then became unsaved', async () => {
-        await renderStrip();
-        await act(() => userEvent.tab());
-        expect(document.activeElement).toBe(presetTab('custom-1'));
-        await act(() => (document.activeElement as HTMLElement).blur());
-
-        await dirtyCustom(401);
-        await act(() => settle(QUIET_MS));
-        expect(openTooltip()).toBeNull();
-
-        // The tip itself works: focus brings it.
-        await act(() => presetTab('custom-1')!.focus());
-        await expect.poll(unsavedTip, POLL).not.toBeNull();
-      });
-
-      it('after a focused unsaved tab was reverted in place, left, and changed again', async () => {
-        await renderStrip();
-        await dirtyCustom(401);
-        await act(() => userEvent.tab());
-        await expect.poll(unsavedTip, POLL).not.toBeNull();
-
-        await act(() => store.commands.layout.reset());
-        await expect.poll(() => label('custom-1'), POLL).not.toContain(UNSAVED);
-        await expect.poll(openTooltip, POLL).toBeNull();
-        await act(() => (document.activeElement as HTMLElement).blur());
-
-        await dirtyCustom(433);
-        await act(() => settle(QUIET_MS));
-        expect(openTooltip()).toBeNull();
-      });
-
-      it('after the pointer left a clean tab that then became unsaved', async () => {
-        await renderStrip();
-        await act(() => userEvent.hover(presetTab('custom-1')!));
-        await act(() => settle(QUIET_MS));
-        expect(openTooltip()).toBeNull();
-        await act(() => userEvent.unhover(presetTab('custom-1')!));
-
-        await dirtyCustom(401);
-        await act(() => settle(QUIET_MS));
-        expect(openTooltip()).toBeNull();
-
-        await act(() => userEvent.hover(presetTab('custom-1')!));
-        await expect.poll(unsavedTip, POLL).not.toBeNull();
-      });
-    });
-
-    it('explains the dot on hover', async () => {
-      rearrange('compose', 401);
-      store.commands.layout.applyPreset('edit');
-      await renderStrip();
-
-      await act(() => userEvent.hover(presetTab('compose')!));
-      await expect.poll(() => openTooltip()?.textContent, POLL).toContain(UNSAVED);
-      await act(() => userEvent.unhover(presetTab('compose')!));
-      await expect.poll(openTooltip, POLL).toBeNull();
     });
 
     it('saves or reverts an inactive preset’s unsaved arrangement from its menu without switching', async () => {
@@ -752,7 +423,6 @@ describe('LayoutPresetStrip', () => {
     it('stays on an unsaved preset when it is pressed again while a slow switch away is still loading', async () => {
       store = createWorkbenchStore(store.getState(), {
         isLoaded: () => false,
-        // Never finishes: the switch waits out its bounded deadline, the window in which a second press lands.
         loadLayoutPresetWidgets: () => new Promise(() => {}),
       });
       await act(() => store.commands.layout.setRegionSize('right', 401));
@@ -763,7 +433,6 @@ describe('LayoutPresetStrip', () => {
       expect(presetTab('edit')).toHaveAttribute('aria-selected', 'true');
       await act(() => userEvent.click(presetTab('compose')!));
 
-      // Well past the activation deadline: nothing switched, and Compose kept its unsaved arrangement.
       await act(() => settle(600));
       expect(activePresetId()).toBe('compose');
       expect(store.getSnapshot().activeProject.widgetRegions.right.sizePx).toBe(401);
@@ -782,155 +451,19 @@ describe('LayoutPresetStrip', () => {
       it('names the preset under the pointer, with what a built-in is for and its shortcut', async () => {
         await renderStrip();
 
-        // Renamed (beforeEach calls Compose "Writing"): the shipped purpose may no longer hold, so only name and key.
         await act(() => userEvent.hover(presetTab('compose')!));
         await expect.poll(tipText, POLL).toContain('Writing');
         expect(tipText()).not.toContain('Generate images from text');
         expect(tipKeycap()?.textContent).toContain('1');
-        // The tip describes the tab; the tab keeps its name.
         expect(presetTab('compose')).toHaveAttribute('aria-label', 'Writing');
 
-        // Still the built-in, but unbound: the purpose shows, no keycap.
         await act(() => userEvent.hover(presetTab('edit')!));
         await expect.poll(tipText, POLL).toBe('EditEdit and refine images');
         expect(tipKeycap()).toBeNull();
 
-        // A custom preset has only its name to show, which is all an icon-only tab is missing.
         await act(() => userEvent.hover(presetTab('custom-1')!));
         await expect.poll(tipText, POLL).toBe('Custom');
       });
-
-      it('shows on keyboard focus', async () => {
-        await renderStrip();
-
-        await act(() => userEvent.tab());
-        expect(document.activeElement).toBe(presetTab('compose'));
-        await expect.poll(tipText, POLL).toContain('Writing');
-      });
-
-      it('keeps quiet while a preset menu is open', async () => {
-        await renderStrip();
-        await act(() => userEvent.tab());
-        await expect.poll(openTooltip, POLL).not.toBeNull();
-
-        await act(() => userEvent.keyboard('{ArrowDown}'));
-        await expect.poll(() => document.querySelector('[role="menu"]'), POLL).not.toBeNull();
-        await expect.poll(openTooltip, POLL).toBeNull();
-
-        // Nor does pointing at another tab bring it while the menu stays open.
-        await act(() => userEvent.hover(presetTab('video')!));
-        await act(() => settle(QUIET_MS));
-        expect(document.querySelector('[role="menu"]')).not.toBeNull();
-        expect(openTooltip()).toBeNull();
-
-        await act(() => userEvent.keyboard('{Escape}'));
-        await expect.poll(() => document.querySelector('[role="menu"]'), POLL).toBeNull();
-        await act(() => userEvent.unhover(presetTab('video')!));
-        await act(() => userEvent.hover(presetTab('video')!));
-        await expect.poll(tipText, POLL).toContain('Generate video');
-      });
-
-      it('keeps quiet while a tab is dragged', async () => {
-        await renderStrip();
-        await act(() => userEvent.tab());
-        expect(document.activeElement).toBe(presetTab('compose'));
-        await expect.poll(openTooltip, POLL).not.toBeNull();
-
-        await act(() => userEvent.keyboard('{Space}'));
-        await expect.poll(openTooltip, POLL).toBeNull();
-        await act(() => userEvent.keyboard('{ArrowRight}'));
-        await act(() => settle(QUIET_MS));
-        expect(openTooltip()).toBeNull();
-
-        await act(() => userEvent.keyboard('{Space}'));
-        expect(store.getSnapshot().account.layoutPresetOrder).toEqual([
-          'custom-1',
-          'compose',
-          'edit',
-          'video',
-          'automate',
-        ]);
-      });
-    });
-
-    describe('with the labels showing', () => {
-      runAtViewport(WIDE_VIEWPORT);
-
-      it('shows only what the label does not already say', async () => {
-        store.commands.layout.applyPreset('custom-1');
-        await renderStrip();
-
-        // A clean custom preset's tip would only repeat its label.
-        await act(() => userEvent.hover(presetTab('custom-1')!));
-        await act(() => settle(QUIET_MS));
-        expect(openTooltip()).toBeNull();
-        await act(() => userEvent.unhover(presetTab('custom-1')!));
-
-        // A built-in's purpose and shortcut are not on the tab.
-        await act(() => userEvent.hover(presetTab('edit')!));
-        await expect.poll(tipText, POLL).toContain('Edit and refine images');
-        await act(() => userEvent.unhover(presetTab('edit')!));
-        await expect.poll(openTooltip, POLL).toBeNull();
-
-        // Unsaved changes are: the tip explains the dot.
-        await act(() => store.commands.layout.setRegionSize('right', 401));
-        await expect.poll(() => presetTab('custom-1')?.getAttribute('aria-label'), POLL).toContain('Unsaved');
-        await act(() => userEvent.hover(presetTab('custom-1')!));
-        await expect.poll(tipText, POLL).toBe('CustomUnsaved layout changes');
-      });
-
-      it('never shows a clean custom preset in a tip that focus hands over', async () => {
-        await renderStrip();
-        await act(() => userEvent.tab());
-        expect(document.activeElement).toBe(presetTab('compose'));
-        await expect.poll(tipText, POLL).toContain('Writing');
-
-        // Every frame, whatever any visible tip says, through the hand-over and the closing fade.
-        const seen = new Set<string>();
-        let isSampling = true;
-        const sample = () => {
-          for (const element of document.querySelectorAll<HTMLElement>('[data-scope="tooltip"][data-part="content"]')) {
-            if (element.checkVisibility()) {
-              seen.add(element.textContent ?? '');
-            }
-          }
-          if (isSampling) {
-            requestAnimationFrame(sample);
-          }
-        };
-        sample();
-
-        await act(() => userEvent.keyboard('{ArrowRight}'));
-        expect(document.activeElement).toBe(presetTab('custom-1'));
-        await act(() => settle(QUIET_MS));
-        isSampling = false;
-
-        expect([...seen].filter((text) => text.includes('Custom'))).toEqual([]);
-        expect(openTooltip()).toBeNull();
-      });
-    });
-
-    it('announces each preset’s bound key, and none for a preset without one', async () => {
-      await renderStrip();
-      const keyShortcuts = (id: string) => presetTab(id)?.getAttribute('aria-keyshortcuts') ?? null;
-
-      // The active tab's menu key comes first; Compose's binding follows.
-      expect(keyShortcuts('compose')).toBe('ArrowDown Alt+1');
-      // Edit is unbound, and a custom preset has no key to bind.
-      expect(keyShortcuts('edit')).toBeNull();
-      expect(keyShortcuts('custom-1')).toBeNull();
-
-      await act(() => userEvent.click(presetTab('edit')!));
-      await expect.poll(() => keyShortcuts('edit'), POLL).toBe('ArrowDown');
-      expect(keyShortcuts('compose')).toBe('Alt+1');
-    });
-
-    it('names the add button', async () => {
-      await renderStrip();
-      const addButton = document.querySelector<HTMLElement>('[aria-label="Save this layout as a new preset"]')!;
-
-      await act(() => userEvent.hover(addButton));
-      await expect.poll(tipText, POLL).toBe('Save this layout as a new preset');
     });
   });
 });

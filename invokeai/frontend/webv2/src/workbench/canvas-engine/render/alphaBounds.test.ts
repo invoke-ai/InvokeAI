@@ -4,14 +4,12 @@ import { isEmpty } from '@workbench/canvas-engine/math/rect';
 import { alphaBounds, hasVisiblePixels } from '@workbench/canvas-engine/render/alphaBounds';
 import { describe, expect, it } from 'vitest';
 
-/** A transparent RGBA buffer of the given size. */
 const buffer = (width: number, height: number): AlphaPixels & { data: Uint8ClampedArray } => ({
   data: new Uint8ClampedArray(Math.max(0, width * height * 4)),
   height,
   width,
 });
 
-/** Sets one pixel's alpha (and, unless told otherwise, leaves RGB at zero). */
 const setAlpha = (pixels: AlphaPixels, x: number, y: number, alpha: number): void => {
   pixels.data[(y * pixels.width + x) * 4 + 3] = alpha;
 };
@@ -69,7 +67,6 @@ describe('alphaBounds', () => {
   });
 
   it('finds the rightmost pixel even when a later row is narrower', () => {
-    // Later rows may increase maxX but never decrease it.
     const pixels = buffer(10, 3);
     setAlpha(pixels, 1, 0, 255);
     setAlpha(pixels, 6, 0, 255);

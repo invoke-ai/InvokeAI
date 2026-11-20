@@ -1,8 +1,8 @@
+import type { CanvasBezierPointContract } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { applyToPoint } from './mat2d';
 
-/** True if the rect has non-positive width or height. */
 export const isEmpty = (r: Rect): boolean => r.width <= 0 || r.height <= 0;
 
 /** Intersection of two rects, or `null` if they don't overlap (or either is empty). */
@@ -21,9 +21,8 @@ export const intersect = (a: Rect, b: Rect): Rect | null => {
 };
 
 /**
- * Union (bounding box) of two rects. An empty rect is treated as
- * contributing no area — the union of an empty rect and a non-empty rect is
- * the non-empty rect; the union of two empty rects is the first rect.
+ * Union (bounding box) of two rects. An empty rect is treated as contributing no area — the union of an empty rect and
+ * a non-empty rect is the non-empty rect; the union of two empty rects is the first rect.
  */
 export const union = (a: Rect, b: Rect): Rect => {
   if (isEmpty(a) && isEmpty(b)) {
@@ -82,13 +81,9 @@ export const transformBounds = (m: Mat2d, r: Rect): Rect => {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 };
 
-/** Rect area, treating empty rects as zero area. */
 const area = (r: Rect): number => (isEmpty(r) ? 0 : r.width * r.height);
 
-/**
- * True if two rects overlap or touch within `slack` pixels of each other
- * (i.e. their `slack`-expanded bounds intersect).
- */
+/** True if two rects overlap or touch within `slack` pixels (their `slack`-expanded bounds intersect). */
 const isNearby = (a: Rect, b: Rect, slack: number): boolean => {
   const expandedA = slack === 0 ? a : expand(a, slack);
   return intersect(expandedA, b) !== null;
@@ -143,4 +138,94 @@ export const mergeDirtyRects = (rects: Rect[], maxRegions = 4): Rect[] => {
   }
 
   return current;
+};
+
+type RenderableBezierPoint = Pick<CanvasBezierPointContract, 'anchor' | 'inHandle' | 'outHandle'>;
+
+export const evaluateBezierSegment = (from: RenderableBezierPoint, to: RenderableBezierPoint, t: number): Vec2 => {
+  const p0 = from.anchor;
+  const p1 = from.outHandle ?? from.anchor;
+  const p2 = to.inHandle ?? to.anchor;
+  const p3 = to.anchor;
+  const mt = 1 - t;
+  const mt2 = mt * mt;
+  const t2 = t * t;
+
+  return {
+    x: mt2 * mt * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t2 * t * p3.x,
+    y: mt2 * mt * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t2 * t * p3.y,
+  };
+};
+
+export const getBezierPathBounds = (points: RenderableBezierPoint[], isClosed: boolean): Rect => {
+  if (points.length === 0) {
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  const include = (point: Vec2) => {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  };
+  points.forEach((point) => include(point.anchor));
+  for (let i = 0; i < (isClosed ? points.length : points.length - 1); i++) {
+    const from = points[i]!;
+    const to = points[(i + 1) % points.length]!;
+    const p1 = from.outHandle ?? from.anchor;
+    const p2 = to.inHandle ?? to.anchor;
+    for (const axis of ['x', 'y'] as const) {
+      // Roots of the cubic's derivative, with the common factor of three removed.
+      const a = -from.anchor[axis] + 3 * p1[axis] - 3 * p2[axis] + to.anchor[axis];
+      const b = 2 * (from.anchor[axis] - 2 * p1[axis] + p2[axis]);
+      const c = p1[axis] - from.anchor[axis];
+      const roots: number[] = [];
+      if (Math.abs(a) < 1e-12) {
+        if (Math.abs(b) >= 1e-12) {
+          roots.push(-c / b);
+        }
+      } else {
+        const discriminant = b * b - 4 * a * c;
+        if (discriminant >= 0) {
+          const sqrt = Math.sqrt(discriminant);
+          roots.push((-b + sqrt) / (2 * a), (-b - sqrt) / (2 * a));
+        }
+      }
+      for (const t of roots) {
+        if (t > 0 && t < 1) {
+          include(evaluateBezierSegment(from, to, t));
+        }
+      }
+    }
+  }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+};
+
+/** Axis-aligned bounds of an outline polygon; an empty polygon yields a zero-size rect. */
+export const polygonBounds = (polygon: readonly Vec2[]): Rect => {
+  if (polygon.length === 0) {
+    return { height: 0, width: 0, x: 0, y: 0 };
+  }
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of polygon) {
+    if (p.x < minX) {
+      minX = p.x;
+    }
+    if (p.y < minY) {
+      minY = p.y;
+    }
+    if (p.x > maxX) {
+      maxX = p.x;
+    }
+    if (p.y > maxY) {
+      maxY = p.y;
+    }
+  }
+  return { height: maxY - minY, width: maxX - minX, x: minX, y: minY };
 };

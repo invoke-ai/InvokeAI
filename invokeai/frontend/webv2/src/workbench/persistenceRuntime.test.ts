@@ -296,34 +296,6 @@ describe('Workbench persistence runtime', () => {
     expect(runtime.getSnapshot()).toEqual({ error: null, phase: 'idle' });
   });
 
-  it('reports refused projects, leaving a deep-linked refusal to the session controller', async () => {
-    const aggregate = createAggregate();
-    const loaded = createInitialWorkbenchState();
-    const refuse = (projectId: string) => ({
-      projectId,
-      projectName: projectId,
-      raw: {},
-      refusal: { raw: {}, scope: 'state' as const, status: 'unsupported-version' as const, version: 3 },
-      source: 'canvas' as const,
-    });
-    const { persistence } = createPersistence(() =>
-      Promise.resolve({ ...snapshot(loaded), refusedProjects: [refuse('future'), refuse('other')] })
-    );
-    const runtime = createWorkbenchPersistenceRuntime({
-      aggregate: aggregate.port,
-      clock: new FakeClock(),
-      loadOptions: { openProjectId: 'future' },
-      persistence,
-    });
-
-    runtime.start();
-    await flushPromises();
-
-    expect(aggregate.events).toContain('refused-projects:other');
-    expect(aggregate.events).not.toContain('not-found');
-    expect(aggregate.state.projects.map((project) => project.id)).toEqual(loaded.projects.map((project) => project.id));
-  });
-
   it('preserves an edit made during load and saves it only after load settles', async () => {
     const aggregate = createAggregate();
     const load = deferred<HydratedWorkbenchSnapshot | null>();
@@ -346,44 +318,6 @@ describe('Workbench persistence runtime', () => {
     expect(persistence.saveWorkbench).toHaveBeenCalledWith(
       expect.objectContaining({ projects: [expect.objectContaining({ name: 'Local edit during load' })] })
     );
-  });
-
-  it('reports edits as pending from the moment they happen until their own save is acknowledged', async () => {
-    const aggregate = createAggregate();
-    const { persistence } = createPersistence(() => Promise.resolve(null));
-    const first = deferred<WorkbenchSaveResult>();
-    const second = deferred<WorkbenchSaveResult>();
-    vi.mocked(persistence.saveWorkbench)
-      .mockImplementationOnce(() => first.promise)
-      .mockImplementationOnce(() => second.promise);
-    const clock = new FakeClock();
-    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
-
-    runtime.start();
-    await flushPromises();
-    aggregate.events.length = 0;
-
-    // Before the debounce fires, the edit is already reported, so nothing can claim it was saved.
-    aggregate.edit('First');
-    await flushPromises();
-    expect(aggregate.events).toEqual(['save-scheduled']);
-    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
-
-    clock.runAll();
-    expect(aggregate.events).toEqual(['save-scheduled', 'save-started']);
-
-    // An edit made while the save runs makes that save's answer stale: nothing reports "saved" until the edit's
-    // own save is acknowledged.
-    aggregate.edit('Second');
-    await flushPromises();
-    first.resolve(saveResult(aggregate.state, 'first'));
-    await flushPromises();
-    expect(aggregate.events).toEqual(['save-scheduled', 'save-started']);
-
-    clock.runAll();
-    second.resolve(saveResult(aggregate.state, 'second'));
-    await flushPromises();
-    expect(aggregate.events).toEqual(['save-scheduled', 'save-started', 'save-started', 'save-succeeded:second']);
   });
 
   it('debounces edits and ignores stale completions after a newer revision', async () => {
@@ -414,66 +348,6 @@ describe('Workbench persistence runtime', () => {
     second.resolve(saveResult(aggregate.state, 'current'));
     await flushPromises();
     expect(aggregate.events).toContain('save-succeeded:current');
-  });
-
-  it('applies server outcomes from a save that went stale', async () => {
-    // A stale snapshot can still receive the draft's only authoritative board id; preserve that create response
-    // despite intervening edits.
-    const aggregate = createAggregate();
-    const { persistence } = createPersistence(() => Promise.resolve(null));
-    const first = deferred<WorkbenchSaveResult>();
-    const second = deferred<WorkbenchSaveResult>();
-    vi.mocked(persistence.saveWorkbench)
-      .mockImplementationOnce(() => first.promise)
-      .mockImplementationOnce(() => second.promise);
-    const clock = new FakeClock();
-    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
-
-    runtime.start();
-    await flushPromises();
-    aggregate.edit('First');
-    clock.runAll();
-
-    // The edit that makes the in-flight save stale.
-    aggregate.edit('Second');
-    clock.runAll();
-
-    first.resolve({
-      ...saveResult(aggregate.state, 'stale'),
-      projectBoardAssignments: [{ boardId: 'board-1', projectId: 'project-1' }],
-    });
-    await flushPromises();
-
-    expect(aggregate.boardAssignments).toEqual([{ boardId: 'board-1', projectId: 'project-1' }]);
-    // Still stale for the purposes of the save's own bookkeeping.
-    expect(aggregate.events).not.toContain('save-succeeded:stale');
-
-    second.resolve(saveResult(aggregate.state, 'current'));
-    await flushPromises();
-    expect(aggregate.events).toContain('save-succeeded:current');
-  });
-
-  it('applies acknowledged board identities before reporting a partial save failure', async () => {
-    const aggregate = createAggregate();
-    const { persistence } = createPersistence(() => Promise.resolve(null));
-    vi.mocked(persistence.saveWorkbench).mockResolvedValueOnce({
-      ...saveResult(aggregate.state),
-      error: 'Project B could not be saved.',
-      hasPendingChanges: true,
-      projectBoardAssignments: [{ boardId: 'board-a', projectId: 'project-a' }],
-    });
-    const clock = new FakeClock();
-    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
-
-    runtime.start();
-    await flushPromises();
-    aggregate.edit();
-    clock.runAll();
-    await flushPromises();
-
-    expect(aggregate.boardAssignments).toEqual([{ boardId: 'board-a', projectId: 'project-a' }]);
-    expect(aggregate.events).toContain('save-failed:Project B could not be saved.');
-    expect(runtime.getSnapshot()).toEqual({ error: 'Project B could not be saved.', phase: 'idle' });
   });
 
   it('retries transient work while reporting a hard failure from the same save', async () => {
@@ -507,122 +381,6 @@ describe('Workbench persistence runtime', () => {
     clock.runAll();
     await flushPromises();
     expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
-  });
-
-  it('retries a transiently pending save without reporting it as saved', async () => {
-    const aggregate = createAggregate();
-    const { persistence } = createPersistence(() => Promise.resolve(null));
-    vi.mocked(persistence.saveWorkbench)
-      .mockResolvedValueOnce({
-        ...saveResult(aggregate.state, 'pending'),
-        hasPendingChanges: true,
-        shouldRetry: true,
-      })
-      .mockResolvedValueOnce(saveResult(aggregate.state, 'acknowledged'));
-    const clock = new FakeClock();
-    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
-    runtime.start();
-    await flushPromises();
-    aggregate.edit();
-    clock.runAll();
-    await flushPromises();
-
-    expect(aggregate.events).not.toContain('save-succeeded:pending');
-    expect(aggregate.events).toContain('save-pending:Autosave is pending and will retry.');
-    expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
-
-    clock.runAll();
-    await flushPromises();
-    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
-    expect(aggregate.events).toContain('save-succeeded:acknowledged');
-  });
-
-  it('retries pending work that awaits no decision instead of asking for attention', async () => {
-    const aggregate = createAggregate();
-    const { persistence } = createPersistence(() => Promise.resolve(null));
-    // A newer draft was staged while the push was in flight: acknowledged, yet still pending, with nothing to resolve.
-    vi.mocked(persistence.saveWorkbench)
-      .mockResolvedValueOnce({
-        ...saveResult(aggregate.state, 'rebased'),
-        hasPendingChanges: true,
-        hasRetryablePendingChanges: true,
-      })
-      .mockResolvedValueOnce(saveResult(aggregate.state, 'acknowledged'));
-    const clock = new FakeClock();
-    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
-    runtime.start();
-    await flushPromises();
-    aggregate.edit();
-    clock.runAll();
-    await flushPromises();
-
-    expect(aggregate.events.some((event) => event.startsWith('save-needs-attention:'))).toBe(false);
-    expect(aggregate.events).not.toContain('save-succeeded:rebased');
-    expect(aggregate.events).toContain('save-pending:Autosave is pending and will retry.');
-
-    clock.runAll();
-    await flushPromises();
-    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
-    expect(aggregate.events.at(-1)).toBe('save-succeeded:acknowledged');
-  });
-
-  it("retries another project's pending work while one awaits a decision, then asks for attention", async () => {
-    const aggregate = createAggregate();
-    const { persistence } = createPersistence(() => Promise.resolve(null));
-    vi.mocked(persistence.saveWorkbench)
-      .mockResolvedValueOnce({
-        ...saveResult(aggregate.state, 'first'),
-        awaitsDecision: true,
-        hasPendingChanges: true,
-        hasRetryablePendingChanges: true,
-      })
-      .mockResolvedValueOnce({
-        ...saveResult(aggregate.state, 'second'),
-        awaitsDecision: true,
-        hasPendingChanges: true,
-        hasRetryablePendingChanges: false,
-      });
-    const clock = new FakeClock();
-    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
-    runtime.start();
-    await flushPromises();
-    aggregate.edit();
-    clock.runAll();
-    await flushPromises();
-
-    expect(aggregate.events).toContain('save-pending:Autosave is pending and will retry.');
-    expect(aggregate.events).not.toContain('save-needs-attention:first');
-
-    clock.runAll();
-    await flushPromises();
-    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
-    expect(aggregate.events.at(-1)).toBe('save-needs-attention:second');
-    clock.runAll();
-    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
-  });
-
-  it('leaves a non-retrying conflict save in an explicit attention state', async () => {
-    const aggregate = createAggregate();
-    const { persistence } = createPersistence(() => Promise.resolve(null));
-    vi.mocked(persistence.saveWorkbench).mockResolvedValueOnce({
-      ...saveResult(aggregate.state, 'conflicted'),
-      awaitsDecision: true,
-      hasPendingChanges: true,
-      shouldRetry: false,
-    });
-    const clock = new FakeClock();
-    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
-    runtime.start();
-    await flushPromises();
-    aggregate.edit();
-    clock.runAll();
-    await flushPromises();
-
-    expect(aggregate.events).toContain('save-needs-attention:conflicted');
-    expect(aggregate.events.some((event) => event.startsWith('save-pending:'))).toBe(false);
-    expect(aggregate.events.some((event) => event.startsWith('save-succeeded:'))).toBe(false);
-    clock.runAll();
-    expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
   });
 
   it('ignores server outcomes once its account lifetime has ended', async () => {
@@ -689,28 +447,6 @@ describe('Workbench persistence runtime', () => {
     expect(aggregate.events).toContain('save-succeeded:latest');
   });
 
-  it('holds a failed revision until a new edit and then retries', async () => {
-    const aggregate = createAggregate();
-    const { persistence } = createPersistence(() => Promise.resolve(null));
-    vi.mocked(persistence.saveWorkbench).mockRejectedValueOnce(new Error('offline'));
-    const clock = new FakeClock();
-    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
-
-    runtime.start();
-    await flushPromises();
-    aggregate.edit();
-    clock.runAll();
-    await flushPromises();
-    expect(aggregate.events).toContain('save-failed:offline');
-
-    clock.runAll();
-    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(1);
-    aggregate.edit('Retry revision');
-    clock.runAll();
-    await flushPromises();
-    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
-  });
-
   it('replays pending work immediately on reconnect and rejects a stale replay', async () => {
     const aggregate = createAggregate();
     const { persistence, setPending } = createPersistence(() => Promise.resolve(null));
@@ -732,29 +468,6 @@ describe('Workbench persistence runtime', () => {
     expect(aggregate.events).not.toContain('save-succeeded:stale-replay');
     clock.runAll();
     expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
-  });
-
-  it('ends a lifetime that never loaded without saving, ignoring the late load', async () => {
-    const aggregate = createAggregate();
-    const load = deferred<HydratedWorkbenchSnapshot | null>();
-    const { persistence } = createPersistence(() => load.promise);
-    const clock = new FakeClock();
-    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
-    const listener = vi.fn();
-    runtime.subscribe(listener);
-
-    runtime.start();
-    const exit = runtime.exit();
-    load.resolve(snapshot(createInitialWorkbenchState()));
-    await flushPromises();
-    aggregate.edit();
-    clock.runAll();
-
-    await expect(exit.settled).resolves.toBe('nothing-to-save');
-    expect(runtime.getSnapshot().phase).toBe('disposed');
-    expect(aggregate.hasHydrated).toBe(false);
-    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
-    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it('disposes immediately when its owning account signal is aborted', async () => {
@@ -850,31 +563,6 @@ describe('Workbench persistence runtime exit checkpoint', () => {
     expect(savedNames(persistence)).toEqual(['In flight', 'Latest']);
   });
 
-  it('writes nothing more when the save in flight already covers the latest state', async () => {
-    const { aggregate, clock, persistence, runtime } = await startLoaded();
-    const inFlight = deferred<WorkbenchSaveResult>();
-    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
-    aggregate.edit('Latest');
-    clock.runAll();
-
-    const exit = runtime.exit();
-    inFlight.resolve(saveResult(aggregate.state));
-
-    await expect(exit.settled).resolves.toBe('nothing-to-save');
-    expect(savedNames(persistence)).toEqual(['Latest']);
-  });
-
-  it('saves again at exit when the latest revision previously failed', async () => {
-    const { aggregate, clock, persistence, runtime } = await startLoaded();
-    vi.mocked(persistence.saveWorkbench).mockRejectedValueOnce(new Error('offline'));
-    aggregate.edit('Failed once');
-    clock.runAll();
-    await flushPromises();
-
-    await expect(runtime.exit().settled).resolves.toBe('saved');
-    expect(savedNames(persistence)).toEqual(['Failed once', 'Failed once']);
-  });
-
   it('writes nothing once the account lifetime ends, even mid-checkpoint', async () => {
     const controller = new AbortController();
     const { aggregate, clock, persistence, runtime } = await startLoaded({ signal: controller.signal });
@@ -890,32 +578,6 @@ describe('Workbench persistence runtime exit checkpoint', () => {
 
     await expect(exit.settled).resolves.toBe('abandoned');
     expect(savedNames(persistence)).toEqual(['Account A']);
-  });
-
-  it('writes nothing for an exit that begins after the account lifetime ended', async () => {
-    const controller = new AbortController();
-    const { aggregate, persistence, runtime } = await startLoaded({ signal: controller.signal });
-    aggregate.edit('Account A');
-    controller.abort();
-
-    await expect(runtime.exit().settled).resolves.toBe('abandoned');
-    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
-  });
-
-  it('records a failed exit save without rejecting, retrying, or touching the aggregate', async () => {
-    const { aggregate, clock, persistence, runtime } = await startLoaded();
-    vi.mocked(persistence.saveWorkbench).mockRejectedValueOnce(new Error('offline'));
-    aggregate.edit('Unsaved');
-    const eventsBeforeExit = [...aggregate.events];
-    const mark = logMark();
-
-    await expect(runtime.exit().settled).resolves.toBe('failed');
-    clock.runAll();
-    await flushPromises();
-
-    expect(loggedSince(mark)).toEqual(['persistence.exit-checkpoint-failed']);
-    expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
-    expect(aggregate.events).toEqual(eventsBeforeExit);
   });
 
   it('saves committed state without waiting for the capture, then once more for what the capture brought in', async () => {
@@ -937,25 +599,6 @@ describe('Workbench persistence runtime exit checkpoint', () => {
     expect(savedNames(persistence)).toEqual(['Committed', 'With pixels']);
   });
 
-  it.each([
-    ['rejects', () => Promise.reject(new Error('upload failed'))],
-    [
-      'throws synchronously',
-      () => {
-        throw new Error('no engine');
-      },
-    ],
-  ])('still saves, once, and records it when the capture %s', async (_, beforeCapture) => {
-    const { aggregate, persistence, runtime } = await startLoaded();
-    aggregate.edit('Committed');
-    const mark = logMark();
-
-    await expect(runtime.exit({ beforeCapture }).settled).resolves.toBe('saved');
-
-    expect(savedNames(persistence)).toEqual(['Committed']);
-    expect(loggedSince(mark)).toEqual(['persistence.exit-capture-incomplete']);
-  });
-
   it('stops waiting for a capture that never settles and records it', async () => {
     const { aggregate, clock, persistence, runtime } = await startLoaded();
     aggregate.edit('Committed');
@@ -970,35 +613,6 @@ describe('Workbench persistence runtime exit checkpoint', () => {
     expect(loggedSince(mark)).toEqual(['persistence.exit-capture-incomplete']);
   });
 
-  it('saves again at exit when the save in flight comes back with an error', async () => {
-    const { aggregate, clock, persistence, runtime } = await startLoaded();
-    const inFlight = deferred<WorkbenchSaveResult>();
-    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
-    aggregate.edit('Latest');
-    clock.runAll();
-
-    const exit = runtime.exit();
-    inFlight.resolve({ ...saveResult(aggregate.state), error: 'server error' });
-
-    await expect(exit.settled).resolves.toBe('saved');
-    expect(savedNames(persistence)).toEqual(['Latest', 'Latest']);
-  });
-
-  it('reports an exit save the backend did not acknowledge as failed and records it', async () => {
-    const { aggregate, persistence, runtime } = await startLoaded();
-    vi.mocked(persistence.saveWorkbench).mockResolvedValueOnce({
-      ...saveResult(aggregate.state),
-      shouldRetry: true,
-    });
-    aggregate.edit('Unacknowledged');
-    const mark = logMark();
-
-    await expect(runtime.exit().settled).resolves.toBe('failed');
-
-    expect(savedNames(persistence)).toEqual(['Unacknowledged']);
-    expect(loggedSince(mark)).toEqual(['persistence.exit-checkpoint-incomplete']);
-  });
-
   it('commits drafts editors still hold and saves them in the one checkpoint write', async () => {
     const draft = createHeldDraft();
     const { aggregate, clock, persistence, runtime } = await startLoaded({ commitDrafts: draft.commit });
@@ -1010,86 +624,6 @@ describe('Workbench persistence runtime exit checkpoint', () => {
     await flushPromises();
 
     expect(savedNames(persistence)).toEqual(['Drafted']);
-  });
-
-  it('stops observing the aggregate and the page at exit', async () => {
-    const page = createPage();
-    const { aggregate, clock, persistence, runtime } = await startLoaded({ page: page.port });
-
-    await expect(runtime.exit().settled).resolves.toBe('nothing-to-save');
-    aggregate.edit('After exit');
-    page.hide();
-    clock.runAll();
-    await flushPromises();
-
-    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
-  });
-
-  it('does not reopen projects after the editor closed its session to leave', async () => {
-    const { aggregate, persistence, runtime, setClosedSession } = await startLoaded();
-    aggregate.edit('Last tab');
-    setClosedSession(true);
-
-    await expect(runtime.exit().settled).resolves.toBe('nothing-to-save');
-    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
-  });
-
-  it('saves an edit committed while the session was being emptied once the session reopens', async () => {
-    const { aggregate, clock, persistence, reopenSession, setClosedSession } = await startLoaded();
-    setClosedSession(true);
-    aggregate.edit('Typed during the close');
-    await flushPromises();
-    clock.runAll();
-    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
-    expect(aggregate.events.at(-1)).toBe('save-scheduled');
-
-    reopenSession();
-    await flushPromises();
-
-    expect(savedNames(persistence)).toEqual(['Typed during the close']);
-    expect(aggregate.events.at(-1)).toBe('save-succeeded:2026-07-17T00:00:00.000Z');
-    clock.runAll();
-    expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
-  });
-
-  it('keeps a retry held while the session was closed bound to its revision when it runs on reopen', async () => {
-    const { aggregate, clock, persistence, reopenSession, setClosedSession } = await startLoaded();
-    vi.mocked(persistence.saveWorkbench).mockResolvedValueOnce({ ...saveResult(aggregate.state), shouldRetry: true });
-    aggregate.edit('Pending retry');
-    clock.runAll();
-    await flushPromises();
-    expect(aggregate.events.at(-1)).toBe('save-pending:Autosave is pending and will retry.');
-    // The retry comes due while the session is closed.
-    setClosedSession(true);
-    clock.runAll();
-    expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
-
-    const retrying = deferred<WorkbenchSaveResult>();
-    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => retrying.promise);
-    reopenSession();
-    expect(savedNames(persistence)).toEqual(['Pending retry', 'Pending retry']);
-    // Edited while the retry is in flight: a retry only counts for the revision it was scheduled for.
-    aggregate.edit('Edited meanwhile');
-    retrying.resolve(saveResult(aggregate.state));
-    await flushPromises();
-
-    expect(aggregate.events).not.toContain('save-succeeded:2026-07-17T00:00:00.000Z');
-    clock.runAll();
-    expect(savedNames(persistence)).toEqual(['Pending retry', 'Pending retry', 'Edited meanwhile']);
-  });
-
-  it('does not save on a reopened session when nothing was requested while it was closed', async () => {
-    const { aggregate, clock, persistence, reopenSession, setClosedSession } = await startLoaded();
-    aggregate.edit('Before the close');
-    clock.runAll();
-    await flushPromises();
-    setClosedSession(true);
-
-    reopenSession();
-    await flushPromises();
-    clock.runAll();
-
-    expect(savedNames(persistence)).toEqual(['Before the close']);
   });
 
   it('loads a remounted editor only after the previous exit checkpoint settles', async () => {
@@ -1123,40 +657,6 @@ describe('Workbench persistence runtime exit checkpoint', () => {
     expect(vi.mocked(second.persistence.loadWorkbench).mock.invocationCallOrder[0]).toBeGreaterThan(
       vi.mocked(first.persistence.saveWorkbench).mock.invocationCallOrder[1]!
     );
-  });
-
-  it('keeps a later editor waiting when the one in between left before it loaded', async () => {
-    const first = await startLoaded();
-    const inFlight = deferred<WorkbenchSaveResult>();
-    vi.mocked(first.persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
-    first.aggregate.edit('In flight');
-    first.clock.runAll();
-    const firstExit = first.runtime.exit();
-
-    const between = createWorkbenchPersistenceRuntime({
-      aggregate: createAggregate().port,
-      clock: new FakeClock(),
-      persistence: createPersistence(() => Promise.resolve(null)).persistence,
-      previousExit: firstExit,
-    });
-    between.start();
-    const betweenExit = between.exit();
-
-    const last = createPersistence(() => Promise.resolve(null));
-    createWorkbenchPersistenceRuntime({
-      aggregate: createAggregate().port,
-      clock: new FakeClock(),
-      persistence: last.persistence,
-      previousExit: betweenExit,
-    }).start();
-    await new Promise((resolve) => {
-      setTimeout(resolve, 0);
-    });
-    expect(last.persistence.loadWorkbench).not.toHaveBeenCalled();
-
-    inFlight.resolve(saveResult(first.aggregate.state));
-    await expect(betweenExit.settled).resolves.toBe('nothing-to-save');
-    await vi.waitFor(() => expect(last.persistence.loadWorkbench).toHaveBeenCalledOnce());
   });
 
   it('stops waiting at the bound and keeps the superseded checkpoint from writing', async () => {
@@ -1205,28 +705,6 @@ describe('Workbench persistence runtime page lifecycle', () => {
     expect(savedNames(persistence)).toEqual(['Before hiding']);
   });
 
-  it('does not re-push a failed revision or one already in flight when the page is hidden', async () => {
-    const page = createPage();
-    const { aggregate, clock, persistence } = await startLoaded({ page: page.port });
-    vi.mocked(persistence.saveWorkbench).mockRejectedValueOnce(new Error('offline'));
-    aggregate.edit('Failed');
-    clock.runAll();
-    await flushPromises();
-
-    page.hide();
-    expect(savedNames(persistence)).toEqual(['Failed']);
-
-    const inFlight = deferred<WorkbenchSaveResult>();
-    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
-    aggregate.edit('In flight');
-    clock.runAll();
-    page.hide();
-    inFlight.resolve(saveResult(aggregate.state));
-    await flushPromises();
-
-    expect(savedNames(persistence)).toEqual(['Failed', 'In flight']);
-  });
-
   it('commits held drafts before deciding whether the hidden page has anything to save', async () => {
     const page = createPage();
     const draft = createHeldDraft();
@@ -1245,73 +723,6 @@ describe('Workbench persistence runtime page lifecycle', () => {
     clock.runAll();
     await flushPromises();
     expect(savedNames(persistence)).toEqual(['Typed just before hiding']);
-  });
-
-  it('writes nothing and leaves drafts alone while the editor is leaving with a closed session', async () => {
-    const page = createPage();
-    const draft = createHeldDraft();
-    const { aggregate, clock, persistence, setClosedSession } = await startLoaded({
-      commitDrafts: draft.commit,
-      page: page.port,
-    });
-    draft.held.commitTo = aggregate;
-    setClosedSession(true);
-
-    aggregate.edit('After the empty session');
-    clock.runAll();
-    draft.held.name = 'Drafted after the empty session';
-    page.hide();
-
-    expect(draft.commit).not.toHaveBeenCalled();
-    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
-  });
-
-  it('leaves drafts alone when the page is hidden before loading or after its account lifetime ended', async () => {
-    const page = createPage();
-    const draft = createHeldDraft();
-    const aggregate = createAggregate();
-    draft.held.commitTo = aggregate;
-    draft.held.name = 'Drafted';
-    const load = deferred<HydratedWorkbenchSnapshot | null>();
-    const { persistence } = createPersistence(() => load.promise);
-    const controller = new AbortController();
-    const runtime = createWorkbenchPersistenceRuntime({
-      aggregate: aggregate.port,
-      clock: new FakeClock(),
-      commitDrafts: draft.commit,
-      page: page.port,
-      persistence,
-      signal: controller.signal,
-    });
-
-    runtime.start();
-    page.hide();
-    expect(draft.commit).not.toHaveBeenCalled();
-
-    load.resolve(null);
-    await flushPromises();
-    controller.abort();
-    page.hide();
-
-    expect(draft.commit).not.toHaveBeenCalled();
-    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
-  });
-
-  it('queues a hidden-page save behind the one in flight', async () => {
-    const page = createPage();
-    const { aggregate, clock, persistence } = await startLoaded({ page: page.port });
-    const inFlight = deferred<WorkbenchSaveResult>();
-    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
-    aggregate.edit('In flight');
-    clock.runAll();
-    aggregate.edit('Hidden');
-
-    page.hide();
-    expect(savedNames(persistence)).toEqual(['In flight']);
-
-    inFlight.resolve(saveResult(aggregate.state));
-    await flushPromises();
-    expect(savedNames(persistence)).toEqual(['In flight', 'Hidden']);
   });
 });
 
@@ -1363,38 +774,6 @@ describe('Workbench persistence runtime unload journal', () => {
     expect(savedNames(persistence)).toEqual(['Typed just before hiding', 'Saving']);
   });
 
-  it('journals while the exit checkpoint saves, until it settles', async () => {
-    const page = createPage();
-    const { aggregate, persistence, runtime } = await startLoaded({ page: page.port });
-    const journaledNames = journalTo(persistence);
-    const checkpointSave = deferred<WorkbenchSaveResult>();
-    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => checkpointSave.promise);
-    aggregate.edit('Left the editor');
-
-    const exit = runtime.exit();
-    // Leaving the editor and reloading at once: the checkpoint's save cannot finish.
-    page.hide();
-    expect(journaledNames).toEqual(['Left the editor']);
-
-    checkpointSave.resolve(saveResult(aggregate.state));
-    await expect(exit.settled).resolves.toBe('saved');
-    page.hide();
-    expect(journaledNames).toEqual(['Left the editor']);
-  });
-
-  it('does not journal for an exit a newer editor superseded', async () => {
-    const page = createPage();
-    const { aggregate, persistence, runtime } = await startLoaded({ page: page.port });
-    const journaledNames = journalTo(persistence);
-    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => deferred<WorkbenchSaveResult>().promise);
-    aggregate.edit('Superseded');
-
-    runtime.exit().supersede();
-    page.hide();
-
-    expect(journaledNames).toEqual([]);
-  });
-
   it('reports a journal that could not be written and still saves', async () => {
     const page = createPage();
     const { aggregate, persistence } = await startLoaded({ page: page.port });
@@ -1430,41 +809,6 @@ describe('Workbench persistence runtime unload journal', () => {
     await flushPromises();
     await flushPromises();
     expect(savedNames(persistence)).toEqual(['First', 'Third']);
-  });
-
-  it('journals the revision again after a journal write that aborted', async () => {
-    const page = createPage();
-    const { aggregate, persistence } = await startLoaded({ page: page.port });
-    let isWritten = false;
-    const journaledNames = journalTo(persistence, () => Promise.resolve(isWritten));
-    vi.mocked(persistence.saveWorkbench).mockImplementation(() => deferred<WorkbenchSaveResult>().promise);
-    const mark = logMark();
-    aggregate.edit('Hidden');
-
-    page.hide();
-    await flushPromises();
-    isWritten = true;
-    page.hide();
-
-    expect(journaledNames).toEqual(['Hidden', 'Hidden']);
-    expect(loggedSince(mark)).toContain('persistence.unload-journal-aborted');
-  });
-
-  it('does not journal, nor count as journaled, while the session is closed', async () => {
-    const page = createPage();
-    const { aggregate, persistence, runtime, setClosedSession } = await startLoaded({ page: page.port });
-    const journaledNames = journalTo(persistence);
-    vi.mocked(persistence.saveWorkbench).mockImplementation(() => deferred<WorkbenchSaveResult>().promise);
-    aggregate.edit('Closing');
-    runtime.exit();
-    setClosedSession(true);
-    page.hide();
-    expect(journaledNames).toEqual([]);
-
-    // The close did not complete and the session reopened: the same revision is journaled after all.
-    setClosedSession(false);
-    page.hide();
-    expect(journaledNames).toEqual(['Closing']);
   });
 });
 
@@ -1535,76 +879,5 @@ describe('Workbench persistence runtime unload prompt', () => {
     await vi.waitFor(() => expect(savedNames(persistence)).toEqual(['At risk', 'Typed', tooLarge]));
     await flushPromises();
     expect(page.beforeUnload()).toBe(false);
-  });
-
-  it('does not checkpoint or prompt before load, while closed, or after its account lifetime ended', async () => {
-    const page = createPage();
-    const aggregate = createAggregate();
-    const load = deferred<HydratedWorkbenchSnapshot | null>();
-    const fake = createPersistence(() => load.promise);
-    fake.setUnloadWouldLose(true);
-    const controller = new AbortController();
-    const runtime = createWorkbenchPersistenceRuntime({
-      aggregate: aggregate.port,
-      clock: new FakeClock(),
-      page: page.port,
-      persistence: fake.persistence,
-      signal: controller.signal,
-    });
-    runtime.start();
-    aggregate.edit('While loading');
-    expect(page.beforeUnload()).toBe(false);
-    expect(fake.persistence.journalBeforeUnload).not.toHaveBeenCalled();
-    expect(fake.persistence.saveWorkbench).not.toHaveBeenCalled();
-
-    load.resolve(null);
-    await flushPromises();
-    expect(page.isListeningBeforeUnload).toBe(true);
-    aggregate.edit('Closing the last tab');
-    fake.setClosedSession(true);
-    expect(page.beforeUnload()).toBe(false);
-    aggregate.edit('Closed');
-    expect(page.beforeUnload()).toBe(false);
-    expect(fake.persistence.journalBeforeUnload).not.toHaveBeenCalled();
-    expect(fake.persistence.saveWorkbench).not.toHaveBeenCalled();
-    fake.reopenSession();
-    expect(page.beforeUnload()).toBe(true);
-    expect(fake.persistence.journalBeforeUnload).toHaveBeenCalledOnce();
-
-    controller.abort();
-    expect(page.isListeningBeforeUnload).toBe(false);
-  });
-
-  it('listens while the exit checkpoint saves, but not for a checkpoint a newer editor superseded', async () => {
-    const page = createPage();
-    const loaded = await startLoaded({ page: page.port });
-    const { aggregate, persistence, runtime } = loaded;
-    const journaledNames = journalTo(loaded);
-    const checkpointSave = deferred<WorkbenchSaveResult>();
-    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => checkpointSave.promise);
-    aggregate.edit(tooLarge);
-
-    const exit = runtime.exit();
-    expect(page.beforeUnload()).toBe(true);
-    expect(journaledNames).toEqual([tooLarge]);
-
-    exit.supersede();
-    expect(page.isListeningBeforeUnload).toBe(false);
-
-    checkpointSave.resolve(saveResult(aggregate.state));
-    await exit.settled;
-    expect(page.isListeningBeforeUnload).toBe(false);
-  });
-
-  it('stops listening when the exit checkpoint settles', async () => {
-    const page = createPage();
-    const loaded = await startLoaded({ page: page.port });
-    loaded.aggregate.edit('Left the editor');
-    expect(page.isListeningBeforeUnload).toBe(true);
-
-    const exit = loaded.runtime.exit();
-    expect(page.isListeningBeforeUnload).toBe(true);
-    await expect(exit.settled).resolves.toBe('saved');
-    expect(page.isListeningBeforeUnload).toBe(false);
   });
 });

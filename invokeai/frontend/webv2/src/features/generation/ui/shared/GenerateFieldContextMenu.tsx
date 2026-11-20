@@ -79,8 +79,8 @@ const MODIFIED_DOT_CSS = {
 
 /**
  * A field's reset and copy menu. A changed field shows a dot in its gutter that resets it on click, so the reset is
- * visible without the menu; the menu opens on right-click or the keyboard menu key (Shift+F10), anchored to the
- * field when no pointer placed it.
+ * visible without the menu; the menu opens on right-click or the keyboard menu key (Shift+F10), anchored to the field
+ * when no pointer placed it.
  */
 export const GenerateFieldContextMenu = ({
   children,

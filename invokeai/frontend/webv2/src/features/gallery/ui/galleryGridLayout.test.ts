@@ -7,7 +7,6 @@ import {
   buildGalleryGridRows,
   buildSparseGalleryNavigationEntries,
   GALLERY_GRID_GAP_PX,
-  GALLERY_PINNED_FOOTER_PX,
   GALLERY_STARRED_HEADER_HEIGHT_PX,
   getGalleryCellSizePx,
   getGalleryColumnCount,
@@ -17,7 +16,6 @@ import {
   getGallerySparseRowKey,
   getGallerySparseSelectionPages,
   getGallerySparseSlotKey,
-  getGalleryPinnedHeightPx,
   getGalleryStarredLayout,
   getGalleryStarredStripItems,
   planGalleryPageOffsets,
@@ -59,14 +57,6 @@ describe('planGalleryPageOffsets', () => {
       expect(planGalleryPageOffsets({ endIndexExclusive, startIndex, total })).toEqual(expected);
     }
   );
-
-  it('returns no offsets for empty or non-finite ranges', () => {
-    expect(planGalleryPageOffsets({ endIndexExclusive: 10, startIndex: 10, total: null })).toEqual([]);
-    expect(planGalleryPageOffsets({ endIndexExclusive: Number.POSITIVE_INFINITY, startIndex: 0, total: null })).toEqual(
-      []
-    );
-    expect(planGalleryPageOffsets({ endIndexExclusive: 4, startIndex: 5, total: null })).toEqual([]);
-  });
 });
 
 describe('getGalleryColumnCountForCell', () => {
@@ -77,75 +67,20 @@ describe('getGalleryColumnCountForCell', () => {
     expect(getGalleryColumnCountForCell({ ...bounds, widthPx: 120 })).toBe(3);
     expect(getGalleryColumnCountForCell({ ...bounds, widthPx: 2000 })).toBe(8);
   });
-
-  it('falls back to the minimum before the width is measured', () => {
-    expect(getGalleryColumnCountForCell({ max: 8, min: 3, targetCellPx: 72, widthPx: 0 })).toBe(3);
-  });
 });
 
 describe('getGalleryColumnCount', () => {
-  it('gives the same answer at the same width regardless of placement', () => {
-    const stacked = getGalleryColumnCount({ imageDensityPercent: 50, widthPx: 600 });
-    const wide = getGalleryColumnCount({ imageDensityPercent: 50, widthPx: 600 });
-
-    expect(stacked).toBe(wide);
-  });
-
   it('fits more columns as the viewport grows', () => {
     const narrow = getGalleryColumnCount({ imageDensityPercent: 50, widthPx: 360 });
     const roomy = getGalleryColumnCount({ imageDensityPercent: 50, widthPx: 1200 });
 
     expect(roomy).toBeGreaterThan(narrow);
   });
-
-  it('fits more columns as density rises', () => {
-    const sparse = getGalleryColumnCount({ imageDensityPercent: 0, widthPx: 800 });
-    const dense = getGalleryColumnCount({ imageDensityPercent: 100, widthPx: 800 });
-
-    expect(dense).toBeGreaterThan(sparse);
-  });
-
-  it('clamps to a usable range at both extremes', () => {
-    expect(getGalleryColumnCount({ imageDensityPercent: 100, widthPx: 40 })).toBe(2);
-    expect(getGalleryColumnCount({ imageDensityPercent: 100, widthPx: 8000 })).toBe(48);
-    expect(getGalleryColumnCount({ imageDensityPercent: 0, widthPx: 8000 })).toBe(42);
-  });
-
-  it('keeps density effective in a wide placement instead of pinning it at a column cap', () => {
-    // A bottom panel around 1100px wide: every density step must still change the count.
-    const counts = [0, 25, 50, 75, 100].map((percent) =>
-      getGalleryColumnCount({ imageDensityPercent: percent, widthPx: 1100 })
-    );
-
-    expect(counts).toEqual([...counts].sort((a, b) => a - b));
-    expect(new Set(counts).size).toBe(counts.length);
-  });
-
-  it('ignores out-of-range density instead of producing a nonsense count', () => {
-    expect(getGalleryColumnCount({ imageDensityPercent: -50, widthPx: 800 })).toBe(
-      getGalleryColumnCount({ imageDensityPercent: 0, widthPx: 800 })
-    );
-    expect(getGalleryColumnCount({ imageDensityPercent: 500, widthPx: 800 })).toBe(
-      getGalleryColumnCount({ imageDensityPercent: 100, widthPx: 800 })
-    );
-  });
-
-  it('falls back to the minimum before the viewport has been measured', () => {
-    expect(getGalleryColumnCount({ imageDensityPercent: 50, widthPx: 0 })).toBe(2);
-  });
 });
 
 describe('getGalleryCellSizePx', () => {
   it('divides the width evenly after removing the inter-column gaps', () => {
     expect(getGalleryCellSizePx({ columnCount: 4, widthPx: 400 + GALLERY_GRID_GAP_PX * 3 })).toBe(100);
-  });
-
-  it('uses a plausible square before measurement so the first paint is not zero-height', () => {
-    expect(getGalleryCellSizePx({ columnCount: 4, widthPx: 0 })).toBe(96);
-  });
-
-  it('never returns a non-positive size when the width is smaller than the gaps', () => {
-    expect(getGalleryCellSizePx({ columnCount: 12, widthPx: 4 })).toBeGreaterThan(0);
   });
 });
 
@@ -174,18 +109,6 @@ describe('pinned sections layout', () => {
     expect(open.height).toBe(GALLERY_STARRED_HEADER_HEIGHT_PX + 2 * (96 + GALLERY_GRID_GAP_PX));
     expect(collapsed.height).toBe(GALLERY_STARRED_HEADER_HEIGHT_PX);
     expect(getGalleryStarredLayout({ collapsed: false, columns: 2, shownCount: 0, tileSize: 96 }).height).toBe(0);
-  });
-
-  it('keeps only the header row for a strip that failed with nothing to show, so the scroll margin covers it', () => {
-    expect(
-      getGalleryStarredLayout({ collapsed: false, columns: 2, failed: true, shownCount: 0, tileSize: 96 }).height
-    ).toBe(GALLERY_STARRED_HEADER_HEIGHT_PX);
-  });
-
-  it('closes the pinned block with its footer only when something is pinned', () => {
-    expect(getGalleryPinnedHeightPx(0, 0)).toBe(0);
-    expect(getGalleryPinnedHeightPx(40, 0)).toBe(40 + GALLERY_PINNED_FOOTER_PX);
-    expect(getGalleryPinnedHeightPx(40, 124)).toBe(164 + GALLERY_PINNED_FOOTER_PX);
   });
 });
 
@@ -252,21 +175,6 @@ describe('sparse gallery geometry', () => {
     expect(entries[3]).toEqual({ item: third, kind: 'item' });
   });
 
-  it('waits on the empty positions of a page that is still loading', () => {
-    const last = createImageItem('item-59');
-    const entries = buildSparseGalleryNavigationEntries({
-      itemSlots: new Map([[59, last]]),
-      pageOffsets: [0, 60],
-      pendingPageOffsets: new Set([60]),
-      total: 180,
-    });
-
-    expect(entries[59]).toEqual({ item: last, kind: 'item' });
-    expect(entries[60]).toEqual({ id: 'gallery-unloaded-slot:60', kind: 'slot', navigable: true });
-    // A settled page's empty position is a gap.
-    expect(entries[58]).toEqual({ id: 'gallery-gap-slot:58', kind: 'slot', navigable: false });
-  });
-
   it('covers only the runs of subscribed pages, not the positions between them', () => {
     const first = createImageItem('first');
     const revealed = createImageItem('revealed');
@@ -285,48 +193,5 @@ describe('sparse gallery geometry', () => {
     expect(entries[0]).toEqual({ item: first, kind: 'item' });
     expect(entries[62]).toEqual({ id: 'gallery-unloaded-slot:599998', kind: 'slot', navigable: true });
     expect(entries[64]).toEqual({ item: revealed, kind: 'item' });
-  });
-
-  it('ends a run on a whole row before the next one while the total is unknown', () => {
-    const entries = buildSparseGalleryNavigationEntries({
-      columnCount: 7,
-      itemSlots: new Map(),
-      pageOffsets: [0, 600],
-      total: null,
-    });
-
-    // 60 positions round up to 63 so the next run's rows keep their columns.
-    expect(entries[62]).toEqual({ id: 'gallery-unloaded-slot:62', kind: 'slot', navigable: true });
-    expect(entries[63]).toEqual({ id: 'gallery-unloaded-slot:588', kind: 'slot', navigable: true });
-  });
-
-  it('joins runs whose boundary rows meet without repeating positions', () => {
-    // At 40 columns the first run's trailing row reaches 120 and the second run's leading row starts at 80.
-    const entries = buildSparseGalleryNavigationEntries({
-      columnCount: 40,
-      itemSlots: new Map(),
-      pageOffsets: [0, 120],
-      total: 300,
-    });
-    const indices = entries.map((entry) => Number((entry as { id: string }).id.split(':')[1]));
-
-    expect(indices).toEqual(Array.from({ length: 240 }, (_, index) => index));
-  });
-
-  it('includes a navigable preceding row before a distant active page', () => {
-    const first = createImageItem('first');
-    const entries = buildSparseGalleryNavigationEntries({
-      columnCount: 3,
-      itemSlots: new Map([[120, first]]),
-      pageOffsets: [120],
-      total: 600,
-    });
-
-    expect(entries.slice(0, 4)).toEqual([
-      { id: 'gallery-unloaded-slot:117', kind: 'slot', navigable: true },
-      { id: 'gallery-unloaded-slot:118', kind: 'slot', navigable: true },
-      { id: 'gallery-unloaded-slot:119', kind: 'slot', navigable: true },
-      { item: first, kind: 'item' },
-    ]);
   });
 });

@@ -40,7 +40,6 @@ vi.mock('@workbench/projects/library', async (importOriginal) => ({
   useProjectLibrary: () => library,
 }));
 
-// A fixture index, so retitling the real docs cannot break this test; the provider still loads it through import().
 vi.mock('./docsSearchIndex.json', () => ({
   default: {
     pages: [
@@ -172,7 +171,6 @@ describe('LaunchpadCommandPaletteDialog', () => {
       { timeout: 5000 }
     );
 
-    // The cue is text in the option's accessible name, not only the icon.
     expect(option.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
 
     for (let step = 0; step < 20 && input.getAttribute('aria-activedescendant') !== option.id; step += 1) {

@@ -7,7 +7,6 @@ import type { RasterCallLogEntry, StubRasterSurface } from './raster.testStub';
 import { colorizeMask, createMaskPatternTile } from './maskFill';
 import { createTestStubRasterBackend } from './raster.testStub';
 
-/** Values recorded for a set-property (e.g. `strokeStyle`), in order. */
 const setValues = (log: RasterCallLogEntry[], prop: string): unknown[] =>
   log.filter((e) => e.op === 'set' && e.args[0] === prop).map((e) => e.args[1]);
 
@@ -24,7 +23,6 @@ describe('createMaskPatternTile', () => {
     for (const style of ['grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical'] as const) {
       const tile = createMaskPatternTile(backend, style, '#00ff88') as StubRasterSurface;
       expect(tile).not.toBeNull();
-      // Lines are drawn (stroke) in the fill colour.
       expect(setValues(tile.callLog, 'strokeStyle')).toContain('#00ff88');
       expect(countOp(tile.callLog, 'stroke')).toBeGreaterThan(0);
     }
@@ -52,7 +50,6 @@ describe('createMaskPatternTile', () => {
     const backend = createTestStubRasterBackend();
     const horizontal = createMaskPatternTile(backend, 'horizontal', '#fff') as StubRasterSurface;
     const vertical = createMaskPatternTile(backend, 'vertical', '#fff') as StubRasterSurface;
-    // Same 9px tile, same spacing → same number of strokes.
     expect(countOp(horizontal.callLog, 'stroke')).toBe(countOp(vertical.callLog, 'stroke'));
   });
 });
@@ -74,7 +71,6 @@ describe('colorizeMask', () => {
       (e) => e.op === 'set' && e.args[0] === 'globalCompositeOperation' && e.args[1] === 'source-in'
     );
     const fillRectIdx = ops.findIndex((e) => e.op === 'fillRect');
-    // Order: stencil blit → switch to source-in → fill the colour.
     expect(drawIdx).toBeGreaterThanOrEqual(0);
     expect(sourceInIdx).toBeGreaterThan(drawIdx);
     expect(fillRectIdx).toBeGreaterThan(sourceInIdx);
@@ -86,7 +82,6 @@ describe('colorizeMask', () => {
     const mask = backend.createSurface(8, 8);
     const tile = createMaskPatternTile(backend, 'diagonal', '#ff0000');
     const out = colorizeMask(backend, mask, 8, 8, fill('diagonal'), tile) as StubRasterSurface;
-    // A repeat pattern was created and used as the source-in fill.
     expect(countOp(out.callLog, 'createPattern')).toBe(1);
     expect(out.callLog.some((e) => e.op === 'createPattern' && e.args[1] === 'repeat')).toBe(true);
   });

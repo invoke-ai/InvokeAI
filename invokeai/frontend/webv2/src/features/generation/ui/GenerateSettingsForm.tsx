@@ -252,7 +252,8 @@ export const GenerateSettingsForm = ({
     [onPatchSettings, sendPatchNow]
   );
 
-  // A size reset lands at once, ahead of a pending size edit; on the canvas the frame keeps its centre, as for any size.
+  // A size reset lands at once, ahead of a pending size edit; on the canvas the frame keeps its centre, as for any
+  // size.
   const commitSizeReset = useCallback(
     (patch: Partial<GenerateSettings>) => sendPatchNow(patch, onPatchSettings),
     [onPatchSettings, sendPatchNow]

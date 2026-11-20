@@ -17,8 +17,8 @@ const cases = parity.adjustments.map((entry) => ({
 }));
 
 /**
- * Counts output channels off the contract: visible color equals the Python node's output byte for byte, while alpha
- * and the color of fully transparent pixels stay as they came in.
+ * Counts output channels off the contract: visible color equals the Python node's output byte for byte, while alpha and
+ * the color of fully transparent pixels stay as they came in.
  */
 const compareWithPython = (actual: Uint8ClampedArray, input: Uint8ClampedArray, expected: Uint8ClampedArray) => {
   let alphaChanged = 0;
@@ -58,7 +58,6 @@ describe('evaluateSpatialSteps', () => {
     const content = decode(rgba);
     const padded = new Uint8ClampedArray((width + 11) * (height + 6) * 4);
     for (let i = 0; i < padded.length; i += 4) {
-      // Hidden padding colors are arbitrary and must survive untouched.
       padded[i] = i % 251;
       padded[i + 1] = 7;
       padded[i + 2] = 200;

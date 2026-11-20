@@ -21,11 +21,7 @@ import { sleep, withRequestDeadline } from '@platform/transport/http';
 
 import { readQueueReadModel, readWholeQueueStatus } from './queueDataStore';
 
-/**
- * What runs anywhere in the queue, whatever the view's scope: a scoped reading counts only its scope, so another
- * project's or another user's item running would read as nothing. An unscoped reading's own count is the whole
- * queue's; a scoped one needs the whole-queue status read. Null while that is unknown.
- */
+/** A scoped reading counts only its scope, so a scoped view needs the whole-queue status read. Null while unknown. */
 export const getInProgressAnywhere = (
   scope: QueueQueryScope,
   model: Pick<QueueReadModel, 'status'> | null | undefined,
@@ -34,15 +30,8 @@ export const getInProgressAnywhere = (
   scope.originPrefix ? (wholeQueueStatus?.queue.inProgress ?? null) : (model?.status.queue.inProgress ?? null);
 
 /**
- * What cancel-current stops: the item in progress the viewer can manage (the server's current one, else one of theirs
- * the read window shows running beside someone else's), else, only in the gap between two items, the next one waiting.
- * The gap is the processor running (not paused) with nothing in progress anywhere in the queue (`inProgressAnywhere`,
- * unknown counting as something): the hand-off between items, a cached reading that is behind, or a canceled item's
- * worker still finishing. Stopping the next item is then what stops the run from the viewer's side. While the
- * processor is paused, or anything runs that it would not cancel, nothing waiting is stopped. The next item is the
- * server's; the read window stands in for it (the server's belonging to someone else) only when it holds exactly the
- * pending items the counts report, since the window is the newest items and the true next may be older.
- * `skippedItemId` leaves out an item a cancel just found already finished.
+ * The manageable in-progress item, else the next waiting item only in the gap between items (processor running,
+ * nothing in progress anywhere). `skippedItemId` leaves out an item a cancel just found already finished.
  */
 export const getCancelCurrentTarget = (
   model: Pick<QueueReadModel, 'current' | 'items' | 'next' | 'status'> | null | undefined,
@@ -89,7 +78,6 @@ export const getCancelCurrentTarget = (
 };
 
 export type CancelCurrentOutcome =
-  /** Another cancel-current is still in flight; this one did nothing. */
   | { kind: 'busy' }
   | { item: QueueItemReadModel; kind: 'canceled' }
   | { error: unknown; kind: 'failed' }
@@ -99,26 +87,14 @@ export type CancelCurrentOutcome =
   /** The account changed meanwhile; nothing is reported for the one that asked. */
   | { kind: 'superseded' };
 
-/**
- * How long a cancel-current that stopped an item keeps the command busy, at least: a double click, a double tap of the
- * shortcut or a double activation in the palette lands well inside it, while a deliberate second press after it stops
- * the next item. It also waits for the read that reconciles the queue, up to `CANCEL_CURRENT_SETTLE_LIMIT_MS`.
- */
+/** Long enough to absorb a double click or double tap; it also waits for the reconciling read, up to the limit. */
 export const CANCEL_CURRENT_SETTLE_MS = 400;
 const CANCEL_CURRENT_SETTLE_LIMIT_MS = 2_000;
 
-/**
- * The account whose cancel-current is in flight or settling; one at a time, so a held key, a double click or a
- * double tap stops one item.
- */
+/** One at a time, so a held key, a double click or a double tap stops one item. */
 let inFlightOwner: AccountScope | null = null;
 
-/**
- * Shows the item canceled at once, then asks the server; true when the server canceled it. An item that had already
- * finished comes back unchanged: the cancel did nothing. A failed request takes the guess back, only while the account
- * that made it is still signed in (a sign-out clears the cache first, and the next account must not see this one's
- * queue), unless an event reported the item canceled meanwhile: the server canceled it, though its answer was lost.
- */
+/** A failed request takes the guess back only while the same account is signed in and no event confirmed the cancel. */
 const cancelItem = async (client: QueryClient, owner: AccountScope, item: QueueItemReadModel): Promise<boolean> => {
   const dropNote = noteQueueCancelRequested({ itemId: item.id, kind: 'item' });
   const guess = applyQueueItemStatusGuess(client, {
@@ -148,14 +124,7 @@ const cancelItem = async (client: QueryClient, owner: AccountScope, item: QueueI
   }
 };
 
-/**
- * Cancel-current, for every surface: the top bar, the queue widget, the shortcut and the palette. Picks its target
- * from the loaded read model when it runs, not when a control rendered. When the item it read as current had already
- * finished, it reads the queue afresh and stops what is current now, once. A call while another is in flight, or
- * within the settle window after one stopped an item (`CANCEL_CURRENT_SETTLE_MS`), returns `busy` at once: one
- * mechanism for every entry point, so a double click, a double tap of the shortcut or a double activation in the
- * palette stops one item.
- */
+/** Shared by every surface; picks its target when it runs. Calls while busy or settling return `busy` at once. */
 export const cancelCurrentQueueItem = async ({
   canManageItem,
   client,
@@ -222,9 +191,7 @@ const cancelCurrent = async (
       return { kind: 'superseded' };
     }
 
-    // The reading the target came from was out of date: read afresh, and for a scoped view the whole queue's status
-    // too. Bounded, so a stalled read cannot hold the command busy. A read that fails leaves what the server answered:
-    // the item had already finished, which is no failure to cancel.
+    // Read afresh, bounded so a stalled read cannot hold the command busy; a failed read means it already finished.
     const reading = await withRequestDeadline(
       (signal) =>
         Promise.all([

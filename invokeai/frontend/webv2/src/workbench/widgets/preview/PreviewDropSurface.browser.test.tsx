@@ -25,7 +25,6 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { commands, page } from 'vitest/browser';
 
-/** The surface drives the real workbench store; the gallery transport is the only double. */
 const harness = vi.hoisted(() => ({
   boards: [] as GalleryBoard[],
   store: null as ReturnType<typeof createWorkbenchStore> | null,
@@ -97,7 +96,6 @@ const storedVideo = (file: { name: string }, createdAt: string): GalleryVideoIte
   thumbnailUrl: `/thumbnails/stored-${file.name}`,
   width: 64,
 });
-// The first drop loads the upload code; a cold transform can take longer than `waitFor`'s default second.
 const LANDED = { timeout: 5_000 };
 
 const render = async ({
@@ -108,9 +106,7 @@ const render = async ({
   isFollowingLive = false,
   shownKind = null,
 }: {
-  /** Rendered inside the surface after its content, such as a dialog it opened. */
   children?: ReactNode;
-  /** Covers the whole test frame, so a centred dialog lies over the surface. */
   fillsFrame?: boolean;
   galleryValues?: Record<string, unknown>;
   isComparing?: boolean;
@@ -176,7 +172,6 @@ const centreOf = (element: Element) => {
   const rect = element.getBoundingClientRect();
   return { clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 };
 };
-/** Dispatches a drag over the zone labelled `zoneName` and drops it there, from the test itself. */
 const dropOn = async (zoneName: string, files: File[]) => {
   const transfer = transferOf(files);
   await send('dragenter', transfer);
@@ -185,7 +180,6 @@ const dropOn = async (zoneName: string, files: File[]) => {
   await send('dragover', transfer, at);
   return send('drop', transfer, at);
 };
-/** A confirmation Preview opened, as its delete confirmation is: a React child of the surface, portalled to the body. */
 const openConfirmation = () => (
   <ConfirmDialog
     body="This cannot be undone."
@@ -197,10 +191,6 @@ const openConfirmation = () => (
   />
 );
 const confirmation = () => page.getByRole('alertdialog');
-/**
- * A real drag from the operating system, through the browser's own drag input, dropped on one half of the surface: the
- * left half shows, the right half compares when comparison is offered.
- */
 const nativeDrop = (half: 'left' | 'right', files: { base64: string; name: string }[]) => {
   const rect = content().getBoundingClientRect();
   return commands.nativeDrag({
@@ -212,7 +202,6 @@ const nativeDrop = (half: 'left' | 'right', files: { base64: string; name: strin
 
 describe('PreviewDropSurface', () => {
   it('uploads files dropped from the desktop and shows the newest, as an upload in the Gallery does', async () => {
-    // Listed after the video, yet the newer of the two: the newest is shown, not the last.
     harness.uploadImage.mockImplementation((file) => Promise.resolve(storedImage(file, '2026-11-10T00:00:02.000Z')));
     harness.uploadVideo.mockImplementation((file) => Promise.resolve(storedVideo(file, '2026-11-10T00:00:01.000Z')));
     const { projectId, store } = await render();
@@ -223,14 +212,12 @@ describe('PreviewDropSurface', () => {
     ]);
 
     await vi.waitFor(() => expect(selectedName(store, projectId)).toBe('stored-still.png'), LANDED);
-    // To the project's auto-add board (Uncategorized here), each kind by its own route.
     expect(harness.uploadImage.mock.calls.map(([file, boardId]) => [file.name, boardId])).toEqual([
       ['still.png', 'none'],
     ]);
     expect(harness.uploadVideo.mock.calls.map(([file, boardId]) => [file.name, boardId])).toEqual([
       ['clip.mp4', 'none'],
     ]);
-    // Selected within its own board, as a pick from Preview's mini gallery is.
     expect(galleryValuesOf(store, projectId).selectedImageQuery).toMatchObject({ boardId: 'none', itemBoard: true });
     expect(store.getState().notifications[0]?.title).toMatch(/^Uploaded 2 /);
     expect(zone('Drop to show').elements()).toHaveLength(0);
@@ -364,7 +351,6 @@ describe('PreviewDropSurface', () => {
     await expect.element(confirmation()).toBeVisible();
     const dialog = confirmation().element().getBoundingClientRect();
 
-    // Over the dialog, which lies over the surface's show zone: a drop there would upload behind the confirmation.
     await commands.nativeDrag({
       files: [{ base64: TINY_PNG_BASE64, name: 'behind.png' }],
       frameWidth: window.innerWidth,
@@ -377,7 +363,6 @@ describe('PreviewDropSurface', () => {
     await nativeDrop('left', [{ base64: TINY_PNG_BASE64, name: 'shown.png' }]);
 
     await vi.waitFor(() => expect(selectedName(store, projectId)).toBe('stored-shown.png'), LANDED);
-    // Uploads run in drop order: had the first drop been taken, its file would lead.
     expect(harness.uploadImage.mock.calls.map(([file]) => file.name)).toEqual(['shown.png']);
   });
 
@@ -392,7 +377,6 @@ describe('PreviewDropSurface', () => {
 
     await send('dragenter', transfer, over);
     expect(zonesShown()).toBe(true);
-    // Onto the dialog, then between its own elements: each step reaches the surface through React, none is its own.
     await send('dragleave', transfer, { ...over, relatedTarget: dialog });
     expect(zonesShown()).toBe(false);
     await send('dragenter', transfer, { ...over, relatedTarget: content() }, dialog);
@@ -402,7 +386,6 @@ describe('PreviewDropSurface', () => {
     expect(zonesShown()).toBe(false);
     expect((await send('drop', transfer, over, dialogTitle)).defaultPrevented).toBe(false);
 
-    // Back onto the surface: a new drag, which ends as it leaves.
     await send('dragleave', transfer, { ...over, relatedTarget: content() }, dialogTitle);
     await send('dragenter', transfer, { ...over, relatedTarget: dialogTitle });
     expect(zonesShown()).toBe(true);
@@ -421,7 +404,6 @@ describe('PreviewDropSurface', () => {
     await send('dragleave', transfer, { relatedTarget: document.body });
     expect(zonesShown()).toBe(false);
 
-    // Out of the window (or cancelled), after crossing onto an element taken down mid-drag: no leave reports it.
     const doomed = document.createElement('div');
     content().append(doomed);
     await send('dragenter', transfer);

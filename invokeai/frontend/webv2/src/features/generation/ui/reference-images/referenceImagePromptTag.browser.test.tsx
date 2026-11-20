@@ -11,7 +11,6 @@ import { page, userEvent } from 'vitest/browser';
 
 import { ReferenceImageRow } from './ReferenceImageRow';
 
-/** FLUX.3 names its references in the prompt; the row's tag button explains the tag and copies it where it can. */
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -108,7 +107,6 @@ describe('reference image prompt tag', () => {
     await expect.element(tagButton()).toHaveAttribute('aria-disabled', 'true');
     await expect.element(tagButton()).toHaveAccessibleDescription(expected);
     await act(() => userEvent.hover(tagButton()));
-    // One tooltip: the unavailable button's own, not a second hint around it.
     await vi.waitFor(() => expect(tooltips()).toEqual([expected]));
   });
 });

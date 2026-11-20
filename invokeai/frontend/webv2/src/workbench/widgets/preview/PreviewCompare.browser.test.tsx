@@ -27,7 +27,6 @@ vi.mock('@features/gallery', async (importOriginal) => ({
     workflow: () => Promise.resolve({ graph: null, workflow: null }),
   },
 }));
-// The transport under the gallery's shared video metadata query.
 vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
   ...(await importOriginal<typeof GalleryBackendModule>()),
   getGalleryVideoMetadata: () => Promise.resolve({ seed: 7 }),
@@ -58,7 +57,6 @@ const detailsItem: GalleryVideoItem = {
 const detailsActions = {} as ImageActions;
 const ignoreOpenChange = () => undefined;
 
-/** Details as the header wires it: open, and pinned to whichever stage Preview publishes. */
 const OpenDetails = () => (
   <PreviewDetailsPanel
     actions={detailsActions}
@@ -148,8 +146,8 @@ const waitForOpacity = (element: HTMLElement, expected: string, label = '', time
   });
 
 /**
- * React derives `onPointerLeave` from `pointerout`, so this clears a hover the
- * component may have picked up from the real cursor without moving it.
+ * React derives `onPointerLeave` from `pointerout`, so this clears a hover the component may have picked up from the
+ * real cursor without moving it.
  */
 const clearMouseHover = (element: HTMLElement): Promise<void> =>
   interact(() =>
@@ -205,7 +203,6 @@ const renderComparison = async ({
   };
 
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  /** Renders the pair into the same tree, so a new pair reaches the mounted comparison as a selection change does. */
   const showPair = (pair: { base: GeneratedImageContract; compare: GeneratedImageContract }) =>
     interact(() => {
       root?.render(
@@ -243,7 +240,6 @@ describe('PreviewCompare', () => {
     const frame = host!.querySelector<HTMLElement>('[aria-label*="Reveal comparison"]')!;
     const compareOverlay = host!.querySelector<HTMLImageElement>('img[alt="compare"]')?.parentElement as HTMLElement;
 
-    // Clear incidental hover to isolate focus behavior, then wait for any resulting fade to settle.
     await clearMouseHover(frame);
     await waitForOpacity(compareOverlay, '0', 'initial');
     await interact(() => frame.focus());
@@ -286,7 +282,6 @@ describe('PreviewCompare', () => {
   });
 
   describe('zoom with differently sized images', () => {
-    /** Parses `translate(Xpx, Ypx) scale(S)` into fractions of the image's frame, so differently sized panes compare. */
     const readFractionTransform = (image: HTMLImageElement) => {
       const frame = image.parentElement!;
       const match = /translate\((-?[\d.]+)px, (-?[\d.]+)px\) scale\(([\d.]+)\)/.exec(image.style.transform);
@@ -301,7 +296,6 @@ describe('PreviewCompare', () => {
         scale: Number(match[3]),
       };
     };
-    /** Both panes show the same region of their own picture: equal scale and equal frame-relative pan. */
     const expectLinked = (first: HTMLImageElement, second: HTMLImageElement) => {
       const a = readFractionTransform(first);
       const b = readFractionTransform(second);
@@ -343,7 +337,6 @@ describe('PreviewCompare', () => {
       );
 
     it('links wheel zoom, pan, and reset across side-by-side panes of different sizes and aspect ratios', async () => {
-      // 1200×800 landscape beside 800×1200 portrait.
       await renderComparison({ initialMode: 'side-by-side' });
       const { base, compare } = getImages();
       const baseFrame = base.parentElement!;
@@ -351,7 +344,6 @@ describe('PreviewCompare', () => {
 
       expect(baseFrame.clientWidth).not.toBe(compareFrame.clientWidth);
 
-      // Zoom ×2 around a point three quarters across, one quarter down the landscape pane.
       await interact(() => wheelAt(baseFrame, 0.75, 0.25, -Math.log(2) / WHEEL_ZOOM_STEP));
       const zoomed = readFractionTransform(base);
 
@@ -361,7 +353,6 @@ describe('PreviewCompare', () => {
       expect(zoomed?.fy).toBeCloseTo(-0.25, 3);
       expectLinked(base, compare);
 
-      // Drag the portrait pane by a tenth of its own width: both pictures follow by the same share of their frames.
       const rect = compareFrame.getBoundingClientRect();
       const startX = rect.left + rect.width / 2;
       const startY = rect.top + rect.height / 2;
@@ -378,7 +369,6 @@ describe('PreviewCompare', () => {
       expect(panned?.fy).toBeCloseTo(-0.25, 3);
       expectLinked(compare, base);
 
-      // Double-click resets both panes to fit.
       await interact(() =>
         baseFrame.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: startX, clientY: startY }))
       );
@@ -387,7 +377,6 @@ describe('PreviewCompare', () => {
     });
 
     it('caps zoom where the sharper image reaches eight times its own pixels', async () => {
-      // A 300×200 image beside the 800×1200 one: the larger image sets the limit.
       await renderComparison({ baseImage: createImage('base', 300, 200), initialMode: 'side-by-side' });
       const { base, compare } = getImages();
       const compareFrame = compare.parentElement!;
@@ -396,7 +385,6 @@ describe('PreviewCompare', () => {
 
       expect(readFractionTransform(compare)?.scale).toBeCloseTo((8 * 800) / compareFrame.clientWidth, 3);
       expectLinked(compare, base);
-      // Past 2× of its own pixels, each pane renders crisp pixels by its own resolution.
       expect(base.style.imageRendering).toBe('pixelated');
     });
 
@@ -409,7 +397,6 @@ describe('PreviewCompare', () => {
       });
       const compareFrame = getImages().compare.parentElement!;
 
-      // Zoom to the 4096px image's cap, a quarter of the way across.
       await interact(() => wheelAt(compareFrame, 0.25, 0.5, -Math.log(1000) / WHEEL_ZOOM_STEP));
       expect(readFractionTransform(getImages().compare)?.scale).toBeCloseTo((8 * 4096) / compareFrame.clientWidth, 3);
 
@@ -419,7 +406,6 @@ describe('PreviewCompare', () => {
       const kept = readFractionTransform(compare);
 
       expect(kept?.scale).toBeCloseTo(limit, 3);
-      // Clamping zooms out around the view's centre, so the region in view stays where it was.
       expect((0.5 - kept!.fx) / kept!.scale).toBeCloseTo(0.25, 2);
       expectLinked(compare, base);
       expect(getComputedStyle(base.parentElement!).cursor).toBe('grab');
@@ -487,7 +473,6 @@ describe('PreviewCompare', () => {
     expect(stage.contains(exit)).toBe(false);
     expect(panel.getBoundingClientRect().bottom).toBeLessThanOrEqual(exit.getBoundingClientRect().top);
 
-    // Pressing inside Details leaves the divider where it was.
     const overlay = host!.querySelector<HTMLImageElement>('img[alt="compare"]')!.parentElement!;
     const clipPath = overlay.style.clipPath;
     const rect = panel.getBoundingClientRect();

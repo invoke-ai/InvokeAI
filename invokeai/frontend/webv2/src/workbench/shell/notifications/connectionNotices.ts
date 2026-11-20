@@ -4,10 +4,7 @@ import type { WorkbenchNotificationCommands } from '@workbench/workbenchStore';
 /** A dropout shorter than this passes unannounced, so a flapping socket does not spam notices. */
 export const CONNECTION_NOTICE_DELAY_MS = 4_000;
 
-/**
- * Announces an outage once, after it has lasted `delayMs`, and its end once, only if the outage was announced. The
- * first connection of a session is not news; nor is a reconnect nobody was told was needed.
- */
+/** Announces an outage once, after it has lasted `delayMs`, and its end once, only if the outage was announced. */
 export const startConnectionNotices = ({
   delayMs = CONNECTION_NOTICE_DELAY_MS,
   getStatus,

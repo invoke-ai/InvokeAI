@@ -1,6 +1,6 @@
 /**
- * Run Vite's entry directly under Node: Windows cannot exec pnpm's .cmd shim without a shell, whose PID would
- * prevent reliable server-tree teardown.
+ * Run Vite's entry directly under Node: Windows cannot exec pnpm's .cmd shim without a shell, whose PID would prevent
+ * reliable server-tree teardown.
  */
 
 import { spawn, spawnSync } from 'node:child_process';

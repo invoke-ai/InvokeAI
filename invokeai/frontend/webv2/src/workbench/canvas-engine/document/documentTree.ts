@@ -17,9 +17,9 @@ export const childrenOf = (
   parentId: string | null
 ): readonly CanvasNodeContract[] | null => {
   if (parentId === null) {
-    return stacks[stack];
+    return stacks[stack] ?? [];
   }
-  const group = findNode(stacks[stack], parentId);
+  const group = findNode(stacks[stack] ?? [], parentId);
   return group && isGroupNode(group) ? group.children : null;
 };
 
@@ -80,7 +80,11 @@ export const cloneSubtree = (
     const children = node.children.map((child) => cloneSubtree(child, createId, ids).node);
     return { ids, node: { ...node, children, id } };
   }
-  return { ids, node: { ...structuredClone(node), id } };
+  const copy = { ...structuredClone(node), id };
+  if (copy.type === 'vector') {
+    copy.paths = copy.paths.map((path) => ({ ...path, id: createId() }));
+  }
+  return { ids, node: copy };
 };
 
 const replaceIn = (
@@ -111,7 +115,7 @@ export const replaceChildren = (
   parentId: string | null,
   children: readonly CanvasNodeContract[]
 ): CanvasStackForests => {
-  const roots = parentId === null ? children : replaceIn(stacks[stack], parentId, () => children);
+  const roots = parentId === null ? children : replaceIn(stacks[stack] ?? [], parentId, () => children);
   return roots === stacks[stack] ? stacks : { ...stacks, [stack]: [...roots] };
 };
 
@@ -142,7 +146,7 @@ export const removeNodes = (stacks: CanvasStackForests, ids: ReadonlySet<string>
   };
   let result = stacks;
   for (const stack of Object.keys(stacks) as CanvasLayerStackKind[]) {
-    const roots = visit(stacks[stack]);
+    const roots = visit(stacks[stack] ?? []);
     if (roots !== stacks[stack]) {
       result = result === stacks ? { ...stacks } : result;
       result[stack] = [...roots];

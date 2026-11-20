@@ -4,7 +4,6 @@ import type { CanvasFontRuntime, FontLoadApi } from './fontLoader';
 
 import { createFontLoader } from './fontLoader';
 
-/** A fake fonts api with a controllable `check` and a deferred `load`. */
 const createFakeFonts = (initiallyLoaded = false) => {
   let loaded = initiallyLoaded;
   let resolveLoad: (() => void) | null = null;
@@ -244,9 +243,6 @@ describe('createFontLoader', () => {
     await expect(loader.ensurePreview(customText)).resolves.toBe('loaded-family');
     expect(runtime.ensure).toHaveBeenCalledOnce();
 
-    // Runtime LRU eviction removes its browser alias without changing the
-    // account generation. A later preview must consult that authoritative
-    // resolver instead of trusting the loader's stale ready entry.
     resolvedFamily = 'fallback';
     await expect(loader.ensurePreview(customText)).resolves.toBe('loaded-family');
     expect(runtime.ensure).toHaveBeenCalledTimes(2);

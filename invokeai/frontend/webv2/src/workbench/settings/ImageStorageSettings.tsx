@@ -28,10 +28,10 @@ const SELECT_POSITIONING = { strategy: 'fixed', sameWidth: true, hideWhenDetache
 type ImageMoveAction = 'start' | 'recover';
 
 /**
- * The job state a refusal was answered against. A running move journals one job per batch, so its job ids advance
- * (with no active job between batches) while it runs: running is one state however far it has got. Otherwise the
- * active and latest jobs tell the states apart. A refusal stops applying once the status moves past it (the move
- * that refused the start ends, for example).
+ * The job state a refusal was answered against. A running move journals one job per batch, so its job ids advance (with
+ * no active job between batches) while it runs: running is one state however far it has got. Otherwise the active and
+ * latest jobs tell the states apart. A refusal stops applying once the status moves past it (the move that refused the
+ * start ends, for example).
  */
 const getJobKey = (status: ImageMoveStatus | undefined): string => {
   if (!status) {
@@ -206,8 +206,8 @@ const ImageStorageEditor = () => {
   const shownActionError = actionError?.jobKey === getJobKey(statusQuery.data) ? actionError : null;
   const usableStatus = statusQuery.isError ? null : status;
   const availability = getJobAvailability({ isActing, isSavingLayout, status: usableStatus });
-  // The move reads the layout per batch, so changing it while a job runs (or may be running: status unknown, or a
-  // start still being accepted) would leave the images split between two layouts.
+  // The move reads the layout per batch, so changing it while a job runs (or may be running: status unknown, or a start
+  // still being accepted) would leave the images split between two layouts.
   const isLayoutLocked =
     layoutQuery.isPending || isSavingLayout || isActing || usableStatus === null || usableStatus.isRunning;
   // Each button references only what explains it: its own action's failure, and the note while it is disabled.

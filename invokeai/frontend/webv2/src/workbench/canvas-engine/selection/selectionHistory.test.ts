@@ -16,8 +16,6 @@ const createHarness = (options: Parameters<typeof createHistory>[0] = {}) => {
   const onChange = vi.fn();
   const selection = withSelectionHistory(
     createSelectionState({
-      // No readable pixels: boolean ops fall back to path bookkeeping, so the
-      // history is exercised through what it records rather than a traced mask.
       backend: createTestStubRasterBackend({ readbackAlpha: 0 }),
       createPath2D: (d) => ({ d }) as unknown as Path2D,
       getDocumentSize: () => DOC,
@@ -97,7 +95,6 @@ describe('withSelectionHistory', () => {
     selection.selectAll(rectBounds(0, 0, 100, 100));
     expect(history.byteSize()).toBe(100 * 100);
     selection.invert(rectBounds(0, 0, 100, 100));
-    // The inverted plane is new; the select-all plane it started from was already charged.
     expect(history.byteSize()).toBe(2 * 100 * 100);
   });
 

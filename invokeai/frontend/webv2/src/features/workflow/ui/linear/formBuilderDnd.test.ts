@@ -125,10 +125,8 @@ describe('pickInnermostFormCollision', () => {
     expect(pickInnermostFormCollision(collisions, nestedForm)).toBe(formEdgeDroppableId('fieldC'));
   });
 
-  /**
-   * A container's nested into target must beat its own edge target so empty-state drops append inside rather than
-   * reorder outside.
-   */
+  // A container's nested into target must beat its own edge target so empty-state drops append inside rather than
+  // reorder outside.
   it('prefers a container over its own edge when both match the same element', () => {
     const collisions = [{ id: formEdgeDroppableId('A') }, { id: formIntoDroppableId('A') }];
 
@@ -136,10 +134,7 @@ describe('pickInnermostFormCollision', () => {
     expect(pickInnermostFormCollision([...collisions].reverse(), nestedForm)).toBe(formIntoDroppableId('A'));
   });
 
-  /**
-   * Compute depth independently so a deeper candidate wins even after incomparable siblings, regardless of
-   * collision order.
-   */
+  // Depth is computed independently: a deeper candidate beats incomparable siblings in any collision order.
   it('is order-independent for incomparable siblings plus a nested descendant', () => {
     const siblingForm: WorkflowForm = {
       elements: {
