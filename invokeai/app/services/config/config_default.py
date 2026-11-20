@@ -405,19 +405,15 @@ class InvokeAIAppConfig(BaseSettings):
         """
 
         if isinstance(config, dict):
-            new_config = self.model_validate(config)
+            new_config = DefaultInvokeAIAppConfig.model_validate(config)
         else:
             new_config = config
 
         for field_name in new_config.model_fields_set:
-            new_value = getattr(new_config, field_name)
-            current_value = getattr(self, field_name)
-
             if field_name in self.model_fields_set and not clobber:
                 continue
 
-            if new_value != current_value:
-                setattr(self, field_name, new_value)
+            setattr(self, field_name, getattr(new_config, field_name))
 
     def write_file(self, dest_path: Path, as_example: bool = False) -> None:
         """Write the current configuration to file. This will overwrite the existing file.
@@ -440,6 +436,9 @@ class InvokeAIAppConfig(BaseSettings):
                 exclude_none=True if as_example else False,
                 exclude={"schema_version", "legacy_models_yaml_path"},
             )
+            # Older releases default to single-user mode. Preserve an explicit true to keep sign-in on rollback.
+            if "multiuser" in self.model_fields_set:
+                config_dict["multiuser"] = self.multiuser
 
             if as_example:
                 file.write("# This is an example file with default and example settings.\n")
@@ -673,8 +672,8 @@ def migrate_v4_0_2_to_4_0_3_config_dict(config_dict: dict[str, Any]) -> dict[str
     return parsed_config_dict
 
 
-def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
-    """Load and migrate a config file to the latest version.
+def load_and_migrate_config(config_path: Path) -> DefaultInvokeAIAppConfig:
+    """Load and migrate a config file to the latest version, without applying environment overrides.
 
     Args:
         config_path: Path to the config file.
@@ -704,22 +703,19 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
 
     if migrated:
         shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
-        try:
-            # load and write without environment variables
-            migrated_config = DefaultInvokeAIAppConfig.model_validate(loaded_config_dict)
-            migrated_config.write_file(config_path)
-        except Exception as e:
-            shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
-            raise RuntimeError(f"Failed to load and migrate v3 config file {config_path}: {e}") from e
 
     try:
-        # Meta is not included in the model fields, so we need to validate it separately
-        config = InvokeAIAppConfig.model_validate(loaded_config_dict)
+        config = DefaultInvokeAIAppConfig.model_validate(loaded_config_dict)
         assert config.schema_version == CONFIG_SCHEMA_VERSION, (
             f"Invalid schema version, expected {CONFIG_SCHEMA_VERSION}: {config.schema_version}"
         )
+        if migrated:
+            config.write_file(config_path)
         return config
     except Exception as e:
+        if migrated:
+            shutil.copy(config_path.with_suffix(".yaml.bak"), config_path)
+            raise RuntimeError(f"Failed to load and migrate config file {config_path}: {e}") from e
         raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
 
 

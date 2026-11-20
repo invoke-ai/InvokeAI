@@ -60,7 +60,7 @@ It has two sections - one for internal use and one for user settings:
 schema_version: 4.0.2
 
 # Put user settings here - see https://invoke.ai/configuration/invokeai-yaml/:
-host: 0.0.0.0 # serve the app on your local network
+host: 127.0.0.1 # serve the app on this computer
 models_dir: D:\invokeai\models # store models on an external drive
 precision: float16 # always use fp16 precision
 ```
@@ -68,6 +68,8 @@ precision: float16 # always use fp16 precision
 The settings in this file will override the defaults. You only need
 to change this file if the default for a particular setting doesn't
 work for you.
+
+To share InvokeAI on your network, [create the first administrator privately](/configuration/multi-user-mode/admin-guide/#set-up-multi-user-mode) before changing the host address.
 
 You'll find an example file next to `invokeai.yaml` that shows the default values.
 

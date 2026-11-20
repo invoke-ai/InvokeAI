@@ -1,7 +1,7 @@
 ---
 title: Multi-User Administrator Guide
 description: Turn on multi-user mode, manage accounts, and keep a shared InvokeAI server safe.
-lastUpdated: 2026-11-17
+lastUpdated: 2026-11-20
 sidebar:
   order: 4
 ---
@@ -32,25 +32,20 @@ Multi-user mode is on by default. See [Upgrading from single-user mode](#upgradi
 
 <Steps>
 
-1. **Back up.** Stop InvokeAI and copy the `databases` folder in your root directory. See [Backups](#backups).
+1. **Keep setup private.** Stop InvokeAI. On an existing install, [back up the database, outputs and configuration](#backups). Disable any reverse proxy, tunnel or port forward that gives others access to InvokeAI. Configure [local-only access](#verify-local-only-access) for your installation. Anyone who can reach the setup page can create the first administrator.
 
-2. **Optionally edit `invokeai.yaml`** in your root directory. To let other computers on your network reach the server, add `host: 0.0.0.0`. Create the administrator account (step 4) before you do, so that no one else on the network can claim it:
+2. **Start in multi-user mode.** Set `multiuser: true` in `invokeai.yaml` or use the default. Remove any `INVOKEAI_MULTIUSER=false` environment override. To require strong passwords, set `strict_password_checking: true`. Start InvokeAI, verify the listener as described below, then open `http://localhost:9090` on the server. On a remote server, use a private SSH tunnel to its loopback address.
 
-   ```yaml
-   host: 0.0.0.0                  # optional: listen on the network, not only this computer
-   strict_password_checking: true # optional: require strong passwords
-   ```
-
-3. **Start InvokeAI** from the launcher or with `invokeai-web`. With `host: 0.0.0.0`, other computers open `http://<server-address>:9090`.
-
-4. **Create the first administrator.** The first browser to open InvokeAI shows **Set up Invoke**. Enter:
+3. **Create the first administrator.** On **Set up Invoke**, enter:
    - **Email**: the sign-in name. It cannot be changed later. It must look like an email address, though `admin@localhost` also works; nothing is ever sent to it.
    - **Display name** (optional): shown to other users instead of the email.
    - **Password** and **Confirm password**.
 
-   Select **Create administrator account**, then sign in.
+   Select **Create administrator account**, then sign in. If an administrator already exists, sign in with that account.
 
-5. **Add the other users** from the Launchpad's **Users** page, or with `invoke-useradd`. See [Manage users](#manage-users).
+4. **Add the other users** from the Launchpad's **Users** page or with `invoke-useradd`. See [Manage users](#manage-users).
+
+5. **Enable network access if needed.** After confirming administrator sign-in, configure [HTTPS](#https-and-internet-access) and enable the intended network route. With a reverse proxy on the same host, keep InvokeAI on loopback. For a direct LAN connection, bind to the server's LAN address and restart. If you change Docker's port mapping, reuse the data volume that contains the administrator account.
 
 </Steps>
 
@@ -62,9 +57,14 @@ Browsers turn off the clipboard and Web Locks for plain-HTTP pages at a network 
 InvokeAI cannot recover a password. If you lose the last administrator's password, reset it from the command line with [`invoke-usermod`](#troubleshooting).
 :::
 
+### Verify local-only access
+
+- **Native install.** Set `host: 127.0.0.1` in `invokeai.yaml`. The server process's `INVOKEAI_HOST` environment variable takes precedence, so unset it or set it to `127.0.0.1` in your launcher or service environment. After starting, inspect the listening socket for your port. For example, on Linux run `ss -ltn 'sport = :9090'`, on macOS run `lsof -nP -iTCP:9090 -sTCP:LISTEN`, or on Windows run `Get-NetTCPConnection -LocalPort 9090 -State Listen`. The local address should be loopback only (`127.0.0.1` or `::1`). A wildcard or LAN address accepts network connections.
+- **Docker.** Leave the listener inside the container on `0.0.0.0`. With the supplied Compose file, set `HOST_INVOKEAI_IP=127.0.0.1` in `.env`. For older Compose files, set the port mapping itself to `127.0.0.1:9090:9090`. With `docker run`, use `--publish 127.0.0.1:9090:9090`. Keep untrusted containers off the same Docker network. After starting, run `docker port <container> 9090/tcp` on the host and confirm the published address is `127.0.0.1:9090`. Substitute your configured port in these checks.
+
 ### Single-user mode
 
-Set `multiuser: false` in `invokeai.yaml` and restart to run without accounts or sign-in. Browsers that had InvokeAI open may need a hard refresh. Every visitor then has full administrator control, so use it only on a server that only this computer can reach: `host: 127.0.0.1` (the default), or in Docker a port published as `127.0.0.1:9090:9090`. In Docker, set the environment variable `INVOKEAI_MULTIUSER=false` instead of editing `invokeai.yaml`.
+Before disabling sign-in, disconnect external routes and [verify local-only access](#verify-local-only-access) with sign-in still enabled. Every visitor in single-user mode has full administrator control. Set `multiuser: false` in `invokeai.yaml` or set `INVOKEAI_MULTIUSER=false` in the container environment. Restart with the same network configuration. Browsers that had InvokeAI open may need a hard refresh.
 
 :::caution[Single-user mode is deprecated]
 Single-user mode will be removed in a future release.
@@ -72,26 +72,30 @@ Single-user mode will be removed in a future release.
 
 ### Upgrading from single-user mode
 
-Earlier versions ran in single-user mode by default. On upgrade, an install switches to multi-user mode unless its `invokeai.yaml` contains `multiuser: false`:
+Earlier versions ran in single-user mode by default. Upgrading with no `multiuser` setting now enables sign-in, even on localhost. New accounts, including the first administrator, start with their own projects and wildcards. If you want to keep working without accounts, check that the effective setting is explicitly `multiuser: false` and keep the server [local only](#single-user-mode). Earlier versions could omit the setting when rewriting the configuration.
 
-- **The first visit asks for an administrator account**, and from then on everyone signs in. Scripts that call the API need a token; see the [API guide](/configuration/multi-user-mode/api-guide/).
-- **Projects made in single-user mode are hidden** from every account, including the new administrator, until you return to single-user mode. Boards, images and workflows stay available to administrators. No data is changed. See [What happens to existing data](#what-happens-to-existing-data).
-- **Check `invokeai.yaml` even if you chose single-user mode.** Earlier versions removed `multiuser: false` from the file whenever they rewrote it (for example after you saved a setting in the app), because `false` was the default then. If the line is gone, add it back to stay in single-user mode. See [Single-user mode](#single-user-mode).
-- **Browser tabs left open across the upgrade stop working** until you reload them with a hard refresh, which brings up the setup or sign-in screen.
-- **A server other computers can reach shows the setup page to anyone until the administrator exists.** This includes Docker, which listens on every interface. Create the administrator account as soon as the server starts, or publish the port on this computer only (`--publish 127.0.0.1:9090:9090`) until you have.
+1. **Before switching, finish queued work.** Stop submitting jobs and let pending and running jobs finish in single-user mode. In particular, **Prompts from File** checks the submitting account when the node runs. Old jobs belong to `system`, which has no administrator role in multi-user mode, so that node fails after the switch.
+2. **Export the work you want to carry across.** While still in single-user mode, open the Launchpad's **Projects** page and choose **Export** from each Workbench project's menu. Save its `.invk` file and check for warnings about missing media. For wildcards, open the prompt panel's **Dynamic → Wildcards → Export** and choose YAML or JSON. The wildcard file contains your whole wildcard collection. See [project export](/users-guide/projects/introduction/#exporting-and-importing) and [wildcard export](/users-guide/image-generation/prompting-guide/#importing-and-exporting-wildcards).
+3. **Set up accounts privately.** Follow [Set up multi-user mode](#set-up-multi-user-mode) to back up, restart and create the administrator before allowing network access. Hard-refresh any browser tabs left open across the switch. Update API clients to [sign in and send a token](/configuration/multi-user-mode/api-guide/).
+4. **Import as the intended owner.** Sign in to the account that should own each project. From **Launchpad → Projects → Import…**, select its `.invk`. For wildcards, use **Dynamic → Wildcards → Import → From files…** in the intended account. Review import warnings and open the project to check its boards, media and references.
+
+Each import creates a new project ID and copies the archived boards and their media. Missing media can leave broken references. The archive includes the project's workflows and referenced media. It leaves out Library workflows, unrelated Library boards, models, queue history, temporary intermediates and account preferences. Older canvas-only `.invk` files require the legacy frontend.
+
+Workbench limits each archive to 2 GiB both packed and unpacked, 20,000 entries and 1,000 boards. If a project exceeds a limit, keep the original database and media backed up. You can still open the original project in a local-only single-user session using the recovery steps below.
+
+**Already upgraded?** Disconnect network access, including any public proxy, and let queued work finish. Stop the server and back it up. On the same root and database, [configure and verify local-only access](#verify-local-only-access) with multi-user mode still enabled. Only then temporarily [enable single-user mode](#single-user-mode), restart and hard-refresh the browser. The original projects and wildcards are available again for export. Stop the server, restore multi-user mode and restart privately. Sign in, complete the imports and verify the administrator account before restoring network access.
 
 ### What happens to existing data
 
-Switching modes changes no data. Every record keeps its owner, and the mode decides who can see it. In single-user mode everything you create belongs to an internal account named `system`, which cannot sign in.
+Switching modes preserves ownership. Work created in single-user mode belongs to the internal `system` account, which cannot sign in. Creating the first administrator does not transfer that work.
 
 | Data | Single-user → multi-user | Multi-user → single-user |
 | --- | --- | --- |
-| Boards, images, videos | Owned by `system`: only administrators can open them | All visible: the single-user mode user is an administrator |
-| Projects | Owned by `system`: no account can open them. They come back when you return to single-user mode | Only projects created in single-user mode are listed. Each account's projects come back when you return to multi-user mode |
-| Library workflows | Public, owned by `system`: every user can open, duplicate or download them from **Shared with me** | All visible |
-| Accounts | Kept. Created in multi-user mode only | Kept, unused until you switch back |
-
-Content that accounts create in multi-user mode stays theirs across any number of switches. There is no tool yet to move `system`-owned content to another account.
+| Boards, images, videos | Administrators can access them. Other accounts can view media on boards they can read | All visible to the single-user administrator |
+| Projects | The originals are visible only in single-user mode. Each recipient can import an exported copy | Only projects created in single-user mode are listed |
+| Wildcards | Each account has its own collection, including administrators. Import the exported file into the intended account | Only the single-user collection is listed |
+| Library workflows | Public by default, owned by `system`. Users can open, duplicate or download public workflows from **Shared with me** | All visible |
+| Accounts | Existing accounts retain their work | Kept for the next switch back to multi-user mode |
 
 ### Upgrading from v6
 
@@ -411,7 +415,7 @@ To restore, follow [Restore a backup](/start-here/upgrading/#restore-a-backup): 
 | "Cannot remove the last administrator" | Promote another account first. |
 | "The system user cannot be deleted, deactivated, promoted to administrator, or given a password" | `system` owns the content created in single-user mode. Leave it as it is. |
 | **Set up Invoke** appears again | The server found no active administrator in its database. Check that it uses the same root and database as before (`--root`, `INVOKEAI_ROOT`, `db_dir`, `db_url`). |
-| Other computers cannot connect | Set `host: 0.0.0.0`, restart, and allow port 9090 (or your `port`) through the server's firewall. |
+| Other computers cannot connect | Confirm administrator sign-in locally, then check the listener, port mapping or proxy for your intended network route. See [Set up multi-user mode](#set-up-multi-user-mode). |
 | "Database is locked" | InvokeAI already uses write-ahead logging and waits 5 seconds for a lock. Another program is holding the database: an open `sqlite3` shell, a backup or sync tool. Find it with `fuser databases/invokeai.db` on Linux. Keep the database on a local disk: write-ahead logging may not engage on network file systems. |
 | Database update fails at startup | Set `log_level: debug` in `invokeai.yaml` and start again to see the error. With SQLite, the database was backed up first and each migration rolls back when it fails; see [Upgrading](/start-here/upgrading/) to restore the backup. With MySQL or MariaDB there is no automatic backup, and a failed migration's changes are not rolled back: it runs again from the start at the next start. Restore your own backup if it keeps failing. |
 | Slow on a large library | An administrator can run **Compact database** under **Settings → Data & workspace**. It can take a long time and pauses database activity while it runs. |

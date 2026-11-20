@@ -12,13 +12,11 @@ Your working directory is mounted under the `/workspace` path inside the pod. Th
 
 ## Quickstart
 
-1. Launch a pod from this template. **It will take about 5-10 minutes to run through the initial setup**. Be patient.
-1. Wait for the application to load.
-    - TIP: you know it's ready when the CPU usage goes idle
-    - You can also check the logs for a line that says "_Point your browser at..._"
-1. Open the Invoke AI web UI: click the `Connect` => `connect over  HTTP` button.
-1. Create the administrator account right away: until it exists, anyone who can open the pod's HTTP address can claim it.
-1. Generate some art!
+1. Before launching, choose a pod with a public IP for SSH. In the template's port settings, clear the exposed HTTP ports and expose only TCP port 22. Anyone who can reach InvokeAI on a fresh installation can claim the first administrator account.
+2. Set the pod's `PUBLIC_KEY` environment variable to your SSH **public** key so that the image starts its SSH server. Set `INVOKEAI_ROOT=/workspace/invokeai` so the administrator account persists on the volume. Launch the pod and wait for InvokeAI to start.
+3. In the pod's **Connect** tab, copy the **SSH over exposed TCP** command. Insert `-N -L 127.0.0.1:9090:127.0.0.1:9090` immediately after `ssh` and run it on your computer. Leave that terminal open. See [RunPod's full SSH setup](https://docs.runpod.io/pods/configuration/use-ssh).
+4. Open `http://localhost:9090` on your computer, create the administrator account and sign in.
+5. Keep using the tunnel for private access. If you want to share InvokeAI through the pod's HTTP proxy, enable HTTP port 9090 only after setup, with multi-user mode enabled and the same `/workspace/invokeai` volume attached.
 
 ## Other things you can do
 

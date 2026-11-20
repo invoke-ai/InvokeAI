@@ -1,11 +1,15 @@
 ---
 title: Upgrading to v7
-lastUpdated: 2026-10-20
+lastUpdated: 2026-11-20
 ---
 
 import { Tabs, TabItem, Steps } from '@astrojs/starlight/components'
 
 Upgrading an existing install to v7 is one-way. This page covers what the upgrade changes, where the backup of your database is, how to go back to an older version and return to v7, and how to try v7 without touching your current install.
+
+## Before upgrading a single-user installation
+
+InvokeAI now requires sign-in by default, including on localhost. If you previously worked without an account, finish queued jobs and export the Workbench projects and wildcards you want to use with your new account **before switching modes**. Create the first administrator while only you can reach the server. The [single-user upgrade instructions](/configuration/multi-user-mode/admin-guide/#upgrading-from-single-user-mode) cover export, private setup, import and recovery if you have already upgraded.
 
 ## The upgrade is one-way
 
@@ -51,7 +55,7 @@ v6 lists the models you installed in v7 as orphaned, and its **Sync Models** in 
 
 ### MySQL and MariaDB
 
-Invoke makes no backup of a server database. Back it up yourself before upgrading, as [MySQL and MariaDB](/configuration/external-database/) describes. To go back, restore that backup.
+Invoke makes no backup of a server database. Back it up yourself before upgrading, as [MySQL and MariaDB](/configuration/external-database/) describes. To go back, restore that backup and follow the same private startup and sign-in checks described below.
 
 ## Restore a backup
 
@@ -67,7 +71,9 @@ Invoke makes no backup of a server database. Back it up yourself before upgradin
 
 5. Copy the backup you chose to `invokeai.db`. Copy it rather than rename it, so the backup stays as it is.
 
-6. Start the older version.
+6. **Keep the first start private.** Older releases can default to running without sign-in. Disconnect external proxy routes, tunnels and port forwards, and configure the server or Docker host to [listen only on loopback](/configuration/multi-user-mode/admin-guide/#verify-local-only-access). If the release supports accounts, explicitly set `multiuser: true` in `invokeai.yaml` or `INVOKEAI_MULTIUSER=true` in the server environment before starting it.
+
+7. Start the older release and verify local-only access. If it supports accounts, open it in a fresh browser session and confirm that it requires sign-in. Use an administrator account from the restored database, or create the first administrator privately if the backup predates setup. Restore network access only after verifying administrator sign-in. For releases without account support, keep access private or require authentication at a reverse proxy and allow remote access only through that proxy.
 
 </Steps>
 

@@ -3,6 +3,7 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from invokeai.app.invocations.baseinvocation import InvocationRegistry
@@ -273,7 +274,7 @@ def test_failed_migrate_backup(tmp_path: Path, patch_rootdir: None):
 def test_migrate_v4_0_2_to_4_0_3_config(tmp_path: Path, patch_rootdir: None):
     """Test that a v4.0.2 config is migrated to v4.0.3 (image subfolder support)."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"
-    temp_config_file.write_text(v4_0_2_config)
+    temp_config_file.write_text(v4_0_2_config + "\nmultiuser: true\n")
 
     config = load_and_migrate_config(temp_config_file)
     assert config.schema_version == "4.0.3"
@@ -281,6 +282,7 @@ def test_migrate_v4_0_2_to_4_0_3_config(tmp_path: Path, patch_rootdir: None):
     assert config.port == 8080
     # image_subfolder_strategy should have its default value
     assert config.image_subfolder_strategy == "flat"
+    assert yaml.safe_load(temp_config_file.read_text())["multiuser"] is True
 
 
 def test_bails_on_invalid_config(tmp_path: Path, patch_rootdir: None):
@@ -316,13 +318,15 @@ def test_write_config_to_file(patch_rootdir: None):
             assert "port: 8080" in content
 
 
-def test_update_config_with_dict(patch_rootdir: None):
+def test_update_config_with_dict(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch):
     """Test updating the config with a dictionary."""
-    config = InvokeAIAppConfig()
+    monkeypatch.setenv("INVOKEAI_MULTIUSER", "false")
+    config = InvokeAIAppConfig(multiuser=True)
     update_dict = {"host": "10.10.10.10", "port": 6060}
     config.update_config(update_dict)
     assert config.host == "10.10.10.10"
     assert config.port == 6060
+    assert config.multiuser is True
 
 
 def test_update_config_with_object(patch_rootdir: None):

@@ -25,13 +25,19 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
 
 ## TL;DR
 
-Ensure your Docker setup is able to use your GPU. The CUDA image needs an Nvidia driver from the R580 series or newer on the host and a GPU with compute capability 7.5 or newer (GTX 16xx, RTX 20xx and later). Then:
+Ensure your Docker setup is able to use your GPU. The CUDA image needs an Nvidia driver from the R580 series or newer on the host and a GPU with compute capability 7.5 or newer (GTX 16xx, RTX 20xx and later).
+
+These commands store your accounts, images and models in the `invokeai-data` Docker volume. For an existing installation, replace `invokeai-data` with the volume name or absolute host directory that holds your InvokeAI data.
+If the data lives inside the old container, [recover it before replacing the container](#recover-data-before-replacing-a-container).
 
 ```bash
-docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai
+docker run --runtime=nvidia --gpus=all --volume invokeai-data:/invokeai \
+  --publish 127.0.0.1:9090:9090 ghcr.io/invoke-ai/invokeai
 ```
 
-Once the container starts up, open [http://localhost:9090](http://localhost:9090) in your browser, create the administrator account, install some models, and start generating. Create the account right away: until it exists, anyone who can reach the published port can claim it. To publish the port to this computer only, use `--publish 127.0.0.1:9090:9090`.
+Open [http://localhost:9090](http://localhost:9090) on the Docker host and create the administrator account. Anyone who can reach a fresh installation can claim this account, so keep the port on loopback and any reverse proxy route closed during setup. If Docker runs on a remote host, run `ssh -N -L 127.0.0.1:9090:127.0.0.1:9090 user@docker-host` from your computer with your SSH login and host, then open the same URL locally.
+
+After creating the administrator, you can share the installation by recreating the container with the volume containing your account and replacing `127.0.0.1` in the port mapping with the host's LAN IP. Keep multi-user mode enabled and use [HTTPS for network access](/configuration/multi-user-mode/admin-guide/#https-and-internet-access).
 
 ### AMD GPUs (ROCm)
 
@@ -40,12 +46,26 @@ Use a `-rocm` image: `main-rocm`, or `<version>-rocm` for a release. Pass both G
 ```bash
 docker run --device /dev/kfd --device /dev/dri \
   --env RENDER_GROUP_ID=$(getent group render | cut -d: -f3) \
-  --publish 9090:9090 ghcr.io/invoke-ai/invokeai:main-rocm
+  --volume invokeai-data:/invokeai --publish 127.0.0.1:9090:9090 ghcr.io/invoke-ai/invokeai:main-rocm
 ```
 
 - `/dev/kfd` is the ROCm compute interface and `/dev/dri` holds the GPU's render nodes. Invoke needs both.
 - Invoke runs as an unprivileged user inside the container, and the devices keep their host group. The entrypoint adds that user to a `render` group with the ID from `RENDER_GROUP_ID`. Without it, PyTorch can't open the GPU and Invoke runs on the CPU.
 - The image includes kernels for every GPU that AMD's ROCm 10 PyTorch build supports (see [AMD](/start-here/system-requirements/#amd)). Those GPUs don't need `HSA_OVERRIDE_GFX_VERSION`.
+
+### Recover data before replacing a container
+
+If you ran InvokeAI without a volume, or an older ROCm Compose service used a runtime directory outside its mounted volume, the container itself can hold your accounts and images. Find the actual path in its startup log (`Root directory = ...`). For a container created without `--rm`, substitute its name and that path below. Run these commands on the Docker host:
+
+```bash
+old_container=old-invokeai
+old_root=/invokeai
+docker stop "$old_container" &&
+  recovered_dir=$(mktemp -d "$PWD/invokeai-recovered.XXXXXX") &&
+  docker cp "$old_container:$old_root/." "$recovered_dir"
+```
+
+Check the copy for your data, including `databases/invokeai.db` with the default SQLite settings. Use `--volume "$recovered_dir:/invokeai"` for the replacement or set `HOST_INVOKEAI_ROOT` in Compose to the recovered directory's absolute path. Keep any external database settings. Start on loopback and verify your existing sign-in and data before enabling network access.
 
 ## Build-It-Yourself
 
@@ -79,23 +99,22 @@ The image includes the driver for a [MySQL or MariaDB database](/configuration/e
 | Environment Variable | Default value | Description |
 | --- | --- | --- |
 | `INVOKEAI_ROOT` | `~/invokeai` | **Required** - the location of your InvokeAI root directory. It will be created if it does not exist. |
+| `HOST_INVOKEAI_IP` | `127.0.0.1` | Interface on the Docker host where Compose publishes the web port. |
 | `HUGGING_FACE_HUB_TOKEN` |  | InvokeAI will work without it, but some of the integrations with HuggingFace (like downloading from models from private repositories) may not work |
-| `GPU_DRIVER` | `cuda` | Optionally change this to `rocm` to build the image for AMD GPUs, or `cpu` for CPU-only builds (required on ARM64 / `aarch64` hosts such as the Raspberry Pi 5). NOTE: Use the `build.sh` script to build the image for this to take effect. |
+| `GPU_DRIVER` | `cuda` | Selects the image build and Compose service when using `./run.sh`. Use `rocm` for AMD GPUs or `cpu` for CPU-only builds (required on ARM64 / `aarch64` hosts such as the Raspberry Pi 5). |
 | `RENDER_GROUP_ID` |  | AMD GPUs only. The ID of the host's `render` group, from `getent group render`. Without it, Invoke can't access the GPU. |
 
 #### Build the Image
 
 Use the standard `docker compose build` command from within the `docker` directory.
 
-If using an AMD GPU:
-a: set the `GPU_DRIVER=rocm` environment variable in `docker-compose.yml` and continue using `docker compose build` as usual, or
-b: set `GPU_DRIVER=rocm` in the `.env` file and use the `build.sh` script, provided for convenience
+For an AMD GPU, set `GPU_DRIVER=rocm` and the host's `RENDER_GROUP_ID` in `.env`, then run `./run.sh` to build and start the ROCm service.
 
 #### Run the Container
 
 Use the standard `docker compose up` command, and generally the `docker compose` [CLI](https://docs.docker.com/compose/reference/) as usual.
 
-Once the container starts up (and configures the InvokeAI root directory if this is a new installation), you can access InvokeAI at [http://localhost:9090](http://localhost:9090) and create the administrator account. Create it right away: until it exists, anyone who can reach the published port can claim it
+Open [http://localhost:9090](http://localhost:9090) on the Docker host or through the SSH tunnel above to create the administrator. To share the installation after setup, set `HOST_INVOKEAI_IP` in `.env` to the host's LAN IP and rerun the command you used to start the service with the same data directory.
 
 ## Troubleshooting / FAQ
 
