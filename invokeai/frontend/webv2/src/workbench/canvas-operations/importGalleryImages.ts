@@ -30,12 +30,13 @@ import {
   type AccountScope,
 } from '@platform/state/accountLifecycle';
 import {
+  advanceMaskFillColors,
   captureInsertionAnchor,
   createControlLayer,
   getDocumentLeaves,
   nextControlLayerName,
+  nextMaskFillColor,
 } from '@workbench/canvas-engine/api';
-import { advanceMaskFillColors, nextMaskFillColor } from '@workbench/canvas-engine/document/maskFillPalette';
 import { hasPendingCanvasResults } from '@workbench/canvasStagingView';
 import {
   createEmptyPaintLayer,

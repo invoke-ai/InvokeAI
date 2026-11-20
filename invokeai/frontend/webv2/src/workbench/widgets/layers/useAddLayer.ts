@@ -1,7 +1,12 @@
 import type { CanvasNodeContract } from '@workbench/canvas-engine/api';
 
-import { createControlLayer, getDocumentIndex, nextControlLayerName } from '@workbench/canvas-engine/api';
-import { advanceMaskFillColors, nextMaskFillColor } from '@workbench/canvas-operations/api';
+import {
+  advanceMaskFillColors,
+  createControlLayer,
+  getDocumentIndex,
+  nextControlLayerName,
+  nextMaskFillColor,
+} from '@workbench/canvas-engine/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { setLayerGroupExpanded } from '@workbench/layerPanelState';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
