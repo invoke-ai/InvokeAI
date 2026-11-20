@@ -22,6 +22,8 @@ import { getRegionalGuidanceSupport } from '@features/generation/graph';
 import { createItemId } from '@platform/browser/randomUuid';
 import {
   createControlLayer,
+  DEFAULT_INPAINT_MASK_FILL,
+  DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR,
   getSourceContentRect,
   isIdentityAdjustments,
   isMergeableRasterLayer,
@@ -79,7 +81,7 @@ export const createEmptyPaintLayer = (name: string, id: string = createLayerId()
 });
 
 /** Use the legacy diagonal inpaint hatch and first fill color; multiple masks are allowed. */
-export const DEFAULT_INPAINT_MASK_FILL = { color: '#e07575', style: 'diagonal' } as const;
+export { DEFAULT_INPAINT_MASK_FILL };
 
 /** The next free "Inpaint Mask N" name given the existing layer names (N ≥ 1, first gap). */
 export const nextInpaintMaskName = (existingNames: readonly string[]): string => {
@@ -143,32 +145,21 @@ export const isAutoControlLayerName = (name: string, typeLabels: readonly string
   ['Control Layer', ...typeLabels].some((prefix) => numberedSuffix(prefix, name) !== null);
 
 /** Builds an empty inpaint mask layer with the legacy-default fill (no bitmap yet). */
-export const createInpaintMaskLayer = (name: string, id: string = createLayerId()): CanvasInpaintMaskLayerContract => ({
+export const createInpaintMaskLayer = (
+  name: string,
+  id: string = createLayerId(),
+  color: string = DEFAULT_INPAINT_MASK_FILL.color
+): CanvasInpaintMaskLayerContract => ({
   blendMode: 'normal',
   id,
   isEnabled: true,
   isLocked: false,
-  mask: { bitmap: null, fill: { ...DEFAULT_INPAINT_MASK_FILL } },
+  mask: { bitmap: null, fill: { ...DEFAULT_INPAINT_MASK_FILL, color } },
   name,
   opacity: 1,
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
   type: 'inpaint_mask',
 });
-
-/** Cycle legacy regional fill colors to distinguish overlaps. */
-export const REGIONAL_GUIDANCE_FILL_COLORS: readonly string[] = [
-  '#799ddb',
-  '#83d683',
-  '#fae150',
-  '#dc9065',
-  '#e07575',
-  '#d58bca',
-  '#a178d6',
-];
-
-/** Colors from the document's region count, legacy pre-increment: the first region uses palette index 1. */
-export const nextRegionalGuidanceFillColor = (existingRegionalGuidanceCount: number): string =>
-  REGIONAL_GUIDANCE_FILL_COLORS[(existingRegionalGuidanceCount + 1) % REGIONAL_GUIDANCE_FILL_COLORS.length];
 
 /** The next free "Regional Guidance N" name given the existing layer names (N ≥ 1, first gap). */
 export const nextRegionalGuidanceName = (existingNames: readonly string[]): string => {
@@ -191,7 +182,7 @@ export const nextRegionalGuidanceName = (existingNames: readonly string[]): stri
 
 export const createRegionalGuidanceLayer = (
   name: string,
-  existingRegionalGuidanceCount: number,
+  color: string | undefined,
   id: string = createLayerId()
 ): CanvasRegionalGuidanceLayerContract => ({
   autoNegative: false,
@@ -201,7 +192,7 @@ export const createRegionalGuidanceLayer = (
   isLocked: false,
   mask: {
     bitmap: null,
-    fill: { color: nextRegionalGuidanceFillColor(existingRegionalGuidanceCount), style: 'solid' },
+    fill: { color: color ?? DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR, style: 'solid' },
   },
   name,
   negativePrompt: null,
@@ -232,7 +223,7 @@ export const createInpaintMaskFromImage = (input: CreateMaskLayerFromImageInput)
 export const createRegionalGuidanceFromImage = (
   input: CreateMaskLayerFromImageInput
 ): CanvasRegionalGuidanceLayerContract => ({
-  ...createRegionalGuidanceLayer(input.name, 0, input.id),
+  ...createRegionalGuidanceLayer(input.name, undefined, input.id),
   mask: {
     bitmap: { ...input.image },
     fill: { ...input.fill },
@@ -332,11 +323,11 @@ export const canAddRegionalReferenceImage = (base: string | null): boolean =>
 
 export const createRegionalGuidanceLayerWithRefImage = (
   name: string,
-  existingRegionalGuidanceCount: number,
+  color: string | undefined,
   base: string | null,
   id: string = createLayerId()
 ): CanvasRegionalGuidanceLayerContract => ({
-  ...createRegionalGuidanceLayer(name, existingRegionalGuidanceCount, id),
+  ...createRegionalGuidanceLayer(name, color, id),
   referenceImages: [createRegionalReferenceImage(base)],
 });
 

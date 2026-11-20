@@ -24,11 +24,10 @@ import {
   createRegionalGuidanceFromImage,
   createRegionalGuidanceLayerWithRefImage,
   DEFAULT_INPAINT_MASK_FILL,
-  nextRegionalGuidanceFillColor,
 } from '@workbench/widgets/layers/layerOps';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { createInitialWorkbenchState, workbenchReducer, type WorkbenchAction } from '@workbench/workbenchState.testing';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { importGalleryImagesToCanvas, type GalleryCanvasImportDestination } from './importGalleryImages';
 
@@ -238,7 +237,7 @@ const expectedLayer = (
       };
     case 'inpaint-mask':
       return createInpaintMaskFromImage({
-        fill: DEFAULT_INPAINT_MASK_FILL,
+        fill: { ...DEFAULT_INPAINT_MASK_FILL, color: ['#e07575', '#83d683'][index]! },
         id: expect.any(String) as string,
         image: ref,
         name: `Inpaint Mask ${index + 1}`,
@@ -246,14 +245,18 @@ const expectedLayer = (
       });
     case 'regional-guidance':
       return createRegionalGuidanceFromImage({
-        fill: { color: nextRegionalGuidanceFillColor(index), style: 'solid' },
+        fill: { color: ['#83d683', '#F59E42'][index]!, style: 'solid' },
         id: expect.any(String) as string,
         image: ref,
         name: `Regional Guidance ${index + 1}`,
         rect: bbox,
       });
     case 'regional-reference': {
-      const layer = createRegionalGuidanceLayerWithRefImage(`Regional Guidance ${index + 1}`, index, base);
+      const layer = createRegionalGuidanceLayerWithRefImage(
+        `Regional Guidance ${index + 1}`,
+        ['#83d683', '#F59E42'][index]!,
+        base
+      );
       const reference = layer.referenceImages[0]!;
       return {
         ...layer,
@@ -269,6 +272,10 @@ const expectedLayer = (
 seedArchitectureCapabilities();
 
 describe('importGalleryImagesToCanvas', () => {
+  beforeEach(() => {
+    accountLifecycle.invalidate();
+    setArchitectureCapabilities(architectureCapabilitiesFixture);
+  });
   it.each<Exclude<GalleryCanvasImportDestination, 'control-resized'>>([
     'raster',
     'control',

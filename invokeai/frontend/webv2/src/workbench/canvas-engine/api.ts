@@ -14,6 +14,14 @@ export {
   needsControlDetection,
   restoreControlOriginal,
 } from './document/controlDerivation';
-export { createControlLayer, type CreateControlLayerInput, nextControlLayerName } from './document/layerFactories';
+export {
+  advanceMaskFillColors,
+  createControlLayer,
+  type CreateControlLayerInput,
+  DEFAULT_INPAINT_MASK_FILL,
+  DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR,
+  nextControlLayerName,
+  nextMaskFillColor,
+} from './document/layerFactories';
 export { createVectorLayer, nextVectorLayerName } from './document/vectorLayerFactories';
 export { shapeDrawsOnLayer } from './tools/shapeTarget';

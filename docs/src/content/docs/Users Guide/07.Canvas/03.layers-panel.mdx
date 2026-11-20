@@ -198,6 +198,8 @@ A control layer made in an earlier version of Invoke keeps its model and works w
 
 ### Inpaint mask
 
+When you add inpaint masks, the first one in the session uses coral (`#e07575`). Each new mask takes the next color from a palette of ten, and the order repeats after ten masks. Regional Guidance uses the same palette with its own cycle, starting at green (`#83d683`). You can change any layer’s fill color in Properties.
+
 * **Fill color** and **Fill style** (Solid, Grid, Crosshatch, Diagonal Left, Diagonal Right, Horizontal or Vertical) — how the mask is drawn on screen. The lines keep their spacing as you zoom the canvas.
 * **Invert mask** — swap the masked and unmasked areas.
 

@@ -5,7 +5,8 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 
 import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
-import { createControlLayer } from '@workbench/canvas-engine/api';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { advanceMaskFillColors, createControlLayer, nextMaskFillColor } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it } from 'vitest';
 
@@ -37,8 +38,6 @@ import {
   isAutoControlLayerName,
   isMergeableRasterLayer,
   nextControlTypeLayerName,
-  nextRegionalGuidanceFillColor,
-  REGIONAL_GUIDANCE_FILL_COLORS,
 } from './layerOps';
 
 seedArchitectureCapabilities();
@@ -115,17 +114,6 @@ describe('createAdjustmentEntry', () => {
       expect(Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff).toBe(true);
     }
     expect(first.id).not.toBe(second.id);
-  });
-});
-
-describe('nextRegionalGuidanceFillColor', () => {
-  it('derives the colour purely from the existing regional-guidance count (no session state)', () => {
-    expect(nextRegionalGuidanceFillColor(0)).toBe(REGIONAL_GUIDANCE_FILL_COLORS[1]);
-    expect(nextRegionalGuidanceFillColor(1)).toBe(REGIONAL_GUIDANCE_FILL_COLORS[2]);
-    expect(nextRegionalGuidanceFillColor(REGIONAL_GUIDANCE_FILL_COLORS.length - 1)).toBe(
-      REGIONAL_GUIDANCE_FILL_COLORS[0]
-    );
-    expect(nextRegionalGuidanceFillColor(0)).toBe(nextRegionalGuidanceFillColor(0));
   });
 });
 
@@ -539,11 +527,37 @@ describe('createRegionalReferenceImage', () => {
 
 describe('createRegionalGuidanceLayerWithRefImage', () => {
   it('is a regional guidance layer pre-seeded with exactly one empty reference image', () => {
-    const layer = createRegionalGuidanceLayerWithRefImage('Region 1', 0, 'sdxl', 'rg-1');
+    const layer = createRegionalGuidanceLayerWithRefImage('Region 1', undefined, 'sdxl', 'rg-1');
     expect(layer.type).toBe('regional_guidance');
     expect(layer.id).toBe('rg-1');
     expect(layer.referenceImages).toHaveLength(1);
     expect(layer.referenceImages[0]?.config.type).toBe('ip_adapter');
     expect(layer.referenceImages[0]?.config.image).toBeNull();
   });
+});
+
+it('cycles mask colors independently in palette order and restarts at the session defaults', () => {
+  accountLifecycle.invalidate();
+  expect(nextMaskFillColor('inpaint_mask')).toBe('#e07575');
+  expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
+  advanceMaskFillColors('inpaint_mask');
+  expect(Array.from({ length: 10 }, (_, index) => nextMaskFillColor('inpaint_mask', index))).toEqual([
+    '#83d683',
+    '#F59E42',
+    '#F4D35E',
+    '#38C9C5',
+    '#62B5F5',
+    '#637BE8',
+    '#AD80E8',
+    '#ED79BA',
+    '#B7D65A',
+    '#e07575',
+  ]);
+  expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
+  advanceMaskFillColors('regional_guidance');
+  expect(nextMaskFillColor('regional_guidance')).toBe('#F59E42');
+  accountLifecycle.invalidate();
+  expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
+  expect(nextMaskFillColor('inpaint_mask')).toBe('#e07575');
+  accountLifecycle.invalidate();
 });

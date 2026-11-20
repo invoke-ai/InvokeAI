@@ -247,7 +247,7 @@ describe('loadCanvasState', () => {
       control: [groupContract('cg', [createControlLayer({ id: 'control', name: 'Control' })], { isHidden: true })],
       inpaint_mask: [createInpaintMaskLayer('Mask', 'mask')],
       raster: [groupContract('rg', [createEmptyPaintLayer('Raster', 'raster'), groupContract('inner', [])])],
-      regional_guidance: [createRegionalGuidanceLayer('Region', 0, 'region')],
+      regional_guidance: [createRegionalGuidanceLayer('Region', undefined, 'region')],
     };
     const snapshot = {
       createdAt: 'now',
