@@ -3,67 +3,46 @@ import { describe, expect, it } from 'vitest';
 import { getCudaDeviceIndex, getDeviceLabel, getDeviceNameLabels, resolveRandDeviceMetadata } from './deviceLabels';
 
 describe('getCudaDeviceIndex', () => {
-  it('parses the index from a cuda device', () => {
-    expect(getCudaDeviceIndex('cuda:0')).toBe(0);
-    expect(getCudaDeviceIndex('cuda:7')).toBe(7);
-    expect(getCudaDeviceIndex('cuda:12')).toBe(12);
-  });
-
-  it('parses the index from an xpu device', () => {
-    expect(getCudaDeviceIndex('xpu:0')).toBe(0);
-    expect(getCudaDeviceIndex('xpu:7')).toBe(7);
-  });
-
-  it('returns null for non-cuda and missing devices', () => {
-    expect(getCudaDeviceIndex('cpu')).toBeNull();
-    expect(getCudaDeviceIndex('mps')).toBeNull();
-    expect(getCudaDeviceIndex('cuda')).toBeNull();
-    expect(getCudaDeviceIndex(null)).toBeNull();
-    expect(getCudaDeviceIndex(undefined)).toBeNull();
-    expect(getCudaDeviceIndex('')).toBeNull();
-  });
-
-  it('does not accept a device with trailing content', () => {
-    expect(getCudaDeviceIndex('cuda:0:1')).toBeNull();
-    expect(getCudaDeviceIndex('xcuda:0')).toBeNull();
+  it.each([
+    ['cuda:0', 0],
+    ['cuda:7', 7],
+    ['cuda:12', 12],
+    ['xpu:0', 0],
+    ['xpu:7', 7],
+    ['cpu', null],
+    ['mps', null],
+    ['cuda', null],
+    [null, null],
+    [undefined, null],
+    ['', null],
+    ['cuda:0:1', null],
+    ['xcuda:0', null],
+  ])('reads %s as index %s', (device, expected) => {
+    expect(getCudaDeviceIndex(device)).toBe(expected);
   });
 });
 
 describe('resolveRandDeviceMetadata', () => {
-  it('always reports CPU when CPU noise is enabled', () => {
-    expect(resolveRandDeviceMetadata(true, [{ device: 'xpu:0', name: 'Arc' }])).toBe('cpu');
-  });
-
-  it('reports the single available accelerator family', () => {
-    expect(resolveRandDeviceMetadata(false, [{ device: 'cuda:0', name: 'RTX' }])).toBe('cuda');
-    expect(resolveRandDeviceMetadata(false, [{ device: 'xpu:0', name: 'Arc' }])).toBe('xpu');
-  });
-
-  it('keeps the legacy CUDA fallback when device data is missing or mixed', () => {
-    expect(resolveRandDeviceMetadata(false, [])).toBe('cuda');
-    expect(
-      resolveRandDeviceMetadata(false, [
+  it.each([
+    ['cpu whenever CPU noise is enabled', true, [{ device: 'xpu:0', name: 'Arc' }], 'cpu'],
+    ['the single cuda family', false, [{ device: 'cuda:0', name: 'RTX' }], 'cuda'],
+    ['the single xpu family', false, [{ device: 'xpu:0', name: 'Arc' }], 'xpu'],
+    ['the legacy cuda fallback without device data', false, [], 'cuda'],
+    [
+      'the legacy cuda fallback for mixed families',
+      false,
+      [
         { device: 'cuda:0', name: 'RTX' },
         { device: 'xpu:0', name: 'Arc' },
-      ])
-    ).toBe('cuda');
+      ],
+      'cuda',
+    ],
+  ])('reports %s', (_label, cpuNoise, devices, expected) => {
+    expect(resolveRandDeviceMetadata(cpuNoise, devices)).toBe(expected);
   });
 });
 
 describe('getDeviceNameLabels', () => {
-  it('leaves a uniquely-named device unsuffixed', () => {
-    expect(getDeviceNameLabels([{ device: 'cuda:0', name: 'RTX 5090' }])).toEqual({ 'cuda:0': 'RTX 5090' });
-  });
-
-  it('suffixes identically-named devices with a 1-based ordinal', () => {
-    expect(
-      getDeviceNameLabels([
-        { device: 'cuda:0', name: 'RTX 5090' },
-        { device: 'cuda:1', name: 'RTX 5090' },
-      ])
-    ).toEqual({ 'cuda:0': 'RTX 5090 #1', 'cuda:1': 'RTX 5090 #2' });
-  });
-
   it('suffixes only the names that repeat', () => {
     expect(
       getDeviceNameLabels([

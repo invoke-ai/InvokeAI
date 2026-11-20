@@ -30,10 +30,7 @@ import {
 import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
-/**
- * Share guarded undoable creation across add menus and stack buttons. Insert above the selection, inside its group
- * for selected leaves.
- */
+/** Guarded undoable creation, above the selection and inside its group for selected leaves. */
 export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
@@ -58,6 +55,26 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           model.prepare({ aboveId: model.document.selectedLayerId, nodes: [node], type: 'insert' })
         );
       switch (id) {
+        case 'vector': {
+          if (!engine) {
+            return;
+          }
+          const document = engine.document.getDocument();
+          void engine.layers.vectorEdit
+            .createLayer({
+              id: createLayerId(),
+            })
+            .then((layer) => {
+              if (
+                layer &&
+                engine.lifecycle.getLifecycleState() === 'active' &&
+                engine.document.getDocument() === document
+              ) {
+                add(t('widgets.layers.actions.addVectorLayer'), layer);
+              }
+            });
+          return;
+        }
         case 'group': {
           // An empty group has no stack of its own: it joins the selected node's stack, else raster.
           const groupId = createLayerId();
@@ -119,6 +136,6 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
         }
       }
     },
-    [base, commitPrepared, layerNames, projectId, regionalGuidanceCount, t]
+    [engine, base, commitPrepared, layerNames, projectId, regionalGuidanceCount, t]
   );
 };

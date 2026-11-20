@@ -1,11 +1,4 @@
-/**
- * Restore points make the canvas's wholesale losses recoverable. Clear canvas and Discard all each keep one (the
- * reducer holds the newest `MAX_CANVAS_SNAPSHOTS` of each kind), the History pane lists them, and restoring a canvas
- * point keeps the canvas it replaces as a point of its own, so a restore can be undone too. A swap of the document
- * (clearing, restoring a canvas) first crosses the paint barrier, so neither the point nor the kept canvas misses
- * strokes still uploading; when they cannot be saved, nothing changes. Everything here acts on one project, captured by
- * its caller, never "the active project".
- */
+/** Restore points for wholesale canvas losses; each acts on one project captured by its caller. */
 
 import type {
   CanvasDocumentContractV3,
@@ -35,10 +28,7 @@ export interface RestorePointPorts {
   engine(): RestorePointEngine | null;
   /** Whether the canvas holds nothing to bring back: no layer but empty masks, no staged result. */
   isBlank(): boolean;
-  /**
-   * Why swapping the document must wait: an operation holds it (`editing`), or a generation runs or results wait for
-   * review (`canvas`), whose results a swap would throw away. Null when nothing does.
-   */
+  /** Why a document swap must wait: an operation (`editing`) or a run or review (`canvas`); null when free. */
   lockReason(): 'editing' | 'canvas' | null;
   createId(): string;
   now(): string;
@@ -76,13 +66,8 @@ const crossPaintBarrier = async (engine: RestorePointEngine): Promise<boolean> =
 
 export interface ClearCanvasRequest {
   readonly ports: RestorePointPorts;
-  /** The restore point's name. */
   readonly name: string;
-  /**
-   * The document whose size the new canvas keeps, and the queue items to stop first (empty to let them finish; their
-   * results are then dropped). Read once the strokes have saved, so a run enqueued or a resize made meanwhile counts.
-   * Null when the project closed.
-   */
+  /** The size source and queue items to stop, read after strokes save; null when the project closed. */
   readonly readTarget: () => {
     readonly document: Pick<CanvasDocumentContractV3, 'height' | 'width'>;
     readonly stop: readonly string[];
@@ -100,10 +85,7 @@ export type ClearCanvasOutcome =
   /** The project or its canvas closed before the canvas could be cleared. */
   | { status: 'gone' };
 
-/**
- * Clears the canvas behind a restore point; a blank canvas has nothing to keep. A wholesale replacement drops canvas
- * history, staging and Discard all points, as any new canvas session does.
- */
+/** Clears the canvas behind a restore point; a blank canvas has nothing to keep. */
 export const clearCanvasWithRestorePoint = async (request: ClearCanvasRequest): Promise<ClearCanvasOutcome> => {
   const engine = request.ports.engine();
   if (!engine) {
@@ -138,10 +120,7 @@ export const clearCanvasWithRestorePoint = async (request: ClearCanvasRequest): 
 };
 
 export type RestoreOutcome =
-  /**
-   * `undoPointId` names the kept canvas that undoes a canvas restore; null for a Discard all point, or when the
-   * replaced canvas was blank.
-   */
+  /** The kept canvas that undoes a canvas restore; null for Discard all or a blank replaced canvas. */
   | { status: 'restored'; undoPointId: string | null }
   | { status: 'locked'; reason: 'editing' | 'canvas' }
   | { status: 'unsaved' }
@@ -151,13 +130,7 @@ export type RestoreOutcome =
   | { status: 'nothing' }
   | { status: 'gone' };
 
-/**
- * Restores a point. A canvas point waits while an operation, a generation or a review holds the canvas, both before
- * and after saving the strokes still uploading, then takes the replaced canvas's place among the points
- * (`undoPointId`) unless that canvas was blank. A Discard all point only re-stages its results, so it neither waits
- * nor keeps the canvas. `isEditedSince`, for an Undo, refuses once the canvas was edited, asked again after the
- * barrier since the strokes it saves land in the document only then.
- */
+/** Restores a point; a canvas point waits for the canvas before and after the paint barrier. */
 export const restoreFromPoint = async (
   ports: RestorePointPorts,
   point: { id: string; kind?: CanvasSnapshotKind },
@@ -210,10 +183,7 @@ export const restoreFromPoint = async (
 /** The canvas a Clear canvas or a restore left, which its Undo must still find. */
 export type CanvasEditFence = Pick<CanvasStateContractV3, 'document' | 'documentRevision'>;
 
-/**
- * Whether the canvas was edited since `fence`: another swap, a resize, or any change to its layers or background.
- * Selecting a layer or moving the bbox does not count, since an Undo that replaces them loses no work.
- */
+/** Edited since `fence`; selection and bbox moves do not count, since an Undo replacing them loses no work. */
 export const isCanvasEditedSince = (fence: CanvasEditFence, canvas: CanvasEditFence): boolean => {
   if (canvas.documentRevision !== fence.documentRevision) {
     return true;

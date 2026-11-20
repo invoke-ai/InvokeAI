@@ -12,9 +12,9 @@ export const supportsExternalModelSettings = (model: Pick<ModelConfig, 'type'>):
   model.type === 'external_image_generator';
 
 /**
- * Whether the starter catalog manages the record's capabilities and defaults: the backend overlays the catalog's
- * values on every response for a record whose source names a starter, so editing them would not persist. Records
- * without a source are matched by the source an external install would record.
+ * Whether the starter catalog manages the record's capabilities and defaults: the backend overlays the catalog's values
+ * on every response for a record whose source names a starter, so editing them would not persist. Records without a
+ * source are matched by the source an external install would record.
  */
 export const isStarterManagedExternalModel = (
   model: Pick<ExternalModelSettingsModel, 'provider_id' | 'provider_model_id'> & { source?: string | null },

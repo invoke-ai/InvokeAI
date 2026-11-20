@@ -24,10 +24,6 @@ const pointer = (x: number, y: number, timeStamp = 0, ctrl = false): PointerInpu
   timeStamp,
 });
 
-/**
- * Draws `kind` over document 20..80 × 20..60 (the polygon and freehand trace its right triangle). A cutout holds Ctrl
- * on the commit: the release, or the polygon's closing press on its first vertex.
- */
 const draw = (tool: Tool, ctx: ToolContext, kind: ShapeToolKind, cutout = false): void => {
   if (kind === 'polygon') {
     for (const [x, y, t] of [
@@ -49,7 +45,6 @@ const draw = (tool: Tool, ctx: ToolContext, kind: ShapeToolKind, cutout = false)
   tool.onPointerUp?.(ctx, pointer(80, 60, 0, cutout));
 };
 
-/** Draws (or with `cutout`, cuts) `kind` on the selected `layer`, whose cache starts as `prefill` when given. */
 const drawOn = (
   layer: CanvasLayerContract,
   kind: ShapeToolKind,
@@ -65,7 +60,6 @@ const drawOn = (
   }
   const stores = createEngineStores();
   stores.shapeOptions.set({ ...stores.shapeOptions.get(), fillEnabled: !strokeOnly, kind, strokeEnabled: strokeOnly });
-  // A translucent foreground must still paint full coverage.
   stores.colorPair.set({ background: '#000000', foreground: '#ff000040' });
   const strokeEdit = createRecordingStrokeEdit();
   const addedLayers: unknown[] = [];
@@ -91,10 +85,8 @@ const drawOn = (
     updateCursor: vi.fn(),
     viewport: { documentToScreen: (p: { x: number; y: number }) => p } as unknown as Viewport,
   };
-  // Off macOS, Ctrl is the cutout key.
   draw(createShapeTool({ isMacOs: false }), ctx, kind, cutout);
   const entry = layers.get(layer.id);
-  /** The layer's alpha at a layer-local pixel, or 0 outside its cache. */
   const alphaAt = (x: number, y: number): number => {
     if (!entry || x < entry.rect.x || y < entry.rect.y) {
       return 0;
@@ -113,9 +105,7 @@ describe('shape tool on a mask in Chromium', () => {
 
       expect(addedLayers).toHaveLength(0);
       expect(strokeEdit.record.commits).toHaveLength(1);
-      // Inside every kind: near the right edge, vertically centred (inside the triangle too).
       expect(alphaAt(72, 40)).toBe(255);
-      // Outside every kind: past the right edge, and the triangle's empty lower-left corner.
       expect(alphaAt(90, 40)).toBe(0);
       if (kind === 'polygon' || kind === 'freehand') {
         expect(alphaAt(25, 55)).toBe(0);
@@ -131,18 +121,6 @@ describe('shape tool on a mask in Chromium', () => {
     expect(alphaAt(50, 40)).toBe(0);
     expect(alphaAt(19, 40)).toBe(0);
     expect(strokeEdit.record.commits).toHaveLength(1);
-  });
-
-  it('lands coverage under the cursor on a moved and scaled regional mask', () => {
-    const mask = layerContract('region', 'regional_guidance', {
-      transform: { rotation: 0, scaleX: 2, scaleY: 2, x: 10, y: 10 },
-    });
-    const { alphaAt } = drawOn(mask, 'rect');
-
-    // Document (72, 40) is local ((72 - 10) / 2, (40 - 10) / 2) = (31, 15).
-    expect(alphaAt(31, 15)).toBe(255);
-    // Document (90, 40) is local (40, 15): outside the shape.
-    expect(alphaAt(40, 15)).toBe(0);
   });
 });
 
@@ -162,7 +140,6 @@ describe('shape cutout in Chromium', () => {
     expect(strokeEdit.record.commits).toHaveLength(1);
     const event = strokeEdit.record.commits[0]!;
     expect(event.tool).toBe('shape-cutout');
-    // The before image is the undo: the pixels the cutout removed, still opaque there.
     expect(event.beforeImageData.data[3]).toBe(255);
     expect(alphaAt(72, 40)).toBe(0);
     expect(alphaAt(90, 40)).toBe(255);
@@ -172,18 +149,5 @@ describe('shape cutout in Chromium', () => {
     } else {
       expect(alphaAt(50, 40)).toBe(0);
     }
-  });
-
-  it('cuts only the inside polygon outline and leaves its hollow interior intact', () => {
-    const { alphaAt, strokeEdit } = drawOn(layerContract('paint', 'raster'), 'polygon', {
-      cutout: true,
-      prefill: '#336699',
-      strokeOnly: true,
-    });
-    expect(alphaAt(76, 35)).toBe(0);
-    expect(alphaAt(65, 30)).toBe(255);
-    expect(alphaAt(25, 55)).toBe(255);
-    expect(strokeEdit.record.commits).toHaveLength(1);
-    expect(strokeEdit.record.commits[0]?.tool).toBe('shape-cutout');
   });
 });

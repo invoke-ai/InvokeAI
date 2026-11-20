@@ -3,6 +3,7 @@ export type {
   ModelBase,
   ModelConfig,
   ModelFileFormat,
+  ModelRole,
   ModelTaxonomyType,
   PredictionType,
   StarterModel,

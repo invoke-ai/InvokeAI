@@ -1,8 +1,8 @@
 /**
  * Freehand lasso thins its drag by sub-pixel screen spacing and straight runs, keeping corners. Polygon lasso spans
- * clicks and closes on double-click, Enter or first-vertex proximity. Both commit through `commitSelection` with shared modifier/persistent-op resolution.
- * Previews never dispatch. Temporary tool switches preserve polygon sessions; real switches cancel them. Selection
- * history is owned by the engine wrapper.
+ * clicks and closes on double-click, Enter or first-vertex proximity. Both commit through `commitSelection` with shared
+ * modifier/persistent-op resolution. Previews never dispatch. Temporary tool switches preserve polygon sessions; real
+ * switches cancel them. Selection history is owned by the engine wrapper.
  */
 
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
@@ -34,10 +34,10 @@ interface FreehandSession {
 }
 
 /**
- * The last point gives way to a new sample while both lie within `FREEHAND_MIN_SPACING_PX` of the point before it;
- * once one leaves that radius the last point stays. Every dropped sample lies within the spacing of a kept point, so
- * thinning moves the outline by less than the spacing and keeps corners and reversals beyond it, and the outline
- * always ends at the latest sample. Redundant points on a forward straight run are dropped too.
+ * The last point gives way to a new sample while both lie within `FREEHAND_MIN_SPACING_PX` of the point before it; once
+ * one leaves that radius the last point stays. Every dropped sample lies within the spacing of a kept point, so
+ * thinning moves the outline by less than the spacing and keeps corners and reversals beyond it, and the outline always
+ * ends at the latest sample. Redundant points on a forward straight run are dropped too.
  */
 const appendFreehandPoint = (session: FreehandSession, sample: PointerInput): void => {
   const { points, screenPoints } = session;
@@ -69,14 +69,12 @@ const appendFreehandPoint = (session: FreehandSession, sample: PointerInput): vo
   screenPoints.push({ x: screen.x, y: screen.y });
 };
 
-/** A polygon vertex-placing session spanning multiple clicks. */
 interface PolygonSession extends PolylineSession {
   kind: 'polygon';
 }
 
 type Session = FreehandSession | PolygonSession;
 
-/** Creates a fresh lasso tool with its own per-gesture point buffer. */
 export const createLassoTool = (): Tool => {
   let session: Session | null = null;
 
@@ -84,7 +82,6 @@ export const createLassoTool = (): Tool => {
     session = null;
   };
 
-  /** Publishes the in-progress outline for the overlay. */
   const publishPreview = (ctx: ToolContext): void => {
     if (!session || session.points.length === 0) {
       ctx.stores.lassoPreview.set(null);
@@ -141,8 +138,7 @@ export const createLassoTool = (): Tool => {
     usesAltKey: true,
     onDeactivate: (ctx, opts) => {
       if (opts?.temporary) {
-        // Temporary switches preserve polygon sessions for panning; mid-drag switches are already blocked by the
-        // pipeline.
+        // Temporary switches preserve polygon sessions for panning; the pipeline already blocks mid-drag switches.
         return;
       }
       reset();
@@ -161,8 +157,7 @@ export const createLassoTool = (): Tool => {
       if (session.kind !== 'polygon') {
         return false;
       }
-      // Enter closes the polygon. No modifiers are in play on a key command,
-      // so the persistent op mode applies.
+      // Enter closes the polygon. No modifiers are in play on a key command, so the persistent op mode applies.
       closePolygon(ctx, session, { alt: false, shift: false });
       return true;
     },
@@ -217,8 +212,8 @@ export const createLassoTool = (): Tool => {
       publishPreview(ctx);
     },
     onPointerUp: (ctx, input) => {
-      // A polygon session spans many clicks — it closes on double-click, Enter,
-      // or a click on the first vertex, never on a plain release.
+      // A polygon session spans many clicks — it closes on double-click, Enter, or a click on the first vertex, never
+      // on a plain release.
       if (!session || session.kind === 'polygon') {
         return;
       }

@@ -52,8 +52,7 @@ const ConnectedProperties = ({ engine }: { engine: CanvasEngineHandle }) => {
   const regionProps = { engine };
   const ToolActions = tool.actions;
 
-  // `inert` will blur a focused tool control once an operation starts; hand focus to the operation's Cancel first. The
-  // Operation section comes first, so its Cancel is the first match; focusing it scrolls it into view.
+  // `inert` will blur a focused tool control once an operation starts; hand focus to the operation's Cancel first.
   const root = useRef<HTMLDivElement>(null);
   const toolSection = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -75,9 +74,15 @@ const ConnectedProperties = ({ engine }: { engine: CanvasEngineHandle }) => {
           {tool.paintsLeaf && !running ? <GroupSelectedNotice /> : null}
           {Preview ? <Preview engine={engine} /> : null}
           {tool.groups.map((group) => (
-            // Keyed by GROUP id, not tool id: tools sharing a group keep its
-            // DOM (and collapse state) alive across the tool switch.
-            <PropertyGroup key={group.id} collapsible={group.collapsible} id={group.id} label={t(group.labelKey)}>
+            // Keyed by GROUP id, not tool id: tools sharing a group keep its DOM (and collapse state) alive across the
+            // tool switch.
+            <PropertyGroup
+              key={group.id}
+              collapsible={group.collapsible}
+              hideLabel={group.hideLabel}
+              id={group.id}
+              label={t(group.labelKey)}
+            >
               <group.body {...regionProps} />
             </PropertyGroup>
           ))}

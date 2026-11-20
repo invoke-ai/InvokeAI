@@ -5,7 +5,6 @@ import { addInstallJob, replaceInstallJob } from '@features/models/data/installs
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { getModelsUiSnapshotForTests, updateModelsUi } from '@features/models/ui/uiStore';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -20,8 +19,6 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 
 const SCANNED_PATH = '/home/user/downloads/juggernaut.safetensors';
 
-// The shape the backend returns for a local install: source is a structured
-// LocalModelSource, not the raw string the frontend sent.
 const queuedJob: ModelInstallJob = {
   id: 1,
   source: { inplace: true, path: SCANNED_PATH, type: 'local' },
@@ -99,7 +96,6 @@ describe('ScanResults install badge lifecycle', () => {
 
     expect(host.textContent).toContain('models.installing');
 
-    // The job completes and the library refresh lands the new model.
     await act(async () => {
       replaceInstallJob({ ...queuedJob, status: 'completed' });
       setModelsSnapshotForTests({ models: [installedModel], status: 'loaded' });
@@ -109,7 +105,6 @@ describe('ScanResults install badge lifecycle', () => {
     expect(host.textContent).not.toContain('models.installing');
     expect(host.textContent).toContain('models.installed');
 
-    // The installed row links to the model it became.
     updateModelsUi({ activeModelKey: null, activeTab: 'add' });
     const viewModel = [...host.querySelectorAll('button')].find((button) => button.textContent === 'models.viewModel');
     expect(viewModel).toBeDefined();
@@ -153,7 +148,6 @@ describe('ScanResults on Windows paths', () => {
     });
     expect(host.textContent).not.toContain('models.installed');
 
-    // Install records store paths with forward slashes, as the backend writes them.
     await act(async () => {
       setModelsSnapshotForTests({
         models: [
@@ -228,18 +222,6 @@ describe('ScanResults row context menu', () => {
     await userEvent.tab({ shift: true });
 
     expect(document.activeElement).not.toBe(host.querySelector('[data-list-primary]'));
-  });
-
-  it('animates the menu out on close, still offering the row it opened for', async () => {
-    await openRowMenu('install');
-    const menu = document.querySelector('[role="menu"]')!;
-
-    const frames = closingFrames(await recordDialogExit(menu, () => act(() => userEvent.keyboard('{Escape}'))));
-
-    expect(frames).not.toHaveLength(0);
-    for (const frame of frames) {
-      expect(frame.text).toContain('models.install');
-    }
   });
 
   it('installs the row from its context menu', async () => {

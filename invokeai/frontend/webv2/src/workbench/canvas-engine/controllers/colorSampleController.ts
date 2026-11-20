@@ -15,8 +15,8 @@ type ColorSampleRouter = (hex: string, phase: ColorSamplePhase) => boolean;
 /**
  * Routes eyedropper picks. A one-shot request takes a pick's previews and settles on its release commit, after
  * structural edits are allowed; Escape, a tool change and disposal settle it with null. Unclaimed picks go to the
- * workbench router while one is installed. A pick belongs to the sink that took its first preview: its commit or
- * cancel goes there alone, so a request armed or settled mid-pick never strays into the router, nor the reverse.
+ * workbench router while one is installed. A pick belongs to the sink that took its first preview: its commit or cancel
+ * goes there alone, so a request armed or settled mid-pick never strays into the router, nor the reverse.
  */
 export class ColorSampleController {
   private request: { previousToolId: ToolId; resolve: (hex: string | null) => void } | null = null;

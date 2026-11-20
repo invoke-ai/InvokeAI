@@ -17,7 +17,6 @@ vi.mock('@platform/transport/socketHub', () => ({
   },
 }));
 
-// A media-kind change refreshes through the store's own (unmocked) refresh, which reads points here.
 vi.mock('@workbench/image-map/api', () => ({
   fetchImageMapClusterLabels: vi.fn(),
   fetchImageMapPoints: mocks.fetchImageMapPoints,
@@ -47,7 +46,6 @@ const getHandler = (event: string): ((payload?: unknown) => void) => {
 
 describe('attachImageMapDataRuntime', () => {
   afterEach(() => {
-    // Back to both kinds while idle, so the reset itself fetches nothing.
     imageMapStore.patchSnapshot({ loadState: 'idle' });
     setImageMapMediaKind(undefined);
   });
@@ -116,14 +114,12 @@ describe('attachImageMapDataRuntime', () => {
   it('leaves a failed canvas alone instead of remounting it once per event', () => {
     const detach = attachImageMapDataRuntime(BOTH_KINDS);
 
-    // Refresh must not repeatedly clear a WebGL failure and remount the broken plot during backfill.
     imageMapStore.patchSnapshot({ loadState: 'loaded', renderError: 'The map failed to render.' });
     getHandler('image_map_projection_ready')({ user_id: 'u1' });
     getHandler('image_index_updated')({ user_id: 'u1' });
     getHandler('image_index_status')({ embedded: 5, pending: 0, total: 5 });
     expect(mocks.refreshImageMapPoints).not.toHaveBeenCalled();
 
-    // The user's own retry still clears it, and refreshes resume.
     imageMapStore.patchSnapshot({ renderError: null });
     getHandler('image_index_updated')({ user_id: 'u1' });
     expect(mocks.refreshImageMapPoints).toHaveBeenCalledTimes(1);
@@ -134,8 +130,6 @@ describe('attachImageMapDataRuntime', () => {
   it('does not queue a duplicate fetch for an event during the first load', () => {
     const detach = attachImageMapDataRuntime(BOTH_KINDS);
 
-    // Ignore ordinary pokes during first loading to avoid duplicate full fetches; newly embedded items may wait
-    // for a later event/manual refresh.
     imageMapStore.patchSnapshot({ loadState: 'loading' });
     getHandler('image_index_updated')({ user_id: 'u1' });
 
@@ -147,8 +141,6 @@ describe('attachImageMapDataRuntime', () => {
     const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onReady = getHandler('image_map_projection_ready');
 
-    // Queue one rerun when recompute overtakes its triggering fetch so stale points and mismatched labels do not
-    // persist.
     imageMapStore.patchSnapshot({ loadState: 'loading' });
     onReady({ user_id: 'u1' });
 
@@ -160,9 +152,6 @@ describe('attachImageMapDataRuntime', () => {
     const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onReady = getHandler('image_map_projection_ready');
 
-    // loadState 'error' with no fetch in flight (the first load failed): the
-    // event starts a fresh fetch rather than being dropped — the failing
-    // first load may have missed the projection it announced.
     imageMapStore.patchSnapshot({ loadState: 'error' });
     onReady({ user_id: 'u1' });
 
@@ -187,9 +176,6 @@ describe('attachImageMapDataRuntime', () => {
     const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onReady = getHandler('image_map_projection_ready');
 
-    // A retry in flight after a WebGL failure: the canvas stays failed until
-    // that retry's own success clears the error, and a mid-flight event must
-    // not start another refresh that would remount into the same failure.
     imageMapStore.patchSnapshot({ loadState: 'loading', renderError: 'The map failed to render.' });
     onReady({ user_id: 'u1' });
 
@@ -204,14 +190,12 @@ describe('attachImageMapDataRuntime', () => {
     mocks.getAuthSession.mockReturnValue({ user: { user_id: 'me' } });
     imageMapStore.patchSnapshot({ loadState: 'loaded' });
 
-    // Ignore other users' projection events; admin refetches can otherwise trigger repeated recomputes.
     onReady({ user_id: 'someone-else' });
     expect(mocks.refreshImageMapPoints).not.toHaveBeenCalled();
 
     onReady({ user_id: 'me' });
     expect(mocks.refreshImageMapPoints).toHaveBeenCalledTimes(1);
 
-    // Single-user mode has no session user, so nothing is ever foreign.
     mocks.getAuthSession.mockReturnValue({ user: null });
     onReady({ user_id: 'whoever' });
     expect(mocks.refreshImageMapPoints).toHaveBeenCalledTimes(2);
@@ -223,12 +207,10 @@ describe('attachImageMapDataRuntime', () => {
     const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onStatus = getHandler('image_index_status');
 
-    // Not yet loaded: counts are stored but nothing refetches.
     onStatus({ embedded: 5, pending: 0, total: 5 });
     expect(mocks.refreshImageMapPoints).not.toHaveBeenCalled();
 
     imageMapStore.patchSnapshot({ loadState: 'loaded' });
-    // Mid-backfill events keep the map quiet; only quiescence pokes /points.
     onStatus({ embedded: 3, pending: 2, total: 5 });
     expect(mocks.refreshImageMapPoints).not.toHaveBeenCalled();
 
@@ -262,7 +244,6 @@ describe('attachImageMapDataRuntime', () => {
     const onConnection = mocks.onConnectionChange.mock.calls[0][0];
 
     imageMapStore.patchSnapshot({ loadState: 'error' });
-    // The subscribe-time replay establishes the baseline, nothing more.
     onConnection('disconnected');
     expect(mocks.refreshImageMapPoints).not.toHaveBeenCalled();
 
@@ -279,14 +260,12 @@ describe('attachImageMapDataRuntime', () => {
   it('does not refetch when it attaches to an already-connected socket', () => {
     imageMapStore.patchSnapshot({ loadState: 'loaded' });
 
-    // Treat synchronous connection replay as baseline, not reconnect, on editor remount.
     const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onConnection = mocks.onConnectionChange.mock.calls[0][0];
 
     onConnection('connected');
     expect(mocks.refreshImageMapPoints).not.toHaveBeenCalled();
 
-    // A genuine drop and recovery still refreshes.
     onConnection('disconnected');
     onConnection('connected');
     expect(mocks.refreshImageMapPoints).toHaveBeenCalledTimes(1);
@@ -309,7 +288,6 @@ describe('attachImageMapDataRuntime', () => {
       },
     });
 
-    // Attaching to the filter already in force, and unrelated Workbench changes, fetch nothing.
     notify();
     expect(mocks.fetchImageMapPoints).not.toHaveBeenCalled();
 

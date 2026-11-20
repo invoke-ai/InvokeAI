@@ -132,7 +132,6 @@ describe('node header panels when their body fails', () => {
     // The label shows while loading too; this is it standing in for a load that failed.
     await vi.waitFor(() => expect(panelLoad.rejected).toBeGreaterThan(0));
     await vi.waitFor(() => expect(panel()?.textContent).toBe(label));
-    // The node is still there and still answers.
     expect(host.querySelector('.react-flow__node[data-id="node"]')).not.toBeNull();
     await act(() => userEvent.unhover(statusButton()));
     await vi.waitFor(() => expect(panel()).toBeNull());

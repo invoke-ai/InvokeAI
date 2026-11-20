@@ -10,6 +10,7 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.util.devices import EmptyCacheOutcome
 
 MB = 2**20
 MODULE = "invokeai.backend.model_manager.load.model_cache.model_cache"
@@ -44,7 +45,7 @@ def moved(cache: ModelCache):
     with (
         patch.object(cache, "_move_model_to_ram", side_effect=move),
         patch(f"{MODULE}.device_has_dedicated_vram", return_value=True),
-        patch(f"{MODULE}.TorchDevice.empty_cache") as empty_cache,
+        patch(f"{MODULE}.TorchDevice.empty_cache", return_value=EmptyCacheOutcome.RAN) as empty_cache,
     ):
         yield keys, empty_cache
 
@@ -120,7 +121,7 @@ def test_a_device_whose_vram_is_system_ram_moves_nothing(cache: ModelCache, devi
         patch.object(cache, "_execution_device", torch.device(device)),
         patch("invokeai.backend.util.devices.xpu_device_is_integrated", return_value=True),
         patch.object(cache, "_move_model_to_ram", return_value=MB) as move,
-        patch(f"{MODULE}.TorchDevice.empty_cache"),
+        patch(f"{MODULE}.TorchDevice.empty_cache", return_value=EmptyCacheOutcome.RAN),
     ):
         assert cache.offload_models_from_vram_except(set()) == 0
     move.assert_not_called()

@@ -64,7 +64,7 @@ const getLayer = (
 const getPaintSource = (
   layer: CanvasLayerContract | undefined
 ): Extract<CanvasLayerSourceContract, { type: 'paint' }> | null => {
-  if (!layer) {
+  if (!layer || layer.type === 'vector') {
     return null;
   }
   if (layer.type === 'raster' || layer.type === 'control') {

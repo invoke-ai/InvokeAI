@@ -36,20 +36,13 @@ import { getInvocationTemplatesSnapshot, refreshInvocationTemplates } from './te
 
 const libraryLogger = createLogger({ area: 'library', namespace: 'workflows' });
 
-/**
- * Filter and paginate server-side; asynchronously enrich cached payloads per row so node/model details cannot
- * block the grid.
- */
+/** Server-side filter and pagination; per-row enrichment of cached payloads never blocks the grid. */
 
 export type { WorkflowTagCount } from '@features/workflow/core/libraryTags';
 
-/**
- * Where the library browses: the account's own templates, bundled templates, public templates (multi-user), or the
- * owned and bundled templates the account has opened.
- */
+/** Recent holds the owned and bundled templates the account has opened. */
 export type WorkflowLibraryPlace = 'user' | 'default' | 'shared' | 'recent';
 
-/** What My library and Shared are ordered by; the other places have fixed keys, see `getWorkflowLibraryOrder`. */
 export type WorkflowLibrarySort = 'updated' | 'opened' | 'created' | 'name' | 'lastRun';
 
 export type WorkflowLibrarySortDirection = 'asc' | 'desc';
@@ -63,14 +56,12 @@ export interface WorkflowLibraryBrowseFilter {
   direction: WorkflowLibrarySortDirection;
 }
 
-/** A key's natural direction: dates newest first, names A to Z. */
 export const getWorkflowLibrarySortDefaultDirection = (sort: WorkflowLibrarySort): WorkflowLibrarySortDirection =>
   sort === 'name' ? 'asc' : 'desc';
 
 /**
- * The order a place actually lists in. Recent is always most recently opened first. Bundled templates always list by
- * name, because the server rewrites their timestamps at every start; they take the filter's direction only while the
- * filter's key is name, so a date order's descending direction never turns them Z to A.
+ * Recent lists most recently opened first. Bundled templates list by name (the server rewrites their timestamps at
+ * every start) and take the filter's direction only when its key is name.
  */
 export const getWorkflowLibraryOrder = ({
   direction,
@@ -98,7 +89,6 @@ export type WorkflowLibraryEntryEnrichment =
 
 export interface WorkflowLibraryEntry {
   item: WorkflowLibraryListItem;
-  /** Parsed once from `item.tags` so cards never re-split the raw string. */
   tags: readonly string[];
   enrichment: WorkflowLibraryEntryEnrichment;
 }
@@ -112,7 +102,6 @@ export interface WorkflowLibraryScrollAnchor {
 export interface WorkflowLibraryBrowseSnapshot {
   filter: WorkflowLibraryBrowseFilter;
   status: 'idle' | 'loading' | 'loaded' | 'error';
-  /** Resident metadata window, in server order. */
   startIndex?: number;
   scrollAnchor?: WorkflowLibraryScrollAnchor | null;
   selectedEntry?: WorkflowLibraryEntry | null;
@@ -131,7 +120,6 @@ export interface WorkflowLibraryBrowseSnapshot {
 const PER_PAGE = 20;
 /** The most consecutive metadata positions the current view keeps resident (see README). */
 export const WORKFLOW_LIBRARY_METADATA_WINDOW = PER_PAGE * 3;
-/** The most demanded identities enrichment serves at once, visible cards first. */
 export const WORKFLOW_LIBRARY_ENRICHMENT_DEMAND = 48;
 const ENRICHMENT_CONCURRENCY = 4;
 
@@ -158,17 +146,13 @@ const ORDER_BY: Record<WorkflowLibrarySort, ListOrderBy> = {
   updated: 'updated_at',
 };
 
-/** The list order a filter asks the server for. */
 const getListOrder = (filter: WorkflowLibraryBrowseFilter): { direction: 'ASC' | 'DESC'; orderBy: ListOrderBy } => {
   const { direction, sort } = getWorkflowLibraryOrder(filter);
 
   return { direction: direction === 'asc' ? 'ASC' : 'DESC', orderBy: ORDER_BY[sort] };
 };
 
-/**
- * What each place reads. Shared is every account's public templates; My library and Recent stay owner scoped (the
- * server keeps bundled templates in an owner-scoped listing).
- */
+/** Shared is every account's public templates; My library and Recent stay owner scoped. */
 const PLACE_SCOPES: Record<
   WorkflowLibraryPlace,
   { categories: readonly WorkflowLibraryCategory[]; hasBeenOpened?: true; isPublic?: true }
@@ -179,7 +163,6 @@ const PLACE_SCOPES: Record<
   user: { categories: ['user'] },
 };
 
-/** List parameters for a place: a single category as `category`, mixed ones as `categories`. */
 const getListScope = (place: WorkflowLibraryPlace) => {
   const { categories, ...flags } = PLACE_SCOPES[place];
 
@@ -211,17 +194,14 @@ const INITIAL_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
 
 const store = createExternalStore<WorkflowLibraryBrowseSnapshot>(INITIAL_SNAPSHOT);
 
-/** The place's unfiltered total, learned from any unfiltered listing of it. */
 const withPlaceTotal = (filter: WorkflowLibraryBrowseFilter, total: number) =>
   filter.search === '' && filter.tags.length === 0 && store.getSnapshot().placeTotals[filter.place] !== total
     ? { placeTotals: { ...store.getSnapshot().placeTotals, [filter.place]: total } }
     : {};
 
-// #region View cache
-
 /**
- * Views already browsed (a place, a tag selection or a search), kept so switching back shows their metadata at once instead of refetching every row. A view older than `VIEW_FRESH_MS` is revalidated in the
- * background and merged in place; library mutations drop the other views.
+ * Views already browsed, so switching back shows their metadata at once. One older than `VIEW_FRESH_MS` revalidates
+ * in the background; library mutations drop the other views.
  */
 interface CachedBrowseView {
   entries: readonly WorkflowLibraryEntry[];
@@ -238,7 +218,6 @@ interface CachedBrowseView {
 const VIEW_CACHE_LIMIT = 8;
 const VIEW_FRESH_MS = 30_000;
 const viewCache = new Map<string, CachedBrowseView>();
-/** Conservative freshness timestamp for the current metadata window. */
 let currentViewFetchedAt = 0;
 
 const getFilterKey = (filter: WorkflowLibraryBrowseFilter): string =>
@@ -275,7 +254,6 @@ const rememberCurrentView = (): void => {
     total,
   });
 
-  // Maps iterate in insertion order, so the first key is the least recently left view.
   while (viewCache.size > VIEW_CACHE_LIMIT) {
     const oldest = viewCache.keys().next().value;
 
@@ -286,25 +264,18 @@ const rememberCurrentView = (): void => {
   }
 };
 
-// #endregion
-
 const initialLoadFlight = createTrailingSingleFlight();
 const refreshFlight = createTrailingSingleFlight();
 let initialLoadGeneration = -1;
 let refreshGeneration = -1;
 
-/**
- * Fences page responses by generation, not request order. A filter change, an account change, or a revalidation of
- * the current view starts a new generation, so a page requested before it cannot publish over what it read.
- */
+/** Fences page responses by generation, not request order; a filter, account or revalidation change starts one. */
 let listGeneration = 0;
 /** Only metadata published in this list generation can satisfy overlapping range reads. */
 let metadataGeneration = -1;
 
 const isListCurrent = (generation: number, owner: AccountScope): boolean =>
   generation === listGeneration && isAccountScopeCurrent(owner);
-
-// #region Entries
 
 const toEntry = (item: WorkflowLibraryListItem): WorkflowLibraryEntry => ({
   enrichment: PENDING_ENRICHMENT,
@@ -326,7 +297,6 @@ const mergeEntries = (
   });
 };
 
-/** Re-arms rows whose enrichment failed so an explicit revalidation retries them. */
 const retryFailedEnrichment = (entries: readonly WorkflowLibraryEntry[]): readonly WorkflowLibraryEntry[] =>
   entries.some((entry) => entry.enrichment.status === 'error')
     ? entries.map((entry) =>
@@ -350,10 +320,7 @@ const publishPage = (result: WorkflowLibraryPage): void => {
   pumpEnrichment();
 };
 
-/**
- * Share one template-load attempt for enrichment and remember failure to prevent fetch storms; explicit
- * refresh/filter/account changes rearm it.
- */
+/** One shared template load; a failure sticks until a refresh, filter or account change, preventing fetch storms. */
 let templatesFlight: Promise<void> | null = null;
 let hasTemplateLoadFailed = false;
 
@@ -415,10 +382,8 @@ const demandedIds = (): Set<string> =>
   new Set([...(selectedDemand ? [selectedDemand] : []), ...visibleDemand.slice(0, WORKFLOW_LIBRARY_ENRICHMENT_DEMAND)]);
 
 /**
- * Drops documents nobody demands, and gives a pending list copy of the selected workflow the selected copy's
- * enrichment at the same revision. Every list publication (first page, range, revalidation, cached view) runs this
- * through `pumpEnrichment`, so a card, its missing-model count and its preview never stay pending beside a rail that
- * already shows the same revision (the enrichment loop skips the id: `findEntry` answers with the selected copy).
+ * Drops undemanded documents, and gives a pending list copy of the selected workflow the selected copy's enrichment at
+ * the same revision, so a card never stays pending beside a rail that shows that revision.
  */
 const trimDocuments = (): void => {
   const demand = demandedIds();
@@ -779,7 +744,6 @@ const loadTagCounts = async (place: WorkflowLibraryPlace, owner: AccountScope): 
           })
         : {};
 
-    // A place switch mid-flight owns the tags now.
     if (!isAccountScopeCurrent(owner) || store.getSnapshot().filter.place !== place) {
       return;
     }
@@ -795,7 +759,6 @@ const loadTagCounts = async (place: WorkflowLibraryPlace, owner: AccountScope): 
 let placeTotalsGeneration = 0;
 const placeTotalFlights = new Map<WorkflowLibraryPlace, Promise<void>>();
 
-/** One place's one-row probe; a caller during a probe of the same place shares it. */
 const probePlaceTotal = (place: WorkflowLibraryPlace): Promise<void> => {
   const inflight = placeTotalFlights.get(place);
 
@@ -831,17 +794,11 @@ const probePlaceTotal = (place: WorkflowLibraryPlace): Promise<void> => {
   return flight;
 };
 
-/**
- * One-row probes for the rail's place totals; the dialog asks once per opening. The current place's total also follows
- * its unfiltered listings, so the dialog leaves out the place whose first page it is loading anyway.
- */
+/** One-row probes for the rail's totals; callers leave out the place whose first page is loading anyway. */
 export const loadWorkflowLibraryPlaceTotals = (places: readonly WorkflowLibraryPlace[]): Promise<void> =>
   Promise.all(places.map(probePlaceTotal)).then(() => undefined);
 
-/**
- * Applies a filter patch. A view browsed before comes back from the cache at once (revalidated in the background once
- * stale); a new one starts from page 0.
- */
+/** A view browsed before comes back from the cache at once, revalidated once stale; a new one starts from page 0. */
 export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBrowseFilter>): void => {
   const snapshot = store.getSnapshot();
   const filter = {
@@ -924,12 +881,7 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
   }
 };
 
-/**
- * Every open of a template place applies the opening filter, a patch over the current one; the dialog passes its
- * place, the account's stored order, and the session's search and tags. The first open loads page 0 and the place's
- * tag counts in that filter, so the first request already comes back in order; a later open applies it as a filter
- * change.
- */
+/** Applies the opening filter over the current one; the first open loads page 0 and tag counts in that filter. */
 export const ensureWorkflowLibraryBrowseLoaded = (opening: Partial<WorkflowLibraryBrowseFilter>): Promise<void> => {
   const snapshot = store.getSnapshot();
 
@@ -965,7 +917,6 @@ export const ensureWorkflowLibraryBrowseLoaded = (opening: Partial<WorkflowLibra
   });
 };
 
-/** Revalidate the selected pin independently of the resident list window. */
 const revalidateSelected = async (generation: number, owner: AccountScope): Promise<void> => {
   const entry = store.getSnapshot().selectedEntry;
   if (!entry || entry.item.workflow_id !== selectedDemand) {
@@ -1024,9 +975,7 @@ const revalidateSelected = async (generation: number, owner: AccountScope): Prom
   }
 };
 
-/**
- * Revalidate resident positions and tag counts. A later range owns the window and fences this list publication.
- */
+/** Revalidate resident positions and tag counts. A later range owns the window and fences this list publication. */
 export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
   refreshFlight.run(async () => {
     const { filter, status } = store.getSnapshot();
@@ -1114,7 +1063,6 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
 
 export const getWorkflowLibraryBrowseSnapshot = (): WorkflowLibraryBrowseSnapshot => store.getSnapshot();
 
-/** Owner-level resource observations for the large-library fixture, independent of browser heap noise. */
 export const getWorkflowLibraryBrowseRetention = () => {
   const snapshot = store.getSnapshot();
   const entries = [
@@ -1133,8 +1081,6 @@ export const getWorkflowLibraryBrowseRetention = () => {
 };
 
 export const useWorkflowLibraryBrowseSelector = store.useSelector;
-
-// #endregion
 
 /** Coalesce library changes into one current-view refresh because they can shift ordering. */
 let isRefreshScheduled = false;
@@ -1198,13 +1144,9 @@ onWorkflowLibraryCacheInvalidated(() => {
   });
 });
 
-/** Holders of the listing: the library dialog while it shows a template place. */
 let browseHolds = 0;
 
-/**
- * Marks the listing as in use until the returned release runs (once). A count rather than a flag, so a remount's
- * release and re-hold leave it held.
- */
+/** Holds the listing until the returned release runs; counted, so a remount's release and re-hold leave it held. */
 export const holdWorkflowLibraryBrowse = (): (() => void) => {
   let isReleased = false;
   browseHolds += 1;
@@ -1218,10 +1160,8 @@ export const holdWorkflowLibraryBrowse = (): (() => void) => {
 };
 
 /**
- * Opening or running a workflow moves it to the top of every view ordered by last opened or last run; hidden views in
- * that order are dropped and fetched when revisited. While the library is in use, the current view in that order
- * refreshes now (the server may record the change after the dialog is open again). Otherwise it is only marked
- * outdated, and the next opening revalidates it: runs complete all session long with nobody looking.
+ * Opening or running a workflow reorders every view by last opened or last run. Hidden ones are dropped; the current
+ * one refreshes while the library is held, otherwise it is marked outdated and the next opening revalidates it.
  */
 const onOrderTouched = (orderBy: ListOrderBy) => (): void => {
   for (const [key, view] of viewCache) {

@@ -38,7 +38,6 @@ const down = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerDo
 const move = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerMove?.(ctx, i, [i]);
 const up = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerUp?.(ctx, i);
 
-/** A press at `from`, a move past the drag threshold, and a release at `to`. */
 const drag = (tool: Tool, ctx: ToolContext, from: PointerInput, to: PointerInput): void => {
   down(tool, ctx, from);
   move(tool, ctx, to);
@@ -165,7 +164,6 @@ describe('marqueeTool: drag → commit', () => {
     const h = createHarness();
     const tool = createMarqueeTool();
 
-    // Past the threshold vertically, but the rect collapses to zero width.
     down(tool, h.ctx, pointer(10, 10));
     move(tool, h.ctx, pointer(10, 30));
     up(tool, h.ctx, pointer(10, 30));
@@ -195,7 +193,6 @@ describe('marqueeTool: cancel', () => {
     expect(h.stores.marqueePreview.get()).toBeNull();
     expect(h.commits).toHaveLength(0);
 
-    // A trailing pointerup from the released pointer does nothing.
     up(tool, h.ctx, pointer(40, 30));
     expect(h.commits).toHaveLength(0);
   });

@@ -28,8 +28,7 @@ describe('activeProgressTargetStore', () => {
 
     activeProgressTargetStore.set(target('queue-1', 1));
 
-    // Progress frames arrive many times a second; a new array per frame would
-    // re-render every consumer.
+    // Progress frames arrive many times a second; a new array per frame would re-render every consumer.
     expect(getActiveProgressTargets()).toBe(first);
   });
 
@@ -70,9 +69,8 @@ describe('activeProgressTargetStore', () => {
   });
 
   it('keeps a settling slot followable but out of the running set', () => {
-    // Completed, result not routed yet: the single-slot preview keeps following
-    // it, while the tile grid must not count it or a single-GPU batch would
-    // flash into two tiles at every item boundary.
+    // Completed, result not routed yet: the single-slot preview keeps following it, while the tile grid must not count
+    // it or a single-GPU batch would flash into two tiles at every item boundary.
     activeProgressTargetStore.set(target('queue-1', 1));
     activeProgressTargetStore.set(target('queue-1', 2));
 

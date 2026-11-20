@@ -8,10 +8,7 @@ import { getFirstOutputImageName } from '@platform/core/outputImages';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
 
-/**
- * Keep transient execution state outside the workbench reducer; subscribe per source node ID to isolate frequent
- * renders.
- */
+/** Transient execution state outside the workbench reducer; per-source-node subscriptions isolate frequent renders. */
 
 export type NodeExecutionStatus = 'running' | 'completed' | 'failed';
 
@@ -101,8 +98,8 @@ export const nodeExecutionStore = {
     });
   },
   /**
-   * The queue item running these nodes reached a terminal state: a node still marked running
-   * finished with it, or never will (its failure/cancel event was lost or never sent).
+   * The queue item running these nodes reached a terminal state: a node still marked running finished with it, or never
+   * will (its failure/cancel event was lost or never sent).
    */
   settleRunning(nodeIds: Iterable<string>, outcome: NodeExecutionOutcome, error?: string): void {
     for (const nodeId of nodeIds) {

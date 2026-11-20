@@ -21,8 +21,8 @@ const wrapCanvasSurface = (canvas: HTMLCanvasElement): RasterSurface => {
       canvas.width = width;
       canvas.height = height;
     },
-    // The mounted canvas element must retain identity, so growth copies through a temporary surface instead of
-    // swapping backing stores. Only layer caches currently grow.
+    // The mounted canvas element must retain identity, so growth copies through a temporary surface instead of swapping
+    // backing stores. Only layer caches currently grow.
     resizePreserving(width: number, height: number, dx: number, dy: number) {
       const previous = document.createElement('canvas');
       previous.width = canvas.width;

@@ -21,8 +21,7 @@ import { submitResolvedInvocation } from './invocationSubmit';
 export interface ActiveInvocationSubmissionArgs {
   commands: WorkbenchCommands;
   destinationOverride?: ResultDestination;
-  /** Words a control-layer rejection from the locale; its error message is for logs only. */
-  formatControlLayerError: PrepareCanvasInvocationArgs['formatControlLayerError'];
+  formatCanvasInvocationFailure: PrepareCanvasInvocationArgs['formatCanvasInvocationFailure'];
   formatUpscaleMetadataFailure: SubmitResolvedInvocationDeps['formatUpscaleMetadataFailure'];
   getModels: () => readonly ModelConfig[] | undefined;
   /** Invoke Front: the backend runs this batch ahead of the user's other pending work. */
@@ -75,7 +74,7 @@ export const submitActiveInvocation = async (
   {
     commands,
     destinationOverride,
-    formatControlLayerError,
+    formatCanvasInvocationFailure,
     formatUpscaleMetadataFailure,
     getModels,
     prepend,
@@ -120,7 +119,7 @@ export const submitActiveInvocation = async (
     activeRuntime.assertCurrent(owner);
     await activeRuntime.submit({
       commands,
-      formatControlLayerError,
+      formatCanvasInvocationFailure,
       formatUpscaleMetadataFailure,
       models,
       owner,

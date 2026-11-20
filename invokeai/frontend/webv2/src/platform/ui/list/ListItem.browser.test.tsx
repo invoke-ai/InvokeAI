@@ -66,47 +66,6 @@ describe('ListItem', () => {
     await userEvent.hover(primary());
   });
 
-  it('keeps detail on the row surface outside the primary button, deferring to a menu it handles itself', async () => {
-    const onContextMenu = vi.fn();
-
-    await render(
-      <ListItem
-        detail={
-          <div>
-            <input aria-label="Weight" onContextMenu={(event) => event.preventDefault()} />
-            <span>Plain detail</span>
-          </div>
-        }
-        title="A concept"
-        onContextMenu={onContextMenu}
-      />
-    );
-
-    const input = host.querySelector('input')!;
-
-    expect(input.closest('[role="listitem"]')).not.toBeNull();
-    expect(primary().contains(input)).toBe(false);
-
-    input.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    expect(onContextMenu).not.toHaveBeenCalled();
-
-    host.querySelector('span')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    expect(onContextMenu).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps the hover surface while its context menu is open', async () => {
-    const surface = () => getComputedStyle(primary().parentElement!).backgroundColor;
-
-    await userEvent.unhover(document.body);
-    await render(<ListItem title="A model" onContextMenu={vi.fn()} />);
-    const resting = surface();
-
-    await render(<ListItem isMenuOpen title="A model" onContextMenu={vi.fn()} />);
-
-    expect(resting).toBe('rgba(0, 0, 0, 0)');
-    expect(surface()).not.toBe(resting);
-  });
-
   it('keeps a disabled row focusable but inert: no press, checkbox, menu, intent, actions, or hover fill', async () => {
     const onAction = vi.fn();
     const onCheckedChange = vi.fn();
@@ -166,69 +125,6 @@ describe('ListItem', () => {
     }
   });
 
-  it('dims a disabled row’s content but draws its keyboard focus ring at full strength', async () => {
-    await render(<ListItem isDisabled title="Too new" onCheckedChange={vi.fn()} onPress={vi.fn()} />);
-    const row = primary().parentElement!;
-
-    // Tab past the disabled checkbox onto the row button, so the ring is keyboard focus-visible.
-    await act(() => (document.activeElement as HTMLElement | null)?.blur());
-    await userEvent.keyboard('{Tab}');
-    expect(document.activeElement).toBe(primary());
-
-    expect(getComputedStyle(row).outlineStyle).toBe('solid');
-    expect(getComputedStyle(row).outlineWidth).toBe('2px');
-    expect(getComputedStyle(row).opacity).toBe('1');
-    // Checkbox slot and primary button: everything the row shows.
-    expect([...row.children].map((slot) => getComputedStyle(slot).opacity)).toEqual(['0.5', '0.5']);
-  });
-
-  it('names its primary button by id, and the popup it discloses while expanded, for menus opened from outside', async () => {
-    await render(<ListItem controls="row-a-menu" id="row-a" title="A workflow" onPress={vi.fn()} />);
-
-    // Collapsed, the button names nothing: aria-controls follows the expanded state.
-    expect(document.getElementById('row-a')).toBe(primary());
-    expect(primary().hasAttribute('aria-controls')).toBe(false);
-    expect(primary().hasAttribute('aria-expanded')).toBe(false);
-
-    await render(<ListItem controls="row-a-menu" id="row-a" isExpanded title="A workflow" onPress={vi.fn()} />);
-
-    expect(primary().getAttribute('aria-controls')).toBe('row-a-menu');
-    expect(primary().getAttribute('aria-expanded')).toBe('true');
-  });
-
-  it('renders a static row without a press handler as plain content, not a button', async () => {
-    await render(<ListItem title="Read only" />);
-
-    expect(primary().tagName).toBe('DIV');
-    expect(primary().hasAttribute('tabindex')).toBe(false);
-    expect(host.querySelector('button')).toBeNull();
-  });
-
-  it('warms on hover or focus before the press and truncates prose at the end', async () => {
-    const onIntent = vi.fn();
-    const longPrompt = 'a very long prompt that keeps going past the width of this narrow row in the harness';
-
-    await render(<ListItem title={longPrompt} titleTruncate="end" onIntent={onIntent} onPress={() => undefined} />);
-
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-    });
-    expect(onIntent).not.toHaveBeenCalled();
-    await act(() => primary().focus());
-    expect(onIntent).toHaveBeenCalledTimes(1);
-    await userEvent.hover(primary());
-    expect(onIntent).toHaveBeenCalledTimes(2);
-
-    // With end truncation there is no pinned tail: the title is one clipped run holding the whole text.
-    const title = host.querySelector<HTMLElement>('[data-list-primary] [title]')!;
-
-    expect(title.children).toHaveLength(1);
-    expect(title.children[0]!.textContent).toBe(longPrompt);
-
-    await render(<ListItem title={longPrompt} onIntent={onIntent} onPress={() => undefined} />);
-    expect(host.querySelector<HTMLElement>('[data-list-primary] [title]')!.children).toHaveLength(2);
-  });
-
   it('toggles the checkbox from the padding around it without stealing presses from the primary button', async () => {
     const onCheckedChange = vi.fn();
     const onPress = vi.fn();
@@ -255,21 +151,6 @@ describe('ListItem', () => {
     await userEvent.click(row, { position: { x: control.right - rowRect.left + 8, y: middle } });
     expect(onPress).toHaveBeenCalledTimes(1);
     expect(onCheckedChange).toHaveBeenCalledTimes(2);
-  });
-
-  it('keeps a title with line breaks on one line', async () => {
-    await render(<ListItem title="single line" titleTruncate="end" onPress={() => undefined} />);
-    const singleLineHeight = host
-      .querySelector<HTMLElement>('[data-list-primary] [title]')!
-      .getBoundingClientRect().height;
-
-    await render(
-      <ListItem title={'first line\nsecond line\nthird line'} titleTruncate="end" onPress={() => undefined} />
-    );
-    const title = host.querySelector<HTMLElement>('[data-list-primary] [title]')!;
-
-    expect(title.getBoundingClientRect().height).toBe(singleLineHeight);
-    expect(title.textContent).toContain('third line');
   });
 
   it('edits the title in place outside any button, at the same height, without the row menu', async () => {

@@ -54,8 +54,8 @@ const resizeHandleFade = {
 } as const;
 
 // The fill covers the border's rows too. The border goes back on top as a separate box: Chromium draws a gradient fill
-// short of a box's own opaque border, which would uncover that row again. The border follows the text area's own
-// border states (`formControlInteraction` in the theme recipes), later entries winning as they do there.
+// short of a box's own opaque border, which would uncover that row again. The border follows the text area's own border
+// states (`formControlInteraction` in the theme recipes), later entries winning as they do there.
 const wellFade = {
   backgroundImage: 'linear-gradient(to bottom, transparent, var(--wb-control-well) calc(100% - 0.25rem))',
   borderBottomRadius: 'control',

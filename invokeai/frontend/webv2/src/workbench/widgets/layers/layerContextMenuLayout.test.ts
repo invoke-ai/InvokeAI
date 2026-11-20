@@ -47,6 +47,7 @@ const actionsFor = (layer: CanvasLayerContract, layers: readonly CanvasLayerCont
     selectedIds: [layer.id],
     canGroupSelection: true,
     canDeleteSelection: true,
+    canDuplicateSelection: true,
     mergeMasksEligibility: 'eligible',
     canMergeSelection: true,
     canRemoveFromGroup: true,

@@ -25,9 +25,9 @@ export interface NotifyOptions {
 export interface UndoableNotice {
   message?: string;
   /**
-   * Reverts the action the notice reports. Offered once, for this account only, while the notice is listed or its
-   * toast shows: possibly minutes later, after tab switches. The closure must capture its target's ids (never "the
-   * active project") and do nothing, or report, when the target is gone.
+   * Reverts the action the notice reports. Offered once, for this account only, while the notice is listed or its toast
+   * shows: possibly minutes later, after tab switches. The closure must capture its target's ids (never "the active
+   * project") and do nothing, or report, when the target is gone.
    */
   onUndo: () => void;
   /** The button's label when it brings back something other than the reported action; "Undo" otherwise. */
@@ -45,15 +45,15 @@ export interface UndoableNotice {
    */
   holdsActions?: readonly WorkbenchNotificationAction[];
   /**
-   * Toast only, never recorded in the notification center: for undoing a change to the center itself, which a record
-   * of it would undo in turn (clearing the list would leave the clear's own notice in it).
+   * Toast only, never recorded in the notification center: for undoing a change to the center itself, which a record of
+   * it would undo in turn (clearing the list would leave the clear's own notice in it).
    */
   transient?: boolean;
 }
 
 /**
- * Notification helper: records into the workbench shell when present, and
- * falls back to global toasts for project-independent surfaces like Home.
+ * Notification helper: records into the workbench shell when present, and falls back to global toasts for
+ * project-independent surfaces like Home.
  */
 export interface Notify {
   success: (title: string, message?: string, options?: NotifyOptions) => void;
