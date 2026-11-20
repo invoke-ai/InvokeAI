@@ -69,8 +69,8 @@ export interface CompositeOptions {
   skipLayerId?: string | null;
   /** Null means direct solid fill; without a provider only solid fills render. */
   maskPatternTile?: ((style: string, color: string) => RasterSurface | null) | null;
-  /** Backing pixels per CSS pixel, supplied only by the viewport composite. */
-  screenPixelRatio?: number;
+  /** The viewport supplies its backing scale and owns the scratch used to stencil screen-space patterns. */
+  screenMask?: { dpr: number; getScratch: (width: number, height: number) => RasterSurface };
   /** Display-only: pixel-consuming composites must omit them, or the tint becomes generated content. */
   regionOverlays?: boolean;
   /** Layer-local output bounds, drawn through the layer transform. */
@@ -427,45 +427,35 @@ const reaches = (bounds: Rect | null, view: Mat2d, region: Rect): boolean => {
   return intersect(screen, region) !== null;
 };
 
-// A detached screen releases its scratch along with the surface wrapper.
-const screenMaskScratch = new WeakMap<RasterSurface, RasterSurface>();
-
 export const compositeDocument = (
   target: RasterSurface,
   doc: CanvasDocumentContractV3,
   caches: LayerCacheStore,
   view: Mat2d,
   opts: CompositeOptions
-): void => {
+): boolean => {
   const plan = reusePreparation(opts.preparation, doc, opts);
   const targetRect: Rect = { height: target.height, width: target.width, x: 0, y: 0 };
   const damage = resolveDamage(plan, view, target, opts.damage);
   if (damage.kind === 'none') {
-    return;
+    return false;
   }
   const ctx = target.ctx;
   opts.diagnostics?.increment('compositeFrames');
   const repaint = damage.kind === 'rect' ? damage.rect : targetRect;
+  let usedMaskScratch = false;
   const drawMaskFill: DrawMaskFill = (layerId, fill, coverage, matrix, kind) => {
     const { surface, rect, version } = coverage;
     const tile = opts.maskPatternTile?.(fill.style, fill.color) ?? null;
-    const dpr = opts.screenPixelRatio;
-    if (tile && dpr !== undefined) {
+    if (tile && opts.screenMask) {
+      const { dpr, getScratch } = opts.screenMask;
       const bounds = roundOut(transformBounds(matrix, rect));
       const area = intersect(bounds, repaint);
       if (!area || isEmpty(area) || ![area.x, area.y, area.width, area.height].every(Number.isFinite)) {
         return;
       }
-      let scratch = screenMaskScratch.get(target);
-      if (!scratch) {
-        scratch = opts.backend.createSurface(area.width, area.height);
-        screenMaskScratch.set(target, scratch);
-      }
-      const width = Math.min(target.width, Math.max(scratch.width, area.width));
-      const height = Math.min(target.height, Math.max(scratch.height, area.height));
-      if (scratch.width !== width || scratch.height !== height) {
-        scratch.resize(width, height);
-      }
+      const scratch = getScratch(area.width, area.height);
+      usedMaskScratch = true;
       const stencil = scratch.ctx;
       identityTransform(stencil);
       stencil.clearRect(0, 0, area.width, area.height);
@@ -475,6 +465,7 @@ export const compositeDocument = (
       stencil.drawImage(surface.canvas, rect.x, rect.y);
 
       // Fill in viewport CSS coordinates so damage and layer transforms cannot shift the pattern.
+      stencil.imageSmoothingEnabled = true;
       stencil.setTransform(dpr, 0, 0, dpr, -area.x, -area.y);
       stencil.globalCompositeOperation = 'source-in';
       stencil.fillStyle = stencil.createPattern(tile.canvas, 'repeat') ?? fill.color;
@@ -660,4 +651,5 @@ export const compositeDocument = (
   }
 
   ctx.restore();
+  return usedMaskScratch;
 };

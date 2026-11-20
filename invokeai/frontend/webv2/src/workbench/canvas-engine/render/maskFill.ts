@@ -7,7 +7,7 @@ const PATTERN_SPECS: Record<
   Exclude<CanvasMaskFillContract['style'], 'solid'>,
   { size: number; spacing: number; width: number }
 > = {
-  // 6px tile, two parallel 45° lines 3px apart (legacy `pattern-diagonal.svg`).
+  // Diagonals repeat every 6px along either axis.
   diagonal: { size: 6, spacing: 6, width: 1.3 },
   diagonal_left: { size: 6, spacing: 6, width: 1.3 },
   // 6px tile, 45° lines in BOTH directions (legacy `pattern-crosshatch.svg`).

@@ -143,6 +143,8 @@ Frame's demanded layers form its working set. After drawing, `RasterController.e
 1. derived and group artifacts the frame did not read (obsolete parameter variants, inactive groups);
 2. least-recently-used base caches outside working set and unprotected.
 
+The main viewport fills patterned masks and regenerate regions in CSS space through a transformed alpha stencil. The attached RenderController keeps one scratch surface sized to cover the largest patterned areas it has repainted within the current viewport backing bounds, and accounts it as detached working-set memory. A viewport shrink bounds the retained surface again. Detach, document replacement, cache clear and a full frame with no patterned overlay release it. A bounded frame can miss an overlay that is still visible, so it keeps the scratch.
+
 Layer is protected while an operation pins it (`RasterMemoryBudgetController.pin`, held by every read lease, snapshot capture, export and duplicate) or while it is held: its pixels not yet persisted (`BitmapStore.hasPendingWork`) or an edit session (transform, text, float, pixel edit, operation lock) owns them. Whatever working set and protected layers still need stays resident; bytes above budget are reported as overage and leave no room for background reservations. Export and thumbnail callers request and pin their own caches. Deterministic tests assert allocation counts and bytes for pan/reveal, rotated bounds, unflushed paint bounds, isolation, transient transforms, eviction, re-rasterization.
 
 ## Raster resource ownership and memory policy

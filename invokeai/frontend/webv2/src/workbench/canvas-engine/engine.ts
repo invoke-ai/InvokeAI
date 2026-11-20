@@ -1476,6 +1476,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     const view = viewport.viewMatrix(dpr);
 
     if (!doc) {
+      renderController.releaseMaskScratch();
       clearSurface(screen);
       clearSurface(overlay);
       return;
@@ -1500,6 +1501,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const renderController = new RenderController({
     applyCursor: (value) => applyCursorToInput(value),
+    backend,
+    rasterMemory: rasterController.memory,
     getInputHandlers: () => ({ ...pipeline, onPointerLeave: onCanvasPointerLeave, onWheel, reset: resetInput }),
     isEngineDisposed: () => disposed,
     onPageHide: () => onPageHide(),
@@ -1559,6 +1562,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     isEditingStagingHiddenStack: () => gestureEditsStagingHiddenStack || sessionEditsStagingHiddenStack,
     layerCache,
     previews: renderController.previews,
+    maskScratch: renderController,
     raster: rasterController,
     // A failed source waits out its retry backoff instead of failing every frame.
     rasterizeLayer: (layer, doc) => {
@@ -1646,6 +1650,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     onBboxChanged: () => scheduler.invalidate({ overlay: true }),
     onDocumentReplaced: () => {
       const cleanup = createCleanupAccumulator();
+      cleanup.run(() => renderController.releaseMaskScratch());
       cleanup.run(() => vectorRuntime?.editor.discard());
       cleanup.run(() => groupSurfaces.clear());
       cleanup.run(() => editingController.invalidateDocument());
@@ -2689,6 +2694,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     checkerboardTile = null;
     maskPatternTiles.clear();
+    renderController.releaseMaskScratch();
     scheduler.invalidate({ all: true });
   };
 
