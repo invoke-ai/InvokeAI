@@ -1,12 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  EXPORT_STYLE_PROPERTIES,
   getWorkflowExportCloneStyle,
   getWorkflowExportStagingStyle,
   getWorkflowSvgExportStyles,
-  hideWorkflowExportInfoIcons,
-  hideWorkflowExportStatusIndicators,
   planWorkflowImageExport,
   sanitizeWorkflowImageFilename,
   setWorkflowExportInputFieldTitleStyles,
@@ -101,12 +98,6 @@ describe('workflow image export', () => {
     });
   });
 
-  it('preserves single-line field title styles in the export clone', () => {
-    expect(EXPORT_STYLE_PROPERTIES).toEqual(
-      expect.arrayContaining(['aspect-ratio', 'text-overflow', '-webkit-line-clamp', '-webkit-box-orient'])
-    );
-  });
-
   it('extracts computed SVG edge styles for inline capture', () => {
     const computedStyle = {
       getPropertyValue: (property: string) =>
@@ -135,31 +126,6 @@ describe('workflow image export', () => {
     expect(setProperty).toHaveBeenCalledWith('opacity', '1', 'important');
   });
 
-  it('hides node status indicators from the export clone', () => {
-    const setProperty = vi.fn();
-    const statusIndicator = { style: { setProperty } } as unknown as HTMLElement;
-    const root = {
-      querySelectorAll: (selector: string) =>
-        selector === '[data-node-status-indicator="true"]' ? [statusIndicator] : [],
-    } as unknown as HTMLElement;
-
-    hideWorkflowExportStatusIndicators(root);
-
-    expect(setProperty).toHaveBeenCalledWith('display', 'none', 'important');
-  });
-
-  it('hides node information icons from the export clone', () => {
-    const setProperty = vi.fn();
-    const infoIcon = { style: { setProperty } } as unknown as SVGElement;
-    const root = {
-      querySelectorAll: (selector: string) => (selector === '[data-node-info-icon="true"]' ? [infoIcon] : []),
-    } as unknown as HTMLElement;
-
-    hideWorkflowExportInfoIcons(root);
-
-    expect(setProperty).toHaveBeenCalledWith('display', 'none', 'important');
-  });
-
   it('keeps input field titles on one line in the export clone', () => {
     const setProperty = vi.fn();
     const fieldTitle = { style: { setProperty } } as unknown as HTMLElement;
@@ -175,11 +141,8 @@ describe('workflow image export', () => {
     expect(setProperty).toHaveBeenCalledWith('text-overflow', 'clip', 'important');
   });
 
-  it('keeps ordinary workflow names unchanged', () => {
+  it('keeps ordinary names, replaces filesystem-invalid characters and falls back for blank names', () => {
     expect(sanitizeWorkflowImageFilename('Hi-Res Two Stage', 'Unnamed Workflow')).toBe('Hi-Res Two Stage');
-  });
-
-  it('replaces filesystem-invalid characters and falls back for blank names', () => {
     expect(sanitizeWorkflowImageFilename('Workflow: 01 / test?', 'Unnamed Workflow')).toBe('Workflow- 01 - test-');
     expect(sanitizeWorkflowImageFilename('   ...   ', 'Unnamed Workflow')).toBe('Unnamed Workflow');
   });

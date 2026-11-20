@@ -2,8 +2,8 @@ import type { SupportedGenerateBase } from '@features/generation/core/supportedB
 
 /**
  * The Compel node that encodes each base's prompts. Compel is the only encoder that reads attention syntax: weights,
- * groups, `.and()`/`.blend()` and `<embedding>`. Every other base, external generators included, hands its text
- * encoder the prompt as written.
+ * groups, `.and()`/`.blend()` and `<embedding>`. Every other base, external generators included, hands its text encoder
+ * the prompt as written.
  */
 export const COMPEL_PROMPT_NODE_TYPES = {
   'sd-1': 'compel',
@@ -14,8 +14,8 @@ export const COMPEL_PROMPT_NODE_TYPES = {
 export type CompelPromptBase = keyof typeof COMPEL_PROMPT_NODE_TYPES;
 
 /**
- * The SDXL Refiner's encoder, Compel as well: the refiner has no prompts of its own and re-encodes the SDXL prompts,
- * so attention syntax carries through its stage. It keys no base: the refiner only ever runs behind an SDXL model.
+ * The SDXL Refiner's encoder, Compel as well: the refiner has no prompts of its own and re-encodes the SDXL prompts, so
+ * attention syntax carries through its stage. It keys no base: the refiner only ever runs behind an SDXL model.
  */
 export const SDXL_REFINER_COMPEL_PROMPT_NODE_TYPE = 'sdxl_refiner_compel_prompt';
 

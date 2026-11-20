@@ -15,9 +15,8 @@ const DIRECTION_X = [1, 0, -1, 0] as const;
 const DIRECTION_Y = [0, 1, 0, -1] as const;
 
 /**
- * Traces the outline of every alpha region as an SVG path in document space
- * (`origin` offsets the mask-local pixel grid). Pixels count as inside at
- * `alpha >= threshold`. Returns an empty string for an empty mask.
+ * Traces the outline of every alpha region as an SVG path in document space (`origin` offsets the mask-local pixel
+ * grid). Pixels count as inside at `alpha >= threshold`. Returns an empty string for an empty mask.
  */
 export const traceMaskOutlinePath = (
   source: MaskAlphaSource,
@@ -31,9 +30,8 @@ export const traceMaskOutlinePath = (
   const inside = (x: number, y: number): boolean =>
     x >= 0 && y >= 0 && x < width && y < height && data[(y * width + x) * 4 + 3]! >= threshold;
 
-  // Directed boundary edges bucketed by start vertex on the (width+1)×(height+1)
-  // pixel-corner grid. Travelling each edge keeps the inside on the right, which
-  // makes outer loops clockwise and holes counter-clockwise.
+  // Directed boundary edges bucketed by start vertex on the (width+1)×(height+1) pixel-corner grid. Travelling each
+  // edge keeps the inside on the right, which makes outer loops clockwise and holes counter-clockwise.
   const stride = width + 1;
   const outgoing = new Map<number, number[]>();
   const addEdge = (x: number, y: number, direction: number): void => {
@@ -68,9 +66,8 @@ export const traceMaskOutlinePath = (
     return '';
   }
 
-  // At a pinch vertex (two regions touching diagonally) two edges leave the
-  // same corner; preferring the tightest right turn keeps each loop around its
-  // own region instead of crossing over to the neighbour.
+  // At a pinch vertex (two regions touching diagonally) two edges leave the same corner; preferring the tightest right
+  // turn keeps each loop around its own region instead of crossing over to the neighbour.
   const takeEdge = (vertex: number, incoming: number): number | null => {
     const bucket = outgoing.get(vertex);
     if (!bucket || bucket.length === 0) {

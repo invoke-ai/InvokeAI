@@ -1,9 +1,5 @@
 import type { AccountScope } from '@platform/state/accountLifecycle';
-import type {
-  CanvasDocumentContractV3,
-  CanvasLayerContract,
-  CanvasLayerSourceContract,
-} from '@workbench/canvas-engine/api';
+import type { CanvasLayerContract, CanvasLayerSourceContract } from '@workbench/canvas-engine/api';
 
 import { galleryImageUrls } from '@features/gallery/utility';
 import { createItemId } from '@platform/browser/randomUuid';
@@ -709,7 +705,7 @@ export const convertLegacyCanvasMetadata = async (
             }
           }
           // The current canvas loader below validates this wire projection before anything can commit.
-          document.stacks[stack as keyof CanvasDocumentContractV3['stacks']].push(result as CanvasLayerContract);
+          document.stacks[stack].push(result as CanvasLayerContract);
         } catch (error) {
           assertAccountScopeCurrent(owner);
           if (!isCurrent()) {

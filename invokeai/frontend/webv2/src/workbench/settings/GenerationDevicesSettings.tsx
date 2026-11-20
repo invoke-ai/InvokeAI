@@ -54,8 +54,8 @@ export const GenerationDevicesSettings = () => {
 
   const toggleAuto = useCallback(
     (checked: boolean) => {
-      // Leaving auto starts from the devices in effect right now, so turning the
-      // switch off is not itself a change in which accelerators are used.
+      // Leaving auto starts from the devices in effect right now, so turning the switch off is not itself a change in
+      // which accelerators are used.
       void save(checked ? 'auto' : selectedDevices);
     },
     [save, selectedDevices]
@@ -69,8 +69,8 @@ export const GenerationDevicesSettings = () => {
             .filter((candidate) => selectedDevices.includes(candidate) || candidate === device)
         : selectedDevices.filter((candidate) => candidate !== device);
 
-      // The backend rejects an empty list, and a config with no devices would fail on
-      // the next startup — so refuse locally rather than surfacing a 422.
+      // The backend rejects an empty list, and a config with no devices would fail on the next startup — so refuse
+      // locally rather than surfacing a 422.
       if (next.length === 0) {
         setSaveError(t('settings.generationDevices.selectAtLeastOne'));
         return;
@@ -181,9 +181,8 @@ const DeviceToggle = ({
 };
 
 /**
- * Each switch owns its own Switch.Root rather than sharing one Field.Root: sibling
- * switches under a single Field.Root share a generated id, and a label click then
- * toggles the wrong control.
+ * Each switch owns its own Switch.Root rather than sharing one Field.Root: sibling switches under a single Field.Root
+ * share a generated id, and a label click then toggles the wrong control.
  */
 const DeviceSwitch = ({
   checked,

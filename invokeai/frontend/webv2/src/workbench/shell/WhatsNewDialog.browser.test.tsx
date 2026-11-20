@@ -88,7 +88,6 @@ describe('WhatsNewDialog', () => {
     settings.patchWorkbenchPreferences.mockReset();
     session.multiuserEnabled = false;
     settings.snapshot = { preferences: { betaNoticeAcknowledged: true, whatsNewSeenVersion: null }, status: 'idle' };
-    // An account switch drops the previous test's request and dismissal; the version is not account data.
     accountLifecycle.invalidate();
     host = document.createElement('div');
     document.body.append(host);
@@ -111,18 +110,14 @@ describe('WhatsNewDialog', () => {
 
   it('shows once for an unseen version after preferences load, then records the version on dismissal', async () => {
     await act(() => store.loadAppVersion());
-    // Not before the account's preferences are known: an account that saw these notes must not see them flash.
     expect(document.querySelector('[role="dialog"]')).toBeNull();
 
     await setSnapshot(ready({ betaNoticeAcknowledged: true, whatsNewSeenVersion: '6.14.2' }));
     await expect.element(page.getByRole('dialog', { name: title() })).toBeVisible();
     await expect.element(page.getByText('v7.0.0-rc1')).toBeVisible();
-    // An automatic open has no click behind it, so focus on a link would draw its keyboard ring; start on the panel.
     await expect.element(page.getByRole('dialog', { name: title() })).toHaveFocus();
     expect(isModalPresent()).toBe(true);
 
-    // Every catalogued highlight renders with its title, and the smaller notes list beneath them. Sharing is for
-    // servers with other accounts, so this single-account one shows none of it.
     const { sharing, ...singleAccountHighlights } = catalog.whatsNew.highlights;
     await expect.element(page.getByText(sharing!.title, { exact: true })).not.toBeInTheDocument();
     for (const { description, title } of Object.values(singleAccountHighlights)) {

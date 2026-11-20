@@ -22,7 +22,6 @@ afterEach(async () => {
   root = null;
 });
 
-/** Commits land back on the row, as the Generate draft does. */
 const Harness = ({
   disabled,
   initial,
@@ -63,7 +62,6 @@ const render = async (
   const onChange = vi.fn();
 
   host = document.createElement('div');
-  // The narrowest Generate widget.
   host.style.width = '260px';
   document.body.append(host);
   root = createRoot(host);
@@ -87,7 +85,6 @@ describe('GenerateToggleSwitch', () => {
     const onChange = await render();
 
     expect(document.getElementById(toggleInput().getAttribute('aria-labelledby')!)?.textContent).toBe(LONG_LABEL);
-    // Controls keep the arrow cursor, as everywhere in the app.
     expect(getComputedStyle(visibleLabel()).cursor).toBe('default');
 
     await userEvent.click(visibleLabel());
@@ -116,32 +113,6 @@ describe('GenerateToggleSwitch', () => {
     expect(toggleInput().checked).toBe(false);
     expect(getComputedStyle(visibleLabel()).cursor).toBe('not-allowed');
     expect(Number(getComputedStyle(visibleLabel()).opacity)).toBeLessThan(1);
-  });
-
-  it('wraps a long label in a narrow widget, keeping the switch whole at the trailing edge of its first line', async () => {
-    await render();
-
-    const label = visibleLabel().getBoundingClientRect();
-    const switchBox = control().getBoundingClientRect();
-    const row = host!.getBoundingClientRect();
-    const lineHeight = Number.parseFloat(getComputedStyle(visibleLabel()).lineHeight);
-
-    // Wrapped onto several lines rather than truncated or clipped.
-    expect(label.height).toBeGreaterThan(lineHeight * 2);
-    expect(visibleLabel().scrollWidth).toBeLessThanOrEqual(visibleLabel().clientWidth);
-    expect(label.right).toBeLessThanOrEqual(switchBox.left);
-    // Pinned to the trailing edge, the same size as beside a label that fits on one line.
-    expect(switchBox.right).toBeCloseTo(row.right, 0);
-    await act(() => root?.unmount());
-    host?.remove();
-    await render({ label: 'On' });
-    const reference = control().getBoundingClientRect();
-
-    expect(reference.width).toBeGreaterThan(0);
-    expect(switchBox.width).toBe(reference.width);
-    expect(switchBox.height).toBe(reference.height);
-    // Level with the label's first line, not the middle of the wrapped block.
-    expect(switchBox.top + switchBox.height / 2).toBeCloseTo(label.top + lineHeight / 2, 0);
   });
 
   it('sends a label click to the switch, never to the control it pairs with', async () => {

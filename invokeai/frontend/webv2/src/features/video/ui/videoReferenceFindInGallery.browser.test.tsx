@@ -8,12 +8,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
 
 import { VideoReferenceListField } from './VideoReferenceListField';
 import { VideoUiProvider, type VideoUiAdapter } from './VideoUiContext';
 
-/** Each reference exposes one find action; pass kind with name so videos resolve against the video endpoint. */
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -99,23 +97,6 @@ const render = async (): Promise<void> => {
   );
 };
 
-/**
- * Park the pointer before mount: an origin hover would reveal the first badge, and moving afterward starts a fade
- * that invalidates resting-opacity assertions.
- */
-const parkPointer = async (): Promise<void> => {
-  const parking = document.createElement('div');
-
-  parking.style.cssText = 'position:fixed;right:0;bottom:0;width:2px;height:2px;z-index:2147483647';
-  document.body.append(parking);
-
-  await act(async () => {
-    await userEvent.hover(parking);
-  });
-
-  parking.remove();
-};
-
 const findButtons = (name: string): HTMLButtonElement[] => [
   ...host.querySelectorAll<HTMLButtonElement>(`button[aria-label="Find ${name} in Gallery"]`),
 ];
@@ -144,7 +125,6 @@ describe('video reference find-in-gallery badges', () => {
   });
 
   it('keeps the badge out of the way until its own thumbnail is hovered or focused', async () => {
-    await parkPointer();
     await render();
 
     // Focus-within exercises the same thumbnail scope as hover. Assert pointer-events during focus changes because
@@ -168,7 +148,6 @@ describe('video reference find-in-gallery badges', () => {
   it('reveals a video reference as a video, once, from its start bound', async () => {
     await render();
 
-    // Both bounds reference the same clip; expose one find control.
     const bounds = findButtons('clip.mp4');
 
     expect(bounds).toHaveLength(1);

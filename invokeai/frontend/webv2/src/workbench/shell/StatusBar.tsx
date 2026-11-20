@@ -71,10 +71,7 @@ const WIDGET_POPOVER_POSITIONING = { placement: 'top-end' } as const;
 const BOTTOM_MENU_TRIGGER = { kind: 'bottom' } as const;
 /** Use content color for active brand accents; background tint is indistinguishable on the light theme. */
 const COMPACT_ROW_HOVER_PROPS = { bg: 'bg.hover', color: 'fg' };
-/**
- * Chips read as SegmentTabs segments: rounded fills inset from the bar's edges (the strip's vertical padding) with a
- * small gap between them. Gaps sit inside the clusters, so the remaining-space chip's capacity already excludes them.
- */
+/** Chips read as SegmentTabs segments; gaps sit inside clusters, so capacity already excludes them. */
 const CHIP_GAP = '0.5';
 
 /** Size drop overlays per cluster so one strip-wide curtain cannot cover the other target. */
@@ -151,8 +148,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
 
     return [{ ...item, isExpandable: isExpandableBottomItem(item), isPopover: isPopoverBottomItem(item) }];
   });
-  // Preserve instance order within clusters; only rendering splits them. Context menus, spacer drops, or
-  // neighboring widgets move membership.
+  // Preserve instance order within clusters; only rendering splits them.
   const alignEndIds = useMemo(
     () => new Set(bottomRegion.alignEndInstanceIds ?? []),
     [bottomRegion.alignEndInstanceIds]
@@ -361,8 +357,8 @@ const CompactBottomWidget = ({
 
       event.preventDefault();
 
-      // A popover chip is a real Popover.Trigger; a div gets no native
-      // Enter/Space click, so synthesize one for the trigger's own handling.
+      // A popover chip is a real Popover.Trigger; a div gets no native Enter/Space click, so synthesize one for the
+      // trigger's own handling.
       if (item.isPopover) {
         event.currentTarget.click();
         return;
@@ -428,8 +424,8 @@ const CompactBottomWidget = ({
     return null;
   }
 
-  // Named by its compact content, which shows (or visually hides) the widget's name: an aria-label would
-  // replace the visible status text that speech-input users read off the chip (WCAG 2.5.3).
+  // Named by its compact content, which shows (or visually hides) the widget's name: an aria-label would replace the
+  // visible status text that speech-input users read off the chip (WCAG 2.5.3).
   const row = (
     <Row
       {...rowDragHandleProps}
@@ -451,9 +447,8 @@ const CompactBottomWidget = ({
       ) : null}
     </Row>
   );
-  // The Row is the popover's actual trigger (toggle, dismissal exemption,
-  // focus restore, aria) while the outer Box keeps the tooltip's trigger id —
-  // two elements, so the two machines never fight over one `id`.
+  // The Row is the popover's actual trigger (toggle, dismissal exemption, focus restore, aria) while the outer Box
+  // keeps the tooltip's trigger id — two elements, so the two machines never fight over one `id`.
   const content = (
     <Box
       ref={bindWrapper}

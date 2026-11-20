@@ -185,7 +185,6 @@ describe('CropLayerController', () => {
 
 const FRAME: Rect = { height: 20, width: 20, x: 0, y: 0 };
 
-/** Each leaf's cache rect, which the fake export also reports as its baked pixels. */
 const CACHE_RECTS: Record<string, Rect> = {
   control: { height: 10, width: 30, x: 5, y: 5 },
   inside: { height: 5, width: 5, x: 2, y: 2 },
@@ -199,7 +198,6 @@ const CACHE_RECTS: Record<string, Rect> = {
 
 const bytes = (rect: Rect): number => rect.width * rect.height * 4;
 
-/** A locked paint leaf whose persisted pixels cover its cache rect. */
 const lockedPaint = (id: string, locked = true) =>
   layerContract(id, 'raster', {
     isLocked: locked,
@@ -214,17 +212,12 @@ const CLARITY: CanvasAdjustmentsContract = [{ amount: 90, id: 'clarity', isEnabl
 
 const createCropAllHarness = (
   options: {
-    /** Raster leaves carrying a Clarity stack. */
     adjusted?: readonly string[];
     historyBytes?: number;
     onExport?: (layerId: string) => void;
-    /** Refuses the owner's bake; its raw export still succeeds. */
     refusal?: AdjustmentRefusal;
-    /** Leaves added on top whose pixels cannot be read. */
     unreadable?: readonly CanvasLayerContract[];
-    /** Leaves whose pixels are not ready (still loading, or their image could not be fetched for now). */
     notReady?: readonly string[];
-    /** Settles pending paint uploads; resolves at once by default. */
     flushPendingPixels?: () => Promise<void>;
   } = {}
 ) => {
@@ -246,7 +239,6 @@ const createCropAllHarness = (
       lockedPaint('locked'),
       lockedPaint('lockedInside'),
       groupContract('lockedGroup', [lockedPaint('lockedByGroup', false)], { isLocked: true }),
-      // A depth layer keeping the original its map was detected from.
       layerContract('control', 'control', {
         controlType: 'depth',
         detection: { settings: {}, type: 'depth_anything_depth_estimation' },
@@ -263,10 +255,8 @@ const createCropAllHarness = (
   for (const [id, rect] of Object.entries(CACHE_RECTS)) {
     h.layers.getOrCreateRect(id, rect);
   }
-  // Raw reads of adjusted leaves are recorded as `<id>:raw`.
   const exported: string[] = [];
   const released: string[] = [];
-  // Reserved raster bytes when each export is read; every export holds its own reservation until released.
   const reservedAtExport: number[] = [];
   const guard = { current: true };
   const discardPersisted = vi.fn();
@@ -331,7 +321,6 @@ describe('CropLayerController: crop all layers', () => {
       const h = createCropAllHarness({ adjusted: ['raster'], refusal });
 
       await expect(h.controller.cropAll()).resolves.toEqual(refusal);
-      // The raw read shows the leaf reaches past the frame, so its stack must run.
       expect(h.exported).toEqual(['mask', 'region', 'control', 'inside', 'raster:raw', 'raster']);
       expect(h.released).toEqual(['mask', 'region', 'control', 'inside', 'raster:raw']);
       expect(h.document()).toBe(h.original);
@@ -372,7 +361,6 @@ describe('CropLayerController: crop all layers', () => {
       status: 'cropped',
     });
     expect(h.exported).toEqual(['mask', 'region', 'control', 'inside', 'raster:raw', 'raster']);
-    // The raw read is released before the bake reserves, so the peak stays one export.
     const croppedRegion = bytes({ height: 10, width: 5, x: 0, y: 0 });
     const croppedControl = bytes({ height: 10, width: 15, x: 0, y: 0 });
     expect(h.reservedAtExport.at(-1)).toBe(croppedRegion + croppedControl + bytes(CACHE_RECTS.raster!));
@@ -391,10 +379,7 @@ describe('CropLayerController: crop all layers', () => {
       status: 'cropped',
     });
 
-    // Hidden, disabled and grouped leaves crop too; locked ones are never read, and only those reaching past the
-    // frame count as skipped.
     expect(h.exported).toEqual(['mask', 'region', 'control', 'inside', 'raster']);
-    // Each export is released before the next is read, keeping only the cropped pixels: the peak is one export.
     const croppedRegion = bytes({ height: 10, width: 5, x: 0, y: 0 });
     const croppedControl = bytes({ height: 10, width: 15, x: 0, y: 0 });
     expect(h.reservedAtExport).toEqual([
@@ -407,7 +392,6 @@ describe('CropLayerController: crop all layers', () => {
     expect(h.released.sort()).toEqual(h.exported.sort());
     expect(h.dispatched.map((mutation) => mutation.type)).toEqual(['replaceCanvasLayers']);
     expect(h.history.entries().past).toEqual(['Crop all layers to frame']);
-    // Before and after pixels of every cropped leaf, admitted once for the entry.
     const after =
       bytes(FRAME) + bytes({ height: 10, width: 15, x: 0, y: 0 }) + bytes({ height: 10, width: 5, x: 0, y: 0 });
     const before = ['raster', 'control', 'mask', 'region'].reduce((sum, id) => sum + bytes(CACHE_RECTS[id]!), 0);
@@ -418,7 +402,6 @@ describe('CropLayerController: crop all layers', () => {
     expect(h.layers.get('raster')?.rect).toEqual(FRAME);
     expect(h.layers.get('control')?.rect).toEqual({ height: 10, width: 15, x: 5, y: 5 });
     expect(h.layers.get('region')?.rect).toEqual({ height: 10, width: 5, x: 0, y: 0 });
-    // The mask outside the frame stays, emptied.
     expect(h.layers.get('mask')?.rect).toMatchObject({ height: 0, width: 0 });
     expect(getDocumentLayer(cropped, 'mask')).toMatchObject({ isHidden: true, mask: { bitmap: null } });
     expect(getDocumentLayer(cropped, 'control')).toMatchObject({
@@ -427,13 +410,11 @@ describe('CropLayerController: crop all layers', () => {
       isEnabled: false,
       source: { offset: { x: 5, y: 5 } },
     });
-    // The cropped map no longer derives from the original, so the original goes; undo brings it back.
     expect(getDocumentLayer(cropped, 'control')).not.toHaveProperty('original');
     for (const id of ['inside', 'locked', 'lockedInside', 'lockedByGroup']) {
       expect(getDocumentLayer(cropped, id)).toBe(getDocumentLayer(h.original, id));
       expect(h.layers.get(id)?.rect).toEqual(CACHE_RECTS[id]);
     }
-    // Structure is untouched: same ids, parents and order.
     const structure = (document: CanvasDocumentContractV3) =>
       [...getDocumentIndex(document).byId.values()].map((entry) => [entry.node.id, entry.parentId, entry.siblingIndex]);
     expect(structure(cropped)).toEqual(structure(h.original));
@@ -451,7 +432,6 @@ describe('CropLayerController: crop all layers', () => {
   });
 
   it('skips leaves whose pixels cannot be read and crops the rest, naming those that reach past the frame', async () => {
-    /** An image layer whose decode failed; its contract still says where its content lies. */
     const unreadableImage = (id: string, name: string, x: number) =>
       layerContract(id, 'raster', {
         name,
@@ -539,7 +519,6 @@ describe('CropLayerController: crop all layers', () => {
   it('releases every reservation when copying the cropped pixels throws', async () => {
     const h = createCropAllHarness();
     const createSurface = h.backend.createSurface.bind(h.backend);
-    // The emptied mask's zero-sized copy succeeds; the first real crop, after its reservation, throws.
     vi.spyOn(h.backend, 'createSurface').mockImplementation((width: number, height: number) => {
       if (width > 0) {
         throw new Error('surface allocation failed');

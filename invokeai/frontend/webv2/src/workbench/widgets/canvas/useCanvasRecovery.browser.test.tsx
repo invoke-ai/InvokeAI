@@ -10,7 +10,6 @@ import { createRoot } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { describe, expect, it, vi } from 'vitest';
 
-/** The hook reads and writes a real store; only the context that would hand it over is stood in for. */
 const harness = vi.hoisted(() => ({
   stopGenerating: null as null | (() => void),
   store: null as ReturnType<typeof createWorkbenchStore> | null,
@@ -29,7 +28,6 @@ const { useStagingRecovery } = await import('./useCanvasRecovery');
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({ initAsync: false, lng: 'en', resources: {} });
 
-/** A run still generating, bound for `project`'s canvas as it is now, or for the Gallery. */
 const run = (id: string, project: Project, destination: 'canvas' | 'gallery' = 'canvas'): QueueItem =>
   ({
     backendItemIds: [1, 2],

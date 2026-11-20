@@ -22,10 +22,9 @@ export type CanvasOperationRunResult = 'published' | 'stale' | 'error';
 
 export interface CanvasOperationSession {
   /**
-   * Prepares a preview asynchronously, then commits it synchronously only while
-   * this request and its export guard are still current. `commitPreview` must
-   * explicitly return `undefined`; do not cast or erase an async callback to
-   * `() => void`, which TypeScript cannot distinguish from a synchronous one.
+   * Prepares a preview asynchronously, then commits it synchronously only while this request and its export guard are
+   * still current. `commitPreview` must explicitly return `undefined`; do not cast or erase an async callback to `() =>
+   * void`, which TypeScript cannot distinguish from a synchronous one.
    */
   run<T>(
     work: (signal: AbortSignal) => Promise<T>,

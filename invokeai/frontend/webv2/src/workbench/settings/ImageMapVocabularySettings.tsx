@@ -40,8 +40,8 @@ const parseDraft = (draft: string): string[] => {
 };
 
 /**
- * Persist whole vocabulary lists immediately and poll rebuild status. The data watcher refreshes map labels even
- * after this dialog closes.
+ * Persist whole vocabulary lists immediately and poll rebuild status. The data watcher refreshes map labels even after
+ * this dialog closes.
  */
 export const ImageMapVocabularySettings = () => {
   const { t } = useTranslation();
@@ -78,8 +78,7 @@ export const ImageMapVocabularySettings = () => {
         const updated = await updateImageMapVocab(nextTerms);
 
         assertAccountScopeCurrent(owner);
-        // Cancel pre-save polls so stale responses cannot resurrect removed entries or replace building with
-        // ready.
+        // Cancel pre-save polls so stale responses cannot resurrect removed entries or replace building with ready.
         await queryClient.cancelQueries({ queryKey: imageMapVocabKeys.all });
         assertAccountScopeCurrent(owner);
         queryClient.setQueryData(imageMapVocabKeys.all, updated);
@@ -168,10 +167,9 @@ export const ImageMapVocabularySettings = () => {
                 }
               }}
               onPaste={(event) => {
-                // A single-line input silently flattens pasted newlines, which
-                // would fuse a copied term-per-line list into one bogus term.
-                // Rewrite the paste as the comma-separated form the parser
-                // (and the placeholder) already speak.
+                // A single-line input silently flattens pasted newlines, which would fuse a copied term-per-line list
+                // into one bogus term. Rewrite the paste as the comma-separated form the parser (and the placeholder)
+                // already speak.
                 const text = event.clipboardData.getData('text');
 
                 if (!text.includes('\n')) {
@@ -216,8 +214,8 @@ export const ImageMapVocabularySettings = () => {
             canManageImageMapVocabulary ? (
               <RemovableTag
                 key={term}
-                // Disabled while a save is in flight: the busy guard would silently drop a second removal,
-                // resurrecting the chip with no feedback.
+                // Disabled while a save is in flight: the busy guard would silently drop a second removal, resurrecting
+                // the chip with no feedback.
                 disabled={isSaving}
                 removeLabel={t('settings.imageMapVocabulary.removeTerm', { term })}
                 onRemove={() => {
@@ -244,8 +242,8 @@ export const ImageMapVocabularySettings = () => {
         onRetry={
           canManageImageMapVocabulary
             ? () => {
-                // Re-saving the same list re-triggers the invalidation, which
-                // is the server's retry path for a failed embedding build.
+                // Re-saving the same list re-triggers the invalidation, which is the server's retry path for a failed
+                // embedding build.
                 void persist(vocab.terms);
               }
             : undefined
@@ -265,8 +263,7 @@ const VocabularyStatusLine = ({
   vocab: ImageMapVocab;
 }) => {
   const { t } = useTranslation();
-  // Explain that rebuild waits behind indexing. Omit age-based stall text here; the map owns the ticking stall
-  // display.
+  // Explain that rebuild waits behind indexing. Omit age-based stall text here; the map owns the ticking stall display.
   const progress = isIndexing(indexCounts) ? describeIndexProgress(indexCounts, t) : null;
 
   return (

@@ -141,7 +141,6 @@ describe('ExternalSizeSelect', () => {
   });
 
   it('tells a Canvas frame off the size table which size is generated and how it is fitted', async () => {
-    // A text-only model is never edited, so the hint leaves edits out.
     await render(ratioModel, { externalImageSize: null, height: 512, width: 640 }, true);
     expect(host?.textContent).toContain('Canvas generates 1024×1024, cropped to the frame.');
 

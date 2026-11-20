@@ -76,11 +76,7 @@ import { WorkflowThumbnailPlaceholder } from './WorkflowLibraryThumbnail';
 import { getMissingNodePacks, resolveEntryRequirements, WorkflowRequirementsList } from './WorkflowRequirementsList';
 import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workflowThumbnail';
 
-/**
- * The project's own workflows, presented through the library's card contract. The dialog filters and orders them
- * (`queryProjectWorkflowEntries`) for its toolbar, tags and result line. Everything here is a local collection
- * command; the library is only consulted for the selected workflow's source, and only on request.
- */
+/** The project's workflows through the library card contract; the library is read only for the selected source. */
 
 const NO_NODE_PACKS: readonly string[] = [];
 /** The large preview is wide-only; the expanded sheet's summary carries a small one. */
@@ -89,18 +85,13 @@ const THUMBNAIL_SLOT_CSS = { ...WORKFLOW_DETAIL_WIDE_ONLY_CSS, ...WORKFLOW_SILHO
 const selectTemplateSummary = (record: WorkflowRecordDTO) => ({ name: record.name, revision: record.revision });
 
 export interface ProjectWorkflowsViewProps {
-  /** Where the card actions menu is anchored; null while it is closed. */
   contextMenuAnchor: WorkflowCardMenuAnchor | null;
-  /** The workflow the card actions menu was raised for, kept through its close. */
   contextMenuTarget: WorkflowContextMenuTarget | null;
-  /** The project's workflows the toolbar and tags let through, in the toolbar's order. */
   entries: readonly ProjectWorkflowLibraryEntry[];
   layout: WorkflowLibraryLayout;
-  /** Missing-model counts for `entries`, by workflow id. */
   missingCounts: ReadonlyMap<string, number>;
   /** The explicit choice; the rail falls back to the active workflow, then the first match. */
   selectedWorkflowId: string | null;
-  /** The date the list's rows show, from the current order. */
   trailingField: WorkflowLibraryListTrailingField;
   onClose: () => void;
   onContextMenu: WorkflowCardContextMenuHandler;
@@ -109,7 +100,6 @@ export interface ProjectWorkflowsViewProps {
   onPreview: (workflowId: string, view?: WorkflowPreviewView) => void;
   onSelect: (workflowId: string | null) => void;
   preview: WorkflowLibraryPanesPreview;
-  /** The stage's handle, through which the dialog's Escape reaches it. */
   previewStageRef: RefObject<WorkflowLibraryPreviewStageHandle | null>;
 }
 
@@ -148,7 +138,6 @@ export const ProjectWorkflowsView = ({
     ? (entries.find((entry) => entry.item.workflow_id === contextMenuTarget.workflowId)?.projectWorkflow ?? null)
     : null;
 
-  // Stepping walks the project's workflows as the toolbar and tags filter and order them.
   const position = selectedEntry ? entries.indexOf(selectedEntry) : -1;
   const stepPreview = useCallback(
     (delta: -1 | 1) => {
@@ -194,7 +183,6 @@ export const ProjectWorkflowsView = ({
     },
     [duplicateWorkflow, onSelect, t]
   );
-  // Removing another workflow, from its card's menu, keeps the selection.
   const confirmRemove = useCallback(() => {
     if (removeTarget) {
       removeWorkflow(removeTarget);
@@ -310,17 +298,13 @@ export const ProjectWorkflowsView = ({
 };
 
 interface ProjectWorkflowActionsOptions {
-  /** The workflow the actions act on: the rail's selection, or the card a context menu was raised on. */
   entry: ProjectWorkflowEntry | null;
   onDuplicate: (workflowId: string, name: string) => void;
   onOpen: (workflowId: string) => void;
-  /** Asks to remove it; the view owns the confirmation. */
   onRemove: (workflowId: string) => void;
-  /** Asks to rename it; the view owns the dialog. */
   onRename: (workflowId: string) => void;
 }
 
-/** One project workflow's menu items, and the handlers the rail's own buttons share with them. */
 const useProjectWorkflowActions = ({
   entry,
   onDuplicate,
@@ -399,7 +383,6 @@ interface ProjectWorkflowContextMenuProps extends Omit<ProjectWorkflowActionsOpt
   onMenuClose: () => void;
 }
 
-/** A project card's actions menu; its rename and remove dialogs are the view's, as the rail's are. */
 const ProjectWorkflowContextMenu = ({
   anchor,
   entry,
@@ -420,15 +403,10 @@ interface ProjectWorkflowDetailPanelProps extends ProjectWorkflowActionsOptions 
   isActive: boolean;
   missingCount: number;
   onPreview: (workflowId: string, view?: WorkflowPreviewView) => void;
-  /** Preview mode's stepper (`WorkflowDetailSheet`); none outside preview mode. */
   stepper: WorkflowPreviewStepperProps | null;
 }
 
-/**
- * The selected project workflow: preview, name with Open, facts, and the library template it is linked to. The
- * template's current record is read only for the selected workflow, through the saved-workflow detail query the
- * workflow header shares; the query client is account-scoped.
- */
+/** The linked template's current record is read only for the selected workflow. */
 const ProjectWorkflowDetailPanel = ({
   entry,
   stepper,
@@ -482,13 +460,8 @@ const ProjectWorkflowDetailPanel = ({
   const isBundledSource = source !== undefined && isBundledLibraryWorkflowId(source.libraryWorkflowId);
   // Bundled templates are rewritten at every server start, so only a user template's revision is comparable.
   const comparesRevision = source !== undefined && !isBundledSource && source.revision !== null;
-  /*
-   * The template's name and revision come from the full saved-workflow record, workflow JSON included: the server has
-   * no metadata-only read by id. Sharing this query (the Call Saved Workflow field and the workflow header use it)
-   * costs no second request. It lives in the account-scoped query client with gcTime Infinity, and
-   * CallSavedWorkflowSyncRuntime invalidates it when the library cache changes; `select` keeps this rail rendering
-   * only for the two fields it shows.
-   */
+  // The full record (the server has no metadata-only read by id), shared with the Call Saved Workflow field and the
+  // header; `select` re-renders the rail only for its two fields.
   const template = useQuery({
     ...savedWorkflowDetailQueryOptions(comparesRevision ? source.libraryWorkflowId : ''),
     enabled: comparesRevision,
@@ -755,8 +728,7 @@ const ProjectWorkflowDetailPanel = ({
           </Stack>
         </Scrollable>
 
-        {/* The pinned footer ends in the primary action, as a picker's commit button; the narrow sheet's summary
-    carries Open and More instead. */}
+        {/* The pinned footer ends in the primary action; the narrow sheet's summary carries Open and More instead. */}
         <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" minW="0" p="2.5">
           <Button
             css={WORKFLOW_PREVIEW_TRIGGER_CSS}
@@ -788,8 +760,7 @@ const ProjectWorkflowDetailPanel = ({
               positioning={menuPositioning}
               onRequestDismiss={keepMenuOpenWhenSiblingMenuCloses}
             >
-              {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
-              menu never takes focus and the first pointer move onto it closes it. */}
+              {/* The tooltip must sit inside the menu trigger in a dialog, or the menu never takes focus. */}
               <Menu.Trigger asChild>
                 <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
                   <IconButton aria-label={t('workflowLibrary.moreActions')} size="lg" variant="outline">

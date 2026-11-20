@@ -22,7 +22,6 @@ afterEach(async () => {
 
 const SIZE = 200;
 
-/** A real engine over a new project, its inpaint mask selected, attached to on-page canvases. */
 const setup = async () => {
   const store = createWorkbenchStore();
   const projectId = store.getState().activeProjectId;
@@ -49,7 +48,6 @@ const setup = async () => {
   engine.interaction.set('clipToBbox', false);
 
   const mask = store.getState().projects[0]!.canvas.document.stacks.inpaint_mask[0] as CanvasLayerContract;
-  // A new canvas selects nothing; strokes here are meant for its mask.
   store.commands.canvas.apply(projectId, { id: mask.id, type: 'setCanvasSelectedLayer' });
   expect(store.getState().projects[0]!.canvas.document.selectedLayerId).toBe(mask.id);
 
@@ -82,7 +80,6 @@ const setup = async () => {
       fire('pointerup', points.at(-1)!, 0);
     });
   };
-  /** Pixels the thumbnail shows in the mask's red fill (the checkerboard behind it is grey); 0 without a canvas. */
   const thumbnailCoverage = (): number => {
     const canvas = host.querySelector('canvas');
     if (!canvas || canvas.style.display === 'none' || canvas.width === 0) {

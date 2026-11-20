@@ -22,10 +22,7 @@ import { Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useTranslation } from 'react-i18next';
 
-/**
- * Render template-only node previews without ReactFlow or workbench dependencies; handles and fields are
- * noninteractive.
- */
+/** Template-only node previews without ReactFlow or workbench dependencies; handles and fields are noninteractive. */
 
 const sortByUiOrder = <T extends { uiOrder?: number | null }>(templates: T[]): T[] =>
   [...templates].sort((a, b) => (a.uiOrder ?? Number.MAX_SAFE_INTEGER) - (b.uiOrder ?? Number.MAX_SAFE_INTEGER));

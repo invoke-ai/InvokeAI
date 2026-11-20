@@ -14,8 +14,8 @@ import { refreshQueue } from './queueDataStore';
 import { useQueueUi } from './QueueUiContext';
 
 /**
- * Re-queues a failed or canceled root item from its saved session; the backend reports which ids it took. A Canvas
- * job whose project is closed here is staged by another tab, so the confirmation says where its result goes.
+ * Re-queues a failed or canceled root item from its saved session; the backend reports which ids it took. A Canvas job
+ * whose project is closed here is staged by another tab, so the confirmation says where its result goes.
  */
 export const RetryQueueItemButton = ({
   isProjectClosedHere = false,

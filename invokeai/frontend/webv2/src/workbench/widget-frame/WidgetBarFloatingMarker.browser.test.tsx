@@ -21,11 +21,6 @@ import { userEvent } from 'vitest/browser';
 
 import { WidgetBar, type WidgetBarGroup } from './WidgetBar';
 
-/**
- * A floated widget keeps its rail slot as a marker: it points at the window instead of docking it, and docking
- * and removing are its context menu's job.
- */
-
 const TestView = () => null;
 
 const createWidget = (id: WidgetTypeId, label: string): RegisteredWidget => ({
@@ -162,7 +157,6 @@ describe('WidgetBar floating marker', () => {
 
     expect(labels).toEqual(['Gallery', 'Image Map, floating window', 'Queue']);
     expect(marker().querySelector('[data-floating-badge]')).not.toBeNull();
-    // A plain button: not a sortable tab, and not a toggle.
     expect(marker().getAttribute('aria-roledescription')).toBeNull();
     expect(marker().hasAttribute('aria-pressed')).toBe(false);
     expect(slot('Gallery').getAttribute('aria-roledescription')).toBe('sortable');
@@ -268,7 +262,6 @@ describe('WidgetBar floating marker', () => {
     await renderBar();
     await openMenu(slot('Queue'));
 
-    // The slot's menu is portalled out of the rail, but React still bubbles its events through the rail.
     await openMenu(menuItem('remove-widget')!);
     expect(openWidgetsMenus()).toHaveLength(0);
     expect(menuItem('remove-widget')).not.toBeNull();
@@ -286,12 +279,10 @@ describe('WidgetBar floating marker', () => {
     await openMenu(marker());
     expect(menuItem('dock-widget')).not.toBeNull();
 
-    // Project B has a floating window with the same instance id, as default widgets do.
     await renderBar('project-b');
     expect(menuItem('dock-widget')).toBeNull();
     expect(menuItem('remove-widget')).toBeNull();
 
-    // Coming back to project A does not bring the old menu back.
     await renderBar('project-a');
     expect(menuItem('dock-widget')).toBeNull();
   });

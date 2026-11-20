@@ -1,6 +1,6 @@
 /**
- * Contiguous [start,end) scopes identify isolated groups with adjustments, opacity or blend. Both renderers rely
- * on preorder/reversed-preorder keeping subtrees contiguous.
+ * Contiguous [start,end) scopes identify isolated groups with adjustments, opacity or blend. Both renderers rely on
+ * preorder/reversed-preorder keeping subtrees contiguous.
  */
 
 import type {

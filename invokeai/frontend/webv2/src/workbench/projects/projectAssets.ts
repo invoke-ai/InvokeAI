@@ -1,8 +1,3 @@
-/**
- * Discover references by name key with separate image/video namespaces. Collection excludes history; remapping
- * includes it.
- */
-
 import {
   collectMediaNames,
   IMAGE_NAME_KEYS,
@@ -11,10 +6,8 @@ import {
   VIDEO_NAME_KEYS,
 } from '@workbench/mediaReferences';
 
-/** Top-level document keys that are history rather than live content. */
 export const PROJECT_HISTORY_ROOT_KEYS: ReadonlySet<string> = new Set(['events', 'graphHistory', 'queue']);
 
-/** Keys that introduce history at any depth (`canvas.snapshots`, the gallery's recents). */
 export const PROJECT_HISTORY_KEYS: ReadonlySet<string> = new Set(['recentImages', 'snapshot', 'snapshots']);
 
 /** Skip and strip installation-specific selection references so unbundled names cannot travel silently. */
@@ -25,17 +18,13 @@ export const GALLERY_SELECTION_KEYS: ReadonlySet<string> = new Set([
   'selectedImageNames',
 ]);
 
-/**
- * Strip gallery board IDs while preserving authored workflow board inputs. A dropped auto-add board falls back to
- * the default destination, the project's inbox.
- */
+/** Strip gallery board IDs, preserving authored workflow board inputs; auto-add falls back to the inbox. */
 export const GALLERY_INSTALLATION_KEYS: ReadonlySet<string> = new Set([
   'autoAddBoardId',
   'projectBoardId',
   'selectedBoardId',
 ]);
 
-/** Clear pagination/window anchors when transferred board IDs change. */
 export const GALLERY_POSITION_KEYS: ReadonlySet<string> = new Set(['galleryPage']);
 
 const INSTALLATION_STATE_KEYS: ReadonlySet<string> = new Set([
@@ -44,16 +33,9 @@ const INSTALLATION_STATE_KEYS: ReadonlySet<string> = new Set([
   ...GALLERY_POSITION_KEYS,
 ]);
 
-/**
- * The URL fields a project stores beside a media name, by record shape, each with the builder that derives it from the
- * name. Transfer blanks these keys at any depth and every load rebuilds them (`projectMediaUrls.ts`), both from these
- * lists, so the two cannot drift apart. Here, not there, because the Launchpad loads this module eagerly.
- *
- * A generated-image record's, beside its `imageName`.
- */
+/** Transfer blanks these and every load rebuilds them from the same lists; here because the Launchpad loads it eagerly. */
 export const GENERATED_IMAGE_URL_FIELDS = { imageUrl: 'full', thumbnailUrl: 'thumbnail' } as const;
 
-/** A gallery item's URL fields, beside its `name` and `kind`. */
 export const GALLERY_ITEM_URL_FIELDS = { fullUrl: 'full', thumbnailUrl: 'thumbnail' } as const;
 
 const isDerivedMediaUrlKey = (key: string): boolean =>
@@ -74,27 +56,18 @@ export interface CanvasFrameRect {
   readonly y: number;
 }
 
-/**
- * What a live Canvas engine holds beyond the document: media its undo state retains and unsaved pixels; and the one
- * edit a Workbench runtime records into its undo history, a frame resize Generate's size asked for.
- */
 export interface LiveCanvasEngine {
   heldAssets(): CanvasHeldAssetRefs;
   subscribe(listener: () => void): () => void;
-  /** Persists the engine's unsaved pixels into the document; rejects when they cannot be saved. */
   flushPendingPixels(): Promise<void>;
-  /** Moves the frame from `from` to `to` as one undoable canvas step named `label`; false when it was refused. */
   commitFrame(from: CanvasFrameRect, to: CanvasFrameRect, label: string): boolean;
 }
 
-/** One mounted Workbench's live Canvas engines, each registered for as long as its undo state survives. */
 export interface LiveCanvasEngines {
   heldAssets(projectId: string): CanvasHeldAssetRefs | undefined;
   register(projectId: string, source: LiveCanvasEngine): () => void;
   subscribe(listener: () => void): () => void;
-  /** Crosses the project's paint barrier; a project without a live engine has nothing unsaved. */
   flushPendingPixels(projectId: string): Promise<void>;
-  /** Records a frame resize in the project's canvas history; false without a live engine, or when it refused. */
   commitFrame(projectId: string, from: CanvasFrameRect, to: CanvasFrameRect, label: string): boolean;
 }
 
@@ -139,14 +112,10 @@ export const collectLiveAssetRefs = (projectDocument: Record<string, unknown>): 
 
 const isHeldSkipKey = (key: string): boolean => key === 'recentImages' || GALLERY_SELECTION_KEYS.has(key);
 
-/** Open editors hold live content and undo state, but not completed queue/event or gallery history. */
 export const collectHeldAssetRefs = (projects: readonly object[]): ProjectAssetRefs =>
   collectMediaNames(projects.flatMap(withoutHistoryRoots), isHeldSkipKey, MAX_HELD_NAME_LENGTH);
 
-/**
- * Containers whose children an edit replaces independently: the canvas, its snapshots, undo stacks, and the workflow
- * collection with its per-workflow histories, so editing one workflow rescans only that workflow.
- */
+/** Containers whose children edits replace independently, so editing one workflow rescans only that workflow. */
 const SPLIT_HELD_KEYS: ReadonlySet<string> = new Set([
   'canvas',
   'snapshots',
@@ -157,26 +126,19 @@ const SPLIT_HELD_KEYS: ReadonlySet<string> = new Set([
   'entries',
 ]);
 
-/** Containers keyed by ids (workflow histories): every child is split, and their entries are shared by identity. */
 const SPLIT_CHILDREN_HELD_KEYS: ReadonlySet<string> = new Set(['workflowHistories']);
 
 type HeldPart = ProjectAssetRefs | CanvasHeldAssetRefs;
 
 const scanHeld = (node: object): ProjectAssetRefs => collectMediaNames([node], isHeldSkipKey, MAX_HELD_NAME_LENGTH);
 
-// Edits that replace name-free subtrees (the project root, layout, settings) then leave the parts unchanged.
 const pushNamed = (refs: ProjectAssetRefs, parts: HeldPart[]): void => {
   if (refs.images.size || refs.videos.size) {
     parts.push(refs);
   }
 };
 
-/**
- * Reads what open editors hold: each project's live content plus the undo state its Canvas engine retains. Edits
- * replace the canvas, its snapshots and undo stacks child by child, so the project is split there; every other subtree
- * is immutable and scanned once per identity, as are the primitive fields of each split node. When no part changed
- * identity the previous result is returned as is; equal name sets under new identities are left to the lease.
- */
+/** Unchanged part identities return the previous result; equal name sets under new identities are left to the lease. */
 export const createOpenProjectsHeldMediaReader = (
   getProjects: () => readonly (object & { id: string })[],
   getCanvasRefs: (projectId: string) => CanvasHeldAssetRefs | undefined
@@ -288,15 +250,13 @@ const mapDocument = (node: unknown, visit: (key: string, value: unknown) => Node
   return hasChanged ? next : node;
 };
 
-/** Strip reserved keys at every depth, covering both persisted widget shapes. */
 export const stripInstallationState = (projectDocument: Record<string, unknown>): Record<string, unknown> =>
   mapDocument(projectDocument, (key, value) => {
     if (INSTALLATION_STATE_KEYS.has(key)) {
       return { drop: true };
     }
 
-    // Blank derived URLs instead of deleting their keys: entries survive, and each load derives them from the
-    // (remapped) names again.
+    // Blank derived URLs rather than deleting keys; each load derives them from the remapped names.
     return isDerivedMediaUrlKey(key) && typeof value === 'string' ? { value: '' } : null;
   }) as Record<string, unknown>;
 
@@ -305,7 +265,6 @@ export interface ProjectAssetMappings {
   videos: ReadonlyMap<string, string>;
 }
 
-/** Use kind-specific mappings; preserve unmapped names and unchanged subtree identity. */
 export const remapAssetRefs = (
   projectDocument: Record<string, unknown>,
   mappings: ProjectAssetMappings
@@ -351,7 +310,6 @@ const readGalleryRecentImageName = (projectDocument: Record<string, unknown>): s
   return null;
 };
 
-/** Leaves of a raw forest in preorder, tolerating malformed nodes. */
 const rawLeaves = (nodes: unknown): Record<string, unknown>[] =>
   Array.isArray(nodes)
     ? nodes.flatMap((node) => (!isRecord(node) ? [] : node.type === 'group' ? rawLeaves(node.children) : [node]))
@@ -364,7 +322,6 @@ const readTopmostCanvasImageName = (projectDocument: Record<string, unknown>): s
     return null;
   }
 
-  // The top-most raster leaf is the one a person would call "what this project looks like".
   for (const layer of rawLeaves(canvas.document.stacks.raster)) {
     if (!isRecord(layer.source)) {
       continue;
@@ -381,6 +338,5 @@ const readTopmostCanvasImageName = (projectDocument: Record<string, unknown>): s
   return null;
 };
 
-/** Prefer the newest result, then the topmost raster, otherwise null. */
 export const selectCoverImageName = (projectDocument: Record<string, unknown>): string | null =>
   readGalleryRecentImageName(projectDocument) ?? readTopmostCanvasImageName(projectDocument);

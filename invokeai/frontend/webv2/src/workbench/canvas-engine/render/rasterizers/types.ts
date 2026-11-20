@@ -6,9 +6,9 @@ import type { Rect } from '@workbench/canvas-engine/types';
 
 /**
  * Resolves persisted image names to decode blobs; application networking stays behind this injectable seam. A resolver
- * throws {@link CanvasImageMissingError} when the image is missing or not readable by this user, so the layer reads
- * as unreadable until its source changes. Any other failure (network, server, an expired session) is taken as
- * transient: operations report `not-ready`, and asking again or the display after its backoff tries again.
+ * throws {@link CanvasImageMissingError} when the image is missing or not readable by this user, so the layer reads as
+ * unreadable until its source changes. Any other failure (network, server, an expired session) is taken as transient:
+ * operations report `not-ready`, and asking again or the display after its backoff tries again.
  */
 export type ImageResolver = (imageName: string, signal?: AbortSignal) => Promise<Blob>;
 
@@ -16,19 +16,15 @@ export type ImageResolver = (imageName: string, signal?: AbortSignal) => Promise
 export type RasterizeTextSource = Extract<CanvasLayerSourceContract, { type: 'text' }>;
 
 /**
- * Pixels and their layer-local content rect. Image/shape/text/gradient start at zero; paint uses its persisted
- * offset.
+ * Pixels and their layer-local content rect. Image/shape/text/gradient start at zero; paint uses its persisted offset.
  */
 export interface RasterizeResult {
   surface: RasterSurface;
   rect: Rect;
 }
 
-/** Dependencies shared by the source rasterizers. */
 export interface RasterizeDeps {
-  /** Surface + bitmap factory seam. */
   backend: RasterBackend;
-  /** Fetches image blobs by name for decoding. */
   resolver: ImageResolver;
   /** Cancels pending image resolution and prevents decode/cache publication. */
   signal?: AbortSignal;
@@ -39,9 +35,8 @@ export interface RasterizeDeps {
   /** Resolves a stable persisted face to the runtime family used for this render. */
   resolveFontFamily?: (source: RasterizeTextSource) => string;
   /**
-   * Document pixel size. Layers are content-sized, so this only backs the
-   * legacy default for gradients that predate the explicit extent field (they
-   * were document-sized by construction and must render identically).
+   * Document pixel size. Layers are content-sized, so this only backs the legacy default for gradients that predate the
+   * explicit extent field (they were document-sized by construction and must render identically).
    */
   documentSize: { width: number; height: number };
 }

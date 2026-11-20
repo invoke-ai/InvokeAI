@@ -5,7 +5,6 @@ import { decodeImageBlob, readClipboardImage } from './canvasClipboard';
 
 const blob = (type: string): Blob => ({ type }) as Blob;
 
-/** A ClipboardItem stand-in exposing just what the reader touches. */
 const item = (types: string[], payload: Record<string, Blob> = {}): ClipboardItem =>
   ({
     getType: (type: string) => Promise.resolve(payload[type] ?? blob(type)),
@@ -18,8 +17,6 @@ describe('readClipboardImage', () => {
   });
 
   it('returns null when permission is refused rather than throwing', async () => {
-    // A paste that cannot read the clipboard is an ordinary outcome — a
-    // defocused document refuses too — so it must not surface as an error.
     const clipboard = { read: () => Promise.reject(new Error('NotAllowedError')) };
     await expect(readClipboardImage({ clipboard })).resolves.toBeNull();
   });

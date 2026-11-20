@@ -70,8 +70,7 @@ export const QueueStatusWidgetView = ({ presentation }: WidgetViewProps) => {
       tone={chip.tone === 'offline' ? 'warning' : undefined}
     >
       {label}
-      {/* Reserved, tabular digits: the chip must not reflow the status bar as
-          the percent ticks from 9 to 10 to 100. */}
+      {/* Reserved, tabular digits: the chip must not reflow the status bar as the percent goes from 9 to 10 to 100. */}
       {showPercent ? (
         <Text as="span" display="inline-block" fontVariantNumeric="tabular-nums" minW="7ch" textAlign="end">
           {` · ${percent}%`}

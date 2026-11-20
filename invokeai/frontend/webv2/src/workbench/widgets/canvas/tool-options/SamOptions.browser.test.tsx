@@ -56,16 +56,11 @@ describe('Select Object retry focus', () => {
   type SetSession = (next: Partial<SamSessionSnapshot>) => void;
   type ProcessResult = Awaited<ReturnType<CanvasOperationCapability['processSelectObjectSession']>>;
 
-  /** The session clears the error as the retry starts and keeps `retrying` until it settles. */
   const startRetry = (set: SetSession): ProcessResult => {
     set({ error: null, retrying: true, status: 'processing-sam' });
     return 'published';
   };
 
-  /**
-   * A Select Object section whose first auto run failed; `succeed` plays the retry through to a ready preview.
-   * `process` is what Find object does to the session, the run's progress by default.
-   */
   const renderFailedSession = async (process: (set: SetSession) => ProcessResult = startRetry) => {
     const i18n = createInstance();
     await i18n.use(initReactI18next).init({ lng: 'en', resources: { en: { translation: enCatalog } } });
@@ -133,7 +128,6 @@ describe('Select Object retry focus', () => {
     await expect.element(findObject).toBeEnabled();
     (document.activeElement as HTMLElement | null)?.blur();
 
-    // A later auto run succeeds after an input change, so the button leaves.
     act(() => set({ error: null, hasPreview: true, status: 'ready' }));
     expect(findObject.query()).toBeNull();
     await act(
@@ -176,7 +170,6 @@ describe('Select Object retry focus', () => {
     await expect.element(findObject).toBeEnabled();
     (document.activeElement as HTMLElement | null)?.blur();
 
-    // A later auto run succeeds after an input change, so the button leaves.
     act(() => set({ error: null, hasPreview: true, status: 'ready' }));
     expect(findObject.query()).toBeNull();
     await act(

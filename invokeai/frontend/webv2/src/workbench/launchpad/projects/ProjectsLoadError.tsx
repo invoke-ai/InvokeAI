@@ -3,11 +3,7 @@ import { getProjectLibrary, refreshProjectLibrary, useProjectLibrarySelector } f
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/**
- * A failed project listing, with a retry: the whole state where there are no projects to show (`state`), or above the
- * projects an earlier read listed (`inline`), never beside the empty state. A retry that recovers removes this alert,
- * so `getRecoveryFocus` names where focus goes then (the first project, say) instead of the page.
- */
+/** A failed listing with a retry: whole-page (`state`) or above earlier projects (`inline`). */
 export const ProjectsLoadError = ({
   getRecoveryFocus,
   layout,

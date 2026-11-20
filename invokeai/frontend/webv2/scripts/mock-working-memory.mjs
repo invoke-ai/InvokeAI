@@ -1,24 +1,7 @@
 /**
- * Working-memory calibration for the mock backend: plans, summaries, the device status, calibration runs and resets
- * (`/api/v2/models/.../working_memory`), and cancelling a run's items by origin. The mock has no Socket.IO, so a run
- * advances when a client reads the model's summary: a read at least a second after the last step finishes the running
- * item and starts the next, which a section polling every two seconds turns into visible progress.
- *
- * Main models (`fixture-model-001`, `-006`, ...) each show one state, by key (`MODEL_SCENARIOS`); every other main model is never
- * calibrated, and VAEs are unsupported. `SHARED_LINES` pairs models whose decode lines pool their measurements, so one
- * of them shows lines only the other measured. `fixture-model-046` follows a warm RX 9060 XT: its largest fp32 size
- * measured allocator fragmentation and is not counted, and two of three windows at one fp16 size ran partially resident,
- * which leaves that size counted on the third. `POST /__faults` with `workingMemory` selects a device scenario instead,
- * with `stoppedCalibration: <model key>` replaces that main model's runs with an attempt Stop aborted, with
- * `runningCalibration: <model key>` with one still running, which holds the GPU, and with
- * `modelChangedCalibration: <model key>` with one whose later steps failed because the model changed after queuing.
- * A calibrate request with an attempt is refused (409, coded) while another attempt runs on the GPU or is open (between
- * its steps, short of them, not aborted, active within the last two minutes of `clock`), for a later step once another
- * run was created since the attempt's first (`calibration_interleaved`), and for a graph naming a model whose hash,
- * base, type, format or variant changed since it compiled, or that was removed. Like the server, it takes a request only
- * with `graph_models` stating every model the graph names and no other (422).
- * Calibration items live here rather than in the fixture queue, so profile counts stay fixed. Tests pass their own
- * `clock` to advance runs without waiting.
+ * Working-memory calibration routes for the mock backend. Without Socket.IO, a summary read STEP_MS after the last step
+ * advances a run. States go by key (`MODEL_SCENARIOS`); `POST /__faults` selects device and calibration scenarios.
+ * Refusals (409 running, interleaved or changed model; 422 `graph_models`) follow the server; tests pass a `clock`.
  */
 
 export const WORKING_MEMORY_SCENARIOS = new Set(['ok', 'multiGpu', 'noGpu', 'storeUnusable', 'error', 'notVerified']);
@@ -46,12 +29,10 @@ const SEEDED_AT = Date.parse('2025-12-01T10:00:00.000Z');
 const ABORTED_LINE_PROBLEM =
   'Stop or an interrupted submission discarded the measurements of this line: its windows come from aborted ' +
   'attempts, which never count. Calibrate again to measure it.';
-/** The server's bounds on an attempt's step count. */
 const MAX_ATTEMPT_STEPS = 256;
 /** A run's items advance at most this often, so a section that refetches on every queued step still shows progress. */
 const STEP_MS = 1_000;
 
-/** What each seeded main model shows, by key. */
 const MODEL_SCENARIOS = {
   'fixture-model-006': 'completed',
   'fixture-model-011': 'stale',
@@ -65,7 +46,6 @@ const MODEL_SCENARIOS = {
 /** The sizes the `fragmented` scenario measured, as the 9060 XT plan picked them. */
 const FRAGMENTED_SIDES = [576, 832, 1216];
 
-/** Why a seeded window of the `fragmented` scenario is excluded from the fit, by its step; undefined when it counts. */
 const excludedIn = (scenario, step, repetition) => {
   if (scenario !== 'fragmented') {
     return undefined;
@@ -167,7 +147,6 @@ const modelIdentifiersOf = (graph) => {
 
 const IDENTITY_FACTS = ['hash', 'base', 'type', 'format', 'variant'];
 
-/** Why `graphModels` does not state exactly the graph's models, every fact of each, or null when it does. */
 const graphModelsProblem = (graph, graphModels) => {
   if (graphModels === null || typeof graphModels !== 'object' || Array.isArray(graphModels)) {
     return 'graph_models is required: the identity of every model the graph names.';
@@ -190,10 +169,7 @@ const graphModelsProblem = (graph, graphModels) => {
     : null;
 };
 
-/**
- * `currentModel` reads a model's record as it is now, so a graph compiled over an older record is refused as the
- * server refuses it; the fixture's records stand in without it.
- */
+/** `currentModel` reads a record as it is now, so a graph compiled over an older one is refused as the server does. */
 export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel } = {}) => {
   const mainModels = models.filter((model) => model.type === 'main');
   const byKey = new Map(models.map((model) => [model.key, model]));
@@ -201,7 +177,6 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
   const runs = new Map();
   /** Measured points by model key: `{ line, width, height, bytes, env_id }`. */
   const points = new Map();
-  /** Run ids by idempotency key, so a resent request returns the run it created. */
   const receipts = new Map();
   let nextRunNumber = 1;
   let nextItemId = 900_000;
@@ -210,17 +185,13 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
 
   const now = () => new Date(SEEDED_AT + 86_400_000 * 30 + createdCount++ * 1_000).toISOString();
 
-  /**
-   * `excluded` names why the fit leaves the window out: `fragmented` or `partial_residency`. A window of an aborted
-   * attempt is left out as well, judged when lines are read (`heldBack`).
-   */
+  /** `excluded`: `fragmented` or `partial_residency`; aborted attempts drop out when lines are read (`heldBack`). */
   const addPoint = (modelKey, run, item, envId = ENV_ID, excluded = undefined) => {
     const dtype = item.case.line.split('_').at(-1);
     const list = points.get(modelKey) ?? [];
     const demand = demandOf(item.case.width * item.case.height, dtype);
 
     list.push({
-      // A fragmented allocator reserves well beyond what the decode needs.
       bytes: excluded === 'fragmented' ? Math.round(demand * 1.4) : demand,
       env_id: envId,
       excluded,
@@ -238,7 +209,6 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
       attempt_steps: attemptSteps,
       created_at: createdAt,
       items: steps.map((step) => ({ case: step, error: null, item_id: nextItemId++, status: 'pending' })),
-      // When the run last did something, on `clock`: its creation, then each item that settles.
       lastActivityAt: clock(),
       run_id: `mock-wm-run-${String(nextRunNumber++).padStart(4, '0')}`,
     };
@@ -313,22 +283,13 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
 
   reset();
 
-  /**
-   * Replaces a main model's runs with an attempt stopped after four of its steps, so a browser check can review that
-   * state (`POST /__faults` with `stoppedCalibration`); false for a key that names no main model. `reset` drops it.
-   */
+  /** An attempt stopped after four steps (`stoppedCalibration` fault); false for a key that names no main model. */
   const seedStopped = (modelKey) => seedOpted(modelKey, 'stopped');
 
-  /**
-   * Replaces a main model's runs with an attempt still running, which holds the GPU (`POST /__faults` with
-   * `runningCalibration`); false for a key that names no main model.
-   */
+  /** An attempt still running, holding the GPU (`runningCalibration` fault); false for a non-main key. */
   const seedRunning = (modelKey) => seedOpted(modelKey, 'running');
 
-  /**
-   * Replaces a main model's runs with an attempt whose later steps failed because the model's record changed after
-   * they were queued (`POST /__faults` with `modelChangedCalibration`); false for a key that names no main model.
-   */
+  /** Later steps failed because the record changed (`modelChangedCalibration` fault); false for a non-main key. */
   const seedModelChanged = (modelKey) => seedOpted(modelKey, 'modelChanged');
 
   const seedOpted = (modelKey, scenario) => {
@@ -364,31 +325,21 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
     return { error: null, error_code: null, status: pointCount > 0 ? 'partial' : 'canceled' };
   };
 
-  /** The windows that count: those of the run's completed items. */
   const pointCountOf = (run) => run.items.filter((item) => item.status === 'completed').length;
-  /**
-   * The windows the run stored, as `point_count` reports them: the valid ones, plus the invalid window a decode
-   * leaves that failed or was canceled while it ran.
-   */
+  /** As `point_count`: the valid windows plus the invalid one a decode failed or canceled mid-run leaves. */
   const storedPointsOf = (run) =>
     pointCountOf(run) + run.items.filter((item) => item.status === 'failed' || item.interrupted).length;
 
   /**
-   * Why no window of a run feeds a fit, by run id, judged per attempt as the server does: `running` while a run of it
-   * is unsettled; `aborted_attempt` once none is and a run of it ended canceled (Stop, a queue clear), failed because
-   * the model changed after it was planned, or it holds fewer runs than it planned (Stop, a failed submission). Any
-   * other failed run ends that run, not the attempt; a run without an attempt is never aborted.
+   * Judged per attempt as the server does: `running` while a run is open, else `aborted_attempt` if one ended early.
+   * A run without an attempt is never aborted.
    */
   const statusesOf = (attempt) => attempt.map((run) => runStatus(run, pointCountOf(run)).status);
   const isShort = (attempt) => attempt.length < Math.max(...attempt.map((run) => run.attempt_steps ?? 0));
-  /** A run of the attempt ended canceled (Stop, a queue clear) or failed because the model changed. */
   const endedEarly = (attempt) =>
     statusesOf(attempt).some((status) => status === 'canceled' || status === 'partial') ||
     attempt.some((run) => run.items.some((item) => item.status === 'failed' && item.errorCode === 'model_changed'));
-  /**
-   * Whether another attempt than `attemptId` holds the GPU, as the server's `_attempt_blocks` judges it: a run of it is
-   * running, or it is open: between its steps, short of them, nothing ended it early, and active within the grace.
-   */
+  /** As the server's `_attempt_blocks`: another attempt has a running run, or is open within the grace. */
   const attemptBlocks = (attemptId) =>
     [
       ...Map.groupBy(
@@ -440,7 +391,6 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
     });
   };
 
-  /** Finishes the running item of the model's oldest unsettled run and starts the next one. */
   const advance = (modelKey) => {
     if (clock() - lastAdvanceAt < STEP_MS) {
       return;
@@ -463,10 +413,7 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
     }
   };
 
-  /**
-   * A model's lines: its own points, plus its partners' points in the current environment, which the server pools
-   * the same way. A line only partners measured appears with `own_windows` 0.
-   */
+  /** Partners' points in the current environment pool in, as on the server; a partner-only line has `own_windows` 0. */
   const linesOf = (modelKey, scenario) => {
     const reasons = heldBack();
     // A window of an aborted attempt never counts, whatever else it measured.
@@ -751,8 +698,7 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
     const existing = known && (runs.get(model.key) ?? []).find((run) => run.run_id === known);
 
     if (!existing) {
-      // A later step after another run, of any model or none, was created since the attempt's first: it would measure
-      // the GPU after that calibration. The attempt stays short, and so aborted.
+      // A later step after another run was created since the attempt's first would measure the GPU after that run.
       const ownFirst = [...runs.values()]
         .flat()
         .filter((run) => attemptId !== null && run.attempt_id === attemptId)
@@ -766,15 +712,12 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
         return { body: { detail: INTERLEAVED_REFUSAL }, status: 409 };
       }
 
-      // One attempt per device class, as the server judges it: a request with an attempt is refused while another
-      // attempt, of any model, runs or is open (`attemptBlocks`). A run without an attempt holds nothing, and a
-      // request without one is never refused for it.
+      // One attempt per device class: refused while another attempt runs or is open; a request without one never is.
       if (attemptId !== null && attemptBlocks(attemptId)) {
         return { body: { detail: RUNNING_REFUSAL }, status: 409 };
       }
 
-      // Every model the graph names must still be the record it compiled over: as its identifier and its
-      // graph_models entry name it.
+      // Every named model must still be the record it compiled over.
       for (const identifier of modelIdentifiersOf(body.graph)) {
         const record = currentModel ? currentModel(identifier.key) : byKey.get(identifier.key);
         const name = identifier.name ?? record?.name ?? identifier.key;
@@ -844,7 +787,6 @@ export const createWorkingMemoryMock = (models, { clock = Date.now, currentModel
     return { points_removed: pointsRemoved, runs_removed: removed.length };
   };
 
-  /** Answers a working-memory route, or returns null for any other path. */
   const handle = ({ body, method, path, scenario }) => {
     if (path === '/api/v2/models/working_memory/status' && method === 'GET') {
       return scenario === 'error'

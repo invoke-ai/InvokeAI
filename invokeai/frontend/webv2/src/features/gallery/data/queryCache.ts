@@ -45,7 +45,6 @@ export const subscribeGalleryThumbnailRevision = (listener: () => void): (() => 
   return () => galleryThumbnailRevisionListeners.delete(listener);
 };
 
-/** Ask mounted gallery thumbnails to request their URLs again after maintenance repairs them. */
 export const refreshGalleryThumbnails = (owner: AccountScope): void => {
   if (!isAccountScopeCurrent(owner)) {
     return;
@@ -65,7 +64,6 @@ export const getRefreshedGalleryThumbnailUrl = (url: string, currentRevision: nu
   return refreshedUrl.toString();
 };
 
-/** A list window's pages, or one sparse/strip page. */
 type GalleryItemsCacheData = InfiniteData<GalleryItemsPage, number> | GalleryItemsPage;
 
 interface ItemCacheRollbackEntry {
@@ -90,7 +88,6 @@ const isGalleryItemsPage = (value: unknown): value is GalleryItemsPage =>
   Array.isArray((value as { items?: unknown }).items) &&
   typeof (value as { total?: unknown }).total === 'number';
 
-/** The pages a list-family cache entry holds, whichever shape it is. */
 const getCachedPages = (query: Query): GalleryItemsPage[] => {
   const data = query.state.data;
 
@@ -134,7 +131,6 @@ const mapPageItems = (
   };
 };
 
-/** Cluster windows ignore board moves; starred-only listings lose items immediately when unstarred. */
 const patchRemovesItems = (filter: CanonicalGalleryItemsFilter, patch: GalleryItemCachePatch): boolean => {
   if (patch.kind === 'delete') {
     return true;
@@ -221,11 +217,7 @@ const patchItemsCacheData = (
 
 const getListingHash = (queryKey: QueryKey): string => hashKey(getGalleryItemListingKey(queryKey));
 
-/**
- * Count the removed items each listing, or each cache entry, holds in its cached pages. Every cached page of a listing
- * reports the same server total, so each must lose the same count: pages left disagreeing would make the sparse views
- * clamp and reconcile against each other.
- */
+/** Every cached page of a listing must lose the same count, or sparse views clamp against each other. */
 const countRemovedItems = (
   queries: readonly Query[],
   patch: GalleryItemCachePatch,
@@ -259,7 +251,6 @@ const countRemovedItems = (
   return new Map([...removedKeysByCountKey].map(([countKey, keys]) => [countKey, keys.size]));
 };
 
-/** An optimistic star patch, or the rollback of one, for state that retains star flags outside the item caches. */
 export type GalleryItemStarPatchEvent =
   | { itemKeys: ReadonlySet<GalleryItemKey>; kind: 'apply'; patchId: number; starred: boolean }
   | { kind: 'revert'; patchId: number };
@@ -269,10 +260,7 @@ type GalleryItemStarPatchListener = (event: GalleryItemStarPatchEvent) => void;
 const galleryItemStarPatchListeners = new WeakMap<QueryClient, Set<GalleryItemStarPatchListener>>();
 let nextGalleryItemStarPatchId = 0;
 
-/**
- * Observe star patches on `client`'s item caches. An unstarred item leaves starred-only listings, and an item on an
- * evicted page is in no cache at all, so its flag can only be reconciled from the patch itself.
- */
+/** An item on an evicted page is in no cache, so its flag can only be reconciled from the patch itself. */
 export const subscribeGalleryItemStarPatches = (
   client: QueryClient,
   listener: GalleryItemStarPatchListener
@@ -293,19 +281,11 @@ const emitGalleryItemStarPatch = (client: QueryClient, event: GalleryItemStarPat
   galleryItemStarPatchListeners.get(client)?.forEach((listener) => listener(event));
 
 export interface GalleryItemCachePatchOptions {
-  /**
-   * Which cached pages a removal lowers the total of. `listing` (the default) lowers every cached page of a listing
-   * that holds a removed item anywhere, as a first patch must. `holder` lowers only the cache entries that still hold a
-   * removed item, for re-applying a patch that already lowered the rest: a page refetched since then is the only one
-   * still counting the item.
-   */
+  /** `holder` lowers only entries still holding a removed item, to re-apply a patch that lowered the rest. */
   totals?: 'holder' | 'listing';
 }
 
-/**
- * Applies only backend-confirmed successes. Failed refs are intentionally
- * ignored, and kind-qualified keys prevent same-name images/videos colliding.
- */
+/** Applies only backend-confirmed successes; kind-qualified keys keep same-name media apart. */
 export const patchGalleryItemCaches = (
   client: QueryClient,
   patch: GalleryItemCachePatch,
@@ -317,9 +297,7 @@ export const patchGalleryItemCaches = (
     return () => undefined;
   }
 
-  // The cluster filter's member list is client-owned, so a server refetch can
-  // never reconcile it: prune it in the same optimistic step (and restore it
-  // with the same rollback) as the list caches it feeds.
+  // The cluster member list is client-owned, so no refetch reconciles it: prune and roll it back with the list caches.
   const rollbackClusterMembers =
     patch.kind === 'delete' ? pruneImageClusterMembers(patch.result.succeeded.map(toGalleryItemKey)) : null;
   const rollbackEntries: ItemCacheRollbackEntry[] = [];
@@ -364,7 +342,7 @@ export const patchGalleryItemCaches = (
   };
 };
 
-/** Capture cached source boards before optimistic moves so rejected refs can be restored before refetch. */
+/** Captured before optimistic moves so rejected refs can be restored before refetch. */
 export const getGalleryItemBoardIdsFromCaches = (
   client: QueryClient,
   refs: readonly GalleryItemRef[]
@@ -391,10 +369,7 @@ export const getGalleryItemBoardIdsFromCaches = (
   return boardIds;
 };
 
-/**
- * Capture each cached starred flag before mutation; failed batches must restore actual prior values rather than
- * invert the request.
- */
+/** Failed batches restore actual prior values, never invert. */
 export const getGalleryItemStarredFromCaches = (
   client: QueryClient,
   refs: readonly GalleryItemRef[]
@@ -430,7 +405,6 @@ interface BoardCacheRollbackEntry {
 const isGalleryBoardsData = (value: unknown): value is GalleryBoard[] =>
   Array.isArray(value) && value.every((board) => typeof board === 'object' && board !== null && 'id' in board);
 
-/** The boards of a project that the account's cached board lists hold, archived ones included where a list has them. */
 export const getGalleryProjectBoardsFromCaches = (client: QueryClient, projectId: string): GalleryBoard[] => {
   const boards = new Map<string, GalleryBoard>();
 
@@ -456,26 +430,20 @@ export const getGalleryProjectBoardsFromCaches = (client: QueryClient, projectId
 const isArchivedBoardsListing = (query: Query): boolean =>
   (query.queryKey.at(-1) as { includeArchived?: boolean } | undefined)?.includeArchived === true;
 
-/** The account's cached board listings that hold data, newest first. */
 const getCachedGalleryBoardListings = (client: QueryClient): Query[] =>
   client
     .getQueryCache()
     .findAll({ queryKey: galleryKeys.boardsForAccount(captureAccountScope()) })
-    // A listing whose refetch failed keeps its last data under an error status: it still decides, as the doc of
-    // `ensureGalleryBoardDestinations` promises, rather than sending every result to the inbox while offline.
+    // A listing whose refetch failed keeps deciding from its last data, rather than sending every result to the inbox.
     .filter((query) => isGalleryBoardsData(query.state.data))
-    // Newest first; of two read in the same instant, the one not invalidated since.
+    // Of two read in the same instant, the one not invalidated since wins.
     .sort(
       (left, right) =>
         right.state.dataUpdatedAt - left.state.dataUpdatedAt ||
         Number(left.state.isInvalidated) - Number(right.state.isInvalidated)
     );
 
-/**
- * The board as the newest cached listing holding it describes it, or undefined when none does: for saying why
- * `canAddToCachedGalleryBoard` refused it (listed without `add_media`, or not listed at all) from the listing that
- * decided, not from a panel's older view of the board.
- */
+/** Explains a `canAddToCachedGalleryBoard` refusal from the listing that decided, not a panel's older view. */
 export const getCachedGalleryBoard = (boardId: string, client: QueryClient = queryClient): GalleryBoard | undefined => {
   for (const listing of getCachedGalleryBoardListings(client)) {
     const board = (listing.state.data as GalleryBoard[]).find((candidate) => candidate.id === boardId);
@@ -487,13 +455,8 @@ export const getCachedGalleryBoard = (boardId: string, client: QueryClient = que
 };
 
 /**
- * Whether the account may add media to a board, as its cached board listings say, newest first. A board listed with
- * `add_media` is a destination, archived or not: archiving hides a board from the panel, not from results sent to it
- * on purpose. A board no listing holds is not one: it was deleted, stopped being readable, or was never asked about.
- * Absence counts only from a listing that would have held the board: one of archived boards too, or a newer listing
- * of live boards than one that held it live. A listing counts while it holds data, whatever its status: one whose
- * refetch failed keeps the last data it read. The caller decides from a listing it ensured with
- * `ensureGalleryBoardDestinations`: nothing is guessed, so a run never fails on its board after generating.
+ * Newest cached listing decides. A board listed with `add_media` is a destination even archived; a board no listing
+ * holds is not, but absence counts only from a listing that would have held it. Failed refetches keep their data.
  */
 export const canAddToCachedGalleryBoard = (boardId: string, client: QueryClient = queryClient): boolean => {
   let isMissingFromNewerLiveListing = false;
@@ -511,7 +474,6 @@ export const canAddToCachedGalleryBoard = (boardId: string, client: QueryClient 
   return false;
 };
 
-/** Value snapshot of the same newest-listing policy used by uploads and destination controls. */
 export const getGalleryBoardDestinationIds = (client: QueryClient = queryClient): readonly string[] => {
   const decided = new Set<string>();
   const destinations: string[] = [];
@@ -526,7 +488,6 @@ export const getGalleryBoardDestinationIds = (client: QueryClient = queryClient)
         destinations.push(board.id);
       }
     }
-    // This listing would contain every remaining readable board, so older data cannot restore one.
     if (isArchivedBoardsListing(listing)) {
       break;
     }
@@ -538,20 +499,12 @@ export const getGalleryBoardDestinationIds = (client: QueryClient = queryClient)
 const GALLERY_BOARD_DESTINATIONS_STALE_MS = 60_000;
 
 /**
- * Has a listing for `canAddToCachedGalleryBoard` to decide from before a submission or upload resolves its
- * destination: every board the account can read, archived ones included, so an archived board chosen on purpose
- * is found and a board missing from it is known to be gone. Returns null, without a tick, while any such listing
- * holds data, whatever its age: a caller that must dispatch synchronously decides from it as it is. A listing older
- * than a minute, or invalidated after a run or upload failed on its board, is read again in the background, so the
- * next resolution decides from fresh data; the read is never awaited and its failure never reported. Only with no
- * such listing at all does the caller await one read. A listing that cannot be read leaves the decision to what is
- * cached: with nothing cached, no board is a destination and results go to the inbox rather than to a board that
- * may refuse them.
+ * Null while any all-boards listing is cached, whatever its age, so synchronous callers decide from it; stale ones are
+ * refreshed in the background, never awaited. With nothing cached and no read possible, results go to the inbox.
  */
 export const ensureGalleryBoardDestinations = (client: QueryClient = queryClient): Promise<void> | null => {
   const options = galleryBoardsOptions({ includeArchived: true });
-  // Any listing of archived boards too will do, whatever its order: an open panel showing archived boards keeps one
-  // fresh, and then an invoke reads nothing.
+  // Any listing including archived boards will do, whatever its order.
   const listings = client
     .getQueryCache()
     .findAll({ queryKey: galleryKeys.boardsForAccount(captureAccountScope()) })
@@ -562,7 +515,7 @@ export const ensureGalleryBoardDestinations = (client: QueryClient = queryClient
       .fetchQuery({ ...options, staleTime: GALLERY_BOARD_DESTINATIONS_STALE_MS })
       .then(() => undefined)
       .catch(() => {
-        // Unanswered: the cached listings, if any, decide.
+        // Unanswered: the cached listings decide.
       });
   }
 
@@ -572,20 +525,13 @@ export const ensureGalleryBoardDestinations = (client: QueryClient = queryClient
   );
 
   if (!hasCurrentListing) {
-    // The read is shared with one already in flight for the same listing and skipped while that listing is fresh.
     void client.prefetchQuery({ ...options, staleTime: GALLERY_BOARD_DESTINATIONS_STALE_MS });
   }
 
   return null;
 };
 
-/**
- * After a board refused a run or an upload, or answered as gone: nothing landed, so only the board listings are
- * invalidated, and the listing of every readable board is read again at once rather than marked stale and left,
- * since nothing need observe it and `ensureGalleryBoardDestinations` decides from whatever is cached. A resolution
- * made before the read lands still decides from the old listing (and shares the read); one made after decides from
- * the new one. The read's failure is not reported: the listings cached keep deciding.
- */
+/** Refetches the all-boards listing at once: nothing observes it, and `ensureGalleryBoardDestinations` reads cache. */
 export const invalidateGalleryBoardDestinations = async (
   client: QueryClient,
   owner: AccountScope = captureAccountScope()
@@ -594,7 +540,6 @@ export const invalidateGalleryBoardDestinations = async (
   if (!isAccountScopeCurrent(owner)) {
     return;
   }
-  // The invalidation refetched any listing of archived boards too that a panel observes; that read serves.
   const isReadInFlight = client
     .getQueryCache()
     .findAll({ queryKey: galleryKeys.boardsForAccount(owner) })
@@ -607,12 +552,7 @@ export const invalidateGalleryBoardDestinations = async (
   }
 };
 
-/**
- * Lists a board the account just created in every cached board listing of the account's, ahead of the refetch that
- * orders it properly: a board selected as it is created is already where new results go. A listing read still in
- * flight was asked before the board existed and would list it away again as it landed, so those reads are cancelled
- * first; the refetch that follows the creation reads them again.
- */
+/** In-flight listing reads predate the board and would drop it on landing, so they are cancelled first. */
 export const addGalleryBoardToCaches = async (client: QueryClient, board: GalleryBoard): Promise<void> => {
   const owner = captureAccountScope();
   await client.cancelQueries({ queryKey: galleryKeys.boardsForAccount(owner) });
@@ -624,11 +564,7 @@ export const addGalleryBoardToCaches = async (client: QueryClient, board: Galler
   }
 };
 
-/**
- * Patches one board across every cached board list and returns a rollback
- * that restores the prior lists — skipping any list something else has
- * written to since, the same conflict rule as `patchGalleryItemCaches`.
- */
+/** The rollback skips lists written since, the same conflict rule as `patchGalleryItemCaches`. */
 export const patchGalleryBoardCaches = (
   client: QueryClient,
   boardId: string,
@@ -678,7 +614,6 @@ export const patchGalleryBoardCaches = (
     );
 };
 
-/** The contiguous row range a window's pages cover, or null for a shape the rebuild cannot reason about. */
 const getGalleryWindowSpan = (
   data: InfiniteData<GalleryItemsPage, number>
 ): { offset: number; rowCount: number } | null => {
@@ -695,10 +630,7 @@ const getGalleryWindowSpan = (
   return isContiguous ? { offset: firstOffset, rowCount: data.pageParams.length * GALLERY_PAGE_SIZE } : null;
 };
 
-/**
- * Swaps an active window's pages atomically from one span-sized read. False
- * falls back to the collapse: the read failed or the entry changed meanwhile.
- */
+/** False (failed read, changed entry) collapses instead. */
 const rebuildGalleryItemWindow = async (client: QueryClient, owner: AccountScope, query: Query): Promise<boolean> => {
   const filter = getGalleryItemsFilterFromKey(query.queryKey);
   const before = query.state.data;
@@ -713,8 +645,7 @@ const rebuildGalleryItemWindow = async (client: QueryClient, owner: AccountScope
     return false;
   }
 
-  // Name-hydrated windows fetch videos one by one; re-reading a video-heavy
-  // span every mutation would cost more than the collapse ever did.
+  // Name-hydrated windows fetch videos singly; re-reading a video-heavy span costs more than collapsing.
   if (
     (filter.semantic !== undefined || isDateBoardId(filter.boardId)) &&
     before.pages.reduce((count, page) => count + page.items.filter((item) => item.kind === 'video').length, 0) >
@@ -738,8 +669,7 @@ const rebuildGalleryItemWindow = async (client: QueryClient, owner: AccountScope
 
   const liveQuery = client.getQueryCache().get(query.queryHash);
 
-  // A page fetch that started during the span read snapshotted the old pages
-  // and will land after this swap; only an idle, untouched entry may take it.
+  // A page fetch started during the span read will land after this swap; only an idle, untouched entry may take it.
   if (liveQuery?.state.data !== before || liveQuery.state.fetchStatus !== 'idle') {
     return false;
   }
@@ -764,7 +694,6 @@ const rebuildGalleryItemWindow = async (client: QueryClient, owner: AccountScope
     return { items, ...(itemIndices ? { itemIndices } : {}), offset: pageOffset, total: result.total };
   });
 
-  // TanStack never stores zero pages; an emptied span keeps one empty page.
   if (pages.length === 0) {
     pages.push({ items: [], total: result.total });
   }
@@ -777,10 +706,8 @@ const rebuildGalleryItemWindow = async (client: QueryClient, owner: AccountScope
   return true;
 };
 
-/** Collapses a window to its anchor page, so its refetch replays one request. */
 const collapseGalleryItemWindowToAnchor = (client: QueryClient, query: Query): void => {
-  // A transient entry (anchored windows carry gcTime 0) may have been
-  // collected while a rebuild awaited; writing to its key would resurrect it.
+  // A transient entry (gcTime 0 on anchored windows) may be collected while a rebuild awaits; a write would revive it.
   if (client.getQueryCache().get(query.queryHash) !== query) {
     return;
   }
@@ -808,8 +735,7 @@ const runGalleryInvalidation = async (
   owner: AccountScope,
   includeBoards: boolean
 ): Promise<void> => {
-  // Date-board pages and lazy range selection share these names. Mark them
-  // stale before active pages refetch so they cannot hydrate stale refs.
+  // Mark shared name caches stale first so date-board pages and range selection cannot hydrate stale refs.
   await client.cancelQueries({ queryKey: galleryKeys.itemNamesForAccount(owner) });
   await client.invalidateQueries({
     queryKey: galleryKeys.itemNamesForAccount(owner),
@@ -819,8 +745,7 @@ const runGalleryInvalidation = async (
 
   const rebuiltQueryHashes = new Set<string>();
 
-  // Rebuild active windows in one span to preserve viewport rows; unobserved windows collapse to their pinned
-  // page.
+  // Active windows rebuild in one span to preserve viewport rows.
   for (const query of getGalleryItemListQueries(client, owner)) {
     const data = query.state.data;
 
@@ -854,10 +779,7 @@ interface GalleryInvalidationState {
 
 const galleryInvalidations = new WeakMap<QueryClient, Map<string, GalleryInvalidationState>>();
 
-/**
- * Coalesce same-tick invalidations with at most one trailing pass to avoid cancelling and restarting observed
- * refetches.
- */
+/** Coalesces same-tick invalidations so observed refetches are not restarted. */
 const scheduleGalleryInvalidation = (
   client: QueryClient,
   owner: AccountScope,
@@ -879,7 +801,6 @@ const scheduleGalleryInvalidation = (
   if (!state.promise) {
     state.promise = (async () => {
       try {
-        // Let a synchronous burst collapse into one pass.
         await Promise.resolve();
 
         while (state.requested) {

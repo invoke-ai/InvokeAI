@@ -104,13 +104,13 @@ interface BatchAnswer {
 }
 
 /**
- * One answer for a check sent in batches. The batches check disjoint names, so name lists join and per-name counts
- * add. A document merges by the server's kind and id, keeping its revisions only when every batch that listed it read
- * the same ones (a save between batches leaves them unknown, so the host reads the server's copy). A batch past the
+ * One answer for a check sent in batches. The batches check disjoint names, so name lists join and per-name counts add.
+ * A document merges by the server's kind and id, keeping its revisions only when every batch that listed it read the
+ * same ones (a save between batches leaves them unknown, so the host reads the server's copy). A batch past the
  * server's document listing cap may have left out a document another batch lists: such a document is marked
  * `namesIncomplete`, its revisions unknown. Counts that cannot be deduplicated across batches err high: documents a
- * batch left unlisted each count as another, and a job or another account's document naming media of several
- * batches counts once per batch.
+ * batch left unlisted each count as another, and a job or another account's document naming media of several batches
+ * counts once per batch.
  */
 const mergeGalleryMediaUsage = (answers: readonly BatchAnswer[]): GalleryMediaUsage => {
   const documents = new Map<string, { batches: Set<number>; document: GalleryMediaUsageDocument }>();

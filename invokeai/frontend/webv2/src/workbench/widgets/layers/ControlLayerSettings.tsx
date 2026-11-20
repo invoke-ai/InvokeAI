@@ -1,5 +1,5 @@
-import type { ArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
 import type { ModelConfig } from '@features/models';
+import type { ArchitectureCapabilitiesSnapshot } from '@features/models/architecturesStore';
 import type {
   CanvasControlAdapterContract,
   CanvasControlLayerContract,
@@ -11,13 +11,13 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { HStack, Separator, Stack, Text } from '@chakra-ui/react';
 import { getControlModelUnusableReason } from '@features/generation/graph';
+import { useCapabilities } from '@features/identity';
+import { getModelBaseLabel, useModelsSelector, useStartersSelector } from '@features/models';
 import {
   ensureArchitectureCapabilitiesLoaded,
   getArchitectureCapabilitiesSnapshot,
   subscribeArchitectureCapabilities,
-} from '@features/generation/runtime';
-import { useCapabilities } from '@features/identity';
-import { getModelBaseLabel, useModelsSelector, useStartersSelector } from '@features/models';
+} from '@features/models/architecturesStore';
 import { focusFirstOperable } from '@platform/react/focusIfUnclaimed';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button } from '@platform/ui/Button';
@@ -63,12 +63,7 @@ const selectStarterModels = (snapshot: {
   response: { starter_models: { source: string }[] } | null;
 }) => (snapshot.status === 'loaded' ? (snapshot.response?.starter_models ?? null) : null);
 
-/**
- * The checks' context for one revision of the capability table, which the checks read when they run. The revision is
- * an argument, not only a dependency: the React Compiler infers a memo's dependencies from what its callback reads,
- * and prunes a side-effect-free `void revision`, so a context made from `base` and `remembered` alone would outlive
- * the table's arrival, and every check memoized on it with it.
- */
+/** `revision` is an argument: the React Compiler prunes a `void revision` dependency and would go stale. */
 const getCheckContext = (base: string | null, remembered: Record<string, string>, _capabilitiesRevision: number) =>
   createControlLayerCheckContext(base, remembered);
 
@@ -86,11 +81,7 @@ interface ControlLayerSettingsProps {
   layer: CanvasControlLayerContract;
 }
 
-/**
- * The control layer Properties panel: Image · Type · Detection · Model, then Weight · Steps · Priority. The rows stay
- * put; only their values change. Type, detector and image edits go through the canvas operations, which detect the
- * map in the background; adapter values commit through canvas undo like any layer property.
- */
+/** Rows stay put and only values change; type, detector and image edits go through canvas operations. */
 export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -322,8 +313,8 @@ export const ControlLayerSettings = ({ engine, layer }: ControlLayerSettingsProp
     };
   }, []);
   const capabilitiesUnavailable = reason === 'capabilities_unavailable';
-  // The click flips the status to `loading` synchronously; keeping the failure surface mounted for the
-  // retry it started keeps the button, and the user's focus, in place.
+  // The click flips the status to `loading` synchronously; keeping the failure surface mounted for the retry it started
+  // keeps the button, and the user's focus, in place.
   const isRetryingCapabilities = hasRequestedCapabilitiesRetry && capabilitiesStatus === 'loading';
   const showCapabilitiesFailure = capabilitiesUnavailable && (capabilitiesStatus === 'error' || isRetryingCapabilities);
 

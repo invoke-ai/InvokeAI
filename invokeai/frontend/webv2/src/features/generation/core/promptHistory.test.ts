@@ -1,4 +1,4 @@
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
 import type { MainModelConfig } from './types';

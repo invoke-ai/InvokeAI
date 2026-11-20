@@ -153,9 +153,8 @@ export const getGalleryBoardGroups = ({
     otherUsersBoards.length > 0 ||
     dateBoards.length > 0 ||
     archivedBoards.length > 0;
-  // Only the caller's own rows on screen count as taken: a name in a hidden project (or an archived board while
-  // archived boards are hidden), or someone else's board, may legitimately be reused, and refusing it would leave the
-  // search with nothing to do.
+  // Only the caller's own rows on screen count as taken: a name in a hidden project (or an archived board while those
+  // are hidden), or someone else's board, may be reused; refusing it would leave the search nothing to do.
   const hasExactMatch = [
     ...projectBoards,
     ...libraryBoards,

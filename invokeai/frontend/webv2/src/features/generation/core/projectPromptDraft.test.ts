@@ -26,7 +26,6 @@ describe('project prompt draft', () => {
       promptTemplate: template,
       promptTemplateViewMode: true,
     });
-    // Nothing to show merged without a template.
     expect(getPromptDraftFromValues({ promptTemplate: { name: 'no id' }, promptTemplateViewMode: true })).toMatchObject(
       { promptTemplate: null, promptTemplateViewMode: false }
     );

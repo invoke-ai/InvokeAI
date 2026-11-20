@@ -1,8 +1,8 @@
 /**
- * Exact adjustment evaluation for pixel-writing consumers (generation, exports, bakes, PSD, filter input,
- * extraction). Per-pixel runs apply on the calling thread; spatial runs go to the shared spatial service at `now`
- * priority. A stack is never evaluated with its spatial entries left out: when they cannot run, the consumer refuses
- * with an {@link AdjustmentRefusal} naming the owner and the cause.
+ * Exact adjustment evaluation for pixel-writing consumers (generation, exports, bakes, PSD, filter input, extraction).
+ * Per-pixel runs apply on the calling thread; spatial runs go to the shared spatial service at `now` priority. A stack
+ * is never evaluated with its spatial entries left out: when they cannot run, the consumer refuses with an {@link
+ * AdjustmentRefusal} naming the owner and the cause.
  */
 
 import type { CanvasAdjustmentsContract, CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
@@ -162,8 +162,8 @@ export const imageDataOf = (data: Uint8ClampedArray, width: number, height: numb
 
 /**
  * A new `rect`-sized surface holding `source`'s pixels at (0,0) with `adjustments` evaluated exactly; `rect`'s origin
- * places it in the stack's reference space. Allocates the surface and one ImageData buffer (8 B/px), which the
- * caller reserves; a spatial job reserves its in-flight buffer separately.
+ * places it in the stack's reference space. Allocates the surface and one ImageData buffer (8 B/px), which the caller
+ * reserves; a spatial job reserves its in-flight buffer separately.
  */
 export const adjustSurfaceExactly = async (
   createSurface: (width: number, height: number) => RasterSurface,

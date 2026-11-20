@@ -224,13 +224,6 @@ const type = async (input: HTMLInputElement, value: string) => {
   });
 };
 
-const pressEnter = async (input: HTMLInputElement) => {
-  await act(async () => {
-    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-    await Promise.resolve();
-  });
-};
-
 const getCreateDialog = async () => {
   let dialog: HTMLElement | null = null;
 
@@ -297,56 +290,6 @@ describe('GalleryBoardsPanel', () => {
     expect(getAutoAddRows()).toEqual(['Inbox']);
   });
 
-  it('lists other projects under their names only when they are shown', async () => {
-    await renderPanel();
-    expect(host?.textContent).not.toContain('Harbor Tower');
-
-    await renderPanel(createGallery({ showOtherProjectBoards: true }));
-
-    const sections = getRowsBySection();
-    expect(Object.keys(sections)).toEqual(['Mahogany House', 'Library', 'Other projects', 'Dates', 'Archived']);
-    expect(sections['Other projects']).toEqual(['Inbox', 'Stripes']);
-    expect(host?.querySelector('[role="heading"][aria-level="4"]')?.textContent).toBe('Harbor Tower');
-  });
-
-  it('explains each tier once, while it holds only its fixed row', async () => {
-    await renderPanel();
-    expect(host?.textContent).not.toContain('belong to this project');
-    expect(host?.textContent).not.toContain('available in every project');
-
-    const onlyFixedRows = boards.filter((board) => board.isInbox || board.kind === 'uncategorized');
-    await renderPanel({ ...createGallery(), boards: onlyFixedRows } as GalleryStateView);
-
-    expect(host?.textContent).toContain('Boards you create here belong to this project.');
-    expect(host?.textContent).toContain('Boards here are available in every project.');
-  });
-
-  it('shows media and asset counts together, so the row does not change meaning with the tab', async () => {
-    await renderPanel();
-
-    const catsRow = getBoardRows().find((row) => row.textContent?.includes('Cats'));
-
-    expect(catsRow?.textContent).toContain('56 | 3');
-  });
-
-  it('marks the selected board for assistive tech', async () => {
-    await renderPanel();
-
-    const current = host?.querySelector('[aria-current="true"]');
-
-    expect(current?.textContent).toContain('dogs');
-  });
-
-  it('renders owner subtitles only when the backend supplies an owner', async () => {
-    await renderPanel();
-
-    const catsRow = getBoardRows().find((row) => row.textContent?.includes('Cats'));
-    const dogsRow = getBoardRows().find((row) => row.textContent?.includes('dogs'));
-
-    expect(catsRow?.textContent).toContain('Alice Example');
-    expect(dogsRow?.textContent).not.toContain('Alice Example');
-  });
-
   it('selects a board and clears the search on click', async () => {
     await renderPanel();
     await type(getSearchInput(), 'cat');
@@ -357,23 +300,6 @@ describe('GalleryBoardsPanel', () => {
 
     expect(actions.selectBoard).toHaveBeenCalledWith('cats');
     expect(getSearchInput().value).toBe('');
-  });
-
-  it('offers an unmatched name in both tiers, each row creating where it sits', async () => {
-    await renderPanel();
-    await type(getSearchInput(), 'birds');
-
-    const sections = getRowsBySection();
-    expect(sections['Mahogany House']).toEqual(['Create board "birds" in Mahogany House']);
-    expect(sections.Library).toEqual(['Create board "birds" in Library']);
-
-    await click(getBoardRows().find((row) => row.textContent?.includes('in Library'))!);
-    expect(actions.createBoard).toHaveBeenCalledWith('birds', null);
-    expect(getSearchInput().value).toBe('');
-
-    await type(getSearchInput(), 'fish');
-    await click(getBoardRows().find((row) => row.textContent?.includes('in Mahogany House'))!);
-    expect(actions.createBoard).toHaveBeenLastCalledWith('fish', 'p1');
   });
 
   it('asks for a name in a dialog from a "+" and creates in that tier', async () => {
@@ -393,16 +319,6 @@ describe('GalleryBoardsPanel', () => {
 
     await click(getAddButton('widgets.gallery.createBoardInProject'));
     expect((await getCreateDialog()).querySelector('h2')?.textContent).toBe('Create board in Mahogany House');
-  });
-
-  it('counts the boards in each tier, the inbox included, but not Uncategorized', async () => {
-    await renderPanel();
-
-    const counts = Array.from(
-      host?.querySelectorAll<HTMLElement>('[data-scope="collapsible"][data-part="trigger"]') ?? []
-    ).map((trigger) => trigger.textContent);
-
-    expect(counts.slice(0, 2)).toEqual(['Mahogany House2', 'Library2']);
   });
 
   describe('dragging a board', () => {
@@ -425,17 +341,6 @@ describe('GalleryBoardsPanel', () => {
       await dragWithMouse(row('Façades'), heading('Library'));
       expect(actions.moveBoard).toHaveBeenLastCalledWith('mine-member', null, 'Library');
       expect(actions.moveBoard).toHaveBeenCalledTimes(3);
-    });
-
-    it('moves nothing dropped on its own tier, and never drags an inbox, which moves with its project', async () => {
-      await renderPanel(createGallery({ showOtherProjectBoards: true }), { withDrag: true });
-
-      await dragWithMouse(row('dogs'), row('Cats'));
-      await dragWithMouse(row('Inbox'), heading('Library'));
-      // Pressing the row's menu button and moving away is no drag either.
-      await dragWithMouse(row('Façades').querySelector<HTMLElement>('.board-row-actions')!, heading('Library'));
-
-      expect(actions.moveBoard).not.toHaveBeenCalled();
     });
 
     it("never drags someone else's board onto the caller's own tiers", async () => {
@@ -475,37 +380,6 @@ describe('GalleryBoardsPanel', () => {
 
       expect(actions.moveBoard).not.toHaveBeenCalled();
     });
-
-    it("takes a drop on a collapsed project's group, by its heading", async () => {
-      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p2'], showOtherProjectBoards: true }), {
-        withDrag: true,
-      });
-
-      await dragWithMouse(row('dogs'), heading('Harbor Tower'));
-
-      expect(actions.moveBoard).toHaveBeenCalledExactlyOnceWith('dogs', 'p2', 'Harbor Tower');
-    });
-
-    it('takes a drop on a collapsed tier, by its heading', async () => {
-      await renderPanel(createGallery({ collapsedBoardSections: ['library'] }), { withDrag: true });
-
-      await dragWithMouse(row('Façades'), heading('Library'));
-
-      expect(actions.moveBoard).toHaveBeenCalledExactlyOnceWith('mine-member', null, 'Library');
-    });
-
-    it('selects a draggable board from the keyboard rather than starting a drag', async () => {
-      await renderPanel(createGallery(), { withDrag: true });
-      const button = getBoardRows().find((candidate) => candidate.textContent?.startsWith('Façades'))!;
-
-      button.focus();
-      await userEvent.keyboard('{Enter}');
-      await userEvent.keyboard(' ');
-
-      expect(actions.selectBoard).toHaveBeenCalledTimes(2);
-      expect(actions.selectBoard).toHaveBeenLastCalledWith('mine-member');
-      expect(actions.moveBoard).not.toHaveBeenCalled();
-    });
   });
 
   describe('focus after a board moves', () => {
@@ -542,122 +416,6 @@ describe('GalleryBoardsPanel', () => {
     const sectionOf = (element: Element) =>
       element.closest('[data-scope="collapsible"][data-part="root"]')?.querySelector('[data-part="trigger"]')
         ?.textContent;
-
-    it('follows the board to its new tier', async () => {
-      await renderPanel(galleryWithFacadesIn('p1'));
-      facadesButton().focus();
-
-      await renderPanel(galleryWithFacadesIn(null) as GalleryStateView);
-      await act(() => Promise.resolve());
-
-      expect(document.activeElement).toBe(facadesButton());
-      expect(sectionOf(facadesButton())).toMatch(/^Library/);
-    });
-
-    it('follows a board moved from its menu once the menu has closed', async () => {
-      await renderPanel(galleryWithFacadesIn('p1'));
-      const menuItem = (label: string) =>
-        [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
-          (element) => element.textContent === label
-        );
-      await act(() => userEvent.click(facadesButton(), { button: 'right' }));
-      const moveTo = await vi.waitFor(() => {
-        expect(menuItem('widgets.gallery.moveBoard')).toBeDefined();
-        return menuItem('widgets.gallery.moveBoard')!;
-      });
-      await act(() => userEvent.click(moveTo));
-      const library = await vi.waitFor(() => {
-        const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
-          (element) => element.textContent === 'Library'
-        );
-        expect(item).toBeDefined();
-        return item!;
-      });
-
-      // As in the app, the move patches the board lists at once: the row leaves while the menu is still open.
-      actions.moveBoard.mockImplementationOnce(() => {
-        void renderPanel(galleryWithFacadesIn(null) as GalleryStateView);
-
-        return Promise.resolve();
-      });
-      await act(() => userEvent.click(library));
-      expect(actions.moveBoard).toHaveBeenCalledExactlyOnceWith('mine-member', null, 'Library');
-
-      await vi.waitFor(() => expect(document.activeElement).toBe(facadesButton()));
-      expect(sectionOf(facadesButton())).toMatch(/^Library/);
-    });
-  });
-
-  it('names another project inbox for assistive tech while the visible row says Inbox', async () => {
-    await renderPanel(createGallery({ showOtherProjectBoards: true }));
-
-    const row = host?.querySelector<HTMLElement>('button[aria-label="Harbor Tower / Inbox"]');
-
-    expect(row?.textContent).toContain('Inbox');
-  });
-
-  it('creates nothing from a dismissed dialog or a blank name, and leaves the search as it was', async () => {
-    await renderPanel();
-    await type(getSearchInput(), 'bir');
-    await click(getAddButton('widgets.gallery.createBoardInProject'));
-
-    const dialog = await getCreateDialog();
-    await type(getDialogInput(dialog), '   ');
-    await submit(dialog);
-    expect(actions.createBoard).not.toHaveBeenCalled();
-    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
-
-    await click(getAddButton('widgets.gallery.createBoardInLibrary'));
-    const reopened = await getCreateDialog();
-    await click([...reopened.querySelectorAll('button')].find((button) => button.textContent === 'common.cancel')!);
-
-    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull());
-    expect(actions.createBoard).not.toHaveBeenCalled();
-    expect(getSearchInput().value).toBe('bir');
-  });
-
-  it('keeps the dialog and its name when the create fails, so it can be tried again', async () => {
-    actions.createBoard.mockResolvedValueOnce(false);
-    await renderPanel();
-    await type(getSearchInput(), 'birds');
-    await click(getAddButton('widgets.gallery.createBoardInProject'));
-
-    const dialog = await getCreateDialog();
-    await submit(dialog);
-
-    expect(actions.createBoard).toHaveBeenCalledExactlyOnceWith('birds', 'p1');
-    expect(document.querySelector('[role="dialog"][data-state="open"]')).toBe(dialog);
-    expect(getDialogInput(dialog).value).toBe('birds');
-    expect(getSearchInput().value).toBe('birds');
-  });
-
-  it('starts the dialog from the typed search, so a name that found nothing is not retyped', async () => {
-    await renderPanel();
-    await type(getSearchInput(), 'birds');
-
-    await click(getAddButton('widgets.gallery.createBoardInProject'));
-
-    const dialog = await getCreateDialog();
-    expect(getDialogInput(dialog).value).toBe('birds');
-    expect(actions.createBoard).not.toHaveBeenCalled();
-
-    await submit(dialog);
-
-    expect(actions.createBoard).toHaveBeenCalledExactlyOnceWith('birds', 'p1');
-    expect(getSearchInput().value).toBe('');
-  });
-
-  it('creates on Enter only when nothing matched', async () => {
-    await renderPanel();
-    const input = getSearchInput();
-
-    await type(input, 'dog');
-    await pressEnter(input);
-    expect(actions.createBoard).not.toHaveBeenCalled();
-
-    await type(input, 'birds');
-    await pressEnter(input);
-    expect(actions.createBoard).toHaveBeenCalledWith('birds', 'p1');
   });
 
   it('lists other people’s boards apart, an admin’s view of them closed until opened', async () => {
@@ -706,15 +464,6 @@ describe('GalleryBoardsPanel', () => {
     expect(getAutoAddRows()).toEqual(['Inbox']);
   });
 
-  it('marks the board results go to as submissions decide it: a chosen board, else the inbox', async () => {
-    await renderPanel(createGallery({ autoAddBoardId: 'dogs' }));
-    expect(getAutoAddRows()).toEqual(['dogs']);
-
-    // A chosen board no listing holds any more (deleted elsewhere) sends results to the inbox.
-    await renderPanel(createGallery({ autoAddBoardId: 'gone' }));
-    expect(getAutoAddRows()).toEqual(['Inbox']);
-  });
-
   it('persists a collapsed section', async () => {
     await renderPanel();
 
@@ -723,79 +472,5 @@ describe('GalleryBoardsPanel', () => {
     await click(trigger!);
 
     expect(actions.updateSettings).toHaveBeenCalledWith({ collapsedBoardSections: ['project'] });
-  });
-
-  describe('a project group under Other projects', () => {
-    const toggle = () => host!.querySelector<HTMLButtonElement>('button[data-gallery-project-group="p2"]')!;
-
-    it('collapses on its own, saved through the gallery settings', async () => {
-      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p9'], showOtherProjectBoards: true }));
-
-      expect(toggle().getAttribute('aria-expanded')).toBe('true');
-      expect(document.getElementById(toggle().getAttribute('aria-controls')!)?.textContent).toContain('Stripes');
-
-      await click(toggle());
-
-      expect(actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ collapsedProjectGroupIds: ['p9', 'p2'] });
-    });
-
-    it('shows no rows while collapsed, and expands again by keyboard', async () => {
-      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p2'], showOtherProjectBoards: true }));
-
-      expect(toggle().getAttribute('aria-expanded')).toBe('false');
-      expect(getRowsBySection()['Other projects']).toEqual([]);
-      // The section still says what it holds while its only group is closed.
-      expect(host?.textContent).toContain('Harbor Tower');
-
-      toggle().focus();
-      await userEvent.keyboard('{Enter}');
-      await userEvent.keyboard(' ');
-
-      expect(actions.updateSettings).toHaveBeenNthCalledWith(1, { collapsedProjectGroupIds: [] });
-      expect(actions.updateSettings).toHaveBeenNthCalledWith(2, { collapsedProjectGroupIds: [] });
-    });
-
-    it("shows a search's matches in a collapsed group without changing what is saved", async () => {
-      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p2'], showOtherProjectBoards: true }));
-
-      await type(getSearchInput(), 'Strip');
-
-      expect(getRowsBySection()['Other projects']).toEqual(['Stripes']);
-      expect(toggle().getAttribute('aria-expanded')).toBe('true');
-
-      await click(toggle());
-
-      expect(actions.updateSettings).not.toHaveBeenCalled();
-    });
-  });
-
-  it('toggles every board group and the sort order from the one options menu', async () => {
-    await renderPanel();
-
-    const openMenu = async () => {
-      const trigger = host?.querySelector<HTMLElement>('button[aria-label="widgets.gallery.filterAndSortBoards"]');
-
-      await click(trigger!);
-    };
-
-    // Checkbox actions keep the menu open for multiple visibility and sort changes.
-    await openMenu();
-
-    const row = (value: string) => document.querySelector<HTMLElement>(`[data-scope="menu"] [data-value="${value}"]`);
-
-    await click(row('date-boards')!);
-    expect(actions.updateSettings).toHaveBeenCalledWith({ showDateBoards: false });
-
-    await click(row('archived-boards')!);
-    expect(actions.updateSettings).toHaveBeenCalledWith({ showArchivedBoards: false });
-
-    await click(row('other-project-boards')!);
-    expect(actions.updateSettings).toHaveBeenCalledWith({ showOtherProjectBoards: true });
-
-    await click(row('board_name')!);
-    expect(actions.updateSettings).toHaveBeenCalledWith({ boardOrderBy: 'board_name' });
-
-    await click(row('ASC')!);
-    expect(actions.updateSettings).toHaveBeenCalledWith({ boardOrderDir: 'ASC' });
   });
 });

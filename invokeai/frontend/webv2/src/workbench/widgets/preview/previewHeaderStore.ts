@@ -13,7 +13,6 @@ export interface PreviewZoomCommands {
   zoomTo: (actualZoom: number) => void;
 }
 
-/** What the header's zoom menu renders: the readout plus the commands. */
 export type PreviewZoomControls = PreviewZoomCommands & PreviewZoomReadout;
 
 /** What the loupe shows, as percents of the image's own pixels. */
@@ -28,11 +27,7 @@ export interface PreviewZoomReadout {
 /** Max zoom, as a fraction of the image's actual pixel size. */
 const MAX_ACTUAL_ZOOM = 8;
 
-/**
- * The zoom range, as fractions of the image's own pixels, for a fit showing it at `fitRatio`: never below the smaller
- * of fit and 100%, so an image the fit enlarges can still be seen at its own size, and never past `MAX_ACTUAL_ZOOM` or
- * fit, whichever is larger. The loupe enforces it; the zoom menu offers only presets inside it.
- */
+/** Zoom range in image pixels: from min(fit, 100%) up to max(`MAX_ACTUAL_ZOOM`, fit). */
 export const getActualZoomLimits = (fitRatio: number): { max: number; min: number } => ({
   max: Math.max(fitRatio, MAX_ACTUAL_ZOOM),
   min: Math.min(fitRatio, 1),
@@ -45,10 +40,7 @@ export interface PreviewItemPosition {
   selectedIndex: number;
 }
 
-/**
- * Publish singleton Preview selection/actions for external chrome without refetching. Clear on unmount or empty
- * selection so static chrome returns.
- */
+/** Singleton Preview selection for external chrome; cleared on unmount or empty selection. */
 export interface PreviewHeaderContext {
   /** The selected item with board/star context, ready for common actions. */
   actionItem: GalleryItem | null;
@@ -62,10 +54,7 @@ export interface PreviewHeaderContext {
   getRegion: (() => HTMLElement | null) | null;
   isVideoFrameCopyAvailable: boolean;
   itemName: string | null;
-  /**
-   * Open the view's shared image context menu from header actions at viewport coordinates; `housekeeping` leaves out
-   * what the header's Edit and Use menus already offer.
-   */
+  /** Opens the shared menu at viewport coordinates; `housekeeping` omits Edit and Use items. */
   openItemMenu: ((x: number, y: number, variant: ImageContextMenuVariant) => void) | null;
   position: PreviewItemPosition | null;
   /** Null unless the selection is an image the loupe can zoom. */

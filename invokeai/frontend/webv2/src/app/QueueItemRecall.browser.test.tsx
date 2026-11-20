@@ -9,8 +9,8 @@ import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { seedArchitectureCapabilities } from '@features/models/core/architectureCapabilities.testing';
 import { buildQueueItemOrigin } from '@features/queue/contracts';
 import { loadQueueWidgetImplementation } from '@features/queue/widget';
 import { accountLifecycle } from '@platform/state/accountLifecycle';

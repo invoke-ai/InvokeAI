@@ -38,6 +38,13 @@ No Python backend: `pnpm dev:mock` serves the app against the in-repo mock backe
 - Stop servers by PID (`ss -ltnp`), not `pkill -f`: its pattern can match the invoking shell. Restart after merges that add mock endpoints.
 - Provider/context error from a `?t=` module after source edits: full reload before calling it a product bug. HMR can split context modules.
 
+## Tests and comments
+
+The package keeps a lean suite and lets code speak for itself. These rules tighten the root standard.
+
+- Test each owner's core contract and its costliest failures: persisted-data compatibility, account/project isolation, security, destructive operations, recall contracts. Not every edge case, caller, past bug or layout detail. One test per behavior, at the cheapest level that proves it. Browser tests only for what needs a real browser: focus, pointer, storage, rendering. A marginal test is deleted, not kept just in case.
+- Names, types and structure carry meaning. Comment only what a reader would otherwise get wrong or undo: a hidden constraint, compatibility rule, backend/external parity, or workaround. One line where possible. No doc comments that restate a name or type, no test narration, no history.
+
 ## Performance and validation
 
 - Check rendering/subscriptions, galleries/lists, pointer handlers, Canvas resources, lazy loading, request scheduling. Use existing virtualization/lazy boundaries. Memoize only identified costs.
@@ -64,4 +71,4 @@ No Python backend: `pnpm dev:mock` serves the app against the in-repo mock backe
 
 Unit tests cache transformed modules between runs in ignored `node_modules/.vitest-cache`.
 
-Focused checks during development. `check:release` before code-milestone readiness: lint, all tests, architecture performance/build, project-file journeys, accessibility, three-engine lifecycle smoke. CI splits it between `lint:code` and `check:release:tests`; together they run each gate once. Routine browser performance checks take two resource observations per fixture; `test:performance:browser:profile` and baseline updates use full timing sampling. Docs-only changes: formatting and `node --test scripts/guidance-links.test.mjs` (Markdown links and anchors); no application tests. Architecture inventories and performance reports stay in ignored `artifacts/`, never committed.
+Focused checks during development. `check:release` before code-milestone readiness: lint, unit tests and fixtures, architecture performance/build, the Chromium browser suite, then project-file, accessibility and three-engine lifecycle journeys on the performance build. CI runs `lint:code` in the checks workflow and splits `check:release:tests` into parallel jobs (unit and fixtures, browser suite in shards, performance, journeys), each building what it needs; together they run each gate once, which [the workflow test](src/architecture/architectureWorkflow.test.ts) enforces. Routine browser performance checks take two resource observations per fixture; `test:performance:browser:profile` and baseline updates use full timing sampling. Docs-only changes: formatting and `node --test scripts/guidance-links.test.mjs` (Markdown links and anchors); no application tests. Performance reports and on-demand `pnpm architecture:inventory` output stay in ignored `artifacts/`, never committed.

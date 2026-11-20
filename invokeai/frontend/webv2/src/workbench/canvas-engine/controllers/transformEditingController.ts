@@ -126,7 +126,7 @@ export class TransformEditingController {
     const document = this.deps.getDocument();
     const leaf = lookupDocumentLeaf(document, layerId);
     const layer = leaf?.layer;
-    if (!document || !layer || !isLeafEditable(leaf) || !hittableLayerSize(layer, document)) {
+    if (!document || !layer || !this.deps.canEdit() || !isLeafEditable(leaf) || !hittableLayerSize(layer, document)) {
       return;
     }
     this.cancel();
@@ -137,11 +137,11 @@ export class TransformEditingController {
   }
 
   /**
-   * Opens a session on `layerId` now, whatever tool is active: selects it, enters the tool and opens the session
-   * even when transform is already active, cancelling a session on another layer. Every refusal is decided before
-   * the selection or tool changes. A leaf whose only content is a stroke persistence has not acknowledged yet (a new
-   * paint layer's first upload) has no persisted extent to frame, so the request waits in `pending` and the session
-   * opens once the bitmap lands.
+   * Opens a session on `layerId` now, whatever tool is active: selects it, enters the tool and opens the session even
+   * when transform is already active, cancelling a session on another layer. Every refusal is decided before the
+   * selection or tool changes. A leaf whose only content is a stroke persistence has not acknowledged yet (a new paint
+   * layer's first upload) has no persisted extent to frame, so the request waits in `pending` and the session opens
+   * once the bitmap lands.
    */
   request(layerId: string): BeginTransformResult {
     const document = this.deps.getDocument();
@@ -176,8 +176,8 @@ export class TransformEditingController {
   }
 
   /**
-   * Every document change settles a wait: the session opens once the layer's pixels are persisted, if it is still
-   * the selection, transform is the tool the user is on and no session opened meanwhile; otherwise the wait ends.
+   * Every document change settles a wait: the session opens once the layer's pixels are persisted, if it is still the
+   * selection, transform is the tool the user is on and no session opened meanwhile; otherwise the wait ends.
    */
   onDocumentChanged(): void {
     if (this.processing) {
@@ -316,7 +316,7 @@ export class TransformEditingController {
       !document ||
       !layer ||
       !size ||
-      !isRenderableLayer(layer) ||
+      (layer.type !== 'vector' && !isRenderableLayer(layer)) ||
       !isLeafEditable(lookupDocumentLeaf(document, session.layerId)) ||
       unchanged(session.transform, session.startTransform)
     ) {
@@ -346,6 +346,7 @@ export class TransformEditingController {
     const source = layer.type === 'raster' || layer.type === 'control' ? layer.source : null;
     // A mask keeps its transform like an image, so its coverage is resampled only when composited, never baked.
     if (
+      layer.type === 'vector' ||
       isMaskLayer(layer) ||
       source?.type === 'image' ||
       source?.type === 'shape' ||

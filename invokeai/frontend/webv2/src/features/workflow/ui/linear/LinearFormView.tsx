@@ -11,8 +11,8 @@ import { LinkifiedText } from './LinkifiedText';
 import { NodeFieldControl } from './NodeFieldControl';
 
 /**
- * The form reads like the Generate and Upscale sections: a heading is a section title, and a hairline that runs edge
- * to edge starts a section. Only root elements bleed; inside a container a line stays within its column.
+ * The form reads like the Generate and Upscale sections: a heading is a section title, and a hairline that runs edge to
+ * edge starts a section. Only root elements bleed; inside a container a line stays within its column.
  */
 const ROOT_INSET = '3';
 const ROOT_HEADING_STYLES = {

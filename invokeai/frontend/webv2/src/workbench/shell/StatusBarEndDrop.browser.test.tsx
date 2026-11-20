@@ -17,7 +17,6 @@ import { PrimaryMouseSensor } from './holdToDragSensor';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// Active, as during a real drag — the drop overlay renders over the strip.
 const DROP_STATE = { helperText: 'Drop here', isActive: true, isAllowed: true };
 const MODIFIERS = [restrictToWindowEdges];
 const SORTABLE_IDS = ['alpha', 'beta'];
@@ -52,7 +51,6 @@ const Harness = ({
   onDragOver: (id: string) => void;
   onDragStart: () => void;
 }) => {
-  // The shell's mouse sensor (holdToDragSensor.ts), same activation.
   const sensors = useSensors(useSensor(PrimaryMouseSensor, { activationConstraint: { distance: 6 } }));
   const handleDragOver = useCallback(
     (event: DragOverEvent) => onDragOver(String(event.over?.id ?? 'none')),
@@ -135,9 +133,8 @@ describe('status bar end-zone drop (real dnd pipeline)', () => {
     const chip = host.querySelector<HTMLElement>('[data-chip="alpha"]')!;
     const zone = host.querySelector<HTMLElement>('[data-endzone]')!;
 
-    // Deliberately OUTSIDE act(): wrapping the gesture starves dnd-kit's
-    // effect-driven onDragOver/onDragEnd and reproduces the exact silent
-    // failure this test exists to catch.
+    // Deliberately OUTSIDE act(): wrapping the gesture starves dnd-kit's effect-driven onDragOver/onDragEnd and
+    // reproduces the exact silent failure this test exists to catch.
     await userEvent.dragAndDrop(chip, zone);
 
     const startedAt = Date.now();
