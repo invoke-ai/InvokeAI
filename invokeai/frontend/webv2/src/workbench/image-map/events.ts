@@ -6,8 +6,8 @@ export interface ImageIndexStatusEvent {
   embedded: number;
   pending: number;
   /**
-   * Failed embeddings are excluded from pending, explaining settled totals above embedded counts. Optional for
-   * older servers; default zero.
+   * Failed embeddings are excluded from pending, explaining settled totals above embedded counts. Optional for older
+   * servers; default zero.
    */
   failed?: number;
 }

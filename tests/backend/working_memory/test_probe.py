@@ -120,7 +120,7 @@ class FakeDevice:
     def before_empty_cache(self) -> None:
         pass
 
-    def after_empty_cache(self) -> None:
+    def after_empty_cache(self, released: bool) -> None:
         self.releases += 1
         if self.releases == self.fail_on_release:
             raise RuntimeError("the device context is sick")
@@ -907,6 +907,36 @@ def test_an_empty_cache_inside_a_window_ends_a_segment_so_the_driver_peak_is_kep
     assert window.driver is not None and window.driver.delta == 3 * GIB
     assert window.reserved is not None and window.reserved.delta == 3 * GIB
     assert window.segments == 2
+
+
+def test_a_release_the_backend_refuses_inside_a_window_is_not_a_segment_boundary(
+    device: FakeDevice, monkeypatch: pytest.MonkeyPatch
+):
+    """An advisory release that fails (`TorchDevice.empty_cache` reports REFUSED) returned nothing, so the segment and
+    its peaks run on; the next release that works ends the window's first segment."""
+    refusing = False
+
+    def empty_cache() -> None:
+        if refusing:
+            raise torch.OutOfMemoryError("CUDA out of memory while releasing")
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "empty_cache", empty_cache)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(devices, "_xpu_is_available", lambda: False)
+    cache = FakeCache(device)
+
+    with _scope() as scope:
+        with _model(cache, "vae").model_on_device(working_memory=_estimate()):
+            device.alloc(3 * GIB)
+            device.free(3 * GIB)
+            refusing = True  # the window opened its own baseline release already
+            assert TorchDevice.empty_cache() is devices.EmptyCacheOutcome.REFUSED
+            refusing = False
+            assert TorchDevice.empty_cache() is devices.EmptyCacheOutcome.RAN
+
+    (window,) = scope.windows
+    assert window.segments == 2, "the release that worked and the end of the window; not the refused one"
 
 
 def test_an_allocated_peak_above_the_reserved_peak_decides_the_demand(device: FakeDevice):

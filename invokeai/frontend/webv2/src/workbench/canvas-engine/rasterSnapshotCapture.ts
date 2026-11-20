@@ -55,8 +55,8 @@ export interface RasterSnapshotCapture {
  * Document snapshots clone structure and privately record canvas identity, raster epoch and lifecycle/document
  * generations. WeakMap membership distinguishes foreign from stale snapshots.
  *
- * Raster capture checks currency before/after every layer and all guards before publication, rejecting mixed
- * revisions. Reserve estimated bytes upfront and top up larger actual surfaces before exceeding budget.
+ * Raster capture checks currency before/after every layer and all guards before publication, rejecting mixed revisions.
+ * Reserve estimated bytes upfront and top up larger actual surfaces before exceeding budget.
  */
 export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDeps): RasterSnapshotCapture => {
   const { isGuardCurrent, memory } = deps;
@@ -181,8 +181,8 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
             }
           );
           const actualBytes = rectBytes(rect);
-          // The up-front reservation was an estimate from the source; a surface
-          // that rasterized larger has to be paid for before it is detached.
+          // The up-front reservation was an estimate from the source; a surface that rasterized larger has to be paid
+          // for before it is detached.
           const additionalBytes = Math.max(0, actualBytes - estimatedBytes.get(layerId)!);
           if (additionalBytes > 0) {
             const additional = reserveBytes(additionalBytes, captureLifecycleGeneration);
@@ -207,14 +207,14 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
           live.release();
         }
       }
-      // One last check across the whole capture: an edit part-way through leaves
-      // earlier layers describing a document the later ones no longer match.
+      // One last check across the whole capture: an edit part-way through leaves earlier layers describing a document
+      // the later ones no longer match.
       if (!isDocumentSnapshotCurrent(documentSnapshot) || capturedGuards.some((guard) => !isGuardCurrent(guard))) {
         return { status: 'stale' };
       }
 
-      // The reservations covered the capture; the published snapshot is tracked
-      // as detached bytes instead, for as long as the caller holds it.
+      // The reservations covered the capture; the published snapshot is tracked as detached bytes instead, for as long
+      // as the caller holds it.
       for (const lease of reservationLeases) {
         lease.release();
       }

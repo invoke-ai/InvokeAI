@@ -151,8 +151,8 @@ export class RasterController {
   }
 
   /**
-   * Reclaims, in order, derived and group artifacts the frame did not use, then unprotected base caches outside
-   * the working set. Whatever the working set still needs stays resident as reported overage.
+   * Reclaims, in order, derived and group artifacts the frame did not use, then unprotected base caches outside the
+   * working set. Whatever the working set still needs stays resident as reported overage.
    */
   enforceBudget(workingSetLayerIds: ReadonlySet<string>, usage: RasterFrameUsage): RasterBudgetResult {
     const excess = (): number => this.memory.snapshot().overageBytes;

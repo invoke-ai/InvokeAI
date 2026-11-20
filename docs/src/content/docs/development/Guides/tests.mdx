@@ -74,39 +74,7 @@ Most backend tests live in the [`tests/`](https://github.com/invoke-ai/InvokeAI/
 
 ### Tests that depend on models
 
-There are a few things to keep in mind when adding tests that depend on models.
-
-1. If a required model is not already present, it should automatically be downloaded as part of the test setup.
-2. If a model is already downloaded, it should not be re-downloaded unnecessarily.
-3. Take reasonable care to keep the total number of models required for the tests low. Whenever possible, re-use models that are already required for other tests. If you are adding a new model, consider including a comment to explain why it is required/unique.
-
-There are several utilities to help with model setup for tests. Here is a sample test that depends on a model:
-
-```python
-import pytest
-import torch
-
-from invokeai.backend.model_management.models.base import BaseModelType, ModelType
-from invokeai.backend.util.test_utils import install_and_load_model
-
-@pytest.mark.slow
-def test_model(model_installer, torch_device):
-    model_info = install_and_load_model(
-        model_installer=model_installer,
-        model_path_id_or_url="HF/dummy_model_id",
-        model_name="dummy_model",
-        base_model=BaseModelType.StableDiffusion1,
-        model_type=ModelType.Dummy,
-    )
-
-    dummy_input = build_dummy_input(torch_device)
-
-    with torch.no_grad(), model_info as model:
-        model.to(torch_device, dtype=torch.float32)
-        output = model(dummy_input)
-
-    # Validate output...
-```
+Tests do not download models routinely, and there is no shared helper that installs one. Prefer small CPU fixtures built in the test. A test that needs a real model must be marked `slow` (excluded by default and in CI) and must not download large models unless it is run on purpose. Keep the total number of models the slow tests need low, re-use models other tests already need, and comment why a new one is required.
 
 ### Test Coverage
 

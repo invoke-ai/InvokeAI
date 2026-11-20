@@ -100,7 +100,6 @@ it('groups affected layers, keeps a warning after dismissal, and reopens recover
   await expect.element(page.getByRole('dialog')).toBeVisible();
 });
 
-/** Every frame recovery showed while closing must still show its row, so it animated out whole. */
 const expectRowWhileClosing = (frames: readonly DialogExitFrame[]) => {
   const closing = closingFrames(frames);
   expect(closing).not.toHaveLength(0);

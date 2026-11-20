@@ -18,18 +18,22 @@ export const MaintenanceMenu = () => {
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
   const syncDialog = useExitPresence(isSyncDialogOpen);
   const [isEmptyCacheConfirmOpen, setIsEmptyCacheConfirmOpen] = useState(false);
-  // Separate instances: run ignores re-entry, and a slow cache emptying must
-  // not swallow a refresh (or vice versa).
+  // Separate instances: run ignores re-entry, and a slow cache emptying must not swallow a refresh (or vice versa).
   const { run: runEmptyCache } = useScopedAction();
   const { run: runRefresh } = useScopedAction();
 
   const handleEmptyCache = () =>
     runEmptyCache(
       async (owner) => {
-        await emptyModelCache(owner.signal);
+        const { vram_release_refused } = await emptyModelCache(owner.signal);
 
         assertAccountScopeCurrent(owner);
-        notify.success(t('models.cacheEmptied'));
+
+        if (vram_release_refused) {
+          notify.error(t('models.vramNotReleased'), t('models.vramNotReleasedDescription'));
+        } else {
+          notify.success(t('models.cacheEmptied'));
+        }
       },
       (message) => notify.error(t('models.failedToEmptyCache'), message)
     );
@@ -40,9 +44,8 @@ export const MaintenanceMenu = () => {
         await refreshModels(owner);
 
         assertAccountScopeCurrent(owner);
-        // refreshModels records failures in the snapshot instead of
-        // rejecting (background refreshes stay silent by design); an
-        // explicit user refresh still deserves a failure toast.
+        // refreshModels records failures in the snapshot instead of rejecting (background refreshes stay silent by
+        // design); an explicit user refresh still deserves a failure toast.
         const { error } = getModelsSnapshot();
 
         if (error !== null) {

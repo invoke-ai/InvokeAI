@@ -1,9 +1,9 @@
-import type { ArchitectureCapabilitiesRow } from '@features/generation/core/architectureCapabilities';
+import type { ArchitectureCapabilitiesRow } from '@features/models/architectures';
 import type { CanvasControlLayerContract } from '@workbench/canvas-engine/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
-import { ensureArchitectureCapabilitiesLoaded } from '@features/generation/data/architectureCapabilitiesStore';
+import { ensureArchitectureCapabilitiesLoaded } from '@features/models/architecturesStore';
+import { architectureCapabilitiesFixture } from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
@@ -17,8 +17,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ControlLayerStatusIcon } from './ControlLayerStatusIcon';
 
-// Stable identities, as the real stores hand out: a fresh array or model per render would change an
-// input React Compiler memoises on, and re-read the table by accident rather than by subscription.
+// Stable identities, as the real stores hand out: a fresh array or model per render would change an input React
+// Compiler memoises on, and re-read the table by accident rather than by subscription.
 const catalog = vi.hoisted(() => ({
   mainModel: { base: 'sd-1', key: 'sd1-main', name: 'SD 1.5', type: 'main' },
   models: [
@@ -35,7 +35,7 @@ vi.mock('@features/models', async (importOriginal) => ({
 vi.mock('./useSelectedMainModel', () => ({ useSelectedMainModel: () => catalog.mainModel }));
 
 const getArchitectureCapabilities = vi.fn<() => Promise<ArchitectureCapabilitiesRow[]>>();
-vi.mock('@features/generation/data/architectureCapabilitiesApi', () => ({
+vi.mock('@features/models/data/architectureCapabilitiesApi', () => ({
   getArchitectureCapabilities: () => getArchitectureCapabilities(),
 }));
 
@@ -64,7 +64,6 @@ const layer = {
   type: 'control',
 } as unknown as CanvasControlLayerContract;
 
-/** Typed Depth with a detector whose map has not been produced yet: the map is stale. */
 const pendingDepthLayer = {
   ...layer,
   adapter: { ...layer.adapter, model: 'sd1-depth' },
@@ -114,13 +113,11 @@ afterEach(async () => {
   getArchitectureCapabilities.mockReset();
   statuses.clear();
   i18n.removeResourceBundle('en', 'translation');
-  // Returns the capability store and the core registry to their unloaded state between tests.
   accountLifecycle.invalidate();
 });
 
 describe('ControlLayerStatusIcon and the capability table', () => {
   it('flags nothing about a valid adapter while the table is still loading', async () => {
-    // Missing capabilities must not label a valid adapter unsupported.
     await render();
 
     expect(warning()).toBeNull();
@@ -148,7 +145,6 @@ describe('ControlLayerStatusIcon detection and new reasons', () => {
     await settle(ensureArchitectureCapabilitiesLoaded);
     await render(pendingDepthLayer);
 
-    // A stale map blocks Invoke, so the row says so until detection catches up.
     expect(warning()?.getAttribute('aria-label')).toContain('widgets.layers.control.validation.detection_pending');
 
     await settle(() =>
@@ -181,7 +177,6 @@ describe('ControlLayerStatusIcon detection and new reasons', () => {
 
     expect(warning()).toBeNull();
     expect(host!.querySelector('.chakra-spinner')).not.toBeNull();
-    // The queued status names no detector; the label uses the one the layer asks for, and does not claim it runs.
     expect(host!.textContent).toBe('Waiting to run Depth Anything…');
   });
 });

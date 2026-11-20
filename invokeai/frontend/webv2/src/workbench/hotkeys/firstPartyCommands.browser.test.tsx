@@ -1,13 +1,13 @@
 import type { GalleryImage, GalleryVideoItem } from '@features/gallery';
 import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type { ModelConfig } from '@features/models';
-import type { ControlLayerRejection } from '@workbench/widgets/canvas/invoke/prepareCanvasInvocation';
+import type { CanvasInvocationFailure } from '@workbench/widgets/canvas/invoke/canvasInvocationFailure';
 
-import { setArchitectureCapabilities } from '@features/generation/core/architectureCapabilities';
+import { setArchitectureCapabilities } from '@features/models/core/architectureCapabilities';
 import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
-} from '@features/generation/core/architectureCapabilities.testing';
+} from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient } from '@tanstack/react-query';
 import { FocusRegionProvider } from '@workbench/focusRegions';
@@ -22,12 +22,13 @@ import { useRegisterFirstPartyCommands } from './firstPartyCommands';
 
 const handlers = vi.hoisted(() => new Map<string, () => unknown>());
 const submitActiveInvocation = vi.hoisted(() =>
-  vi.fn<(args: { formatControlLayerError: (rejection: ControlLayerRejection) => string }) => Promise<void>>(() =>
-    Promise.resolve()
-  )
+  vi.fn<
+    (args: {
+      formatCanvasInvocationFailure: (failure: CanvasInvocationFailure) => { message: string; title: string };
+    }) => Promise<void>
+  >(() => Promise.resolve())
 );
 
-// Generate values live in one mutable project so recall commits and typed edits land where the next read sees them.
 const workbench = vi.hoisted(() => ({
   commands: { layout: {}, notifications: {}, queue: {}, widgets: {} } as Record<string, unknown>,
   generateValues: {} as Record<string, unknown>,
@@ -52,7 +53,6 @@ vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
   getGalleryImageMetadata: recallFixtures.metadata,
   getGalleryVideoMetadata: recallFixtures.videoMetadata,
 }));
-// Partial: the video recall loads through the image-actions entry, whose menus import the rest of this module.
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => {
   const getProject = () => ({
     id: 'project-1',
@@ -190,13 +190,11 @@ it('recalls from hotkeys on top of recalls and edits committed while the image r
   await act(async () => {
     recalls = [handlers.get('viewer.recallPrompts')?.(), handlers.get('viewer.recallSeed')?.()] as Promise<unknown>[];
     await vi.waitFor(() => expect(finishRead).toBeDefined());
-    // The second recall joins the shared read on a later turn.
     await new Promise<void>((resolve) => {
       setTimeout(resolve, 0);
     });
   });
   expect(recallFixtures.metadata).toHaveBeenCalledOnce();
-  // Typed while both recalls wait on the shared image record.
   workbench.generateValues = { ...workbench.generateValues, steps: 42 };
   await act(async () => {
     finishRead?.({ positive_prompt: 'recalled prompt', seed: 7 });
@@ -240,7 +238,6 @@ describe('viewer recall keys on a selected video', () => {
     const open = vi.fn();
 
     accountLifecycle.activate('hotkey-video-recall-account');
-    // Activation clears the seeded capabilities; seed them again for this account.
     setArchitectureCapabilities(architectureCapabilitiesFixture);
     recallFixtures.item = video;
     recallFixtures.models = [wanModel];
@@ -276,7 +273,6 @@ describe('viewer recall keys on a selected video', () => {
       expect.objectContaining({ positivePrompt: 'a fox running' }),
       'project-1'
     );
-    // Remix keeps the panel's seed.
     expect(patchValues.mock.calls[0]?.[1]).not.toMatchObject({ seed: 4321 });
     expect(open).toHaveBeenCalledWith(expect.objectContaining({ widgetId: 'video' }));
   });
@@ -295,9 +291,7 @@ describe('viewer recall keys on a selected video', () => {
     const sdxl = { ...wanModel, base: 'sdxl', format: 'checkpoint', key: 'sdxl-model', name: 'SDXL' } as ModelConfig;
 
     accountLifecycle.activate('hotkey-video-recall-account');
-    // Activation clears the seeded capabilities; seed them again for this account.
     setArchitectureCapabilities(architectureCapabilitiesFixture);
-    // A video item is selected too; the image answer wins, exactly as before videos were recalled.
     recallFixtures.item = video;
     recallFixtures.image = {
       boardId: 'none',
@@ -340,7 +334,7 @@ describe('viewer recall keys on a selected video', () => {
   });
 });
 
-it('words a blocked control layer from the locale when Invoke runs from its hotkey', async () => {
+it('words a blocked control layer and its notice title from the locale when Invoke runs from its hotkey', async () => {
   await renderCommands();
 
   await act(async () => {
@@ -348,7 +342,13 @@ it('words a blocked control layer from the locale when Invoke runs from its hotk
   });
 
   const [args] = submitActiveInvocation.mock.calls[0] ?? [];
-  expect(args?.formatControlLayerError({ code: 'switch_adapter_kind', layerName: 'Sketch' })).toBe(
-    'Control layer "Sketch": Choose a control type so a model for the selected main model can be picked.'
-  );
+  expect(
+    args?.formatCanvasInvocationFailure({
+      issue: { code: 'switch_adapter_kind', kind: 'control_layer', layerId: 'sketch', layerName: 'Sketch' },
+      kind: 'canvas_input',
+    })
+  ).toEqual({
+    message: 'Control layer "Sketch": Choose a control type so a model for the selected main model can be picked.',
+    title: 'Canvas generation failed',
+  });
 });

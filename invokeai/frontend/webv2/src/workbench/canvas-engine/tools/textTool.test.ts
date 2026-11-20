@@ -60,7 +60,6 @@ const createHarness = (doc: CanvasDocumentContractV3) => {
   const ctx = {
     cancelTextEdit,
     getDocument: () => doc,
-    // Missing caches force hit tests to use estimated text extent.
     layers: { get: () => undefined },
     openTextCreate,
     openTextEdit,
@@ -205,7 +204,6 @@ describe('text tool: teardown', () => {
     expect(tool.onKeyCommand?.(h.ctx, 'cancel')).toBe(true);
     expect(h.cancelTextEdit).toHaveBeenCalledTimes(1);
 
-    // Apply is a no-op here (React owns the live content/commit).
     tool.onKeyCommand?.(h.ctx, 'apply');
     expect(h.cancelTextEdit).toHaveBeenCalledTimes(1);
   });

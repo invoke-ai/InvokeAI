@@ -1,7 +1,7 @@
 ---
 title: FLUX.3
 description: Generate and edit images with FLUX.3 Image Klein (step-distilled) and Klein Base, including editing with up to ten reference images, LoRAs, layout boxes from Canvas regional guidance and the GGUF, single-file and quantized builds.
-lastUpdated: 2026-11-03
+lastUpdated: 2026-11-06
 sidebar:
   order: 6
 ---
@@ -15,8 +15,8 @@ and edits or combines up to ten reference images. InvokeAI supports both publish
   prompt. It is meant mainly for fine-tuning and LoRA training, but generates normally too.
 
 The variant is detected on install. A new FLUX.3 model starts with the defaults of its variant (steps, CFG,
-1024×1024); when you switch from one variant to the other, use **Reset all to model defaults** in the
-Generate panel header to take over the new defaults.
+1024×1024); when you switch from one variant to the other, use **Apply model defaults** in the
+Generate panel header's ↺ menu to take over the new defaults.
 
 ## License
 
@@ -118,6 +118,13 @@ extra pass over the weights on every load.
   installing it switches on, or with `fp8_compute`, the weights stay fp8; otherwise they are expanded to bf16 as the
   model loads.
 
+- **unsloth's FP8 build** (`flux-3-image-klein-FP8.safetensors`, Klein only) is fp8 with one scale per output row,
+  saved under Diffusers' key names, and behaves like fp8r: on a GPU with fp8 support it stays fp8 with FP8 Storage or
+  [`fp8_compute`](/configuration/optimization/fp8-compute/) (with `fp8_compute` on fp8 hardware the
+  matmul runs directly on the fp8 weights), and it is expanded to bf16 as the model loads otherwise. unsloth's INT8 build and other
+  torchao layouts, such as per-tensor or block-wise fp8, are refused at install with a message saying why. A
+  Diffusers-named file that is not a torchao export is not recognized.
+
 FP8 Storage does not apply to the int8 and nvfp4 builds: their quantized layers are smaller already, and the layers
 they keep in bf16 stay bf16. The Model Manager can still show the toggle as on for an nvfp4 build, because installing
 switches it on for any file holding fp8 numbers, and nvfp4's block scales are fp8. It has no effect there. Other
@@ -130,9 +137,9 @@ Add up to **ten** reference images on the Generate tab or the Canvas and describ
 model is needed. A single reference is used at up to 4 MP; with several, each is limited to 1 MP.
 
 FLUX.3 names its references in the prompt as `<ref_image_0>`, `<ref_image_1>` and so on, for example
-`The fox from <ref_image_0> sitting next to the fox from <ref_image_1>`. Each reference card shows its tag; click
-the tag to copy it. Only enabled cards with an image are numbered, so turning a card off renumbers the cards below
-it.
+`The fox from <ref_image_0> sitting next to the fox from <ref_image_1>`. Each reference row shows its tag; click
+the tag to copy it. Only enabled references with an image are numbered, so turning one off renumbers the ones below
+it. A reference's name is only a label: the tag follows its position.
 
 In the workflow editor, wrap each image in a **Kontext Conditioning - FLUX** node and connect them, or a collection
 of them, to the **Reference Images** input of **Denoise - FLUX.3**.
@@ -292,9 +299,9 @@ ComfyUI's w4a8 build and single files in fp8 scaled, nvfp4 or mxfp8 are refused 
 upsampler is not recognized; [Model Format Support](/users-guide/models/model-format-support/#text-llms) lists what
 loads.
 
-Before this release, InvokeAI did not install the upsampler as a Text LLM: the folder was not identified, and both
-ComfyUI single files, bf16 and int8, were identified as Qwen3.5 encoders. Use **Re-identify model** in the Model
-Manager on such an install.
+The two ComfyUI single files also serve as a Qwen3.5 9B encoder, so MOSS-Image's encoder picker lists them. MOSS-Image
+was trained on the stock encoder, so use Comfy-Org's MOSS-Image encoder file for it. An upsampler file installed as a
+Qwen3.5 Encoder also serves as a Text LLM once it is re-identified (**Re-identify** in the Model Manager).
 
 ## Prompt upsampler in generation
 

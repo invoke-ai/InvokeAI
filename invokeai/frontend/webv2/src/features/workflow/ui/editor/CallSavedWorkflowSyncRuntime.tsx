@@ -331,9 +331,8 @@ export const CallSavedWorkflowSyncRuntime = () => {
                 failedQuery?.state.data !== undefined && failedQuery.state.data !== null
               )
             ) {
-              // Keep the node blocked while stale data is being retried. This
-              // permits transient revalidation failures to recover without
-              // allowing a deleted child workflow to enqueue stale inputs.
+              // Keep the node blocked while stale data is being retried. This permits transient revalidation failures
+              // to recover without allowing a deleted child workflow to enqueue stale inputs.
               authorizeNodeRetry(node.id, workflowId);
             }
             setStatus(node.id, workflowId, 'error');

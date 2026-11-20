@@ -1,6 +1,6 @@
 /**
- * The workbench's size scales. `md` is the working size: a control or text that names no size renders dense enough
- * for the workbench, smaller names are for tight inline spots, and larger ones for roomier surfaces.
+ * The workbench's size scales. `md` is the working size: a control or text that names no size renders dense enough for
+ * the workbench, smaller names are for tight inline spots, and larger ones for roomier surfaces.
  */
 
 /** Control heights in px; button, input, select, and segment-group sizes of the same name align. */

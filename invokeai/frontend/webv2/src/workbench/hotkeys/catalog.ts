@@ -2,40 +2,29 @@ import type { HotkeyCategory, HotkeyDefinition, HotkeyScope } from './types';
 
 import { IS_MAC_OS } from './keys';
 
-/**
- * Every binding the app ships, so Hotkeys settings list each under its widget whether or not that widget is mounted.
- * A widget registers the same ids with the same defaults while it is mounted (parity tests hold them together); only
- * registered handlers intercept chords. App chords are global, other chords require widget focus, and editable fields
- * are excluded unless explicitly allowed. Overrides include print/search/settings, undo/redo, selection/clipboard, and
- * Canvas merge/deselect/invert; browser-reserved chords work only when delivered to the page.
- */
+/** Every shipped binding, listed in settings whether or not its widget is mounted; widgets register the same ids. */
 
 const categoryScopes = {
   app: { kind: 'global' },
   canvas: { kind: 'widget', typeIds: ['canvas'] },
   gallery: { kind: 'widget', typeIds: ['gallery'] },
+  queue: { kind: 'widget', typeIds: ['queue'] },
   viewer: { kind: 'widget', typeIds: ['preview'] },
   workflows: { kind: 'widget', typeIds: ['workflow'] },
 } as const satisfies Record<HotkeyCategory, HotkeyScope>;
 
-/**
- * Recall and workflow loading act on the gallery selection, which Preview shows, so they answer wherever the user
- * selects or views it: Gallery or Preview. Remix stays per widget because Gallery binds its own.
- */
+/** Recall and workflow loading act on the gallery selection, so they answer in both Gallery and Preview. */
 const selectedImageScope: HotkeyScope = { kind: 'widget', typeIds: ['preview', 'gallery'] };
 
-/**
- * Keep invocation shortcuts available inside text and numeric fields so prompt editing does not swallow
- * submission.
- */
+/** Keep invocation shortcuts available inside text and numeric fields so prompt editing does not swallow submission. */
 const editableAppHotkeys = new Set([
   'app.focusPrompt',
   'app.invoke',
   'app.invokeFront',
   'app.invokeToOtherDestination',
   'app.openProjectSwitcher',
-  // Settings is a global destination with no meaning inside a text field, so
-  // the caret's location should not decide whether it opens.
+  // Settings is a global destination with no meaning inside a text field, so the caret's location should not decide
+  // whether it opens.
   'app.openSettings',
   'app.promptHistoryNext',
   'app.promptHistoryPrev',
@@ -57,7 +46,11 @@ const hotkey = (
   category: HotkeyCategory,
   id: string,
   defaultKeys: string[],
-  { scope = categoryScopes[category], title = formatHotkeyTitle(id) }: { scope?: HotkeyScope; title?: string } = {}
+  {
+    ignoreRepeat,
+    scope = categoryScopes[category],
+    title = formatHotkeyTitle(id),
+  }: { ignoreRepeat?: boolean; scope?: HotkeyScope; title?: string } = {}
 ): HotkeyDefinition => {
   const commandId = `${category}.${id}`;
 
@@ -67,14 +60,15 @@ const hotkey = (
     commandId,
     defaultKeys,
     id: commandId,
+    ...(ignoreRepeat ? { ignoreRepeat } : {}),
     preventDefault: true,
     scope,
     title,
   };
 };
 
-// The palette must open while typing and toggle closed above its own modal
-// layer, so it opts into both editable and modal contexts.
+// The palette must open while typing and toggle closed above its own modal layer, so it opts into both editable and
+// modal contexts.
 export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
   allowInEditable: true,
   allowInModal: true,
@@ -87,21 +81,15 @@ export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
   title: 'Open Command Palette',
 };
 
-/**
- * Generation's `PromptTextarea` marks an editable prompt this way only while the selected model reads attention
- * syntax. Anywhere else Ctrl+Up/Down keeps its text-field meaning.
- */
+/** Set by `PromptTextarea` only while the model reads attention syntax; elsewhere Ctrl+Up/Down edits text. */
 const PROMPT_ATTENTION_TARGET_SELECTOR = 'textarea[data-prompt-attention-target="true"]:not([readonly])';
+
+/** The Queue marks a row this way while it offers recall, so its A key works there as in the Gallery. */
+const QUEUE_RECALL_ITEM_TARGET_SELECTOR = '[data-queue-recall-item], [data-queue-recall-item] *';
 
 export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
 
-/**
- * Region focus stays reachable from text fields, so its chord must be one no text field binds: Alt+Shift+Arrow,
- * except on macOS, where most modified arrows are taken. Option+Shift+Arrow selects by word or paragraph,
- * Control+Arrow and Control+Shift+Arrow belong to Mission Control (and never reach the page), Control+Option+Arrow
- * is VoiceOver's navigation chord, and Command+Option+Left/Right switch browser tabs. Control+Command+Arrow has no
- * stock macOS, browser, text-field or VoiceOver binding that we know of.
- */
+/** Reachable from text fields, so no text field may bind it; macOS reserves most other modified arrows. */
 export const getRegionFocusDefaultKey = (direction: RegionFocusDirection, isMacOs = IS_MAC_OS): string =>
   `${isMacOs ? 'mod+ctrl' : 'alt+shift'}+arrow${direction}`;
 
@@ -141,13 +129,18 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'selectEditPreset', ['alt+2']),
   hotkey('app', 'selectVideoPreset', ['alt+3']),
   hotkey('app', 'selectAutomatePreset', ['alt+4'], { title: 'Select Workflow Preset' }),
-  hotkey('app', 'cancelQueueItem', ['shift+x']),
-  hotkey('app', 'clearQueue', ['mod+shift+x'], { title: 'Cancel all queue items' }),
+  // Each press stops one item; holding the key must not walk down the queue.
+  hotkey('app', 'cancelQueueItem', ['shift+x'], { ignoreRepeat: true, title: 'Cancel current or next queue item' }),
+  hotkey('app', 'clearQueue', ['mod+shift+x'], { ignoreRepeat: true, title: 'Cancel all queue items' }),
   // The ids keep "Tab" so saved bindings survive; each opens a widget, wherever the layout keeps it.
   hotkey('app', 'selectGenerateTab', ['1'], { title: 'Open Generate' }),
   hotkey('app', 'selectCanvasTab', ['2'], { title: 'Open Canvas' }),
   hotkey('app', 'selectUpscalingTab', ['3'], { title: 'Open Upscale' }),
   hotkey('app', 'selectWorkflowsTab', ['4'], { title: 'Open Workflow editor' }),
+  hotkey('app', 'switchWorkflowView', ['shift+z'], {
+    scope: categoryScopes.workflows,
+    title: 'Switch workflow view',
+  }),
   hotkey('app', 'selectModelsTab', ['5'], { title: 'Open Model Manager' }),
   hotkey('app', 'selectQueueTab', ['6'], { title: 'Open Queue' }),
   hotkey('app', 'openWidgets', [], { title: 'Show widgets' }),
@@ -177,6 +170,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'tool.lasso', ['l'], { title: 'Select Lasso Tool' }),
   hotkey('canvas', 'tool.marquee', ['m'], { title: 'Select Marquee Tool' }),
   hotkey('canvas', 'tool.shape', ['u'], { title: 'Select Shape Tool' }),
+  hotkey('canvas', 'tool.spline', ['s'], { title: 'Select Spline Edit Tool' }),
   hotkey('canvas', 'tool.text', ['t'], { title: 'Select Text Tool' }),
   hotkey('canvas', 'tool.gradient', ['g'], { title: 'Select Gradient Tool' }),
   hotkey('canvas', 'tool.colorPicker', ['i'], { title: 'Select Color Picker' }),
@@ -237,13 +231,15 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('workflows', 'redo', ['mod+shift+z', 'mod+y']),
   hotkey('viewer', 'swapImages', ['c']),
   hotkey('viewer', 'nextComparisonMode', ['m']),
+  // Bound only while Select for compare waits for a second image or a comparison is open, so Esc is otherwise free.
+  hotkey('viewer', 'exitCompare', ['esc'], { title: 'Cancel or Exit Compare' }),
   hotkey('viewer', 'deleteImage', ['delete', 'backspace']),
   hotkey('viewer', 'loadWorkflow', ['w'], { scope: selectedImageScope }),
-  hotkey('viewer', 'recallAll', ['a'], { scope: selectedImageScope }),
-  hotkey('viewer', 'recallSeed', ['s'], { scope: selectedImageScope }),
-  hotkey('viewer', 'recallPrompts', ['p'], { scope: selectedImageScope }),
-  hotkey('viewer', 'remix', ['r']),
-  hotkey('viewer', 'useSize', ['d'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallAll', ['a'], { ignoreRepeat: true, scope: selectedImageScope }),
+  hotkey('viewer', 'recallSeed', ['s'], { ignoreRepeat: true, scope: selectedImageScope }),
+  hotkey('viewer', 'recallPrompts', ['p'], { ignoreRepeat: true, scope: selectedImageScope }),
+  hotkey('viewer', 'remix', ['r'], { ignoreRepeat: true }),
+  hotkey('viewer', 'useSize', ['d'], { ignoreRepeat: true, scope: selectedImageScope }),
   hotkey('viewer', 'toggleMetadata', ['i'], { title: 'Toggle Details' }),
   // Preview registers these while it shows an item; the arrows step saved items outside comparison.
   hotkey('viewer', 'toggleFilmstrip', ['t']),
@@ -252,8 +248,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('viewer', 'zoomToActual', ['1'], { title: 'Zoom to Actual Size' }),
   hotkey('viewer', 'zoomToFit', ['f'], { title: 'Zoom to Fit' }),
   hotkey('gallery', 'selectAllOnPage', ['mod+a']),
-  // No default key: Esc in the Gallery is left to Preview interactions, and the Preview label's clear button
-  // deselects. Users can still assign one.
+  // No default key: Esc in the Gallery is left to Preview interactions, and the Preview label's clear button deselects.
   hotkey('gallery', 'clearSelection', []),
   hotkey('gallery', 'galleryNavUp', ['up']),
   hotkey('gallery', 'galleryNavRight', ['right']),
@@ -263,9 +258,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('gallery', 'galleryNavRightAlt', ['alt+right']),
   hotkey('gallery', 'galleryNavDownAlt', ['alt+down']),
   hotkey('gallery', 'galleryNavLeftAlt', ['alt+left']),
-  // Shift extends the selection; Ctrl (Cmd on macOS) moves focus alone. Toggling the focused item has no default
-  // key: Cmd+Space is Spotlight on macOS, and Ctrl+Space already toggles by activating the focused thumbnail as a
-  // Ctrl+click. Ctrl+Enter is not used: it invokes from anywhere, the gallery included.
+  // Shift extends the selection; Ctrl (Cmd on macOS) moves focus alone.
   hotkey('gallery', 'extendSelectionUp', ['shift+up']),
   hotkey('gallery', 'extendSelectionRight', ['shift+right']),
   hotkey('gallery', 'extendSelectionDown', ['shift+down']),
@@ -276,7 +269,10 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('gallery', 'moveFocusLeft', ['mod+left']),
   hotkey('gallery', 'toggleFocusedInSelection', []),
   hotkey('gallery', 'deleteSelection', ['delete', 'backspace']),
-  hotkey('gallery', 'remix', ['r']),
+  hotkey('gallery', 'remix', ['r'], { ignoreRepeat: true }),
   hotkey('gallery', 'starImage', ['.']),
+  // Preview's compare Esc, answered where its second image is picked.
+  hotkey('gallery', 'exitCompare', ['esc'], { title: 'Cancel or Exit Compare' }),
   hotkey('gallery', 'toggleStarredOnly', []),
+  { ...hotkey('queue', 'recallAll', ['a'], { ignoreRepeat: true }), targetSelector: QUEUE_RECALL_ITEM_TARGET_SELECTOR },
 ];

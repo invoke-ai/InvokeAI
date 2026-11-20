@@ -30,10 +30,7 @@ const VIEW_ICON: Record<ProjectsViewId, typeof LayoutGridIcon> = {
   list: ListIcon,
 };
 
-/**
- * Attach the tooltip to the icon to preserve the item's checked data-state; drive it from hidden-radio focus for
- * keyboard access.
- */
+/** Tooltip on the icon so the item keeps its checked data-state; hidden-radio focus drives it. */
 const ViewSegment = ({ id }: { id: ProjectsViewId }) => {
   const { t } = useTranslation();
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
@@ -133,7 +130,7 @@ export const ProjectsToolbar = ({
                 </Menu.ItemGroupLabel>
                 {PROJECT_SORT_IDS.map((id) => (
                   <Menu.Item key={id} value={id}>
-                    <Icon as={CheckIcon} boxSize="3.5" opacity={id === sort ? 1 : 0} />
+                    <Icon as={CheckIcon} boxSize="3.5" color="fg" opacity={id === sort ? 1 : 0} />
                     <Menu.ItemText>{t(SORT_LABEL_KEY[id])}</Menu.ItemText>
                   </Menu.Item>
                 ))}

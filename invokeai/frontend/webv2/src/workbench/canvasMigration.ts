@@ -1,3 +1,4 @@
+import type { AutoSwitchMode } from '@features/queue/contracts';
 import type {
   CanvasDocumentContractV3,
   CanvasGroupContract,
@@ -165,8 +166,7 @@ const zControlAdapter = z
     model: z.string().nullable(),
     weight: zFiniteNumber,
   })
-  // The same bounds for every kind: the stored kind is advisory (the resolved kind governs in the panel, readiness
-  // validation and the graph), and a refusal here would reject the whole document.
+  // Same bounds for every kind: the stored kind is advisory, and a refusal here rejects the whole document.
   .refine(({ beginEndStepPct }) => isStorableControlStepRange(beginEndStepPct))
   .refine(({ weight }) => isStorableControlWeight(weight));
 const zMaskFill = z.object({
@@ -250,6 +250,41 @@ const zLayerBase = z.object({
 });
 const zCanvasLayer = z.discriminatedUnion('type', [
   zLayerBase.extend({
+    isHidden: z.boolean().optional(),
+    paths: z.array(
+      z.object({
+        id: z.string(),
+        name: z.string().nullable(),
+        isClosed: z.boolean(),
+        points: z.array(
+          z.object({
+            anchor: zCoordinate,
+            inHandle: zCoordinate.nullable(),
+            outHandle: zCoordinate.nullable(),
+            type: z.enum(['corner', 'smooth', 'symmetric']),
+          })
+        ),
+      })
+    ),
+    type: z.literal('vector'),
+    guideColor: z
+      .string()
+      .regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i)
+      .optional()
+      .catch(undefined),
+    fillColor: z
+      .string()
+      .regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i)
+      .optional()
+      .catch(undefined),
+    fillEnabled: z.boolean().optional().catch(undefined),
+    strokeColor: z.string().regex(/^#[0-9a-f]{6}([0-9a-f]{2})?$/i),
+    strokeWidth: z.number().int().min(1).max(600),
+    strokeEnabled: z.boolean().optional().catch(undefined),
+    traceTaperEnds: z.boolean().optional().catch(undefined),
+    traceTaper: z.number().int().min(1).max(500).optional().catch(undefined),
+  }),
+  zLayerBase.extend({
     // A pre-stack adjustments OBJECT is dropped rather than failing the document.
     adjustments: zAdjustments.optional().catch(undefined),
     inpaint: z
@@ -278,8 +313,7 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   zLayerBase.extend({
     autoNegative: z.boolean(),
     isHidden: z.boolean().optional(),
-    // A structurally broken layout role drops (the region reads as an object). A role this build does not know
-    // refuses the canvas instead: rewriting it as an object would replace the user's choice on the next autosave.
+    // A broken layout role drops; an unknown one refuses the canvas, since rewriting it would lose the user's choice.
     layout: z
       .object({ kind: z.string(), text: z.string().optional() })
       .optional()
@@ -308,11 +342,9 @@ const asPositiveNumber = (value: unknown, fallback: number): number => {
   return numeric > 0 ? numeric : fallback;
 };
 
-/** A positive whole-pixel dimension, shared by creation and every load path. */
 const asPositiveInteger = (value: unknown, fallback: number): number =>
   Math.max(1, Math.round(asPositiveNumber(value, fallback)));
 
-/** The canonical whole-pixel geometry for a live or persisted canvas document. */
 const normalizeCanvasDocumentGeometry = (rawWidth: unknown, rawHeight: unknown, rawBbox?: unknown) => {
   const width = asPositiveInteger(rawWidth, DEFAULT_CANVAS_DOCUMENT_WIDTH);
   const height = asPositiveInteger(rawHeight, DEFAULT_CANVAS_DOCUMENT_HEIGHT);
@@ -371,11 +403,7 @@ const createInitialInpaintMaskLayer = (): CanvasInpaintMaskLayerContract => ({
   type: 'inpaint_mask',
 });
 
-/**
- * A fresh canvas state for a newly created project: an empty document with one empty inpaint mask, ready for
- * inpainting. Nothing is selected, so the first brush stroke lands on a new paint layer, as the empty Layers panel
- * says; selecting the mask paints the area to inpaint.
- */
+/** Nothing is selected, so the first brush stroke lands on a new paint layer. */
 export const createNewCanvasState = (
   width = DEFAULT_CANVAS_DOCUMENT_WIDTH,
   height = DEFAULT_CANVAS_DOCUMENT_HEIGHT
@@ -446,7 +474,7 @@ const ownSchemaRequirement = (node: Record<string, unknown>): CanvasSchemaVersio
 
 /**
  * The newest schema a node or any descendant needs. v4: custom-font typography. v5: a noise or spatial adjustment,
- * enabled or not, which a v4 reader would drop. v6: a control layer carrying any derivation field.
+ * enabled or not, which a v4 reader would drop. v6: control derivation fields.
  */
 const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
   if (!isRecord(node)) {
@@ -464,15 +492,15 @@ const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
   return required;
 };
 
-/**
- * The schema a document is written as: the newest it already declares (adoption is sticky) or the newest its content
- * needs, so a build that cannot read that content refuses the document rather than dropping it on load.
- */
+/** Adoption is sticky, so a build that cannot read the content refuses the document rather than dropping it. */
 export const writableCanvasSchemaVersion = (
   declaredVersions: Iterable<unknown>,
   document: Pick<CanvasDocumentContractV3, 'stacks'>
 ): CanvasSchemaVersion => {
   let version = newestCanvasSchemaVersion(declaredVersions);
+  if (document.stacks.vector !== undefined) {
+    version = Math.max(version, 7) as CanvasSchemaVersion;
+  }
   for (const roots of Object.values(document.stacks)) {
     for (const root of roots) {
       if (version === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
@@ -496,14 +524,19 @@ export const placementToTransform = (
   y: placement.y,
 });
 
-const AUTO_SWITCH_MODES: CanvasStagingAreaContractV2['autoSwitchMode'][] = ['off', 'latest', 'progress'];
+type StagingAutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
+type IsSameUnion<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
-const asAutoSwitchMode = (value: unknown): CanvasStagingAreaContractV2['autoSwitchMode'] =>
-  AUTO_SWITCH_MODES.includes(value as CanvasStagingAreaContractV2['autoSwitchMode'])
-    ? (value as CanvasStagingAreaContractV2['autoSwitchMode'])
+/** Keyed by both unions so a mode added to either alone fails to compile, never resetting stored values to `off`. */
+const STAGING_AUTO_SWITCH_MODES: Readonly<
+  Record<StagingAutoSwitchMode, IsSameUnion<StagingAutoSwitchMode, AutoSwitchMode>>
+> = { latest: true, off: true, progress: true };
+
+const asAutoSwitchMode = (value: unknown): StagingAutoSwitchMode =>
+  typeof value === 'string' && Object.hasOwn(STAGING_AUTO_SWITCH_MODES, value)
+    ? (value as StagingAutoSwitchMode)
     : 'off';
 
-/** Fills the known optional defaults of a staging area. */
 const normalizeStagingArea = (rawCanvas: Record<string, unknown>): CanvasStagingAreaContractV2 => {
   const rawStagingArea = isRecord(rawCanvas.stagingArea) ? rawCanvas.stagingArea : {};
   const defaults = createDefaultStagingArea();
@@ -561,7 +594,6 @@ const unsupported = (scope: CanvasVersionScope, version: number): Refusal => ({
   version,
 });
 
-/** Refuses unsupported declared versions before anything is defaulted or parsed. */
 const checkVersion = (value: Record<string, unknown>, scope: CanvasVersionScope, path: string): Refusal | null => {
   const version = classifyVersion(value.version);
   switch (version.kind) {
@@ -604,7 +636,6 @@ interface ParseContext {
   count: number;
 }
 
-/** Fills the known optional defaults on a leaf, then validates it strictly. */
 const parseLeaf = (value: Record<string, unknown>, path: string, context: ParseContext): CanvasLayerContract | null => {
   let candidate: Record<string, unknown> = value;
   if (value.type === 'control') {
@@ -667,8 +698,7 @@ const parseNode = (value: unknown, path: string, depth: number, context: ParseCo
   if (context.stack === 'raster' || shell.data.isHidden === false) {
     delete shell.data.isHidden;
   }
-  // Overlay groups carry coverage, not color. Drop raster-only properties silently because diagnostics reject the
-  // whole document.
+  // Overlay groups carry coverage, not color: drop raster-only properties silently.
   if (context.stack !== 'raster') {
     delete shell.data.adjustments;
     delete shell.data.blendMode;
@@ -706,6 +736,9 @@ const parseStacks = (value: unknown, path: string): ParsedStacks => {
     }
   }
   for (const stack of LAYER_STACK_ORDER) {
+    if (stack === 'vector' && value.vector === undefined) {
+      continue;
+    }
     const roots = value[stack] === undefined ? [] : value[stack];
     if (!Array.isArray(roots)) {
       context.diagnostics.push({ message: `${stack} stack is not an array`, path: `${path}.${stack}` });
@@ -718,7 +751,6 @@ const parseStacks = (value: unknown, path: string): ParsedStacks => {
   return context.diagnostics.length > 0 ? { diagnostics: context.diagnostics } : { stacks };
 };
 
-/** Re-validates an in-memory document, filling known optional defaults; `null` when any node is invalid. */
 export const normalizeCanvasDocumentContract = (
   document: CanvasDocumentContractV3
 ): CanvasDocumentContractV3 | null => {
@@ -864,10 +896,7 @@ const loadCanvasStateStep = (canvas: unknown): LoadStep<CanvasStateContractV3> =
   };
 };
 
-/**
- * Check versions before defaulting: absent state is fresh, current state is validated, and other versions retain
- * raw payloads for recovery.
- */
+/** Other versions keep their raw payloads for recovery. */
 export const loadCanvasState = (canvas: unknown): CanvasLoadResult<CanvasStateContractV3> => {
   const step = loadCanvasStateStep(canvas);
   return step.status === 'loaded' ? step : { ...step, raw: canvas };

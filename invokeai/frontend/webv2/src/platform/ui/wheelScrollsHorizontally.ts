@@ -37,8 +37,8 @@ export const wheelScrollsHorizontally: RefCallback<HTMLElement> = (element) => {
 
 /**
  * Scroll `strip` for a wheel that landed on something laid over it, such as an overflow cue. A vertical wheel maps as
- * `wheelScrollsHorizontally` maps it; a horizontal one, which the browser cannot scroll natively from outside the strip,
- * moves it by its own delta. A strip whose content fits passes the wheel through.
+ * `wheelScrollsHorizontally` maps it; a horizontal one, which the browser cannot scroll natively from outside the
+ * strip, moves it by its own delta. A strip whose content fits passes the wheel through.
  */
 export const forwardWheelToStrip = (strip: HTMLElement, event: WheelEvent): void => {
   if (strip.scrollWidth <= strip.clientWidth || (event.deltaX === 0 && event.deltaY === 0)) {

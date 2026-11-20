@@ -80,7 +80,6 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
           return;
         }
 
-        // Report partial success so retries do not duplicate completed writes.
         const done = caught instanceof WildcardWriteError ? caught.done : 0;
 
         reportError(
@@ -110,7 +109,6 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
         const entries = planWildcardImport(parsed, catalog.wildcards);
         assertAccountScopeCurrent(owner);
 
-        // Import directly when file selection leaves no conflicts or other decisions.
         if (entries.every((entry) => entry.rejection === null && entry.conflictId === null)) {
           await applyImport(entries, {}, owner);
           return;

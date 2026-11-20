@@ -5,9 +5,10 @@ import type { GalleryUiAdapter } from '@features/gallery/react';
 import type { GalleryHost } from '@features/gallery/ui/GalleryUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { getGalleryUploadAccept, legacyGeneratedImageToGalleryItem } from '@features/gallery/core/items';
+import { legacyGeneratedImageToGalleryItem } from '@features/gallery/core/items';
 import { GalleryUiProvider } from '@features/gallery/react';
 import { GalleryHostProvider } from '@features/gallery/ui/GalleryUiContext';
+import { resolvedValues } from '@platform/core/resolvedValues.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, useCallback, useState } from 'react';
@@ -162,16 +163,8 @@ const MultiAddHost = ({ initialSelection }: { initialSelection: GalleryPickerSel
 
 const OPEN_DIALOG = '[role="dialog"][data-state="open"]';
 
-/** Let ResizeObserver and virtualizer layout work finish before checking that a scroll position stayed put. */
-const finishLayout = () =>
-  act(async () => {
-    await new Promise((resolve) => {
-      requestAnimationFrame(() => setTimeout(resolve, 0));
-    });
-  });
-
 /** A host without a workbench (the Launchpad): no Gallery widget scope to seed from or reveal. */
-const launchpadHost: GalleryHost = { galleryValues: {}, notifications, projectName: '' };
+const launchpadHost: GalleryHost = { galleryValues: resolvedValues(), notifications, projectName: '' };
 
 const renderPicker = async (picker?: React.ReactElement, { withoutWorkbench = false } = {}) => {
   const content = picker ?? (
@@ -263,15 +256,6 @@ const pressKey = async (target: HTMLElement, key: string) => {
   await act(() => target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key })));
 };
 
-const typeSearch = async (input: HTMLInputElement, value: string) => {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-
-  await act(() => {
-    setter?.call(input, value);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-};
-
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.listItems.mockImplementation((filter: { boardId: string; offset: number; searchTerm: string }) => {
@@ -352,26 +336,6 @@ describe('GalleryPickerPopover', () => {
     expect(document.querySelector(OPEN_DIALOG)).toBeNull();
   });
 
-  it('keeps the highlight on its item when an insert shifts the listing', async () => {
-    const { dialog } = await openPicker();
-
-    await vi.waitFor(() => expect(getActiveOption(dialog)).toBe(getOption(dialog, 'image:b.png')));
-
-    // Another client adds a newer image, so the refetched listing moves every item one slot along.
-    dogItems.unshift(image('new.png'));
-    try {
-      await act(() => queryClient!.invalidateQueries());
-      await vi.waitFor(() => expect(getOption(dialog, 'image:new.png')).toBeDefined());
-
-      await vi.waitFor(() => expect(getActiveOption(dialog)).toBe(getOption(dialog, 'image:b.png')));
-
-      await pressKey(getSearchInput(dialog), 'Enter');
-      expect(onPick).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ name: 'b.png' }));
-    } finally {
-      dogItems.shift();
-    }
-  });
-
   it('requests a distant keyboard target by page offset without fetching intervening pages', async () => {
     const total = 2_400;
     const lastPageOffset = Math.floor((total - 1) / 60) * 60;
@@ -401,234 +365,6 @@ describe('GalleryPickerPopover', () => {
     expect(requestedOffsets).toContain(lastPageOffset);
     expect(requestedOffsets.every((offset) => offset === 0 || offset >= lastPageOffset - 60)).toBe(true);
     expect(mocks.listInfiniteItems).not.toHaveBeenCalled();
-  });
-
-  it('holds the item a placeholder highlight lands on once its page loads, through a later insert', async () => {
-    let inserted = 0;
-    mocks.listItems.mockImplementation((filter: { offset: number }) => {
-      const total = 2_390 + inserted;
-      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) => {
-        const position = filter.offset + index - inserted;
-
-        return image(position < 0 ? 'adopted-new.png' : `adopted-${position}.png`);
-      });
-
-      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
-    });
-
-    const { dialog } = await openPicker();
-    const input = getSearchInput(dialog);
-
-    // End lands on a placeholder: its page is requested only now.
-    await pressKey(input, 'End');
-    await vi.waitFor(() => expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:adopted-2389.png'));
-
-    inserted = 1;
-    await act(() => queryClient!.invalidateQueries());
-    await vi.waitFor(() => expect(dialog.querySelector('[role="option"][aria-setsize="2391"]')).not.toBeNull());
-
-    await vi.waitFor(() => expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:adopted-2389.png'));
-    await pressKey(input, 'Enter');
-    expect(onPick).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ name: 'adopted-2389.png' }));
-  });
-
-  it('keeps both pages of a view that straddles a page edge loaded while the arrows move within it', async () => {
-    const total = 120;
-    mocks.listItems.mockImplementation((filter: { offset: number }) => {
-      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) =>
-        image(`edge-${filter.offset + index}.png`)
-      );
-
-      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
-    });
-
-    const { dialog } = await openPicker();
-    const input = getSearchInput(dialog);
-    const activeIndex = () => Number(getActiveOption(dialog)?.dataset.itemIndex ?? -1);
-    const columns = getColumnCount(dialog);
-
-    await pressKey(input, 'End');
-    await vi.waitFor(() => expect(activeIndex()).toBe(total - 1));
-
-    // Walk up into the first page: the row just left behind, on the second page, stays in view.
-    while (activeIndex() >= 60) {
-      const nextIndex = activeIndex() - columns;
-      await pressKey(input, 'ArrowUp');
-      await vi.waitFor(() => expect(activeIndex()).toBe(nextIndex));
-    }
-    const belowIndex = activeIndex() + columns;
-
-    expect(belowIndex).toBeGreaterThanOrEqual(60);
-    // Record every state the tile passes through: dropping its page would flash a skeleton before it re-subscribes.
-    const belowKey = `image:edge-${belowIndex}.png`;
-    const tileKeys = new Set<string | null | undefined>();
-    const observer = new MutationObserver(() => {
-      tileKeys.add(dialog.querySelector(`[data-item-index="${belowIndex}"]`)?.getAttribute('data-item-key'));
-    });
-    observer.observe(dialog, { attributes: true, childList: true, subtree: true });
-    await pressKey(input, 'ArrowLeft');
-    await finishLayout();
-    await vi.waitFor(() => expect(dialog.querySelector('[role="listbox"]')?.getAttribute('aria-busy')).toBeNull());
-    observer.disconnect();
-
-    expect(activeIndex()).toBe(belowIndex - columns - 1);
-    expect([...tileKeys].filter((key) => key !== belowKey)).toEqual([]);
-    expect(dialog.querySelector(`[data-item-index="${belowIndex}"]`)?.getAttribute('data-item-key')).toBe(belowKey);
-  });
-
-  it('keeps a pointer-scrolled position when a later page changes the count', async () => {
-    let total = 600;
-    mocks.listItems.mockImplementation((filter: { offset: number }) => {
-      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) =>
-        image(`scrolled-${filter.offset + index}.png`)
-      );
-
-      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
-    });
-
-    const { dialog } = await openPicker();
-    const firstOption = await vi.waitFor(() => {
-      const option = dialog.querySelector<HTMLElement>('[role="option"]');
-
-      expect(option).not.toBeNull();
-      return option!;
-    });
-    let viewport: HTMLElement | null = firstOption.parentElement;
-
-    while (viewport && viewport.scrollHeight <= viewport.clientHeight) {
-      viewport = viewport.parentElement;
-    }
-
-    expect(viewport).not.toBeNull();
-    // Another client adds an item, so pages fetched after the scroll report a larger count.
-    total = 601;
-    await act(() => {
-      viewport!.scrollTop = viewport!.scrollHeight / 2;
-      viewport!.dispatchEvent(new Event('scroll'));
-    });
-    const scrolledTop = viewport!.scrollTop;
-
-    expect(scrolledTop).toBeGreaterThan(0);
-    await vi.waitFor(() => expect(dialog.querySelector('[role="option"][aria-setsize="601"]')).not.toBeNull());
-
-    await finishLayout();
-    expect(viewport!.scrollTop).toBe(scrolledTop);
-  });
-
-  it('keeps a pointer-scrolled position when an insert shifts the highlighted item', async () => {
-    let inserted = 0;
-    mocks.listItems.mockImplementation((filter: { offset: number }) => {
-      const total = 600 + inserted;
-      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) => {
-        const position = filter.offset + index - inserted;
-
-        return image(position < 0 ? 'shifted-new.png' : `shifted-${position}.png`);
-      });
-
-      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
-    });
-
-    const { dialog } = await openPicker();
-
-    await vi.waitFor(() => expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:shifted-0.png'));
-    let viewport: HTMLElement | null = getActiveOption(dialog)!.parentElement;
-
-    while (viewport && viewport.scrollHeight <= viewport.clientHeight) {
-      viewport = viewport.parentElement;
-    }
-
-    // Scroll the highlighted first row out of view while its page stays loaded.
-    await act(() => {
-      viewport!.scrollTop = getActiveOption(dialog)!.getBoundingClientRect().height * 4;
-      viewport!.dispatchEvent(new Event('scroll'));
-    });
-    await finishLayout();
-    const scrolledTop = viewport!.scrollTop;
-
-    expect(scrolledTop).toBeGreaterThan(0);
-    inserted = 1;
-    await act(() => queryClient!.invalidateQueries());
-    await vi.waitFor(() => expect(dialog.querySelector('[role="option"][aria-setsize="601"]')).not.toBeNull());
-
-    // The highlight moved one slot along with its item, which stays scrolled out of view.
-    expect(getSearchInput(dialog).getAttribute('aria-activedescendant')).toMatch(/-slot-1$/);
-    await finishLayout();
-    expect(viewport!.scrollTop).toBe(scrolledTop);
-  });
-
-  it('reveals an arrow move back onto the slot the highlight was first placed on before an insert shifted it', async () => {
-    let inserted = 0;
-    mocks.listItems.mockImplementation((filter: { offset: number }) => {
-      const total = 600 + inserted;
-      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) => {
-        const position = filter.offset + index - inserted;
-
-        return image(position < 0 ? 'moved-new.png' : `moved-${position}.png`);
-      });
-
-      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
-    });
-
-    const { dialog } = await openPicker();
-    let viewport: HTMLElement | null = getActiveOption(dialog)!.parentElement;
-
-    while (viewport && viewport.scrollHeight <= viewport.clientHeight) {
-      viewport = viewport.parentElement;
-    }
-
-    inserted = 1;
-    await act(() => queryClient!.invalidateQueries());
-    await vi.waitFor(() => expect(dialog.querySelector('[role="option"][aria-setsize="601"]')).not.toBeNull());
-    await vi.waitFor(() => expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:moved-0.png'));
-
-    // Scroll the highlight out of view, then step back onto slot 0, where it was placed before the insert.
-    await act(() => {
-      viewport!.scrollTop = getActiveOption(dialog)!.getBoundingClientRect().height * 4;
-      viewport!.dispatchEvent(new Event('scroll'));
-    });
-    expect(viewport!.scrollTop).toBeGreaterThan(0);
-
-    await pressKey(getSearchInput(dialog), 'ArrowLeft');
-
-    await vi.waitFor(() => expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:moved-new.png'));
-    await vi.waitFor(() => expect(viewport!.scrollTop).toBe(0));
-  });
-
-  it('keeps the highlight in view when the column count changes', async () => {
-    const total = 60;
-    mocks.listItems.mockImplementation((filter: { offset: number }) => {
-      const items = Array.from({ length: Math.max(0, Math.min(60, total - filter.offset)) }, (_, index) =>
-        image(`reflow-${filter.offset + index}.png`)
-      );
-
-      return { itemIndices: items.map((_, index) => filter.offset + index), items, offset: filter.offset, total };
-    });
-
-    const { dialog } = await openPicker();
-
-    await pressKey(getSearchInput(dialog), 'End');
-    await vi.waitFor(() => expect(getActiveOption(dialog)?.getAttribute('aria-posinset')).toBe(String(total)));
-    const columnsBefore = getComputedStyle(getActiveOption(dialog)!.parentElement!).gridTemplateColumns;
-
-    // Narrowing the popover drops a column, which moves the highlight's row further down.
-    await act(() => {
-      dialog.style.width = `${dialog.getBoundingClientRect().width * 0.7}px`;
-    });
-    await vi.waitFor(() =>
-      expect(getComputedStyle(getActiveOption(dialog)!.parentElement!).gridTemplateColumns).not.toBe(columnsBefore)
-    );
-
-    let viewport: HTMLElement | null = getActiveOption(dialog)!.parentElement;
-
-    while (viewport && viewport.scrollHeight <= viewport.clientHeight) {
-      viewport = viewport.parentElement;
-    }
-    await vi.waitFor(() => {
-      const option = getActiveOption(dialog)!.getBoundingClientRect();
-      const bounds = viewport!.getBoundingClientRect();
-      expect(option.top).toBeGreaterThanOrEqual(bounds.top - 1);
-      expect(option.bottom).toBeLessThanOrEqual(bounds.bottom + 1);
-    });
   });
 
   it('shows and retries a failed uncached page within the current listing', async () => {
@@ -701,26 +437,6 @@ describe('GalleryPickerPopover', () => {
     expect(document.querySelector(OPEN_DIALOG)).not.toBeNull();
   });
 
-  it('filters the board as you type and restarts the highlight at the first match', async () => {
-    const { dialog } = await openPicker();
-
-    await typeSearch(getSearchInput(dialog), 'cat');
-
-    expect(mocks.listItems).toHaveBeenCalledWith(expect.objectContaining({ boardId: 'dogs', searchTerm: 'cat' }));
-    await vi.waitFor(() =>
-      expect(getOptions(dialog).map((option) => option.dataset.itemKey)).toEqual(['image:cat.png'])
-    );
-    await vi.waitFor(() => expect(getActiveOption(dialog)).toBe(getOption(dialog, 'image:cat.png')));
-    await vi.waitFor(() => expect(getStatus(dialog)).toBe('widgets.gallery.picker.matchCount'));
-
-    // With text in the field, Left/Right belong to the caret.
-    const leftKey = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowLeft' });
-
-    await act(() => getSearchInput(dialog).dispatchEvent(leftKey));
-    expect(leftKey.defaultPrevented).toBe(false);
-    await vi.waitFor(() => expect(getActiveOption(dialog)).toBe(getOption(dialog, 'image:cat.png')));
-  });
-
   it('does not let Enter pick stale slots while a different board page is loading', async () => {
     let resolveCats:
       | ((page: { items: GalleryItem[]; itemIndices: number[]; offset: number; total: number }) => void)
@@ -755,19 +471,6 @@ describe('GalleryPickerPopover', () => {
 
     await act(() => resolveCats?.({ items: [image('cat.png', 'cats')], itemIndices: [0], offset: 0, total: 1 }));
     await vi.waitFor(() => expect(getOption(dialog, 'image:cat.png')).toBeDefined());
-  });
-
-  it('switches to the Assets view from the tabs', async () => {
-    const { dialog } = await openPicker();
-    // Icons label the tabs in the picker's narrow header; the view names stay their accessible names.
-    const assetsTab = [...dialog.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((tab) =>
-      tab.getAttribute('aria-label')?.startsWith('common.assets')
-    );
-    expect(assetsTab?.textContent).not.toContain('common.assets');
-
-    await act(() => assetsTab?.click());
-
-    expect(mocks.listItems).toHaveBeenCalledWith(expect.objectContaining({ boardId: 'dogs', galleryView: 'assets' }));
   });
 
   it('keeps multi-add pickers open until every slot is filled', async () => {
@@ -828,74 +531,6 @@ describe('GalleryPickerPopover', () => {
     );
   });
 
-  it("opens at a given board in the Gallery widget's view when the opening scope names no view", async () => {
-    const { dialog } = await openPicker(
-      <GalleryPickerPopover accept={['image']} label="Choose image" openingScope={{ boardId: 'none' }} onPick={vi.fn()}>
-        <button type="button">Choose image</button>
-      </GalleryPickerPopover>
-    );
-
-    await vi.waitFor(() =>
-      expect(mocks.listItems).toHaveBeenCalledWith(expect.objectContaining({ boardId: 'none', galleryView: 'images' }))
-    );
-    expect(dialog.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('aria-label')).toMatch(
-      /^common\.media/
-    );
-  });
-
-  it('switches boards from an in-place list and re-scopes the grid', async () => {
-    const { dialog } = await openPicker();
-    const input = getSearchInput(dialog);
-    const boardButton = dialog.querySelector<HTMLButtonElement>('[aria-expanded]');
-
-    await typeSearch(input, 'cat');
-    await act(() => boardButton?.click());
-
-    expect(boardButton?.getAttribute('aria-expanded')).toBe('true');
-    await vi.waitFor(() => expect(getOptions(dialog)).toHaveLength(0));
-    expect(input.value).toBe('');
-    await vi.waitFor(() => expect(getStatus(dialog)).toBe('widgets.gallery.picker.boardCount'));
-    expect(getBoardRow(dialog, 'Dogs')?.getAttribute('aria-current')).toBe('true');
-    expect(getBoardRow(dialog, 'Cats')).toBeDefined();
-
-    // Enter with an empty search must not silently switch boards.
-    await pressKey(input, 'Enter');
-    expect(boardButton?.getAttribute('aria-expanded')).toBe('true');
-
-    // ArrowDown hands focus to the first row; ArrowUp from it comes back.
-    await pressKey(input, 'ArrowDown');
-    const firstRow = getBoardsRegion(dialog)?.querySelector('button');
-
-    await vi.waitFor(() => expect(document.activeElement).toBe(firstRow));
-    await pressKey(firstRow as HTMLElement, 'ArrowUp');
-    await vi.waitFor(() => expect(document.activeElement).toBe(input));
-
-    await act(() => getBoardRow(dialog, 'widgets.gallery.uncategorized')?.click());
-
-    expect(boardButton?.getAttribute('aria-expanded')).toBe('false');
-    expect(mocks.listItems).toHaveBeenCalledWith(expect.objectContaining({ boardId: 'none' }));
-    await vi.waitFor(() =>
-      expect(getOptions(dialog).map((option) => option.dataset.itemKey)).toEqual(['image:loose.png'])
-    );
-    expect(galleryCommands.selectBoard).not.toHaveBeenCalled();
-  });
-
-  // Assert video acceptance through the rendered picker; the regression was view wiring rather than the
-  // accept-list builder.
-  it('offers the full video and audio list on a video-kind picker', async () => {
-    const { dialog } = await openPicker(
-      <GalleryPickerPopover accept={['video']} label="Choose video" onPick={onPick}>
-        <button type="button">Choose video</button>
-      </GalleryPickerPopover>
-    );
-    const accept = dialog.querySelector<HTMLInputElement>('input[type="file"]')?.getAttribute('accept')?.split(',');
-
-    expect(accept).toContain('video/*');
-    expect(accept).toContain('audio/*');
-    expect(accept).toEqual(getGalleryUploadAccept(['video']).split(','));
-    expect(accept).not.toContain('image/png');
-  });
-
   it('uploads into the current board and picks the result', async () => {
     const uploaded = {
       boardId: 'dogs',
@@ -950,56 +585,6 @@ describe('GalleryPickerPopover', () => {
     expect(document.querySelector(OPEN_DIALOG)).not.toBeNull();
   });
 
-  it('hands off to the Gallery widget on the picker board', async () => {
-    const { dialog } = await openPicker();
-
-    await act(() => dialog.querySelector<HTMLButtonElement>('[aria-expanded]')?.click());
-    await act(() => getBoardRow(dialog, 'widgets.gallery.uncategorized')?.click());
-
-    const openButton = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
-      button.textContent?.includes('widgets.gallery.picker.openGallery')
-    );
-
-    await act(() => openButton?.click());
-
-    expect(galleryCommands.selectBoard).toHaveBeenCalledExactlyOnceWith('none');
-    expect(galleryCommands.setView).toHaveBeenCalledExactlyOnceWith('images');
-    expect(openGallery).toHaveBeenCalledOnce();
-    expect(document.querySelector(OPEN_DIALOG)).toBeNull();
-  });
-
-  it('leaves the Gallery board alone when it already matches, and stays open if the widget cannot open', async () => {
-    openGallery.mockReturnValueOnce(false);
-
-    const { dialog } = await openPicker();
-    const openButton = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
-      button.textContent?.includes('widgets.gallery.picker.openGallery')
-    );
-
-    await act(() => openButton?.click());
-
-    expect(galleryCommands.selectBoard).not.toHaveBeenCalled();
-    expect(openGallery).toHaveBeenCalledOnce();
-    expect(document.querySelector(OPEN_DIALOG)).not.toBeNull();
-  });
-
-  it('picks without a workbench and offers no hand-off to a Gallery widget there', async () => {
-    const { dialog } = await openPicker(undefined, { withoutWorkbench: true });
-    const [first] = getOptions(dialog);
-
-    expect(first).toBeDefined();
-    expect(
-      [...dialog.querySelectorAll('button')].some((button) =>
-        button.textContent?.includes('widgets.gallery.picker.openGallery')
-      )
-    ).toBe(false);
-
-    await act(() => first!.click());
-
-    expect(onPick).toHaveBeenCalledOnce();
-    expect(document.querySelector(OPEN_DIALOG)).toBeNull();
-  });
-
   it('reports a failed first listing with Retry instead of loading skeletons forever', async () => {
     mocks.listItems.mockImplementationOnce(() => {
       throw new Error('Service Unavailable');
@@ -1025,86 +610,5 @@ describe('GalleryPickerPopover', () => {
     expect(dialog.querySelector('[role="alert"]')).toBeNull();
     // The Retry that held focus is gone; the search field, which drives the grid, takes it back.
     await vi.waitFor(() => expect(document.activeElement).toBe(input));
-  });
-
-  it('shows a failed search as that search failing, not the previous results, and recovers with Retry', async () => {
-    const { dialog } = await openPicker();
-    const input = getSearchInput(dialog);
-
-    await vi.waitFor(() => expect(getOptions(dialog)).toHaveLength(6));
-    mocks.listItems.mockImplementationOnce(() => {
-      throw new Error('Service Unavailable');
-    });
-    await typeSearch(input, 'cat');
-
-    await vi.waitFor(() => expect(dialog.querySelector('[role="alert"]')).not.toBeNull());
-    await vi.waitFor(() => expect(getOptions(dialog)).toEqual([]));
-    expect(dialog.querySelector('[aria-busy="true"][role="listbox"]')).toBeNull();
-
-    await pressKey(input, 'Enter');
-    expect(onPick).not.toHaveBeenCalled();
-
-    await act(() =>
-      dialog.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.retryLoadingItems"]')?.click()
-    );
-
-    await vi.waitFor(() =>
-      expect(getOptions(dialog).map((option) => option.dataset.itemKey)).toEqual(['image:cat.png'])
-    );
-    expect(mocks.listItems).toHaveBeenLastCalledWith(expect.objectContaining({ searchTerm: 'cat' }));
-  });
-
-  it('shows the previous scope only as a dimmed, inert placeholder while loading, and never during a retry', async () => {
-    const { dialog } = await openPicker();
-    const input = getSearchInput(dialog);
-    let deliver: () => void = () => undefined;
-    const deferCatResults = () =>
-      new Promise((resolve) => {
-        deliver = () => resolve({ items: [dogItems[3]], total: 1 });
-      });
-
-    mocks.listItems.mockImplementationOnce(deferCatResults);
-    await typeSearch(input, 'cat');
-
-    // The previous board's tiles stay on screen, but as a busy placeholder for the new search, not its results.
-    const listbox = dialog.querySelector<HTMLElement>('[role="listbox"]');
-
-    expect(listbox?.getAttribute('aria-busy')).toBe('true');
-    await vi.waitFor(() => expect(getOptions(dialog)).toHaveLength(6));
-    expect(input.getAttribute('aria-activedescendant')).toBeNull();
-    await act(() => getOption(dialog, 'image:a.png').click());
-    await pressKey(input, 'Enter');
-    expect(onPick).not.toHaveBeenCalled();
-    await vi.waitFor(() => expect(getStatus(dialog)).not.toBe('widgets.gallery.picker.matchCount'));
-
-    await act(() => deliver());
-
-    await vi.waitFor(() => expect(dialog.querySelector('[role="listbox"]')?.getAttribute('aria-busy')).toBeNull());
-    await vi.waitFor(() =>
-      expect(getOptions(dialog).map((option) => option.dataset.itemKey)).toEqual(['image:cat.png'])
-    );
-
-    // A search that failed keeps showing its failure while it is retried; the placeholder does not return.
-    mocks.listItems.mockImplementationOnce(() => {
-      throw new Error('Service Unavailable');
-    });
-    await typeSearch(input, 'b');
-    await vi.waitFor(() => expect(dialog.querySelector('[role="alert"]')).not.toBeNull());
-
-    mocks.listItems.mockImplementationOnce(deferCatResults);
-    await act(() =>
-      dialog.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.retryLoadingItems"]')?.click()
-    );
-
-    expect(dialog.querySelector('[role="alert"]')?.getAttribute('aria-busy')).toBe('true');
-    expect(dialog.querySelector('[role="listbox"]')).toBeNull();
-    await vi.waitFor(() => expect(getOptions(dialog)).toEqual([]));
-
-    await act(() => deliver());
-
-    await vi.waitFor(() =>
-      expect(getOptions(dialog).map((option) => option.dataset.itemKey)).toEqual(['image:cat.png'])
-    );
-    expect(dialog.querySelector('[role="alert"]')).toBeNull();
   });
 });

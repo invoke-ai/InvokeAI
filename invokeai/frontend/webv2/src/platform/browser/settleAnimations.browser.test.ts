@@ -2,10 +2,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 
 import { settleAnimations } from './settleAnimations.testing';
 
-/**
- * Use the test runner's deadline for never-ending cases; extra timing thresholds introduce load-sensitive
- * failures.
- */
+/** Use the test runner's deadline for never-ending cases; extra timing thresholds introduce load-sensitive failures. */
 
 let host: HTMLDivElement | null = null;
 let styles: HTMLStyleElement | null = null;

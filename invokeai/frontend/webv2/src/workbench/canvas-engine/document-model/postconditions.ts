@@ -68,9 +68,9 @@ export const isPatchApplied = (node: CanvasNodeContract, patch: CanvasLayerBaseP
   });
 
 /**
- * Whether every field named by `config` already holds its value; nested
- * partials compare field by field, and a `null` config value asserts the field
- * is cleared: absent (the reducer deletes mask modifiers and region layout roles) or stored as null (prompts).
+ * Whether every field named by `config` already holds its value; nested partials compare field by field, and a `null`
+ * config value asserts the field is cleared: absent (the reducer deletes mask modifiers and region layout roles) or
+ * stored as null (prompts).
  */
 export const isConfigApplied = (node: CanvasNodeContract, config: CanvasLayerConfigPatch): boolean => {
   if (node.type !== config.layerType) {

@@ -1,8 +1,22 @@
 import type { GalleryItemRef, GalleryVideoItem } from '@features/gallery';
 import type { VideoWidgetValues } from '@features/video/core/types';
+import type { VideoSection } from '@features/video/core/videoPolicies';
 import type { ReactNode } from 'react';
 
 import { createContext, use, useMemo } from 'react';
+
+/** The persisted open state of each Video section, kept with Generate's under the same per-user preference. */
+export const VIDEO_SECTION_IDS = {
+  components: 'video-components',
+  concepts: 'video-concepts',
+  conditioningClip: 'video-conditioning-clip',
+  dimensions: 'video-dimensions',
+  frames: 'video-frames',
+  guidance: 'video-guidance',
+  references: 'video-references',
+  render: 'video-render',
+  source: 'video-source',
+} as const satisfies Record<VideoSection, string>;
 
 /** Workbench supplies this UI port because features cannot import workbench. */
 export interface VideoUiAdapter {
@@ -10,8 +24,8 @@ export interface VideoUiAdapter {
   findInGallery(ref: GalleryItemRef): void;
   /**
    * Where an upload made from the panel lands, resolved when the upload starts from the listing of every readable
-   * board: the Gallery's auto-add board while that listing lets the account add to it, else the project's inbox;
-   * `none` is Uncategorized.
+   * board: the Gallery's auto-add board while that listing lets the account add to it, else the project's inbox; `none`
+   * is Uncategorized.
    */
   getUploadBoardId(): Promise<string>;
   /** Notices about this project; `undoable` reports a change that already happened, with its Undo. */
@@ -25,8 +39,8 @@ export interface VideoUiAdapter {
     origin?: 'user' | 'system'
   ): void;
   /**
-   * Select item in Preview and request looping this window. Returns its playback token, or null if Preview could
-   * not be raised and no request was made.
+   * Select item in Preview and request looping this window. Returns its playback token, or null if Preview could not be
+   * raised and no request was made.
    */
   playVideoSpanInPreview(span: { endSeconds: number; item: GalleryVideoItem; startSeconds: number }): number | null;
   projectId: string;
@@ -43,8 +57,8 @@ export interface VideoUiAdapter {
 }
 
 /**
- * Reports the armed request token, or null after disarming. isPlaying mirrors the element; pause preserves the
- * armed window for native resume.
+ * Reports the armed request token, or null after disarming. isPlaying mirrors the element; pause preserves the armed
+ * window for native resume.
  */
 export interface VideoSpanPlaybackState {
   isPlaying: boolean;

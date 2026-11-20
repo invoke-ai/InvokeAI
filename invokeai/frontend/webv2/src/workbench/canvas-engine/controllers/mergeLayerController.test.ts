@@ -79,7 +79,6 @@ const createHarness = (
     publishSelectedLayerIds: () => undefined,
     runSpatial,
   });
-  // The reducer's own contracts, which merge and undo must restore by identity.
   const originals = {
     lower: getDocumentLayer(h.document(), 'lower')!,
     upper: getDocumentLayer(h.document(), 'upper')!,
@@ -154,7 +153,6 @@ describe('MergeLayerController: merge down', () => {
   });
 
   it('reserves a layer-local adjusted copy only when the display has no current one', async () => {
-    // Raw undo snapshots plus the merged pixels and their prepared replacement; a copy adds a surface and ImageData.
     const baseBytes = (100 + 100) * 4 + 225 * 4 * 2;
     const copying = createHarness(undefined, { lowerAdjusted: true });
     copying.state.rasterBytes = baseBytes;
@@ -327,7 +325,6 @@ describe('MergeLayerController: merge visible with a spatial group stack', () =>
     const h = scene(runSpatial);
 
     expect(await h.controller.mergeVisible()).toBe('merged');
-    // The buffer holds every member: the union of their baked rects.
     expect(runSpatial).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
         height: MERGED_RECT.height,
@@ -360,7 +357,6 @@ describe('MergeLayerController: merge masks', () => {
   const createMaskHarness = (
     options: { bottomNoiseLevel?: number; historyBytes?: number; onExport?: () => void } = {}
   ) => {
-    // Generation settings every source shares, so the merge may carry them over the whole union.
     const settings = (noiseLevel = 0.2) => ({
       denoise: { isEnabled: true, limit: 0.4 },
       noise: { isEnabled: true, level: noiseLevel },
@@ -439,7 +435,6 @@ describe('MergeLayerController: merge masks', () => {
       transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
       type: 'inpaint_mask',
     });
-    // The union of the three sources' extents, in place of the topmost source; the others are gone.
     expect(h.layers.get('new-1')?.rect).toEqual({ height: 40, width: 40, x: 0, y: 0 });
     expect(getDocumentIndex(h.document()).byId.get('new-1')).toMatchObject({ parentId: 'first', siblingIndex: 1 });
     expect(leafIds(h.document())).toEqual(['other', 'new-1']);

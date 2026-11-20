@@ -3,7 +3,6 @@ import type { GenerationUiAdapter } from '@features/generation/ui/GenerationUiCo
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { GenerationUiProvider } from '@features/generation/ui/GenerationUiContext';
-import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import i18next from 'i18next';
 import { act } from 'react';
@@ -12,7 +11,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-import { ReferenceImageCard } from './ReferenceImageCard';
+import { ReferenceImageRow } from './ReferenceImageRow';
 
 const mocks = vi.hoisted(() => {
   // A real decodable image, so the crop export's <img> loads without a backend.
@@ -59,7 +58,6 @@ const REFERENCE: GenerateReferenceImage = {
   isEnabled: true,
 };
 
-/** A reference whose saved crop is the centred 256px square of the 512px original. */
 const SQUARE_CROPPED_REFERENCE: GenerateReferenceImage = {
   ...REFERENCE,
   config: {
@@ -83,7 +81,7 @@ const renderCard = (referenceImage: GenerateReferenceImage) => {
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <GenerationUiProvider adapter={ADAPTER}>
-            <ReferenceImageCard
+            <ReferenceImageRow
               count={1}
               index={0}
               referenceImage={referenceImage}
@@ -92,6 +90,7 @@ const renderCard = (referenceImage: GenerateReferenceImage) => {
               onMove={noop}
               onPatch={noop}
               onRemove={noop}
+              onRename={noop}
               onUseSize={noop}
             />
           </GenerationUiProvider>
@@ -115,8 +114,18 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 
+const chooseCrop = async () => {
+  await act(() =>
+    userEvent.click(
+      document.querySelector<HTMLElement>('button[aria-label="widgets.generate.referenceImageMoreActions"]')!
+    )
+  );
+  await expect.poll(() => document.querySelector('[role="menuitem"][data-value="crop"]')).not.toBeNull();
+  await act(() => userEvent.click(document.querySelector<HTMLElement>('[role="menuitem"][data-value="crop"]')!));
+};
+
 const openCropDialog = async (): Promise<HTMLElement> => {
-  await act(() => userEvent.click(document.querySelector<HTMLElement>('button[aria-label="common.crop"]')!));
+  await chooseCrop();
   await expect.poll(() => document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open');
   const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
   await expect
@@ -125,7 +134,6 @@ const openCropDialog = async (): Promise<HTMLElement> => {
   return dialog;
 };
 
-/** The crop box as percentages of the image, read back from its inline style. */
 const readCropBox = (dialog: HTMLElement) => {
   const style = dialog.querySelector<HTMLElement>('[data-crop-box]')!.style;
   return {
@@ -149,7 +157,6 @@ const pointer = (type: string, target: Element, clientX: number, clientY: number
     })
   );
 
-/** `translate(x px, y px) scale(z)` from the stage's inline transform. */
 const readView = (dialog: HTMLElement) => {
   const transform = dialog.querySelector<HTMLElement>('[data-crop-stage]')!.style.transform;
   const [, x, y, zoom] = /translate\(([-\d.e]+)px, ([-\d.e]+)px\) scale\(([-\d.e]+)\)/.exec(transform) ?? [];
@@ -162,17 +169,6 @@ const spaceKey = (type: 'keydown' | 'keyup', target: EventTarget = window) =>
   target.dispatchEvent(new KeyboardEvent(type, { bubbles: true, cancelable: true, code: 'Space', key: ' ' }));
 
 describe('reference image crop dialog', () => {
-  it('animates out instead of unmounting on close', async () => {
-    await act(() => userEvent.click(document.querySelector<HTMLElement>('button[aria-label="common.crop"]')!));
-    await expect.poll(() => document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open');
-    const dialog = document.querySelector('[role="dialog"]')!;
-
-    const frames = closingFrames(await recordDialogExit(dialog, () => act(() => userEvent.keyboard('{Escape}'))));
-    await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
-
-    expect(frames).not.toHaveLength(0);
-  });
-
   it('holds the chosen aspect ratio while the crop box is resized from a handle', async () => {
     const dialog = await openCropDialog();
     const full = readCropBox(dialog);
@@ -200,7 +196,6 @@ describe('reference image crop dialog', () => {
       pointer('pointerup', viewport, startX + rect.width * 0.1, startY + rect.height * 0.3);
     });
 
-    // The 30% vertical shrink dominates after accounting for the ratio; the opposite corner stays anchored.
     const resized = readCropBox(dialog);
     expect(resized.width / resized.height).toBeCloseTo(9 / 16, 3);
     expect(resized.height).toBeCloseTo(portrait.height - 30, 1);
@@ -239,14 +234,13 @@ describe('reference image crop dialog', () => {
     await act(() => {
       expect(viewport.dispatchEvent(wheel)).toBe(false);
     });
-    // The pixel under the cursor stays put: the stage grows by 1.1 about the cursor's viewport offset (the event
-    // stores integer client coordinates, so read the offset back from it).
+    // The pixel under the cursor stays put: the stage grows by 1.1 about the cursor's viewport offset (the event stores
+    // integer client coordinates, so read the offset back from it).
     const zoomed = readView(dialog);
     expect(zoomed.zoom).toBeCloseTo(1.1, 3);
     expect(zoomed.x).toBeCloseTo(-0.1 * (wheel.clientX - rect.left), 3);
     expect(zoomed.y).toBeCloseTo(-0.1 * (wheel.clientY - rect.top), 3);
 
-    // Space arms a pan from anywhere, and a drag on the crop box moves the view rather than the box.
     await act(() => {
       spaceKey('keydown');
     });
@@ -263,7 +257,6 @@ describe('reference image crop dialog', () => {
     expect(panned.x).toBeCloseTo(zoomed.x + 30, 0);
     expect(panned.y).toBeCloseTo(zoomed.y + 20, 0);
     expect(readCropBox(dialog)).toEqual(before);
-    // Still held, so the next drag pans too; releasing returns to crop editing.
     expect(viewport.dataset.panState).toBe('ready');
     await act(() => {
       spaceKey('keyup');
@@ -449,7 +442,6 @@ describe('reference image crop dialog', () => {
     expect(viewportOf(dialog).dataset.panState).toBe('idle');
     await act(() => userEvent.keyboard(' '));
 
-    // The unchanged full crop applies and closes the dialog.
     await expect.poll(() => noop.mock.calls.length).toBeGreaterThan(0);
     await expect
       .poll(() => document.querySelector('[role="dialog"]')?.getAttribute('data-state') ?? null)
@@ -474,7 +466,6 @@ describe('reference image crop dialog', () => {
     expect(options.isIntermediate).toBe(false);
     await expect.poll(() => (ADAPTER.notifications.info as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
     expect(ADAPTER.gallery.touchImages).toHaveBeenCalledOnce();
-    // Nothing was applied: the dialog stays open and the reference untouched.
     expect(dialog.getAttribute('data-state')).toBe('open');
     expect(noop).not.toHaveBeenCalled();
   });

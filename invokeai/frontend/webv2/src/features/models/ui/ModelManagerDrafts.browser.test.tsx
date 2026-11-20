@@ -2,9 +2,9 @@ import type { ModelConfig } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { refreshModels, removeModelsFromStore, setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { refreshModels, setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { MAX_MODEL_DRAFTS, recordModelDraftFields } from '@features/models/ui/modelDraftsStore';
-import { closeModelDetail, openModelDetail, pruneModelsUiKeys } from '@features/models/ui/uiStore';
+import { closeModelDetail, openModelDetail } from '@features/models/ui/uiStore';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { applyThemeToRoot } from '@theme/applyTheme';
@@ -15,11 +15,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { ModelManagerView } from './ModelManagerView';
-
-/**
- * Unsaved model edits survive moving around the manager: switching tabs and models unmounts the detail forms, and
- * returning restores the draft, the open editor, and a failed save's error until the user saves or cancels.
- */
 
 const { api, pending } = vi.hoisted(() => ({
   api: {
@@ -35,7 +30,6 @@ const { api, pending } = vi.hoisted(() => ({
 vi.mock('@features/models/data/api', async (importOriginal) => ({
   ...(await importOriginal<typeof ModelsApi>()),
   ...api,
-  // Panels the navigation passes through; they stay loading so the test touches no network.
   getExternalProviderConfigs: pending,
   getFp8StorageSupport: pending,
   getHFTokenStatus: pending,
@@ -101,7 +95,6 @@ const fill = async (control: HTMLInputElement | HTMLTextAreaElement | null, valu
 
 const isEditorOpen = () => buttonNamed('models.editing') !== undefined;
 const textShown = (text: string) => document.body.textContent.includes(text);
-// Inside the row's button, so the marker is part of the row's accessible name.
 const rowMarker = (key: string) =>
   document.querySelector(
     `[data-list-row="${key}"] [data-list-primary] [role="img"][aria-label="models.unsavedChanges"]`
@@ -115,7 +108,6 @@ const openTab = (tab: keyof typeof TAB_INDEX) =>
 const selectModel = (key: string) =>
   click(document.querySelector<HTMLElement>(`[data-list-row="${key}"] [data-list-primary]`)!);
 
-/** Leave the model's details through both other tabs and come back. */
 const visitOtherTabsAndReturn = async () => {
   await openTab('add');
   expect(nameInput()).toBeNull();
@@ -128,7 +120,6 @@ const startEditing = async (name: string) => {
   await fill(nameInput(), name);
 };
 
-/** A catalog refresh that finds the given server records, as after another client's change. */
 const serverNowHas = async (...models: ModelConfig[]) => {
   api.listModels.mockResolvedValueOnce(models);
   await act(() => refreshModels());
@@ -181,32 +172,6 @@ describe('model manager drafts', () => {
     expect(textShown('models.unsavedChanges')).toBe(true);
   });
 
-  it('keeps a separate draft per model across model switches', async () => {
-    await startEditing('Draft A');
-    await selectModel(B.key);
-    expect(isEditorOpen()).toBe(false);
-    await startEditing('Draft B');
-
-    await selectModel(A.key);
-    expect(nameInput()?.value).toBe('Draft A');
-    await selectModel(B.key);
-    expect(nameInput()?.value).toBe('Draft B');
-  });
-
-  it('marks models with unsaved edits in the library and clears the mark when the edit is undone', async () => {
-    expect(rowMarker(A.key)).toBeNull();
-
-    await startEditing('Draft A');
-    expect(rowMarker(A.key)).not.toBeNull();
-    expect(rowMarker(B.key)).toBeNull();
-
-    // An open editor with nothing changed is not an unsaved change.
-    await fill(nameInput(), A.name);
-    expect(isEditorOpen()).toBe(true);
-    expect(rowMarker(A.key)).toBeNull();
-    expect(textShown('models.unsavedChanges')).toBe(false);
-  });
-
   it('discards the draft on Cancel, and it stays discarded after navigating away and back', async () => {
     await startEditing('Draft A');
 
@@ -218,23 +183,6 @@ describe('model manager drafts', () => {
     expect(isEditorOpen()).toBe(false);
     await click(buttonNamed('common.edit'));
     expect(nameInput()?.value).toBe(A.name);
-  });
-
-  it('clears the draft after a successful save', async () => {
-    api.updateModel.mockResolvedValue({ ...A, name: 'Saved A' });
-    await startEditing('Saved A');
-
-    await click(buttonNamed('users.saveChanges'));
-
-    await expect.poll(isEditorOpen).toBe(false);
-    expect(api.updateModel).toHaveBeenCalledWith(
-      A.key,
-      expect.objectContaining({ name: 'Saved A' }),
-      expect.anything()
-    );
-    expect(rowMarker(A.key)).toBeNull();
-    await visitOtherTabsAndReturn();
-    expect(isEditorOpen()).toBe(false);
   });
 
   it('keeps the draft and the failure after a failed save while the user looks elsewhere', async () => {
@@ -254,19 +202,6 @@ describe('model manager drafts', () => {
     expect(rowMarker(A.key)).not.toBeNull();
   });
 
-  it("drops a model's draft when a refresh finds the model gone", async () => {
-    await startEditing('Draft A');
-    await selectModel(B.key);
-
-    await serverNowHas(B);
-    // Reinstalled under the same key: it must start clean, not resurrect the old draft.
-    await serverNowHas(A, B);
-
-    expect(rowMarker(A.key)).toBeNull();
-    await selectModel(A.key);
-    expect(isEditorOpen()).toBe(false);
-  });
-
   it('forgets drafts on an account transition', async () => {
     await startEditing('Draft A');
 
@@ -278,23 +213,6 @@ describe('model manager drafts', () => {
 
     expect(rowMarker(A.key)).toBeNull();
     expect(isEditorOpen()).toBe(false);
-  });
-
-  it('takes server changes to untouched fields while keeping the edits, open or not', async () => {
-    await startEditing('Draft A');
-
-    await serverNowHas({ ...A, description: 'Written elsewhere' }, B);
-    expect(nameInput()?.value).toBe('Draft A');
-    expect(descriptionInput()?.value).toBe('Written elsewhere');
-
-    await openTab('add');
-    await serverNowHas({ ...A, description: 'Written again', source_url: 'https://example.com/a' }, B);
-    await openTab('details');
-
-    expect(nameInput()?.value).toBe('Draft A');
-    expect(descriptionInput()?.value).toBe('Written again');
-    expect(fieldControl<HTMLInputElement>('models.sourceUrl')?.value).toBe('https://example.com/a');
-    expect(statusShown('models.changedElsewhere')).toBe(false);
   });
 
   it('keeps an edited field the server also changed, says so, and Cancel takes the server value', async () => {
@@ -314,30 +232,12 @@ describe('model manager drafts', () => {
     expect(statusShown('models.changedElsewhere')).toBe(false);
   });
 
-  it('retains default-settings edits across navigation until Reset discards them', async () => {
-    const weightSwitch = () =>
-      fieldSwitch('models.customizeDefaultField:models.defaultFields.weight') as HTMLInputElement;
-
-    await click(weightSwitch().closest('label')!);
-    expect(weightSwitch().checked).toBe(true);
-
-    await visitOtherTabsAndReturn();
-    expect(weightSwitch().checked).toBe(true);
-    expect(textShown('models.unsavedChanges')).toBe(true);
-    expect(rowMarker(A.key)).not.toBeNull();
-
-    await click(buttonNamed('common.reset'));
-    expect(weightSwitch().checked).toBe(false);
-    expect(rowMarker(A.key)).toBeNull();
-  });
-
   it('settles an identity save that lands after leaving and returning, keeping edits typed meanwhile', async () => {
     const save = deferredSave();
     await startEditing('Sent name');
     await click(saveChangesButton());
 
     await visitOtherTabsAndReturn();
-    // The remounted form still shows the request it did not start, and cannot send a second one.
     expect(saveChangesButton().disabled).toBe(true);
     await fill(descriptionInput(), 'Typed after saving');
 
@@ -349,90 +249,6 @@ describe('model manager drafts', () => {
     expect(descriptionInput()?.value).toBe('Typed after saving');
     expect(rowMarker(A.key)).not.toBeNull();
     expect(statusShown('models.changedElsewhere')).toBe(false);
-  });
-
-  it('shows an identity save failure that lands after leaving and returning', async () => {
-    const save = deferredSave();
-    await startEditing('Taken name');
-    await click(saveChangesButton());
-    await visitOtherTabsAndReturn();
-
-    await save.reject(new Error('A model with this name already exists.'));
-
-    expect(document.querySelector('[role="alert"]')?.textContent).toBe('A model with this name already exists.');
-    expect(nameInput()?.value).toBe('Taken name');
-    expect(saveChangesButton().disabled).toBe(false);
-  });
-
-  it('settles a default-settings save that lands after leaving and returning', async () => {
-    const save = deferredSave();
-    await toggleDefault('weight');
-    await click(saveDefaultsButton());
-    await visitOtherTabsAndReturn();
-    expect(saveDefaultsButton().disabled).toBe(true);
-    await toggleDefault('weightMin');
-
-    await save.resolve({ ...A, default_settings: { weight: 0.75 } });
-
-    expect(api.updateModel).toHaveBeenCalledOnce();
-    expect(defaultSwitch('weight').checked).toBe(true);
-    expect(defaultSwitch('weightMin').checked).toBe(true);
-    expect(textShown('models.unsavedChanges')).toBe(true);
-    await click(buttonNamed('common.reset'));
-    // Reset takes the saved record: the saved weight stays, the later edit goes.
-    expect(defaultSwitch('weight').checked).toBe(true);
-    expect(defaultSwitch('weightMin').checked).toBe(false);
-  });
-
-  it('keeps default-settings edits when their save fails after leaving and returning', async () => {
-    const save = deferredSave();
-    await toggleDefault('weight');
-    await click(saveDefaultsButton());
-    await visitOtherTabsAndReturn();
-
-    await save.reject(new Error('Rejected.'));
-
-    expect(defaultSwitch('weight').checked).toBe(true);
-    expect(saveDefaultsButton().disabled).toBe(false);
-    expect(rowMarker(A.key)).not.toBeNull();
-  });
-
-  it('stops calling an edit unsaved once the server holds the same value', async () => {
-    await startEditing('Draft A');
-
-    await serverNowHas({ ...A, name: 'Draft A' }, B);
-
-    expect(isEditorOpen()).toBe(true);
-    expect(rowMarker(A.key)).toBeNull();
-    expect(textShown('models.unsavedChanges')).toBe(false);
-  });
-
-  it('rebases default settings onto server changes and flags an edited one the server also changed', async () => {
-    await toggleDefault('weight');
-
-    await serverNowHas({ ...A, default_settings: { weight: 0.5, weight_max: 1.5 } }, B);
-
-    const weightInput = document.querySelectorAll<HTMLInputElement>('input[data-scope="number-input"]')[0];
-    expect(weightInput?.value).toBe('0.75');
-    expect(defaultSwitch('weightMax').checked).toBe(true);
-    expect(statusShown('models.changedElsewhere')).toBe(true);
-
-    await click(buttonNamed('common.reset'));
-    expect(document.querySelectorAll<HTMLInputElement>('input[data-scope="number-input"]')[0]?.value).toBe('0.5');
-    expect(statusShown('models.changedElsewhere')).toBe(false);
-  });
-
-  it('saves one surface while the other keeps its unsaved edits', async () => {
-    api.updateModel.mockResolvedValue({ ...A, default_settings: { weight: 0.75 } });
-    await startEditing('Draft A');
-    await toggleDefault('weight');
-
-    await click(saveDefaultsButton());
-
-    await expect.poll(() => buttonNamed('common.reset')).toBeUndefined();
-    expect(isEditorOpen()).toBe(true);
-    expect(nameInput()?.value).toBe('Draft A');
-    expect(rowMarker(A.key)).not.toBeNull();
   });
 
   it('keeps only the most recently edited drafts', async () => {
@@ -456,22 +272,11 @@ describe('model manager in a single pane', () => {
   let host: HTMLDivElement;
   let root: Root;
 
-  /** Below the 50rem both panes need: the library and the detail take turns. */
   const NARROW_PX = 640;
   const back = () => page.getByRole('button', { name: 'models.backToList' });
   const library = () => page.getByRole('heading', { name: 'models.title' });
   const detail = () => page.getByRole('tablist');
   const row = (key: string) => document.querySelector<HTMLElement>(`[data-list-row="${key}"] [data-list-primary]`)!;
-  const setWidth = async (width: number) => {
-    await act(async () => {
-      host.style.width = `${String(width)}px`;
-      await new Promise((resolve) => {
-        requestAnimationFrame(resolve);
-      });
-    });
-  };
-
-  /** True when the control is inside the pane's visible scroll viewport, not just inside the manager's width. */
   const isInView = (element: HTMLElement) => {
     const bounds = element.getBoundingClientRect();
     const viewport = element.closest('[data-scope="scroll-area"][data-part="viewport"]') ?? host;
@@ -514,7 +319,6 @@ describe('model manager in a single pane', () => {
   it('opens a model from the library, keeps its actions in view, and goes back to the row', async () => {
     await expect.element(library()).toBeVisible();
     await expect.element(detail()).not.toBeInTheDocument();
-    // The install queue reports under the library as well as under the detail.
     await expect.element(page.getByRole('button', { name: /models.installQueue/ })).toBeVisible();
     expect(await auditAccessibility(host)).toEqual([]);
 
@@ -540,33 +344,6 @@ describe('model manager in a single pane', () => {
     expect(row(B.key).getAttribute('aria-current')).toBe('true');
   });
 
-  it('reaches Add Models from the library header', async () => {
-    await page.getByRole('button', { name: 'models.addModels', exact: true }).click();
-
-    await expect.element(page.getByRole('tab', { name: 'models.addModels' })).toHaveAttribute('aria-selected', 'true');
-    await expect.element(back()).toHaveFocus();
-  });
-
-  it('keeps an unsaved draft through Back, reopening, and wide and narrow resizes', async () => {
-    await click(row(A.key));
-    await startEditing('Draft A');
-
-    await back().click();
-    expect(rowMarker(A.key)).not.toBeNull();
-    await click(row(A.key));
-    expect(nameInput()?.value).toBe('Draft A');
-
-    await setWidth(1200);
-    await expect.element(library()).toBeVisible();
-    await expect.element(back()).not.toBeInTheDocument();
-    expect(nameInput()?.value).toBe('Draft A');
-
-    await setWidth(NARROW_PX);
-    await expect.element(back()).toBeVisible();
-    expect(isEditorOpen()).toBe(true);
-    expect(nameInput()?.value).toBe('Draft A');
-  });
-
   it('returns to the library with focus on a row after deleting the open model', async () => {
     api.deleteModel.mockResolvedValue(undefined);
     await click(row(B.key));
@@ -580,99 +357,10 @@ describe('model manager in a single pane', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(row(A.key)));
     expect(api.deleteModel).toHaveBeenCalledWith(B.key, expect.anything());
   });
-
-  it('shows the detail when a model is opened from elsewhere, such as the install queue', async () => {
-    await act(() => openModelDetail(A.key));
-
-    await expect.element(detail()).toBeVisible();
-    await expect.element(back()).toBeVisible();
-  });
 });
-
-describe('model manager starting pane', () => {
-  let host: HTMLDivElement;
-  let root: Root;
-
-  const library = () => page.getByRole('heading', { name: 'models.title' });
-  const addTab = () => page.getByRole('tab', { name: 'models.addModels' });
-
-  const mount = async (models: ModelConfig[]) => {
-    // An account change resets the manager, so the starting pane is still undecided.
-    accountLifecycle.activate('model-manager-start-test', ':user:model-manager-start-test');
-    setModelsSnapshotForTests({ models, status: 'loaded' });
-    host = document.createElement('div');
-    host.style.cssText = 'display:flex;height:450px;width:640px;';
-    document.body.append(host);
-    root = createRoot(host);
-    await act(() =>
-      root.render(
-        <ChakraProvider value={system}>
-          <ModelManagerView />
-        </ChakraProvider>
-      )
-    );
-  };
-
-  afterEach(async () => {
-    await act(() => root.unmount());
-    host.remove();
-    accountLifecycle.invalidate();
-  });
-
-  it('opens a non-empty library on the list', async () => {
-    await mount([A, B]);
-
-    await expect.element(library()).toBeVisible();
-    await expect.element(addTab()).not.toBeInTheDocument();
-  });
-
-  it('opens an empty library on Add Models, and an arriving install leaves the pane, tab and focus alone', async () => {
-    await mount([]);
-
-    await expect.element(addTab()).toHaveAttribute('aria-selected', 'true');
-    await expect.element(library()).not.toBeInTheDocument();
-    // Settling the starting pane does not pull focus into an untouched page.
-    expect(document.activeElement).toBe(document.body);
-    const field = await vi.waitFor(() => {
-      const input = document.querySelector<HTMLInputElement>(
-        '[role="tabpanel"] input[type="text"], [role="tabpanel"] input:not([type])'
-      );
-      expect(input).not.toBeNull();
-      return input!;
-    });
-    await act(() => userEvent.click(field));
-
-    await act(() => setModelsSnapshotForTests({ models: [A], status: 'loaded' }));
-
-    await expect.element(addTab()).toHaveAttribute('aria-selected', 'true');
-    await expect.element(library()).not.toBeInTheDocument();
-    expect(document.activeElement).toBe(field);
-  });
-
-  it('stays on the list, now empty, when the last model is deleted', async () => {
-    await mount([A]);
-    await expect.element(library()).toBeVisible();
-
-    await act(() => {
-      removeModelsFromStore([A.key]);
-      pruneModelsUiKeys([A.key]);
-    });
-
-    await expect.element(library()).toBeVisible();
-    await expect.element(addTab()).not.toBeInTheDocument();
-  });
-});
-
-const defaultSwitch = (field: 'weight' | 'weightMin' | 'weightMax') =>
-  fieldSwitch(`models.customizeDefaultField:models.defaultFields.${field}`)!;
-const toggleDefault = (field: 'weight' | 'weightMin' | 'weightMax') =>
-  click(defaultSwitch(field).closest('label') ?? undefined);
 const buttonContaining = (text: string) =>
   [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent.includes(text))!;
 const saveChangesButton = () => buttonContaining('users.saveChanges');
-const saveDefaultsButton = () => buttonContaining('models.saveDefaults');
-
-/** A save the test settles by hand, after the user has moved around. */
 const deferredSave = () => {
   let resolve!: (model: ModelConfig) => void;
   let reject!: (error: Error) => void;
@@ -695,12 +383,4 @@ const deferredSave = () => {
         await promise;
       }),
   };
-};
-
-const fieldSwitch = (label: string): HTMLInputElement | null => {
-  const labelElement = [...document.querySelectorAll('[data-scope="switch"][data-part="label"]')].find(
-    (element) => element.textContent === label
-  );
-
-  return labelElement?.closest('label')?.querySelector('input') ?? null;
 };

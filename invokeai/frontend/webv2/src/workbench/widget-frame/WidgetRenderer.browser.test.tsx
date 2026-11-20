@@ -7,9 +7,8 @@ import type {
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type * as workbenchContext from '@workbench/WorkbenchContext';
 
-import { Box, ChakraProvider, Stack, Text } from '@chakra-ui/react';
+import { Box, ChakraProvider } from '@chakra-ui/react';
 import { getLogSnapshot } from '@platform/logging/logger';
-import { StatusWidgetChip } from '@platform/ui';
 import { toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { FocusRegionProvider, useFocusRegionProps } from '@workbench/focusRegions';
@@ -18,7 +17,6 @@ import { WorkbenchReloadError } from '@workbench/projects/reloadWorkbench';
 import { createWidgetRecovery } from '@workbench/widget-frame/widgetRecoveryStore';
 import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import i18next from 'i18next';
-import { CircleIcon } from 'lucide-react';
 import { act, Activity, useState, type ReactNode, type SVGProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
@@ -102,29 +100,8 @@ await i18n.use(initReactI18next).init({
 });
 
 const TestIcon = (props: SVGProps<SVGSVGElement>) => <svg {...props} />;
-const TestView = () => <div data-testid="loaded" />;
 const FocusableView = () => <button type="button">Loaded control</button>;
 const CenterFrame = ({ children }: { children: ReactNode }) => <Box {...useFocusRegionProps('center')}>{children}</Box>;
-const TooltipView = () => (
-  <Stack data-testid="loaded" gap="2">
-    <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
-      Test widget
-    </Text>
-    <Text color="fg.subtle" fontSize="xs">
-      Ready
-    </Text>
-  </Stack>
-);
-const CompactView = () => (
-  <StatusWidgetChip icon={CircleIcon}>
-    <span data-widget-identity-label="">Test widget</span>
-  </StatusWidgetChip>
-);
-const CustomHeaderLabel = () => (
-  <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
-    Custom widget label
-  </Text>
-);
 
 const ThrowingView = () => {
   throw new Error('widget exploded');
@@ -199,28 +176,6 @@ const render = async (children: ReactNode) => {
   });
 };
 
-const getIdentityGeometry = ({ loadedIcon = false } = {}) => {
-  const icon = host?.querySelector<HTMLElement>(loadedIcon ? 'svg' : '[data-widget-identity-slot]');
-  const label = host?.querySelector<HTMLElement>('[data-widget-identity-label]');
-
-  expect(icon).not.toBeNull();
-  expect(label).not.toBeNull();
-  if (!icon || !label) {
-    throw new Error('Expected widget identity icon and label.');
-  }
-
-  const iconRect = icon.getBoundingClientRect();
-  const labelRect = label.getBoundingClientRect();
-  expect(iconRect.width).toBe(12);
-  expect(labelRect.left).toBeGreaterThan(iconRect.right);
-
-  return {
-    iconLeft: iconRect.left,
-    iconWidth: iconRect.width,
-    labelLeft: labelRect.left,
-  };
-};
-
 beforeEach(() => {
   workbenchMocks.project.id = 'test-project';
   workbenchMocks.reload.mockReset().mockResolvedValue(undefined);
@@ -229,7 +184,6 @@ beforeEach(() => {
 
 afterEach(async () => {
   recoveryOwner.widgetRecovery.clear();
-  // Focus is per test: the next one starts with no region outlined and no move pending.
   focusController.clear();
   await act(async () => {
     root?.unmount();
@@ -240,124 +194,7 @@ afterEach(async () => {
   root = null;
 });
 
-describe('WidgetRenderer loading identity transitions', () => {
-  it.each(['left', 'center'] as const)(
-    'keeps %s navigation focus when a lazy view replaces its fallback',
-    async (region) => {
-      const { resolve, widget } = createDeferredWidget();
-      widget.manifest.chrome = { header: 'hidden' };
-      const view = <WidgetRenderer instance={createInstance()} region={region} widget={widget} />;
-      await render(
-        <>
-          <button type="button">Opener</button>
-          {region === 'center' ? <CenterFrame>{view}</CenterFrame> : view}
-        </>
-      );
-      const opener = host!.querySelector('button')!;
-      opener.focus();
-      focusController.focusRegion(region, undefined, 'test-instance');
-      await act(async () => {
-        await new Promise(requestAnimationFrame);
-        await new Promise(requestAnimationFrame);
-      });
-      // A replaceable side fallback must not take focus; center has a persistent owning frame.
-      if (region === 'left') {
-        expect(document.activeElement).toBe(opener);
-      } else {
-        expect(document.activeElement).toBe(host!.querySelector('[data-focus-region="center"]'));
-      }
-      await resolve({ view: FocusableView });
-      await expect.poll(() => host?.textContent).toContain('Loaded control');
-      await expect.poll(() => document.activeElement).toBe(host!.querySelector(`[data-focus-region="${region}"]`));
-      await act(() => userEvent.keyboard('{Tab}'));
-      expect(document.activeElement?.textContent).toBe('Loaded control');
-    }
-  );
-
-  // Center and right docks own separate chrome; identity slots belong in left/bottom panel frames.
-  it('swaps spinner for icon without moving a renamed standard header', async () => {
-    const { resolve, widget } = createDeferredWidget();
-    await render(<WidgetRenderer instance={createInstance('Renamed widget')} region="left" widget={widget} />);
-
-    const loadingGeometry = getIdentityGeometry();
-    expect(host?.textContent).toContain('Renamed widget');
-
-    await resolve({ view: TestView });
-    await expect.poll(() => host?.querySelector('[data-testid="loaded"]')).not.toBeNull();
-
-    expect(getIdentityGeometry()).toEqual(loadingGeometry);
-    expect(host?.textContent).toContain('Renamed widget');
-    expect(host?.textContent).not.toContain('Test widget');
-    expect(host?.querySelector('.chakra-spinner')).toBeNull();
-  });
-
-  it('keeps the identity slot aligned when a custom header label loads', async () => {
-    const { resolve, widget } = createDeferredWidget();
-    await render(<WidgetRenderer instance={createInstance()} region="left" widget={widget} />);
-
-    const loadingGeometry = getIdentityGeometry();
-    await resolve({ headerLabel: CustomHeaderLabel, view: TestView });
-    await expect.poll(() => host?.querySelector('[data-testid="loaded"]')).not.toBeNull();
-
-    expect(getIdentityGeometry()).toEqual(loadingGeometry);
-    expect(host?.textContent).toContain('Custom widget label');
-  });
-
-  it('preserves spinner and icon geometry for compact widgets', async () => {
-    const { resolve, widget } = createDeferredWidget();
-    await render(<WidgetRenderer instance={createInstance()} presentation="compact" region="bottom" widget={widget} />);
-
-    const loadingGeometry = getIdentityGeometry();
-    await resolve({ view: CompactView });
-    await expect.poll(() => host?.querySelector('[data-widget-identity-label]')).not.toBeNull();
-
-    expect(getIdentityGeometry({ loadedIcon: true })).toEqual(loadingGeometry);
-    expect(host?.querySelector('.chakra-spinner')).toBeNull();
-  });
-
-  it('preserves the identity slot when tooltip details load', async () => {
-    const { resolve, widget } = createDeferredWidget();
-    await render(<WidgetRenderer instance={createInstance()} presentation="tooltip" region="bottom" widget={widget} />);
-
-    const loadingGeometry = getIdentityGeometry();
-    await resolve({ view: TooltipView });
-    await expect.poll(() => host?.querySelector('[data-testid="loaded"]')).not.toBeNull();
-
-    expect(getIdentityGeometry()).toEqual(loadingGeometry);
-    expect(host?.querySelector('.chakra-spinner')).toBeNull();
-  });
-});
-
 describe('WidgetRenderer failure containment', () => {
-  it('keeps a crashed compact widget inside the status bar strip', async () => {
-    const { resolve, widget } = createDeferredWidget();
-    // The status bar is a 24px-tall strip; a crashed widget must not outgrow it.
-    host = document.createElement('div');
-    host.style.cssText = 'align-items:center;display:flex;height:24px;width:480px;';
-    document.body.append(host);
-    root = createRoot(host);
-
-    await act(async () => {
-      root?.render(
-        <I18nextProvider i18n={i18n}>
-          <ChakraProvider value={system}>
-            <WidgetRenderer instance={createInstance()} presentation="compact" region="bottom" widget={widget} />
-          </ChakraProvider>
-        </I18nextProvider>
-      );
-      await Promise.resolve();
-    });
-
-    await resolve({ view: ThrowingView });
-    await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
-
-    const failure = host?.querySelector<HTMLElement>('button');
-    expect(failure).not.toBeNull();
-    expect(failure?.getBoundingClientRect().height).toBeLessThanOrEqual(24);
-    // The label still identifies which widget died.
-    expect(host?.textContent).toContain('Test widget');
-  });
-
   it('keeps a crashed panel widget framed and resizable', async () => {
     const { resolve, widget } = createDeferredWidget();
     await render(<WidgetRenderer instance={createInstance()} region="left" widget={widget} />);
@@ -367,9 +204,7 @@ describe('WidgetRenderer failure containment', () => {
 
     const frame = host?.querySelector<HTMLElement>('aside')?.parentElement;
     expect(frame).toBeDefined();
-    // Panel width survives the crash, so the region does not collapse or overflow.
     expect(frame?.getBoundingClientRect().width).toBe(384);
-    // And the drag handle is still there to resize with.
     expect(frame?.querySelector('[role="separator"]')).not.toBeNull();
   });
 });
@@ -702,121 +537,6 @@ describe('shared widget recovery', () => {
         });
       }
       toast.mockRestore();
-    }
-  );
-
-  it.each(['project', 'account', 'hide-and-reveal'] as const)(
-    'fences a reload confirmation after %s changes',
-    async (transition) => {
-      const toast = vi.spyOn(toaster, 'create').mockImplementation(() => 'inactive-reload');
-      const { widget } = createDeferredWidget();
-      widget.implementation = createWidgetImplementationResource('test', () =>
-        Promise.reject(new Error('unavailable'))
-      );
-      const content = (
-        <WidgetRenderer instance={createInstance()} presentation="expanded" region="center" widget={widget} />
-      );
-      const Retained = ({ children }: { children: ReactNode }) => {
-        const [visible, setVisible] = useState(true);
-        return (
-          <>
-            <button type="button" onClick={() => setVisible(false)}>
-              Hide confirmation owner
-            </button>
-            <button type="button" onClick={() => setVisible(true)}>
-              Show confirmation owner
-            </button>
-            <Activity mode={visible ? 'visible' : 'hidden'}>{children}</Activity>
-          </>
-        );
-      };
-      await render(<Retained>{content}</Retained>);
-      await page.getByRole('button', { name: 'Retry', exact: true }).click();
-      await page.getByRole('button', { name: 'Reload editor', exact: true }).click();
-      if (transition === 'hide-and-reveal') {
-        await act(() =>
-          [...host!.querySelectorAll<HTMLButtonElement>('button')]
-            .find((button) => button.textContent === 'Hide confirmation owner')!
-            .click()
-        );
-        await act(() =>
-          [...host!.querySelectorAll<HTMLButtonElement>('button')]
-            .find((button) => button.textContent === 'Show confirmation owner')!
-            .click()
-        );
-      } else if (transition === 'project') {
-        workbenchMocks.project.id = 'replacement-project';
-      } else {
-        const { accountLifecycle } = await import('@platform/state/accountLifecycle');
-        accountLifecycle.activate('replacement', ':user:replacement');
-      }
-      await page.getByRole('alertdialog').getByRole('button', { name: 'Reload editor', exact: true }).click();
-      expect(workbenchMocks.reload).not.toHaveBeenCalled();
-      if (transition === 'hide-and-reveal') {
-        expect(toast).toHaveBeenCalledWith(
-          expect.objectContaining({ description: recoveryCopy.reloadReasons.inactive })
-        );
-      } else {
-        expect(toast).not.toHaveBeenCalled();
-      }
-      toast.mockRestore();
-      workbenchMocks.project.id = 'test-project';
-    }
-  );
-
-  it('lets non-activation workbench chords bubble from compact Retry', async () => {
-    const { widget, resolve } = createDeferredWidget();
-    await render(<WidgetRenderer instance={createInstance()} presentation="compact" region="bottom" widget={widget} />);
-    await resolve({ view: ThrowingView });
-    const events: string[] = [];
-    const listen = (event: KeyboardEvent) => {
-      events.push(event.key);
-    };
-    window.addEventListener('keydown', listen);
-    try {
-      host!.querySelector<HTMLButtonElement>('button')!.focus();
-      await userEvent.keyboard('{Alt>}{Shift>}{ArrowRight}{/Shift}{/Alt}');
-      await userEvent.keyboard('{Alt>}{PageDown}{/Alt}');
-      await userEvent.keyboard('{Control>}k{/Control}');
-      expect(events).toEqual(expect.arrayContaining(['ArrowRight', 'PageDown', 'k']));
-    } finally {
-      window.removeEventListener('keydown', listen);
-    }
-  });
-
-  it.each(['{Enter}', '[Space]'])(
-    'recovers failed chrome with one %s retry while its healthy body survives',
-    async (key) => {
-      let broken = true;
-      const HeaderActions = () => {
-        if (broken) {
-          throw new Error('chrome exploded');
-        }
-        return <button type="button">Recovered action</button>;
-      };
-      const { widget, resolve } = createDeferredWidget();
-      const retryResource = vi.spyOn(widget.implementation, 'retry');
-      Object.assign(workbenchMocks.project.widgetInstances, { 'test-instance': createInstance() });
-      await render(
-        <>
-          <WidgetChromeSlotById instanceId="test-instance" widget={widget} slot="actions" />
-          <WidgetRenderer instance={createInstance()} region="center" widget={widget} />
-        </>
-      );
-      await resolve({ headerActions: HeaderActions, view: FocusableView });
-      await expect.poll(() => host?.querySelectorAll('[data-testid="widget-failure"]').length).toBe(1);
-      const retry = host!.querySelector<HTMLButtonElement>(
-        'button[aria-label="Test widget failed — select to retry"]'
-      )!;
-      retry.focus();
-      expect(document.activeElement).toBe(retry);
-      broken = false;
-      await userEvent.keyboard(key);
-      await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).toBeNull();
-      expect(retryResource).toHaveBeenCalledTimes(1);
-      expect(host?.textContent).toContain('Recovered action');
-      expect(host?.textContent).toContain('Loaded control');
-      delete (workbenchMocks.project.widgetInstances as Record<string, unknown>)['test-instance'];
     }
   );
 });

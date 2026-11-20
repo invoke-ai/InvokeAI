@@ -1,9 +1,11 @@
 import type { InvocationTemplate, ProjectWorkflowSource, XYPosition } from '@features/workflow/contracts';
+import type * as ScrollableMenuModule from '@platform/ui/ScrollableMenuContent';
 
-import { Box, HStack, Icon, Menu, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { Box, Center, HStack, Icon, Menu, Portal, Spinner, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { useAuthSession } from '@features/identity';
 import { savedWorkflowDetailQueryOptions } from '@features/workflow/data/savedWorkflowQueries';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
+import { isBundledLibraryWorkflowId } from '@features/workflow/queries';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
   buildConnectorNode,
@@ -23,38 +25,58 @@ import {
   summarizeWorkflowLoadWarnings,
 } from '@features/workflow/utility';
 import { canCopyText } from '@platform/browser/clipboard';
+import { createDeferredModule } from '@platform/react/deferredModule';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { createExternalStore } from '@platform/state/externalStore';
 import { Button, IconButton, RenameDialog, Tooltip } from '@platform/ui';
-import { MenuItem } from '@platform/ui/Menu';
+import { CloseButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
+import { LoadError } from '@platform/ui/LoadError';
+import { MenuActionItem, MenuContent, SCROLLABLE_MENU_CONTENT_PROPS } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { HeaderActionDivider, HeaderHistoryButton } from '@platform/ui/PanelHeader';
+import { useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { useQuery } from '@tanstack/react-query';
 import {
   BookmarkIcon,
   BookUpIcon,
+  CameraIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
   CloudAlertIcon,
   CloudCheckIcon,
   CloudIcon,
+  CopyIcon,
+  DownloadIcon,
+  FileDownIcon,
+  InfoIcon,
   LibraryIcon,
   Link2Icon,
   Link2OffIcon,
   LockIcon,
+  PencilIcon,
   PlusIcon,
+  Redo2Icon,
   RefreshCwIcon,
   TriangleAlertIcon,
+  Undo2Icon,
+  UploadIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowWidgetLabelProps, WorkflowWidgetViewProps } from './contracts';
-import type { WorkflowProjectPersistence } from './WorkflowUiContext';
+import type * as WorkflowLibraryDialogModule from './library/WorkflowLibraryDialog';
+import type { WorkflowProjectPersistence, WorkflowProjectSnapshot } from './WorkflowUiContext';
 
 import { AddNodeDialog } from './editor/AddNodeDialog';
 import { CallSavedWorkflowSyncRuntime } from './editor/CallSavedWorkflowSyncRuntime';
 import { getWorkflowViewCenter } from './editor/flowInstanceStore';
+import { exportWorkflowPng, useWorkflowPngExportState } from './editor/workflowPngExport';
 import { releaseWorkflowViewportsExcept } from './editor/workflowViewportStore';
 import { LibraryCopyChoiceHost } from './library/LibraryCopyChoiceDialog';
-import { isBundledLibraryWorkflowId, isUpdatableSource } from './library/projectWorkflowEntries';
-import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';
+import { isUpdatableSource } from './library/projectWorkflowEntries';
 import { WorkflowPublicationHost } from './library/WorkflowPublicationHost';
 import { PendingWorkflowLoader } from './PendingLibraryWorkflowLoader';
 import { copyWorkflowJson, downloadWorkflowJson } from './workflowTransfer';
@@ -75,12 +97,178 @@ import {
   workflowUiStore,
 } from './workflowUiStore';
 
-/**
- * Keep dialogs mounted here and drive them through workflowUiStore; manifest slots contribute label, quick
- * actions, and shared menu actions.
- */
+/** Dialogs stay mounted here, driven through workflowUiStore. */
 
-/** How the project's own persistence is shown beside the library actions. */
+/** Kept out of the editor's startup bundle; entry points preload it on hover or focus, and a failed load retries. */
+const workflowLibraryDialog = createDeferredModule(() => import('./library/WorkflowLibraryDialog'));
+const preloadWorkflowLibraryDialog = workflowLibraryDialog.preload;
+
+const handleLibraryPlaceholderOpenChange = ({ open }: { open: boolean }) => setWorkflowLibraryOpen(open);
+
+const WorkflowLibraryDialogLoader = ({ isOpen }: { isOpen: boolean }) => {
+  const { t } = useTranslation();
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+  const renderDialog = useCallback(
+    (module: typeof WorkflowLibraryDialogModule) => (
+      <module.WorkflowLibraryDialog isOpen={isOpen} onOpenChange={setWorkflowLibraryOpen} />
+    ),
+    [isOpen]
+  );
+  const renderPlaceholder = useCallback(
+    (failed: boolean) => (
+      <Dialog.Root open={isOpen} onOpenChange={handleLibraryPlaceholderOpenChange}>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content>
+              <Dialog.Header>
+                <Dialog.Title>{t('workflowLibrary.title')}</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                {failed ? (
+                  <LoadError
+                    isRetrying={false}
+                    layout="state"
+                    message={t('workflowLibrary.dialogLoadFailed')}
+                    onRetry={retry}
+                  />
+                ) : (
+                  <Center gap="2" p="6" role="status">
+                    <Spinner />
+                    <Text>{t('workflowLibrary.loading')}</Text>
+                  </Center>
+                )}
+              </Dialog.Body>
+              <Dialog.CloseTrigger asChild>
+                <CloseButton />
+              </Dialog.CloseTrigger>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+    ),
+    [isOpen, retry, t]
+  );
+  const renderError = useCallback(() => renderPlaceholder(true), [renderPlaceholder]);
+
+  return (
+    <workflowLibraryDialog.Deferred
+      key={attempt}
+      fallback={renderPlaceholder(false)}
+      render={renderDialog}
+      renderError={renderError}
+    />
+  );
+};
+
+interface WorkflowChoice {
+  id: string;
+  name: string;
+}
+
+const selectWorkflowChoices = (project: WorkflowProjectSnapshot): WorkflowChoice[] =>
+  project.workflows.map((entry) => ({ id: entry.document.id, name: entry.document.name }));
+const areWorkflowChoicesEqual = (left: readonly WorkflowChoice[], right: readonly WorkflowChoice[]) =>
+  left.length === right.length &&
+  left.every((choice, index) => choice.id === right[index]?.id && choice.name === right[index].name);
+
+/** A frame later, once the positioner has capped the menu; the list's viewport is the nearest scroller. */
+const revealActiveChoice = (item: HTMLElement | null) => {
+  if (item) {
+    requestAnimationFrame(() => item.scrollIntoView({ block: 'nearest' }));
+  }
+};
+
+/**
+ * Deferred: a static import would pull the editor's boot code into this chunk, which a Launchpad manager reaches. Until
+ * it loads, the same rows scroll natively.
+ */
+const scrollableMenu = createDeferredModule(() => import('@platform/ui/ScrollableMenuContent'));
+const NATIVE_SCROLL_LIST_PROPS = { minH: '0', overflowY: 'auto' } as const;
+
+const WorkflowSwitcherContent = ({
+  activeWorkflowId,
+  onOpenLibrary,
+}: {
+  activeWorkflowId: string;
+  onOpenLibrary: () => void;
+}) => {
+  const { t } = useTranslation();
+  const choices = useWorkflowProjectSelector(selectWorkflowChoices, areWorkflowChoicesEqual);
+  const { createWorkflow, selectWorkflow } = useProjectGraphCommands();
+  const newWorkflow = useCallback(() => createWorkflow(), [createWorkflow]);
+  const chooseWorkflow = useCallback(
+    (event: { value: string }) => {
+      if (event.value !== activeWorkflowId) {
+        selectWorkflow(event.value);
+      }
+    },
+    [activeWorkflowId, selectWorkflow]
+  );
+  const footer = useMemo(
+    () => (
+      <>
+        <Menu.Separator />
+        <MenuActionItem
+          icon={PlusIcon}
+          label={t('widgets.workflow.newWorkflow')}
+          value="new-workflow"
+          onSelect={newWorkflow}
+        />
+        <MenuActionItem
+          icon={LibraryIcon}
+          label={t('widgets.workflow.libraryWithEllipsis')}
+          value="workflow-library"
+          onSelect={onOpenLibrary}
+        />
+      </>
+    ),
+    [newWorkflow, onOpenLibrary, t]
+  );
+
+  const rows = useMemo(
+    () => (
+      <Menu.RadioItemGroup value={activeWorkflowId} onValueChange={chooseWorkflow}>
+        <Menu.ItemGroupLabel color="fg.muted">{t('widgets.workflow.inThisProject')}</Menu.ItemGroupLabel>
+        {choices.map((choice) => {
+          const name = choice.name || t('widgets.workflow.untitled');
+
+          return (
+            // Typeahead matches an option's value text, which is its value (an id) unless named.
+            <Menu.RadioItem
+              key={choice.id}
+              ref={choice.id === activeWorkflowId ? revealActiveChoice : undefined}
+              value={choice.id}
+              valueText={name}
+            >
+              <Menu.ItemIndicator color="accent.fg">
+                <Icon as={CheckIcon} boxSize="3.5" />
+              </Menu.ItemIndicator>
+              <Menu.ItemText color={choice.name ? undefined : 'fg.subtle'} flex="1" minW="0">
+                <MiddleTruncate as="span" text={name} />
+              </Menu.ItemText>
+            </Menu.RadioItem>
+          );
+        })}
+      </Menu.RadioItemGroup>
+    ),
+    [activeWorkflowId, choices, chooseWorkflow, t]
+  );
+  const nativeList = useMemo(() => <Box {...NATIVE_SCROLL_LIST_PROPS}>{rows}</Box>, [rows]);
+  const renderList = useCallback(
+    (module: typeof ScrollableMenuModule) => <module.ScrollableMenuList>{rows}</module.ScrollableMenuList>,
+    [rows]
+  );
+
+  return (
+    <MenuContent {...SCROLLABLE_MENU_CONTENT_PROPS} maxW="20rem" minW="14rem">
+      <scrollableMenu.Deferred fallback={nativeList} render={renderList} />
+      {footer}
+    </MenuContent>
+  );
+};
+
 const PERSISTENCE_VIEW: Record<
   WorkflowProjectPersistence['status'],
   { color: string; icon: ElementType; labelKey: string }
@@ -92,11 +280,7 @@ const PERSISTENCE_VIEW: Record<
   saving: { color: 'fg.subtle', icon: RefreshCwIcon, labelKey: 'widgets.workflow.persistenceSaving' },
 };
 
-/**
- * What the workflow's library link says: the template it updates, a bundled template, another linked template, or
- * none. The template's name is not part of the project; it is read only once asked for, through the query the update
- * confirmation uses.
- */
+/** The template's name is not in the project; it is read on demand through the update confirmation's query. */
 const useTemplateLinkDescription = (
   source: ProjectWorkflowSource | undefined,
   wantsName: boolean,
@@ -123,11 +307,7 @@ const useTemplateLinkDescription = (
       : t('workflowLibrary.sourceNone');
 };
 
-/**
- * The center chrome's label: the workflow's name, with its library link inside the same button, so the name pill
- * shrinks as one piece. The label clips rather than overflows its island: at narrow center widths the actions island
- * beside it would otherwise paint over the name and take its clicks.
- */
+/** Clips rather than overflows: at narrow widths the actions island would paint over the name and take its clicks. */
 export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
   const { t } = useTranslation();
   const workflowName = useWorkflowProjectSelector((project) => project.projectGraph.name);
@@ -135,6 +315,8 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
   const source = useWorkflowProjectSelector((project) => project.activeWorkflow.source);
   const session = useAuthSession();
+  const triggerIds = useTooltipTriggerIds();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [wantsTemplateName, setWantsTemplateName] = useState(false);
   const linkDescription = useTemplateLinkDescription(source, wantsTemplateName, session);
   const linkDescriptionId = useId();
@@ -142,6 +324,7 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
     () => openWorkflowLibraryAtProjectWorkflow(projectId, activeWorkflowId),
     [activeWorkflowId, projectId]
   );
+  const onMenuOpenChange = useCallback((event: { open: boolean }) => setIsMenuOpen(event.open), []);
   const onTooltipOpenChange = useCallback((event: { open: boolean }) => {
     if (event.open) {
       setWantsTemplateName(true);
@@ -151,7 +334,7 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
   const tooltipContent = useMemo(
     () => (
       <Stack gap="0.5">
-        <Text>{t('widgets.workflow.projectWorkflows')}</Text>
+        <Text>{t('widgets.workflow.switchWorkflow')}</Text>
         <Text color="fg.muted">{linkDescription}</Text>
       </Stack>
     ),
@@ -162,10 +345,8 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
     return <Text fontWeight="700">{t('widgets.labels.workflow')}</Text>;
   }
 
-  // Center chrome already names the widget; the workflow name opens the project's workflows with this one selected.
   const displayName = workflowName || t('widgets.workflow.untitled');
   const isLinked = isUpdatableSource(source, session);
-  // A source this account cannot update is locked, whether bundled or owned by another account.
   const linkIcon = isLinked ? Link2Icon : source ? LockIcon : Link2OffIcon;
   const linkKind = isLinked
     ? 'linked'
@@ -176,49 +357,164 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
       : 'none';
 
   return (
-    // Sized by its content, so a narrow center shrinks it and the view menu beside it in proportion; a zero basis
-    // would leave the name only what the view menu does not take.
+    // Sized by content so a narrow center shrinks it and the view menu in proportion; a zero basis starves the name.
     <HStack css={LABEL_CLIP_CSS} flex="1 1 auto" gap="1" minW="0">
       <Text color="fg.subtle" flexShrink={1} minW="0" overflow="hidden">
         /
       </Text>
-      <Tooltip content={tooltipContent} onOpenChange={onTooltipOpenChange}>
-        <Button
-          aria-describedby={linkDescriptionId}
-          aria-label={t('widgets.workflow.openProjectWorkflows', { name: displayName })}
-          // The button recipe refuses to shrink; the name must give way before the actions island overlaps it.
-          flexShrink={1}
-          maxW="16rem"
-          minW="0"
-          overflow="hidden"
-          size="sm"
-          variant="ghost"
-          onClick={openProjectWorkflows}
+      {/* The list mounts only while open: the chrome re-renders on editor changes the list does not show. */}
+      <Menu.Root
+        ids={triggerIds}
+        lazyMount
+        positioning={WORKFLOW_SWITCHER_POSITIONING}
+        unmountOnExit
+        onOpenChange={onMenuOpenChange}
+      >
+        {/* Not over the menu it describes: it opens below the trigger, where the tooltip would cover the list. */}
+        <Tooltip
+          content={tooltipContent}
+          disabled={isMenuOpen}
+          ids={triggerIds}
+          keepsRootWhenDisabled
+          onOpenChange={onTooltipOpenChange}
         >
-          <Icon as={LibraryIcon} boxSize="3.5" flexShrink={0} />
-          <MiddleTruncate color={workflowName ? undefined : 'fg.subtle'} fontWeight="600" minW="0" text={displayName} />
-          <Icon as={linkIcon} boxSize="3.5" color="fg.subtle" data-template-link={linkKind} flexShrink={0} />
-        </Button>
-      </Tooltip>
+          <Menu.Trigger asChild>
+            <Button
+              aria-describedby={linkDescriptionId}
+              aria-label={t('widgets.workflow.switchWorkflowTrigger', { name: displayName })}
+              // The button recipe refuses to shrink; the name must give way before the actions island overlaps it.
+              flexShrink={1}
+              maxW="16rem"
+              minW="0"
+              overflow="hidden"
+              size="sm"
+              variant="ghost"
+              onFocus={preloadWorkflowLibraryDialog}
+              onPointerEnter={preloadWorkflowLibraryDialog}
+            >
+              <MiddleTruncate
+                color={workflowName ? undefined : 'fg.subtle'}
+                fontWeight="600"
+                minW="0"
+                text={displayName}
+              />
+              <Icon as={linkIcon} boxSize="3.5" color="fg.subtle" data-template-link={linkKind} flexShrink={0} />
+              <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />
+            </Button>
+          </Menu.Trigger>
+        </Tooltip>
+        <Portal>
+          <Menu.Positioner>
+            <WorkflowSwitcherContent activeWorkflowId={activeWorkflowId} onOpenLibrary={openProjectWorkflows} />
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
       <VisuallyHidden id={linkDescriptionId}>{linkDescription}</VisuallyHidden>
     </HStack>
   );
 };
 
-// Clipped, but with room for the name button's focus ring.
+const WORKFLOW_SWITCHER_POSITIONING = { placement: 'bottom-start' } as const;
+
 const LABEL_CLIP_CSS = { overflow: 'clip', overflowClipMargin: '4px' } as const;
 
-/** Entries contributed to the shared widget actions menu. */
-export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
+/** Below this width Undo and Redo give way first; the ⋯ menu offers them while they are hidden. */
+const HEADER_HISTORY_CSS = { '@container (width < 24rem)': { display: 'none' } } as const;
+
+/** Per widget instance and region: each header has its own width, and each ⋯ menu asks after its own header. */
+const headerHistoryStore = createExternalStore<{ hiddenIn: Readonly<Record<string, true>> }>({ hiddenIn: {} });
+
+const getHeaderKey = ({ region, runtime }: WorkflowWidgetViewProps) => `${runtime.instanceId}\0${region}`;
+
+const setHeaderHistoryHidden = (key: string, hidden: boolean) => {
+  const { hiddenIn } = headerHistoryStore.getSnapshot();
+
+  if (Boolean(hiddenIn[key]) === hidden) {
+    return;
+  }
+
+  const { [key]: _removed, ...rest } = hiddenIn;
+  headerHistoryStore.setSnapshot({ hiddenIn: hidden ? { ...rest, [key]: true } : rest });
+};
+
+/** Tracks one header's history group: a group the narrow header hides has no width. Leaving forgets only its entry. */
+const useHeaderHistoryObserver = (key: string) =>
+  useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!element) {
+        return undefined;
+      }
+
+      const update = () => setHeaderHistoryHidden(key, element.getBoundingClientRect().width === 0);
+      // A group hidden from the start never reports a size, so read it once now.
+      update();
+      const observer = new ResizeObserver(update);
+      observer.observe(element);
+
+      return () => {
+        observer.disconnect();
+        setHeaderHistoryHidden(key, false);
+      };
+    },
+    [key]
+  );
+
+const WorkflowHistoryMenuItems = () => {
+  const { t } = useTranslation();
+  const { CommandShortcut } = useWorkflowUi();
+  const canUndo = useWorkflowProjectSelector((project) => project.canUndo);
+  const canRedo = useWorkflowProjectSelector((project) => project.canRedo);
+  const { redo, undo } = useProjectGraphCommands();
+  const undoShortcut = useMemo(() => <CommandShortcut commandId="workflows.undo" />, [CommandShortcut]);
+  const redoShortcut = useMemo(() => <CommandShortcut commandId="workflows.redo" />, [CommandShortcut]);
+  // The click event must not reach a step that takes an optional target.
+  const onUndo = useCallback(() => undo(), [undo]);
+  const onRedo = useCallback(() => redo(), [redo]);
+
+  return (
+    <>
+      <MenuActionItem
+        disabled={!canUndo}
+        icon={Undo2Icon}
+        label={t('widgets.workflow.toolbar.undo')}
+        shortcut={undoShortcut}
+        value="undo"
+        onSelect={onUndo}
+      />
+      <MenuActionItem
+        disabled={!canRedo}
+        icon={Redo2Icon}
+        label={t('widgets.workflow.toolbar.redo')}
+        shortcut={redoShortcut}
+        value="redo"
+        onSelect={onRedo}
+      />
+      <Menu.Separator />
+    </>
+  );
+};
+
+const EXPORT_SUBMENU_POSITIONING = { placement: 'right-start' } as const;
+
+export const WorkflowMenuItems = (props: WorkflowWidgetViewProps) => {
   const { t } = useTranslation();
   const session = useAuthSession();
   const { getProjectGraph } = useWorkflowUi();
   const { widgets } = useWorkflowHostCommands();
-  const { createWorkflow } = useProjectGraphCommands();
   const notify = useWorkflowNotifications();
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
   const source = useWorkflowProjectSelector((project) => project.activeWorkflow.source);
+  const workflowName = useWorkflowProjectSelector((project) => project.activeWorkflow.document.name);
+  const pngExport = useWorkflowPngExportState();
+  // One export runs at a time, from here or the editor toolbar.
+  const downloadPngUnavailableReason = pngExport.isExporting
+    ? t('widgets.workflow.downloadPngRunning')
+    : pngExport.isAvailable
+      ? undefined
+      : t('widgets.workflow.downloadPngUnavailable');
   const canUpdateSource = isUpdatableSource(source, session);
+  const headerKey = getHeaderKey(props);
+  const isHeaderHistoryHidden = headerHistoryStore.useSelector((snapshot) => Boolean(snapshot.hiddenIn[headerKey]));
 
   const openDetailsPanel = useCallback(() => {
     widgets.open({ region: 'left', widgetId: 'workflow' });
@@ -247,6 +543,10 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
       .then(() => notify.success(t('widgets.workflow.copyJsonSuccess')))
       .catch(() => notify.error(t('widgets.workflow.copyJsonFailed')));
   }, [getProjectGraph, notify, t]);
+  const downloadPng = useCallback(
+    () => void exportWorkflowPng({ notifications: notify, t, workflowName }),
+    [notify, t, workflowName]
+  );
   const saveToLibrary = useCallback(
     () => requestWorkflowPublication({ kind: 'save-as-new', workflowId: activeWorkflowId }),
     [activeWorkflowId]
@@ -255,46 +555,93 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
     () => requestWorkflowPublication({ kind: 'update-source', workflowId: activeWorkflowId }),
     [activeWorkflowId]
   );
-  const openLibrary = useCallback(() => setWorkflowLibraryOpen(true), []);
   const renameActiveWorkflow = useCallback(() => requestWorkflowRename(activeWorkflowId), [activeWorkflowId]);
-  // Nothing is replaced: a new workflow is added beside the others, so no confirmation stands in the way.
-  const newWorkflow = useCallback(() => createWorkflow(), [createWorkflow]);
 
   return (
-    <Menu.ItemGroup>
-      <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
-        {t('widgets.labels.workflow')}
-      </Menu.ItemGroupLabel>
-      <Menu.Item value="details" onClick={openDetailsPanel}>
-        {t('widgets.workflow.detailsWithEllipsis')}
-      </Menu.Item>
-      <Menu.Item value="rename" onClick={renameActiveWorkflow}>
-        {t('widgets.workflow.renameWithEllipsis')}
-      </Menu.Item>
-      <Menu.Item value="library" onClick={openLibrary}>
-        {t('widgets.workflow.libraryWithEllipsis')}
-      </Menu.Item>
-      <Menu.Item value="save-to-library" onClick={saveToLibrary}>
-        {t('widgets.workflow.saveToLibraryWithEllipsis')}
-      </Menu.Item>
-      {canUpdateSource ? (
-        <Menu.Item value="update-template" onClick={updateTemplate}>
-          {t('widgets.workflow.updateTemplateWithEllipsis')}
-        </Menu.Item>
-      ) : null}
-      <Menu.Item value="import" onClick={requestWorkflowImport}>
-        {t('widgets.workflow.importJsonWithEllipsis')}
-      </Menu.Item>
-      <Menu.Item value="export" onClick={exportWorkflow}>
-        {t('widgets.workflow.exportJson')}
-      </Menu.Item>
-      <MenuItem unavailableReason={copyUnavailableReason} value="copy" onClick={copyWorkflow}>
-        {t('widgets.workflow.copyJson')}
-      </MenuItem>
-      <Menu.Item value="new" onClick={newWorkflow}>
-        {t('widgets.workflow.newWorkflow')}
-      </Menu.Item>
-    </Menu.ItemGroup>
+    <>
+      {isHeaderHistoryHidden ? <WorkflowHistoryMenuItems /> : null}
+      <Menu.ItemGroup>
+        <Menu.ItemGroupLabel>{t('widgets.workflow.menuThisWorkflow')}</Menu.ItemGroupLabel>
+        <MenuActionItem
+          icon={PencilIcon}
+          label={t('widgets.workflow.renameWithEllipsis')}
+          value="rename"
+          onSelect={renameActiveWorkflow}
+        />
+        <MenuActionItem
+          icon={InfoIcon}
+          label={t('widgets.workflow.detailsWithEllipsis')}
+          value="details"
+          onSelect={openDetailsPanel}
+        />
+        {/* Saving always creates a template; beside Update, a linked workflow's save says so. */}
+        <MenuActionItem
+          icon={BookmarkIcon}
+          label={t(
+            canUpdateSource
+              ? 'widgets.workflow.saveAsNewTemplateWithEllipsis'
+              : 'widgets.workflow.saveToLibraryWithEllipsis'
+          )}
+          value="save-to-library"
+          onSelect={saveToLibrary}
+        />
+        {canUpdateSource ? (
+          <MenuActionItem
+            icon={BookUpIcon}
+            label={t('widgets.workflow.updateTemplateWithEllipsis')}
+            value="update-template"
+            onSelect={updateTemplate}
+          />
+        ) : null}
+      </Menu.ItemGroup>
+      <Menu.Separator />
+      <Menu.ItemGroup>
+        <Menu.ItemGroupLabel>{t('widgets.workflow.menuImportExport')}</Menu.ItemGroupLabel>
+        <MenuActionItem
+          icon={UploadIcon}
+          label={t('widgets.workflow.importJsonWithEllipsis')}
+          value="import"
+          onSelect={requestWorkflowImport}
+        />
+        <Menu.Root positioning={EXPORT_SUBMENU_POSITIONING}>
+          <Menu.TriggerItem>
+            <HStack gap="2" minW="0" w="full">
+              <Icon as={FileDownIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+              <Text flex="1" fontSize="md">
+                {t('widgets.workflow.export')}
+              </Text>
+              <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+            </HStack>
+          </Menu.TriggerItem>
+          <Portal>
+            <Menu.Positioner>
+              <MenuContent minW="12rem">
+                <MenuActionItem
+                  icon={DownloadIcon}
+                  label={t('widgets.workflow.exportJson')}
+                  value="export-json"
+                  onSelect={exportWorkflow}
+                />
+                <MenuActionItem
+                  icon={CopyIcon}
+                  label={t('widgets.workflow.copyJson')}
+                  unavailableReason={copyUnavailableReason}
+                  value="copy-json"
+                  onSelect={copyWorkflow}
+                />
+                <MenuActionItem
+                  icon={CameraIcon}
+                  label={t('widgets.workflow.downloadPng')}
+                  unavailableReason={downloadPngUnavailableReason}
+                  value="download-png"
+                  onSelect={downloadPng}
+                />
+              </MenuContent>
+            </Menu.Positioner>
+          </Portal>
+        </Menu.Root>
+      </Menu.ItemGroup>
+    </>
   );
 };
 
@@ -303,7 +650,38 @@ const selectPersistenceView = (persistence: WorkflowProjectPersistence) => ({
   status: persistence.status,
 });
 
-export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
+const WorkflowHistoryActions = () => {
+  const { t } = useTranslation();
+  const { CommandShortcut } = useWorkflowUi();
+  const canUndo = useWorkflowProjectSelector((project) => project.canUndo);
+  const canRedo = useWorkflowProjectSelector((project) => project.canRedo);
+  const { redo, undo } = useProjectGraphCommands();
+  const undoShortcut = useMemo(() => <CommandShortcut commandId="workflows.undo" />, [CommandShortcut]);
+  const redoShortcut = useMemo(() => <CommandShortcut commandId="workflows.redo" />, [CommandShortcut]);
+
+  return (
+    <>
+      <HeaderHistoryButton
+        available={canUndo}
+        icon={Undo2Icon}
+        label={t('widgets.workflow.toolbar.undo')}
+        shortcut={undoShortcut}
+        onStep={undo}
+      />
+      <HeaderHistoryButton
+        available={canRedo}
+        icon={Redo2Icon}
+        label={t('widgets.workflow.toolbar.redo')}
+        shortcut={redoShortcut}
+        onStep={redo}
+      />
+    </>
+  );
+};
+
+export const WorkflowHeaderActions = (props: WorkflowWidgetViewProps) => {
+  const { region } = props;
+  const observeHeaderHistory = useHeaderHistoryObserver(getHeaderKey(props));
   const { t } = useTranslation();
   const session = useAuthSession();
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
@@ -325,6 +703,8 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
   // A pending save without browser recovery has no safety net at all; say so rather than showing the same cloud.
   const persistenceLabel =
     status === 'pending' && !hasLocalRecovery ? t('widgets.workflow.persistencePendingNoRecovery') : t(view.labelKey);
+  // History steps show wherever the editor renders; the left region's linear form has no editor.
+  const showsHistory = region !== 'left';
 
   return (
     <HStack gap="0.5">
@@ -341,8 +721,14 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
           </IconButton>
         </Tooltip>
       ) : null}
-      {/* Center labels already open the project's workflows; other regions need this separate trigger and leave
-          publication and persistence to the editor header. */}
+      {showsHistory ? (
+        <HStack ref={observeHeaderHistory} css={HEADER_HISTORY_CSS} gap="0.5">
+          {region === 'center' ? <HeaderActionDivider /> : null}
+          <WorkflowHistoryActions />
+          <HeaderActionDivider />
+        </HStack>
+      ) : null}
+      {/* The center label's menu already opens the library. */}
       {region === 'center' ? null : (
         <Tooltip content={t('widgets.workflow.library')}>
           <IconButton
@@ -351,6 +737,8 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
             size="sm"
             variant="ghost"
             onClick={openWorkflowLibrary}
+            onFocus={preloadWorkflowLibraryDialog}
+            onPointerEnter={preloadWorkflowLibraryDialog}
           >
             <Icon as={LibraryIcon} boxSize="3.5" />
           </IconButton>
@@ -413,9 +801,12 @@ export const WorkflowDialogHost = () => {
   const importRequestCount = workflowUiStore.useSelector((snapshot) => snapshot.importRequestCount);
   const isAddNodeOpen = workflowUiStore.useSelector((snapshot) => snapshot.isAddNodeOpen);
   const isLibraryOpen = workflowUiStore.useSelector((snapshot) => snapshot.isLibraryOpen);
+  const [hasOpenedLibrary, setHasOpenedLibrary] = useState(isLibraryOpen);
+  if (isLibraryOpen && !hasOpenedLibrary) {
+    setHasOpenedLibrary(true);
+  }
   const lastImportRequestRef = useRef(importRequestCount);
-  // A rename request opens the dialog once, for the workflow it named, and only while that workflow is the active
-  // one; closing records the request as handled.
+  // A rename request opens once, only while its workflow is active; closing records it as handled.
   const renameRequest = workflowUiStore.useSelector((snapshot) => snapshot.renameRequest);
   const [handledRenameRequestId, setHandledRenameRequestId] = useState(0);
   const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
@@ -479,7 +870,6 @@ export const WorkflowDialogHost = () => {
     // The middle of the editor, wherever its window or panel sits, not of the browser window.
     const center = getWorkflowViewCenter() ?? { x: 0, y: 0 };
 
-    // Slight scatter so repeated inserts do not stack perfectly.
     return { x: center.x + (Math.random() - 0.5) * 80, y: center.y + (Math.random() - 0.5) * 80 };
   }, [addNodePosition]);
 
@@ -674,7 +1064,8 @@ export const WorkflowDialogHost = () => {
         onAddNote={addNote}
         onOpenChange={setAddNodeOpen}
       />
-      <WorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
+      {/* Kept mounted after the first open, so exit transitions, close reset and remembered place behave as usual. */}
+      {hasOpenedLibrary ? <WorkflowLibraryDialogLoader isOpen={isLibraryOpen} /> : null}
       <LibraryCopyChoiceHost />
       <RenameDialog
         key={renameRequest?.requestId ?? 0}
