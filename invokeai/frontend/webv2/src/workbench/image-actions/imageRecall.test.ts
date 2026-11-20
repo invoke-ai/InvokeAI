@@ -2423,6 +2423,18 @@ describe('recall onto a panel holding unused standalone components', () => {
       );
     });
 
+    // A 7.0 server stamps the version on records of the legacy frontend too; only webv2 writes `rand_device`.
+    it('keeps the standalone SD 3 encoders for a legacy frontend record stamped by a 7.0 server', () => {
+      const shape = { label: 'diffusers', overrides: { format: 'diffusers' } };
+      const { model } = satisfiedSettingsFor('sd-3', shape);
+      const { settings: filled } = fullyFilledSettingsFor('sd-3', shape);
+      const encoders = ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel'] as const;
+      const recorded = { ...filled, ...Object.fromEntries(encoders.map((key) => [key, null])) } as GenerateSettings;
+      const values = recallStripped(model, recorded, filled, ['rand_device'], '7.0.0');
+
+      expect(encoders.map((key) => values[key]?.key ?? null)).toEqual(encoders.map((key) => filled[key]!.key));
+    });
+
     it.each(['krea-2', 'qwen-image-2-1'] as const)(
       'clears the Vision Tower a %s panel holds when the recorded run used none',
       (base) => {

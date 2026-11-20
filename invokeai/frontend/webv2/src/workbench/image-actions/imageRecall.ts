@@ -991,19 +991,28 @@ const SETTINGS_RECORDED_WHEN_LOADED: Partial<Record<string, readonly RecalledCom
 
 /**
  * Writers that passed a component to their loader without recording it, so its absence from their records proves
- * nothing. A record names the writer through `app_version`; one without it is the current writer's.
+ * nothing. The server stamps `app_version`, so it dates a writer but cannot tell the webv2 writer from the legacy
+ * frontend, which a 7.0 server also stamps. webv2 always records `rand_device`; the legacy SD 3 and Z-Image builders
+ * never do. A record without `app_version` is the current writer's.
  */
 const UNRECORDING_WRITERS: readonly {
   base: string;
   /** The first version that recorded the settings. */
   recordedFrom: string;
   settings: readonly RecalledComponentSetting[];
+  /** The legacy frontend, which writes no `rand_device`, omitted them too, whatever the server version. */
+  legacyFrontendOmits?: true;
 }[] = [
   // v6.10.0rc1 sent `qwen3_source_model` to the loader but never wrote `qwen3_source`.
   { base: 'z-image', recordedFrom: '6.10.0rc2', settings: ['componentSourceModel'] },
-  // The legacy frontend passed standalone T5 and CLIP encoders to the loader and wrote none of them; webv2 recorded
+  // The legacy frontend passes standalone T5 and CLIP encoders to the loader and writes none of them; webv2 recorded
   // them from 7.0.0-beta.2.
-  { base: 'sd-3', recordedFrom: '7.0.0-beta.2', settings: ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel'] },
+  {
+    base: 'sd-3',
+    legacyFrontendOmits: true,
+    recordedFrom: '7.0.0-beta.2',
+    settings: ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel'],
+  },
 ];
 
 const PRE_RELEASE_RANK: Record<string, number> = { a: 0, alpha: 0, b: 1, beta: 1, rc: 2 };
@@ -1033,7 +1042,10 @@ const isWriterBefore = (metadata: unknown, version: string): boolean => {
 const mayHaveOmittedSetting = (metadata: unknown, base: string, setting: RecalledComponentSetting): boolean =>
   UNRECORDING_WRITERS.some(
     (writer) =>
-      writer.base === base && writer.settings.includes(setting) && isWriterBefore(metadata, writer.recordedFrom)
+      writer.base === base &&
+      writer.settings.includes(setting) &&
+      (isWriterBefore(metadata, writer.recordedFrom) ||
+        (writer.legacyFrontendOmits === true && isRecord(metadata) && !('rand_device' in metadata)))
   );
 
 const getRecalledComponent = (
