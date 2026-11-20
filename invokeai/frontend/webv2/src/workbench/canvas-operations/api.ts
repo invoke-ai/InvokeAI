@@ -96,5 +96,6 @@ export {
   type FilterParamSpec,
 } from './filterGraphs';
 export { readLastUsedFilterType, recordLastUsedFilterType } from './filterPreferences';
+export { advanceMaskFillColors, nextMaskFillColor } from '@workbench/canvas-engine/document/maskFillPalette';
 export { buildSamGraph, documentToExportLocalSamInput, isSamDocumentInputValid, isSamInputValid } from './samGraph';
 export { isSamRunError } from './selectObjectSession';

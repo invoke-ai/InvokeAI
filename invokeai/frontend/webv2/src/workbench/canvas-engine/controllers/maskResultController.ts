@@ -2,14 +2,13 @@ import type { CommitMaskImageResult, CommitMaskImageResultOptions } from '@workb
 
 import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import {
-  advanceMaskFillColors,
   createInpaintMaskFromImage,
   createRegionalGuidanceFromImage,
   DEFAULT_INPAINT_MASK_FILL,
   nextInpaintMaskName,
-  nextMaskFillColor,
   nextRegionalGuidanceName,
 } from '@workbench/canvas-engine/document/layerFactories';
+import { advanceMaskFillColors, nextMaskFillColor } from '@workbench/canvas-engine/document/maskFillPalette';
 import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 
 import type { CanvasMutationContext } from './mutationContext';

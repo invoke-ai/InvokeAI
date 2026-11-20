@@ -10,47 +10,10 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createDefaultControlAdapter } from '@workbench/controlAdapters';
 
 export const DEFAULT_INPAINT_MASK_FILL = { color: '#e07575', style: 'diagonal' } as const;
-const MASK_FILL_COLORS = [
-  '#e07575',
-  '#83d683',
-  '#F59E42',
-  '#F4D35E',
-  '#38C9C5',
-  '#62B5F5',
-  '#637BE8',
-  '#AD80E8',
-  '#ED79BA',
-  '#B7D65A',
-] as const;
-
-type MaskLayerKind = 'inpaint_mask' | 'regional_guidance';
-
-const firstColorIndex = { inpaint_mask: 0, regional_guidance: 1 };
-const nextColorIndex = { ...firstColorIndex };
-let isColorResetRegistered = false;
-
-export const DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR = MASK_FILL_COLORS[1];
-
-export const nextMaskFillColor = (kind: MaskLayerKind, offset = 0): string =>
-  MASK_FILL_COLORS[(nextColorIndex[kind] + offset) % MASK_FILL_COLORS.length]!;
-
-export const advanceMaskFillColors = (kind: MaskLayerKind, count = 1): void => {
-  // Register on first advance: a top-level call would keep this module in every bundle that imports the Canvas API.
-  if (!isColorResetRegistered) {
-    isColorResetRegistered = true;
-    registerAccountOwnedResource({
-      clear: () => {
-        Object.assign(nextColorIndex, firstColorIndex);
-      },
-      name: 'canvas-mask-fill-colors',
-    });
-  }
-  nextColorIndex[kind] = (nextColorIndex[kind] + count) % MASK_FILL_COLORS.length;
-};
+export const DEFAULT_REGIONAL_GUIDANCE_FILL_COLOR = '#83d683';
 
 export const nextNumberedName = (prefix: string, existingNames: readonly string[]): string => {
   const expression = new RegExp(`^${prefix} (\\d+)$`);
