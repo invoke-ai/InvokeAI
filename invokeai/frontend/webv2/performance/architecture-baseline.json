@@ -510,6 +510,7 @@
           "source:src/app/WorkflowCommandShortcut.tsx",
           "source:src/app/WorkflowUiAdapter.tsx",
           "source:src/app/accountLifecycle.ts",
+          "source:src/app/galleryItemMenu.tsx",
           "source:src/app/loggingRuntime.ts",
           "source:src/app/main.tsx",
           "source:src/app/queueStagedResults.ts",

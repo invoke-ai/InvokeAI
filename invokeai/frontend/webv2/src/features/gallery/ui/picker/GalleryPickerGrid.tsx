@@ -8,6 +8,7 @@ import { toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
 import { getGalleryColumnCountForCell } from '@features/gallery/ui/galleryGridLayout';
 import { GalleryTileFrame, GalleryTileMedia } from '@features/gallery/ui/GalleryTileFrame';
+import { useGalleryItemContextMenu } from '@features/gallery/ui/GalleryUiContext';
 import { Button } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { CheckIcon } from 'lucide-react';
@@ -75,6 +76,7 @@ const GalleryPickerTile = memo(function GalleryPickerTile({
   const { t } = useTranslation();
   const key = toGalleryItemKey(item);
   const css = useMemo(() => getTileCss(state, index === activeIndex), [activeIndex, index, state]);
+  const onContextMenu = useGalleryItemContextMenu(item);
   const unsupportedLabel =
     state === 'unsupported'
       ? t(item.kind === 'video' ? 'widgets.gallery.picker.unsupportedVideo' : 'widgets.gallery.picker.unsupportedImage')
@@ -94,6 +96,7 @@ const GalleryPickerTile = memo(function GalleryPickerTile({
       item={item}
       role="option"
       title={unsupportedLabel}
+      onContextMenu={onContextMenu}
     >
       <GalleryTileMedia
         fit="square"
