@@ -2408,7 +2408,10 @@ describe('recall onto a panel holding unused standalone components', () => {
     it.each([
       ['6.14.4', true],
       ['7.0.0-alpha.4', true],
+      ['7.0.0-beta.1', true],
       ['7.0.0-beta.2', false],
+      ['7.0.0-beta.2-post1', false],
+      ['7.0.0', false],
     ] as const)('keeps the standalone SD 3 encoders for a %s record', (appVersion, keeps) => {
       const shape = { label: 'diffusers', overrides: { format: 'diffusers' } };
       const { model } = satisfiedSettingsFor('sd-3', shape);
@@ -2430,7 +2433,7 @@ describe('recall onto a panel holding unused standalone components', () => {
       const { settings: filled } = fullyFilledSettingsFor('sd-3', shape);
       const encoders = ['clipGEmbedModel', 'clipLEmbedModel', 't5EncoderModel'] as const;
       const recorded = { ...filled, ...Object.fromEntries(encoders.map((key) => [key, null])) } as GenerateSettings;
-      const values = recallStripped(model, recorded, filled, ['rand_device'], '7.0.0');
+      const values = recallStripped(model, recorded, filled, ['rand_device'], '7.0.0-beta.2-post1');
 
       expect(encoders.map((key) => values[key]?.key ?? null)).toEqual(encoders.map((key) => filled[key]!.key));
     });
