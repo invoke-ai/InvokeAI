@@ -15,7 +15,7 @@ import {
   seedArchitectureCapabilities,
 } from '@features/models/core/architectureCapabilities.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { createControlLayer, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { createControlLayer, getDocumentLeaves, nextMaskFillColor } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import {
@@ -624,6 +624,24 @@ describe('importGalleryImagesToCanvas', () => {
     expect(result).toEqual({ status: 'blocked' });
     expect(commitStructural).toHaveBeenCalledOnce();
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('reports blocked and keeps the mask colors when the project refuses the ingested layers', async () => {
+    const { project, state } = withProject();
+    const applyCanvasMutation = vi.fn(() => false);
+
+    const result = await importGalleryImagesToCanvas({
+      applyCanvasMutation,
+      destination: 'regional-guidance',
+      engine: null,
+      ...queriesFor(() => state),
+      images: [image('a.png'), image('b.png')],
+      project,
+    });
+
+    expect(result).toEqual({ status: 'blocked' });
+    expect(applyCanvasMutation).toHaveBeenCalledOnce();
+    expect(nextMaskFillColor('regional_guidance')).toBe('#83d683');
   });
 
   it('returns stale-document when the captured target document identity changes', async () => {

@@ -457,8 +457,13 @@ export const compositeDocument = (
       const scratch = getScratch(area.width, area.height);
       usedMaskScratch = true;
       const stencil = scratch.ctx;
+      stencil.save();
       identityTransform(stencil);
       stencil.clearRect(0, 0, area.width, area.height);
+      // The retained scratch can be far larger than a small repaint; drawing the whole mask across it is the cost.
+      stencil.beginPath();
+      stencil.rect(0, 0, area.width, area.height);
+      stencil.clip();
       stencil.globalCompositeOperation = 'source-over';
       stencil.imageSmoothingEnabled = ctx.imageSmoothingEnabled;
       setTransformFromMat(stencil, { ...matrix, e: matrix.e - area.x, f: matrix.f - area.y });
@@ -470,6 +475,7 @@ export const compositeDocument = (
       stencil.globalCompositeOperation = 'source-in';
       stencil.fillStyle = stencil.createPattern(tile.canvas, 'repeat') ?? fill.color;
       stencil.fillRect(area.x / dpr, area.y / dpr, area.width / dpr, area.height / dpr);
+      stencil.restore();
 
       ctx.save();
       identityTransform(ctx);

@@ -356,9 +356,9 @@ export const importGalleryImagesToCanvas = async (options: {
       if (committed.status !== 'committed') {
         return { status: 'blocked' };
       }
-    } else {
-      // Without a live canvas session, import through ingestion.
-      applyCanvasMutation(project.id, forward);
+    } else if (applyCanvasMutation(project.id, forward) === false) {
+      // Without a live canvas session, import through ingestion; `false` means the project refused the layers.
+      return { status: 'blocked' };
     }
     const layerKind = layers[0]?.type;
     if (layerKind === 'inpaint_mask' || layerKind === 'regional_guidance') {

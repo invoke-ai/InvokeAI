@@ -462,7 +462,17 @@ const CONTROL_DERIVATION_KEYS = ['controlType', 'detection', 'original', 'origin
 const controlLayerRequiresV6 = (node: Record<string, unknown>): boolean =>
   node.type === 'control' && CONTROL_DERIVATION_KEYS.some((key) => node[key] !== undefined);
 
+// A v7 reader drops a raster regenerate region whose fill it cannot parse instead of refusing the document.
+const rasterRegionRequiresV8 = (node: Record<string, unknown>): boolean =>
+  node.type === 'raster' &&
+  isRecord(node.inpaint) &&
+  isRecord(node.inpaint.fill) &&
+  node.inpaint.fill.style === 'diagonal_left';
+
 const ownSchemaRequirement = (node: Record<string, unknown>): CanvasSchemaVersion => {
+  if (rasterRegionRequiresV8(node)) {
+    return 8;
+  }
   if (controlLayerRequiresV6(node)) {
     return 6;
   }
@@ -474,7 +484,8 @@ const ownSchemaRequirement = (node: Record<string, unknown>): CanvasSchemaVersio
 
 /**
  * The newest schema a node or any descendant needs. v4: custom-font typography. v5: a noise or spatial adjustment,
- * enabled or not, which a v4 reader would drop. v6: control derivation fields.
+ * enabled or not, which a v4 reader would drop. v6: control derivation fields. v8: a Diagonal Left raster regenerate
+ * region.
  */
 const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
   if (!isRecord(node)) {

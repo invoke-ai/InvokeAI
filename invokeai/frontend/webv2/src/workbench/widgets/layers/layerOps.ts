@@ -411,17 +411,17 @@ const clonePixelSource = (layer: PixelLayer): CanvasPixelSourceContract | null =
   return null;
 };
 
-const pixelLayerToMask = (layer: PixelLayer): CanvasMaskContract | null => {
+const pixelLayerToMask = (layer: PixelLayer, color: string): CanvasMaskContract | null => {
   const source = clonePixelSource(layer);
   if (!source) {
     return null;
   }
   if (source.type === 'image') {
-    return { bitmap: source.image, fill: { ...DEFAULT_INPAINT_MASK_FILL } };
+    return { bitmap: source.image, fill: { ...DEFAULT_INPAINT_MASK_FILL, color } };
   }
   return {
     bitmap: source.bitmap,
-    fill: { ...DEFAULT_INPAINT_MASK_FILL },
+    fill: { ...DEFAULT_INPAINT_MASK_FILL, color },
     offset: source.offset,
   };
 };
@@ -461,18 +461,20 @@ const pixelLayerToControl = (
 const pixelLayerToInpaintMask = (
   layer: PixelLayer,
   id: string,
-  isCopy: boolean
+  isCopy: boolean,
+  color: string
 ): CanvasInpaintMaskLayerContract | null => {
-  const mask = pixelLayerToMask(layer);
+  const mask = pixelLayerToMask(layer, color);
   return mask ? { ...destinationBase(layer, id, isCopy), mask, type: 'inpaint_mask' } : null;
 };
 
 const pixelLayerToRegionalGuidance = (
   layer: PixelLayer,
   id: string,
-  isCopy: boolean
+  isCopy: boolean,
+  color: string
 ): CanvasRegionalGuidanceLayerContract | null => {
-  const mask = pixelLayerToMask(layer);
+  const mask = pixelLayerToMask(layer, color);
   return mask
     ? {
         ...destinationBase(layer, id, isCopy),
@@ -492,27 +494,33 @@ export const copyRasterToControl = (
   base?: string | null
 ): CanvasControlLayerContract | null => pixelLayerToControl(layer, id, true, base);
 
+// Pixel layers carry no mask color; callers pass the destination palette's next color.
 export const copyRasterToInpaintMask = (
   layer: CanvasRasterLayerContractV2,
-  id: string
-): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, id, true);
+  id: string,
+  color: string
+): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, id, true, color);
 
 export const copyRasterToRegionalGuidance = (
   layer: CanvasRasterLayerContractV2,
-  id: string
-): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, id, true);
+  id: string,
+  color: string
+): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, id, true, color);
 
 export const convertRasterToControl = (
   layer: CanvasRasterLayerContractV2,
   base?: string | null
 ): CanvasControlLayerContract | null => pixelLayerToControl(layer, layer.id, false, base);
 
-export const convertRasterToInpaintMask = (layer: CanvasRasterLayerContractV2): CanvasInpaintMaskLayerContract | null =>
-  pixelLayerToInpaintMask(layer, layer.id, false);
+export const convertRasterToInpaintMask = (
+  layer: CanvasRasterLayerContractV2,
+  color: string
+): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, layer.id, false, color);
 
 export const convertRasterToRegionalGuidance = (
-  layer: CanvasRasterLayerContractV2
-): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, layer.id, false);
+  layer: CanvasRasterLayerContractV2,
+  color: string
+): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, layer.id, false, color);
 
 export const copyControlToRaster = (
   layer: CanvasControlLayerContract,
@@ -524,13 +532,15 @@ export const copyControlToRaster = (
 
 export const copyControlToInpaintMask = (
   layer: CanvasControlLayerContract,
-  id: string
-): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, id, true);
+  id: string,
+  color: string
+): CanvasInpaintMaskLayerContract | null => pixelLayerToInpaintMask(layer, id, true, color);
 
 export const copyControlToRegionalGuidance = (
   layer: CanvasControlLayerContract,
-  id: string
-): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, id, true);
+  id: string,
+  color: string
+): CanvasRegionalGuidanceLayerContract | null => pixelLayerToRegionalGuidance(layer, id, true, color);
 
 export const copyMaskToRegionalGuidance = (
   layer: CanvasInpaintMaskLayerContract,

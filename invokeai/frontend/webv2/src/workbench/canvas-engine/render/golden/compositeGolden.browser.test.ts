@@ -234,11 +234,14 @@ describe('compositor goldens', () => {
     expect(target.ctx.getImageData(16, 24, 1, 1).data[3]).toBe(0);
 
     const fullFrame = read();
+    solid('#00ff00')(scratch.ctx, { height: HEIGHT, width: WIDTH, x: 0, y: 0 });
     compositeDocument(target, document, caches, zoomedView, {
       ...zoomedOptions,
       damage: { kind: 'regions', regions: [{ layerId: 'mask', rect: { height: 4, width: 4, x: 5, y: 5 } }] },
     });
     expect(read()).toEqual(fullFrame);
+    // A small repaint draws only its own corner of the retained scratch.
+    expect(Array.from(scratch.ctx.getImageData(80, 60, 1, 1).data)).toEqual([0, 255, 0, 255]);
   });
 
   it('draws a mask being edited over a staged candidate, which covers the raster beneath', async () => {

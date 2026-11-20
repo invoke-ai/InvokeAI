@@ -22,6 +22,7 @@ import { canCopyImage } from '@platform/browser/clipboard';
 import { IconButton, MenuActionItem, MenuContent, MenuIconItem, RenameDialog, Tooltip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  advanceMaskFillColors,
   canMergeSelectedRasters,
   getDocumentIndex,
   getDocumentLayer,
@@ -33,6 +34,7 @@ import {
   isNodeHidden,
   isOverlayStack,
   lookupDocumentNodeState,
+  nextMaskFillColor,
   renderableSourceOf,
 } from '@workbench/canvas-engine/api';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
@@ -463,9 +465,9 @@ const LayerMenu = ({
         layer.type === 'raster' && targetType === 'control'
           ? convertRasterToControl(layer, base)
           : layer.type === 'raster' && targetType === 'inpaint_mask'
-            ? convertRasterToInpaintMask(layer)
+            ? convertRasterToInpaintMask(layer, nextMaskFillColor('inpaint_mask'))
             : layer.type === 'raster' && targetType === 'regional_guidance'
-              ? convertRasterToRegionalGuidance(layer)
+              ? convertRasterToRegionalGuidance(layer, nextMaskFillColor('regional_guidance'))
               : targetType === 'raster'
                 ? convertRasterControlLayer(layer, 'raster')
                 : null;
@@ -476,6 +478,9 @@ const LayerMenu = ({
       // contract internally.
       if (!engine?.layers.commitLayerConversion(label, layer, converted)) {
         throw makeStatusError('not-ready');
+      }
+      if (converted.type === 'inpaint_mask' || converted.type === 'regional_guidance') {
+        advanceMaskFillColors(converted.type);
       }
     },
     [base, engine, layer, makeStatusError]
@@ -742,28 +747,36 @@ const LayerMenu = ({
 
   const handleCopyToInpaintMask = useCallback(() => {
     const id = createLayerId();
+    const color = nextMaskFillColor('inpaint_mask');
     const copied =
       layer.type === 'raster'
-        ? copyRasterToInpaintMask(layer, id)
+        ? copyRasterToInpaintMask(layer, id, color)
         : layer.type === 'control'
-          ? copyControlToInpaintMask(layer, id)
+          ? copyControlToInpaintMask(layer, id, color)
           : layer.type === 'regional_guidance'
             ? copyRegionalGuidanceToInpaintMask(layer, id)
             : null;
     addCopy(copied, getActionLabel('copy-to-inpaint-mask'));
+    if (layer.type === 'raster' || layer.type === 'control') {
+      advanceMaskFillColors('inpaint_mask');
+    }
   }, [addCopy, getActionLabel, layer]);
 
   const handleCopyToRegionalGuidance = useCallback(() => {
     const id = createLayerId();
+    const color = nextMaskFillColor('regional_guidance');
     const copied =
       layer.type === 'raster'
-        ? copyRasterToRegionalGuidance(layer, id)
+        ? copyRasterToRegionalGuidance(layer, id, color)
         : layer.type === 'control'
-          ? copyControlToRegionalGuidance(layer, id)
+          ? copyControlToRegionalGuidance(layer, id, color)
           : layer.type === 'inpaint_mask'
             ? copyMaskToRegionalGuidance(layer, id)
             : null;
     addCopy(copied, getActionLabel('copy-to-regional-guidance'));
+    if (layer.type === 'raster' || layer.type === 'control') {
+      advanceMaskFillColors('regional_guidance');
+    }
   }, [addCopy, getActionLabel, layer]);
 
   const handleCopyTo = useCallback(
