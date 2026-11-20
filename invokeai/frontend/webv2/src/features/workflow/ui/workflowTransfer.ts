@@ -4,8 +4,6 @@ import { serializeWorkflowJson } from '@features/workflow/utility';
 import { copyText } from '@platform/browser/clipboard';
 import { downloadText } from '@platform/browser/downloadBlob';
 
-/** Export-side helpers shared by the workflow menu items and panels. */
-
 export const downloadWorkflowJson = (document: ProjectGraphState): void => {
   downloadText(
     JSON.stringify(serializeWorkflowJson(document), null, 2),

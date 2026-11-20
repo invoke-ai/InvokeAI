@@ -5,8 +5,8 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
- * Choices applied to the next install from a source. FP8 storage is an opt-in only: identification already turns it
- * on for checkpoints whose weights are stored in FP8, so leaving the box unticked never turns that off.
+ * Choices applied to the next install from a source. FP8 storage is an opt-in only: identification already turns it on
+ * for checkpoints whose weights are stored in FP8, so leaving the box unticked never turns that off.
  */
 export const InstallOptions = ({
   fp8Storage,

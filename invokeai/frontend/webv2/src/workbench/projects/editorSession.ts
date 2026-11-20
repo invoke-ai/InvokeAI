@@ -18,8 +18,8 @@ type AcquireLock = (name: string) => Promise<ExclusiveLockResult>;
 
 /**
  * A reload may claim its session before the old document has let the lock go, and a duplicated tab (copied session
- * storage) never gets it. The persisted id is retried this long before a session of its own is taken, so a reload
- * keeps its session, and with it its own unload journal entries, at the cost of a short wait for a duplicated tab.
+ * storage) never gets it. The persisted id is retried this long before a session of its own is taken, so a reload keeps
+ * its session, and with it its own unload journal entries, at the cost of a short wait for a duplicated tab.
  */
 const PERSISTED_CLAIM_RETRIES = 5;
 const PERSISTED_CLAIM_RETRY_MS = 100;
@@ -30,8 +30,8 @@ const waitFor = (ms: number): Promise<void> =>
   });
 
 /**
- * Whether a page still holds the editor session: its lock is released only when its last holder releases it or the
- * page goes away. False when it cannot be told (no Web Locks), so recovery then proceeds as if the page were gone.
+ * Whether a page still holds the editor session: its lock is released only when its last holder releases it or the page
+ * goes away. False when it cannot be told (no Web Locks), so recovery then proceeds as if the page were gone.
  */
 export const isEditorSessionLive = async (
   editorSessionId: string,

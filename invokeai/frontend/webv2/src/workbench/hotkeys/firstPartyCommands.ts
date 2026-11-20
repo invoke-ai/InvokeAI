@@ -21,7 +21,6 @@ import {
 } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { useWorkbenchFocus, useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
@@ -37,6 +36,7 @@ import {
 } from '@workbench/widgetPlacementCommands';
 import { getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
+import { describeCanvasInvocationFailure } from '@workbench/widgets/canvas/invoke/canvasInvocationFailure';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { resolvePanelToggle } from '@workbench/workbenchState';
@@ -133,17 +133,12 @@ export const useRegisterFirstPartyCommands = () => {
     void ensureModelsLoaded();
   });
 
-  /**
-   * Submits the active route. `destinationOverride` applies to this run only and
-   * is never written back to the project — "just this once, send it to the
-   * gallery" must not silently retarget every subsequent invoke. `prepend` is
-   * likewise per run: Invoke Front puts this batch ahead of the user's pending work.
-   */
+  /** Submits the active route; `destinationOverride` and `prepend` apply to this run only, never persisted. */
   const submitInvocation = async (destinationOverride?: ResultDestination, prepend = false) => {
     await submitActiveInvocation({
       commands,
       destinationOverride,
-      formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+      formatCanvasInvocationFailure: (failure) => describeCanvasInvocationFailure(t, failure),
       formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
       getModels: getAvailableModels,
       ...(prepend ? { prepend } : {}),
@@ -220,8 +215,8 @@ export const useRegisterFirstPartyCommands = () => {
 
       const didRecall = await executeImageRecall({
         commands,
-        // Re-read on every call: recall awaits the image record, and a snapshot from the keypress would overwrite
-        // edits and recalls committed meanwhile.
+        // Re-read on every call: recall awaits the image record, and a snapshot from the keypress would overwrite edits
+        // and recalls committed meanwhile.
         getGenerateValues: () => {
           const project = queries.getProject(activeProject.id);
 

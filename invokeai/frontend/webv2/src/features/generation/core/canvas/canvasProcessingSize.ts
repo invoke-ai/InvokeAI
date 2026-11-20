@@ -1,8 +1,8 @@
 /**
- * None snaps the bbox to the model grid; auto grows undersized content toward optimal area at its aspect ratio;
- * manual uses the selected size. Restore final output to the exact bbox. Hosted providers ignore the scaling method:
- * they are asked for one of their own sizes nearest the bbox (or the bbox itself when free-form), and the compiler
- * restores their output to the bbox.
+ * None snaps the bbox to the model grid; auto grows undersized content toward optimal area at its aspect ratio; manual
+ * uses the selected size. Restore final output to the exact bbox. Hosted providers ignore the scaling method: they are
+ * asked for one of their own sizes nearest the bbox (or the bbox itself when free-form), and the compiler restores
+ * their output to the bbox.
  */
 
 import type { GenerateModelConfig, PidMode } from '@features/generation/core/types';

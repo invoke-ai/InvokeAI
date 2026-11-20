@@ -74,7 +74,6 @@ const dragHandle = (name: string): HTMLButtonElement | null =>
 
 const presetRow = (id: string): HTMLElement | null => document.querySelector<HTMLElement>(`[data-list-row="${id}"]`);
 
-/** Both topbar hosts, as the app mounts them (StrictMode included), so the edit dialog stacks over the manager. */
 const renderTopBarDialogs = async () => {
   host = document.createElement('div');
   document.body.append(host);
@@ -136,7 +135,6 @@ describe('LayoutPresetManagerDialogBody', () => {
 
     const frames = await recordDialogExit(dialog, () => act(() => userEvent.click(done)));
 
-    // An unmounted dialog never reaches its closed state, so it cannot animate out; a retained one does, then leaves.
     expect(closingFrames(frames)).not.toHaveLength(0);
     await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
   });
@@ -197,8 +195,8 @@ describe('LayoutPresetManagerDialogBody', () => {
 
   it('reorders presets from a focused row handle with the keyboard', async () => {
     await renderManager();
-    // The dialog places its initial focus asynchronously after mount; focusing
-    // the handle before that lands would be undone by it.
+    // The dialog places its initial focus asynchronously after mount; focusing the handle before that lands would be
+    // undone by it.
     await expect.poll(() => document.querySelector('[role="dialog"]')?.contains(document.activeElement)).toBe(true);
     const handle = dragHandle('Custom');
     expect(handle).not.toBeNull();

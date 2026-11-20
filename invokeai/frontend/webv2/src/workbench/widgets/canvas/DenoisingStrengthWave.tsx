@@ -30,7 +30,6 @@ const WAVE_SEGMENTS = 5;
 /** Drawn at the summary text's line height so it sits in a section title row. */
 const WAVE_DISPLAY_HEIGHT = 10;
 
-/** A value-reactive wave whose amplitude shows the denoising strength. */
 export const DenoisingStrengthWave = ({ value }: { value: number }) => {
   const path = getDenoisingStrengthWavePath(value, WAVE_WIDTH, WAVE_HEIGHT, WAVE_SEGMENTS);
 

@@ -9,8 +9,8 @@ import { useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from '
 import { useTranslation } from 'react-i18next';
 
 /**
- * The detail rail's account of a workflow before it is opened: where it comes from, what its author says about it,
- * and what a person fills in. Read from the same preview model the stage draws, so the rail and the preview agree.
+ * The detail rail's account of a workflow before it is opened: where it comes from, what its author says about it, and
+ * what a person fills in. Read from the same preview model the stage draws, so the rail and the preview agree.
  */
 
 const NOTES_LINES = 3;

@@ -1,9 +1,9 @@
 /**
  * Gradient drag defines linear start/end or radial center/radius. Editable selected gradients update placement in
- * layer-local space while preserving kind/stops/extent; locked or hidden gradients, and a selected mask or region
- * (a gradient is a raster layer of its own), refuse at the press, with the not-allowed cursor beforehand. Otherwise
- * create a bbox-sized gradient from options. Preview/cancel never dispatch; one real drag makes one commit. Selection
- * masks do not clip parametric gradients.
+ * layer-local space while preserving kind/stops/extent; locked or hidden gradients, and a selected mask or region (a
+ * gradient is a raster layer of its own), refuse at the press, with the not-allowed cursor beforehand. Otherwise create
+ * a bbox-sized gradient from options. Preview/cancel never dispatch; one real drag makes one commit. Selection masks do
+ * not clip parametric gradients.
  */
 
 import type { CanvasLayerEditRefusal } from '@workbench/canvas-engine/capabilities';
@@ -44,9 +44,8 @@ const angleFromDrag = (start: Vec2, end: Vec2): number =>
   (Math.atan2(end.y - start.y, end.x - start.x) * 180) / Math.PI;
 
 /**
- * The placement a drag from `start` to `end` (layer-local px) gives a gradient:
- * a linear ramp is centered on the drag's midpoint and as long as the drag; a
- * radial one is centered on the press point with the drag length as radius.
+ * The placement a drag from `start` to `end` (layer-local px) gives a gradient: a linear ramp is centered on the drag's
+ * midpoint and as long as the drag; a radial one is centered on the press point with the drag length as radius.
  */
 export const placementFromDrag = (
   kind: 'linear' | 'radial',
@@ -86,7 +85,6 @@ const predictRefusal = (ctx: ToolContext): CanvasLayerEditRefusal | null => {
   return status ? { layerId: selected.id, layerName: selected.name, status } : null;
 };
 
-/** Creates a fresh gradient tool with its own gesture state. */
 export const createGradientTool = (): Tool => {
   let state: GestureState | null = null;
 
@@ -194,8 +192,7 @@ export const createGradientTool = (): Tool => {
 
       // New gradients use bbox size and origin; subtract that origin to map drag coordinates locally.
       const options = ctx.stores.gradientOptions.get();
-      // The built-in FG→BG preset resolves the pair now; custom stops are
-      // explicit and independent of later pair edits.
+      // The built-in FG→BG preset resolves the pair now; custom stops are explicit and ignore later pair edits.
       const pair = ctx.stores.colorPair.get();
       const stops =
         options.preset === 'pair'

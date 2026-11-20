@@ -11,7 +11,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { createBboxTool } from './bboxTool';
 
-// Grid-aligned start frame (grid 8) so a zero-net-move gesture is a true no-op.
 const bbox = { height: 96, width: 96, x: 16, y: 16 };
 
 const makeDoc = (): CanvasDocumentContractV3 => ({
@@ -24,8 +23,6 @@ const makeDoc = (): CanvasDocumentContractV3 => ({
   width: 512,
 });
 
-// Identity viewport: screen coordinates equal document coordinates (zoom 1, no pan),
-// so pointer inputs can use the same value for both spaces.
 const identityViewport = {
   documentToScreen: (p: Vec2): Vec2 => ({ x: p.x, y: p.y }),
 } as unknown as Viewport;
@@ -101,8 +98,8 @@ describe('bbox tool: move gesture', () => {
     const h = createHarness(makeDoc());
     const tool = createBboxTool();
 
-    down(tool, h.ctx, pointer(60, 60)); // inside the frame → move
-    move(tool, h.ctx, pointer(75, 75)); // delta (15,15) → moved
+    down(tool, h.ctx, pointer(60, 60));
+    move(tool, h.ctx, pointer(75, 75));
     expect(h.previewOf()).not.toBeNull();
 
     up(tool, h.ctx, pointer(75, 75));
@@ -112,7 +109,6 @@ describe('bbox tool: move gesture', () => {
     // origin snapped: 16+15 = 31 → grid 8 → 32.
     expect(h.commits[0]?.forward).toEqual({ bbox: { height: 96, width: 96, x: 32, y: 32 }, type: 'setCanvasBbox' });
     expect(h.commits[0]?.inverse).toEqual({ bbox: { ...bbox }, type: 'setCanvasBbox' });
-    // Preview cleared after commit.
     expect(h.previewOf()).toBeNull();
   });
 
@@ -214,8 +210,8 @@ describe('bbox tool: resize gesture', () => {
     const h = createHarness(makeDoc());
     const tool = createBboxTool();
 
-    down(tool, h.ctx, pointer(112, 112)); // SE corner handle
-    move(tool, h.ctx, pointer(130, 130)); // delta (18,18)
+    down(tool, h.ctx, pointer(112, 112));
+    move(tool, h.ctx, pointer(130, 130));
     up(tool, h.ctx, pointer(130, 130));
 
     expect(h.commits).toHaveLength(1);
@@ -226,9 +222,8 @@ describe('bbox tool: resize gesture', () => {
   it('constrains the ratio while shift is held on an unlocked frame', () => {
     const h = createHarness(makeDoc());
     const tool = createBboxTool();
-    // Start frame is square (96x96) → shift preserves 1:1.
     down(tool, h.ctx, pointer(112, 112));
-    move(tool, h.ctx, pointer(150, 112, { shift: true })); // widen only, ratio 1:1 keeps square
+    move(tool, h.ctx, pointer(150, 112, { shift: true }));
     up(tool, h.ctx, pointer(150, 112, { shift: true }));
     const out = h.commits[0]?.forward as { bbox: { width: number; height: number } };
     expect(out.bbox.width).toBe(out.bbox.height);
@@ -238,8 +233,8 @@ describe('bbox tool: resize gesture', () => {
     const h = createHarness(makeDoc());
     const tool = createBboxTool();
 
-    down(tool, h.ctx, pointer(112, 112)); // SE corner handle
-    move(tool, h.ctx, pointer(128, 128, { ctrl: true })); // delta (16,16), mirrored
+    down(tool, h.ctx, pointer(112, 112));
+    move(tool, h.ctx, pointer(128, 128, { ctrl: true }));
     up(tool, h.ctx, pointer(128, 128, { ctrl: true }));
 
     // Both sides move 16: 96 + 32 = 128 per axis, center held at (64,64).
@@ -267,7 +262,7 @@ describe('bbox tool: resize gesture', () => {
     const h = createHarness(makeDoc());
     const tool = createBboxTool();
 
-    down(tool, h.ctx, pointer(60, 60, { ctrl: true })); // inside the frame → move
+    down(tool, h.ctx, pointer(60, 60, { ctrl: true }));
     move(tool, h.ctx, pointer(76, 76, { ctrl: true }));
     up(tool, h.ctx, pointer(76, 76, { ctrl: true }));
 
@@ -280,8 +275,8 @@ describe('bbox tool: no-op cases', () => {
     const h = createHarness(makeDoc());
     const tool = createBboxTool();
     down(tool, h.ctx, pointer(60, 60));
-    move(tool, h.ctx, pointer(70, 70)); // crosses threshold → moved
-    move(tool, h.ctx, pointer(60, 60)); // back to origin
+    move(tool, h.ctx, pointer(70, 70));
+    move(tool, h.ctx, pointer(60, 60));
     up(tool, h.ctx, pointer(60, 60));
     expect(h.commits).toHaveLength(0);
     expect(h.dispatched).toHaveLength(0);
@@ -326,19 +321,18 @@ describe('bbox tool: hover cursors', () => {
   it('reflects the hovered handle/interior in the cursor and refreshes it on change', () => {
     const h = createHarness(makeDoc());
     const tool = createBboxTool();
-    // Hover (no gesture) then read the tool's CSS cursor. Frame is {16,16,96,96}.
     const cursorAt = (x: number, y: number): string | undefined => {
       move(tool, h.ctx, pointer(x, y));
       return tool.cursor?.(h.ctx);
     };
 
-    expect(cursorAt(112, 112)).toBe('nwse-resize'); // SE corner
-    expect(cursorAt(16, 112)).toBe('nesw-resize'); // SW corner
-    expect(cursorAt(16, 16)).toBe('nwse-resize'); // NW corner
-    expect(cursorAt(112, 16)).toBe('nesw-resize'); // NE corner
-    expect(cursorAt(64, 16)).toBe('ns-resize'); // N edge midpoint
-    expect(cursorAt(112, 64)).toBe('ew-resize'); // E edge midpoint
-    expect(cursorAt(64, 64)).toBe('move'); // interior
+    expect(cursorAt(112, 112)).toBe('nwse-resize');
+    expect(cursorAt(16, 112)).toBe('nesw-resize');
+    expect(cursorAt(16, 16)).toBe('nwse-resize');
+    expect(cursorAt(112, 16)).toBe('nesw-resize');
+    expect(cursorAt(64, 16)).toBe('ns-resize');
+    expect(cursorAt(112, 64)).toBe('ew-resize');
+    expect(cursorAt(64, 64)).toBe('move');
     expect(cursorAt(400, 400)).toBe('default');
     expect(h.ctx.updateCursor).toHaveBeenCalled();
   });
@@ -346,8 +340,8 @@ describe('bbox tool: hover cursors', () => {
   it('holds the grabbed handle cursor during a resize drag', () => {
     const h = createHarness(makeDoc());
     const tool = createBboxTool();
-    down(tool, h.ctx, pointer(112, 112)); // grab SE corner
-    move(tool, h.ctx, pointer(130, 130)); // dragging
+    down(tool, h.ctx, pointer(112, 112));
+    move(tool, h.ctx, pointer(130, 130));
     expect(tool.cursor?.(h.ctx)).toBe('nwse-resize');
   });
 });
@@ -359,7 +353,6 @@ describe('bbox tool: undo/redo contract', () => {
     down(tool, h.ctx, pointer(112, 112));
     move(tool, h.ctx, pointer(130, 130));
     up(tool, h.ctx, pointer(130, 130));
-    // The engine's commitStructural dispatches `inverse` on undo — restoring the original frame.
     expect(h.commits[0]?.inverse).toEqual({ bbox: { ...bbox }, type: 'setCanvasBbox' });
   });
 });

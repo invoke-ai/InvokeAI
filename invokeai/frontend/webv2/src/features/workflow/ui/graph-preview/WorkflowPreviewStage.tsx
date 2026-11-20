@@ -19,23 +19,11 @@ import { useTranslation } from 'react-i18next';
 
 import type * as WorkflowPreviewJsonModule from './WorkflowPreviewJson';
 
-/**
- * The parts every workflow preview stage shares (the library's preview mode and the graph preview dialog): the bar
- * over the stage, its find field, its Nodes / Inputs / Graph views and the messages the stage shows in their place.
- * The bar keeps its tabs at the start and its menu at the end in every view; only the find field, shown with the
- * nodes, comes and goes in the space between, so nothing a reader aims at moves.
- */
+/** Shared stage parts; only the find field comes and goes in the bar, so nothing a reader aims at moves. */
 
-/**
- * What the stage shows: the nodes (the diagram), the form's inputs, or the graph: the compiled JSON the server is sent,
- * which is what "graph" means here.
- */
+/** `graph` is the compiled JSON the server is sent. */
 export type WorkflowPreviewView = 'nodes' | 'inputs' | 'graph';
 
-/**
- * The size of the dialogs a workflow preview shows in (the library, and the graph preview), so both previews read the
- * same: most of the window, wide and landscape.
- */
 export const WORKFLOW_PREVIEW_DIALOG_SIZE = {
   h: '80vh',
   maxH: '80vh',
@@ -56,7 +44,6 @@ export const WorkflowPreviewJson = (props: ComponentProps<typeof WorkflowPreview
   );
 };
 
-/** A failed preview stays local to its stage, leaving the surrounding tabs and close action available. */
 export const WorkflowPreviewLoadError = ({ onRetry }: { onRetry: () => void }) => {
   const { t } = useTranslation();
 
@@ -83,10 +70,6 @@ export const WorkflowPreviewBar = ({ children }: { children: ReactNode }) => (
   </HStack>
 );
 
-/**
- * The view tabs: Nodes; Inputs, counting the form's inputs once the document is read, where there is a form; Graph,
- * where there is a compiled graph (or a document to compile) to show.
- */
 export const getWorkflowPreviewViewTabs = (
   model: WorkflowPreviewModel | null,
   { hasGraph, hasInputs }: { hasGraph: boolean; hasInputs: boolean },
@@ -120,14 +103,10 @@ export interface WorkflowPreviewFind {
   onKeyDown: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
   /** The graph's `onMatchCountChange`: only it knows whether every node is drawn. */
   onMatchCountChange: (count: number) => void;
-  /** Empties the field, for a graph drawn afresh. */
   reset: () => void;
 }
 
-/**
- * The find field's state. It belongs to the drawing it searched (`drawing` names it): another document, or this one
- * replaced, starts unfiltered.
- */
+/** Belongs to the drawing it searched: another document, or this one replaced, starts unfiltered. */
 export const useWorkflowPreviewFind = (
   graphRef: RefObject<WorkflowDocumentGraphHandle | null>,
   drawing: number

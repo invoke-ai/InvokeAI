@@ -157,8 +157,8 @@ interface HostOptions {
 }
 
 /**
- * Use raster stubs and unique per-call hashes so distinct entries upload while plan-key dedupe still reuses
- * unchanged plans.
+ * Use raster stubs and unique per-call hashes so distinct entries upload while plan-key dedupe still reuses unchanged
+ * plans.
  */
 const makeHost = (document: CanvasDocumentContractV3, options: HostOptions = {}): HostHarness => {
   const stub = createTestStubRasterBackend();
@@ -213,9 +213,8 @@ const makeHost = (document: CanvasDocumentContractV3, options: HostOptions = {})
         createSurface: (w: number, h: number): RasterSurface => stub.createSurface(w, h),
         encodeSurface: (surface: RasterSurface): Promise<Blob> => stub.encodeSurface(surface),
       },
-      // Unique per call: byHash never collapses distinct entries (the stub
-      // encodes size-only blobs), so upload counts stay per-entry; cross-call
-      // reuse goes through the plan-key cache.
+      // Unique per call: byHash never collapses distinct entries (the stub encodes size-only blobs), so upload counts
+      // stay per-entry; cross-call reuse goes through the plan-key cache.
       hashBlob: () => {
         hashCounter += 1;
         return Promise.resolve(`hash-${hashCounter}`);
@@ -361,8 +360,8 @@ describe('composeForGeneration', () => {
     const text = customTextLayer('text');
     const document = {
       ...makeDoc([text]),
-      // The estimate is 60px wide, so this bbox only edge-touches it. The
-      // captured surface below is 100px wide, representing a wider loaded face.
+      // The estimate is 60px wide, so this bbox only edge-touches it. The captured surface below is 100px wide,
+      // representing a wider loaded face.
       bbox: { height: 32, width: 4, x: 60, y: 0 },
     };
     const harness = makeHost(document, { layerRects: { text: { height: 32, width: 100, x: 0, y: 0 } } });
@@ -500,8 +499,8 @@ describe('composeForGeneration', () => {
   });
 
   it('rethrows a control-predicate throw after releasing the snapshot, committing nothing', async () => {
-    // A raster layer first, so the base composite has already uploaded (and
-    // populated the operation-scoped cache) before the predicate aborts.
+    // A raster layer first, so the base composite has already uploaded (and populated the operation-scoped cache)
+    // before the predicate aborts.
     const harness = makeHost(makeDoc([rasterLayer('base'), controlLayer('control-a')]));
 
     await expect(

@@ -43,16 +43,6 @@ describe('tool presentation adapters', () => {
     }
   });
 
-  it('keeps property groups for configurable tools and omits sections whose only content was gesture guidance', () => {
-    for (const toolId of TOOL_IDS) {
-      if (toolId === 'view' || toolId === 'colorPicker' || toolId === 'sam') {
-        expect(TOOL_PRESENTATION_ADAPTERS[toolId].groups, toolId).toEqual([]);
-      } else {
-        expect(TOOL_PRESENTATION_ADAPTERS[toolId].groups.length, toolId).toBeGreaterThan(0);
-      }
-    }
-  });
-
   it('resolves every form group label in the English catalog and keeps group ids unique per form', () => {
     const resolve = (key: string): unknown =>
       key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], en);

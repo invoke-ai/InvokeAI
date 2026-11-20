@@ -303,8 +303,8 @@ describe('commitChangedAxes', () => {
   });
 
   it('does not read sub-pixel arithmetic on an axis as a resize of it', () => {
-    // At a fractional zoom the rectangle on screen is not on whole pixels, and the untouched axis comes back a
-    // fraction off: it must keep what was stored, not take the viewport's cap.
+    // At a fractional zoom the rectangle on screen is not on whole pixels, and the untouched axis comes back a fraction
+    // off: it must keep what was stored, not take the viewport's cap.
     expect(commitChangedAxes(stored, start, { ...start, heightPx: 350, widthPx: 600.3 }, viewport)).toEqual({
       ...stored,
       heightPx: 350,

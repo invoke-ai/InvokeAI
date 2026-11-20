@@ -24,8 +24,7 @@ export const ReloadNodesButton = () => {
         await refreshCustomNodePacks(owner);
         assertAccountScopeCurrent(owner);
 
-        // A retained stale list can hide refetch failure; reload must inspect the store error before announcing
-        // success.
+        // A retained stale list can hide a refetch failure: check the store error before announcing success.
         const { error: refreshError } = getCustomNodesSnapshot();
 
         if (refreshError !== null) {
@@ -34,8 +33,7 @@ export const ReloadNodesButton = () => {
           return;
         }
 
-        // Only recognized backend success prose earns a success toast; surface unknown statuses without claiming
-        // success.
+        // Only the backend's known success prose earns a success toast; other statuses show without claiming success.
         if (status.startsWith('Custom nodes reloaded')) {
           notify.success(t('nodes.customNodesReloaded'));
         } else {

@@ -1,13 +1,6 @@
 /**
- * Where a project still uses gallery media the user is about to delete. Deleting such media removes the backing
- * file under authored work, so the deletion flow must warn even when ordinary confirmations are turned off.
- *
- * The scan fails safe. The surfaces the panel names are listed below; whatever else in the project names a selected
- * item counts too, as `otherProjectState`, unless an exclusion below says it only shows or records media. A field this
- * build hydrates into `Project` that stores a media name therefore warns until it is given a surface or an exclusion.
- * The scan sees only what loading kept, though: a field only a newer build writes is dropped when this build loads the
- * project (the document allowlist, and the workspace canvas, of which only the selected layer and staging area are
- * kept), so it is not scanned here.
+ * Deleting media a project uses breaks authored work, so the deletion must warn even with confirmations off. The scan
+ * fails safe: any project field not given a surface or an exclusion below counts as `otherProjectState`.
  */
 
 import type { GalleryItemRef } from '@features/gallery/contracts';
@@ -20,18 +13,17 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 
 export interface MediaUsage {
   surface: GalleryMediaUsageSurface;
-  /** The workflow's or snapshot's name, for the `workflow` and `canvasSnapshot` surfaces. */
   label?: string;
-  /** The workflow document's or snapshot's id: what identifies it across copies of the project, as names need not. */
+  /** Identifies it across copies of the project, as names need not. */
   sourceId?: string;
-  /** Selected items this surface uses, in selection order as `collectMediaUsage` lists them. */
+  /** In selection order. */
   refs: GalleryItemRef[];
 }
 
 // Vector guides have no raster sources or media references.
 type StackKind = Exclude<keyof Project['canvas']['document']['stacks'], 'vector'>;
 
-/** The canvas layer stacks, each its own surface; a new stack kind fails to compile until it has one. */
+/** A new stack kind fails to compile until it has a surface. */
 const STACK_SURFACES = {
   raster: 'canvasRaster',
   control: 'canvasControl',
@@ -41,15 +33,11 @@ const STACK_SURFACES = {
 
 const STACK_KINDS = Object.keys(STACK_SURFACES) as StackKind[];
 
-/**
- * How the remainder treats each project field: `scanned`, or `excluded` because it only shows or records media, or is
- * session state that is never saved. Typed against `Project`, so a new field fails to compile until it is placed here.
- */
+/** Typed against `Project`, so a new field fails to compile until it is placed here. */
 const PROJECT_FIELDS = {
-  // The listed surfaces read its layer stacks, staged results and each snapshot's document and staged results; the
-  // rest of it, a stack kind or snapshot field added later included, is scanned here.
+  // The surfaces read only part of it; the rest, later additions included, is scanned.
   canvas: 'scanned',
-  // Session-only run log; it names every generated image.
+  // Session-only; names every generated image.
   events: 'excluded',
   floatingWidgets: 'scanned',
   id: 'scanned',
@@ -59,17 +47,17 @@ const PROJECT_FIELDS = {
   name: 'scanned',
   presetWorkingLayouts: 'scanned',
   promptHistory: 'scanned',
-  // Session-only queue runs and their results; they name every generated image.
+  // Session-only; names every generated image.
   queue: 'excluded',
   settings: 'scanned',
-  // Session-only undo history, never saved; restoring it is not work the deletion breaks.
+  // Session-only, never saved.
   undoRedo: 'excluded',
-  // The last submitted graph per source widget, a record of a past run: the next run compiles from the widget's values.
+  // A record of a past run: the next run compiles from the widget's values.
   widgetGraphs: 'excluded',
   // Scanned without Gallery instances (below).
   widgetInstances: 'scanned',
   widgetRegions: 'scanned',
-  // Session-only workflow edit histories, never saved.
+  // Session-only, never saved.
   workflowHistories: 'excluded',
   // Scanned without each workflow's last run (below).
   workflows: 'scanned',
@@ -83,16 +71,10 @@ const scan = (roots: readonly unknown[]): MediaNameRefs => collectMediaNames(roo
 const selectedIn = (refs: MediaNameRefs, selected: readonly GalleryItemRef[]): GalleryItemRef[] =>
   selected.filter((ref) => (ref.kind === 'image' ? refs.images : refs.videos).has(ref.name));
 
-/** `record` without `keys`: what a listed surface leaves of a container it reads only part of. */
 const without = <Value extends object>(record: Value, keys: readonly PropertyKey[]): Partial<Value> =>
   Object.fromEntries(Object.entries(record).filter(([key]) => !keys.includes(key))) as Partial<Value>;
 
-/**
- * The project without its excluded fields and without exactly what the listed surfaces scan (most of its bulk), so
- * anything they do not read, a stack kind or snapshot field added later included, is still scanned. Excluded within
- * scanned fields: Gallery instances (selection, recents, compare image, searches: they show media) and workflows'
- * last runs (a record of a run's output).
- */
+/** Gallery instances only show media and workflows' last runs only record output, so both are excluded. */
 const remainderRoots = (project: Project): unknown[] => {
   const { canvas, widgetInstances, workflows } = project;
   const rest: Record<string, unknown> = {
@@ -116,11 +98,7 @@ const remainderRoots = (project: Project): unknown[] => {
   return Object.entries(rest).flatMap(([key, value]) => (isExcludedField(key) ? [] : [value]));
 };
 
-/**
- * The project's surfaces that use any of `selected`, in panel order: live work, staged canvas results and canvas
- * snapshots, which the user can still accept or restore; then `otherProjectState` for selected items that only the rest
- * of the project names (see `PROJECT_FIELDS` for what that leaves out).
- */
+/** Staged canvas results and snapshots count: the user can still accept or restore them. */
 export const collectMediaUsage = (project: Project, selected: readonly GalleryItemRef[]): MediaUsage[] => {
   if (selected.length === 0) {
     return [];
@@ -170,7 +148,6 @@ export const collectMediaUsage = (project: Project, selected: readonly GalleryIt
   return usage;
 };
 
-/** Panel order, as `collectMediaUsage` lists the surfaces. */
 const SURFACE_ORDER = {
   generateReferenceImages: 0,
   canvasRaster: 1,
@@ -185,11 +162,7 @@ const SURFACE_ORDER = {
   otherProjectState: 10,
 } as const satisfies Record<GalleryMediaUsageSurface, number>;
 
-/**
- * Two scans of one project (two copies of it) as one, in panel order: a surface either uses keeps the refs of both (a
- * workflow or snapshot matched by id, named as in `first`), and `otherProjectState` keeps only refs no listed surface
- * of either reports.
- */
+/** Surfaces match by id across copies; `otherProjectState` keeps only refs no listed surface of either reports. */
 export const mergeMediaUsage = (first: readonly MediaUsage[], second: readonly MediaUsage[]): MediaUsage[] => {
   const merged = new Map<string, MediaUsage>();
 

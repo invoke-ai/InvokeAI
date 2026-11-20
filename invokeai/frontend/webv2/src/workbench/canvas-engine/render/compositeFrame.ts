@@ -82,10 +82,10 @@ export const isInStagingHiddenStack = (doc: CanvasDocumentContractV3, nodeId: st
 };
 
 /**
- * The selected control layer, mask or region a shown preview hides, when the screen would draw it with the stack
- * shown. A gesture on it reveals the stack (and a brush refuses a layer whose pixels are not loaded yet), so the frame
- * keeps it resident while hidden and on screen. A selected group needs nothing up front: brush and shapes paint a new
- * layer, move drags whatever caches exist.
+ * The selected control layer, mask or region a shown preview hides, when the screen would draw it with the stack shown.
+ * A gesture on it reveals the stack (and a brush refuses a layer whose pixels are not loaded yet), so the frame keeps
+ * it resident while hidden and on screen. A selected group needs nothing up front: brush and shapes paint a new layer,
+ * move drags whatever caches exist.
  */
 const stagingHiddenSelectedLeaf = (doc: CanvasDocumentContractV3): SemanticLeaf | null => {
   const leaf = doc.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
@@ -132,8 +132,8 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
   const { derivedSurfaceCache, diagnostics, layerCache, previews, raster, stores, transformOverrides, viewport } = deps;
 
   /**
-   * Create missing caches and rasterize stale ones, but never resize existing entries here: unflushed paint may
-   * exceed persisted bounds. Rasterization owns bounds changes.
+   * Create missing caches and rasterize stale ones, but never resize existing entries here: unflushed paint may exceed
+   * persisted bounds. Rasterization owns bounds changes.
    */
   const ensureLayerCaches = (
     doc: CanvasDocumentContractV3,
@@ -173,8 +173,8 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
     };
   };
 
-  // The frame description is reused until the document, isolation or override contents change; each leaf's
-  // bounds until its contract, placement, live cache extent or the document size does.
+  // The frame description is reused until the document, isolation or override contents change; each leaf's bounds until
+  // its contract, placement, live cache extent or the document size does.
   let preparation: CompositePreparation | null = null;
   // A bounded or empty repaint reads only part of the working set; the usage window stays open from the last full
   // repaint so artifacts it skipped are not evicted as unused.
@@ -288,7 +288,6 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         controlView: isolatedGuard ? null : deps.getControlView(),
         derivedSurfaces: derivedSurfaceCache,
         diagnostics,
-        // Pixels in flight, drawn directly above the layer they were cut from.
         floatingSelection: isolatedGuard ? null : (floatFrame?.composite ?? null),
         imageSmoothing: shouldSmoothAtZoom(viewport.getZoom()),
         isolationLayerId: isolatedGuard?.layerId ?? null,
@@ -312,7 +311,6 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
                 surface: stagedPreview.surface,
               }
             : null,
-        // Skip the edited text layer because its portal renders live content.
         skipLayerId: stores.textEditSession.get()?.layerId ?? null,
         transformOverrides: overrides,
       });

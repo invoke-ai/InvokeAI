@@ -182,9 +182,9 @@ const isTerminalStatus = (status: QueueServerItemDTO['status']): boolean =>
 
 /**
  * Removes finished history and keeps pending, waiting and running items. Without a scope the server prunes in one
- * sweep; a scoped prune deletes the scope's terminal root items individually, as the clear commands do. Deleting a
- * root removes its whole workflow-call chain, so children are never addressed on their own: a second delete would
- * miss, and a finished child must not take a still-waiting parent with it.
+ * sweep; a scoped prune deletes the scope's terminal root items individually, as the clear commands do. Deleting a root
+ * removes its whole workflow-call chain, so children are never addressed on their own: a second delete would miss, and
+ * a finished child must not take a still-waiting parent with it.
  */
 export const clearFinishedQueueItems = async (scope: QueueQueryScope = {}): Promise<void> => {
   const owner = captureAccountScope();

@@ -13,7 +13,6 @@ import { rasterizeSource } from './index';
 
 const imageRef = (imageName: string, width = 32, height = 16): CanvasImageRef => ({ height, imageName, width });
 
-/** A backend whose `createImageBitmap` is a spy returning a closable fake bitmap. */
 const createSpyBackend = () => {
   const stub = createTestStubRasterBackend();
   const createImageBitmap = vi.fn((source: ImageBitmapSource): Promise<ImageBitmap> => {
@@ -103,12 +102,10 @@ describe('rasterizeSource — image', () => {
 
     const [resultA, resultB] = await Promise.all([rasterizeSource(source, deps), rasterizeSource(source, deps)]);
 
-    // Both active rasterizations share one decode; the final release closes it.
     expect(resolver).toHaveBeenCalledTimes(1);
     expect(createImageBitmap).toHaveBeenCalledTimes(1);
     expect(deps.bitmapPool?.byteSize()).toBe(0);
 
-    // Surface sized to the image ref; content rect at the origin.
     expect(resultA.surface.width).toBe(32);
     expect(resultA.surface.height).toBe(16);
     expect(resultA.rect).toEqual({ height: 16, width: 32, x: 0, y: 0 });
@@ -165,7 +162,6 @@ describe('rasterizeSource — paint', () => {
 
     const { rect, surface } = await rasterizeSource({ bitmap: null, type: 'paint' }, deps);
 
-    // Content-sized: an empty paint layer holds no pixels — a zero rect.
     expect(rect).toEqual({ height: 0, width: 0, x: 0, y: 0 });
     expect(surface.width).toBe(0);
     expect(surface.height).toBe(0);
@@ -187,7 +183,6 @@ describe('rasterizeSource — paint', () => {
       deps
     );
 
-    // Sized to the bitmap dims, placed at the persisted offset.
     expect(surface.width).toBe(32);
     expect(surface.height).toBe(16);
     expect(rect).toEqual({ height: 16, width: 32, x: 40, y: 25 });

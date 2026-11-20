@@ -16,11 +16,11 @@ import {
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getEffectiveReferenceImage,
-  hasArchitectureCapabilities,
   isSupportedGenerateModel,
   isVaeModelConfig,
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
+import { hasArchitectureCapabilities } from '@features/models/architectures';
 import {
   getInvocationTemplatesSnapshot,
   refreshInvocationTemplates,
@@ -85,17 +85,13 @@ const toErrorMessage = (error: unknown): string => (error instanceof Error ? err
 
 export interface WorkflowMediaRef {
   kind: 'image' | 'video';
-  /** The image or video name the backend stores the embedded workflow under. */
   name: string;
 }
 
 const fetchEmbeddedWorkflow = (media: WorkflowMediaRef, signal: AbortSignal) =>
   media.kind === 'image' ? galleryImages.workflow(media.name, signal) : galleryVideos.workflow(media.name, signal);
 
-/**
- * Load the media's authored workflow, or reconstruct its generation graph, then open the workflow editor. False
- * from `openWorkflowEditor` means no editor can consume the load request.
- */
+/** False from `openWorkflowEditor` means no editor can consume the load request. */
 export const executeLoadMediaWorkflow = async ({
   isProjectActive,
   media,
@@ -205,7 +201,7 @@ export const executeLoadMediaWorkflow = async ({
 const getReferenceImageName = (referenceImage: GenerateReferenceImage): string | null =>
   referenceImage.config.image ? getEffectiveReferenceImage(referenceImage.config.image).image_name : null;
 
-/** Sequential, deduplicated lookups, one per request the Gallery API accepts, so a stale recall stops between them. */
+/** Sequential, so a stale recall stops between requests. */
 const resolveReferenceImages = async (
   names: readonly string[],
   signal: AbortSignal,
@@ -229,7 +225,6 @@ const resolveReferenceImages = async (
   return assets;
 };
 
-/** Entries without an asset, or whose effective asset is not among `availableNames`, are dropped. */
 const keepAvailableReferenceImages = (
   referenceImages: GenerateReferenceImage[],
   availableNames: ReadonlySet<string>
@@ -239,7 +234,6 @@ const keepAvailableReferenceImages = (
     return name !== null && availableNames.has(name);
   });
 
-/** Drops reference images whose effective asset is no longer in the gallery, using one bulk lookup. */
 export const filterAvailableReferenceImages = async (
   referenceImages: GenerateReferenceImage[],
   signal: AbortSignal
@@ -256,7 +250,6 @@ export const filterAvailableReferenceImages = async (
     )
   );
 
-/** Why `getCurrentGenerateValues` answered null: no supported model, or no table to initialise from. */
 export const getMissingGenerateValuesMessage = (t: TFunction): string =>
   hasArchitectureCapabilities()
     ? t('widgets.generate.selectSupportedModelFirst')
@@ -275,7 +268,7 @@ export const getCurrentGenerateValues = ({
     return normalizedValues;
   }
 
-  // A first set of values is synthesised from architecture policy, and every caller persists it.
+  // Values are synthesised from architecture policy, and every caller persists them.
   if (!hasArchitectureCapabilities()) {
     return null;
   }
@@ -296,13 +289,8 @@ export const getCurrentGenerateValues = ({
 let canvasRecallHolder: { owner: AccountScope } | null = null;
 
 /**
- * Claims the one Canvas recall that may run at a time, or returns null while another reads or commits (a double
- * click, a second key press): a Canvas recall that started before another commits finds the document changed and
- * recalls only in part. Recalls that leave the Canvas alone need no claim: they re-read Generate values after every
- * await. A claim left over from an account that has since ended holds nothing back. Release once the recall has
- * committed, before saving its Canvas images, so a slow save holds no later recall back. Releasing again, or after
- * another claim took over, does nothing. API-driven recalls (`recall_parameters_updated`) queue among themselves
- * and do not claim.
+ * One Canvas recall at a time: one started before another commits would recall only in part. Release after the commit,
+ * before saving Canvas images; extra releases do nothing. API-driven recalls queue among themselves and do not claim.
  */
 export const claimCanvasRecall = (owner: AccountScope): (() => void) | null => {
   if (canvasRecallHolder && isAccountScopeCurrent(canvasRecallHolder.owner)) {
@@ -324,19 +312,16 @@ interface ImageRecallInput {
   /** Re-read after every await: the commit writes the whole Generate record, so a snapshot would revert newer edits. */
   getGenerateValues: () => Record<string, unknown>;
   image: GalleryImage;
-  /** The project's route is Canvas, whose frame the Generate size is. */
   isCanvasFrame?: boolean;
   kind: ImageRecallKind;
   models: ModelConfig[];
-  /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
   owner?: AccountScope;
   projectId?: string;
-  /** Holds the gallery's shared image metadata entry, which menus and Preview Details may already have read. */
+  /** Menus and Preview Details may already have read the shared metadata entry. */
   queryClient: QueryClient;
   t: TFunction;
 }
 
-/** Recalls an image's recorded settings; a Canvas recall pressed while another runs says so (see `claimCanvasRecall`). */
 export const executeImageRecall = async ({
   commands,
   canvasTarget,
@@ -381,8 +366,7 @@ export const executeImageRecall = async ({
         title: t('widgets.gallery.itemActions.recall.cannotRecallImage'),
       });
 
-    // No reads without values to apply them to: the answer only depends on the model catalog and capabilities,
-    // which reading the record does not change.
+    // No reads without values to apply them to.
     if (!readGenerateValues()) {
       missingValuesNotice();
       return false;
@@ -390,8 +374,7 @@ export const executeImageRecall = async ({
 
     const metadata =
       kind === 'dimensions' ? null : await fetchGalleryImageMetadata(queryClient, owner, image.imageName);
-    // Only all/remix recall references. Checked against the record, not the built list, so the check happens before
-    // the snapshot below.
+    // Checked against the record, not the built list, so it precedes the snapshot.
     const referenceRecord = kind === 'all' || kind === 'remix' ? readMetadataReferenceImages(metadata) : null;
     let referenceAssets = new Map<string, GalleryImage>();
     let referenceLookupFailed = false;
@@ -480,8 +463,7 @@ export const executeImageRecall = async ({
     if (canvasTarget && !canvasTarget.getProject()) {
       return false;
     }
-    // Every read is above: nothing yields between this snapshot and the commit, so an edit made while the record
-    // or its references loaded stays in the values the recall writes.
+    // Nothing yields between this snapshot and the commit, so edits made while loading survive.
     const currentGenerateValues = readGenerateValues();
 
     if (!currentGenerateValues) {
@@ -510,15 +492,13 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    // An empty recalled list clears the current references; there is nothing to check for it.
     if (result.fields.includes('referenceImages') && result.values.referenceImages.length > 0) {
       result.values.referenceImages = keepAvailableReferenceImages(
         result.values.referenceImages,
         availableReferenceNames
       );
 
-      // Every recorded reference was deleted: keep the current ones, fitted to the recalled model as an unrecorded list
-      // would be, rather than clearing them as if the record listed none.
+      // Every recorded reference was deleted: keep and refit the current ones rather than clearing them.
       if (result.values.referenceImages.length === 0) {
         result.values.referenceImages = getCompatibleReferenceImages(
           currentGenerateValues.referenceImages,

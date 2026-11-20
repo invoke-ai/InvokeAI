@@ -43,11 +43,9 @@ const createHarness = (docSize: { width: number; height: number } | null = DOC, 
   return { backend, onChange, selection };
 };
 
-/** The recorded op names on the mask surface. */
 const maskLog = (selection: SelectionState): { op: string; args: unknown[] }[] =>
   (selection.mask()?.surface as StubRasterSurface | undefined)?.callLog ?? [];
 
-/** The last `globalCompositeOperation` value set before a given op, scanning the whole log. */
 const compositeOpsFor = (log: { op: string; args: unknown[] }[]): unknown[] =>
   log.filter((e) => e.op === 'set' && e.args[0] === 'globalCompositeOperation').map((e) => e.args[1]);
 
@@ -71,7 +69,6 @@ describe('selectionState: mask building from a path', () => {
   it('no longer clamps bounds to the document rect (infinite plane); the mask is bounded to the path', () => {
     const { selection } = createHarness();
     selection.commit({ bounds: rectBounds(-10, -10, 200, 200), op: 'replace', path: fakePath('p') });
-    // Selection masks use path bounds, including negative origins, without document clamping.
     expect(selection.bounds()).toEqual(rectBounds(-10, -10, 200, 200));
     expect(selection.mask()?.rect).toEqual(rectBounds(-10, -10, 200, 200));
   });
@@ -85,7 +82,6 @@ describe('selectionState: boolean ops', () => {
 
     expect(selection.hasSelection()).toBe(true);
     expect(selection.bounds()).toEqual(rectBounds(10, 10, 40, 40));
-    // One traced outline replaces the two source paths (the stub reads back solid pixels).
     expect(selection.antsPaths()).toHaveLength(1);
     expect(selection.antsPaths()[0]).not.toEqual(fakePath('b'));
     expect(compositeOpsFor(maskLog(selection))).toContain('source-over');
@@ -165,7 +161,6 @@ describe('selectionState: selectAll / invert / clear', () => {
     expect(selection.antsPaths()).toHaveLength(1);
     selection.invert(rectBounds(0, 0, 100, 100));
     expect(selection.hasSelection()).toBe(true);
-    // The document border plus the former outline.
     expect(selection.antsPaths()).toHaveLength(2);
   });
 
@@ -238,11 +233,8 @@ describe('selectionState: replaceMask', () => {
     expect(selection.mask()?.rect).toEqual(source.placed.rect);
     expect(selection.mask()?.surface).not.toBe(source.placed.surface);
     expect(selection.mask()?.surface).not.toBe(previousSurface);
-    // The ants trace the mask's true edge — here only the solid (0,1) pixel —
-    // rather than the replacement's bounding rect.
     expect(selection.antsPaths()).toEqual([{ d: 'M 7 -2 L 8 -2 L 8 -1 L 7 -1 Z' } as unknown as Path2D]);
 
-    // The mask owns a blitted copy; no RGBA readback is written back into it.
     const log = maskLog(selection);
     expect(log.filter((entry) => entry.op === 'drawImage').map((entry) => entry.args)).toEqual([
       [source.placed.surface.canvas, 0, 0],

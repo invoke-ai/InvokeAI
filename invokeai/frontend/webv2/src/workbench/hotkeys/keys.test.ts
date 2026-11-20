@@ -12,7 +12,6 @@ import {
   toTinykeysBinding,
 } from './keys';
 
-/** A keydown as a browser reports it, with the modifier state tinykeys reads. */
 const press = (init: { key: string; code: string; altKey?: boolean; metaKey?: boolean }): KeyboardEvent =>
   ({
     altKey: false,
@@ -96,7 +95,6 @@ describe('hotkey keys', () => {
       'mod+alt+n'
     );
     expect(eventToHotkeyString(press({ altKey: true, code: 'KeyQ', key: 'a' }), false)).toBe('alt+a');
-    // Ctrl+Alt+N on a Polish layout is AltGr+N, which types ń: recorded as typed, it matches again.
     const polish = {
       ...press({ altKey: true, code: 'KeyN', key: 'ń' }),
       ctrlKey: true,
@@ -104,7 +102,6 @@ describe('hotkey keys', () => {
     } as unknown as KeyboardEvent;
     expect(eventToHotkeyString(polish, false)).toBe('mod+alt+ń');
     expect(acceptsHotkeyPress(polish, 'mod+alt+ń')).toBe(true);
-    // Option alone matches only by character, so it records the character it types.
     expect(eventToHotkeyString(press({ altKey: true, code: 'KeyA', key: 'å' }), true)).toBe('alt+å');
   });
 

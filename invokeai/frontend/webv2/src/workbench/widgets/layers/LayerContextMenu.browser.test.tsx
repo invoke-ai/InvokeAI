@@ -30,7 +30,6 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-/** The menu reads the real store and drives a real engine over real decoded pixels. */
 const harness = vi.hoisted(() => ({
   engine: null as CanvasEngine | null,
   store: null as ReturnType<typeof createWorkbenchStore> | null,
@@ -87,10 +86,6 @@ const maskLayer = (id: string, overrides: Partial<CanvasLayerContract> = {}): Ca
     ...overrides,
   } as Partial<CanvasLayerContract>);
 
-/**
- * Renders the Layers panel's layer menu over a real engine for `nodes`, with `selectedIds` selected in the panel (the
- * first as primary), returning a way to open it on a layer. Images named in `unreadable` no longer exist.
- */
 const renderMenu = async (
   nodes: CanvasNodeContract[],
   selectedIds: readonly string[] = [],
@@ -236,8 +231,8 @@ describe('Layers context menu over a real engine', () => {
     const description = document.getElementById(regenerate.getAttribute('aria-describedby')!)!;
     const width = menu.getBoundingClientRect().width;
     description.textContent = '';
-    // The description is about as wide as the widest label; which of the two is wider depends on the font, so allow
-    // it a few pixels rather than none.
+    // The description is about as wide as the widest label; which of the two is wider depends on the font, so allow it
+    // a few pixels rather than none.
     expect(width - menu.getBoundingClientRect().width).toBeLessThan(8);
   });
 
@@ -281,7 +276,6 @@ describe('generation and canvas visibility in the layer menus', () => {
 
     await openMenu('mask');
     expect(labels()).toContain('Show on canvas');
-    // From the keyboard, as the row's controls are reached.
     const exclude = window.document.querySelector<HTMLElement>('[role="menuitem"][data-value="toggle-visibility"]')!;
     expect(exclude.textContent).toBe('Exclude from generation');
     for (let step = 0; step < 30 && !exclude.hasAttribute('data-highlighted'); step += 1) {

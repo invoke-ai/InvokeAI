@@ -3,8 +3,8 @@ import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
 
 /**
- * Key progress by backend item ID for server-wide and concurrent GPU work; local submission IDs cannot identify
- * other clients' items.
+ * Key progress by backend item ID for server-wide and concurrent GPU work; local submission IDs cannot identify other
+ * clients' items.
  */
 
 export interface ItemProgress {
@@ -19,8 +19,7 @@ export interface ItemProgress {
 const progressByItemId = createKeyedTransientStore<number, ItemProgress>();
 
 /**
- * Keep a stable sorted ID snapshot separate from per-item progress so one session's steps do not rerender other
- * tiles.
+ * Keep a stable sorted ID snapshot separate from per-item progress so one session's steps do not rerender other tiles.
  */
 const activeItemIdsStore = createExternalStore<{ itemIds: number[] }>({ itemIds: [] });
 

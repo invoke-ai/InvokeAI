@@ -11,11 +11,11 @@ export interface DeferredModule<Module> {
   /** Starts the load ahead of use, as on hover or focus, ignoring a failure. */
   preload: () => void;
   /**
-   * Renders `render(module)`. Once the module has loaded it renders directly. Before that, each mount owns its own
-   * lazy load, so a load that failed is tried again on the next mount, where a module-level `lazy` would keep its first
-   * failure for the page's lifetime. While loading it shows `fallback`; a failed load shows `renderError(error)`
-   * when provided, else `fallback`. An error the loaded
-   * module throws while rendering reaches the host's error boundary instead.
+   * Renders `render(module)`. Once the module has loaded it renders directly. Before that, each mount owns its own lazy
+   * load, so a load that failed is tried again on the next mount, where a module-level `lazy` would keep its first
+   * failure for the page's lifetime. While loading it shows `fallback`; a failed load shows `renderError(error)` when
+   * provided, else `fallback`. An error the loaded module throws while rendering reaches the host's error boundary
+   * instead.
    */
   Deferred: (props: {
     fallback: ReactNode;
