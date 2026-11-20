@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createInstance, type i18n as I18nInstance } from 'i18next';
 import { act, cloneElement, startTransition, useCallback, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,7 +30,7 @@ const uploadImageMock = vi.fn();
 const uploadVideoMock = vi.fn();
 const resolveItemMock = vi.fn();
 
-const pickerState = vi.hoisted(() => ({ accept: null as readonly string[] | null }));
+const pickerState = vi.hoisted(() => ({ accept: null as readonly string[] | null, isOpen: false }));
 const workflowApiMock = vi.hoisted(() => ({ apiFetch: vi.fn(), apiFetchJson: vi.fn() }));
 const workflowCommandsMock = vi.hoisted(() => ({ editGraph: vi.fn() }));
 const findInGalleryMock = vi.hoisted(() => vi.fn());
@@ -52,7 +53,13 @@ vi.mock('@features/gallery/picker', () => ({
   }) => {
     pickerState.accept = accept;
 
-    return cloneElement(children, { onClick: () => onPick(SELECTED_GALLERY_VIDEO) });
+    return (
+      <>
+        {cloneElement(children, { onClick: () => onPick(SELECTED_GALLERY_VIDEO) })}
+        {/* The real picker's content is portaled out of the field, as here. */}
+        {pickerState.isOpen ? createPortal(<input aria-label="Search the picker" />, document.body) : null}
+      </>
+    );
   },
 }));
 
@@ -655,6 +662,64 @@ describe('WorkflowFieldInput media inputs', () => {
     });
     expect(uploadVideoMock).toHaveBeenCalledTimes(1);
     expect(uploadVideoMock.mock.calls[0]?.[1]).toBe('none');
+  });
+
+  it("opens the gallery's item menu for the field's media at the pointer, and leaves its picker's to the browser", async () => {
+    const openItemContextMenu = vi.fn();
+    const nodeMenu = vi.fn((event: React.MouseEvent) => event.defaultPrevented);
+    const adapter = { openItemContextMenu } as unknown as GalleryUiAdapter;
+    pickerState.isOpen = true;
+
+    try {
+      await act(() => {
+        root.render(
+          <ChakraProvider value={system}>
+            <QueryClientProvider client={queryClient}>
+              <DndContext>
+                <GalleryUiProvider adapter={adapter}>
+                  <div onContextMenu={nodeMenu}>
+                    <WorkflowFieldInput
+                      template={VIDEO_TEMPLATE}
+                      value={{ video_name: 'clip.mp4' }}
+                      onChange={vi.fn()}
+                    />
+                  </div>
+                </GalleryUiProvider>
+              </DndContext>
+            </QueryClientProvider>
+          </ChakraProvider>
+        );
+      });
+      await vi.waitFor(() => {
+        expect(host.textContent).toContain('640x480 · 5s');
+      });
+      const rightClick = async (element: Element) => {
+        const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 40 });
+        await act(() => element.dispatchEvent(event));
+        return event;
+      };
+
+      // The thumbnail itself errors in the test server; the well's picker button holds it.
+      const well = host.querySelector('button[aria-label="widgets.gallery.picker.chooseVideo"]')!;
+      expect((await rightClick(well)).defaultPrevented).toBe(true);
+      // The node reads this to stay out of the way.
+      expect(nodeMenu).toHaveLastReturnedWith(true);
+      expect(openItemContextMenu).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          item: expect.objectContaining({ kind: 'video', name: 'clip.mp4' }),
+          ref: { kind: 'video', name: 'clip.mp4' },
+          x: 30,
+          y: 40,
+        })
+      );
+
+      expect(
+        (await rightClick(document.querySelector('input[aria-label="Search the picker"]')!)).defaultPrevented
+      ).toBe(false);
+      expect(openItemContextMenu).toHaveBeenCalledOnce();
+    } finally {
+      pickerState.isOpen = false;
+    }
   });
 });
 

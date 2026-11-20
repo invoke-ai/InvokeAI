@@ -4,6 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import { Box, Flex, Text } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
+import { useGalleryItemContextMenu } from '@features/gallery/react';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { useProgressImage } from '@features/queue/react';
 import {
@@ -59,10 +60,9 @@ const isSameImageView = (a: CurrentImageView | null, b: CurrentImageView | null)
 /** The image under the node's frame, draggable wherever gallery images can be dropped. */
 const DraggableCurrentImage = ({ children, image }: { children: ReactNode; image: CurrentImageView | null }) => {
   const disabledId = useId();
-  const dragData = useMemo(
-    () => (image ? getGalleryItemDragData([{ kind: 'image', name: image.imageName }]) : undefined),
-    [image]
-  );
+  const itemRef = useMemo(() => (image ? { kind: 'image' as const, name: image.imageName } : null), [image]);
+  const dragData = useMemo(() => (itemRef ? getGalleryItemDragData([itemRef]) : undefined), [itemRef]);
+  const onContextMenu = useGalleryItemContextMenu(itemRef);
   // Pointer drags only, as the Preview frame's: the image is no tab stop, so the canvas keeps its own keys.
   const { listeners, setNodeRef } = useDraggable({
     data: dragData,
@@ -74,7 +74,13 @@ const DraggableCurrentImage = ({ children, image }: { children: ReactNode; image
 
   return (
     // `nodrag`: the canvas leaves the pointer to the image drag rather than moving the node.
-    <Box ref={setNodeRef} className="nodrag" cursor={image ? 'grab' : undefined} {...listeners}>
+    <Box
+      ref={setNodeRef}
+      className="nodrag"
+      cursor={image ? 'grab' : undefined}
+      onContextMenu={onContextMenu}
+      {...listeners}
+    >
       {children}
     </Box>
   );
